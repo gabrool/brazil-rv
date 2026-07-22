@@ -13,3 +13,23 @@ htmlcov/
 *.pth
 *.ckpt
 *.onnx
+
+# Local-only environments, caches, secrets, and runtime files
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.ipynb_checkpoints/
+**/*.py[cod]
+**/.coverage
+**/htmlcov/
+**/build/
+**/dist/
+**/*.log
+**/*.tmp
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
