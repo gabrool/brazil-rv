@@ -22,9 +22,11 @@ from .contract import (
     GRADIENT_CLIP,
     HUBER_DELTA,
     HardwareInfo,
+    MUON_COMPATIBILITY_CONTRACT_VERSION,
     RuntimeProfile,
 )
 from .metrics import create_metric_table
+from .muon import PYTORCH_MUON_REFERENCE
 
 
 def validate_runtime_profile(profile: RuntimeProfile) -> HardwareInfo:
@@ -421,6 +423,7 @@ def checkpoint_payload(
     model: nn.Module,
     model_variant: str,
     optimizer_variant: str,
+    muon_backend: str | None,
     runtime_profile: str,
     seed: int,
     epoch: int,
@@ -431,6 +434,9 @@ def checkpoint_payload(
     return {
         "contract_version": CONTRACT_VERSION,
         "cloud_runtime_contract_version": CLOUD_RUNTIME_CONTRACT_VERSION,
+        "muon_compatibility_contract_version": (MUON_COMPATIBILITY_CONTRACT_VERSION),
+        "muon_backend": muon_backend,
+        "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "model_variant": model_variant,
         "optimizer_variant": optimizer_variant,
         "runtime_profile": runtime_profile,

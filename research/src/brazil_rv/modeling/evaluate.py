@@ -14,6 +14,7 @@ import torch
 from .contract import (
     CLOUD_RUNTIME_CONTRACT_VERSION,
     CONTRACT_VERSION,
+    MUON_COMPATIBILITY_CONTRACT_VERSION,
     RUNTIME_PROFILES,
     RUNTIME_PROFILE_NAMES,
 )
@@ -30,10 +31,15 @@ from .engine import (
     warmup_compiled_evaluation,
 )
 from .model import CrossAssetPatchITransformerV1
+from .muon import PYTORCH_MUON_REFERENCE
+from .optim import OFFICIAL_MUON_BACKEND, REFERENCE_MUON_BACKEND
 
 _CHECKPOINT_IDENTITY_FIELDS = (
     "contract_version",
     "cloud_runtime_contract_version",
+    "muon_compatibility_contract_version",
+    "muon_backend",
+    "muon_reference",
     "model_variant",
     "optimizer_variant",
     "seed",
@@ -52,6 +58,30 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _validate_muon_identity_values(identity: dict[str, object]) -> None:
+    if (
+        identity["muon_compatibility_contract_version"]
+        != MUON_COMPATIBILITY_CONTRACT_VERSION
+    ):
+        raise ValueError(
+            "Invalid Muon identity field: muon_compatibility_contract_version"
+        )
+    if identity["muon_reference"] != dict(PYTORCH_MUON_REFERENCE):
+        raise ValueError("Invalid Muon identity field: muon_reference")
+
+    optimizer_variant = identity["optimizer_variant"]
+    if optimizer_variant not in ("hybrid", "adamw"):
+        raise ValueError("Invalid Muon identity field: optimizer_variant")
+    muon_backend = identity["muon_backend"]
+    if optimizer_variant == "hybrid" and muon_backend not in (
+        OFFICIAL_MUON_BACKEND,
+        REFERENCE_MUON_BACKEND,
+    ):
+        raise ValueError("Invalid Muon identity field: muon_backend")
+    if optimizer_variant == "adamw" and muon_backend is not None:
+        raise ValueError("Invalid Muon identity field: muon_backend")
+
+
 def _validate_run_checkpoint_identity(
     manifest: dict[str, object],
     checkpoint: dict[str, object],
@@ -62,6 +92,7 @@ def _validate_run_checkpoint_identity(
             raise ValueError(f"Missing run/checkpoint identity field: {field}")
         if manifest[field] != checkpoint[field]:
             raise ValueError(f"Run/checkpoint identity mismatch: {field}")
+    _validate_muon_identity_values(manifest)
     manifest_store = Path(str(manifest["resolved_feature_store_path"])).expanduser()
     if manifest_store.resolve() != feature_store:
         raise ValueError("Validated feature store does not match the run identity")

@@ -13,15 +13,21 @@ from .contract import (
     FINAL_LR_FACTOR,
     MAX_EPOCHS,
     MUON_ADJUST_LR_FN,
+    MUON_EPS,
     MUON_LR,
     MUON_MOMENTUM,
     MUON_NESTEROV,
+    MUON_NS_COEFFICIENTS,
     MUON_NS_STEPS,
     MUON_WEIGHT_DECAY,
     OPTIMIZER_VARIANTS,
     WARMUP_FRACTION,
 )
 from .layers import MuonLinear
+from .muon import PyTorch213Muon
+
+OFFICIAL_MUON_BACKEND = "torch.optim.Muon"
+REFERENCE_MUON_BACKEND = "brazil_rv.modeling.muon.PyTorch213Muon"
 
 
 def partition_parameters(
@@ -84,17 +90,25 @@ def build_optimizers(
 ) -> tuple[
     dict[str, torch.optim.Optimizer],
     dict[str, list[nn.Parameter]],
+    str | None,
 ]:
     groups = partition_parameters(model, optimizer_variant)
     optimizers: dict[str, torch.optim.Optimizer] = {}
+    muon_backend: str | None = None
     if optimizer_variant == "hybrid":
-        if not hasattr(torch.optim, "Muon"):
-            raise RuntimeError("Hybrid optimization requires official torch.optim.Muon")
-        optimizers["muon"] = torch.optim.Muon(
+        if hasattr(torch.optim, "Muon"):
+            muon_class = torch.optim.Muon
+            muon_backend = OFFICIAL_MUON_BACKEND
+        else:
+            muon_class = PyTorch213Muon
+            muon_backend = REFERENCE_MUON_BACKEND
+        optimizers["muon"] = muon_class(
             groups["muon"],
             lr=MUON_LR,
             momentum=MUON_MOMENTUM,
             nesterov=MUON_NESTEROV,
+            ns_coefficients=MUON_NS_COEFFICIENTS,
+            eps=MUON_EPS,
             ns_steps=MUON_NS_STEPS,
             weight_decay=MUON_WEIGHT_DECAY,
             adjust_lr_fn=MUON_ADJUST_LR_FN,
@@ -113,7 +127,7 @@ def build_optimizers(
         eps=ADAMW_EPS,
         fused=True,
     )
-    return optimizers, groups
+    return optimizers, groups, muon_backend
 
 
 def learning_rate_factor(step: int, total_steps: int, warmup_steps: int) -> float:

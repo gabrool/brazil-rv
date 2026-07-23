@@ -7,6 +7,7 @@ from pathlib import Path
 
 CONTRACT_VERSION = "CROSS_ASSET_ITRANSFORMER_V1"
 CLOUD_RUNTIME_CONTRACT_VERSION = "CROSS_ASSET_ITRANSFORMER_CLOUD_RUNTIME_V1"
+MUON_COMPATIBILITY_CONTRACT_VERSION = "PYTORCH_2_13_MUON_COMPAT_V1"
 FEATURE_CONTRACT_VERSION = "M1_FEATURES_V1"
 
 
@@ -103,6 +104,8 @@ HUBER_DELTA = 1.0
 MUON_LR = 0.02
 MUON_MOMENTUM = 0.95
 MUON_NESTEROV = True
+MUON_NS_COEFFICIENTS = (3.4445, -4.7750, 2.0315)
+MUON_EPS = 1e-7
 MUON_NS_STEPS = 5
 MUON_WEIGHT_DECAY = 0.01
 MUON_ADJUST_LR_FN = "original"
@@ -275,6 +278,8 @@ class MuonConstants:
     lr: float = MUON_LR
     momentum: float = MUON_MOMENTUM
     nesterov: bool = MUON_NESTEROV
+    ns_coefficients: tuple[float, float, float] = MUON_NS_COEFFICIENTS
+    eps: float = MUON_EPS
     ns_steps: int = MUON_NS_STEPS
     weight_decay: float = MUON_WEIGHT_DECAY
     adjust_lr_fn: str = MUON_ADJUST_LR_FN

@@ -13,6 +13,7 @@ import torch
 
 from .contract import (
     CONTRACT_VERSION,
+    MUON_COMPATIBILITY_CONTRACT_VERSION,
     PROJECT_ROOT,
     RUNTIME_PROFILES,
     RUNTIME_PROFILE_NAMES,
@@ -42,6 +43,7 @@ from .engine import (
 )
 from .metrics import sample_level_ic
 from .model import CrossAssetPatchITransformerV1, count_trainable_parameters
+from .muon import PYTORCH_MUON_REFERENCE
 from .optim import build_optimizers
 
 
@@ -78,6 +80,7 @@ def _evaluate_fixed_batch(
 def _validate_compiled_checkpoint_compatibility(
     model: CrossAssetPatchITransformerV1,
     evaluation_batch: dict[str, torch.Tensor],
+    muon_backend: str,
     profile_name: str,
     completed_steps: int,
     validation_score: float,
@@ -98,6 +101,7 @@ def _validate_compiled_checkpoint_compatibility(
         model,
         "full",
         "hybrid",
+        muon_backend,
         profile_name,
         11,
         completed_steps,
@@ -137,10 +141,6 @@ def main() -> None:
     args = parse_args()
     profile = RUNTIME_PROFILES[args.profile]
     hardware = validate_runtime_profile(profile)
-    if not hasattr(torch.optim, "Muon"):
-        raise RuntimeError(
-            "The cloud memorization sanity check requires torch.optim.Muon"
-        )
     torch.set_float32_matmul_precision("high")
     torch.manual_seed(11)
     torch.cuda.manual_seed_all(11)
@@ -169,7 +169,7 @@ def main() -> None:
 
     model = CrossAssetPatchITransformerV1("full").to("cuda")
     model.eval()
-    optimizers, _ = build_optimizers(model, "hybrid")
+    optimizers, _, muon_backend = build_optimizers(model, "hybrid")
     compile_model(model, profile)
     compile_report = warmup_compiled_model(
         model,
@@ -237,6 +237,7 @@ def main() -> None:
         ) = _validate_compiled_checkpoint_compatibility(
             model,
             evaluation_batch,
+            muon_backend,
             profile.name,
             completed_steps,
             final_spearman,
@@ -267,6 +268,9 @@ def main() -> None:
     output_dir.mkdir(parents=True)
     report = {
         "contract_version": CONTRACT_VERSION,
+        "muon_compatibility_contract_version": (MUON_COMPATIBILITY_CONTRACT_VERSION),
+        "muon_backend": muon_backend,
+        "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "created_at_utc": created_at.isoformat(),
         "resolved_feature_store_path": str(feature_store),
         "profile": profile.name,

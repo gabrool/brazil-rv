@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import inspect
 import json
 from pathlib import Path
@@ -13,11 +14,24 @@ from torch import nn
 import brazil_rv.modeling.engine as engine_module
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
+    ADAMW_BETAS,
+    ADAMW_EPS,
+    ADAMW_LR,
+    ADAMW_WEIGHT_DECAY,
     EFFECTIVE_BATCH_SIZE,
     EQUITY_COUNT,
     FINAL_LR_FACTOR,
     INSTRUMENT_COUNT,
     MAX_EPOCHS,
+    MUON_ADJUST_LR_FN,
+    MUON_COMPATIBILITY_CONTRACT_VERSION,
+    MUON_EPS,
+    MUON_LR,
+    MUON_MOMENTUM,
+    MUON_NESTEROV,
+    MUON_NS_COEFFICIENTS,
+    MUON_NS_STEPS,
+    MUON_WEIGHT_DECAY,
     PATCH_INPUT_WIDTH,
     RUNTIME_PROFILES,
 )
@@ -35,7 +49,10 @@ from brazil_rv.modeling.layers import MuonLinear
 from brazil_rv.modeling.metrics import create_metric_table
 from brazil_rv.modeling.train import _atomic_write_json
 from brazil_rv.modeling.model import CrossAssetPatchITransformerV1
+from brazil_rv.modeling.muon import PYTORCH_MUON_REFERENCE, PyTorch213Muon
 from brazil_rv.modeling.optim import (
+    OFFICIAL_MUON_BACKEND,
+    REFERENCE_MUON_BACKEND,
     build_schedulers,
     learning_rate_factor,
     partition_parameters,
@@ -62,6 +79,118 @@ class _TrackingScheduler:
 
     def step(self) -> None:
         self.step_count += 1
+
+
+def _assert_nested_exact(left: object, right: object) -> None:
+    if isinstance(left, torch.Tensor):
+        assert isinstance(right, torch.Tensor)
+        torch.testing.assert_close(left, right, atol=0, rtol=0)
+    elif isinstance(left, dict):
+        assert isinstance(right, dict)
+        assert left.keys() == right.keys()
+        for key in left:
+            _assert_nested_exact(left[key], right[key])
+    elif isinstance(left, (list, tuple)):
+        assert isinstance(right, type(left))
+        assert len(left) == len(right)
+        for left_item, right_item in zip(left, right, strict=True):
+            _assert_nested_exact(left_item, right_item)
+    else:
+        assert left == right
+
+
+class _AtomicFallbackModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.muon_weight = nn.Parameter(
+            torch.arange(6, dtype=torch.float32).reshape(2, 3) / 10
+        )
+        self.adamw_bias = nn.Parameter(torch.tensor([0.5, -0.25]))
+
+
+def test_real_fallback_participates_in_atomic_joint_updates() -> None:
+    model = _AtomicFallbackModel()
+    optimizers: dict[str, torch.optim.Optimizer] = {
+        "muon": PyTorch213Muon(
+            [model.muon_weight],
+            lr=MUON_LR,
+            momentum=MUON_MOMENTUM,
+            nesterov=MUON_NESTEROV,
+            ns_coefficients=MUON_NS_COEFFICIENTS,
+            eps=MUON_EPS,
+            ns_steps=MUON_NS_STEPS,
+            weight_decay=MUON_WEIGHT_DECAY,
+            adjust_lr_fn=MUON_ADJUST_LR_FN,
+        ),
+        "adamw": torch.optim.AdamW(
+            [model.adamw_bias],
+            lr=ADAMW_LR,
+            betas=ADAMW_BETAS,
+            eps=ADAMW_EPS,
+            weight_decay=ADAMW_WEIGHT_DECAY,
+            fused=False,
+        ),
+    }
+    schedulers = {
+        name: torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+        for name, optimizer in optimizers.items()
+    }
+
+    model.muon_weight.grad = torch.full_like(model.muon_weight, 0.25)
+    model.adamw_bias.grad = torch.tensor([0.5, -0.75])
+    parameter_snapshots = {
+        name: parameter.detach().clone() for name, parameter in model.named_parameters()
+    }
+    scheduler_epochs = {
+        name: scheduler.last_epoch for name, scheduler in schedulers.items()
+    }
+    succeeded, gradient_norm = _optimizer_update(model, optimizers, schedulers)
+    assert succeeded
+    assert np.isfinite(gradient_norm)
+    assert not torch.equal(model.muon_weight, parameter_snapshots["muon_weight"])
+    assert not torch.equal(model.adamw_bias, parameter_snapshots["adamw_bias"])
+    assert all(
+        schedulers[name].last_epoch == scheduler_epochs[name] + 1 for name in schedulers
+    )
+    assert all(parameter.grad is None for parameter in model.parameters())
+    momentum_buffer = optimizers["muon"].state[model.muon_weight]["momentum_buffer"]
+    assert torch.isfinite(momentum_buffer).all()
+
+    for nonfinite_partition in ("muon", "adamw"):
+        model.muon_weight.grad = torch.full_like(model.muon_weight, 0.125)
+        model.adamw_bias.grad = torch.tensor([0.25, -0.5])
+        nonfinite_parameter = (
+            model.muon_weight if nonfinite_partition == "muon" else model.adamw_bias
+        )
+        nonfinite_parameter.grad.flatten()[0] = float("inf")
+        parameter_snapshots = {
+            name: parameter.detach().clone()
+            for name, parameter in model.named_parameters()
+        }
+        optimizer_states = {
+            name: copy.deepcopy(optimizer.state_dict())
+            for name, optimizer in optimizers.items()
+        }
+        scheduler_states = {
+            name: copy.deepcopy(scheduler.state_dict())
+            for name, scheduler in schedulers.items()
+        }
+
+        succeeded, gradient_norm = _optimizer_update(model, optimizers, schedulers)
+        assert not succeeded
+        assert not np.isfinite(gradient_norm)
+        for name, parameter in model.named_parameters():
+            torch.testing.assert_close(
+                parameter,
+                parameter_snapshots[name],
+                atol=0,
+                rtol=0,
+            )
+        for name, optimizer in optimizers.items():
+            _assert_nested_exact(optimizer.state_dict(), optimizer_states[name])
+        for name, scheduler in schedulers.items():
+            _assert_nested_exact(scheduler.state_dict(), scheduler_states[name])
+        assert all(parameter.grad is None for parameter in model.parameters())
 
 
 def test_bf16_nonfinite_gradient_skips_joint_optimizer_update() -> None:
@@ -335,12 +464,20 @@ def test_daily_ic_aggregation_with_ties() -> None:
     )
 
 
-def _matching_run_identity(feature_store: Path) -> dict[str, object]:
+def _matching_run_identity(
+    feature_store: Path,
+    *,
+    optimizer_variant: str = "hybrid",
+    muon_backend: str | None = OFFICIAL_MUON_BACKEND,
+) -> dict[str, object]:
     return {
         "contract_version": "CROSS_ASSET_ITRANSFORMER_V1",
         "cloud_runtime_contract_version": ("CROSS_ASSET_ITRANSFORMER_CLOUD_RUNTIME_V1"),
+        "muon_compatibility_contract_version": (MUON_COMPATIBILITY_CONTRACT_VERSION),
+        "muon_backend": muon_backend,
+        "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "model_variant": "full",
-        "optimizer_variant": "hybrid",
+        "optimizer_variant": optimizer_variant,
         "seed": 11,
         "runtime_profile": "a10",
         "resolved_feature_store_path": str(feature_store),
@@ -349,11 +486,19 @@ def _matching_run_identity(feature_store: Path) -> dict[str, object]:
     }
 
 
-def test_evaluation_identity_accepts_match_and_different_evaluation_profile(
+@pytest.mark.parametrize(
+    "muon_backend",
+    (OFFICIAL_MUON_BACKEND, REFERENCE_MUON_BACKEND),
+)
+def test_evaluation_identity_accepts_matching_hybrid_backends(
+    muon_backend: str,
     tmp_path: Path,
 ) -> None:
     feature_store = tmp_path.resolve()
-    manifest = _matching_run_identity(feature_store)
+    manifest = _matching_run_identity(
+        feature_store,
+        muon_backend=muon_backend,
+    )
     checkpoint = dict(manifest)
     evaluation_profile = "a100"
     assert evaluation_profile != manifest["runtime_profile"]
@@ -361,11 +506,90 @@ def test_evaluation_identity_accepts_match_and_different_evaluation_profile(
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
 
 
+def test_evaluation_identity_accepts_matching_adamw_without_muon(
+    tmp_path: Path,
+) -> None:
+    feature_store = tmp_path.resolve()
+    manifest = _matching_run_identity(
+        feature_store,
+        optimizer_variant="adamw",
+        muon_backend=None,
+    )
+    _validate_run_checkpoint_identity(manifest, dict(manifest), feature_store)
+
+
+def test_evaluation_identity_rejects_matching_unknown_optimizer_variant(
+    tmp_path: Path,
+) -> None:
+    feature_store = tmp_path.resolve()
+    manifest = _matching_run_identity(
+        feature_store,
+        optimizer_variant="unknown",
+        muon_backend=None,
+    )
+    with pytest.raises(ValueError, match="optimizer_variant"):
+        _validate_run_checkpoint_identity(manifest, dict(manifest), feature_store)
+
+
+@pytest.mark.parametrize(
+    ("field", "stale_value"),
+    (
+        ("muon_compatibility_contract_version", "STALE_MUON_CONTRACT"),
+        (
+            "muon_reference",
+            {
+                "upstream_tag": "v2.12.0",
+                "upstream_path": "torch/optim/_muon.py",
+                "upstream_blob_sha": "stale",
+            },
+        ),
+    ),
+)
+def test_evaluation_identity_rejects_stale_but_matching_muon_values(
+    field: str,
+    stale_value: object,
+    tmp_path: Path,
+) -> None:
+    feature_store = tmp_path.resolve()
+    manifest = _matching_run_identity(feature_store)
+    checkpoint = dict(manifest)
+    manifest[field] = stale_value
+    checkpoint[field] = copy.deepcopy(stale_value)
+    with pytest.raises(ValueError, match=field):
+        _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+
+@pytest.mark.parametrize(
+    ("optimizer_variant", "muon_backend"),
+    (
+        ("hybrid", None),
+        ("hybrid", "unknown.Muon"),
+        ("adamw", OFFICIAL_MUON_BACKEND),
+    ),
+)
+def test_evaluation_identity_rejects_invalid_matching_backend_semantics(
+    optimizer_variant: str,
+    muon_backend: str | None,
+    tmp_path: Path,
+) -> None:
+    feature_store = tmp_path.resolve()
+    manifest = _matching_run_identity(
+        feature_store,
+        optimizer_variant=optimizer_variant,
+        muon_backend=muon_backend,
+    )
+    with pytest.raises(ValueError, match="muon_backend"):
+        _validate_run_checkpoint_identity(manifest, dict(manifest), feature_store)
+
+
 @pytest.mark.parametrize(
     "field",
     (
         "contract_version",
         "cloud_runtime_contract_version",
+        "muon_compatibility_contract_version",
+        "muon_backend",
+        "muon_reference",
         "model_variant",
         "optimizer_variant",
         "seed",
@@ -416,6 +640,7 @@ def test_checkpoint_round_trip_eager(tmp_path: Path) -> None:
         model,
         "temporal_only",
         "adamw",
+        None,
         "a10",
         11,
         1,

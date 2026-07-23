@@ -28,6 +28,7 @@ from .contract import (
     MAX_EPOCHS,
     MIN_IC_IMPROVEMENT,
     MODEL_VARIANTS,
+    MUON_COMPATIBILITY_CONTRACT_VERSION,
     MuonConstants,
     OPTIMIZER_VARIANTS,
     PROJECT_ROOT,
@@ -55,6 +56,7 @@ from .engine import (
     warmup_compiled_model,
 )
 from .model import CrossAssetPatchITransformerV1, count_trainable_parameters
+from .muon import PYTORCH_MUON_REFERENCE
 from .optim import build_optimizers, build_schedulers
 
 
@@ -162,8 +164,6 @@ def main() -> None:
     args = parse_args()
     profile = RUNTIME_PROFILES[args.profile]
     hardware = validate_runtime_profile(profile)
-    if args.optimizer == "hybrid" and not hasattr(torch.optim, "Muon"):
-        raise RuntimeError("Hybrid optimization requires official torch.optim.Muon")
     commit_sha = clean_git_commit_sha()
     set_seeds(args.seed)
     torch.set_float32_matmul_precision("high")
@@ -186,7 +186,7 @@ def main() -> None:
         raise ValueError(
             f"Full-model parameter count is out of range: {parameter_count}"
         )
-    optimizers, _ = build_optimizers(model, args.optimizer)
+    optimizers, _, muon_backend = build_optimizers(model, args.optimizer)
     schedulers, steps_per_epoch, warmup_steps = build_schedulers(
         optimizers, train_rows.height
     )
@@ -211,6 +211,9 @@ def main() -> None:
         "status": "running",
         "contract_version": CONTRACT_VERSION,
         "cloud_runtime_contract_version": CLOUD_RUNTIME_CONTRACT_VERSION,
+        "muon_compatibility_contract_version": (MUON_COMPATIBILITY_CONTRACT_VERSION),
+        "muon_backend": muon_backend,
+        "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "feature_store_pointer": str(FEATURE_STORE_POINTER),
         "resolved_feature_store_path": str(feature_store),
         "feature_manifest_contract_version": feature_manifest["contract_version"],
@@ -360,6 +363,7 @@ def main() -> None:
                     model,
                     args.model,
                     args.optimizer,
+                    muon_backend,
                     profile.name,
                     args.seed,
                     epoch,
@@ -381,6 +385,7 @@ def main() -> None:
             model,
             args.model,
             args.optimizer,
+            muon_backend,
             profile.name,
             args.seed,
             stopped_epoch,
