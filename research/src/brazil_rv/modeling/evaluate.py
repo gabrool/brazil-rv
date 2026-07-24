@@ -17,6 +17,7 @@ from .contract import (
     MUON_COMPATIBILITY_CONTRACT_VERSION,
     RUNTIME_PROFILES,
     RUNTIME_PROFILE_NAMES,
+    TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION,
 )
 from .data import (
     create_evaluation_loader,
@@ -25,8 +26,12 @@ from .data import (
     warm_feature_store_cache,
 )
 from .engine import (
+    build_compile_metadata,
+    clone_eager_reference_model,
     compile_model,
     evaluate_model,
+    qualify_eager_compiled_model,
+    require_compile_parity,
     validate_runtime_profile,
     warmup_compiled_evaluation,
 )
@@ -129,6 +134,20 @@ def main() -> None:
         raise ValueError("Run manifest model contract version does not match")
     if manifest.get("cloud_runtime_contract_version") != CLOUD_RUNTIME_CONTRACT_VERSION:
         raise ValueError("Run manifest cloud runtime contract version does not match")
+    if (
+        manifest.get("torch_compile_compatibility_contract_version")
+        != TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION
+    ):
+        raise ValueError("Run manifest torch.compile contract version does not match")
+    training_compile = manifest.get("compile")
+    if not isinstance(training_compile, dict):
+        raise ValueError("Run manifest compile metadata is missing")
+    training_parity = training_compile.get("parity")
+    if (
+        not isinstance(training_parity, dict)
+        or training_parity.get("passed") is not True
+    ):
+        raise ValueError("Training run did not pass eager/compiled qualification")
     feature_store = (
         Path(str(manifest["resolved_feature_store_path"])).expanduser().resolve()
     )
@@ -146,13 +165,23 @@ def main() -> None:
     model = CrossAssetPatchITransformerV1(str(checkpoint["model_variant"]))
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to("cuda")
-    compile_model(model, profile)
-    (
-        evaluation_pass_seconds,
-        evaluation_steady_state_median_seconds,
-        compile_peak_allocated,
-        compile_peak_reserved,
-    ) = warmup_compiled_evaluation(model, next(iter(loader)))
+    eager_reference = clone_eager_reference_model(model)
+    evaluation_batch = next(iter(loader))
+    compile_setup = compile_model(model, profile)
+    compile_parity = qualify_eager_compiled_model(
+        eager_reference,
+        model,
+        evaluation_batch,
+        include_backward=False,
+    )
+    require_compile_parity(compile_parity)
+    del eager_reference
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+    compile_report = warmup_compiled_evaluation(model, evaluation_batch)
+    compile_metadata = build_compile_metadata(
+        compile_setup, compile_parity, compile_report
+    )
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.synchronize()
     started = time.perf_counter()
@@ -183,27 +212,15 @@ def main() -> None:
     _atomic_write_parquet(evaluation_dir / "daily_metrics.parquet", daily_metrics)
     evaluation_manifest = {
         "created_at_utc": created_at.isoformat(),
+        "torch_compile_compatibility_contract_version": (
+            TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION
+        ),
         "split": args.split,
         "training_runtime_profile": manifest["runtime_profile"],
         "evaluation_runtime_profile": profile.name,
         "hardware": asdict(hardware),
         "feature_cache_warmup": asdict(cache_report),
-        "compile": {
-            "enabled": True,
-            "api": "nn.Module.compile",
-            "backend": profile.compile_backend,
-            "mode": profile.compile_mode,
-            "fullgraph": profile.compile_fullgraph,
-            "dynamic": profile.compile_dynamic,
-            "backward_pass_autocast": "off",
-            "eager_fallback_allowed": False,
-            "evaluation_pass_seconds": evaluation_pass_seconds,
-            "evaluation_steady_state_median_seconds": (
-                evaluation_steady_state_median_seconds
-            ),
-            "peak_allocated_cuda_memory_bytes": compile_peak_allocated,
-            "peak_reserved_cuda_memory_bytes": compile_peak_reserved,
-        },
+        "compile": compile_metadata,
         "evaluation_seconds": evaluation_seconds,
         "peak_allocated_cuda_memory_bytes": peak_allocated,
         "peak_reserved_cuda_memory_bytes": peak_reserved,

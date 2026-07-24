@@ -8,6 +8,7 @@ from pathlib import Path
 CONTRACT_VERSION = "CROSS_ASSET_ITRANSFORMER_V1"
 CLOUD_RUNTIME_CONTRACT_VERSION = "CROSS_ASSET_ITRANSFORMER_CLOUD_RUNTIME_V1"
 MUON_COMPATIBILITY_CONTRACT_VERSION = "PYTORCH_2_13_MUON_COMPAT_V1"
+TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION = "TORCH_COMPILE_COMPATIBILITY_V1"
 FEATURE_CONTRACT_VERSION = "M1_FEATURES_V1"
 
 
@@ -119,6 +120,15 @@ WARMUP_FRACTION = 0.05
 FINAL_LR_FACTOR = 0.1
 COMPILE_WARMUP_PASS_COUNT = 5
 COMPILE_STEADY_STATE_PASS_COUNT = 3
+
+COMPILE_PARITY_PREDICTION_ATOL = 5e-3
+COMPILE_PARITY_PREDICTION_RTOL = 5e-3
+COMPILE_PARITY_LOSS_ATOL = 5e-4
+COMPILE_PARITY_LOSS_RTOL = 5e-3
+COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX = 1e-2
+COMPILE_PARITY_GRADIENT_COSINE_MIN = 0.9999
+COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL = 1e-3
+COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL = 1e-2
 
 MIN_IC_EQUITIES = 30
 SANITY_SAMPLE_COUNT = 32
@@ -234,6 +244,69 @@ class HardwareInfo:
     pytorch_version: str
     cuda_version: str | None
     cudnn_version: int | None
+
+
+@dataclass(frozen=True)
+class CompileSetupReport:
+    api: str
+    backend: str
+    mode: str
+    fullgraph: bool
+    dynamic: bool
+    backward_pass_autocast_control_available: bool
+    backward_pass_autocast_policy: str
+
+
+@dataclass(frozen=True)
+class CompileParityThresholds:
+    prediction_atol: float = COMPILE_PARITY_PREDICTION_ATOL
+    prediction_rtol: float = COMPILE_PARITY_PREDICTION_RTOL
+    loss_atol: float = COMPILE_PARITY_LOSS_ATOL
+    loss_rtol: float = COMPILE_PARITY_LOSS_RTOL
+    gradient_relative_l2_max: float = COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX
+    gradient_cosine_min: float = COMPILE_PARITY_GRADIENT_COSINE_MIN
+    gradient_max_absolute_atol: float = COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL
+    gradient_max_absolute_rtol: float = COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL
+
+
+@dataclass(frozen=True)
+class CompileParityReport:
+    mode: str
+    dropout_enabled: bool
+    batch_size: int
+    passed: bool
+
+    eager_predictions_finite: bool
+    compiled_predictions_finite: bool
+    prediction_allclose: bool
+    prediction_max_absolute_difference: float
+    prediction_relative_l2_error: float
+
+    eager_loss: float
+    compiled_loss: float
+    losses_finite: bool
+    loss_absolute_difference: float
+    loss_tolerance: float
+
+    gradient_presence_match: bool | None
+    eager_gradients_finite: bool | None
+    compiled_gradients_finite: bool | None
+    gradient_parameter_count: int | None
+    eager_gradient_l2_norm: float | None
+    compiled_gradient_l2_norm: float | None
+    eager_gradient_max_absolute: float | None
+    gradient_relative_l2_error: float | None
+    gradient_cosine_similarity: float | None
+    gradient_max_absolute_difference: float | None
+    gradient_max_absolute_tolerance: float | None
+
+
+@dataclass(frozen=True)
+class CompileEvaluationWarmupReport:
+    evaluation_pass_seconds: tuple[float, float, float, float, float]
+    evaluation_steady_state_median_seconds: float
+    peak_allocated_cuda_memory_bytes: int
+    peak_reserved_cuda_memory_bytes: int
 
 
 @dataclass(frozen=True)

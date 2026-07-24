@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import inspect
 import json
+from contextlib import nullcontext
+from dataclasses import asdict
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,6 +20,17 @@ from brazil_rv.modeling.contract import (
     ADAMW_EPS,
     ADAMW_LR,
     ADAMW_WEIGHT_DECAY,
+    COMPILE_PARITY_GRADIENT_COSINE_MIN,
+    COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
+    COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
+    COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX,
+    COMPILE_PARITY_LOSS_ATOL,
+    COMPILE_PARITY_LOSS_RTOL,
+    COMPILE_PARITY_PREDICTION_ATOL,
+    COMPILE_PARITY_PREDICTION_RTOL,
+    CompileEvaluationWarmupReport,
+    CompileParityThresholds,
+    CompileSetupReport,
     EFFECTIVE_BATCH_SIZE,
     EQUITY_COUNT,
     FINAL_LR_FACTOR,
@@ -34,12 +47,16 @@ from brazil_rv.modeling.contract import (
     MUON_WEIGHT_DECAY,
     PATCH_INPUT_WIDTH,
     RUNTIME_PROFILES,
+    TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION,
 )
 from brazil_rv.modeling.evaluate import _validate_run_checkpoint_identity
 from brazil_rv.modeling.engine import (
+    _compile_parity_report,
     _filter_evaluation_rows,
     _optimizer_update,
+    build_compile_metadata,
     checkpoint_payload,
+    clone_eager_reference_model,
     compile_model,
     masked_huber_loss,
     train_one_epoch,
@@ -304,31 +321,340 @@ def test_scheduler_endpoints_and_actual_update_numbering() -> None:
     assert actual_factors[-1] == FINAL_LR_FACTOR
 
 
-def test_compile_configuration_uses_in_place_module_api(
+def test_compile_setup_modern_explicit_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[dict[str, object]] = []
 
     def fake_compile(module: nn.Module, **kwargs: object) -> None:
-        assert isinstance(module, nn.Module)
         calls.append(kwargs)
 
-    config = torch._functorch.config
-    original_autocast = config.backward_pass_autocast
-    monkeypatch.setattr(config, "backward_pass_autocast", original_autocast)
+    config = SimpleNamespace(backward_pass_autocast="same_as_forward")
+    monkeypatch.setattr(engine_module, "functorch_config", config)
     monkeypatch.setattr(nn.Module, "compile", fake_compile)
     profile = RUNTIME_PROFILES["a10"]
-    model = nn.Linear(2, 1)
-    compile_model(model, profile)
+    report = compile_model(nn.Linear(2, 1), profile)
     assert calls == [
         {
-            "backend": "inductor",
-            "mode": "reduce-overhead",
-            "fullgraph": True,
-            "dynamic": False,
+            "backend": profile.compile_backend,
+            "mode": profile.compile_mode,
+            "fullgraph": profile.compile_fullgraph,
+            "dynamic": profile.compile_dynamic,
         }
     ]
     assert config.backward_pass_autocast == "off"
+    assert report == CompileSetupReport(
+        api="nn.Module.compile",
+        backend="inductor",
+        mode="reduce-overhead",
+        fullgraph=True,
+        dynamic=False,
+        backward_pass_autocast_control_available=True,
+        backward_pass_autocast_policy="explicit_off",
+    )
+
+
+def test_compile_setup_legacy_implicit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_compile(module: nn.Module, **kwargs: object) -> None:
+        calls.append(kwargs)
+
+    config = SimpleNamespace()
+    monkeypatch.setattr(engine_module, "functorch_config", config)
+    monkeypatch.setattr(nn.Module, "compile", fake_compile)
+    profile = RUNTIME_PROFILES["gh200"]
+    report = compile_model(nn.Linear(2, 1), profile)
+    assert calls == [
+        {
+            "backend": profile.compile_backend,
+            "mode": profile.compile_mode,
+            "fullgraph": profile.compile_fullgraph,
+            "dynamic": profile.compile_dynamic,
+        }
+    ]
+    assert not hasattr(config, "backward_pass_autocast")
+    assert not report.backward_pass_autocast_control_available
+    assert report.backward_pass_autocast_policy == "legacy_implicit"
+
+
+def test_compile_setup_requires_callable_module_api() -> None:
+    model = SimpleNamespace(compile=None)
+    with pytest.raises(RuntimeError, match="nn.Module.compile"):
+        compile_model(model, RUNTIME_PROFILES["a10"])
+
+
+def _synthetic_compile_parity(
+    *,
+    prediction_pair: tuple[torch.Tensor, torch.Tensor] | None = None,
+    loss_pair: tuple[float, float] = (1.0, 1.0),
+    gradient_pair: tuple[torch.Tensor | None, torch.Tensor | None] | None = None,
+    include_backward: bool = True,
+):
+    if prediction_pair is None:
+        predictions = torch.tensor([[1.0, 2.0]], dtype=torch.float32)
+        prediction_pair = (predictions, predictions.clone())
+    if gradient_pair is None:
+        gradient = torch.tensor([1.0, 2.0], dtype=torch.float32)
+        gradient_pair = (gradient, gradient.clone())
+    eager_gradients = (("weight", gradient_pair[0]),) if include_backward else None
+    compiled_gradients = (("weight", gradient_pair[1]),) if include_backward else None
+    return _compile_parity_report(
+        prediction_pair[0],
+        prediction_pair[1],
+        torch.tensor(loss_pair[0]),
+        torch.tensor(loss_pair[1]),
+        eager_gradients,
+        compiled_gradients,
+    )
+
+
+def test_compile_parity_exact_and_within_threshold_pass() -> None:
+    assert _synthetic_compile_parity().passed
+    eager_predictions = torch.tensor([[1.0, 2.0]])
+    compiled_predictions = eager_predictions + 1e-3
+    report = _synthetic_compile_parity(
+        prediction_pair=(eager_predictions, compiled_predictions),
+        loss_pair=(1.0, 1.0001),
+        gradient_pair=(
+            torch.tensor([1.0, 2.0]),
+            torch.tensor([1.00001, 2.0]),
+        ),
+    )
+    assert report.passed
+
+
+def test_compile_parity_prediction_and_loss_divergence_fail() -> None:
+    eager_predictions = torch.tensor([[1.0, 2.0]])
+    prediction_failure = _synthetic_compile_parity(
+        prediction_pair=(eager_predictions, eager_predictions + 0.1)
+    )
+    loss_failure = _synthetic_compile_parity(loss_pair=(1.0, 1.1))
+    assert not prediction_failure.passed
+    assert not prediction_failure.prediction_allclose
+    assert not loss_failure.passed
+    assert loss_failure.loss_absolute_difference > loss_failure.loss_tolerance
+
+
+def test_compile_parity_gradient_presence_and_finiteness_failures() -> None:
+    presence_failure = _synthetic_compile_parity(gradient_pair=(torch.ones(2), None))
+    eager_nonfinite = _synthetic_compile_parity(
+        gradient_pair=(torch.tensor([float("inf")]), torch.ones(1))
+    )
+    compiled_nonfinite = _synthetic_compile_parity(
+        gradient_pair=(torch.ones(1), torch.tensor([float("nan")]))
+    )
+    assert not presence_failure.passed
+    assert not presence_failure.gradient_presence_match
+    assert not eager_nonfinite.passed
+    assert not eager_nonfinite.eager_gradients_finite
+    assert not compiled_nonfinite.passed
+    assert not compiled_nonfinite.compiled_gradients_finite
+
+
+def test_compile_parity_nonfinite_predictions_fail() -> None:
+    finite = torch.ones(1, 1)
+    eager_nonfinite = _synthetic_compile_parity(
+        prediction_pair=(torch.full((1, 1), float("inf")), finite)
+    )
+    compiled_nonfinite = _synthetic_compile_parity(
+        prediction_pair=(finite, torch.full((1, 1), float("nan")))
+    )
+    assert not eager_nonfinite.passed
+    assert not eager_nonfinite.eager_predictions_finite
+    assert not compiled_nonfinite.passed
+    assert not compiled_nonfinite.compiled_predictions_finite
+
+
+def test_compile_parity_gradient_relative_l2_threshold_failure() -> None:
+    report = _synthetic_compile_parity(
+        gradient_pair=(torch.tensor([1.0, 0.0]), torch.tensor([1.0, 0.011]))
+    )
+    assert not report.passed
+    assert report.gradient_relative_l2_error is not None
+    assert report.gradient_relative_l2_error > COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX
+
+
+def test_compile_parity_gradient_cosine_threshold_failure() -> None:
+    report = _synthetic_compile_parity(
+        gradient_pair=(torch.tensor([1.0, 0.0]), torch.tensor([1.0, 0.02]))
+    )
+    assert not report.passed
+    assert report.gradient_cosine_similarity is not None
+    assert report.gradient_cosine_similarity < COMPILE_PARITY_GRADIENT_COSINE_MIN
+
+
+def test_compile_parity_gradient_max_absolute_threshold_failure() -> None:
+    eager_gradient = torch.ones(100)
+    compiled_gradient = eager_gradient.clone()
+    compiled_gradient[0] += 0.012
+    report = _synthetic_compile_parity(
+        gradient_pair=(eager_gradient, compiled_gradient)
+    )
+    assert not report.passed
+    assert report.gradient_relative_l2_error is not None
+    assert report.gradient_relative_l2_error <= COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX
+    assert report.gradient_max_absolute_difference is not None
+    assert report.gradient_max_absolute_tolerance is not None
+    assert (
+        report.gradient_max_absolute_difference > report.gradient_max_absolute_tolerance
+    )
+
+
+def test_compile_parity_zero_gradient_rules() -> None:
+    both_zero = _synthetic_compile_parity(
+        gradient_pair=(torch.zeros(2), torch.zeros(2))
+    )
+    compiled_nonzero = _synthetic_compile_parity(
+        gradient_pair=(torch.zeros(2), torch.tensor([1e-4, 0.0]))
+    )
+    assert both_zero.passed
+    assert both_zero.gradient_relative_l2_error == 0.0
+    assert both_zero.gradient_cosine_similarity == 1.0
+    assert not compiled_nonzero.passed
+    assert compiled_nonzero.gradient_relative_l2_error == float("inf")
+    assert compiled_nonzero.gradient_cosine_similarity == -1.0
+
+
+def test_compile_parity_forward_only_has_null_gradient_fields() -> None:
+    report = _synthetic_compile_parity(include_backward=False)
+    assert report.passed
+    assert report.mode == "forward_only"
+    for field in (
+        "gradient_presence_match",
+        "eager_gradients_finite",
+        "compiled_gradients_finite",
+        "gradient_parameter_count",
+        "eager_gradient_l2_norm",
+        "compiled_gradient_l2_norm",
+        "eager_gradient_max_absolute",
+        "gradient_relative_l2_error",
+        "gradient_cosine_similarity",
+        "gradient_max_absolute_difference",
+        "gradient_max_absolute_tolerance",
+    ):
+        assert getattr(report, field) is None
+
+
+def test_compile_qualification_uses_requested_grad_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    eager_model = nn.Linear(1, 1, bias=False)
+    compiled_model = copy.deepcopy(eager_model)
+    batch = {
+        "targets": torch.zeros(1, 1, 1),
+        "label_mask": torch.ones(1, 1, 1, dtype=torch.bool),
+    }
+    grad_modes: list[bool] = []
+
+    def record_grad_mode(
+        model: nn.Module, batch: dict[str, torch.Tensor]
+    ) -> torch.Tensor:
+        grad_modes.append(torch.is_grad_enabled())
+        return next(model.parameters()).sum().reshape(1, 1, 1)
+
+    monkeypatch.setattr(engine_module, "_to_cuda", lambda batch: batch)
+    monkeypatch.setattr(engine_module, "_predict", record_grad_mode)
+    monkeypatch.setattr(torch, "autocast", lambda **_: nullcontext())
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda: None)
+
+    with torch.no_grad():
+        forward_backward = engine_module.qualify_eager_compiled_model(
+            eager_model,
+            compiled_model,
+            batch,
+            include_backward=True,
+        )
+    assert forward_backward.mode == "forward_backward"
+    assert grad_modes == [True, True]
+
+    grad_modes.clear()
+    with torch.no_grad():
+        forward_only = engine_module.qualify_eager_compiled_model(
+            eager_model,
+            compiled_model,
+            batch,
+            include_backward=False,
+        )
+    assert grad_modes == [False, False]
+    assert forward_only.mode == "forward_only"
+    for field in (
+        "gradient_presence_match",
+        "eager_gradients_finite",
+        "compiled_gradients_finite",
+        "gradient_parameter_count",
+        "eager_gradient_l2_norm",
+        "compiled_gradient_l2_norm",
+        "eager_gradient_max_absolute",
+        "gradient_relative_l2_error",
+        "gradient_cosine_similarity",
+        "gradient_max_absolute_difference",
+        "gradient_max_absolute_tolerance",
+    ):
+        assert getattr(forward_only, field) is None
+
+
+def test_compile_metadata_schema_is_exact() -> None:
+    setup = CompileSetupReport(
+        api="nn.Module.compile",
+        backend="inductor",
+        mode="reduce-overhead",
+        fullgraph=True,
+        dynamic=False,
+        backward_pass_autocast_control_available=False,
+        backward_pass_autocast_policy="legacy_implicit",
+    )
+    parity = _synthetic_compile_parity(include_backward=False)
+    warmup = CompileEvaluationWarmupReport(
+        evaluation_pass_seconds=(1.0, 2.0, 3.0, 4.0, 5.0),
+        evaluation_steady_state_median_seconds=4.0,
+        peak_allocated_cuda_memory_bytes=101,
+        peak_reserved_cuda_memory_bytes=202,
+    )
+    metadata = build_compile_metadata(setup, parity, warmup)
+    assert metadata == {
+        "enabled": True,
+        "eager_fallback_allowed": False,
+        "setup": asdict(setup),
+        "parity_thresholds": asdict(CompileParityThresholds()),
+        "parity": asdict(parity),
+        "warmup": asdict(warmup),
+    }
+    assert "backward_pass_autocast" not in metadata
+    assert "backward_pass_autocast" not in metadata["setup"]
+    assert TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION == (
+        "TORCH_COMPILE_COMPATIBILITY_V1"
+    )
+    assert asdict(CompileParityThresholds()) == {
+        "prediction_atol": COMPILE_PARITY_PREDICTION_ATOL,
+        "prediction_rtol": COMPILE_PARITY_PREDICTION_RTOL,
+        "loss_atol": COMPILE_PARITY_LOSS_ATOL,
+        "loss_rtol": COMPILE_PARITY_LOSS_RTOL,
+        "gradient_relative_l2_max": COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX,
+        "gradient_cosine_min": COMPILE_PARITY_GRADIENT_COSINE_MIN,
+        "gradient_max_absolute_atol": COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
+        "gradient_max_absolute_rtol": COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
+    }
+
+
+def test_clone_eager_reference_has_distinct_exact_parameters_and_rng() -> None:
+    torch.manual_seed(17)
+    model = nn.Sequential(nn.Linear(3, 4), nn.BatchNorm1d(4))
+    rng_state = torch.random.get_rng_state().clone()
+    reference = clone_eager_reference_model(model)
+    assert torch.equal(torch.random.get_rng_state(), rng_state)
+    for (source_name, source), (reference_name, cloned) in zip(
+        model.named_parameters(), reference.named_parameters(), strict=True
+    ):
+        assert source_name == reference_name
+        torch.testing.assert_close(source, cloned, atol=0, rtol=0)
+        assert source is not cloned
+        assert source.data_ptr() != cloned.data_ptr()
+    with torch.no_grad():
+        next(reference.parameters()).add_(1.0)
+    assert not torch.equal(next(model.parameters()), next(reference.parameters()))
 
 
 @pytest.mark.parametrize("profile_name", tuple(RUNTIME_PROFILES))

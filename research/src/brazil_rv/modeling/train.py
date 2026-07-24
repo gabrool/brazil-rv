@@ -38,6 +38,7 @@ from .contract import (
     SchedulerConstants,
     SplitBoundaries,
     TEMPORAL_DEPTH,
+    TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION,
     TrainingConstants,
 )
 from .data import (
@@ -48,9 +49,13 @@ from .data import (
     warm_feature_store_cache,
 )
 from .engine import (
+    build_compile_metadata,
     checkpoint_payload,
+    clone_eager_reference_model,
     compile_model,
     evaluate_model,
+    qualify_eager_compiled_model,
+    require_compile_parity,
     train_one_epoch,
     validate_runtime_profile,
     warmup_compiled_model,
@@ -179,6 +184,8 @@ def main() -> None:
     train_loader, validation_loader, sampler = create_training_loaders(
         feature_store, train_rows, validation_rows, profile, args.seed
     )
+    training_batch = next(iter(train_loader))
+    evaluation_batch = next(iter(validation_loader))
 
     model = CrossAssetPatchITransformerV1(args.model).to("cuda")
     parameter_count = count_trainable_parameters(model)
@@ -190,11 +197,25 @@ def main() -> None:
     schedulers, steps_per_epoch, warmup_steps = build_schedulers(
         optimizers, train_rows.height
     )
-    compile_model(model, profile)
+    eager_reference = clone_eager_reference_model(model)
+    compile_setup = compile_model(model, profile)
+    compile_parity = qualify_eager_compiled_model(
+        eager_reference,
+        model,
+        training_batch,
+        include_backward=True,
+    )
+    require_compile_parity(compile_parity)
+    del eager_reference
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
     compile_report = warmup_compiled_model(
         model,
-        next(iter(train_loader)),
-        next(iter(validation_loader)),
+        training_batch,
+        evaluation_batch,
+    )
+    compile_metadata = build_compile_metadata(
+        compile_setup, compile_parity, compile_report
     )
 
     created_at = datetime.now(timezone.utc)
@@ -212,6 +233,9 @@ def main() -> None:
         "contract_version": CONTRACT_VERSION,
         "cloud_runtime_contract_version": CLOUD_RUNTIME_CONTRACT_VERSION,
         "muon_compatibility_contract_version": (MUON_COMPATIBILITY_CONTRACT_VERSION),
+        "torch_compile_compatibility_contract_version": (
+            TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION
+        ),
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "feature_store_pointer": str(FEATURE_STORE_POINTER),
@@ -250,24 +274,7 @@ def main() -> None:
         "cuda_version": hardware.cuda_version,
         "gpu_name": hardware.device_name,
         "gpu_total_memory": hardware.total_vram_bytes,
-        "compile": {
-            "enabled": True,
-            "api": "nn.Module.compile",
-            "backend": profile.compile_backend,
-            "mode": profile.compile_mode,
-            "fullgraph": profile.compile_fullgraph,
-            "dynamic": profile.compile_dynamic,
-            "backward_pass_autocast": "off",
-            "eager_fallback_allowed": False,
-            "training_pass_seconds": compile_report.training_pass_seconds,
-            "training_steady_state_median_seconds": (
-                compile_report.training_steady_state_median_seconds
-            ),
-            "evaluation_pass_seconds": compile_report.evaluation_pass_seconds,
-            "evaluation_steady_state_median_seconds": (
-                compile_report.evaluation_steady_state_median_seconds
-            ),
-        },
+        "compile": compile_metadata,
         "hardware": asdict(hardware),
         "feature_cache_warmup": asdict(cache_report),
         "loader": {

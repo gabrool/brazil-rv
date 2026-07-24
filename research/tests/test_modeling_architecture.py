@@ -199,15 +199,19 @@ def test_compile_warmup_reports_final_three_pass_medians(
     evaluation_times = iter((13.0, 8.0, 4.0, 2.0, 3.0))
     training_calls = 0
     evaluation_calls = 0
+    training_modes: list[bool] = []
+    evaluation_modes: list[bool] = []
 
-    def timed_training(*_: object) -> float:
+    def timed_training(model: nn.Module, *_: object) -> float:
         nonlocal training_calls
         training_calls += 1
+        training_modes.append(model.training)
         return next(training_times)
 
-    def timed_evaluation(*_: object) -> float:
+    def timed_evaluation(model: nn.Module, *_: object) -> float:
         nonlocal evaluation_calls
         evaluation_calls += 1
+        evaluation_modes.append(model.training)
         return next(evaluation_times)
 
     monkeypatch.setattr(engine_module, "_to_cuda", lambda batch: batch)
@@ -219,12 +223,16 @@ def test_compile_warmup_reports_final_three_pass_medians(
     monkeypatch.setattr(torch.cuda, "max_memory_allocated", lambda: 101)
     monkeypatch.setattr(torch.cuda, "max_memory_reserved", lambda: 202)
 
-    report = warmup_compiled_model(nn.Linear(1, 1), {}, {})
+    model = nn.Linear(1, 1)
+    report = warmup_compiled_model(model, {}, {})
 
     assert COMPILE_WARMUP_PASS_COUNT == 5
     assert COMPILE_STEADY_STATE_PASS_COUNT == 3
     assert training_calls == 5
     assert evaluation_calls == 5
+    assert training_modes == [True] * 5
+    assert evaluation_modes == [False] * 5
+    assert not model.training
     assert report.training_pass_seconds == (11.0, 7.0, 5.0, 9.0, 6.0)
     assert report.training_steady_state_median_seconds == 6.0
     assert report.evaluation_pass_seconds == (13.0, 8.0, 4.0, 2.0, 3.0)

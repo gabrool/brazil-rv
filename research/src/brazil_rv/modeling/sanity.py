@@ -23,6 +23,7 @@ from .contract import (
     SANITY_MAX_STEPS,
     SANITY_MIN_SPEARMAN,
     SANITY_SAMPLE_COUNT,
+    TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION,
 )
 from .data import (
     create_training_loaders,
@@ -35,9 +36,13 @@ from .engine import (
     _optimizer_update,
     _predict,
     _to_cuda,
+    build_compile_metadata,
     checkpoint_payload,
+    clone_eager_reference_model,
     compile_model,
     masked_huber_loss,
+    qualify_eager_compiled_model,
+    require_compile_parity,
     validate_runtime_profile,
     warmup_compiled_model,
 )
@@ -170,12 +175,25 @@ def main() -> None:
     model = CrossAssetPatchITransformerV1("full").to("cuda")
     model.eval()
     optimizers, _, muon_backend = build_optimizers(model, "hybrid")
-    compile_model(model, profile)
+    eager_reference = clone_eager_reference_model(model)
+    compile_setup = compile_model(model, profile)
+    compile_parity = qualify_eager_compiled_model(
+        eager_reference,
+        model,
+        microbatches[0],
+        include_backward=True,
+    )
+    require_compile_parity(compile_parity)
+    del eager_reference
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
     compile_report = warmup_compiled_model(
         model,
         microbatches[0],
         evaluation_batch,
-        training_mode=False,
+    )
+    compile_metadata = build_compile_metadata(
+        compile_setup, compile_parity, compile_report
     )
     torch.cuda.reset_peak_memory_stats()
     all_gradients_finite = True
@@ -253,7 +271,8 @@ def main() -> None:
         compile_report.peak_reserved_cuda_memory_bytes,
     )
     passed = (
-        memorization_succeeded
+        compile_parity.passed
+        and memorization_succeeded
         and compiled_checkpoint_eager_compatible
         and peak_allocated < 0.8 * hardware.total_vram_bytes
         and peak_reserved < 0.9 * hardware.total_vram_bytes
@@ -269,21 +288,16 @@ def main() -> None:
     report = {
         "contract_version": CONTRACT_VERSION,
         "muon_compatibility_contract_version": (MUON_COMPATIBILITY_CONTRACT_VERSION),
+        "torch_compile_compatibility_contract_version": (
+            TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION
+        ),
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "created_at_utc": created_at.isoformat(),
         "resolved_feature_store_path": str(feature_store),
         "profile": profile.name,
         "hardware": asdict(hardware),
-        "compile_settings": {
-            "api": "nn.Module.compile",
-            "backend": profile.compile_backend,
-            "mode": profile.compile_mode,
-            "fullgraph": profile.compile_fullgraph,
-            "dynamic": profile.compile_dynamic,
-            "backward_pass_autocast": "off",
-        },
-        "compile_warmup": asdict(compile_report),
+        "compile": compile_metadata,
         "feature_cache_warmup": asdict(cache_report),
         "physical_microbatch_size": profile.microbatch_size,
         "accumulation_steps": profile.accumulation_steps,
