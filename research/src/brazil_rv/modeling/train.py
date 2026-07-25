@@ -17,28 +17,23 @@ import torch
 
 from .contract import (
     ALLOWED_SEEDS,
-    CLOUD_RUNTIME_CONTRACT_VERSION,
     AdamWConstants,
     ArchitectureConstants,
-    CONTRACT_VERSION,
     CROSS_ASSET_DEPTH,
     EARLY_STOP_PATIENCE,
     EFFECTIVE_BATCH_SIZE,
     FEATURE_STORE_POINTER,
+    GH200_RUNTIME,
     MAX_EPOCHS,
     MIN_IC_IMPROVEMENT,
     MODEL_VARIANTS,
-    MUON_COMPATIBILITY_CONTRACT_VERSION,
     MuonConstants,
     OPTIMIZER_VARIANTS,
     PROJECT_ROOT,
-    RUNTIME_PROFILES,
-    RUNTIME_PROFILE_NAMES,
     RUN_OUTPUT_BASE,
     SchedulerConstants,
     SplitBoundaries,
     TEMPORAL_DEPTH,
-    TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION,
     TrainingConstants,
 )
 from .data import (
@@ -57,7 +52,7 @@ from .engine import (
     qualify_eager_compiled_model,
     require_compile_parity,
     train_one_epoch,
-    validate_runtime_profile,
+    validate_runtime,
     warmup_compiled_model,
 )
 from .model import CrossAssetPatchITransformerV1, count_trainable_parameters
@@ -67,7 +62,6 @@ from .optim import build_optimizers, build_schedulers
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--profile", required=True, choices=RUNTIME_PROFILE_NAMES)
     parser.add_argument("--model", required=True, choices=MODEL_VARIANTS)
     parser.add_argument("--optimizer", required=True, choices=OPTIMIZER_VARIANTS)
     parser.add_argument("--seed", required=True, type=int, choices=ALLOWED_SEEDS)
@@ -167,8 +161,8 @@ def _write_daily_metrics(
 
 def main() -> None:
     args = parse_args()
-    profile = RUNTIME_PROFILES[args.profile]
-    hardware = validate_runtime_profile(profile)
+    runtime = GH200_RUNTIME
+    hardware = validate_runtime()
     commit_sha = clean_git_commit_sha()
     set_seeds(args.seed)
     torch.set_float32_matmul_precision("high")
@@ -182,7 +176,7 @@ def main() -> None:
     )
     cache_report = warm_feature_store_cache(feature_store)
     train_loader, validation_loader, sampler = create_training_loaders(
-        feature_store, train_rows, validation_rows, profile, args.seed
+        feature_store, train_rows, validation_rows, runtime, args.seed
     )
     training_batch = next(iter(train_loader))
     evaluation_batch = next(iter(validation_loader))
@@ -198,7 +192,7 @@ def main() -> None:
         optimizers, train_rows.height
     )
     eager_reference = clone_eager_reference_model(model)
-    compile_setup = compile_model(model, profile)
+    compile_setup = compile_model(model, runtime)
     compile_parity = qualify_eager_compiled_model(
         eager_reference,
         model,
@@ -220,8 +214,8 @@ def main() -> None:
 
     created_at = datetime.now(timezone.utc)
     run_dir = RUN_OUTPUT_BASE / (
-        "cross_asset_patch_itransformer_v1_"
-        f"{args.model}_{args.optimizer}_{profile.name}_seed{args.seed}_"
+        "cross_asset_patch_itransformer_"
+        f"{args.model}_{args.optimizer}_seed{args.seed}_"
         f"{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     if run_dir.exists():
@@ -230,12 +224,6 @@ def main() -> None:
     training_started_at = datetime.now(timezone.utc)
     manifest: dict[str, object] = {
         "status": "running",
-        "contract_version": CONTRACT_VERSION,
-        "cloud_runtime_contract_version": CLOUD_RUNTIME_CONTRACT_VERSION,
-        "muon_compatibility_contract_version": (MUON_COMPATIBILITY_CONTRACT_VERSION),
-        "torch_compile_compatibility_contract_version": (
-            TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION
-        ),
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "feature_store_pointer": str(FEATURE_STORE_POINTER),
@@ -243,14 +231,12 @@ def main() -> None:
         "feature_manifest_contract_version": feature_manifest["contract_version"],
         "model_variant": args.model,
         "optimizer_variant": args.optimizer,
-        "runtime_profile": profile.name,
-        "runtime_profile_constants": asdict(profile),
-        "physical_microbatch_size": profile.microbatch_size,
-        "accumulation_steps": profile.accumulation_steps,
+        "physical_microbatch_size": runtime.microbatch_size,
+        "accumulation_steps": runtime.accumulation_steps,
         "effective_batch_size": EFFECTIVE_BATCH_SIZE,
-        "evaluation_batch_size": profile.evaluation_batch_size,
-        "num_workers": profile.num_workers,
-        "prefetch_factor": profile.prefetch_factor,
+        "evaluation_batch_size": runtime.evaluation_batch_size,
+        "num_workers": runtime.num_workers,
+        "prefetch_factor": runtime.prefetch_factor,
         "precision": "bf16",
         "grad_scaler_used": False,
         "seed": args.seed,
@@ -327,7 +313,7 @@ def main() -> None:
         torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
         epoch_started = time.perf_counter()
-        training = train_one_epoch(model, train_loader, optimizers, schedulers, profile)
+        training = train_one_epoch(model, train_loader, optimizers, schedulers, runtime)
         validation, daily_rows = evaluate_model(model, validation_loader)
         torch.cuda.synchronize()
         epoch_seconds = time.perf_counter() - epoch_started
@@ -371,7 +357,6 @@ def main() -> None:
                     args.model,
                     args.optimizer,
                     muon_backend,
-                    profile.name,
                     args.seed,
                     epoch,
                     primary_score,
@@ -393,7 +378,6 @@ def main() -> None:
             args.model,
             args.optimizer,
             muon_backend,
-            profile.name,
             args.seed,
             stopped_epoch,
             float(history[-1]["validation_primary_ic"]),

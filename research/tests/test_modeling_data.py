@@ -14,10 +14,10 @@ from brazil_rv.modeling.contract import (
     EFFECTIVE_BATCH_SIZE,
     EQUITY_ABSOLUTE_START_PATCH,
     EQUITY_COUNT,
+    GH200_RUNTIME,
     HORIZON_COUNT,
     INSTRUMENT_COUNT,
     PATCH_INPUT_WIDTH,
-    RUNTIME_PROFILES,
     TEST_START,
     TRAIN_END,
     TRAIN_START,
@@ -281,7 +281,7 @@ def _sampler_rows() -> pl.DataFrame:
     first_date = date(2023, 1, 2)
     trade_dates = [
         first_date + timedelta(days=date_offset)
-        for date_offset in range(40)
+        for date_offset in range(571)
         for _ in range(55)
     ]
     return pl.DataFrame(
@@ -290,41 +290,44 @@ def _sampler_rows() -> pl.DataFrame:
     )
 
 
-def test_date_stratified_profile_batching() -> None:
+def test_date_stratified_effective_batches_are_distinct_and_deterministic() -> None:
     rows = _sampler_rows()
     source_dates = rows.get_column("trade_date").to_list()
-    for profile in RUNTIME_PROFILES.values():
-        sampler = DateStratifiedMicrobatchSampler(rows, profile, seed=11)
-        sampler.set_epoch(3)
-        requests = list(sampler)
-        repeated = DateStratifiedMicrobatchSampler(rows, profile, seed=11)
-        repeated.set_epoch(3)
-        assert requests == list(repeated)
-        for start in range(0, len(requests), profile.accumulation_steps):
-            group = requests[start : start + profile.accumulation_steps]
-            assert all(
-                len(request.indices) == profile.microbatch_size for request in group
-            )
-            positions = [index for request in group for index in request.indices]
-            assert len(positions) == EFFECTIVE_BATCH_SIZE
-            assert len({source_dates[index] for index in positions}) == 32
+    sampler = DateStratifiedMicrobatchSampler(rows, GH200_RUNTIME, seed=11)
+    sampler.set_epoch(3)
+    requests = list(sampler)
+    repeated = DateStratifiedMicrobatchSampler(rows, GH200_RUNTIME, seed=11)
+    repeated.set_epoch(3)
+    assert requests == list(repeated)
+    assert len(requests) == 496
+    for start in range(0, len(requests), GH200_RUNTIME.accumulation_steps):
+        group = requests[start : start + GH200_RUNTIME.accumulation_steps]
+        assert len(group) == GH200_RUNTIME.accumulation_steps
+        assert all(
+            len(request.indices) == GH200_RUNTIME.microbatch_size for request in group
+        )
+        positions = [index for request in group for index in request.indices]
+        assert len(positions) == EFFECTIVE_BATCH_SIZE
+        assert len({source_dates[index] for index in positions}) == 512
 
 
 def test_fixed_evaluation_padding_invalidates_only_padded_rows(
     tmp_path: Path,
 ) -> None:
     store, base_rows = _synthetic_store(tmp_path)
-    profile = RUNTIME_PROFILES["a10"]
-    rows = pl.concat([base_rows] * 22, rechunk=True).with_columns(
+    rows = pl.concat([base_rows] * 86, rechunk=True).with_columns(
         pl.int_range(pl.len()).alias("sample_id")
     )
-    sampler = SequentialPaddedBatchSampler(rows.height, profile.evaluation_batch_size)
+    sampler = SequentialPaddedBatchSampler(
+        rows.height, GH200_RUNTIME.evaluation_batch_size
+    )
     requests = list(sampler)
     assert all(
-        len(request.indices) == profile.evaluation_batch_size for request in requests
+        len(request.indices) == GH200_RUNTIME.evaluation_batch_size
+        for request in requests
     )
     assert all(
-        request.valid_count == profile.evaluation_batch_size
+        request.valid_count == GH200_RUNTIME.evaluation_batch_size
         for request in requests[:-1]
     )
     assert requests[-1].valid_count == 2
@@ -339,11 +342,12 @@ def test_fixed_evaluation_padding_invalidates_only_padded_rows(
     assert np.all(batch["decision_idx"][2:] == -1)
 
 
-def test_profile_effective_batch_invariant() -> None:
-    assert set(RUNTIME_PROFILES) == {"a10", "a100", "gh200"}
-    assert all(
-        profile.microbatch_size * profile.accumulation_steps == EFFECTIVE_BATCH_SIZE
-        for profile in RUNTIME_PROFILES.values()
+def test_gh200_batch_contract() -> None:
+    assert GH200_RUNTIME.microbatch_size == 64
+    assert GH200_RUNTIME.accumulation_steps == 8
+    assert (
+        GH200_RUNTIME.microbatch_size * GH200_RUNTIME.accumulation_steps
+        == EFFECTIVE_BATCH_SIZE
     )
 
 

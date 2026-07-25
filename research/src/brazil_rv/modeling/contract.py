@@ -5,10 +5,6 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-CONTRACT_VERSION = "CROSS_ASSET_ITRANSFORMER_V1"
-CLOUD_RUNTIME_CONTRACT_VERSION = "CROSS_ASSET_ITRANSFORMER_CLOUD_RUNTIME_V1"
-MUON_COMPATIBILITY_CONTRACT_VERSION = "PYTORCH_2_13_MUON_COMPAT_V1"
-TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION = "TORCH_COMPILE_COMPATIBILITY_V1"
 FEATURE_CONTRACT_VERSION = "M1_FEATURES_V1"
 
 
@@ -95,7 +91,7 @@ INPUT_DROPOUT = 0.05
 RESIDUAL_DROPOUT = 0.10
 ATTENTION_DROPOUT = 0.0
 
-EFFECTIVE_BATCH_SIZE = 32
+EFFECTIVE_BATCH_SIZE = 512
 MAX_EPOCHS = 20
 EARLY_STOP_PATIENCE = 5
 MIN_IC_IMPROVEMENT = 1e-4
@@ -131,7 +127,7 @@ COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL = 1e-3
 COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL = 1e-2
 
 MIN_IC_EQUITIES = 30
-SANITY_SAMPLE_COUNT = 32
+SANITY_SAMPLE_COUNT = 512
 SANITY_DECISION_INDEX = 27
 SANITY_MAX_STEPS = 1_000
 SANITY_MAX_LOSS = 0.05
@@ -154,9 +150,7 @@ EXPECTED_ARRAY_SHAPES = {
 
 
 @dataclass(frozen=True)
-class RuntimeProfile:
-    name: str
-    precision: str
+class RuntimeSettings:
     microbatch_size: int
     accumulation_steps: int
     evaluation_batch_size: int
@@ -168,74 +162,32 @@ class RuntimeProfile:
     compile_dynamic: bool
     minimum_vram_bytes: int
     expected_compute_capability: tuple[int, int]
-    required_device_name_fragment: str | None
-    required_cpu_architecture: str | None
+    required_cpu_architecture: str
 
 
-RUNTIME_PROFILES = {
-    "a10": RuntimeProfile(
-        name="a10",
-        precision="bf16",
-        microbatch_size=16,
-        accumulation_steps=2,
-        evaluation_batch_size=64,
-        num_workers=4,
-        prefetch_factor=2,
-        compile_backend="inductor",
-        compile_mode="reduce-overhead",
-        compile_fullgraph=True,
-        compile_dynamic=False,
-        minimum_vram_bytes=22 * 1024**3,
-        expected_compute_capability=(8, 6),
-        required_device_name_fragment="A10",
-        required_cpu_architecture=None,
-    ),
-    "a100": RuntimeProfile(
-        name="a100",
-        precision="bf16",
-        microbatch_size=32,
-        accumulation_steps=1,
-        evaluation_batch_size=128,
-        num_workers=6,
-        prefetch_factor=4,
-        compile_backend="inductor",
-        compile_mode="reduce-overhead",
-        compile_fullgraph=True,
-        compile_dynamic=False,
-        minimum_vram_bytes=38 * 1024**3,
-        expected_compute_capability=(8, 0),
-        required_device_name_fragment="A100",
-        required_cpu_architecture=None,
-    ),
-    "gh200": RuntimeProfile(
-        name="gh200",
-        precision="bf16",
-        microbatch_size=32,
-        accumulation_steps=1,
-        evaluation_batch_size=256,
-        num_workers=8,
-        prefetch_factor=4,
-        compile_backend="inductor",
-        compile_mode="reduce-overhead",
-        compile_fullgraph=True,
-        compile_dynamic=False,
-        minimum_vram_bytes=90 * 1024**3,
-        expected_compute_capability=(9, 0),
-        required_device_name_fragment=None,
-        required_cpu_architecture="aarch64",
-    ),
-}
-RUNTIME_PROFILE_NAMES = tuple(RUNTIME_PROFILES)
-if any(
-    profile.microbatch_size * profile.accumulation_steps != EFFECTIVE_BATCH_SIZE
-    for profile in RUNTIME_PROFILES.values()
+GH200_RUNTIME = RuntimeSettings(
+    microbatch_size=64,
+    accumulation_steps=8,
+    evaluation_batch_size=256,
+    num_workers=8,
+    prefetch_factor=4,
+    compile_backend="inductor",
+    compile_mode="reduce-overhead",
+    compile_fullgraph=True,
+    compile_dynamic=False,
+    minimum_vram_bytes=90 * 1024**3,
+    expected_compute_capability=(9, 0),
+    required_cpu_architecture="aarch64",
+)
+if (
+    GH200_RUNTIME.microbatch_size * GH200_RUNTIME.accumulation_steps
+    != EFFECTIVE_BATCH_SIZE
 ):
-    raise ValueError("Every runtime profile must preserve effective batch 32")
+    raise ValueError("GH200 physical and accumulated batches must equal 512")
 
 
 @dataclass(frozen=True)
 class HardwareInfo:
-    profile: str
     device_name: str
     compute_capability: tuple[int, int]
     total_vram_bytes: int

@@ -17,7 +17,6 @@ from torch import nn
 
 from .contract import (
     ArchitectureConstants,
-    CLOUD_RUNTIME_CONTRACT_VERSION,
     COMPILE_PARITY_GRADIENT_COSINE_MIN,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
@@ -33,18 +32,18 @@ from .contract import (
     CompileParityThresholds,
     CompileSetupReport,
     CompileWarmupReport,
-    CONTRACT_VERSION,
+    GH200_RUNTIME,
     GRADIENT_CLIP,
     HUBER_DELTA,
     HardwareInfo,
-    MUON_COMPATIBILITY_CONTRACT_VERSION,
-    RuntimeProfile,
+    RuntimeSettings,
 )
 from .metrics import create_metric_table
 from .muon import PYTORCH_MUON_REFERENCE
 
 
-def validate_runtime_profile(profile: RuntimeProfile) -> HardwareInfo:
+def validate_runtime() -> HardwareInfo:
+    runtime = GH200_RUNTIME
     if not torch.cuda.is_available():
         raise RuntimeError("Cloud runtime requires CUDA")
     if torch.cuda.device_count() != 1:
@@ -55,34 +54,22 @@ def validate_runtime_profile(profile: RuntimeProfile) -> HardwareInfo:
     capability = torch.cuda.get_device_capability(0)
     total_memory = torch.cuda.get_device_properties(0).total_memory
     cpu_architecture = system_platform.machine()
-    if total_memory < profile.minimum_vram_bytes:
+    if total_memory < runtime.minimum_vram_bytes:
         raise RuntimeError(
-            f"Profile {profile.name} requires at least "
-            f"{profile.minimum_vram_bytes} VRAM bytes, found {total_memory}"
+            f"GH200 runtime requires at least {runtime.minimum_vram_bytes} "
+            f"VRAM bytes, found {total_memory}"
         )
-    if capability != profile.expected_compute_capability:
+    if capability != runtime.expected_compute_capability:
         raise RuntimeError(
-            f"Profile {profile.name} requires compute capability "
-            f"{profile.expected_compute_capability}, found {capability}"
+            f"GH200 runtime requires compute capability "
+            f"{runtime.expected_compute_capability}, found {capability}"
         )
-    if (
-        profile.required_device_name_fragment is not None
-        and profile.required_device_name_fragment not in device_name
-    ):
+    if cpu_architecture != runtime.required_cpu_architecture:
         raise RuntimeError(
-            f"Profile {profile.name} requires a device name containing "
-            f"{profile.required_device_name_fragment!r}, found {device_name!r}"
-        )
-    if (
-        profile.required_cpu_architecture is not None
-        and cpu_architecture != profile.required_cpu_architecture
-    ):
-        raise RuntimeError(
-            f"Profile {profile.name} requires CPU architecture "
-            f"{profile.required_cpu_architecture}, found {cpu_architecture}"
+            f"GH200 runtime requires CPU architecture "
+            f"{runtime.required_cpu_architecture}, found {cpu_architecture}"
         )
     return HardwareInfo(
-        profile=profile.name,
         device_name=device_name,
         compute_capability=capability,
         total_vram_bytes=total_memory,
@@ -96,7 +83,7 @@ def validate_runtime_profile(profile: RuntimeProfile) -> HardwareInfo:
 
 def compile_model(
     model: nn.Module,
-    profile: RuntimeProfile,
+    runtime: RuntimeSettings,
 ) -> CompileSetupReport:
     compile_api = getattr(model, "compile", None)
     if not callable(compile_api):
@@ -110,17 +97,17 @@ def compile_model(
     else:
         policy = "legacy_implicit"
     compile_api(
-        backend=profile.compile_backend,
-        mode=profile.compile_mode,
-        fullgraph=profile.compile_fullgraph,
-        dynamic=profile.compile_dynamic,
+        backend=runtime.compile_backend,
+        mode=runtime.compile_mode,
+        fullgraph=runtime.compile_fullgraph,
+        dynamic=runtime.compile_dynamic,
     )
     return CompileSetupReport(
         api="nn.Module.compile",
-        backend=profile.compile_backend,
-        mode=profile.compile_mode,
-        fullgraph=profile.compile_fullgraph,
-        dynamic=profile.compile_dynamic,
+        backend=runtime.compile_backend,
+        mode=runtime.compile_mode,
+        fullgraph=runtime.compile_fullgraph,
+        dynamic=runtime.compile_dynamic,
         backward_pass_autocast_control_available=control_available,
         backward_pass_autocast_policy=policy,
     )
@@ -640,7 +627,7 @@ def train_one_epoch(
     loader: Iterable[dict[str, torch.Tensor]],
     optimizers: dict[str, torch.optim.Optimizer],
     schedulers: dict[str, torch.optim.lr_scheduler.LambdaLR],
-    profile: RuntimeProfile,
+    runtime: RuntimeSettings,
 ) -> dict[str, float | int]:
     model.train()
     for optimizer in optimizers.values():
@@ -653,7 +640,7 @@ def train_one_epoch(
 
     for cpu_batch in loader:
         effective_batch.append(cpu_batch)
-        if len(effective_batch) != profile.accumulation_steps:
+        if len(effective_batch) != runtime.accumulation_steps:
             continue
         effective_valid_samples = sum(
             int(batch["label_mask"].any(dim=(1, 2)).sum()) for batch in effective_batch
@@ -782,7 +769,6 @@ def checkpoint_payload(
     model_variant: str,
     optimizer_variant: str,
     muon_backend: str | None,
-    runtime_profile: str,
     seed: int,
     epoch: int,
     validation_score: float,
@@ -790,14 +776,10 @@ def checkpoint_payload(
     git_commit_sha: str,
 ) -> dict[str, object]:
     return {
-        "contract_version": CONTRACT_VERSION,
-        "cloud_runtime_contract_version": CLOUD_RUNTIME_CONTRACT_VERSION,
-        "muon_compatibility_contract_version": (MUON_COMPATIBILITY_CONTRACT_VERSION),
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "model_variant": model_variant,
         "optimizer_variant": optimizer_variant,
-        "runtime_profile": runtime_profile,
         "seed": seed,
         "epoch": epoch,
         "validation_score": validation_score,

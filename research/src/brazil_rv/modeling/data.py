@@ -29,7 +29,7 @@ from .contract import (
     INSTRUMENT_COUNT,
     PATCH_INPUT_WIDTH,
     PATCH_MINUTES,
-    RuntimeProfile,
+    RuntimeSettings,
     TEST_END,
     TEST_START,
     TRAIN_END,
@@ -139,7 +139,9 @@ def validate_feature_store(store: Path) -> pl.DataFrame:
     ):
         raise ValueError("Training, validation, and test rows must be disjoint")
     if splits["train"].get_column("trade_date").n_unique() < EFFECTIVE_BATCH_SIZE:
-        raise ValueError("Training requires at least 32 distinct dates")
+        raise ValueError(
+            f"Training requires at least {EFFECTIVE_BATCH_SIZE} distinct dates"
+        )
     return sample_index
 
 
@@ -326,9 +328,9 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
 
 class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
     def __init__(
-        self, sample_index: pl.DataFrame, profile: RuntimeProfile, seed: int
+        self, sample_index: pl.DataFrame, runtime: RuntimeSettings, seed: int
     ) -> None:
-        self.profile = profile
+        self.runtime = runtime
         self.seed = seed
         self.epoch = 0
         self.sample_count = sample_index.height
@@ -343,7 +345,9 @@ class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
             for trade_date, positions in positions_by_date.items()
         }
         if len(self.dates) < EFFECTIVE_BATCH_SIZE:
-            raise ValueError("Date-stratified sampling requires 32 distinct dates")
+            raise ValueError(
+                f"Date-stratified sampling requires {EFFECTIVE_BATCH_SIZE} distinct dates"
+            )
         self.epoch_sample_count = (
             math.ceil(self.sample_count / EFFECTIVE_BATCH_SIZE) * EFFECTIVE_BATCH_SIZE
         )
@@ -352,7 +356,7 @@ class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
         self.epoch = epoch
 
     def __len__(self) -> int:
-        return self.epoch_sample_count // self.profile.microbatch_size
+        return self.epoch_sample_count // self.runtime.microbatch_size
 
     def __iter__(self) -> Iterator[BatchRequest]:
         generator = np.random.default_rng(self.seed + self.epoch)
@@ -365,9 +369,9 @@ class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
                 trade_date = self.dates[int(date_position)]
                 choices = self.positions_by_date[trade_date]
                 effective_indices.append(int(choices[generator.integers(len(choices))]))
-            for start in range(0, EFFECTIVE_BATCH_SIZE, self.profile.microbatch_size):
+            for start in range(0, EFFECTIVE_BATCH_SIZE, self.runtime.microbatch_size):
                 indices = tuple(
-                    effective_indices[start : start + self.profile.microbatch_size]
+                    effective_indices[start : start + self.runtime.microbatch_size]
                 )
                 yield BatchRequest(indices=indices, valid_count=len(indices))
 
@@ -405,7 +409,7 @@ def seed_worker(_: int) -> None:
 def _create_loader(
     dataset: VectorizedFeatureDataset,
     sampler: Sampler[BatchRequest],
-    profile: RuntimeProfile,
+    runtime: RuntimeSettings,
     seed: int,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     generator = torch.Generator()
@@ -414,10 +418,10 @@ def _create_loader(
         dataset,
         batch_size=None,
         sampler=sampler,
-        num_workers=profile.num_workers,
+        num_workers=runtime.num_workers,
         pin_memory=True,
         persistent_workers=True,
-        prefetch_factor=profile.prefetch_factor,
+        prefetch_factor=runtime.prefetch_factor,
         in_order=True,
         multiprocessing_context="spawn",
         collate_fn=tensorize_vectorized_batch,
@@ -430,23 +434,23 @@ def create_training_loaders(
     store: Path,
     train_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
-    profile: RuntimeProfile,
+    runtime: RuntimeSettings,
     seed: int,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
     DateStratifiedMicrobatchSampler,
 ]:
-    sampler = DateStratifiedMicrobatchSampler(train_rows, profile, seed)
+    sampler = DateStratifiedMicrobatchSampler(train_rows, runtime, seed)
     train_loader = _create_loader(
-        VectorizedFeatureDataset(store, train_rows), sampler, profile, seed
+        VectorizedFeatureDataset(store, train_rows), sampler, runtime, seed
     )
     validation_loader = _create_loader(
         VectorizedFeatureDataset(store, validation_rows),
         SequentialPaddedBatchSampler(
-            validation_rows.height, profile.evaluation_batch_size
+            validation_rows.height, runtime.evaluation_batch_size
         ),
-        profile,
+        runtime,
         seed,
     )
     return train_loader, validation_loader, sampler
@@ -455,12 +459,12 @@ def create_training_loaders(
 def create_evaluation_loader(
     store: Path,
     rows: pl.DataFrame,
-    profile: RuntimeProfile,
+    runtime: RuntimeSettings,
     seed: int,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
         VectorizedFeatureDataset(store, rows),
-        SequentialPaddedBatchSampler(rows.height, profile.evaluation_batch_size),
-        profile,
+        SequentialPaddedBatchSampler(rows.height, runtime.evaluation_batch_size),
+        runtime,
         seed,
     )

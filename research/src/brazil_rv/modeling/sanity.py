@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import json
 import subprocess
 import tempfile
@@ -12,18 +11,14 @@ import numpy as np
 import torch
 
 from .contract import (
-    CONTRACT_VERSION,
-    MUON_COMPATIBILITY_CONTRACT_VERSION,
+    GH200_RUNTIME,
     PROJECT_ROOT,
-    RUNTIME_PROFILES,
-    RUNTIME_PROFILE_NAMES,
     RUN_OUTPUT_BASE,
     SANITY_DECISION_INDEX,
     SANITY_MAX_LOSS,
     SANITY_MAX_STEPS,
     SANITY_MIN_SPEARMAN,
     SANITY_SAMPLE_COUNT,
-    TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION,
 )
 from .data import (
     create_training_loaders,
@@ -43,19 +38,13 @@ from .engine import (
     masked_huber_loss,
     qualify_eager_compiled_model,
     require_compile_parity,
-    validate_runtime_profile,
+    validate_runtime,
     warmup_compiled_model,
 )
 from .metrics import sample_level_ic
 from .model import CrossAssetPatchITransformerV1, count_trainable_parameters
 from .muon import PYTORCH_MUON_REFERENCE
 from .optim import build_optimizers
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--profile", required=True, choices=RUNTIME_PROFILE_NAMES)
-    return parser.parse_args()
 
 
 def _evaluate_fixed_batch(
@@ -86,7 +75,6 @@ def _validate_compiled_checkpoint_compatibility(
     model: CrossAssetPatchITransformerV1,
     evaluation_batch: dict[str, torch.Tensor],
     muon_backend: str,
-    profile_name: str,
     completed_steps: int,
     validation_score: float,
     feature_store: Path,
@@ -107,7 +95,6 @@ def _validate_compiled_checkpoint_compatibility(
         "full",
         "hybrid",
         muon_backend,
-        profile_name,
         11,
         completed_steps,
         validation_score,
@@ -143,9 +130,8 @@ def _validate_compiled_checkpoint_compatibility(
 
 
 def main() -> None:
-    args = parse_args()
-    profile = RUNTIME_PROFILES[args.profile]
-    hardware = validate_runtime_profile(profile)
+    runtime = GH200_RUNTIME
+    hardware = validate_runtime()
     torch.set_float32_matmul_precision("high")
     torch.manual_seed(11)
     torch.cuda.manual_seed_all(11)
@@ -163,10 +149,12 @@ def main() -> None:
         fixed_rows.height != SANITY_SAMPLE_COUNT
         or fixed_rows.get_column("trade_date").n_unique() != SANITY_SAMPLE_COUNT
     ):
-        raise ValueError("Sanity samples must cover 32 distinct training dates")
+        raise ValueError(
+            f"Sanity samples must cover {SANITY_SAMPLE_COUNT} distinct training dates"
+        )
     cache_report = warm_feature_store_cache(feature_store)
     train_loader, evaluation_loader, sampler = create_training_loaders(
-        feature_store, fixed_rows, fixed_rows, profile, 11
+        feature_store, fixed_rows, fixed_rows, runtime, 11
     )
     sampler.set_epoch(0)
     microbatches = list(train_loader)
@@ -176,7 +164,7 @@ def main() -> None:
     model.eval()
     optimizers, _, muon_backend = build_optimizers(model, "hybrid")
     eager_reference = clone_eager_reference_model(model)
-    compile_setup = compile_model(model, profile)
+    compile_setup = compile_model(model, runtime)
     compile_parity = qualify_eager_compiled_model(
         eager_reference,
         model,
@@ -256,7 +244,6 @@ def main() -> None:
             model,
             evaluation_batch,
             muon_backend,
-            profile.name,
             completed_steps,
             final_spearman,
             feature_store,
@@ -279,28 +266,21 @@ def main() -> None:
     )
     created_at = datetime.now(timezone.utc)
     output_dir = RUN_OUTPUT_BASE / (
-        "sanity_cross_asset_patch_itransformer_v1_"
-        f"{profile.name}_{created_at:%Y%m%dT%H%M%S%fZ}"
+        f"sanity_cross_asset_patch_itransformer_{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     if output_dir.exists():
         raise FileExistsError(f"Sanity output already exists: {output_dir}")
     output_dir.mkdir(parents=True)
     report = {
-        "contract_version": CONTRACT_VERSION,
-        "muon_compatibility_contract_version": (MUON_COMPATIBILITY_CONTRACT_VERSION),
-        "torch_compile_compatibility_contract_version": (
-            TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION
-        ),
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "created_at_utc": created_at.isoformat(),
         "resolved_feature_store_path": str(feature_store),
-        "profile": profile.name,
         "hardware": asdict(hardware),
         "compile": compile_metadata,
         "feature_cache_warmup": asdict(cache_report),
-        "physical_microbatch_size": profile.microbatch_size,
-        "accumulation_steps": profile.accumulation_steps,
+        "physical_microbatch_size": runtime.microbatch_size,
+        "accumulation_steps": runtime.accumulation_steps,
         "sample_count": SANITY_SAMPLE_COUNT,
         "decision_index": SANITY_DECISION_INDEX,
         "optimizer_steps": completed_steps,

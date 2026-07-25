@@ -172,8 +172,7 @@ cleanup_temporary_files() {
 trap cleanup_temporary_files EXIT
 
 TORCH_LOGS="recompiles,graph_breaks" \
-uv run --frozen python -m brazil_rv.modeling.sanity \
-    --profile gh200
+uv run --frozen python -m brazil_rv.modeling.sanity
 
 SANITY_REPORTS=()
 while IFS= read -r -d '' report; do

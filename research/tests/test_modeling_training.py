@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 import json
+import sys
 from contextlib import nullcontext
 from dataclasses import asdict
 from pathlib import Path
@@ -14,6 +15,9 @@ import torch
 from torch import nn
 
 import brazil_rv.modeling.engine as engine_module
+import brazil_rv.modeling.evaluate as evaluate_module
+import brazil_rv.modeling.sanity as sanity_module
+import brazil_rv.modeling.train as train_module
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
     ADAMW_BETAS,
@@ -31,13 +35,12 @@ from brazil_rv.modeling.contract import (
     CompileEvaluationWarmupReport,
     CompileParityThresholds,
     CompileSetupReport,
-    EFFECTIVE_BATCH_SIZE,
     EQUITY_COUNT,
     FINAL_LR_FACTOR,
+    GH200_RUNTIME,
     INSTRUMENT_COUNT,
     MAX_EPOCHS,
     MUON_ADJUST_LR_FN,
-    MUON_COMPATIBILITY_CONTRACT_VERSION,
     MUON_EPS,
     MUON_LR,
     MUON_MOMENTUM,
@@ -46,8 +49,6 @@ from brazil_rv.modeling.contract import (
     MUON_NS_STEPS,
     MUON_WEIGHT_DECAY,
     PATCH_INPUT_WIDTH,
-    RUNTIME_PROFILES,
-    TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION,
 )
 from brazil_rv.modeling.evaluate import _validate_run_checkpoint_identity
 from brazil_rv.modeling.engine import (
@@ -60,7 +61,7 @@ from brazil_rv.modeling.engine import (
     compile_model,
     masked_huber_loss,
     train_one_epoch,
-    validate_runtime_profile,
+    validate_runtime,
 )
 from brazil_rv.modeling.layers import MuonLinear
 from brazil_rv.modeling.metrics import create_metric_table
@@ -79,6 +80,7 @@ from brazil_rv.modeling.optim import (
 class _TrackingOptimizer:
     def __init__(self, parameters: list[nn.Parameter]) -> None:
         self.parameters = parameters
+        self.param_groups = [{"lr": 1e-3}]
         self.step_count = 0
 
     def step(self) -> None:
@@ -238,6 +240,74 @@ def test_cloud_engine_has_no_scaler_dependency() -> None:
     assert "scaler" not in inspect.signature(train_one_epoch).parameters
 
 
+def test_entrypoint_clis_use_only_current_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train", "--model", "full", "--optimizer", "hybrid", "--seed", "11"],
+    )
+    assert vars(train_module.parse_args()) == {
+        "model": "full",
+        "optimizer": "hybrid",
+        "seed": 11,
+    }
+    monkeypatch.setattr(
+        sys, "argv", ["evaluate", "--run-dir", str(tmp_path), "--split", "validation"]
+    )
+    assert vars(evaluate_module.parse_args()) == {
+        "run_dir": tmp_path,
+        "split": "validation",
+    }
+    assert not hasattr(sanity_module, "parse_args")
+
+
+def test_training_updates_after_eight_physical_batches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = nn.Linear(1, 1, bias=False)
+    optimizer = _TrackingOptimizer(list(model.parameters()))
+    scheduler = _TrackingScheduler()
+    loader = [
+        {
+            "targets": torch.zeros(1, 1, 1),
+            "label_mask": torch.ones(1, 1, 1, dtype=torch.bool),
+        }
+        for _ in range(GH200_RUNTIME.accumulation_steps)
+    ]
+    forward_calls = 0
+    backward_calls = 0
+
+    def record_backward(gradient: torch.Tensor) -> torch.Tensor:
+        nonlocal backward_calls
+        backward_calls += 1
+        return gradient
+
+    model.weight.register_hook(record_backward)
+
+    def predict(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        nonlocal forward_calls
+        forward_calls += 1
+        return next(model.parameters()).reshape(1, 1, 1)
+
+    monkeypatch.setattr(engine_module, "_to_cuda", lambda batch: batch)
+    monkeypatch.setattr(engine_module, "_predict", predict)
+    report = train_one_epoch(
+        model,
+        loader,
+        {"adamw": optimizer},
+        {"adamw": scheduler},
+        GH200_RUNTIME,
+    )
+    assert forward_calls == 8
+    assert optimizer.step_count == 1
+    assert backward_calls == 8
+    assert scheduler.step_count == 1
+    assert report["optimizer_steps"] == 1
+
+
 def test_muon_partition_is_complete_disjoint_and_exact() -> None:
     model = CrossAssetPatchITransformerV1("full")
     groups = partition_parameters(model, "hybrid")
@@ -308,8 +378,9 @@ def test_scheduler_endpoints_and_actual_update_numbering() -> None:
     parameter = nn.Parameter(torch.zeros(()))
     optimizer = torch.optim.SGD([parameter], lr=1.0)
     schedulers, steps_per_epoch, actual_warmup = build_schedulers(
-        {"adamw": optimizer}, EFFECTIVE_BATCH_SIZE * 10
+        {"adamw": optimizer}, 31_405
     )
+    assert steps_per_epoch == 62
     actual_total = steps_per_epoch * MAX_EPOCHS
     actual_factors = []
     for _ in range(actual_total):
@@ -332,14 +403,14 @@ def test_compile_setup_modern_explicit_off(
     config = SimpleNamespace(backward_pass_autocast="same_as_forward")
     monkeypatch.setattr(engine_module, "functorch_config", config)
     monkeypatch.setattr(nn.Module, "compile", fake_compile)
-    profile = RUNTIME_PROFILES["a10"]
-    report = compile_model(nn.Linear(2, 1), profile)
+    runtime = GH200_RUNTIME
+    report = compile_model(nn.Linear(2, 1), runtime)
     assert calls == [
         {
-            "backend": profile.compile_backend,
-            "mode": profile.compile_mode,
-            "fullgraph": profile.compile_fullgraph,
-            "dynamic": profile.compile_dynamic,
+            "backend": runtime.compile_backend,
+            "mode": runtime.compile_mode,
+            "fullgraph": runtime.compile_fullgraph,
+            "dynamic": runtime.compile_dynamic,
         }
     ]
     assert config.backward_pass_autocast == "off"
@@ -365,14 +436,14 @@ def test_compile_setup_legacy_implicit(
     config = SimpleNamespace()
     monkeypatch.setattr(engine_module, "functorch_config", config)
     monkeypatch.setattr(nn.Module, "compile", fake_compile)
-    profile = RUNTIME_PROFILES["gh200"]
-    report = compile_model(nn.Linear(2, 1), profile)
+    runtime = GH200_RUNTIME
+    report = compile_model(nn.Linear(2, 1), runtime)
     assert calls == [
         {
-            "backend": profile.compile_backend,
-            "mode": profile.compile_mode,
-            "fullgraph": profile.compile_fullgraph,
-            "dynamic": profile.compile_dynamic,
+            "backend": runtime.compile_backend,
+            "mode": runtime.compile_mode,
+            "fullgraph": runtime.compile_fullgraph,
+            "dynamic": runtime.compile_dynamic,
         }
     ]
     assert not hasattr(config, "backward_pass_autocast")
@@ -383,7 +454,7 @@ def test_compile_setup_legacy_implicit(
 def test_compile_setup_requires_callable_module_api() -> None:
     model = SimpleNamespace(compile=None)
     with pytest.raises(RuntimeError, match="nn.Module.compile"):
-        compile_model(model, RUNTIME_PROFILES["a10"])
+        compile_model(model, GH200_RUNTIME)
 
 
 def _synthetic_compile_parity(
@@ -624,9 +695,6 @@ def test_compile_metadata_schema_is_exact() -> None:
     }
     assert "backward_pass_autocast" not in metadata
     assert "backward_pass_autocast" not in metadata["setup"]
-    assert TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION == (
-        "TORCH_COMPILE_COMPATIBILITY_V1"
-    )
     assert asdict(CompileParityThresholds()) == {
         "prediction_atol": COMPILE_PARITY_PREDICTION_ATOL,
         "prediction_rtol": COMPILE_PARITY_PREDICTION_RTOL,
@@ -657,46 +725,70 @@ def test_clone_eager_reference_has_distinct_exact_parameters_and_rng() -> None:
     assert not torch.equal(next(model.parameters()), next(reference.parameters()))
 
 
-@pytest.mark.parametrize("profile_name", tuple(RUNTIME_PROFILES))
-def test_runtime_profile_hardware_validation(
-    profile_name: str, monkeypatch: pytest.MonkeyPatch
+def test_gh200_runtime_hardware_validation(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    profile = RUNTIME_PROFILES[profile_name]
-    device_name = {
-        "a10": "NVIDIA A10",
-        "a100": "NVIDIA A100-SXM4-40GB",
-        "gh200": "NVIDIA GH200 480GB",
-    }[profile_name]
-    cpu_architecture = profile.required_cpu_architecture or "x86_64"
+    runtime = GH200_RUNTIME
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.cuda, "device_count", lambda: 1)
     monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda: True)
-    monkeypatch.setattr(torch.cuda, "get_device_name", lambda _: device_name)
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda _: "NVIDIA GH200 480GB")
     monkeypatch.setattr(
         torch.cuda,
         "get_device_capability",
-        lambda _: profile.expected_compute_capability,
+        lambda _: runtime.expected_compute_capability,
     )
     monkeypatch.setattr(
         torch.cuda,
         "get_device_properties",
-        lambda _: SimpleNamespace(total_memory=profile.minimum_vram_bytes),
+        lambda _: SimpleNamespace(total_memory=runtime.minimum_vram_bytes),
     )
     monkeypatch.setattr(
-        engine_module.system_platform, "machine", lambda: cpu_architecture
+        engine_module.system_platform,
+        "machine",
+        lambda: runtime.required_cpu_architecture,
     )
     monkeypatch.setattr(
         engine_module.system_platform, "platform", lambda: "test-platform"
     )
-    hardware = validate_runtime_profile(profile)
-    assert hardware.profile == profile.name
-    assert hardware.compute_capability == profile.expected_compute_capability
-    if profile.required_device_name_fragment is not None:
-        monkeypatch.setattr(torch.cuda, "get_device_name", lambda _: "wrong-device")
-    else:
-        monkeypatch.setattr(engine_module.system_platform, "machine", lambda: "x86_64")
+    hardware = validate_runtime()
+    assert hardware.compute_capability == runtime.expected_compute_capability
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     with pytest.raises(RuntimeError):
-        validate_runtime_profile(profile)
+        validate_runtime()
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 2)
+    with pytest.raises(RuntimeError):
+        validate_runtime()
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 1)
+    monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda: False)
+    with pytest.raises(RuntimeError):
+        validate_runtime()
+    monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda: True)
+    monkeypatch.setattr(
+        torch.cuda,
+        "get_device_properties",
+        lambda _: SimpleNamespace(total_memory=runtime.minimum_vram_bytes - 1),
+    )
+    with pytest.raises(RuntimeError):
+        validate_runtime()
+    monkeypatch.setattr(
+        torch.cuda,
+        "get_device_properties",
+        lambda _: SimpleNamespace(total_memory=runtime.minimum_vram_bytes),
+    )
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda _: (9, 1))
+    with pytest.raises(RuntimeError):
+        validate_runtime()
+    monkeypatch.setattr(
+        torch.cuda,
+        "get_device_capability",
+        lambda _: runtime.expected_compute_capability,
+    )
+    monkeypatch.setattr(engine_module.system_platform, "machine", lambda: "x86_64")
+    with pytest.raises(RuntimeError):
+        validate_runtime()
 
 
 def test_padded_evaluation_matches_unpadded_reference() -> None:
@@ -797,15 +889,11 @@ def _matching_run_identity(
     muon_backend: str | None = OFFICIAL_MUON_BACKEND,
 ) -> dict[str, object]:
     return {
-        "contract_version": "CROSS_ASSET_ITRANSFORMER_V1",
-        "cloud_runtime_contract_version": ("CROSS_ASSET_ITRANSFORMER_CLOUD_RUNTIME_V1"),
-        "muon_compatibility_contract_version": (MUON_COMPATIBILITY_CONTRACT_VERSION),
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "model_variant": "full",
         "optimizer_variant": optimizer_variant,
         "seed": 11,
-        "runtime_profile": "a10",
         "resolved_feature_store_path": str(feature_store),
         "git_commit_sha": "test-sha",
         "architecture_constants": {"d_model": 256},
@@ -826,9 +914,6 @@ def test_evaluation_identity_accepts_matching_hybrid_backends(
         muon_backend=muon_backend,
     )
     checkpoint = dict(manifest)
-    evaluation_profile = "a100"
-    assert evaluation_profile != manifest["runtime_profile"]
-    manifest["evaluation_runtime_profile"] = evaluation_profile
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
 
 
@@ -857,31 +942,20 @@ def test_evaluation_identity_rejects_matching_unknown_optimizer_variant(
         _validate_run_checkpoint_identity(manifest, dict(manifest), feature_store)
 
 
-@pytest.mark.parametrize(
-    ("field", "stale_value"),
-    (
-        ("muon_compatibility_contract_version", "STALE_MUON_CONTRACT"),
-        (
-            "muon_reference",
-            {
-                "upstream_tag": "v2.12.0",
-                "upstream_path": "torch/optim/_muon.py",
-                "upstream_blob_sha": "stale",
-            },
-        ),
-    ),
-)
-def test_evaluation_identity_rejects_stale_but_matching_muon_values(
-    field: str,
-    stale_value: object,
+def test_evaluation_identity_rejects_stale_muon_reference(
     tmp_path: Path,
 ) -> None:
     feature_store = tmp_path.resolve()
     manifest = _matching_run_identity(feature_store)
     checkpoint = dict(manifest)
-    manifest[field] = stale_value
-    checkpoint[field] = copy.deepcopy(stale_value)
-    with pytest.raises(ValueError, match=field):
+    stale_reference = {
+        "upstream_tag": "v2.12.0",
+        "upstream_path": "torch/optim/_muon.py",
+        "upstream_blob_sha": "stale",
+    }
+    manifest["muon_reference"] = stale_reference
+    checkpoint["muon_reference"] = copy.deepcopy(stale_reference)
+    with pytest.raises(ValueError, match="muon_reference"):
         _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
 
 
@@ -911,15 +985,11 @@ def test_evaluation_identity_rejects_invalid_matching_backend_semantics(
 @pytest.mark.parametrize(
     "field",
     (
-        "contract_version",
-        "cloud_runtime_contract_version",
-        "muon_compatibility_contract_version",
         "muon_backend",
         "muon_reference",
         "model_variant",
         "optimizer_variant",
         "seed",
-        "runtime_profile",
         "resolved_feature_store_path",
         "git_commit_sha",
         "architecture_constants",
@@ -967,7 +1037,6 @@ def test_checkpoint_round_trip_eager(tmp_path: Path) -> None:
         "temporal_only",
         "adamw",
         None,
-        "a10",
         11,
         1,
         0.0,

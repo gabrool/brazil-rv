@@ -11,14 +11,7 @@ from pathlib import Path
 import polars as pl
 import torch
 
-from .contract import (
-    CLOUD_RUNTIME_CONTRACT_VERSION,
-    CONTRACT_VERSION,
-    MUON_COMPATIBILITY_CONTRACT_VERSION,
-    RUNTIME_PROFILES,
-    RUNTIME_PROFILE_NAMES,
-    TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION,
-)
+from .contract import GH200_RUNTIME
 from .data import (
     create_evaluation_loader,
     select_sample_split,
@@ -32,7 +25,7 @@ from .engine import (
     evaluate_model,
     qualify_eager_compiled_model,
     require_compile_parity,
-    validate_runtime_profile,
+    validate_runtime,
     warmup_compiled_evaluation,
 )
 from .model import CrossAssetPatchITransformerV1
@@ -40,15 +33,11 @@ from .muon import PYTORCH_MUON_REFERENCE
 from .optim import OFFICIAL_MUON_BACKEND, REFERENCE_MUON_BACKEND
 
 _CHECKPOINT_IDENTITY_FIELDS = (
-    "contract_version",
-    "cloud_runtime_contract_version",
-    "muon_compatibility_contract_version",
     "muon_backend",
     "muon_reference",
     "model_variant",
     "optimizer_variant",
     "seed",
-    "runtime_profile",
     "resolved_feature_store_path",
     "git_commit_sha",
     "architecture_constants",
@@ -57,20 +46,12 @@ _CHECKPOINT_IDENTITY_FIELDS = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--profile", required=True, choices=RUNTIME_PROFILE_NAMES)
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--split", required=True, choices=("validation", "test"))
     return parser.parse_args()
 
 
 def _validate_muon_identity_values(identity: dict[str, object]) -> None:
-    if (
-        identity["muon_compatibility_contract_version"]
-        != MUON_COMPATIBILITY_CONTRACT_VERSION
-    ):
-        raise ValueError(
-            "Invalid Muon identity field: muon_compatibility_contract_version"
-        )
     if identity["muon_reference"] != dict(PYTORCH_MUON_REFERENCE):
         raise ValueError("Invalid Muon identity field: muon_reference")
 
@@ -121,8 +102,8 @@ def _atomic_write_parquet(path: Path, frame: pl.DataFrame) -> None:
 
 def main() -> None:
     args = parse_args()
-    profile = RUNTIME_PROFILES[args.profile]
-    hardware = validate_runtime_profile(profile)
+    runtime = GH200_RUNTIME
+    hardware = validate_runtime()
     torch.set_float32_matmul_precision("high")
 
     manifest = json.loads(
@@ -130,15 +111,6 @@ def main() -> None:
     )
     if manifest.get("status") != "completed":
         raise ValueError("Standalone evaluation requires a completed run")
-    if manifest.get("contract_version") != CONTRACT_VERSION:
-        raise ValueError("Run manifest model contract version does not match")
-    if manifest.get("cloud_runtime_contract_version") != CLOUD_RUNTIME_CONTRACT_VERSION:
-        raise ValueError("Run manifest cloud runtime contract version does not match")
-    if (
-        manifest.get("torch_compile_compatibility_contract_version")
-        != TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION
-    ):
-        raise ValueError("Run manifest torch.compile contract version does not match")
     training_compile = manifest.get("compile")
     if not isinstance(training_compile, dict):
         raise ValueError("Run manifest compile metadata is missing")
@@ -160,14 +132,14 @@ def main() -> None:
 
     cache_report = warm_feature_store_cache(feature_store)
     loader = create_evaluation_loader(
-        feature_store, rows, profile, int(manifest["seed"])
+        feature_store, rows, runtime, int(manifest["seed"])
     )
     model = CrossAssetPatchITransformerV1(str(checkpoint["model_variant"]))
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to("cuda")
     eager_reference = clone_eager_reference_model(model)
     evaluation_batch = next(iter(loader))
-    compile_setup = compile_model(model, profile)
+    compile_setup = compile_model(model, runtime)
     compile_parity = qualify_eager_compiled_model(
         eager_reference,
         model,
@@ -193,9 +165,7 @@ def main() -> None:
 
     created_at = datetime.now(timezone.utc)
     evaluation_dir = (
-        args.run_dir
-        / "evaluations"
-        / (f"{args.split}_{profile.name}_{created_at:%Y%m%dT%H%M%S%fZ}")
+        args.run_dir / "evaluations" / (f"{args.split}_{created_at:%Y%m%dT%H%M%S%fZ}")
     )
     if evaluation_dir.exists():
         raise FileExistsError(f"Evaluation output already exists: {evaluation_dir}")
@@ -212,12 +182,7 @@ def main() -> None:
     _atomic_write_parquet(evaluation_dir / "daily_metrics.parquet", daily_metrics)
     evaluation_manifest = {
         "created_at_utc": created_at.isoformat(),
-        "torch_compile_compatibility_contract_version": (
-            TORCH_COMPILE_COMPATIBILITY_CONTRACT_VERSION
-        ),
         "split": args.split,
-        "training_runtime_profile": manifest["runtime_profile"],
-        "evaluation_runtime_profile": profile.name,
         "hardware": asdict(hardware),
         "feature_cache_warmup": asdict(cache_report),
         "compile": compile_metadata,

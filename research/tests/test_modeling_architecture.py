@@ -11,9 +11,9 @@ from brazil_rv.modeling.contract import (
     COMPILE_STEADY_STATE_PASS_COUNT,
     COMPILE_WARMUP_PASS_COUNT,
     EQUITY_COUNT,
+    GH200_RUNTIME,
     INSTRUMENT_COUNT,
     PATCH_INPUT_WIDTH,
-    RUNTIME_PROFILES,
 )
 from brazil_rv.modeling.engine import compile_model, warmup_compiled_model
 from brazil_rv.modeling.layers import MultiHeadAttention, RotaryEmbedding
@@ -245,5 +245,5 @@ def test_compile_warmup_reports_final_three_pass_medians(
 def test_in_place_compile_preserves_state_dict_keys() -> None:
     model = CrossAssetPatchITransformerV1("temporal_only").to("cuda")
     expected_keys = set(model.state_dict())
-    compile_model(model, RUNTIME_PROFILES["a10"])
+    compile_model(model, GH200_RUNTIME)
     assert set(model.state_dict()) == expected_keys
