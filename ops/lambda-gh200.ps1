@@ -65,7 +65,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$script:ScriptVersion = '1.1.0'
+$script:ScriptVersion = '1.1.1'
 $script:ApiBaseUri = 'https://cloud.lambda.ai/api/v1'
 $script:TargetRegion = 'us-east-3'
 $script:FileSystemName = 'brazil-rv-east3'
@@ -1729,6 +1729,54 @@ function Test-SshAgentContainsIdentity {
     return $false
 }
 
+function Start-WindowsSshAgent {
+    try {
+        $service = Get-Service -Name 'ssh-agent' -ErrorAction Stop
+        if ([string]$service.Status -ne 'Running') {
+            Start-Service -Name 'ssh-agent' -ErrorAction Stop
+            $service = Get-Service -Name 'ssh-agent' -ErrorAction Stop
+        }
+        if ([string]$service.Status -ne 'Running') {
+            throw 'The service did not enter the Running state.'
+        }
+    }
+    catch {
+        throw (
+            'Windows ssh-agent is unavailable. Open PowerShell as Administrator once and run: ' +
+            'Set-Service -Name ssh-agent -StartupType Manual; Start-Service ssh-agent'
+        )
+    }
+}
+
+function Get-SshAgentListing {
+    param(
+        [Parameter(Mandatory = $true)][string]$SshAddPath,
+        [AllowNull()][scriptblock]$ProcessInvoker,
+        [AllowNull()][scriptblock]$AgentStarter
+    )
+
+    if ($null -eq $ProcessInvoker) {
+        $ProcessInvoker = {
+            param([string]$Executable)
+            Invoke-CheckedProcess -FilePath $Executable -ArgumentList @('-L') `
+                -AllowedExitCodes @(0, 1, 2)
+        }
+    }
+    if ($null -eq $AgentStarter) {
+        $AgentStarter = { Start-WindowsSshAgent }
+    }
+
+    $listed = & $ProcessInvoker $SshAddPath
+    if ($listed.ExitCode -eq 2) {
+        & $AgentStarter
+        $listed = & $ProcessInvoker $SshAddPath
+    }
+    if ($listed.ExitCode -eq 2) {
+        throw 'ssh-add still cannot communicate with Windows ssh-agent after service recovery.'
+    }
+    return $listed
+}
+
 function Get-SshPreflight {
     $sshDirectory = Join-Path $env:USERPROFILE '.ssh'
     $privateKey = Join-Path $sshDirectory 'lambda_brazil_rv_ed25519'
@@ -1744,14 +1792,13 @@ function Get-SshPreflight {
     $identity = Get-PublicKeyIdentity (
         [IO.File]::ReadAllText($publicKey, [Text.Encoding]::UTF8)
     )
-    $listed = Invoke-CheckedProcess -FilePath $sshAdd.Source -ArgumentList @('-L') `
-        -AllowedExitCodes @(0, 1)
+    $listed = Get-SshAgentListing -SshAddPath $sshAdd.Source
     if ($listed.ExitCode -ne 0 -or
         -not (Test-SshAgentContainsIdentity $listed.StdOut $identity)) {
         Write-Host 'Loading the Brazil-RV SSH key into ssh-agent. Enter its passphrase if prompted.'
         [void](Invoke-CheckedProcess -FilePath $sshAdd.Source -ArgumentList @($privateKey) `
             -TimeoutSeconds 300 -NoCapture)
-        $listed = Invoke-CheckedProcess -FilePath $sshAdd.Source -ArgumentList @('-L')
+        $listed = Get-SshAgentListing -SshAddPath $sshAdd.Source
     }
     if (-not (Test-SshAgentContainsIdentity $listed.StdOut $identity)) {
         throw 'The brazil-rv public key is not loaded in ssh-agent.'
@@ -1784,7 +1831,7 @@ function Assert-LaunchSshIdentity {
     )) {
         throw 'The local SSH public key identity changed after preflight.'
     }
-    $listed = Invoke-CheckedProcess -FilePath $SshPreflight.SshAddPath -ArgumentList @('-L')
+    $listed = Get-SshAgentListing -SshAddPath $SshPreflight.SshAddPath
     if (-not (Test-SshAgentContainsIdentity $listed.StdOut $currentIdentity)) {
         throw 'The preflight SSH identity is no longer loaded in ssh-agent.'
     }
@@ -2815,7 +2862,6 @@ function Invoke-WatcherEntry {
 if ($MyInvocation.InvocationName -ne '.') {
     Invoke-WatcherEntry
 }
-
 
 
 
