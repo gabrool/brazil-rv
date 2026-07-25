@@ -622,6 +622,54 @@ def _optimizer_update(
     return update_succeeded, float(gradient_norm)
 
 
+def _run_accumulated_update(
+    model: nn.Module,
+    effective_batch: list[dict[str, torch.Tensor]],
+    optimizers: dict[str, torch.optim.Optimizer],
+    schedulers: dict[str, torch.optim.lr_scheduler.LambdaLR],
+    *,
+    check_predictions_finite: bool = False,
+) -> tuple[torch.Tensor, int, bool, float, bool | None]:
+    if not effective_batch:
+        raise ValueError("Effective batch must contain at least one physical batch")
+    effective_valid_samples = sum(
+        int(batch["label_mask"].any(dim=(1, 2)).sum()) for batch in effective_batch
+    )
+    denominator = max(effective_valid_samples, 1)
+    effective_loss_sum: torch.Tensor | None = None
+    predictions_finite: bool | None = True if check_predictions_finite else None
+    for buffered_batch in effective_batch:
+        batch = _to_cuda(buffered_batch)
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            predictions = _predict(model, batch)
+            microbatch_loss_sum = _loss_sum(
+                predictions,
+                batch["targets"],
+                batch["label_mask"],
+            )
+        if check_predictions_finite:
+            predictions_finite = bool(
+                predictions_finite and bool(torch.isfinite(predictions).all())
+            )
+        (microbatch_loss_sum / denominator).backward()
+        detached_loss = microbatch_loss_sum.detach()
+        effective_loss_sum = (
+            detached_loss
+            if effective_loss_sum is None
+            else effective_loss_sum + detached_loss
+        )
+    update_succeeded, gradient_norm = _optimizer_update(model, optimizers, schedulers)
+    if effective_loss_sum is None:
+        raise RuntimeError("Effective batch contains no physical batches")
+    return (
+        effective_loss_sum,
+        effective_valid_samples,
+        update_succeeded,
+        gradient_norm,
+        predictions_finite,
+    )
+
+
 def train_one_epoch(
     model: nn.Module,
     loader: Iterable[dict[str, torch.Tensor]],
@@ -642,31 +690,18 @@ def train_one_epoch(
         effective_batch.append(cpu_batch)
         if len(effective_batch) != runtime.accumulation_steps:
             continue
-        effective_valid_samples = sum(
-            int(batch["label_mask"].any(dim=(1, 2)).sum()) for batch in effective_batch
+        (
+            effective_loss_sum,
+            effective_valid_samples,
+            update_succeeded,
+            gradient_norm,
+            _,
+        ) = _run_accumulated_update(
+            model,
+            effective_batch,
+            optimizers,
+            schedulers,
         )
-        denominator = max(effective_valid_samples, 1)
-        effective_loss_sum: torch.Tensor | None = None
-        for buffered_batch in effective_batch:
-            batch = _to_cuda(buffered_batch)
-            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-                microbatch_loss_sum = _loss_sum(
-                    _predict(model, batch),
-                    batch["targets"],
-                    batch["label_mask"],
-                )
-            (microbatch_loss_sum / denominator).backward()
-            detached_loss = microbatch_loss_sum.detach()
-            effective_loss_sum = (
-                detached_loss
-                if effective_loss_sum is None
-                else effective_loss_sum + detached_loss
-            )
-        update_succeeded, gradient_norm = _optimizer_update(
-            model, optimizers, schedulers
-        )
-        if effective_loss_sum is None:
-            raise RuntimeError("Effective batch contains no microbatches")
         loss_sum += float(effective_loss_sum)
         valid_sample_count += effective_valid_samples
         if update_succeeded:

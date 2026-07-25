@@ -92,6 +92,22 @@ class _TrackingOptimizer:
             parameter.grad = None
 
 
+class _TrackingSgdOptimizer(_TrackingOptimizer):
+    def __init__(self, parameters: list[nn.Parameter], lr: float) -> None:
+        super().__init__(parameters)
+        self.param_groups[0]["lr"] = lr
+
+    def step(self) -> None:
+        self.step_count += 1
+        with torch.no_grad():
+            for parameter in self.parameters:
+                if parameter.grad is not None:
+                    parameter.add_(
+                        parameter.grad,
+                        alpha=-float(self.param_groups[0]["lr"]),
+                    )
+
+
 class _TrackingScheduler:
     def __init__(self) -> None:
         self.step_count = 0
@@ -306,6 +322,125 @@ def test_training_updates_after_eight_physical_batches(
     assert backward_calls == 8
     assert scheduler.step_count == 1
     assert report["optimizer_steps"] == 1
+
+
+def test_accumulated_update_matches_logical_batch_with_unequal_valid_counts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    torch.manual_seed(17)
+    reference_model = nn.Linear(2, 1)
+    accumulated_model = copy.deepcopy(reference_model)
+    features = torch.randn(16, 2)
+    targets = torch.randn(16, 1, 1)
+    valid_counts = (1, 2, 1, 2, 2, 1, 2, 1)
+    microbatches: list[dict[str, torch.Tensor]] = []
+    masks: list[torch.Tensor] = []
+    for index, valid_count in enumerate(valid_counts):
+        mask = torch.zeros(2, 1, 1, dtype=torch.bool)
+        mask[:valid_count] = True
+        masks.append(mask)
+        start = index * 2
+        microbatches.append(
+            {
+                "features": features[start : start + 2],
+                "targets": targets[start : start + 2],
+                "label_mask": mask,
+            }
+        )
+
+    monkeypatch.setattr(engine_module, "_to_cuda", lambda batch: batch)
+    monkeypatch.setattr(
+        engine_module,
+        "_predict",
+        lambda model, batch: model(batch["features"]).reshape(-1, 1, 1),
+    )
+    monkeypatch.setattr(
+        engine_module.torch,
+        "autocast",
+        lambda **_: nullcontext(),
+    )
+
+    reference_optimizer = _TrackingSgdOptimizer(
+        list(reference_model.parameters()), 0.01
+    )
+    reference_scheduler = _TrackingScheduler()
+    reference_predictions = reference_model(features).reshape(-1, 1, 1)
+    logical_mask = torch.cat(masks)
+    logical_valid_count = int(logical_mask.any(dim=(1, 2)).sum())
+    reference_loss = (
+        engine_module._loss_sum(reference_predictions, targets, logical_mask)
+        / logical_valid_count
+    )
+    reference_loss.backward()
+    reference_succeeded, _ = _optimizer_update(
+        reference_model,
+        {"adamw": reference_optimizer},
+        {"adamw": reference_scheduler},
+    )
+
+    accumulated_optimizer = _TrackingSgdOptimizer(
+        list(accumulated_model.parameters()), 0.01
+    )
+    accumulated_scheduler = _TrackingScheduler()
+    report = train_one_epoch(
+        accumulated_model,
+        microbatches,
+        {"adamw": accumulated_optimizer},
+        {"adamw": accumulated_scheduler},
+        GH200_RUNTIME,
+    )
+
+    assert len(set(valid_counts)) > 1
+    assert reference_succeeded
+    assert report["train_loss"] == pytest.approx(float(reference_loss.detach()))
+    for reference_parameter, accumulated_parameter in zip(
+        reference_model.parameters(), accumulated_model.parameters(), strict=True
+    ):
+        torch.testing.assert_close(
+            accumulated_parameter,
+            reference_parameter,
+            atol=1e-7,
+            rtol=1e-7,
+        )
+    assert reference_optimizer.step_count == 1
+    assert accumulated_optimizer.step_count == 1
+    assert reference_scheduler.step_count == 1
+    assert accumulated_scheduler.step_count == 1
+    assert report["optimizer_steps"] == 1
+
+
+def test_incomplete_accumulation_group_fails_without_optimizer_step(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = nn.Linear(1, 1, bias=False)
+    initial_weight = model.weight.detach().clone()
+    optimizer = _TrackingOptimizer(list(model.parameters()))
+    scheduler = _TrackingScheduler()
+    loader = [
+        {
+            "targets": torch.zeros(1, 1, 1),
+            "label_mask": torch.ones(1, 1, 1, dtype=torch.bool),
+        }
+        for _ in range(GH200_RUNTIME.accumulation_steps - 1)
+    ]
+    monkeypatch.setattr(
+        engine_module,
+        "_predict",
+        lambda *_: pytest.fail("An incomplete group must not run a forward pass"),
+    )
+
+    with pytest.raises(ValueError, match="ended inside an effective batch"):
+        train_one_epoch(
+            model,
+            loader,
+            {"adamw": optimizer},
+            {"adamw": scheduler},
+            GH200_RUNTIME,
+        )
+
+    torch.testing.assert_close(model.weight, initial_weight, atol=0, rtol=0)
+    assert optimizer.step_count == 0
+    assert scheduler.step_count == 0
 
 
 def test_muon_partition_is_complete_disjoint_and_exact() -> None:
