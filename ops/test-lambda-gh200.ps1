@@ -300,6 +300,53 @@ Invoke-Test 'ssh-agent membership compares normalized identities ordinally' {
     )) 'Agent identity used a substring match.'
 }
 
+Invoke-Test 'ssh-agent exit two starts the Windows agent and retries once' {
+    $state = [pscustomobject]@{
+        Index = 0
+        Starts = 0
+        Queue = @(
+            (New-ProcessResult 2),
+            (New-ProcessResult 0)
+        )
+    }
+    $listed = Get-SshAgentListing -SshAddPath 'ssh-add.exe' -ProcessInvoker ({
+        param($Path)
+        $result = $state.Queue[$state.Index]
+        $state.Index++
+        return $result
+    }.GetNewClosure()) -AgentStarter ({
+        $state.Starts++
+    }.GetNewClosure())
+    Assert-Equal $listed.ExitCode 0 'Recovered agent listing was not returned.'
+    Assert-Equal $state.Index 2 'Agent listing was not retried exactly once.'
+    Assert-Equal $state.Starts 1 'Windows agent was not started exactly once.'
+}
+
+Invoke-Test 'ssh-agent exit one means no identities and does not start the service' {
+    $script:SshAgentStarts = 0
+    $listed = Get-SshAgentListing -SshAddPath 'ssh-add.exe' -ProcessInvoker {
+        param($Path)
+        return New-ProcessResult 1
+    } -AgentStarter {
+        $script:SshAgentStarts++
+    }
+    Assert-Equal $listed.ExitCode 1 'Empty agent listing status changed.'
+    Assert-Equal $script:SshAgentStarts 0 'Empty agent incorrectly restarted the service.'
+}
+
+Invoke-Test 'ssh-agent persistent exit two fails after one recovery attempt' {
+    $script:SshAgentStarts = 0
+    Assert-Throws {
+        Get-SshAgentListing -SshAddPath 'ssh-add.exe' -ProcessInvoker {
+            param($Path)
+            return New-ProcessResult 2
+        } -AgentStarter {
+            $script:SshAgentStarts++
+        }
+    } 'Persistent unavailable agent was accepted.'
+    Assert-Equal $script:SshAgentStarts 1 'Agent recovery was attempted more than once.'
+}
+
 Invoke-Test 'Frozen launch artifacts expose both hashes and detect tampering and CRLF' {
     $directory = Join-Path ([IO.Path]::GetTempPath()) ('gh200-artifacts-' + [Guid]::NewGuid().ToString('N'))
     [IO.Directory]::CreateDirectory($directory) | Out-Null
@@ -856,9 +903,6 @@ Write-Host "Lambda GH200 watcher tests: $($script:Passed)/$total passed."
 if ($script:Failed -ne 0) {
     exit 1
 }
-
-
-
 
 
 

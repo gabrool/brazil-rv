@@ -12,6 +12,8 @@ import numpy as np
 import torch
 
 from .contract import (
+    COMPILE_PARITY_PREDICTION_ATOL,
+    COMPILE_PARITY_PREDICTION_RTOL,
     GH200_RUNTIME,
     PROJECT_ROOT,
     RUN_OUTPUT_BASE,
@@ -128,8 +130,8 @@ def _validate_compiled_checkpoint_compatibility(
         torch.allclose(
             compiled_predictions,
             eager_predictions,
-            atol=5e-3,
-            rtol=5e-3,
+            atol=COMPILE_PARITY_PREDICTION_ATOL,
+            rtol=COMPILE_PARITY_PREDICTION_RTOL,
         )
     )
     return compatible, maximum_difference
