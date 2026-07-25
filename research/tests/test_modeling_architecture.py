@@ -8,12 +8,16 @@ import brazil_rv.modeling.engine as engine_module
 
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
+    ARCHITECTURES,
     COMPILE_STEADY_STATE_PASS_COUNT,
     COMPILE_WARMUP_PASS_COUNT,
     EQUITY_COUNT,
+    EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     GH200_RUNTIME,
     INSTRUMENT_COUNT,
+    MODEL_VARIANTS,
     PATCH_INPUT_WIDTH,
+    architecture_for_variant,
 )
 from brazil_rv.modeling.engine import compile_model, warmup_compiled_model
 from brazil_rv.modeling.layers import MultiHeadAttention, RotaryEmbedding
@@ -61,9 +65,9 @@ def _forward(
     )
 
 
-@pytest.fixture(scope="module")
-def full_model() -> CrossAssetPatchITransformerV1:
-    return CrossAssetPatchITransformerV1("full").eval()
+@pytest.fixture(scope="module", params=MODEL_VARIANTS)
+def variant_model(request: pytest.FixtureRequest) -> CrossAssetPatchITransformerV1:
+    return CrossAssetPatchITransformerV1(str(request.param)).eval()
 
 
 @pytest.fixture(scope="module")
@@ -71,23 +75,62 @@ def temporal_model() -> CrossAssetPatchITransformerV1:
     return CrossAssetPatchITransformerV1("temporal_only").eval()
 
 
-def test_forward_shape_and_finiteness(
-    full_model: CrossAssetPatchITransformerV1,
+def test_forward_shape_and_finiteness_for_every_variant(
+    variant_model: CrossAssetPatchITransformerV1,
 ) -> None:
     with torch.no_grad():
-        output = _forward(full_model, _inputs())
+        output = _forward(variant_model, _inputs())
     assert output.shape == (1, EQUITY_COUNT, 3)
     assert torch.isfinite(output).all()
 
 
-def test_full_parameter_count(
-    full_model: CrossAssetPatchITransformerV1,
+def test_exact_parameter_count_for_every_variant(
+    variant_model: CrossAssetPatchITransformerV1,
 ) -> None:
-    assert 6_300_000 <= count_trainable_parameters(full_model) <= 6_600_000
+    assert (
+        count_trainable_parameters(variant_model)
+        == (EXPECTED_TRAINABLE_PARAMETER_COUNTS[variant_model.variant])
+    )
+
+
+def test_variant_architectures_are_exact() -> None:
+    assert MODEL_VARIANTS == ("full", "reduced_full", "temporal_only")
+    expected = {
+        "full": (256, 8, 32, 2, 6, 704),
+        "reduced_full": (192, 6, 32, 2, 2, 512),
+        "temporal_only": (256, 8, 32, 2, 0, 704),
+    }
+    for variant, values in expected.items():
+        architecture = architecture_for_variant(variant)
+        assert (
+            architecture.d_model,
+            architecture.attention_heads,
+            architecture.head_dim,
+            architecture.temporal_depth,
+            architecture.cross_asset_depth,
+            architecture.swiglu_width,
+        ) == values
+        assert ARCHITECTURES[variant] is architecture
+
+
+def test_existing_variant_state_dict_layouts_remain_compatible() -> None:
+    full = CrossAssetPatchITransformerV1("full")
+    temporal = CrossAssetPatchITransformerV1("temporal_only")
+    assert full.patch_projection.weight.shape == (256, PATCH_INPUT_WIDTH)
+    assert len(full.temporal_encoder.blocks) == 2
+    assert full.cross_asset_encoder is not None
+    assert len(full.cross_asset_encoder.blocks) == 6
+    assert "cross_asset_encoder.blocks.5.feedforward.down.weight" in full.state_dict()
+    assert temporal.patch_projection.weight.shape == (256, PATCH_INPUT_WIDTH)
+    assert len(temporal.temporal_encoder.blocks) == 2
+    assert temporal.cross_asset_encoder is None
+    assert not any(
+        key.startswith("cross_asset_encoder.") for key in temporal.state_dict()
+    )
 
 
 def test_equity_permutation_equivariance(
-    full_model: CrossAssetPatchITransformerV1,
+    variant_model: CrossAssetPatchITransformerV1,
 ) -> None:
     inputs = _inputs()
     permutation = torch.arange(EQUITY_COUNT - 1, -1, -1)
@@ -100,21 +143,21 @@ def test_equity_permutation_equivariance(
     ):
         permuted[key][:, :EQUITY_COUNT] = inputs[key][:, :EQUITY_COUNT][:, permutation]
     with torch.no_grad():
-        baseline = _forward(full_model, inputs)
-        changed = _forward(full_model, permuted)
+        baseline = _forward(variant_model, inputs)
+        changed = _forward(variant_model, permuted)
     torch.testing.assert_close(changed, baseline[:, permutation], atol=2e-5, rtol=2e-5)
 
 
 def test_inactive_equity_isolation(
-    full_model: CrossAssetPatchITransformerV1,
+    variant_model: CrossAssetPatchITransformerV1,
 ) -> None:
     inputs = _inputs()
     changed = {key: value.clone() for key, value in inputs.items()}
     changed["patches"][:, 10] = 1_000.0
     changed["slow_features"][:, 10] = 1_000.0
     with torch.no_grad():
-        baseline_output = _forward(full_model, inputs)
-        changed_output = _forward(full_model, changed)
+        baseline_output = _forward(variant_model, inputs)
+        changed_output = _forward(variant_model, changed)
     torch.testing.assert_close(
         baseline_output[:, :4], changed_output[:, :4], atol=0.0, rtol=0.0
     )
@@ -183,11 +226,11 @@ def test_sdpa_boolean_key_mask_semantics() -> None:
 
 
 def test_inactive_predictions_are_exactly_zero(
-    full_model: CrossAssetPatchITransformerV1,
+    variant_model: CrossAssetPatchITransformerV1,
 ) -> None:
     inputs = _inputs()
     with torch.no_grad():
-        output = _forward(full_model, inputs)
+        output = _forward(variant_model, inputs)
     inactive = ~inputs["instrument_mask"][:, :EQUITY_COUNT]
     assert torch.equal(output[inactive], torch.zeros_like(output[inactive]))
 

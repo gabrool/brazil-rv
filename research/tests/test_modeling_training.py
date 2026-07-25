@@ -6,6 +6,7 @@ import json
 import sys
 from contextlib import nullcontext
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,6 +21,7 @@ import brazil_rv.modeling.sanity as sanity_module
 import brazil_rv.modeling.train as train_module
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
+    ALLOWED_SEEDS,
     ADAMW_BETAS,
     ADAMW_EPS,
     ADAMW_LR,
@@ -32,11 +34,13 @@ from brazil_rv.modeling.contract import (
     COMPILE_PARITY_LOSS_RTOL,
     COMPILE_PARITY_PREDICTION_ATOL,
     COMPILE_PARITY_PREDICTION_RTOL,
+    EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     CompileEvaluationWarmupReport,
     CompileParityThresholds,
     CompileSetupReport,
     EQUITY_COUNT,
     FINAL_LR_FACTOR,
+    MODEL_VARIANTS,
     GH200_RUNTIME,
     INSTRUMENT_COUNT,
     MAX_EPOCHS,
@@ -46,8 +50,10 @@ from brazil_rv.modeling.contract import (
     MUON_MOMENTUM,
     MUON_NESTEROV,
     MUON_NS_COEFFICIENTS,
+    architecture_for_variant,
     MUON_NS_STEPS,
     MUON_WEIGHT_DECAY,
+    OPTIMIZER_VARIANTS,
     PATCH_INPUT_WIDTH,
 )
 from brazil_rv.modeling.evaluate import _validate_run_checkpoint_identity
@@ -65,7 +71,11 @@ from brazil_rv.modeling.engine import (
 )
 from brazil_rv.modeling.layers import MuonLinear
 from brazil_rv.modeling.metrics import create_metric_table
-from brazil_rv.modeling.train import _atomic_write_json
+from brazil_rv.modeling.train import (
+    _atomic_write_json,
+    _model_metadata,
+    _run_directory_name,
+)
 from brazil_rv.modeling.model import CrossAssetPatchITransformerV1
 from brazil_rv.modeling.muon import PYTORCH_MUON_REFERENCE, PyTorch213Muon
 from brazil_rv.modeling.optim import (
@@ -271,6 +281,17 @@ def test_entrypoint_clis_use_only_current_runtime(
         "seed": 11,
     }
     monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train", "--model", "reduced_full", "--optimizer", "adamw", "--seed", "47"],
+    )
+    assert vars(train_module.parse_args()) == {
+        "model": "reduced_full",
+        "optimizer": "adamw",
+        "seed": 47,
+    }
+
+    monkeypatch.setattr(
         sys, "argv", ["evaluate", "--run-dir", str(tmp_path), "--split", "validation"]
     )
     assert vars(evaluate_module.parse_args()) == {
@@ -278,6 +299,24 @@ def test_entrypoint_clis_use_only_current_runtime(
         "split": "validation",
     }
     assert not hasattr(sanity_module, "parse_args")
+
+
+def test_experiment_matrix_contains_eighteen_runs() -> None:
+    runs = {
+        (model_variant, optimizer_variant, seed)
+        for model_variant in MODEL_VARIANTS
+        for optimizer_variant in OPTIMIZER_VARIANTS
+        for seed in ALLOWED_SEEDS
+    }
+    assert len(runs) == 18
+
+
+def test_reduced_full_run_directory_name_records_variant() -> None:
+    created_at = datetime(2026, 1, 2, 3, 4, 5, 6_789, tzinfo=timezone.utc)
+    assert _run_directory_name("reduced_full", "hybrid", 29, created_at) == (
+        "cross_asset_patch_itransformer_"
+        "reduced_full_hybrid_seed29_20260102T030405006789Z"
+    )
 
 
 def test_training_updates_after_eight_physical_batches(
@@ -1020,18 +1059,19 @@ def test_daily_ic_aggregation_with_ties() -> None:
 def _matching_run_identity(
     feature_store: Path,
     *,
+    model_variant: str = "full",
     optimizer_variant: str = "hybrid",
     muon_backend: str | None = OFFICIAL_MUON_BACKEND,
 ) -> dict[str, object]:
+    model_metadata = _model_metadata(model_variant)
     return {
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
-        "model_variant": "full",
+        **model_metadata,
         "optimizer_variant": optimizer_variant,
         "seed": 11,
         "resolved_feature_store_path": str(feature_store),
         "git_commit_sha": "test-sha",
-        "architecture_constants": {"d_model": 256},
     }
 
 
@@ -1050,6 +1090,19 @@ def test_evaluation_identity_accepts_matching_hybrid_backends(
     )
     checkpoint = dict(manifest)
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+
+@pytest.mark.parametrize("model_variant", MODEL_VARIANTS)
+def test_evaluation_identity_accepts_every_model_architecture(
+    model_variant: str,
+    tmp_path: Path,
+) -> None:
+    feature_store = tmp_path.resolve()
+    manifest = _matching_run_identity(
+        feature_store,
+        model_variant=model_variant,
+    )
+    _validate_run_checkpoint_identity(manifest, dict(manifest), feature_store)
 
 
 def test_evaluation_identity_accepts_matching_adamw_without_muon(
@@ -1139,6 +1192,63 @@ def test_evaluation_identity_rejects_each_mismatch(field: str, tmp_path: Path) -
         _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
 
 
+def test_evaluation_identity_rejects_internally_incompatible_architecture(
+    tmp_path: Path,
+) -> None:
+    feature_store = tmp_path.resolve()
+    manifest = _matching_run_identity(
+        feature_store,
+        model_variant="reduced_full",
+    )
+    architecture = dict(manifest["architecture_constants"])
+    architecture["d_model"] = 256
+    manifest["architecture_constants"] = architecture
+    checkpoint = copy.deepcopy(manifest)
+    with pytest.raises(ValueError, match="architecture metadata"):
+        _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+
+def test_evaluation_identity_rejects_incorrect_parameter_count(
+    tmp_path: Path,
+) -> None:
+    feature_store = tmp_path.resolve()
+    manifest = _matching_run_identity(feature_store)
+    manifest["parameter_count"] = 1
+    with pytest.raises(ValueError, match="parameter count"):
+        _validate_run_checkpoint_identity(manifest, dict(manifest), feature_store)
+
+
+def test_reduced_full_manifest_and_checkpoint_metadata(tmp_path: Path) -> None:
+    expected_architecture = asdict(architecture_for_variant("reduced_full"))
+    metadata = _model_metadata("reduced_full")
+    assert metadata == {
+        "model_variant": "reduced_full",
+        "architecture_constants": expected_architecture,
+        "parameter_count": EXPECTED_TRAINABLE_PARAMETER_COUNTS["reduced_full"],
+        "temporal_depth": 2,
+        "cross_asset_depth": 2,
+    }
+
+    model = CrossAssetPatchITransformerV1("reduced_full")
+    payload = checkpoint_payload(
+        model,
+        "reduced_full",
+        "adamw",
+        None,
+        11,
+        1,
+        0.0,
+        tmp_path,
+        "test-sha",
+    )
+    assert payload["model_variant"] == "reduced_full"
+    assert payload["architecture_constants"] == expected_architecture
+    with pytest.raises(ValueError, match="does not match"):
+        checkpoint_payload(
+            model, "full", "adamw", None, 11, 1, 0.0, tmp_path, "test-sha"
+        )
+
+
 def test_atomic_json_write_replaces_final_without_temporary_file(
     tmp_path: Path,
 ) -> None:
@@ -1148,9 +1258,10 @@ def test_atomic_json_write_replaces_final_without_temporary_file(
     assert not (tmp_path / "run_manifest.json.tmp").exists()
 
 
-def test_checkpoint_round_trip_eager(tmp_path: Path) -> None:
+@pytest.mark.parametrize("model_variant", MODEL_VARIANTS)
+def test_checkpoint_round_trip_eager(model_variant: str, tmp_path: Path) -> None:
     torch.manual_seed(13)
-    model = CrossAssetPatchITransformerV1("temporal_only")
+    model = CrossAssetPatchITransformerV1(model_variant)
     model.train()
     patches = torch.zeros(1, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH)
     history = torch.zeros(1, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT, dtype=torch.bool)
@@ -1169,7 +1280,7 @@ def test_checkpoint_round_trip_eager(tmp_path: Path) -> None:
         expected = model(patches, history, instrument, slow, state_position)
     payload = checkpoint_payload(
         model,
-        "temporal_only",
+        model_variant,
         "adamw",
         None,
         11,
@@ -1181,7 +1292,7 @@ def test_checkpoint_round_trip_eager(tmp_path: Path) -> None:
     checkpoint_path = tmp_path / "checkpoint.pt"
     torch.save(payload, checkpoint_path)
     loaded = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    restored = CrossAssetPatchITransformerV1("temporal_only").eval()
+    restored = CrossAssetPatchITransformerV1(model_variant).eval()
     restored.load_state_dict(loaded["model_state_dict"])
     with torch.no_grad():
         actual = restored(patches, history, instrument, slow, state_position)

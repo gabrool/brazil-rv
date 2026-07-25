@@ -11,7 +11,11 @@ from pathlib import Path
 import polars as pl
 import torch
 
-from .contract import GH200_RUNTIME
+from .contract import (
+    EXPECTED_TRAINABLE_PARAMETER_COUNTS,
+    GH200_RUNTIME,
+    architecture_for_variant,
+)
 from .data import (
     create_evaluation_loader,
     select_sample_split,
@@ -68,6 +72,18 @@ def _validate_muon_identity_values(identity: dict[str, object]) -> None:
         raise ValueError("Invalid Muon identity field: muon_backend")
 
 
+def _validate_architecture_identity(identity: dict[str, object]) -> None:
+    model_variant = str(identity["model_variant"])
+    expected = asdict(architecture_for_variant(model_variant))
+    if identity["architecture_constants"] != expected:
+        raise ValueError(
+            f"Invalid architecture metadata for model variant: {model_variant}"
+        )
+    expected_parameter_count = EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_variant]
+    if identity.get("parameter_count") != expected_parameter_count:
+        raise ValueError(f"Invalid parameter count for model variant: {model_variant}")
+
+
 def _validate_run_checkpoint_identity(
     manifest: dict[str, object],
     checkpoint: dict[str, object],
@@ -78,6 +94,7 @@ def _validate_run_checkpoint_identity(
             raise ValueError(f"Missing run/checkpoint identity field: {field}")
         if manifest[field] != checkpoint[field]:
             raise ValueError(f"Run/checkpoint identity mismatch: {field}")
+    _validate_architecture_identity(manifest)
     _validate_muon_identity_values(manifest)
     manifest_store = Path(str(manifest["resolved_feature_store_path"])).expanduser()
     if manifest_store.resolve() != feature_store:
@@ -184,6 +201,9 @@ def main() -> None:
         "created_at_utc": created_at.isoformat(),
         "split": args.split,
         "hardware": asdict(hardware),
+        "model_variant": manifest["model_variant"],
+        "architecture_constants": manifest["architecture_constants"],
+        "parameter_count": manifest["parameter_count"],
         "feature_cache_warmup": asdict(cache_report),
         "compile": compile_metadata,
         "evaluation_seconds": evaluation_seconds,

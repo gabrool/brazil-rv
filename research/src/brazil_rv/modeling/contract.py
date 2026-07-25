@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from types import MappingProxyType
 
 FEATURE_CONTRACT_VERSION = "M1_FEATURES_V1"
 
@@ -74,16 +76,9 @@ INSTRUMENT_FAMILY_IDS = (
     + (FAMILY_RATE_FUTURE,) * 4
 )
 
-MODEL_VARIANTS = ("full", "temporal_only")
 OPTIMIZER_VARIANTS = ("hybrid", "adamw")
 ALLOWED_SEEDS = (11, 29, 47)
 
-D_MODEL = 256
-ATTENTION_HEADS = 8
-HEAD_DIM = 32
-TEMPORAL_DEPTH = 2
-CROSS_ASSET_DEPTH = 6
-SWIGLU_WIDTH = 704
 RMS_NORM_EPS = 1e-6
 QK_NORM_EPS = 1e-6
 ROPE_BASE = 10_000.0
@@ -274,19 +269,81 @@ class CompileWarmupReport:
 
 @dataclass(frozen=True)
 class ArchitectureConstants:
-    d_model: int = D_MODEL
-    attention_heads: int = ATTENTION_HEADS
-    head_dim: int = HEAD_DIM
-    temporal_depth: int = TEMPORAL_DEPTH
-    cross_asset_depth: int = CROSS_ASSET_DEPTH
-    swiglu_width: int = SWIGLU_WIDTH
-    rms_norm_eps: float = RMS_NORM_EPS
-    qk_norm_eps: float = QK_NORM_EPS
-    rope_base: float = ROPE_BASE
-    input_dropout: float = INPUT_DROPOUT
-    residual_dropout: float = RESIDUAL_DROPOUT
-    attention_dropout: float = ATTENTION_DROPOUT
-    output_horizons: int = HORIZON_COUNT
+    d_model: int
+    attention_heads: int
+    head_dim: int
+    temporal_depth: int
+    cross_asset_depth: int
+    swiglu_width: int
+    rms_norm_eps: float
+    qk_norm_eps: float
+    rope_base: float
+    input_dropout: float
+    residual_dropout: float
+    attention_dropout: float
+    output_horizons: int
+
+
+ARCHITECTURES: Mapping[str, ArchitectureConstants] = MappingProxyType(
+    {
+        "full": ArchitectureConstants(
+            d_model=256,
+            attention_heads=8,
+            head_dim=32,
+            temporal_depth=2,
+            cross_asset_depth=6,
+            swiglu_width=704,
+            rms_norm_eps=RMS_NORM_EPS,
+            qk_norm_eps=QK_NORM_EPS,
+            rope_base=ROPE_BASE,
+            input_dropout=INPUT_DROPOUT,
+            residual_dropout=RESIDUAL_DROPOUT,
+            attention_dropout=ATTENTION_DROPOUT,
+            output_horizons=HORIZON_COUNT,
+        ),
+        "reduced_full": ArchitectureConstants(
+            d_model=192,
+            attention_heads=6,
+            head_dim=32,
+            temporal_depth=2,
+            cross_asset_depth=2,
+            swiglu_width=512,
+            rms_norm_eps=RMS_NORM_EPS,
+            qk_norm_eps=QK_NORM_EPS,
+            rope_base=ROPE_BASE,
+            input_dropout=INPUT_DROPOUT,
+            residual_dropout=RESIDUAL_DROPOUT,
+            attention_dropout=ATTENTION_DROPOUT,
+            output_horizons=HORIZON_COUNT,
+        ),
+        "temporal_only": ArchitectureConstants(
+            d_model=256,
+            attention_heads=8,
+            head_dim=32,
+            temporal_depth=2,
+            cross_asset_depth=0,
+            swiglu_width=704,
+            rms_norm_eps=RMS_NORM_EPS,
+            qk_norm_eps=QK_NORM_EPS,
+            rope_base=ROPE_BASE,
+            input_dropout=INPUT_DROPOUT,
+            residual_dropout=RESIDUAL_DROPOUT,
+            attention_dropout=ATTENTION_DROPOUT,
+            output_horizons=HORIZON_COUNT,
+        ),
+    }
+)
+MODEL_VARIANTS = tuple(ARCHITECTURES)
+EXPECTED_TRAINABLE_PARAMETER_COUNTS: Mapping[str, int] = MappingProxyType(
+    {"full": 6_455_811, "reduced_full": 1_792_899, "temporal_only": 1_635_587}
+)
+
+
+def architecture_for_variant(variant: str) -> ArchitectureConstants:
+    try:
+        return ARCHITECTURES[variant]
+    except KeyError as error:
+        raise ValueError(f"Unknown model variant: {variant}") from error
 
 
 @dataclass(frozen=True)

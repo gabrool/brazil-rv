@@ -16,7 +16,7 @@ import torch._functorch.config as functorch_config
 from torch import nn
 
 from .contract import (
-    ArchitectureConstants,
+    architecture_for_variant,
     COMPILE_PARITY_GRADIENT_COSINE_MIN,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
@@ -810,6 +810,10 @@ def checkpoint_payload(
     feature_store: Path,
     git_commit_sha: str,
 ) -> dict[str, object]:
+    if getattr(model, "variant", None) != model_variant:
+        raise ValueError("Checkpoint model variant does not match the model")
+    architecture = architecture_for_variant(model_variant)
+
     return {
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
@@ -819,7 +823,7 @@ def checkpoint_payload(
         "epoch": epoch,
         "validation_score": validation_score,
         "model_state_dict": model.state_dict(),
-        "architecture_constants": asdict(ArchitectureConstants()),
+        "architecture_constants": asdict(architecture),
         "resolved_feature_store_path": str(feature_store),
         "git_commit_sha": git_commit_sha,
     }

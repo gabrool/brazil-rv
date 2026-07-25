@@ -18,8 +18,7 @@ import torch
 from .contract import (
     ALLOWED_SEEDS,
     AdamWConstants,
-    ArchitectureConstants,
-    CROSS_ASSET_DEPTH,
+    EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     EARLY_STOP_PATIENCE,
     EFFECTIVE_BATCH_SIZE,
     FEATURE_STORE_POINTER,
@@ -33,8 +32,8 @@ from .contract import (
     RUN_OUTPUT_BASE,
     SchedulerConstants,
     SplitBoundaries,
-    TEMPORAL_DEPTH,
     TrainingConstants,
+    architecture_for_variant,
 )
 from .data import (
     create_training_loaders,
@@ -73,6 +72,29 @@ def set_seeds(seed: int) -> None:
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+
+def _model_metadata(model_variant: str) -> dict[str, object]:
+    architecture = architecture_for_variant(model_variant)
+    return {
+        "model_variant": model_variant,
+        "architecture_constants": asdict(architecture),
+        "parameter_count": EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_variant],
+        "temporal_depth": architecture.temporal_depth,
+        "cross_asset_depth": architecture.cross_asset_depth,
+    }
+
+
+def _run_directory_name(
+    model_variant: str,
+    optimizer_variant: str,
+    seed: int,
+    created_at: datetime,
+) -> str:
+    return (
+        "cross_asset_patch_itransformer_"
+        f"{model_variant}_{optimizer_variant}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
+    )
 
 
 def clean_git_commit_sha() -> str:
@@ -182,10 +204,13 @@ def main() -> None:
     evaluation_batch = next(iter(validation_loader))
 
     model = CrossAssetPatchITransformerV1(args.model).to("cuda")
+    model_metadata = _model_metadata(args.model)
     parameter_count = count_trainable_parameters(model)
-    if args.model == "full" and not 6_300_000 <= parameter_count <= 6_600_000:
+    expected_parameter_count = int(model_metadata["parameter_count"])
+    if parameter_count != expected_parameter_count:
         raise ValueError(
-            f"Full-model parameter count is out of range: {parameter_count}"
+            f"{args.model} parameter count must be {expected_parameter_count}: "
+            f"got {parameter_count}"
         )
     optimizers, _, muon_backend = build_optimizers(model, args.optimizer)
     schedulers, steps_per_epoch, warmup_steps = build_schedulers(
@@ -213,10 +238,8 @@ def main() -> None:
     )
 
     created_at = datetime.now(timezone.utc)
-    run_dir = RUN_OUTPUT_BASE / (
-        "cross_asset_patch_itransformer_"
-        f"{args.model}_{args.optimizer}_seed{args.seed}_"
-        f"{created_at:%Y%m%dT%H%M%S%fZ}"
+    run_dir = RUN_OUTPUT_BASE / _run_directory_name(
+        args.model, args.optimizer, args.seed, created_at
     )
     if run_dir.exists():
         raise FileExistsError(f"Run output already exists: {run_dir}")
@@ -229,7 +252,7 @@ def main() -> None:
         "feature_store_pointer": str(FEATURE_STORE_POINTER),
         "resolved_feature_store_path": str(feature_store),
         "feature_manifest_contract_version": feature_manifest["contract_version"],
-        "model_variant": args.model,
+        **model_metadata,
         "optimizer_variant": args.optimizer,
         "physical_microbatch_size": runtime.microbatch_size,
         "accumulation_steps": runtime.accumulation_steps,
@@ -243,7 +266,6 @@ def main() -> None:
         "split_boundaries": {
             key: str(value) for key, value in asdict(SplitBoundaries()).items()
         },
-        "architecture_constants": asdict(ArchitectureConstants()),
         "training_constants": asdict(TrainingConstants()),
         "optimizer_constants": {
             "muon": asdict(MuonConstants()),
@@ -255,7 +277,6 @@ def main() -> None:
             "total_steps": steps_per_epoch * MAX_EPOCHS,
             "warmup_steps": warmup_steps,
         },
-        "parameter_count": parameter_count,
         "pytorch_version": hardware.pytorch_version,
         "cuda_version": hardware.cuda_version,
         "gpu_name": hardware.device_name,
@@ -291,8 +312,6 @@ def main() -> None:
         "best_validation_primary_score": None,
         "stopped_epoch": None,
         "training_duration_seconds": None,
-        "temporal_depth": TEMPORAL_DEPTH,
-        "cross_asset_depth": (CROSS_ASSET_DEPTH if args.model == "full" else 0),
         "bitwise_gpu_reproducibility_guaranteed": False,
     }
     _atomic_write_json(run_dir / "run_manifest.json", manifest)
