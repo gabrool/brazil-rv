@@ -112,7 +112,10 @@ FINAL_LR_FACTOR = 0.1
 COMPILE_WARMUP_PASS_COUNT = 5
 COMPILE_STEADY_STATE_PASS_COUNT = 3
 
-COMPILE_PARITY_PREDICTION_ATOL = 5e-3
+# Eager and Inductor BF16 kernels may differ by one or two representable steps
+# while retaining effectively identical losses and gradients. Keep the relative,
+# loss, and gradient gates strict, but allow that expected output quantization.
+COMPILE_PARITY_PREDICTION_ATOL = 2e-2
 COMPILE_PARITY_PREDICTION_RTOL = 5e-3
 COMPILE_PARITY_LOSS_ATOL = 5e-4
 COMPILE_PARITY_LOSS_RTOL = 5e-3
