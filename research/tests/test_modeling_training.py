@@ -659,7 +659,7 @@ def _synthetic_compile_parity(
 def test_compile_parity_exact_and_within_threshold_pass() -> None:
     assert _synthetic_compile_parity().passed
     eager_predictions = torch.tensor([[1.0, 2.0]])
-    compiled_predictions = eager_predictions + 1e-3
+    compiled_predictions = eager_predictions + 0.0078125
     report = _synthetic_compile_parity(
         prediction_pair=(eager_predictions, compiled_predictions),
         loss_pair=(1.0, 1.0001),
@@ -669,6 +669,7 @@ def test_compile_parity_exact_and_within_threshold_pass() -> None:
         ),
     )
     assert report.passed
+    assert report.prediction_max_absolute_difference == pytest.approx(0.0078125)
 
 
 def test_compile_parity_prediction_and_loss_divergence_fail() -> None:
