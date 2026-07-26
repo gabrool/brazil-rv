@@ -74,9 +74,9 @@ class CacheWarmupReport:
 
 @dataclass(frozen=True)
 class TabularRowBatch:
-    features: np.ndarray
-    labels: np.ndarray
-    weights: np.ndarray
+    features: np.ndarray | torch.Tensor
+    labels: np.ndarray | torch.Tensor
+    weights: np.ndarray | torch.Tensor
     sample_id: np.ndarray
     date_idx: np.ndarray
     decision_idx: np.ndarray
@@ -509,12 +509,17 @@ class TabularRowIterator:
         store: Path,
         sample_index: pl.DataFrame,
         horizon_index: int,
+        *,
+        device: str,
         batch_size: int = 64,
     ) -> None:
         if horizon_index not in range(HORIZON_COUNT):
             raise ValueError("horizon_index is outside the three-horizon contract")
+        if device not in ("cpu", "cuda"):
+            raise ValueError("TabularRowIterator device must be 'cpu' or 'cuda'")
         self.dataset = VectorizedFeatureDataset(store, sample_index, "mlp")
         self.horizon_index = horizon_index
+        self.device = device
         self.batch_size = batch_size
 
     def __iter__(self) -> Iterator[TabularRowBatch]:
@@ -528,10 +533,17 @@ class TabularRowIterator:
             row_sample, row_equity = np.nonzero(valid)
             if row_sample.size == 0:
                 continue
+            features = batch["tabular_features"][row_sample, row_equity]
+            labels = batch["targets"][row_sample, row_equity, self.horizon_index]
+            weights = (1.0 / counts[row_sample]).astype(np.float32)
+            if self.device == "cuda":
+                features = torch.from_numpy(features).to("cuda")
+                labels = torch.from_numpy(labels).to("cuda")
+                weights = torch.from_numpy(weights).to("cuda")
             yield TabularRowBatch(
-                features=batch["tabular_features"][row_sample, row_equity],
-                labels=batch["targets"][row_sample, row_equity, self.horizon_index],
-                weights=(1.0 / counts[row_sample]).astype(np.float32),
+                features=features,
+                labels=labels,
+                weights=weights,
                 sample_id=batch["sample_id"][row_sample],
                 date_idx=batch["date_idx"][row_sample],
                 decision_idx=batch["decision_idx"][row_sample],

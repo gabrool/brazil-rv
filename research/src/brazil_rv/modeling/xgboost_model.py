@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import gc
+import hashlib
+import hmac
 import json
 import os
 import tempfile
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable
 
 import numpy as np
 import polars as pl
+import torch
 import xgboost as xgb
 
 from .contract import (
@@ -17,6 +21,7 @@ from .contract import (
     HORIZONS,
     TABULAR_FEATURE_COUNT,
     XGBOOST_CANDIDATES,
+    XGBOOST_DEVICE,
     XGBOOST_EARLY_STOPPING_ROUNDS,
     XGBOOST_FIXED_PARAMETERS,
     XGBOOST_INNER_EMBARGO_DATES,
@@ -25,7 +30,7 @@ from .contract import (
     XGBOOST_VERSION,
     XGBoostCandidate,
 )
-from .data import TabularRowIterator
+from .data import TabularRowBatch, TabularRowIterator
 from .metrics import create_metric_table
 
 
@@ -43,6 +48,7 @@ class MatrixBundle:
     training: xgb.DMatrix
     validation: xgb.DMatrix
     validation_source: TabularRowIterator
+    device: str
 
 
 @dataclass(frozen=True)
@@ -54,20 +60,51 @@ class XGBoostRunResult:
     validation_predictions: pl.DataFrame
     matrix_dimensions: dict[str, object]
     boosting_rounds: dict[str, int]
+    booster_sha256: dict[str, str]
+    native_cuda_qualification: dict[str, object]
+
+
+def _validate_requested_device(device: str) -> None:
+    if device not in ("cpu", "cuda"):
+        raise ValueError("XGBoost device must be 'cpu' or 'cuda'")
+
+
+def _validate_batch_device(batch: TabularRowBatch, device: str) -> None:
+    _validate_requested_device(device)
+    arrays = (batch.features, batch.labels, batch.weights)
+    if device == "cuda":
+        if not all(
+            isinstance(value, torch.Tensor) and value.device.type == "cuda"
+            for value in arrays
+        ):
+            raise TypeError(
+                "CUDA XGBoost batches require CUDA torch.Tensor features, labels, "
+                "and weights"
+            )
+    elif not all(isinstance(value, np.ndarray) for value in arrays):
+        raise TypeError(
+            "CPU XGBoost test batches require NumPy features, labels, and weights"
+        )
 
 
 class QuantileBatchDataIter(xgb.DataIter):
-    """XGBoost DataIter backed by the compact re-iterable row source."""
+    """Device-checked XGBoost iterator over compact valid equity rows."""
 
     def __init__(
-        self, source: TabularRowIterator, cache_prefix: Path | None = None
+        self,
+        source: Iterable[TabularRowBatch],
+        cache_prefix: Path | None = None,
+        *,
+        device: str,
     ) -> None:
+        _validate_requested_device(device)
         super().__init__(
             cache_prefix=None if cache_prefix is None else str(cache_prefix),
             release_data=True,
-            on_host=True,
+            on_host=device == "cuda",
         )
         self.source = source
+        self.device = device
         self._iterator = iter(source)
 
     def reset(self) -> None:
@@ -78,6 +115,7 @@ class QuantileBatchDataIter(xgb.DataIter):
             batch = next(self._iterator)
         except StopIteration:
             return False
+        _validate_batch_device(batch, self.device)
         input_data(data=batch.features, label=batch.labels, weight=batch.weights)
         return True
 
@@ -127,13 +165,48 @@ def candidate_parameters(candidate: XGBoostCandidate, seed: int) -> dict[str, ob
     }
 
 
+def booster_device(booster: xgb.Booster) -> str:
+    config = json.loads(booster.save_config())
+    try:
+        device = config["learner"]["generic_param"]["device"]
+    except (KeyError, TypeError) as error:
+        raise ValueError(
+            "XGBoost booster configuration is missing its device"
+        ) from error
+    if not isinstance(device, str):
+        raise ValueError("XGBoost booster configuration has an invalid device")
+    return device
+
+
+def validate_booster_device(booster: xgb.Booster, requested_device: str) -> None:
+    _validate_requested_device(requested_device)
+    configured_device = booster_device(booster)
+    if requested_device == "cuda":
+        matches = configured_device.startswith("cuda")
+    else:
+        matches = configured_device == "cpu"
+    if not matches:
+        raise ValueError(
+            f"XGBoost booster device {configured_device!r} does not match "
+            f"requested device {requested_device!r}"
+        )
+
+
+def _validate_horizon_indices(mapping: dict[int, object], name: str) -> None:
+    expected = set(range(len(HORIZONS)))
+    if set(mapping) != expected:
+        raise ValueError(f"{name} must contain exactly the three horizon indices")
+
+
 def build_quantile_matrix(
-    source: TabularRowIterator,
+    source: Iterable[TabularRowBatch],
     cache_prefix: Path,
     *,
+    device: str,
     reference: xgb.DMatrix | None = None,
 ) -> xgb.DMatrix:
-    iterator = QuantileBatchDataIter(source, cache_prefix)
+    _validate_requested_device(device)
+    iterator = QuantileBatchDataIter(source, cache_prefix, device=device)
     matrix = xgb.ExtMemQuantileDMatrix(
         iterator,
         max_bin=int(XGBOOST_FIXED_PARAMETERS["max_bin"]),
@@ -151,24 +224,33 @@ def _build_matrix_bundles(
     training_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
     cache_dir: Path,
+    *,
+    device: str,
 ) -> dict[int, MatrixBundle]:
+    _validate_requested_device(device)
     cache_dir.mkdir(parents=True, exist_ok=True)
     bundles: dict[int, MatrixBundle] = {}
     for horizon_index, horizon in enumerate(HORIZONS):
-        training_source = TabularRowIterator(store, training_rows, horizon_index)
-        validation_source = TabularRowIterator(store, validation_rows, horizon_index)
+        training_source = TabularRowIterator(
+            store, training_rows, horizon_index, device=device
+        )
+        validation_source = TabularRowIterator(
+            store, validation_rows, horizon_index, device=device
+        )
         training = build_quantile_matrix(
-            training_source, cache_dir / f"train_{horizon}m"
+            training_source, cache_dir / f"train_{horizon}m", device=device
         )
         validation = build_quantile_matrix(
             validation_source,
             cache_dir / f"validation_{horizon}m",
+            device=device,
             reference=training,
         )
         bundles[horizon_index] = MatrixBundle(
             training=training,
             validation=validation,
             validation_source=validation_source,
+            device=device,
         )
     return bundles
 
@@ -231,26 +313,37 @@ def predict_from_bundles(
     bundles: dict[int, MatrixBundle],
     rows: pl.DataFrame,
     boosting_rounds: dict[int, int] | None = None,
+    *,
+    requested_device: str,
 ) -> np.ndarray:
+    _validate_requested_device(requested_device)
+    _validate_horizon_indices(boosters, "boosters")
+    _validate_horizon_indices(bundles, "matrix bundles")
     predictions = np.zeros((rows.height, EQUITY_COUNT, len(HORIZONS)), dtype=np.float32)
     position_by_sample = {
         int(sample_id): position
         for position, sample_id in enumerate(rows.get_column("sample_id"))
     }
     for horizon_index in range(len(HORIZONS)):
+        bundle = bundles[horizon_index]
+        if bundle.device != requested_device:
+            raise ValueError(
+                f"XGBoost matrix device {bundle.device!r} does not match "
+                f"requested device {requested_device!r}"
+            )
+        booster = boosters[horizon_index]
+        validate_booster_device(booster, requested_device)
         prediction_options = (
             {}
             if boosting_rounds is None
             else {"iteration_range": (0, boosting_rounds[horizon_index])}
         )
-        values = boosters[horizon_index].predict(
-            bundles[horizon_index].validation, **prediction_options
-        )
+        values = booster.predict(bundle.validation, **prediction_options)
         _fill_horizon_predictions(
             predictions,
             horizon_index,
             np.asarray(values, dtype=np.float32),
-            bundles[horizon_index].validation_source,
+            bundle.validation_source,
             position_by_sample,
         )
     return predictions
@@ -297,17 +390,24 @@ def tune_xgboost(
     training_rows: pl.DataFrame,
     cache_dir: Path,
     seed: int,
+    *,
+    device: str,
 ) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
+    if device != XGBOOST_DEVICE:
+        raise ValueError("Production XGBoost tuning requires the CUDA device")
     split = inner_date_split(training_rows)
     bundles = _build_matrix_bundles(
         store,
         split.training_rows,
         split.validation_rows,
         cache_dir / "inner",
+        device=device,
     )
     tuning_rows: list[dict[str, object]] = []
     for candidate_index, candidate in enumerate(XGBOOST_CANDIDATES):
         parameters = candidate_parameters(candidate, seed)
+        if parameters["device"] != device:
+            raise ValueError("XGBoost parameters and matrix device disagree")
         boosters: dict[int, xgb.Booster] = {}
         rounds: dict[int, int] = {}
         for horizon_index, horizon in enumerate(HORIZONS):
@@ -320,10 +420,15 @@ def tune_xgboost(
                 early_stopping_rounds=XGBOOST_EARLY_STOPPING_ROUNDS,
                 verbose_eval=False,
             )
+            validate_booster_device(booster, device)
             boosters[horizon_index] = booster
             rounds[horizon_index] = _best_rounds(booster)
         predictions = predict_from_bundles(
-            boosters, bundles, split.validation_rows, rounds
+            boosters,
+            bundles,
+            split.validation_rows,
+            rounds,
+            requested_device=device,
         )
         summary, _, _ = evaluate_predictions(store, split.validation_rows, predictions)
         horizon_scores = {
@@ -382,6 +487,8 @@ def refit_xgboost(
     cache_dir: Path,
     selected: dict[str, object],
     seed: int,
+    *,
+    device: str,
 ) -> tuple[
     dict[int, xgb.Booster],
     dict[int, MatrixBundle],
@@ -392,23 +499,30 @@ def refit_xgboost(
         learning_rate=float(selected["learning_rate"]),
         min_child_weight=int(selected["min_child_weight"]),
     )
+    if device != XGBOOST_DEVICE:
+        raise ValueError("Production XGBoost refit requires the CUDA device")
     parameters = candidate_parameters(candidate, seed)
+    if parameters["device"] != device:
+        raise ValueError("XGBoost parameters and matrix device disagree")
     bundles = _build_matrix_bundles(
         store,
         training_rows,
         validation_rows,
         cache_dir / "final",
+        device=device,
     )
     boosters: dict[int, xgb.Booster] = {}
     boosting_rounds: dict[int, int] = {}
     for horizon_index, horizon in enumerate(HORIZONS):
         rounds = int(selected[f"horizon_{horizon}m_boosting_rounds"])
-        boosters[horizon_index] = xgb.train(
+        booster = xgb.train(
             parameters,
             bundles[horizon_index].training,
             num_boost_round=rounds,
             verbose_eval=False,
         )
+        validate_booster_device(booster, device)
+        boosters[horizon_index] = booster
         boosting_rounds[horizon_index] = rounds
     return boosters, bundles, boosting_rounds
 
@@ -417,21 +531,169 @@ def booster_path(run_dir: Path, horizon: int) -> Path:
     return run_dir / f"booster_{horizon}m.ubj"
 
 
-def save_boosters(run_dir: Path, boosters: dict[int, xgb.Booster]) -> None:
+def _horizon_hash_key(horizon: int) -> str:
+    return f"{horizon}m"
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def save_boosters(run_dir: Path, boosters: dict[int, xgb.Booster]) -> dict[str, str]:
+    _validate_horizon_indices(boosters, "boosters")
+    hashes: dict[str, str] = {}
     for horizon_index, horizon in enumerate(HORIZONS):
         destination = booster_path(run_dir, horizon)
         temporary = destination.with_name(f"{destination.stem}.tmp.ubj")
+        temporary.unlink(missing_ok=True)
         boosters[horizon_index].save_model(temporary)
         os.replace(temporary, destination)
+        hashes[_horizon_hash_key(horizon)] = _sha256(destination)
+    return hashes
 
 
-def load_boosters(run_dir: Path) -> dict[int, xgb.Booster]:
-    boosters: dict[int, xgb.Booster] = {}
-    for horizon_index, horizon in enumerate(HORIZONS):
-        booster = xgb.Booster()
-        booster.load_model(booster_path(run_dir, horizon))
-        boosters[horizon_index] = booster
-    return boosters
+def validate_booster_hashes(run_dir: Path, expected_sha256: object) -> dict[str, str]:
+    expected_keys = {_horizon_hash_key(horizon) for horizon in HORIZONS}
+    if not isinstance(expected_sha256, dict) or set(expected_sha256) != expected_keys:
+        raise ValueError(
+            "XGBoost booster SHA256 map must contain exactly 30m, 60m, and 120m"
+        )
+    expected_files = {booster_path(run_dir, horizon).name for horizon in HORIZONS}
+    actual_files = {
+        path.name for path in run_dir.glob("booster_*m.ubj") if path.is_file()
+    }
+    if actual_files != expected_files:
+        raise ValueError("XGBoost run must contain exactly three horizon booster files")
+
+    validated: dict[str, str] = {}
+    for horizon in HORIZONS:
+        key = _horizon_hash_key(horizon)
+        expected = expected_sha256[key]
+        if (
+            not isinstance(expected, str)
+            or len(expected) != 64
+            or any(character not in "0123456789abcdef" for character in expected)
+        ):
+            raise ValueError(f"Malformed XGBoost booster SHA256 for horizon {key}")
+        actual = _sha256(booster_path(run_dir, horizon))
+        if not hmac.compare_digest(actual, expected):
+            raise ValueError(f"XGBoost booster SHA256 mismatch for horizon {key}")
+        validated[key] = expected
+    return validated
+
+
+def _load_booster(path: Path, requested_device: str) -> xgb.Booster:
+    _validate_requested_device(requested_device)
+    booster = xgb.Booster()
+    booster.load_model(path)
+    booster.set_param({"device": requested_device})
+    validate_booster_device(booster, requested_device)
+    return booster
+
+
+def load_boosters(
+    run_dir: Path,
+    *,
+    requested_device: str,
+    expected_sha256: object,
+) -> dict[int, xgb.Booster]:
+    validate_booster_hashes(run_dir, expected_sha256)
+    return {
+        horizon_index: _load_booster(booster_path(run_dir, horizon), requested_device)
+        for horizon_index, horizon in enumerate(HORIZONS)
+    }
+
+
+def qualify_native_cuda_xgboost(work_dir: Path) -> dict[str, object]:
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            "Native CUDA XGBoost qualification requires an available GPU"
+        )
+
+    qualification_dir: Path | None = None
+    with xgb.config_context(use_cuda_async_pool=True):
+        with tempfile.TemporaryDirectory(
+            prefix="xgboost_cuda_qualification_", dir=work_dir
+        ) as temporary:
+            qualification_dir = Path(temporary)
+            row_count = 16
+            source = [
+                TabularRowBatch(
+                    features=(
+                        torch.arange(
+                            row_count * TABULAR_FEATURE_COUNT,
+                            dtype=torch.float32,
+                            device="cuda",
+                        ).reshape(row_count, TABULAR_FEATURE_COUNT)
+                        / TABULAR_FEATURE_COUNT
+                    ),
+                    labels=torch.linspace(
+                        -1.0, 1.0, row_count, dtype=torch.float32, device="cuda"
+                    ),
+                    weights=torch.full(
+                        (row_count,),
+                        1.0 / row_count,
+                        dtype=torch.float32,
+                        device="cuda",
+                    ),
+                    sample_id=np.arange(row_count, dtype=np.int64),
+                    date_idx=np.zeros(row_count, dtype=np.int64),
+                    decision_idx=np.zeros(row_count, dtype=np.int64),
+                    equity_slot=np.arange(row_count, dtype=np.int16),
+                )
+            ]
+            matrix = build_quantile_matrix(
+                source,
+                qualification_dir / "matrix",
+                device=XGBOOST_DEVICE,
+            )
+            parameters = {
+                **dict(XGBOOST_FIXED_PARAMETERS),
+                "max_depth": 2,
+                "learning_rate": 0.2,
+                "min_child_weight": 1,
+                "seed": 0,
+                "validate_parameters": True,
+            }
+            booster = xgb.train(parameters, matrix, num_boost_round=2)
+            validate_booster_device(booster, XGBOOST_DEVICE)
+            original = np.asarray(booster.predict(matrix), dtype=np.float32)
+            if not np.isfinite(original).all():
+                raise ValueError(
+                    "Native CUDA XGBoost qualification produced nonfinite output"
+                )
+
+            destination = qualification_dir / "qualification.ubj"
+            temporary_model = qualification_dir / "qualification.tmp.ubj"
+            booster.save_model(temporary_model)
+            os.replace(temporary_model, destination)
+            reloaded = _load_booster(destination, XGBOOST_DEVICE)
+            restored = np.asarray(reloaded.predict(matrix), dtype=np.float32)
+            if not np.isfinite(restored).all():
+                raise ValueError(
+                    "Reloaded native CUDA XGBoost qualification output is nonfinite"
+                )
+            if not np.array_equal(restored, original):
+                raise ValueError(
+                    "Native CUDA XGBoost qualification save/load changed predictions"
+                )
+            report = {
+                "passed": True,
+                "device": booster_device(reloaded),
+                "rows": row_count,
+                "columns": TABULAR_FEATURE_COUNT,
+                "boosting_rounds": 2,
+                "exact_reload_prediction_equality": True,
+            }
+            del reloaded, booster, matrix, source
+            gc.collect()
+    if qualification_dir is None or qualification_dir.exists():
+        raise RuntimeError("Native CUDA XGBoost qualification cache was not removed")
+    return report
 
 
 def prediction_long_frame(
@@ -472,17 +734,26 @@ def _write_parquet(path: Path, frame: pl.DataFrame) -> None:
     os.replace(temporary, path)
 
 
-def write_xgboost_artifacts(
+def _save_and_qualify_boosters(
     run_dir: Path,
     boosters: dict[int, xgb.Booster],
     bundles: dict[int, MatrixBundle],
     validation_rows: pl.DataFrame,
-    result: XGBoostRunResult,
-) -> None:
-    original_predictions = predict_from_bundles(boosters, bundles, validation_rows)
-    save_boosters(run_dir, boosters)
-    reloaded = load_boosters(run_dir)
-    reloaded_predictions = predict_from_bundles(reloaded, bundles, validation_rows)
+    *,
+    device: str,
+) -> dict[str, str]:
+    original_predictions = predict_from_bundles(
+        boosters, bundles, validation_rows, requested_device=device
+    )
+    booster_sha256 = save_boosters(run_dir, boosters)
+    reloaded = load_boosters(
+        run_dir,
+        requested_device=device,
+        expected_sha256=booster_sha256,
+    )
+    reloaded_predictions = predict_from_bundles(
+        reloaded, bundles, validation_rows, requested_device=device
+    )
     if reloaded_predictions.shape != (
         validation_rows.height,
         EQUITY_COUNT,
@@ -491,7 +762,12 @@ def write_xgboost_artifacts(
         raise ValueError("Reloaded XGBoost prediction shape is invalid")
     if not np.array_equal(reloaded_predictions, original_predictions):
         raise ValueError("XGBoost save/load changed validation predictions")
+    del reloaded
+    gc.collect()
+    return booster_sha256
 
+
+def write_xgboost_artifacts(run_dir: Path, result: XGBoostRunResult) -> None:
     _write_parquet(run_dir / "tuning_results.parquet", pl.DataFrame(result.tuning_rows))
     _write_json(run_dir / "selected_xgboost_settings.json", result.selected_settings)
     _write_json(run_dir / "validation_summary.json", result.validation_summary)
@@ -512,69 +788,84 @@ def train_xgboost_run(
     run_dir: Path,
     seed: int,
 ) -> XGBoostRunResult:
-    with tempfile.TemporaryDirectory(prefix="xgboost_", dir=run_dir) as temporary:
-        cache_dir = Path(temporary)
-        selected, tuning_rows, inner_split = tune_xgboost(
-            store, training_rows, cache_dir, seed
-        )
-        boosters, bundles, boosting_rounds = refit_xgboost(
-            store,
-            training_rows,
-            validation_rows,
-            cache_dir,
-            selected,
-            seed,
-        )
-        predictions = predict_from_bundles(boosters, bundles, validation_rows)
-        validation_summary, validation_daily_rows, arrays = evaluate_predictions(
-            store, validation_rows, predictions
-        )
-        dates = dict(
-            pl.read_parquet(store / "date_index.parquet")
-            .select("date_idx", "trade_date")
-            .iter_rows()
-        )
-        validation_daily_rows = [
-            {"trade_date": dates[int(row["date_idx"])], **row}
-            for row in validation_daily_rows
-        ]
-        selected_settings = {
-            "feature_store": str(store.resolve()),
-            "candidate_index": int(selected["candidate_index"]),
-            "max_depth": int(selected["max_depth"]),
-            "learning_rate": float(selected["learning_rate"]),
-            "min_child_weight": int(selected["min_child_weight"]),
-            "fixed_parameters": dict(XGBOOST_FIXED_PARAMETERS),
-            "boosting_rounds": {
-                f"{HORIZONS[index]}m": rounds
-                for index, rounds in boosting_rounds.items()
-            },
-            "inner_split": inner_split,
-        }
-        result = XGBoostRunResult(
-            selected_settings=selected_settings,
-            tuning_rows=tuning_rows,
-            validation_summary=validation_summary,
-            validation_daily_rows=validation_daily_rows,
-            validation_predictions=prediction_long_frame(
-                validation_rows, predictions, arrays
-            ),
-            matrix_dimensions=_matrix_dimensions(bundles),
-            boosting_rounds={
-                f"{HORIZONS[index]}m": rounds
-                for index, rounds in boosting_rounds.items()
-            },
-        )
-        write_xgboost_artifacts(
-            run_dir,
-            boosters,
-            bundles,
-            validation_rows,
-            result,
-        )
-        del bundles
-        gc.collect()
-        return result
+    with xgb.config_context(use_cuda_async_pool=True):
+        with tempfile.TemporaryDirectory(prefix="xgboost_", dir=run_dir) as temporary:
+            cache_dir = Path(temporary)
+            native_cuda_qualification = qualify_native_cuda_xgboost(cache_dir)
+            selected, tuning_rows, inner_split = tune_xgboost(
+                store,
+                training_rows,
+                cache_dir,
+                seed,
+                device=XGBOOST_DEVICE,
+            )
+            boosters, bundles, boosting_rounds = refit_xgboost(
+                store,
+                training_rows,
+                validation_rows,
+                cache_dir,
+                selected,
+                seed,
+                device=XGBOOST_DEVICE,
+            )
+            predictions = predict_from_bundles(
+                boosters,
+                bundles,
+                validation_rows,
+                requested_device=XGBOOST_DEVICE,
+            )
+            validation_summary, validation_daily_rows, arrays = evaluate_predictions(
+                store, validation_rows, predictions
+            )
+            dates = dict(
+                pl.read_parquet(store / "date_index.parquet")
+                .select("date_idx", "trade_date")
+                .iter_rows()
+            )
+            validation_daily_rows = [
+                {"trade_date": dates[int(row["date_idx"])], **row}
+                for row in validation_daily_rows
+            ]
+            selected_settings = {
+                "feature_store": str(store.resolve()),
+                "candidate_index": int(selected["candidate_index"]),
+                "max_depth": int(selected["max_depth"]),
+                "learning_rate": float(selected["learning_rate"]),
+                "min_child_weight": int(selected["min_child_weight"]),
+                "fixed_parameters": dict(XGBOOST_FIXED_PARAMETERS),
+                "boosting_rounds": {
+                    f"{HORIZONS[index]}m": rounds
+                    for index, rounds in boosting_rounds.items()
+                },
+                "inner_split": inner_split,
+            }
+            booster_sha256 = _save_and_qualify_boosters(
+                run_dir,
+                boosters,
+                bundles,
+                validation_rows,
+                device=XGBOOST_DEVICE,
+            )
+            result = XGBoostRunResult(
+                selected_settings=selected_settings,
+                tuning_rows=tuning_rows,
+                validation_summary=validation_summary,
+                validation_daily_rows=validation_daily_rows,
+                validation_predictions=prediction_long_frame(
+                    validation_rows, predictions, arrays
+                ),
+                matrix_dimensions=_matrix_dimensions(bundles),
+                boosting_rounds={
+                    f"{HORIZONS[index]}m": rounds
+                    for index, rounds in boosting_rounds.items()
+                },
+                booster_sha256=booster_sha256,
+                native_cuda_qualification=native_cuda_qualification,
+            )
+            write_xgboost_artifacts(run_dir, result)
+            del bundles, boosters
+            gc.collect()
+    return result
 
 
 def evaluate_saved_xgboost(
@@ -583,21 +874,39 @@ def evaluate_saved_xgboost(
     rows: pl.DataFrame,
     run_dir: Path,
     work_dir: Path,
+    expected_booster_sha256: object,
 ) -> tuple[
     np.ndarray,
     dict[str, object],
     list[dict[str, object]],
     pl.DataFrame,
 ]:
-    with tempfile.TemporaryDirectory(
-        prefix="xgboost_evaluate_", dir=work_dir
-    ) as temporary:
-        cache_dir = Path(temporary)
-        bundles = _build_matrix_bundles(store, training_rows, rows, cache_dir)
-        boosters = load_boosters(run_dir)
-        predictions = predict_from_bundles(boosters, bundles, rows)
-        del bundles
-        gc.collect()
+    with xgb.config_context(use_cuda_async_pool=True):
+        validated_sha256 = validate_booster_hashes(run_dir, expected_booster_sha256)
+        with tempfile.TemporaryDirectory(
+            prefix="xgboost_evaluate_", dir=work_dir
+        ) as temporary:
+            cache_dir = Path(temporary)
+            bundles = _build_matrix_bundles(
+                store,
+                training_rows,
+                rows,
+                cache_dir,
+                device=XGBOOST_DEVICE,
+            )
+            boosters = load_boosters(
+                run_dir,
+                requested_device=XGBOOST_DEVICE,
+                expected_sha256=validated_sha256,
+            )
+            predictions = predict_from_bundles(
+                boosters,
+                bundles,
+                rows,
+                requested_device=XGBOOST_DEVICE,
+            )
+            del bundles, boosters
+            gc.collect()
     summary, daily_rows, arrays = evaluate_predictions(store, rows, predictions)
     return (
         predictions,

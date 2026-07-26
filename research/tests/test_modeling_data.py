@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 import pytest
+import torch
 
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
@@ -473,8 +474,8 @@ def test_tabular_row_iterator_masks_horizons_and_equalizes_samples(
     label_mask = np.load(store / "label_mask.npy", mmap_mode="r+")
     label_mask[0, 1, 0, 1] = False
     label_mask.flush()
-    horizon_0 = list(TabularRowIterator(store, rows, 0, batch_size=2))
-    horizon_1 = list(TabularRowIterator(store, rows, 1, batch_size=2))
+    horizon_0 = list(TabularRowIterator(store, rows, 0, device="cpu", batch_size=2))
+    horizon_1 = list(TabularRowIterator(store, rows, 1, device="cpu", batch_size=2))
     assert sum(batch.features.shape[0] for batch in horizon_0) == 6
     assert sum(batch.features.shape[0] for batch in horizon_1) == 5
     for batches in (horizon_0, horizon_1):
@@ -487,3 +488,22 @@ def test_tabular_row_iterator_masks_horizons_and_equalizes_samples(
     on_first_sample = first_horizon_1.sample_id == 10
     assert on_first_sample.sum() == 1
     assert first_horizon_1.weights[on_first_sample].item() == 1.0
+
+
+def test_tabular_row_iterator_cuda_materializes_only_model_inputs(
+    tmp_path: Path,
+) -> None:
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA tensor materialization requires an available GPU")
+    store, rows = _synthetic_store(tmp_path)
+    batch = next(iter(TabularRowIterator(store, rows, 0, device="cuda")))
+    for value in (batch.features, batch.labels, batch.weights):
+        assert isinstance(value, torch.Tensor)
+        assert value.device.type == "cuda"
+    for value in (
+        batch.sample_id,
+        batch.date_idx,
+        batch.decision_idx,
+        batch.equity_slot,
+    ):
+        assert isinstance(value, np.ndarray)
