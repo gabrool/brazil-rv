@@ -58,8 +58,14 @@ from brazil_rv.modeling.contract import (
     MUON_WEIGHT_DECAY,
     OPTIMIZER_VARIANTS,
     XGBOOST_CANDIDATES,
+    XGBOOST_DEVICE,
+    XGBOOST_FIXED_PARAMETERS,
+    XGBOOST_VERSION,
 )
-from brazil_rv.modeling.evaluate import _validate_run_checkpoint_identity
+from brazil_rv.modeling.evaluate import (
+    _validate_run_checkpoint_identity,
+    _validate_xgboost_identity,
+)
 from brazil_rv.modeling.engine import (
     _compile_parity_report,
     _filter_evaluation_rows,
@@ -82,13 +88,17 @@ from brazil_rv.modeling.train import (
 from brazil_rv.modeling.model import build_neural_model
 from brazil_rv.modeling.data import TabularRowBatch
 from brazil_rv.modeling.xgboost_model import (
+    QuantileBatchDataIter,
     _fill_horizon_predictions,
+    booster_device,
     build_quantile_matrix,
     inner_date_split,
     load_boosters,
     prediction_long_frame,
+    qualify_native_cuda_xgboost,
     save_boosters,
     select_candidate,
+    validate_booster_hashes,
 )
 from brazil_rv.modeling.muon import PYTORCH_MUON_REFERENCE, PyTorch213Muon
 from brazil_rv.modeling.optim import (
@@ -1406,21 +1416,39 @@ def test_xgboost_prediction_reshape_and_long_frame() -> None:
     ]
 
 
+def _tabular_xgboost_test_batch() -> TabularRowBatch:
+    return TabularRowBatch(
+        features=np.arange(4 * 871, dtype=np.float32).reshape(4, 871),
+        labels=np.asarray([-1.0, -0.25, 0.25, 1.0], dtype=np.float32),
+        weights=np.full(4, 0.25, dtype=np.float32),
+        sample_id=np.arange(4, dtype=np.int64),
+        date_idx=np.zeros(4, dtype=np.int64),
+        decision_idx=np.zeros(4, dtype=np.int64),
+        equity_slot=np.arange(4, dtype=np.int64),
+    )
+
+
+def test_xgboost_cpu_iterator_is_explicit_and_passes_numpy() -> None:
+    captured: dict[str, object] = {}
+    iterator = QuantileBatchDataIter([_tabular_xgboost_test_batch()], device="cpu")
+    assert iterator.next(lambda **values: captured.update(values))
+    assert isinstance(captured["data"], np.ndarray)
+    assert isinstance(captured["label"], np.ndarray)
+    assert isinstance(captured["weight"], np.ndarray)
+    assert not iterator.next(lambda **_: None)
+
+
+def test_xgboost_cuda_iterator_rejects_numpy_batches() -> None:
+    iterator = QuantileBatchDataIter([_tabular_xgboost_test_batch()], device="cuda")
+    with pytest.raises(TypeError, match="CUDA torch.Tensor"):
+        iterator.next(lambda **_: None)
+
+
 def test_xgboost_streaming_external_memory_quantile_matrix(tmp_path: Path) -> None:
-    source = [
-        TabularRowBatch(
-            features=np.arange(4 * 871, dtype=np.float32).reshape(4, 871),
-            labels=np.asarray([-1.0, -0.25, 0.25, 1.0], dtype=np.float32),
-            weights=np.full(4, 0.25, dtype=np.float32),
-            sample_id=np.arange(4, dtype=np.int64),
-            date_idx=np.zeros(4, dtype=np.int64),
-            decision_idx=np.zeros(4, dtype=np.int64),
-            equity_slot=np.arange(4, dtype=np.int64),
-        )
-    ]
     matrix = build_quantile_matrix(
-        source,  # type: ignore[arg-type]
+        [_tabular_xgboost_test_batch()],
         tmp_path / "quantile",
+        device="cpu",
     )
     assert matrix.num_row() == 4
     assert matrix.num_col() == 871
@@ -1430,7 +1458,7 @@ def test_xgboost_streaming_external_memory_quantile_matrix(tmp_path: Path) -> No
     assert not any(path.is_file() for path in tmp_path.rglob("*"))
 
 
-def test_xgboost_three_booster_ubj_round_trip(tmp_path: Path) -> None:
+def _train_cpu_xgboost_test_model() -> tuple[xgb.Booster, xgb.DMatrix]:
     features = np.arange(48, dtype=np.float32).reshape(12, 4)
     labels = np.linspace(-1.0, 1.0, 12, dtype=np.float32)
     matrix = xgb.DMatrix(features, label=labels)
@@ -1445,10 +1473,133 @@ def test_xgboost_three_booster_ubj_round_trip(tmp_path: Path) -> None:
         matrix,
         num_boost_round=3,
     )
+    return booster, matrix
+
+
+def test_xgboost_three_booster_ubj_round_trip(tmp_path: Path) -> None:
+    booster, matrix = _train_cpu_xgboost_test_model()
     boosters = {index: booster for index in range(len(HORIZONS))}
     expected = booster.predict(matrix)
-    save_boosters(tmp_path, boosters)
-    loaded = load_boosters(tmp_path)
+    hashes = save_boosters(tmp_path, boosters)
+    assert set(hashes) == {"30m", "60m", "120m"}
+    assert all(len(digest) == 64 for digest in hashes.values())
+
+    loaded = load_boosters(tmp_path, requested_device="cpu", expected_sha256=hashes)
     for index, horizon in enumerate(HORIZONS):
         assert (tmp_path / f"booster_{horizon}m.ubj").is_file()
+        assert booster_device(loaded[index]) == "cpu"
         np.testing.assert_array_equal(loaded[index].predict(matrix), expected)
+
+    cuda_rebound = load_boosters(
+        tmp_path, requested_device="cuda", expected_sha256=hashes
+    )
+    assert all(
+        booster_device(cuda_rebound[index]).startswith("cuda")
+        for index in range(len(HORIZONS))
+    )
+
+
+def test_xgboost_booster_hash_validation_rejects_mutation(tmp_path: Path) -> None:
+    booster, _ = _train_cpu_xgboost_test_model()
+    hashes = save_boosters(tmp_path, {index: booster for index in range(len(HORIZONS))})
+    path = tmp_path / "booster_30m.ubj"
+    payload = bytearray(path.read_bytes())
+    payload[len(payload) // 2] ^= 1
+    path.write_bytes(payload)
+    with pytest.raises(ValueError, match="SHA256 mismatch for horizon 30m"):
+        validate_booster_hashes(tmp_path, hashes)
+
+
+def test_xgboost_booster_hash_validation_rejects_missing_file(
+    tmp_path: Path,
+) -> None:
+    booster, _ = _train_cpu_xgboost_test_model()
+    hashes = save_boosters(tmp_path, {index: booster for index in range(len(HORIZONS))})
+    (tmp_path / "booster_60m.ubj").unlink()
+    with pytest.raises(ValueError, match="exactly three horizon booster files"):
+        validate_booster_hashes(tmp_path, hashes)
+
+
+def test_xgboost_booster_hash_validation_rejects_malformed_maps(
+    tmp_path: Path,
+) -> None:
+    booster, _ = _train_cpu_xgboost_test_model()
+    hashes = save_boosters(tmp_path, {index: booster for index in range(len(HORIZONS))})
+    invalid_maps = (
+        {},
+        {**hashes, "999m": "0" * 64},
+        {**hashes, "30m": "not-a-sha256"},
+    )
+    for invalid in invalid_maps:
+        with pytest.raises(ValueError, match="SHA256"):
+            validate_booster_hashes(tmp_path, invalid)
+
+
+def _completed_xgboost_manifest(
+    feature_store: Path, booster_sha256: dict[str, str]
+) -> dict[str, object]:
+    return {
+        "status": "completed",
+        "model_name": "xgboost",
+        "model_family": "xgboost",
+        "optimizer_variant": None,
+        "architecture_constants": None,
+        "parameter_count": None,
+        "compile": None,
+        "bf16": None,
+        "seed": 11,
+        "git_commit_sha": "a" * 40,
+        "resolved_feature_store_path": str(feature_store),
+        "xgboost": {
+            "version": XGBOOST_VERSION,
+            "device": XGBOOST_DEVICE,
+            "objective": "reg:pseudohubererror",
+            "fixed_parameters": dict(XGBOOST_FIXED_PARAMETERS),
+            "selected_settings": {
+                "feature_store": str(feature_store),
+                "fixed_parameters": dict(XGBOOST_FIXED_PARAMETERS),
+            },
+            "native_cuda_qualification": {
+                "passed": True,
+                "device": "cuda:0",
+                "exact_reload_prediction_equality": True,
+            },
+            "booster_sha256": booster_sha256,
+        },
+    }
+
+
+def test_completed_xgboost_manifest_requires_bound_booster_hashes(
+    tmp_path: Path,
+) -> None:
+    feature_store = tmp_path / "store"
+    feature_store.mkdir()
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    booster, _ = _train_cpu_xgboost_test_model()
+    hashes = save_boosters(run_dir, {index: booster for index in range(len(HORIZONS))})
+    manifest = _completed_xgboost_manifest(feature_store, hashes)
+    assert _validate_xgboost_identity(manifest, feature_store, run_dir) == hashes
+
+    missing_hashes = copy.deepcopy(manifest)
+    del missing_hashes["xgboost"]["booster_sha256"]  # type: ignore[index]
+    with pytest.raises(ValueError, match="SHA256 metadata is missing"):
+        _validate_xgboost_identity(missing_hashes, feature_store, run_dir)
+
+
+def test_native_cuda_xgboost_qualification_and_cache_cleanup(
+    tmp_path: Path,
+) -> None:
+    if (
+        sys.platform != "linux"
+        or not torch.cuda.is_available()
+        or not bool(xgb.build_info().get("USE_CUDA"))
+    ):
+        pytest.skip("native CUDA async-pool XGBoost runtime is unavailable")
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    report = qualify_native_cuda_xgboost(work_dir)
+    assert report["passed"] is True
+    assert report["exact_reload_prediction_equality"] is True
+    assert str(report["device"]).startswith("cuda")
+    assert not any(work_dir.iterdir())

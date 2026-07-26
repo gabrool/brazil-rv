@@ -12,9 +12,14 @@ import polars as pl
 import torch
 
 from .contract import (
+    ALLOWED_SEEDS,
     EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     GH200_RUNTIME,
     NEURAL_MODELS,
+    XGBOOST_DEVICE,
+    XGBOOST_FIXED_PARAMETERS,
+    XGBOOST_OBJECTIVE,
+    XGBOOST_VERSION,
     architecture_for_model,
 )
 from .data import (
@@ -36,7 +41,11 @@ from .engine import (
 from .model import build_neural_model
 from .muon import PYTORCH_MUON_REFERENCE
 from .optim import OFFICIAL_MUON_BACKEND, REFERENCE_MUON_BACKEND
-from .xgboost_model import evaluate_saved_xgboost, validate_xgboost_runtime
+from .xgboost_model import (
+    evaluate_saved_xgboost,
+    validate_booster_hashes,
+    validate_xgboost_runtime,
+)
 
 _CHECKPOINT_IDENTITY_FIELDS = (
     "muon_backend",
@@ -104,13 +113,24 @@ def _validate_run_checkpoint_identity(
 
 
 def _validate_xgboost_identity(
-    manifest: dict[str, object], feature_store: Path
-) -> None:
+    manifest: dict[str, object], feature_store: Path, run_dir: Path
+) -> dict[str, str]:
+    if manifest.get("status") != "completed":
+        raise ValueError("Standalone XGBoost evaluation requires a completed run")
     if (
         manifest.get("model_name") != "xgboost"
         or manifest.get("model_family") != "xgboost"
     ):
         raise ValueError("Invalid XGBoost run identity")
+    if manifest.get("seed") not in ALLOWED_SEEDS:
+        raise ValueError("Invalid XGBoost run seed identity")
+    commit_sha = manifest.get("git_commit_sha")
+    if (
+        not isinstance(commit_sha, str)
+        or len(commit_sha) != 40
+        or any(character not in "0123456789abcdef" for character in commit_sha)
+    ):
+        raise ValueError("Invalid XGBoost Git SHA identity")
     for field in (
         "optimizer_variant",
         "architecture_constants",
@@ -123,9 +143,37 @@ def _validate_xgboost_identity(
     manifest_store = Path(str(manifest["resolved_feature_store_path"])).expanduser()
     if manifest_store.resolve() != feature_store:
         raise ValueError("Validated feature store does not match the run identity")
+
     metadata = manifest.get("xgboost")
-    if not isinstance(metadata, dict) or "selected_settings" not in metadata:
+    if not isinstance(metadata, dict):
         raise ValueError("Completed XGBoost metadata is missing")
+    if metadata.get("version") != XGBOOST_VERSION:
+        raise ValueError("Invalid XGBoost version identity")
+    if metadata.get("device") != XGBOOST_DEVICE:
+        raise ValueError("Invalid XGBoost device identity")
+    if metadata.get("objective") != XGBOOST_OBJECTIVE:
+        raise ValueError("Invalid XGBoost objective identity")
+    if metadata.get("fixed_parameters") != dict(XGBOOST_FIXED_PARAMETERS):
+        raise ValueError("Invalid XGBoost fixed-parameter identity")
+    selected = metadata.get("selected_settings")
+    if not isinstance(selected, dict):
+        raise ValueError("Completed XGBoost selected settings are missing")
+    selected_store = Path(str(selected.get("feature_store"))).expanduser()
+    if selected_store.resolve() != feature_store:
+        raise ValueError("XGBoost selected settings use a different feature store")
+    if selected.get("fixed_parameters") != dict(XGBOOST_FIXED_PARAMETERS):
+        raise ValueError("Invalid selected XGBoost fixed parameters")
+    qualification = metadata.get("native_cuda_qualification")
+    if (
+        not isinstance(qualification, dict)
+        or qualification.get("passed") is not True
+        or qualification.get("exact_reload_prediction_equality") is not True
+        or not str(qualification.get("device", "")).startswith("cuda")
+    ):
+        raise ValueError("Completed XGBoost native CUDA qualification is invalid")
+    if "booster_sha256" not in metadata:
+        raise ValueError("Completed XGBoost booster SHA256 metadata is missing")
+    return validate_booster_hashes(run_dir, metadata["booster_sha256"])
 
 
 def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
@@ -249,7 +297,9 @@ def main() -> None:
 
     model_family = str(manifest.get("model_family"))
     if model_family == "xgboost":
-        _validate_xgboost_identity(manifest, feature_store)
+        booster_sha256 = _validate_xgboost_identity(
+            manifest, feature_store, args.run_dir
+        )
         xgboost_runtime = validate_xgboost_runtime()
         started = time.perf_counter()
         _, summary, daily_rows, predictions = evaluate_saved_xgboost(
@@ -258,6 +308,7 @@ def main() -> None:
             rows,
             args.run_dir,
             evaluation_dir,
+            booster_sha256,
         )
         family_metadata: dict[str, object] = {
             "xgboost_runtime": xgboost_runtime,

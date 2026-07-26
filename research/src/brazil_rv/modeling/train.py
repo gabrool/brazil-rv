@@ -292,6 +292,8 @@ def _run_xgboost(
             "boosting_rounds": result.boosting_rounds,
             "matrix_dimensions": result.matrix_dimensions,
             "validation_primary_score": result.validation_summary["primary_score"],
+            "booster_sha256": result.booster_sha256,
+            "native_cuda_qualification": result.native_cuda_qualification,
         },
     }
     _atomic_write_json(run_dir / "run_manifest.json", completed)
