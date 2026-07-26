@@ -4,7 +4,6 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import polars as pl
@@ -14,35 +13,93 @@ from .contract import (
     CONTEXT_SYMBOLS,
     DECISION_CONTEXT_INDICES,
     DECISION_EQUITY_INDICES,
+    DYNAMIC_CHANNELS,
+    EXPECTED_DATE_COUNT,
+    EXPECTED_SAMPLE_COUNT,
     HORIZONS,
-    PRICE_FEATURE_CLIP,
-    VOL_REGIME_CLIP,
-    VOLUME_FEATURE_CLIP,
+    SLOW_CHANNELS,
+    output_array_specs,
 )
+from .transforms import centered_midranks
 
 AUDIT_BASE = CANONICAL_OUTPUT_POINTER.parent.parent / "feature_audits"
 EQUITY_VISIBLE_MINUTES = max(DECISION_EQUITY_INDICES)
 CONTEXT_VISIBLE_MINUTES = max(DECISION_CONTEXT_INDICES)
-DATE_CHUNK = 16
+DATE_CHUNK = 8
+TARGET_MEAN_TOLERANCE = 2e-6
+
+DYNAMIC_BOUNDS: tuple[tuple[float, float], ...] = (
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-6.0, 6.0),
+    (0.0, 1.0),
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-4.0, 4.0),
+    (-4.0, 4.0),
+    (-4.0, 4.0),
+    (-6.0, 6.0),
+    (-1.0, 1.0),
+    (0.0, 1.0),
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-1.0, 1.0),
+    (-1.0, 1.0),
+    (0.0, 10.0),
+    (0.0, 10.0),
+    (-1.0, 1.0),
+    (-1.0, 1.0),
+    (-1.0, 1.0),
+    (-1.0, 1.0),
+)
+SLOW_BOUNDS: tuple[tuple[float, float] | None, ...] = (
+    (-4.0, 4.0),
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-4.0, 4.0),
+    (-6.0, 6.0),
+    (-10.0, 10.0),
+    (-10.0, 10.0),
+    (-4.0, 4.0),
+    (-4.0, 4.0),
+    (0.0, 4.0),
+    None,
+    None,
+    (-6.0, 6.0),
+    (0.0, 1.0),
+    (0.0, 1.0),
+    (-1.0, 1.0),
+    (-1.0, 1.0),
+    (-1.0, 1.0),
+    (-5.0, 5.0),
+    (-5.0, 5.0),
+    (-5.0, 5.0),
+    (-5.0, 5.0),
+    (-5.0, 5.0),
+    (-5.0, 5.0),
+    (-1.0, 1.0),
+    (-1.0, 1.0),
+    (0.0, 1.0),
+    (0.0, 1.0),
+    (-1.0, 3.0),
+    (0.0, 1.0),
+)
 
 
 @dataclass
-class BoundedStats:
-    low: float
-    high: float
-    bins: int = 2000
-
-    def __post_init__(self) -> None:
-        self.edges = np.linspace(self.low, self.high, self.bins + 1, dtype=np.float64)
-        self.hist = np.zeros(self.bins, dtype=np.int64)
-        self.count = 0
-        self.total = 0.0
-        self.total_sq = 0.0
-        self.minimum = np.inf
-        self.maximum = -np.inf
-        self.zero_count = 0
-        self.low_clip_count = 0
-        self.high_clip_count = 0
+class StreamingStats:
+    count: int = 0
+    total: float = 0.0
+    total_sq: float = 0.0
+    minimum: float = np.inf
+    maximum: float = -np.inf
+    zero_count: int = 0
 
     def update(self, values: np.ndarray) -> None:
         values = np.asarray(values, dtype=np.float64).ravel()
@@ -50,40 +107,18 @@ class BoundedStats:
             return
         if not np.isfinite(values).all():
             raise ValueError("Non-finite value encountered during statistical audit")
-        if values.min() < self.low - 1e-5 or values.max() > self.high + 1e-5:
-            raise ValueError(
-                f"Value outside declared feature bounds [{self.low}, {self.high}]"
-            )
         self.count += int(values.size)
         self.total += float(values.sum(dtype=np.float64))
-        self.total_sq += float(
-            np.square(values, dtype=np.float64).sum(dtype=np.float64)
-        )
+        self.total_sq += float(np.square(values).sum(dtype=np.float64))
         self.minimum = min(self.minimum, float(values.min()))
         self.maximum = max(self.maximum, float(values.max()))
         self.zero_count += int(np.count_nonzero(values == 0.0))
-        tolerance = 1e-6
-        self.low_clip_count += int(np.count_nonzero(values <= self.low + tolerance))
-        self.high_clip_count += int(np.count_nonzero(values >= self.high - tolerance))
-        self.hist += np.histogram(values, bins=self.edges)[0]
-
-    def quantile(self, probability: float) -> float | None:
-        if self.count == 0:
-            return None
-        if probability <= 0:
-            return self.minimum
-        if probability >= 1:
-            return self.maximum
-        target = int(np.ceil(probability * self.count))
-        index = int(np.searchsorted(np.cumsum(self.hist), target, side="left"))
-        index = min(index, self.bins - 1)
-        return float((self.edges[index] + self.edges[index + 1]) / 2.0)
 
     def row(self, scope: str, feature: str) -> dict[str, object]:
         mean = self.total / self.count if self.count else None
         variance = (
             max(self.total_sq / self.count - mean * mean, 0.0)
-            if self.count and mean is not None
+            if mean is not None
             else None
         )
         return {
@@ -91,478 +126,423 @@ class BoundedStats:
             "feature": feature,
             "count": self.count,
             "mean": mean,
-            "std": float(np.sqrt(variance)) if variance is not None else None,
+            "std": None if variance is None else float(np.sqrt(variance)),
             "min": None if self.count == 0 else self.minimum,
-            "p001": self.quantile(0.001),
-            "p01": self.quantile(0.01),
-            "p05": self.quantile(0.05),
-            "p50": self.quantile(0.50),
-            "p95": self.quantile(0.95),
-            "p99": self.quantile(0.99),
-            "p999": self.quantile(0.999),
             "max": None if self.count == 0 else self.maximum,
-            "zero_rate": self.zero_count / self.count if self.count else None,
-            "low_clip_rate": self.low_clip_count / self.count if self.count else None,
-            "high_clip_rate": self.high_clip_count / self.count if self.count else None,
+            "zero_rate": None if self.count == 0 else self.zero_count / self.count,
         }
 
 
-def _chunks(indices: np.ndarray, size: int = DATE_CHUNK) -> Iterable[np.ndarray]:
-    for start in range(0, len(indices), size):
-        yield indices[start : start + size]
-
-
-def _exact_stats(
-    values: np.ndarray,
-    *,
-    period: str,
-    metric: str,
-    horizon: int,
-    unit: str,
-) -> dict[str, object]:
-    values = np.asarray(values, dtype=np.float64)
-    if values.size == 0:
-        return {
-            "period": period,
-            "metric": metric,
-            "horizon_minutes": horizon,
-            "unit": unit,
-            "count": 0,
-        }
-    if not np.isfinite(values).all():
-        raise ValueError(
-            f"Non-finite values in {metric}, horizon={horizon}, period={period}"
-        )
-    quantiles = np.quantile(
-        values,
-        [0.0, 0.001, 0.01, 0.05, 0.50, 0.95, 0.99, 0.999, 1.0],
-    )
+def _load_arrays(features_dir: Path) -> dict[str, np.ndarray]:
     return {
-        "period": period,
-        "metric": metric,
-        "horizon_minutes": horizon,
-        "unit": unit,
-        "count": int(values.size),
-        "mean": float(values.mean()),
-        "std": float(values.std()),
-        "min": float(quantiles[0]),
-        "p001": float(quantiles[1]),
-        "p01": float(quantiles[2]),
-        "p05": float(quantiles[3]),
-        "p50": float(quantiles[4]),
-        "p95": float(quantiles[5]),
-        "p99": float(quantiles[6]),
-        "p999": float(quantiles[7]),
-        "max": float(quantiles[8]),
-        "abs_gt_5_rate": float(np.mean(np.abs(values) > 5.0))
-        if unit == "volatility units"
-        else None,
-        "abs_gt_10_rate": float(np.mean(np.abs(values) > 10.0))
-        if unit == "volatility units"
-        else None,
+        filename: np.load(features_dir / filename, mmap_mode="r", allow_pickle=False)
+        for filename in output_array_specs(EXPECTED_DATE_COUNT)
     }
 
 
-def _collect_masked(
-    array: np.ndarray,
-    mask: np.ndarray,
-    date_indices: np.ndarray,
-    horizon_index: int,
-    *,
-    scale: float = 1.0,
-) -> np.ndarray:
-    pieces: list[np.ndarray] = []
-    for chunk in _chunks(date_indices, 32):
-        chunk_mask = np.asarray(mask[chunk, :, :, horizon_index], dtype=bool)
-        values = np.asarray(array[chunk, :, :, horizon_index], dtype=np.float32)[
-            chunk_mask
-        ]
-        if values.size:
-            pieces.append(values.astype(np.float64, copy=False) * scale)
-    return np.concatenate(pieces) if pieces else np.empty(0, dtype=np.float64)
+def _validate_shapes(
+    arrays: dict[str, np.ndarray], manifest: dict[str, object]
+) -> None:
+    for filename, spec in output_array_specs(EXPECTED_DATE_COUNT).items():
+        array = arrays[filename]
+        if array.shape != spec.shape or array.dtype != spec.dtype:
+            raise ValueError(
+                f"Output contract mismatch for {filename}: {array.shape}/{array.dtype}"
+            )
+        manifest_spec = manifest["outputs"][filename]
+        if (
+            list(array.shape) != manifest_spec["shape"]
+            or array.dtype.name != manifest_spec["dtype"]
+        ):
+            raise ValueError(f"Manifest output mismatch for {filename}")
 
 
-def main() -> None:
-    created_at = datetime.now(timezone.utc)
-    features_dir = Path(CANONICAL_OUTPUT_POINTER.read_text(encoding="utf-8").strip())
-    if not features_dir.is_dir():
-        raise FileNotFoundError(
-            f"Canonical feature pointer resolves to missing directory: {features_dir}"
+def _check_bounds(values: np.ndarray, bounds: tuple[float, float], name: str) -> None:
+    low, high = bounds
+    if values.size and (values.min() < low - 1e-5 or values.max() > high + 1e-5):
+        raise ValueError(f"{name} is outside [{low}, {high}]")
+
+
+def _validate_family_fields(arrays: dict[str, np.ndarray]) -> None:
+    context_dynamic = arrays["context_features.npy"]
+    context_slow = arrays["context_slow.npy"]
+    equity_slow = arrays["equity_slow.npy"]
+    if np.any(context_dynamic[..., 16:26] != 0):
+        raise ValueError("Context cross-sectional dynamic channels must be zero")
+    if np.any(equity_slow[..., 30:32] != 0):
+        raise ValueError("Equity DI-only slow channels must be zero")
+    if np.any(context_slow[..., 13:15] != 0):
+        raise ValueError("Context equity-dollar-volume channels must be zero")
+    if np.any(context_slow[..., 17:20] != 0):
+        raise ValueError("Context cross-sectional slow ranks must be zero")
+    if np.any(context_slow[..., 20:26] != 0):
+        raise ValueError("Context exposure-beta channels must be zero")
+    if np.any(context_slow[:, :2, 30:32] != 0):
+        raise ValueError("WIN/WDO DI-only slow channels must be zero")
+
+
+def _validate_targets(arrays: dict[str, np.ndarray]) -> None:
+    targets = arrays["targets.npy"]
+    raw_returns = arrays["raw_returns.npy"]
+    label_mask = arrays["label_mask.npy"]
+    medians = arrays["cross_section_median.npy"]
+    horizon_mask = arrays["horizon_mask.npy"]
+    equity_features = arrays["equity_features.npy"]
+    membership = arrays["equity_membership.npy"]
+    ready = arrays["equity_data_ready.npy"]
+
+    for start in range(0, EXPECTED_DATE_COUNT, DATE_CHUNK):
+        stop = min(start + DATE_CHUNK, EXPECTED_DATE_COUNT)
+        chunk_targets = np.asarray(targets[start:stop], dtype=np.float32)
+        chunk_raw = np.asarray(raw_returns[start:stop], dtype=np.float32)
+        chunk_mask = np.asarray(label_mask[start:stop], dtype=bool)
+        if not np.isfinite(chunk_targets).all() or not np.isfinite(chunk_raw).all():
+            raise ValueError("Targets or raw returns contain non-finite values")
+        if np.any(chunk_targets[~chunk_mask] != 0):
+            raise ValueError("Invalid targets are not exactly zero")
+        if np.any(chunk_raw[~chunk_mask] != 0):
+            raise ValueError("Invalid raw returns are not exactly zero")
+        valid_targets = chunk_targets[chunk_mask]
+        if valid_targets.size and (
+            valid_targets.min() <= -1.0 or valid_targets.max() >= 1.0
+        ):
+            raise ValueError("Valid rank targets must be strictly inside (-1, 1)")
+        counts = chunk_mask.sum(axis=1)
+        means = np.divide(
+            (chunk_targets * chunk_mask).sum(axis=1, dtype=np.float64),
+            counts,
+            out=np.zeros_like(counts, dtype=np.float64),
+            where=counts > 0,
         )
+        if np.any(np.abs(means[counts > 0]) > TARGET_MEAN_TOLERANCE):
+            raise ValueError("A valid target cross-section is not centered at zero")
+        expected_horizon = counts >= 30
+        if not np.array_equal(expected_horizon, horizon_mask[start:stop]):
+            raise ValueError("horizon_mask disagrees with valid-label counts")
 
-    output_dir = AUDIT_BASE / f"m1_features_v1_audit_{created_at:%Y%m%dT%H%M%S%fZ}"
-    output_dir.mkdir(parents=True, exist_ok=False)
+        observed = np.asarray(equity_features[start:stop, :, :, 5], dtype=bool)
+        entry = observed[:, :, DECISION_EQUITY_INDICES]
+        exits = np.stack(
+            [
+                observed[:, :, np.asarray(DECISION_EQUITY_INDICES) + horizon - 1]
+                for horizon in HORIZONS
+            ],
+            axis=3,
+        )
+        required = (
+            membership[start:stop, :, None, None]
+            & ready[start:stop, :, None, None]
+            & entry[:, :, :, None]
+            & exits
+            & horizon_mask[start:stop, None, :, :]
+        )
+        if np.any(chunk_mask & ~required):
+            raise ValueError("label_mask violates membership, readiness, or endpoints")
 
+        for local_date in range(stop - start):
+            for decision_idx in range(len(DECISION_EQUITY_INDICES)):
+                for horizon_idx in range(len(HORIZONS)):
+                    valid = chunk_mask[local_date, :, decision_idx, horizon_idx]
+                    if not valid.any():
+                        continue
+                    group_targets = chunk_targets[
+                        local_date, valid, decision_idx, horizon_idx
+                    ]
+                    np.testing.assert_allclose(
+                        group_targets,
+                        centered_midranks(group_targets),
+                        atol=1e-6,
+                        rtol=0.0,
+                        err_msg="Stored targets are not exact centered midranks",
+                    )
+                    group_raw = chunk_raw[local_date, valid, decision_idx, horizon_idx]
+                    stored_median = medians[
+                        start + local_date, decision_idx, horizon_idx
+                    ]
+                    if not np.isclose(np.median(group_raw), stored_median, atol=1e-7):
+                        raise ValueError(
+                            "Stored cross-sectional median is inconsistent"
+                        )
+
+
+def _collect_feature_stats(
+    arrays: dict[str, np.ndarray], eligible_dates: np.ndarray
+) -> tuple[list[dict[str, object]], np.ndarray, np.ndarray, np.ndarray]:
+    equity_dynamic_stats = [StreamingStats() for _ in DYNAMIC_CHANNELS]
+    equity_slow_stats = [StreamingStats() for _ in SLOW_CHANNELS]
+    context_dynamic_stats = [
+        [StreamingStats() for _ in DYNAMIC_CHANNELS] for _ in CONTEXT_SYMBOLS
+    ]
+    context_slow_stats = [
+        [StreamingStats() for _ in SLOW_CHANNELS] for _ in CONTEXT_SYMBOLS
+    ]
+    security_observed = np.zeros(arrays["equity_features.npy"].shape[1], dtype=np.int64)
+    security_possible = np.zeros_like(security_observed)
+    security_active_days = np.zeros_like(security_observed)
+
+    for start in range(0, EXPECTED_DATE_COUNT, DATE_CHUNK):
+        stop = min(start + DATE_CHUNK, EXPECTED_DATE_COUNT)
+        equity_dynamic = np.asarray(
+            arrays["equity_features.npy"][start:stop], dtype=np.float32
+        )
+        equity_slow = np.asarray(
+            arrays["equity_slow.npy"][start:stop], dtype=np.float32
+        )
+        context_dynamic = np.asarray(
+            arrays["context_features.npy"][start:stop], dtype=np.float32
+        )
+        context_slow = np.asarray(
+            arrays["context_slow.npy"][start:stop], dtype=np.float32
+        )
+        for name, values in (
+            ("equity_features", equity_dynamic),
+            ("equity_slow", equity_slow),
+            ("context_features", context_dynamic),
+            ("context_slow", context_slow),
+        ):
+            if not np.isfinite(values).all():
+                raise ValueError(f"Non-finite value in {name} dates {start}:{stop}")
+        for channel, bounds in enumerate(DYNAMIC_BOUNDS):
+            _check_bounds(
+                equity_dynamic[..., channel], bounds, f"equity dynamic {channel}"
+            )
+            _check_bounds(
+                context_dynamic[..., channel], bounds, f"context dynamic {channel}"
+            )
+        for channel, bounds in enumerate(SLOW_BOUNDS):
+            if bounds is not None:
+                _check_bounds(
+                    equity_slow[..., channel], bounds, f"equity slow {channel}"
+                )
+                _check_bounds(
+                    context_slow[..., channel], bounds, f"context slow {channel}"
+                )
+
+    eligible_set = set(eligible_dates.tolist())
+    for start in range(0, EXPECTED_DATE_COUNT, DATE_CHUNK):
+        indices = np.asarray(
+            [
+                index
+                for index in range(start, min(start + DATE_CHUNK, EXPECTED_DATE_COUNT))
+                if index in eligible_set
+            ],
+            dtype=np.int64,
+        )
+        if indices.size == 0:
+            continue
+        equity_dynamic = np.asarray(
+            arrays["equity_features.npy"][indices, :, :EQUITY_VISIBLE_MINUTES],
+            dtype=np.float32,
+        )
+        equity_slow = np.asarray(arrays["equity_slow.npy"][indices], dtype=np.float32)
+        active = np.asarray(
+            arrays["equity_membership.npy"][indices]
+            & arrays["equity_data_ready.npy"][indices],
+            dtype=bool,
+        )
+        dynamic_use = np.broadcast_to(active[:, :, None], equity_dynamic.shape[:-1])
+        for channel, stats in enumerate(equity_dynamic_stats):
+            stats.update(equity_dynamic[..., channel][dynamic_use])
+        for channel, stats in enumerate(equity_slow_stats):
+            stats.update(equity_slow[..., channel][active])
+
+        observed = (equity_dynamic[..., 5] > 0.5) & dynamic_use
+        security_observed += observed.sum(axis=(0, 2), dtype=np.int64)
+        security_possible += active.sum(axis=0, dtype=np.int64) * EQUITY_VISIBLE_MINUTES
+        security_active_days += active.sum(axis=0, dtype=np.int64)
+
+        for slot in range(len(CONTEXT_SYMBOLS)):
+            dynamic = np.asarray(
+                arrays["context_features.npy"][indices, slot, :CONTEXT_VISIBLE_MINUTES],
+                dtype=np.float32,
+            )
+            slow = np.asarray(
+                arrays["context_slow.npy"][indices, slot], dtype=np.float32
+            )
+            ready = np.asarray(
+                arrays["context_data_ready.npy"][indices, slot], dtype=bool
+            )
+            use = np.broadcast_to(ready[:, None], dynamic.shape[:-1])
+            for channel, stats in enumerate(context_dynamic_stats[slot]):
+                stats.update(dynamic[..., channel][use])
+            for channel, stats in enumerate(context_slow_stats[slot]):
+                stats.update(slow[..., channel][ready])
+
+    rows = [
+        stats.row("equity_active", name)
+        for name, stats in zip(DYNAMIC_CHANNELS, equity_dynamic_stats, strict=True)
+    ]
+    rows.extend(
+        stats.row("equity_active", name)
+        for name, stats in zip(SLOW_CHANNELS, equity_slow_stats, strict=True)
+    )
+    for slot, symbol in enumerate(CONTEXT_SYMBOLS):
+        rows.extend(
+            stats.row(f"context:{symbol}", name)
+            for name, stats in zip(
+                DYNAMIC_CHANNELS, context_dynamic_stats[slot], strict=True
+            )
+        )
+        rows.extend(
+            stats.row(f"context:{symbol}", name)
+            for name, stats in zip(SLOW_CHANNELS, context_slow_stats[slot], strict=True)
+        )
+    return rows, security_observed, security_possible, security_active_days
+
+
+def _target_stats(
+    arrays: dict[str, np.ndarray],
+    trade_dates: list[object],
+    eligible_dates: np.ndarray,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    years = sorted({trade_dates[index].year for index in eligible_dates})
+    target_rows: list[dict[str, object]] = []
+    yearly_rows: list[dict[str, object]] = []
+    for year in years:
+        year_indices = eligible_dates[
+            np.asarray([trade_dates[index].year == year for index in eligible_dates])
+        ]
+        year_row: dict[str, object] = {
+            "year": year,
+            "eligible_dates": int(year_indices.size),
+            "sample_count": int(year_indices.size * len(DECISION_EQUITY_INDICES)),
+        }
+        for horizon_idx, horizon in enumerate(HORIZONS):
+            target_stats = StreamingStats()
+            raw_stats = StreamingStats()
+            median_stats = StreamingStats()
+            valid_count = 0
+            opportunity_count = 0
+            horizon_count = 0
+            for start in range(0, year_indices.size, 32):
+                chunk = year_indices[start : start + 32]
+                mask = np.asarray(
+                    arrays["label_mask.npy"][chunk, :, :, horizon_idx], dtype=bool
+                )
+                target_stats.update(
+                    np.asarray(
+                        arrays["targets.npy"][chunk, :, :, horizon_idx],
+                        dtype=np.float32,
+                    )[mask]
+                )
+                raw_stats.update(
+                    10_000.0
+                    * np.asarray(
+                        arrays["raw_returns.npy"][chunk, :, :, horizon_idx],
+                        dtype=np.float32,
+                    )[mask]
+                )
+                horizon_mask = np.asarray(
+                    arrays["horizon_mask.npy"][chunk, :, horizon_idx], dtype=bool
+                )
+                median_stats.update(
+                    10_000.0
+                    * np.asarray(
+                        arrays["cross_section_median.npy"][chunk, :, horizon_idx],
+                        dtype=np.float32,
+                    )[horizon_mask]
+                )
+                valid_count += int(mask.sum())
+                horizon_count += int(horizon_mask.sum())
+                active = np.asarray(
+                    arrays["equity_membership.npy"][chunk]
+                    & arrays["equity_data_ready.npy"][chunk],
+                    dtype=bool,
+                )
+                opportunity_count += int(active.sum()) * len(DECISION_EQUITY_INDICES)
+            for metric, unit, stats in (
+                ("rank_target", "centered rank", target_stats),
+                ("raw_return", "basis points", raw_stats),
+                ("cross_section_median", "basis points", median_stats),
+            ):
+                row = stats.row(str(year), metric)
+                row.update({"horizon_minutes": horizon, "unit": unit})
+                target_rows.append(row)
+            year_row[f"target_{horizon}_mean"] = (
+                target_stats.total / target_stats.count if target_stats.count else None
+            )
+            year_row[f"horizon_{horizon}_sample_coverage"] = horizon_count / (
+                year_indices.size * len(DECISION_EQUITY_INDICES)
+            )
+            year_row[f"label_{horizon}_opportunity_coverage"] = (
+                valid_count / opportunity_count if opportunity_count else 0.0
+            )
+        yearly_rows.append(year_row)
+    return target_rows, yearly_rows
+
+
+def audit_feature_store(features_dir: Path) -> Path:
+    """Run the complete store audit and return its immutable output directory."""
+    features_dir = Path(features_dir)
+    if not features_dir.is_dir():
+        raise FileNotFoundError(f"Feature directory does not exist: {features_dir}")
     manifest = json.loads((features_dir / "manifest.json").read_text(encoding="utf-8"))
+    constants = manifest["constants"]
+    if tuple(constants["dynamic_channels"]) != DYNAMIC_CHANNELS:
+        raise ValueError("Manifest dynamic-channel order is stale")
+    if tuple(constants["equity_slow_channels"]) != SLOW_CHANNELS:
+        raise ValueError("Manifest equity slow-channel order is stale")
+    if tuple(constants["context_slow_channels"]) != SLOW_CHANNELS:
+        raise ValueError("Manifest context slow-channel order is stale")
+
     date_index = pl.read_parquet(features_dir / "date_index.parquet")
     equity_index = pl.read_parquet(features_dir / "equity_index.parquet")
     context_index = pl.read_parquet(features_dir / "context_index.parquet")
-    if tuple(context_index.get_column("symbol").to_list()) != CONTEXT_SYMBOLS:
-        raise ValueError("Context index order does not match the feature contract")
     sample_index = pl.read_parquet(features_dir / "sample_index.parquet")
     daily_audit = pl.read_parquet(features_dir / "daily_audit.parquet")
+    if (
+        date_index.height != EXPECTED_DATE_COUNT
+        or daily_audit.height != EXPECTED_DATE_COUNT
+    ):
+        raise ValueError("Date metadata does not preserve the 1,248-date contract")
+    if sample_index.height != EXPECTED_SAMPLE_COUNT:
+        raise ValueError("Sample metadata does not preserve the 59,565-sample contract")
+    if tuple(context_index.get_column("symbol")) != CONTEXT_SYMBOLS:
+        raise ValueError("Context index order does not match the feature contract")
 
-    arrays = {
-        name: np.load(features_dir / name, mmap_mode="r", allow_pickle=False)
-        for name in (
-            "equity_features.npy",
-            "equity_slow.npy",
-            "equity_membership.npy",
-            "equity_data_ready.npy",
-            "context_features.npy",
-            "context_slow.npy",
-            "context_data_ready.npy",
-            "raw_returns.npy",
-            "targets.npy",
-            "label_mask.npy",
-            "cross_section_median.npy",
-            "horizon_mask.npy",
-        )
-    }
-
-    for filename, spec in manifest["outputs"].items():
-        array = arrays[filename]
-        if list(array.shape) != spec["shape"] or array.dtype.name != spec["dtype"]:
-            raise ValueError(
-                f"Manifest mismatch for {filename}: "
-                f"actual={array.shape}/{array.dtype.name}, "
-                f"manifest={spec['shape']}/{spec['dtype']}"
-            )
+    arrays = _load_arrays(features_dir)
+    _validate_shapes(arrays, manifest)
+    _validate_family_fields(arrays)
+    _validate_targets(arrays)
 
     eligible_dates = np.sort(
         sample_index.get_column("date_idx").unique().to_numpy().astype(np.int64)
     )
-    if eligible_dates.size == 0:
-        raise ValueError("No feature-eligible dates in sample_index")
-    expected_samples = int(eligible_dates.size * len(DECISION_EQUITY_INDICES))
-    if sample_index.height != expected_samples:
-        raise ValueError(
-            f"Expected {expected_samples} samples from eligible dates, "
-            f"found {sample_index.height}"
-        )
+    if sample_index.height != eligible_dates.size * len(DECISION_EQUITY_INDICES):
+        raise ValueError("Eligible dates do not contain exactly 55 samples each")
     if int(manifest["sample_count"]) != sample_index.height:
         raise ValueError("Manifest sample_count does not match sample_index")
-
-    trade_dates = date_index.get_column("trade_date").to_list()
-    years = np.asarray([trade_dates[index].year for index in range(len(trade_dates))])
-    year_groups = {
-        int(year): eligible_dates[years[eligible_dates] == year]
-        for year in np.unique(years[eligible_dates])
-    }
-
-    equity_feature_stats = {
-        "open_move_normalized": BoundedStats(-PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP),
-        "high_move_normalized": BoundedStats(-PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP),
-        "low_move_normalized": BoundedStats(-PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP),
-        "close_move_normalized": BoundedStats(-PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP),
-        "volume_surprise": BoundedStats(-VOLUME_FEATURE_CLIP, VOLUME_FEATURE_CLIP),
-        "vol_regime": BoundedStats(-VOL_REGIME_CLIP, VOL_REGIME_CLIP),
-    }
-    yearly_close_stats = {
-        year: BoundedStats(-PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP)
-        for year in year_groups
-    }
-    yearly_volume_stats = {
-        year: BoundedStats(-VOLUME_FEATURE_CLIP, VOLUME_FEATURE_CLIP)
-        for year in year_groups
-    }
-
-    security_observed = np.zeros(equity_index.height, dtype=np.int64)
-    security_possible = np.zeros(equity_index.height, dtype=np.int64)
-    security_active_days = np.zeros(equity_index.height, dtype=np.int64)
-    yearly_observed: dict[int, int] = {year: 0 for year in year_groups}
-    yearly_possible: dict[int, int] = {year: 0 for year in year_groups}
-
-    equity_features = arrays["equity_features.npy"]
-    equity_slow = arrays["equity_slow.npy"]
-    equity_membership = arrays["equity_membership.npy"]
-    equity_ready = arrays["equity_data_ready.npy"]
-
-    for year, indices in year_groups.items():
-        for chunk in _chunks(indices):
-            features = np.asarray(
-                equity_features[chunk, :, :EQUITY_VISIBLE_MINUTES, :],
-                dtype=np.float32,
-            )
-            active = np.asarray(
-                equity_membership[chunk] & equity_ready[chunk],
-                dtype=bool,
-            )
-            observed = features[..., 5] > 0.5
-            use = observed & active[:, :, None]
-
-            for channel, name in enumerate(
-                (
-                    "open_move_normalized",
-                    "high_move_normalized",
-                    "low_move_normalized",
-                    "close_move_normalized",
-                    "volume_surprise",
-                )
-            ):
-                equity_feature_stats[name].update(features[..., channel][use])
-            yearly_close_stats[year].update(features[..., 3][use])
-            yearly_volume_stats[year].update(features[..., 4][use])
-
-            slow_values = np.asarray(equity_slow[chunk, :, 0], dtype=np.float32)
-            equity_feature_stats["vol_regime"].update(slow_values[active])
-
-            observed_by_security = use.sum(axis=(0, 2), dtype=np.int64)
-            possible_by_security = (
-                active.sum(axis=0, dtype=np.int64) * EQUITY_VISIBLE_MINUTES
-            )
-            security_observed += observed_by_security
-            security_possible += possible_by_security
-            security_active_days += active.sum(axis=0, dtype=np.int64)
-            yearly_observed[year] += int(observed_by_security.sum())
-            yearly_possible[year] += int(possible_by_security.sum())
-
-    feature_rows = [
-        stats.row("equity_active", feature)
-        for feature, stats in equity_feature_stats.items()
-    ]
-
-    context_features = arrays["context_features.npy"]
-    context_slow = arrays["context_slow.npy"]
-    context_ready = arrays["context_data_ready.npy"]
-    context_density: dict[str, float] = {}
-
-    for slot, symbol in enumerate(CONTEXT_SYMBOLS):
-        dynamic_stats = {
-            "open_move_normalized": BoundedStats(
-                -PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP
-            ),
-            "high_move_normalized": BoundedStats(
-                -PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP
-            ),
-            "low_move_normalized": BoundedStats(
-                -PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP
-            ),
-            "close_move_normalized": BoundedStats(
-                -PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP
-            ),
-            "volume_surprise": BoundedStats(-VOLUME_FEATURE_CLIP, VOLUME_FEATURE_CLIP),
-        }
-        vol_stats = BoundedStats(-VOL_REGIME_CLIP, VOL_REGIME_CLIP)
-        observed_count = 0
-        possible_count = 0
-
-        for chunk in _chunks(eligible_dates):
-            features = np.asarray(
-                context_features[chunk, slot, :CONTEXT_VISIBLE_MINUTES, :],
-                dtype=np.float32,
-            )
-            ready = np.asarray(context_ready[chunk, slot], dtype=bool)
-            observed = features[..., 5] > 0.5
-            use = observed & ready[:, None]
-            for channel, name in enumerate(dynamic_stats):
-                dynamic_stats[name].update(features[..., channel][use])
-            vol_stats.update(
-                np.asarray(context_slow[chunk, slot, 0], dtype=np.float32)[ready]
-            )
-            observed_count += int(use.sum())
-            possible_count += int(ready.sum()) * CONTEXT_VISIBLE_MINUTES
-
-        for feature, stats in dynamic_stats.items():
-            row = stats.row(f"context:{symbol}", feature)
-            feature_rows.append(row)
-        vol_row = vol_stats.row(f"context:{symbol}", "vol_regime")
-        feature_rows.append(vol_row)
-
-        if slot >= 2:
-            prior_stats = BoundedStats(-1.0, 3.0, bins=1600)
-            expiry_stats = BoundedStats(0.0, 1.0, bins=1000)
-            ready_values = np.asarray(context_ready[eligible_dates, slot], dtype=bool)
-            prior_stats.update(
-                np.asarray(context_slow[eligible_dates, slot, 1], dtype=np.float32)[
-                    ready_values
-                ]
-            )
-            expiry_stats.update(
-                np.asarray(context_slow[eligible_dates, slot, 2], dtype=np.float32)[
-                    ready_values
-                ]
-            )
-            for feature, stats in (
-                ("prior_rate_level_scaled", prior_stats),
-                ("time_to_expiry_scaled", expiry_stats),
-            ):
-                row = stats.row(f"context:{symbol}", feature)
-                feature_rows.append(row)
-
-        context_density[symbol] = (
-            observed_count / possible_count if possible_count else 0.0
+    sample_dates = sample_index.get_column("date_idx").to_numpy().astype(np.int64)
+    if not arrays["context_data_ready.npy"][sample_dates].all():
+        raise ValueError("sample_index contains a context-unready date")
+    sample_active = (
+        arrays["equity_membership.npy"][sample_dates]
+        & arrays["equity_data_ready.npy"][sample_dates]
+    ).sum(axis=1)
+    if np.any(sample_active < 30):
+        raise ValueError(
+            "sample_index contains a date with fewer than 30 active equities"
         )
+    if not np.array_equal(
+        sample_active,
+        sample_index.get_column("active_equity_count").to_numpy(),
+    ):
+        raise ValueError("sample_index active-equity counts are inconsistent")
 
-    target_rows: list[dict[str, object]] = []
-    yearly_rows: dict[int, dict[str, object]] = {}
-    label_mask = arrays["label_mask.npy"]
-    targets = arrays["targets.npy"]
-    raw_returns = arrays["raw_returns.npy"]
-    cross_section_median = arrays["cross_section_median.npy"]
-    horizon_mask = arrays["horizon_mask.npy"]
+    feature_rows, security_observed, security_possible, security_active_days = (
+        _collect_feature_stats(arrays, eligible_dates)
+    )
+    trade_dates = date_index.get_column("trade_date").to_list()
+    target_rows, yearly_rows = _target_stats(arrays, trade_dates, eligible_dates)
+
     security_label_counts = np.zeros(
         (equity_index.height, len(HORIZONS)), dtype=np.int64
     )
-
-    daily = daily_audit.with_columns(pl.col("trade_date").dt.year().alias("year"))
-    for year, indices in year_groups.items():
-        daily_year = daily.filter(
-            (pl.col("year") == year) & (pl.col("sample_count") > 0)
+    for start in range(0, EXPECTED_DATE_COUNT, DATE_CHUNK):
+        stop = min(start + DATE_CHUNK, EXPECTED_DATE_COUNT)
+        security_label_counts += arrays["label_mask.npy"][start:stop].sum(
+            axis=(0, 2), dtype=np.int64
         )
-        active_counts = daily_year.get_column("active_equity_count").to_numpy()
-        yearly_rows[year] = {
-            "year": year,
-            "eligible_dates": len(indices),
-            "sample_count": int(
-                sample_index.filter(pl.col("trade_date").dt.year() == year).height
-            ),
-            "active_equities_min": int(active_counts.min()),
-            "active_equities_median": float(np.median(active_counts)),
-            "active_equities_mean": float(active_counts.mean()),
-            "active_equities_max": int(active_counts.max()),
-            "equity_observed_input_fraction": (
-                yearly_observed[year] / yearly_possible[year]
-                if yearly_possible[year]
-                else 0.0
-            ),
-            "close_move_mean": yearly_close_stats[year].row("", "")["mean"],
-            "close_move_std": yearly_close_stats[year].row("", "")["std"],
-            "volume_surprise_mean": yearly_volume_stats[year].row("", "")["mean"],
-            "volume_surprise_std": yearly_volume_stats[year].row("", "")["std"],
-            "volume_surprise_p50": yearly_volume_stats[year].quantile(0.5),
-            "volume_surprise_p99": yearly_volume_stats[year].quantile(0.99),
-        }
-
-    for horizon_index, horizon in enumerate(HORIZONS):
-        overall_target_parts: list[np.ndarray] = []
-        overall_raw_parts: list[np.ndarray] = []
-        overall_median_parts: list[np.ndarray] = []
-
-        for year, indices in year_groups.items():
-            year_targets = _collect_masked(targets, label_mask, indices, horizon_index)
-            year_raw_bps = _collect_masked(
-                raw_returns,
-                label_mask,
-                indices,
-                horizon_index,
-                scale=10_000.0,
-            )
-            year_horizon_mask = np.asarray(
-                horizon_mask[indices, :, horizon_index], dtype=bool
-            )
-            year_medians_bps = (
-                np.asarray(
-                    cross_section_median[indices, :, horizon_index], dtype=np.float64
-                )[year_horizon_mask]
-                * 10_000.0
-            )
-
-            target_rows.append(
-                _exact_stats(
-                    year_targets,
-                    period=str(year),
-                    metric="target",
-                    horizon=horizon,
-                    unit="volatility units",
-                )
-            )
-            target_rows.append(
-                _exact_stats(
-                    year_raw_bps,
-                    period=str(year),
-                    metric="raw_return",
-                    horizon=horizon,
-                    unit="basis points",
-                )
-            )
-            target_rows.append(
-                _exact_stats(
-                    year_medians_bps,
-                    period=str(year),
-                    metric="cross_section_median",
-                    horizon=horizon,
-                    unit="basis points",
-                )
-            )
-
-            mask_year = np.asarray(label_mask[indices, :, :, horizon_index], dtype=bool)
-            security_label_counts[:, horizon_index] += mask_year.sum(
-                axis=(0, 2), dtype=np.int64
-            )
-            active_opportunities = (
-                np.asarray(
-                    equity_membership[indices] & equity_ready[indices],
-                    dtype=bool,
-                ).sum(axis=1, dtype=np.int64)
-                * len(DECISION_EQUITY_INDICES)
-            ).sum(dtype=np.int64)
-            yearly_rows[year][f"target_{horizon}_mean"] = (
-                float(year_targets.mean()) if year_targets.size else None
-            )
-            yearly_rows[year][f"target_{horizon}_std"] = (
-                float(year_targets.std()) if year_targets.size else None
-            )
-            yearly_rows[year][f"target_{horizon}_p01"] = (
-                float(np.quantile(year_targets, 0.01)) if year_targets.size else None
-            )
-            yearly_rows[year][f"target_{horizon}_p99"] = (
-                float(np.quantile(year_targets, 0.99)) if year_targets.size else None
-            )
-            yearly_rows[year][f"horizon_{horizon}_sample_coverage"] = float(
-                year_horizon_mask.mean()
-            )
-            yearly_rows[year][f"label_{horizon}_opportunity_coverage"] = (
-                int(mask_year.sum()) / int(active_opportunities)
-                if active_opportunities
-                else 0.0
-            )
-
-            overall_target_parts.append(year_targets)
-            overall_raw_parts.append(year_raw_bps)
-            overall_median_parts.append(year_medians_bps)
-
-        overall_targets = (
-            np.concatenate(overall_target_parts)
-            if overall_target_parts
-            else np.empty(0, dtype=np.float64)
-        )
-        overall_raw_bps = (
-            np.concatenate(overall_raw_parts)
-            if overall_raw_parts
-            else np.empty(0, dtype=np.float64)
-        )
-        overall_medians_bps = (
-            np.concatenate(overall_median_parts)
-            if overall_median_parts
-            else np.empty(0, dtype=np.float64)
-        )
-        target_rows.extend(
-            (
-                _exact_stats(
-                    overall_targets,
-                    period="ALL",
-                    metric="target",
-                    horizon=horizon,
-                    unit="volatility units",
-                ),
-                _exact_stats(
-                    overall_raw_bps,
-                    period="ALL",
-                    metric="raw_return",
-                    horizon=horizon,
-                    unit="basis points",
-                ),
-                _exact_stats(
-                    overall_medians_bps,
-                    period="ALL",
-                    metric="cross_section_median",
-                    horizon=horizon,
-                    unit="basis points",
-                ),
-            )
-        )
-
     security_stats = equity_index.select(
         "equity_slot", "security_id", "latest_ticker"
     ).with_columns(
@@ -583,42 +563,66 @@ def main() -> None:
         pl.Series("valid_labels_120", security_label_counts[:, 2], dtype=pl.Int64),
     )
 
-    active_counts_all = (
-        daily_audit.filter(pl.col("sample_count") > 0)
-        .get_column("active_equity_count")
-        .to_numpy()
+    active_counts = (
+        arrays["equity_membership.npy"][eligible_dates]
+        & arrays["equity_data_ready.npy"][eligible_dates]
+    ).sum(axis=1)
+    context_density: dict[str, float] = {}
+    for slot, symbol in enumerate(CONTEXT_SYMBOLS):
+        ready = arrays["context_data_ready.npy"][eligible_dates, slot]
+        observed = (
+            arrays["context_features.npy"][
+                eligible_dates, slot, :CONTEXT_VISIBLE_MINUTES, 5
+            ]
+            > 0.5
+        )
+        denominator = int(ready.sum()) * CONTEXT_VISIBLE_MINUTES
+        context_density[symbol] = (
+            int((observed & ready[:, None]).sum()) / denominator if denominator else 0.0
+        )
+
+    created_at = datetime.now(timezone.utc)
+    output_dir = AUDIT_BASE / f"m1_features_v1_audit_{created_at:%Y%m%dT%H%M%S%fZ}"
+    output_dir.mkdir(parents=True, exist_ok=False)
+    store_size = sum(
+        path.stat().st_size for path in features_dir.iterdir() if path.is_file()
     )
-    equity_observed_fraction = (
-        int(security_observed.sum()) / int(security_possible.sum())
-        if security_possible.sum()
-        else 0.0
+    max_target_mean = max(
+        abs(float(row["mean"]))
+        for row in target_rows
+        if row["feature"] == "rank_target" and row["mean"] is not None
     )
-    sample_dates = [trade_dates[index] for index in eligible_dates]
     summary = {
         "created_at_utc": created_at.isoformat(),
-        "canonical_features_dir": str(features_dir),
+        "features_dir": str(features_dir),
         "audit_output_dir": str(output_dir),
         "contract_version": manifest["contract_version"],
-        "date_count": int(arrays["equity_features.npy"].shape[0]),
+        "date_count": EXPECTED_DATE_COUNT,
         "eligible_date_count": int(eligible_dates.size),
-        "first_eligible_date": str(sample_dates[0]),
-        "last_eligible_date": str(sample_dates[-1]),
-        "sample_count": int(sample_index.height),
+        "first_eligible_date": str(trade_dates[int(eligible_dates[0])]),
+        "last_eligible_date": str(trade_dates[int(eligible_dates[-1])]),
+        "sample_count": EXPECTED_SAMPLE_COUNT,
+        "store_size_bytes": store_size,
         "active_equities": {
-            "min": int(active_counts_all.min()),
-            "median": float(np.median(active_counts_all)),
-            "mean": float(active_counts_all.mean()),
-            "max": int(active_counts_all.max()),
+            "min": int(active_counts.min()),
+            "median": float(np.median(active_counts)),
+            "mean": float(active_counts.mean()),
+            "max": int(active_counts.max()),
         },
-        "equity_observed_input_fraction": equity_observed_fraction,
         "context_observed_input_fraction": context_density,
-        "security_observed_input_fraction": {
-            "min": float(security_stats.get_column("observed_input_fraction").min()),
-            "median": float(
-                security_stats.get_column("observed_input_fraction").median()
-            ),
-            "max": float(security_stats.get_column("observed_input_fraction").max()),
-        },
+        "maximum_absolute_year_horizon_rank_target_mean": max_target_mean,
+        "checks": [
+            "exact shape and dtype contract",
+            "finite dynamic, slow, raw-return, median, and target arrays",
+            "all declared channel bounds",
+            "family-inapplicable fields are exactly zero",
+            "invalid targets and raw returns are exactly zero",
+            "valid targets are exact centered midranks inside (-1, 1)",
+            "every valid target cross-section is centered at zero",
+            "raw-return medians and horizon masks are consistent",
+            "membership, readiness, and exact label endpoints are enforced",
+            "date and sample counts are unchanged",
+        ],
         "output_files": [
             "audit_summary.json",
             "feature_stats.csv",
@@ -626,25 +630,21 @@ def main() -> None:
             "yearly_stats.csv",
             "security_stats.csv",
         ],
-        "notes": [
-            "Feature statistics use only point-in-time members that are data-ready on feature-eligible dates.",
-            f"Dynamic-feature statistics use only model-visible minutes: equity [0,{EQUITY_VISIBLE_MINUTES}) and context [0,{CONTEXT_VISIBLE_MINUTES}).",
-            "Quantiles for clipped feature channels are histogram approximations; target and return quantiles are exact.",
-            "No model tensors are modified by this audit.",
-        ],
     }
-
     pl.DataFrame(feature_rows).write_csv(output_dir / "feature_stats.csv")
     pl.DataFrame(target_rows).write_csv(output_dir / "target_stats.csv")
-    pl.DataFrame(list(yearly_rows.values())).sort("year").write_csv(
-        output_dir / "yearly_stats.csv"
-    )
+    pl.DataFrame(yearly_rows).write_csv(output_dir / "yearly_stats.csv")
     security_stats.write_csv(output_dir / "security_stats.csv")
     (output_dir / "audit_summary.json").write_text(
         json.dumps(summary, indent=2), encoding="utf-8"
     )
-
     print(json.dumps(summary, indent=2))
+    return output_dir
+
+
+def main() -> None:
+    features_dir = Path(CANONICAL_OUTPUT_POINTER.read_text(encoding="utf-8").strip())
+    audit_feature_store(features_dir)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
-"""Cross-asset patch iTransformer research model."""
+"""Brazil RV model families."""
 
-from .model import CrossAssetPatchITransformerV1
+from .model import TargetedCrossAssetTransformer, build_neural_model
 
-__all__ = ["CrossAssetPatchITransformerV1"]
+__all__ = ["TargetedCrossAssetTransformer", "build_neural_model"]

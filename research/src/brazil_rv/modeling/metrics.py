@@ -136,7 +136,7 @@ def create_metric_table(
                     "date_idx": int(date_value),
                     "horizon_minutes": horizon_minutes,
                     "spearman_ic": _mean(spearman[on_date, horizon_index]),
-                    "pearson_ic": _mean(pearson[on_date, horizon_index]),
+                    "rank_target_pearson_ic": _mean(pearson[on_date, horizon_index]),
                     "top_return": _mean(
                         diagnostics["top_return"][on_date, horizon_index]
                     ),
@@ -164,7 +164,7 @@ def create_metric_table(
             [row["spearman_ic"] for row in horizon_rows], dtype=np.float64
         )
         daily_pearson = np.asarray(
-            [row["pearson_ic"] for row in horizon_rows], dtype=np.float64
+            [row["rank_target_pearson_ic"] for row in horizon_rows], dtype=np.float64
         )
         mean_spearman = _mean(daily_spearman)
         standard_deviation = _standard_deviation(daily_spearman)
@@ -178,7 +178,7 @@ def create_metric_table(
                     if np.isfinite(standard_deviation) and standard_deviation > 0.0
                     else float("nan")
                 ),
-                "mean_daily_pearson_ic": _mean(daily_pearson),
+                "mean_daily_rank_target_pearson_ic": _mean(daily_pearson),
                 "mean_top_return": _mean(
                     np.asarray(
                         [row["top_return"] for row in horizon_rows],

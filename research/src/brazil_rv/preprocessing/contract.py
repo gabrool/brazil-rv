@@ -49,13 +49,73 @@ DYNAMIC_CHANNELS = (
     "close_move_normalized",
     "volume_surprise",
     "observed",
+    "return_since_open_normalized",
+    "return_15m_normalized",
+    "return_30m_normalized",
+    "return_60m_normalized",
+    "realized_vol_15m_log_ratio",
+    "realized_vol_30m_log_ratio",
+    "realized_vol_60m_log_ratio",
+    "cumulative_volume_surprise",
+    "session_range_position",
+    "observed_fraction_30m",
+    "market_median_return_15m",
+    "market_median_return_60m",
+    "market_breadth_15m",
+    "market_breadth_60m",
+    "market_dispersion_15m",
+    "market_dispersion_60m",
+    "cross_section_return_rank_15m",
+    "cross_section_return_rank_60m",
+    "cross_section_volume_rank",
+    "cross_section_volatility_rank_30m",
 )
-EQUITY_SLOW_CHANNELS = ("vol_regime",)
-CONTEXT_SLOW_CHANNELS = (
+SLOW_CHANNELS = (
     "vol_regime",
+    "overnight_gap_normalized",
+    "previous_close_to_close_return_normalized",
+    "previous_open_to_close_return_normalized",
+    "previous_last_60m_return_normalized",
+    "previous_realized_vol_log_ratio",
+    "previous_volume_log_ratio",
+    "return_5d_normalized",
+    "return_20d_normalized",
+    "realized_vol_5d_log_ratio",
+    "realized_vol_20d_log_ratio",
+    "vol_of_vol_20d",
+    "median_daily_real_volume_20d_log_scale",
+    "median_daily_dollar_volume_20d_log_scale",
+    "daily_dollar_volume_regime_20d",
+    "observed_fraction_5d",
+    "observed_fraction_20d",
+    "overnight_gap_cross_section_rank",
+    "dollar_volume_cross_section_rank",
+    "realized_vol_cross_section_rank",
+    "beta_to_WIN",
+    "beta_to_WDO",
+    "beta_to_DI1F27",
+    "beta_to_DI1F28",
+    "beta_to_DI1F29",
+    "beta_to_DI1F31",
+    "weekday_sin",
+    "weekday_cos",
+    "month_end_proximity",
+    "quarter_end_proximity",
     "prior_rate_level_scaled",
     "time_to_expiry_scaled",
 )
+EQUITY_SLOW_CHANNELS = SLOW_CHANNELS
+CONTEXT_SLOW_CHANNELS = SLOW_CHANNELS
+DYNAMIC_CHANNEL_COUNT = len(DYNAMIC_CHANNELS)
+SLOW_CHANNEL_COUNT = len(SLOW_CHANNELS)
+EQUITY_SLOW_COUNT = SLOW_CHANNEL_COUNT
+CONTEXT_SLOW_COUNT = SLOW_CHANNEL_COUNT
+PATCH_INPUT_WIDTH = 5 * DYNAMIC_CHANNEL_COUNT
+if DYNAMIC_CHANNEL_COUNT != 26 or SLOW_CHANNEL_COUNT != 32:
+    raise ValueError("Feature channel contract has the wrong width")
+
+EXPECTED_DATE_COUNT = 1248
+EXPECTED_SAMPLE_COUNT = 59_565
 
 DECISION_EQUITY_INDICES = tuple(15 + 5 * index for index in range(55))
 DECISION_CONTEXT_INDICES = tuple(75 + 5 * index for index in range(55))
@@ -81,6 +141,24 @@ VOLUME_FEATURE_CLIP = 6.0
 VOL_REGIME_CLIP = 4.0
 MIN_ACTIVE_EQUITIES = 30
 VOL_EWMA_ALPHA = 1 - 2 ** (-1 / VOL_EWMA_HALF_LIFE_DAYS)
+RETURN_WINDOWS = (15, 30, 60)
+REALIZED_VOL_MIN_FRACTION = 0.80
+REALIZED_VOL_LOG_FLOOR = 1e-6
+REALIZED_VOL_LOG_CLIP = 4.0
+OBSERVED_FRACTION_WINDOW = 30
+SLOW_SHORT_WINDOW = 5
+SLOW_LONG_WINDOW = 20
+SLOW_SHORT_MIN_VALID = 4
+SLOW_LONG_MIN_VALID = 15
+BETA_EWMA_HALF_LIFE_DAYS = 20
+BETA_EWMA_ALPHA = 1 - 2 ** (-1 / BETA_EWMA_HALF_LIFE_DAYS)
+BETA_MIN_PAIRED_SESSIONS = 20
+BETA_VARIANCE_FLOOR = 1e-12
+BETA_CLIP = 5.0
+REAL_VOLUME_LOG_CENTER = 12.0
+REAL_VOLUME_LOG_SCALE = 4.0
+DOLLAR_VOLUME_LOG_CENTER = 18.0
+DOLLAR_VOLUME_LOG_SCALE = 4.0
 
 
 @dataclass(frozen=True)
@@ -125,13 +203,15 @@ def manifest_constants() -> dict[str, object]:
         "expected_equities": EXPECTED_EQUITIES,
         "context_symbols": list(CONTEXT_SYMBOLS),
         "context_families": list(CONTEXT_FAMILIES),
+        "expected_date_count": EXPECTED_DATE_COUNT,
+        "expected_sample_count": EXPECTED_SAMPLE_COUNT,
         "equity_session_start_minute": EQUITY_SESSION_START_MINUTE,
         "equity_session_minutes": EQUITY_SESSION_MINUTES,
         "context_session_start_minute": CONTEXT_SESSION_START_MINUTE,
         "context_session_minutes": CONTEXT_SESSION_MINUTES,
         "dynamic_channels": list(DYNAMIC_CHANNELS),
-        "equity_slow_channels": list(EQUITY_SLOW_CHANNELS),
-        "context_slow_channels": list(CONTEXT_SLOW_CHANNELS),
+        "equity_slow_channels": list(SLOW_CHANNELS),
+        "context_slow_channels": list(SLOW_CHANNELS),
         "decision_equity_indices": list(DECISION_EQUITY_INDICES),
         "decision_context_indices": list(DECISION_CONTEXT_INDICES),
         "horizons": list(HORIZONS),
@@ -151,4 +231,26 @@ def manifest_constants() -> dict[str, object]:
         "volume_feature_clip": VOLUME_FEATURE_CLIP,
         "vol_regime_clip": VOL_REGIME_CLIP,
         "min_active_equities": MIN_ACTIVE_EQUITIES,
+        "return_windows": list(RETURN_WINDOWS),
+        "realized_vol_min_fraction": REALIZED_VOL_MIN_FRACTION,
+        "realized_vol_log_floor": REALIZED_VOL_LOG_FLOOR,
+        "realized_vol_log_clip": REALIZED_VOL_LOG_CLIP,
+        "observed_fraction_window": OBSERVED_FRACTION_WINDOW,
+        "slow_short_window": SLOW_SHORT_WINDOW,
+        "slow_long_window": SLOW_LONG_WINDOW,
+        "slow_short_min_valid": SLOW_SHORT_MIN_VALID,
+        "slow_long_min_valid": SLOW_LONG_MIN_VALID,
+        "beta_ewma_half_life_days": BETA_EWMA_HALF_LIFE_DAYS,
+        "beta_ewma_alpha": BETA_EWMA_ALPHA,
+        "beta_min_paired_sessions": BETA_MIN_PAIRED_SESSIONS,
+        "beta_variance_floor": BETA_VARIANCE_FLOOR,
+        "beta_clip": BETA_CLIP,
+        "real_volume_log_affine": {
+            "center": REAL_VOLUME_LOG_CENTER,
+            "scale": REAL_VOLUME_LOG_SCALE,
+        },
+        "dollar_volume_log_affine": {
+            "center": DOLLAR_VOLUME_LOG_CENTER,
+            "scale": DOLLAR_VOLUME_LOG_SCALE,
+        },
     }

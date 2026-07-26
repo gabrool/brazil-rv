@@ -30,7 +30,7 @@ from brazil_rv.modeling.contract import (
     MUON_WEIGHT_DECAY,
 )
 from brazil_rv.modeling.layers import MuonLinear
-from brazil_rv.modeling.model import CrossAssetPatchITransformerV1
+from brazil_rv.modeling.model import build_neural_model
 from brazil_rv.modeling.muon import (
     DEFAULT_A,
     DEFAULT_B,
@@ -353,7 +353,7 @@ def test_optimizer_multiple_parameter_groups_exact_parity() -> None:
 def test_real_model_muon_shapes_and_one_update_exact_parity() -> None:
     _require_official_reference()
     official_class = torch.optim.Muon
-    model = CrossAssetPatchITransformerV1("full")
+    model = build_neural_model("context_pooled")
     routed = partition_parameters(model, "hybrid")["muon"]
     shapes = sorted({tuple(parameter.shape) for parameter in routed})
     assert shapes == [(256, 256), (256, 704), (704, 256)]

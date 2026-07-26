@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import gc
 import inspect
 import json
 import sys
@@ -11,8 +12,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
+import polars as pl
 import pytest
 import torch
+import xgboost as xgb
 from torch import nn
 
 import brazil_rv.modeling.engine as engine_module
@@ -20,7 +23,6 @@ import brazil_rv.modeling.evaluate as evaluate_module
 import brazil_rv.modeling.sanity as sanity_module
 import brazil_rv.modeling.train as train_module
 from brazil_rv.modeling.contract import (
-    ABSOLUTE_PATCH_COUNT,
     ALLOWED_SEEDS,
     ADAMW_BETAS,
     ADAMW_EPS,
@@ -40,9 +42,10 @@ from brazil_rv.modeling.contract import (
     CompileSetupReport,
     EQUITY_COUNT,
     FINAL_LR_FACTOR,
-    MODEL_VARIANTS,
+    NEURAL_MODELS,
+    SUPPORTED_MODELS,
     GH200_RUNTIME,
-    INSTRUMENT_COUNT,
+    HORIZONS,
     MAX_EPOCHS,
     MUON_ADJUST_LR_FN,
     MUON_EPS,
@@ -50,11 +53,11 @@ from brazil_rv.modeling.contract import (
     MUON_MOMENTUM,
     MUON_NESTEROV,
     MUON_NS_COEFFICIENTS,
-    architecture_for_variant,
+    architecture_for_model,
     MUON_NS_STEPS,
     MUON_WEIGHT_DECAY,
     OPTIMIZER_VARIANTS,
-    PATCH_INPUT_WIDTH,
+    XGBOOST_CANDIDATES,
 )
 from brazil_rv.modeling.evaluate import _validate_run_checkpoint_identity
 from brazil_rv.modeling.engine import (
@@ -65,7 +68,7 @@ from brazil_rv.modeling.engine import (
     checkpoint_payload,
     clone_eager_reference_model,
     compile_model,
-    masked_huber_loss,
+    rank_target_huber_loss,
     train_one_epoch,
     validate_runtime,
 )
@@ -76,7 +79,17 @@ from brazil_rv.modeling.train import (
     _model_metadata,
     _run_directory_name,
 )
-from brazil_rv.modeling.model import CrossAssetPatchITransformerV1
+from brazil_rv.modeling.model import build_neural_model
+from brazil_rv.modeling.data import TabularRowBatch
+from brazil_rv.modeling.xgboost_model import (
+    _fill_horizon_predictions,
+    build_quantile_matrix,
+    inner_date_split,
+    load_boosters,
+    prediction_long_frame,
+    save_boosters,
+    select_candidate,
+)
 from brazil_rv.modeling.muon import PYTORCH_MUON_REFERENCE, PyTorch213Muon
 from brazil_rv.modeling.optim import (
     OFFICIAL_MUON_BACKEND,
@@ -270,26 +283,22 @@ def test_entrypoint_clis_use_only_current_runtime(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["train", "--model", "full", "--optimizer", "hybrid", "--seed", "11"],
-    )
-    assert vars(train_module.parse_args()) == {
-        "model": "full",
-        "optimizer": "hybrid",
-        "seed": 11,
-    }
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["train", "--model", "reduced_full", "--optimizer", "adamw", "--seed", "47"],
-    )
-    assert vars(train_module.parse_args()) == {
-        "model": "reduced_full",
-        "optimizer": "adamw",
+    assert vars(
+        train_module.parse_args(
+            ["--model", "context_pooled", "--optimizer", "hybrid", "--seed", "11"]
+        )
+    ) == {"model": "context_pooled", "optimizer": "hybrid", "seed": 11}
+    assert vars(train_module.parse_args(["--model", "xgboost", "--seed", "47"])) == {
+        "model": "xgboost",
+        "optimizer": None,
         "seed": 47,
     }
+    with pytest.raises(SystemExit):
+        train_module.parse_args(["--model", "mlp", "--seed", "11"])
+    with pytest.raises(SystemExit):
+        train_module.parse_args(
+            ["--model", "xgboost", "--optimizer", "adamw", "--seed", "11"]
+        )
 
     monkeypatch.setattr(
         sys, "argv", ["evaluate", "--run-dir", str(tmp_path), "--split", "validation"]
@@ -301,21 +310,33 @@ def test_entrypoint_clis_use_only_current_runtime(
     assert not hasattr(sanity_module, "parse_args")
 
 
-def test_experiment_matrix_contains_eighteen_runs() -> None:
+def test_experiment_matrix_contains_thirty_nine_runs() -> None:
     runs = {
-        (model_variant, optimizer_variant, seed)
-        for model_variant in MODEL_VARIANTS
+        (model_name, optimizer_variant, seed)
+        for model_name in NEURAL_MODELS
         for optimizer_variant in OPTIMIZER_VARIANTS
         for seed in ALLOWED_SEEDS
     }
-    assert len(runs) == 18
+    runs.update(("xgboost", None, seed) for seed in ALLOWED_SEEDS)
+    assert tuple(SUPPORTED_MODELS) == (
+        "temporal_only",
+        "context_only",
+        "pooled_market",
+        "context_pooled",
+        "tcn",
+        "mlp",
+        "xgboost",
+    )
+    assert len(runs) == 39
 
 
-def test_reduced_full_run_directory_name_records_variant() -> None:
+def test_model_family_neutral_run_directory_names() -> None:
     created_at = datetime(2026, 1, 2, 3, 4, 5, 6_789, tzinfo=timezone.utc)
-    assert _run_directory_name("reduced_full", "hybrid", 29, created_at) == (
-        "cross_asset_patch_itransformer_"
-        "reduced_full_hybrid_seed29_20260102T030405006789Z"
+    assert _run_directory_name("context_pooled", "hybrid", 29, created_at) == (
+        "context_pooled_hybrid_seed29_20260102T030405006789Z"
+    )
+    assert _run_directory_name("xgboost", None, 29, created_at) == (
+        "xgboost_seed29_20260102T030405006789Z"
     )
 
 
@@ -483,7 +504,7 @@ def test_incomplete_accumulation_group_fails_without_optimizer_step(
 
 
 def test_muon_partition_is_complete_disjoint_and_exact() -> None:
-    model = CrossAssetPatchITransformerV1("full")
+    model = build_neural_model("context_pooled")
     groups = partition_parameters(model, "hybrid")
     routed = [parameter for group in groups.values() for parameter in group]
     trainable = list(model.parameters())
@@ -501,7 +522,7 @@ def test_muon_partition_is_complete_disjoint_and_exact() -> None:
 
 
 def test_adamw_decay_partition() -> None:
-    model = CrossAssetPatchITransformerV1("full")
+    model = build_neural_model("context_pooled")
     groups = partition_parameters(model, "adamw")
     decay_ids = {id(parameter) for parameter in groups["decay"]}
     no_decay_ids = {id(parameter) for parameter in groups["no_decay"]}
@@ -515,7 +536,7 @@ def test_adamw_decay_partition() -> None:
     assert id(model.state_token) in no_decay_ids
 
 
-def test_masked_huber_reduction() -> None:
+def test_rank_target_huber_reduction() -> None:
     predictions = torch.zeros(2, 3, 2)
     targets = torch.tensor(
         [
@@ -530,9 +551,11 @@ def test_masked_huber_reduction() -> None:
         ]
     )
     expected = torch.tensor((0.625 + 0.5625) / 2.0)
-    torch.testing.assert_close(masked_huber_loss(predictions, targets, mask), expected)
+    torch.testing.assert_close(
+        rank_target_huber_loss(predictions, targets, mask), expected
+    )
     all_invalid_predictions = torch.ones(1, 3, 2, requires_grad=True)
-    all_invalid_loss = masked_huber_loss(
+    all_invalid_loss = rank_target_huber_loss(
         all_invalid_predictions,
         torch.zeros_like(all_invalid_predictions),
         torch.zeros(1, 3, 2, dtype=torch.bool),
@@ -1060,11 +1083,11 @@ def test_daily_ic_aggregation_with_ties() -> None:
 def _matching_run_identity(
     feature_store: Path,
     *,
-    model_variant: str = "full",
+    model_name: str = "context_pooled",
     optimizer_variant: str = "hybrid",
     muon_backend: str | None = OFFICIAL_MUON_BACKEND,
 ) -> dict[str, object]:
-    model_metadata = _model_metadata(model_variant)
+    model_metadata = _model_metadata(model_name)
     return {
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
@@ -1093,15 +1116,15 @@ def test_evaluation_identity_accepts_matching_hybrid_backends(
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
 
 
-@pytest.mark.parametrize("model_variant", MODEL_VARIANTS)
+@pytest.mark.parametrize("model_name", NEURAL_MODELS)
 def test_evaluation_identity_accepts_every_model_architecture(
-    model_variant: str,
+    model_name: str,
     tmp_path: Path,
 ) -> None:
     feature_store = tmp_path.resolve()
     manifest = _matching_run_identity(
         feature_store,
-        model_variant=model_variant,
+        model_name=model_name,
     )
     _validate_run_checkpoint_identity(manifest, dict(manifest), feature_store)
 
@@ -1176,7 +1199,7 @@ def test_evaluation_identity_rejects_invalid_matching_backend_semantics(
     (
         "muon_backend",
         "muon_reference",
-        "model_variant",
+        "model_name",
         "optimizer_variant",
         "seed",
         "resolved_feature_store_path",
@@ -1199,10 +1222,10 @@ def test_evaluation_identity_rejects_internally_incompatible_architecture(
     feature_store = tmp_path.resolve()
     manifest = _matching_run_identity(
         feature_store,
-        model_variant="reduced_full",
+        model_name="context_pooled",
     )
     architecture = dict(manifest["architecture_constants"])
-    architecture["d_model"] = 256
+    architecture["d_model"] = 255
     manifest["architecture_constants"] = architecture
     checkpoint = copy.deepcopy(manifest)
     with pytest.raises(ValueError, match="architecture metadata"):
@@ -1219,21 +1242,20 @@ def test_evaluation_identity_rejects_incorrect_parameter_count(
         _validate_run_checkpoint_identity(manifest, dict(manifest), feature_store)
 
 
-def test_reduced_full_manifest_and_checkpoint_metadata(tmp_path: Path) -> None:
-    expected_architecture = asdict(architecture_for_variant("reduced_full"))
-    metadata = _model_metadata("reduced_full")
+def test_context_pooled_manifest_and_checkpoint_metadata(tmp_path: Path) -> None:
+    expected_architecture = asdict(architecture_for_model("context_pooled"))
+    metadata = _model_metadata("context_pooled")
     assert metadata == {
-        "model_variant": "reduced_full",
+        "model_name": "context_pooled",
+        "model_family": "transformer",
         "architecture_constants": expected_architecture,
-        "parameter_count": EXPECTED_TRAINABLE_PARAMETER_COUNTS["reduced_full"],
-        "temporal_depth": 2,
-        "cross_asset_depth": 2,
+        "parameter_count": EXPECTED_TRAINABLE_PARAMETER_COUNTS["context_pooled"],
     }
 
-    model = CrossAssetPatchITransformerV1("reduced_full")
+    model = build_neural_model("context_pooled")
     payload = checkpoint_payload(
         model,
-        "reduced_full",
+        "context_pooled",
         "adamw",
         None,
         11,
@@ -1242,11 +1264,11 @@ def test_reduced_full_manifest_and_checkpoint_metadata(tmp_path: Path) -> None:
         tmp_path,
         "test-sha",
     )
-    assert payload["model_variant"] == "reduced_full"
+    assert payload["model_name"] == "context_pooled"
     assert payload["architecture_constants"] == expected_architecture
     with pytest.raises(ValueError, match="does not match"):
         checkpoint_payload(
-            model, "full", "adamw", None, 11, 1, 0.0, tmp_path, "test-sha"
+            model, "temporal_only", "adamw", None, 11, 1, 0.0, tmp_path, "test-sha"
         )
 
 
@@ -1259,29 +1281,15 @@ def test_atomic_json_write_replaces_final_without_temporary_file(
     assert not (tmp_path / "run_manifest.json.tmp").exists()
 
 
-@pytest.mark.parametrize("model_variant", MODEL_VARIANTS)
-def test_checkpoint_round_trip_eager(model_variant: str, tmp_path: Path) -> None:
+@pytest.mark.parametrize("model_name", NEURAL_MODELS)
+def test_checkpoint_round_trip_eager(model_name: str, tmp_path: Path) -> None:
     torch.manual_seed(13)
-    model = CrossAssetPatchITransformerV1(model_variant)
-    model.train()
-    patches = torch.zeros(1, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH)
-    history = torch.zeros(1, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT, dtype=torch.bool)
-    history[:, 0, 12:15] = True
-    instrument = torch.zeros(1, INSTRUMENT_COUNT, dtype=torch.bool)
-    instrument[:, 0] = True
-    instrument[:, EQUITY_COUNT:] = True
-    slow = torch.zeros(1, INSTRUMENT_COUNT, 3)
-    state_position = torch.tensor([15])
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
-    prediction = model(patches, history, instrument, slow, state_position)
-    prediction.square().mean().backward()
-    optimizer.step()
-    model.eval()
+    model = build_neural_model(model_name)
     with torch.no_grad():
-        expected = model(patches, history, instrument, slow, state_position)
+        next(model.parameters()).add_(0.125)
     payload = checkpoint_payload(
         model,
-        model_variant,
+        model_name,
         "adamw",
         None,
         11,
@@ -1293,8 +1301,154 @@ def test_checkpoint_round_trip_eager(model_variant: str, tmp_path: Path) -> None
     checkpoint_path = tmp_path / "checkpoint.pt"
     torch.save(payload, checkpoint_path)
     loaded = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    restored = CrossAssetPatchITransformerV1(model_variant).eval()
+    restored = build_neural_model(model_name)
     restored.load_state_dict(loaded["model_state_dict"])
-    with torch.no_grad():
-        actual = restored(patches, history, instrument, slow, state_position)
-    torch.testing.assert_close(actual, expected, atol=1e-5, rtol=1e-5)
+    for name, parameter in model.state_dict().items():
+        torch.testing.assert_close(
+            restored.state_dict()[name], parameter, atol=0, rtol=0
+        )
+
+
+def test_xgboost_candidate_order_and_deterministic_tie_breaking() -> None:
+    expected = [
+        (depth, learning_rate, child_weight)
+        for depth in (4, 6, 8)
+        for learning_rate in (0.03, 0.07)
+        for child_weight in (10, 50)
+    ]
+    assert [
+        (row.max_depth, row.learning_rate, row.min_child_weight)
+        for row in XGBOOST_CANDIDATES
+    ] == expected
+    rows = [
+        {"candidate_index": index, "primary_score": 0.25}
+        for index in range(len(XGBOOST_CANDIDATES))
+    ]
+    assert select_candidate(rows)["candidate_index"] == 0
+
+
+def test_xgboost_inner_split_uses_final_twenty_percent_and_five_date_embargo() -> None:
+    dates = pl.date_range(
+        pl.date(2024, 1, 2),
+        pl.date(2024, 2, 12),
+        interval="1d",
+        eager=True,
+    )[:30]
+    rows = pl.DataFrame(
+        {
+            "sample_id": np.arange(30),
+            "trade_date": dates,
+        }
+    )
+    split = inner_date_split(rows)
+    assert len(split.training_dates) == 19
+    assert len(split.embargo_dates) == 5
+    assert len(split.validation_dates) == 6
+    assert split.training_rows.height == 19
+    assert split.validation_rows.height == 6
+    assert max(split.training_dates) < min(split.embargo_dates)
+    assert max(split.embargo_dates) < min(split.validation_dates)
+
+
+def test_xgboost_prediction_reshape_and_long_frame() -> None:
+    output = np.zeros((2, EQUITY_COUNT, len(HORIZONS)), dtype=np.float32)
+    source = [
+        TabularRowBatch(
+            features=np.zeros((2, 871), dtype=np.float32),
+            labels=np.zeros(2, dtype=np.float32),
+            weights=np.ones(2, dtype=np.float32),
+            sample_id=np.asarray([20, 10], dtype=np.int64),
+            date_idx=np.asarray([2, 1], dtype=np.int64),
+            decision_idx=np.asarray([5, 4], dtype=np.int64),
+            equity_slot=np.asarray([3, 5], dtype=np.int64),
+        )
+    ]
+    _fill_horizon_predictions(
+        output,
+        1,
+        np.asarray([0.4, -0.2], dtype=np.float32),
+        source,  # type: ignore[arg-type]
+        {10: 0, 20: 1},
+    )
+    assert output.shape == (2, 158, 3)
+    assert output[1, 3, 1] == pytest.approx(0.4)
+    assert output[0, 5, 1] == pytest.approx(-0.2)
+
+    mask = np.zeros_like(output, dtype=bool)
+    mask[1, 3, 1] = True
+    arrays = {
+        "sample_id": np.asarray([10, 20], dtype=np.int64),
+        "date_idx": np.asarray([1, 2], dtype=np.int64),
+        "decision_idx": np.asarray([4, 5], dtype=np.int64),
+        "label_mask": mask,
+        "targets": output + 1.0,
+        "raw_returns": output - 1.0,
+    }
+    rows = pl.DataFrame(
+        {
+            "sample_id": [10, 20],
+            "date_idx": [1, 2],
+            "decision_idx": [4, 5],
+        }
+    )
+    frame = prediction_long_frame(rows, output, arrays)
+    assert frame.to_dicts() == [
+        {
+            "sample_id": 20,
+            "date_idx": 2,
+            "decision_idx": 5,
+            "equity_slot": 3,
+            "horizon_minutes": 60,
+            "prediction": pytest.approx(0.4),
+            "target": pytest.approx(1.4),
+            "raw_return": pytest.approx(-0.6),
+        }
+    ]
+
+
+def test_xgboost_streaming_external_memory_quantile_matrix(tmp_path: Path) -> None:
+    source = [
+        TabularRowBatch(
+            features=np.arange(4 * 871, dtype=np.float32).reshape(4, 871),
+            labels=np.asarray([-1.0, -0.25, 0.25, 1.0], dtype=np.float32),
+            weights=np.full(4, 0.25, dtype=np.float32),
+            sample_id=np.arange(4, dtype=np.int64),
+            date_idx=np.zeros(4, dtype=np.int64),
+            decision_idx=np.zeros(4, dtype=np.int64),
+            equity_slot=np.arange(4, dtype=np.int64),
+        )
+    ]
+    matrix = build_quantile_matrix(
+        source,  # type: ignore[arg-type]
+        tmp_path / "quantile",
+    )
+    assert matrix.num_row() == 4
+    assert matrix.num_col() == 871
+    assert any(path.is_file() for path in tmp_path.iterdir())
+    del matrix
+    gc.collect()
+    assert not any(path.is_file() for path in tmp_path.rglob("*"))
+
+
+def test_xgboost_three_booster_ubj_round_trip(tmp_path: Path) -> None:
+    features = np.arange(48, dtype=np.float32).reshape(12, 4)
+    labels = np.linspace(-1.0, 1.0, 12, dtype=np.float32)
+    matrix = xgb.DMatrix(features, label=labels)
+    booster = xgb.train(
+        {
+            "objective": "reg:pseudohubererror",
+            "huber_slope": 1.0,
+            "tree_method": "hist",
+            "device": "cpu",
+            "seed": 17,
+        },
+        matrix,
+        num_boost_round=3,
+    )
+    boosters = {index: booster for index in range(len(HORIZONS))}
+    expected = booster.predict(matrix)
+    save_boosters(tmp_path, boosters)
+    loaded = load_boosters(tmp_path)
+    for index, horizon in enumerate(HORIZONS):
+        assert (tmp_path / f"booster_{horizon}m.ubj").is_file()
+        np.testing.assert_array_equal(loaded[index].predict(matrix), expected)

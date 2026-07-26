@@ -7,6 +7,7 @@ import os
 import random
 import subprocess
 import time
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,23 +18,27 @@ import torch
 
 from .contract import (
     ALLOWED_SEEDS,
-    AdamWConstants,
-    EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     EARLY_STOP_PATIENCE,
     EFFECTIVE_BATCH_SIZE,
+    EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     FEATURE_STORE_POINTER,
     GH200_RUNTIME,
     MAX_EPOCHS,
     MIN_IC_IMPROVEMENT,
-    MODEL_VARIANTS,
-    MuonConstants,
+    NEURAL_MODELS,
     OPTIMIZER_VARIANTS,
     PROJECT_ROOT,
     RUN_OUTPUT_BASE,
+    SUPPORTED_MODELS,
+    AdamWConstants,
+    MuonConstants,
     SchedulerConstants,
     SplitBoundaries,
     TrainingConstants,
-    architecture_for_variant,
+    XGBOOST_DEVICE,
+    XGBOOST_FIXED_PARAMETERS,
+    XGBOOST_OBJECTIVE,
+    architecture_for_model,
 )
 from .data import (
     create_training_loaders,
@@ -54,47 +59,56 @@ from .engine import (
     validate_runtime,
     warmup_compiled_model,
 )
-from .model import CrossAssetPatchITransformerV1, count_trainable_parameters
+from .model import build_neural_model, count_trainable_parameters
 from .muon import PYTORCH_MUON_REFERENCE
 from .optim import build_optimizers, build_schedulers
+from .xgboost_model import train_xgboost_run, validate_xgboost_runtime
 
 
-def parse_args() -> argparse.Namespace:
+def validate_cli_args(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> argparse.Namespace:
+    if args.model == "xgboost" and args.optimizer is not None:
+        parser.error("--optimizer is not allowed when --model xgboost")
+    if args.model in NEURAL_MODELS and args.optimizer is None:
+        parser.error("--optimizer is required for neural models")
+    return args
+
+
+def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", required=True, choices=MODEL_VARIANTS)
-    parser.add_argument("--optimizer", required=True, choices=OPTIMIZER_VARIANTS)
+    parser.add_argument("--model", required=True, choices=SUPPORTED_MODELS)
+    parser.add_argument("--optimizer", choices=OPTIMIZER_VARIANTS)
     parser.add_argument("--seed", required=True, type=int, choices=ALLOWED_SEEDS)
-    return parser.parse_args()
+    return validate_cli_args(parser, parser.parse_args(arguments))
 
 
-def set_seeds(seed: int) -> None:
+def set_seeds(seed: int, *, neural: bool) -> None:
     random.seed(seed)
     np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    if neural:
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
 
-def _model_metadata(model_variant: str) -> dict[str, object]:
-    architecture = architecture_for_variant(model_variant)
+def _model_metadata(model_name: str) -> dict[str, object]:
+    architecture = architecture_for_model(model_name)
     return {
-        "model_variant": model_variant,
+        "model_name": model_name,
+        "model_family": architecture.family,
         "architecture_constants": asdict(architecture),
-        "parameter_count": EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_variant],
-        "temporal_depth": architecture.temporal_depth,
-        "cross_asset_depth": architecture.cross_asset_depth,
+        "parameter_count": EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_name],
     }
 
 
 def _run_directory_name(
-    model_variant: str,
-    optimizer_variant: str,
+    model_name: str,
+    optimizer_variant: str | None,
     seed: int,
     created_at: datetime,
 ) -> str:
-    return (
-        "cross_asset_patch_itransformer_"
-        f"{model_variant}_{optimizer_variant}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
-    )
+    optimizer_part = "" if optimizer_variant is None else f"_{optimizer_variant}"
+    return f"{model_name}{optimizer_part}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
 
 
 def clean_git_commit_sha() -> str:
@@ -131,7 +145,7 @@ def _atomic_write_history(path: Path, rows: list[dict[str, object]]) -> None:
         "epoch",
         "optimizer_steps",
         "train_loss",
-        "validation_loss",
+        "validation_rank_target_huber_loss",
         "validation_primary_ic",
         "validation_ic_30",
         "validation_ic_60",
@@ -181,29 +195,136 @@ def _write_daily_metrics(
     _atomic_write_parquet(path, pl.DataFrame(with_dates))
 
 
-def main() -> None:
-    args = parse_args()
-    runtime = GH200_RUNTIME
-    hardware = validate_runtime()
-    commit_sha = clean_git_commit_sha()
-    set_seeds(args.seed)
-    torch.set_float32_matmul_precision("high")
+def _common_manifest(
+    *,
+    model_name: str,
+    model_family: str,
+    optimizer_variant: str | None,
+    seed: int,
+    commit_sha: str,
+    feature_store: Path,
+    feature_manifest: dict[str, object],
+    hardware: object,
+    created_at: datetime,
+) -> dict[str, object]:
+    return {
+        "status": "running",
+        "model_name": model_name,
+        "model_family": model_family,
+        "optimizer_variant": optimizer_variant,
+        "seed": seed,
+        "git_commit_sha": commit_sha,
+        "feature_store_pointer": str(FEATURE_STORE_POINTER),
+        "resolved_feature_store_path": str(feature_store),
+        "feature_manifest_contract_version": feature_manifest["contract_version"],
+        "resolved_source_paths": feature_manifest.get("canonical_inputs"),
+        "split_boundaries": {
+            key: str(value) for key, value in asdict(SplitBoundaries()).items()
+        },
+        "hardware": asdict(hardware),
+        "created_at_utc": created_at.isoformat(),
+        "training_started_at_utc": datetime.now(timezone.utc).isoformat(),
+        "completed_at_utc": None,
+        "training_duration_seconds": None,
+    }
 
-    feature_store = resolve_feature_store()
-    sample_index = validate_feature_store(feature_store)
-    train_rows = select_sample_split(sample_index, "train")
-    validation_rows = select_sample_split(sample_index, "validation")
-    feature_manifest = json.loads(
-        (feature_store / "manifest.json").read_text(encoding="utf-8")
+
+def _run_xgboost(
+    *,
+    args: argparse.Namespace,
+    hardware: object,
+    commit_sha: str,
+    feature_store: Path,
+    feature_manifest: dict[str, object],
+    train_rows: pl.DataFrame,
+    validation_rows: pl.DataFrame,
+    cache_report: object,
+    created_at: datetime,
+    run_dir: Path,
+) -> None:
+    xgboost_runtime = validate_xgboost_runtime()
+    manifest = {
+        **_common_manifest(
+            model_name="xgboost",
+            model_family="xgboost",
+            optimizer_variant=None,
+            seed=args.seed,
+            commit_sha=commit_sha,
+            feature_store=feature_store,
+            feature_manifest=feature_manifest,
+            hardware=hardware,
+            created_at=created_at,
+        ),
+        "architecture_constants": None,
+        "parameter_count": None,
+        "compile": None,
+        "precision": None,
+        "bf16": None,
+        "grad_scaler_used": None,
+        "optimizer_state": None,
+        "checkpoint_identity": None,
+        "feature_cache_warmup": asdict(cache_report),
+        "xgboost": {
+            "version": xgboost_runtime["version"],
+            "build_info": xgboost_runtime["build_info"],
+            "device": XGBOOST_DEVICE,
+            "objective": XGBOOST_OBJECTIVE,
+            "fixed_parameters": dict(XGBOOST_FIXED_PARAMETERS),
+        },
+    }
+    _atomic_write_json(run_dir / "run_manifest.json", manifest)
+    started = time.perf_counter()
+    result = train_xgboost_run(
+        feature_store,
+        train_rows,
+        validation_rows,
+        run_dir,
+        args.seed,
     )
-    cache_report = warm_feature_store_cache(feature_store)
+    completed = {
+        **manifest,
+        "status": "completed",
+        "completed_at_utc": datetime.now(timezone.utc).isoformat(),
+        "training_duration_seconds": time.perf_counter() - started,
+        "xgboost": {
+            **manifest["xgboost"],
+            "selected_settings": result.selected_settings,
+            "boosting_rounds": result.boosting_rounds,
+            "matrix_dimensions": result.matrix_dimensions,
+            "validation_primary_score": result.validation_summary["primary_score"],
+        },
+    }
+    _atomic_write_json(run_dir / "run_manifest.json", completed)
+
+
+def _run_neural(
+    *,
+    args: argparse.Namespace,
+    hardware: object,
+    commit_sha: str,
+    feature_store: Path,
+    feature_manifest: dict[str, object],
+    train_rows: pl.DataFrame,
+    validation_rows: pl.DataFrame,
+    cache_report: object,
+    created_at: datetime,
+    run_dir: Path,
+) -> None:
+    if args.optimizer is None:
+        raise AssertionError("Validated neural CLI is missing its optimizer")
+    runtime = GH200_RUNTIME
     train_loader, validation_loader, sampler = create_training_loaders(
-        feature_store, train_rows, validation_rows, runtime, args.seed
+        feature_store,
+        train_rows,
+        validation_rows,
+        args.model,
+        runtime,
+        args.seed,
     )
     training_batch = next(iter(train_loader))
     evaluation_batch = next(iter(validation_loader))
 
-    model = CrossAssetPatchITransformerV1(args.model).to("cuda")
+    model = build_neural_model(args.model).to("cuda")
     model_metadata = _model_metadata(args.model)
     parameter_count = count_trainable_parameters(model)
     expected_parameter_count = int(model_metadata["parameter_count"])
@@ -228,32 +349,26 @@ def main() -> None:
     del eager_reference
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
-    compile_report = warmup_compiled_model(
-        model,
-        training_batch,
-        evaluation_batch,
-    )
+    compile_report = warmup_compiled_model(model, training_batch, evaluation_batch)
     compile_metadata = build_compile_metadata(
         compile_setup, compile_parity, compile_report
     )
 
-    created_at = datetime.now(timezone.utc)
-    run_dir = RUN_OUTPUT_BASE / _run_directory_name(
-        args.model, args.optimizer, args.seed, created_at
-    )
-    if run_dir.exists():
-        raise FileExistsError(f"Run output already exists: {run_dir}")
-    run_dir.mkdir(parents=True)
-    training_started_at = datetime.now(timezone.utc)
     manifest: dict[str, object] = {
-        "status": "running",
+        **_common_manifest(
+            model_name=args.model,
+            model_family=str(model_metadata["model_family"]),
+            optimizer_variant=args.optimizer,
+            seed=args.seed,
+            commit_sha=commit_sha,
+            feature_store=feature_store,
+            feature_manifest=feature_manifest,
+            hardware=hardware,
+            created_at=created_at,
+        ),
+        **model_metadata,
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
-        "feature_store_pointer": str(FEATURE_STORE_POINTER),
-        "resolved_feature_store_path": str(feature_store),
-        "feature_manifest_contract_version": feature_manifest["contract_version"],
-        **model_metadata,
-        "optimizer_variant": args.optimizer,
         "physical_microbatch_size": runtime.microbatch_size,
         "accumulation_steps": runtime.accumulation_steps,
         "effective_batch_size": EFFECTIVE_BATCH_SIZE,
@@ -261,11 +376,8 @@ def main() -> None:
         "num_workers": runtime.num_workers,
         "prefetch_factor": runtime.prefetch_factor,
         "precision": "bf16",
+        "bf16": True,
         "grad_scaler_used": False,
-        "seed": args.seed,
-        "split_boundaries": {
-            key: str(value) for key, value in asdict(SplitBoundaries()).items()
-        },
         "training_constants": asdict(TrainingConstants()),
         "optimizer_constants": {
             "muon": asdict(MuonConstants()),
@@ -282,7 +394,6 @@ def main() -> None:
         "gpu_name": hardware.device_name,
         "gpu_total_memory": hardware.total_vram_bytes,
         "compile": compile_metadata,
-        "hardware": asdict(hardware),
         "feature_cache_warmup": asdict(cache_report),
         "loader": {
             "vectorized": True,
@@ -292,10 +403,8 @@ def main() -> None:
             "evaluation_padding": "repeat_last_and_mask",
         },
         "peak_memory": {
-            "compile_warmup_allocated": (
-                compile_report.peak_allocated_cuda_memory_bytes
-            ),
-            "compile_warmup_reserved": (compile_report.peak_reserved_cuda_memory_bytes),
+            "compile_warmup_allocated": compile_report.peak_allocated_cuda_memory_bytes,
+            "compile_warmup_reserved": compile_report.peak_reserved_cuda_memory_bytes,
             "run_allocated": None,
             "run_reserved": None,
         },
@@ -305,13 +414,9 @@ def main() -> None:
             "enable_gqa": False,
             "backend_selection": "automatic",
         },
-        "created_at_utc": created_at.isoformat(),
-        "training_started_at_utc": training_started_at.isoformat(),
-        "git_commit_sha": commit_sha,
         "best_epoch": None,
         "best_validation_primary_score": None,
         "stopped_epoch": None,
-        "training_duration_seconds": None,
         "bitwise_gpu_reproducibility_guaranteed": False,
     }
     _atomic_write_json(run_dir / "run_manifest.json", manifest)
@@ -349,7 +454,9 @@ def main() -> None:
                 "epoch": epoch,
                 "optimizer_steps": training["optimizer_steps"],
                 "train_loss": training["train_loss"],
-                "validation_loss": validation["masked_huber_loss"],
+                "validation_rank_target_huber_loss": validation[
+                    "rank_target_huber_loss"
+                ],
                 "validation_primary_ic": primary_score,
                 "validation_ic_30": horizon_ic[0],
                 "validation_ic_60": horizon_ic[1],
@@ -408,9 +515,7 @@ def main() -> None:
         raise RuntimeError("Training did not produce a best checkpoint")
     _atomic_write_json(run_dir / "validation_metrics.json", best_metrics)
     _write_daily_metrics(
-        run_dir / "validation_daily_metrics.parquet",
-        best_daily_rows,
-        feature_store,
+        run_dir / "validation_daily_metrics.parquet", best_daily_rows, feature_store
     )
     completed_manifest = {
         **manifest,
@@ -427,6 +532,60 @@ def main() -> None:
         },
     }
     _atomic_write_json(run_dir / "run_manifest.json", completed_manifest)
+
+
+def main() -> None:
+    args = parse_args()
+    neural = args.model in NEURAL_MODELS
+    hardware = validate_runtime()
+    commit_sha = clean_git_commit_sha()
+    set_seeds(args.seed, neural=neural)
+    if neural:
+        torch.set_float32_matmul_precision("high")
+
+    feature_store = resolve_feature_store()
+    sample_index = validate_feature_store(feature_store)
+    train_rows = select_sample_split(sample_index, "train")
+    validation_rows = select_sample_split(sample_index, "validation")
+    feature_manifest = json.loads(
+        (feature_store / "manifest.json").read_text(encoding="utf-8")
+    )
+    cache_report = warm_feature_store_cache(feature_store)
+
+    created_at = datetime.now(timezone.utc)
+    run_dir = RUN_OUTPUT_BASE / _run_directory_name(
+        args.model, args.optimizer, args.seed, created_at
+    )
+    if run_dir.exists():
+        raise FileExistsError(f"Run output already exists: {run_dir}")
+    run_dir.mkdir(parents=True)
+
+    if neural:
+        _run_neural(
+            args=args,
+            hardware=hardware,
+            commit_sha=commit_sha,
+            feature_store=feature_store,
+            feature_manifest=feature_manifest,
+            train_rows=train_rows,
+            validation_rows=validation_rows,
+            cache_report=cache_report,
+            created_at=created_at,
+            run_dir=run_dir,
+        )
+    else:
+        _run_xgboost(
+            args=args,
+            hardware=hardware,
+            commit_sha=commit_sha,
+            feature_store=feature_store,
+            feature_manifest=feature_manifest,
+            train_rows=train_rows,
+            validation_rows=validation_rows,
+            cache_report=cache_report,
+            created_at=created_at,
+            run_dir=run_dir,
+        )
     print(f"Completed run: {run_dir}")
 
 

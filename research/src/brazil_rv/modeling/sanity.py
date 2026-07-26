@@ -43,27 +43,27 @@ from .engine import (
     checkpoint_payload,
     clone_eager_reference_model,
     compile_model,
-    masked_huber_loss,
+    rank_target_huber_loss,
     qualify_eager_compiled_model,
     require_compile_parity,
     validate_runtime,
     warmup_compiled_model,
 )
 from .metrics import sample_level_ic
-from .model import CrossAssetPatchITransformerV1, count_trainable_parameters
+from .model import build_neural_model, count_trainable_parameters
 from .muon import PYTORCH_MUON_REFERENCE
 from .optim import build_optimizers
 
 
 def _evaluate_fixed_batch(
-    model: CrossAssetPatchITransformerV1,
+    model: torch.nn.Module,
     cpu_batch: dict[str, torch.Tensor],
 ) -> tuple[float, float, bool]:
     batch = _to_cuda(cpu_batch)
     valid_count = int(cpu_batch["sample_valid_mask"].sum())
     with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.bfloat16):
         output = _predict(model, batch)
-        loss = masked_huber_loss(
+        loss = rank_target_huber_loss(
             output[:valid_count],
             batch["targets"][:valid_count],
             batch["label_mask"][:valid_count],
@@ -80,7 +80,7 @@ def _evaluate_fixed_batch(
 
 
 def _validate_compiled_checkpoint_compatibility(
-    model: CrossAssetPatchITransformerV1,
+    model: torch.nn.Module,
     evaluation_batch: dict[str, torch.Tensor],
     muon_backend: str,
     completed_steps: int,
@@ -100,7 +100,7 @@ def _validate_compiled_checkpoint_compatibility(
     ).stdout.strip()
     checkpoint = checkpoint_payload(
         model,
-        "full",
+        "context_pooled",
         "hybrid",
         muon_backend,
         11,
@@ -114,7 +114,7 @@ def _validate_compiled_checkpoint_compatibility(
     try:
         torch.save(checkpoint, checkpoint_path)
         loaded = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-        eager_model = CrossAssetPatchITransformerV1("full")
+        eager_model = build_neural_model("context_pooled")
         eager_model.load_state_dict(loaded["model_state_dict"])
         eager_model.to("cuda").eval()
         with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.bfloat16):
@@ -164,12 +164,14 @@ def main() -> None:
         )
     cache_report = warm_feature_store_cache(feature_store)
     train_loader, evaluation_loader, sampler = create_training_loaders(
-        feature_store, training, memorization_rows, runtime, 11
+        feature_store, training, memorization_rows, "context_pooled", runtime, 11
     )
     sampler.set_epoch(0)
     smoke_batches = list(islice(train_loader, runtime.accumulation_steps))
     evaluation_batch = next(iter(evaluation_loader))
-    memorization_dataset = VectorizedFeatureDataset(feature_store, memorization_rows)
+    memorization_dataset = VectorizedFeatureDataset(
+        feature_store, memorization_rows, "context_pooled"
+    )
     memorization_batch = tensorize_vectorized_batch(
         memorization_dataset[
             BatchRequest(
@@ -188,7 +190,7 @@ def main() -> None:
         int(batch["sample_valid_mask"].sum()) for batch in smoke_batches
     ]
 
-    model = CrossAssetPatchITransformerV1("full").to("cuda")
+    model = build_neural_model("context_pooled").to("cuda")
     model.eval()
     initial_model_state = {
         key: value.detach().cpu().clone() for key, value in model.state_dict().items()
@@ -267,7 +269,7 @@ def main() -> None:
         batch = _to_cuda(memorization_batch)
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             predictions = _predict(model, batch)
-            sample_loss = masked_huber_loss(
+            sample_loss = rank_target_huber_loss(
                 predictions, batch["targets"], batch["label_mask"]
             )
         sample_loss.backward()
@@ -342,12 +344,14 @@ def main() -> None:
     )
     created_at = datetime.now(timezone.utc)
     output_dir = RUN_OUTPUT_BASE / (
-        f"sanity_cross_asset_patch_itransformer_{created_at:%Y%m%dT%H%M%S%fZ}"
+        f"sanity_context_pooled_{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     if output_dir.exists():
         raise FileExistsError(f"Sanity output already exists: {output_dir}")
     output_dir.mkdir(parents=True)
     report = {
+        "model_name": "context_pooled",
+        "model_family": "transformer",
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "created_at_utc": created_at.isoformat(),
@@ -377,7 +381,7 @@ def main() -> None:
             "accumulation_steps": 1,
             "decision_index": SANITY_DECISION_INDEX,
             "optimizer_steps": completed_steps,
-            "final_masked_huber_loss": final_loss,
+            "final_rank_target_huber_loss": final_loss,
             "mean_valid_sample_spearman_ic": final_spearman,
             "all_gradients_finite": all_gradients_finite,
             "all_predictions_finite": all_predictions_finite,

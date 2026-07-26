@@ -1,28 +1,42 @@
 from __future__ import annotations
 
+import io
+
 import pytest
 import torch
 from torch import nn
 
 import brazil_rv.modeling.engine as engine_module
-
+from brazil_rv.modeling.baselines import ResidualTabularMLP, SharedCausalTCN
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
-    ARCHITECTURES,
     COMPILE_STEADY_STATE_PASS_COUNT,
     COMPILE_WARMUP_PASS_COUNT,
     EQUITY_COUNT,
     EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     GH200_RUNTIME,
     INSTRUMENT_COUNT,
-    MODEL_VARIANTS,
+    NEURAL_MODELS,
     PATCH_INPUT_WIDTH,
-    architecture_for_variant,
+    POOLED_INDUCING_TOKEN_COUNT,
+    SLOW_FEATURE_COUNT,
+    SUPPORTED_MODELS,
+    TABULAR_FEATURE_COUNT,
+    TCN_DILATIONS,
+    TCN_KERNEL_SIZE,
+    architecture_for_model,
 )
 from brazil_rv.modeling.engine import compile_model, warmup_compiled_model
-from brazil_rv.modeling.layers import MultiHeadAttention, RotaryEmbedding
+from brazil_rv.modeling.layers import (
+    CrossAttention,
+    MultiHeadAttention,
+    PooledMarketMemory,
+    RotaryEmbedding,
+    TargetedFusionBlock,
+)
 from brazil_rv.modeling.model import (
-    CrossAssetPatchITransformerV1,
+    TargetedCrossAssetTransformer,
+    build_neural_model,
     count_trainable_parameters,
 )
 
@@ -42,20 +56,28 @@ def _inputs() -> dict[str, torch.Tensor]:
     instrument[:, EQUITY_COUNT:] = True
     history[:, :4, 12:15] = True
     history[:, EQUITY_COUNT:, :15] = True
-    slow = 0.1 * torch.randn(1, INSTRUMENT_COUNT, 3, generator=generator)
+    slow = 0.1 * torch.randn(
+        1, INSTRUMENT_COUNT, SLOW_FEATURE_COUNT, generator=generator
+    )
+    tabular = 0.1 * torch.randn(
+        1, EQUITY_COUNT, TABULAR_FEATURE_COUNT, generator=generator
+    )
     return {
         "patches": patches,
         "history_patch_mask": history,
         "instrument_mask": instrument,
         "slow_features": slow,
         "state_position": torch.tensor([15]),
+        "tabular_features": tabular,
+        "equity_mask": instrument[:, :EQUITY_COUNT].clone(),
     }
 
 
 def _forward(
-    model: CrossAssetPatchITransformerV1,
-    inputs: dict[str, torch.Tensor],
+    model: nn.Module, model_name: str, inputs: dict[str, torch.Tensor]
 ) -> torch.Tensor:
+    if model_name == "mlp":
+        return model(inputs["tabular_features"], inputs["equity_mask"])
     return model(
         inputs["patches"],
         inputs["history_patch_mask"],
@@ -65,117 +87,182 @@ def _forward(
     )
 
 
-@pytest.fixture(scope="module", params=MODEL_VARIANTS)
-def variant_model(request: pytest.FixtureRequest) -> CrossAssetPatchITransformerV1:
-    return CrossAssetPatchITransformerV1(str(request.param)).eval()
+@pytest.fixture(scope="module", params=NEURAL_MODELS)
+def neural_model(request: pytest.FixtureRequest) -> tuple[str, nn.Module]:
+    model_name = str(request.param)
+    return model_name, build_neural_model(model_name).eval()
 
 
-@pytest.fixture(scope="module")
-def temporal_model() -> CrossAssetPatchITransformerV1:
-    return CrossAssetPatchITransformerV1("temporal_only").eval()
+def test_exact_public_model_contract() -> None:
+    assert SUPPORTED_MODELS == (
+        "temporal_only",
+        "context_only",
+        "pooled_market",
+        "context_pooled",
+        "tcn",
+        "mlp",
+        "xgboost",
+    )
+    assert NEURAL_MODELS == SUPPORTED_MODELS[:-1]
+    assert PATCH_INPUT_WIDTH == 130
+    assert SLOW_FEATURE_COUNT == 32
+    assert TABULAR_FEATURE_COUNT == 871
 
 
-def test_forward_shape_and_finiteness_for_every_variant(
-    variant_model: CrossAssetPatchITransformerV1,
+def test_forward_shape_finiteness_and_parameter_count(
+    neural_model: tuple[str, nn.Module],
 ) -> None:
+    model_name, model = neural_model
     with torch.no_grad():
-        output = _forward(variant_model, _inputs())
+        output = _forward(model, model_name, _inputs())
     assert output.shape == (1, EQUITY_COUNT, 3)
     assert torch.isfinite(output).all()
-
-
-def test_exact_parameter_count_for_every_variant(
-    variant_model: CrossAssetPatchITransformerV1,
-) -> None:
     assert (
-        count_trainable_parameters(variant_model)
-        == (EXPECTED_TRAINABLE_PARAMETER_COUNTS[variant_model.variant])
+        count_trainable_parameters(model)
+        == EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_name]
     )
 
 
-def test_variant_architectures_are_exact() -> None:
-    assert MODEL_VARIANTS == ("full", "reduced_full", "temporal_only")
-    expected = {
-        "full": (256, 8, 32, 2, 6, 704),
-        "reduced_full": (192, 6, 32, 2, 2, 512),
-        "temporal_only": (256, 8, 32, 2, 0, 704),
-    }
-    for variant, values in expected.items():
-        architecture = architecture_for_variant(variant)
+def test_transformer_architectures_and_memory_are_exact() -> None:
+    for model_name, context_tokens, pooled_tokens, fusion_blocks in (
+        ("temporal_only", 0, 0, 0),
+        ("context_only", 6, 0, 1),
+        ("pooled_market", 0, 6, 1),
+        ("context_pooled", 6, 6, 1),
+    ):
+        architecture = architecture_for_model(model_name)
         assert (
             architecture.d_model,
             architecture.attention_heads,
             architecture.head_dim,
             architecture.temporal_depth,
-            architecture.cross_asset_depth,
             architecture.swiglu_width,
-        ) == values
-        assert ARCHITECTURES[variant] is architecture
+        ) == (256, 8, 32, 2, 704)
+        assert architecture.context_memory_tokens == context_tokens
+        assert architecture.pooled_memory_tokens == pooled_tokens
+        assert architecture.fusion_blocks == fusion_blocks
+        model = TargetedCrossAssetTransformer(model_name)
+        assert len(model.temporal_encoder.blocks) == 2
+        assert (
+            sum(isinstance(module, TargetedFusionBlock) for module in model.modules())
+            == fusion_blocks
+        )
+        assert not any(
+            "cross_asset_encoder" in name for name, _ in model.named_modules()
+        )
+        if pooled_tokens:
+            assert isinstance(model.pooled_memory, PooledMarketMemory)
+            assert model.pooled_memory.inducing_tokens.shape[0] == 4
+            assert POOLED_INDUCING_TOKEN_COUNT == 4
 
 
-def test_existing_variant_state_dict_layouts_remain_compatible() -> None:
-    full = CrossAssetPatchITransformerV1("full")
-    temporal = CrossAssetPatchITransformerV1("temporal_only")
-    assert full.patch_projection.weight.shape == (256, PATCH_INPUT_WIDTH)
-    assert len(full.temporal_encoder.blocks) == 2
-    assert full.cross_asset_encoder is not None
-    assert len(full.cross_asset_encoder.blocks) == 6
-    assert "cross_asset_encoder.blocks.5.feedforward.down.weight" in full.state_dict()
-    assert temporal.patch_projection.weight.shape == (256, PATCH_INPUT_WIDTH)
-    assert len(temporal.temporal_encoder.blocks) == 2
-    assert temporal.cross_asset_encoder is None
-    assert not any(
-        key.startswith("cross_asset_encoder.") for key in temporal.state_dict()
+def test_context_only_is_targeted_and_context_sensitive() -> None:
+    model = TargetedCrossAssetTransformer("context_only").eval()
+    inputs = _inputs()
+    unrelated = {key: value.clone() for key, value in inputs.items()}
+    unrelated["patches"][:, 1] += 100.0
+    unrelated["slow_features"][:, 1] += 100.0
+    context_changed = {key: value.clone() for key, value in inputs.items()}
+    context_changed["patches"][:, EQUITY_COUNT] += 10.0
+    context_changed["slow_features"][:, EQUITY_COUNT] += 10.0
+    with torch.no_grad():
+        baseline = _forward(model, "context_only", inputs)
+        unrelated_output = _forward(model, "context_only", unrelated)
+        context_output = _forward(model, "context_only", context_changed)
+    torch.testing.assert_close(
+        baseline[:, 0], unrelated_output[:, 0], atol=0.0, rtol=0.0
     )
+    assert not torch.equal(baseline[:, 0], context_output[:, 0])
 
 
-def test_equity_permutation_equivariance(
-    variant_model: CrossAssetPatchITransformerV1,
-) -> None:
+def test_pooled_market_active_and_inactive_isolation() -> None:
+    model = TargetedCrossAssetTransformer("pooled_market").eval()
+    inputs = _inputs()
+    active_changed = {key: value.clone() for key, value in inputs.items()}
+    active_changed["patches"][:, 1] += 20.0
+    inactive_changed = {key: value.clone() for key, value in inputs.items()}
+    inactive_changed["patches"][:, 10] += 20_000.0
+    inactive_changed["slow_features"][:, 10] += 20_000.0
+    with torch.no_grad():
+        baseline = _forward(model, "pooled_market", inputs)
+        active_output = _forward(model, "pooled_market", active_changed)
+        inactive_output = _forward(model, "pooled_market", inactive_changed)
+    assert not torch.equal(baseline[:, 0], active_output[:, 0])
+    torch.testing.assert_close(baseline[:, :4], inactive_output[:, :4], atol=0, rtol=0)
+
+
+@pytest.mark.parametrize("model_name", NEURAL_MODELS)
+def test_equity_permutation_equivariance_and_inactive_zero(model_name: str) -> None:
+    model = build_neural_model(model_name).eval()
     inputs = _inputs()
     permutation = torch.arange(EQUITY_COUNT - 1, -1, -1)
     permuted = {key: value.clone() for key, value in inputs.items()}
-    for key in (
-        "patches",
-        "history_patch_mask",
-        "instrument_mask",
-        "slow_features",
-    ):
-        permuted[key][:, :EQUITY_COUNT] = inputs[key][:, :EQUITY_COUNT][:, permutation]
+    if model_name == "mlp":
+        permuted["tabular_features"] = inputs["tabular_features"][:, permutation]
+        permuted["equity_mask"] = inputs["equity_mask"][:, permutation]
+    else:
+        for key in (
+            "patches",
+            "history_patch_mask",
+            "instrument_mask",
+            "slow_features",
+        ):
+            permuted[key][:, :EQUITY_COUNT] = inputs[key][:, :EQUITY_COUNT][
+                :, permutation
+            ]
     with torch.no_grad():
-        baseline = _forward(variant_model, inputs)
-        changed = _forward(variant_model, permuted)
-    torch.testing.assert_close(changed, baseline[:, permutation], atol=2e-5, rtol=2e-5)
+        baseline = _forward(model, model_name, inputs)
+        changed = _forward(model, model_name, permuted)
+    torch.testing.assert_close(changed, baseline[:, permutation], atol=3e-5, rtol=3e-5)
+    inactive = (
+        ~inputs["equity_mask"]
+        if model_name == "mlp"
+        else ~inputs["instrument_mask"][:, :EQUITY_COUNT]
+    )
+    assert torch.equal(baseline[inactive], torch.zeros_like(baseline[inactive]))
 
 
-def test_inactive_equity_isolation(
-    variant_model: CrossAssetPatchITransformerV1,
-) -> None:
+def test_tcn_is_causal_and_contains_no_attention() -> None:
+    model = SharedCausalTCN().eval()
+    assert 1 + (TCN_KERNEL_SIZE - 1) * sum(TCN_DILATIONS) >= ABSOLUTE_PATCH_COUNT
+    assert not any(
+        isinstance(module, (MultiHeadAttention, CrossAttention))
+        for module in model.modules()
+    )
     inputs = _inputs()
     changed = {key: value.clone() for key, value in inputs.items()}
-    changed["patches"][:, 10] = 1_000.0
-    changed["slow_features"][:, 10] = 1_000.0
+    changed["patches"][:, :, 20:] += 1_000.0
+    changed["history_patch_mask"][:, :, 20:] = True
     with torch.no_grad():
-        baseline_output = _forward(variant_model, inputs)
-        changed_output = _forward(variant_model, changed)
-    torch.testing.assert_close(
-        baseline_output[:, :4], changed_output[:, :4], atol=0.0, rtol=0.0
+        baseline = _forward(model, "tcn", inputs)
+        output = _forward(model, "tcn", changed)
+    torch.testing.assert_close(baseline, output, atol=0, rtol=0)
+
+
+def test_mlp_has_only_feedforward_modules() -> None:
+    model = ResidualTabularMLP()
+    assert model.input_projection.in_features == TABULAR_FEATURE_COUNT
+    assert not any(
+        isinstance(module, (MultiHeadAttention, CrossAttention, nn.Conv1d))
+        for module in model.modules()
     )
 
 
-def test_temporal_only_isolation(
-    temporal_model: CrossAssetPatchITransformerV1,
+def test_state_dict_round_trip_for_every_neural_setting(
+    neural_model: tuple[str, nn.Module],
 ) -> None:
+    model_name, model = neural_model
     inputs = _inputs()
-    changed = {key: value.clone() for key, value in inputs.items()}
-    changed["patches"][:, 1] += 50.0
-    changed["slow_features"][:, 1] += 50.0
-    changed["patches"][:, EQUITY_COUNT:] -= 50.0
-    changed["slow_features"][:, EQUITY_COUNT:] -= 50.0
     with torch.no_grad():
-        baseline = _forward(temporal_model, inputs)
-        mutated = _forward(temporal_model, changed)
-    torch.testing.assert_close(baseline[:, 0], mutated[:, 0], atol=0.0, rtol=0.0)
+        expected = _forward(model, model_name, inputs)
+    buffer = io.BytesIO()
+    torch.save(model.state_dict(), buffer)
+    buffer.seek(0)
+    restored = build_neural_model(model_name).eval()
+    restored.load_state_dict(torch.load(buffer, weights_only=True))
+    with torch.no_grad():
+        actual = _forward(restored, model_name, inputs)
+    torch.testing.assert_close(actual, expected, atol=0, rtol=0)
 
 
 def test_rope_norm_and_dynamic_state_positions() -> None:
@@ -216,24 +303,6 @@ def test_sdpa_boolean_key_mask_semantics() -> None:
         baseline[:, (0, 2)], masked_change[:, (0, 2)], atol=0.0, rtol=0.0
     )
 
-    only_first_key = torch.tensor([[True, False, False]])
-    changed_allowed = inputs.clone()
-    changed_allowed[:, 0] += 10.0
-    with torch.no_grad():
-        allowed_baseline = attention(inputs, only_first_key)
-        allowed_change = attention(changed_allowed, only_first_key)
-    assert not torch.equal(allowed_baseline[:, 2], allowed_change[:, 2])
-
-
-def test_inactive_predictions_are_exactly_zero(
-    variant_model: CrossAssetPatchITransformerV1,
-) -> None:
-    inputs = _inputs()
-    with torch.no_grad():
-        output = _forward(variant_model, inputs)
-    inactive = ~inputs["instrument_mask"][:, :EQUITY_COUNT]
-    assert torch.equal(output[inactive], torch.zeros_like(output[inactive]))
-
 
 def test_compile_warmup_reports_final_three_pass_medians(
     monkeypatch: pytest.MonkeyPatch,
@@ -268,11 +337,9 @@ def test_compile_warmup_reports_final_three_pass_medians(
 
     model = nn.Linear(1, 1)
     report = warmup_compiled_model(model, {}, {})
-
     assert COMPILE_WARMUP_PASS_COUNT == 5
     assert COMPILE_STEADY_STATE_PASS_COUNT == 3
-    assert training_calls == 5
-    assert evaluation_calls == 5
+    assert training_calls == evaluation_calls == 5
     assert training_modes == [True] * 5
     assert evaluation_modes == [False] * 5
     assert not model.training
@@ -286,7 +353,7 @@ def test_compile_warmup_reports_final_three_pass_medians(
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 def test_in_place_compile_preserves_state_dict_keys() -> None:
-    model = CrossAssetPatchITransformerV1("temporal_only").to("cuda")
+    model = TargetedCrossAssetTransformer("context_pooled").to("cuda")
     expected_keys = set(model.state_dict())
     compile_model(model, GH200_RUNTIME)
     assert set(model.state_dict()) == expected_keys

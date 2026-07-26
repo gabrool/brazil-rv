@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -11,9 +12,12 @@ from brazil_rv.preprocessing.contract import (
     DECISION_EQUITY_INDICES,
     DYNAMIC_CHANNELS,
     EQUITY_SESSION_MINUTES,
+    EQUITY_SLOW_CHANNELS,
     HORIZONS,
+    SLOW_CHANNELS,
     output_array_specs,
 )
+from brazil_rv.preprocessing.build import _write_feature_schema
 from brazil_rv.preprocessing.io import (
     create_output_memmaps,
     expand_membership,
@@ -23,9 +27,13 @@ from brazil_rv.preprocessing.io import (
     validate_source_date_isolation,
 )
 from brazil_rv.preprocessing.transforms import (
+    add_equity_cross_sectional_dynamic,
     build_causal_features,
+    build_daily_changes,
     build_prior_rate_level,
     build_raw_returns,
+    causal_exposure_betas,
+    centered_midranks,
     center_cross_section,
     time_to_expiry_scaled,
 )
@@ -226,12 +234,12 @@ def test_missing_bar_semantics() -> None:
     missing_observed[-1, DECISION_EQUITY_INDICES[0]] = False
     changed = build_causal_features(raw, missing_observed, valid, is_rate=False)
     deleted = DECISION_EQUITY_INDICES[0]
-    np.testing.assert_array_equal(changed.dynamic[-1, deleted], np.zeros(6))
+    np.testing.assert_array_equal(changed.dynamic[-1, deleted, :6], np.zeros(6))
     np.testing.assert_array_equal(
-        baseline.dynamic[-1, :deleted], changed.dynamic[-1, :deleted]
+        baseline.dynamic[-1, :deleted, :6], changed.dynamic[-1, :deleted, :6]
     )
     np.testing.assert_array_equal(
-        baseline.dynamic[-1, deleted + 2 :], changed.dynamic[-1, deleted + 2 :]
+        baseline.dynamic[-1, deleted + 2 :, :6], changed.dynamic[-1, deleted + 2 :, :6]
     )
     _, endpoint_mask = build_raw_returns(raw, missing_observed)
     assert not endpoint_mask[-1, 0].any()
@@ -380,7 +388,29 @@ def test_output_contract(tmp_path: Path) -> None:
         "close_move_normalized",
         "volume_surprise",
         "observed",
+        "return_since_open_normalized",
+        "return_15m_normalized",
+        "return_30m_normalized",
+        "return_60m_normalized",
+        "realized_vol_15m_log_ratio",
+        "realized_vol_30m_log_ratio",
+        "realized_vol_60m_log_ratio",
+        "cumulative_volume_surprise",
+        "session_range_position",
+        "observed_fraction_30m",
+        "market_median_return_15m",
+        "market_median_return_60m",
+        "market_breadth_15m",
+        "market_breadth_60m",
+        "market_dispersion_15m",
+        "market_dispersion_60m",
+        "cross_section_return_rank_15m",
+        "cross_section_return_rank_60m",
+        "cross_section_volume_rank",
+        "cross_section_volatility_rank_30m",
     )
+    assert EQUITY_SLOW_CHANNELS == SLOW_CHANNELS
+    assert len(SLOW_CHANNELS) == 32
 
     raw = np.zeros((30, 1, len(HORIZONS)), dtype=np.float32)
     raw[:, 0, :] = np.linspace(-0.01, 0.01, 30)[:, None]
@@ -393,3 +423,222 @@ def test_output_contract(tmp_path: Path) -> None:
     assert np.isfinite(targets).all()
     assert np.isfinite(medians).all()
     assert not targets[~label_mask].any()
+
+
+def test_centered_midranks_and_rank_target_groups() -> None:
+    values = np.array([3.0, 1.0, 1.0, 8.0])
+    np.testing.assert_allclose(
+        centered_midranks(values), np.array([0.25, -0.5, -0.5, 0.75])
+    )
+    np.testing.assert_array_equal(centered_midranks(np.array([5.0])), [0.0])
+    assert centered_midranks(values).mean() == 0.0
+
+    raw = np.zeros((30, 2, len(HORIZONS)), dtype=np.float32)
+    raw[:, 0, 0] = np.arange(30)
+    raw[:, 1, 0] = np.arange(30)[::-1]
+    raw[:, :, 1] = np.repeat(np.arange(30)[:, None], 2, axis=1)
+    raw[:, :, 2] = 4.0
+    candidate = np.ones(raw.shape, dtype=bool)
+    candidate[0, 0, 0] = False
+    sigma = np.linspace(0.5, 2.0, 30)
+    _, label_mask, targets, _, horizon_mask = center_cross_section(
+        raw, candidate, sigma
+    )
+    assert not label_mask[:, 0, 0].any()
+    assert not targets[:, 0, 0].any()
+    assert not horizon_mask[0, 0]
+    for decision_idx in range(2):
+        for horizon_idx in range(len(HORIZONS)):
+            valid = label_mask[:, decision_idx, horizon_idx]
+            if not valid.any():
+                continue
+            assert abs(float(targets[valid, decision_idx, horizon_idx].mean())) < 1e-7
+            assert np.all(
+                np.diff(np.sort(targets[valid, decision_idx, horizon_idx])) >= 0
+            )
+    assert np.all(targets[label_mask] > -1.0)
+    assert np.all(targets[label_mask] < 1.0)
+    assert np.all(targets[:, :, 2][label_mask[:, :, 2]] == 0.0)
+
+
+def test_exact_trailing_features_and_no_forward_fill() -> None:
+    raw, observed = _synthetic_grid(days=21)
+    result = build_causal_features(
+        raw, observed, np.ones(21, dtype=bool), is_rate=False
+    )
+    day = 20
+    minute = 60
+    sigma = result.sigma[day]
+    expected_return_15 = np.log(raw[day, minute, 3] / raw[day, minute - 15, 3]) / (
+        sigma * np.sqrt(15)
+    )
+    np.testing.assert_allclose(result.dynamic[day, minute, 7], expected_return_15)
+    adjacent = np.log(
+        raw[day, minute - 29 : minute + 1, 3] / raw[day, minute - 30 : minute, 3]
+    )
+    expected_rv_30 = np.clip(np.log(np.sqrt(np.mean(adjacent**2)) / sigma), -4, 4)
+    np.testing.assert_allclose(result.dynamic[day, minute, 11], expected_rv_30)
+
+    missing = observed.copy()
+    missing[day, minute - 15] = False
+    changed = build_causal_features(
+        raw, missing, np.ones(21, dtype=bool), is_rate=False
+    )
+    assert changed.dynamic[day, minute, 7] == 0.0
+    for position in (32, 34, 36, 38, 40, 42, 44):
+        missing[day, position] = False
+    changed = build_causal_features(
+        raw, missing, np.ones(21, dtype=bool), is_rate=False
+    )
+    assert changed.dynamic[day, minute, 11] == 0.0
+
+
+def test_prefix_cumulative_volume_and_cutoff_causality() -> None:
+    raw, observed = _synthetic_grid(days=21)
+    valid = np.ones(21, dtype=bool)
+    baseline = build_causal_features(raw, observed, valid, is_rate=False)
+
+    volume_changed = raw.copy()
+    volume_changed[-1, 201:, 4] *= 1000.0
+    changed = build_causal_features(volume_changed, observed, valid, is_rate=False)
+    np.testing.assert_array_equal(
+        baseline.dynamic[-1, :201, 13], changed.dynamic[-1, :201, 13]
+    )
+
+    cutoff = DECISION_EQUITY_INDICES[0]
+    future_changed = raw.copy()
+    future_changed[-1, cutoff:, :4] *= 1.7
+    future_changed[-1, cutoff:, 4] *= 11.0
+    changed = build_causal_features(future_changed, observed, valid, is_rate=False)
+    np.testing.assert_array_equal(
+        baseline.dynamic[-1, :cutoff], changed.dynamic[-1, :cutoff]
+    )
+    np.testing.assert_array_equal(baseline.slow[-1], changed.slow[-1])
+
+
+def test_overnight_gap_and_slow_state_ignore_current_close() -> None:
+    raw, observed = _synthetic_grid(days=21)
+    dates = tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(21))
+    baseline = build_causal_features(
+        raw,
+        observed,
+        np.ones(21, dtype=bool),
+        is_rate=False,
+        market_dates=dates,
+    )
+    expected_gap = np.log(raw[20, 0, 0] / raw[19, -1, 3]) / (
+        baseline.sigma[20] * np.sqrt(EQUITY_SESSION_MINUTES)
+    )
+    np.testing.assert_allclose(baseline.slow[20, 1], np.clip(expected_gap, -10.0, 10.0))
+
+    changed_raw = raw.copy()
+    changed_raw[20, 1:, :4] *= 1.9
+    changed_raw[20, 1:, 4] *= 50.0
+    changed = build_causal_features(
+        changed_raw,
+        observed,
+        np.ones(21, dtype=bool),
+        is_rate=False,
+        market_dates=dates,
+    )
+    np.testing.assert_array_equal(baseline.slow[20], changed.slow[20])
+    assert np.isfinite(baseline.slow[20, 7:12]).all()
+
+
+def test_cross_sectional_leave_one_out_permutation_and_isolation() -> None:
+    equity_count = 31
+    dynamic = np.zeros((equity_count, 1, len(DYNAMIC_CHANNELS)), dtype=np.float32)
+    validity = np.zeros((equity_count, 1, 4), dtype=bool)
+    values = np.linspace(-1.0, 1.0, equity_count, dtype=np.float32)
+    dynamic[:, 0, 7] = values
+    validity[:, 0, 0] = True
+    active = np.ones(equity_count, dtype=bool)
+    add_equity_cross_sectional_dynamic(dynamic, validity, active)
+    np.testing.assert_allclose(dynamic[:, 0, 22], centered_midranks(values))
+    for focal in (0, 15, 30):
+        peers = np.delete(values, focal)
+        np.testing.assert_allclose(dynamic[focal, 0, 16], np.median(peers))
+        np.testing.assert_allclose(
+            dynamic[focal, 0, 18], 2.0 * np.mean(peers > 0.0) - 1.0
+        )
+
+    permutation = np.arange(equity_count)[::-1]
+    permuted = np.zeros_like(dynamic)
+    permuted[:, :, :16] = dynamic[permutation, :, :16]
+    permuted_validity = validity[permutation].copy()
+    add_equity_cross_sectional_dynamic(permuted, permuted_validity, active)
+    np.testing.assert_allclose(permuted[:, :, 16:26], dynamic[permutation, :, 16:26])
+
+    extended = np.zeros((equity_count + 1, 1, len(DYNAMIC_CHANNELS)), dtype=np.float32)
+    extended[:equity_count, :, :16] = dynamic[:, :, :16]
+    extended[-1, 0, 7] = 1_000.0
+    extended_validity = np.zeros((equity_count + 1, 1, 4), dtype=bool)
+    extended_validity[:equity_count, 0, 0] = True
+    extended_validity[-1, 0, 0] = True
+    extended_active = np.r_[active, False]
+    add_equity_cross_sectional_dynamic(extended, extended_validity, extended_active)
+    np.testing.assert_allclose(extended[:equity_count, :, 16:26], dynamic[:, :, 16:26])
+
+    too_small = dynamic[:29].copy()
+    too_small[:, :, 16:26] = 0.0
+    add_equity_cross_sectional_dynamic(
+        too_small, validity[:29], np.ones(29, dtype=bool)
+    )
+    assert not too_small[:, :, 16:26].any()
+
+
+def test_causal_exposure_beta_uses_prior_paired_sessions() -> None:
+    context = np.arange(1.0, 23.0)[:, None]
+    equity = np.column_stack((2.0 * context[:, 0], -context[:, 0]))
+    context_valid = np.ones(context.shape, dtype=bool)
+    equity_valid = np.ones(equity.shape, dtype=bool)
+    baseline = causal_exposure_betas(equity, equity_valid, context, context_valid)
+    np.testing.assert_allclose(baseline[20, :, 0], [2.0, -1.0], atol=1e-6)
+
+    changed_equity = equity.copy()
+    changed_equity[20] = [20_000.0, 30_000.0]
+    changed = causal_exposure_betas(
+        changed_equity, equity_valid, context, context_valid
+    )
+    np.testing.assert_array_equal(baseline[20], changed[20])
+    assert not np.array_equal(baseline[21], changed[21])
+
+    closes = np.array([100.0, 0.0, 102.0])
+    changes, valid = build_daily_changes(
+        closes, np.array([True, False, True]), is_rate=False
+    )
+    np.testing.assert_allclose(changes[2], np.log(1.02))
+    assert valid.tolist() == [False, False, True]
+
+
+def test_context_family_zero_fields_and_deterministic_fixture() -> None:
+    raw, observed = _synthetic_grid(days=21)
+    valid = np.ones(21, dtype=bool)
+    first = build_causal_features(
+        raw,
+        observed,
+        valid,
+        is_rate=False,
+        include_dollar_volume=False,
+    )
+    second = build_causal_features(
+        raw,
+        observed,
+        valid,
+        is_rate=False,
+        include_dollar_volume=False,
+    )
+    np.testing.assert_array_equal(first.dynamic, second.dynamic)
+    np.testing.assert_array_equal(first.slow, second.slow)
+    assert not first.dynamic[..., 16:26].any()
+    assert not first.slow[..., 13:15].any()
+    assert not first.slow[..., 17:26].any()
+    assert not first.slow[..., 30:32].any()
+
+
+def test_generated_schema_matches_channel_contract(tmp_path: Path) -> None:
+    _write_feature_schema(tmp_path)
+    schema = json.loads((tmp_path / "feature_schema.json").read_text(encoding="utf-8"))
+    assert [row["name"] for row in schema["dynamic_channels"]] == list(DYNAMIC_CHANNELS)
+    assert [row["name"] for row in schema["slow_channels"]] == list(SLOW_CHANNELS)
+    assert "average_one_based_midrank" in schema["stored_target"]

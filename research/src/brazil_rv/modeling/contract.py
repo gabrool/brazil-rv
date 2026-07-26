@@ -46,15 +46,18 @@ VALIDATION_END = date(2025, 6, 30)
 TEST_START = date(2025, 7, 7)
 TEST_END = date(2026, 7, 17)
 
+EXPECTED_DATE_COUNT = 1248
 EXPECTED_SAMPLE_COUNT = 59_565
 EXPECTED_DECISIONS_PER_DATE = 55
 EQUITY_COUNT = 158
 CONTEXT_COUNT = 6
 INSTRUMENT_COUNT = EQUITY_COUNT + CONTEXT_COUNT
 HORIZON_COUNT = 3
-DYNAMIC_CHANNEL_COUNT = 6
-EQUITY_SLOW_COUNT = 1
-CONTEXT_SLOW_COUNT = 3
+DYNAMIC_CHANNEL_COUNT = 26
+SLOW_FEATURE_COUNT = 32
+EQUITY_SLOW_COUNT = SLOW_FEATURE_COUNT
+CONTEXT_SLOW_COUNT = SLOW_FEATURE_COUNT
+CONTEXT_GENERIC_DYNAMIC_COUNT = 16
 CONTEXT_SYMBOLS = ("WIN$", "WDO$", "DI1F27", "DI1F28", "DI1F29", "DI1F31")
 HORIZONS = (30, 60, 120)
 
@@ -64,6 +67,18 @@ ABSOLUTE_PATCH_COUNT = 69
 STATE_TOKEN_SLOT = 69
 TEMPORAL_TOKEN_COUNT = 70
 EQUITY_ABSOLUTE_START_PATCH = 12
+TABULAR_OFFSETS = (0, 15, 30, 60, 120)
+TABULAR_VALIDITY_COUNT = (1 + CONTEXT_COUNT) * len(TABULAR_OFFSETS)
+TABULAR_FEATURE_COUNT = (
+    SLOW_FEATURE_COUNT
+    + DYNAMIC_CHANNEL_COUNT * len(TABULAR_OFFSETS)
+    + CONTEXT_GENERIC_DYNAMIC_COUNT * CONTEXT_COUNT * len(TABULAR_OFFSETS)
+    + SLOW_FEATURE_COUNT * CONTEXT_COUNT
+    + 2
+    + TABULAR_VALIDITY_COUNT
+)
+if PATCH_INPUT_WIDTH != 130 or TABULAR_FEATURE_COUNT != 871:
+    raise ValueError("Model input widths do not match the feature contract")
 
 FAMILY_EQUITY = 0
 FAMILY_EQUITY_FUTURE = 1
@@ -76,6 +91,14 @@ INSTRUMENT_FAMILY_IDS = (
     + (FAMILY_RATE_FUTURE,) * 4
 )
 
+TRANSFORMER_MODELS = (
+    "temporal_only",
+    "context_only",
+    "pooled_market",
+    "context_pooled",
+)
+NEURAL_MODELS = (*TRANSFORMER_MODELS, "tcn", "mlp")
+SUPPORTED_MODELS = (*NEURAL_MODELS, "xgboost")
 OPTIMIZER_VARIANTS = ("hybrid", "adamw")
 ALLOWED_SEEDS = (11, 29, 47)
 
@@ -85,6 +108,17 @@ ROPE_BASE = 10_000.0
 INPUT_DROPOUT = 0.05
 RESIDUAL_DROPOUT = 0.10
 ATTENTION_DROPOUT = 0.0
+TARGETED_FUSION_GATE_BIAS = -2.0
+POOLED_INDUCING_TOKEN_COUNT = 4
+
+TCN_WIDTH = 128
+TCN_DEPTH = 6
+TCN_KERNEL_SIZE = 3
+TCN_DILATIONS = (1, 2, 4, 8, 16, 32)
+TCN_FUSION_WIDTH = 256
+MLP_WIDTH = 256
+MLP_DEPTH = 3
+MLP_SWIGLU_WIDTH = 512
 
 EFFECTIVE_BATCH_SIZE = 512
 MAX_EPOCHS = 20
@@ -111,10 +145,6 @@ WARMUP_FRACTION = 0.05
 FINAL_LR_FACTOR = 0.1
 COMPILE_WARMUP_PASS_COUNT = 5
 COMPILE_STEADY_STATE_PASS_COUNT = 3
-
-# Eager and Inductor BF16 kernels may differ by one or two representable steps
-# while retaining effectively identical losses and gradients. Keep the relative,
-# loss, and gradient gates strict, but allow that expected output quantization.
 COMPILE_PARITY_PREDICTION_ATOL = 2e-2
 COMPILE_PARITY_PREDICTION_RTOL = 5e-3
 COMPILE_PARITY_LOSS_ATOL = 5e-4
@@ -132,13 +162,23 @@ SANITY_MAX_STEPS = 1_000
 SANITY_MAX_LOSS = 0.05
 SANITY_MIN_SPEARMAN = 0.90
 
+XGBOOST_VERSION = "3.2.0"
+XGBOOST_OBJECTIVE = "reg:pseudohubererror"
+XGBOOST_HUBER_SLOPE = 1.0
+XGBOOST_TREE_METHOD = "hist"
+XGBOOST_DEVICE = "cuda"
+XGBOOST_INNER_VALIDATION_FRACTION = 0.20
+XGBOOST_INNER_EMBARGO_DATES = 5
+XGBOOST_EARLY_STOPPING_ROUNDS = 50
+XGBOOST_MAX_BOOSTING_ROUNDS = 4_000
+
 EXPECTED_ARRAY_SHAPES = {
-    "equity_features.npy": (1248, 158, 405, 6),
-    "equity_slow.npy": (1248, 158, 1),
+    "equity_features.npy": (1248, 158, 405, 26),
+    "equity_slow.npy": (1248, 158, 32),
     "equity_membership.npy": (1248, 158),
     "equity_data_ready.npy": (1248, 158),
-    "context_features.npy": (1248, 6, 465, 6),
-    "context_slow.npy": (1248, 6, 3),
+    "context_features.npy": (1248, 6, 465, 26),
+    "context_slow.npy": (1248, 6, 32),
     "context_data_ready.npy": (1248, 6),
     "raw_returns.npy": (1248, 158, 55, 3),
     "targets.npy": (1248, 158, 55, 3),
@@ -271,12 +311,12 @@ class CompileWarmupReport:
 
 
 @dataclass(frozen=True)
-class ArchitectureConstants:
+class TransformerArchitecture:
+    family: str
     d_model: int
     attention_heads: int
     head_dim: int
     temporal_depth: int
-    cross_asset_depth: int
     swiglu_width: int
     rms_norm_eps: float
     qk_norm_eps: float
@@ -284,69 +324,154 @@ class ArchitectureConstants:
     input_dropout: float
     residual_dropout: float
     attention_dropout: float
+    context_memory_tokens: int
+    pooled_memory_tokens: int
+    fusion_blocks: int
     output_horizons: int
 
 
-ARCHITECTURES: Mapping[str, ArchitectureConstants] = MappingProxyType(
+@dataclass(frozen=True)
+class TCNArchitecture:
+    family: str
+    patch_input_width: int
+    width: int
+    residual_blocks: int
+    kernel_size: int
+    dilations: tuple[int, ...]
+    slow_width: int
+    fusion_states: int
+    fusion_width: int
+    dropout: float
+    output_horizons: int
+
+
+@dataclass(frozen=True)
+class MLPArchitecture:
+    family: str
+    input_width: int
+    hidden_width: int
+    residual_blocks: int
+    swiglu_width: int
+    norm_eps: float
+    dropout: float
+    output_horizons: int
+
+
+_SHARED_TRANSFORMER = {
+    "family": "transformer",
+    "d_model": 256,
+    "attention_heads": 8,
+    "head_dim": 32,
+    "temporal_depth": 2,
+    "swiglu_width": 704,
+    "rms_norm_eps": RMS_NORM_EPS,
+    "qk_norm_eps": QK_NORM_EPS,
+    "rope_base": ROPE_BASE,
+    "input_dropout": INPUT_DROPOUT,
+    "residual_dropout": RESIDUAL_DROPOUT,
+    "attention_dropout": ATTENTION_DROPOUT,
+    "output_horizons": HORIZON_COUNT,
+}
+NEURAL_ARCHITECTURES: Mapping[
+    str, TransformerArchitecture | TCNArchitecture | MLPArchitecture
+] = MappingProxyType(
     {
-        "full": ArchitectureConstants(
-            d_model=256,
-            attention_heads=8,
-            head_dim=32,
-            temporal_depth=2,
-            cross_asset_depth=6,
-            swiglu_width=704,
-            rms_norm_eps=RMS_NORM_EPS,
-            qk_norm_eps=QK_NORM_EPS,
-            rope_base=ROPE_BASE,
-            input_dropout=INPUT_DROPOUT,
-            residual_dropout=RESIDUAL_DROPOUT,
-            attention_dropout=ATTENTION_DROPOUT,
+        "temporal_only": TransformerArchitecture(
+            **_SHARED_TRANSFORMER,
+            context_memory_tokens=0,
+            pooled_memory_tokens=0,
+            fusion_blocks=0,
+        ),
+        "context_only": TransformerArchitecture(
+            **_SHARED_TRANSFORMER,
+            context_memory_tokens=6,
+            pooled_memory_tokens=0,
+            fusion_blocks=1,
+        ),
+        "pooled_market": TransformerArchitecture(
+            **_SHARED_TRANSFORMER,
+            context_memory_tokens=0,
+            pooled_memory_tokens=6,
+            fusion_blocks=1,
+        ),
+        "context_pooled": TransformerArchitecture(
+            **_SHARED_TRANSFORMER,
+            context_memory_tokens=6,
+            pooled_memory_tokens=6,
+            fusion_blocks=1,
+        ),
+        "tcn": TCNArchitecture(
+            family="tcn",
+            patch_input_width=PATCH_INPUT_WIDTH,
+            width=TCN_WIDTH,
+            residual_blocks=TCN_DEPTH,
+            kernel_size=TCN_KERNEL_SIZE,
+            dilations=TCN_DILATIONS,
+            slow_width=SLOW_FEATURE_COUNT,
+            fusion_states=9,
+            fusion_width=TCN_FUSION_WIDTH,
+            dropout=RESIDUAL_DROPOUT,
             output_horizons=HORIZON_COUNT,
         ),
-        "reduced_full": ArchitectureConstants(
-            d_model=192,
-            attention_heads=6,
-            head_dim=32,
-            temporal_depth=2,
-            cross_asset_depth=2,
-            swiglu_width=512,
-            rms_norm_eps=RMS_NORM_EPS,
-            qk_norm_eps=QK_NORM_EPS,
-            rope_base=ROPE_BASE,
-            input_dropout=INPUT_DROPOUT,
-            residual_dropout=RESIDUAL_DROPOUT,
-            attention_dropout=ATTENTION_DROPOUT,
-            output_horizons=HORIZON_COUNT,
-        ),
-        "temporal_only": ArchitectureConstants(
-            d_model=256,
-            attention_heads=8,
-            head_dim=32,
-            temporal_depth=2,
-            cross_asset_depth=0,
-            swiglu_width=704,
-            rms_norm_eps=RMS_NORM_EPS,
-            qk_norm_eps=QK_NORM_EPS,
-            rope_base=ROPE_BASE,
-            input_dropout=INPUT_DROPOUT,
-            residual_dropout=RESIDUAL_DROPOUT,
-            attention_dropout=ATTENTION_DROPOUT,
+        "mlp": MLPArchitecture(
+            family="mlp",
+            input_width=TABULAR_FEATURE_COUNT,
+            hidden_width=MLP_WIDTH,
+            residual_blocks=MLP_DEPTH,
+            swiglu_width=MLP_SWIGLU_WIDTH,
+            norm_eps=RMS_NORM_EPS,
+            dropout=RESIDUAL_DROPOUT,
             output_horizons=HORIZON_COUNT,
         ),
     }
 )
-MODEL_VARIANTS = tuple(ARCHITECTURES)
 EXPECTED_TRAINABLE_PARAMETER_COUNTS: Mapping[str, int] = MappingProxyType(
-    {"full": 6_455_811, "reduced_full": 1_792_899, "temporal_only": 1_635_587}
+    {
+        "temporal_only": 1_668_611,
+        "context_only": 2_603_779,
+        "pooled_market": 3_539_715,
+        "context_pooled": 3_539_715,
+        "tcn": 777_987,
+        "mlp": 1_404_675,
+    }
 )
 
 
-def architecture_for_variant(variant: str) -> ArchitectureConstants:
+def architecture_for_model(
+    model_name: str,
+) -> TransformerArchitecture | TCNArchitecture | MLPArchitecture:
     try:
-        return ARCHITECTURES[variant]
+        return NEURAL_ARCHITECTURES[model_name]
     except KeyError as error:
-        raise ValueError(f"Unknown model variant: {variant}") from error
+        raise ValueError(f"Unknown neural model: {model_name}") from error
+
+
+@dataclass(frozen=True)
+class XGBoostCandidate:
+    max_depth: int
+    learning_rate: float
+    min_child_weight: int
+
+
+XGBOOST_CANDIDATES = tuple(
+    XGBoostCandidate(max_depth, learning_rate, min_child_weight)
+    for max_depth in (4, 6, 8)
+    for learning_rate in (0.03, 0.07)
+    for min_child_weight in (10, 50)
+)
+XGBOOST_FIXED_PARAMETERS: Mapping[str, object] = MappingProxyType(
+    {
+        "subsample": 0.80,
+        "colsample_bytree": 0.80,
+        "reg_lambda": 5.0,
+        "reg_alpha": 0.1,
+        "max_bin": 256,
+        "objective": XGBOOST_OBJECTIVE,
+        "huber_slope": XGBOOST_HUBER_SLOPE,
+        "tree_method": XGBOOST_TREE_METHOD,
+        "device": XGBOOST_DEVICE,
+    }
+)
 
 
 @dataclass(frozen=True)

@@ -16,7 +16,7 @@ import torch._functorch.config as functorch_config
 from torch import nn
 
 from .contract import (
-    architecture_for_variant,
+    architecture_for_model,
     COMPILE_PARITY_GRADIENT_COSINE_MIN,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
@@ -333,7 +333,7 @@ def _compile_parity_report(
     )
 
 
-def _masked_huber_sample_losses(
+def _rank_target_huber_sample_losses(
     predictions: torch.Tensor,
     targets: torch.Tensor,
     label_mask: torch.Tensor,
@@ -358,13 +358,13 @@ def _masked_huber_sample_losses(
     return sample_loss, valid_samples
 
 
-def masked_huber_loss(
+def rank_target_huber_loss(
     predictions: torch.Tensor,
     targets: torch.Tensor,
     label_mask: torch.Tensor,
     delta: float = HUBER_DELTA,
 ) -> torch.Tensor:
-    sample_loss, valid_samples = _masked_huber_sample_losses(
+    sample_loss, valid_samples = _rank_target_huber_sample_losses(
         predictions, targets, label_mask, delta
     )
     if bool(valid_samples.any()):
@@ -377,28 +377,33 @@ def _loss_sum(
     targets: torch.Tensor,
     label_mask: torch.Tensor,
 ) -> torch.Tensor:
-    sample_loss, valid_samples = _masked_huber_sample_losses(
+    sample_loss, valid_samples = _rank_target_huber_sample_losses(
         predictions, targets, label_mask, HUBER_DELTA
     )
     return sample_loss[valid_samples].sum()
 
 
 def _to_cuda(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-    return {
-        key: batch[key].to("cuda", non_blocking=True)
-        for key in (
+    model_keys = (
+        ("tabular_features", "equity_mask")
+        if "tabular_features" in batch
+        else (
             "patches",
             "history_patch_mask",
             "instrument_mask",
             "slow_features",
             "state_position",
-            "targets",
-            "label_mask",
         )
+    )
+    return {
+        key: batch[key].to("cuda", non_blocking=True)
+        for key in (*model_keys, "targets", "label_mask")
     }
 
 
 def _predict(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+    if "tabular_features" in batch:
+        return model(batch["tabular_features"], batch["equity_mask"])
     return model(
         batch["patches"],
         batch["history_patch_mask"],
@@ -450,7 +455,7 @@ def qualify_eager_compiled_model(
             torch.autocast(device_type="cuda", dtype=torch.bfloat16),
         ):
             eager_predictions = _predict(eager_model, batch)
-            eager_loss = masked_huber_loss(
+            eager_loss = rank_target_huber_loss(
                 eager_predictions, batch["targets"], batch["label_mask"]
             )
         if include_backward:
@@ -466,7 +471,7 @@ def qualify_eager_compiled_model(
             torch.autocast(device_type="cuda", dtype=torch.bfloat16),
         ):
             compiled_predictions = _predict(compiled_model, batch)
-            compiled_loss = masked_huber_loss(
+            compiled_loss = rank_target_huber_loss(
                 compiled_predictions, batch["targets"], batch["label_mask"]
             )
         if include_backward:
@@ -522,7 +527,9 @@ def _timed_training_warmup_pass(
         started = time.perf_counter()
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             predictions = _predict(model, batch)
-            loss = masked_huber_loss(predictions, batch["targets"], batch["label_mask"])
+            loss = rank_target_huber_loss(
+                predictions, batch["targets"], batch["label_mask"]
+            )
         loss.backward()
         torch.cuda.synchronize()
         seconds = time.perf_counter() - started
@@ -795,13 +802,13 @@ def evaluate_model(
     )
     if valid_sample_count == 0:
         raise ValueError("Evaluation split contains no valid labeled sample")
-    summary["masked_huber_loss"] = total_loss / valid_sample_count
+    summary["rank_target_huber_loss"] = total_loss / valid_sample_count
     return summary, daily_rows
 
 
 def checkpoint_payload(
     model: nn.Module,
-    model_variant: str,
+    model_name: str,
     optimizer_variant: str,
     muon_backend: str | None,
     seed: int,
@@ -810,14 +817,14 @@ def checkpoint_payload(
     feature_store: Path,
     git_commit_sha: str,
 ) -> dict[str, object]:
-    if getattr(model, "variant", None) != model_variant:
-        raise ValueError("Checkpoint model variant does not match the model")
-    architecture = architecture_for_variant(model_variant)
+    if getattr(model, "model_name", None) != model_name:
+        raise ValueError("Checkpoint model name does not match the model")
+    architecture = architecture_for_model(model_name)
 
     return {
         "muon_backend": muon_backend,
         "muon_reference": dict(PYTORCH_MUON_REFERENCE),
-        "model_variant": model_variant,
+        "model_name": model_name,
         "optimizer_variant": optimizer_variant,
         "seed": seed,
         "epoch": epoch,

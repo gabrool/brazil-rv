@@ -7,13 +7,15 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
+from numpy.lib.format import open_memmap
+
+from .audit import audit_feature_store
 
 from .contract import (
     CANONICAL_OUTPUT_POINTER,
     CONTEXT_FAMILIES,
     CONTEXT_SESSION_MINUTES,
     CONTEXT_SESSION_START_MINUTE,
-    CONTEXT_SLOW_CHANNELS,
     CONTEXT_SYMBOLS,
     CONTRACT_VERSION,
     DECISION_CONTEXT_INDICES,
@@ -23,16 +25,13 @@ from .contract import (
     EQUITY_SESSION_MINUTES,
     EQUITY_SESSION_START_MINUTE,
     EQUITY_SLOW_CHANNELS,
+    EXPECTED_DATE_COUNT,
     EXPECTED_EQUITIES,
+    EXPECTED_SAMPLE_COUNT,
     HORIZONS,
     MIN_ACTIVE_EQUITIES,
     OUTPUT_BASE,
-    PRICE_FEATURE_CLIP,
-    PRICE_VOL_REFERENCE,
     RATE_CONTEXT_SYMBOLS,
-    RATE_VOL_REFERENCE_BP,
-    VOL_REGIME_CLIP,
-    VOLUME_FEATURE_CLIP,
     manifest_constants,
     output_array_specs,
 )
@@ -54,9 +53,13 @@ from .io import (
     validate_source_date_isolation,
 )
 from .transforms import (
+    add_equity_cross_sectional_dynamic,
+    add_slow_cross_sectional_ranks,
     build_causal_features,
+    build_daily_changes,
     build_prior_rate_level,
     build_raw_returns,
+    causal_exposure_betas,
     center_cross_section,
     time_to_expiry_scaled,
 )
@@ -82,6 +85,10 @@ def main() -> None:
     context_files = discover_context_files(inputs.context_dir)
     context_expiries = load_context_expiries(inputs.catalogue_path)
 
+    if len(market_dates) != EXPECTED_DATE_COUNT:
+        raise ValueError(
+            f"Expected {EXPECTED_DATE_COUNT} market dates, found {len(market_dates)}"
+        )
     output_dir = OUTPUT_BASE / f"m1_features_v1_{created_at:%Y%m%dT%H%M%S%fZ}"
     arrays = create_output_memmaps(output_dir, len(market_dates))
 
@@ -97,6 +104,24 @@ def main() -> None:
     arrays["equity_membership.npy"][...] = membership
 
     equity_sigma = np.zeros((len(market_dates), EXPECTED_EQUITIES), dtype=np.float64)
+    equity_change = np.zeros_like(equity_sigma)
+    equity_change_valid = np.zeros_like(equity_sigma, dtype=bool)
+    dynamic_valid_path = output_dir / ".equity_dynamic_valid.npy"
+    dynamic_valid = open_memmap(
+        dynamic_valid_path,
+        mode="w+",
+        dtype=bool,
+        shape=(len(market_dates), EXPECTED_EQUITIES, EQUITY_SESSION_MINUTES, 4),
+    )
+    dynamic_valid[...] = False
+    slow_rank_valid_path = output_dir / ".equity_slow_rank_valid.npy"
+    slow_rank_valid = open_memmap(
+        slow_rank_valid_path,
+        mode="w+",
+        dtype=bool,
+        shape=(len(market_dates), EXPECTED_EQUITIES, 3),
+    )
+    slow_rank_valid[...] = False
     security_audits: list[dict[str, object]] = []
     source_groups = assignments.partition_by("source_file", maintain_order=True)
     for source_number, group in enumerate(source_groups, start=1):
@@ -142,12 +167,20 @@ def main() -> None:
                 count=len(market_dates),
             )
             result = build_causal_features(
-                raw_grid, observed, identity_day, is_rate=False
+                raw_grid,
+                observed,
+                identity_day,
+                is_rate=False,
+                market_dates=market_dates,
             )
             arrays["equity_features.npy"][:, slot] = result.dynamic
-            arrays["equity_slow.npy"][:, slot, 0] = result.vol_regime
+            arrays["equity_slow.npy"][:, slot] = result.slow
             arrays["equity_data_ready.npy"][:, slot] = result.data_ready
+            dynamic_valid[:, slot] = result.dynamic_valid
+            slow_rank_valid[:, slot] = result.slow_rank_valid
             equity_sigma[:, slot] = result.sigma
+            equity_change[:, slot] = result.daily_change
+            equity_change_valid[:, slot] = result.daily_change_valid
 
             raw_returns, _ = build_raw_returns(raw_grid, observed)
             arrays["raw_returns.npy"][:, slot] = raw_returns
@@ -171,6 +204,10 @@ def main() -> None:
             print(f"Processed equity source {source_number}/{len(source_groups)}")
 
     all_market_dates = frozenset(market_dates)
+    context_change = np.zeros(
+        (len(market_dates), len(CONTEXT_SYMBOLS)), dtype=np.float64
+    )
+    context_change_valid = np.zeros_like(context_change, dtype=bool)
     for context_slot, symbol in enumerate(CONTEXT_SYMBOLS):
         source_path = context_files[symbol]
         source = load_source_file(source_path)
@@ -202,21 +239,58 @@ def main() -> None:
                 valid_day,
                 is_rate=True,
                 extra_ready=prior_ready,
+                market_dates=market_dates,
+                include_dollar_volume=False,
             )
-            arrays["context_slow.npy"][:, context_slot, 1] = prior_rate
-            arrays["context_slow.npy"][:, context_slot, 2] = expiry_scaled
+            daily_change, daily_change_valid = build_daily_changes(
+                daily_close,
+                daily_close_observed,
+                is_rate=True,
+            )
         else:
-            result = build_causal_features(raw_grid, observed, valid_day, is_rate=False)
+            result = build_causal_features(
+                raw_grid,
+                observed,
+                valid_day,
+                is_rate=False,
+                market_dates=market_dates,
+                include_dollar_volume=False,
+            )
+            daily_change = result.daily_change
+            daily_change_valid = result.daily_change_valid
         arrays["context_features.npy"][:, context_slot] = result.dynamic
-        arrays["context_slow.npy"][:, context_slot, 0] = result.vol_regime
+        arrays["context_slow.npy"][:, context_slot] = result.slow
+        if symbol in RATE_CONTEXT_SYMBOLS:
+            arrays["context_slow.npy"][:, context_slot, 30] = prior_rate
+            arrays["context_slow.npy"][:, context_slot, 31] = expiry_scaled
         arrays["context_data_ready.npy"][:, context_slot] = result.data_ready
+        context_change[:, context_slot] = daily_change
+        context_change_valid[:, context_slot] = daily_change_valid
         print(f"Processed context {symbol}")
+
+    exposure_betas = causal_exposure_betas(
+        equity_change,
+        equity_change_valid,
+        context_change,
+        context_change_valid,
+    )
+    exposure_betas *= arrays["equity_data_ready.npy"][..., None]
+    arrays["equity_slow.npy"][:, :, 20:26] = exposure_betas
 
     sample_rows: list[dict[str, object]] = []
     daily_audits: list[dict[str, object]] = []
     security_label_counts = np.zeros((EXPECTED_EQUITIES, len(HORIZONS)), dtype=np.int64)
     sample_id = 0
     for date_idx, trade_date in enumerate(market_dates):
+        active = membership[date_idx] & arrays["equity_data_ready.npy"][date_idx]
+        add_equity_cross_sectional_dynamic(
+            arrays["equity_features.npy"][date_idx],
+            dynamic_valid[date_idx],
+            active,
+        )
+        add_slow_cross_sectional_ranks(
+            arrays["equity_slow.npy"][date_idx], slow_rank_valid[date_idx], active
+        )
         observed = arrays["equity_features.npy"][date_idx, :, :, 5].astype(bool)
         entry_observed = observed[:, DECISION_EQUITY_INDICES]
         exit_observed = np.stack(
@@ -250,7 +324,6 @@ def main() -> None:
         arrays["horizon_mask.npy"][date_idx] = horizon_mask
         security_label_counts += label_mask.sum(axis=1)
 
-        active = membership[date_idx] & arrays["equity_data_ready.npy"][date_idx]
         active_count = int(active.sum())
         context_ready_count = int(arrays["context_data_ready.npy"][date_idx].sum())
         feature_eligible = (
@@ -301,6 +374,12 @@ def main() -> None:
             }
         )
 
+    dynamic_valid.flush()
+    slow_rank_valid.flush()
+    del dynamic_valid, slow_rank_valid
+    dynamic_valid_path.unlink()
+    slow_rank_valid_path.unlink()
+
     for array in arrays.values():
         array.flush()
 
@@ -308,6 +387,10 @@ def main() -> None:
     equity_index = _equity_index_frame(assignments)
     context_index = _context_index_frame(context_files, context_expiries)
     sample_index = _sample_index_frame(sample_rows)
+    if sample_index.height != EXPECTED_SAMPLE_COUNT:
+        raise ValueError(
+            f"Expected {EXPECTED_SAMPLE_COUNT} samples, found {sample_index.height}"
+        )
     _validate_output(
         arrays,
         assignments,
@@ -351,8 +434,10 @@ def main() -> None:
         created_at,
         duration,
     )
+    audit_dir = audit_feature_store(output_dir)
     _promote(output_dir)
     print(f"Canonical output: {output_dir}")
+    print(f"Statistical audit: {audit_dir}")
 
 
 def _date_index_frame(market_dates: tuple[object, ...]) -> pl.DataFrame:
@@ -447,12 +532,44 @@ def _validate_output(
             if not np.isfinite(arrays[filename][date_idx]).all():
                 raise ValueError(f"Non-finite value in {filename} at date {date_idx}")
 
+    if np.any(arrays["context_features.npy"][..., 16:26] != 0):
+        raise ValueError("Context cross-sectional dynamic channels must be zero")
+    if np.any(arrays["equity_slow.npy"][..., 30:32] != 0):
+        raise ValueError("Equity DI-only slow channels must be zero")
+    if np.any(arrays["context_slow.npy"][..., 13:15] != 0):
+        raise ValueError("Context equity-dollar-volume channels must be zero")
+    if np.any(arrays["context_slow.npy"][..., 17:26] != 0):
+        raise ValueError("Context rank and beta channels must be zero")
+    if np.any(arrays["context_slow.npy"][:, :2, 30:32] != 0):
+        raise ValueError("WIN/WDO DI-only slow channels must be zero")
+
     for date_idx in range(date_count):
         label_mask = arrays["label_mask.npy"][date_idx]
-        if np.any(arrays["targets.npy"][date_idx][~label_mask] != 0):
+        targets = arrays["targets.npy"][date_idx]
+        if np.any(targets[~label_mask] != 0):
             raise ValueError(f"Nonzero masked target at date {date_idx}")
         if np.any(arrays["raw_returns.npy"][date_idx][~label_mask] != 0):
             raise ValueError(f"Nonzero masked raw return at date {date_idx}")
+        valid_targets = targets[label_mask]
+        if valid_targets.size and (
+            valid_targets.min() <= -1.0 or valid_targets.max() >= 1.0
+        ):
+            raise ValueError(f"Rank target outside (-1, 1) at date {date_idx}")
+        counts = label_mask.sum(axis=0)
+        means = np.divide(
+            (targets * label_mask).sum(axis=0, dtype=np.float64),
+            counts,
+            out=np.zeros_like(counts, dtype=np.float64),
+            where=counts > 0,
+        )
+        if np.any(np.abs(means[counts > 0]) > 2e-6):
+            raise ValueError(
+                f"Rank target cross-section is not centered at date {date_idx}"
+            )
+        if not np.array_equal(
+            counts >= MIN_ACTIVE_EQUITIES, arrays["horizon_mask.npy"][date_idx]
+        ):
+            raise ValueError(f"Horizon mask is inconsistent at date {date_idx}")
         observed = arrays["equity_features.npy"][date_idx, :, :, 5].astype(bool)
         entry = observed[:, DECISION_EQUITY_INDICES]
         exits = np.stack(
@@ -495,104 +612,32 @@ def _write_feature_schema(output_dir: Path) -> None:
     schema = {
         "contract_version": CONTRACT_VERSION,
         "dynamic_channels": [
-            {
-                "index": 0,
-                "name": DYNAMIC_CHANNELS[0],
-                "price_formula": "log(open / anchor) / causal_sigma",
-                "rate_formula": "100 * (open - anchor) / causal_sigma_bp",
-                "unit": "causal-volatility units; dimensionless after normalization",
-                "clip": [-PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP],
-            },
-            {
-                "index": 1,
-                "name": DYNAMIC_CHANNELS[1],
-                "price_formula": "log(high / anchor) / causal_sigma",
-                "rate_formula": "100 * (high - anchor) / causal_sigma_bp",
-                "unit": "causal-volatility units; dimensionless after normalization",
-                "clip": [-PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP],
-            },
-            {
-                "index": 2,
-                "name": DYNAMIC_CHANNELS[2],
-                "price_formula": "log(low / anchor) / causal_sigma",
-                "rate_formula": "100 * (low - anchor) / causal_sigma_bp",
-                "unit": "causal-volatility units; dimensionless after normalization",
-                "clip": [-PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP],
-            },
-            {
-                "index": 3,
-                "name": DYNAMIC_CHANNELS[3],
-                "price_formula": "log(close / anchor) / causal_sigma",
-                "rate_formula": "100 * (close - anchor) / causal_sigma_bp",
-                "unit": "causal-volatility units; dimensionless after normalization",
-                "clip": [-PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP],
-            },
-            {
-                "index": 4,
-                "name": DYNAMIC_CHANNELS[4],
-                "formula": "robust z-score of log(real_volume) versus prior 20 sessions at the same minute",
-                "unit": "robust z-score; dimensionless",
-                "clip": [-VOLUME_FEATURE_CLIP, VOLUME_FEATURE_CLIP],
-            },
-            {
-                "index": 5,
-                "name": DYNAMIC_CHANNELS[5],
-                "formula": "1 for an observed source bar, otherwise 0",
-                "unit": "indicator",
-            },
+            {"index": index, "name": name}
+            for index, name in enumerate(DYNAMIC_CHANNELS)
         ],
-        "equity_slow_channels": [
-            {
-                "index": 0,
-                "name": EQUITY_SLOW_CHANNELS[0],
-                "formula": "clip(log(causal_sigma / 1e-4), -4, 4)",
-                "unit": "dimensionless log-ratio",
-                "reference": {
-                    "value": PRICE_VOL_REFERENCE,
-                    "unit": "one-minute log-return",
-                },
-                "clip": [-VOL_REGIME_CLIP, VOL_REGIME_CLIP],
-            }
+        "slow_channels": [
+            {"index": index, "name": name}
+            for index, name in enumerate(EQUITY_SLOW_CHANNELS)
         ],
-        "context_slow_channels": [
-            {
-                "index": 0,
-                "name": CONTEXT_SLOW_CHANNELS[0],
-                "price_formula": "clip(log(causal_sigma / 1e-4), -4, 4)",
-                "rate_formula": "clip(log(causal_sigma_bp / 0.1), -4, 4)",
-                "unit": "dimensionless log-ratio",
-                "references": {
-                    "price": {
-                        "value": PRICE_VOL_REFERENCE,
-                        "unit": "one-minute log-return",
-                    },
-                    "rate": {
-                        "value": RATE_VOL_REFERENCE_BP,
-                        "unit": "basis points per minute",
-                    },
-                },
-                "clip": [-VOL_REGIME_CLIP, VOL_REGIME_CLIP],
-            },
-            {
-                "index": 1,
-                "name": CONTEXT_SLOW_CHANNELS[1],
-                "formula": "clip(previous_session_close_percent / 10.0, -1, 3)",
-                "unit": "dimensionless ratio",
-                "reference": {"value": 10.0, "unit": "percentage points"},
-                "clip": [-1.0, 3.0],
-            },
-            {
-                "index": 2,
-                "name": CONTEXT_SLOW_CHANNELS[2],
-                "formula": "clip(log1p(max((expiry_date - trade_date).days, 0) / 365.25) / log(11), 0, 1)",
-                "unit": "dimensionless",
-                "reference": {
-                    "value": 10.0,
-                    "unit": "years mapped to 1",
-                },
-                "clip": [0.0, 1.0],
-            },
-        ],
+        "dynamic_semantics": {
+            "0:5": "Existing causal normalized OHLC moves, robust volume surprise, and observed flag.",
+            "6:16": "Causal instrument returns, realized volatility, cumulative volume, range, and source-quality state through the current minute.",
+            "16:26": "Point-in-time equity leave-one-out market summaries and centered cross-sectional midranks; exactly zero for context instruments.",
+        },
+        "slow_semantics": {
+            "0:17": "Current-open-only gap plus completed-session volatility, return, liquidity, and quality state.",
+            "17:20": "Point-in-time equity centered midranks; exactly zero for context instruments.",
+            "20:26": "Causal equity betas to the six existing contexts; exactly zero for context instruments.",
+            "26:30": "Deterministic current-date calendar encodings.",
+            "30:32": "Existing DI prior-rate and expiry fields; zero for equities, WIN, and WDO.",
+        },
+        "family_inapplicable_zero_fields": {
+            "equity": [30, 31],
+            "all_context": list(range(13, 15)) + list(range(17, 26)),
+            "WIN_WDO": [30, 31],
+            "DI": list(range(20, 26)),
+            "context_dynamic": list(range(16, 26)),
+        },
         "grids": {
             "equity": {
                 "timezone": "America/Sao_Paulo",
@@ -612,14 +657,17 @@ def _write_feature_schema(output_dir: Path) -> None:
             "input_rule": "indices strictly below the cutoff",
         },
         "horizons_minutes": list(HORIZONS),
-        "label_formula": "(log(exit_close / entry_open) - cross_section_median) / (causal_equity_sigma * sqrt(horizon_minutes))",
+        "base_target": "(log(exit_close / entry_open) - contemporaneous_cross_section_median) / (causal_equity_sigma * sqrt(horizon_minutes))",
+        "stored_target": "2 * ((average_one_based_midrank - 0.5) / valid_cross_section_size) - 1",
+        "target_grouping": "independently by date, decision, and horizon",
         "masks": {
             "equity_membership": "monthly point-in-time universe membership",
-            "equity_data_ready": "accepted assignment interval and prior-session volatility state; independent of current-day bars",
-            "context_data_ready": "prior-session volatility state; DI also requires prior-session rate level and expiry; independent of current-day bars",
-            "label_mask": "membership, data readiness, exact entry and exit endpoints, and valid horizon cross-section",
+            "equity_data_ready": "accepted identity interval and prior volatility state; optional features never tighten readiness",
+            "context_data_ready": "prior volatility state; DI also requires its existing prior-rate state",
+            "label_mask": "membership, readiness, exact entry/exit endpoints, and a valid horizon cross-section",
             "horizon_mask": "at least 30 valid equity labels for the date, decision, and horizon",
         },
+        "missingness": "Invalid continuous features are zero; observed, readiness, membership, patch masks, and quality channels carry availability.",
     }
     (output_dir / "feature_schema.json").write_text(
         json.dumps(schema, indent=2), encoding="utf-8"

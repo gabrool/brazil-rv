@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from .contract import (
     ABSOLUTE_PATCH_COUNT,
     CONTEXT_COUNT,
+    CONTEXT_GENERIC_DYNAMIC_COUNT,
     CONTEXT_SYMBOLS,
     EFFECTIVE_BATCH_SIZE,
     EQUITY_ABSOLUTE_START_PATCH,
@@ -26,10 +27,15 @@ from .contract import (
     EXPECTED_SAMPLE_COUNT,
     FEATURE_CONTRACT_VERSION,
     FEATURE_STORE_POINTER,
+    HORIZON_COUNT,
     INSTRUMENT_COUNT,
+    NEURAL_MODELS,
     PATCH_INPUT_WIDTH,
     PATCH_MINUTES,
     RuntimeSettings,
+    SLOW_FEATURE_COUNT,
+    TABULAR_FEATURE_COUNT,
+    TABULAR_OFFSETS,
     TEST_END,
     TEST_START,
     TRAIN_END,
@@ -45,6 +51,7 @@ FEATURE_ARRAY_FILES = (
     "equity_data_ready.npy",
     "context_features.npy",
     "context_slow.npy",
+    "context_data_ready.npy",
     "targets.npy",
     "label_mask.npy",
     "raw_returns.npy",
@@ -63,6 +70,17 @@ class CacheWarmupReport:
     bytes_read: int
     files_read: int
     seconds: float
+
+
+@dataclass(frozen=True)
+class TabularRowBatch:
+    features: np.ndarray
+    labels: np.ndarray
+    weights: np.ndarray
+    sample_id: np.ndarray
+    date_idx: np.ndarray
+    decision_idx: np.ndarray
+    equity_slot: np.ndarray
 
 
 def resolve_feature_store(pointer: Path = FEATURE_STORE_POINTER) -> Path:
@@ -115,7 +133,7 @@ def validate_feature_store(store: Path) -> pl.DataFrame:
         )
     _validate_sample_index(sample_index)
     for filename, expected_shape in EXPECTED_ARRAY_SHAPES.items():
-        array = np.load(store / filename, mmap_mode="r")
+        array = np.load(store / filename, mmap_mode="r", allow_pickle=False)
         if array.shape != expected_shape:
             raise ValueError(
                 f"Expected {filename} shape {expected_shape}, found {array.shape}"
@@ -160,13 +178,7 @@ def select_sample_split(sample_index: pl.DataFrame, split: str) -> pl.DataFrame:
 def split_sample_index(sample_index: pl.DataFrame) -> dict[str, pl.DataFrame]:
     return {
         split: select_sample_split(sample_index, split)
-        for split in (
-            "train",
-            "embargo_1",
-            "validation",
-            "embargo_2",
-            "test",
-        )
+        for split in ("train", "embargo_1", "validation", "embargo_2", "test")
     }
 
 
@@ -185,9 +197,246 @@ def warm_feature_store_cache(store: Path) -> CacheWarmupReport:
     )
 
 
+def _common_batch(
+    arrays: dict[str, np.ndarray],
+    rows: dict[str, np.ndarray],
+    positions: np.ndarray,
+    valid_count: int,
+) -> tuple[
+    dict[str, np.ndarray], np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
+    sample_id = rows["sample_id"][positions].astype(np.int64, copy=True)
+    date_idx = rows["date_idx"][positions].astype(np.int64, copy=True)
+    decision_idx = rows["decision_idx"][positions].astype(np.int64, copy=True)
+    equity_cutoffs = rows["equity_cutoff_index"][positions]
+    context_cutoffs = rows["context_cutoff_index"][positions]
+    batch_size = positions.size
+    sample_valid_mask = np.arange(batch_size) < valid_count
+    active_equities = np.asarray(
+        arrays["equity_membership.npy"][date_idx]
+        & arrays["equity_data_ready.npy"][date_idx],
+        dtype=bool,
+    )
+    targets = np.zeros((batch_size, EQUITY_COUNT, HORIZON_COUNT), dtype=np.float32)
+    label_mask = np.zeros_like(targets, dtype=bool)
+    raw_returns = np.zeros_like(targets)
+    for decision in np.unique(decision_idx):
+        group = np.flatnonzero(decision_idx == decision)
+        targets[group] = arrays["targets.npy"][date_idx[group], :, int(decision), :]
+        label_mask[group] = arrays["label_mask.npy"][
+            date_idx[group], :, int(decision), :
+        ]
+        raw_returns[group] = arrays["raw_returns.npy"][
+            date_idx[group], :, int(decision), :
+        ]
+    padded = ~sample_valid_mask
+    targets[padded] = 0.0
+    label_mask[padded] = False
+    raw_returns[padded] = 0.0
+    sample_id[padded] = -1
+    date_idx[padded] = -1
+    decision_idx[padded] = -1
+    common = {
+        "targets": targets,
+        "label_mask": label_mask,
+        "raw_returns": raw_returns,
+        "sample_valid_mask": sample_valid_mask,
+        "sample_id": sample_id,
+        "date_idx": date_idx,
+        "decision_idx": decision_idx,
+    }
+    return (
+        common,
+        active_equities,
+        equity_cutoffs,
+        context_cutoffs,
+        rows["date_idx"][positions].astype(np.int64, copy=False),
+        rows["decision_idx"][positions].astype(np.int64, copy=False),
+    )
+
+
+def _build_patch_batch(
+    arrays: dict[str, np.ndarray],
+    date_idx: np.ndarray,
+    equity_cutoffs: np.ndarray,
+    context_cutoffs: np.ndarray,
+    active_equities: np.ndarray,
+    model_name: str,
+) -> dict[str, np.ndarray]:
+    batch_size = date_idx.size
+    patches = np.zeros(
+        (batch_size, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH),
+        dtype=np.float32,
+    )
+    history_patch_mask = np.zeros(
+        (batch_size, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT), dtype=bool
+    )
+    instrument_mask = np.zeros((batch_size, INSTRUMENT_COUNT), dtype=bool)
+    instrument_mask[:, :EQUITY_COUNT] = active_equities
+    slow_features = np.zeros(
+        (batch_size, INSTRUMENT_COUNT, SLOW_FEATURE_COUNT), dtype=np.float32
+    )
+    slow_features[:, :EQUITY_COUNT] = (
+        np.asarray(arrays["equity_slow.npy"][date_idx], dtype=np.float32)
+        * active_equities[..., None]
+    )
+    state_position = np.empty(batch_size, dtype=np.int64)
+    needs_context = model_name in ("context_only", "context_pooled", "tcn")
+
+    for equity_cutoff in np.unique(equity_cutoffs):
+        group = np.flatnonzero(equity_cutoffs == equity_cutoff)
+        context_cutoff = int(context_cutoffs[group[0]])
+        state = context_cutoff // PATCH_MINUTES
+        equity_patch_count = int(equity_cutoff) // PATCH_MINUTES
+        if EQUITY_ABSOLUTE_START_PATCH + equity_patch_count != state:
+            raise ValueError("Equity and context patch clocks are misaligned")
+        state_position[group] = state
+        equity_prefix = np.asarray(
+            arrays["equity_features.npy"][date_idx[group], :, : int(equity_cutoff), :],
+            dtype=np.float32,
+        ).reshape(group.size, EQUITY_COUNT, equity_patch_count, PATCH_INPUT_WIDTH)
+        patches[
+            group,
+            :EQUITY_COUNT,
+            EQUITY_ABSOLUTE_START_PATCH:state,
+        ] = equity_prefix * active_equities[group, :, None, None]
+        history_patch_mask[
+            group,
+            :EQUITY_COUNT,
+            EQUITY_ABSOLUTE_START_PATCH:state,
+        ] = active_equities[group, :, None]
+        if needs_context:
+            context_prefix = np.asarray(
+                arrays["context_features.npy"][date_idx[group], :, :context_cutoff, :],
+                dtype=np.float32,
+            ).reshape(group.size, CONTEXT_COUNT, state, PATCH_INPUT_WIDTH)
+            patches[group, EQUITY_COUNT:, :state] = context_prefix
+            history_patch_mask[group, EQUITY_COUNT:, :state] = True
+
+    if needs_context:
+        context_ready = np.asarray(
+            arrays["context_data_ready.npy"][date_idx], dtype=bool
+        )
+        instrument_mask[:, EQUITY_COUNT:] = context_ready
+        slow_features[:, EQUITY_COUNT:] = (
+            np.asarray(arrays["context_slow.npy"][date_idx], dtype=np.float32)
+            * context_ready[..., None]
+        )
+    return {
+        "patches": patches,
+        "history_patch_mask": history_patch_mask,
+        "instrument_mask": instrument_mask,
+        "slow_features": slow_features,
+        "state_position": state_position,
+    }
+
+
+def build_tabular_batch(
+    arrays: dict[str, np.ndarray],
+    date_idx: np.ndarray,
+    decision_idx: np.ndarray,
+    equity_cutoffs: np.ndarray,
+    context_cutoffs: np.ndarray,
+    active_equities: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """Construct the exact shared 871-wide MLP/XGBoost representation."""
+    batch_size = date_idx.size
+    output = np.zeros(
+        (batch_size, EQUITY_COUNT, TABULAR_FEATURE_COUNT), dtype=np.float32
+    )
+    cursor = 0
+    output[:, :, cursor : cursor + SLOW_FEATURE_COUNT] = (
+        np.asarray(arrays["equity_slow.npy"][date_idx], dtype=np.float32)
+        * active_equities[..., None]
+    )
+    cursor += SLOW_FEATURE_COUNT
+
+    equity_validity: list[np.ndarray] = []
+    for offset in TABULAR_OFFSETS:
+        block = np.zeros(
+            (batch_size, EQUITY_COUNT, PATCH_INPUT_WIDTH // PATCH_MINUTES),
+            dtype=np.float32,
+        )
+        valid = np.zeros((batch_size, EQUITY_COUNT), dtype=bool)
+        for cutoff in np.unique(equity_cutoffs):
+            group = np.flatnonzero(equity_cutoffs == cutoff)
+            minute = int(cutoff) - 1 - offset
+            if minute < 0:
+                continue
+            values = np.asarray(
+                arrays["equity_features.npy"][date_idx[group], :, minute, :],
+                dtype=np.float32,
+            )
+            group_valid = (values[..., 5] > 0.5) & active_equities[group]
+            block[group] = values * group_valid[..., None]
+            valid[group] = group_valid
+        output[:, :, cursor : cursor + block.shape[-1]] = block
+        cursor += block.shape[-1]
+        equity_validity.append(valid)
+
+    context_validity: list[np.ndarray] = []
+    for context_slot in range(CONTEXT_COUNT):
+        for offset in TABULAR_OFFSETS:
+            block = np.zeros(
+                (batch_size, CONTEXT_GENERIC_DYNAMIC_COUNT), dtype=np.float32
+            )
+            valid = np.zeros(batch_size, dtype=bool)
+            for cutoff in np.unique(context_cutoffs):
+                group = np.flatnonzero(context_cutoffs == cutoff)
+                minute = int(cutoff) - 1 - offset
+                if minute < 0:
+                    continue
+                values = np.asarray(
+                    arrays["context_features.npy"][
+                        date_idx[group], context_slot, minute, :
+                    ],
+                    dtype=np.float32,
+                )
+                group_valid = values[:, 5] > 0.5
+                block[group] = (
+                    values[:, :CONTEXT_GENERIC_DYNAMIC_COUNT] * group_valid[:, None]
+                )
+                valid[group] = group_valid
+            output[:, :, cursor : cursor + CONTEXT_GENERIC_DYNAMIC_COUNT] = block[
+                :, None, :
+            ]
+            cursor += CONTEXT_GENERIC_DYNAMIC_COUNT
+            context_validity.append(valid)
+
+    context_slow = np.asarray(
+        arrays["context_slow.npy"][date_idx], dtype=np.float32
+    ).reshape(batch_size, CONTEXT_COUNT * SLOW_FEATURE_COUNT)
+    output[:, :, cursor : cursor + context_slow.shape[-1]] = context_slow[:, None]
+    cursor += context_slow.shape[-1]
+
+    normalized_position = decision_idx.astype(np.float32) / (
+        EXPECTED_DECISIONS_PER_DATE - 1
+    )
+    output[:, :, cursor] = np.sin(2.0 * np.pi * normalized_position)[:, None]
+    output[:, :, cursor + 1] = np.cos(2.0 * np.pi * normalized_position)[:, None]
+    cursor += 2
+    for valid in equity_validity:
+        output[:, :, cursor] = valid
+        cursor += 1
+    for valid in context_validity:
+        output[:, :, cursor] = valid[:, None]
+        cursor += 1
+    if cursor != TABULAR_FEATURE_COUNT:
+        raise RuntimeError(f"Tabular feature construction ended at width {cursor}")
+    output *= active_equities[..., None]
+    return {"tabular_features": output, "equity_mask": active_equities.copy()}
+
+
 class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
-    def __init__(self, store: Path, sample_index: pl.DataFrame) -> None:
+    def __init__(
+        self, store: Path, sample_index: pl.DataFrame, model_name: str
+    ) -> None:
+        if model_name not in NEURAL_MODELS:
+            raise ValueError(
+                f"Vectorized dataset requires a neural model: {model_name}"
+            )
         self.store = store
+        self.model_name = model_name
         self.rows = {
             column: np.asarray(sample_index.get_column(column).to_list())
             for column in (
@@ -211,7 +460,9 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
     def _open_arrays(self) -> dict[str, np.ndarray]:
         if self._arrays is None:
             self._arrays = {
-                filename: np.load(self.store / filename, mmap_mode="r")
+                filename: np.load(
+                    self.store / filename, mmap_mode="r", allow_pickle=False
+                )
                 for filename in FEATURE_ARRAY_FILES
             }
         return self._arrays
@@ -219,111 +470,73 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
     def __getitem__(self, request: BatchRequest) -> dict[str, np.ndarray]:
         arrays = self._open_arrays()
         positions = np.asarray(request.indices, dtype=np.int64)
-        sample_id = self.rows["sample_id"][positions].astype(np.int64, copy=True)
-        date_idx = self.rows["date_idx"][positions].astype(np.int64, copy=True)
-        decision_idx = self.rows["decision_idx"][positions].astype(np.int64, copy=True)
-        equity_cutoffs = self.rows["equity_cutoff_index"][positions]
-        context_cutoffs = self.rows["context_cutoff_index"][positions]
-        batch_size = positions.size
-        sample_valid_mask = np.arange(batch_size) < request.valid_count
-
-        active_equities = np.asarray(
-            arrays["equity_membership.npy"][date_idx]
-            & arrays["equity_data_ready.npy"][date_idx],
-            dtype=bool,
-        )
-        instrument_mask = np.ones((batch_size, INSTRUMENT_COUNT), dtype=bool)
-        instrument_mask[:, :EQUITY_COUNT] = active_equities
-        patches = np.zeros(
-            (
-                batch_size,
-                INSTRUMENT_COUNT,
-                ABSOLUTE_PATCH_COUNT,
-                PATCH_INPUT_WIDTH,
-            ),
-            dtype=np.float32,
-        )
-        history_patch_mask = np.zeros(
-            (batch_size, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT), dtype=bool
-        )
-        targets = np.zeros((batch_size, EQUITY_COUNT, 3), dtype=np.float32)
-        label_mask = np.zeros((batch_size, EQUITY_COUNT, 3), dtype=bool)
-        raw_returns = np.zeros((batch_size, EQUITY_COUNT, 3), dtype=np.float32)
-        state_position = np.empty(batch_size, dtype=np.int64)
-
-        for decision in np.unique(decision_idx):
-            group = np.flatnonzero(decision_idx == decision)
-            equity_cutoff = int(equity_cutoffs[group[0]])
-            context_cutoff = int(context_cutoffs[group[0]])
-            group_state_position = context_cutoff // PATCH_MINUTES
-            equity_patch_count = equity_cutoff // PATCH_MINUTES
-            if EQUITY_ABSOLUTE_START_PATCH + equity_patch_count != group_state_position:
-                raise ValueError("Equity and context patch clocks are misaligned")
-            state_position[group] = group_state_position
-            equity_prefix = np.asarray(
-                arrays["equity_features.npy"][date_idx[group], :, :equity_cutoff, :],
-                dtype=np.float32,
-            ).reshape(
-                group.size,
-                EQUITY_COUNT,
-                equity_patch_count,
-                PATCH_INPUT_WIDTH,
+        (
+            common,
+            active_equities,
+            equity_cutoffs,
+            context_cutoffs,
+            source_date_idx,
+            source_decision_idx,
+        ) = _common_batch(arrays, self.rows, positions, request.valid_count)
+        if self.model_name == "mlp":
+            inputs = build_tabular_batch(
+                arrays,
+                source_date_idx,
+                source_decision_idx,
+                equity_cutoffs,
+                context_cutoffs,
+                active_equities,
             )
-            patches[
-                group,
-                :EQUITY_COUNT,
-                EQUITY_ABSOLUTE_START_PATCH:group_state_position,
-            ] = equity_prefix
-            history_patch_mask[
-                group,
-                :EQUITY_COUNT,
-                EQUITY_ABSOLUTE_START_PATCH:group_state_position,
-            ] = active_equities[group, :, None]
-            context_prefix = np.asarray(
-                arrays["context_features.npy"][date_idx[group], :, :context_cutoff, :],
-                dtype=np.float32,
-            ).reshape(
-                group.size,
-                CONTEXT_COUNT,
-                group_state_position,
-                PATCH_INPUT_WIDTH,
+            inputs["tabular_features"][~common["sample_valid_mask"]] = 0.0
+            inputs["equity_mask"][~common["sample_valid_mask"]] = False
+        else:
+            inputs = _build_patch_batch(
+                arrays,
+                source_date_idx,
+                equity_cutoffs,
+                context_cutoffs,
+                active_equities,
+                self.model_name,
             )
-            patches[group, EQUITY_COUNT:, :group_state_position] = context_prefix
-            history_patch_mask[group, EQUITY_COUNT:, :group_state_position] = True
-            targets[group] = arrays["targets.npy"][date_idx[group], :, int(decision), :]
-            label_mask[group] = arrays["label_mask.npy"][
-                date_idx[group], :, int(decision), :
-            ]
-            raw_returns[group] = arrays["raw_returns.npy"][
-                date_idx[group], :, int(decision), :
-            ]
+        return {**inputs, **common}
 
-        patches[:, :EQUITY_COUNT] *= active_equities[:, :, None, None]
-        slow_features = np.zeros((batch_size, INSTRUMENT_COUNT, 3), dtype=np.float32)
-        slow_features[:, :EQUITY_COUNT, 0] = arrays["equity_slow.npy"][date_idx, :, 0]
-        slow_features[:, EQUITY_COUNT:] = arrays["context_slow.npy"][date_idx]
 
-        padded = ~sample_valid_mask
-        targets[padded] = 0.0
-        label_mask[padded] = False
-        raw_returns[padded] = 0.0
-        sample_id[padded] = -1
-        date_idx[padded] = -1
-        decision_idx[padded] = -1
-        return {
-            "patches": patches,
-            "history_patch_mask": history_patch_mask,
-            "instrument_mask": instrument_mask,
-            "slow_features": slow_features,
-            "state_position": state_position,
-            "targets": targets,
-            "label_mask": label_mask,
-            "raw_returns": raw_returns,
-            "sample_valid_mask": sample_valid_mask,
-            "sample_id": sample_id,
-            "date_idx": date_idx,
-            "decision_idx": decision_idx,
-        }
+class TabularRowIterator:
+    """Re-iterable compact valid-row source for one horizon booster."""
+
+    def __init__(
+        self,
+        store: Path,
+        sample_index: pl.DataFrame,
+        horizon_index: int,
+        batch_size: int = 64,
+    ) -> None:
+        if horizon_index not in range(HORIZON_COUNT):
+            raise ValueError("horizon_index is outside the three-horizon contract")
+        self.dataset = VectorizedFeatureDataset(store, sample_index, "mlp")
+        self.horizon_index = horizon_index
+        self.batch_size = batch_size
+
+    def __iter__(self) -> Iterator[TabularRowBatch]:
+        equity_slots = np.arange(EQUITY_COUNT, dtype=np.int16)
+        for start in range(0, len(self.dataset), self.batch_size):
+            stop = min(start + self.batch_size, len(self.dataset))
+            request = BatchRequest(tuple(range(start, stop)), stop - start)
+            batch = self.dataset[request]
+            valid = batch["label_mask"][:, :, self.horizon_index]
+            counts = valid.sum(axis=1)
+            row_sample, row_equity = np.nonzero(valid)
+            if row_sample.size == 0:
+                continue
+            yield TabularRowBatch(
+                features=batch["tabular_features"][row_sample, row_equity],
+                labels=batch["targets"][row_sample, row_equity, self.horizon_index],
+                weights=(1.0 / counts[row_sample]).astype(np.float32),
+                sample_id=batch["sample_id"][row_sample],
+                date_idx=batch["date_idx"][row_sample],
+                decision_idx=batch["decision_idx"][row_sample],
+                equity_slot=equity_slots[row_equity],
+            )
 
 
 class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
@@ -434,6 +647,7 @@ def create_training_loaders(
     store: Path,
     train_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
+    model_name: str,
     runtime: RuntimeSettings,
     seed: int,
 ) -> tuple[
@@ -443,10 +657,13 @@ def create_training_loaders(
 ]:
     sampler = DateStratifiedMicrobatchSampler(train_rows, runtime, seed)
     train_loader = _create_loader(
-        VectorizedFeatureDataset(store, train_rows), sampler, runtime, seed
+        VectorizedFeatureDataset(store, train_rows, model_name),
+        sampler,
+        runtime,
+        seed,
     )
     validation_loader = _create_loader(
-        VectorizedFeatureDataset(store, validation_rows),
+        VectorizedFeatureDataset(store, validation_rows, model_name),
         SequentialPaddedBatchSampler(
             validation_rows.height, runtime.evaluation_batch_size
         ),
@@ -459,11 +676,12 @@ def create_training_loaders(
 def create_evaluation_loader(
     store: Path,
     rows: pl.DataFrame,
+    model_name: str,
     runtime: RuntimeSettings,
     seed: int,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
-        VectorizedFeatureDataset(store, rows),
+        VectorizedFeatureDataset(store, rows, model_name),
         SequentialPaddedBatchSampler(rows.height, runtime.evaluation_batch_size),
         runtime,
         seed,

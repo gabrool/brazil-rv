@@ -7,27 +7,42 @@ from .contract import (
     ABSOLUTE_PATCH_COUNT,
     EQUITY_COUNT,
     FAMILY_COUNT,
-    INSTRUMENT_FAMILY_IDS,
     INSTRUMENT_COUNT,
+    INSTRUMENT_FAMILY_IDS,
+    NEURAL_MODELS,
     PATCH_INPUT_WIDTH,
+    POOLED_INDUCING_TOKEN_COUNT,
+    SLOW_FEATURE_COUNT,
+    TARGETED_FUSION_GATE_BIAS,
     TEMPORAL_TOKEN_COUNT,
-    architecture_for_variant,
+    TRANSFORMER_MODELS,
+    TransformerArchitecture,
+    architecture_for_model,
 )
-from .layers import RotaryEmbedding, TransformerStack
+from .layers import (
+    PooledMarketMemory,
+    RotaryEmbedding,
+    TargetedFusionBlock,
+    TransformerStack,
+)
 
 
-class CrossAssetPatchITransformerV1(nn.Module):
-    def __init__(self, variant: str = "full") -> None:
+class TargetedCrossAssetTransformer(nn.Module):
+    def __init__(self, model_name: str) -> None:
         super().__init__()
-        architecture = architecture_for_variant(variant)
+        architecture = architecture_for_model(model_name)
+        if not isinstance(architecture, TransformerArchitecture):
+            raise ValueError(f"{model_name} is not a transformer setting")
         if architecture.d_model != architecture.attention_heads * architecture.head_dim:
-            raise ValueError("Variant attention dimensions are inconsistent")
-        self.variant = variant
+            raise ValueError("Transformer attention dimensions are inconsistent")
+        self.model_name = model_name
         self.d_model = architecture.d_model
         self.patch_projection = nn.Linear(
             PATCH_INPUT_WIDTH, architecture.d_model, bias=False
         )
-        self.slow_projection = nn.Linear(3, architecture.d_model, bias=False)
+        self.slow_projection = nn.Linear(
+            SLOW_FEATURE_COUNT, architecture.d_model, bias=False
+        )
         self.absolute_time_embedding = nn.Embedding(
             TEMPORAL_TOKEN_COUNT, architecture.d_model
         )
@@ -51,18 +66,30 @@ class CrossAssetPatchITransformerV1(nn.Module):
         self.instrument_norm = nn.RMSNorm(
             architecture.d_model, eps=architecture.rms_norm_eps
         )
-        self.cross_asset_encoder = (
-            TransformerStack(
-                architecture.cross_asset_depth,
+        self.pooled_memory = (
+            PooledMarketMemory(
                 architecture.d_model,
                 architecture.attention_heads,
                 architecture.swiglu_width,
                 architecture.rms_norm_eps,
                 architecture.qk_norm_eps,
                 architecture.residual_dropout,
-                rope=None,
+                POOLED_INDUCING_TOKEN_COUNT,
             )
-            if architecture.cross_asset_depth > 0
+            if architecture.pooled_memory_tokens
+            else None
+        )
+        self.targeted_fusion = (
+            TargetedFusionBlock(
+                architecture.d_model,
+                architecture.attention_heads,
+                architecture.swiglu_width,
+                architecture.rms_norm_eps,
+                architecture.qk_norm_eps,
+                architecture.residual_dropout,
+                TARGETED_FUSION_GATE_BIAS,
+            )
+            if architecture.fusion_blocks
             else None
         )
         self.prediction_head = nn.Linear(
@@ -80,9 +107,12 @@ class CrossAssetPatchITransformerV1(nn.Module):
         )
         self.apply(self._initialize_module)
         nn.init.normal_(self.state_token, mean=0.0, std=0.02)
+        if self.pooled_memory is not None:
+            nn.init.normal_(self.pooled_memory.inducing_tokens, mean=0.0, std=0.02)
+        if self.targeted_fusion is not None:
+            nn.init.zeros_(self.targeted_fusion.gate.weight)
+            nn.init.constant_(self.targeted_fusion.gate.bias, TARGETED_FUSION_GATE_BIAS)
         self.temporal_encoder.scale_residual_weights()
-        if self.cross_asset_encoder is not None:
-            self.cross_asset_encoder.scale_residual_weights()
 
     @staticmethod
     def _initialize_module(module: nn.Module) -> None:
@@ -155,30 +185,51 @@ class CrossAssetPatchITransformerV1(nn.Module):
         slow_features: torch.Tensor,
         state_position: torch.Tensor,
     ) -> torch.Tensor:
-        if self.cross_asset_encoder is None:
-            equity_states = self._temporal_states(
-                patches,
-                history_patch_mask,
-                slow_features,
-                state_position,
-                EQUITY_COUNT,
-            )
-        else:
-            instrument_states = self._temporal_states(
-                patches,
-                history_patch_mask,
-                slow_features,
-                state_position,
-                INSTRUMENT_COUNT,
-            )
-            instrument_states = self.cross_asset_encoder(
-                instrument_states, instrument_mask
-            )
-            equity_states = instrument_states[:, :EQUITY_COUNT]
-        predictions = self.prediction_head(equity_states)
-        return predictions * instrument_mask[:, :EQUITY_COUNT, None].to(
-            predictions.dtype
+        instrument_count = (
+            EQUITY_COUNT
+            if self.model_name in ("temporal_only", "pooled_market")
+            else INSTRUMENT_COUNT
         )
+        states = self._temporal_states(
+            patches,
+            history_patch_mask,
+            slow_features,
+            state_position,
+            instrument_count,
+        )
+        equity_states = states[:, :EQUITY_COUNT]
+        equity_mask = instrument_mask[:, :EQUITY_COUNT]
+        if self.targeted_fusion is not None:
+            memory_parts: list[torch.Tensor] = []
+            mask_parts: list[torch.Tensor] = []
+            if self.model_name in ("context_only", "context_pooled"):
+                memory_parts.append(states[:, EQUITY_COUNT:])
+                mask_parts.append(instrument_mask[:, EQUITY_COUNT:])
+            if self.pooled_memory is not None:
+                pooled = self.pooled_memory(equity_states, equity_mask)
+                memory_parts.append(pooled)
+                mask_parts.append(
+                    torch.ones(pooled.shape[:2], dtype=torch.bool, device=pooled.device)
+                )
+            memory = torch.cat(memory_parts, dim=1)
+            memory_mask = torch.cat(mask_parts, dim=1)
+            equity_states = self.targeted_fusion(
+                equity_states, memory, memory_mask, equity_mask
+            )
+        predictions = self.prediction_head(equity_states)
+        return predictions * equity_mask[..., None].to(predictions.dtype)
+
+
+def build_neural_model(model_name: str) -> nn.Module:
+    if model_name not in NEURAL_MODELS:
+        raise ValueError(f"Unknown neural model: {model_name}")
+    if model_name in TRANSFORMER_MODELS:
+        return TargetedCrossAssetTransformer(model_name)
+    from .baselines import ResidualTabularMLP, SharedCausalTCN
+
+    if model_name == "tcn":
+        return SharedCausalTCN()
+    return ResidualTabularMLP()
 
 
 def count_trainable_parameters(model: nn.Module) -> int:

@@ -14,7 +14,8 @@ import torch
 from .contract import (
     EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     GH200_RUNTIME,
-    architecture_for_variant,
+    NEURAL_MODELS,
+    architecture_for_model,
 )
 from .data import (
     create_evaluation_loader,
@@ -32,14 +33,15 @@ from .engine import (
     validate_runtime,
     warmup_compiled_evaluation,
 )
-from .model import CrossAssetPatchITransformerV1
+from .model import build_neural_model
 from .muon import PYTORCH_MUON_REFERENCE
 from .optim import OFFICIAL_MUON_BACKEND, REFERENCE_MUON_BACKEND
+from .xgboost_model import evaluate_saved_xgboost, validate_xgboost_runtime
 
 _CHECKPOINT_IDENTITY_FIELDS = (
     "muon_backend",
     "muon_reference",
-    "model_variant",
+    "model_name",
     "optimizer_variant",
     "seed",
     "resolved_feature_store_path",
@@ -73,15 +75,15 @@ def _validate_muon_identity_values(identity: dict[str, object]) -> None:
 
 
 def _validate_architecture_identity(identity: dict[str, object]) -> None:
-    model_variant = str(identity["model_variant"])
-    expected = asdict(architecture_for_variant(model_variant))
+    model_name = str(identity["model_name"])
+    if model_name not in NEURAL_MODELS:
+        raise ValueError(f"Invalid neural model identity: {model_name}")
+    expected = asdict(architecture_for_model(model_name))
     if identity["architecture_constants"] != expected:
-        raise ValueError(
-            f"Invalid architecture metadata for model variant: {model_variant}"
-        )
-    expected_parameter_count = EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_variant]
+        raise ValueError(f"Invalid architecture metadata for model: {model_name}")
+    expected_parameter_count = EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_name]
     if identity.get("parameter_count") != expected_parameter_count:
-        raise ValueError(f"Invalid parameter count for model variant: {model_variant}")
+        raise ValueError(f"Invalid parameter count for model: {model_name}")
 
 
 def _validate_run_checkpoint_identity(
@@ -101,6 +103,31 @@ def _validate_run_checkpoint_identity(
         raise ValueError("Validated feature store does not match the run identity")
 
 
+def _validate_xgboost_identity(
+    manifest: dict[str, object], feature_store: Path
+) -> None:
+    if (
+        manifest.get("model_name") != "xgboost"
+        or manifest.get("model_family") != "xgboost"
+    ):
+        raise ValueError("Invalid XGBoost run identity")
+    for field in (
+        "optimizer_variant",
+        "architecture_constants",
+        "parameter_count",
+        "compile",
+        "bf16",
+    ):
+        if manifest.get(field) is not None:
+            raise ValueError(f"XGBoost field must be nonapplicable: {field}")
+    manifest_store = Path(str(manifest["resolved_feature_store_path"])).expanduser()
+    if manifest_store.resolve() != feature_store:
+        raise ValueError("Validated feature store does not match the run identity")
+    metadata = manifest.get("xgboost")
+    if not isinstance(metadata, dict) or "selected_settings" not in metadata:
+        raise ValueError("Completed XGBoost metadata is missing")
+
+
 def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
     temporary = path.with_name(f"{path.name}.tmp")
     temporary.unlink(missing_ok=True)
@@ -117,17 +144,26 @@ def _atomic_write_parquet(path: Path, frame: pl.DataFrame) -> None:
     os.replace(temporary, path)
 
 
-def main() -> None:
-    args = parse_args()
-    runtime = GH200_RUNTIME
-    hardware = validate_runtime()
-    torch.set_float32_matmul_precision("high")
-
-    manifest = json.loads(
-        (args.run_dir / "run_manifest.json").read_text(encoding="utf-8")
+def _daily_frame(rows: list[dict[str, object]], feature_store: Path) -> pl.DataFrame:
+    dates = dict(
+        pl.read_parquet(feature_store / "date_index.parquet")
+        .select("date_idx", "trade_date")
+        .iter_rows()
     )
-    if manifest.get("status") != "completed":
-        raise ValueError("Standalone evaluation requires a completed run")
+    return pl.DataFrame(
+        [{"trade_date": dates[int(row["date_idx"])], **row} for row in rows]
+    )
+
+
+def _evaluate_neural(
+    manifest: dict[str, object],
+    feature_store: Path,
+    rows: pl.DataFrame,
+) -> tuple[
+    dict[str, object],
+    list[dict[str, object]],
+    dict[str, object],
+]:
     training_compile = manifest.get("compile")
     if not isinstance(training_compile, dict):
         raise ValueError("Run manifest compile metadata is missing")
@@ -137,26 +173,26 @@ def main() -> None:
         or training_parity.get("passed") is not True
     ):
         raise ValueError("Training run did not pass eager/compiled qualification")
-    feature_store = (
-        Path(str(manifest["resolved_feature_store_path"])).expanduser().resolve()
-    )
-    sample_index = validate_feature_store(feature_store)
-    rows = select_sample_split(sample_index, args.split)
     checkpoint = torch.load(
-        args.run_dir / "best.pt", map_location="cpu", weights_only=False
+        Path(str(manifest["run_dir"])) / "best.pt",
+        map_location="cpu",
+        weights_only=False,
     )
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
-
-    cache_report = warm_feature_store_cache(feature_store)
+    model_name = str(checkpoint["model_name"])
     loader = create_evaluation_loader(
-        feature_store, rows, runtime, int(manifest["seed"])
+        feature_store,
+        rows,
+        model_name,
+        GH200_RUNTIME,
+        int(manifest["seed"]),
     )
-    model = CrossAssetPatchITransformerV1(str(checkpoint["model_variant"]))
+    model = build_neural_model(model_name)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to("cuda")
     eager_reference = clone_eager_reference_model(model)
     evaluation_batch = next(iter(loader))
-    compile_setup = compile_model(model, runtime)
+    compile_setup = compile_model(model, GH200_RUNTIME)
     compile_parity = qualify_eager_compiled_model(
         eager_reference,
         model,
@@ -176,39 +212,85 @@ def main() -> None:
     started = time.perf_counter()
     summary, daily_rows = evaluate_model(model, loader)
     torch.cuda.synchronize()
-    evaluation_seconds = time.perf_counter() - started
-    peak_allocated = torch.cuda.max_memory_allocated()
-    peak_reserved = torch.cuda.max_memory_reserved()
+    metadata = {
+        "compile": compile_metadata,
+        "evaluation_seconds": time.perf_counter() - started,
+        "peak_allocated_cuda_memory_bytes": torch.cuda.max_memory_allocated(),
+        "peak_reserved_cuda_memory_bytes": torch.cuda.max_memory_reserved(),
+    }
+    return summary, daily_rows, metadata
+
+
+def main() -> None:
+    args = parse_args()
+    hardware = validate_runtime()
+    torch.set_float32_matmul_precision("high")
+
+    manifest_path = args.run_dir / "run_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("status") != "completed":
+        raise ValueError("Standalone evaluation requires a completed run")
+    manifest["run_dir"] = str(args.run_dir.resolve())
+    feature_store = (
+        Path(str(manifest["resolved_feature_store_path"])).expanduser().resolve()
+    )
+    sample_index = validate_feature_store(feature_store)
+    training_rows = select_sample_split(sample_index, "train")
+    rows = select_sample_split(sample_index, args.split)
+    cache_report = warm_feature_store_cache(feature_store)
 
     created_at = datetime.now(timezone.utc)
     evaluation_dir = (
-        args.run_dir / "evaluations" / (f"{args.split}_{created_at:%Y%m%dT%H%M%S%fZ}")
+        args.run_dir / "evaluations" / f"{args.split}_{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     if evaluation_dir.exists():
         raise FileExistsError(f"Evaluation output already exists: {evaluation_dir}")
     evaluation_dir.mkdir(parents=True)
+
+    model_family = str(manifest.get("model_family"))
+    if model_family == "xgboost":
+        _validate_xgboost_identity(manifest, feature_store)
+        xgboost_runtime = validate_xgboost_runtime()
+        started = time.perf_counter()
+        _, summary, daily_rows, predictions = evaluate_saved_xgboost(
+            feature_store,
+            training_rows,
+            rows,
+            args.run_dir,
+            evaluation_dir,
+        )
+        family_metadata: dict[str, object] = {
+            "xgboost_runtime": xgboost_runtime,
+            "compile": None,
+            "evaluation_seconds": time.perf_counter() - started,
+            "peak_allocated_cuda_memory_bytes": None,
+            "peak_reserved_cuda_memory_bytes": None,
+        }
+        _atomic_write_parquet(evaluation_dir / "predictions.parquet", predictions)
+    elif model_family in {
+        architecture_for_model(name).family for name in NEURAL_MODELS
+    }:
+        summary, daily_rows, family_metadata = _evaluate_neural(
+            manifest, feature_store, rows
+        )
+    else:
+        raise ValueError(f"Unknown model family in run manifest: {model_family}")
+
     _atomic_write_json(evaluation_dir / "metrics.json", summary)
-    dates = dict(
-        pl.read_parquet(feature_store / "date_index.parquet")
-        .select("date_idx", "trade_date")
-        .iter_rows()
+    _atomic_write_parquet(
+        evaluation_dir / "daily_metrics.parquet",
+        _daily_frame(daily_rows, feature_store),
     )
-    daily_metrics = pl.DataFrame(
-        [{"trade_date": dates[int(row["date_idx"])], **row} for row in daily_rows]
-    )
-    _atomic_write_parquet(evaluation_dir / "daily_metrics.parquet", daily_metrics)
     evaluation_manifest = {
         "created_at_utc": created_at.isoformat(),
         "split": args.split,
         "hardware": asdict(hardware),
-        "model_variant": manifest["model_variant"],
+        "model_name": manifest["model_name"],
+        "model_family": manifest["model_family"],
         "architecture_constants": manifest["architecture_constants"],
         "parameter_count": manifest["parameter_count"],
         "feature_cache_warmup": asdict(cache_report),
-        "compile": compile_metadata,
-        "evaluation_seconds": evaluation_seconds,
-        "peak_allocated_cuda_memory_bytes": peak_allocated,
-        "peak_reserved_cuda_memory_bytes": peak_reserved,
+        **family_metadata,
     }
     _atomic_write_json(evaluation_dir / "evaluation_manifest.json", evaluation_manifest)
     print(f"Evaluated {args.split}: {evaluation_dir}")
