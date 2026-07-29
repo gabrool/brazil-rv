@@ -336,7 +336,7 @@ def test_compile_warmup_reports_final_three_pass_medians(
     monkeypatch.setattr(torch.cuda, "max_memory_reserved", lambda: 202)
 
     model = nn.Linear(1, 1)
-    report = warmup_compiled_model(model, {}, {})
+    report = warmup_compiled_model(model, {}, {}, 0.1)
     assert COMPILE_WARMUP_PASS_COUNT == 5
     assert COMPILE_STEADY_STATE_PASS_COUNT == 3
     assert training_calls == evaluation_calls == 5
