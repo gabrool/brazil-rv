@@ -68,6 +68,29 @@ from .optim import build_optimizer, build_scheduler
 from .xgboost_model import train_xgboost_run, validate_xgboost_runtime
 
 
+_HISTORY_COLUMNS = (
+    "epoch",
+    "optimizer_steps",
+    "backward_passes",
+    "train_loss",
+    "validation_soft_spearman_loss",
+    "validation_primary_ic",
+    "validation_ic_30",
+    "validation_ic_60",
+    "validation_ic_120",
+    "mean_gradient_norm",
+    "maximum_gradient_norm",
+    "mean_first_pass_sam_gradient_norm",
+    "mean_sam_perturbation_norm",
+    "mean_second_pass_sam_gradient_norm",
+    "all_finite",
+    "adamw_lr",
+    "epoch_seconds",
+    "peak_allocated_cuda_memory_bytes",
+    "peak_reserved_cuda_memory_bytes",
+)
+
+
 def validate_cli_args(
     parser: argparse.ArgumentParser, args: argparse.Namespace
 ) -> argparse.Namespace:
@@ -172,34 +195,17 @@ def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
 
 
 def _atomic_write_history(path: Path, rows: list[dict[str, object]]) -> None:
-    columns = (
-        "epoch",
-        "optimizer_steps",
-        "backward_passes",
-        "train_loss",
-        "validation_soft_spearman_loss",
-        "validation_primary_ic",
-        "validation_ic_30",
-        "validation_ic_60",
-        "validation_ic_120",
-        "mean_gradient_norm",
-        "maximum_gradient_norm",
-        "mean_first_pass_sam_gradient_norm",
-        "mean_sam_perturbation_norm",
-        "mean_second_pass_sam_gradient_norm",
-        "all_finite",
-        "adamw_lr",
-        "epoch_seconds",
-        "peak_allocated_cuda_memory_bytes",
-        "peak_reserved_cuda_memory_bytes",
-    )
     temporary = path.with_name(f"{path.name}.tmp")
     temporary.unlink(missing_ok=True)
-    with temporary.open("w", newline="", encoding="utf-8") as output:
-        writer = csv.DictWriter(output, fieldnames=columns)
-        writer.writeheader()
-        writer.writerows(rows)
-    os.replace(temporary, path)
+    try:
+        with temporary.open("w", newline="", encoding="utf-8") as output:
+            writer = csv.DictWriter(output, fieldnames=_HISTORY_COLUMNS)
+            writer.writeheader()
+            writer.writerows(rows)
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def _atomic_write_parquet(path: Path, frame: pl.DataFrame) -> None:
@@ -504,9 +510,6 @@ def _run_neural(
         history.append(
             {
                 "epoch": epoch,
-                "optimizer_variant": args.optimizer,
-                "soft_rank_temperature": args.temperature,
-                "sam_rho": args.sam_rho,
                 "optimizer_steps": training["optimizer_steps"],
                 "backward_passes": training["backward_passes"],
                 "train_loss": training["train_loss"],

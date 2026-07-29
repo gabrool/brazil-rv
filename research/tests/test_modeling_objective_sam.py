@@ -156,6 +156,52 @@ class _PureCrossSectionModel(nn.Module):
         return self.linear(features)
 
 
+class _ManyParameterModel(nn.Module):
+    def __init__(self, parameter_count: int = 12) -> None:
+        super().__init__()
+        self.weights = nn.ParameterList(
+            [nn.Parameter(torch.randn(2, 3) * 0.1) for _ in range(parameter_count)]
+        )
+
+    def forward(self, features: torch.Tensor) -> torch.Tensor:
+        return sum(features @ weight for weight in self.weights)
+
+
+class _CompiledCudaDropoutModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.dropout = nn.Dropout(0.5)
+        self.linear = nn.Linear(2, 3, bias=False)
+        self.register_buffer(
+            "dropout_trace",
+            torch.zeros(16, 7, 2, dtype=torch.bool),
+            persistent=False,
+        )
+        self.register_buffer(
+            "trace_index", torch.zeros((), dtype=torch.long), persistent=False
+        )
+
+    def forward(self, features: torch.Tensor) -> torch.Tensor:
+        dropped = self.dropout(features)
+        mask = dropped.eq(0).detach()
+        indices = self.trace_index.reshape(1, 1, 1).expand_as(mask)
+        self.dropout_trace.scatter_(0, indices, mask)
+        self.trace_index.add_(1)
+        return self.linear(dropped)
+
+
+class _FiniteForwardNanBackward(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx: object, inputs: torch.Tensor) -> torch.Tensor:
+        del ctx
+        return inputs.clone()
+
+    @staticmethod
+    def backward(ctx: object, gradient: torch.Tensor) -> torch.Tensor:
+        del ctx
+        return torch.full_like(gradient, float("nan"))
+
+
 class _CountingScheduler:
     def __init__(self) -> None:
         self.steps = 0
@@ -182,8 +228,18 @@ def _microbatches() -> list[dict[str, torch.Tensor]]:
     return batches
 
 
-def _adamw(model: nn.Module) -> torch.optim.AdamW:
-    return torch.optim.AdamW(
+class _CountingAdamW(torch.optim.AdamW):
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.step_calls = 0
+
+    def step(self, closure: object = None) -> object:
+        self.step_calls += 1
+        return super().step(closure)
+
+
+def _adamw(model: nn.Module) -> _CountingAdamW:
+    return _CountingAdamW(
         model.parameters(),
         lr=ADAMW_LR,
         betas=ADAMW_BETAS,
@@ -246,6 +302,61 @@ def test_eager_and_compiled_updates_match(
         torch.testing.assert_close(compiled, eager, atol=2e-7, rtol=2e-7)
 
 
+@pytest.mark.parametrize(
+    ("optimizer_variant", "sam_rho", "expected_flag_arities", "float_arity"),
+    [
+        ("adamw", None, [2, 1, 1], 2),
+        ("sam_adamw", 0.02, [2, 1, 2, 2, 2, 1, 1, 1], 6),
+    ],
+)
+def test_update_synchronization_boundaries_do_not_scale_with_parameters(
+    cpu_engine: None,
+    monkeypatch: pytest.MonkeyPatch,
+    optimizer_variant: str,
+    sam_rho: float | None,
+    expected_flag_arities: list[int],
+    float_arity: int,
+) -> None:
+    model = _ManyParameterModel()
+    optimizer = _adamw(model)
+    flag_arities: list[int] = []
+    float_arities: list[int] = []
+    original_host_flags = engine._host_flags
+    original_host_floats = engine._host_floats
+
+    def observed_flags(*flags: torch.Tensor) -> tuple[bool, ...]:
+        assert all(flag.shape == torch.Size([]) for flag in flags)
+        flag_arities.append(len(flags))
+        return original_host_flags(*flags)
+
+    def observed_floats(*values: torch.Tensor) -> tuple[float, ...]:
+        assert all(value.shape == torch.Size([]) for value in values)
+        float_arities.append(len(values))
+        return original_host_floats(*values)
+
+    monkeypatch.setattr(engine, "_host_flags", observed_flags)
+    monkeypatch.setattr(engine, "_host_floats", observed_floats)
+    run_effective_batch_update(
+        model,
+        _microbatches(),
+        optimizer,
+        None,
+        GH200_RUNTIME,
+        optimizer_variant,
+        0.1,
+        sam_rho,
+    )
+
+    assert flag_arities == expected_flag_arities
+    assert float_arities == [float_arity]
+    reference = next(model.parameters())
+    assert engine._tensors_finite(model.parameters(), reference).shape == torch.Size([])
+    snapshots = [parameter.detach().clone() for parameter in model.parameters()]
+    assert engine._tensor_pairs_equal(
+        zip(model.parameters(), snapshots, strict=True), reference
+    ).shape == torch.Size([])
+
+
 def test_eight_microbatches_match_concatenated_group_normalization(
     cpu_engine: None,
 ) -> None:
@@ -254,12 +365,13 @@ def test_eight_microbatches_match_concatenated_group_normalization(
     reference_model = copy.deepcopy(accumulated_model)
     accumulated_optimizer = _adamw(accumulated_model)
     reference_optimizer = _adamw(reference_model)
+    scheduler = _CountingScheduler()
 
     update = run_effective_batch_update(
         accumulated_model,
         batches,
         accumulated_optimizer,
-        None,
+        scheduler,
         GH200_RUNTIME,
         "adamw",
         0.1,
@@ -274,6 +386,8 @@ def test_eight_microbatches_match_concatenated_group_normalization(
     reference_optimizer.step()
 
     assert update["backward_passes"] == 8
+    assert accumulated_optimizer.step_calls == 1
+    assert scheduler.steps == 1
     for actual, expected in zip(
         accumulated_model.parameters(), reference_model.parameters(), strict=True
     ):
@@ -302,6 +416,14 @@ def test_sam_replays_same_batches_rng_and_counts(cpu_engine: None) -> None:
     model = _CrossSectionModel(dropout=0.5).train()
     optimizer = _adamw(model)
     scheduler = _CountingScheduler()
+    backward_calls = 0
+
+    def count_backward(gradient: torch.Tensor) -> torch.Tensor:
+        nonlocal backward_calls
+        backward_calls += 1
+        return gradient
+
+    model.linear.weight.register_hook(count_backward)
     update = run_effective_batch_update(
         model,
         _microbatches(),
@@ -313,12 +435,75 @@ def test_sam_replays_same_batches_rng_and_counts(cpu_engine: None) -> None:
         0.02,
     )
     assert update["backward_passes"] == 16
+    assert update["rng_replay_exact"] is True
+    assert optimizer.step_calls == 1
     assert scheduler.steps == 1
     assert len(model.dropout_masks) == 16
+    assert backward_calls == 16
     for first, second in zip(
         model.dropout_masks[:8], model.dropout_masks[8:], strict=True
     ):
         torch.testing.assert_close(first, second, atol=0, rtol=0)
+
+
+def test_compiled_cuda_sam_replays_identical_dropout_masks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    if not torch.cuda.is_available():
+        pytest.skip("native CUDA is unavailable")
+    if not torch.cuda.is_bf16_supported():
+        pytest.skip("native CUDA BF16 is unavailable")
+    capability = torch.cuda.get_device_capability()
+    if capability[0] < 8:
+        pytest.skip(
+            f"native CUDA BF16 compilation is unavailable at capability {capability}"
+        )
+
+    monkeypatch.setattr(
+        engine,
+        "_to_cuda",
+        lambda batch: {
+            key: value.to("cuda", non_blocking=False) for key, value in batch.items()
+        },
+    )
+    monkeypatch.setattr(
+        engine, "_predict", lambda model, batch: model(batch["features"])
+    )
+    model = _CompiledCudaDropoutModel().to("cuda").train()
+    engine.compile_model(model, GH200_RUNTIME)
+    warmup = torch.randn(1, 7, 2, device="cuda")
+    with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+        model(warmup)
+    torch.cuda.synchronize()
+    model.dropout_trace.zero_()
+    model.trace_index.zero_()
+    torch.manual_seed(29)
+    torch.cuda.manual_seed_all(29)
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=ADAMW_LR,
+        betas=ADAMW_BETAS,
+        eps=ADAMW_EPS,
+        weight_decay=ADAMW_WEIGHT_DECAY,
+        fused=True,
+    )
+
+    update = run_effective_batch_update(
+        model,
+        _microbatches(),
+        optimizer,
+        None,
+        GH200_RUNTIME,
+        "sam_adamw",
+        0.1,
+        0.02,
+    )
+
+    assert update["rng_replay_exact"] is True
+    assert int(model.trace_index) == 16
+    torch.testing.assert_close(
+        model.dropout_trace[:8], model.dropout_trace[8:], atol=0, rtol=0
+    )
 
 
 def test_sam_matches_reference_l2_adamw_update(cpu_engine: None) -> None:
@@ -381,6 +566,7 @@ def test_sam_restores_parameters_after_second_pass_exception(
 ) -> None:
     model = _CrossSectionModel()
     optimizer = _adamw(model)
+    scheduler = _CountingScheduler()
     initial = [parameter.detach().clone() for parameter in model.parameters()]
     calls = 0
 
@@ -399,7 +585,7 @@ def test_sam_restores_parameters_after_second_pass_exception(
             model,
             _microbatches(),
             optimizer,
-            None,
+            scheduler,
             GH200_RUNTIME,
             "sam_adamw",
             0.1,
@@ -407,6 +593,206 @@ def test_sam_restores_parameters_after_second_pass_exception(
         )
     for parameter, expected in zip(model.parameters(), initial, strict=True):
         torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
+    assert optimizer.step_calls == 0
+    assert scheduler.steps == 0
+
+
+def test_sam_restores_parameters_after_first_pass_exception(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = _CrossSectionModel()
+    optimizer = _adamw(model)
+    scheduler = _CountingScheduler()
+    initial = [parameter.detach().clone() for parameter in model.parameters()]
+
+    def failing_predict(
+        module: nn.Module, batch: dict[str, torch.Tensor]
+    ) -> torch.Tensor:
+        module(batch["features"])
+        raise RuntimeError("first-pass injected")
+
+    monkeypatch.setattr(engine, "_predict", failing_predict)
+    with pytest.raises(RuntimeError, match="first-pass injected"):
+        run_effective_batch_update(
+            model,
+            _microbatches(),
+            optimizer,
+            scheduler,
+            GH200_RUNTIME,
+            "sam_adamw",
+            0.1,
+            0.02,
+        )
+    for parameter, expected in zip(model.parameters(), initial, strict=True):
+        torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
+    assert optimizer.step_calls == 0
+    assert scheduler.steps == 0
+
+
+def test_sam_restores_parameters_when_perturbation_construction_fails(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = _CrossSectionModel()
+    optimizer = _adamw(model)
+    scheduler = _CountingScheduler()
+    initial = [parameter.detach().clone() for parameter in model.parameters()]
+
+    def failing_perturbation(
+        parameters: tuple[nn.Parameter, ...], scale: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        del scale
+        with torch.no_grad():
+            parameters[0].add_(1.0)
+        raise RuntimeError("perturbation injected")
+
+    monkeypatch.setattr(engine, "_apply_sam_perturbation", failing_perturbation)
+    with pytest.raises(RuntimeError, match="perturbation injected"):
+        run_effective_batch_update(
+            model,
+            _microbatches(),
+            optimizer,
+            scheduler,
+            GH200_RUNTIME,
+            "sam_adamw",
+            0.1,
+            0.02,
+        )
+    for parameter, expected in zip(model.parameters(), initial, strict=True):
+        torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
+    assert optimizer.step_calls == 0
+    assert scheduler.steps == 0
+
+
+def test_sam_rejects_nonfinite_perturbation_and_restores_parameters(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = _CrossSectionModel()
+    optimizer = _adamw(model)
+    scheduler = _CountingScheduler()
+    initial = [parameter.detach().clone() for parameter in model.parameters()]
+
+    def nonfinite_perturbation(
+        parameters: tuple[nn.Parameter, ...], scale: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        del scale
+        with torch.no_grad():
+            parameters[0].add_(1.0)
+        reference = parameters[0]
+        return (
+            reference.new_zeros((), dtype=torch.float32),
+            torch.zeros((), dtype=torch.bool, device=reference.device),
+        )
+
+    monkeypatch.setattr(engine, "_apply_sam_perturbation", nonfinite_perturbation)
+    with pytest.raises(FloatingPointError, match="perturbation is non-finite"):
+        run_effective_batch_update(
+            model,
+            _microbatches(),
+            optimizer,
+            scheduler,
+            GH200_RUNTIME,
+            "sam_adamw",
+            0.1,
+            0.02,
+        )
+    for parameter, expected in zip(model.parameters(), initial, strict=True):
+        torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
+    assert optimizer.step_calls == 0
+    assert scheduler.steps == 0
+
+
+def test_sam_rejects_nonfinite_loss_and_gradients_without_update(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = _CrossSectionModel()
+    optimizer = _adamw(model)
+    scheduler = _CountingScheduler()
+    initial = [parameter.detach().clone() for parameter in model.parameters()]
+    monkeypatch.setattr(
+        engine,
+        "_predict",
+        lambda module, batch: module(batch["features"]) * float("nan"),
+    )
+
+    with pytest.raises(FloatingPointError, match="loss"):
+        run_effective_batch_update(
+            model,
+            _microbatches(),
+            optimizer,
+            scheduler,
+            GH200_RUNTIME,
+            "sam_adamw",
+            0.1,
+            0.02,
+        )
+    for parameter, expected in zip(model.parameters(), initial, strict=True):
+        torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
+    assert optimizer.step_calls == 0
+    assert scheduler.steps == 0
+
+
+def test_sam_rejects_nonfinite_gradients_with_finite_loss_without_update(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = _CrossSectionModel()
+    optimizer = _adamw(model)
+    scheduler = _CountingScheduler()
+    initial = [parameter.detach().clone() for parameter in model.parameters()]
+
+    monkeypatch.setattr(
+        engine,
+        "_predict",
+        lambda module, batch: _FiniteForwardNanBackward.apply(
+            module(batch["features"])
+        ),
+    )
+    with pytest.raises(FloatingPointError, match="gradients"):
+        run_effective_batch_update(
+            model,
+            _microbatches(),
+            optimizer,
+            scheduler,
+            GH200_RUNTIME,
+            "sam_adamw",
+            0.1,
+            0.02,
+        )
+    for parameter, expected in zip(model.parameters(), initial, strict=True):
+        torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
+    assert optimizer.step_calls == 0
+    assert scheduler.steps == 0
+
+
+def test_sam_rejects_nonfinite_post_update_parameters_and_restores_snapshot(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = _CrossSectionModel()
+    optimizer = _adamw(model)
+    scheduler = _CountingScheduler()
+    initial = [parameter.detach().clone() for parameter in model.parameters()]
+
+    def nonfinite_step(closure: object = None) -> None:
+        del closure
+        optimizer.step_calls += 1
+        with torch.no_grad():
+            next(model.parameters()).fill_(float("inf"))
+
+    monkeypatch.setattr(optimizer, "step", nonfinite_step)
+    with pytest.raises(FloatingPointError, match="non-finite parameters"):
+        run_effective_batch_update(
+            model,
+            _microbatches(),
+            optimizer,
+            scheduler,
+            GH200_RUNTIME,
+            "sam_adamw",
+            0.1,
+            0.02,
+        )
+    for parameter, expected in zip(model.parameters(), initial, strict=True):
+        torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
+    assert optimizer.step_calls == 1
+    assert scheduler.steps == 0
 
 
 def test_rho_grid_metadata_cli_and_run_names() -> None:
@@ -476,6 +862,11 @@ def test_checkpoint_round_trip_contains_resume_boundary_state(tmp_path: Path) ->
     model = build_neural_model("tcn")
     optimizer, _ = build_optimizer(model)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+    for parameter in model.parameters():
+        parameter.grad = torch.full_like(parameter, 1e-3)
+    optimizer.step()
+    scheduler.step()
+    optimizer.zero_grad(set_to_none=True)
     payload = checkpoint_payload(
         model,
         optimizer,
@@ -503,5 +894,19 @@ def test_checkpoint_round_trip_contains_resume_boundary_state(tmp_path: Path) ->
     restored_scheduler.load_state_dict(loaded["scheduler_state_dict"])
     assert loaded["objective"] == objective_metadata(0.1)
     assert loaded["sam"] == sam_metadata("sam_adamw", 0.02)
+    expected_optimizer = loaded["optimizer_state_dict"]
+    actual_optimizer = restored_optimizer.state_dict()
+    assert actual_optimizer["param_groups"] == expected_optimizer["param_groups"]
+    assert actual_optimizer["state"].keys() == expected_optimizer["state"].keys()
+    for parameter_id, expected_state in expected_optimizer["state"].items():
+        actual_state = actual_optimizer["state"][parameter_id]
+        assert actual_state.keys() == expected_state.keys()
+        for field, expected in expected_state.items():
+            actual = actual_state[field]
+            if isinstance(expected, torch.Tensor):
+                torch.testing.assert_close(actual, expected, atol=0, rtol=0)
+            else:
+                assert actual == expected
+    assert restored_scheduler.state_dict() == loaded["scheduler_state_dict"]
     for expected, actual in zip(model.parameters(), restored.parameters(), strict=True):
         torch.testing.assert_close(actual, expected, atol=0, rtol=0)

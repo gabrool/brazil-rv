@@ -269,6 +269,7 @@ def main() -> None:
     sam_smoke["passed"] = bool(
         sam_smoke["backward_passes"] == 16
         and sam_smoke["scheduler_steps"] == 1
+        and sam_smoke["rng_replay_exact"]
         and sam_smoke["predictions_finite"]
         and sam_smoke["parameters_finite"]
     )

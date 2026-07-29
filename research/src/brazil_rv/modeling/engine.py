@@ -677,21 +677,19 @@ def _optimizer_update(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
-) -> float:
+) -> torch.Tensor:
+    parameters = tuple(model.parameters())
+    reference = parameters[0]
     try:
-        gradient_norm = torch.nn.utils.clip_grad_norm_(
-            model.parameters(), GRADIENT_CLIP
-        )
-        if not bool(torch.isfinite(gradient_norm)):
+        gradient_norm = torch.nn.utils.clip_grad_norm_(parameters, GRADIENT_CLIP)
+        if not _host_flags(torch.isfinite(gradient_norm))[0]:
             raise FloatingPointError("Gradient clipping produced a non-finite norm")
         optimizer.step()
-        if not all(
-            bool(torch.isfinite(parameter).all()) for parameter in model.parameters()
-        ):
+        if not _host_flags(_tensors_finite(parameters, reference))[0]:
             raise FloatingPointError("Optimizer update produced non-finite parameters")
         if scheduler is not None:
             scheduler.step()
-        return float(gradient_norm)
+        return gradient_norm.detach()
     finally:
         optimizer.zero_grad(set_to_none=True)
 
@@ -713,11 +711,33 @@ def _gradient_l2_norm(model: nn.Module) -> torch.Tensor:
     return torch.sqrt(torch.stack(squared).sum())
 
 
-def _gradients_finite(model: nn.Module) -> bool:
-    return all(
-        parameter.grad is None or bool(torch.isfinite(parameter.grad).all())
-        for parameter in model.parameters()
-    )
+def _tensors_finite(
+    tensors: Iterable[torch.Tensor], reference: torch.Tensor
+) -> torch.Tensor:
+    predicates = [torch.isfinite(tensor).all() for tensor in tensors]
+    if not predicates:
+        return torch.ones((), dtype=torch.bool, device=reference.device)
+    return torch.stack(predicates).all()
+
+
+def _tensor_pairs_equal(
+    pairs: Iterable[tuple[torch.Tensor, torch.Tensor]], reference: torch.Tensor
+) -> torch.Tensor:
+    predicates = [torch.eq(left, right).all() for left, right in pairs]
+    if not predicates:
+        return torch.ones((), dtype=torch.bool, device=reference.device)
+    return torch.stack(predicates).all()
+
+
+def _host_flags(*flags: torch.Tensor) -> tuple[bool, ...]:
+    """Synchronize one stacked collection of device predicates."""
+    return tuple(bool(value) for value in torch.stack(flags).tolist())
+
+
+def _host_floats(*values: torch.Tensor) -> tuple[float, ...]:
+    """Synchronize one stacked collection of device diagnostics."""
+    scalars = torch.stack([value.detach().float() for value in values]).tolist()
+    return tuple(float(value) for value in scalars)
 
 
 def _accumulate_group_gradients(
@@ -727,9 +747,15 @@ def _accumulate_group_gradients(
     group_count: int,
     *,
     check_predictions_finite: bool = False,
-) -> tuple[float, bool | None]:
-    loss_sum = 0.0
-    predictions_finite: bool | None = True if check_predictions_finite else None
+) -> tuple[torch.Tensor, torch.Tensor | None]:
+    reference = next(model.parameters())
+    loss_sum = reference.new_zeros((), dtype=torch.float32)
+    losses_finite = torch.ones((), dtype=torch.bool, device=reference.device)
+    predictions_finite = (
+        torch.ones((), dtype=torch.bool, device=reference.device)
+        if check_predictions_finite
+        else None
+    )
     for buffered_batch in effective_batch:
         batch = _to_cuda(buffered_batch)
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
@@ -740,15 +766,24 @@ def _accumulate_group_gradients(
             batch["label_mask"],
             temperature,
         )
-        if not bool(torch.isfinite(microbatch_loss_sum)):
-            raise FloatingPointError("Differentiable Spearman loss is non-finite")
-        if check_predictions_finite:
-            predictions_finite = bool(
-                predictions_finite and bool(torch.isfinite(predictions).all())
-            )
+        detached_loss = microbatch_loss_sum.detach()
+        loss_sum = loss_sum + detached_loss
+        losses_finite = losses_finite & torch.isfinite(detached_loss)
+        if predictions_finite is not None:
+            predictions_finite = predictions_finite & torch.isfinite(predictions).all()
         (microbatch_loss_sum / group_count).backward()
-        loss_sum += float(microbatch_loss_sum.detach())
-    if not _gradients_finite(model):
+    gradients_finite = _tensors_finite(
+        (
+            parameter.grad
+            for parameter in model.parameters()
+            if parameter.grad is not None
+        ),
+        reference,
+    )
+    loss_ok, gradients_ok = _host_flags(losses_finite, gradients_finite)
+    if not loss_ok:
+        raise FloatingPointError("Differentiable Spearman loss is non-finite")
+    if not gradients_ok:
         raise FloatingPointError("Differentiable Spearman gradients are non-finite")
     return loss_sum, predictions_finite
 
@@ -772,6 +807,46 @@ def _restore_rng_state(
         torch.cuda.set_rng_state(cuda_state, next(model.parameters()).device)
 
 
+def _rng_states_equal(
+    left: tuple[torch.Tensor, torch.Tensor | None],
+    right: tuple[torch.Tensor, torch.Tensor | None],
+) -> bool:
+    left_cpu, left_cuda = left
+    right_cpu, right_cuda = right
+    if not torch.equal(left_cpu, right_cpu):
+        return False
+    if left_cuda is None or right_cuda is None:
+        return left_cuda is right_cuda
+    return torch.equal(left_cuda, right_cuda)
+
+
+def _apply_sam_perturbation(
+    parameters: tuple[nn.Parameter, ...], scale: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
+    reference = parameters[0]
+    squared_norm = reference.new_zeros((), dtype=torch.float32)
+    perturbations_finite = torch.ones((), dtype=torch.bool, device=reference.device)
+    with torch.no_grad():
+        for parameter in parameters:
+            if parameter.grad is None:
+                continue
+            perturbation = parameter.grad.detach().float() * scale
+            squared_norm = squared_norm + perturbation.square().sum()
+            perturbations_finite = (
+                perturbations_finite & torch.isfinite(perturbation).all()
+            )
+            parameter.add_(perturbation)
+    return torch.sqrt(squared_norm), perturbations_finite
+
+
+def _restore_parameters(
+    parameters: tuple[nn.Parameter, ...], snapshot: list[torch.Tensor]
+) -> None:
+    with torch.no_grad():
+        for parameter, original in zip(parameters, snapshot, strict=True):
+            parameter.copy_(original)
+
+
 def _run_adamw_update(
     model: nn.Module,
     effective_batch: list[dict[str, torch.Tensor]],
@@ -790,15 +865,22 @@ def _run_adamw_update(
         check_predictions_finite=check_predictions_finite,
     )
     gradient_norm = _optimizer_update(model, optimizer, scheduler)
+    diagnostic_tensors = [loss_sum, gradient_norm]
+    if predictions_finite is not None:
+        diagnostic_tensors.append(predictions_finite.float())
+    diagnostics = _host_floats(*diagnostic_tensors)
     return {
-        "loss_sum": loss_sum,
+        "loss_sum": diagnostics[0],
         "group_count": group_count,
-        "gradient_norm": gradient_norm,
+        "gradient_norm": diagnostics[1],
         "first_pass_gradient_norm": None,
         "perturbation_norm": None,
         "second_pass_gradient_norm": None,
-        "predictions_finite": predictions_finite,
+        "predictions_finite": (
+            None if predictions_finite is None else bool(diagnostics[2])
+        ),
         "backward_passes": len(effective_batch),
+        "rng_replay_exact": None,
         "all_finite": True,
     }
 
@@ -814,9 +896,9 @@ def _run_sam_update(
     check_predictions_finite: bool,
 ) -> dict[str, float | int | bool | None]:
     rho = validate_sam_rho(rho)
-    initial_parameters = [
-        parameter.detach().clone() for parameter in model.parameters()
-    ]
+    parameters = tuple(model.parameters())
+    reference = parameters[0]
+    initial_parameters = [parameter.detach().clone() for parameter in parameters]
     rng_state = _rng_state(model)
     optimizer.zero_grad(set_to_none=True)
     try:
@@ -827,30 +909,21 @@ def _run_sam_update(
             group_count,
             check_predictions_finite=check_predictions_finite,
         )
+        first_pass_end_rng = _rng_state(model)
         first_gradient_norm = _gradient_l2_norm(model)
-        if not bool(torch.isfinite(first_gradient_norm)):
+        if not _host_flags(torch.isfinite(first_gradient_norm))[0]:
             raise FloatingPointError("First-pass SAM gradient norm is non-finite")
 
-        perturbed: list[tuple[nn.Parameter, torch.Tensor]] = []
-        perturbations: list[torch.Tensor] = []
         scale = rho / (first_gradient_norm + SAM_NORM_EPS)
-        with torch.no_grad():
-            for parameter in model.parameters():
-                if parameter.grad is None:
-                    continue
-                original = parameter.detach().clone()
-                perturbation = parameter.grad.detach().float() * scale
-                if not bool(torch.isfinite(perturbation).all()):
-                    raise FloatingPointError("SAM perturbation is non-finite")
-                parameter.add_(perturbation)
-                perturbed.append((parameter, original))
-                perturbations.append(perturbation)
-        perturbation_norm = torch.sqrt(
-            torch.stack(
-                [perturbation.square().sum() for perturbation in perturbations]
-            ).sum()
+        perturbation_norm, perturbations_finite = _apply_sam_perturbation(
+            parameters, scale
         )
-        if not bool(torch.isfinite(perturbation_norm)):
+        perturbations_ok, perturbation_norm_ok = _host_flags(
+            perturbations_finite, torch.isfinite(perturbation_norm)
+        )
+        if not perturbations_ok:
+            raise FloatingPointError("SAM perturbation is non-finite")
+        if not perturbation_norm_ok:
             raise FloatingPointError("SAM perturbation norm is non-finite")
 
         optimizer.zero_grad(set_to_none=True)
@@ -863,44 +936,60 @@ def _run_sam_update(
                 group_count,
                 check_predictions_finite=check_predictions_finite,
             )
+            second_pass_end_rng = _rng_state(model)
         finally:
-            with torch.no_grad():
-                for parameter, original in perturbed:
-                    parameter.copy_(original)
+            _restore_parameters(parameters, initial_parameters)
 
-        for parameter, original in perturbed:
-            if not torch.equal(parameter, original):
-                raise RuntimeError("SAM parameter restoration was not exact")
-        if not all(
-            bool(torch.isfinite(parameter).all()) for parameter in model.parameters()
-        ):
+        restoration_exact, restored_finite = _host_flags(
+            _tensor_pairs_equal(
+                zip(parameters, initial_parameters, strict=True), reference
+            ),
+            _tensors_finite(parameters, reference),
+        )
+        if not restoration_exact:
+            raise RuntimeError("SAM parameter restoration was not exact")
+        if not restored_finite:
             raise FloatingPointError("Restored SAM parameters are non-finite")
+        if not _rng_states_equal(first_pass_end_rng, second_pass_end_rng):
+            raise RuntimeError("SAM RNG replay diverged")
         second_gradient_norm = _gradient_l2_norm(model)
-        if not bool(torch.isfinite(second_gradient_norm)):
+        if not _host_flags(torch.isfinite(second_gradient_norm))[0]:
             raise FloatingPointError("Second-pass SAM gradient norm is non-finite")
         gradient_norm = _optimizer_update(model, optimizer, scheduler)
+
+        predictions_finite = (
+            None
+            if first_predictions_finite is None
+            else first_predictions_finite & second_predictions_finite
+        )
+        diagnostic_tensors = [
+            first_loss_sum,
+            second_loss_sum,
+            gradient_norm,
+            first_gradient_norm,
+            perturbation_norm,
+            second_gradient_norm,
+        ]
+        if predictions_finite is not None:
+            diagnostic_tensors.append(predictions_finite.float())
+        diagnostics = _host_floats(*diagnostic_tensors)
         return {
-            "loss_sum": first_loss_sum,
-            "second_loss_sum": second_loss_sum,
+            "loss_sum": diagnostics[0],
+            "second_loss_sum": diagnostics[1],
             "group_count": group_count,
-            "gradient_norm": gradient_norm,
-            "first_pass_gradient_norm": float(first_gradient_norm),
-            "perturbation_norm": float(perturbation_norm),
-            "second_pass_gradient_norm": float(second_gradient_norm),
+            "gradient_norm": diagnostics[2],
+            "first_pass_gradient_norm": diagnostics[3],
+            "perturbation_norm": diagnostics[4],
+            "second_pass_gradient_norm": diagnostics[5],
             "predictions_finite": (
-                None
-                if not check_predictions_finite
-                else bool(first_predictions_finite and second_predictions_finite)
+                None if predictions_finite is None else bool(diagnostics[6])
             ),
             "backward_passes": 2 * len(effective_batch),
+            "rng_replay_exact": True,
             "all_finite": True,
         }
     except BaseException:
-        with torch.no_grad():
-            for parameter, initial in zip(
-                model.parameters(), initial_parameters, strict=True
-            ):
-                parameter.copy_(initial)
+        _restore_parameters(parameters, initial_parameters)
         optimizer.zero_grad(set_to_none=True)
         raise
 

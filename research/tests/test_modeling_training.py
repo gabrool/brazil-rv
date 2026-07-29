@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import csv
 import gc
 import json
 import sys
@@ -18,6 +19,8 @@ from torch import nn
 
 import brazil_rv.modeling.engine as engine_module
 from brazil_rv.modeling.contract import (
+    ADAMW_LR,
+    ADAMW_WEIGHT_DECAY,
     COMPILE_PARITY_GRADIENT_COSINE_MIN,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
@@ -29,10 +32,15 @@ from brazil_rv.modeling.contract import (
     CompileEvaluationWarmupReport,
     CompileParityThresholds,
     CompileSetupReport,
+    EFFECTIVE_BATCH_SIZE,
     EQUITY_COUNT,
+    FINAL_LR_FACTOR,
+    MAX_EPOCHS,
     NEURAL_MODELS,
     GH200_RUNTIME,
     HORIZONS,
+    TRANSFORMER_MODELS,
+    WARMUP_FRACTION,
     XGBOOST_CANDIDATES,
     XGBOOST_DEVICE,
     XGBOOST_FIXED_PARAMETERS,
@@ -55,6 +63,8 @@ from brazil_rv.modeling.engine import (
 )
 from brazil_rv.modeling.metrics import create_metric_table
 from brazil_rv.modeling.train import (
+    _HISTORY_COLUMNS,
+    _atomic_write_history,
     _atomic_write_json,
     _model_metadata,
 )
@@ -73,7 +83,12 @@ from brazil_rv.modeling.xgboost_model import (
     select_candidate,
     validate_booster_hashes,
 )
-from brazil_rv.modeling.optim import build_optimizer
+from brazil_rv.modeling.optim import (
+    build_optimizer,
+    build_scheduler,
+    learning_rate_factor,
+    partition_parameters,
+)
 
 
 def test_compile_setup_modern_explicit_off(
@@ -681,6 +696,163 @@ def test_atomic_json_write_replaces_final_without_temporary_file(
     _atomic_write_json(output, {"status": "running"})
     assert json.loads(output.read_text(encoding="utf-8")) == {"status": "running"}
     assert not (tmp_path / "run_manifest.json.tmp").exists()
+
+
+def _history_row(*, sam: bool) -> dict[str, object]:
+    return {
+        "epoch": 3,
+        "optimizer_steps": 62,
+        "backward_passes": 992 if sam else 496,
+        "train_loss": 0.8125,
+        "validation_soft_spearman_loss": 0.75,
+        "validation_primary_ic": 0.031,
+        "validation_ic_30": 0.021,
+        "validation_ic_60": 0.032,
+        "validation_ic_120": 0.040,
+        "mean_gradient_norm": 0.42,
+        "maximum_gradient_norm": 0.91,
+        "mean_first_pass_sam_gradient_norm": 0.33 if sam else None,
+        "mean_sam_perturbation_norm": 0.02 if sam else None,
+        "mean_second_pass_sam_gradient_norm": 0.37 if sam else None,
+        "all_finite": True,
+        "adamw_lr": 0.0003,
+        "epoch_seconds": 61.5,
+        "peak_allocated_cuda_memory_bytes": 12_345_678,
+        "peak_reserved_cuda_memory_bytes": 23_456_789,
+    }
+
+
+@pytest.mark.parametrize("sam", (False, True), ids=("adamw", "sam_adamw"))
+def test_atomic_history_round_trip_exact_schema_and_no_temporary_file(
+    tmp_path: Path, sam: bool
+) -> None:
+    output = tmp_path / "history.csv"
+    output.write_text("stale\n", encoding="utf-8")
+    expected = _history_row(sam=sam)
+
+    _atomic_write_history(output, [expected])
+
+    with output.open(newline="", encoding="utf-8") as source:
+        reader = csv.DictReader(source)
+        rows = list(reader)
+    assert reader.fieldnames == list(_HISTORY_COLUMNS)
+    assert rows == [
+        {key: "" if value is None else str(value) for key, value in expected.items()}
+    ]
+    assert not output.with_name("history.csv.tmp").exists()
+
+
+def test_atomic_history_rejects_unexpected_fields_without_replacing_output(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "history.csv"
+    original = "existing-history\n"
+    output.write_text(original, encoding="utf-8")
+    row = {**_history_row(sam=False), "optimizer_variant": "adamw"}
+
+    with pytest.raises(ValueError, match="fields not in fieldnames"):
+        _atomic_write_history(output, [row])
+
+    assert output.read_text(encoding="utf-8") == original
+    assert not output.with_name("history.csv.tmp").exists()
+
+
+@pytest.mark.parametrize("model_name", NEURAL_MODELS)
+def test_adamw_parameter_routing_is_complete_disjoint_and_semantic(
+    model_name: str,
+) -> None:
+    model = build_neural_model(model_name)
+    groups = partition_parameters(model)
+    decay_ids = {id(parameter) for parameter in groups["decay"]}
+    no_decay_ids = {id(parameter) for parameter in groups["no_decay"]}
+    trainable = [
+        parameter for parameter in model.parameters() if parameter.requires_grad
+    ]
+    trainable_ids = {id(parameter) for parameter in trainable}
+
+    assert decay_ids.isdisjoint(no_decay_ids)
+    assert decay_ids | no_decay_ids == trainable_ids
+    assert len(groups["decay"]) + len(groups["no_decay"]) == len(trainable_ids)
+
+    saw_linear_weight = False
+    saw_bias = False
+    saw_embedding = False
+    saw_rms_norm = False
+    for module in model.modules():
+        for attribute, parameter in module.named_parameters(recurse=False):
+            if not parameter.requires_grad:
+                continue
+            parameter_id = id(parameter)
+            no_decay = (
+                isinstance(module, (nn.RMSNorm, nn.Embedding))
+                or attribute == "bias"
+                or (module is model and attribute == "state_token")
+            )
+            assert (parameter_id in no_decay_ids) is no_decay
+            assert (parameter_id in decay_ids) is (not no_decay)
+            saw_linear_weight |= isinstance(module, nn.Linear) and attribute == "weight"
+            saw_bias |= attribute == "bias"
+            saw_embedding |= isinstance(module, nn.Embedding)
+            saw_rms_norm |= isinstance(module, nn.RMSNorm)
+
+    assert saw_linear_weight
+    assert saw_bias
+    assert saw_embedding is (model_name in TRANSFORMER_MODELS)
+    assert hasattr(model, "state_token") is (model_name in TRANSFORMER_MODELS)
+    if saw_rms_norm:
+        assert all(
+            id(module.weight) in no_decay_ids
+            for module in model.modules()
+            if isinstance(module, nn.RMSNorm)
+        )
+
+    optimizer, optimizer_groups = build_optimizer(model)
+    assert optimizer_groups == groups
+    assert {
+        id(parameter) for parameter in optimizer.param_groups[0]["params"]
+    } == decay_ids
+    assert {
+        id(parameter) for parameter in optimizer.param_groups[1]["params"]
+    } == no_decay_ids
+    assert optimizer.param_groups[0]["weight_decay"] == ADAMW_WEIGHT_DECAY
+    assert optimizer.param_groups[1]["weight_decay"] == 0.0
+
+
+def test_scheduler_warmup_cosine_endpoints_and_update_numbering() -> None:
+    parameter = nn.Parameter(torch.ones(()))
+    optimizer = torch.optim.AdamW([parameter], lr=ADAMW_LR)
+    training_sample_count = 31_405
+    scheduler, steps_per_epoch, warmup_steps = build_scheduler(
+        optimizer, training_sample_count
+    )
+    total_steps = steps_per_epoch * MAX_EPOCHS
+
+    assert steps_per_epoch == 62
+    assert (
+        steps_per_epoch
+        == (training_sample_count + EFFECTIVE_BATCH_SIZE - 1) // EFFECTIVE_BATCH_SIZE
+    )
+    assert warmup_steps == int(WARMUP_FRACTION * total_steps)
+    assert learning_rate_factor(1, total_steps, warmup_steps) == pytest.approx(
+        1.0 / warmup_steps
+    )
+    assert learning_rate_factor(warmup_steps, total_steps, warmup_steps) == 1.0
+    assert learning_rate_factor(
+        total_steps, total_steps, warmup_steps
+    ) == pytest.approx(FINAL_LR_FACTOR)
+
+    observed = []
+    for update_number in range(1, total_steps + 1):
+        observed.append(optimizer.param_groups[0]["lr"] / ADAMW_LR)
+        optimizer.step()
+        scheduler.step()
+        assert scheduler.last_epoch == update_number
+    assert observed[0] == pytest.approx(
+        learning_rate_factor(1, total_steps, warmup_steps)
+    )
+    assert observed[warmup_steps - 1] == pytest.approx(1.0)
+    assert observed[-1] == pytest.approx(FINAL_LR_FACTOR)
+    assert optimizer.param_groups[0]["lr"] / ADAMW_LR == pytest.approx(FINAL_LR_FACTOR)
 
 
 @pytest.mark.parametrize("model_name", NEURAL_MODELS)
