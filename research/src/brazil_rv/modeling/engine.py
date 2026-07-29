@@ -34,12 +34,15 @@ from .contract import (
     CompileWarmupReport,
     GH200_RUNTIME,
     GRADIENT_CLIP,
-    HUBER_DELTA,
     HardwareInfo,
     RuntimeSettings,
+    SAM_NORM_EPS,
+    SAM_RHOS,
+    SOFT_RANK_STANDARDIZATION_EPS,
+    SOFT_RANK_TEMPERATURES,
+    SOFT_SPEARMAN_CORRELATION_EPS,
 )
 from .metrics import create_metric_table
-from .muon import PYTORCH_MUON_REFERENCE
 
 
 def validate_runtime() -> HardwareInfo:
@@ -333,54 +336,114 @@ def _compile_parity_report(
     )
 
 
-def _rank_target_huber_sample_losses(
+def validate_soft_rank_temperature(temperature: float) -> float:
+    if temperature not in SOFT_RANK_TEMPERATURES:
+        raise ValueError(
+            f"Soft-rank temperature must be one of {SOFT_RANK_TEMPERATURES}"
+        )
+    return temperature
+
+
+def validate_sam_rho(rho: float) -> float:
+    if rho not in SAM_RHOS:
+        raise ValueError(f"SAM rho must be one of {SAM_RHOS}")
+    return rho
+
+
+def experiment_decimal(value: float, minimum_fraction_digits: int) -> str:
+    text = f"{value:.10f}".rstrip("0")
+    whole, fraction = text.split(".")
+    return f"{whole}p{fraction.ljust(minimum_fraction_digits, '0')}"
+
+
+def objective_metadata(temperature: float) -> dict[str, object]:
+    return {
+        "name": "soft_spearman",
+        "temperature": validate_soft_rank_temperature(temperature),
+        "score_standardization": "masked_cross_sectional",
+        "soft_rank": "pairwise_sigmoid",
+        "aggregation": "equal_valid_cross_section_horizon",
+        "reported_validation_metric": "hard_spearman",
+    }
+
+
+def sam_metadata(
+    optimizer_variant: str, sam_rho: float | None
+) -> dict[str, object] | None:
+    if optimizer_variant == "adamw":
+        if sam_rho is not None:
+            raise ValueError("Ordinary AdamW does not accept a SAM rho")
+        return None
+    if optimizer_variant != "sam_adamw" or sam_rho is None:
+        raise ValueError("SAM-AdamW requires a supported positive rho")
+    return {
+        "rho": validate_sam_rho(sam_rho),
+        "norm": "l2",
+        "adaptive": False,
+        "base_optimizer": "adamw",
+        "same_batch_replay": True,
+        "same_rng_replay": True,
+        "backward_passes_per_update": 16,
+    }
+
+
+def _soft_spearman_loss_sum(
     predictions: torch.Tensor,
     targets: torch.Tensor,
     label_mask: torch.Tensor,
-    delta: float,
+    temperature: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    difference = predictions.float() - targets.float()
-    absolute = difference.abs()
-    elementwise = torch.where(
-        absolute <= delta,
-        0.5 * difference.square(),
-        delta * (absolute - 0.5 * delta),
-    )
-    mask = label_mask.bool()
-    label_counts = mask.sum(dim=1)
-    valid_horizons = label_counts > 0
-    horizon_loss = (elementwise * mask).sum(dim=1) / label_counts.clamp_min(1)
-    valid_horizon_counts = valid_horizons.sum(dim=1)
-    valid_samples = valid_horizon_counts > 0
-    sample_loss = (horizon_loss * valid_horizons).sum(
-        dim=1
-    ) / valid_horizon_counts.clamp_min(1)
-    return sample_loss, valid_samples
+    validate_soft_rank_temperature(temperature)
+    with torch.autocast(device_type=predictions.device.type, enabled=False):
+        scores = predictions.float().transpose(1, 2)
+        target_ranks = targets.float().transpose(1, 2)
+        mask = label_mask.bool().transpose(1, 2)
+        counts = mask.sum(dim=-1)
+        valid_groups = counts >= 2
+        safe_counts = counts.clamp_min(1)
+
+        score_mean = (scores * mask).sum(dim=-1) / safe_counts
+        score_centered = (scores - score_mean.unsqueeze(-1)) * mask
+        score_variance = score_centered.square().sum(dim=-1) / safe_counts
+        standardized = score_centered / torch.sqrt(
+            score_variance.unsqueeze(-1) + SOFT_RANK_STANDARDIZATION_EPS
+        )
+
+        equity_count = scores.shape[-1]
+        not_self = ~torch.eye(
+            equity_count, dtype=torch.bool, device=scores.device
+        ).reshape(1, 1, equity_count, equity_count)
+        pair_mask = mask.unsqueeze(-1) & mask.unsqueeze(-2) & not_self
+        pairwise = (
+            standardized.unsqueeze(-1) - standardized.unsqueeze(-2)
+        ) / temperature
+        soft_ranks = (1.0 + (torch.sigmoid(pairwise) * pair_mask).sum(dim=-1)) * mask
+
+        soft_mean = soft_ranks.sum(dim=-1) / safe_counts
+        soft_centered = (soft_ranks - soft_mean.unsqueeze(-1)) * mask
+        target_mean = (target_ranks * mask).sum(dim=-1) / safe_counts
+        target_centered = (target_ranks - target_mean.unsqueeze(-1)) * mask
+        covariance = (soft_centered * target_centered).sum(dim=-1)
+        denominator = (
+            (soft_centered.square().sum(dim=-1) * target_centered.square().sum(dim=-1))
+            .clamp_min(SOFT_SPEARMAN_CORRELATION_EPS)
+            .sqrt()
+        )
+        correlation = covariance / denominator
+        group_losses = (1.0 - correlation) * valid_groups
+        return group_losses.sum(), valid_groups.sum()
 
 
-def rank_target_huber_loss(
+def soft_spearman_loss(
     predictions: torch.Tensor,
     targets: torch.Tensor,
     label_mask: torch.Tensor,
-    delta: float = HUBER_DELTA,
+    temperature: float,
 ) -> torch.Tensor:
-    sample_loss, valid_samples = _rank_target_huber_sample_losses(
-        predictions, targets, label_mask, delta
+    loss_sum, group_count = _soft_spearman_loss_sum(
+        predictions, targets, label_mask, temperature
     )
-    if bool(valid_samples.any()):
-        return sample_loss[valid_samples].mean()
-    return predictions.float().sum() * 0.0
-
-
-def _loss_sum(
-    predictions: torch.Tensor,
-    targets: torch.Tensor,
-    label_mask: torch.Tensor,
-) -> torch.Tensor:
-    sample_loss, valid_samples = _rank_target_huber_sample_losses(
-        predictions, targets, label_mask, HUBER_DELTA
-    )
-    return sample_loss[valid_samples].sum()
+    return loss_sum / group_count.clamp_min(1)
 
 
 def _to_cuda(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
@@ -428,6 +491,7 @@ def qualify_eager_compiled_model(
     cpu_batch: dict[str, torch.Tensor],
     *,
     include_backward: bool,
+    temperature: float,
 ) -> CompileParityReport:
     eager_parameters = tuple(eager_model.named_parameters())
     compiled_parameters = tuple(compiled_model.named_parameters())
@@ -450,13 +514,11 @@ def qualify_eager_compiled_model(
         eager_model.zero_grad(set_to_none=True)
         compiled_model.zero_grad(set_to_none=True)
 
-        with (
-            torch.enable_grad() if include_backward else torch.no_grad(),
-            torch.autocast(device_type="cuda", dtype=torch.bfloat16),
-        ):
-            eager_predictions = _predict(eager_model, batch)
-            eager_loss = rank_target_huber_loss(
-                eager_predictions, batch["targets"], batch["label_mask"]
+        with torch.enable_grad() if include_backward else torch.no_grad():
+            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                eager_predictions = _predict(eager_model, batch)
+            eager_loss = soft_spearman_loss(
+                eager_predictions, batch["targets"], batch["label_mask"], temperature
             )
         if include_backward:
             eager_loss.backward()
@@ -466,13 +528,11 @@ def qualify_eager_compiled_model(
         eager_predictions = eager_predictions.detach().clone()
         eager_loss = eager_loss.detach().clone()
 
-        with (
-            torch.enable_grad() if include_backward else torch.no_grad(),
-            torch.autocast(device_type="cuda", dtype=torch.bfloat16),
-        ):
-            compiled_predictions = _predict(compiled_model, batch)
-            compiled_loss = rank_target_huber_loss(
-                compiled_predictions, batch["targets"], batch["label_mask"]
+        with torch.enable_grad() if include_backward else torch.no_grad():
+            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                compiled_predictions = _predict(compiled_model, batch)
+            compiled_loss = soft_spearman_loss(
+                compiled_predictions, batch["targets"], batch["label_mask"], temperature
             )
         if include_backward:
             compiled_loss.backward()
@@ -519,7 +579,7 @@ def build_compile_metadata(
 
 
 def _timed_training_warmup_pass(
-    model: nn.Module, batch: dict[str, torch.Tensor]
+    model: nn.Module, batch: dict[str, torch.Tensor], temperature: float
 ) -> float:
     model.zero_grad(set_to_none=True)
     try:
@@ -527,9 +587,9 @@ def _timed_training_warmup_pass(
         started = time.perf_counter()
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             predictions = _predict(model, batch)
-            loss = rank_target_huber_loss(
-                predictions, batch["targets"], batch["label_mask"]
-            )
+        loss = soft_spearman_loss(
+            predictions, batch["targets"], batch["label_mask"], temperature
+        )
         loss.backward()
         torch.cuda.synchronize()
         seconds = time.perf_counter() - started
@@ -564,13 +624,14 @@ def warmup_compiled_model(
     model: nn.Module,
     training_batch: dict[str, torch.Tensor],
     evaluation_batch: dict[str, torch.Tensor],
+    temperature: float,
 ) -> CompileWarmupReport:
     torch.cuda.reset_peak_memory_stats()
     training_cuda = _to_cuda(training_batch)
     evaluation_cuda = _to_cuda(evaluation_batch)
     model.train()
     training_pass_seconds = tuple(
-        _timed_training_warmup_pass(model, training_cuda)
+        _timed_training_warmup_pass(model, training_cuda, temperature)
         for _ in range(COMPILE_WARMUP_PASS_COUNT)
     )
     model.eval()
@@ -614,121 +675,349 @@ def warmup_compiled_evaluation(
 
 def _optimizer_update(
     model: nn.Module,
-    optimizers: dict[str, torch.optim.Optimizer],
-    schedulers: dict[str, torch.optim.lr_scheduler.LambdaLR],
-) -> tuple[bool, float]:
-    gradient_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), GRADIENT_CLIP)
-    update_succeeded = bool(torch.isfinite(gradient_norm))
-    if update_succeeded:
-        for optimizer in optimizers.values():
-            optimizer.step()
-        for scheduler in schedulers.values():
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None,
+) -> float:
+    try:
+        gradient_norm = torch.nn.utils.clip_grad_norm_(
+            model.parameters(), GRADIENT_CLIP
+        )
+        if not bool(torch.isfinite(gradient_norm)):
+            raise FloatingPointError("Gradient clipping produced a non-finite norm")
+        optimizer.step()
+        if not all(
+            bool(torch.isfinite(parameter).all()) for parameter in model.parameters()
+        ):
+            raise FloatingPointError("Optimizer update produced non-finite parameters")
+        if scheduler is not None:
             scheduler.step()
-    for optimizer in optimizers.values():
+        return float(gradient_norm)
+    finally:
         optimizer.zero_grad(set_to_none=True)
-    return update_succeeded, float(gradient_norm)
 
 
-def _run_accumulated_update(
+def _valid_group_count(effective_batch: list[dict[str, torch.Tensor]]) -> int:
+    return sum(
+        int((batch["label_mask"].sum(dim=1) >= 2).sum()) for batch in effective_batch
+    )
+
+
+def _gradient_l2_norm(model: nn.Module) -> torch.Tensor:
+    squared = [
+        parameter.grad.detach().float().square().sum()
+        for parameter in model.parameters()
+        if parameter.grad is not None
+    ]
+    if not squared:
+        return next(model.parameters()).new_zeros((), dtype=torch.float32)
+    return torch.sqrt(torch.stack(squared).sum())
+
+
+def _gradients_finite(model: nn.Module) -> bool:
+    return all(
+        parameter.grad is None or bool(torch.isfinite(parameter.grad).all())
+        for parameter in model.parameters()
+    )
+
+
+def _accumulate_group_gradients(
     model: nn.Module,
     effective_batch: list[dict[str, torch.Tensor]],
-    optimizers: dict[str, torch.optim.Optimizer],
-    schedulers: dict[str, torch.optim.lr_scheduler.LambdaLR],
+    temperature: float,
+    group_count: int,
     *,
     check_predictions_finite: bool = False,
-) -> tuple[torch.Tensor, int, bool, float, bool | None]:
-    if not effective_batch:
-        raise ValueError("Effective batch must contain at least one physical batch")
-    effective_valid_samples = sum(
-        int(batch["label_mask"].any(dim=(1, 2)).sum()) for batch in effective_batch
-    )
-    denominator = max(effective_valid_samples, 1)
-    effective_loss_sum: torch.Tensor | None = None
+) -> tuple[float, bool | None]:
+    loss_sum = 0.0
     predictions_finite: bool | None = True if check_predictions_finite else None
     for buffered_batch in effective_batch:
         batch = _to_cuda(buffered_batch)
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             predictions = _predict(model, batch)
-            microbatch_loss_sum = _loss_sum(
-                predictions,
-                batch["targets"],
-                batch["label_mask"],
-            )
+        microbatch_loss_sum, _ = _soft_spearman_loss_sum(
+            predictions,
+            batch["targets"],
+            batch["label_mask"],
+            temperature,
+        )
+        if not bool(torch.isfinite(microbatch_loss_sum)):
+            raise FloatingPointError("Differentiable Spearman loss is non-finite")
         if check_predictions_finite:
             predictions_finite = bool(
                 predictions_finite and bool(torch.isfinite(predictions).all())
             )
-        (microbatch_loss_sum / denominator).backward()
-        detached_loss = microbatch_loss_sum.detach()
-        effective_loss_sum = (
-            detached_loss
-            if effective_loss_sum is None
-            else effective_loss_sum + detached_loss
+        (microbatch_loss_sum / group_count).backward()
+        loss_sum += float(microbatch_loss_sum.detach())
+    if not _gradients_finite(model):
+        raise FloatingPointError("Differentiable Spearman gradients are non-finite")
+    return loss_sum, predictions_finite
+
+
+def _rng_state(model: nn.Module) -> tuple[torch.Tensor, torch.Tensor | None]:
+    parameter = next(model.parameters())
+    cuda_state = (
+        torch.cuda.get_rng_state(parameter.device)
+        if parameter.device.type == "cuda"
+        else None
+    )
+    return torch.get_rng_state(), cuda_state
+
+
+def _restore_rng_state(
+    model: nn.Module, state: tuple[torch.Tensor, torch.Tensor | None]
+) -> None:
+    cpu_state, cuda_state = state
+    torch.set_rng_state(cpu_state)
+    if cuda_state is not None:
+        torch.cuda.set_rng_state(cuda_state, next(model.parameters()).device)
+
+
+def _run_adamw_update(
+    model: nn.Module,
+    effective_batch: list[dict[str, torch.Tensor]],
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None,
+    temperature: float,
+    group_count: int,
+    check_predictions_finite: bool,
+) -> dict[str, float | int | bool | None]:
+    optimizer.zero_grad(set_to_none=True)
+    loss_sum, predictions_finite = _accumulate_group_gradients(
+        model,
+        effective_batch,
+        temperature,
+        group_count,
+        check_predictions_finite=check_predictions_finite,
+    )
+    gradient_norm = _optimizer_update(model, optimizer, scheduler)
+    return {
+        "loss_sum": loss_sum,
+        "group_count": group_count,
+        "gradient_norm": gradient_norm,
+        "first_pass_gradient_norm": None,
+        "perturbation_norm": None,
+        "second_pass_gradient_norm": None,
+        "predictions_finite": predictions_finite,
+        "backward_passes": len(effective_batch),
+        "all_finite": True,
+    }
+
+
+def _run_sam_update(
+    model: nn.Module,
+    effective_batch: list[dict[str, torch.Tensor]],
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None,
+    temperature: float,
+    rho: float,
+    group_count: int,
+    check_predictions_finite: bool,
+) -> dict[str, float | int | bool | None]:
+    rho = validate_sam_rho(rho)
+    initial_parameters = [
+        parameter.detach().clone() for parameter in model.parameters()
+    ]
+    rng_state = _rng_state(model)
+    optimizer.zero_grad(set_to_none=True)
+    try:
+        first_loss_sum, first_predictions_finite = _accumulate_group_gradients(
+            model,
+            effective_batch,
+            temperature,
+            group_count,
+            check_predictions_finite=check_predictions_finite,
         )
-    update_succeeded, gradient_norm = _optimizer_update(model, optimizers, schedulers)
-    if effective_loss_sum is None:
-        raise RuntimeError("Effective batch contains no physical batches")
-    return (
-        effective_loss_sum,
-        effective_valid_samples,
-        update_succeeded,
-        gradient_norm,
-        predictions_finite,
+        first_gradient_norm = _gradient_l2_norm(model)
+        if not bool(torch.isfinite(first_gradient_norm)):
+            raise FloatingPointError("First-pass SAM gradient norm is non-finite")
+
+        perturbed: list[tuple[nn.Parameter, torch.Tensor]] = []
+        perturbations: list[torch.Tensor] = []
+        scale = rho / (first_gradient_norm + SAM_NORM_EPS)
+        with torch.no_grad():
+            for parameter in model.parameters():
+                if parameter.grad is None:
+                    continue
+                original = parameter.detach().clone()
+                perturbation = parameter.grad.detach().float() * scale
+                if not bool(torch.isfinite(perturbation).all()):
+                    raise FloatingPointError("SAM perturbation is non-finite")
+                parameter.add_(perturbation)
+                perturbed.append((parameter, original))
+                perturbations.append(perturbation)
+        perturbation_norm = torch.sqrt(
+            torch.stack(
+                [perturbation.square().sum() for perturbation in perturbations]
+            ).sum()
+        )
+        if not bool(torch.isfinite(perturbation_norm)):
+            raise FloatingPointError("SAM perturbation norm is non-finite")
+
+        optimizer.zero_grad(set_to_none=True)
+        _restore_rng_state(model, rng_state)
+        try:
+            second_loss_sum, second_predictions_finite = _accumulate_group_gradients(
+                model,
+                effective_batch,
+                temperature,
+                group_count,
+                check_predictions_finite=check_predictions_finite,
+            )
+        finally:
+            with torch.no_grad():
+                for parameter, original in perturbed:
+                    parameter.copy_(original)
+
+        for parameter, original in perturbed:
+            if not torch.equal(parameter, original):
+                raise RuntimeError("SAM parameter restoration was not exact")
+        if not all(
+            bool(torch.isfinite(parameter).all()) for parameter in model.parameters()
+        ):
+            raise FloatingPointError("Restored SAM parameters are non-finite")
+        second_gradient_norm = _gradient_l2_norm(model)
+        if not bool(torch.isfinite(second_gradient_norm)):
+            raise FloatingPointError("Second-pass SAM gradient norm is non-finite")
+        gradient_norm = _optimizer_update(model, optimizer, scheduler)
+        return {
+            "loss_sum": first_loss_sum,
+            "second_loss_sum": second_loss_sum,
+            "group_count": group_count,
+            "gradient_norm": gradient_norm,
+            "first_pass_gradient_norm": float(first_gradient_norm),
+            "perturbation_norm": float(perturbation_norm),
+            "second_pass_gradient_norm": float(second_gradient_norm),
+            "predictions_finite": (
+                None
+                if not check_predictions_finite
+                else bool(first_predictions_finite and second_predictions_finite)
+            ),
+            "backward_passes": 2 * len(effective_batch),
+            "all_finite": True,
+        }
+    except BaseException:
+        with torch.no_grad():
+            for parameter, initial in zip(
+                model.parameters(), initial_parameters, strict=True
+            ):
+                parameter.copy_(initial)
+        optimizer.zero_grad(set_to_none=True)
+        raise
+
+
+def run_effective_batch_update(
+    model: nn.Module,
+    effective_batch: list[dict[str, torch.Tensor]],
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None,
+    runtime: RuntimeSettings,
+    optimizer_variant: str,
+    temperature: float,
+    sam_rho: float | None,
+    *,
+    check_predictions_finite: bool = False,
+) -> dict[str, float | int | bool | None]:
+    if len(effective_batch) != runtime.accumulation_steps:
+        raise ValueError(
+            f"Effective batch requires exactly {runtime.accumulation_steps} "
+            "physical microbatches"
+        )
+    validate_soft_rank_temperature(temperature)
+    sam_metadata(optimizer_variant, sam_rho)
+    group_count = _valid_group_count(effective_batch)
+    if group_count == 0:
+        raise ValueError("Effective batch contains no valid cross-section/horizon")
+    if optimizer_variant == "adamw":
+        return _run_adamw_update(
+            model,
+            effective_batch,
+            optimizer,
+            scheduler,
+            temperature,
+            group_count,
+            check_predictions_finite,
+        )
+    assert sam_rho is not None
+    return _run_sam_update(
+        model,
+        effective_batch,
+        optimizer,
+        scheduler,
+        temperature,
+        sam_rho,
+        group_count,
+        check_predictions_finite,
     )
 
 
 def train_one_epoch(
     model: nn.Module,
     loader: Iterable[dict[str, torch.Tensor]],
-    optimizers: dict[str, torch.optim.Optimizer],
-    schedulers: dict[str, torch.optim.lr_scheduler.LambdaLR],
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler.LRScheduler,
     runtime: RuntimeSettings,
-) -> dict[str, float | int]:
+    optimizer_variant: str,
+    temperature: float,
+    sam_rho: float | None,
+) -> dict[str, float | int | bool | None]:
     model.train()
-    for optimizer in optimizers.values():
-        optimizer.zero_grad(set_to_none=True)
+    optimizer.zero_grad(set_to_none=True)
     loss_sum = 0.0
-    valid_sample_count = 0
+    group_count = 0
     optimizer_steps = 0
     gradient_norms: list[float] = []
+    first_gradient_norms: list[float] = []
+    perturbation_norms: list[float] = []
+    second_gradient_norms: list[float] = []
+    backward_passes = 0
     effective_batch: list[dict[str, torch.Tensor]] = []
 
     for cpu_batch in loader:
         effective_batch.append(cpu_batch)
         if len(effective_batch) != runtime.accumulation_steps:
             continue
-        (
-            effective_loss_sum,
-            effective_valid_samples,
-            update_succeeded,
-            gradient_norm,
-            _,
-        ) = _run_accumulated_update(
+        update = run_effective_batch_update(
             model,
             effective_batch,
-            optimizers,
-            schedulers,
+            optimizer,
+            scheduler,
+            runtime,
+            optimizer_variant,
+            temperature,
+            sam_rho,
         )
-        loss_sum += float(effective_loss_sum)
-        valid_sample_count += effective_valid_samples
-        if update_succeeded:
-            optimizer_steps += 1
-        gradient_norms.append(gradient_norm)
+        loss_sum += float(update["loss_sum"])
+        group_count += int(update["group_count"])
+        optimizer_steps += 1
+        backward_passes += int(update["backward_passes"])
+        gradient_norms.append(float(update["gradient_norm"]))
+        if update["first_pass_gradient_norm"] is not None:
+            first_gradient_norms.append(float(update["first_pass_gradient_norm"]))
+            perturbation_norms.append(float(update["perturbation_norm"]))
+            second_gradient_norms.append(float(update["second_pass_gradient_norm"]))
         effective_batch.clear()
 
     if effective_batch:
         raise ValueError("Training epoch ended inside an effective batch")
-    if valid_sample_count == 0:
-        raise ValueError("Training epoch contains no valid labeled sample")
+    if group_count == 0:
+        raise ValueError("Training epoch contains no valid loss group")
     return {
         "optimizer_steps": optimizer_steps,
-        "train_loss": loss_sum / valid_sample_count,
+        "backward_passes": backward_passes,
+        "train_loss": loss_sum / group_count,
         "mean_gradient_norm": float(np.mean(gradient_norms)),
         "maximum_gradient_norm": float(np.max(gradient_norms)),
-        "muon_lr": (
-            optimizers["muon"].param_groups[0]["lr"] if "muon" in optimizers else 0.0
+        "mean_first_pass_sam_gradient_norm": (
+            float(np.mean(first_gradient_norms)) if first_gradient_norms else None
         ),
-        "adamw_lr": optimizers["adamw"].param_groups[0]["lr"],
+        "mean_sam_perturbation_norm": (
+            float(np.mean(perturbation_norms)) if perturbation_norms else None
+        ),
+        "mean_second_pass_sam_gradient_norm": (
+            float(np.mean(second_gradient_norms)) if second_gradient_norms else None
+        ),
+        "all_finite": True,
+        "adamw_lr": optimizer.param_groups[0]["lr"],
     }
 
 
@@ -756,10 +1045,11 @@ def _filter_evaluation_rows(
 def evaluate_model(
     model: nn.Module,
     loader: Iterable[dict[str, torch.Tensor]],
+    temperature: float,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     model.eval()
     total_loss = 0.0
-    valid_sample_count = 0
+    valid_group_count = 0
     collected: dict[str, list[np.ndarray]] = {
         key: []
         for key in (
@@ -775,18 +1065,19 @@ def evaluate_model(
         for cpu_batch in loader:
             batch = _to_cuda(cpu_batch)
             valid_count = int(cpu_batch["sample_valid_mask"].sum())
-            loss_count = int(
-                cpu_batch["label_mask"][:valid_count].any(dim=(1, 2)).sum()
+            group_count = int(
+                (cpu_batch["label_mask"][:valid_count].sum(dim=1) >= 2).sum()
             )
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 predictions = _predict(model, batch)
-                loss_sum = _loss_sum(
-                    predictions[:valid_count],
-                    batch["targets"][:valid_count],
-                    batch["label_mask"][:valid_count],
-                )
+            loss_sum, _ = _soft_spearman_loss_sum(
+                predictions[:valid_count],
+                batch["targets"][:valid_count],
+                batch["label_mask"][:valid_count],
+                temperature,
+            )
             total_loss += float(loss_sum)
-            valid_sample_count += loss_count
+            valid_group_count += group_count
             valid_arrays = _filter_evaluation_rows(predictions, cpu_batch)
             for key, values in valid_arrays.items():
                 collected[key].append(values)
@@ -800,17 +1091,20 @@ def evaluate_model(
         arrays["date_idx"],
         arrays["decision_idx"],
     )
-    if valid_sample_count == 0:
-        raise ValueError("Evaluation split contains no valid labeled sample")
-    summary["rank_target_huber_loss"] = total_loss / valid_sample_count
+    if valid_group_count == 0:
+        raise ValueError("Evaluation split contains no valid loss group")
+    summary["soft_spearman_loss"] = total_loss / valid_group_count
     return summary, daily_rows
 
 
 def checkpoint_payload(
     model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler.LRScheduler,
     model_name: str,
     optimizer_variant: str,
-    muon_backend: str | None,
+    temperature: float,
+    sam_rho: float | None,
     seed: int,
     epoch: int,
     validation_score: float,
@@ -822,14 +1116,16 @@ def checkpoint_payload(
     architecture = architecture_for_model(model_name)
 
     return {
-        "muon_backend": muon_backend,
-        "muon_reference": dict(PYTORCH_MUON_REFERENCE),
         "model_name": model_name,
         "optimizer_variant": optimizer_variant,
+        "objective": objective_metadata(temperature),
+        "sam": sam_metadata(optimizer_variant, sam_rho),
         "seed": seed,
         "epoch": epoch,
         "validation_score": validation_score,
         "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "scheduler_state_dict": scheduler.state_dict(),
         "architecture_constants": asdict(architecture),
         "resolved_feature_store_path": str(feature_store),
         "git_commit_sha": git_commit_sha,

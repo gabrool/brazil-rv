@@ -10,16 +10,8 @@ from typing import Any
 import pytest
 import torch
 from torch import nn
-from torch.nn import functional as F
-
 import brazil_rv.modeling.muon as compatibility_module
-import brazil_rv.modeling.optim as optim_module
 from brazil_rv.modeling.contract import (
-    ADAMW_BETAS,
-    ADAMW_EPS,
-    ADAMW_LR,
-    ADAMW_WEIGHT_DECAY,
-    EFFECTIVE_BATCH_SIZE,
     MUON_ADJUST_LR_FN,
     MUON_EPS,
     MUON_LR,
@@ -45,13 +37,6 @@ from brazil_rv.modeling.muon import (
     _adjust_lr,
     _zeropower_via_newtonschulz,
     muon,
-)
-from brazil_rv.modeling.optim import (
-    OFFICIAL_MUON_BACKEND,
-    REFERENCE_MUON_BACKEND,
-    build_optimizers,
-    build_schedulers,
-    partition_parameters,
 )
 
 REFERENCE_TORCH_VERSION = "2.13.0"
@@ -186,7 +171,7 @@ def test_upstream_identity_and_official_defaults() -> None:
     assert PYTORCH_MUON_UPSTREAM_TAG == "v2.13.0"
     assert PYTORCH_MUON_UPSTREAM_PATH == "torch/optim/_muon.py"
     assert PYTORCH_MUON_UPSTREAM_BLOB_SHA == "2e45e07c4a596fb93f435130c344bb634ee0541c"
-    assert PYTORCH_MUON_BACKEND_NAME == REFERENCE_MUON_BACKEND
+    assert PYTORCH_MUON_BACKEND_NAME == "brazil_rv.modeling.muon.PyTorch213Muon"
     assert (EPS, DEFAULT_A, DEFAULT_B, DEFAULT_C, DEFAULT_NS_STEPS) == (
         1e-7,
         3.4445,
@@ -354,7 +339,9 @@ def test_real_model_muon_shapes_and_one_update_exact_parity() -> None:
     _require_official_reference()
     official_class = torch.optim.Muon
     model = build_neural_model("context_pooled")
-    routed = partition_parameters(model, "hybrid")["muon"]
+    routed = [
+        module.weight for module in model.modules() if isinstance(module, MuonLinear)
+    ]
     shapes = sorted({tuple(parameter.shape) for parameter in routed})
     assert shapes == [(256, 256), (256, 704), (704, 256)]
     generator = torch.Generator().manual_seed(511)
@@ -670,226 +657,6 @@ def test_state_dict_round_trip_is_exact() -> None:
     restored = PyTorch213Muon([restored_parameter], **_production_kwargs())
     restored.load_state_dict(compatibility_optimizer.state_dict())
     _assert_exact(restored.state_dict(), compatibility_optimizer.state_dict())
-
-
-class _HybridParityModel(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.embedding = nn.Embedding(11, 4)
-        self.norm = nn.RMSNorm(4)
-        self.square = MuonLinear(4, 4, bias=False)
-        self.tall = MuonLinear(4, 6, bias=False)
-        self.wide = MuonLinear(6, 4, bias=False)
-        self.bias = nn.Parameter(torch.zeros(4))
-        self.output = nn.Linear(4, 2, bias=True)
-
-    def forward(self, indices: torch.Tensor, values: torch.Tensor) -> torch.Tensor:
-        hidden = self.norm(self.embedding(indices) + values)
-        hidden = torch.tanh(self.square(hidden))
-        hidden = torch.tanh(self.wide(torch.tanh(self.tall(hidden))))
-        return self.output(hidden + self.bias)
-
-
-def _hybrid_optimizers(
-    model: nn.Module,
-    muon_class: type[torch.optim.Optimizer],
-) -> tuple[
-    dict[str, torch.optim.Optimizer],
-    dict[str, torch.optim.lr_scheduler.LambdaLR],
-]:
-    groups = partition_parameters(model, "hybrid")
-    optimizers: dict[str, torch.optim.Optimizer] = {
-        "muon": muon_class(groups["muon"], **_production_kwargs()),
-        "adamw": torch.optim.AdamW(
-            [
-                {
-                    "params": groups["decay"],
-                    "weight_decay": ADAMW_WEIGHT_DECAY,
-                },
-                {
-                    "params": groups["no_decay"],
-                    "weight_decay": 0.0,
-                },
-            ],
-            lr=ADAMW_LR,
-            betas=ADAMW_BETAS,
-            eps=ADAMW_EPS,
-            fused=True,
-        ),
-    }
-    schedulers, _, _ = build_schedulers(optimizers, EFFECTIVE_BATCH_SIZE)
-    return optimizers, schedulers
-
-
-def test_deterministic_hybrid_trajectory_exact_for_twenty_updates() -> None:
-    _require_official_reference()
-    official_class = torch.optim.Muon
-    original_threads = torch.get_num_threads()
-    original_deterministic = torch.are_deterministic_algorithms_enabled()
-    try:
-        torch.set_num_threads(1)
-        torch.use_deterministic_algorithms(True)
-        torch.manual_seed(244)
-        official_model = _HybridParityModel()
-        compatibility_model = _HybridParityModel()
-        compatibility_model.load_state_dict(official_model.state_dict())
-        official_optimizers, official_schedulers = _hybrid_optimizers(
-            official_model,
-            official_class,
-        )
-        compatibility_optimizers, compatibility_schedulers = _hybrid_optimizers(
-            compatibility_model,
-            PyTorch213Muon,
-        )
-        generator = torch.Generator().manual_seed(7781)
-        batches = [
-            (
-                torch.randint(0, 11, (7,), generator=generator),
-                torch.randn(7, 4, generator=generator),
-                torch.randn(7, 2, generator=generator),
-            )
-            for _ in range(20)
-        ]
-        for indices, values, targets in batches:
-            for optimizer in official_optimizers.values():
-                optimizer.zero_grad(set_to_none=True)
-            for optimizer in compatibility_optimizers.values():
-                optimizer.zero_grad(set_to_none=True)
-            official_loss = F.mse_loss(
-                official_model(indices, values),
-                targets,
-            )
-            compatibility_loss = F.mse_loss(
-                compatibility_model(indices, values),
-                targets,
-            )
-            torch.testing.assert_close(
-                official_loss,
-                compatibility_loss,
-                atol=0,
-                rtol=0,
-            )
-            official_loss.backward()
-            compatibility_loss.backward()
-            official_norm = torch.nn.utils.clip_grad_norm_(
-                official_model.parameters(),
-                1.0,
-            )
-            compatibility_norm = torch.nn.utils.clip_grad_norm_(
-                compatibility_model.parameters(),
-                1.0,
-            )
-            torch.testing.assert_close(
-                official_norm,
-                compatibility_norm,
-                atol=0,
-                rtol=0,
-            )
-            for optimizer in official_optimizers.values():
-                optimizer.step()
-            for optimizer in compatibility_optimizers.values():
-                optimizer.step()
-            for scheduler in official_schedulers.values():
-                scheduler.step()
-            for scheduler in compatibility_schedulers.values():
-                scheduler.step()
-
-            for (_, official_parameter), (_, compatibility_parameter) in zip(
-                official_model.named_parameters(),
-                compatibility_model.named_parameters(),
-                strict=True,
-            ):
-                torch.testing.assert_close(
-                    official_parameter,
-                    compatibility_parameter,
-                    atol=0,
-                    rtol=0,
-                )
-            _assert_exact(
-                official_optimizers["muon"].state_dict(),
-                compatibility_optimizers["muon"].state_dict(),
-            )
-            _assert_exact(
-                official_optimizers["adamw"].state_dict(),
-                compatibility_optimizers["adamw"].state_dict(),
-            )
-            for name in official_optimizers:
-                for official_group, compatibility_group in zip(
-                    official_optimizers[name].param_groups,
-                    compatibility_optimizers[name].param_groups,
-                    strict=True,
-                ):
-                    _assert_exact(official_group["lr"], compatibility_group["lr"])
-                assert (
-                    official_schedulers[name].last_epoch
-                    == compatibility_schedulers[name].last_epoch
-                )
-    finally:
-        torch.use_deterministic_algorithms(original_deterministic)
-        torch.set_num_threads(original_threads)
-
-
-class _RoutingModel(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.muon = MuonLinear(3, 4, bias=False)
-        self.embedding = nn.Embedding(5, 4)
-        self.output = nn.Linear(4, 2, bias=True)
-
-
-def test_backend_resolution_prefers_official_when_present() -> None:
-    _require_official_reference()
-    official_class = torch.optim.Muon
-    optimizers, _, backend = build_optimizers(_RoutingModel(), "hybrid")
-    assert type(optimizers["muon"]) is official_class
-    assert backend == OFFICIAL_MUON_BACKEND
-
-
-def test_backend_resolution_uses_fallback_and_explicit_frozen_kwargs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured: dict[str, Any] = {}
-
-    class RecordingMuon(PyTorch213Muon):
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            captured.update(kwargs)
-            super().__init__(*args, **kwargs)
-
-    monkeypatch.delattr(torch.optim, "Muon", raising=False)
-    monkeypatch.setattr(optim_module, "PyTorch213Muon", RecordingMuon)
-    optimizers, _, backend = build_optimizers(_RoutingModel(), "hybrid")
-    assert isinstance(optimizers["muon"], RecordingMuon)
-    assert backend == REFERENCE_MUON_BACKEND
-    assert captured == _production_kwargs()
-
-
-def test_official_constructor_failure_propagates_without_fallback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class SentinelError(RuntimeError):
-        pass
-
-    class FailingOfficialMuon:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            del args, kwargs
-            raise SentinelError("official constructor failed")
-
-    class ForbiddenFallback:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            del args, kwargs
-            raise AssertionError("fallback must not be constructed")
-
-    monkeypatch.setattr(torch.optim, "Muon", FailingOfficialMuon, raising=False)
-    monkeypatch.setattr(optim_module, "PyTorch213Muon", ForbiddenFallback)
-    with pytest.raises(SentinelError, match="official constructor failed"):
-        build_optimizers(_RoutingModel(), "hybrid")
-
-
-def test_adamw_build_has_no_muon_backend() -> None:
-    optimizers, groups, backend = build_optimizers(_RoutingModel(), "adamw")
-    assert optimizers.keys() == {"adamw"}
-    assert groups["muon"] == []
-    assert backend is None
 
 
 def test_fallback_subclasses_public_optimizer_and_accepts_production_settings() -> None:

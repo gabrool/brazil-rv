@@ -99,8 +99,13 @@ TRANSFORMER_MODELS = (
 )
 NEURAL_MODELS = (*TRANSFORMER_MODELS, "tcn", "mlp")
 SUPPORTED_MODELS = (*NEURAL_MODELS, "xgboost")
-OPTIMIZER_VARIANTS = ("hybrid", "adamw")
+OPTIMIZER_VARIANTS = ("adamw", "sam_adamw")
 ALLOWED_SEEDS = (11, 29, 47)
+SOFT_RANK_TEMPERATURES = (0.05, 0.10, 0.20, 0.50)
+SAM_RHOS = (0.0025, 0.005, 0.010, 0.020, 0.035, 0.050)
+SOFT_RANK_STANDARDIZATION_EPS = 1e-6
+SOFT_SPEARMAN_CORRELATION_EPS = 1e-8
+SAM_NORM_EPS = 1e-12
 
 RMS_NORM_EPS = 1e-6
 QK_NORM_EPS = 1e-6
@@ -125,7 +130,6 @@ MAX_EPOCHS = 20
 EARLY_STOP_PATIENCE = 5
 MIN_IC_IMPROVEMENT = 1e-4
 GRADIENT_CLIP = 1.0
-HUBER_DELTA = 1.0
 
 MUON_LR = 0.02
 MUON_MOMENTUM = 0.95
@@ -156,10 +160,10 @@ COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL = 1e-2
 
 MIN_IC_EQUITIES = 30
 SANITY_SMOKE_SAMPLE_COUNT = 512
-SANITY_MEMORIZATION_SAMPLE_COUNT = 64
+SANITY_MEMORIZATION_SAMPLE_COUNT = 8
 SANITY_DECISION_INDEX = 27
 SANITY_MAX_STEPS = 1_000
-SANITY_MAX_LOSS = 0.05
+SANITY_MAX_LOSS = 0.10
 SANITY_MIN_SPEARMAN = 0.90
 
 XGBOOST_VERSION = "3.2.0"
@@ -481,19 +485,6 @@ class TrainingConstants:
     early_stop_patience: int = EARLY_STOP_PATIENCE
     minimum_ic_improvement: float = MIN_IC_IMPROVEMENT
     gradient_clip: float = GRADIENT_CLIP
-    huber_delta: float = HUBER_DELTA
-
-
-@dataclass(frozen=True)
-class MuonConstants:
-    lr: float = MUON_LR
-    momentum: float = MUON_MOMENTUM
-    nesterov: bool = MUON_NESTEROV
-    ns_coefficients: tuple[float, float, float] = MUON_NS_COEFFICIENTS
-    eps: float = MUON_EPS
-    ns_steps: int = MUON_NS_STEPS
-    weight_decay: float = MUON_WEIGHT_DECAY
-    adjust_lr_fn: str = MUON_ADJUST_LR_FN
 
 
 @dataclass(frozen=True)

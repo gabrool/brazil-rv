@@ -33,14 +33,14 @@ from .engine import (
     clone_eager_reference_model,
     compile_model,
     evaluate_model,
+    objective_metadata,
     qualify_eager_compiled_model,
     require_compile_parity,
+    sam_metadata,
     validate_runtime,
     warmup_compiled_evaluation,
 )
 from .model import build_neural_model
-from .muon import PYTORCH_MUON_REFERENCE
-from .optim import OFFICIAL_MUON_BACKEND, REFERENCE_MUON_BACKEND
 from .xgboost_model import (
     evaluate_saved_xgboost,
     validate_booster_hashes,
@@ -48,10 +48,10 @@ from .xgboost_model import (
 )
 
 _CHECKPOINT_IDENTITY_FIELDS = (
-    "muon_backend",
-    "muon_reference",
     "model_name",
     "optimizer_variant",
+    "objective",
+    "sam",
     "seed",
     "resolved_feature_store_path",
     "git_commit_sha",
@@ -66,21 +66,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _validate_muon_identity_values(identity: dict[str, object]) -> None:
-    if identity["muon_reference"] != dict(PYTORCH_MUON_REFERENCE):
-        raise ValueError("Invalid Muon identity field: muon_reference")
-
+def _validate_objective_and_optimizer(identity: dict[str, object]) -> None:
+    objective = identity["objective"]
+    if not isinstance(objective, dict) or "temperature" not in objective:
+        raise ValueError("Invalid neural objective metadata")
+    if objective != objective_metadata(float(objective["temperature"])):
+        raise ValueError("Invalid neural objective metadata")
     optimizer_variant = identity["optimizer_variant"]
-    if optimizer_variant not in ("hybrid", "adamw"):
-        raise ValueError("Invalid Muon identity field: optimizer_variant")
-    muon_backend = identity["muon_backend"]
-    if optimizer_variant == "hybrid" and muon_backend not in (
-        OFFICIAL_MUON_BACKEND,
-        REFERENCE_MUON_BACKEND,
-    ):
-        raise ValueError("Invalid Muon identity field: muon_backend")
-    if optimizer_variant == "adamw" and muon_backend is not None:
-        raise ValueError("Invalid Muon identity field: muon_backend")
+    sam = identity["sam"]
+    rho = None if sam is None else float(sam["rho"])
+    if sam != sam_metadata(str(optimizer_variant), rho):
+        raise ValueError("Invalid neural optimizer metadata")
 
 
 def _validate_architecture_identity(identity: dict[str, object]) -> None:
@@ -106,7 +102,7 @@ def _validate_run_checkpoint_identity(
         if manifest[field] != checkpoint[field]:
             raise ValueError(f"Run/checkpoint identity mismatch: {field}")
     _validate_architecture_identity(manifest)
-    _validate_muon_identity_values(manifest)
+    _validate_objective_and_optimizer(manifest)
     manifest_store = Path(str(manifest["resolved_feature_store_path"])).expanduser()
     if manifest_store.resolve() != feature_store:
         raise ValueError("Validated feature store does not match the run identity")
@@ -227,6 +223,8 @@ def _evaluate_neural(
         weights_only=False,
     )
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+    objective = manifest["objective"]
+    temperature = float(objective["temperature"])
     model_name = str(checkpoint["model_name"])
     loader = create_evaluation_loader(
         feature_store,
@@ -246,6 +244,7 @@ def _evaluate_neural(
         model,
         evaluation_batch,
         include_backward=False,
+        temperature=temperature,
     )
     require_compile_parity(compile_parity)
     del eager_reference
@@ -258,7 +257,7 @@ def _evaluate_neural(
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.synchronize()
     started = time.perf_counter()
-    summary, daily_rows = evaluate_model(model, loader)
+    summary, daily_rows = evaluate_model(model, loader, temperature)
     torch.cuda.synchronize()
     metadata = {
         "compile": compile_metadata,
@@ -340,6 +339,9 @@ def main() -> None:
         "model_family": manifest["model_family"],
         "architecture_constants": manifest["architecture_constants"],
         "parameter_count": manifest["parameter_count"],
+        "optimizer_variant": manifest["optimizer_variant"],
+        "objective": manifest.get("objective"),
+        "sam": manifest.get("sam"),
         "feature_cache_warmup": asdict(cache_report),
         **family_metadata,
     }
