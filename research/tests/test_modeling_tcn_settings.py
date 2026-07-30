@@ -17,23 +17,27 @@ from brazil_rv.modeling.contract import (
     INSTRUMENT_COUNT,
     PATCH_INPUT_WIDTH,
     SLOW_FEATURE_COUNT,
+    TCN_BLOCK_VARIANTS,
     TCN_FUSIONS,
     TCN_RECEPTIVE_FIELDS,
+    TCN_SWIGLU_HIDDEN_WIDTHS,
     TCN_WIDTHS,
     TCNSettings,
     expected_trainable_parameter_count,
     resolve_tcn_architecture,
 )
+from brazil_rv.modeling.layers import SwiGLU
 from brazil_rv.modeling.model import (
     build_neural_model,
     count_trainable_parameters,
 )
+from brazil_rv.modeling.optim import partition_parameters
 
 
 LEGAL_SETTINGS = tuple(
-    TCNSettings(fusion, width, receptive_field)
-    for fusion, width, receptive_field in product(
-        TCN_FUSIONS, TCN_WIDTHS, TCN_RECEPTIVE_FIELDS
+    TCNSettings(fusion, width, receptive_field, block)
+    for fusion, width, receptive_field, block in product(
+        TCN_FUSIONS, TCN_WIDTHS, TCN_RECEPTIVE_FIELDS, TCN_BLOCK_VARIANTS
     )
 )
 
@@ -103,39 +107,52 @@ def test_tcn_public_setting_and_receptive_field_contract() -> None:
         "context_pooled",
     )
     assert TCN_WIDTHS == (64, 128, 192, 256)
+    assert TCN_BLOCK_VARIANTS == ("gelu", "silu", "swiglu")
+    assert dict(TCN_SWIGLU_HIDDEN_WIDTHS) == {64: 24, 128: 40, 192: 64, 256: 88}
     assert dict(TCN_RECEPTIVE_FIELDS) == {
-        "short": (1, 2, 4),
-        "medium": (1, 2, 4, 8),
-        "long": (1, 2, 4, 8, 16),
+        "short": (1, 1, 1, 1, 1, 2),
+        "medium": (1, 2, 2, 2, 4, 4),
+        "long": (1, 2, 4, 4, 4, 8),
         "full": (1, 2, 4, 8, 16, 32),
     }
     for receptive_field, theoretical_patches in (
         ("short", 15),
         ("medium", 31),
-        ("long", 63),
+        ("long", 47),
         ("full", 127),
     ):
         architecture = resolve_tcn_architecture(
-            TCNSettings("none", 64, receptive_field)
+            TCNSettings("context_only", 64, receptive_field, "gelu")
         )
         assert architecture.dilations == TCN_RECEPTIVE_FIELDS[receptive_field]
-        assert architecture.residual_blocks == len(architecture.dilations)
+        assert architecture.residual_blocks == 6
         assert architecture.theoretical_receptive_field_patches == theoretical_patches
-        assert architecture.effective_receptive_field_patches == min(
-            theoretical_patches, ABSOLUTE_PATCH_COUNT
+        assert architecture.maximum_effective_equity_receptive_field_patches == min(
+            theoretical_patches, 57
         )
         assert (
             architecture.theoretical_receptive_field_minutes == 5 * theoretical_patches
         )
-        assert architecture.effective_receptive_field_minutes == 5 * min(
+        assert architecture.maximum_effective_equity_receptive_field_minutes == 5 * min(
+            theoretical_patches, 57
+        )
+        assert architecture.maximum_effective_context_receptive_field_patches == min(
             theoretical_patches, ABSOLUTE_PATCH_COUNT
         )
+        assert (
+            architecture.maximum_effective_context_receptive_field_minutes
+            == 5 * min(theoretical_patches, ABSOLUTE_PATCH_COUNT)
+        )
+    for fusion in ("none", "pooled_market"):
+        architecture = resolve_tcn_architecture(TCNSettings(fusion, 64, "full", "gelu"))
+        assert architecture.maximum_effective_context_receptive_field_patches is None
+        assert architecture.maximum_effective_context_receptive_field_minutes is None
 
 
 @pytest.mark.parametrize(
     "settings",
     LEGAL_SETTINGS,
-    ids=lambda row: f"{row.fusion}-w{row.width}-{row.receptive_field}",
+    ids=lambda row: f"{row.fusion}-w{row.width}-{row.receptive_field}-{row.block}",
 )
 def test_every_tcn_setting_instantiates_with_exact_parameter_count(
     settings: TCNSettings,
@@ -157,12 +174,30 @@ def test_every_tcn_setting_instantiates_with_exact_parameter_count(
     )
 
 
+def test_tcn_parameter_count_is_equal_across_receptive_fields() -> None:
+    for fusion, width, block in product(TCN_FUSIONS, TCN_WIDTHS, TCN_BLOCK_VARIANTS):
+        counts = {
+            expected_trainable_parameter_count(
+                "tcn",
+                resolve_tcn_architecture(
+                    TCNSettings(fusion, width, receptive_field, block)
+                ),
+            )
+            for receptive_field in TCN_RECEPTIVE_FIELDS
+        }
+        assert len(counts) == 1
+
+
 def test_tcn_parameter_counts_increase_strictly_with_width() -> None:
-    for fusion, receptive_field in product(TCN_FUSIONS, TCN_RECEPTIVE_FIELDS):
+    for fusion, receptive_field, block in product(
+        TCN_FUSIONS, TCN_RECEPTIVE_FIELDS, TCN_BLOCK_VARIANTS
+    ):
         counts = [
             expected_trainable_parameter_count(
                 "tcn",
-                resolve_tcn_architecture(TCNSettings(fusion, width, receptive_field)),
+                resolve_tcn_architecture(
+                    TCNSettings(fusion, width, receptive_field, block)
+                ),
             )
             for width in TCN_WIDTHS
         ]
@@ -171,18 +206,20 @@ def test_tcn_parameter_counts_increase_strictly_with_width() -> None:
 
 
 def test_none_has_no_fusion_modules() -> None:
-    model = _model(TCNSettings("none", 128, "full"))
+    model = _model(TCNSettings("none", 128, "full", "gelu"))
     for name in ("fusion_input", "fusion_output", "fusion_gate", "fusion_norm"):
         assert not hasattr(model, name)
     assert not any(name.startswith("fusion") for name, _ in model.named_modules())
 
 
-@pytest.mark.parametrize("fusion", TCN_FUSIONS)
+@pytest.mark.parametrize(
+    ("fusion", "block"), tuple(product(TCN_FUSIONS, TCN_BLOCK_VARIANTS))
+)
 def test_tcn_fusion_sources_are_exact_and_inactive_peers_are_masked(
-    fusion: str,
+    fusion: str, block: str
 ) -> None:
     torch.manual_seed(23)
-    model = _model(TCNSettings(fusion, 64, "short")).eval()
+    model = _model(TCNSettings(fusion, 64, "short", block)).eval()
     inputs = _inputs()
     with torch.no_grad():
         baseline = _forward(model, inputs)
@@ -196,6 +233,83 @@ def test_tcn_fusion_sources_are_exact_and_inactive_peers_are_masked(
     torch.testing.assert_close(
         baseline[:, :4], inactive_peer[:, :4], atol=0.0, rtol=0.0
     )
+    inactive = ~inputs["instrument_mask"][:, :EQUITY_COUNT]
+    assert torch.equal(baseline[inactive], torch.zeros_like(baseline[inactive]))
+
+
+@pytest.mark.parametrize("fusion", ("context_only", "context_pooled"))
+def test_unavailable_context_cannot_affect_tcn_output(fusion: str) -> None:
+    torch.manual_seed(29)
+    model = _model(TCNSettings(fusion, 64, "short", "gelu")).eval()
+    inputs = _inputs()
+    inputs["instrument_mask"][:, EQUITY_COUNT] = False
+    changed = _changed(inputs, EQUITY_COUNT)
+    with torch.no_grad():
+        baseline = _forward(model, inputs)
+        output = _forward(model, changed)
+    torch.testing.assert_close(baseline, output, atol=0.0, rtol=0.0)
+
+
+@pytest.mark.parametrize("block", TCN_BLOCK_VARIANTS)
+def test_tcn_block_structure_and_optimizer_routing(block: str) -> None:
+    architecture = resolve_tcn_architecture(TCNSettings("none", 128, "short", block))
+    model = _model(TCNSettings("none", 128, "short", block))
+    for residual in model.blocks:
+        if block == "swiglu":
+            assert isinstance(residual.swiglu, SwiGLU)
+            assert not hasattr(residual, "projection")
+        else:
+            assert hasattr(residual, "projection")
+            assert not hasattr(residual, "swiglu")
+    assert architecture.swiglu_hidden_width == (
+        TCN_SWIGLU_HIDDEN_WIDTHS[128] if block == "swiglu" else None
+    )
+    groups = partition_parameters(model)
+    assert sum(
+        parameter.numel() for group in groups.values() for parameter in group
+    ) == (count_trainable_parameters(model))
+
+
+def test_gelu_and_silu_parameter_counts_are_equal() -> None:
+    for fusion, width, receptive_field in product(
+        TCN_FUSIONS, TCN_WIDTHS, TCN_RECEPTIVE_FIELDS
+    ):
+        counts = [
+            expected_trainable_parameter_count(
+                "tcn",
+                resolve_tcn_architecture(
+                    TCNSettings(fusion, width, receptive_field, block)
+                ),
+            )
+            for block in ("gelu", "silu")
+        ]
+        assert counts[0] == counts[1]
+
+
+@pytest.mark.parametrize("block", TCN_BLOCK_VARIANTS)
+def test_all_tcn_blocks_are_finite_masked_permutation_equivariant_and_causal(
+    block: str,
+) -> None:
+    torch.manual_seed(37)
+    model = _model(TCNSettings("context_pooled", 64, "full", block)).eval()
+    inputs = _inputs()
+    permutation = torch.arange(EQUITY_COUNT - 1, -1, -1)
+    permuted = {key: value.clone() for key, value in inputs.items()}
+    for key in ("patches", "history_patch_mask", "instrument_mask", "slow_features"):
+        permuted[key][:, :EQUITY_COUNT] = inputs[key][:, :EQUITY_COUNT][:, permutation]
+    future = {key: value.clone() for key, value in inputs.items()}
+    future["patches"][:, :, 15:] += 1_000.0
+    future["history_patch_mask"][:, :, 15:] = True
+    with torch.no_grad():
+        baseline = _forward(model, inputs)
+        permuted_output = _forward(model, permuted)
+        future_output = _forward(model, future)
+    assert baseline.shape == (1, EQUITY_COUNT, 3)
+    assert torch.isfinite(baseline).all()
+    torch.testing.assert_close(
+        permuted_output, baseline[:, permutation], atol=3e-5, rtol=3e-5
+    )
+    torch.testing.assert_close(future_output, baseline, atol=0.0, rtol=0.0)
     inactive = ~inputs["instrument_mask"][:, :EQUITY_COUNT]
     assert torch.equal(baseline[inactive], torch.zeros_like(baseline[inactive]))
 
@@ -268,10 +382,9 @@ def test_baseline_tcn_state_layout_count_and_seeded_output_are_exact() -> None:
 @pytest.mark.parametrize(
     "settings",
     (
-        TCNSettings("none", 64, "short"),
-        TCNSettings("context_only", 128, "medium"),
-        TCNSettings("pooled_market", 192, "long"),
-        TCNSettings("context_pooled", 256, "full"),
+        TCNSettings("none", 64, "short", "gelu"),
+        TCNSettings("context_only", 128, "medium", "silu"),
+        TCNSettings("pooled_market", 192, "long", "swiglu"),
     ),
 )
 def test_selected_tcn_state_dict_round_trip(settings: TCNSettings) -> None:
@@ -320,6 +433,8 @@ def _tcn_cli(settings: TCNSettings) -> list[str]:
     return [
         "--model",
         "tcn",
+        "--tcn-block",
+        settings.block,
         "--tcn-fusion",
         settings.fusion,
         "--tcn-width",
@@ -343,7 +458,7 @@ def test_cli_accepts_every_legal_tcn_setting() -> None:
 
 @pytest.mark.parametrize(
     "flag",
-    ("--tcn-fusion", "--tcn-width", "--tcn-receptive-field"),
+    ("--tcn-fusion", "--tcn-width", "--tcn-receptive-field", "--tcn-block"),
 )
 def test_cli_requires_all_tcn_settings(flag: str) -> None:
     arguments = _tcn_cli(BASELINE_TCN_SETTINGS)
@@ -356,6 +471,7 @@ def test_cli_requires_all_tcn_settings(flag: str) -> None:
 @pytest.mark.parametrize(
     ("flag", "value"),
     (
+        ("--tcn-block", "relu"),
         ("--tcn-fusion", "attention"),
         ("--tcn-width", "96"),
         ("--tcn-receptive-field", "extra_full"),
@@ -388,6 +504,8 @@ def test_cli_forbids_tcn_settings_for_every_other_model(model_name: str) -> None
             "--tcn-fusion",
             "none",
             "--tcn-width",
+            "--tcn-block",
+            "gelu",
             "64",
             "--tcn-receptive-field",
             "short",
@@ -400,9 +518,10 @@ def test_cli_forbids_tcn_settings_for_every_other_model(model_name: str) -> None
 @pytest.mark.parametrize(
     "settings",
     (
-        TCNSettings("attention", 64, "short"),
-        TCNSettings("none", 96, "short"),
-        TCNSettings("none", 64, "extra_full"),
+        TCNSettings("attention", 64, "short", "gelu"),
+        TCNSettings("none", 96, "short", "gelu"),
+        TCNSettings("none", 64, "extra_full", "gelu"),
+        TCNSettings("none", 64, "short", "relu"),
     ),
 )
 def test_direct_tcn_configuration_rejects_invalid_values(

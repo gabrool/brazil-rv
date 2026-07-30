@@ -34,6 +34,7 @@ from brazil_rv.modeling.contract import (
     CompileParityThresholds,
     CompileSetupReport,
     EFFECTIVE_BATCH_SIZE,
+    TCN_BLOCK_VARIANTS,
     EQUITY_COUNT,
     FINAL_LR_FACTOR,
     MAX_EPOCHS,
@@ -727,10 +728,36 @@ def test_evaluation_identity_rejects_incompatible_architecture_and_count(
 def test_atomic_json_write_replaces_final_without_temporary_file(
     tmp_path: Path,
 ) -> None:
+
     output = tmp_path / "run_manifest.json"
     _atomic_write_json(output, {"status": "running"})
     assert json.loads(output.read_text(encoding="utf-8")) == {"status": "running"}
     assert not (tmp_path / "run_manifest.json.tmp").exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("fusion", "none"),
+        ("width", 64),
+        ("receptive_field", "short"),
+        ("block", "silu"),
+    ),
+)
+def test_evaluation_identity_rejects_each_tcn_setting_mismatch(
+    field: str,
+    value: object,
+    tmp_path: Path,
+) -> None:
+    manifest = _matching_run_identity(tmp_path.resolve())
+    manifest["tcn_settings"] = {
+        **manifest["tcn_settings"],
+        field: value,
+    }
+    with pytest.raises(ValueError, match="architecture metadata"):
+        _validate_run_checkpoint_identity(
+            manifest, copy.deepcopy(manifest), tmp_path.resolve()
+        )
 
 
 def _history_row(*, sam: bool) -> dict[str, object]:
@@ -925,8 +952,11 @@ def test_checkpoint_round_trip_eager(model_name: str, tmp_path: Path) -> None:
         )
 
 
-def test_selected_tcn_checkpoint_round_trip_and_identity(tmp_path: Path) -> None:
-    settings = TCNSettings("pooled_market", 192, "long")
+@pytest.mark.parametrize("block", TCN_BLOCK_VARIANTS)
+def test_selected_tcn_checkpoint_round_trip_and_identity(
+    tmp_path: Path, block: str
+) -> None:
+    settings = TCNSettings("pooled_market", 192, "long", block)
     architecture = architecture_for_model("tcn", settings)
     torch.manual_seed(31)
     model = build_neural_model("tcn", architecture)

@@ -119,12 +119,21 @@ POOLED_INDUCING_TOKEN_COUNT = 4
 TCN_KERNEL_SIZE = 3
 TCN_FUSIONS = ("none", "context_only", "pooled_market", "context_pooled")
 TCN_WIDTHS = (64, 128, 192, 256)
+TCN_BLOCK_VARIANTS = ("gelu", "silu", "swiglu")
 TCN_RECEPTIVE_FIELDS: Mapping[str, tuple[int, ...]] = MappingProxyType(
     {
-        "short": (1, 2, 4),
-        "medium": (1, 2, 4, 8),
-        "long": (1, 2, 4, 8, 16),
+        "short": (1, 1, 1, 1, 1, 2),
+        "medium": (1, 2, 2, 2, 4, 4),
+        "long": (1, 2, 4, 4, 4, 8),
         "full": (1, 2, 4, 8, 16, 32),
+    }
+)
+TCN_SWIGLU_HIDDEN_WIDTHS: Mapping[int, int] = MappingProxyType(
+    {
+        64: 24,
+        128: 40,
+        192: 64,
+        256: 88,
     }
 )
 MLP_WIDTH = 256
@@ -345,12 +354,14 @@ class TCNSettings:
     fusion: str
     width: int
     receptive_field: str
+    block: str
 
 
 BASELINE_TCN_SETTINGS = TCNSettings(
     fusion="context_pooled",
     width=128,
     receptive_field="full",
+    block="gelu",
 )
 
 
@@ -359,17 +370,21 @@ class TCNArchitecture:
     family: str
     fusion_mode: str
     receptive_field: str
+    block: str
     patch_input_width: int
     width: int
+    swiglu_hidden_width: int | None
     residual_blocks: int
     kernel_size: int
     dilations: tuple[int, ...]
     slow_width: int
     fusion_states: int
     theoretical_receptive_field_patches: int
-    effective_receptive_field_patches: int
     theoretical_receptive_field_minutes: int
-    effective_receptive_field_minutes: int
+    maximum_effective_equity_receptive_field_patches: int
+    maximum_effective_equity_receptive_field_minutes: int
+    maximum_effective_context_receptive_field_patches: int | None
+    maximum_effective_context_receptive_field_minutes: int | None
     fusion_width: int
     dropout: float
     output_horizons: int
@@ -483,6 +498,8 @@ def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
         raise ValueError(
             f"Invalid TCN receptive field: {settings.receptive_field}"
         ) from error
+    if settings.block not in TCN_BLOCK_VARIANTS:
+        raise ValueError(f"Invalid TCN block: {settings.block}")
     fusion_states = {
         "none": 0,
         "context_only": 7,
@@ -490,22 +507,40 @@ def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
         "context_pooled": 9,
     }[settings.fusion]
     theoretical_patches = 1 + (TCN_KERNEL_SIZE - 1) * sum(dilations)
-    effective_patches = min(theoretical_patches, ABSOLUTE_PATCH_COUNT)
+    equity_patches = min(
+        theoretical_patches,
+        ABSOLUTE_PATCH_COUNT - EQUITY_ABSOLUTE_START_PATCH,
+    )
+    context_patches = (
+        min(theoretical_patches, ABSOLUTE_PATCH_COUNT)
+        if settings.fusion in ("context_only", "context_pooled")
+        else None
+    )
     return TCNArchitecture(
         family="tcn",
         fusion_mode=settings.fusion,
         receptive_field=settings.receptive_field,
+        block=settings.block,
         patch_input_width=PATCH_INPUT_WIDTH,
         width=settings.width,
+        swiglu_hidden_width=(
+            TCN_SWIGLU_HIDDEN_WIDTHS[settings.width]
+            if settings.block == "swiglu"
+            else None
+        ),
         residual_blocks=len(dilations),
         kernel_size=TCN_KERNEL_SIZE,
         dilations=dilations,
         slow_width=SLOW_FEATURE_COUNT,
         fusion_states=fusion_states,
         theoretical_receptive_field_patches=theoretical_patches,
-        effective_receptive_field_patches=effective_patches,
         theoretical_receptive_field_minutes=theoretical_patches * PATCH_MINUTES,
-        effective_receptive_field_minutes=effective_patches * PATCH_MINUTES,
+        maximum_effective_equity_receptive_field_patches=equity_patches,
+        maximum_effective_equity_receptive_field_minutes=equity_patches * PATCH_MINUTES,
+        maximum_effective_context_receptive_field_patches=context_patches,
+        maximum_effective_context_receptive_field_minutes=(
+            None if context_patches is None else context_patches * PATCH_MINUTES
+        ),
         fusion_width=2 * settings.width,
         dropout=RESIDUAL_DROPOUT,
         output_horizons=HORIZON_COUNT,
@@ -518,10 +553,17 @@ def expected_trainable_parameter_count(
 ) -> int:
     if isinstance(architecture, TCNArchitecture):
         width = architecture.width
+        if architecture.block == "swiglu":
+            block_parameters = (
+                architecture.kernel_size * width**2
+                + 3 * width
+                + 3 * width * architecture.swiglu_hidden_width
+            )
+        else:
+            block_parameters = (architecture.kernel_size + 1) * width**2 + 3 * width
         count = (
             architecture.patch_input_width * width
-            + architecture.residual_blocks
-            * ((architecture.kernel_size + 1) * width**2 + 3 * width)
+            + architecture.residual_blocks * block_parameters
             + architecture.slow_width * width
             + 2 * width
             + architecture.output_horizons * width

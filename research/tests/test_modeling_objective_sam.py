@@ -41,6 +41,8 @@ BASELINE_TCN_CLI = (
     "128",
     "--tcn-receptive-field",
     "full",
+    "--tcn-block",
+    "gelu",
 )
 
 
@@ -874,7 +876,7 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
             11,
             created,
         )
-        == "tcn_context_pooled_w128_rffull_adamw_tau0p10_seed11_"
+        == "tcn_context_pooled_w128_rffull_bgelu_adamw_tau0p10_seed11_"
         "20260102T030405006789Z"
     )
     assert (
@@ -887,7 +889,7 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
             11,
             created,
         )
-        == "tcn_context_pooled_w128_rffull_sam_adamw_rho0p010_tau0p10_"
+        == "tcn_context_pooled_w128_rffull_bgelu_sam_adamw_rho0p010_tau0p10_"
         "seed11_20260102T030405006789Z"
     )
 

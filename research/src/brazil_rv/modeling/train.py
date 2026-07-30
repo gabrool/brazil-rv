@@ -37,6 +37,7 @@ from .contract import (
     SplitBoundaries,
     TCNArchitecture,
     TCNSettings,
+    TCN_BLOCK_VARIANTS,
     TCN_FUSIONS,
     TCN_RECEPTIVE_FIELDS,
     TCN_WIDTHS,
@@ -114,11 +115,16 @@ def validate_cli_args(
         parser.error("--sam-rho is required for --optimizer sam_adamw")
     if args.optimizer == "adamw" and args.sam_rho is not None:
         parser.error("--sam-rho is forbidden for --optimizer adamw")
-    tcn_values = (args.tcn_fusion, args.tcn_width, args.tcn_receptive_field)
+    tcn_values = (
+        args.tcn_fusion,
+        args.tcn_width,
+        args.tcn_receptive_field,
+        args.tcn_block,
+    )
     if args.model == "tcn" and any(value is None for value in tcn_values):
         parser.error(
-            "--tcn-fusion, --tcn-width, and --tcn-receptive-field are required "
-            "when --model tcn"
+            "--tcn-fusion, --tcn-width, --tcn-receptive-field, and --tcn-block "
+            "are required when --model tcn"
         )
     if args.model != "tcn" and any(value is not None for value in tcn_values):
         parser.error("TCN architecture arguments are forbidden unless --model tcn")
@@ -139,6 +145,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--tcn-fusion", choices=TCN_FUSIONS)
     parser.add_argument("--tcn-width", type=int, choices=TCN_WIDTHS)
     parser.add_argument("--tcn-receptive-field", choices=TCN_RECEPTIVE_FIELDS)
+    parser.add_argument("--tcn-block", choices=TCN_BLOCK_VARIANTS)
     parser.add_argument("--seed", required=True, type=int, choices=ALLOWED_SEEDS)
     return validate_cli_args(parser, parser.parse_args(arguments))
 
@@ -158,6 +165,7 @@ def _tcn_settings_from_args(args: argparse.Namespace) -> TCNSettings | None:
         fusion=args.tcn_fusion,
         width=args.tcn_width,
         receptive_field=args.tcn_receptive_field,
+        block=args.tcn_block,
     )
 
 
@@ -192,7 +200,7 @@ def _run_directory_name(
     if tcn_settings is not None:
         model_part = (
             f"tcn_{tcn_settings.fusion}_w{tcn_settings.width}_"
-            f"rf{tcn_settings.receptive_field}"
+            f"rf{tcn_settings.receptive_field}_b{tcn_settings.block}"
         )
     optimizer_part = f"_{optimizer_variant}"
     rho_part = "" if sam_rho is None else f"_rho{experiment_decimal(sam_rho, 3)}"
