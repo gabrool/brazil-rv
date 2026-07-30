@@ -16,9 +16,11 @@ from brazil_rv.modeling.contract import (
     ADAMW_EPS,
     ADAMW_LR,
     ADAMW_WEIGHT_DECAY,
+    BASELINE_TCN_SETTINGS,
     GH200_RUNTIME,
     SAM_RHOS,
     SOFT_RANK_TEMPERATURES,
+    architecture_for_model,
 )
 from brazil_rv.modeling.engine import (
     checkpoint_payload,
@@ -29,6 +31,17 @@ from brazil_rv.modeling.engine import (
 )
 from brazil_rv.modeling.model import build_neural_model
 from brazil_rv.modeling.optim import build_optimizer
+
+
+BASELINE_TCN_ARCHITECTURE = architecture_for_model("tcn", BASELINE_TCN_SETTINGS)
+BASELINE_TCN_CLI = (
+    "--tcn-fusion",
+    "context_pooled",
+    "--tcn-width",
+    "128",
+    "--tcn-receptive-field",
+    "full",
+)
 
 
 def _rank_targets(equity_count: int) -> torch.Tensor:
@@ -809,6 +822,7 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
         [
             "--model",
             "tcn",
+            *BASELINE_TCN_CLI,
             "--optimizer",
             "adamw",
             "--soft-rank-temperature",
@@ -822,6 +836,7 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
         [
             "--model",
             "tcn",
+            *BASELINE_TCN_CLI,
             "--optimizer",
             "sam_adamw",
             "--soft-rank-temperature",
@@ -838,6 +853,7 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
             [
                 "--model",
                 "tcn",
+                *BASELINE_TCN_CLI,
                 "--optimizer",
                 "sam_adamw",
                 "--soft-rank-temperature",
@@ -849,17 +865,35 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
 
     created = datetime(2026, 1, 2, 3, 4, 5, 6789, tzinfo=timezone.utc)
     assert (
-        train._run_directory_name("tcn", "adamw", 0.1, None, 11, created)
-        == "tcn_adamw_tau0p10_seed11_20260102T030405006789Z"
+        train._run_directory_name(
+            "tcn",
+            BASELINE_TCN_SETTINGS,
+            "adamw",
+            0.1,
+            None,
+            11,
+            created,
+        )
+        == "tcn_context_pooled_w128_rffull_adamw_tau0p10_seed11_"
+        "20260102T030405006789Z"
     )
     assert (
-        train._run_directory_name("tcn", "sam_adamw", 0.1, 0.01, 11, created)
-        == "tcn_sam_adamw_rho0p010_tau0p10_seed11_20260102T030405006789Z"
+        train._run_directory_name(
+            "tcn",
+            BASELINE_TCN_SETTINGS,
+            "sam_adamw",
+            0.1,
+            0.01,
+            11,
+            created,
+        )
+        == "tcn_context_pooled_w128_rffull_sam_adamw_rho0p010_tau0p10_"
+        "seed11_20260102T030405006789Z"
     )
 
 
 def test_checkpoint_round_trip_contains_resume_boundary_state(tmp_path: Path) -> None:
-    model = build_neural_model("tcn")
+    model = build_neural_model("tcn", BASELINE_TCN_ARCHITECTURE)
     optimizer, _ = build_optimizer(model)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
     for parameter in model.parameters():
@@ -872,6 +906,8 @@ def test_checkpoint_round_trip_contains_resume_boundary_state(tmp_path: Path) ->
         optimizer,
         scheduler,
         "tcn",
+        BASELINE_TCN_ARCHITECTURE,
+        BASELINE_TCN_SETTINGS,
         "sam_adamw",
         0.1,
         0.02,
@@ -884,7 +920,7 @@ def test_checkpoint_round_trip_contains_resume_boundary_state(tmp_path: Path) ->
     path = tmp_path / "checkpoint.pt"
     torch.save(payload, path)
     loaded = torch.load(path, map_location="cpu", weights_only=False)
-    restored = build_neural_model("tcn")
+    restored = build_neural_model("tcn", BASELINE_TCN_ARCHITECTURE)
     restored_optimizer, _ = build_optimizer(restored)
     restored_scheduler = torch.optim.lr_scheduler.LambdaLR(
         restored_optimizer, lambda _: 1.0

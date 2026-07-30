@@ -16,7 +16,6 @@ import torch._functorch.config as functorch_config
 from torch import nn
 
 from .contract import (
-    architecture_for_model,
     COMPILE_PARITY_GRADIENT_COSINE_MIN,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
@@ -35,12 +34,15 @@ from .contract import (
     GH200_RUNTIME,
     GRADIENT_CLIP,
     HardwareInfo,
+    NeuralArchitecture,
     RuntimeSettings,
     SAM_NORM_EPS,
     SAM_RHOS,
     SOFT_RANK_STANDARDIZATION_EPS,
     SOFT_RANK_TEMPERATURES,
     SOFT_SPEARMAN_CORRELATION_EPS,
+    TCNSettings,
+    expected_trainable_parameter_count,
 )
 from .metrics import create_metric_table
 
@@ -1191,6 +1193,8 @@ def checkpoint_payload(
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler,
     model_name: str,
+    architecture: NeuralArchitecture,
+    tcn_settings: TCNSettings | None,
     optimizer_variant: str,
     temperature: float,
     sam_rho: float | None,
@@ -1202,7 +1206,6 @@ def checkpoint_payload(
 ) -> dict[str, object]:
     if getattr(model, "model_name", None) != model_name:
         raise ValueError("Checkpoint model name does not match the model")
-    architecture = architecture_for_model(model_name)
 
     return {
         "model_name": model_name,
@@ -1215,7 +1218,9 @@ def checkpoint_payload(
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict(),
+        "tcn_settings": None if tcn_settings is None else asdict(tcn_settings),
         "architecture_constants": asdict(architecture),
+        "parameter_count": expected_trainable_parameter_count(model_name, architecture),
         "resolved_feature_store_path": str(feature_store),
         "git_commit_sha": git_commit_sha,
     }

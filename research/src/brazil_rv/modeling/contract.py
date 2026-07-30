@@ -116,11 +116,17 @@ ATTENTION_DROPOUT = 0.0
 TARGETED_FUSION_GATE_BIAS = -2.0
 POOLED_INDUCING_TOKEN_COUNT = 4
 
-TCN_WIDTH = 128
-TCN_DEPTH = 6
 TCN_KERNEL_SIZE = 3
-TCN_DILATIONS = (1, 2, 4, 8, 16, 32)
-TCN_FUSION_WIDTH = 256
+TCN_FUSIONS = ("none", "context_only", "pooled_market", "context_pooled")
+TCN_WIDTHS = (64, 128, 192, 256)
+TCN_RECEPTIVE_FIELDS: Mapping[str, tuple[int, ...]] = MappingProxyType(
+    {
+        "short": (1, 2, 4),
+        "medium": (1, 2, 4, 8),
+        "long": (1, 2, 4, 8, 16),
+        "full": (1, 2, 4, 8, 16, 32),
+    }
+)
 MLP_WIDTH = 256
 MLP_DEPTH = 3
 MLP_SWIGLU_WIDTH = 512
@@ -335,8 +341,24 @@ class TransformerArchitecture:
 
 
 @dataclass(frozen=True)
+class TCNSettings:
+    fusion: str
+    width: int
+    receptive_field: str
+
+
+BASELINE_TCN_SETTINGS = TCNSettings(
+    fusion="context_pooled",
+    width=128,
+    receptive_field="full",
+)
+
+
+@dataclass(frozen=True)
 class TCNArchitecture:
     family: str
+    fusion_mode: str
+    receptive_field: str
     patch_input_width: int
     width: int
     residual_blocks: int
@@ -344,6 +366,10 @@ class TCNArchitecture:
     dilations: tuple[int, ...]
     slow_width: int
     fusion_states: int
+    theoretical_receptive_field_patches: int
+    effective_receptive_field_patches: int
+    theoretical_receptive_field_minutes: int
+    effective_receptive_field_minutes: int
     fusion_width: int
     dropout: float
     output_horizons: int
@@ -361,6 +387,9 @@ class MLPArchitecture:
     output_horizons: int
 
 
+NeuralArchitecture = TransformerArchitecture | TCNArchitecture | MLPArchitecture
+
+
 _SHARED_TRANSFORMER = {
     "family": "transformer",
     "d_model": 256,
@@ -376,58 +405,45 @@ _SHARED_TRANSFORMER = {
     "attention_dropout": ATTENTION_DROPOUT,
     "output_horizons": HORIZON_COUNT,
 }
-NEURAL_ARCHITECTURES: Mapping[
-    str, TransformerArchitecture | TCNArchitecture | MLPArchitecture
-] = MappingProxyType(
-    {
-        "temporal_only": TransformerArchitecture(
-            **_SHARED_TRANSFORMER,
-            context_memory_tokens=0,
-            pooled_memory_tokens=0,
-            fusion_blocks=0,
-        ),
-        "context_only": TransformerArchitecture(
-            **_SHARED_TRANSFORMER,
-            context_memory_tokens=6,
-            pooled_memory_tokens=0,
-            fusion_blocks=1,
-        ),
-        "pooled_market": TransformerArchitecture(
-            **_SHARED_TRANSFORMER,
-            context_memory_tokens=0,
-            pooled_memory_tokens=6,
-            fusion_blocks=1,
-        ),
-        "context_pooled": TransformerArchitecture(
-            **_SHARED_TRANSFORMER,
-            context_memory_tokens=6,
-            pooled_memory_tokens=6,
-            fusion_blocks=1,
-        ),
-        "tcn": TCNArchitecture(
-            family="tcn",
-            patch_input_width=PATCH_INPUT_WIDTH,
-            width=TCN_WIDTH,
-            residual_blocks=TCN_DEPTH,
-            kernel_size=TCN_KERNEL_SIZE,
-            dilations=TCN_DILATIONS,
-            slow_width=SLOW_FEATURE_COUNT,
-            fusion_states=9,
-            fusion_width=TCN_FUSION_WIDTH,
-            dropout=RESIDUAL_DROPOUT,
-            output_horizons=HORIZON_COUNT,
-        ),
-        "mlp": MLPArchitecture(
-            family="mlp",
-            input_width=TABULAR_FEATURE_COUNT,
-            hidden_width=MLP_WIDTH,
-            residual_blocks=MLP_DEPTH,
-            swiglu_width=MLP_SWIGLU_WIDTH,
-            norm_eps=RMS_NORM_EPS,
-            dropout=RESIDUAL_DROPOUT,
-            output_horizons=HORIZON_COUNT,
-        ),
-    }
+NEURAL_ARCHITECTURES: Mapping[str, TransformerArchitecture | MLPArchitecture] = (
+    MappingProxyType(
+        {
+            "temporal_only": TransformerArchitecture(
+                **_SHARED_TRANSFORMER,
+                context_memory_tokens=0,
+                pooled_memory_tokens=0,
+                fusion_blocks=0,
+            ),
+            "context_only": TransformerArchitecture(
+                **_SHARED_TRANSFORMER,
+                context_memory_tokens=6,
+                pooled_memory_tokens=0,
+                fusion_blocks=1,
+            ),
+            "pooled_market": TransformerArchitecture(
+                **_SHARED_TRANSFORMER,
+                context_memory_tokens=0,
+                pooled_memory_tokens=6,
+                fusion_blocks=1,
+            ),
+            "context_pooled": TransformerArchitecture(
+                **_SHARED_TRANSFORMER,
+                context_memory_tokens=6,
+                pooled_memory_tokens=6,
+                fusion_blocks=1,
+            ),
+            "mlp": MLPArchitecture(
+                family="mlp",
+                input_width=TABULAR_FEATURE_COUNT,
+                hidden_width=MLP_WIDTH,
+                residual_blocks=MLP_DEPTH,
+                swiglu_width=MLP_SWIGLU_WIDTH,
+                norm_eps=RMS_NORM_EPS,
+                dropout=RESIDUAL_DROPOUT,
+                output_horizons=HORIZON_COUNT,
+            ),
+        }
+    )
 )
 EXPECTED_TRAINABLE_PARAMETER_COUNTS: Mapping[str, int] = MappingProxyType(
     {
@@ -435,7 +451,6 @@ EXPECTED_TRAINABLE_PARAMETER_COUNTS: Mapping[str, int] = MappingProxyType(
         "context_only": 2_603_779,
         "pooled_market": 3_539_715,
         "context_pooled": 3_539_715,
-        "tcn": 777_987,
         "mlp": 1_404_675,
     }
 )
@@ -443,11 +458,86 @@ EXPECTED_TRAINABLE_PARAMETER_COUNTS: Mapping[str, int] = MappingProxyType(
 
 def architecture_for_model(
     model_name: str,
+    tcn_settings: TCNSettings | None = None,
 ) -> TransformerArchitecture | TCNArchitecture | MLPArchitecture:
+    if model_name == "tcn":
+        if tcn_settings is None:
+            raise ValueError("TCN settings are required for model tcn")
+        return resolve_tcn_architecture(tcn_settings)
+    if tcn_settings is not None:
+        raise ValueError(f"TCN settings are forbidden for model {model_name}")
     try:
         return NEURAL_ARCHITECTURES[model_name]
     except KeyError as error:
         raise ValueError(f"Unknown neural model: {model_name}") from error
+
+
+def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
+    if settings.fusion not in TCN_FUSIONS:
+        raise ValueError(f"Invalid TCN fusion: {settings.fusion}")
+    if settings.width not in TCN_WIDTHS:
+        raise ValueError(f"Invalid TCN width: {settings.width}")
+    try:
+        dilations = TCN_RECEPTIVE_FIELDS[settings.receptive_field]
+    except KeyError as error:
+        raise ValueError(
+            f"Invalid TCN receptive field: {settings.receptive_field}"
+        ) from error
+    fusion_states = {
+        "none": 0,
+        "context_only": 7,
+        "pooled_market": 3,
+        "context_pooled": 9,
+    }[settings.fusion]
+    theoretical_patches = 1 + (TCN_KERNEL_SIZE - 1) * sum(dilations)
+    effective_patches = min(theoretical_patches, ABSOLUTE_PATCH_COUNT)
+    return TCNArchitecture(
+        family="tcn",
+        fusion_mode=settings.fusion,
+        receptive_field=settings.receptive_field,
+        patch_input_width=PATCH_INPUT_WIDTH,
+        width=settings.width,
+        residual_blocks=len(dilations),
+        kernel_size=TCN_KERNEL_SIZE,
+        dilations=dilations,
+        slow_width=SLOW_FEATURE_COUNT,
+        fusion_states=fusion_states,
+        theoretical_receptive_field_patches=theoretical_patches,
+        effective_receptive_field_patches=effective_patches,
+        theoretical_receptive_field_minutes=theoretical_patches * PATCH_MINUTES,
+        effective_receptive_field_minutes=effective_patches * PATCH_MINUTES,
+        fusion_width=2 * settings.width,
+        dropout=RESIDUAL_DROPOUT,
+        output_horizons=HORIZON_COUNT,
+    )
+
+
+def expected_trainable_parameter_count(
+    model_name: str,
+    architecture: TransformerArchitecture | TCNArchitecture | MLPArchitecture,
+) -> int:
+    if isinstance(architecture, TCNArchitecture):
+        width = architecture.width
+        count = (
+            architecture.patch_input_width * width
+            + architecture.residual_blocks
+            * ((architecture.kernel_size + 1) * width**2 + 3 * width)
+            + architecture.slow_width * width
+            + 2 * width
+            + architecture.output_horizons * width
+            + architecture.output_horizons
+        )
+        if architecture.fusion_mode != "none":
+            count += (
+                architecture.fusion_states * width * architecture.fusion_width
+                + architecture.fusion_width
+                + architecture.fusion_width * width
+                + 2 * width**2
+                + width
+                + 2 * width
+            )
+        return count
+    return EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_name]
 
 
 @dataclass(frozen=True)

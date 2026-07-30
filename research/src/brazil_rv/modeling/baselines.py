@@ -12,16 +12,11 @@ from .contract import (
     MLP_DEPTH,
     MLP_SWIGLU_WIDTH,
     MLP_WIDTH,
-    PATCH_INPUT_WIDTH,
     RESIDUAL_DROPOUT,
     RMS_NORM_EPS,
-    SLOW_FEATURE_COUNT,
     TABULAR_FEATURE_COUNT,
     TARGETED_FUSION_GATE_BIAS,
-    TCN_DILATIONS,
-    TCN_FUSION_WIDTH,
-    TCN_KERNEL_SIZE,
-    TCN_WIDTH,
+    TCNArchitecture,
 )
 from .layers import CausalTCNResidualBlock, MuonLinear, SwiGLU
 
@@ -29,31 +24,43 @@ from .layers import CausalTCNResidualBlock, MuonLinear, SwiGLU
 class SharedCausalTCN(nn.Module):
     model_name = "tcn"
 
-    def __init__(self) -> None:
+    def __init__(self, architecture: TCNArchitecture) -> None:
         super().__init__()
-        self.input_projection = nn.Linear(PATCH_INPUT_WIDTH, TCN_WIDTH, bias=False)
+        self.architecture = architecture
+        width = architecture.width
+        self.input_projection = nn.Linear(
+            architecture.patch_input_width, width, bias=False
+        )
         self.blocks = nn.ModuleList(
             [
                 CausalTCNResidualBlock(
-                    TCN_WIDTH,
-                    TCN_KERNEL_SIZE,
+                    width,
+                    architecture.kernel_size,
                     dilation,
-                    RESIDUAL_DROPOUT,
+                    architecture.dropout,
                 )
-                for dilation in TCN_DILATIONS
+                for dilation in architecture.dilations
             ]
         )
-        self.slow_projection = nn.Linear(SLOW_FEATURE_COUNT, TCN_WIDTH, bias=False)
-        self.state_norm = nn.LayerNorm(TCN_WIDTH)
-        self.fusion_input = nn.Linear(9 * TCN_WIDTH, TCN_FUSION_WIDTH, bias=True)
-        self.fusion_output = MuonLinear(TCN_FUSION_WIDTH, TCN_WIDTH, bias=False)
-        self.fusion_gate = nn.Linear(2 * TCN_WIDTH, TCN_WIDTH, bias=True)
-        self.fusion_norm = nn.LayerNorm(TCN_WIDTH)
-        self.dropout = nn.Dropout(RESIDUAL_DROPOUT)
-        self.prediction_head = nn.Linear(TCN_WIDTH, HORIZON_COUNT, bias=True)
+        self.slow_projection = nn.Linear(architecture.slow_width, width, bias=False)
+        self.state_norm = nn.LayerNorm(width)
+        if architecture.fusion_mode != "none":
+            self.fusion_input = nn.Linear(
+                architecture.fusion_states * width,
+                architecture.fusion_width,
+                bias=True,
+            )
+            self.fusion_output = MuonLinear(
+                architecture.fusion_width, width, bias=False
+            )
+            self.fusion_gate = nn.Linear(2 * width, width, bias=True)
+            self.fusion_norm = nn.LayerNorm(width)
+        self.dropout = nn.Dropout(architecture.dropout)
+        self.prediction_head = nn.Linear(width, architecture.output_horizons, bias=True)
         self.apply(self._initialize_module)
-        nn.init.zeros_(self.fusion_gate.weight)
-        nn.init.constant_(self.fusion_gate.bias, TARGETED_FUSION_GATE_BIAS)
+        if architecture.fusion_mode != "none":
+            nn.init.zeros_(self.fusion_gate.weight)
+            nn.init.constant_(self.fusion_gate.bias, TARGETED_FUSION_GATE_BIAS)
 
     @staticmethod
     def _initialize_module(module: nn.Module) -> None:
@@ -72,21 +79,30 @@ class SharedCausalTCN(nn.Module):
         slow_features: torch.Tensor,
         state_position: torch.Tensor,
     ) -> torch.Tensor:
+        architecture = self.architecture
         batch_size = patches.shape[0]
+        instrument_count = (
+            INSTRUMENT_COUNT
+            if architecture.fusion_mode in ("context_only", "context_pooled")
+            else EQUITY_COUNT
+        )
+        patches = patches[:, :instrument_count]
+        history_patch_mask = history_patch_mask[:, :instrument_count]
+        slow_features = slow_features[:, :instrument_count]
         masked = patches * history_patch_mask[..., None].to(patches.dtype)
         hidden = self.input_projection(masked).reshape(
-            batch_size * INSTRUMENT_COUNT, masked.shape[2], TCN_WIDTH
+            batch_size * instrument_count, masked.shape[2], architecture.width
         )
         hidden = hidden.transpose(1, 2)
         for block in self.blocks:
             hidden = block(hidden)
         hidden = hidden.transpose(1, 2).reshape(
-            batch_size, INSTRUMENT_COUNT, masked.shape[2], TCN_WIDTH
+            batch_size, instrument_count, masked.shape[2], architecture.width
         )
         gather_index = (
             (state_position - 1)
             .view(batch_size, 1, 1, 1)
-            .expand(-1, INSTRUMENT_COUNT, 1, TCN_WIDTH)
+            .expand(-1, instrument_count, 1, architecture.width)
         )
         state = hidden.gather(2, gather_index).squeeze(2)
         return self.state_norm(state + self.slow_projection(slow_features))
@@ -103,29 +119,34 @@ class SharedCausalTCN(nn.Module):
             patches, history_patch_mask, slow_features, state_position
         )
         equity_states = states[:, :EQUITY_COUNT]
-        context_states = states[:, EQUITY_COUNT:]
         equity_mask = instrument_mask[:, :EQUITY_COUNT]
-        weight = equity_mask[..., None].to(states.dtype)
-        count = weight.sum(dim=1).clamp_min(1.0)
-        mean = (equity_states * weight).sum(dim=1) / count
-        second_moment = (equity_states.square() * weight).sum(dim=1) / count
-        dispersion = torch.sqrt(torch.clamp(second_moment - mean.square(), min=1e-6))
-        shared = torch.cat(
-            (
-                context_states.reshape(states.shape[0], CONTEXT_COUNT * TCN_WIDTH),
-                mean,
-                dispersion,
-            ),
-            dim=-1,
-        )
-        shared = shared[:, None].expand(-1, EQUITY_COUNT, -1)
-        fusion_input = torch.cat((equity_states, shared), dim=-1)
-        fused = self.fusion_output(F.gelu(self.fusion_input(fusion_input)))
-        fused = self.dropout(F.gelu(fused))
-        gate = torch.sigmoid(
-            self.fusion_gate(torch.cat((equity_states, fused), dim=-1))
-        )
-        equity_states = self.fusion_norm(equity_states + gate * fused)
+        fusion_mode = self.architecture.fusion_mode
+        if fusion_mode != "none":
+            shared_parts: list[torch.Tensor] = []
+            if fusion_mode in ("context_only", "context_pooled"):
+                shared_parts.append(
+                    states[:, EQUITY_COUNT:].reshape(
+                        states.shape[0], CONTEXT_COUNT * self.architecture.width
+                    )
+                )
+            if fusion_mode in ("pooled_market", "context_pooled"):
+                weight = equity_mask[..., None].to(states.dtype)
+                count = weight.sum(dim=1).clamp_min(1.0)
+                mean = (equity_states * weight).sum(dim=1) / count
+                second_moment = (equity_states.square() * weight).sum(dim=1) / count
+                dispersion = torch.sqrt(
+                    torch.clamp(second_moment - mean.square(), min=1e-6)
+                )
+                shared_parts.extend((mean, dispersion))
+            shared = torch.cat(shared_parts, dim=-1)
+            shared = shared[:, None].expand(-1, EQUITY_COUNT, -1)
+            fusion_input = torch.cat((equity_states, shared), dim=-1)
+            fused = self.fusion_output(F.gelu(self.fusion_input(fusion_input)))
+            fused = self.dropout(F.gelu(fused))
+            gate = torch.sigmoid(
+                self.fusion_gate(torch.cat((equity_states, fused), dim=-1))
+            )
+            equity_states = self.fusion_norm(equity_states + gate * fused)
         predictions = self.prediction_head(equity_states)
         return predictions * equity_mask[..., None].to(predictions.dtype)
 

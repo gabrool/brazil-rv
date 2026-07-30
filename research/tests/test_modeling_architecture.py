@@ -10,10 +10,10 @@ import brazil_rv.modeling.engine as engine_module
 from brazil_rv.modeling.baselines import ResidualTabularMLP, SharedCausalTCN
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
+    BASELINE_TCN_SETTINGS,
     COMPILE_STEADY_STATE_PASS_COUNT,
     COMPILE_WARMUP_PASS_COUNT,
     EQUITY_COUNT,
-    EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     GH200_RUNTIME,
     INSTRUMENT_COUNT,
     NEURAL_MODELS,
@@ -22,9 +22,9 @@ from brazil_rv.modeling.contract import (
     SLOW_FEATURE_COUNT,
     SUPPORTED_MODELS,
     TABULAR_FEATURE_COUNT,
-    TCN_DILATIONS,
     TCN_KERNEL_SIZE,
     architecture_for_model,
+    expected_trainable_parameter_count,
 )
 from brazil_rv.modeling.engine import compile_model, warmup_compiled_model
 from brazil_rv.modeling.layers import (
@@ -39,6 +39,16 @@ from brazil_rv.modeling.model import (
     build_neural_model,
     count_trainable_parameters,
 )
+
+
+BASELINE_TCN_ARCHITECTURE = architecture_for_model("tcn", BASELINE_TCN_SETTINGS)
+
+
+def _build_model(model_name: str) -> nn.Module:
+    return build_neural_model(
+        model_name,
+        BASELINE_TCN_ARCHITECTURE if model_name == "tcn" else None,
+    )
 
 
 def _inputs() -> dict[str, torch.Tensor]:
@@ -90,7 +100,7 @@ def _forward(
 @pytest.fixture(scope="module", params=NEURAL_MODELS)
 def neural_model(request: pytest.FixtureRequest) -> tuple[str, nn.Module]:
     model_name = str(request.param)
-    return model_name, build_neural_model(model_name).eval()
+    return model_name, _build_model(model_name).eval()
 
 
 def test_exact_public_model_contract() -> None:
@@ -117,9 +127,12 @@ def test_forward_shape_finiteness_and_parameter_count(
         output = _forward(model, model_name, _inputs())
     assert output.shape == (1, EQUITY_COUNT, 3)
     assert torch.isfinite(output).all()
-    assert (
-        count_trainable_parameters(model)
-        == EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_name]
+    architecture = architecture_for_model(
+        model_name,
+        BASELINE_TCN_SETTINGS if model_name == "tcn" else None,
+    )
+    assert count_trainable_parameters(model) == expected_trainable_parameter_count(
+        model_name, architecture
     )
 
 
@@ -193,7 +206,7 @@ def test_pooled_market_active_and_inactive_isolation() -> None:
 
 @pytest.mark.parametrize("model_name", NEURAL_MODELS)
 def test_equity_permutation_equivariance_and_inactive_zero(model_name: str) -> None:
-    model = build_neural_model(model_name).eval()
+    model = _build_model(model_name).eval()
     inputs = _inputs()
     permutation = torch.arange(EQUITY_COUNT - 1, -1, -1)
     permuted = {key: value.clone() for key, value in inputs.items()}
@@ -223,8 +236,9 @@ def test_equity_permutation_equivariance_and_inactive_zero(model_name: str) -> N
 
 
 def test_tcn_is_causal_and_contains_no_attention() -> None:
-    model = SharedCausalTCN().eval()
-    assert 1 + (TCN_KERNEL_SIZE - 1) * sum(TCN_DILATIONS) >= ABSOLUTE_PATCH_COUNT
+    model = SharedCausalTCN(BASELINE_TCN_ARCHITECTURE).eval()
+    assert BASELINE_TCN_ARCHITECTURE.kernel_size == TCN_KERNEL_SIZE
+    assert BASELINE_TCN_ARCHITECTURE.effective_receptive_field_patches == 69
     assert not any(
         isinstance(module, (MultiHeadAttention, CrossAttention))
         for module in model.modules()
@@ -258,7 +272,7 @@ def test_state_dict_round_trip_for_every_neural_setting(
     buffer = io.BytesIO()
     torch.save(model.state_dict(), buffer)
     buffer.seek(0)
-    restored = build_neural_model(model_name).eval()
+    restored = _build_model(model_name).eval()
     restored.load_state_dict(torch.load(buffer, weights_only=True))
     with torch.no_grad():
         actual = _forward(restored, model_name, inputs)

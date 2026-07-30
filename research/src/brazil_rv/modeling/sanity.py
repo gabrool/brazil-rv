@@ -12,6 +12,7 @@ import numpy as np
 import torch
 
 from .contract import (
+    BASELINE_TCN_SETTINGS,
     COMPILE_PARITY_PREDICTION_ATOL,
     COMPILE_PARITY_PREDICTION_RTOL,
     GH200_RUNTIME,
@@ -23,6 +24,7 @@ from .contract import (
     SANITY_MEMORIZATION_SAMPLE_COUNT,
     SANITY_MIN_SPEARMAN,
     SANITY_SMOKE_SAMPLE_COUNT,
+    architecture_for_model,
 )
 from .data import (
     BatchRequest,
@@ -56,6 +58,7 @@ from .optim import build_optimizer, build_scheduler
 SANITY_TEMPERATURE = 0.10
 SANITY_SAM_RHO = 0.020
 SANITY_MODEL = "tcn"
+SANITY_TCN_ARCHITECTURE = architecture_for_model(SANITY_MODEL, BASELINE_TCN_SETTINGS)
 
 
 def _evaluate_fixed_batch(
@@ -108,6 +111,8 @@ def _checkpoint_compatibility(
         optimizer,
         scheduler,
         SANITY_MODEL,
+        SANITY_TCN_ARCHITECTURE,
+        BASELINE_TCN_SETTINGS,
         "adamw",
         SANITY_TEMPERATURE,
         None,
@@ -122,7 +127,7 @@ def _checkpoint_compatibility(
     try:
         torch.save(checkpoint, checkpoint_path)
         loaded = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-        eager_model = build_neural_model(SANITY_MODEL)
+        eager_model = build_neural_model(SANITY_MODEL, SANITY_TCN_ARCHITECTURE)
         eager_optimizer, _ = build_optimizer(eager_model)
         eager_scheduler, _, _ = build_scheduler(eager_optimizer, training_sample_count)
         eager_model.load_state_dict(loaded["model_state_dict"])
@@ -173,13 +178,22 @@ def main() -> None:
 
     cache_report = warm_feature_store_cache(feature_store)
     train_loader, evaluation_loader, sampler = create_training_loaders(
-        feature_store, training, memorization_rows, SANITY_MODEL, runtime, 11
+        feature_store,
+        training,
+        memorization_rows,
+        SANITY_MODEL,
+        runtime,
+        11,
+        SANITY_TCN_ARCHITECTURE,
     )
     sampler.set_epoch(0)
     smoke_batches = list(islice(train_loader, runtime.accumulation_steps))
     evaluation_batch = next(iter(evaluation_loader))
     memorization_dataset = VectorizedFeatureDataset(
-        feature_store, memorization_rows, SANITY_MODEL
+        feature_store,
+        memorization_rows,
+        SANITY_MODEL,
+        SANITY_TCN_ARCHITECTURE,
     )
     memorization_batch = tensorize_vectorized_batch(
         memorization_dataset[
@@ -196,7 +210,7 @@ def main() -> None:
         torch.cat([batch["date_idx"] for batch in smoke_batches]).unique().numel()
     )
 
-    model = build_neural_model(SANITY_MODEL).to("cuda")
+    model = build_neural_model(SANITY_MODEL, SANITY_TCN_ARCHITECTURE).to("cuda")
     initial_state = {
         key: value.detach().clone() for key, value in model.state_dict().items()
     }
@@ -286,7 +300,9 @@ def main() -> None:
         feature_store,
     )
 
-    memorization_model = build_neural_model(SANITY_MODEL).to("cuda").eval()
+    memorization_model = (
+        build_neural_model(SANITY_MODEL, SANITY_TCN_ARCHITECTURE).to("cuda").eval()
+    )
     memorization_optimizer, _ = build_optimizer(memorization_model)
     memorization_scheduler, _, _ = build_scheduler(
         memorization_optimizer, memorization_rows.height

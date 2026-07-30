@@ -21,6 +21,7 @@ import brazil_rv.modeling.engine as engine_module
 from brazil_rv.modeling.contract import (
     ADAMW_LR,
     ADAMW_WEIGHT_DECAY,
+    BASELINE_TCN_SETTINGS,
     COMPILE_PARITY_GRADIENT_COSINE_MIN,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
@@ -40,11 +41,13 @@ from brazil_rv.modeling.contract import (
     GH200_RUNTIME,
     HORIZONS,
     TRANSFORMER_MODELS,
+    TCNSettings,
     WARMUP_FRACTION,
     XGBOOST_CANDIDATES,
     XGBOOST_DEVICE,
     XGBOOST_FIXED_PARAMETERS,
     XGBOOST_VERSION,
+    architecture_for_model,
 )
 from brazil_rv.modeling.evaluate import (
     _validate_run_checkpoint_identity,
@@ -89,6 +92,22 @@ from brazil_rv.modeling.optim import (
     learning_rate_factor,
     partition_parameters,
 )
+
+
+def _tcn_settings(model_name: str) -> TCNSettings | None:
+    return BASELINE_TCN_SETTINGS if model_name == "tcn" else None
+
+
+def _architecture(model_name: str):
+    return architecture_for_model(model_name, _tcn_settings(model_name))
+
+
+def _build_model(model_name: str) -> nn.Module:
+    architecture = _architecture(model_name)
+    return build_neural_model(
+        model_name,
+        architecture if model_name == "tcn" else None,
+    )
 
 
 def test_compile_setup_modern_explicit_off(
@@ -593,7 +612,11 @@ def _matching_run_identity(
     sam_rho: float | None = None,
 ) -> dict[str, object]:
     return {
-        **_model_metadata(model_name),
+        **_model_metadata(
+            model_name,
+            _architecture(model_name),
+            _tcn_settings(model_name),
+        ),
         "optimizer_variant": optimizer_variant,
         "objective": objective_metadata(temperature),
         "sam": sam_metadata(optimizer_variant, sam_rho),
@@ -639,7 +662,9 @@ def test_evaluation_identity_accepts_optimizer_metadata(
         "seed",
         "resolved_feature_store_path",
         "git_commit_sha",
+        "tcn_settings",
         "architecture_constants",
+        "parameter_count",
     ),
 )
 def test_evaluation_identity_rejects_each_mismatch(field: str, tmp_path: Path) -> None:
@@ -684,6 +709,16 @@ def test_evaluation_identity_rejects_incompatible_architecture_and_count(
     manifest = _matching_run_identity(tmp_path.resolve())
     manifest["parameter_count"] = 1
     with pytest.raises(ValueError, match="parameter count"):
+        _validate_run_checkpoint_identity(
+            manifest, copy.deepcopy(manifest), tmp_path.resolve()
+        )
+
+    manifest = _matching_run_identity(tmp_path.resolve())
+    manifest["tcn_settings"] = {
+        **manifest["tcn_settings"],
+        "width": 64,
+    }
+    with pytest.raises(ValueError, match="architecture metadata"):
         _validate_run_checkpoint_identity(
             manifest, copy.deepcopy(manifest), tmp_path.resolve()
         )
@@ -761,7 +796,7 @@ def test_atomic_history_rejects_unexpected_fields_without_replacing_output(
 def test_adamw_parameter_routing_is_complete_disjoint_and_semantic(
     model_name: str,
 ) -> None:
-    model = build_neural_model(model_name)
+    model = _build_model(model_name)
     groups = partition_parameters(model)
     decay_ids = {id(parameter) for parameter in groups["decay"]}
     no_decay_ids = {id(parameter) for parameter in groups["no_decay"]}
@@ -858,7 +893,7 @@ def test_scheduler_warmup_cosine_endpoints_and_update_numbering() -> None:
 @pytest.mark.parametrize("model_name", NEURAL_MODELS)
 def test_checkpoint_round_trip_eager(model_name: str, tmp_path: Path) -> None:
     torch.manual_seed(13)
-    model = build_neural_model(model_name)
+    model = _build_model(model_name)
     optimizer, _ = build_optimizer(model)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
     payload = checkpoint_payload(
@@ -866,6 +901,8 @@ def test_checkpoint_round_trip_eager(model_name: str, tmp_path: Path) -> None:
         optimizer,
         scheduler,
         model_name,
+        _architecture(model_name),
+        _tcn_settings(model_name),
         "adamw",
         0.1,
         None,
@@ -880,11 +917,59 @@ def test_checkpoint_round_trip_eager(model_name: str, tmp_path: Path) -> None:
     checkpoint_path = tmp_path / "checkpoint.pt"
     torch.save(payload, checkpoint_path)
     loaded = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    restored = build_neural_model(model_name)
+    restored = _build_model(model_name)
     restored.load_state_dict(loaded["model_state_dict"])
     for name, parameter in model.state_dict().items():
         torch.testing.assert_close(
             restored.state_dict()[name], parameter, atol=0, rtol=0
+        )
+
+
+def test_selected_tcn_checkpoint_round_trip_and_identity(tmp_path: Path) -> None:
+    settings = TCNSettings("pooled_market", 192, "long")
+    architecture = architecture_for_model("tcn", settings)
+    torch.manual_seed(31)
+    model = build_neural_model("tcn", architecture)
+    optimizer, _ = build_optimizer(model)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+    payload = checkpoint_payload(
+        model,
+        optimizer,
+        scheduler,
+        "tcn",
+        architecture,
+        settings,
+        "adamw",
+        0.1,
+        None,
+        11,
+        2,
+        0.05,
+        tmp_path,
+        "test-sha",
+    )
+    manifest = {
+        **_model_metadata("tcn", architecture, settings),
+        "optimizer_variant": "adamw",
+        "objective": objective_metadata(0.1),
+        "sam": sam_metadata("adamw", None),
+        "seed": 11,
+        "resolved_feature_store_path": str(tmp_path),
+        "git_commit_sha": "test-sha",
+    }
+    _validate_run_checkpoint_identity(manifest, payload, tmp_path.resolve())
+    assert payload["tcn_settings"] == asdict(settings)
+    assert payload["architecture_constants"] == asdict(architecture)
+    assert payload["parameter_count"] == manifest["parameter_count"]
+
+    checkpoint_path = tmp_path / "selected.pt"
+    torch.save(payload, checkpoint_path)
+    loaded = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    restored = build_neural_model("tcn", architecture)
+    restored.load_state_dict(loaded["model_state_dict"])
+    for name, parameter in model.state_dict().items():
+        torch.testing.assert_close(
+            restored.state_dict()[name], parameter, atol=0.0, rtol=0.0
         )
 
 

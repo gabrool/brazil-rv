@@ -23,10 +23,12 @@ from brazil_rv.modeling.contract import (
     TABULAR_FEATURE_COUNT,
     TABULAR_OFFSETS,
     TEST_START,
+    TCNSettings,
     TRAIN_END,
     TRAIN_START,
     VALIDATION_END,
     VALIDATION_START,
+    resolve_tcn_architecture,
 )
 from brazil_rv.modeling.data import (
     BatchRequest,
@@ -406,6 +408,28 @@ def test_family_specific_batches_construct_only_required_inputs(tmp_path: Path) 
     assert not pooled_batch["patches"][:, EQUITY_COUNT:].any()
     assert not pooled_batch["instrument_mask"][:, EQUITY_COUNT:].any()
     assert not pooled_batch["slow_features"][:, EQUITY_COUNT:].any()
+
+
+@pytest.mark.parametrize(
+    ("fusion", "needs_context"),
+    (
+        ("none", False),
+        ("context_only", True),
+        ("pooled_market", False),
+        ("context_pooled", True),
+    ),
+)
+def test_tcn_batches_construct_only_selected_context(
+    tmp_path: Path, fusion: str, needs_context: bool
+) -> None:
+    store, rows = _synthetic_store(tmp_path)
+    architecture = resolve_tcn_architecture(TCNSettings(fusion, 64, "short"))
+    batch = VectorizedFeatureDataset(store, rows, "tcn", architecture)[
+        BatchRequest(indices=(0,), valid_count=1)
+    ]
+    assert bool(batch["patches"][:, EQUITY_COUNT:].any()) is needs_context
+    assert bool(batch["instrument_mask"][:, EQUITY_COUNT:].any()) is needs_context
+    assert bool(batch["slow_features"][:, EQUITY_COUNT:].any()) is needs_context
 
 
 def test_compact_tabular_offsets_validity_and_future_causality(tmp_path: Path) -> None:
