@@ -20,7 +20,6 @@ from .contract import (
     ALLOWED_SEEDS,
     EARLY_STOP_PATIENCE,
     EFFECTIVE_BATCH_SIZE,
-    EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     FEATURE_STORE_POINTER,
     GH200_RUNTIME,
     MAX_EPOCHS,
@@ -33,13 +32,20 @@ from .contract import (
     SOFT_RANK_TEMPERATURES,
     SUPPORTED_MODELS,
     AdamWConstants,
+    NeuralArchitecture,
     SchedulerConstants,
     SplitBoundaries,
+    TCNArchitecture,
+    TCNSettings,
+    TCN_FUSIONS,
+    TCN_RECEPTIVE_FIELDS,
+    TCN_WIDTHS,
     TrainingConstants,
     XGBOOST_DEVICE,
     XGBOOST_FIXED_PARAMETERS,
     XGBOOST_OBJECTIVE,
     architecture_for_model,
+    expected_trainable_parameter_count,
 )
 from .data import (
     create_training_loaders,
@@ -108,6 +114,14 @@ def validate_cli_args(
         parser.error("--sam-rho is required for --optimizer sam_adamw")
     if args.optimizer == "adamw" and args.sam_rho is not None:
         parser.error("--sam-rho is forbidden for --optimizer adamw")
+    tcn_values = (args.tcn_fusion, args.tcn_width, args.tcn_receptive_field)
+    if args.model == "tcn" and any(value is None for value in tcn_values):
+        parser.error(
+            "--tcn-fusion, --tcn-width, and --tcn-receptive-field are required "
+            "when --model tcn"
+        )
+    if args.model != "tcn" and any(value is not None for value in tcn_values):
+        parser.error("TCN architecture arguments are forbidden unless --model tcn")
     return args
 
 
@@ -122,6 +136,9 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
         choices=SOFT_RANK_TEMPERATURES,
     )
     parser.add_argument("--sam-rho", type=float, choices=SAM_RHOS)
+    parser.add_argument("--tcn-fusion", choices=TCN_FUSIONS)
+    parser.add_argument("--tcn-width", type=int, choices=TCN_WIDTHS)
+    parser.add_argument("--tcn-receptive-field", choices=TCN_RECEPTIVE_FIELDS)
     parser.add_argument("--seed", required=True, type=int, choices=ALLOWED_SEEDS)
     return validate_cli_args(parser, parser.parse_args(arguments))
 
@@ -134,18 +151,33 @@ def set_seeds(seed: int, *, neural: bool) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
-def _model_metadata(model_name: str) -> dict[str, object]:
-    architecture = architecture_for_model(model_name)
+def _tcn_settings_from_args(args: argparse.Namespace) -> TCNSettings | None:
+    if args.model != "tcn":
+        return None
+    return TCNSettings(
+        fusion=args.tcn_fusion,
+        width=args.tcn_width,
+        receptive_field=args.tcn_receptive_field,
+    )
+
+
+def _model_metadata(
+    model_name: str,
+    architecture: NeuralArchitecture,
+    tcn_settings: TCNSettings | None,
+) -> dict[str, object]:
     return {
         "model_name": model_name,
         "model_family": architecture.family,
+        "tcn_settings": None if tcn_settings is None else asdict(tcn_settings),
         "architecture_constants": asdict(architecture),
-        "parameter_count": EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_name],
+        "parameter_count": expected_trainable_parameter_count(model_name, architecture),
     }
 
 
 def _run_directory_name(
     model_name: str,
+    tcn_settings: TCNSettings | None,
     optimizer_variant: str | None,
     temperature: float | None,
     sam_rho: float | None,
@@ -156,11 +188,17 @@ def _run_directory_name(
         return f"{model_name}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
     if temperature is None:
         raise ValueError("Neural run names require a soft-rank temperature")
+    model_part = model_name
+    if tcn_settings is not None:
+        model_part = (
+            f"tcn_{tcn_settings.fusion}_w{tcn_settings.width}_"
+            f"rf{tcn_settings.receptive_field}"
+        )
     optimizer_part = f"_{optimizer_variant}"
     rho_part = "" if sam_rho is None else f"_rho{experiment_decimal(sam_rho, 3)}"
     tau_part = f"_tau{experiment_decimal(temperature, 2)}"
     return (
-        f"{model_name}{optimizer_part}{rho_part}{tau_part}_seed{seed}_"
+        f"{model_part}{optimizer_part}{rho_part}{tau_part}_seed{seed}_"
         f"{created_at:%Y%m%dT%H%M%S%fZ}"
     )
 
@@ -296,6 +334,7 @@ def _run_xgboost(
             hardware=hardware,
             created_at=created_at,
         ),
+        "tcn_settings": None,
         "architecture_constants": None,
         "parameter_count": None,
         "compile": None,
@@ -343,6 +382,7 @@ def _run_xgboost(
 def _run_neural(
     *,
     args: argparse.Namespace,
+    tcn_settings: TCNSettings | None,
     hardware: object,
     commit_sha: str,
     feature_store: Path,
@@ -357,6 +397,10 @@ def _run_neural(
         raise AssertionError("Validated neural CLI is missing its optimizer")
     if args.temperature is None:
         raise AssertionError("Validated neural CLI is missing its temperature")
+    architecture = architecture_for_model(args.model, tcn_settings)
+    tcn_architecture = (
+        architecture if isinstance(architecture, TCNArchitecture) else None
+    )
     runtime = GH200_RUNTIME
     train_loader, validation_loader, sampler = create_training_loaders(
         feature_store,
@@ -365,12 +409,13 @@ def _run_neural(
         args.model,
         runtime,
         args.seed,
+        tcn_architecture,
     )
     training_batch = next(iter(train_loader))
     evaluation_batch = next(iter(validation_loader))
 
-    model = build_neural_model(args.model).to("cuda")
-    model_metadata = _model_metadata(args.model)
+    model = build_neural_model(args.model, tcn_architecture).to("cuda")
+    model_metadata = _model_metadata(args.model, architecture, tcn_settings)
     parameter_count = count_trainable_parameters(model)
     expected_parameter_count = int(model_metadata["parameter_count"])
     if parameter_count != expected_parameter_count:
@@ -547,6 +592,8 @@ def _run_neural(
                     optimizer,
                     scheduler,
                     args.model,
+                    architecture,
+                    tcn_settings,
                     args.optimizer,
                     args.temperature,
                     args.sam_rho,
@@ -571,6 +618,8 @@ def _run_neural(
             optimizer,
             scheduler,
             args.model,
+            architecture,
+            tcn_settings,
             args.optimizer,
             args.temperature,
             args.sam_rho,
@@ -609,6 +658,7 @@ def _run_neural(
 
 def main() -> None:
     args = parse_args()
+    tcn_settings = _tcn_settings_from_args(args)
     neural = args.model in NEURAL_MODELS
     hardware = validate_runtime()
     commit_sha = clean_git_commit_sha()
@@ -628,6 +678,7 @@ def main() -> None:
     created_at = datetime.now(timezone.utc)
     run_dir = RUN_OUTPUT_BASE / _run_directory_name(
         args.model,
+        tcn_settings,
         args.optimizer,
         args.temperature,
         args.sam_rho,
@@ -641,6 +692,7 @@ def main() -> None:
     if neural:
         _run_neural(
             args=args,
+            tcn_settings=tcn_settings,
             hardware=hardware,
             commit_sha=commit_sha,
             feature_store=feature_store,

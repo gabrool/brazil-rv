@@ -13,14 +13,17 @@ import torch
 
 from .contract import (
     ALLOWED_SEEDS,
-    EXPECTED_TRAINABLE_PARAMETER_COUNTS,
     GH200_RUNTIME,
+    NeuralArchitecture,
     NEURAL_MODELS,
+    TCNArchitecture,
+    TCNSettings,
     XGBOOST_DEVICE,
     XGBOOST_FIXED_PARAMETERS,
     XGBOOST_OBJECTIVE,
     XGBOOST_VERSION,
     architecture_for_model,
+    expected_trainable_parameter_count,
 )
 from .data import (
     create_evaluation_loader,
@@ -55,7 +58,9 @@ _CHECKPOINT_IDENTITY_FIELDS = (
     "seed",
     "resolved_feature_store_path",
     "git_commit_sha",
+    "tcn_settings",
     "architecture_constants",
+    "parameter_count",
 )
 
 
@@ -79,14 +84,36 @@ def _validate_objective_and_optimizer(identity: dict[str, object]) -> None:
         raise ValueError("Invalid neural optimizer metadata")
 
 
-def _validate_architecture_identity(identity: dict[str, object]) -> None:
+def _architecture_from_identity(
+    identity: dict[str, object],
+) -> NeuralArchitecture:
     model_name = str(identity["model_name"])
     if model_name not in NEURAL_MODELS:
         raise ValueError(f"Invalid neural model identity: {model_name}")
-    expected = asdict(architecture_for_model(model_name))
+    raw_settings = identity.get("tcn_settings")
+    if model_name == "tcn":
+        if not isinstance(raw_settings, dict):
+            raise ValueError("TCN settings metadata is missing")
+        try:
+            settings = TCNSettings(**raw_settings)
+        except TypeError as error:
+            raise ValueError("Invalid TCN settings metadata") from error
+    else:
+        if raw_settings is not None:
+            raise ValueError(f"TCN settings are forbidden for model: {model_name}")
+        settings = None
+    return architecture_for_model(model_name, settings)
+
+
+def _validate_architecture_identity(identity: dict[str, object]) -> None:
+    model_name = str(identity["model_name"])
+    architecture = _architecture_from_identity(identity)
+    expected = asdict(architecture)
     if identity["architecture_constants"] != expected:
         raise ValueError(f"Invalid architecture metadata for model: {model_name}")
-    expected_parameter_count = EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_name]
+    expected_parameter_count = expected_trainable_parameter_count(
+        model_name, architecture
+    )
     if identity.get("parameter_count") != expected_parameter_count:
         raise ValueError(f"Invalid parameter count for model: {model_name}")
 
@@ -129,6 +156,7 @@ def _validate_xgboost_identity(
         raise ValueError("Invalid XGBoost Git SHA identity")
     for field in (
         "optimizer_variant",
+        "tcn_settings",
         "architecture_constants",
         "parameter_count",
         "compile",
@@ -223,6 +251,10 @@ def _evaluate_neural(
         weights_only=False,
     )
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+    architecture = _architecture_from_identity(checkpoint)
+    tcn_architecture = (
+        architecture if isinstance(architecture, TCNArchitecture) else None
+    )
     objective = manifest["objective"]
     temperature = float(objective["temperature"])
     model_name = str(checkpoint["model_name"])
@@ -232,8 +264,9 @@ def _evaluate_neural(
         model_name,
         GH200_RUNTIME,
         int(manifest["seed"]),
+        tcn_architecture,
     )
-    model = build_neural_model(model_name)
+    model = build_neural_model(model_name, tcn_architecture)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to("cuda")
     eager_reference = clone_eager_reference_model(model)
@@ -317,9 +350,7 @@ def main() -> None:
             "peak_reserved_cuda_memory_bytes": None,
         }
         _atomic_write_parquet(evaluation_dir / "predictions.parquet", predictions)
-    elif model_family in {
-        architecture_for_model(name).family for name in NEURAL_MODELS
-    }:
+    elif model_family in {"transformer", "tcn", "mlp"}:
         summary, daily_rows, family_metadata = _evaluate_neural(
             manifest, feature_store, rows
         )
@@ -337,6 +368,7 @@ def main() -> None:
         "hardware": asdict(hardware),
         "model_name": manifest["model_name"],
         "model_family": manifest["model_family"],
+        "tcn_settings": manifest["tcn_settings"],
         "architecture_constants": manifest["architecture_constants"],
         "parameter_count": manifest["parameter_count"],
         "optimizer_variant": manifest["optimizer_variant"],

@@ -16,6 +16,7 @@ from .contract import (
     TARGETED_FUSION_GATE_BIAS,
     TEMPORAL_TOKEN_COUNT,
     TRANSFORMER_MODELS,
+    TCNArchitecture,
     TransformerArchitecture,
     architecture_for_model,
 )
@@ -220,15 +221,23 @@ class TargetedCrossAssetTransformer(nn.Module):
         return predictions * equity_mask[..., None].to(predictions.dtype)
 
 
-def build_neural_model(model_name: str) -> nn.Module:
+def build_neural_model(
+    model_name: str, tcn_architecture: TCNArchitecture | None = None
+) -> nn.Module:
     if model_name not in NEURAL_MODELS:
         raise ValueError(f"Unknown neural model: {model_name}")
     if model_name in TRANSFORMER_MODELS:
+        if tcn_architecture is not None:
+            raise ValueError(f"TCN architecture is forbidden for model {model_name}")
         return TargetedCrossAssetTransformer(model_name)
     from .baselines import ResidualTabularMLP, SharedCausalTCN
 
     if model_name == "tcn":
-        return SharedCausalTCN()
+        if tcn_architecture is None:
+            raise ValueError("TCN architecture is required for model tcn")
+        return SharedCausalTCN(tcn_architecture)
+    if tcn_architecture is not None:
+        raise ValueError("TCN architecture is forbidden for model mlp")
     return ResidualTabularMLP()
 
 

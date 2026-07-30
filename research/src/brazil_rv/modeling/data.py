@@ -38,6 +38,7 @@ from .contract import (
     TABULAR_OFFSETS,
     TEST_END,
     TEST_START,
+    TCNArchitecture,
     TRAIN_END,
     TRAIN_START,
     VALIDATION_END,
@@ -261,7 +262,7 @@ def _build_patch_batch(
     equity_cutoffs: np.ndarray,
     context_cutoffs: np.ndarray,
     active_equities: np.ndarray,
-    model_name: str,
+    needs_context: bool,
 ) -> dict[str, np.ndarray]:
     batch_size = date_idx.size
     patches = np.zeros(
@@ -281,7 +282,6 @@ def _build_patch_batch(
         * active_equities[..., None]
     )
     state_position = np.empty(batch_size, dtype=np.int64)
-    needs_context = model_name in ("context_only", "context_pooled", "tcn")
 
     for equity_cutoff in np.unique(equity_cutoffs):
         group = np.flatnonzero(equity_cutoffs == equity_cutoff)
@@ -429,14 +429,32 @@ def build_tabular_batch(
 
 class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
     def __init__(
-        self, store: Path, sample_index: pl.DataFrame, model_name: str
+        self,
+        store: Path,
+        sample_index: pl.DataFrame,
+        model_name: str,
+        tcn_architecture: TCNArchitecture | None = None,
     ) -> None:
         if model_name not in NEURAL_MODELS:
             raise ValueError(
                 f"Vectorized dataset requires a neural model: {model_name}"
             )
+        if model_name == "tcn":
+            if tcn_architecture is None:
+                raise ValueError("TCN architecture is required for model tcn")
+            needs_context = tcn_architecture.fusion_mode in (
+                "context_only",
+                "context_pooled",
+            )
+        else:
+            if tcn_architecture is not None:
+                raise ValueError(
+                    f"TCN architecture is forbidden for model {model_name}"
+                )
+            needs_context = model_name in ("context_only", "context_pooled")
         self.store = store
         self.model_name = model_name
+        self.needs_context = needs_context
         self.rows = {
             column: np.asarray(sample_index.get_column(column).to_list())
             for column in (
@@ -496,7 +514,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 equity_cutoffs,
                 context_cutoffs,
                 active_equities,
-                self.model_name,
+                self.needs_context,
             )
         return {**inputs, **common}
 
@@ -662,6 +680,7 @@ def create_training_loaders(
     model_name: str,
     runtime: RuntimeSettings,
     seed: int,
+    tcn_architecture: TCNArchitecture | None = None,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
@@ -669,13 +688,13 @@ def create_training_loaders(
 ]:
     sampler = DateStratifiedMicrobatchSampler(train_rows, runtime, seed)
     train_loader = _create_loader(
-        VectorizedFeatureDataset(store, train_rows, model_name),
+        VectorizedFeatureDataset(store, train_rows, model_name, tcn_architecture),
         sampler,
         runtime,
         seed,
     )
     validation_loader = _create_loader(
-        VectorizedFeatureDataset(store, validation_rows, model_name),
+        VectorizedFeatureDataset(store, validation_rows, model_name, tcn_architecture),
         SequentialPaddedBatchSampler(
             validation_rows.height, runtime.evaluation_batch_size
         ),
@@ -691,9 +710,10 @@ def create_evaluation_loader(
     model_name: str,
     runtime: RuntimeSettings,
     seed: int,
+    tcn_architecture: TCNArchitecture | None = None,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
-        VectorizedFeatureDataset(store, rows, model_name),
+        VectorizedFeatureDataset(store, rows, model_name, tcn_architecture),
         SequentialPaddedBatchSampler(rows.height, runtime.evaluation_batch_size),
         runtime,
         seed,
