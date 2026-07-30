@@ -21,7 +21,8 @@ State and logs are written under:
 Availability polls start no more often than every 1.25 seconds. One central limiter
 keeps all API requests at least 1.10 seconds apart. Launch attempts are also kept at
 least 12.50 seconds apart and to no more than five attempts in any rolling minute.
-HTTP 429 Retry-After values and bounded GET backoff are respected.
+HTTP 429 Retry-After values, bounded local rate-limit backoff, and bounded GET
+backoff are respected.
 
 Launch mode may create a billable instance. Launch mode does not automatically
 terminate it. Launch mode does not automatically start production training. It runs
@@ -82,10 +83,11 @@ $script:LaunchMinimumSeconds = 12.50
 $script:LaunchWindowSeconds = 60.0
 $script:LaunchWindowMaximum = 5
 $script:InstancePollSeconds = 1.25
-$script:SshPollSeconds = 2.0
+$script:SshPollSeconds = 5.0
 $script:ActiveTimeoutSeconds = 20 * 60
-$script:SshTimeoutSeconds = 15 * 60
+$script:SshTimeoutSeconds = 45 * 60
 $script:SshAttemptTimeoutSeconds = 15
+$script:SshProgressSeconds = 5 * 60
 $script:ScpTimeoutSeconds = 5 * 60
 $script:ScpAttempts = 3
 $script:ScpRetrySeconds = 5
@@ -94,6 +96,7 @@ $script:AmbiguousLaunchPollSeconds = 1.25
 $script:HttpTimeoutSeconds = 30
 $script:BootstrapTimeoutSeconds = 90 * 60
 $script:TransientGetBackoffSeconds = @(2, 4, 8, 16, 32, 60)
+$script:RateLimitBackoffSeconds = @(2, 4, 8, 16, 32, 60)
 $script:StateFieldNames = @(
     'script_version',
     'mode',
@@ -133,6 +136,7 @@ $script:ApiClock = $null
 $script:LastApiRequestStart = -1.0
 $script:LaunchAttemptStarts = @()
 $script:TransientGetBackoffIndex = 0
+$script:RateLimitBackoffIndex = 0
 $script:LockStream = $null
 $script:NotifyIcon = $null
 $script:State = $null
@@ -684,6 +688,10 @@ function Get-SshOptions {
         '-i', $PrivateKeyPath,
         '-o', 'IdentitiesOnly=yes',
         '-o', 'BatchMode=yes',
+        '-o', 'PreferredAuthentications=publickey',
+        '-o', 'PasswordAuthentication=no',
+        '-o', 'KbdInteractiveAuthentication=no',
+        '-o', 'ConnectionAttempts=1',
         '-o', 'StrictHostKeyChecking=accept-new',
         '-o', "UserKnownHostsFile=$KnownHostsPath",
         '-o', 'ConnectTimeout=10',
@@ -1162,7 +1170,9 @@ function Invoke-LambdaApi {
         [AllowNull()][scriptblock]$BeforeRequest,
         [AllowNull()][scriptblock]$WaitForSlot,
         [AllowNull()][scriptblock]$RequestStartRegistrar,
-        [AllowNull()][scriptblock]$WebRequestInvoker
+        [AllowNull()][scriptblock]$WebRequestInvoker,
+        [AllowNull()][scriptblock]$Sleep,
+        [AllowNull()][scriptblock]$Logger
     )
 
     if ($null -eq $WaitForSlot) {
@@ -1180,6 +1190,16 @@ function Invoke-LambdaApi {
             Invoke-WebRequest @RequestParameters
         }
     }
+    if ($null -eq $Sleep) {
+        $Sleep = { param([double]$Seconds)
+            Start-Sleep -Milliseconds ([int][Math]::Ceiling($Seconds * 1000))
+        }
+    }
+    if ($null -eq $Logger) {
+        $Logger = { param([string]$Level, [string]$Event, [hashtable]$Fields)
+            Write-Log -Level $Level -Event $Event -Fields $Fields
+        }
+    }
 
     while ($true) {
         $parameters = New-LambdaRequestParameters -Method $Method -Path $Path -Body $Body
@@ -1195,6 +1215,7 @@ function Invoke-LambdaApi {
                 Throw-SafeLambdaFailure -Code 'client/invalid-response' -HttpStatus ([int]$response.StatusCode)
             }
             $script:TransientGetBackoffIndex = 0
+            $script:RateLimitBackoffIndex = 0
             return [pscustomobject]@{
                 Succeeded = $true
                 Data = $parsed.data
@@ -1212,12 +1233,22 @@ function Invoke-LambdaApi {
             $classification = Classify-LambdaFailure -Code $failure.Code `
                 -HttpStatus $failure.HttpStatus -IsLaunch ([bool]$Launch)
             if ($classification -eq 'rate_limited') {
-                $delay = Get-RetryAfterSeconds $failure.RetryAfter
-                Write-Log -Level WARN -Event 'api_rate_limited' -Fields @{
+                $index = [Math]::Min(
+                    $script:RateLimitBackoffIndex,
+                    $script:RateLimitBackoffSeconds.Count - 1
+                )
+                $localDelay = [double]$script:RateLimitBackoffSeconds[$index]
+                $script:RateLimitBackoffIndex++
+                $serverDelay = Get-RetryAfterSeconds $failure.RetryAfter
+                $delay = [Math]::Max($serverDelay, $localDelay)
+                & $Logger 'WARN' 'api_rate_limited' @{
                     http_status = $failure.HttpStatus
-                    retry_after_seconds = $delay
+                    server_retry_after_seconds = $serverDelay
+                    local_backoff_seconds = $localDelay
+                    effective_delay_seconds = $delay
+                    consecutive_rate_limit_count = $script:RateLimitBackoffIndex
                 }
-                Start-Sleep -Milliseconds ([int][Math]::Ceiling($delay * 1000))
+                & $Sleep $delay
                 continue
             }
             if ($Launch) {
@@ -1237,11 +1268,11 @@ function Invoke-LambdaApi {
                 )
                 $delay = $script:TransientGetBackoffSeconds[$index]
                 $script:TransientGetBackoffIndex++
-                Write-Log -Level WARN -Event 'api_get_transient_failure' -Fields @{
+                & $Logger 'WARN' 'api_get_transient_failure' @{
                     http_status = $failure.HttpStatus
                     backoff_seconds = $delay
                 }
-                Start-Sleep -Seconds $delay
+                & $Sleep $delay
                 continue
             }
             Throw-SafeLambdaFailure -Code $failure.Code -HttpStatus $failure.HttpStatus
@@ -2213,6 +2244,41 @@ function Test-TcpPort {
     }
 }
 
+function Get-SshFailureClassification {
+    param(
+        [bool]$TcpReachable,
+        [AllowNull()][object]$ProcessResult
+    )
+
+    if (-not $TcpReachable) {
+        return 'tcp_unavailable'
+    }
+    if ($null -eq $ProcessResult) {
+        return 'other_ssh_failure'
+    }
+    if ($ProcessResult.TimedOut) {
+        return 'ssh_process_timeout'
+    }
+
+    $stderr = [string]$ProcessResult.StdErr
+    if ($stderr -match 'host key verification failed|remote host identification has changed|offending .* key') {
+        return 'host_key_failure'
+    }
+    if ($stderr -match 'connection refused') {
+        return 'connection_refused'
+    }
+    if ($stderr -match 'connection timed out|operation timed out') {
+        return 'connection_timeout'
+    }
+    if ($stderr -match 'connection (closed|reset)|closed by remote host') {
+        return 'connection_closed'
+    }
+    if ($stderr -match 'permission denied \(publickey') {
+        return 'publickey_rejected'
+    }
+    return 'other_ssh_failure'
+}
+
 function Wait-ForAuthenticatedSsh {
     param(
         [Parameter(Mandatory = $true)][string]$IpAddress,
@@ -2222,7 +2288,8 @@ function Wait-ForAuthenticatedSsh {
         [AllowNull()][scriptblock]$TcpProbe,
         [AllowNull()][scriptblock]$SshAttempt,
         [AllowNull()][scriptblock]$Now,
-        [AllowNull()][scriptblock]$Sleep
+        [AllowNull()][scriptblock]$Sleep,
+        [AllowNull()][scriptblock]$Logger
     )
 
     $clock = $null
@@ -2248,25 +2315,120 @@ function Wait-ForAuthenticatedSsh {
                 -AllowedExitCodes (0..255) -AllowTimeout
         }.GetNewClosure()
     }
+    if ($null -eq $Logger) {
+        $Logger = { param([string]$Level, [string]$Event, [hashtable]$Fields)
+            Write-Log -Level $Level -Event $Event -Fields $Fields
+        }
+    }
     $arguments = @(Get-SshOptions -PrivateKeyPath $SshPreflight.PrivateKeyPath `
         -KnownHostsPath $KnownHostsPath) + @("ubuntu@$IpAddress", 'true')
     $started = [double](& $Now)
-    while (([double](& $Now) - $started) -lt $script:SshTimeoutSeconds) {
-        if (& $TcpProbe $IpAddress) {
+    $deadline = $started + $script:SshTimeoutSeconds
+    $nextProgress = $started + $script:SshProgressSeconds
+    $tcpProbeCount = 0
+    $tcpReachableCount = 0
+    $sshAttemptCount = 0
+    $lastExitCode = $null
+    $lastAttemptTimedOut = $false
+    $lastFailureClassification = $null
+    $lastLoggedClassification = $null
+
+    & $Logger 'INFO' 'ssh_readiness_wait_started' @{
+        instance_id = $InstanceId
+        ip = $IpAddress
+        timeout_seconds = $script:SshTimeoutSeconds
+        poll_seconds = $script:SshPollSeconds
+    }
+
+    while ([double](& $Now) -lt $deadline) {
+        $tcpProbeCount++
+        $tcpReachable = [bool](& $TcpProbe $IpAddress)
+        $result = $null
+        if ($tcpReachable) {
+            $tcpReachableCount++
+            $sshAttemptCount++
             $result = & $SshAttempt $arguments
-            if (-not $result.TimedOut -and $result.ExitCode -eq 0) {
-                Write-Log -Level INFO -Event 'ssh_authenticated' -Fields @{
+            $lastExitCode = [int]$result.ExitCode
+            $lastAttemptTimedOut = [bool]$result.TimedOut
+            if (-not $lastAttemptTimedOut -and $lastExitCode -eq 0) {
+                $elapsed = [Math]::Max(0.0, [double](& $Now) - $started)
+                & $Logger 'INFO' 'ssh_authenticated' @{
                     instance_id = $InstanceId
                     ip = $IpAddress
+                    elapsed_seconds = [Math]::Round($elapsed, 1)
+                    tcp_probe_count = $tcpProbeCount
+                    tcp_reachable_count = $tcpReachableCount
+                    ssh_attempt_count = $sshAttemptCount
                 }
                 Send-WatcherNotification -Title 'Lambda GH200 SSH authenticated' `
                     -Message "Authenticated SSH is ready for instance $InstanceId." -Sound
                 return
             }
         }
-        & $Sleep $script:SshPollSeconds
+
+        $lastFailureClassification = Get-SshFailureClassification `
+            -TcpReachable $tcpReachable -ProcessResult $result
+        $nowSeconds = [double](& $Now)
+        if (
+            $null -eq $lastLoggedClassification -or
+            $lastFailureClassification -ne $lastLoggedClassification -or
+            $nowSeconds -ge $nextProgress
+        ) {
+            & $Logger 'INFO' 'ssh_readiness_wait_progress' @{
+                instance_id = $InstanceId
+                elapsed_seconds = [Math]::Round(
+                    [Math]::Max(0.0, $nowSeconds - $started),
+                    1
+                )
+                tcp_probe_count = $tcpProbeCount
+                tcp_reachable_count = $tcpReachableCount
+                ssh_attempt_count = $sshAttemptCount
+                last_ssh_exit_code = $lastExitCode
+                last_attempt_timed_out = $lastAttemptTimedOut
+                last_failure_classification = $lastFailureClassification
+            }
+            $lastLoggedClassification = $lastFailureClassification
+            if ($nowSeconds -ge $nextProgress) {
+                $nextProgress = $nowSeconds + $script:SshProgressSeconds
+            }
+        }
+
+        $remaining = $deadline - [double](& $Now)
+        if ($remaining -gt 0) {
+            & $Sleep ([Math]::Min($script:SshPollSeconds, $remaining))
+        }
     }
-    throw "Authenticated SSH did not succeed within 15 minutes for instance $InstanceId."
+
+    $elapsed = [Math]::Max(0.0, [double](& $Now) - $started)
+    if ($null -eq $lastFailureClassification) {
+        $lastFailureClassification = 'tcp_unavailable'
+    }
+    & $Logger 'ERROR' 'ssh_readiness_wait_timeout' @{
+        instance_id = $InstanceId
+        elapsed_seconds = [Math]::Round($elapsed, 1)
+        tcp_probe_count = $tcpProbeCount
+        tcp_reachable_count = $tcpReachableCount
+        ssh_attempt_count = $sshAttemptCount
+        last_ssh_exit_code = $lastExitCode
+        last_attempt_timed_out = $lastAttemptTimedOut
+        last_failure_classification = $lastFailureClassification
+    }
+    $exitCodeText = if ($null -eq $lastExitCode) { 'none' } else { [string]$lastExitCode }
+    throw (
+        (
+            'Authenticated SSH did not succeed within 45 minutes for instance {0}. ' +
+            'elapsed_seconds={1}; tcp_probes={2}; tcp_reachable={3}; ssh_attempts={4}; ' +
+            'last_ssh_exit_code={5}; last_attempt_timed_out={6}; last_failure={7}.'
+        ) -f
+        $InstanceId,
+        [Math]::Round($elapsed, 1),
+        $tcpProbeCount,
+        $tcpReachableCount,
+        $sshAttemptCount,
+        $exitCodeText,
+        $lastAttemptTimedOut,
+        $lastFailureClassification
+    )
 }
 
 function Get-ManualSshCommand {

@@ -113,13 +113,74 @@ function New-TestMarker {
 function New-ProcessResult {
     param(
         [int]$ExitCode,
-        [bool]$TimedOut = $false
+        [bool]$TimedOut = $false,
+        [string]$StdErr = ''
     )
     return [pscustomobject]@{
         ExitCode = $ExitCode
         TimedOut = $TimedOut
         StdOut = ''
-        StdErr = ''
+        StdErr = $StdErr
+    }
+}
+
+function New-TestHttp429Exception {
+    param([string]$RetryAfter)
+
+    $response = [pscustomobject]@{
+        StatusCode = 429
+        Headers = @{ 'Retry-After' = $RetryAfter }
+        Content = $null
+    }
+    $exception = New-Object Management.Automation.RuntimeException('synthetic 429 body marker')
+    Add-Member -InputObject $exception -NotePropertyName Response -NotePropertyValue $response
+    return $exception
+}
+
+function Invoke-TestRateLimitSequence {
+    param([string[]]$RetryAfterValues)
+
+    $holder = [pscustomobject]@{
+        Calls = 0
+        Failures = @($RetryAfterValues | ForEach-Object { New-TestHttp429Exception $_ })
+        Sleeps = New-Object 'System.Collections.Generic.List[double]'
+        Logs = New-Object 'System.Collections.Generic.List[object]'
+    }
+    $http = {
+        param([hashtable]$Parameters)
+        if ($holder.Calls -lt $holder.Failures.Count) {
+            $failure = $holder.Failures[$holder.Calls]
+            $holder.Calls++
+            throw $failure
+        }
+        $holder.Calls++
+        return [pscustomobject]@{
+            Content = '{"data":{"ok":true}}'
+            StatusCode = 200
+        }
+    }.GetNewClosure()
+    $sleep = {
+        param([double]$Seconds)
+        [void]$holder.Sleeps.Add($Seconds)
+    }.GetNewClosure()
+    $logger = {
+        param([string]$Level, [string]$Event, [hashtable]$Fields)
+        [void]$holder.Logs.Add([pscustomobject]@{
+            Level = $Level
+            Event = $Event
+            Fields = $Fields
+        })
+    }.GetNewClosure()
+
+    $result = Invoke-LambdaApi -Method GET -Path '/instances' `
+        -WaitForSlot { param([bool]$IsLaunch) } `
+        -RequestStartRegistrar { param([bool]$IsLaunch) 0.0 } `
+        -WebRequestInvoker $http -Sleep $sleep -Logger $logger
+    return [pscustomobject]@{
+        Result = $result
+        Calls = $holder.Calls
+        Sleeps = $holder.Sleeps.ToArray()
+        Logs = $holder.Logs.ToArray()
     }
 }
 
@@ -517,6 +578,41 @@ Invoke-Test 'Lambda request parameters always include a 30-second timeout' {
     $script:ApiHeaders = $null
 }
 
+Invoke-Test 'HTTP 429 uses increasing bounded local backoff and resets after success' {
+    $script:RateLimitBackoffIndex = 0
+    $first = Invoke-TestRateLimitSequence @('0', '0', '0', '0', '0', '0', '0')
+    Assert-Equal ($first.Sleeps -join ',') '2,4,8,16,32,60,60' `
+        'Consecutive 429 backoff sequence changed.'
+    $rateLogs = @($first.Logs | Where-Object { $_.Event -eq 'api_rate_limited' })
+    Assert-Equal $rateLogs.Count 7 'A 429 retry was not logged exactly once.'
+    for ($index = 0; $index -lt $rateLogs.Count; $index++) {
+        Assert-Equal $rateLogs[$index].Fields.consecutive_rate_limit_count ($index + 1) `
+            'Consecutive 429 count changed.'
+        Assert-Equal $rateLogs[$index].Fields.effective_delay_seconds `
+            $first.Sleeps[$index] 'Logged 429 delay differs from the effective delay.'
+    }
+    Assert-Equal $script:RateLimitBackoffIndex 0 'Successful response did not reset 429 backoff.'
+
+    $second = Invoke-TestRateLimitSequence @('0')
+    Assert-Equal ($second.Sleeps -join ',') '2' '429 backoff did not restart after success.'
+    $serializedLogs = $first.Logs | ConvertTo-Json -Depth 5 -Compress
+    Assert-True (-not $serializedLogs.Contains('synthetic 429 body marker')) `
+        'Raw HTTP failure text leaked into 429 logs.'
+}
+
+Invoke-Test 'HTTP 429 respects a server delay larger than local backoff' {
+    $script:RateLimitBackoffIndex = 0
+    $result = Invoke-TestRateLimitSequence @('120')
+    Assert-Equal ($result.Sleeps -join ',') '120' 'Large Retry-After was capped locally.'
+    $rateLog = @($result.Logs | Where-Object { $_.Event -eq 'api_rate_limited' })[0]
+    Assert-Equal $rateLog.Fields.server_retry_after_seconds 120.0 `
+        'Server Retry-After was not logged.'
+    Assert-Equal $rateLog.Fields.local_backoff_seconds 2.0 `
+        'Initial local backoff changed.'
+    Assert-Equal $rateLog.Fields.effective_delay_seconds 120.0 `
+        'Effective 429 delay was not logged.'
+}
+
 Invoke-Test 'Ambiguous reconciliation repeats empty reads then adopts exactly one instance' {
     $script:PersistWatcherState = $false
     $script:State = New-WatcherState Launch
@@ -588,6 +684,46 @@ Invoke-Test 'Firewall accepts exact/range/all SSH rules and rejects unrelated or
     } 'Absent firewall rules were accepted.'
 }
 
+Invoke-Test 'SSH options enforce one public-key-only authentication attempt' {
+    $arguments = Get-SshOptions -PrivateKeyPath 'key' -KnownHostsPath 'known-hosts'
+    $options = for ($index = 0; $index -lt $arguments.Count; $index++) {
+        if ($arguments[$index] -eq '-o') {
+            $arguments[$index + 1]
+        }
+    }
+    $expected = @(
+        'IdentitiesOnly=yes',
+        'BatchMode=yes',
+        'PreferredAuthentications=publickey',
+        'PasswordAuthentication=no',
+        'KbdInteractiveAuthentication=no',
+        'ConnectionAttempts=1',
+        'StrictHostKeyChecking=accept-new',
+        'UserKnownHostsFile=known-hosts',
+        'ConnectTimeout=10',
+        'ServerAliveInterval=30',
+        'ServerAliveCountMax=3'
+    )
+    Assert-Equal ($options -join ',') ($expected -join ',') 'SSH options changed.'
+}
+
+Invoke-Test 'SSH failure classifications expose only safe categories' {
+    $cases = @(
+        @($false, $null, 'tcp_unavailable'),
+        @($true, (New-ProcessResult -1 $true 'secret timeout'), 'ssh_process_timeout'),
+        @($true, (New-ProcessResult 255 $false 'Connection refused'), 'connection_refused'),
+        @($true, (New-ProcessResult 255 $false 'Connection timed out'), 'connection_timeout'),
+        @($true, (New-ProcessResult 255 $false 'Connection closed by remote host'), 'connection_closed'),
+        @($true, (New-ProcessResult 255 $false 'Permission denied (publickey).'), 'publickey_rejected'),
+        @($true, (New-ProcessResult 255 $false 'Host key verification failed.'), 'host_key_failure'),
+        @($true, (New-ProcessResult 255 $false 'unrecognized failure'), 'other_ssh_failure')
+    )
+    foreach ($case in $cases) {
+        $actual = Get-SshFailureClassification -TcpReachable $case[0] -ProcessResult $case[1]
+        Assert-Equal $actual $case[2] 'SSH failure classification changed.'
+    }
+}
+
 Invoke-Test 'Authenticated SSH ignores TCP-only and failed SSH before a later zero exit' {
     $script:TestNow = 0.0
     $script:SshAttempts = 0
@@ -604,30 +740,106 @@ Invoke-Test 'Authenticated SSH ignores TCP-only and failed SSH before a later ze
     }
     Wait-ForAuthenticatedSsh '198.51.100.2' 'instance-1' $preflight 'known-hosts' `
         $tcp $attempt { $script:TestNow } `
-        { param([double]$Seconds) $script:TestNow += $Seconds }
+        { param([double]$Seconds) $script:TestNow += $Seconds } `
+        { param($Level, $Event, $Fields) }
     Assert-Equal $script:SshAttempts 2 'Failed authentication was treated as ready.'
 }
 
-Invoke-Test 'Authenticated SSH times out when every attempt times out' {
-    $oldTimeout = $script:SshTimeoutSeconds
-    $script:SshTimeoutSeconds = 4
-    try {
-        $script:TestNow = 0.0
-        $preflight = [pscustomobject]@{
-            PrivateKeyPath = 'key'
-            SshPath = 'ssh'
+Invoke-Test 'Authenticated SSH can become ready after 15 minutes and before the 45-minute deadline' {
+    Assert-Equal $script:SshPollSeconds 5.0 'SSH polling interval changed.'
+    Assert-Equal $script:SshTimeoutSeconds 2700 'SSH readiness deadline changed.'
+    $holder = [pscustomobject]@{
+        Now = 0.0
+        Attempts = 0
+        Logs = New-Object 'System.Collections.Generic.List[object]'
+        FailedResult = New-ProcessResult 255 $false 'Permission denied (publickey).'
+        SuccessResult = New-ProcessResult 0
+    }
+    $preflight = [pscustomobject]@{ PrivateKeyPath = 'key'; SshPath = 'ssh' }
+    $attempt = {
+        param($Arguments)
+        $holder.Attempts++
+        if ($holder.Now -ge (16 * 60)) {
+            return $holder.SuccessResult
         }
-        Assert-Throws {
-            Wait-ForAuthenticatedSsh '198.51.100.2' 'instance-1' $preflight 'known-hosts' `
-                { param($HostName) $true } `
-                { param($Arguments) New-ProcessResult -1 $true } `
-                { $script:TestNow } `
-                { param([double]$Seconds) $script:TestNow += $Seconds }
-        } 'Authenticated SSH timeout was accepted.'
+        return $holder.FailedResult
+    }.GetNewClosure()
+    $logger = {
+        param($Level, $Event, $Fields)
+        [void]$holder.Logs.Add([pscustomobject]@{ Event = $Event; Fields = $Fields })
+    }.GetNewClosure()
+    Wait-ForAuthenticatedSsh -IpAddress '198.51.100.2' -InstanceId 'instance-1' `
+        -SshPreflight $preflight -KnownHostsPath 'known-hosts' `
+        -TcpProbe { param($HostName) $true } -SshAttempt $attempt `
+        -Now { $holder.Now }.GetNewClosure() `
+        -Sleep { param([double]$Seconds) $holder.Now += $Seconds }.GetNewClosure() `
+        -Logger $logger
+    Assert-Equal $holder.Now 960.0 'Late SSH readiness time changed.'
+    Assert-True ($holder.Now -gt (15 * 60)) 'SSH did not exercise readiness after 15 minutes.'
+    Assert-True ($holder.Now -lt $script:SshTimeoutSeconds) 'SSH succeeded after its deadline.'
+    $success = @($holder.Logs | Where-Object { $_.Event -eq 'ssh_authenticated' })[0]
+    Assert-Equal $success.Fields.ssh_attempt_count $holder.Attempts `
+        'SSH success telemetry attempt count changed.'
+}
+
+Invoke-Test 'TCP reachability alone times out at 45 minutes with bounded safe telemetry' {
+    $holder = [pscustomobject]@{
+        Now = 0.0
+        Attempts = 0
+        Logs = New-Object 'System.Collections.Generic.List[object]'
+        FailedResult = New-ProcessResult -1 $true 'secret-marker: never log this'
     }
-    finally {
-        $script:SshTimeoutSeconds = $oldTimeout
+    $preflight = [pscustomobject]@{ PrivateKeyPath = 'key'; SshPath = 'ssh' }
+    $attempt = {
+        param($Arguments)
+        $holder.Attempts++
+        return $holder.FailedResult
+    }.GetNewClosure()
+    $logger = {
+        param($Level, $Event, $Fields)
+        [void]$holder.Logs.Add([pscustomobject]@{
+            Level = $Level
+            Event = $Event
+            Fields = $Fields
+        })
+    }.GetNewClosure()
+    $failure = $null
+    try {
+        Wait-ForAuthenticatedSsh -IpAddress '198.51.100.2' -InstanceId 'instance-1' `
+            -SshPreflight $preflight -KnownHostsPath 'known-hosts' `
+            -TcpProbe { param($HostName) $true } -SshAttempt $attempt `
+            -Now { $holder.Now }.GetNewClosure() `
+            -Sleep { param([double]$Seconds) $holder.Now += $Seconds }.GetNewClosure() `
+            -Logger $logger
     }
+    catch {
+        $failure = $_.Exception
+    }
+    Assert-True ($null -ne $failure) 'TCP-only readiness was accepted.'
+    Assert-Equal $holder.Now 2700.0 'SSH timeout did not reach the 45-minute deadline.'
+    Assert-Equal $holder.Attempts 540 'SSH attempt count changed.'
+    $started = @($holder.Logs | Where-Object { $_.Event -eq 'ssh_readiness_wait_started' })
+    $progress = @($holder.Logs | Where-Object { $_.Event -eq 'ssh_readiness_wait_progress' })
+    $timeout = @($holder.Logs | Where-Object { $_.Event -eq 'ssh_readiness_wait_timeout' })
+    Assert-Equal $started.Count 1 'SSH readiness start was not logged once.'
+    Assert-Equal $progress.Count 9 'SSH progress logs are not bounded.'
+    Assert-Equal $timeout.Count 1 'SSH timeout was not logged once.'
+    Assert-Equal $timeout[0].Fields.tcp_probe_count 540 'TCP probe count changed.'
+    Assert-Equal $timeout[0].Fields.tcp_reachable_count 540 'TCP reachable count changed.'
+    Assert-Equal $timeout[0].Fields.ssh_attempt_count 540 'SSH attempt telemetry changed.'
+    Assert-Equal $timeout[0].Fields.last_ssh_exit_code -1 'Last SSH exit code changed.'
+    Assert-True $timeout[0].Fields.last_attempt_timed_out 'SSH timeout flag was lost.'
+    Assert-Equal $timeout[0].Fields.last_failure_classification 'ssh_process_timeout' `
+        'Last SSH classification changed.'
+    $serializedLogs = $holder.Logs | ConvertTo-Json -Depth 5 -Compress
+    Assert-True (-not $serializedLogs.Contains('secret-marker')) 'SSH stderr leaked into logs.'
+    Assert-True (-not $failure.Message.Contains('secret-marker')) 'SSH stderr leaked into the exception.'
+    Assert-True $failure.Message.Contains('elapsed_seconds=2700') `
+        'SSH timeout exception omitted elapsed time.'
+    Assert-True $failure.Message.Contains('ssh_attempts=540') `
+        'SSH timeout exception omitted attempt counts.'
+    Assert-True $failure.Message.Contains('last_failure=ssh_process_timeout') `
+        'SSH timeout exception omitted safe classification.'
 }
 
 Invoke-Test 'SCP retries failures and succeeds on the third attempt' {
