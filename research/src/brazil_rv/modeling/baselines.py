@@ -38,6 +38,8 @@ class SharedCausalTCN(nn.Module):
                     architecture.kernel_size,
                     dilation,
                     architecture.dropout,
+                    architecture.block,
+                    architecture.swiglu_hidden_width,
                 )
                 for dilation in architecture.dilations
             ]
@@ -125,9 +127,10 @@ class SharedCausalTCN(nn.Module):
             shared_parts: list[torch.Tensor] = []
             if fusion_mode in ("context_only", "context_pooled"):
                 shared_parts.append(
-                    states[:, EQUITY_COUNT:].reshape(
-                        states.shape[0], CONTEXT_COUNT * self.architecture.width
-                    )
+                    (
+                        states[:, EQUITY_COUNT:]
+                        * instrument_mask[:, EQUITY_COUNT:, None].to(states.dtype)
+                    ).reshape(states.shape[0], CONTEXT_COUNT * self.architecture.width)
                 )
             if fusion_mode in ("pooled_market", "context_pooled"):
                 weight = equity_mask[..., None].to(states.dtype)

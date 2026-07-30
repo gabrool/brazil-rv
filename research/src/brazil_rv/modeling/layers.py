@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import cast
 
 import torch
 from torch import nn
@@ -344,9 +345,16 @@ class PooledMarketMemory(nn.Module):
 
 class CausalTCNResidualBlock(nn.Module):
     def __init__(
-        self, width: int, kernel_size: int, dilation: int, dropout: float
+        self,
+        width: int,
+        kernel_size: int,
+        dilation: int,
+        dropout: float,
+        block: str,
+        swiglu_hidden_width: int | None,
     ) -> None:
         super().__init__()
+        self.block = block
         self.left_padding = (kernel_size - 1) * dilation
         self.convolution = nn.Conv1d(
             width,
@@ -357,11 +365,19 @@ class CausalTCNResidualBlock(nn.Module):
             bias=True,
         )
         self.norm = nn.LayerNorm(width)
-        self.projection = MuonLinear(width, width, bias=False)
+        if block == "swiglu":
+            self.swiglu = SwiGLU(width, cast(int, swiglu_hidden_width))
+        else:
+            self.projection = MuonLinear(width, width, bias=False)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         hidden = self.convolution(F.pad(inputs, (self.left_padding, 0)))
         hidden = self.norm(hidden.transpose(1, 2))
-        hidden = self.dropout(F.gelu(self.projection(F.gelu(hidden))))
+        if self.block == "gelu":
+            hidden = self.dropout(F.gelu(self.projection(F.gelu(hidden))))
+        elif self.block == "silu":
+            hidden = self.dropout(F.silu(self.projection(F.silu(hidden))))
+        else:
+            hidden = self.dropout(self.swiglu(hidden))
         return inputs + hidden.transpose(1, 2)

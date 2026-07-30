@@ -265,6 +265,11 @@ def _build_patch_batch(
     needs_context: bool,
 ) -> dict[str, np.ndarray]:
     batch_size = date_idx.size
+    context_ready = (
+        np.asarray(arrays["context_data_ready.npy"][date_idx], dtype=bool)
+        if needs_context
+        else None
+    )
     patches = np.zeros(
         (batch_size, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH),
         dtype=np.float32,
@@ -306,17 +311,17 @@ def _build_patch_batch(
             EQUITY_ABSOLUTE_START_PATCH:state,
         ] = active_equities[group, :, None]
         if needs_context:
+            ready = context_ready[group]
             context_prefix = np.asarray(
                 arrays["context_features.npy"][date_idx[group], :, :context_cutoff, :],
                 dtype=np.float32,
             ).reshape(group.size, CONTEXT_COUNT, state, PATCH_INPUT_WIDTH)
-            patches[group, EQUITY_COUNT:, :state] = context_prefix
-            history_patch_mask[group, EQUITY_COUNT:, :state] = True
+            patches[group, EQUITY_COUNT:, :state] = (
+                context_prefix * ready[..., None, None]
+            )
+            history_patch_mask[group, EQUITY_COUNT:, :state] = ready[..., None]
 
     if needs_context:
-        context_ready = np.asarray(
-            arrays["context_data_ready.npy"][date_idx], dtype=bool
-        )
         instrument_mask[:, EQUITY_COUNT:] = context_ready
         slow_features[:, EQUITY_COUNT:] = (
             np.asarray(arrays["context_slow.npy"][date_idx], dtype=np.float32)
@@ -477,11 +482,20 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
 
     def _open_arrays(self) -> dict[str, np.ndarray]:
         if self._arrays is None:
+            filenames = (
+                FEATURE_ARRAY_FILES
+                if self.model_name == "mlp" or self.needs_context
+                else tuple(
+                    name
+                    for name in FEATURE_ARRAY_FILES
+                    if not name.startswith("context_")
+                )
+            )
             self._arrays = {
                 filename: np.load(
                     self.store / filename, mmap_mode="r", allow_pickle=False
                 )
-                for filename in FEATURE_ARRAY_FILES
+                for filename in filenames
             }
         return self._arrays
 

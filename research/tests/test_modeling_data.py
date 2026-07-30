@@ -423,13 +423,48 @@ def test_tcn_batches_construct_only_selected_context(
     tmp_path: Path, fusion: str, needs_context: bool
 ) -> None:
     store, rows = _synthetic_store(tmp_path)
-    architecture = resolve_tcn_architecture(TCNSettings(fusion, 64, "short"))
-    batch = VectorizedFeatureDataset(store, rows, "tcn", architecture)[
-        BatchRequest(indices=(0,), valid_count=1)
-    ]
+    architecture = resolve_tcn_architecture(TCNSettings(fusion, 64, "short", "gelu"))
+    dataset = VectorizedFeatureDataset(store, rows, "tcn", architecture)
+    batch = dataset[BatchRequest(indices=(0,), valid_count=1)]
     assert bool(batch["patches"][:, EQUITY_COUNT:].any()) is needs_context
     assert bool(batch["instrument_mask"][:, EQUITY_COUNT:].any()) is needs_context
     assert bool(batch["slow_features"][:, EQUITY_COUNT:].any()) is needs_context
+
+    if not needs_context:
+        assert dataset._arrays is not None
+        assert not any(name.startswith("context_") for name in dataset._arrays)
+
+
+def test_unavailable_context_is_zeroed_before_tensor_construction(
+    tmp_path: Path,
+) -> None:
+    store, rows = _synthetic_store(tmp_path)
+    context = np.load(store / "context_features.npy", mmap_mode="r+")
+    context_slow = np.load(store / "context_slow.npy", mmap_mode="r+")
+    context_ready = np.load(store / "context_data_ready.npy", mmap_mode="r+")
+    context[0, 0] = 123.0
+    context_slow[0, 0] = 456.0
+    context_ready[0, 0] = False
+    context.flush()
+    context_slow.flush()
+    context_ready.flush()
+
+    architecture = resolve_tcn_architecture(
+        TCNSettings("context_only", 64, "short", "gelu")
+    )
+    batch = VectorizedFeatureDataset(store, rows, "tcn", architecture)[
+        BatchRequest(indices=(0,), valid_count=1)
+    ]
+    unavailable = EQUITY_COUNT
+    ready = EQUITY_COUNT + 1
+    assert not batch["patches"][0, unavailable].any()
+    assert not batch["history_patch_mask"][0, unavailable].any()
+    assert not batch["slow_features"][0, unavailable].any()
+    assert not batch["instrument_mask"][0, unavailable]
+    assert batch["patches"][0, ready, :15].any()
+    assert batch["history_patch_mask"][0, ready, :15].all()
+    assert batch["slow_features"][0, ready].any()
+    assert batch["instrument_mask"][0, ready]
 
 
 def test_compact_tabular_offsets_validity_and_future_causality(tmp_path: Path) -> None:

@@ -238,7 +238,10 @@ def test_equity_permutation_equivariance_and_inactive_zero(model_name: str) -> N
 def test_tcn_is_causal_and_contains_no_attention() -> None:
     model = SharedCausalTCN(BASELINE_TCN_ARCHITECTURE).eval()
     assert BASELINE_TCN_ARCHITECTURE.kernel_size == TCN_KERNEL_SIZE
-    assert BASELINE_TCN_ARCHITECTURE.effective_receptive_field_patches == 69
+    assert (
+        BASELINE_TCN_ARCHITECTURE.maximum_effective_context_receptive_field_patches
+        == 69
+    )
     assert not any(
         isinstance(module, (MultiHeadAttention, CrossAttention))
         for module in model.modules()
