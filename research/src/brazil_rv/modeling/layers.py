@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from typing import cast
 
 import torch
 from torch import nn
@@ -353,6 +352,17 @@ class CausalTCNResidualBlock(nn.Module):
         block: str,
         swiglu_hidden_width: int | None,
     ) -> None:
+        if block not in ("gelu", "silu", "swiglu"):
+            raise ValueError("TCN block must be one of: gelu, silu, swiglu")
+        if block == "swiglu":
+            if type(swiglu_hidden_width) is not int or swiglu_hidden_width <= 0:
+                raise ValueError(
+                    "SwiGLU TCN block requires a positive integer swiglu_hidden_width"
+                )
+        elif swiglu_hidden_width is not None:
+            raise ValueError(
+                "GELU and SiLU TCN blocks require swiglu_hidden_width=None"
+            )
         super().__init__()
         self.block = block
         self.left_padding = (kernel_size - 1) * dilation
@@ -366,7 +376,7 @@ class CausalTCNResidualBlock(nn.Module):
         )
         self.norm = nn.LayerNorm(width)
         if block == "swiglu":
-            self.swiglu = SwiGLU(width, cast(int, swiglu_hidden_width))
+            self.swiglu = SwiGLU(width, swiglu_hidden_width)
         else:
             self.projection = MuonLinear(width, width, bias=False)
         self.dropout = nn.Dropout(dropout)

@@ -26,7 +26,7 @@ from brazil_rv.modeling.contract import (
     expected_trainable_parameter_count,
     resolve_tcn_architecture,
 )
-from brazil_rv.modeling.layers import SwiGLU
+from brazil_rv.modeling.layers import CausalTCNResidualBlock, SwiGLU
 from brazil_rv.modeling.model import (
     build_neural_model,
     count_trainable_parameters,
@@ -265,9 +265,42 @@ def test_tcn_block_structure_and_optimizer_routing(block: str) -> None:
         TCN_SWIGLU_HIDDEN_WIDTHS[128] if block == "swiglu" else None
     )
     groups = partition_parameters(model)
-    assert sum(
-        parameter.numel() for group in groups.values() for parameter in group
-    ) == (count_trainable_parameters(model))
+    routed_ids: set[int] = set()
+    for parameters in groups.values():
+        group_ids = {id(parameter) for parameter in parameters}
+        assert routed_ids.isdisjoint(group_ids)
+        routed_ids.update(group_ids)
+    assert routed_ids == {
+        id(parameter) for parameter in model.parameters() if parameter.requires_grad
+    }
+
+
+@pytest.mark.parametrize("block", ("gelu", "silu"))
+def test_non_swiglu_block_rejects_hidden_width(block: str) -> None:
+    with pytest.raises(
+        ValueError,
+        match="GELU and SiLU TCN blocks require swiglu_hidden_width=None",
+    ):
+        CausalTCNResidualBlock(64, 3, 1, 0.1, block, 24)
+
+
+@pytest.mark.parametrize("hidden_width", (None, 0, -1, 1.5, True))
+def test_swiglu_block_requires_positive_integer_hidden_width(
+    hidden_width: object,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="SwiGLU TCN block requires a positive integer swiglu_hidden_width",
+    ):
+        CausalTCNResidualBlock(64, 3, 1, 0.1, "swiglu", hidden_width)
+
+
+def test_residual_block_rejects_unknown_block() -> None:
+    with pytest.raises(
+        ValueError,
+        match="TCN block must be one of: gelu, silu, swiglu",
+    ):
+        CausalTCNResidualBlock(64, 3, 1, 0.1, "relu", None)
 
 
 def test_gelu_and_silu_parameter_counts_are_equal() -> None:
@@ -495,7 +528,9 @@ def test_cli_rejects_invalid_tcn_values(flag: str, value: str) -> None:
         "xgboost",
     ),
 )
-def test_cli_forbids_tcn_settings_for_every_other_model(model_name: str) -> None:
+def test_cli_forbids_tcn_settings_for_every_other_model(
+    model_name: str, capsys: pytest.CaptureFixture[str]
+) -> None:
     arguments = ["--model", model_name, "--seed", "11"]
     if model_name != "xgboost":
         arguments.extend(["--optimizer", "adamw", "--soft-rank-temperature", "0.10"])
@@ -504,15 +539,19 @@ def test_cli_forbids_tcn_settings_for_every_other_model(model_name: str) -> None
             "--tcn-fusion",
             "none",
             "--tcn-width",
+            "64",
             "--tcn-block",
             "gelu",
-            "64",
             "--tcn-receptive-field",
             "short",
         ]
     )
     with pytest.raises(SystemExit):
         train.parse_args(arguments)
+    assert (
+        "TCN architecture arguments are forbidden unless --model tcn"
+        in capsys.readouterr().err
+    )
 
 
 @pytest.mark.parametrize(
