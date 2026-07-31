@@ -446,6 +446,7 @@ def test_run_names_and_manifests_distinguish_all_tcn_settings() -> None:
                 "tcn",
                 settings,
                 "adamw",
+                "soft_spearman",
                 0.1,
                 None,
                 11,

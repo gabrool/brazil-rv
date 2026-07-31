@@ -18,6 +18,7 @@ import torch
 
 from .contract import (
     ALLOWED_SEEDS,
+    DEFAULT_NEURAL_OBJECTIVE,
     EARLY_STOP_PATIENCE,
     EFFECTIVE_BATCH_SIZE,
     FEATURE_STORE_POINTER,
@@ -25,6 +26,7 @@ from .contract import (
     MAX_EPOCHS,
     MIN_IC_IMPROVEMENT,
     NEURAL_MODELS,
+    NEURAL_OBJECTIVES,
     OPTIMIZER_VARIANTS,
     PROJECT_ROOT,
     RUN_OUTPUT_BASE,
@@ -77,10 +79,15 @@ from .xgboost_model import train_xgboost_run, validate_xgboost_runtime
 
 _HISTORY_COLUMNS = (
     "epoch",
+    "objective",
+    "soft_rank_temperature",
+    "optimizer",
+    "rho",
+    "seed",
     "optimizer_steps",
     "backward_passes",
-    "train_loss",
-    "validation_soft_spearman_loss",
+    "train_objective_loss",
+    "validation_objective_loss",
     "validation_primary_ic",
     "validation_ic_30",
     "validation_ic_60",
@@ -103,14 +110,20 @@ def validate_cli_args(
 ) -> argparse.Namespace:
     if args.model == "xgboost" and args.optimizer is not None:
         parser.error("--optimizer is not allowed when --model xgboost")
+    if args.model == "xgboost" and args.objective is not None:
+        parser.error("--objective is not allowed when --model xgboost")
     if args.model == "xgboost" and args.temperature is not None:
         parser.error("--soft-rank-temperature is not allowed when --model xgboost")
     if args.model == "xgboost" and args.sam_rho is not None:
         parser.error("--sam-rho is not allowed when --model xgboost")
     if args.model in NEURAL_MODELS and args.optimizer is None:
         parser.error("--optimizer is required for neural models")
-    if args.model in NEURAL_MODELS and args.temperature is None:
-        parser.error("--soft-rank-temperature is required for neural models")
+    if args.model in NEURAL_MODELS and args.objective is None:
+        args.objective = DEFAULT_NEURAL_OBJECTIVE
+    if args.objective == "soft_spearman" and args.temperature is None:
+        parser.error("--soft-rank-temperature is required for soft_spearman")
+    if args.objective == "rank_huber" and args.temperature is not None:
+        parser.error("--soft-rank-temperature is forbidden for rank_huber")
     if args.optimizer == "sam_adamw" and args.sam_rho is None:
         parser.error("--sam-rho is required for --optimizer sam_adamw")
     if args.optimizer == "adamw" and args.sam_rho is not None:
@@ -135,6 +148,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, choices=SUPPORTED_MODELS)
     parser.add_argument("--optimizer", choices=OPTIMIZER_VARIANTS)
+    parser.add_argument("--objective", choices=NEURAL_OBJECTIVES)
     parser.add_argument(
         "--soft-rank-temperature",
         dest="temperature",
@@ -187,6 +201,7 @@ def _run_directory_name(
     model_name: str,
     tcn_settings: TCNSettings | None,
     optimizer_variant: str | None,
+    objective: str | None,
     temperature: float | None,
     sam_rho: float | None,
     seed: int,
@@ -194,19 +209,23 @@ def _run_directory_name(
 ) -> str:
     if optimizer_variant is None:
         return f"{model_name}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
-    if temperature is None:
-        raise ValueError("Neural run names require a soft-rank temperature")
+    if objective is None:
+        raise ValueError("Neural run names require an objective")
+    objective_metadata(objective, temperature)
     model_part = model_name
     if tcn_settings is not None:
         model_part = (
             f"tcn_{tcn_settings.fusion}_w{tcn_settings.width}_"
             f"rf{tcn_settings.receptive_field}_b{tcn_settings.block}"
         )
+    objective_part = f"_{objective}"
     optimizer_part = f"_{optimizer_variant}"
     rho_part = "" if sam_rho is None else f"_rho{experiment_decimal(sam_rho, 3)}"
-    tau_part = f"_tau{experiment_decimal(temperature, 2)}"
+    tau_part = (
+        "" if temperature is None else f"_tau{experiment_decimal(temperature, 2)}"
+    )
     return (
-        f"{model_part}{optimizer_part}{rho_part}{tau_part}_seed{seed}_"
+        f"{model_part}{objective_part}{optimizer_part}{rho_part}{tau_part}_seed{seed}_"
         f"{created_at:%Y%m%dT%H%M%S%fZ}"
     )
 
@@ -403,8 +422,8 @@ def _run_neural(
 ) -> None:
     if args.optimizer is None:
         raise AssertionError("Validated neural CLI is missing its optimizer")
-    if args.temperature is None:
-        raise AssertionError("Validated neural CLI is missing its temperature")
+    if args.objective is None:
+        raise AssertionError("Validated neural CLI is missing its objective")
     architecture = architecture_for_model(args.model, tcn_settings)
     tcn_architecture = (
         architecture if isinstance(architecture, TCNArchitecture) else None
@@ -442,6 +461,7 @@ def _run_neural(
         model,
         training_batch,
         include_backward=True,
+        objective=args.objective,
         temperature=args.temperature,
     )
     require_compile_parity(compile_parity)
@@ -449,7 +469,11 @@ def _run_neural(
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
     compile_report = warmup_compiled_model(
-        model, training_batch, evaluation_batch, args.temperature
+        model,
+        training_batch,
+        evaluation_batch,
+        args.objective,
+        args.temperature,
     )
     compile_metadata = build_compile_metadata(
         compile_setup, compile_parity, compile_report
@@ -468,7 +492,7 @@ def _run_neural(
             created_at=created_at,
         ),
         **model_metadata,
-        "objective": objective_metadata(args.temperature),
+        "objective": objective_metadata(args.objective, args.temperature),
         "sam": sam_metadata(args.optimizer, args.sam_rho),
         "physical_microbatch_size": runtime.microbatch_size,
         "accumulation_steps": runtime.accumulation_steps,
@@ -544,11 +568,12 @@ def _run_neural(
             scheduler,
             runtime,
             args.optimizer,
+            args.objective,
             args.temperature,
             args.sam_rho,
         )
         validation, daily_rows = evaluate_model(
-            model, validation_loader, args.temperature
+            model, validation_loader, args.objective, args.temperature
         )
         torch.cuda.synchronize()
         epoch_seconds = time.perf_counter() - epoch_started
@@ -563,10 +588,15 @@ def _run_neural(
         history.append(
             {
                 "epoch": epoch,
+                "objective": args.objective,
+                "soft_rank_temperature": args.temperature,
+                "optimizer": args.optimizer,
+                "rho": args.sam_rho,
+                "seed": args.seed,
                 "optimizer_steps": training["optimizer_steps"],
                 "backward_passes": training["backward_passes"],
-                "train_loss": training["train_loss"],
-                "validation_soft_spearman_loss": validation["soft_spearman_loss"],
+                "train_objective_loss": training["train_objective_loss"],
+                "validation_objective_loss": validation["objective_loss"],
                 "validation_primary_ic": primary_score,
                 "validation_ic_30": horizon_ic[0],
                 "validation_ic_60": horizon_ic[1],
@@ -603,6 +633,7 @@ def _run_neural(
                     architecture,
                     tcn_settings,
                     args.optimizer,
+                    args.objective,
                     args.temperature,
                     args.sam_rho,
                     args.seed,
@@ -629,6 +660,7 @@ def _run_neural(
             architecture,
             tcn_settings,
             args.optimizer,
+            args.objective,
             args.temperature,
             args.sam_rho,
             args.seed,
@@ -688,6 +720,7 @@ def main() -> None:
         args.model,
         tcn_settings,
         args.optimizer,
+        args.objective,
         args.temperature,
         args.sam_rho,
         args.seed,

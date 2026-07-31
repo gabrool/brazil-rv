@@ -101,8 +101,10 @@ NEURAL_MODELS = (*TRANSFORMER_MODELS, "tcn", "mlp")
 SUPPORTED_MODELS = (*NEURAL_MODELS, "xgboost")
 OPTIMIZER_VARIANTS = ("adamw", "sam_adamw")
 ALLOWED_SEEDS = (11, 29, 47)
+NEURAL_OBJECTIVES = ("soft_spearman", "rank_huber")
+DEFAULT_NEURAL_OBJECTIVE = "soft_spearman"
 SOFT_RANK_TEMPERATURES = (0.05, 0.10, 0.20, 0.50)
-SAM_RHOS = (0.0025, 0.005, 0.010, 0.020, 0.035, 0.050)
+SAM_RHOS = (0.025, 0.050, 0.075, 0.100, 0.125)
 SOFT_RANK_STANDARDIZATION_EPS = 1e-6
 SOFT_SPEARMAN_CORRELATION_EPS = 1e-8
 SAM_NORM_EPS = 1e-12
@@ -145,6 +147,7 @@ MAX_EPOCHS = 20
 EARLY_STOP_PATIENCE = 5
 MIN_IC_IMPROVEMENT = 1e-4
 GRADIENT_CLIP = 1.0
+HUBER_DELTA = 1.0
 
 MUON_LR = 0.02
 MUON_MOMENTUM = 0.95
@@ -617,6 +620,7 @@ class TrainingConstants:
     early_stop_patience: int = EARLY_STOP_PATIENCE
     minimum_ic_improvement: float = MIN_IC_IMPROVEMENT
     gradient_clip: float = GRADIENT_CLIP
+    huber_delta: float = HUBER_DELTA
 
 
 @dataclass(frozen=True)

@@ -18,16 +18,21 @@ from brazil_rv.modeling.contract import (
     ADAMW_WEIGHT_DECAY,
     BASELINE_TCN_SETTINGS,
     GH200_RUNTIME,
+    HUBER_DELTA,
+    NEURAL_OBJECTIVES,
     SAM_RHOS,
     SOFT_RANK_TEMPERATURES,
     architecture_for_model,
 )
 from brazil_rv.modeling.engine import (
     checkpoint_payload,
+    objective_loss,
     objective_metadata,
+    rank_huber_loss,
     run_effective_batch_update,
     sam_metadata,
     soft_spearman_loss,
+    train_one_epoch,
 )
 from brazil_rv.modeling.model import build_neural_model
 from brazil_rv.modeling.optim import build_optimizer
@@ -111,7 +116,7 @@ def test_groups_are_independent_and_equally_weighted() -> None:
 
 def test_temperature_metadata_and_fp32_under_bf16_autocast() -> None:
     assert tuple(SOFT_RANK_TEMPERATURES) == (0.05, 0.10, 0.20, 0.50)
-    assert objective_metadata(0.1) == {
+    assert objective_metadata("soft_spearman", 0.1) == {
         "name": "soft_spearman",
         "temperature": 0.1,
         "score_standardization": "masked_cross_sectional",
@@ -120,7 +125,7 @@ def test_temperature_metadata_and_fp32_under_bf16_autocast() -> None:
         "reported_validation_metric": "hard_spearman",
     }
     with pytest.raises(ValueError):
-        objective_metadata(0.3)
+        objective_metadata("soft_spearman", 0.3)
     targets = _rank_targets(4).bfloat16()
     predictions = targets.clone().requires_grad_()
     with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
@@ -130,6 +135,92 @@ def test_temperature_metadata_and_fp32_under_bf16_autocast() -> None:
     loss.backward()
     assert loss.dtype == torch.float32
     assert torch.isfinite(predictions.grad).all()
+
+
+def _historical_rank_huber_loss(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    label_mask: torch.Tensor,
+    delta: float = 1.0,
+) -> torch.Tensor:
+    difference = predictions.float() - targets.float()
+    absolute = difference.abs()
+    elementwise = torch.where(
+        absolute <= delta,
+        0.5 * difference.square(),
+        delta * (absolute - 0.5 * delta),
+    )
+    mask = label_mask.bool()
+    label_counts = mask.sum(dim=1)
+    valid_horizons = label_counts > 0
+    horizon_loss = (elementwise * mask).sum(dim=1) / label_counts.clamp_min(1)
+    valid_horizon_counts = valid_horizons.sum(dim=1)
+    valid_samples = valid_horizon_counts > 0
+    sample_loss = (horizon_loss * valid_horizons).sum(
+        dim=1
+    ) / valid_horizon_counts.clamp_min(1)
+    if bool(valid_samples.any()):
+        return sample_loss[valid_samples].mean()
+    return predictions.float().sum() * 0.0
+
+
+def test_rank_huber_exact_historical_numerics_masking_and_weighting() -> None:
+    assert HUBER_DELTA == 1.0
+    predictions = torch.tensor(
+        [
+            [[-2.0, 0.2, 9.0], [0.4, -0.8, -7.0], [3.0, 0.0, 5.0]],
+            [[0.1, 1.5, -2.0], [0.9, -1.5, 3.0], [-0.3, 0.5, 4.0]],
+        ],
+        requires_grad=True,
+    )
+    targets = torch.tensor(
+        [
+            [[-0.5, -0.5, 0.0], [0.5, 0.5, 0.0], [0.0, 0.0, 0.0]],
+            [[-2.0 / 3.0, -0.5, -0.5], [0.0, 0.5, 0.5], [2.0 / 3.0, 0.0, 0.0]],
+        ]
+    )
+    mask = torch.tensor(
+        [
+            [[True, True, False], [True, True, False], [False, False, False]],
+            [[True, True, True], [True, True, True], [True, False, False]],
+        ]
+    )
+    expected = _historical_rank_huber_loss(predictions, targets, mask)
+    actual = rank_huber_loss(predictions, targets, mask)
+    expected_gradient = torch.autograd.grad(expected, predictions, retain_graph=True)[0]
+    actual_gradient = torch.autograd.grad(actual, predictions)[0]
+
+    torch.testing.assert_close(actual, expected, atol=0, rtol=0)
+    torch.testing.assert_close(actual_gradient, expected_gradient, atol=0, rtol=0)
+    masked_changed = predictions.detach().clone()
+    masked_changed[~mask] = 1_000_000.0
+    torch.testing.assert_close(
+        rank_huber_loss(masked_changed, targets, mask), actual, atol=0, rtol=0
+    )
+
+
+def test_objective_dispatch_and_rank_huber_metadata() -> None:
+    assert tuple(NEURAL_OBJECTIVES) == ("soft_spearman", "rank_huber")
+    assert objective_metadata("rank_huber", None) == {
+        "name": "rank_huber",
+        "temperature": None,
+        "delta": 1.0,
+        "target": "centered_cross_sectional_midrank",
+        "aggregation": "equal_valid_sample_then_horizon_then_equity",
+        "reported_validation_metric": "hard_spearman",
+    }
+    with pytest.raises(ValueError, match="does not accept"):
+        objective_metadata("rank_huber", 0.1)
+
+    predictions = torch.tensor([[[-0.5], [0.5]]])
+    targets = torch.tensor([[[-0.75], [0.75]]])
+    mask = torch.ones_like(targets, dtype=torch.bool)
+    torch.testing.assert_close(
+        objective_loss(predictions, targets, mask, "rank_huber", None),
+        rank_huber_loss(predictions, targets, mask),
+        atol=0,
+        rtol=0,
+    )
 
 
 def test_soft_spearman_eager_compiled_predictions_loss_and_gradients() -> None:
@@ -274,11 +365,18 @@ def cpu_engine(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.parametrize(
-    ("optimizer_variant", "sam_rho"),
-    [("adamw", None), ("sam_adamw", 0.02)],
+    ("objective", "temperature", "optimizer_variant", "sam_rho"),
+    [
+        ("soft_spearman", 0.1, "adamw", None),
+        ("soft_spearman", 0.1, "sam_adamw", 0.025),
+        ("rank_huber", None, "adamw", None),
+        ("rank_huber", None, "sam_adamw", 0.025),
+    ],
 )
 def test_eager_and_compiled_updates_match(
     cpu_engine: None,
+    objective: str,
+    temperature: float | None,
     optimizer_variant: str,
     sam_rho: float | None,
 ) -> None:
@@ -297,7 +395,8 @@ def test_eager_and_compiled_updates_match(
         None,
         GH200_RUNTIME,
         optimizer_variant,
-        0.1,
+        objective,
+        temperature,
         sam_rho,
     )
     compiled_update = run_effective_batch_update(
@@ -307,7 +406,8 @@ def test_eager_and_compiled_updates_match(
         None,
         GH200_RUNTIME,
         optimizer_variant,
-        0.1,
+        objective,
+        temperature,
         sam_rho,
     )
     assert compiled_update["backward_passes"] == eager_update["backward_passes"]
@@ -317,11 +417,39 @@ def test_eager_and_compiled_updates_match(
         torch.testing.assert_close(compiled, eager, atol=2e-7, rtol=2e-7)
 
 
+@pytest.mark.parametrize("rho", SAM_RHOS)
+@pytest.mark.parametrize(
+    ("objective", "temperature"),
+    [("soft_spearman", 0.1), ("rank_huber", None)],
+)
+def test_all_supported_sam_rhos_work_with_either_objective(
+    cpu_engine: None,
+    objective: str,
+    temperature: float | None,
+    rho: float,
+) -> None:
+    model = _CrossSectionModel()
+    optimizer = _adamw(model)
+    update = run_effective_batch_update(
+        model,
+        _microbatches(),
+        optimizer,
+        None,
+        GH200_RUNTIME,
+        "sam_adamw",
+        objective,
+        temperature,
+        rho,
+    )
+    assert update["backward_passes"] == 16
+    assert optimizer.step_calls == 1
+
+
 @pytest.mark.parametrize(
     ("optimizer_variant", "sam_rho", "expected_flag_arities", "float_arity"),
     [
         ("adamw", None, [2, 1, 1], 2),
-        ("sam_adamw", 0.02, [2, 1, 2, 2, 2, 1, 1, 1], 6),
+        ("sam_adamw", 0.025, [2, 1, 2, 2, 2, 1, 1, 1], 6),
     ],
 )
 def test_update_synchronization_boundaries_do_not_scale_with_parameters(
@@ -358,6 +486,7 @@ def test_update_synchronization_boundaries_do_not_scale_with_parameters(
         None,
         GH200_RUNTIME,
         optimizer_variant,
+        "soft_spearman",
         0.1,
         sam_rho,
     )
@@ -389,6 +518,7 @@ def test_eight_microbatches_match_concatenated_group_normalization(
         scheduler,
         GH200_RUNTIME,
         "adamw",
+        "soft_spearman",
         0.1,
         None,
     )
@@ -409,7 +539,90 @@ def test_eight_microbatches_match_concatenated_group_normalization(
         torch.testing.assert_close(actual, expected, atol=2e-7, rtol=2e-7)
 
 
-def test_incomplete_group_fails_before_forward(cpu_engine: None) -> None:
+def test_rank_huber_accumulated_batch_matches_concatenated_batch(
+    cpu_engine: None,
+) -> None:
+    batches = _microbatches()
+    accumulated_model = _CrossSectionModel()
+    reference_model = copy.deepcopy(accumulated_model)
+    accumulated_optimizer = _adamw(accumulated_model)
+    reference_optimizer = _adamw(reference_model)
+    scheduler = _CountingScheduler()
+
+    update = run_effective_batch_update(
+        accumulated_model,
+        batches,
+        accumulated_optimizer,
+        scheduler,
+        GH200_RUNTIME,
+        "adamw",
+        "rank_huber",
+        None,
+        None,
+    )
+    features = torch.cat([batch["features"] for batch in batches])
+    targets = torch.cat([batch["targets"] for batch in batches])
+    mask = torch.cat([batch["label_mask"] for batch in batches])
+    reference_loss = rank_huber_loss(reference_model(features), targets, mask)
+    reference_loss.backward()
+    torch.nn.utils.clip_grad_norm_(reference_model.parameters(), 1.0)
+    reference_optimizer.step()
+
+    assert update["loss_count"] == len(batches)
+    assert update["backward_passes"] == 8
+    assert accumulated_optimizer.step_calls == 1
+    assert scheduler.steps == 1
+    for actual, expected in zip(
+        accumulated_model.parameters(), reference_model.parameters(), strict=True
+    ):
+        torch.testing.assert_close(actual, expected, atol=2e-7, rtol=2e-7)
+
+
+def test_rank_huber_selected_for_both_sam_passes(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    selected: list[tuple[str, float | None]] = []
+    original = engine._objective_loss_sum
+
+    def observed(
+        predictions: torch.Tensor,
+        targets: torch.Tensor,
+        label_mask: torch.Tensor,
+        objective: str,
+        temperature: float | None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        selected.append((objective, temperature))
+        return original(predictions, targets, label_mask, objective, temperature)
+
+    monkeypatch.setattr(engine, "_objective_loss_sum", observed)
+    model = _CrossSectionModel()
+    optimizer = _adamw(model)
+    scheduler = _CountingScheduler()
+    update = run_effective_batch_update(
+        model,
+        _microbatches(),
+        optimizer,
+        scheduler,
+        GH200_RUNTIME,
+        "sam_adamw",
+        "rank_huber",
+        None,
+        0.025,
+    )
+
+    assert selected == [("rank_huber", None)] * 16
+    assert update["backward_passes"] == 16
+    assert optimizer.step_calls == 1
+    assert scheduler.steps == 1
+
+
+@pytest.mark.parametrize(
+    ("objective", "temperature"),
+    [("soft_spearman", 0.1), ("rank_huber", None)],
+)
+def test_incomplete_group_fails_before_forward(
+    cpu_engine: None, objective: str, temperature: float | None
+) -> None:
     model = _CrossSectionModel()
     optimizer = _adamw(model)
     with pytest.raises(ValueError, match="exactly 8"):
@@ -420,10 +633,58 @@ def test_incomplete_group_fails_before_forward(cpu_engine: None) -> None:
             None,
             GH200_RUNTIME,
             "adamw",
-            0.1,
+            objective,
+            temperature,
             None,
         )
     assert not model.dropout_masks
+    assert optimizer.step_calls == 0
+
+
+def test_incomplete_training_epoch_fails_before_forward_or_update(
+    cpu_engine: None,
+) -> None:
+    model = _CrossSectionModel()
+    optimizer = _adamw(model)
+    scheduler = _CountingScheduler()
+    with pytest.raises(ValueError, match="end inside an effective batch"):
+        train_one_epoch(
+            model,
+            _microbatches()[:-1],
+            optimizer,
+            scheduler,
+            GH200_RUNTIME,
+            "sam_adamw",
+            "rank_huber",
+            None,
+            0.025,
+        )
+    assert not model.dropout_masks
+    assert optimizer.step_calls == 0
+    assert scheduler.steps == 0
+
+
+def test_training_epoch_updates_once_per_complete_accumulated_group(
+    cpu_engine: None,
+) -> None:
+    model = _CrossSectionModel()
+    optimizer = _adamw(model)
+    scheduler = _CountingScheduler()
+    result = train_one_epoch(
+        model,
+        [*_microbatches(), *_microbatches()],
+        optimizer,
+        scheduler,
+        GH200_RUNTIME,
+        "sam_adamw",
+        "rank_huber",
+        None,
+        0.025,
+    )
+    assert result["optimizer_steps"] == 2
+    assert result["backward_passes"] == 32
+    assert optimizer.step_calls == 2
+    assert scheduler.steps == 2
 
 
 def test_sam_replays_same_batches_rng_and_counts(cpu_engine: None) -> None:
@@ -446,8 +707,9 @@ def test_sam_replays_same_batches_rng_and_counts(cpu_engine: None) -> None:
         scheduler,
         GH200_RUNTIME,
         "sam_adamw",
+        "soft_spearman",
         0.1,
-        0.02,
+        0.025,
     )
     assert update["backward_passes"] == 16
     assert update["rng_replay_exact"] is True
@@ -510,8 +772,9 @@ def test_compiled_cuda_sam_replays_identical_dropout_masks(
         None,
         GH200_RUNTIME,
         "sam_adamw",
+        "soft_spearman",
         0.1,
-        0.02,
+        0.025,
     )
 
     assert update["rng_replay_exact"] is True
@@ -527,7 +790,7 @@ def test_sam_matches_reference_l2_adamw_update(cpu_engine: None) -> None:
     reference_model = copy.deepcopy(actual_model)
     actual_optimizer = _adamw(actual_model)
     reference_optimizer = _adamw(reference_model)
-    rho = 0.02
+    rho = 0.025
 
     run_effective_batch_update(
         actual_model,
@@ -536,6 +799,7 @@ def test_sam_matches_reference_l2_adamw_update(cpu_engine: None) -> None:
         None,
         GH200_RUNTIME,
         "sam_adamw",
+        "soft_spearman",
         0.1,
         rho,
     )
@@ -603,8 +867,9 @@ def test_sam_restores_parameters_after_second_pass_exception(
             scheduler,
             GH200_RUNTIME,
             "sam_adamw",
+            "soft_spearman",
             0.1,
-            0.02,
+            0.025,
         )
     for parameter, expected in zip(model.parameters(), initial, strict=True):
         torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
@@ -635,8 +900,9 @@ def test_sam_restores_parameters_after_first_pass_exception(
             scheduler,
             GH200_RUNTIME,
             "sam_adamw",
+            "soft_spearman",
             0.1,
-            0.02,
+            0.025,
         )
     for parameter, expected in zip(model.parameters(), initial, strict=True):
         torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
@@ -669,8 +935,9 @@ def test_sam_restores_parameters_when_perturbation_construction_fails(
             scheduler,
             GH200_RUNTIME,
             "sam_adamw",
+            "soft_spearman",
             0.1,
-            0.02,
+            0.025,
         )
     for parameter, expected in zip(model.parameters(), initial, strict=True):
         torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
@@ -707,8 +974,9 @@ def test_sam_rejects_nonfinite_perturbation_and_restores_parameters(
             scheduler,
             GH200_RUNTIME,
             "sam_adamw",
+            "soft_spearman",
             0.1,
-            0.02,
+            0.025,
         )
     for parameter, expected in zip(model.parameters(), initial, strict=True):
         torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
@@ -737,8 +1005,9 @@ def test_sam_rejects_nonfinite_loss_and_gradients_without_update(
             scheduler,
             GH200_RUNTIME,
             "sam_adamw",
+            "soft_spearman",
             0.1,
-            0.02,
+            0.025,
         )
     for parameter, expected in zip(model.parameters(), initial, strict=True):
         torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
@@ -769,8 +1038,9 @@ def test_sam_rejects_nonfinite_gradients_with_finite_loss_without_update(
             scheduler,
             GH200_RUNTIME,
             "sam_adamw",
+            "soft_spearman",
             0.1,
-            0.02,
+            0.025,
         )
     for parameter, expected in zip(model.parameters(), initial, strict=True):
         torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
@@ -801,8 +1071,9 @@ def test_sam_rejects_nonfinite_post_update_parameters_and_restores_snapshot(
             scheduler,
             GH200_RUNTIME,
             "sam_adamw",
+            "soft_spearman",
             0.1,
-            0.02,
+            0.025,
         )
     for parameter, expected in zip(model.parameters(), initial, strict=True):
         torch.testing.assert_close(parameter, expected, atol=0, rtol=0)
@@ -811,14 +1082,15 @@ def test_sam_rejects_nonfinite_post_update_parameters_and_restores_snapshot(
 
 
 def test_rho_grid_metadata_cli_and_run_names() -> None:
-    assert tuple(SAM_RHOS) == (0.0025, 0.005, 0.010, 0.020, 0.035, 0.050)
+    assert tuple(SAM_RHOS) == (0.025, 0.050, 0.075, 0.100, 0.125)
     assert sam_metadata("adamw", None) is None
-    assert sam_metadata("sam_adamw", 0.02)["rho"] == 0.02
-    for invalid in (0.0, -0.01, 0.03, 0.051):
+    for rho in SAM_RHOS:
+        assert sam_metadata("sam_adamw", rho)["rho"] == rho
+    for invalid in (0.0, -0.01, 0.020, 0.126):
         with pytest.raises(ValueError):
             sam_metadata("sam_adamw", invalid)
     with pytest.raises(ValueError):
-        sam_metadata("adamw", 0.02)
+        sam_metadata("adamw", 0.025)
 
     adamw = train.parse_args(
         [
@@ -833,23 +1105,46 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
             "11",
         ]
     )
+    assert adamw.objective == "soft_spearman"
     assert adamw.sam_rho is None
-    sam = train.parse_args(
+    soft_anchor = train.parse_args(
         [
             "--model",
             "tcn",
             *BASELINE_TCN_CLI,
             "--optimizer",
             "sam_adamw",
+            "--objective",
+            "soft_spearman",
             "--soft-rank-temperature",
-            "0.10",
+            "0.50",
             "--sam-rho",
-            "0.020",
+            "0.125",
             "--seed",
             "11",
         ]
     )
-    assert sam.sam_rho == 0.02
+    assert soft_anchor.objective == "soft_spearman"
+    assert soft_anchor.temperature == 0.50
+    assert soft_anchor.sam_rho == 0.125
+    rank_huber = train.parse_args(
+        [
+            "--model",
+            "tcn",
+            *BASELINE_TCN_CLI,
+            "--optimizer",
+            "sam_adamw",
+            "--objective",
+            "rank_huber",
+            "--sam-rho",
+            "0.025",
+            "--seed",
+            "11",
+        ]
+    )
+    assert rank_huber.objective == "rank_huber"
+    assert rank_huber.temperature is None
+    assert rank_huber.sam_rho == 0.025
     with pytest.raises(SystemExit):
         train.parse_args(
             [
@@ -857,7 +1152,9 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
                 "tcn",
                 *BASELINE_TCN_CLI,
                 "--optimizer",
-                "sam_adamw",
+                "adamw",
+                "--objective",
+                "rank_huber",
                 "--soft-rank-temperature",
                 "0.10",
                 "--seed",
@@ -871,12 +1168,13 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
             "tcn",
             BASELINE_TCN_SETTINGS,
             "adamw",
+            "soft_spearman",
             0.1,
             None,
             11,
             created,
         )
-        == "tcn_context_pooled_w128_rffull_bgelu_adamw_tau0p10_seed11_"
+        == "tcn_context_pooled_w128_rffull_bgelu_soft_spearman_adamw_tau0p10_seed11_"
         "20260102T030405006789Z"
     )
     assert (
@@ -884,17 +1182,38 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
             "tcn",
             BASELINE_TCN_SETTINGS,
             "sam_adamw",
-            0.1,
-            0.01,
+            "soft_spearman",
+            0.5,
+            0.125,
             11,
             created,
         )
-        == "tcn_context_pooled_w128_rffull_bgelu_sam_adamw_rho0p010_tau0p10_"
-        "seed11_20260102T030405006789Z"
+        == "tcn_context_pooled_w128_rffull_bgelu_soft_spearman_sam_adamw_"
+        "rho0p125_tau0p50_seed11_20260102T030405006789Z"
+    )
+    assert (
+        train._run_directory_name(
+            "tcn",
+            BASELINE_TCN_SETTINGS,
+            "sam_adamw",
+            "rank_huber",
+            None,
+            0.025,
+            11,
+            created,
+        )
+        == "tcn_context_pooled_w128_rffull_bgelu_rank_huber_sam_adamw_"
+        "rho0p025_seed11_20260102T030405006789Z"
     )
 
 
-def test_checkpoint_round_trip_contains_resume_boundary_state(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("objective", "temperature"),
+    [("soft_spearman", 0.1), ("rank_huber", None)],
+)
+def test_checkpoint_round_trip_contains_resume_boundary_state(
+    tmp_path: Path, objective: str, temperature: float | None
+) -> None:
     model = build_neural_model("tcn", BASELINE_TCN_ARCHITECTURE)
     optimizer, _ = build_optimizer(model)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
@@ -911,8 +1230,9 @@ def test_checkpoint_round_trip_contains_resume_boundary_state(tmp_path: Path) ->
         BASELINE_TCN_ARCHITECTURE,
         BASELINE_TCN_SETTINGS,
         "sam_adamw",
-        0.1,
-        0.02,
+        objective,
+        temperature,
+        0.025,
         11,
         3,
         0.12,
@@ -930,8 +1250,8 @@ def test_checkpoint_round_trip_contains_resume_boundary_state(tmp_path: Path) ->
     restored.load_state_dict(loaded["model_state_dict"])
     restored_optimizer.load_state_dict(loaded["optimizer_state_dict"])
     restored_scheduler.load_state_dict(loaded["scheduler_state_dict"])
-    assert loaded["objective"] == objective_metadata(0.1)
-    assert loaded["sam"] == sam_metadata("sam_adamw", 0.02)
+    assert loaded["objective"] == objective_metadata(objective, temperature)
+    assert loaded["sam"] == sam_metadata("sam_adamw", 0.025)
     expected_optimizer = loaded["optimizer_state_dict"]
     actual_optimizer = restored_optimizer.state_dict()
     assert actual_optimizer["param_groups"] == expected_optimizer["param_groups"]

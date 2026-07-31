@@ -73,9 +73,14 @@ def parse_args() -> argparse.Namespace:
 
 def _validate_objective_and_optimizer(identity: dict[str, object]) -> None:
     objective = identity["objective"]
-    if not isinstance(objective, dict) or "temperature" not in objective:
+    if (
+        not isinstance(objective, dict)
+        or not {"name", "temperature"} <= objective.keys()
+    ):
         raise ValueError("Invalid neural objective metadata")
-    if objective != objective_metadata(float(objective["temperature"])):
+    raw_temperature = objective["temperature"]
+    temperature = None if raw_temperature is None else float(raw_temperature)
+    if objective != objective_metadata(str(objective["name"]), temperature):
         raise ValueError("Invalid neural objective metadata")
     optimizer_variant = identity["optimizer_variant"]
     sam = identity["sam"]
@@ -256,7 +261,9 @@ def _evaluate_neural(
         architecture if isinstance(architecture, TCNArchitecture) else None
     )
     objective = manifest["objective"]
-    temperature = float(objective["temperature"])
+    objective_name = str(objective["name"])
+    raw_temperature = objective["temperature"]
+    temperature = None if raw_temperature is None else float(raw_temperature)
     model_name = str(checkpoint["model_name"])
     loader = create_evaluation_loader(
         feature_store,
@@ -277,6 +284,7 @@ def _evaluate_neural(
         model,
         evaluation_batch,
         include_backward=False,
+        objective=objective_name,
         temperature=temperature,
     )
     require_compile_parity(compile_parity)
@@ -290,7 +298,7 @@ def _evaluate_neural(
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.synchronize()
     started = time.perf_counter()
-    summary, daily_rows = evaluate_model(model, loader, temperature)
+    summary, daily_rows = evaluate_model(model, loader, objective_name, temperature)
     torch.cuda.synchronize()
     metadata = {
         "compile": compile_metadata,
