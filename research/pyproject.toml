@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cupy-cuda12x==14.1.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
     "duckdb>=1.5.4",
     "einops>=0.8.2",
     "ipykernel>=7.3.0",

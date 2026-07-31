@@ -66,7 +66,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$script:ScriptVersion = '1.1.1'
+$script:ScriptVersion = '1.1.2'
 $script:ApiBaseUri = 'https://cloud.lambda.ai/api/v1'
 $script:TargetRegion = 'us-east-3'
 $script:FileSystemName = 'brazil-rv-east3'
@@ -97,6 +97,7 @@ $script:HttpTimeoutSeconds = 30
 $script:BootstrapTimeoutSeconds = 90 * 60
 $script:TransientGetBackoffSeconds = @(2, 4, 8, 16, 32, 60)
 $script:RateLimitBackoffSeconds = @(2, 4, 8, 16, 32, 60)
+$script:RateLimitRecoverySuccesses = 3
 $script:StateFieldNames = @(
     'script_version',
     'mode',
@@ -137,6 +138,8 @@ $script:LastApiRequestStart = -1.0
 $script:LaunchAttemptStarts = @()
 $script:TransientGetBackoffIndex = 0
 $script:RateLimitBackoffIndex = 0
+$script:RateLimitHealthySuccessCount = 0
+$script:RateLimitLastLoggedDelay = $null
 $script:LockStream = $null
 $script:NotifyIcon = $null
 $script:State = $null
@@ -628,7 +631,7 @@ function Invoke-CheckedProcess {
         [Parameter(Mandatory = $true)][string]$FilePath,
         [string[]]$ArgumentList = @(),
         [AllowNull()][string]$WorkingDirectory,
-        [int]$TimeoutSeconds = 300,
+        [ValidateRange(1, 2147483)][int]$TimeoutSeconds = 300,
         [int[]]$AllowedExitCodes = @(0),
         [switch]$NoCapture,
         [switch]$AllowTimeout
@@ -648,14 +651,30 @@ function Invoke-CheckedProcess {
             $stdoutTask = $process.StandardOutput.ReadToEndAsync()
             $stderrTask = $process.StandardError.ReadToEndAsync()
         }
-        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-            try { $process.Kill() } catch { }
-            $process.WaitForExit()
+        $timedOut = -not $process.WaitForExit($TimeoutSeconds * 1000)
+        if ($timedOut) {
+            if (-not $process.HasExited) {
+                $process.Kill()
+            }
+            if (-not $process.WaitForExit(5000)) {
+                throw "Timed-out process $([IO.Path]::GetFileName($FilePath)) could not be reaped."
+            }
+        }
+        $process.WaitForExit()
+        $stdout = if ($null -ne $stdoutTask) {
+            $stdoutTask.GetAwaiter().GetResult()
+        }
+        else { '' }
+        $stderr = if ($null -ne $stderrTask) {
+            $stderrTask.GetAwaiter().GetResult()
+        }
+        else { '' }
+        if ($timedOut) {
             $timeoutResult = [pscustomobject]@{
                 ExitCode = -1
                 TimedOut = $true
-                StdOut = if ($null -ne $stdoutTask) { $stdoutTask.Result } else { '' }
-                StdErr = if ($null -ne $stderrTask) { $stderrTask.Result } else { '' }
+                StdOut = $stdout
+                StdErr = $stderr
             }
             if (-not $AllowTimeout) {
                 throw "External process $([IO.Path]::GetFileName($FilePath)) timed out."
@@ -665,8 +684,8 @@ function Invoke-CheckedProcess {
         $result = [pscustomobject]@{
             ExitCode = $process.ExitCode
             TimedOut = $false
-            StdOut = if ($null -ne $stdoutTask) { $stdoutTask.Result } else { '' }
-            StdErr = if ($null -ne $stderrTask) { $stderrTask.Result } else { '' }
+            StdOut = $stdout
+            StdErr = $stderr
         }
         if ($AllowedExitCodes -notcontains $result.ExitCode) {
             throw "External process $([IO.Path]::GetFileName($FilePath)) exited with code $($result.ExitCode)."
@@ -1215,7 +1234,22 @@ function Invoke-LambdaApi {
                 Throw-SafeLambdaFailure -Code 'client/invalid-response' -HttpStatus ([int]$response.StatusCode)
             }
             $script:TransientGetBackoffIndex = 0
-            $script:RateLimitBackoffIndex = 0
+            if ($script:RateLimitBackoffIndex -gt 0) {
+                $script:RateLimitHealthySuccessCount++
+                if ($script:RateLimitHealthySuccessCount -ge $script:RateLimitRecoverySuccesses) {
+                    $script:RateLimitBackoffIndex = [Math]::Max(
+                        0,
+                        $script:RateLimitBackoffIndex - 1
+                    )
+                    $script:RateLimitHealthySuccessCount = 0
+                    if ($script:RateLimitBackoffIndex -eq 0) {
+                        $script:RateLimitLastLoggedDelay = $null
+                    }
+                }
+            }
+            else {
+                $script:RateLimitHealthySuccessCount = 0
+            }
             return [pscustomobject]@{
                 Succeeded = $true
                 Data = $parsed.data
@@ -1238,15 +1272,23 @@ function Invoke-LambdaApi {
                     $script:RateLimitBackoffSeconds.Count - 1
                 )
                 $localDelay = [double]$script:RateLimitBackoffSeconds[$index]
-                $script:RateLimitBackoffIndex++
+                $script:RateLimitBackoffIndex = [Math]::Min(
+                    $script:RateLimitBackoffIndex + 1,
+                    $script:RateLimitBackoffSeconds.Count
+                )
+                $script:RateLimitHealthySuccessCount = 0
                 $serverDelay = Get-RetryAfterSeconds $failure.RetryAfter
                 $delay = [Math]::Max($serverDelay, $localDelay)
-                & $Logger 'WARN' 'api_rate_limited' @{
-                    http_status = $failure.HttpStatus
-                    server_retry_after_seconds = $serverDelay
-                    local_backoff_seconds = $localDelay
-                    effective_delay_seconds = $delay
-                    consecutive_rate_limit_count = $script:RateLimitBackoffIndex
+                if ($null -eq $script:RateLimitLastLoggedDelay -or
+                    $delay -ne $script:RateLimitLastLoggedDelay) {
+                    & $Logger 'WARN' 'api_rate_limited' @{
+                        http_status = $failure.HttpStatus
+                        server_retry_after_seconds = $serverDelay
+                        local_backoff_seconds = $localDelay
+                        effective_delay_seconds = $delay
+                        rate_limit_level = $script:RateLimitBackoffIndex
+                    }
+                    $script:RateLimitLastLoggedDelay = $delay
                 }
                 & $Sleep $delay
                 continue
@@ -2209,6 +2251,7 @@ function Wait-ForActiveInstance {
             Save-WatcherState
             Send-WatcherNotification -Title 'Lambda GH200 active' `
                 -Message "Instance $InstanceId is active at $ip." -Sound
+            Write-Host "Instance active: $InstanceId at $ip"
             return $instance
         }
         if (@('unhealthy', 'terminated', 'terminating', 'preempted') -contains $status) {
@@ -2308,10 +2351,12 @@ function Wait-ForAuthenticatedSsh {
         }
     }
     if ($null -eq $SshAttempt) {
+        $sshPath = [string]$SshPreflight.SshPath
+        $sshAttemptTimeoutSeconds = [int]$script:SshAttemptTimeoutSeconds
         $SshAttempt = { param([string[]]$Arguments)
-            Invoke-CheckedProcess -FilePath $SshPreflight.SshPath `
+            Invoke-CheckedProcess -FilePath $sshPath `
                 -ArgumentList $Arguments `
-                -TimeoutSeconds $script:SshAttemptTimeoutSeconds `
+                -TimeoutSeconds $sshAttemptTimeoutSeconds `
                 -AllowedExitCodes (0..255) -AllowTimeout
         }.GetNewClosure()
     }
@@ -2339,6 +2384,7 @@ function Wait-ForAuthenticatedSsh {
         timeout_seconds = $script:SshTimeoutSeconds
         poll_seconds = $script:SshPollSeconds
     }
+    Write-Host "SSH wait started: instance $InstanceId, 45-minute deadline."
 
     while ([double](& $Now) -lt $deadline) {
         $tcpProbeCount++
@@ -2360,6 +2406,7 @@ function Wait-ForAuthenticatedSsh {
                     tcp_reachable_count = $tcpReachableCount
                     ssh_attempt_count = $sshAttemptCount
                 }
+                Write-Host "SSH authenticated: instance $InstanceId after $([Math]::Round($elapsed, 1)) seconds."
                 Send-WatcherNotification -Title 'Lambda GH200 SSH authenticated' `
                     -Message "Authenticated SSH is ready for instance $InstanceId." -Sound
                 return
@@ -2387,6 +2434,10 @@ function Wait-ForAuthenticatedSsh {
                 last_attempt_timed_out = $lastAttemptTimedOut
                 last_failure_classification = $lastFailureClassification
             }
+            Write-Host (
+                "SSH waiting: elapsed=$([Math]::Round([Math]::Max(0.0, $nowSeconds - $started), 1))s " +
+                "status=$lastFailureClassification attempts=$sshAttemptCount"
+            )
             $lastLoggedClassification = $lastFailureClassification
             if ($nowSeconds -ge $nextProgress) {
                 $nextProgress = $nowSeconds + $script:SshProgressSeconds
@@ -2667,7 +2718,7 @@ function Complete-BootstrapFromMarker {
     }
     Send-WatcherNotification -Title 'Lambda GH200 bootstrap succeeded' `
         -Message 'Repository tests and the real gh200 sanity check passed.' -Sound
-    Write-Host 'Bootstrap success marker validated. No bootstrap command was repeated.'
+    Write-Host 'Bootstrap result: succeeded; success marker validated.'
     Write-Host "Sanity report: $($identity.SanityReportPath)"
     Write-Host ('Manual SSH: ' + (Get-ManualSshCommand $SshPreflight $KnownHostsPath $IpAddress))
 }
@@ -2738,7 +2789,8 @@ function Stop-RemoteBootstrapFailure {
     }
     Send-WatcherNotification -Title 'Lambda GH200 bootstrap FAILED' `
         -Message "Instance $InstanceId remains running for diagnosis." -Kind Error -Sound
-    Write-Host "$Detail. Instance: $InstanceId IP: $IpAddress" -ForegroundColor Red
+    Write-Host "Bootstrap result: failed. $Detail. Instance: $InstanceId IP: $IpAddress" `
+        -ForegroundColor Red
     Write-Host "Persistent bootstrap log: $PersistentLog" -ForegroundColor Red
     Write-Host "Manual SSH: $ManualSsh" -ForegroundColor Red
     Write-Host 'The paid instance was deliberately left running.' -ForegroundColor Red
@@ -2807,6 +2859,7 @@ function Invoke-RemoteBootstrap {
     Set-StateValue 'bootstrap_completed_at_utc' $null
     Set-StateValue 'sanity_report_path' $null
     Save-WatcherState
+    Write-Host "Bootstrap started: instance $instanceId."
     $sshArguments = New-BootstrapSshArguments `
         -PrivateKeyPath $Preflight.Ssh.PrivateKeyPath `
         -KnownHostsPath $KnownHostsPath `
@@ -2946,6 +2999,9 @@ function Invoke-WatcherEntry {
 
     if ($SelfTest) {
         & (Join-Path $script:OpsDirectory 'test-lambda-gh200.ps1')
+        if ($LASTEXITCODE -ne 0) {
+            throw "Lambda GH200 watcher self-test failed with exit code $LASTEXITCODE."
+        }
         return
     }
 

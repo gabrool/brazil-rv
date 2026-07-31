@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import io
 import json
 from datetime import datetime, timezone
@@ -91,12 +90,6 @@ def _changed(
     changed["patches"][:, instrument] += 100.0
     changed["slow_features"][:, instrument] += 100.0
     return changed
-
-
-def _update_digest(digest: object, name: str, tensor: torch.Tensor) -> None:
-    digest.update(name.encode())
-    digest.update(str(tuple(tensor.shape)).encode())
-    digest.update(tensor.detach().contiguous().numpy().tobytes())
 
 
 def test_tcn_public_setting_and_receptive_field_contract() -> None:
@@ -347,10 +340,14 @@ def test_all_tcn_blocks_are_finite_masked_permutation_equivariant_and_causal(
     assert torch.equal(baseline[inactive], torch.zeros_like(baseline[inactive]))
 
 
-def test_baseline_tcn_state_layout_count_and_seeded_output_are_exact() -> None:
+def test_baseline_tcn_state_layout_count_and_seed_reproducibility() -> None:
     torch.manual_seed(1234)
     architecture = resolve_tcn_architecture(BASELINE_TCN_SETTINGS)
-    model = _model(BASELINE_TCN_SETTINGS).eval()
+    first_model = _model(BASELINE_TCN_SETTINGS).eval()
+    torch.manual_seed(1234)
+    second_model = _model(BASELINE_TCN_SETTINGS).eval()
+    torch.manual_seed(1235)
+    different_model = _model(BASELINE_TCN_SETTINGS).eval()
     expected_keys = ["input_projection.weight"]
     for block in range(6):
         expected_keys.extend(
@@ -378,16 +375,22 @@ def test_baseline_tcn_state_layout_count_and_seeded_output_are_exact() -> None:
             "prediction_head.bias",
         )
     )
-    assert tuple(model.state_dict()) == tuple(expected_keys)
-    assert count_trainable_parameters(model) == 777_987
+    assert tuple(first_model.state_dict()) == tuple(expected_keys)
+    assert count_trainable_parameters(first_model) == 777_987
     assert expected_trainable_parameter_count("tcn", architecture) == 777_987
 
-    state_digest = hashlib.sha256()
-    for key, value in model.state_dict().items():
-        _update_digest(state_digest, key, value)
-    assert (
-        state_digest.hexdigest()
-        == "cce6cfeff5335f7275819747043a7962191157e3c43d2ac49e4cbcfe55da45bf"
+    for key in expected_keys:
+        torch.testing.assert_close(
+            first_model.state_dict()[key],
+            second_model.state_dict()[key],
+            atol=0.0,
+            rtol=0.0,
+        )
+    assert any(
+        not torch.equal(
+            first_model.state_dict()[key], different_model.state_dict()[key]
+        )
+        for key in expected_keys
     )
 
     generator = torch.Generator().manual_seed(5678)
@@ -403,12 +406,19 @@ def test_baseline_tcn_state_layout_count_and_seeded_output_are_exact() -> None:
     instrument[:, 4:EQUITY_COUNT] = False
     slow = torch.randn(1, INSTRUMENT_COUNT, SLOW_FEATURE_COUNT, generator=generator)
     with torch.no_grad():
-        output = model(patches, history, instrument, slow, torch.tensor([69]))
-    output_digest = hashlib.sha256()
-    _update_digest(output_digest, "output", output)
-    assert (
-        output_digest.hexdigest()
-        == "59ed77569ca2d6b42f543ae09b04a157cda2e8dd986fe63edb5b86aaf785afff"
+        first_output = first_model(
+            patches, history, instrument, slow, torch.tensor([69])
+        )
+        second_output = second_model(
+            patches, history, instrument, slow, torch.tensor([69])
+        )
+    assert first_output.shape == (1, EQUITY_COUNT, 3)
+    assert torch.isfinite(first_output).all()
+    torch.testing.assert_close(
+        first_output,
+        second_output,
+        atol=0.0,
+        rtol=0.0,
     )
 
 

@@ -20,6 +20,7 @@ from .contract import (
     RUN_OUTPUT_BASE,
     SANITY_DECISION_INDEX,
     SANITY_MAX_LOSS,
+    SANITY_MAX_LOSS_RATIO,
     SANITY_MAX_STEPS,
     SANITY_MEMORIZATION_SAMPLE_COUNT,
     SANITY_MIN_SPEARMAN,
@@ -62,6 +63,26 @@ SANITY_MODEL = "tcn"
 SANITY_TCN_ARCHITECTURE = architecture_for_model(SANITY_MODEL, BASELINE_TCN_SETTINGS)
 
 
+def _memorization_passes(
+    initial_loss: float,
+    final_loss: float,
+    final_spearman: float,
+    predictions_finite: bool,
+    gradients_finite: bool,
+) -> bool:
+    return bool(
+        np.isfinite(initial_loss)
+        and np.isfinite(final_loss)
+        and np.isfinite(final_spearman)
+        and initial_loss > 0.0
+        and final_loss <= SANITY_MAX_LOSS
+        and final_loss <= SANITY_MAX_LOSS_RATIO * initial_loss
+        and final_spearman >= SANITY_MIN_SPEARMAN
+        and predictions_finite
+        and gradients_finite
+    )
+
+
 def _evaluate_fixed_batch(
     model: torch.nn.Module,
     cpu_batch: dict[str, torch.Tensor],
@@ -86,6 +107,23 @@ def _evaluate_fixed_batch(
         float(loss),
         float(np.nanmean(spearman)),
         bool(np.isfinite(predictions).all()),
+    )
+
+
+def _checkpoint_predictions_compatible(
+    compiled_predictions: torch.Tensor,
+    eager_predictions: torch.Tensor,
+) -> bool:
+    return bool(
+        compiled_predictions.shape == eager_predictions.shape
+        and torch.isfinite(compiled_predictions).all()
+        and torch.isfinite(eager_predictions).all()
+        and torch.allclose(
+            compiled_predictions,
+            eager_predictions,
+            atol=COMPILE_PARITY_PREDICTION_ATOL,
+            rtol=COMPILE_PARITY_PREDICTION_RTOL,
+        )
     )
 
 
@@ -144,14 +182,8 @@ def _checkpoint_compatibility(
     maximum_difference = float(
         (compiled_predictions - eager_predictions).abs().max().cpu()
     )
-    compatible = bool(
-        torch.isfinite(eager_predictions).all()
-        and torch.allclose(
-            compiled_predictions,
-            eager_predictions,
-            atol=COMPILE_PARITY_PREDICTION_ATOL,
-            rtol=COMPILE_PARITY_PREDICTION_RTOL,
-        )
+    compatible = _checkpoint_predictions_compatible(
+        compiled_predictions, eager_predictions
     )
     return compatible, maximum_difference
 
@@ -356,10 +388,12 @@ def main() -> None:
                 memorization_model, memorization_batch
             )
             predictions_finite &= finite
-            if (
-                final_loss <= SANITY_MAX_LOSS
-                and final_loss <= 0.25 * initial_loss
-                and final_spearman >= SANITY_MIN_SPEARMAN
+            if _memorization_passes(
+                initial_loss,
+                final_loss,
+                final_spearman,
+                predictions_finite,
+                gradients_finite,
             ):
                 break
     if completed_steps % 10:
@@ -367,12 +401,17 @@ def main() -> None:
             memorization_model, memorization_batch
         )
         predictions_finite &= finite
-    memorization_passed = bool(
-        final_loss <= SANITY_MAX_LOSS
-        and final_loss <= 0.25 * initial_loss
-        and final_spearman >= SANITY_MIN_SPEARMAN
-        and predictions_finite
-        and gradients_finite
+    memorization_passed = _memorization_passes(
+        initial_loss,
+        final_loss,
+        final_spearman,
+        predictions_finite,
+        gradients_finite,
+    )
+    loss_ratio = (
+        final_loss / initial_loss
+        if np.isfinite(initial_loss) and np.isfinite(final_loss) and initial_loss > 0.0
+        else None
     )
 
     peak_allocated = max(
@@ -426,9 +465,15 @@ def main() -> None:
             "optimizer_steps": completed_steps,
             "initial_objective_loss": initial_loss,
             "final_objective_loss": final_loss,
+            "final_to_initial_loss_ratio": loss_ratio,
             "final_mean_hard_spearman": final_spearman,
             "all_gradients_finite": gradients_finite,
             "all_predictions_finite": predictions_finite,
+            "thresholds": {
+                "maximum_final_loss": SANITY_MAX_LOSS,
+                "maximum_final_to_initial_loss_ratio": SANITY_MAX_LOSS_RATIO,
+                "minimum_mean_hard_spearman": SANITY_MIN_SPEARMAN,
+            },
             "passed": memorization_passed,
         },
         "checkpoint_compatibility": {

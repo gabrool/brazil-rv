@@ -184,6 +184,12 @@ function Invoke-TestRateLimitSequence {
     }
 }
 
+function Reset-TestRateLimitState {
+    $script:RateLimitBackoffIndex = 0
+    $script:RateLimitHealthySuccessCount = 0
+    $script:RateLimitLastLoggedDelay = $null
+}
+
 Invoke-Test 'GH200 discovery requires one exact one-GPU candidate' {
     $types = [ordered]@{
         gpu_1x_gh200 = [pscustomobject]@{
@@ -578,30 +584,41 @@ Invoke-Test 'Lambda request parameters always include a 30-second timeout' {
     $script:ApiHeaders = $null
 }
 
-Invoke-Test 'HTTP 429 uses increasing bounded local backoff and resets after success' {
-    $script:RateLimitBackoffIndex = 0
+Invoke-Test 'HTTP 429 uses bounded backoff and requires sustained success to recover' {
+    Reset-TestRateLimitState
     $first = Invoke-TestRateLimitSequence @('0', '0', '0', '0', '0', '0', '0')
     Assert-Equal ($first.Sleeps -join ',') '2,4,8,16,32,60,60' `
         'Consecutive 429 backoff sequence changed.'
     $rateLogs = @($first.Logs | Where-Object { $_.Event -eq 'api_rate_limited' })
-    Assert-Equal $rateLogs.Count 7 'A 429 retry was not logged exactly once.'
+    Assert-Equal $rateLogs.Count 6 'Repeated capped 429 state was not log-suppressed.'
     for ($index = 0; $index -lt $rateLogs.Count; $index++) {
-        Assert-Equal $rateLogs[$index].Fields.consecutive_rate_limit_count ($index + 1) `
-            'Consecutive 429 count changed.'
+        Assert-Equal $rateLogs[$index].Fields.rate_limit_level ($index + 1) `
+            'Rate-limit level changed.'
         Assert-Equal $rateLogs[$index].Fields.effective_delay_seconds `
             $first.Sleeps[$index] 'Logged 429 delay differs from the effective delay.'
     }
-    Assert-Equal $script:RateLimitBackoffIndex 0 'Successful response did not reset 429 backoff.'
+    Assert-Equal $script:RateLimitBackoffIndex 6 `
+        'One successful response completely reset 429 state.'
+    Assert-Equal $script:RateLimitHealthySuccessCount 1 `
+        'The first healthy response was not retained as recovery evidence.'
 
-    $second = Invoke-TestRateLimitSequence @('0')
-    Assert-Equal ($second.Sleeps -join ',') '2' '429 backoff did not restart after success.'
+    $immediate = Invoke-TestRateLimitSequence @('0')
+    Assert-Equal ($immediate.Sleeps -join ',') '60' `
+        'An immediate recurring 429 restarted at the minimum delay.'
+    Assert-Equal $immediate.Logs.Count 0 'Unchanged capped 429 state produced repetitive logs.'
+    $healthyOne = Invoke-TestRateLimitSequence @()
+    $healthyTwo = Invoke-TestRateLimitSequence @()
+    Assert-Equal $healthyOne.Sleeps.Count 0 'Healthy polling slept unexpectedly.'
+    Assert-Equal $healthyTwo.Sleeps.Count 0 'Healthy polling slept unexpectedly.'
+    Assert-Equal $script:RateLimitBackoffIndex 5 `
+        'Three healthy responses did not decay rate-limit state by one level.'
     $serializedLogs = $first.Logs | ConvertTo-Json -Depth 5 -Compress
     Assert-True (-not $serializedLogs.Contains('synthetic 429 body marker')) `
         'Raw HTTP failure text leaked into 429 logs.'
 }
 
 Invoke-Test 'HTTP 429 respects a server delay larger than local backoff' {
-    $script:RateLimitBackoffIndex = 0
+    Reset-TestRateLimitState
     $result = Invoke-TestRateLimitSequence @('120')
     Assert-Equal ($result.Sleeps -join ',') '120' 'Large Retry-After was capped locally.'
     $rateLog = @($result.Logs | Where-Object { $_.Event -eq 'api_rate_limited' })[0]
@@ -705,6 +722,148 @@ Invoke-Test 'SSH options enforce one public-key-only authentication attempt' {
         'ServerAliveCountMax=3'
     )
     Assert-Equal ($options -join ',') ($expected -join ',') 'SSH options changed.'
+}
+
+Invoke-Test 'Process wrapper concurrently drains stdout and stderr before exit zero' {
+    $powerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
+    $child = @'
+foreach ($index in 0..4999) {
+    [Console]::Out.WriteLine("out-$index")
+    [Console]::Error.WriteLine("err-$index")
+}
+'@
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $result = Invoke-CheckedProcess -FilePath $powerShell `
+        -ArgumentList @('-NoLogo', '-NoProfile', '-Command', $child) -TimeoutSeconds 10
+    $stopwatch.Stop()
+    Assert-Equal $result.ExitCode 0 'Concurrent-output child did not exit zero.'
+    Assert-True (-not $result.TimedOut) 'Concurrent-output child timed out.'
+    Assert-True $result.StdOut.Contains('out-0') 'Initial stdout was not captured.'
+    Assert-True $result.StdOut.Contains('out-4999') 'Final stdout was not flushed.'
+    Assert-True $result.StdErr.Contains('err-0') 'Initial stderr was not captured.'
+    Assert-True $result.StdErr.Contains('err-4999') 'Final stderr was not flushed.'
+    Assert-True ($stopwatch.Elapsed.TotalSeconds -lt 10.0) `
+        'Concurrent-output child exceeded its bound.'
+}
+
+Invoke-Test 'Process wrapper accepts known-host warning on stderr with exit zero' {
+    $powerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
+    $child = '[Console]::Error.WriteLine("Warning: Permanently added host to known hosts."); exit 0'
+    $result = Invoke-CheckedProcess -FilePath $powerShell `
+        -ArgumentList @('-NoLogo', '-NoProfile', '-Command', $child) -TimeoutSeconds 5
+    Assert-Equal $result.ExitCode 0 'Warning child did not exit zero.'
+    Assert-True (-not $result.TimedOut) 'Warning child was misclassified as timed out.'
+    Assert-True $result.StdErr.Contains('Permanently added') `
+        'Known-host-style warning was not captured.'
+}
+
+Invoke-Test 'Process wrapper times out, kills, reaps, and returns within a bound' {
+    $powerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
+    $child = '[Console]::Out.WriteLine($PID); [Console]::Out.Flush(); Start-Sleep -Seconds 30'
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $result = Invoke-CheckedProcess -FilePath $powerShell `
+        -ArgumentList @('-NoLogo', '-NoProfile', '-Command', $child) `
+        -TimeoutSeconds 1 -AllowedExitCodes (0..255) -AllowTimeout
+    $stopwatch.Stop()
+    $childPid = [int]$result.StdOut.Trim()
+    Assert-True $result.TimedOut 'Long-running child did not time out.'
+    Assert-Equal $result.ExitCode -1 'Timed-out child did not use the timeout exit code.'
+    Assert-True ($stopwatch.Elapsed.TotalSeconds -ge 0.8) `
+        'Process timeout returned before the real deadline.'
+    Assert-True ($stopwatch.Elapsed.TotalSeconds -lt 5.0) `
+        'Timed-out child was not killed and reaped promptly.'
+    Assert-True ($null -eq (Get-Process -Id $childPid -ErrorAction SilentlyContinue)) `
+        'Timed-out child process was leaked.'
+}
+
+Invoke-Test 'Authenticated readiness uses real transient children before success' {
+    $powerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
+    $holder = [pscustomobject]@{ Now = 0.0; Attempts = 0 }
+    $attempt = {
+        param([string[]]$Arguments)
+        $holder.Attempts++
+        $exitCode = if ($holder.Attempts -lt 3) { 255 } else { 0 }
+        $child = '[Console]::Error.WriteLine("transient ssh readiness"); exit ' + $exitCode
+        Invoke-CheckedProcess -FilePath $powerShell `
+            -ArgumentList @('-NoLogo', '-NoProfile', '-Command', $child) `
+            -TimeoutSeconds 5 -AllowedExitCodes (0..255) -AllowTimeout
+    }.GetNewClosure()
+    $preflight = [pscustomobject]@{ PrivateKeyPath = 'key'; SshPath = $powerShell }
+    Wait-ForAuthenticatedSsh -IpAddress '198.51.100.2' -InstanceId 'instance-1' `
+        -SshPreflight $preflight -KnownHostsPath 'known-hosts' `
+        -TcpProbe { param($HostName) $true } -SshAttempt $attempt `
+        -Now { $holder.Now }.GetNewClosure() `
+        -Sleep { param([double]$Seconds) $holder.Now += $Seconds }.GetNewClosure() `
+        -Logger { param($Level, $Event, $Fields) }
+    Assert-Equal $holder.Attempts 3 'Transient readiness did not require three real children.'
+    Assert-Equal $holder.Now 10.0 'Transient readiness polling interval changed.'
+}
+
+Invoke-Test 'OpenSSH version probe is network-free when ssh.exe is available' {
+    $ssh = Get-Command ssh.exe -ErrorAction SilentlyContinue
+    if ($null -eq $ssh) {
+        return
+    }
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $result = Invoke-CheckedProcess -FilePath $ssh.Source -ArgumentList @('-V') `
+        -TimeoutSeconds 5 -AllowedExitCodes (0..255) -AllowTimeout
+    $stopwatch.Stop()
+    Assert-True (-not $result.TimedOut) 'ssh.exe -V timed out.'
+    Assert-True (($result.StdOut + $result.StdErr) -match 'OpenSSH') `
+        'ssh.exe -V did not return an OpenSSH version.'
+    Assert-True ($stopwatch.Elapsed.TotalSeconds -lt 5.0) `
+        'ssh.exe -V exceeded its local bound.'
+}
+
+Invoke-Test 'Default readiness closure preserves its real subprocess timeout' {
+    $powerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
+    $originalOptions = (Get-Command Get-SshOptions -ErrorAction Stop).ScriptBlock
+    $originalAttemptTimeout = $script:SshAttemptTimeoutSeconds
+    $originalOuterTimeout = $script:SshTimeoutSeconds
+    $originalPoll = $script:SshPollSeconds
+    $holder = [pscustomobject]@{ Now = 0.0; Sleeps = 0 }
+    $childPath = Join-Path ([IO.Path]::GetTempPath()) `
+        "lambda-gh200-readiness-$([Guid]::NewGuid().ToString('N')).ps1"
+    [IO.File]::WriteAllText(
+        $childPath,
+        'param([Parameter(ValueFromRemainingArguments=$true)][object[]]$Remaining); exit 0',
+        (New-Object Text.UTF8Encoding($false))
+    )
+    try {
+        $script:SshAttemptTimeoutSeconds = 1
+        $script:SshTimeoutSeconds = 3
+        $script:SshPollSeconds = 1
+        Set-Item Function:script:Get-SshOptions -Value {
+            param($PrivateKeyPath, $KnownHostsPath)
+            @('-NoLogo', '-NoProfile', '-File', $childPath)
+        }.GetNewClosure()
+        $preflight = [pscustomobject]@{
+            PrivateKeyPath = 'unused-test-key'
+            SshPath = $powerShell
+        }
+        $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+        Wait-ForAuthenticatedSsh -IpAddress '198.51.100.2' -InstanceId 'instance-1' `
+            -SshPreflight $preflight -KnownHostsPath 'unused-known-hosts' `
+            -TcpProbe { param($HostName) $true } `
+            -Now { $holder.Now }.GetNewClosure() `
+            -Sleep {
+                param([double]$Seconds)
+                $holder.Sleeps++
+                $holder.Now += $Seconds
+            }.GetNewClosure() `
+            -Logger { param($Level, $Event, $Fields) }
+        $stopwatch.Stop()
+    }
+    finally {
+        Set-Item Function:script:Get-SshOptions -Value $originalOptions
+        $script:SshAttemptTimeoutSeconds = $originalAttemptTimeout
+        $script:SshTimeoutSeconds = $originalOuterTimeout
+        $script:SshPollSeconds = $originalPoll
+        Remove-Item -LiteralPath $childPath -Force -ErrorAction SilentlyContinue
+    }
+    Assert-Equal $holder.Sleeps 0 'Successful default readiness slept unexpectedly.'
+    Assert-True ($stopwatch.Elapsed.TotalSeconds -lt 5.0) `
+        'Default readiness did not preserve the real subprocess timeout capture.'
 }
 
 Invoke-Test 'SSH failure classifications expose only safe categories' {
@@ -912,6 +1071,16 @@ Invoke-Test 'Bootstrap source enforces four args, idempotent marker, and no trai
     Assert-True $bootstrap.Contains('BRAZIL_RV_BOOTSTRAP_ALREADY_COMPLETE=') 'Idempotent exit missing.'
     Assert-True $bootstrap.Contains('"passed": True') 'Expanded marker passed field missing.'
     Assert-True $bootstrap.Contains('validate_repository') 'Existing repository validation missing.'
+    Assert-True $bootstrap.Contains('uv sync --frozen') 'Frozen dependency sync missing.'
+    Assert-True $bootstrap.Contains('uv run --frozen pytest -q') 'Full pytest gate missing.'
+    Assert-True $bootstrap.Contains('uv run --frozen ruff check .') 'Ruff check gate missing.'
+    Assert-True $bootstrap.Contains('uv run --frozen ruff format --check .') 'Ruff format gate missing.'
+    Assert-True $bootstrap.Contains('uv run --frozen python -m compileall -q src tests') `
+        'Compile-all gate missing.'
+    Assert-True $bootstrap.Contains('brazil_rv.modeling.sanity') 'Real sanity gate missing.'
+    Assert-True (-not $bootstrap.Contains('uv pip install')) 'Manual dependency patch was added.'
+    Assert-True (-not $bootstrap.Contains('pytest -k')) 'Pytest selection filter was added.'
+    Assert-True (-not $bootstrap.Contains('--deselect')) 'Pytest deselection was added.'
     Assert-True (-not $bootstrap.Contains('brazil_rv.modeling.train')) 'Training command was added.'
     Assert-True (-not $bootstrap.Contains('torchrun')) 'Distributed training was added.'
 }
@@ -1115,6 +1284,7 @@ Write-Host "Lambda GH200 watcher tests: $($script:Passed)/$total passed."
 if ($script:Failed -ne 0) {
     exit 1
 }
+exit 0
 
 
 

@@ -3,8 +3,11 @@ from __future__ import annotations
 import copy
 import csv
 import gc
+import importlib
 import json
+import platform
 import sys
+import tomllib
 from contextlib import nullcontext
 from dataclasses import asdict
 from pathlib import Path
@@ -41,6 +44,9 @@ from brazil_rv.modeling.contract import (
     NEURAL_MODELS,
     GH200_RUNTIME,
     HORIZONS,
+    SANITY_MAX_LOSS,
+    SANITY_MAX_LOSS_RATIO,
+    SANITY_MIN_SPEARMAN,
     TRANSFORMER_MODELS,
     TCNSettings,
     WARMUP_FRACTION,
@@ -73,6 +79,10 @@ from brazil_rv.modeling.train import (
     _model_metadata,
 )
 from brazil_rv.modeling.model import build_neural_model
+from brazil_rv.modeling.sanity import (
+    _checkpoint_predictions_compatible,
+    _memorization_passes,
+)
 from brazil_rv.modeling.data import TabularRowBatch
 from brazil_rv.modeling.xgboost_model import (
     QuantileBatchDataIter,
@@ -136,7 +146,7 @@ def test_compile_setup_modern_explicit_off(
     assert report == CompileSetupReport(
         api="nn.Module.compile",
         backend="inductor",
-        mode="reduce-overhead",
+        mode="default",
         fullgraph=True,
         dynamic=False,
         backward_pass_autocast_control_available=True,
@@ -259,39 +269,75 @@ def test_compile_parity_nonfinite_predictions_fail() -> None:
     assert not compiled_nonfinite.compiled_predictions_finite
 
 
-def test_compile_parity_gradient_relative_l2_threshold_failure() -> None:
-    report = _synthetic_compile_parity(
-        gradient_pair=(torch.tensor([1.0, 0.0]), torch.tensor([1.0, 0.011]))
-    )
-    assert not report.passed
-    assert report.gradient_relative_l2_error is not None
-    assert report.gradient_relative_l2_error > COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX
-
-
-def test_compile_parity_gradient_cosine_threshold_failure() -> None:
-    report = _synthetic_compile_parity(
-        gradient_pair=(torch.tensor([1.0, 0.0]), torch.tensor([1.0, 0.02]))
-    )
-    assert not report.passed
-    assert report.gradient_cosine_similarity is not None
-    assert report.gradient_cosine_similarity < COMPILE_PARITY_GRADIENT_COSINE_MIN
-
-
-def test_compile_parity_gradient_max_absolute_threshold_failure() -> None:
+def test_compile_parity_gradient_relative_l2_boundary() -> None:
+    epsilon = 1e-4
     eager_gradient = torch.ones(100)
-    compiled_gradient = eager_gradient.clone()
-    compiled_gradient[0] += 0.012
-    report = _synthetic_compile_parity(
-        gradient_pair=(eager_gradient, compiled_gradient)
-    )
-    assert not report.passed
-    assert report.gradient_relative_l2_error is not None
-    assert report.gradient_relative_l2_error <= COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX
-    assert report.gradient_max_absolute_difference is not None
-    assert report.gradient_max_absolute_tolerance is not None
+    inside = eager_gradient * (1.0 + COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX - epsilon)
+    outside = eager_gradient * (1.0 + COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX + epsilon)
+    inside_report = _synthetic_compile_parity(gradient_pair=(eager_gradient, inside))
+    outside_report = _synthetic_compile_parity(gradient_pair=(eager_gradient, outside))
+    assert inside_report.passed
+    assert inside_report.gradient_relative_l2_error is not None
     assert (
-        report.gradient_max_absolute_difference > report.gradient_max_absolute_tolerance
+        inside_report.gradient_relative_l2_error
+        < COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX
     )
+    assert not outside_report.passed
+    assert outside_report.gradient_relative_l2_error is not None
+    assert (
+        outside_report.gradient_relative_l2_error
+        > COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX
+    )
+
+
+def test_compile_parity_gradient_cosine_boundary() -> None:
+    epsilon = 1e-5
+    eager_gradient = torch.tensor([1.0, 0.0])
+
+    def gradient(cosine: float) -> torch.Tensor:
+        return torch.tensor([cosine, (1.0 - cosine**2) ** 0.5])
+
+    inside_report = _synthetic_compile_parity(
+        gradient_pair=(
+            eager_gradient,
+            gradient(COMPILE_PARITY_GRADIENT_COSINE_MIN + epsilon),
+        )
+    )
+    outside_report = _synthetic_compile_parity(
+        gradient_pair=(
+            eager_gradient,
+            gradient(COMPILE_PARITY_GRADIENT_COSINE_MIN - epsilon),
+        )
+    )
+    assert inside_report.passed
+    assert inside_report.gradient_cosine_similarity is not None
+    assert inside_report.gradient_cosine_similarity > COMPILE_PARITY_GRADIENT_COSINE_MIN
+    assert not outside_report.passed
+    assert outside_report.gradient_cosine_similarity is not None
+    assert (
+        outside_report.gradient_cosine_similarity < COMPILE_PARITY_GRADIENT_COSINE_MIN
+    )
+
+
+def test_compile_parity_gradient_max_absolute_boundary() -> None:
+    epsilon = 1e-4
+    eager_gradient = torch.ones(100)
+    tolerance = (
+        COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL
+        + COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL * float(eager_gradient.abs().max())
+    )
+    inside = eager_gradient.clone()
+    outside = eager_gradient.clone()
+    inside[0] += tolerance - epsilon
+    outside[0] += tolerance + epsilon
+    inside_report = _synthetic_compile_parity(gradient_pair=(eager_gradient, inside))
+    outside_report = _synthetic_compile_parity(gradient_pair=(eager_gradient, outside))
+    assert inside_report.passed
+    assert inside_report.gradient_max_absolute_difference is not None
+    assert inside_report.gradient_max_absolute_difference < tolerance
+    assert not outside_report.passed
+    assert outside_report.gradient_max_absolute_difference is not None
+    assert outside_report.gradient_max_absolute_difference > tolerance
 
 
 def test_compile_parity_zero_gradient_rules() -> None:
@@ -401,7 +447,7 @@ def test_compile_metadata_schema_is_exact() -> None:
     setup = CompileSetupReport(
         api="nn.Module.compile",
         backend="inductor",
-        mode="reduce-overhead",
+        mode="default",
         fullgraph=True,
         dynamic=False,
         backward_pass_autocast_control_available=False,
@@ -435,6 +481,59 @@ def test_compile_metadata_schema_is_exact() -> None:
         "gradient_max_absolute_atol": COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
         "gradient_max_absolute_rtol": COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
     }
+
+
+def test_sanity_checkpoint_prediction_compatibility_boundaries() -> None:
+    eager = torch.tensor([1.0])
+    tolerance = COMPILE_PARITY_PREDICTION_ATOL + COMPILE_PARITY_PREDICTION_RTOL
+    inside = eager + tolerance - 1e-6
+    outside = eager + tolerance + 1e-6
+    assert _checkpoint_predictions_compatible(inside, eager)
+    assert not _checkpoint_predictions_compatible(outside, eager)
+    assert not _checkpoint_predictions_compatible(torch.tensor([float("nan")]), eager)
+    assert not _checkpoint_predictions_compatible(eager, torch.tensor([float("inf")]))
+    assert not _checkpoint_predictions_compatible(torch.ones(2), eager)
+
+
+def test_sanity_memorization_gate_accepts_exact_boundaries() -> None:
+    assert _memorization_passes(
+        initial_loss=2.0 * SANITY_MAX_LOSS,
+        final_loss=SANITY_MAX_LOSS,
+        final_spearman=SANITY_MIN_SPEARMAN,
+        predictions_finite=True,
+        gradients_finite=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    (
+        {"final_loss": SANITY_MAX_LOSS + 1e-6, "initial_loss": 1.0},
+        {
+            "final_loss": SANITY_MAX_LOSS_RATIO * 0.1 + 1e-6,
+            "initial_loss": 0.1,
+        },
+        {"final_spearman": SANITY_MIN_SPEARMAN - 1e-6},
+        {"predictions_finite": False},
+        {"gradients_finite": False},
+        {"initial_loss": 0.0, "final_loss": 0.0},
+        {"initial_loss": float("nan")},
+        {"final_loss": float("inf")},
+        {"final_spearman": float("nan")},
+    ),
+)
+def test_sanity_memorization_gate_rejects_each_failed_criterion(
+    overrides: dict[str, float | bool],
+) -> None:
+    criteria: dict[str, float | bool] = {
+        "initial_loss": 2.0 * SANITY_MAX_LOSS,
+        "final_loss": SANITY_MAX_LOSS,
+        "final_spearman": SANITY_MIN_SPEARMAN,
+        "predictions_finite": True,
+        "gradients_finite": True,
+    }
+    criteria.update(overrides)
+    assert not _memorization_passes(**criteria)
 
 
 def test_clone_eager_reference_has_distinct_exact_parameters_and_rng() -> None:
@@ -1033,6 +1132,38 @@ def test_selected_tcn_checkpoint_round_trip_and_identity(
         torch.testing.assert_close(
             restored.state_dict()[name], parameter, atol=0.0, rtol=0.0
         )
+
+
+def test_gh200_cupy_dependency_is_pinned_locked_and_importable() -> None:
+    research_root = Path(__file__).parents[1]
+    project = tomllib.loads((research_root / "pyproject.toml").read_text("utf-8"))
+    requirement = (
+        "cupy-cuda12x==14.1.1; "
+        "sys_platform == 'linux' and platform_machine == 'aarch64'"
+    )
+    assert requirement in project["project"]["dependencies"]
+
+    lock = tomllib.loads((research_root / "uv.lock").read_text("utf-8"))
+    cupy_packages = [
+        package for package in lock["package"] if package["name"] == "cupy-cuda12x"
+    ]
+    assert len(cupy_packages) == 1
+    assert cupy_packages[0]["version"] == "14.1.1"
+    root_package = next(
+        package for package in lock["package"] if package["name"] == "brazil-rv"
+    )
+    marker = "platform_machine == 'aarch64' and sys_platform == 'linux'"
+    assert {"name": "cupy-cuda12x", "marker": marker} in root_package["dependencies"]
+    assert {
+        "name": "cupy-cuda12x",
+        "marker": marker,
+        "specifier": "==14.1.1",
+    } in root_package["metadata"]["requires-dist"]
+    assert XGBOOST_VERSION == xgb.__version__ == "3.2.0"
+
+    if sys.platform == "linux" and platform.machine() == "aarch64":
+        cupy = importlib.import_module("cupy")
+        assert cupy.__version__ == "14.1.1"
 
 
 def test_xgboost_candidate_order_and_deterministic_tie_breaking() -> None:
