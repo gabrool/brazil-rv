@@ -47,7 +47,7 @@ from .engine import (
     qualify_eager_compiled_model,
     require_compile_parity,
     run_effective_batch_update,
-    soft_spearman_loss,
+    objective_loss,
     validate_runtime,
     warmup_compiled_model,
 )
@@ -55,8 +55,9 @@ from .metrics import sample_level_ic
 from .model import build_neural_model, count_trainable_parameters
 from .optim import build_optimizer, build_scheduler
 
+SANITY_OBJECTIVE = "soft_spearman"
 SANITY_TEMPERATURE = 0.10
-SANITY_SAM_RHO = 0.020
+SANITY_SAM_RHO = 0.025
 SANITY_MODEL = "tcn"
 SANITY_TCN_ARCHITECTURE = architecture_for_model(SANITY_MODEL, BASELINE_TCN_SETTINGS)
 
@@ -70,10 +71,11 @@ def _evaluate_fixed_batch(
     with torch.no_grad():
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             output = _predict(model, batch)
-        loss = soft_spearman_loss(
+        loss = objective_loss(
             output[:valid_count],
             batch["targets"][:valid_count],
             batch["label_mask"][:valid_count],
+            SANITY_OBJECTIVE,
             SANITY_TEMPERATURE,
         )
     predictions = output[:valid_count].float().cpu().numpy()
@@ -114,6 +116,7 @@ def _checkpoint_compatibility(
         SANITY_TCN_ARCHITECTURE,
         BASELINE_TCN_SETTINGS,
         "adamw",
+        SANITY_OBJECTIVE,
         SANITY_TEMPERATURE,
         None,
         11,
@@ -221,6 +224,7 @@ def main() -> None:
         model,
         smoke_batches[0],
         include_backward=True,
+        objective=SANITY_OBJECTIVE,
         temperature=SANITY_TEMPERATURE,
     )
     require_compile_parity(compile_parity)
@@ -228,7 +232,11 @@ def main() -> None:
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
     compile_report = warmup_compiled_model(
-        model, smoke_batches[0], evaluation_batch, SANITY_TEMPERATURE
+        model,
+        smoke_batches[0],
+        evaluation_batch,
+        SANITY_OBJECTIVE,
+        SANITY_TEMPERATURE,
     )
     compile_metadata = build_compile_metadata(
         compile_setup, compile_parity, compile_report
@@ -246,6 +254,7 @@ def main() -> None:
         adamw_scheduler,
         runtime,
         "adamw",
+        SANITY_OBJECTIVE,
         SANITY_TEMPERATURE,
         None,
         check_predictions_finite=True,
@@ -272,6 +281,7 @@ def main() -> None:
         sam_scheduler,
         runtime,
         "sam_adamw",
+        SANITY_OBJECTIVE,
         SANITY_TEMPERATURE,
         SANITY_SAM_RHO,
         check_predictions_finite=True,
@@ -319,10 +329,11 @@ def main() -> None:
         cuda_batch = _to_cuda(memorization_batch)
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             predictions = _predict(memorization_model, cuda_batch)
-        loss = soft_spearman_loss(
+        loss = objective_loss(
             predictions,
             cuda_batch["targets"],
             cuda_batch["label_mask"],
+            SANITY_OBJECTIVE,
             SANITY_TEMPERATURE,
         )
         if not bool(torch.isfinite(loss)):
@@ -388,6 +399,8 @@ def main() -> None:
     )
     report = {
         "model_name": SANITY_MODEL,
+        "objective": SANITY_OBJECTIVE,
+        "soft_rank_temperature": SANITY_TEMPERATURE,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "resolved_feature_store_path": str(feature_store),
         "hardware": asdict(hardware),
@@ -411,8 +424,8 @@ def main() -> None:
             "sample_count": SANITY_MEMORIZATION_SAMPLE_COUNT,
             "decision_index": SANITY_DECISION_INDEX,
             "optimizer_steps": completed_steps,
-            "initial_soft_spearman_loss": initial_loss,
-            "final_soft_spearman_loss": final_loss,
+            "initial_objective_loss": initial_loss,
+            "final_objective_loss": final_loss,
             "final_mean_hard_spearman": final_spearman,
             "all_gradients_finite": gradients_finite,
             "all_predictions_finite": predictions_finite,

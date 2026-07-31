@@ -6,7 +6,7 @@ import math
 import platform as system_platform
 import statistics
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Sized
 from dataclasses import asdict
 from pathlib import Path
 
@@ -33,7 +33,9 @@ from .contract import (
     CompileWarmupReport,
     GH200_RUNTIME,
     GRADIENT_CLIP,
+    HUBER_DELTA,
     HardwareInfo,
+    NEURAL_OBJECTIVES,
     NeuralArchitecture,
     RuntimeSettings,
     SAM_NORM_EPS,
@@ -358,13 +360,37 @@ def experiment_decimal(value: float, minimum_fraction_digits: int) -> str:
     return f"{whole}p{fraction.ljust(minimum_fraction_digits, '0')}"
 
 
-def objective_metadata(temperature: float) -> dict[str, object]:
+def validate_neural_objective(
+    objective: str, temperature: float | None
+) -> tuple[str, float | None]:
+    if objective not in NEURAL_OBJECTIVES:
+        raise ValueError(f"Neural objective must be one of {NEURAL_OBJECTIVES}")
+    if objective == "soft_spearman":
+        if temperature is None:
+            raise ValueError("soft_spearman requires a soft-rank temperature")
+        return objective, validate_soft_rank_temperature(temperature)
+    if temperature is not None:
+        raise ValueError("rank_huber does not accept a soft-rank temperature")
+    return objective, None
+
+
+def objective_metadata(objective: str, temperature: float | None) -> dict[str, object]:
+    objective, temperature = validate_neural_objective(objective, temperature)
+    if objective == "soft_spearman":
+        return {
+            "name": objective,
+            "temperature": temperature,
+            "score_standardization": "masked_cross_sectional",
+            "soft_rank": "pairwise_sigmoid",
+            "aggregation": "equal_valid_cross_section_horizon",
+            "reported_validation_metric": "hard_spearman",
+        }
     return {
-        "name": "soft_spearman",
-        "temperature": validate_soft_rank_temperature(temperature),
-        "score_standardization": "masked_cross_sectional",
-        "soft_rank": "pairwise_sigmoid",
-        "aggregation": "equal_valid_cross_section_horizon",
+        "name": objective,
+        "temperature": None,
+        "delta": HUBER_DELTA,
+        "target": "centered_cross_sectional_midrank",
+        "aggregation": "equal_valid_sample_then_horizon_then_equity",
         "reported_validation_metric": "hard_spearman",
     }
 
@@ -448,6 +474,78 @@ def soft_spearman_loss(
     return loss_sum / group_count.clamp_min(1)
 
 
+def _rank_huber_sample_losses(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    label_mask: torch.Tensor,
+    delta: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    difference = predictions.float() - targets.float()
+    absolute = difference.abs()
+    elementwise = torch.where(
+        absolute <= delta,
+        0.5 * difference.square(),
+        delta * (absolute - 0.5 * delta),
+    )
+    mask = label_mask.bool()
+    label_counts = mask.sum(dim=1)
+    valid_horizons = label_counts > 0
+    horizon_loss = (elementwise * mask).sum(dim=1) / label_counts.clamp_min(1)
+    valid_horizon_counts = valid_horizons.sum(dim=1)
+    valid_samples = valid_horizon_counts > 0
+    sample_loss = (horizon_loss * valid_horizons).sum(
+        dim=1
+    ) / valid_horizon_counts.clamp_min(1)
+    return sample_loss, valid_samples
+
+
+def _rank_huber_loss_sum(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    label_mask: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    sample_loss, valid_samples = _rank_huber_sample_losses(
+        predictions, targets, label_mask, HUBER_DELTA
+    )
+    return sample_loss[valid_samples].sum(), valid_samples.sum()
+
+
+def rank_huber_loss(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    label_mask: torch.Tensor,
+) -> torch.Tensor:
+    loss_sum, sample_count = _rank_huber_loss_sum(predictions, targets, label_mask)
+    return loss_sum / sample_count.clamp_min(1)
+
+
+def _objective_loss_sum(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    label_mask: torch.Tensor,
+    objective: str,
+    temperature: float | None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    objective, temperature = validate_neural_objective(objective, temperature)
+    if objective == "soft_spearman":
+        assert temperature is not None
+        return _soft_spearman_loss_sum(predictions, targets, label_mask, temperature)
+    return _rank_huber_loss_sum(predictions, targets, label_mask)
+
+
+def objective_loss(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    label_mask: torch.Tensor,
+    objective: str,
+    temperature: float | None,
+) -> torch.Tensor:
+    loss_sum, loss_count = _objective_loss_sum(
+        predictions, targets, label_mask, objective, temperature
+    )
+    return loss_sum / loss_count.clamp_min(1)
+
+
 def _to_cuda(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     model_keys = (
         ("tabular_features", "equity_mask")
@@ -493,7 +591,8 @@ def qualify_eager_compiled_model(
     cpu_batch: dict[str, torch.Tensor],
     *,
     include_backward: bool,
-    temperature: float,
+    objective: str,
+    temperature: float | None,
 ) -> CompileParityReport:
     eager_parameters = tuple(eager_model.named_parameters())
     compiled_parameters = tuple(compiled_model.named_parameters())
@@ -519,8 +618,12 @@ def qualify_eager_compiled_model(
         with torch.enable_grad() if include_backward else torch.no_grad():
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 eager_predictions = _predict(eager_model, batch)
-            eager_loss = soft_spearman_loss(
-                eager_predictions, batch["targets"], batch["label_mask"], temperature
+            eager_loss = objective_loss(
+                eager_predictions,
+                batch["targets"],
+                batch["label_mask"],
+                objective,
+                temperature,
             )
         if include_backward:
             eager_loss.backward()
@@ -533,8 +636,12 @@ def qualify_eager_compiled_model(
         with torch.enable_grad() if include_backward else torch.no_grad():
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 compiled_predictions = _predict(compiled_model, batch)
-            compiled_loss = soft_spearman_loss(
-                compiled_predictions, batch["targets"], batch["label_mask"], temperature
+            compiled_loss = objective_loss(
+                compiled_predictions,
+                batch["targets"],
+                batch["label_mask"],
+                objective,
+                temperature,
             )
         if include_backward:
             compiled_loss.backward()
@@ -581,7 +688,10 @@ def build_compile_metadata(
 
 
 def _timed_training_warmup_pass(
-    model: nn.Module, batch: dict[str, torch.Tensor], temperature: float
+    model: nn.Module,
+    batch: dict[str, torch.Tensor],
+    objective: str,
+    temperature: float | None,
 ) -> float:
     model.zero_grad(set_to_none=True)
     try:
@@ -589,8 +699,12 @@ def _timed_training_warmup_pass(
         started = time.perf_counter()
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             predictions = _predict(model, batch)
-        loss = soft_spearman_loss(
-            predictions, batch["targets"], batch["label_mask"], temperature
+        loss = objective_loss(
+            predictions,
+            batch["targets"],
+            batch["label_mask"],
+            objective,
+            temperature,
         )
         loss.backward()
         torch.cuda.synchronize()
@@ -626,14 +740,15 @@ def warmup_compiled_model(
     model: nn.Module,
     training_batch: dict[str, torch.Tensor],
     evaluation_batch: dict[str, torch.Tensor],
-    temperature: float,
+    objective: str,
+    temperature: float | None,
 ) -> CompileWarmupReport:
     torch.cuda.reset_peak_memory_stats()
     training_cuda = _to_cuda(training_batch)
     evaluation_cuda = _to_cuda(evaluation_batch)
     model.train()
     training_pass_seconds = tuple(
-        _timed_training_warmup_pass(model, training_cuda, temperature)
+        _timed_training_warmup_pass(model, training_cuda, objective, temperature)
         for _ in range(COMPILE_WARMUP_PASS_COUNT)
     )
     model.eval()
@@ -696,9 +811,16 @@ def _optimizer_update(
         optimizer.zero_grad(set_to_none=True)
 
 
-def _valid_group_count(effective_batch: list[dict[str, torch.Tensor]]) -> int:
+def _objective_loss_count(
+    effective_batch: list[dict[str, torch.Tensor]], objective: str
+) -> int:
+    if objective == "soft_spearman":
+        return sum(
+            int((batch["label_mask"].sum(dim=1) >= 2).sum())
+            for batch in effective_batch
+        )
     return sum(
-        int((batch["label_mask"].sum(dim=1) >= 2).sum()) for batch in effective_batch
+        int(batch["label_mask"].any(dim=(1, 2)).sum()) for batch in effective_batch
     )
 
 
@@ -742,11 +864,12 @@ def _host_floats(*values: torch.Tensor) -> tuple[float, ...]:
     return tuple(float(value) for value in scalars)
 
 
-def _accumulate_group_gradients(
+def _accumulate_objective_gradients(
     model: nn.Module,
     effective_batch: list[dict[str, torch.Tensor]],
-    temperature: float,
-    group_count: int,
+    objective: str,
+    temperature: float | None,
+    loss_count: int,
     *,
     check_predictions_finite: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
@@ -762,10 +885,11 @@ def _accumulate_group_gradients(
         batch = _to_cuda(buffered_batch)
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             predictions = _predict(model, batch)
-        microbatch_loss_sum, _ = _soft_spearman_loss_sum(
+        microbatch_loss_sum, _ = _objective_loss_sum(
             predictions,
             batch["targets"],
             batch["label_mask"],
+            objective,
             temperature,
         )
         detached_loss = microbatch_loss_sum.detach()
@@ -773,7 +897,7 @@ def _accumulate_group_gradients(
         losses_finite = losses_finite & torch.isfinite(detached_loss)
         if predictions_finite is not None:
             predictions_finite = predictions_finite & torch.isfinite(predictions).all()
-        (microbatch_loss_sum / group_count).backward()
+        (microbatch_loss_sum / loss_count).backward()
     gradients_finite = _tensors_finite(
         (
             parameter.grad
@@ -784,9 +908,9 @@ def _accumulate_group_gradients(
     )
     loss_ok, gradients_ok = _host_flags(losses_finite, gradients_finite)
     if not loss_ok:
-        raise FloatingPointError("Differentiable Spearman loss is non-finite")
+        raise FloatingPointError("Training objective loss is non-finite")
     if not gradients_ok:
-        raise FloatingPointError("Differentiable Spearman gradients are non-finite")
+        raise FloatingPointError("Training objective gradients are non-finite")
     return loss_sum, predictions_finite
 
 
@@ -854,16 +978,18 @@ def _run_adamw_update(
     effective_batch: list[dict[str, torch.Tensor]],
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
-    temperature: float,
-    group_count: int,
+    objective: str,
+    temperature: float | None,
+    loss_count: int,
     check_predictions_finite: bool,
 ) -> dict[str, float | int | bool | None]:
     optimizer.zero_grad(set_to_none=True)
-    loss_sum, predictions_finite = _accumulate_group_gradients(
+    loss_sum, predictions_finite = _accumulate_objective_gradients(
         model,
         effective_batch,
+        objective,
         temperature,
-        group_count,
+        loss_count,
         check_predictions_finite=check_predictions_finite,
     )
     gradient_norm = _optimizer_update(model, optimizer, scheduler)
@@ -873,7 +999,7 @@ def _run_adamw_update(
     diagnostics = _host_floats(*diagnostic_tensors)
     return {
         "loss_sum": diagnostics[0],
-        "group_count": group_count,
+        "loss_count": loss_count,
         "gradient_norm": diagnostics[1],
         "first_pass_gradient_norm": None,
         "perturbation_norm": None,
@@ -892,9 +1018,10 @@ def _run_sam_update(
     effective_batch: list[dict[str, torch.Tensor]],
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
-    temperature: float,
+    objective: str,
+    temperature: float | None,
     rho: float,
-    group_count: int,
+    loss_count: int,
     check_predictions_finite: bool,
 ) -> dict[str, float | int | bool | None]:
     rho = validate_sam_rho(rho)
@@ -904,11 +1031,12 @@ def _run_sam_update(
     rng_state = _rng_state(model)
     optimizer.zero_grad(set_to_none=True)
     try:
-        first_loss_sum, first_predictions_finite = _accumulate_group_gradients(
+        first_loss_sum, first_predictions_finite = _accumulate_objective_gradients(
             model,
             effective_batch,
+            objective,
             temperature,
-            group_count,
+            loss_count,
             check_predictions_finite=check_predictions_finite,
         )
         first_pass_end_rng = _rng_state(model)
@@ -931,12 +1059,15 @@ def _run_sam_update(
         optimizer.zero_grad(set_to_none=True)
         _restore_rng_state(model, rng_state)
         try:
-            second_loss_sum, second_predictions_finite = _accumulate_group_gradients(
-                model,
-                effective_batch,
-                temperature,
-                group_count,
-                check_predictions_finite=check_predictions_finite,
+            second_loss_sum, second_predictions_finite = (
+                _accumulate_objective_gradients(
+                    model,
+                    effective_batch,
+                    objective,
+                    temperature,
+                    loss_count,
+                    check_predictions_finite=check_predictions_finite,
+                )
             )
             second_pass_end_rng = _rng_state(model)
         finally:
@@ -978,7 +1109,7 @@ def _run_sam_update(
         return {
             "loss_sum": diagnostics[0],
             "second_loss_sum": diagnostics[1],
-            "group_count": group_count,
+            "loss_count": loss_count,
             "gradient_norm": diagnostics[2],
             "first_pass_gradient_norm": diagnostics[3],
             "perturbation_norm": diagnostics[4],
@@ -1003,7 +1134,8 @@ def run_effective_batch_update(
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
     runtime: RuntimeSettings,
     optimizer_variant: str,
-    temperature: float,
+    objective: str,
+    temperature: float | None,
     sam_rho: float | None,
     *,
     check_predictions_finite: bool = False,
@@ -1013,19 +1145,20 @@ def run_effective_batch_update(
             f"Effective batch requires exactly {runtime.accumulation_steps} "
             "physical microbatches"
         )
-    validate_soft_rank_temperature(temperature)
+    objective_metadata(objective, temperature)
     sam_metadata(optimizer_variant, sam_rho)
-    group_count = _valid_group_count(effective_batch)
-    if group_count == 0:
-        raise ValueError("Effective batch contains no valid cross-section/horizon")
+    loss_count = _objective_loss_count(effective_batch, objective)
+    if loss_count == 0:
+        raise ValueError("Effective batch contains no valid objective unit")
     if optimizer_variant == "adamw":
         return _run_adamw_update(
             model,
             effective_batch,
             optimizer,
             scheduler,
+            objective,
             temperature,
-            group_count,
+            loss_count,
             check_predictions_finite,
         )
     assert sam_rho is not None
@@ -1034,9 +1167,10 @@ def run_effective_batch_update(
         effective_batch,
         optimizer,
         scheduler,
+        objective,
         temperature,
         sam_rho,
-        group_count,
+        loss_count,
         check_predictions_finite,
     )
 
@@ -1048,13 +1182,18 @@ def train_one_epoch(
     scheduler: torch.optim.lr_scheduler.LRScheduler,
     runtime: RuntimeSettings,
     optimizer_variant: str,
-    temperature: float,
+    objective: str,
+    temperature: float | None,
     sam_rho: float | None,
 ) -> dict[str, float | int | bool | None]:
+    if not isinstance(loader, Sized):
+        raise TypeError("Training loader must expose its physical microbatch count")
+    if len(loader) % runtime.accumulation_steps:
+        raise ValueError("Training epoch would end inside an effective batch")
     model.train()
     optimizer.zero_grad(set_to_none=True)
     loss_sum = 0.0
-    group_count = 0
+    loss_count = 0
     optimizer_steps = 0
     gradient_norms: list[float] = []
     first_gradient_norms: list[float] = []
@@ -1074,11 +1213,12 @@ def train_one_epoch(
             scheduler,
             runtime,
             optimizer_variant,
+            objective,
             temperature,
             sam_rho,
         )
         loss_sum += float(update["loss_sum"])
-        group_count += int(update["group_count"])
+        loss_count += int(update["loss_count"])
         optimizer_steps += 1
         backward_passes += int(update["backward_passes"])
         gradient_norms.append(float(update["gradient_norm"]))
@@ -1090,12 +1230,12 @@ def train_one_epoch(
 
     if effective_batch:
         raise ValueError("Training epoch ended inside an effective batch")
-    if group_count == 0:
-        raise ValueError("Training epoch contains no valid loss group")
+    if loss_count == 0:
+        raise ValueError("Training epoch contains no valid objective unit")
     return {
         "optimizer_steps": optimizer_steps,
         "backward_passes": backward_passes,
-        "train_loss": loss_sum / group_count,
+        "train_objective_loss": loss_sum / loss_count,
         "mean_gradient_norm": float(np.mean(gradient_norms)),
         "maximum_gradient_norm": float(np.max(gradient_norms)),
         "mean_first_pass_sam_gradient_norm": (
@@ -1136,11 +1276,13 @@ def _filter_evaluation_rows(
 def evaluate_model(
     model: nn.Module,
     loader: Iterable[dict[str, torch.Tensor]],
-    temperature: float,
+    objective: str,
+    temperature: float | None,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
+    objective_metadata(objective, temperature)
     model.eval()
     total_loss = 0.0
-    valid_group_count = 0
+    total_loss_count = 0
     collected: dict[str, list[np.ndarray]] = {
         key: []
         for key in (
@@ -1156,19 +1298,17 @@ def evaluate_model(
         for cpu_batch in loader:
             batch = _to_cuda(cpu_batch)
             valid_count = int(cpu_batch["sample_valid_mask"].sum())
-            group_count = int(
-                (cpu_batch["label_mask"][:valid_count].sum(dim=1) >= 2).sum()
-            )
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 predictions = _predict(model, batch)
-            loss_sum, _ = _soft_spearman_loss_sum(
+            loss_sum, loss_count = _objective_loss_sum(
                 predictions[:valid_count],
                 batch["targets"][:valid_count],
                 batch["label_mask"][:valid_count],
+                objective,
                 temperature,
             )
             total_loss += float(loss_sum)
-            valid_group_count += group_count
+            total_loss_count += int(loss_count)
             valid_arrays = _filter_evaluation_rows(predictions, cpu_batch)
             for key, values in valid_arrays.items():
                 collected[key].append(values)
@@ -1182,9 +1322,10 @@ def evaluate_model(
         arrays["date_idx"],
         arrays["decision_idx"],
     )
-    if valid_group_count == 0:
-        raise ValueError("Evaluation split contains no valid loss group")
-    summary["soft_spearman_loss"] = total_loss / valid_group_count
+    if total_loss_count == 0:
+        raise ValueError("Evaluation split contains no valid objective unit")
+    summary["objective"] = objective_metadata(objective, temperature)
+    summary["objective_loss"] = total_loss / total_loss_count
     return summary, daily_rows
 
 
@@ -1196,7 +1337,8 @@ def checkpoint_payload(
     architecture: NeuralArchitecture,
     tcn_settings: TCNSettings | None,
     optimizer_variant: str,
-    temperature: float,
+    objective: str,
+    temperature: float | None,
     sam_rho: float | None,
     seed: int,
     epoch: int,
@@ -1210,7 +1352,7 @@ def checkpoint_payload(
     return {
         "model_name": model_name,
         "optimizer_variant": optimizer_variant,
-        "objective": objective_metadata(temperature),
+        "objective": objective_metadata(objective, temperature),
         "sam": sam_metadata(optimizer_variant, sam_rho),
         "seed": seed,
         "epoch": epoch,

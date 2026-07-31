@@ -329,8 +329,14 @@ def test_compile_parity_forward_only_has_null_gradient_fields() -> None:
         assert getattr(report, field) is None
 
 
+@pytest.mark.parametrize(
+    ("objective", "temperature"),
+    (("soft_spearman", 0.1), ("rank_huber", None)),
+)
 def test_compile_qualification_uses_requested_grad_mode(
     monkeypatch: pytest.MonkeyPatch,
+    objective: str,
+    temperature: float | None,
 ) -> None:
     eager_model = nn.Linear(1, 1, bias=False)
     compiled_model = copy.deepcopy(eager_model)
@@ -357,7 +363,8 @@ def test_compile_qualification_uses_requested_grad_mode(
             compiled_model,
             batch,
             include_backward=True,
-            temperature=0.1,
+            objective=objective,
+            temperature=temperature,
         )
     assert forward_backward.mode == "forward_backward"
     assert grad_modes == [True, True]
@@ -369,7 +376,8 @@ def test_compile_qualification_uses_requested_grad_mode(
             compiled_model,
             batch,
             include_backward=False,
-            temperature=0.1,
+            objective=objective,
+            temperature=temperature,
         )
     assert grad_modes == [False, False]
     assert forward_only.mode == "forward_only"
@@ -609,7 +617,8 @@ def _matching_run_identity(
     *,
     model_name: str = "tcn",
     optimizer_variant: str = "adamw",
-    temperature: float = 0.1,
+    objective: str = "soft_spearman",
+    temperature: float | None = 0.1,
     sam_rho: float | None = None,
 ) -> dict[str, object]:
     return {
@@ -619,7 +628,7 @@ def _matching_run_identity(
             _tcn_settings(model_name),
         ),
         "optimizer_variant": optimizer_variant,
-        "objective": objective_metadata(temperature),
+        "objective": objective_metadata(objective, temperature),
         "sam": sam_metadata(optimizer_variant, sam_rho),
         "seed": 11,
         "resolved_feature_store_path": str(feature_store),
@@ -638,7 +647,7 @@ def test_evaluation_identity_accepts_every_model_architecture(
 
 @pytest.mark.parametrize(
     ("optimizer_variant", "sam_rho"),
-    (("adamw", None), ("sam_adamw", 0.02)),
+    (("adamw", None), ("sam_adamw", 0.025)),
 )
 def test_evaluation_identity_accepts_optimizer_metadata(
     optimizer_variant: str,
@@ -649,6 +658,21 @@ def test_evaluation_identity_accepts_optimizer_metadata(
         tmp_path.resolve(),
         optimizer_variant=optimizer_variant,
         sam_rho=sam_rho,
+    )
+    _validate_run_checkpoint_identity(manifest, dict(manifest), tmp_path.resolve())
+
+
+@pytest.mark.parametrize(
+    ("objective", "temperature"),
+    (("soft_spearman", 0.1), ("rank_huber", None)),
+)
+def test_evaluation_identity_accepts_objective_metadata(
+    objective: str,
+    temperature: float | None,
+    tmp_path: Path,
+) -> None:
+    manifest = _matching_run_identity(
+        tmp_path.resolve(), objective=objective, temperature=temperature
     )
     _validate_run_checkpoint_identity(manifest, dict(manifest), tmp_path.resolve())
 
@@ -687,7 +711,7 @@ def test_evaluation_identity_rejects_internal_objective_and_optimizer_conflicts(
         )
 
     manifest = _matching_run_identity(tmp_path.resolve())
-    manifest["sam"] = sam_metadata("sam_adamw", 0.02)
+    manifest["sam"] = sam_metadata("sam_adamw", 0.025)
     with pytest.raises(ValueError, match="SAM rho"):
         _validate_run_checkpoint_identity(
             manifest, copy.deepcopy(manifest), tmp_path.resolve()
@@ -760,13 +784,18 @@ def test_evaluation_identity_rejects_each_tcn_setting_mismatch(
         )
 
 
-def _history_row(*, sam: bool) -> dict[str, object]:
+def _history_row(*, sam: bool, objective: str = "soft_spearman") -> dict[str, object]:
     return {
         "epoch": 3,
+        "objective": objective,
+        "soft_rank_temperature": 0.1 if objective == "soft_spearman" else None,
+        "optimizer": "sam_adamw" if sam else "adamw",
+        "rho": 0.025 if sam else None,
+        "seed": 11,
         "optimizer_steps": 62,
         "backward_passes": 992 if sam else 496,
-        "train_loss": 0.8125,
-        "validation_soft_spearman_loss": 0.75,
+        "train_objective_loss": 0.8125,
+        "validation_objective_loss": 0.75,
         "validation_primary_ic": 0.031,
         "validation_ic_30": 0.021,
         "validation_ic_60": 0.032,
@@ -774,7 +803,7 @@ def _history_row(*, sam: bool) -> dict[str, object]:
         "mean_gradient_norm": 0.42,
         "maximum_gradient_norm": 0.91,
         "mean_first_pass_sam_gradient_norm": 0.33 if sam else None,
-        "mean_sam_perturbation_norm": 0.02 if sam else None,
+        "mean_sam_perturbation_norm": 0.025 if sam else None,
         "mean_second_pass_sam_gradient_norm": 0.37 if sam else None,
         "all_finite": True,
         "adamw_lr": 0.0003,
@@ -785,12 +814,13 @@ def _history_row(*, sam: bool) -> dict[str, object]:
 
 
 @pytest.mark.parametrize("sam", (False, True), ids=("adamw", "sam_adamw"))
+@pytest.mark.parametrize("objective", ("soft_spearman", "rank_huber"))
 def test_atomic_history_round_trip_exact_schema_and_no_temporary_file(
-    tmp_path: Path, sam: bool
+    tmp_path: Path, sam: bool, objective: str
 ) -> None:
     output = tmp_path / "history.csv"
     output.write_text("stale\n", encoding="utf-8")
-    expected = _history_row(sam=sam)
+    expected = _history_row(sam=sam, objective=objective)
 
     _atomic_write_history(output, [expected])
 
@@ -810,7 +840,7 @@ def test_atomic_history_rejects_unexpected_fields_without_replacing_output(
     output = tmp_path / "history.csv"
     original = "existing-history\n"
     output.write_text(original, encoding="utf-8")
-    row = {**_history_row(sam=False), "optimizer_variant": "adamw"}
+    row = {**_history_row(sam=False), "unexpected": "field"}
 
     with pytest.raises(ValueError, match="fields not in fieldnames"):
         _atomic_write_history(output, [row])
@@ -931,6 +961,7 @@ def test_checkpoint_round_trip_eager(model_name: str, tmp_path: Path) -> None:
         _architecture(model_name),
         _tcn_settings(model_name),
         "adamw",
+        "soft_spearman",
         0.1,
         None,
         11,
@@ -970,6 +1001,7 @@ def test_selected_tcn_checkpoint_round_trip_and_identity(
         architecture,
         settings,
         "adamw",
+        "soft_spearman",
         0.1,
         None,
         11,
@@ -981,7 +1013,7 @@ def test_selected_tcn_checkpoint_round_trip_and_identity(
     manifest = {
         **_model_metadata("tcn", architecture, settings),
         "optimizer_variant": "adamw",
-        "objective": objective_metadata(0.1),
+        "objective": objective_metadata("soft_spearman", 0.1),
         "sam": sam_metadata("adamw", None),
         "seed": 11,
         "resolved_feature_store_path": str(tmp_path),
