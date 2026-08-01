@@ -128,6 +128,7 @@ TCN_RECEPTIVE_FIELDS: Mapping[str, tuple[int, ...]] = MappingProxyType(
         "medium": (1, 2, 2, 2, 4, 4),
         "long": (1, 2, 4, 4, 4, 8),
         "full": (1, 2, 4, 8, 16, 32),
+        "matched_full": (1, 2, 4, 8, 8, 12),
     }
 )
 TCN_SWIGLU_HIDDEN_WIDTHS: Mapping[int, int] = MappingProxyType(

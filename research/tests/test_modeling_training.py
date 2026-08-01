@@ -37,7 +37,6 @@ from brazil_rv.modeling.contract import (
     CompileParityThresholds,
     CompileSetupReport,
     EFFECTIVE_BATCH_SIZE,
-    TCN_BLOCK_VARIANTS,
     EQUITY_COUNT,
     FINAL_LR_FACTOR,
     MAX_EPOCHS,
@@ -57,6 +56,7 @@ from brazil_rv.modeling.contract import (
     architecture_for_model,
 )
 from brazil_rv.modeling.evaluate import (
+    _architecture_from_identity,
     _validate_run_checkpoint_identity,
     _validate_xgboost_identity,
 )
@@ -863,7 +863,7 @@ def test_atomic_json_write_replaces_final_without_temporary_file(
     (
         ("fusion", "none"),
         ("width", 64),
-        ("receptive_field", "short"),
+        ("receptive_field", "matched_full"),
         ("block", "silu"),
     ),
 )
@@ -881,6 +881,33 @@ def test_evaluation_identity_rejects_each_tcn_setting_mismatch(
         _validate_run_checkpoint_identity(
             manifest, copy.deepcopy(manifest), tmp_path.resolve()
         )
+
+
+@pytest.mark.parametrize(
+    ("settings_receptive_field", "architecture_receptive_field"),
+    (("full", "matched_full"), ("matched_full", "full")),
+)
+def test_evaluation_identity_rejects_full_matched_full_crosswire(
+    settings_receptive_field: str,
+    architecture_receptive_field: str,
+    tmp_path: Path,
+) -> None:
+    settings = TCNSettings("context_pooled", 128, settings_receptive_field, "gelu")
+    architecture = architecture_for_model(
+        "tcn",
+        TCNSettings("context_pooled", 128, architecture_receptive_field, "gelu"),
+    )
+    identity = {
+        **_model_metadata("tcn", architecture, settings),
+        "optimizer_variant": "adamw",
+        "objective": objective_metadata("soft_spearman", 0.1),
+        "sam": sam_metadata("adamw", None),
+        "seed": 11,
+        "resolved_feature_store_path": str(tmp_path),
+        "git_commit_sha": "test-sha",
+    }
+    with pytest.raises(ValueError, match="architecture metadata"):
+        _validate_run_checkpoint_identity(identity, dict(identity), tmp_path.resolve())
 
 
 def _history_row(*, sam: bool, objective: str = "soft_spearman") -> dict[str, object]:
@@ -1082,11 +1109,18 @@ def test_checkpoint_round_trip_eager(model_name: str, tmp_path: Path) -> None:
         )
 
 
-@pytest.mark.parametrize("block", TCN_BLOCK_VARIANTS)
+@pytest.mark.parametrize(
+    "settings",
+    (
+        TCNSettings("pooled_market", 192, "long", "gelu"),
+        TCNSettings("pooled_market", 192, "long", "silu"),
+        TCNSettings("pooled_market", 192, "long", "swiglu"),
+        TCNSettings("context_pooled", 128, "matched_full", "gelu"),
+    ),
+)
 def test_selected_tcn_checkpoint_round_trip_and_identity(
-    tmp_path: Path, block: str
+    tmp_path: Path, settings: TCNSettings
 ) -> None:
-    settings = TCNSettings("pooled_market", 192, "long", block)
     architecture = architecture_for_model("tcn", settings)
     torch.manual_seed(31)
     model = build_neural_model("tcn", architecture)
@@ -1126,6 +1160,7 @@ def test_selected_tcn_checkpoint_round_trip_and_identity(
     checkpoint_path = tmp_path / "selected.pt"
     torch.save(payload, checkpoint_path)
     loaded = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    assert _architecture_from_identity(loaded) == architecture
     restored = build_neural_model("tcn", architecture)
     restored.load_state_dict(loaded["model_state_dict"])
     for name, parameter in model.state_dict().items():
