@@ -107,12 +107,15 @@ def test_tcn_public_setting_and_receptive_field_contract() -> None:
         "medium": (1, 2, 2, 2, 4, 4),
         "long": (1, 2, 4, 4, 4, 8),
         "full": (1, 2, 4, 8, 16, 32),
+        "matched_full": (1, 2, 4, 8, 8, 12),
     }
+    assert len(LEGAL_SETTINGS) == 240
     for receptive_field, theoretical_patches in (
         ("short", 15),
         ("medium", 31),
         ("long", 47),
         ("full", 127),
+        ("matched_full", 71),
     ):
         architecture = resolve_tcn_architecture(
             TCNSettings("context_only", 64, receptive_field, "gelu")
@@ -140,6 +143,29 @@ def test_tcn_public_setting_and_receptive_field_contract() -> None:
         architecture = resolve_tcn_architecture(TCNSettings(fusion, 64, "full", "gelu"))
         assert architecture.maximum_effective_context_receptive_field_patches is None
         assert architecture.maximum_effective_context_receptive_field_minutes is None
+
+
+def test_matched_full_exact_history_and_full_parameter_equivalence() -> None:
+    settings = TCNSettings("context_pooled", 128, "matched_full", "gelu")
+    architecture = resolve_tcn_architecture(settings)
+    assert architecture.dilations == (1, 2, 4, 8, 8, 12)
+    assert architecture.residual_blocks == 6
+    assert architecture.kernel_size == 3
+    assert architecture.theoretical_receptive_field_patches == 71
+    assert architecture.theoretical_receptive_field_minutes == 355
+    assert architecture.maximum_effective_equity_receptive_field_patches == 57
+    assert architecture.maximum_effective_equity_receptive_field_minutes == 285
+    assert architecture.maximum_effective_context_receptive_field_patches == 69
+    assert architecture.maximum_effective_context_receptive_field_minutes == 345
+
+    full_settings = TCNSettings("context_pooled", 128, "full", "gelu")
+    full_architecture = resolve_tcn_architecture(full_settings)
+    matched_count = count_trainable_parameters(_model(settings))
+    full_count = count_trainable_parameters(_model(full_settings))
+    assert matched_count == full_count == 777_987
+    assert matched_count == expected_trainable_parameter_count("tcn", architecture)
+    assert full_count == expected_trainable_parameter_count("tcn", full_architecture)
+    assert BASELINE_TCN_SETTINGS == full_settings
 
 
 @pytest.mark.parametrize(
@@ -428,6 +454,7 @@ def test_baseline_tcn_state_layout_count_and_seed_reproducibility() -> None:
         TCNSettings("none", 64, "short", "gelu"),
         TCNSettings("context_only", 128, "medium", "silu"),
         TCNSettings("pooled_market", 192, "long", "swiglu"),
+        TCNSettings("context_pooled", 128, "matched_full", "gelu"),
     ),
 )
 def test_selected_tcn_state_dict_round_trip(settings: TCNSettings) -> None:
@@ -471,6 +498,26 @@ def test_run_names_and_manifests_distinguish_all_tcn_settings() -> None:
         )
     assert len(set(names)) == len(LEGAL_SETTINGS)
     assert len(set(identities)) == len(LEGAL_SETTINGS)
+
+    settings = TCNSettings("context_pooled", 128, "matched_full", "gelu")
+    architecture = resolve_tcn_architecture(settings)
+    name = train._run_directory_name(
+        "tcn",
+        settings,
+        "adamw",
+        "soft_spearman",
+        0.1,
+        None,
+        11,
+        created_at,
+    )
+    assert "_rfmatched_full_" in name
+    metadata = json.loads(
+        json.dumps(train._model_metadata("tcn", architecture, settings))
+    )
+    assert metadata["tcn_settings"]["receptive_field"] == "matched_full"
+    assert metadata["architecture_constants"]["receptive_field"] == "matched_full"
+    assert metadata["architecture_constants"]["dilations"] == [1, 2, 4, 8, 8, 12]
 
 
 def _tcn_cli(settings: TCNSettings) -> list[str]:
