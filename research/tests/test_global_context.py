@@ -462,6 +462,83 @@ def test_resume_estimates_and_downloads_only_unfinished_requests(
     )
 
 
+def test_exact_interrupted_partial_is_cleaned_and_request_resumes(
+    tmp_path: Path,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = request_plan(request, tmp_path, ("ES.v.0",))
+    partial = global_source_module._request_partial_path(plan[0])
+    partial.parent.mkdir(parents=True)
+    partial.write_bytes(b"interrupted")
+    client = _FakeHistorical()
+
+    completed = download_history(
+        client,
+        request,
+        tmp_path,
+        confirmed_paid_download=True,
+        symbols=("ES.v.0",),
+    )
+
+    assert completed == plan
+    assert not partial.exists()
+    assert len(client.metadata.calls) == len(plan)
+    assert len(client.timeseries.calls) == len(plan)
+    assert (tmp_path / "manifest.json").is_file()
+
+
+def test_stale_partial_beside_completed_request_does_not_redownload(
+    tmp_path: Path,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = _fake_acquisition(tmp_path, request)
+    partial = global_source_module._request_partial_path(plan[0])
+    partial.write_bytes(b"stale")
+    client = _FakeHistorical()
+
+    download_history(
+        client,
+        request,
+        tmp_path,
+        confirmed_paid_download=True,
+        symbols=("ES.v.0",),
+    )
+
+    assert not partial.exists()
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
+@pytest.mark.parametrize("issue", ("arbitrary", "malformed"))
+def test_unplanned_or_malformed_partial_remains_a_hard_error(
+    tmp_path: Path,
+    issue: str,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = request_plan(request, tmp_path, ("ES.v.0",))
+    if issue == "arbitrary":
+        partial = tmp_path / "bars" / "unknown.dbn.zst.partial"
+        partial.parent.mkdir(parents=True)
+        partial.write_bytes(b"unexpected")
+    else:
+        partial = global_source_module._request_partial_path(plan[0])
+        partial.mkdir(parents=True)
+    client = _FakeHistorical()
+
+    with pytest.raises(ValueError, match="partial artifact"):
+        download_history(
+            client,
+            request,
+            tmp_path,
+            confirmed_paid_download=True,
+            symbols=("ES.v.0",),
+        )
+
+    assert partial.exists()
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
 @pytest.mark.parametrize(
     "issue",
     ("missing", "extra", "duplicate", "gap", "overlap", "hash", "descriptor"),

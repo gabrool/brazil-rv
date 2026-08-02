@@ -5,7 +5,8 @@ import hashlib
 import json
 import os
 import shutil
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 from datetime import UTC, date, datetime, timedelta
@@ -255,9 +256,32 @@ def _validate_planned_files(
         raise ValueError("Expected Databento request artifacts are missing")
 
 
+def _request_partial_path(request: HistoricalRequest) -> Path:
+    return request.data_path.with_suffix(f"{request.data_path.suffix}.partial")
+
+
+def _remove_stale_planned_partials(
+    raw_dir: Path, plan: Sequence[HistoricalRequest]
+) -> None:
+    expected = {_request_partial_path(request).absolute() for request in plan}
+    actual = {
+        path.absolute()
+        for directory in ("requests", "bars", "definitions")
+        for path in (raw_dir / directory).rglob("*.partial")
+    }
+    if actual - expected:
+        raise ValueError("Unexpected Databento partial artifact exists")
+    partials = tuple(_request_partial_path(request) for request in plan)
+    if any(path.exists() and not path.is_file() for path in partials):
+        raise ValueError("Malformed Databento partial artifact exists")
+    for path in partials:
+        path.unlink(missing_ok=True)
+
+
 def remaining_requests(
     raw_dir: Path, plan: Sequence[HistoricalRequest]
 ) -> tuple[HistoricalRequest, ...]:
+    _remove_stale_planned_partials(raw_dir, plan)
     _validate_planned_files(raw_dir, plan, complete=False)
     return tuple(request for request in plan if not _completed_request(request))
 
@@ -279,7 +303,7 @@ def _download_request(
 ) -> None:
     for path in (request.data_path, request.descriptor_path):
         path.parent.mkdir(parents=True, exist_ok=True)
-    partial = request.data_path.with_suffix(f"{request.data_path.suffix}.partial")
+    partial = _request_partial_path(request)
     partial.unlink(missing_ok=True)
     try:
         client.timeseries.get_range(
@@ -303,6 +327,37 @@ def _download_request(
     _atomic_json(request.descriptor_path, descriptor)
 
 
+@contextmanager
+def _acquisition_lock(raw_dir: Path) -> Iterator[None]:
+    raw_dir.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = raw_dir.parent / f".{raw_dir.name}.acquisition.lock"
+    with lock_path.open("a+b") as lock:
+        lock.seek(0, os.SEEK_END)
+        if lock.tell() == 0:
+            lock.write(b"\0")
+            lock.flush()
+        lock.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise RuntimeError("Databento acquisition is already active") from None
+        try:
+            yield
+        finally:
+            lock.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
 def download_history(
     client: HistoricalClient,
     request: RequestRange,
@@ -311,40 +366,41 @@ def download_history(
     confirmed_paid_download: bool,
     symbols: Sequence[str] = GLOBAL_CONTEXT_SYMBOLS,
 ) -> tuple[HistoricalRequest, ...]:
-    plan = request_plan(request, raw_dir, symbols)
-    remaining = remaining_requests(raw_dir, plan)
-    estimate = estimate_cost(client, remaining)
-    print(json.dumps(estimate))
-    if remaining and not confirmed_paid_download:
-        raise RuntimeError(
-            "Re-run with --confirm-paid-download after reviewing the estimate"
+    with _acquisition_lock(raw_dir):
+        plan = request_plan(request, raw_dir, symbols)
+        remaining = remaining_requests(raw_dir, plan)
+        estimate = estimate_cost(client, remaining)
+        print(json.dumps(estimate))
+        if remaining and not confirmed_paid_download:
+            raise RuntimeError(
+                "Re-run with --confirm-paid-download after reviewing the estimate"
+            )
+        for planned_request in remaining:
+            _download_request(client, planned_request)
+        _validate_planned_files(raw_dir, plan, complete=True)
+        descriptors = []
+        for planned_request in plan:
+            if not _completed_request(planned_request):
+                raise ValueError("Completed Databento request is missing")
+            descriptors.append(_read_json(planned_request.descriptor_path))
+        _atomic_json(
+            raw_dir / "manifest.json",
+            {
+                "status": "complete",
+                "provider": GLOBAL_PROVIDER,
+                "dataset": GLOBAL_DATASET,
+                "schemas": list(HISTORICAL_SCHEMAS),
+                "databento_version": GLOBAL_DATABENTO_VERSION,
+                "symbols": list(symbols),
+                "stype_in": CONTINUOUS_STYPE,
+                "stype_out": INSTRUMENT_ID_STYPE,
+                "requested_start": str(request.start),
+                "requested_end": str(request.end),
+                "continuous_roll_rule": GLOBAL_CONTINUOUS_ROLL_RULE,
+                "requests": descriptors,
+            },
         )
-    for planned_request in remaining:
-        _download_request(client, planned_request)
-    _validate_planned_files(raw_dir, plan, complete=True)
-    descriptors = []
-    for planned_request in plan:
-        if not _completed_request(planned_request):
-            raise ValueError("Completed Databento request is missing")
-        descriptors.append(_read_json(planned_request.descriptor_path))
-    _atomic_json(
-        raw_dir / "manifest.json",
-        {
-            "status": "complete",
-            "provider": GLOBAL_PROVIDER,
-            "dataset": GLOBAL_DATASET,
-            "schemas": list(HISTORICAL_SCHEMAS),
-            "databento_version": GLOBAL_DATABENTO_VERSION,
-            "symbols": list(symbols),
-            "stype_in": CONTINUOUS_STYPE,
-            "stype_out": INSTRUMENT_ID_STYPE,
-            "requested_start": str(request.start),
-            "requested_end": str(request.end),
-            "continuous_roll_rule": GLOBAL_CONTINUOUS_ROLL_RULE,
-            "requests": descriptors,
-        },
-    )
-    return plan
+        return plan
 
 
 def _date_ns(value: date) -> int:
@@ -1162,12 +1218,13 @@ def main() -> None:
         request = authoritative_request_range(resolve_pointer(args.universe_pointer))
         if args.command == "estimate":
             client = _historical_client()
-            plan = request_plan(request, args.raw_dir)
-            print(
-                json.dumps(
-                    estimate_cost(client, remaining_requests(args.raw_dir, plan))
+            with _acquisition_lock(args.raw_dir):
+                plan = request_plan(request, args.raw_dir)
+                print(
+                    json.dumps(
+                        estimate_cost(client, remaining_requests(args.raw_dir, plan))
+                    )
                 )
-            )
         elif args.command == "download":
             download_history(
                 _historical_client(),
