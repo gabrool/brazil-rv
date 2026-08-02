@@ -280,8 +280,9 @@ def _request_partial_path(request: HistoricalRequest) -> Path:
 
 def _recover_request_states(raw_dir: Path, plan: Sequence[HistoricalRequest]) -> None:
     partials = tuple(_request_partial_path(request) for request in plan)
-    descriptor_temporaries = tuple(
-        _json_temporary_path(request.descriptor_path) for request in plan
+    recoverable_temporaries = (
+        *(_json_temporary_path(request.descriptor_path) for request in plan),
+        _json_temporary_path(raw_dir / "manifest.json"),
     )
     expected_partials = {path.absolute() for path in partials}
     actual_partials = {path.absolute() for path in raw_dir.rglob("*.partial")}
@@ -290,14 +291,14 @@ def _recover_request_states(raw_dir: Path, plan: Sequence[HistoricalRequest]) ->
     if any(path.exists() and not path.is_file() for path in partials):
         raise ValueError("Malformed Databento partial artifact exists")
 
-    expected_temporaries = {path.absolute() for path in descriptor_temporaries}
+    expected_temporaries = {path.absolute() for path in recoverable_temporaries}
     actual_temporaries = {path.absolute() for path in raw_dir.rglob("*.tmp")}
     if actual_temporaries - expected_temporaries:
         raise ValueError("Unexpected Databento temporary artifact exists")
-    if any(path.exists() and not path.is_file() for path in descriptor_temporaries):
+    if any(path.exists() and not path.is_file() for path in recoverable_temporaries):
         raise ValueError("Malformed Databento temporary artifact exists")
 
-    for path in (*partials, *descriptor_temporaries):
+    for path in (*partials, *recoverable_temporaries):
         path.unlink(missing_ok=True)
     _validate_planned_files(raw_dir, plan, complete=False)
 

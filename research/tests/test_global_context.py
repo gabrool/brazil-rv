@@ -735,6 +735,116 @@ def test_atomic_descriptor_failure_cleans_exact_temporary(
     assert not temporary.exists()
 
 
+def test_stale_manifest_temporary_regenerates_missing_manifest_without_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = _fake_acquisition(tmp_path, request)
+    manifest_path = tmp_path / "manifest.json"
+    temporary = global_source_module._json_temporary_path(manifest_path)
+    expected_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    request_paths = tuple(
+        path
+        for planned in plan
+        for path in (planned.data_path, planned.descriptor_path)
+    )
+    expected_artifacts = {path: path.read_bytes() for path in request_paths}
+    manifest_path.unlink()
+    temporary.write_text("untrusted stale manifest", encoding="utf-8")
+    client = _FakeHistorical()
+
+    download_history(
+        client,
+        request,
+        tmp_path,
+        confirmed_paid_download=True,
+        symbols=("ES.v.0",),
+    )
+
+    assert not temporary.exists()
+    assert json.loads(manifest_path.read_text(encoding="utf-8")) == expected_manifest
+    assert {path: path.read_bytes() for path in request_paths} == expected_artifacts
+    monkeypatch.setattr(global_source_module, "_dbn_metadata", _fake_dbn_metadata(plan))
+    validated, _ = _validate_raw_acquisition(tmp_path, request, symbols=("ES.v.0",))
+    assert validated == plan
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
+def test_stale_manifest_temporary_beside_valid_manifest_is_cleaned(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = _fake_acquisition(tmp_path, request)
+    manifest_path = tmp_path / "manifest.json"
+    temporary = global_source_module._json_temporary_path(manifest_path)
+    expected_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    temporary.write_text("untrusted stale manifest", encoding="utf-8")
+    client = _FakeHistorical()
+
+    download_history(
+        client,
+        request,
+        tmp_path,
+        confirmed_paid_download=True,
+        symbols=("ES.v.0",),
+    )
+
+    assert not temporary.exists()
+    assert json.loads(manifest_path.read_text(encoding="utf-8")) == expected_manifest
+    monkeypatch.setattr(global_source_module, "_dbn_metadata", _fake_dbn_metadata(plan))
+    validated, _ = _validate_raw_acquisition(tmp_path, request, symbols=("ES.v.0",))
+    assert validated == plan
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
+def test_manifest_temporary_non_file_is_a_hard_error(tmp_path: Path) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    _fake_acquisition(tmp_path, request)
+    temporary = global_source_module._json_temporary_path(tmp_path / "manifest.json")
+    temporary.mkdir()
+    client = _FakeHistorical()
+
+    with pytest.raises(ValueError, match="Malformed Databento temporary artifact"):
+        download_history(
+            client,
+            request,
+            tmp_path,
+            confirmed_paid_download=True,
+            symbols=("ES.v.0",),
+        )
+
+    assert temporary.is_dir()
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
+def test_incorrectly_located_manifest_temporary_remains_a_hard_error(
+    tmp_path: Path,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    misplaced = tmp_path / "unexpected" / "manifest.json.tmp"
+    misplaced.parent.mkdir()
+    misplaced.write_text("untrusted stale manifest", encoding="utf-8")
+    client = _FakeHistorical()
+
+    with pytest.raises(ValueError, match="Unexpected Databento temporary artifact"):
+        download_history(
+            client,
+            request,
+            tmp_path,
+            confirmed_paid_download=True,
+            symbols=("ES.v.0",),
+        )
+
+    assert misplaced.is_file()
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
 @pytest.mark.parametrize(
     "issue",
     ("missing", "extra", "duplicate", "gap", "overlap", "hash", "descriptor"),
