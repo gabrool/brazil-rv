@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import os
+import shutil
 import json
 import subprocess
 import time as clock
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import polars as pl
@@ -75,9 +78,11 @@ from .transforms import (
 )
 
 
-def main() -> None:
-    started = clock.perf_counter()
-    created_at = datetime.now(timezone.utc)
+def _construct_feature_store(
+    output_dir: Path,
+    created_at: datetime,
+    started: float,
+) -> None:
     inputs = resolve_inputs()
     research_start, research_end = read_research_interval(inputs.universe_dir)
     assignments = load_assignments(inputs.assignments_dir)
@@ -99,9 +104,6 @@ def main() -> None:
         raise ValueError(
             f"Expected {EXPECTED_DATE_COUNT} market dates, found {len(market_dates)}"
         )
-    output_dir = (
-        OUTPUT_BASE / f"m1_features_global_context_{created_at:%Y%m%dT%H%M%S%fZ}"
-    )
     arrays = create_output_memmaps(output_dir, len(market_dates))
 
     membership_rows = pl.read_parquet(
@@ -480,8 +482,30 @@ def main() -> None:
         created_at,
         duration,
     )
-    audit_dir = audit_feature_store(output_dir)
-    _promote(output_dir)
+
+
+def build_feature_store(*, created_at: datetime | None = None) -> tuple[Path, Path]:
+    started = clock.perf_counter()
+    created_at = datetime.now(timezone.utc) if created_at is None else created_at
+    output_dir = (
+        OUTPUT_BASE / f"m1_features_global_context_{created_at:%Y%m%dT%H%M%S%fZ}"
+    )
+    partial = output_dir.with_name(f"{output_dir.name}.{uuid4().hex}.partial")
+    if output_dir.exists():
+        raise FileExistsError(f"Feature output already exists: {output_dir}")
+    try:
+        _construct_feature_store(partial, created_at, started)
+        audit_dir = audit_feature_store(partial)
+        os.replace(partial, output_dir)
+        _promote(output_dir)
+    except BaseException:
+        shutil.rmtree(partial, ignore_errors=True)
+        raise
+    return output_dir, audit_dir
+
+
+def main() -> None:
+    output_dir, audit_dir = build_feature_store()
     print(f"Canonical output: {output_dir}")
     print(f"Statistical audit: {audit_dir}")
 
@@ -898,10 +922,13 @@ def _write_manifest(
 
 def _promote(output_dir: Path) -> None:
     temporary_pointer = CANONICAL_OUTPUT_POINTER.with_name(
-        f"{CANONICAL_OUTPUT_POINTER.name}.tmp"
+        f"{CANONICAL_OUTPUT_POINTER.name}.{uuid4().hex}.tmp"
     )
-    temporary_pointer.write_text(str(output_dir), encoding="utf-8")
-    temporary_pointer.replace(CANONICAL_OUTPUT_POINTER)
+    try:
+        temporary_pointer.write_text(str(output_dir), encoding="utf-8")
+        os.replace(temporary_pointer, CANONICAL_OUTPUT_POINTER)
+    finally:
+        temporary_pointer.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

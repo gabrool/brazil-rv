@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
 import polars as pl
 import pytest
 
+from brazil_rv.preprocessing import build as build_module
 from brazil_rv.preprocessing.contract import (
     DECISION_EQUITY_INDICES,
     DYNAMIC_CHANNELS,
@@ -646,3 +647,83 @@ def test_generated_schema_matches_channel_contract(tmp_path: Path) -> None:
         GLOBAL_SLOW_CHANNELS
     )
     assert "average_one_based_midrank" in schema["stored_target"]
+
+
+def _atomic_build_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> tuple[Path, Path, Path, datetime]:
+    output_base = tmp_path / "features"
+    output_base.mkdir()
+    pointer = output_base / "m1_features_canonical_path.txt"
+    previous = output_base / "previous_complete"
+    previous.mkdir()
+    pointer.write_text(str(previous), encoding="utf-8")
+    monkeypatch.setattr(build_module, "OUTPUT_BASE", output_base)
+    monkeypatch.setattr(build_module, "CANONICAL_OUTPUT_POINTER", pointer)
+    created_at = datetime(2026, 1, 2, 3, 4, 5, 6789, tzinfo=UTC)
+    final = output_base / f"m1_features_global_context_{created_at:%Y%m%dT%H%M%S%fZ}"
+    return pointer, previous, final, created_at
+
+
+def test_feature_build_audits_partial_then_promotes_atomically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pointer, _, final, created_at = _atomic_build_paths(monkeypatch, tmp_path)
+    audited: list[Path] = []
+
+    def construct(partial: Path, *_: object) -> None:
+        assert partial.parent == final.parent
+        assert partial.name.endswith(".partial")
+        assert not final.exists()
+        partial.mkdir()
+        (partial / "artifact").write_text("complete", encoding="utf-8")
+
+    def audit(partial: Path) -> Path:
+        assert partial.is_dir()
+        assert not final.exists()
+        audited.append(partial)
+        return tmp_path / "audit"
+
+    monkeypatch.setattr(build_module, "_construct_feature_store", construct)
+    monkeypatch.setattr(build_module, "audit_feature_store", audit)
+
+    output, audit_dir = build_module.build_feature_store(created_at=created_at)
+    assert output == final
+    assert audit_dir == tmp_path / "audit"
+    assert audited[0].name.endswith(".partial")
+    assert (final / "artifact").read_text(encoding="utf-8") == "complete"
+    assert pointer.read_text(encoding="utf-8") == str(final)
+    assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
+
+
+@pytest.mark.parametrize("failure", ("build", "audit"))
+def test_feature_build_failure_cleans_only_its_partial_and_keeps_pointer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    pointer, previous, final, created_at = _atomic_build_paths(monkeypatch, tmp_path)
+    unrelated = final.parent / "unrelated.partial"
+    unrelated.mkdir()
+
+    def construct(partial: Path, *_: object) -> None:
+        partial.mkdir()
+        (partial / "artifact").write_text("incomplete", encoding="utf-8")
+        if failure == "build":
+            raise RuntimeError("injected build failure")
+
+    def audit(_: Path) -> Path:
+        raise RuntimeError("injected audit failure")
+
+    monkeypatch.setattr(build_module, "_construct_feature_store", construct)
+    monkeypatch.setattr(build_module, "audit_feature_store", audit)
+
+    with pytest.raises(RuntimeError, match=f"injected {failure} failure"):
+        build_module.build_feature_store(created_at=created_at)
+
+    assert pointer.read_text(encoding="utf-8") == str(previous)
+    assert not final.exists()
+    assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
+    assert unrelated.is_dir()

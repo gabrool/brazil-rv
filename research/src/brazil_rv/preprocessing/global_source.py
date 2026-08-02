@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo
@@ -37,9 +38,10 @@ RAW_BASE = PROJECT_ROOT / "quant-data/b3/raw/databento/global_context"
 NORMALIZED_BASE = PROJECT_ROOT / "quant-data/b3/interim/global_context"
 API_KEY_ENV = "DATABENTO_API_KEY"
 CONTINUOUS_STYPE = "continuous"
-OUTRIGHT_STYPE = "raw_symbol"
+INSTRUMENT_ID_STYPE = "instrument_id"
 REQUEST_WARMUP_DAYS = 45
 DOWNLOAD_CHUNK_DAYS = 31
+HISTORICAL_SCHEMAS = (GLOBAL_SCHEMA, "definition")
 PRICE_COLUMNS = ("open", "high", "low", "close")
 NORMALIZED_COLUMNS = (
     "ts_event_utc",
@@ -73,12 +75,13 @@ class RequestRange:
 
 
 @dataclass(frozen=True)
-class DownloadChunk:
+class HistoricalRequest:
     continuous_symbol: str
+    schema: str
     start: date
     end: date
-    bars_path: Path
-    definitions_path: Path
+    data_path: Path
+    descriptor_path: Path
 
 
 def _sha256(path: Path) -> str:
@@ -130,100 +133,174 @@ def chunk_ranges(start: date, end: date) -> tuple[RequestRange, ...]:
 
 def estimate_cost(
     client: HistoricalClient,
-    request: RequestRange,
-    symbols: Sequence[str] = GLOBAL_CONTEXT_SYMBOLS,
-) -> dict[str, float]:
-    costs: dict[str, float] = {}
+    requests: Sequence[HistoricalRequest],
+) -> dict[str, object]:
+    by_schema = {
+        schema: {"request_count": 0, "estimated_cost_usd": 0.0}
+        for schema in HISTORICAL_SCHEMAS
+    }
     try:
-        for symbol in symbols:
-            costs[symbol] = float(
-                client.metadata.get_cost(
-                    dataset=GLOBAL_DATASET,
-                    start=request.start,
-                    end=request.end,
-                    symbols=[symbol],
-                    schema=GLOBAL_SCHEMA,
-                    stype_in=CONTINUOUS_STYPE,
-                )
-            )
+        for request in requests:
+            cost = float(client.metadata.get_cost(**_request_kwargs(request)))
+            by_schema[request.schema]["request_count"] += 1
+            by_schema[request.schema]["estimated_cost_usd"] += cost
     except Exception:
         raise RuntimeError("Databento cost estimate failed") from None
-    return costs
+    return {
+        "remaining_request_count": len(requests),
+        "by_schema": by_schema,
+        "total_usd": sum(
+            float(summary["estimated_cost_usd"]) for summary in by_schema.values()
+        ),
+    }
 
 
 def _safe_symbol(symbol: str) -> str:
     return symbol.replace(".", "_")
 
 
-def _download_one(
-    client: HistoricalClient,
-    symbol: str,
+def request_plan(
     request: RequestRange,
     raw_dir: Path,
-) -> DownloadChunk:
-    stem = f"{_safe_symbol(symbol)}_{request.start}_{request.end}"
-    bars_path = raw_dir / "bars" / f"{stem}.dbn.zst"
-    definitions_path = raw_dir / "definitions" / f"{stem}.dbn.zst"
-    metadata_path = raw_dir / "requests" / f"{stem}.json"
-    if bars_path.is_file() and definitions_path.is_file() and metadata_path.is_file():
-        return DownloadChunk(
-            symbol, request.start, request.end, bars_path, definitions_path
+    symbols: Sequence[str] = GLOBAL_CONTEXT_SYMBOLS,
+) -> tuple[HistoricalRequest, ...]:
+    planned: list[HistoricalRequest] = []
+    for symbol in symbols:
+        for chunk in chunk_ranges(request.start, request.end):
+            for schema in HISTORICAL_SCHEMAS:
+                schema_name = schema.replace("-", "_")
+                stem = f"{_safe_symbol(symbol)}_{chunk.start}_{chunk.end}_{schema_name}"
+                directory = "bars" if schema == GLOBAL_SCHEMA else "definitions"
+                planned.append(
+                    HistoricalRequest(
+                        continuous_symbol=symbol,
+                        schema=schema,
+                        start=chunk.start,
+                        end=chunk.end,
+                        data_path=raw_dir / directory / f"{stem}.dbn.zst",
+                        descriptor_path=raw_dir / "requests" / f"{stem}.json",
+                    )
+                )
+    return tuple(planned)
+
+
+def _request_contract(request: HistoricalRequest) -> dict[str, object]:
+    return {
+        "request_id": request.descriptor_path.stem,
+        "provider": GLOBAL_PROVIDER,
+        "dataset": GLOBAL_DATASET,
+        "schema": request.schema,
+        "continuous_symbol": request.continuous_symbol,
+        "stype_in": CONTINUOUS_STYPE,
+        "stype_out": INSTRUMENT_ID_STYPE,
+        "start": str(request.start),
+        "end": str(request.end),
+        "data_path": f"{request.data_path.parent.name}/{request.data_path.name}",
+    }
+
+
+def _read_json(path: Path) -> dict[str, object]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"JSON object required: {path}")
+    return payload
+
+
+def _completed_request(request: HistoricalRequest) -> bool:
+    data_exists = request.data_path.is_file()
+    descriptor_exists = request.descriptor_path.is_file()
+    if data_exists != descriptor_exists:
+        raise ValueError(
+            f"Incomplete Databento request artifacts: {request.descriptor_path.stem}"
         )
-    for path in (bars_path, definitions_path, metadata_path):
+    if not data_exists:
+        return False
+    descriptor = _read_json(request.descriptor_path)
+    expected = _request_contract(request)
+    if set(descriptor) != {*expected, "data_sha256", "data_size_bytes"} or any(
+        descriptor[name] != value for name, value in expected.items()
+    ):
+        raise ValueError(
+            f"Databento request descriptor mismatch: {request.descriptor_path}"
+        )
+    if descriptor["data_sha256"] != _sha256(request.data_path):
+        raise ValueError(f"Databento request hash mismatch: {request.data_path}")
+    if descriptor["data_size_bytes"] != request.data_path.stat().st_size:
+        raise ValueError(f"Databento request size mismatch: {request.data_path}")
+    return True
+
+
+def _validate_planned_files(
+    raw_dir: Path,
+    plan: Sequence[HistoricalRequest],
+    *,
+    complete: bool,
+) -> None:
+    expected_descriptors = {request.descriptor_path.resolve() for request in plan}
+    expected_data = {request.data_path.resolve() for request in plan}
+    actual_descriptors = {
+        path.resolve() for path in (raw_dir / "requests").rglob("*") if path.is_file()
+    }
+    actual_data = {
+        path.resolve()
+        for directory in ("bars", "definitions")
+        for path in (raw_dir / directory).rglob("*")
+        if path.is_file()
+    }
+    if actual_descriptors - expected_descriptors or actual_data - expected_data:
+        raise ValueError("Unexpected Databento request artifacts exist")
+    if complete and (
+        actual_descriptors != expected_descriptors or actual_data != expected_data
+    ):
+        raise ValueError("Expected Databento request artifacts are missing")
+
+
+def remaining_requests(
+    raw_dir: Path, plan: Sequence[HistoricalRequest]
+) -> tuple[HistoricalRequest, ...]:
+    _validate_planned_files(raw_dir, plan, complete=False)
+    return tuple(request for request in plan if not _completed_request(request))
+
+
+def _request_kwargs(request: HistoricalRequest) -> dict[str, object]:
+    return {
+        "dataset": GLOBAL_DATASET,
+        "start": request.start,
+        "end": request.end,
+        "symbols": [request.continuous_symbol],
+        "schema": request.schema,
+        "stype_in": CONTINUOUS_STYPE,
+    }
+
+
+def _download_request(
+    client: HistoricalClient,
+    request: HistoricalRequest,
+) -> None:
+    for path in (request.data_path, request.descriptor_path):
         path.parent.mkdir(parents=True, exist_ok=True)
-    bars_partial = bars_path.with_suffix(f"{bars_path.suffix}.partial")
-    definitions_partial = definitions_path.with_suffix(
-        f"{definitions_path.suffix}.partial"
-    )
-    bars_partial.unlink(missing_ok=True)
-    definitions_partial.unlink(missing_ok=True)
+    partial = request.data_path.with_suffix(f"{request.data_path.suffix}.partial")
+    partial.unlink(missing_ok=True)
     try:
         client.timeseries.get_range(
-            dataset=GLOBAL_DATASET,
-            start=request.start,
-            end=request.end,
-            symbols=[symbol],
-            schema=GLOBAL_SCHEMA,
-            stype_in=CONTINUOUS_STYPE,
-            stype_out=OUTRIGHT_STYPE,
-            path=bars_partial,
-        )
-        client.timeseries.get_range(
-            dataset=GLOBAL_DATASET,
-            start=request.start,
-            end=request.end,
-            symbols=[symbol],
-            schema="definition",
-            stype_in=CONTINUOUS_STYPE,
-            stype_out=OUTRIGHT_STYPE,
-            path=definitions_partial,
+            **_request_kwargs(request),
+            stype_out=INSTRUMENT_ID_STYPE,
+            path=partial,
         )
     except Exception:
-        bars_partial.unlink(missing_ok=True)
-        definitions_partial.unlink(missing_ok=True)
+        partial.unlink(missing_ok=True)
         raise RuntimeError("Databento historical download failed") from None
-    if not bars_partial.is_file() or not definitions_partial.is_file():
-        raise RuntimeError("Databento did not produce both requested DBN files")
-    os.replace(bars_partial, bars_path)
-    os.replace(definitions_partial, definitions_path)
-    _atomic_json(
-        metadata_path,
+    if not partial.is_file():
+        raise RuntimeError("Databento did not produce the requested DBN file")
+    os.replace(partial, request.data_path)
+    descriptor = _request_contract(request)
+    descriptor.update(
         {
-            "provider": GLOBAL_PROVIDER,
-            "dataset": GLOBAL_DATASET,
-            "schema": GLOBAL_SCHEMA,
-            "continuous_symbol": symbol,
-            "stype_in": CONTINUOUS_STYPE,
-            "stype_out": OUTRIGHT_STYPE,
-            "start": str(request.start),
-            "end": str(request.end),
-            "bars_sha256": _sha256(bars_path),
-            "definitions_sha256": _sha256(definitions_path),
-        },
+            "data_sha256": _sha256(request.data_path),
+            "data_size_bytes": request.data_path.stat().st_size,
+        }
     )
-    return DownloadChunk(
-        symbol, request.start, request.end, bars_path, definitions_path
-    )
+    _atomic_json(request.descriptor_path, descriptor)
 
 
 def download_history(
@@ -233,48 +310,218 @@ def download_history(
     *,
     confirmed_paid_download: bool,
     symbols: Sequence[str] = GLOBAL_CONTEXT_SYMBOLS,
-) -> tuple[DownloadChunk, ...]:
-    costs = estimate_cost(client, request, symbols)
-    print(json.dumps({"estimated_cost_usd": costs, "total_usd": sum(costs.values())}))
-    if not confirmed_paid_download:
+) -> tuple[HistoricalRequest, ...]:
+    plan = request_plan(request, raw_dir, symbols)
+    remaining = remaining_requests(raw_dir, plan)
+    estimate = estimate_cost(client, remaining)
+    print(json.dumps(estimate))
+    if remaining and not confirmed_paid_download:
         raise RuntimeError(
             "Re-run with --confirm-paid-download after reviewing the estimate"
         )
-    chunks = tuple(
-        _download_one(client, symbol, chunk, raw_dir)
-        for symbol in symbols
-        for chunk in chunk_ranges(request.start, request.end)
-    )
+    for planned_request in remaining:
+        _download_request(client, planned_request)
+    _validate_planned_files(raw_dir, plan, complete=True)
+    descriptors = []
+    for planned_request in plan:
+        if not _completed_request(planned_request):
+            raise ValueError("Completed Databento request is missing")
+        descriptors.append(_read_json(planned_request.descriptor_path))
     _atomic_json(
         raw_dir / "manifest.json",
         {
+            "status": "complete",
             "provider": GLOBAL_PROVIDER,
             "dataset": GLOBAL_DATASET,
-            "schema": GLOBAL_SCHEMA,
+            "schemas": list(HISTORICAL_SCHEMAS),
             "databento_version": GLOBAL_DATABENTO_VERSION,
             "symbols": list(symbols),
+            "stype_in": CONTINUOUS_STYPE,
+            "stype_out": INSTRUMENT_ID_STYPE,
             "requested_start": str(request.start),
             "requested_end": str(request.end),
             "continuous_roll_rule": GLOBAL_CONTINUOUS_ROLL_RULE,
-            "chunks": [
-                {
-                    "continuous_symbol": chunk.continuous_symbol,
-                    "start": str(chunk.start),
-                    "end": str(chunk.end),
-                    "bars_path": str(chunk.bars_path),
-                    "bars_sha256": _sha256(chunk.bars_path),
-                    "definitions_path": str(chunk.definitions_path),
-                    "definitions_sha256": _sha256(chunk.definitions_path),
-                }
-                for chunk in chunks
-            ],
+            "requests": descriptors,
         },
     )
-    return chunks
+    return plan
+
+
+def _date_ns(value: date) -> int:
+    return int(datetime.combine(value, datetime.min.time(), UTC).timestamp() * 1e9)
+
+
+def _dbn_metadata(path: Path) -> dict[str, object]:
+    try:
+        metadata = db.DBNStore.from_file(path).metadata
+    except Exception:
+        raise ValueError(f"Invalid Databento DBN file: {path}") from None
+    return {
+        "dataset": metadata.dataset,
+        "schema": str(metadata.schema),
+        "stype_in": str(metadata.stype_in),
+        "stype_out": str(metadata.stype_out),
+        "start": metadata.start,
+        "end": metadata.end,
+        "symbols": list(metadata.symbols),
+        "partial": list(metadata.partial),
+        "not_found": list(metadata.not_found),
+        "mappings": metadata.mappings,
+    }
+
+
+def _mapping_by_date(
+    metadata: dict[str, object],
+    request: HistoricalRequest,
+) -> dict[date, int]:
+    mappings = metadata["mappings"]
+    if not isinstance(mappings, dict) or set(mappings) != {request.continuous_symbol}:
+        raise ValueError(f"DBN continuous mapping mismatch: {request.data_path}")
+    entries = mappings[request.continuous_symbol]
+    if not isinstance(entries, list):
+        raise ValueError(f"Malformed DBN mapping metadata: {request.data_path}")
+    output: dict[date, int] = {}
+    cursor = request.start
+    while cursor < request.end:
+        matches = [
+            entry
+            for entry in entries
+            if date.fromisoformat(str(entry["start_date"]))
+            <= cursor
+            < date.fromisoformat(str(entry["end_date"]))
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"Missing or ambiguous continuous mapping: "
+                f"{request.continuous_symbol} {cursor}"
+            )
+        try:
+            instrument_id = int(matches[0]["symbol"])
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"Continuous mapping is not an instrument ID: {request.data_path}"
+            ) from None
+        if instrument_id <= 0:
+            raise ValueError(
+                f"Continuous mapping has an invalid instrument ID: {request.data_path}"
+            )
+        output[cursor] = instrument_id
+        cursor += timedelta(days=1)
+    return output
+
+
+def _validate_dbn_contract(
+    request: HistoricalRequest,
+) -> tuple[dict[str, object], dict[date, int]]:
+    metadata = _dbn_metadata(request.data_path)
+    expected = {
+        "dataset": GLOBAL_DATASET,
+        "schema": request.schema,
+        "stype_in": CONTINUOUS_STYPE,
+        "stype_out": INSTRUMENT_ID_STYPE,
+        "start": _date_ns(request.start),
+        "end": _date_ns(request.end),
+        "symbols": [request.continuous_symbol],
+    }
+    if any(metadata[name] != value for name, value in expected.items()):
+        raise ValueError(f"DBN request metadata mismatch: {request.data_path}")
+    if metadata["partial"] or metadata["not_found"]:
+        raise ValueError(
+            f"DBN request contains unresolved symbols: {request.data_path}"
+        )
+    return metadata, _mapping_by_date(metadata, request)
+
+
+def _validate_manifest_intervals(
+    entries: Sequence[dict[str, object]],
+    request: RequestRange,
+    symbols: Sequence[str],
+) -> None:
+    for symbol in symbols:
+        for schema in HISTORICAL_SCHEMAS:
+            intervals = sorted(
+                (
+                    date.fromisoformat(str(entry["start"])),
+                    date.fromisoformat(str(entry["end"])),
+                )
+                for entry in entries
+                if entry.get("continuous_symbol") == symbol
+                and entry.get("schema") == schema
+            )
+            cursor = request.start
+            for start, end in intervals:
+                if start > cursor:
+                    raise ValueError(
+                        f"Databento request interval gap: {symbol} {schema}"
+                    )
+                if start < cursor:
+                    raise ValueError(
+                        f"Databento request interval overlap: {symbol} {schema}"
+                    )
+                if end <= start:
+                    raise ValueError(
+                        f"Invalid Databento request interval: {symbol} {schema}"
+                    )
+                cursor = end
+            if cursor != request.end:
+                raise ValueError(f"Databento request interval gap: {symbol} {schema}")
+
+
+def _validate_raw_acquisition(
+    raw_dir: Path,
+    request: RequestRange,
+    symbols: Sequence[str] = GLOBAL_CONTEXT_SYMBOLS,
+) -> tuple[tuple[HistoricalRequest, ...], dict[str, dict[date, int]]]:
+    plan = request_plan(request, raw_dir, symbols)
+    manifest_path = raw_dir / "manifest.json"
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"Completed raw manifest is missing: {manifest_path}")
+    manifest = _read_json(manifest_path)
+    expected_header = {
+        "status": "complete",
+        "provider": GLOBAL_PROVIDER,
+        "dataset": GLOBAL_DATASET,
+        "schemas": list(HISTORICAL_SCHEMAS),
+        "databento_version": GLOBAL_DATABENTO_VERSION,
+        "symbols": list(symbols),
+        "stype_in": CONTINUOUS_STYPE,
+        "stype_out": INSTRUMENT_ID_STYPE,
+        "requested_start": str(request.start),
+        "requested_end": str(request.end),
+        "continuous_roll_rule": GLOBAL_CONTINUOUS_ROLL_RULE,
+    }
+    if set(manifest) != {*expected_header, "requests"} or any(
+        manifest[name] != value for name, value in expected_header.items()
+    ):
+        raise ValueError("Raw Databento manifest contract mismatch")
+    entries = manifest["requests"]
+    if not isinstance(entries, list) or any(
+        not isinstance(entry, dict) for entry in entries
+    ):
+        raise ValueError("Raw Databento manifest requests are malformed")
+    request_ids = [entry.get("request_id") for entry in entries]
+    if len(request_ids) != len(set(request_ids)):
+        raise ValueError("Duplicate Databento request in raw manifest")
+    _validate_manifest_intervals(entries, request, symbols)
+    _validate_planned_files(raw_dir, plan, complete=True)
+
+    descriptors: list[dict[str, object]] = []
+    mappings: dict[str, dict[date, int]] = {}
+    for planned_request in plan:
+        if not _completed_request(planned_request):
+            raise ValueError("Expected Databento request is missing")
+        descriptor = _read_json(planned_request.descriptor_path)
+        descriptors.append(descriptor)
+        _, mappings[planned_request.descriptor_path.stem] = _validate_dbn_contract(
+            planned_request
+        )
+    if entries != descriptors:
+        raise ValueError("Raw manifest requests do not match request descriptors")
+    return plan, mappings
 
 
 def _dbn_frame(path: Path) -> pl.DataFrame:
-    frame = db.DBNStore.from_file(path).to_df(map_symbols=True).reset_index()
+    frame = db.DBNStore.from_file(path).to_df(map_symbols=False).reset_index()
     return pl.from_pandas(frame)
 
 
@@ -283,6 +530,92 @@ def _timestamp_column(frame: pl.DataFrame) -> str:
         if name in frame.columns:
             return name
     raise ValueError("Databento frame has no event timestamp")
+
+
+def _definition_identities(definitions: pl.DataFrame) -> pl.DataFrame:
+    required = {"instrument_id", "raw_symbol"}
+    missing = sorted(required.difference(definitions.columns))
+    if missing:
+        raise ValueError(f"Definition records are missing columns: {missing}")
+    expiration = (
+        pl.col("expiration").cast(pl.Datetime("ns", "UTC"), strict=False)
+        if "expiration" in definitions.columns
+        else pl.lit(None, dtype=pl.Datetime("ns", "UTC"))
+    )
+    rows = definitions.select(
+        pl.col("instrument_id").cast(pl.UInt32),
+        pl.col("raw_symbol").cast(pl.String),
+        expiration.alias("expiration_utc"),
+    )
+    if rows.filter(
+        pl.col("instrument_id").is_null()
+        | pl.col("raw_symbol").is_null()
+        | (pl.col("raw_symbol").str.len_chars() == 0)
+    ).height:
+        raise ValueError("Definition records contain a missing outright identity")
+    conflicts = rows.group_by("instrument_id").agg(
+        pl.col("raw_symbol").n_unique().alias("raw_symbol_count"),
+        pl.col("expiration_utc").drop_nulls().n_unique().alias("expiration_count"),
+    )
+    if conflicts.filter(
+        (pl.col("raw_symbol_count") != 1) | (pl.col("expiration_count") > 1)
+    ).height:
+        raise ValueError("Definition records contain an ambiguous outright mapping")
+    return rows.group_by("instrument_id").agg(
+        pl.col("raw_symbol").first(),
+        pl.col("expiration_utc").drop_nulls().first(),
+    )
+
+
+def _attach_definition_identity(
+    frame: pl.DataFrame,
+    definitions: pl.DataFrame,
+) -> pl.DataFrame:
+    if "instrument_id" not in frame.columns:
+        raise ValueError("Databento bars are missing instrument_id")
+    bars = frame.drop("raw_symbol") if "raw_symbol" in frame.columns else frame
+    mapped = bars.join(
+        _definition_identities(definitions),
+        on="instrument_id",
+        how="left",
+        validate="m:1",
+    )
+    if mapped.filter(pl.col("raw_symbol").is_null()).height:
+        raise ValueError("Definition records are missing an instrument mapping")
+    return mapped
+
+
+def _validate_bar_instrument_mapping(
+    frame: pl.DataFrame,
+    request: HistoricalRequest,
+    mapping: dict[date, int],
+) -> None:
+    timestamp = _timestamp_column(frame)
+    expected = pl.DataFrame(
+        {
+            "_mapping_date": list(mapping),
+            "_expected_instrument_id": list(mapping.values()),
+        },
+        schema={"_mapping_date": pl.Date, "_expected_instrument_id": pl.UInt32},
+    )
+    checked = (
+        frame.select(
+            pl.col(timestamp)
+            .cast(pl.Datetime("ns", "UTC"))
+            .dt.date()
+            .alias("_mapping_date"),
+            pl.col("instrument_id").cast(pl.UInt32),
+        )
+        .join(expected, on="_mapping_date", how="left", validate="m:1")
+        .filter(
+            pl.col("_expected_instrument_id").is_null()
+            | (pl.col("instrument_id") != pl.col("_expected_instrument_id"))
+        )
+    )
+    if checked.height:
+        raise ValueError(
+            f"Bars disagree with the continuous mapping: {request.data_path}"
+        )
 
 
 def normalize_bars(
@@ -295,28 +628,14 @@ def normalize_bars(
         and continuous_symbol != "6L.v.0"
     ):
         raise ValueError(f"Unsupported continuous symbol: {continuous_symbol}")
+    if definitions is not None:
+        frame = _attach_definition_identity(frame, definitions)
     timestamp = _timestamp_column(frame)
     raw_symbol = "raw_symbol" if "raw_symbol" in frame.columns else "symbol"
     required = {timestamp, raw_symbol, "instrument_id", *PRICE_COLUMNS, "volume"}
     missing = sorted(required.difference(frame.columns))
     if missing:
         raise ValueError(f"Databento frame is missing columns: {missing}")
-    expiration = None
-    if definitions is not None and not definitions.is_empty():
-        definition_symbol = (
-            "raw_symbol" if "raw_symbol" in definitions.columns else "symbol"
-        )
-        if (
-            definition_symbol in definitions.columns
-            and "expiration" in definitions.columns
-        ):
-            expiration = definitions.select(
-                pl.col("instrument_id").cast(pl.UInt32),
-                pl.col(definition_symbol).cast(pl.String).alias("raw_symbol"),
-                pl.col("expiration")
-                .cast(pl.Datetime("ns", "UTC"), strict=False)
-                .alias("expiration_utc"),
-            ).unique("instrument_id", keep="last")
     slot = (
         GLOBAL_CONTEXT_SYMBOLS.index(continuous_symbol)
         if continuous_symbol in GLOBAL_CONTEXT_SYMBOLS
@@ -336,6 +655,11 @@ def normalize_bars(
                 if "received_at_utc" in frame.columns
                 else pl.lit(None, dtype=pl.Datetime("ns", "UTC"))
             ).alias("received_at_utc"),
+            (
+                pl.col("expiration_utc").cast(pl.Datetime("ns", "UTC"))
+                if "expiration_utc" in frame.columns
+                else pl.lit(None, dtype=pl.Datetime("ns", "UTC"))
+            ).alias("expiration_utc"),
         )
         .sort("ts_event_utc")
         .with_columns(
@@ -351,16 +675,8 @@ def normalize_bars(
             .fill_null(False)
             .alias("mapping_changed"),
         )
+        .select(NORMALIZED_COLUMNS)
     )
-    if expiration is None:
-        normalized = normalized.with_columns(
-            pl.lit(None, dtype=pl.Datetime("ns", "UTC")).alias("expiration_utc")
-        )
-    else:
-        normalized = normalized.join(
-            expiration, on=["instrument_id", "raw_symbol"], how="left"
-        )
-    normalized = normalized.select(NORMALIZED_COLUMNS)
     validate_normalized_bars(normalized, expected_symbol=continuous_symbol)
     return normalized
 
@@ -419,92 +735,111 @@ def validate_normalized_bars(
             )
 
 
-def _chunk_metadata(path: Path) -> dict[str, object]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def normalize_download(raw_dir: Path, *, created_at: datetime | None = None) -> Path:
+def normalize_download(
+    raw_dir: Path,
+    request: RequestRange,
+    *,
+    created_at: datetime | None = None,
+) -> Path:
+    plan, mappings = _validate_raw_acquisition(raw_dir, request)
     created_at = datetime.now(UTC) if created_at is None else created_at
-    request_files = sorted((raw_dir / "requests").glob("*.json"))
-    if not request_files:
-        raise FileNotFoundError(
-            f"No completed Databento request chunks under {raw_dir}"
-        )
     output_dir = NORMALIZED_BASE / f"global_context_{created_at:%Y%m%dT%H%M%S%fZ}"
     partial = output_dir.with_name(f"{output_dir.name}.partial")
     if output_dir.exists() or partial.exists():
         raise FileExistsError(f"Global normalized output already exists: {output_dir}")
-    (partial / "bars").mkdir(parents=True)
-    source_hashes: dict[str, str] = {}
-    normalized_hashes: dict[str, str] = {}
-    row_count = 0
-    symbols_seen: set[str] = set()
-    previous_raw_symbols: dict[str, str] = {}
-    for request_path in request_files:
-        metadata = _chunk_metadata(request_path)
-        symbol = str(metadata["continuous_symbol"])
-        bars_path = raw_dir / "bars" / f"{request_path.stem}.dbn.zst"
-        definitions_path = raw_dir / "definitions" / f"{request_path.stem}.dbn.zst"
-        if _sha256(bars_path) != metadata["bars_sha256"]:
-            raise ValueError(f"Source hash mismatch: {bars_path}")
-        if _sha256(definitions_path) != metadata["definitions_sha256"]:
-            raise ValueError(f"Definition hash mismatch: {definitions_path}")
-        normalized = normalize_bars(
-            _dbn_frame(bars_path), symbol, _dbn_frame(definitions_path)
+
+    try:
+        (partial / "bars").mkdir(parents=True)
+        source_hashes: dict[str, str] = {}
+        normalized_hashes: dict[str, str] = {}
+        row_count = 0
+        symbols_seen: set[str] = set()
+        previous_raw_symbols: dict[str, str] = {}
+        for index in range(0, len(plan), len(HISTORICAL_SCHEMAS)):
+            bars_request, definitions_request = plan[
+                index : index + len(HISTORICAL_SCHEMAS)
+            ]
+            if (
+                bars_request.schema != GLOBAL_SCHEMA
+                or definitions_request.schema != "definition"
+                or bars_request.continuous_symbol
+                != definitions_request.continuous_symbol
+                or bars_request.start != definitions_request.start
+                or bars_request.end != definitions_request.end
+            ):
+                raise ValueError("Historical request pair does not match the contract")
+            bar_mapping = mappings[bars_request.descriptor_path.stem]
+            definition_mapping = mappings[definitions_request.descriptor_path.stem]
+            if bar_mapping != definition_mapping:
+                raise ValueError("OHLCV and definition continuous mappings disagree")
+            bars = _dbn_frame(bars_request.data_path)
+            _validate_bar_instrument_mapping(bars, bars_request, bar_mapping)
+            symbol = bars_request.continuous_symbol
+            normalized = normalize_bars(
+                bars,
+                symbol,
+                _dbn_frame(definitions_request.data_path),
+            )
+            normalized = _with_mapping_changes(
+                normalized, previous_raw_symbols.get(symbol)
+            )
+            previous_raw_symbols[symbol] = str(normalized.item(-1, "raw_symbol"))
+            partition = (
+                partial / "bars" / f"slot={int(normalized.item(0, 'global_slot')):02d}"
+            )
+            partition.mkdir(parents=True, exist_ok=True)
+            target = partition / f"{bars_request.descriptor_path.stem}.parquet"
+            normalized.write_parquet(target, compression="zstd", statistics=True)
+            for source_path in (
+                bars_request.data_path,
+                definitions_request.data_path,
+            ):
+                source_hashes[str(source_path)] = _sha256(source_path)
+            normalized_hashes[str(target.relative_to(partial))] = _sha256(target)
+            row_count += normalized.height
+            symbols_seen.add(symbol)
+        if symbols_seen != set(GLOBAL_CONTEXT_SYMBOLS):
+            raise ValueError(
+                "Completed source requests do not contain the fixed global universe"
+            )
+        summary = (
+            pl.scan_parquet(partial / "bars/**/*.parquet", glob=True)
+            .select(
+                pl.col("ts_event_utc").min().alias("actual_start"),
+                pl.col("bar_end_utc").max().alias("actual_end"),
+                pl.len().alias("rows"),
+            )
+            .collect()
+            .row(0, named=True)
         )
-        normalized = _with_mapping_changes(normalized, previous_raw_symbols.get(symbol))
-        previous_raw_symbols[symbol] = str(normalized.item(-1, "raw_symbol"))
-        partition = (
-            partial / "bars" / f"slot={int(normalized.item(0, 'global_slot')):02d}"
-        )
-        partition.mkdir(parents=True, exist_ok=True)
-        target = partition / f"{request_path.stem}.parquet"
-        normalized.write_parquet(target, compression="zstd", statistics=True)
-        source_hashes[str(bars_path)] = _sha256(bars_path)
-        source_hashes[str(definitions_path)] = _sha256(definitions_path)
-        normalized_hashes[str(target.relative_to(partial))] = _sha256(target)
-        row_count += normalized.height
-        symbols_seen.add(symbol)
-    if symbols_seen != set(GLOBAL_CONTEXT_SYMBOLS):
-        raise ValueError(
-            "Completed source chunks do not contain the fixed global universe"
-        )
-    scan = pl.scan_parquet(partial / "bars/**/*.parquet", glob=True)
-    summary = (
-        scan.select(
-            pl.col("ts_event_utc").min().alias("actual_start"),
-            pl.col("bar_end_utc").max().alias("actual_end"),
-            pl.len().alias("rows"),
-        )
-        .collect()
-        .row(0, named=True)
-    )
-    if int(summary["rows"]) != row_count:
-        raise ValueError("Normalized row count changed during store validation")
-    raw_manifest = json.loads((raw_dir / "manifest.json").read_text(encoding="utf-8"))
-    manifest = {
-        "status": "complete",
-        "provider": GLOBAL_PROVIDER,
-        "dataset": GLOBAL_DATASET,
-        "schema": GLOBAL_SCHEMA,
-        "databento_version": GLOBAL_DATABENTO_VERSION,
-        "symbols": list(GLOBAL_CONTEXT_SYMBOLS),
-        "families": list(GLOBAL_CONTEXT_FAMILIES),
-        "quote_directions": list(GLOBAL_QUOTE_DIRECTIONS),
-        "continuous_roll_rule": GLOBAL_CONTINUOUS_ROLL_RULE,
-        "requested_start": raw_manifest["requested_start"],
-        "requested_end": raw_manifest["requested_end"],
-        "actual_start_utc": str(summary["actual_start"]),
-        "actual_end_utc": str(summary["actual_end"]),
-        "row_count": row_count,
-        "normalized_columns": list(NORMALIZED_COLUMNS),
-        "source_hashes": source_hashes,
-        "normalized_hashes": normalized_hashes,
-        "created_at_utc": created_at.isoformat(),
-    }
-    _atomic_json(partial / "manifest.json", manifest)
-    os.replace(partial, output_dir)
-    _atomic_pointer(GLOBAL_SOURCE_POINTER, output_dir)
+        if int(summary["rows"]) != row_count:
+            raise ValueError("Normalized row count changed during store validation")
+        manifest = {
+            "status": "complete",
+            "provider": GLOBAL_PROVIDER,
+            "dataset": GLOBAL_DATASET,
+            "schema": GLOBAL_SCHEMA,
+            "databento_version": GLOBAL_DATABENTO_VERSION,
+            "symbols": list(GLOBAL_CONTEXT_SYMBOLS),
+            "families": list(GLOBAL_CONTEXT_FAMILIES),
+            "quote_directions": list(GLOBAL_QUOTE_DIRECTIONS),
+            "continuous_roll_rule": GLOBAL_CONTINUOUS_ROLL_RULE,
+            "requested_start": str(request.start),
+            "requested_end": str(request.end),
+            "actual_start_utc": str(summary["actual_start"]),
+            "actual_end_utc": str(summary["actual_end"]),
+            "row_count": row_count,
+            "normalized_columns": list(NORMALIZED_COLUMNS),
+            "source_hashes": source_hashes,
+            "normalized_hashes": normalized_hashes,
+            "created_at_utc": created_at.isoformat(),
+        }
+        _atomic_json(partial / "manifest.json", manifest)
+        os.replace(partial, output_dir)
+        _atomic_pointer(GLOBAL_SOURCE_POINTER, output_dir)
+    except BaseException:
+        shutil.rmtree(partial, ignore_errors=True)
+        raise
     return output_dir
 
 
@@ -804,11 +1139,13 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", required=True)
     estimate = subparsers.add_parser("estimate")
     estimate.add_argument("--universe-pointer", type=Path, required=True)
+    estimate.add_argument("--raw-dir", type=Path, default=RAW_BASE)
     download = subparsers.add_parser("download")
     download.add_argument("--universe-pointer", type=Path, required=True)
     download.add_argument("--raw-dir", type=Path, default=RAW_BASE)
     download.add_argument("--confirm-paid-download", action="store_true")
     normalize = subparsers.add_parser("normalize")
+    normalize.add_argument("--universe-pointer", type=Path, required=True)
     normalize.add_argument("--raw-dir", type=Path, default=RAW_BASE)
     shadow = subparsers.add_parser("shadow")
     shadow.add_argument("--output-dir", type=Path, required=True)
@@ -821,25 +1158,25 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    if args.command in {"estimate", "download"}:
+    if args.command in {"estimate", "download", "normalize"}:
         request = authoritative_request_range(resolve_pointer(args.universe_pointer))
-        client = _historical_client()
         if args.command == "estimate":
-            costs = estimate_cost(client, request)
+            client = _historical_client()
+            plan = request_plan(request, args.raw_dir)
             print(
                 json.dumps(
-                    {"estimated_cost_usd": costs, "total_usd": sum(costs.values())}
+                    estimate_cost(client, remaining_requests(args.raw_dir, plan))
                 )
             )
-        else:
+        elif args.command == "download":
             download_history(
-                client,
+                _historical_client(),
                 request,
                 args.raw_dir,
                 confirmed_paid_download=args.confirm_paid_download,
             )
-    elif args.command == "normalize":
-        print(normalize_download(args.raw_dir))
+        else:
+            print(normalize_download(args.raw_dir, request))
     elif args.command == "shadow":
         run_shadow_collection(args.output_dir, args.flush_records)
     else:
