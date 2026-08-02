@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import polars as pl
@@ -746,8 +749,12 @@ def _global_coverage_reports(
     return coverage, decision_summary, minute_summary, roll_rows
 
 
-def audit_feature_store(features_dir: Path) -> Path:
-    """Run the complete store audit and return its immutable output directory."""
+def _generate_feature_audit(
+    features_dir: Path,
+    output_dir: Path,
+    final_output_dir: Path,
+    created_at: datetime,
+) -> None:
     features_dir = Path(features_dir)
     if not features_dir.is_dir():
         raise FileNotFoundError(f"Feature directory does not exist: {features_dir}")
@@ -960,8 +967,6 @@ def audit_feature_store(features_dir: Path) -> Path:
             int((observed & ready[:, None]).sum()) / denominator if denominator else 0.0
         )
 
-    created_at = datetime.now(timezone.utc)
-    output_dir = AUDIT_BASE / f"m1_features_audit_{created_at:%Y%m%dT%H%M%S%fZ}"
     output_dir.mkdir(parents=True, exist_ok=False)
     store_size = sum(
         path.stat().st_size for path in features_dir.iterdir() if path.is_file()
@@ -974,7 +979,7 @@ def audit_feature_store(features_dir: Path) -> Path:
     summary = {
         "created_at_utc": created_at.isoformat(),
         "features_dir": str(features_dir),
-        "audit_output_dir": str(output_dir),
+        "audit_output_dir": str(final_output_dir),
         "contract_version": manifest["contract_version"],
         "date_count": EXPECTED_DATE_COUNT,
         "eligible_date_count": int(eligible_dates.size),
@@ -1041,6 +1046,21 @@ def audit_feature_store(features_dir: Path) -> Path:
         json.dumps(summary, indent=2), encoding="utf-8"
     )
     print(json.dumps(summary, indent=2))
+
+
+def audit_feature_store(features_dir: Path) -> Path:
+    """Run the complete store audit and atomically publish its output directory."""
+    created_at = datetime.now(timezone.utc)
+    output_dir = AUDIT_BASE / f"m1_features_audit_{created_at:%Y%m%dT%H%M%S%fZ}"
+    partial = output_dir.with_name(f"{output_dir.name}.{uuid4().hex}.partial")
+    if output_dir.exists():
+        raise FileExistsError(f"Feature audit output already exists: {output_dir}")
+    try:
+        _generate_feature_audit(features_dir, partial, output_dir, created_at)
+        os.replace(partial, output_dir)
+    except BaseException:
+        shutil.rmtree(partial, ignore_errors=True)
+        raise
     return output_dir
 
 

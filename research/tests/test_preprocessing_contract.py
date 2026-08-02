@@ -8,6 +8,7 @@ import numpy as np
 import polars as pl
 import pytest
 
+from brazil_rv.preprocessing import audit as audit_module
 from brazil_rv.preprocessing import build as build_module
 from brazil_rv.preprocessing.contract import (
     DECISION_EQUITY_INDICES,
@@ -666,43 +667,106 @@ def _atomic_build_paths(
     return pointer, previous, final, created_at
 
 
-def test_feature_build_audits_partial_then_promotes_atomically(
+def test_feature_audit_summary_references_final_existing_store(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    feature_store = tmp_path / "feature_store"
+    feature_store.mkdir()
+    audit_base = tmp_path / "audits"
+    monkeypatch.setattr(audit_module, "AUDIT_BASE", audit_base)
+
+    def generate(
+        source: Path,
+        partial: Path,
+        final: Path,
+        _: datetime,
+    ) -> None:
+        assert source == feature_store
+        assert partial.name.endswith(".partial")
+        assert not final.exists()
+        partial.mkdir(parents=True)
+        (partial / "audit_summary.json").write_text(
+            json.dumps(
+                {
+                    "features_dir": str(source),
+                    "audit_output_dir": str(final),
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(audit_module, "_generate_feature_audit", generate)
+    audit_dir = audit_module.audit_feature_store(feature_store)
+    summary = json.loads((audit_dir / "audit_summary.json").read_text(encoding="utf-8"))
+
+    assert Path(summary["features_dir"]) == feature_store
+    assert Path(summary["features_dir"]).is_dir()
+    assert Path(summary["audit_output_dir"]) == audit_dir
+    assert audit_dir.is_dir()
+    assert ".partial" not in summary["features_dir"]
+    assert not tuple(audit_base.glob("*.partial"))
+
+
+def test_feature_build_renames_then_audits_then_promotes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     pointer, _, final, created_at = _atomic_build_paths(monkeypatch, tmp_path)
-    audited: list[Path] = []
+    audit_dir = tmp_path / "audit"
+    events: list[str] = []
+    real_replace = build_module.os.replace
 
     def construct(partial: Path, *_: object) -> None:
+        events.append("construct partial")
         assert partial.parent == final.parent
         assert partial.name.endswith(".partial")
         assert not final.exists()
         partial.mkdir()
         (partial / "artifact").write_text("complete", encoding="utf-8")
 
-    def audit(partial: Path) -> Path:
-        assert partial.is_dir()
-        assert not final.exists()
-        audited.append(partial)
-        return tmp_path / "audit"
+    def replace(source: Path, destination: Path) -> None:
+        events.append("rename final")
+        assert Path(source).name.endswith(".partial")
+        assert Path(destination) == final
+        real_replace(source, destination)
+
+    def audit(path: Path) -> Path:
+        events.append("audit final")
+        assert path == final
+        assert path.is_dir()
+        assert pointer.read_text(encoding="utf-8") != str(final)
+        audit_dir.mkdir()
+        return audit_dir
+
+    def promote(path: Path) -> None:
+        events.append("promote pointer")
+        assert path == final
+        pointer.write_text(str(path), encoding="utf-8")
 
     monkeypatch.setattr(build_module, "_construct_feature_store", construct)
+    monkeypatch.setattr(build_module.os, "replace", replace)
     monkeypatch.setattr(build_module, "audit_feature_store", audit)
+    monkeypatch.setattr(build_module, "_promote", promote)
 
-    output, audit_dir = build_module.build_feature_store(created_at=created_at)
+    output, published_audit = build_module.build_feature_store(created_at=created_at)
+
+    assert events == [
+        "construct partial",
+        "rename final",
+        "audit final",
+        "promote pointer",
+    ]
     assert output == final
-    assert audit_dir == tmp_path / "audit"
-    assert audited[0].name.endswith(".partial")
+    assert published_audit == audit_dir
     assert (final / "artifact").read_text(encoding="utf-8") == "complete"
     assert pointer.read_text(encoding="utf-8") == str(final)
     assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
 
 
-@pytest.mark.parametrize("failure", ("build", "audit"))
-def test_feature_build_failure_cleans_only_its_partial_and_keeps_pointer(
+def test_feature_build_failure_before_rename_cleans_only_its_partial(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    failure: str,
 ) -> None:
     pointer, previous, final, created_at = _atomic_build_paths(monkeypatch, tmp_path)
     unrelated = final.parent / "unrelated.partial"
@@ -711,19 +775,97 @@ def test_feature_build_failure_cleans_only_its_partial_and_keeps_pointer(
     def construct(partial: Path, *_: object) -> None:
         partial.mkdir()
         (partial / "artifact").write_text("incomplete", encoding="utf-8")
-        if failure == "build":
-            raise RuntimeError("injected build failure")
-
-    def audit(_: Path) -> Path:
-        raise RuntimeError("injected audit failure")
+        raise RuntimeError("injected build failure")
 
     monkeypatch.setattr(build_module, "_construct_feature_store", construct)
-    monkeypatch.setattr(build_module, "audit_feature_store", audit)
 
-    with pytest.raises(RuntimeError, match=f"injected {failure} failure"):
+    with pytest.raises(RuntimeError, match="injected build failure"):
         build_module.build_feature_store(created_at=created_at)
 
     assert pointer.read_text(encoding="utf-8") == str(previous)
+    assert previous.is_dir()
     assert not final.exists()
     assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
     assert unrelated.is_dir()
+
+
+def test_feature_audit_failure_cleans_outputs_and_keeps_pointer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pointer, previous, final, created_at = _atomic_build_paths(monkeypatch, tmp_path)
+    audit_base = tmp_path / "audits"
+    unrelated_audit = audit_base / "existing_audit"
+    unrelated_audit.mkdir(parents=True)
+
+    def construct(partial: Path, *_: object) -> None:
+        partial.mkdir()
+        (partial / "artifact").write_text("complete", encoding="utf-8")
+
+    def fail_audit(
+        source: Path,
+        partial: Path,
+        _: Path,
+        __: datetime,
+    ) -> None:
+        assert source == final
+        partial.mkdir(parents=True)
+        (partial / "incomplete").write_text("incomplete", encoding="utf-8")
+        raise RuntimeError("injected audit failure")
+
+    monkeypatch.setattr(audit_module, "AUDIT_BASE", audit_base)
+    monkeypatch.setattr(audit_module, "_generate_feature_audit", fail_audit)
+    monkeypatch.setattr(build_module, "_construct_feature_store", construct)
+    monkeypatch.setattr(
+        build_module, "audit_feature_store", audit_module.audit_feature_store
+    )
+
+    with pytest.raises(RuntimeError, match="injected audit failure"):
+        build_module.build_feature_store(created_at=created_at)
+
+    assert pointer.read_text(encoding="utf-8") == str(previous)
+    assert previous.is_dir()
+    assert not final.exists()
+    assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
+    assert tuple(audit_base.iterdir()) == (unrelated_audit,)
+
+
+def test_pointer_promotion_failure_removes_new_store_and_audit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pointer, previous, final, created_at = _atomic_build_paths(monkeypatch, tmp_path)
+    audit_dir = tmp_path / "audits" / "new_audit"
+    unrelated_audit = tmp_path / "audits" / "existing_audit"
+    unrelated_audit.mkdir(parents=True)
+    real_replace = build_module.os.replace
+
+    def construct(partial: Path, *_: object) -> None:
+        partial.mkdir()
+        (partial / "artifact").write_text("complete", encoding="utf-8")
+
+    def audit(path: Path) -> Path:
+        assert path == final
+        audit_dir.mkdir()
+        (audit_dir / "audit_summary.json").write_text("{}", encoding="utf-8")
+        return audit_dir
+
+    def fail_pointer_replace(source: Path, destination: Path) -> None:
+        if Path(destination) == pointer:
+            raise RuntimeError("injected pointer failure")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(build_module, "_construct_feature_store", construct)
+    monkeypatch.setattr(build_module, "audit_feature_store", audit)
+    monkeypatch.setattr(build_module.os, "replace", fail_pointer_replace)
+
+    with pytest.raises(RuntimeError, match="injected pointer failure"):
+        build_module.build_feature_store(created_at=created_at)
+
+    assert pointer.read_text(encoding="utf-8") == str(previous)
+    assert previous.is_dir()
+    assert not final.exists()
+    assert not audit_dir.exists()
+    assert unrelated_audit.is_dir()
+    assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
+    assert not tuple(pointer.parent.glob(f"{pointer.name}.*.tmp"))

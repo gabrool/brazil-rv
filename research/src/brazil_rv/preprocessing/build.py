@@ -493,14 +493,20 @@ def build_feature_store(*, created_at: datetime | None = None) -> tuple[Path, Pa
     partial = output_dir.with_name(f"{output_dir.name}.{uuid4().hex}.partial")
     if output_dir.exists():
         raise FileExistsError(f"Feature output already exists: {output_dir}")
+    audit_dir: Path | None = None
+    renamed = False
     try:
         _construct_feature_store(partial, created_at, started)
-        audit_dir = audit_feature_store(partial)
         os.replace(partial, output_dir)
+        renamed = True
+        audit_dir = audit_feature_store(output_dir)
         _promote(output_dir)
     except BaseException:
-        shutil.rmtree(partial, ignore_errors=True)
+        if audit_dir is not None:
+            shutil.rmtree(audit_dir, ignore_errors=True)
+        shutil.rmtree(output_dir if renamed else partial, ignore_errors=True)
         raise
+    assert audit_dir is not None
     return output_dir, audit_dir
 
 
