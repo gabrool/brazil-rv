@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
@@ -537,6 +538,201 @@ def test_unplanned_or_malformed_partial_remains_a_hard_error(
     assert partial.exists()
     assert not client.metadata.calls
     assert not client.timeseries.calls
+
+
+def test_dbn_without_descriptor_recovers_without_provider_calls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = _fake_acquisition(tmp_path, request)
+    interrupted = plan[0]
+    original_descriptor = json.loads(
+        interrupted.descriptor_path.read_text(encoding="utf-8")
+    )
+    interrupted.descriptor_path.unlink()
+    monkeypatch.setattr(global_source_module, "_dbn_metadata", _fake_dbn_metadata(plan))
+    client = _FakeHistorical()
+
+    recovered = download_history(
+        client,
+        request,
+        tmp_path,
+        confirmed_paid_download=True,
+        symbols=("ES.v.0",),
+    )
+
+    descriptor = json.loads(interrupted.descriptor_path.read_text(encoding="utf-8"))
+    assert recovered == plan
+    assert descriptor == original_descriptor
+    assert (
+        descriptor["data_sha256"]
+        == hashlib.sha256(interrupted.data_path.read_bytes()).hexdigest()
+    )
+    assert descriptor["data_size_bytes"] == interrupted.data_path.stat().st_size
+    assert global_source_module._completed_request(interrupted)
+    validated, _ = _validate_raw_acquisition(tmp_path, request, symbols=("ES.v.0",))
+    assert validated == plan
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
+def test_exact_stale_descriptor_temporary_is_cleaned_without_redownload(
+    tmp_path: Path,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = _fake_acquisition(tmp_path, request)
+    temporary = global_source_module._json_temporary_path(plan[0].descriptor_path)
+    temporary.write_text("stale", encoding="utf-8")
+    client = _FakeHistorical()
+
+    download_history(
+        client,
+        request,
+        tmp_path,
+        confirmed_paid_download=True,
+        symbols=("ES.v.0",),
+    )
+
+    assert not temporary.exists()
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
+def test_descriptor_temporary_without_dbn_is_cleaned_and_downloaded_once(
+    tmp_path: Path,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = request_plan(request, tmp_path, ("ES.v.0",))
+    target = plan[0]
+    temporary = global_source_module._json_temporary_path(target.descriptor_path)
+    temporary.parent.mkdir(parents=True)
+    temporary.write_text("interrupted", encoding="utf-8")
+    client = _FakeHistorical()
+
+    download_history(
+        client,
+        request,
+        tmp_path,
+        confirmed_paid_download=True,
+        symbols=("ES.v.0",),
+    )
+
+    matching_downloads = [
+        call
+        for call in client.timeseries.calls
+        if call["schema"] == target.schema
+        and call["start"] == target.start
+        and call["end"] == target.end
+        and call["symbols"] == [target.continuous_symbol]
+    ]
+    assert not temporary.exists()
+    assert len(matching_downloads) == 1
+    assert target.data_path.is_file()
+    assert target.descriptor_path.is_file()
+
+
+@pytest.mark.parametrize("issue", ("unknown", "malformed"))
+def test_unknown_or_malformed_descriptor_temporary_is_a_hard_error(
+    tmp_path: Path,
+    issue: str,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = request_plan(request, tmp_path, ("ES.v.0",))
+    if issue == "unknown":
+        temporary = tmp_path / "requests" / "unknown.json.tmp"
+        temporary.parent.mkdir(parents=True)
+        temporary.write_text("unexpected", encoding="utf-8")
+    else:
+        temporary = global_source_module._json_temporary_path(plan[0].descriptor_path)
+        temporary.mkdir(parents=True)
+    client = _FakeHistorical()
+
+    with pytest.raises(ValueError, match="temporary artifact"):
+        download_history(
+            client,
+            request,
+            tmp_path,
+            confirmed_paid_download=True,
+            symbols=("ES.v.0",),
+        )
+
+    assert temporary.exists()
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
+def test_invalid_dbn_without_descriptor_is_preserved_and_rejected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = request_plan(request, tmp_path, ("ES.v.0",))
+    interrupted = plan[0]
+    interrupted.data_path.parent.mkdir(parents=True)
+    interrupted.data_path.write_bytes(b"paid-but-invalid")
+    monkeypatch.setattr(
+        global_source_module,
+        "_dbn_metadata",
+        _fake_dbn_metadata(plan, wrong_path=interrupted.data_path),
+    )
+    client = _FakeHistorical()
+
+    with pytest.raises(ValueError, match="DBN request metadata mismatch"):
+        download_history(
+            client,
+            request,
+            tmp_path,
+            confirmed_paid_download=True,
+            symbols=("ES.v.0",),
+        )
+
+    assert interrupted.data_path.read_bytes() == b"paid-but-invalid"
+    assert not interrupted.descriptor_path.exists()
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
+def test_descriptor_without_dbn_remains_an_integrity_error(tmp_path: Path) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    plan = _fake_acquisition(tmp_path, request)
+    interrupted = plan[0]
+    interrupted.data_path.unlink()
+    client = _FakeHistorical()
+
+    with pytest.raises(ValueError, match="Incomplete Databento request artifacts"):
+        download_history(
+            client,
+            request,
+            tmp_path,
+            confirmed_paid_download=True,
+            symbols=("ES.v.0",),
+        )
+
+    assert interrupted.descriptor_path.is_file()
+    assert not client.metadata.calls
+    assert not client.timeseries.calls
+
+
+def test_atomic_descriptor_failure_cleans_exact_temporary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    descriptor = tmp_path / "requests" / "request.json"
+    descriptor.parent.mkdir(parents=True)
+    temporary = global_source_module._json_temporary_path(descriptor)
+
+    def fail_replace(source: Path, destination: Path) -> None:
+        assert Path(source) == temporary
+        assert Path(destination) == descriptor
+        raise RuntimeError("injected descriptor publication failure")
+
+    monkeypatch.setattr(global_source_module.os, "replace", fail_replace)
+    with pytest.raises(RuntimeError, match="descriptor publication failure"):
+        global_source_module._atomic_json(descriptor, {"status": "complete"})
+
+    assert not descriptor.exists()
+    assert not temporary.exists()
 
 
 @pytest.mark.parametrize(
