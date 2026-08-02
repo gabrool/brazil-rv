@@ -93,12 +93,19 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _json_temporary_path(path: Path) -> Path:
+    return path.with_name(f"{path.name}.tmp")
+
+
 def _atomic_json(path: Path, payload: dict[str, object]) -> None:
-    temporary = path.with_name(f"{path.name}.tmp")
-    temporary.write_text(
-        json.dumps(payload, indent=2, allow_nan=False), encoding="utf-8"
-    )
-    os.replace(temporary, path)
+    temporary = _json_temporary_path(path)
+    try:
+        temporary.write_text(
+            json.dumps(payload, indent=2, allow_nan=False), encoding="utf-8"
+        )
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _atomic_pointer(pointer: Path, target: Path) -> None:
@@ -200,6 +207,17 @@ def _request_contract(request: HistoricalRequest) -> dict[str, object]:
     }
 
 
+def _request_descriptor(request: HistoricalRequest) -> dict[str, object]:
+    descriptor = _request_contract(request)
+    descriptor.update(
+        {
+            "data_sha256": _sha256(request.data_path),
+            "data_size_bytes": request.data_path.stat().st_size,
+        }
+    )
+    return descriptor
+
+
 def _read_json(path: Path) -> dict[str, object]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -260,29 +278,46 @@ def _request_partial_path(request: HistoricalRequest) -> Path:
     return request.data_path.with_suffix(f"{request.data_path.suffix}.partial")
 
 
-def _remove_stale_planned_partials(
-    raw_dir: Path, plan: Sequence[HistoricalRequest]
-) -> None:
-    expected = {_request_partial_path(request).absolute() for request in plan}
-    actual = {
-        path.absolute()
-        for directory in ("requests", "bars", "definitions")
-        for path in (raw_dir / directory).rglob("*.partial")
-    }
-    if actual - expected:
-        raise ValueError("Unexpected Databento partial artifact exists")
+def _recover_request_states(raw_dir: Path, plan: Sequence[HistoricalRequest]) -> None:
     partials = tuple(_request_partial_path(request) for request in plan)
+    descriptor_temporaries = tuple(
+        _json_temporary_path(request.descriptor_path) for request in plan
+    )
+    expected_partials = {path.absolute() for path in partials}
+    actual_partials = {path.absolute() for path in raw_dir.rglob("*.partial")}
+    if actual_partials - expected_partials:
+        raise ValueError("Unexpected Databento partial artifact exists")
     if any(path.exists() and not path.is_file() for path in partials):
         raise ValueError("Malformed Databento partial artifact exists")
-    for path in partials:
+
+    expected_temporaries = {path.absolute() for path in descriptor_temporaries}
+    actual_temporaries = {path.absolute() for path in raw_dir.rglob("*.tmp")}
+    if actual_temporaries - expected_temporaries:
+        raise ValueError("Unexpected Databento temporary artifact exists")
+    if any(path.exists() and not path.is_file() for path in descriptor_temporaries):
+        raise ValueError("Malformed Databento temporary artifact exists")
+
+    for path in (*partials, *descriptor_temporaries):
         path.unlink(missing_ok=True)
+    _validate_planned_files(raw_dir, plan, complete=False)
+
+    for request in plan:
+        data_exists = request.data_path.is_file()
+        descriptor_exists = request.descriptor_path.is_file()
+        if descriptor_exists and not data_exists:
+            raise ValueError(
+                f"Incomplete Databento request artifacts: "
+                f"{request.descriptor_path.stem}"
+            )
+        if data_exists and not descriptor_exists:
+            _validate_dbn_contract(request)
+            _atomic_json(request.descriptor_path, _request_descriptor(request))
 
 
 def remaining_requests(
     raw_dir: Path, plan: Sequence[HistoricalRequest]
 ) -> tuple[HistoricalRequest, ...]:
-    _remove_stale_planned_partials(raw_dir, plan)
-    _validate_planned_files(raw_dir, plan, complete=False)
+    _recover_request_states(raw_dir, plan)
     return tuple(request for request in plan if not _completed_request(request))
 
 
@@ -317,14 +352,7 @@ def _download_request(
     if not partial.is_file():
         raise RuntimeError("Databento did not produce the requested DBN file")
     os.replace(partial, request.data_path)
-    descriptor = _request_contract(request)
-    descriptor.update(
-        {
-            "data_sha256": _sha256(request.data_path),
-            "data_size_bytes": request.data_path.stat().st_size,
-        }
-    )
-    _atomic_json(request.descriptor_path, descriptor)
+    _atomic_json(request.descriptor_path, _request_descriptor(request))
 
 
 @contextmanager

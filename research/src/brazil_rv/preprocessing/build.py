@@ -62,6 +62,7 @@ from .io import (
     prepare_session_bars,
     read_research_interval,
     resolve_inputs,
+    resolve_pointer,
     validate_physical_source_identity,
     validate_source_date_isolation,
 )
@@ -484,6 +485,15 @@ def _construct_feature_store(
     )
 
 
+def _canonical_pointer_targets(output_dir: Path) -> bool:
+    try:
+        return (
+            resolve_pointer(CANONICAL_OUTPUT_POINTER).resolve() == output_dir.resolve()
+        )
+    except Exception:
+        return False
+
+
 def build_feature_store(*, created_at: datetime | None = None) -> tuple[Path, Path]:
     started = clock.perf_counter()
     created_at = datetime.now(timezone.utc) if created_at is None else created_at
@@ -495,16 +505,19 @@ def build_feature_store(*, created_at: datetime | None = None) -> tuple[Path, Pa
         raise FileExistsError(f"Feature output already exists: {output_dir}")
     audit_dir: Path | None = None
     renamed = False
+    promotion_started = False
     try:
         _construct_feature_store(partial, created_at, started)
         os.replace(partial, output_dir)
         renamed = True
         audit_dir = audit_feature_store(output_dir)
+        promotion_started = True
         _promote(output_dir)
     except BaseException:
-        if audit_dir is not None:
-            shutil.rmtree(audit_dir, ignore_errors=True)
-        shutil.rmtree(output_dir if renamed else partial, ignore_errors=True)
+        if not promotion_started or not _canonical_pointer_targets(output_dir):
+            if audit_dir is not None:
+                shutil.rmtree(audit_dir, ignore_errors=True)
+            shutil.rmtree(output_dir if renamed else partial, ignore_errors=True)
         raise
     assert audit_dir is not None
     return output_dir, audit_dir

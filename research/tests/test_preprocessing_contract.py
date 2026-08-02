@@ -830,7 +830,7 @@ def test_feature_audit_failure_cleans_outputs_and_keeps_pointer(
     assert tuple(audit_base.iterdir()) == (unrelated_audit,)
 
 
-def test_pointer_promotion_failure_removes_new_store_and_audit(
+def test_pointer_failure_before_replacement_rolls_back_invocation_outputs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -866,6 +866,49 @@ def test_pointer_promotion_failure_removes_new_store_and_audit(
     assert previous.is_dir()
     assert not final.exists()
     assert not audit_dir.exists()
+    assert unrelated_audit.is_dir()
+    assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
+    assert not tuple(pointer.parent.glob(f"{pointer.name}.*.tmp"))
+
+
+def test_pointer_interruption_after_replacement_preserves_committed_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pointer, previous, final, created_at = _atomic_build_paths(monkeypatch, tmp_path)
+    audit_dir = tmp_path / "audits" / "new_audit"
+    unrelated_audit = tmp_path / "audits" / "existing_audit"
+    unrelated_audit.mkdir(parents=True)
+    real_replace = build_module.os.replace
+
+    def construct(partial: Path, *_: object) -> None:
+        partial.mkdir()
+        (partial / "artifact").write_text("complete", encoding="utf-8")
+
+    def audit(path: Path) -> Path:
+        assert path == final
+        audit_dir.mkdir()
+        (audit_dir / "audit_summary.json").write_text("{}", encoding="utf-8")
+        return audit_dir
+
+    def replace_then_interrupt(source: Path, destination: Path) -> None:
+        real_replace(source, destination)
+        if Path(destination) == pointer:
+            raise KeyboardInterrupt("injected post-replacement interruption")
+
+    monkeypatch.setattr(build_module, "_construct_feature_store", construct)
+    monkeypatch.setattr(build_module, "audit_feature_store", audit)
+    monkeypatch.setattr(build_module.os, "replace", replace_then_interrupt)
+
+    with pytest.raises(KeyboardInterrupt, match="post-replacement interruption"):
+        build_module.build_feature_store(created_at=created_at)
+
+    assert pointer.read_text(encoding="utf-8") == str(final)
+    assert final.is_dir()
+    assert (final / "artifact").is_file()
+    assert audit_dir.is_dir()
+    assert (audit_dir / "audit_summary.json").is_file()
+    assert previous.is_dir()
     assert unrelated_audit.is_dir()
     assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
     assert not tuple(pointer.parent.glob(f"{pointer.name}.*.tmp"))
