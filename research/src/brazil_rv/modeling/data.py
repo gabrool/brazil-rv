@@ -16,9 +16,12 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 
 from .contract import (
     ABSOLUTE_PATCH_COUNT,
-    CONTEXT_COUNT,
     CONTEXT_GENERIC_DYNAMIC_COUNT,
-    CONTEXT_SYMBOLS,
+    DECISION_GLOBAL_INDICES,
+    GLOBAL_CONTEXT_COUNT,
+    GLOBAL_CONTEXT_SETTINGS,
+    GLOBAL_CONTEXT_SYMBOLS,
+    GLOBAL_WINDOW_MINUTES,
     EFFECTIVE_BATCH_SIZE,
     EQUITY_ABSOLUTE_START_PATCH,
     EQUITY_COUNT,
@@ -29,6 +32,8 @@ from .contract import (
     FEATURE_STORE_POINTER,
     HORIZON_COUNT,
     INSTRUMENT_COUNT,
+    LOCAL_CONTEXT_COUNT,
+    LOCAL_CONTEXT_SYMBOLS,
     NEURAL_MODELS,
     PATCH_INPUT_WIDTH,
     PATCH_MINUTES,
@@ -54,6 +59,9 @@ FEATURE_ARRAY_FILES = (
     "context_slow.npy",
     "context_data_ready.npy",
     "targets.npy",
+    "global_features.npy",
+    "global_slow.npy",
+    "global_data_ready.npy",
     "label_mask.npy",
     "raw_returns.npy",
 )
@@ -139,13 +147,23 @@ def validate_feature_store(store: Path) -> pl.DataFrame:
             raise ValueError(
                 f"Expected {filename} shape {expected_shape}, found {array.shape}"
             )
-    context_symbols = tuple(
+    local_symbols = tuple(
         pl.read_parquet(store / "context_index.parquet")
         .sort("context_slot")
         .get_column("symbol")
     )
-    if context_symbols != CONTEXT_SYMBOLS:
-        raise ValueError("Context axis does not match the fixed contract")
+    if local_symbols != LOCAL_CONTEXT_SYMBOLS:
+        raise ValueError("Local context axis does not match the fixed contract")
+    global_symbols = tuple(
+        pl.scan_parquet(store / "global_context_index.parquet")
+        .select("global_slot", "continuous_symbol")
+        .unique()
+        .sort("global_slot")
+        .collect()
+        .get_column("continuous_symbol")
+    )
+    if global_symbols != GLOBAL_CONTEXT_SYMBOLS:
+        raise ValueError("Global context axis does not match the fixed contract")
     splits = split_sample_index(sample_index)
     split_ids = [
         set(splits[name].get_column("sample_id").to_list())
@@ -260,16 +278,31 @@ def _build_patch_batch(
     arrays: dict[str, np.ndarray],
     date_idx: np.ndarray,
     equity_cutoffs: np.ndarray,
+    decision_idx: np.ndarray,
     context_cutoffs: np.ndarray,
     active_equities: np.ndarray,
-    needs_context: bool,
+    global_context: str | None,
 ) -> dict[str, np.ndarray]:
     batch_size = date_idx.size
-    context_ready = (
+    needs_context = global_context is not None
+    if needs_context and global_context not in GLOBAL_CONTEXT_SETTINGS:
+        raise ValueError(f"Invalid global context setting: {global_context}")
+    local_ready = (
         np.asarray(arrays["context_data_ready.npy"][date_idx], dtype=bool)
         if needs_context
         else None
     )
+    global_ready = None
+    if needs_context:
+        readiness = np.asarray(arrays["global_data_ready.npy"][date_idx], dtype=bool)
+        global_ready = readiness[
+            np.arange(batch_size)[:, None],
+            np.arange(GLOBAL_CONTEXT_COUNT)[None, :],
+            decision_idx[:, None],
+        ]
+        if global_context == "masked":
+            global_ready[:] = False
+
     patches = np.zeros(
         (batch_size, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH),
         dtype=np.float32,
@@ -311,22 +344,54 @@ def _build_patch_batch(
             EQUITY_ABSOLUTE_START_PATCH:state,
         ] = active_equities[group, :, None]
         if needs_context:
-            ready = context_ready[group]
+            ready = local_ready[group]
             context_prefix = np.asarray(
                 arrays["context_features.npy"][date_idx[group], :, :context_cutoff, :],
                 dtype=np.float32,
-            ).reshape(group.size, CONTEXT_COUNT, state, PATCH_INPUT_WIDTH)
-            patches[group, EQUITY_COUNT:, :state] = (
-                context_prefix * ready[..., None, None]
-            )
-            history_patch_mask[group, EQUITY_COUNT:, :state] = ready[..., None]
+            ).reshape(group.size, LOCAL_CONTEXT_COUNT, state, PATCH_INPUT_WIDTH)
+            patches[
+                group, EQUITY_COUNT : EQUITY_COUNT + LOCAL_CONTEXT_COUNT, :state
+            ] = context_prefix * ready[..., None, None]
+            history_patch_mask[
+                group, EQUITY_COUNT : EQUITY_COUNT + LOCAL_CONTEXT_COUNT, :state
+            ] = ready[..., None]
 
     if needs_context:
-        instrument_mask[:, EQUITY_COUNT:] = context_ready
-        slow_features[:, EQUITY_COUNT:] = (
+        global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+        instrument_mask[:, EQUITY_COUNT:global_start] = local_ready
+        slow_features[:, EQUITY_COUNT:global_start] = (
             np.asarray(arrays["context_slow.npy"][date_idx], dtype=np.float32)
-            * context_ready[..., None]
+            * local_ready[..., None]
         )
+        global_cutoffs = np.asarray(DECISION_GLOBAL_INDICES)[decision_idx]
+        minute_indices = (
+            global_cutoffs[:, None]
+            - GLOBAL_WINDOW_MINUTES
+            + np.arange(GLOBAL_WINDOW_MINUTES)[None, :]
+        )
+        global_grid = np.asarray(
+            arrays["global_features.npy"][date_idx], dtype=np.float32
+        )
+        global_prefix = global_grid[
+            np.arange(batch_size)[:, None, None],
+            np.arange(GLOBAL_CONTEXT_COUNT)[None, :, None],
+            minute_indices[:, None, :],
+        ].reshape(
+            batch_size,
+            GLOBAL_CONTEXT_COUNT,
+            ABSOLUTE_PATCH_COUNT,
+            PATCH_INPUT_WIDTH,
+        )
+        patches[:, global_start:] = global_prefix * global_ready[..., None, None]
+        history_patch_mask[:, global_start:] = global_ready[..., None]
+        instrument_mask[:, global_start:] = global_ready
+        global_slow = np.asarray(arrays["global_slow.npy"][date_idx], dtype=np.float32)
+        decision_slow = global_slow[
+            np.arange(batch_size)[:, None],
+            np.arange(GLOBAL_CONTEXT_COUNT)[None, :],
+            decision_idx[:, None],
+        ]
+        slow_features[:, global_start:] = decision_slow * global_ready[..., None]
     return {
         "patches": patches,
         "history_patch_mask": history_patch_mask,
@@ -343,9 +408,22 @@ def build_tabular_batch(
     equity_cutoffs: np.ndarray,
     context_cutoffs: np.ndarray,
     active_equities: np.ndarray,
+    global_context: str,
 ) -> dict[str, np.ndarray]:
-    """Construct the exact shared 871-wide MLP/XGBoost representation."""
+    """Construct the exact shared MLP/XGBoost representation."""
     batch_size = date_idx.size
+    if global_context not in GLOBAL_CONTEXT_SETTINGS:
+        raise ValueError(f"Invalid global context setting: {global_context}")
+    readiness = np.asarray(arrays["global_data_ready.npy"][date_idx], dtype=bool)
+    global_ready = readiness[
+        np.arange(batch_size)[:, None],
+        np.arange(GLOBAL_CONTEXT_COUNT)[None, :],
+        decision_idx[:, None],
+    ]
+    if global_context == "masked":
+        global_ready[:] = False
+    global_cutoffs = np.asarray(DECISION_GLOBAL_INDICES)[decision_idx]
+    global_grid = np.asarray(arrays["global_features.npy"][date_idx], dtype=np.float32)
     output = np.zeros(
         (batch_size, EQUITY_COUNT, TABULAR_FEATURE_COUNT), dtype=np.float32
     )
@@ -380,7 +458,7 @@ def build_tabular_batch(
         equity_validity.append(valid)
 
     context_validity: list[np.ndarray] = []
-    for context_slot in range(CONTEXT_COUNT):
+    for context_slot in range(LOCAL_CONTEXT_COUNT):
         for offset in TABULAR_OFFSETS:
             block = np.zeros(
                 (batch_size, CONTEXT_GENERIC_DYNAMIC_COUNT), dtype=np.float32
@@ -408,11 +486,36 @@ def build_tabular_batch(
             cursor += CONTEXT_GENERIC_DYNAMIC_COUNT
             context_validity.append(valid)
 
+    global_minutes = (
+        global_cutoffs[:, None]
+        - 1
+        - np.asarray(TABULAR_OFFSETS, dtype=np.int64)[None, :]
+    )
+    global_values = global_grid[
+        np.arange(batch_size)[:, None, None],
+        np.arange(GLOBAL_CONTEXT_COUNT)[None, :, None],
+        global_minutes[:, None, :],
+    ]
+    global_validity = (global_values[..., 5] > 0.5) & global_ready[..., None]
+    global_dynamic = (
+        global_values[..., :CONTEXT_GENERIC_DYNAMIC_COUNT] * global_validity[..., None]
+    ).reshape(batch_size, -1)
+    output[:, :, cursor : cursor + global_dynamic.shape[-1]] = global_dynamic[:, None]
+    cursor += global_dynamic.shape[-1]
     context_slow = np.asarray(
         arrays["context_slow.npy"][date_idx], dtype=np.float32
-    ).reshape(batch_size, CONTEXT_COUNT * SLOW_FEATURE_COUNT)
+    ).reshape(batch_size, LOCAL_CONTEXT_COUNT * SLOW_FEATURE_COUNT)
     output[:, :, cursor : cursor + context_slow.shape[-1]] = context_slow[:, None]
     cursor += context_slow.shape[-1]
+    global_slow = np.asarray(arrays["global_slow.npy"][date_idx], dtype=np.float32)
+    decision_slow = global_slow[
+        np.arange(batch_size)[:, None],
+        np.arange(GLOBAL_CONTEXT_COUNT)[None, :],
+        decision_idx[:, None],
+    ]
+    decision_slow = (decision_slow * global_ready[..., None]).reshape(batch_size, -1)
+    output[:, :, cursor : cursor + decision_slow.shape[-1]] = decision_slow[:, None]
+    cursor += decision_slow.shape[-1]
 
     normalized_position = decision_idx.astype(np.float32) / (
         EXPECTED_DECISIONS_PER_DATE - 1
@@ -426,6 +529,13 @@ def build_tabular_batch(
     for valid in context_validity:
         output[:, :, cursor] = valid[:, None]
         cursor += 1
+    for valid in global_validity.reshape(batch_size, -1).T:
+        output[:, :, cursor] = valid[:, None]
+        cursor += 1
+    for ready in global_ready.T:
+        output[:, :, cursor] = ready[:, None]
+        cursor += 1
+
     if cursor != TABULAR_FEATURE_COUNT:
         raise RuntimeError(f"Tabular feature construction ended at width {cursor}")
     output *= active_equities[..., None]
@@ -438,6 +548,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         store: Path,
         sample_index: pl.DataFrame,
         model_name: str,
+        global_context: str | None,
         tcn_architecture: TCNArchitecture | None = None,
     ) -> None:
         if model_name not in NEURAL_MODELS:
@@ -456,10 +567,15 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 raise ValueError(
                     f"TCN architecture is forbidden for model {model_name}"
                 )
-            needs_context = model_name in ("context_only", "context_pooled")
+            needs_context = model_name in ("context_only", "context_pooled", "mlp")
+        if needs_context and global_context not in GLOBAL_CONTEXT_SETTINGS:
+            raise ValueError("Context-consuming models require global context setting")
+        if not needs_context and global_context is not None:
+            raise ValueError("Context-free models do not accept global context setting")
         self.store = store
         self.model_name = model_name
         self.needs_context = needs_context
+        self.global_context = global_context
         self.rows = {
             column: np.asarray(sample_index.get_column(column).to_list())
             for column in (
@@ -488,7 +604,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 else tuple(
                     name
                     for name in FEATURE_ARRAY_FILES
-                    if not name.startswith("context_")
+                    if not name.startswith(("context_", "global_"))
                 )
             )
             self._arrays = {
@@ -518,6 +634,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 equity_cutoffs,
                 context_cutoffs,
                 active_equities,
+                self.global_context,
             )
             inputs["tabular_features"][~common["sample_valid_mask"]] = 0.0
             inputs["equity_mask"][~common["sample_valid_mask"]] = False
@@ -526,9 +643,10 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 arrays,
                 source_date_idx,
                 equity_cutoffs,
+                source_decision_idx,
                 context_cutoffs,
                 active_equities,
-                self.needs_context,
+                self.global_context,
             )
         return {**inputs, **common}
 
@@ -543,13 +661,16 @@ class TabularRowIterator:
         horizon_index: int,
         *,
         device: str,
+        global_context: str,
         batch_size: int = 64,
     ) -> None:
         if horizon_index not in range(HORIZON_COUNT):
             raise ValueError("horizon_index is outside the three-horizon contract")
         if device not in ("cpu", "cuda"):
             raise ValueError("TabularRowIterator device must be 'cpu' or 'cuda'")
-        self.dataset = VectorizedFeatureDataset(store, sample_index, "mlp")
+        self.dataset = VectorizedFeatureDataset(
+            store, sample_index, "mlp", global_context
+        )
         self.horizon_index = horizon_index
         self.device = device
         self.batch_size = batch_size
@@ -692,6 +813,7 @@ def create_training_loaders(
     train_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
     model_name: str,
+    global_context: str | None,
     runtime: RuntimeSettings,
     seed: int,
     tcn_architecture: TCNArchitecture | None = None,
@@ -702,13 +824,17 @@ def create_training_loaders(
 ]:
     sampler = DateStratifiedMicrobatchSampler(train_rows, runtime, seed)
     train_loader = _create_loader(
-        VectorizedFeatureDataset(store, train_rows, model_name, tcn_architecture),
+        VectorizedFeatureDataset(
+            store, train_rows, model_name, global_context, tcn_architecture
+        ),
         sampler,
         runtime,
         seed,
     )
     validation_loader = _create_loader(
-        VectorizedFeatureDataset(store, validation_rows, model_name, tcn_architecture),
+        VectorizedFeatureDataset(
+            store, validation_rows, model_name, global_context, tcn_architecture
+        ),
         SequentialPaddedBatchSampler(
             validation_rows.height, runtime.evaluation_batch_size
         ),
@@ -722,12 +848,15 @@ def create_evaluation_loader(
     store: Path,
     rows: pl.DataFrame,
     model_name: str,
+    global_context: str | None,
     runtime: RuntimeSettings,
     seed: int,
     tcn_architecture: TCNArchitecture | None = None,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
-        VectorizedFeatureDataset(store, rows, model_name, tcn_architecture),
+        VectorizedFeatureDataset(
+            store, rows, model_name, global_context, tcn_architecture
+        ),
         SequentialPaddedBatchSampler(rows.height, runtime.evaluation_batch_size),
         runtime,
         seed,

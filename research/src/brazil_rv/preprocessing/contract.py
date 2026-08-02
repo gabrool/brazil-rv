@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-CONTRACT_VERSION = "M1_FEATURES_V1"
+CONTRACT_VERSION = "M1_FEATURES_GLOBAL_CONTEXT"
 
 PROJECT_ROOT = Path(r"C:\Brazil-RV")
 UNIVERSE_POINTER = (
@@ -20,15 +20,19 @@ COTAHIST_POINTER = (
     PROJECT_ROOT / "quant-data/b3/interim/b3/cotahist/parsed_canonical_path.txt"
 )
 CONTEXT_POINTER = PROJECT_ROOT / "quant-data/b3/raw/xp/milestone3_long_history_path.txt"
+GLOBAL_SOURCE_POINTER = (
+    PROJECT_ROOT
+    / "quant-data/b3/interim/global_context/global_context_canonical_path.txt"
+)
 CATALOGUE_PATH = (
     PROJECT_ROOT / "quant-data/b3/raw/xp/catalogue_canonical/symbol_catalogue.parquet"
 )
 OUTPUT_BASE = PROJECT_ROOT / "quant-data/b3/processed/features"
-CANONICAL_OUTPUT_POINTER = OUTPUT_BASE / "m1_features_v1_canonical_path.txt"
+CANONICAL_OUTPUT_POINTER = OUTPUT_BASE / "m1_features_canonical_path.txt"
 
 EXPECTED_EQUITIES = 158
-CONTEXT_SYMBOLS = ("WIN$", "WDO$", "DI1F27", "DI1F28", "DI1F29", "DI1F31")
-CONTEXT_FAMILIES = (
+LOCAL_CONTEXT_SYMBOLS = ("WIN$", "WDO$", "DI1F27", "DI1F28", "DI1F29", "DI1F31")
+LOCAL_CONTEXT_FAMILIES = (
     "EQUITY_FUTURE",
     "FX_FUTURE",
     "RATE_FUTURE",
@@ -36,12 +40,51 @@ CONTEXT_FAMILIES = (
     "RATE_FUTURE",
     "RATE_FUTURE",
 )
-RATE_CONTEXT_SYMBOLS = frozenset(CONTEXT_SYMBOLS[2:])
+RATE_CONTEXT_SYMBOLS = frozenset(LOCAL_CONTEXT_SYMBOLS[2:])
+GLOBAL_CONTEXT_SYMBOLS = (
+    "ES.v.0",
+    "NQ.v.0",
+    "ZT.v.0",
+    "ZN.v.0",
+    "CL.v.0",
+    "HG.v.0",
+    "6E.v.0",
+    "6M.v.0",
+)
+GLOBAL_CONTEXT_FAMILIES = (
+    "US_EQUITY_ES",
+    "US_EQUITY_NQ",
+    "US_RATES_ZT",
+    "US_RATES_ZN",
+    "COMMODITY_CL",
+    "COMMODITY_HG",
+    "FX_6E",
+    "FX_6M",
+)
+GLOBAL_QUOTE_DIRECTIONS = (
+    "USD_PER_INDEX_POINT",
+    "USD_PER_INDEX_POINT",
+    "USD_PER_TREASURY_POINT",
+    "USD_PER_TREASURY_POINT",
+    "USD_PER_BARREL",
+    "USD_PER_POUND",
+    "USD_PER_EUR",
+    "USD_PER_MXN",
+)
+GLOBAL_PROVIDER = "Databento"
+GLOBAL_DATASET = "GLBX.MDP3"
+GLOBAL_SCHEMA = "ohlcv-1m"
+GLOBAL_DATABENTO_VERSION = "0.81.0"
+GLOBAL_CONTINUOUS_ROLL_RULE = "highest_prior_day_volume"
+GLOBAL_AVAILABILITY_RULE = "bar_start_utc + 1 minute <= decision_time_utc"
 
 EQUITY_SESSION_START_MINUTE = 10 * 60
 EQUITY_SESSION_MINUTES = 405
 CONTEXT_SESSION_START_MINUTE = 9 * 60
 CONTEXT_SESSION_MINUTES = 465
+GLOBAL_SESSION_START_MINUTE = 4 * 60 + 30
+GLOBAL_SESSION_END_MINUTE = 14 * 60 + 45
+GLOBAL_SESSION_MINUTES = GLOBAL_SESSION_END_MINUTE - GLOBAL_SESSION_START_MINUTE
 DYNAMIC_CHANNELS = (
     "open_move_normalized",
     "high_move_normalized",
@@ -106,12 +149,47 @@ SLOW_CHANNELS = (
 )
 EQUITY_SLOW_CHANNELS = SLOW_CHANNELS
 CONTEXT_SLOW_CHANNELS = SLOW_CHANNELS
+GLOBAL_SLOW_CHANNELS = (
+    "vol_regime",
+    "previous_b3_close_to_decision_return_normalized",
+    "previous_futures_session_close_to_close_return_normalized",
+    "previous_futures_session_open_to_close_return_normalized",
+    "previous_futures_session_last_60m_return_normalized",
+    "previous_futures_session_realized_vol_log_ratio",
+    "previous_futures_session_volume_log_ratio",
+    "return_5_sessions_normalized",
+    "return_20_sessions_normalized",
+    "realized_vol_5_sessions_log_ratio",
+    "realized_vol_20_sessions_log_ratio",
+    "vol_of_vol_20_sessions",
+    "median_daily_volume_20_sessions_log_scale",
+    "unused_equity_liquidity_13",
+    "unused_equity_liquidity_14",
+    "unused_equity_liquidity_15",
+    "observed_session_fraction_5_sessions",
+    "unused_equity_context_17",
+    "unused_equity_context_18",
+    "unused_equity_context_19",
+    "unused_equity_context_20",
+    "unused_equity_context_21",
+    "unused_equity_context_22",
+    "unused_equity_context_23",
+    "unused_equity_context_24",
+    "unused_equity_context_25",
+    "weekday_sin",
+    "weekday_cos",
+    "month_end_proximity",
+    "quarter_end_proximity",
+    "unused_local_rate_level",
+    "time_to_expiry_scaled",
+)
 DYNAMIC_CHANNEL_COUNT = len(DYNAMIC_CHANNELS)
 SLOW_CHANNEL_COUNT = len(SLOW_CHANNELS)
 EQUITY_SLOW_COUNT = SLOW_CHANNEL_COUNT
 CONTEXT_SLOW_COUNT = SLOW_CHANNEL_COUNT
+GLOBAL_SLOW_COUNT = len(GLOBAL_SLOW_CHANNELS)
 PATCH_INPUT_WIDTH = 5 * DYNAMIC_CHANNEL_COUNT
-if DYNAMIC_CHANNEL_COUNT != 26 or SLOW_CHANNEL_COUNT != 32:
+if DYNAMIC_CHANNEL_COUNT != 26 or SLOW_CHANNEL_COUNT != 32 or GLOBAL_SLOW_COUNT != 32:
     raise ValueError("Feature channel contract has the wrong width")
 
 EXPECTED_DATE_COUNT = 1248
@@ -119,6 +197,7 @@ EXPECTED_SAMPLE_COUNT = 59_565
 
 DECISION_EQUITY_INDICES = tuple(15 + 5 * index for index in range(55))
 DECISION_CONTEXT_INDICES = tuple(75 + 5 * index for index in range(55))
+DECISION_GLOBAL_INDICES = tuple(345 + 5 * index for index in range(55))
 DECISION_TIMES = tuple(
     time((EQUITY_SESSION_START_MINUTE + index) // 60, index % 60)
     for index in DECISION_EQUITY_INDICES
@@ -170,7 +249,8 @@ class OutputArraySpec:
 def output_array_specs(date_count: int) -> dict[str, OutputArraySpec]:
     d = date_count
     n = EXPECTED_EQUITIES
-    c = len(CONTEXT_SYMBOLS)
+    c = len(LOCAL_CONTEXT_SYMBOLS)
+    g = len(GLOBAL_CONTEXT_SYMBOLS)
     q = len(DECISION_EQUITY_INDICES)
     h = len(HORIZONS)
     f = len(DYNAMIC_CHANNELS)
@@ -191,6 +271,13 @@ def output_array_specs(date_count: int) -> dict[str, OutputArraySpec]:
         ),
         "context_data_ready.npy": OutputArraySpec(np.dtype(bool), (d, c)),
         "raw_returns.npy": OutputArraySpec(np.dtype(np.float32), (d, n, q, h)),
+        "global_features.npy": OutputArraySpec(
+            np.dtype(np.float32), (d, g, GLOBAL_SESSION_MINUTES, f)
+        ),
+        "global_slow.npy": OutputArraySpec(
+            np.dtype(np.float32), (d, g, q, len(GLOBAL_SLOW_CHANNELS))
+        ),
+        "global_data_ready.npy": OutputArraySpec(np.dtype(bool), (d, g, q)),
         "targets.npy": OutputArraySpec(np.dtype(np.float32), (d, n, q, h)),
         "label_mask.npy": OutputArraySpec(np.dtype(bool), (d, n, q, h)),
         "cross_section_median.npy": OutputArraySpec(np.dtype(np.float32), (d, q, h)),
@@ -201,8 +288,17 @@ def output_array_specs(date_count: int) -> dict[str, OutputArraySpec]:
 def manifest_constants() -> dict[str, object]:
     return {
         "expected_equities": EXPECTED_EQUITIES,
-        "context_symbols": list(CONTEXT_SYMBOLS),
-        "context_families": list(CONTEXT_FAMILIES),
+        "local_context_symbols": list(LOCAL_CONTEXT_SYMBOLS),
+        "local_context_families": list(LOCAL_CONTEXT_FAMILIES),
+        "global_context_symbols": list(GLOBAL_CONTEXT_SYMBOLS),
+        "global_context_families": list(GLOBAL_CONTEXT_FAMILIES),
+        "global_quote_directions": list(GLOBAL_QUOTE_DIRECTIONS),
+        "global_provider": GLOBAL_PROVIDER,
+        "global_dataset": GLOBAL_DATASET,
+        "global_schema": GLOBAL_SCHEMA,
+        "global_databento_version": GLOBAL_DATABENTO_VERSION,
+        "global_continuous_roll_rule": GLOBAL_CONTINUOUS_ROLL_RULE,
+        "global_availability_rule": GLOBAL_AVAILABILITY_RULE,
         "expected_date_count": EXPECTED_DATE_COUNT,
         "expected_sample_count": EXPECTED_SAMPLE_COUNT,
         "equity_session_start_minute": EQUITY_SESSION_START_MINUTE,
@@ -211,12 +307,17 @@ def manifest_constants() -> dict[str, object]:
         "context_session_minutes": CONTEXT_SESSION_MINUTES,
         "dynamic_channels": list(DYNAMIC_CHANNELS),
         "equity_slow_channels": list(SLOW_CHANNELS),
+        "global_session_start_minute": GLOBAL_SESSION_START_MINUTE,
+        "global_session_end_minute": GLOBAL_SESSION_END_MINUTE,
+        "global_session_minutes": GLOBAL_SESSION_MINUTES,
         "context_slow_channels": list(SLOW_CHANNELS),
         "decision_equity_indices": list(DECISION_EQUITY_INDICES),
         "decision_context_indices": list(DECISION_CONTEXT_INDICES),
         "horizons": list(HORIZONS),
+        "global_slow_channels": list(GLOBAL_SLOW_CHANNELS),
         "vol_warmup_valid_days": VOL_WARMUP_VALID_DAYS,
         "vol_ewma_half_life_days": VOL_EWMA_HALF_LIFE_DAYS,
+        "decision_global_indices": list(DECISION_GLOBAL_INDICES),
         "vol_ewma_alpha": VOL_EWMA_ALPHA,
         "min_adjacent_returns_per_day": MIN_ADJACENT_RETURNS_PER_DAY,
         "price_vol_floor": PRICE_VOL_FLOOR,

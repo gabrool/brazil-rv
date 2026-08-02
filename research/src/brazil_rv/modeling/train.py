@@ -22,6 +22,7 @@ from .contract import (
     EARLY_STOP_PATIENCE,
     EFFECTIVE_BATCH_SIZE,
     FEATURE_STORE_POINTER,
+    GLOBAL_CONTEXT_SETTINGS,
     GH200_RUNTIME,
     MAX_EPOCHS,
     MIN_IC_IMPROVEMENT,
@@ -46,6 +47,7 @@ from .contract import (
     TrainingConstants,
     XGBOOST_DEVICE,
     XGBOOST_FIXED_PARAMETERS,
+    model_consumes_context,
     XGBOOST_OBJECTIVE,
     architecture_for_model,
     expected_trainable_parameter_count,
@@ -141,6 +143,11 @@ def validate_cli_args(
         )
     if args.model != "tcn" and any(value is not None for value in tcn_values):
         parser.error("TCN architecture arguments are forbidden unless --model tcn")
+    consumes_context = model_consumes_context(args.model, _tcn_settings_from_args(args))
+    if consumes_context and args.global_context is None:
+        args.global_context = "enabled"
+    if not consumes_context and args.global_context is not None:
+        parser.error("--global-context is forbidden for context-free models")
     return args
 
 
@@ -160,6 +167,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--tcn-width", type=int, choices=TCN_WIDTHS)
     parser.add_argument("--tcn-receptive-field", choices=TCN_RECEPTIVE_FIELDS)
     parser.add_argument("--tcn-block", choices=TCN_BLOCK_VARIANTS)
+    parser.add_argument("--global-context", choices=GLOBAL_CONTEXT_SETTINGS)
     parser.add_argument("--seed", required=True, type=int, choices=ALLOWED_SEEDS)
     return validate_cli_args(parser, parser.parse_args(arguments))
 
@@ -204,11 +212,13 @@ def _run_directory_name(
     objective: str | None,
     temperature: float | None,
     sam_rho: float | None,
+    global_context: str | None,
     seed: int,
     created_at: datetime,
 ) -> str:
+    context_part = "" if global_context is None else f"_global-{global_context}"
     if optimizer_variant is None:
-        return f"{model_name}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
+        return f"{model_name}{context_part}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
     if objective is None:
         raise ValueError("Neural run names require an objective")
     objective_metadata(objective, temperature)
@@ -225,7 +235,7 @@ def _run_directory_name(
         "" if temperature is None else f"_tau{experiment_decimal(temperature, 2)}"
     )
     return (
-        f"{model_part}{objective_part}{optimizer_part}{rho_part}{tau_part}_seed{seed}_"
+        f"{model_part}{objective_part}{optimizer_part}{rho_part}{tau_part}{context_part}_seed{seed}_"
         f"{created_at:%Y%m%dT%H%M%S%fZ}"
     )
 
@@ -306,6 +316,7 @@ def _common_manifest(
     model_name: str,
     model_family: str,
     optimizer_variant: str | None,
+    global_context: str | None,
     seed: int,
     commit_sha: str,
     feature_store: Path,
@@ -318,6 +329,13 @@ def _common_manifest(
         "model_name": model_name,
         "model_family": model_family,
         "optimizer_variant": optimizer_variant,
+        "global_context": global_context,
+        "global_context_source_hashes": feature_manifest["global_context"][
+            "source_hashes"
+        ],
+        "global_context_normalized_store_hashes": feature_manifest["global_context"][
+            "normalized_store_hashes"
+        ],
         "seed": seed,
         "git_commit_sha": commit_sha,
         "feature_store_pointer": str(FEATURE_STORE_POINTER),
@@ -354,6 +372,7 @@ def _run_xgboost(
             model_name="xgboost",
             model_family="xgboost",
             optimizer_variant=None,
+            global_context=args.global_context,
             seed=args.seed,
             commit_sha=commit_sha,
             feature_store=feature_store,
@@ -385,6 +404,7 @@ def _run_xgboost(
         feature_store,
         train_rows,
         validation_rows,
+        args.global_context,
         run_dir,
         args.seed,
     )
@@ -434,6 +454,7 @@ def _run_neural(
         train_rows,
         validation_rows,
         args.model,
+        args.global_context,
         runtime,
         args.seed,
         tcn_architecture,
@@ -484,6 +505,7 @@ def _run_neural(
             model_name=args.model,
             model_family=str(model_metadata["model_family"]),
             optimizer_variant=args.optimizer,
+            global_context=args.global_context,
             seed=args.seed,
             commit_sha=commit_sha,
             feature_store=feature_store,
@@ -640,6 +662,8 @@ def _run_neural(
                     epoch,
                     primary_score,
                     feature_store,
+                    args.global_context,
+                    feature_manifest,
                     commit_sha,
                 ),
             )
@@ -667,6 +691,8 @@ def _run_neural(
             stopped_epoch,
             float(history[-1]["validation_primary_ic"]),
             feature_store,
+            args.global_context,
+            feature_manifest,
             commit_sha,
         ),
     )
@@ -723,6 +749,7 @@ def main() -> None:
         args.objective,
         args.temperature,
         args.sam_rho,
+        args.global_context,
         args.seed,
         created_at,
     )

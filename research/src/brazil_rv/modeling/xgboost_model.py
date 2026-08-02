@@ -223,6 +223,7 @@ def _build_matrix_bundles(
     store: Path,
     training_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
+    global_context: str,
     cache_dir: Path,
     *,
     device: str,
@@ -232,10 +233,18 @@ def _build_matrix_bundles(
     bundles: dict[int, MatrixBundle] = {}
     for horizon_index, horizon in enumerate(HORIZONS):
         training_source = TabularRowIterator(
-            store, training_rows, horizon_index, device=device
+            store,
+            training_rows,
+            horizon_index,
+            global_context=global_context,
+            device=device,
         )
         validation_source = TabularRowIterator(
-            store, validation_rows, horizon_index, device=device
+            store,
+            validation_rows,
+            horizon_index,
+            global_context=global_context,
+            device=device,
         )
         training = build_quantile_matrix(
             training_source, cache_dir / f"train_{horizon}m", device=device
@@ -388,6 +397,7 @@ def select_candidate(tuning_rows: list[dict[str, object]]) -> dict[str, object]:
 def tune_xgboost(
     store: Path,
     training_rows: pl.DataFrame,
+    global_context: str,
     cache_dir: Path,
     seed: int,
     *,
@@ -400,6 +410,7 @@ def tune_xgboost(
         store,
         split.training_rows,
         split.validation_rows,
+        global_context,
         cache_dir / "inner",
         device=device,
     )
@@ -484,6 +495,7 @@ def refit_xgboost(
     store: Path,
     training_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
+    global_context: str,
     cache_dir: Path,
     selected: dict[str, object],
     seed: int,
@@ -508,6 +520,7 @@ def refit_xgboost(
         store,
         training_rows,
         validation_rows,
+        global_context,
         cache_dir / "final",
         device=device,
     )
@@ -785,6 +798,7 @@ def train_xgboost_run(
     store: Path,
     training_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
+    global_context: str,
     run_dir: Path,
     seed: int,
 ) -> XGBoostRunResult:
@@ -795,6 +809,7 @@ def train_xgboost_run(
             selected, tuning_rows, inner_split = tune_xgboost(
                 store,
                 training_rows,
+                global_context,
                 cache_dir,
                 seed,
                 device=XGBOOST_DEVICE,
@@ -803,6 +818,7 @@ def train_xgboost_run(
                 store,
                 training_rows,
                 validation_rows,
+                global_context,
                 cache_dir,
                 selected,
                 seed,
@@ -872,6 +888,7 @@ def evaluate_saved_xgboost(
     store: Path,
     training_rows: pl.DataFrame,
     rows: pl.DataFrame,
+    global_context: str,
     run_dir: Path,
     work_dir: Path,
     expected_booster_sha256: object,
@@ -891,6 +908,7 @@ def evaluate_saved_xgboost(
                 store,
                 training_rows,
                 rows,
+                global_context,
                 cache_dir,
                 device=XGBOOST_DEVICE,
             )

@@ -162,7 +162,7 @@ def test_matched_full_exact_history_and_full_parameter_equivalence() -> None:
     full_architecture = resolve_tcn_architecture(full_settings)
     matched_count = count_trainable_parameters(_model(settings))
     full_count = count_trainable_parameters(_model(full_settings))
-    assert matched_count == full_count == 777_987
+    assert matched_count == full_count == 1_040_131
     assert matched_count == expected_trainable_parameter_count("tcn", architecture)
     assert full_count == expected_trainable_parameter_count("tcn", full_architecture)
     assert BASELINE_TCN_SETTINGS == full_settings
@@ -183,9 +183,9 @@ def test_every_tcn_setting_instantiates_with_exact_parameter_count(
         architecture.fusion_states
         == {
             "none": 0,
-            "context_only": 7,
+            "context_only": 15,
             "pooled_market": 3,
-            "context_pooled": 9,
+            "context_pooled": 17,
         }[settings.fusion]
     )
     assert count_trainable_parameters(model) == expected_trainable_parameter_count(
@@ -350,8 +350,8 @@ def test_all_tcn_blocks_are_finite_masked_permutation_equivariant_and_causal(
     for key in ("patches", "history_patch_mask", "instrument_mask", "slow_features"):
         permuted[key][:, :EQUITY_COUNT] = inputs[key][:, :EQUITY_COUNT][:, permutation]
     future = {key: value.clone() for key, value in inputs.items()}
-    future["patches"][:, :, 15:] += 1_000.0
-    future["history_patch_mask"][:, :, 15:] = True
+    future["patches"][:, :EQUITY_COUNT, 15:] += 1_000.0
+    future["history_patch_mask"][:, :EQUITY_COUNT, 15:] = True
     with torch.no_grad():
         baseline = _forward(model, inputs)
         permuted_output = _forward(model, permuted)
@@ -402,8 +402,8 @@ def test_baseline_tcn_state_layout_count_and_seed_reproducibility() -> None:
         )
     )
     assert tuple(first_model.state_dict()) == tuple(expected_keys)
-    assert count_trainable_parameters(first_model) == 777_987
-    assert expected_trainable_parameter_count("tcn", architecture) == 777_987
+    assert count_trainable_parameters(first_model) == 1_040_131
+    assert expected_trainable_parameter_count("tcn", architecture) == 1_040_131
 
     for key in expected_keys:
         torch.testing.assert_close(
@@ -486,6 +486,9 @@ def test_run_names_and_manifests_distinguish_all_tcn_settings() -> None:
                 "soft_spearman",
                 0.1,
                 None,
+                "enabled"
+                if settings.fusion in ("context_only", "context_pooled")
+                else None,
                 11,
                 created_at,
             )
@@ -508,6 +511,7 @@ def test_run_names_and_manifests_distinguish_all_tcn_settings() -> None:
         "soft_spearman",
         0.1,
         None,
+        "enabled",
         11,
         created_at,
     )

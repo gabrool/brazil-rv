@@ -1344,6 +1344,8 @@ def checkpoint_payload(
     epoch: int,
     validation_score: float,
     feature_store: Path,
+    global_context: str | None,
+    feature_manifest: dict[str, object],
     git_commit_sha: str,
 ) -> dict[str, object]:
     if getattr(model, "model_name", None) != model_name:
@@ -1364,5 +1366,13 @@ def checkpoint_payload(
         "architecture_constants": asdict(architecture),
         "parameter_count": expected_trainable_parameter_count(model_name, architecture),
         "resolved_feature_store_path": str(feature_store),
+        "feature_manifest_contract_version": feature_manifest["contract_version"],
+        "global_context": global_context,
+        "global_context_source_hashes": feature_manifest["global_context"][
+            "source_hashes"
+        ],
+        "global_context_normalized_store_hashes": feature_manifest["global_context"][
+            "normalized_store_hashes"
+        ],
         "git_commit_sha": git_commit_sha,
     }

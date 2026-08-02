@@ -1,0 +1,351 @@
+from __future__ import annotations
+
+import json
+from datetime import UTC, date, datetime, time, timedelta
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import numpy as np
+import polars as pl
+import pytest
+
+from brazil_rv.preprocessing.contract import (
+    DECISION_GLOBAL_INDICES,
+    GLOBAL_CONTEXT_SYMBOLS,
+    GLOBAL_SESSION_MINUTES,
+)
+from brazil_rv.preprocessing import global_features as global_features_module
+from brazil_rv.preprocessing.global_features import (
+    build_global_grid,
+    build_global_instrument_features,
+)
+from brazil_rv.preprocessing.global_source import (
+    API_KEY_ENV,
+    NORMALIZED_COLUMNS,
+    RequestRange,
+    _with_mapping_changes,
+    download_history,
+    load_global_symbol,
+    normalize_bars,
+    require_api_key,
+    write_shadow_daily_chunks,
+)
+from brazil_rv.preprocessing.transforms import build_dynamic_features
+
+
+B3_TIMEZONE = ZoneInfo("America/Sao_Paulo")
+
+
+def _raw_frame(
+    timestamps: list[datetime],
+    *,
+    raw_symbols: list[str] | None = None,
+) -> pl.DataFrame:
+    count = len(timestamps)
+    symbols = raw_symbols or ["ESU6"] * count
+    close = np.arange(count, dtype=np.float64) + 100.0
+    return pl.DataFrame(
+        {
+            "ts_event_utc": timestamps,
+            "instrument_id": np.arange(count, dtype=np.uint32) + 101,
+            "symbol": symbols,
+            "open": close - 0.1,
+            "high": close + 0.2,
+            "low": close - 0.2,
+            "close": close,
+            "volume": np.arange(count, dtype=np.float64) + 10.0,
+        }
+    )
+
+
+def _b3_utc(value: date, clock: time) -> datetime:
+    return datetime.combine(value, clock, B3_TIMEZONE).astimezone(UTC)
+
+
+def _global_history_frame(decision_date: date) -> pl.DataFrame:
+    timestamps: list[datetime] = []
+    for day_offset in range(25, 0, -1):
+        session_date = decision_date - timedelta(days=day_offset)
+        start = datetime.combine(session_date, time(18), UTC)
+        timestamps.extend(start + timedelta(minutes=minute) for minute in range(31))
+    timestamps.append(_b3_utc(decision_date - timedelta(days=1), time(16, 44)))
+    current_start = _b3_utc(decision_date, time(4, 30))
+    timestamps.extend(
+        current_start + timedelta(minutes=minute) for minute in range(346)
+    )
+    raw = _raw_frame(timestamps).with_columns(
+        pl.lit(101).cast(pl.UInt32).alias("instrument_id")
+    )
+    return normalize_bars(raw, "ES.v.0")
+
+
+def test_normalized_schema_availability_and_mapping_identity() -> None:
+    decision_date = date(2026, 1, 15)
+    timestamps = [
+        _b3_utc(decision_date, time(10, 14)),
+        _b3_utc(decision_date, time(10, 15)),
+    ]
+    normalized = normalize_bars(_raw_frame(timestamps), "ES.v.0")
+    assert normalized.schema["bar_end_utc"] == pl.Datetime("ns", "UTC")
+    assert tuple(normalized.columns) == NORMALIZED_COLUMNS
+    assert normalized["bar_end_utc"].to_list() == [
+        timestamp + timedelta(minutes=1) for timestamp in timestamps
+    ]
+    assert normalized["global_slot"].to_list() == [0, 0]
+    assert normalized["raw_symbol"].to_list() == ["ESU6", "ESU6"]
+
+    raw, observed, _, index = build_global_grid(normalized, (decision_date,))
+    cutoff = DECISION_GLOBAL_INDICES[0]
+    assert cutoff == 345
+    assert observed[0, cutoff - 1]
+    assert observed[0, cutoff]
+    assert observed[0, :cutoff].sum() == 1
+    assert not observed[0, cutoff - 2]
+    assert not raw[0, cutoff - 2].any()
+    assert raw[0, :cutoff].shape == (345, 5)
+    assert index.filter(pl.col("minute_idx") == cutoff - 1)["bar_end_utc"].item() == (
+        timestamps[0] + timedelta(minutes=1)
+    )
+
+    future_changed = raw.copy()
+    future_changed[0, cutoff:] = 1_000_000.0
+    np.testing.assert_array_equal(raw[0, :cutoff], future_changed[0, :cutoff])
+
+
+def test_global_grid_handles_b3_alignment_across_us_dst() -> None:
+    market_dates = (date(2026, 1, 15), date(2026, 7, 15))
+    timestamps = [_b3_utc(value, time(10, 14)) for value in market_dates]
+    assert timestamps[0].hour == timestamps[1].hour
+    normalized = normalize_bars(_raw_frame(timestamps), "ES.v.0")
+    _, observed, _, index = build_global_grid(normalized, market_dates)
+    assert observed[:, DECISION_GLOBAL_INDICES[0] - 1].all()
+    assert index["minute_idx"].to_list() == [344, 344]
+
+
+def test_first_and_last_global_windows_are_exact() -> None:
+    first, last = DECISION_GLOBAL_INDICES[0], DECISION_GLOBAL_INDICES[-1]
+    assert first - 345 == 0
+    assert last - 345 == 270
+    assert first // 5 == 69
+    assert last <= GLOBAL_SESSION_MINUTES
+
+
+def test_decision_features_use_only_the_eligible_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    decision_date = date(2026, 2, 2)
+    market_dates = (decision_date - timedelta(days=1), decision_date)
+    baseline_frame = _global_history_frame(decision_date)
+
+    def build(frame: pl.DataFrame):
+        monkeypatch.setattr(
+            global_features_module,
+            "load_global_symbol",
+            lambda _source, _symbol: frame,
+        )
+        return build_global_instrument_features(Path(), "ES.v.0", market_dates)
+
+    def change_prices(
+        frame: pl.DataFrame, timestamp: datetime, factor: float
+    ) -> pl.DataFrame:
+        return frame.with_columns(
+            *(
+                pl.when(pl.col("ts_event_utc") == timestamp)
+                .then(pl.col(name) * factor)
+                .otherwise(pl.col(name))
+                .alias(name)
+                for name in ("open", "high", "low", "close")
+            )
+        )
+
+    baseline = build(baseline_frame)
+    date_idx = 1
+    cutoff = DECISION_GLOBAL_INDICES[0]
+    assert baseline.data_ready[date_idx, 0]
+
+    future = build(
+        change_prices(baseline_frame, _b3_utc(decision_date, time(10, 15)), 1.1)
+    )
+    np.testing.assert_array_equal(
+        baseline.dynamic[date_idx, :cutoff], future.dynamic[date_idx, :cutoff]
+    )
+    np.testing.assert_array_equal(baseline.slow[date_idx, 0], future.slow[date_idx, 0])
+
+    eligible = build(
+        change_prices(baseline_frame, _b3_utc(decision_date, time(10, 14)), 1.1)
+    )
+    assert not np.array_equal(
+        baseline.dynamic[date_idx, :cutoff], eligible.dynamic[date_idx, :cutoff]
+    )
+    assert baseline.slow[date_idx, 0, 1] != eligible.slow[date_idx, 0, 1]
+
+
+def test_roll_boundary_is_recorded_and_cross_roll_returns_are_suppressed() -> None:
+    first = normalize_bars(
+        _raw_frame([datetime(2026, 1, 2, 14, 0, tzinfo=UTC)]), "ES.v.0"
+    )
+    second = normalize_bars(
+        _raw_frame(
+            [datetime(2026, 1, 2, 14, 1, tzinfo=UTC)],
+            raw_symbols=["ESH7"],
+        ),
+        "ES.v.0",
+    )
+    combined = _with_mapping_changes(
+        second, previous_raw_symbol=str(first.item(-1, "raw_symbol"))
+    )
+    assert combined["mapping_changed"].to_list() == [True]
+
+    raw = np.zeros((1, 20, 5), dtype=np.float64)
+    close = np.linspace(100.0, 101.9, 20)
+    raw[0, :, 0] = close
+    raw[0, :, 1] = close + 0.1
+    raw[0, :, 2] = close - 0.1
+    raw[0, :, 3] = close
+    raw[0, :, 4] = 10.0
+    observed = np.ones((1, 20), dtype=bool)
+    mapping_changed = np.zeros_like(observed)
+    mapping_changed[0, 15] = True
+    dynamic, validity = build_dynamic_features(
+        raw,
+        observed,
+        np.ones(1, dtype=bool),
+        np.full(1, 0.01),
+        is_rate=False,
+        mapping_changed=mapping_changed,
+    )
+    assert not dynamic[0, 15, :4].any()
+    assert dynamic[0, 15, 7] == 0.0
+    assert not validity[0, 15, 0]
+
+
+def test_shadow_chunks_match_historical_schema_and_resume(tmp_path: Path) -> None:
+    first_date = date(2026, 1, 2)
+    second_date = date(2026, 1, 3)
+    first_raw = _raw_frame([datetime(2026, 1, 2, 14, 0, tzinfo=UTC)])
+    second_raw = _raw_frame(
+        [datetime(2026, 1, 3, 14, 0, tzinfo=UTC)],
+        raw_symbols=["ESH7"],
+    )
+    expected_columns = tuple(normalize_bars(first_raw, "ES.v.0").columns)
+    write_shadow_daily_chunks(first_raw, "ES.v.0", tmp_path)
+    write_shadow_daily_chunks(first_raw, "ES.v.0", tmp_path)
+    write_shadow_daily_chunks(second_raw, "ES.v.0", tmp_path)
+
+    stored = load_global_symbol(tmp_path, "ES.v.0")
+    assert tuple(stored.columns) == expected_columns == NORMALIZED_COLUMNS
+    assert stored.height == 2
+    assert stored["mapping_changed"].to_list() == [False, True]
+    assert (tmp_path / "bars/slot=00" / f"date={first_date}.parquet").is_file()
+    assert (tmp_path / "bars/slot=00" / f"date={second_date}.parquet").is_file()
+    assert not tuple(tmp_path.rglob("*.tmp"))
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["mode"] == "shadow"
+    assert manifest["symbols"] == list(GLOBAL_CONTEXT_SYMBOLS)
+    assert manifest["row_count"] == 2
+    assert manifest["source_hashes"] == {}
+
+
+class _FakeMetadata:
+    def get_cost(self, **_: object) -> float:
+        return 1.25
+
+
+class _FakeTimeseries:
+    def __init__(self, fail_on_call: int | None = None) -> None:
+        self.calls = 0
+        self.fail_on_call = fail_on_call
+
+    def get_range(self, *, path: Path, schema: str, **_: object) -> None:
+        self.calls += 1
+        if self.calls == self.fail_on_call:
+            raise RuntimeError("provider failure")
+        Path(path).write_bytes(schema.encode())
+
+
+class _FakeHistorical:
+    def __init__(self, fail_on_call: int | None = None) -> None:
+        self.metadata = _FakeMetadata()
+        self.timeseries = _FakeTimeseries(fail_on_call)
+
+
+def test_download_is_cost_gated_resumable_and_secret_free(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 1, 3))
+    client = _FakeHistorical()
+    with pytest.raises(RuntimeError, match="confirm-paid-download"):
+        download_history(
+            client,
+            request,
+            tmp_path,
+            confirmed_paid_download=False,
+            symbols=("ES.v.0",),
+        )
+    assert client.timeseries.calls == 0
+
+    download_history(
+        client,
+        request,
+        tmp_path,
+        confirmed_paid_download=True,
+        symbols=("ES.v.0",),
+    )
+    assert client.timeseries.calls == 2
+    download_history(
+        client,
+        request,
+        tmp_path,
+        confirmed_paid_download=True,
+        symbols=("ES.v.0",),
+    )
+    assert client.timeseries.calls == 2
+    manifest_text = (tmp_path / "manifest.json").read_text(encoding="utf-8")
+    assert "super-secret-key" not in manifest_text
+    assert "super-secret-key" not in capsys.readouterr().out
+
+
+def test_failed_download_never_promotes_partial_chunk(tmp_path: Path) -> None:
+    client = _FakeHistorical(fail_on_call=2)
+    with pytest.raises(RuntimeError, match="historical download failed"):
+        download_history(
+            client,
+            RequestRange(date(2026, 1, 2), date(2026, 1, 3)),
+            tmp_path,
+            confirmed_paid_download=True,
+            symbols=("ES.v.0",),
+        )
+    assert not tuple(tmp_path.rglob("*.partial"))
+    assert not (tmp_path / "manifest.json").exists()
+
+
+def test_credentials_and_bad_source_rows_fail_cleanly() -> None:
+    with pytest.raises(RuntimeError, match=API_KEY_ENV):
+        require_api_key({})
+    assert require_api_key({API_KEY_ENV: "super-secret-key"}) == "super-secret-key"
+
+    malformed = _raw_frame([datetime(2026, 1, 2, 14, 0, tzinfo=UTC)]).with_columns(
+        pl.lit(-1.0).alias("volume")
+    )
+    with pytest.raises(ValueError, match="Malformed OHLCV"):
+        normalize_bars(malformed, "ES.v.0")
+
+    unresolved = _raw_frame([datetime(2026, 1, 2, 14, 0, tzinfo=UTC)]).with_columns(
+        pl.lit(None, dtype=pl.String).alias("symbol")
+    )
+    with pytest.raises(ValueError, match="Malformed OHLCV"):
+        normalize_bars(unresolved, "ES.v.0")
+
+    with pytest.raises(ValueError, match="Unsupported continuous symbol"):
+        normalize_bars(_raw_frame([datetime(2026, 1, 2, 14, 0, tzinfo=UTC)]), "BAD")
+
+    duplicate = _raw_frame([datetime(2026, 1, 2, 14, 0, tzinfo=UTC)])
+    with pytest.raises(ValueError, match="Duplicate"):
+        normalize_bars(pl.concat([duplicate, duplicate]), "ES.v.0")
+
+    malformed_ohlc = _raw_frame([datetime(2026, 1, 2, 14, 0, tzinfo=UTC)]).with_columns(
+        pl.lit(0.5).alias("high")
+    )
+    with pytest.raises(ValueError, match="Malformed OHLCV"):
+        normalize_bars(malformed_ohlc, "ES.v.0")

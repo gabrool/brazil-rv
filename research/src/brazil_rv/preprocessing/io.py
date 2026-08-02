@@ -14,7 +14,8 @@ from .contract import (
     ASSIGNMENTS_POINTER,
     CATALOGUE_PATH,
     CONTEXT_POINTER,
-    CONTEXT_SYMBOLS,
+    GLOBAL_SOURCE_POINTER,
+    LOCAL_CONTEXT_SYMBOLS,
     COTAHIST_POINTER,
     EXPECTED_EQUITIES,
     UNIVERSE_POINTER,
@@ -39,6 +40,7 @@ class CanonicalInputs:
     cotahist_dir: Path
     context_dir: Path
     catalogue_path: Path
+    global_source_dir: Path
 
     def manifest_entries(self) -> dict[str, dict[str, str]]:
         return {
@@ -59,6 +61,10 @@ class CanonicalInputs:
                 "resolved_path": str(self.context_dir),
             },
             "xp_catalogue": {"resolved_path": str(self.catalogue_path)},
+            "global_context_source": {
+                "pointer": str(GLOBAL_SOURCE_POINTER),
+                "resolved_path": str(self.global_source_dir),
+            },
         }
 
 
@@ -76,6 +82,7 @@ def resolve_inputs() -> CanonicalInputs:
         cotahist_dir=resolve_pointer(COTAHIST_POINTER),
         context_dir=resolve_pointer(CONTEXT_POINTER),
         catalogue_path=CATALOGUE_PATH,
+        global_source_dir=resolve_pointer(GLOBAL_SOURCE_POINTER),
     )
 
 
@@ -242,18 +249,18 @@ def discover_context_files(context_dir: Path) -> dict[str, Path]:
         if symbol_frame.is_empty():
             continue
         symbol = symbol_frame.item()
-        if symbol in CONTEXT_SYMBOLS:
+        if symbol in LOCAL_CONTEXT_SYMBOLS:
             if symbol in found:
                 raise ValueError(f"Multiple context sources found for {symbol}")
             found[symbol] = path
-    missing = [symbol for symbol in CONTEXT_SYMBOLS if symbol not in found]
+    missing = [symbol for symbol in LOCAL_CONTEXT_SYMBOLS if symbol not in found]
     if missing:
         raise FileNotFoundError(f"Missing context sources: {missing}")
     return found
 
 
 def load_context_expiries(catalogue_path: Path) -> dict[str, date]:
-    fixed_di = CONTEXT_SYMBOLS[2:]
+    fixed_di = LOCAL_CONTEXT_SYMBOLS[2:]
     rows = (
         pl.read_parquet(catalogue_path, columns=["name", "expiration_time"])
         .filter(pl.col("name").is_in(fixed_di))

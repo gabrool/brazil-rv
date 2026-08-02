@@ -217,6 +217,7 @@ def main() -> None:
         training,
         memorization_rows,
         SANITY_MODEL,
+        "enabled",
         runtime,
         11,
         SANITY_TCN_ARCHITECTURE,
@@ -228,6 +229,7 @@ def main() -> None:
         feature_store,
         memorization_rows,
         SANITY_MODEL,
+        "enabled",
         SANITY_TCN_ARCHITECTURE,
     )
     memorization_batch = tensorize_vectorized_batch(
@@ -438,6 +440,7 @@ def main() -> None:
     )
     report = {
         "model_name": SANITY_MODEL,
+        "global_context": "enabled",
         "objective": SANITY_OBJECTIVE,
         "soft_rank_temperature": SANITY_TEMPERATURE,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
