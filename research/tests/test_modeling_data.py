@@ -10,7 +10,10 @@ import torch
 
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
-    CONTEXT_COUNT,
+    DECISION_GLOBAL_INDICES,
+    GLOBAL_CONTEXT_COUNT,
+    GLOBAL_WINDOW_MINUTES,
+    LOCAL_CONTEXT_COUNT,
     DYNAMIC_CHANNEL_COUNT,
     EFFECTIVE_BATCH_SIZE,
     EQUITY_ABSOLUTE_START_PATCH,
@@ -97,8 +100,14 @@ def _synthetic_store(path: Path) -> tuple[Path, pl.DataFrame]:
         size=(date_count, EQUITY_COUNT, 405, DYNAMIC_CHANNEL_COUNT)
     ).astype(np.float32)
     context = generator.normal(
-        size=(date_count, CONTEXT_COUNT, 465, DYNAMIC_CHANNEL_COUNT)
+        size=(date_count, LOCAL_CONTEXT_COUNT, 465, DYNAMIC_CHANNEL_COUNT)
     ).astype(np.float32)
+    global_features = generator.normal(
+        size=(date_count, GLOBAL_CONTEXT_COUNT, 615, DYNAMIC_CHANNEL_COUNT)
+    ).astype(np.float32)
+    global_features[..., 5] = 1.0
+    global_ready = np.ones((date_count, GLOBAL_CONTEXT_COUNT, 55), dtype=bool)
+    global_ready[1, 2, 2] = False
     equity[0, 0, 5:10] = 0.0
     membership = np.zeros((date_count, EQUITY_COUNT), dtype=bool)
     ready = np.zeros_like(membership)
@@ -118,9 +127,16 @@ def _synthetic_store(path: Path) -> tuple[Path, pl.DataFrame]:
         "equity_data_ready.npy": ready,
         "context_features.npy": context,
         "context_slow.npy": generator.normal(
-            size=(date_count, CONTEXT_COUNT, SLOW_FEATURE_COUNT)
+            size=(date_count, LOCAL_CONTEXT_COUNT, SLOW_FEATURE_COUNT)
         ).astype(np.float32),
-        "context_data_ready.npy": np.ones((date_count, CONTEXT_COUNT), dtype=bool),
+        "context_data_ready.npy": np.ones(
+            (date_count, LOCAL_CONTEXT_COUNT), dtype=bool
+        ),
+        "global_features.npy": global_features,
+        "global_slow.npy": generator.normal(
+            size=(date_count, GLOBAL_CONTEXT_COUNT, 55, SLOW_FEATURE_COUNT)
+        ).astype(np.float32),
+        "global_data_ready.npy": global_ready,
         "targets.npy": targets,
         "label_mask.npy": label_mask,
         "raw_returns.npy": generator.normal(
@@ -153,6 +169,10 @@ def _direct_reference(
             "equity_data_ready.npy",
             "context_features.npy",
             "context_slow.npy",
+            "context_data_ready.npy",
+            "global_features.npy",
+            "global_slow.npy",
+            "global_data_ready.npy",
             "targets.npy",
             "label_mask.npy",
             "raw_returns.npy",
@@ -210,18 +230,45 @@ def _direct_reference(
             :EQUITY_COUNT,
             EQUITY_ABSOLUTE_START_PATCH:state_position,
         ] = active[:, None]
-        output["patches"][batch_position, EQUITY_COUNT:, :state_position] = np.asarray(
+        local_slice = slice(EQUITY_COUNT, EQUITY_COUNT + LOCAL_CONTEXT_COUNT)
+        local_ready = np.asarray(arrays["context_data_ready.npy"][date_idx])
+        local_prefix = np.asarray(
             arrays["context_features.npy"][date_idx, :, :context_cutoff]
-        ).reshape(CONTEXT_COUNT, state_position, PATCH_INPUT_WIDTH)
-        output["history_patch_mask"][batch_position, EQUITY_COUNT:, :state_position] = (
-            True
+        ).reshape(LOCAL_CONTEXT_COUNT, state_position, PATCH_INPUT_WIDTH)
+        output["patches"][batch_position, local_slice, :state_position] = (
+            local_prefix * local_ready[:, None, None]
         )
+        output["history_patch_mask"][batch_position, local_slice, :state_position] = (
+            local_ready[:, None]
+        )
+        output["instrument_mask"][batch_position, local_slice] = local_ready
         output["slow_features"][batch_position, :EQUITY_COUNT] = (
             arrays["equity_slow.npy"][date_idx] * active[:, None]
         )
-        output["slow_features"][batch_position, EQUITY_COUNT:] = arrays[
-            "context_slow.npy"
-        ][date_idx]
+        output["slow_features"][batch_position, local_slice] = (
+            arrays["context_slow.npy"][date_idx] * local_ready[:, None]
+        )
+
+        global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+        global_ready = np.asarray(
+            arrays["global_data_ready.npy"][date_idx, :, decision_idx]
+        )
+        global_cutoff = DECISION_GLOBAL_INDICES[decision_idx]
+        global_prefix = np.asarray(
+            arrays["global_features.npy"][
+                date_idx, :, global_cutoff - GLOBAL_WINDOW_MINUTES : global_cutoff
+            ]
+        ).reshape(GLOBAL_CONTEXT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH)
+        output["patches"][batch_position, global_start:] = (
+            global_prefix * global_ready[:, None, None]
+        )
+        output["history_patch_mask"][batch_position, global_start:] = global_ready[
+            :, None
+        ]
+        output["instrument_mask"][batch_position, global_start:] = global_ready
+        output["slow_features"][batch_position, global_start:] = (
+            arrays["global_slow.npy"][date_idx, :, decision_idx] * global_ready[:, None]
+        )
         output["state_position"][batch_position] = state_position
         output["targets"][batch_position] = arrays["targets.npy"][
             date_idx, :, decision_idx
@@ -248,7 +295,7 @@ def _direct_reference(
 def test_vectorized_batch_equivalence_and_masks(tmp_path: Path) -> None:
     store, rows = _synthetic_store(tmp_path)
     request = BatchRequest(indices=(0, 1), valid_count=2)
-    actual = VectorizedFeatureDataset(store, rows, "context_pooled")[request]
+    actual = VectorizedFeatureDataset(store, rows, "context_pooled", "enabled")[request]
     expected = _direct_reference(store, rows, request)
     for key in expected:
         np.testing.assert_array_equal(actual[key], expected[key])
@@ -274,7 +321,9 @@ def test_vectorized_batch_equivalence_and_masks(tmp_path: Path) -> None:
 def test_vectorized_future_prefix_isolation(tmp_path: Path) -> None:
     store, rows = _synthetic_store(tmp_path)
     request = BatchRequest(indices=(0, 1, 2), valid_count=3)
-    baseline = VectorizedFeatureDataset(store, rows, "context_pooled")[request]
+    baseline = VectorizedFeatureDataset(store, rows, "context_pooled", "enabled")[
+        request
+    ]
     equity = np.load(store / "equity_features.npy", mmap_mode="r+")
     context = np.load(store / "context_features.npy", mmap_mode="r+")
     for row in rows.iter_rows(named=True):
@@ -282,7 +331,9 @@ def test_vectorized_future_prefix_isolation(tmp_path: Path) -> None:
         context[int(row["date_idx"]), :, int(row["context_cutoff_index"]) :] = -1e6
     equity.flush()
     context.flush()
-    changed = VectorizedFeatureDataset(store, rows, "context_pooled")[request]
+    changed = VectorizedFeatureDataset(store, rows, "context_pooled", "enabled")[
+        request
+    ]
     for key in baseline:
         np.testing.assert_array_equal(changed[key], baseline[key])
 
@@ -341,7 +392,9 @@ def test_fixed_evaluation_padding_invalidates_only_padded_rows(
         for request in requests[:-1]
     )
     assert requests[-1].valid_count == 2
-    batch = VectorizedFeatureDataset(store, rows, "context_pooled")[requests[-1]]
+    batch = VectorizedFeatureDataset(store, rows, "context_pooled", "enabled")[
+        requests[-1]
+    ]
     assert batch["sample_valid_mask"].sum() == 2
     assert not batch["sample_valid_mask"][2:].any()
     assert not batch["label_mask"][2:].any()
@@ -395,16 +448,18 @@ def test_split_and_embargo_are_disjoint() -> None:
 def test_family_specific_batches_construct_only_required_inputs(tmp_path: Path) -> None:
     store, rows = _synthetic_store(tmp_path)
     request = BatchRequest(indices=(0,), valid_count=1)
-    patch_batch = VectorizedFeatureDataset(store, rows, "context_pooled")[request]
+    patch_batch = VectorizedFeatureDataset(store, rows, "context_pooled", "enabled")[
+        request
+    ]
     assert "patches" in patch_batch and "tabular_features" not in patch_batch
-    mlp_batch = VectorizedFeatureDataset(store, rows, "mlp")[request]
+    mlp_batch = VectorizedFeatureDataset(store, rows, "mlp", "enabled")[request]
     assert "tabular_features" in mlp_batch and "patches" not in mlp_batch
     assert mlp_batch["tabular_features"].shape == (
         1,
         EQUITY_COUNT,
         TABULAR_FEATURE_COUNT,
     )
-    pooled_batch = VectorizedFeatureDataset(store, rows, "pooled_market")[request]
+    pooled_batch = VectorizedFeatureDataset(store, rows, "pooled_market", None)[request]
     assert not pooled_batch["patches"][:, EQUITY_COUNT:].any()
     assert not pooled_batch["instrument_mask"][:, EQUITY_COUNT:].any()
     assert not pooled_batch["slow_features"][:, EQUITY_COUNT:].any()
@@ -424,7 +479,9 @@ def test_tcn_batches_construct_only_selected_context(
 ) -> None:
     store, rows = _synthetic_store(tmp_path)
     architecture = resolve_tcn_architecture(TCNSettings(fusion, 64, "short", "gelu"))
-    dataset = VectorizedFeatureDataset(store, rows, "tcn", architecture)
+    dataset = VectorizedFeatureDataset(
+        store, rows, "tcn", "enabled" if needs_context else None, architecture
+    )
     batch = dataset[BatchRequest(indices=(0,), valid_count=1)]
     assert bool(batch["patches"][:, EQUITY_COUNT:].any()) is needs_context
     assert bool(batch["instrument_mask"][:, EQUITY_COUNT:].any()) is needs_context
@@ -452,7 +509,7 @@ def test_unavailable_context_is_zeroed_before_tensor_construction(
     architecture = resolve_tcn_architecture(
         TCNSettings("context_only", 64, "short", "gelu")
     )
-    batch = VectorizedFeatureDataset(store, rows, "tcn", architecture)[
+    batch = VectorizedFeatureDataset(store, rows, "tcn", "enabled", architecture)[
         BatchRequest(indices=(0,), valid_count=1)
     ]
     unavailable = EQUITY_COUNT
@@ -471,6 +528,7 @@ def test_compact_tabular_offsets_validity_and_future_causality(tmp_path: Path) -
     store, rows = _synthetic_store(tmp_path)
     equity = np.load(store / "equity_features.npy", mmap_mode="r+")
     context = np.load(store / "context_features.npy", mmap_mode="r+")
+    global_features = np.load(store / "global_features.npy", mmap_mode="r+")
     equity[0, 0, :, 5] = 0.0
     equity[0, 0, 14, :DYNAMIC_CHANNEL_COUNT] = np.arange(
         DYNAMIC_CHANNEL_COUNT, dtype=np.float32
@@ -484,9 +542,10 @@ def test_compact_tabular_offsets_validity_and_future_causality(tmp_path: Path) -
     context.flush()
 
     request = BatchRequest(indices=(0,), valid_count=1)
-    baseline = VectorizedFeatureDataset(store, rows, "mlp")[request]
+    baseline = VectorizedFeatureDataset(store, rows, "mlp", "enabled")[request]
     features = baseline["tabular_features"]
-    assert features.shape[-1] == 871
+
+    assert features.shape[-1] == TABULAR_FEATURE_COUNT
     np.testing.assert_array_equal(
         features[0, 0, 32 : 32 + DYNAMIC_CHANNEL_COUNT],
         equity[0, 0, 14],
@@ -498,7 +557,15 @@ def test_compact_tabular_offsets_validity_and_future_causality(tmp_path: Path) -
     np.testing.assert_array_equal(
         features[0, 0, context_start : context_start + 16], context[0, 0, 74, :16]
     )
-    validity_start = TABULAR_FEATURE_COUNT - 35
+    global_start = context_start + LOCAL_CONTEXT_COUNT * len(TABULAR_OFFSETS) * 16
+    np.testing.assert_array_equal(
+        features[0, 0, global_start : global_start + 16],
+        global_features[0, 0, 344, :16],
+    )
+    validity_start = TABULAR_FEATURE_COUNT - (
+        (1 + LOCAL_CONTEXT_COUNT + GLOBAL_CONTEXT_COUNT) * len(TABULAR_OFFSETS)
+        + GLOBAL_CONTEXT_COUNT
+    )
     assert features[0, 0, validity_start : validity_start + 5].tolist() == [
         1.0,
         0.0,
@@ -517,13 +584,73 @@ def test_compact_tabular_offsets_validity_and_future_causality(tmp_path: Path) -
 
     equity[0, :, 15:] = 100_000.0
     context[0, :, 75:] = -100_000.0
+    global_features[0, :, 345:] = 50_000.0
     equity.flush()
     context.flush()
-    changed = VectorizedFeatureDataset(store, rows, "mlp")[request]
+    global_features.flush()
+    changed = VectorizedFeatureDataset(store, rows, "mlp", "enabled")[request]
     np.testing.assert_array_equal(
         baseline["tabular_features"], changed["tabular_features"]
     )
     assert TABULAR_OFFSETS == (0, 15, 30, 60, 120)
+
+
+def test_masked_global_context_keeps_layout_and_contributes_exact_zeros(
+    tmp_path: Path,
+) -> None:
+    store, rows = _synthetic_store(tmp_path)
+    request = BatchRequest(indices=(0,), valid_count=1)
+    enabled = VectorizedFeatureDataset(store, rows, "context_pooled", "enabled")[
+        request
+    ]
+    masked = VectorizedFeatureDataset(store, rows, "context_pooled", "masked")[request]
+    assert enabled.keys() == masked.keys()
+    for key in enabled:
+        assert enabled[key].shape == masked[key].shape
+
+    global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+    assert enabled["patches"][:, global_start:].any()
+    assert enabled["instrument_mask"][:, global_start:].any()
+    assert enabled["slow_features"][:, global_start:].any()
+    assert not masked["patches"][:, global_start:].any()
+    assert not masked["history_patch_mask"][:, global_start:].any()
+    assert not masked["instrument_mask"][:, global_start:].any()
+    assert not masked["slow_features"][:, global_start:].any()
+
+    enabled_tabular = VectorizedFeatureDataset(store, rows, "mlp", "enabled")[request][
+        "tabular_features"
+    ]
+    masked_tabular = VectorizedFeatureDataset(store, rows, "mlp", "masked")[request][
+        "tabular_features"
+    ]
+    global_dynamic_start = (
+        SLOW_FEATURE_COUNT
+        + len(TABULAR_OFFSETS) * DYNAMIC_CHANNEL_COUNT
+        + LOCAL_CONTEXT_COUNT * len(TABULAR_OFFSETS) * 16
+    )
+    global_dynamic_stop = (
+        global_dynamic_start + GLOBAL_CONTEXT_COUNT * len(TABULAR_OFFSETS) * 16
+    )
+    global_slow_start = global_dynamic_stop + LOCAL_CONTEXT_COUNT * SLOW_FEATURE_COUNT
+    global_slow_stop = global_slow_start + GLOBAL_CONTEXT_COUNT * SLOW_FEATURE_COUNT
+    global_validity_start = (
+        global_slow_stop
+        + 2
+        + len(TABULAR_OFFSETS)
+        + LOCAL_CONTEXT_COUNT * len(TABULAR_OFFSETS)
+    )
+    global_columns = np.concatenate(
+        (
+            np.arange(global_dynamic_start, global_dynamic_stop),
+            np.arange(global_slow_start, global_slow_stop),
+            np.arange(global_validity_start, TABULAR_FEATURE_COUNT),
+        )
+    )
+    keep = np.ones(TABULAR_FEATURE_COUNT, dtype=bool)
+    keep[global_columns] = False
+    assert enabled_tabular[..., global_columns].any()
+    assert not masked_tabular[..., global_columns].any()
+    np.testing.assert_array_equal(enabled_tabular[..., keep], masked_tabular[..., keep])
 
 
 def test_tabular_row_iterator_masks_horizons_and_equalizes_samples(
@@ -533,8 +660,16 @@ def test_tabular_row_iterator_masks_horizons_and_equalizes_samples(
     label_mask = np.load(store / "label_mask.npy", mmap_mode="r+")
     label_mask[0, 1, 0, 1] = False
     label_mask.flush()
-    horizon_0 = list(TabularRowIterator(store, rows, 0, device="cpu", batch_size=2))
-    horizon_1 = list(TabularRowIterator(store, rows, 1, device="cpu", batch_size=2))
+    horizon_0 = list(
+        TabularRowIterator(
+            store, rows, 0, device="cpu", global_context="enabled", batch_size=2
+        )
+    )
+    horizon_1 = list(
+        TabularRowIterator(
+            store, rows, 1, device="cpu", global_context="enabled", batch_size=2
+        )
+    )
     assert sum(batch.features.shape[0] for batch in horizon_0) == 6
     assert sum(batch.features.shape[0] for batch in horizon_1) == 5
     for batches in (horizon_0, horizon_1):
@@ -555,7 +690,11 @@ def test_tabular_row_iterator_cuda_materializes_only_model_inputs(
     if not torch.cuda.is_available():
         pytest.skip("CUDA tensor materialization requires an available GPU")
     store, rows = _synthetic_store(tmp_path)
-    batch = next(iter(TabularRowIterator(store, rows, 0, device="cuda")))
+    batch = next(
+        iter(
+            TabularRowIterator(store, rows, 0, device="cuda", global_context="enabled")
+        )
+    )
     for value in (batch.features, batch.labels, batch.weights):
         assert isinstance(value, torch.Tensor)
         assert value.device.type == "cuda"

@@ -79,9 +79,6 @@ def build_causal_features(
     if len(market_dates) != date_count:
         raise ValueError("market_dates must align to the date axis")
 
-    dynamic = np.zeros((date_count, minute_count, 26), dtype=np.float32)
-    # return 15m, return 60m, volume surprise, and RV 30m validity.
-    dynamic_valid = np.zeros((date_count, minute_count, 4), dtype=bool)
     slow = np.zeros((date_count, 32), dtype=np.float32)
     # Overnight gap, trailing dollar volume, and trailing 20-day RV validity.
     slow_rank_valid = np.zeros((date_count, 3), dtype=bool)
@@ -108,16 +105,6 @@ def build_causal_features(
                     -VOL_REGIME_CLIP,
                     VOL_REGIME_CLIP,
                 )
-            )
-            _build_dynamic_day(
-                dynamic[date_idx],
-                dynamic_valid[date_idx],
-                raw_grid,
-                observed,
-                valid_day,
-                date_idx,
-                sigma,
-                is_rate=is_rate,
             )
             _build_slow_day(
                 slow[date_idx],
@@ -146,6 +133,13 @@ def build_causal_features(
                     1.0 - VOL_EWMA_ALPHA
                 ) * ewma_variance + VOL_EWMA_ALPHA * daily_variance
 
+    dynamic, dynamic_valid = build_dynamic_features(
+        raw_grid,
+        observed,
+        data_ready,
+        sigma_by_day,
+        is_rate=is_rate,
+    )
     return InstrumentFeatures(
         dynamic=dynamic,
         dynamic_valid=dynamic_valid,
@@ -158,12 +152,54 @@ def build_causal_features(
     )
 
 
+def build_dynamic_features(
+    raw_grid: NDArray[np.float64],
+    observed: NDArray[np.bool_],
+    valid_day: NDArray[np.bool_],
+    sigma_by_day: NDArray[np.float64],
+    *,
+    is_rate: bool,
+    mapping_changed: NDArray[np.bool_] | None = None,
+) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
+    """Build causal minute features from volatility state fixed before each day."""
+    date_count, minute_count, field_count = raw_grid.shape
+    if (
+        field_count != 5
+        or observed.shape != (date_count, minute_count)
+        or valid_day.shape != (date_count,)
+        or sigma_by_day.shape != (date_count,)
+    ):
+        raise ValueError(
+            "Dynamic feature inputs do not share the fixed date/minute axes"
+        )
+    if mapping_changed is None:
+        mapping_changed = np.zeros_like(observed)
+    if mapping_changed.shape != observed.shape:
+        raise ValueError("mapping_changed must align to the minute grid")
+    dynamic = np.zeros((date_count, minute_count, 26), dtype=np.float32)
+    validity = np.zeros((date_count, minute_count, 4), dtype=bool)
+    for date_idx in np.flatnonzero(valid_day & (sigma_by_day > 0)):
+        _build_dynamic_day(
+            dynamic[date_idx],
+            validity[date_idx],
+            raw_grid,
+            observed,
+            valid_day,
+            mapping_changed,
+            int(date_idx),
+            float(sigma_by_day[date_idx]),
+            is_rate=is_rate,
+        )
+    return dynamic, validity
+
+
 def _build_dynamic_day(
     output: NDArray[np.float32],
     validity: NDArray[np.bool_],
     raw_grid: NDArray[np.float64],
     observed: NDArray[np.bool_],
     valid_day: NDArray[np.bool_],
+    mapping_changed: NDArray[np.bool_],
     date_idx: int,
     sigma: float,
     *,
@@ -175,13 +211,17 @@ def _build_dynamic_day(
     if positions.size == 0:
         return
 
+    current_mapping_changed = mapping_changed[date_idx]
     prices = current_raw[positions, :4]
     anchors = np.empty(positions.size, dtype=np.float64)
     anchors[0] = prices[0, 0]
     anchors[1:] = current_raw[positions[:-1], 3]
     moves = _price_change(prices, anchors[:, None], is_rate=is_rate)
-    output[positions, :4] = np.clip(
-        moves / sigma, -PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP
+    move_valid = ~current_mapping_changed[positions]
+    output[positions[move_valid], :4] = np.clip(
+        moves[move_valid] / sigma,
+        -PRICE_FEATURE_CLIP,
+        PRICE_FEATURE_CLIP,
     ).astype(np.float32)
 
     first_history_date = max(0, date_idx - VOLUME_LOOKBACK_SESSIONS)
@@ -207,14 +247,17 @@ def _build_dynamic_day(
         validity[ready_positions, 2] = True
     output[positions, 5] = 1.0
 
+    roll_prefix = np.concatenate(([0], np.cumsum(current_mapping_changed)))
     if current_observed[0]:
         open_price = current_raw[0, 0]
         elapsed = positions + 1
+        same_contract = roll_prefix[positions + 1] == roll_prefix[1]
+        usable_positions = positions[same_contract]
         since_open = _price_change(
-            current_raw[positions, 3], open_price, is_rate=is_rate
+            current_raw[usable_positions, 3], open_price, is_rate=is_rate
         )
-        output[positions, 6] = np.clip(
-            since_open / (sigma * np.sqrt(elapsed)),
+        output[usable_positions, 6] = np.clip(
+            since_open / (sigma * np.sqrt(elapsed[same_contract])),
             -PRICE_FEATURE_CLIP,
             PRICE_FEATURE_CLIP,
         ).astype(np.float32)
@@ -223,6 +266,9 @@ def _build_dynamic_day(
         endpoints = positions - window
         exact = endpoints >= 0
         exact[exact] &= current_observed[endpoints[exact]]
+        exact[exact] &= (
+            roll_prefix[positions[exact] + 1] == roll_prefix[endpoints[exact] + 1]
+        )
         if exact.any():
             usable_positions = positions[exact]
             returns = _price_change(
@@ -240,7 +286,9 @@ def _build_dynamic_day(
             elif window == 60:
                 validity[usable_positions, 1] = True
 
-    adjacent = current_observed[1:] & current_observed[:-1]
+    adjacent = (
+        current_observed[1:] & current_observed[:-1] & ~current_mapping_changed[1:]
+    )
     one_minute = np.zeros(current_raw.shape[0] - 1, dtype=np.float64)
     if adjacent.any():
         one_minute[adjacent] = _price_change(
@@ -295,12 +343,18 @@ def _build_dynamic_day(
                 )
             )
 
-    running_high = np.maximum.accumulate(
-        np.where(current_observed, current_raw[:, 1], -np.inf)
-    )
-    running_low = np.minimum.accumulate(
-        np.where(current_observed, current_raw[:, 2], np.inf)
-    )
+    running_high = np.full(current_raw.shape[0], -np.inf)
+    running_low = np.full(current_raw.shape[0], np.inf)
+    high = -np.inf
+    low = np.inf
+    for minute_idx in positions:
+        if current_mapping_changed[minute_idx]:
+            high = -np.inf
+            low = np.inf
+        high = max(high, current_raw[minute_idx, 1])
+        low = min(low, current_raw[minute_idx, 2])
+        running_high[minute_idx] = high
+        running_low[minute_idx] = low
     ranges = running_high[positions] - running_low[positions]
     usable_range = ranges > 0
     usable_positions = positions[usable_range]

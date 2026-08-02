@@ -9,6 +9,7 @@ from .contract import (
     EQUITY_COUNT,
     HORIZON_COUNT,
     INSTRUMENT_COUNT,
+    LOCAL_CONTEXT_COUNT,
     MLP_DEPTH,
     MLP_SWIGLU_WIDTH,
     MLP_WIDTH,
@@ -16,6 +17,7 @@ from .contract import (
     RMS_NORM_EPS,
     TABULAR_FEATURE_COUNT,
     TARGETED_FUSION_GATE_BIAS,
+    STATE_TOKEN_SLOT,
     TCNArchitecture,
 )
 from .layers import CausalTCNResidualBlock, MuonLinear, SwiGLU
@@ -101,10 +103,17 @@ class SharedCausalTCN(nn.Module):
         hidden = hidden.transpose(1, 2).reshape(
             batch_size, instrument_count, masked.shape[2], architecture.width
         )
-        gather_index = (
-            (state_position - 1)
-            .view(batch_size, 1, 1, 1)
-            .expand(-1, instrument_count, 1, architecture.width)
+        gather_positions = state_position[:, None].expand(-1, instrument_count)
+        if instrument_count == INSTRUMENT_COUNT:
+            global_slots = (
+                torch.arange(instrument_count, device=patches.device)
+                >= EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+            )
+            gather_positions = torch.where(
+                global_slots[None], STATE_TOKEN_SLOT, gather_positions
+            )
+        gather_index = (gather_positions - 1)[..., None, None].expand(
+            -1, -1, 1, architecture.width
         )
         state = hidden.gather(2, gather_index).squeeze(2)
         return self.state_norm(state + self.slow_projection(slow_features))

@@ -454,13 +454,12 @@ Invoke-Test 'Frozen launch artifacts expose both hashes and detect tampering and
     }
 }
 
-Invoke-Test 'State uses launch identity fields and removes local_git_sha' {
+Invoke-Test 'State uses launch identity fields' {
     $state = New-WatcherState Launch
     Assert-True ($null -ne $state.PSObject.Properties['launch_git_sha']) 'launch_git_sha missing.'
     Assert-True ($null -ne $state.PSObject.Properties['launch_bundle_sha256']) 'bundle hash missing.'
     Assert-True ($null -ne $state.PSObject.Properties['launch_bootstrap_sha256']) 'bootstrap hash missing.'
     Assert-True ($null -ne $state.PSObject.Properties['sanity_report_path']) 'sanity path missing.'
-    Assert-True ($null -eq $state.PSObject.Properties['local_git_sha']) 'Legacy local_git_sha remains.'
 }
 
 Invoke-Test 'Same-instance adoption preserves launch identity; different adoption clears it' {

@@ -7,12 +7,14 @@ from .contract import (
     ABSOLUTE_PATCH_COUNT,
     EQUITY_COUNT,
     FAMILY_COUNT,
+    LOCAL_CONTEXT_COUNT,
     INSTRUMENT_COUNT,
     INSTRUMENT_FAMILY_IDS,
     NEURAL_MODELS,
     PATCH_INPUT_WIDTH,
     POOLED_INDUCING_TOKEN_COUNT,
     SLOW_FEATURE_COUNT,
+    STATE_TOKEN_SLOT,
     TARGETED_FUSION_GATE_BIAS,
     TEMPORAL_TOKEN_COUNT,
     TRANSFORMER_MODELS,
@@ -142,7 +144,16 @@ class TargetedCrossAssetTransformer(nn.Module):
             None, None, :, :
         ]
         patch_tokens = self.patch_projection(patches) + absolute_time + family
-        state_time = self.absolute_time_embedding(state_position)[:, None, :]
+        state_positions = state_position[:, None].expand(-1, instrument_count)
+        if instrument_count == INSTRUMENT_COUNT:
+            global_slots = (
+                torch.arange(instrument_count, device=patches.device)
+                >= EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+            )
+            state_positions = torch.where(
+                global_slots[None], STATE_TOKEN_SLOT, state_positions
+            )
+        state_time = self.absolute_time_embedding(state_positions)
         state_tokens = (
             self.state_token[None, None, :]
             + state_time
@@ -160,12 +171,9 @@ class TargetedCrossAssetTransformer(nn.Module):
         patch_positions = self.patch_position_ids.view(1, 1, -1).expand(
             batch_size, instrument_count, -1
         )
-        state_positions = state_position.view(batch_size, 1, 1).expand(
-            -1, instrument_count, -1
-        )
-        position_ids = torch.cat((patch_positions, state_positions), dim=2).reshape(
-            batch_size * instrument_count, TEMPORAL_TOKEN_COUNT
-        )
+        position_ids = torch.cat(
+            (patch_positions, state_positions[..., None]), dim=2
+        ).reshape(batch_size * instrument_count, TEMPORAL_TOKEN_COUNT)
         encoded = self.temporal_encoder(
             tokens.reshape(
                 batch_size * instrument_count,

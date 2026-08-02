@@ -47,7 +47,7 @@ else
     ln -s "$DATA_TARGET" "$DATA_LINK"
 fi
 
-FEATURE_POINTER="$DATA_LINK/b3/processed/features/m1_features_v1_canonical_path.txt"
+FEATURE_POINTER="$DATA_LINK/b3/processed/features/m1_features_canonical_path.txt"
 [[ -f "$FEATURE_POINTER" ]]
 mapfile -t FEATURE_POINTER_LINES < "$FEATURE_POINTER"
 [[ ${#FEATURE_POINTER_LINES[@]} -eq 1 ]]

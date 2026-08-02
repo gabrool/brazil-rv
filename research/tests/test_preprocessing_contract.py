@@ -13,6 +13,7 @@ from brazil_rv.preprocessing.contract import (
     DYNAMIC_CHANNELS,
     EQUITY_SESSION_MINUTES,
     EQUITY_SLOW_CHANNELS,
+    GLOBAL_SLOW_CHANNELS,
     HORIZONS,
     SLOW_CHANNELS,
     output_array_specs,
@@ -641,4 +642,7 @@ def test_generated_schema_matches_channel_contract(tmp_path: Path) -> None:
     schema = json.loads((tmp_path / "feature_schema.json").read_text(encoding="utf-8"))
     assert [row["name"] for row in schema["dynamic_channels"]] == list(DYNAMIC_CHANNELS)
     assert [row["name"] for row in schema["slow_channels"]] == list(SLOW_CHANNELS)
+    assert [row["name"] for row in schema["global_slow_channels"]] == list(
+        GLOBAL_SLOW_CHANNELS
+    )
     assert "average_one_based_midrank" in schema["stored_target"]

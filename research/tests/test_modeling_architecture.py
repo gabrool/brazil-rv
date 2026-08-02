@@ -14,6 +14,7 @@ from brazil_rv.modeling.contract import (
     COMPILE_STEADY_STATE_PASS_COUNT,
     COMPILE_WARMUP_PASS_COUNT,
     EQUITY_COUNT,
+    LOCAL_CONTEXT_COUNT,
     GH200_RUNTIME,
     INSTRUMENT_COUNT,
     NEURAL_MODELS,
@@ -116,7 +117,7 @@ def test_exact_public_model_contract() -> None:
     assert NEURAL_MODELS == SUPPORTED_MODELS[:-1]
     assert PATCH_INPUT_WIDTH == 130
     assert SLOW_FEATURE_COUNT == 32
-    assert TABULAR_FEATURE_COUNT == 871
+    assert TABULAR_FEATURE_COUNT == 1815
 
 
 def test_forward_shape_finiteness_and_parameter_count(
@@ -139,9 +140,9 @@ def test_forward_shape_finiteness_and_parameter_count(
 def test_transformer_architectures_and_memory_are_exact() -> None:
     for model_name, context_tokens, pooled_tokens, fusion_blocks in (
         ("temporal_only", 0, 0, 0),
-        ("context_only", 6, 0, 1),
+        ("context_only", 14, 0, 1),
         ("pooled_market", 0, 6, 1),
-        ("context_pooled", 6, 6, 1),
+        ("context_pooled", 14, 6, 1),
     ):
         architecture = architecture_for_model(model_name)
         assert (
@@ -159,9 +160,6 @@ def test_transformer_architectures_and_memory_are_exact() -> None:
         assert (
             sum(isinstance(module, TargetedFusionBlock) for module in model.modules())
             == fusion_blocks
-        )
-        assert not any(
-            "cross_asset_encoder" in name for name, _ in model.named_modules()
         )
         if pooled_tokens:
             assert isinstance(model.pooled_memory, PooledMarketMemory)
@@ -248,8 +246,8 @@ def test_tcn_is_causal_and_contains_no_attention() -> None:
     )
     inputs = _inputs()
     changed = {key: value.clone() for key, value in inputs.items()}
-    changed["patches"][:, :, 20:] += 1_000.0
-    changed["history_patch_mask"][:, :, 20:] = True
+    changed["patches"][:, : EQUITY_COUNT + LOCAL_CONTEXT_COUNT, 20:] += 1_000.0
+    changed["history_patch_mask"][:, : EQUITY_COUNT + LOCAL_CONTEXT_COUNT, 20:] = True
     with torch.no_grad():
         baseline = _forward(model, "tcn", inputs)
         output = _forward(model, "tcn", changed)

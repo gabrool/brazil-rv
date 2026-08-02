@@ -39,6 +39,7 @@ from brazil_rv.modeling.contract import (
     EFFECTIVE_BATCH_SIZE,
     EQUITY_COUNT,
     FINAL_LR_FACTOR,
+    FEATURE_CONTRACT_VERSION,
     MAX_EPOCHS,
     NEURAL_MODELS,
     GH200_RUNTIME,
@@ -46,6 +47,7 @@ from brazil_rv.modeling.contract import (
     SANITY_MAX_LOSS,
     SANITY_MAX_LOSS_RATIO,
     SANITY_MIN_SPEARMAN,
+    TABULAR_FEATURE_COUNT,
     TRANSFORMER_MODELS,
     TCNSettings,
     WARMUP_FRACTION,
@@ -54,6 +56,7 @@ from brazil_rv.modeling.contract import (
     XGBOOST_FIXED_PARAMETERS,
     XGBOOST_VERSION,
     architecture_for_model,
+    model_consumes_context,
 )
 from brazil_rv.modeling.evaluate import (
     _architecture_from_identity,
@@ -711,6 +714,40 @@ def test_daily_ic_aggregation_with_ties() -> None:
     )
 
 
+def _feature_manifest(feature_store: Path) -> dict[str, object]:
+    feature_store.mkdir(parents=True, exist_ok=True)
+    source_hashes = {"ES": "source-sha256"}
+    normalized_store_hashes = {"ES": "store-sha256"}
+    manifest = {
+        "contract_version": FEATURE_CONTRACT_VERSION,
+        "global_context": {
+            "source_hashes": source_hashes,
+            "normalized_store_hashes": normalized_store_hashes,
+        },
+    }
+    (feature_store / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return {
+        "feature_manifest_contract_version": FEATURE_CONTRACT_VERSION,
+        "global_context_source_hashes": source_hashes,
+        "global_context_normalized_store_hashes": normalized_store_hashes,
+    }
+
+
+def _global_identity(feature_store: Path, model_name: str) -> dict[str, object]:
+    identity = _feature_manifest(feature_store)
+    identity["global_context"] = (
+        "enabled"
+        if model_consumes_context(model_name, _tcn_settings(model_name))
+        else None
+    )
+    return identity
+
+
+def _read_feature_manifest(feature_store: Path) -> dict[str, object]:
+    _feature_manifest(feature_store)
+    return json.loads((feature_store / "manifest.json").read_text(encoding="utf-8"))
+
+
 def _matching_run_identity(
     feature_store: Path,
     *,
@@ -730,6 +767,7 @@ def _matching_run_identity(
         "objective": objective_metadata(objective, temperature),
         "sam": sam_metadata(optimizer_variant, sam_rho),
         "seed": 11,
+        **_global_identity(feature_store, model_name),
         "resolved_feature_store_path": str(feature_store),
         "git_commit_sha": "test-sha",
     }
@@ -789,6 +827,10 @@ def test_evaluation_identity_accepts_objective_metadata(
         "tcn_settings",
         "architecture_constants",
         "parameter_count",
+        "feature_manifest_contract_version",
+        "global_context",
+        "global_context_source_hashes",
+        "global_context_normalized_store_hashes",
     ),
 )
 def test_evaluation_identity_rejects_each_mismatch(field: str, tmp_path: Path) -> None:
@@ -797,6 +839,23 @@ def test_evaluation_identity_rejects_each_mismatch(field: str, tmp_path: Path) -
     checkpoint[field] = {"mismatch": field}
     with pytest.raises(ValueError, match=field):
         _validate_run_checkpoint_identity(manifest, checkpoint, tmp_path.resolve())
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "feature_manifest_contract_version",
+        "global_context_source_hashes",
+        "global_context_normalized_store_hashes",
+    ),
+)
+def test_evaluation_identity_rejects_feature_store_global_mismatch(
+    field: str, tmp_path: Path
+) -> None:
+    manifest = _matching_run_identity(tmp_path.resolve())
+    manifest[field] = {"mismatch": field}
+    with pytest.raises(ValueError, match=field):
+        _validate_run_checkpoint_identity(manifest, dict(manifest), tmp_path.resolve())
 
 
 def test_evaluation_identity_rejects_internal_objective_and_optimizer_conflicts(
@@ -903,6 +962,8 @@ def test_evaluation_identity_rejects_full_matched_full_crosswire(
         "objective": objective_metadata("soft_spearman", 0.1),
         "sam": sam_metadata("adamw", None),
         "seed": 11,
+        **_feature_manifest(tmp_path),
+        "global_context": "enabled",
         "resolved_feature_store_path": str(tmp_path),
         "git_commit_sha": "test-sha",
     }
@@ -1079,6 +1140,12 @@ def test_checkpoint_round_trip_eager(model_name: str, tmp_path: Path) -> None:
     model = _build_model(model_name)
     optimizer, _ = build_optimizer(model)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+    feature_manifest = _read_feature_manifest(tmp_path)
+    global_context = (
+        "enabled"
+        if model_consumes_context(model_name, _tcn_settings(model_name))
+        else None
+    )
     payload = checkpoint_payload(
         model,
         optimizer,
@@ -1094,6 +1161,8 @@ def test_checkpoint_round_trip_eager(model_name: str, tmp_path: Path) -> None:
         1,
         0.0,
         tmp_path,
+        global_context,
+        feature_manifest,
         "test-sha",
     )
     manifest = {**_matching_run_identity(tmp_path, model_name=model_name)}
@@ -1126,6 +1195,8 @@ def test_selected_tcn_checkpoint_round_trip_and_identity(
     model = build_neural_model("tcn", architecture)
     optimizer, _ = build_optimizer(model)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+    feature_manifest = _read_feature_manifest(tmp_path)
+    global_context = "enabled" if model_consumes_context("tcn", settings) else None
     payload = checkpoint_payload(
         model,
         optimizer,
@@ -1141,6 +1212,8 @@ def test_selected_tcn_checkpoint_round_trip_and_identity(
         2,
         0.05,
         tmp_path,
+        global_context,
+        feature_manifest,
         "test-sha",
     )
     manifest = {
@@ -1150,6 +1223,8 @@ def test_selected_tcn_checkpoint_round_trip_and_identity(
         "sam": sam_metadata("adamw", None),
         "seed": 11,
         "resolved_feature_store_path": str(tmp_path),
+        **_feature_manifest(tmp_path),
+        "global_context": global_context,
         "git_commit_sha": "test-sha",
     }
     _validate_run_checkpoint_identity(manifest, payload, tmp_path.resolve())
@@ -1246,7 +1321,7 @@ def test_xgboost_prediction_reshape_and_long_frame() -> None:
     output = np.zeros((2, EQUITY_COUNT, len(HORIZONS)), dtype=np.float32)
     source = [
         TabularRowBatch(
-            features=np.zeros((2, 871), dtype=np.float32),
+            features=np.zeros((2, TABULAR_FEATURE_COUNT), dtype=np.float32),
             labels=np.zeros(2, dtype=np.float32),
             weights=np.ones(2, dtype=np.float32),
             sample_id=np.asarray([20, 10], dtype=np.int64),
@@ -1300,7 +1375,9 @@ def test_xgboost_prediction_reshape_and_long_frame() -> None:
 
 def _tabular_xgboost_test_batch() -> TabularRowBatch:
     return TabularRowBatch(
-        features=np.arange(4 * 871, dtype=np.float32).reshape(4, 871),
+        features=np.arange(4 * TABULAR_FEATURE_COUNT, dtype=np.float32).reshape(
+            4, TABULAR_FEATURE_COUNT
+        ),
         labels=np.asarray([-1.0, -0.25, 0.25, 1.0], dtype=np.float32),
         weights=np.full(4, 0.25, dtype=np.float32),
         sample_id=np.arange(4, dtype=np.int64),
@@ -1333,7 +1410,7 @@ def test_xgboost_streaming_external_memory_quantile_matrix(tmp_path: Path) -> No
         device="cpu",
     )
     assert matrix.num_row() == 4
-    assert matrix.num_col() == 871
+    assert matrix.num_col() == TABULAR_FEATURE_COUNT
     assert any(path.is_file() for path in tmp_path.iterdir())
     del matrix
     gc.collect()
@@ -1431,6 +1508,8 @@ def _completed_xgboost_manifest(
         "bf16": None,
         "seed": 11,
         "git_commit_sha": "a" * 40,
+        **_feature_manifest(feature_store),
+        "global_context": "enabled",
         "resolved_feature_store_path": str(feature_store),
         "xgboost": {
             "version": XGBOOST_VERSION,

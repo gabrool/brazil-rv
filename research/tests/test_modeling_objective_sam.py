@@ -15,6 +15,7 @@ from brazil_rv.modeling.contract import (
     ADAMW_BETAS,
     ADAMW_EPS,
     ADAMW_LR,
+    FEATURE_CONTRACT_VERSION,
     ADAMW_WEIGHT_DECAY,
     BASELINE_TCN_SETTINGS,
     GH200_RUNTIME,
@@ -1171,11 +1172,12 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
             "soft_spearman",
             0.1,
             None,
+            "enabled",
             11,
             created,
         )
-        == "tcn_context_pooled_w128_rffull_bgelu_soft_spearman_adamw_tau0p10_seed11_"
-        "20260102T030405006789Z"
+        == "tcn_context_pooled_w128_rffull_bgelu_soft_spearman_adamw_tau0p10_"
+        "global-enabled_seed11_20260102T030405006789Z"
     )
     assert (
         train._run_directory_name(
@@ -1185,11 +1187,12 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
             "soft_spearman",
             0.5,
             0.125,
+            "enabled",
             11,
             created,
         )
         == "tcn_context_pooled_w128_rffull_bgelu_soft_spearman_sam_adamw_"
-        "rho0p125_tau0p50_seed11_20260102T030405006789Z"
+        "rho0p125_tau0p50_global-enabled_seed11_20260102T030405006789Z"
     )
     assert (
         train._run_directory_name(
@@ -1199,11 +1202,12 @@ def test_rho_grid_metadata_cli_and_run_names() -> None:
             "rank_huber",
             None,
             0.025,
+            "enabled",
             11,
             created,
         )
         == "tcn_context_pooled_w128_rffull_bgelu_rank_huber_sam_adamw_"
-        "rho0p025_seed11_20260102T030405006789Z"
+        "rho0p025_global-enabled_seed11_20260102T030405006789Z"
     )
 
 
@@ -1222,6 +1226,13 @@ def test_checkpoint_round_trip_contains_resume_boundary_state(
     optimizer.step()
     scheduler.step()
     optimizer.zero_grad(set_to_none=True)
+    feature_manifest = {
+        "contract_version": FEATURE_CONTRACT_VERSION,
+        "global_context": {
+            "source_hashes": {"ES": "source-sha256"},
+            "normalized_store_hashes": {"ES": "store-sha256"},
+        },
+    }
     payload = checkpoint_payload(
         model,
         optimizer,
@@ -1237,6 +1248,8 @@ def test_checkpoint_round_trip_contains_resume_boundary_state(
         3,
         0.12,
         tmp_path,
+        "enabled",
+        feature_manifest,
         "test-sha",
     )
     path = tmp_path / "checkpoint.pt"

@@ -13,6 +13,7 @@ import torch
 
 from .contract import (
     ALLOWED_SEEDS,
+    GLOBAL_CONTEXT_SETTINGS,
     GH200_RUNTIME,
     NeuralArchitecture,
     NEURAL_MODELS,
@@ -24,6 +25,7 @@ from .contract import (
     XGBOOST_VERSION,
     architecture_for_model,
     expected_trainable_parameter_count,
+    model_consumes_context,
 )
 from .data import (
     create_evaluation_loader,
@@ -61,6 +63,10 @@ _CHECKPOINT_IDENTITY_FIELDS = (
     "tcn_settings",
     "architecture_constants",
     "parameter_count",
+    "feature_manifest_contract_version",
+    "global_context",
+    "global_context_source_hashes",
+    "global_context_normalized_store_hashes",
 )
 
 
@@ -123,6 +129,42 @@ def _validate_architecture_identity(identity: dict[str, object]) -> None:
         raise ValueError(f"Invalid parameter count for model: {model_name}")
 
 
+def _validate_global_identity(
+    identity: dict[str, object], feature_store: Path
+) -> str | None:
+    model_name = str(identity["model_name"])
+    raw_tcn = identity.get("tcn_settings")
+    tcn_settings = (
+        TCNSettings(**raw_tcn)
+        if model_name == "tcn" and isinstance(raw_tcn, dict)
+        else None
+    )
+    consumes_context = model_consumes_context(model_name, tcn_settings)
+    setting = identity.get("global_context")
+    if consumes_context and setting not in GLOBAL_CONTEXT_SETTINGS:
+        raise ValueError(
+            "Context-consuming identity has invalid global context setting"
+        )
+    if not consumes_context and setting is not None:
+        raise ValueError("Context-free identity has a global context setting")
+
+    feature_manifest = json.loads(
+        (feature_store / "manifest.json").read_text(encoding="utf-8")
+    )
+    global_metadata = feature_manifest["global_context"]
+    expected = {
+        "feature_manifest_contract_version": feature_manifest["contract_version"],
+        "global_context_source_hashes": global_metadata["source_hashes"],
+        "global_context_normalized_store_hashes": global_metadata[
+            "normalized_store_hashes"
+        ],
+    }
+    for field, value in expected.items():
+        if identity.get(field) != value:
+            raise ValueError(f"Run identity does not match feature store: {field}")
+    return None if setting is None else str(setting)
+
+
 def _validate_run_checkpoint_identity(
     manifest: dict[str, object],
     checkpoint: dict[str, object],
@@ -135,6 +177,7 @@ def _validate_run_checkpoint_identity(
             raise ValueError(f"Run/checkpoint identity mismatch: {field}")
     _validate_architecture_identity(manifest)
     _validate_objective_and_optimizer(manifest)
+    _validate_global_identity(manifest, feature_store)
     manifest_store = Path(str(manifest["resolved_feature_store_path"])).expanduser()
     if manifest_store.resolve() != feature_store:
         raise ValueError("Validated feature store does not match the run identity")
@@ -172,6 +215,7 @@ def _validate_xgboost_identity(
     manifest_store = Path(str(manifest["resolved_feature_store_path"])).expanduser()
     if manifest_store.resolve() != feature_store:
         raise ValueError("Validated feature store does not match the run identity")
+    _validate_global_identity(manifest, feature_store)
 
     metadata = manifest.get("xgboost")
     if not isinstance(metadata, dict):
@@ -269,6 +313,7 @@ def _evaluate_neural(
         feature_store,
         rows,
         model_name,
+        manifest["global_context"],
         GH200_RUNTIME,
         int(manifest["seed"]),
         tcn_architecture,
@@ -346,6 +391,7 @@ def main() -> None:
             feature_store,
             training_rows,
             rows,
+            str(manifest["global_context"]),
             args.run_dir,
             evaluation_dir,
             booster_sha256,
@@ -380,6 +426,14 @@ def main() -> None:
         "architecture_constants": manifest["architecture_constants"],
         "parameter_count": manifest["parameter_count"],
         "optimizer_variant": manifest["optimizer_variant"],
+        "global_context": manifest["global_context"],
+        "feature_manifest_contract_version": manifest[
+            "feature_manifest_contract_version"
+        ],
+        "global_context_source_hashes": manifest["global_context_source_hashes"],
+        "global_context_normalized_store_hashes": manifest[
+            "global_context_normalized_store_hashes"
+        ],
         "objective": manifest.get("objective"),
         "sam": manifest.get("sam"),
         "feature_cache_warmup": asdict(cache_report),

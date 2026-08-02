@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 from types import MappingProxyType
 
-FEATURE_CONTRACT_VERSION = "M1_FEATURES_V1"
+FEATURE_CONTRACT_VERSION = "M1_FEATURES_GLOBAL_CONTEXT"
 
 
 def resolve_project_root() -> Path:
@@ -35,7 +35,7 @@ FEATURE_STORE_POINTER = (
     / "b3"
     / "processed"
     / "features"
-    / "m1_features_v1_canonical_path.txt"
+    / "m1_features_canonical_path.txt"
 )
 RUN_OUTPUT_BASE = PROJECT_ROOT / "quant-data" / "b3" / "processed" / "model_runs"
 
@@ -50,7 +50,9 @@ EXPECTED_DATE_COUNT = 1248
 EXPECTED_SAMPLE_COUNT = 59_565
 EXPECTED_DECISIONS_PER_DATE = 55
 EQUITY_COUNT = 158
-CONTEXT_COUNT = 6
+LOCAL_CONTEXT_COUNT = 6
+GLOBAL_CONTEXT_COUNT = 8
+CONTEXT_COUNT = LOCAL_CONTEXT_COUNT + GLOBAL_CONTEXT_COUNT
 INSTRUMENT_COUNT = EQUITY_COUNT + CONTEXT_COUNT
 HORIZON_COUNT = 3
 DYNAMIC_CHANNEL_COUNT = 26
@@ -58,7 +60,17 @@ SLOW_FEATURE_COUNT = 32
 EQUITY_SLOW_COUNT = SLOW_FEATURE_COUNT
 CONTEXT_SLOW_COUNT = SLOW_FEATURE_COUNT
 CONTEXT_GENERIC_DYNAMIC_COUNT = 16
-CONTEXT_SYMBOLS = ("WIN$", "WDO$", "DI1F27", "DI1F28", "DI1F29", "DI1F31")
+LOCAL_CONTEXT_SYMBOLS = ("WIN$", "WDO$", "DI1F27", "DI1F28", "DI1F29", "DI1F31")
+GLOBAL_CONTEXT_SYMBOLS = (
+    "ES.v.0",
+    "NQ.v.0",
+    "ZT.v.0",
+    "ZN.v.0",
+    "CL.v.0",
+    "HG.v.0",
+    "6E.v.0",
+    "6M.v.0",
+)
 HORIZONS = (30, 60, 120)
 
 PATCH_MINUTES = 5
@@ -67,29 +79,51 @@ ABSOLUTE_PATCH_COUNT = 69
 STATE_TOKEN_SLOT = 69
 TEMPORAL_TOKEN_COUNT = 70
 EQUITY_ABSOLUTE_START_PATCH = 12
+GLOBAL_VISIBLE_MINUTES = 615
+GLOBAL_WINDOW_MINUTES = ABSOLUTE_PATCH_COUNT * PATCH_MINUTES
+DECISION_GLOBAL_INDICES = tuple(345 + PATCH_MINUTES * index for index in range(55))
 TABULAR_OFFSETS = (0, 15, 30, 60, 120)
-TABULAR_VALIDITY_COUNT = (1 + CONTEXT_COUNT) * len(TABULAR_OFFSETS)
+TABULAR_EQUITY_SLOW_COUNT = SLOW_FEATURE_COUNT
+TABULAR_EQUITY_DYNAMIC_COUNT = DYNAMIC_CHANNEL_COUNT * len(TABULAR_OFFSETS)
+TABULAR_CONTEXT_DYNAMIC_COUNT = (
+    CONTEXT_GENERIC_DYNAMIC_COUNT * CONTEXT_COUNT * len(TABULAR_OFFSETS)
+)
+TABULAR_CONTEXT_SLOW_COUNT = SLOW_FEATURE_COUNT * CONTEXT_COUNT
+TABULAR_DECISION_TIME_COUNT = 2
+TABULAR_VALIDITY_COUNT = (1 + CONTEXT_COUNT) * len(
+    TABULAR_OFFSETS
+) + GLOBAL_CONTEXT_COUNT
 TABULAR_FEATURE_COUNT = (
-    SLOW_FEATURE_COUNT
-    + DYNAMIC_CHANNEL_COUNT * len(TABULAR_OFFSETS)
-    + CONTEXT_GENERIC_DYNAMIC_COUNT * CONTEXT_COUNT * len(TABULAR_OFFSETS)
-    + SLOW_FEATURE_COUNT * CONTEXT_COUNT
-    + 2
+    TABULAR_EQUITY_SLOW_COUNT
+    + TABULAR_EQUITY_DYNAMIC_COUNT
+    + TABULAR_CONTEXT_DYNAMIC_COUNT
+    + TABULAR_CONTEXT_SLOW_COUNT
+    + TABULAR_DECISION_TIME_COUNT
     + TABULAR_VALIDITY_COUNT
 )
-if PATCH_INPUT_WIDTH != 130 or TABULAR_FEATURE_COUNT != 871:
+if PATCH_INPUT_WIDTH != 130 or TABULAR_FEATURE_COUNT != 1815:
     raise ValueError("Model input widths do not match the feature contract")
 
 FAMILY_EQUITY = 0
 FAMILY_EQUITY_FUTURE = 1
 FAMILY_FX_FUTURE = 2
 FAMILY_RATE_FUTURE = 3
-FAMILY_COUNT = 4
+FAMILY_EQUITY_INDEX = 4
+FAMILY_RATE_TREASURY = 5
+FAMILY_ENERGY = 6
+FAMILY_INDUSTRIAL_METAL = 7
+FAMILY_MAJOR_FX = 8
+FAMILY_EMERGING_FX = 9
+FAMILY_COUNT = 10
 INSTRUMENT_FAMILY_IDS = (
     (FAMILY_EQUITY,) * EQUITY_COUNT
     + (FAMILY_EQUITY_FUTURE, FAMILY_FX_FUTURE)
     + (FAMILY_RATE_FUTURE,) * 4
+    + (FAMILY_EQUITY_INDEX,) * 2
+    + (FAMILY_RATE_TREASURY,) * 2
+    + (FAMILY_ENERGY, FAMILY_INDUSTRIAL_METAL, FAMILY_MAJOR_FX, FAMILY_EMERGING_FX)
 )
+GLOBAL_CONTEXT_SETTINGS = ("enabled", "masked")
 
 TRANSFORMER_MODELS = (
     "temporal_only",
@@ -204,6 +238,9 @@ EXPECTED_ARRAY_SHAPES = {
     "context_features.npy": (1248, 6, 465, 26),
     "context_slow.npy": (1248, 6, 32),
     "context_data_ready.npy": (1248, 6),
+    "global_features.npy": (1248, 8, 615, 26),
+    "global_slow.npy": (1248, 8, 55, 32),
+    "global_data_ready.npy": (1248, 8, 55),
     "raw_returns.npy": (1248, 158, 55, 3),
     "targets.npy": (1248, 158, 55, 3),
     "label_mask.npy": (1248, 158, 55, 3),
@@ -436,20 +473,20 @@ NEURAL_ARCHITECTURES: Mapping[str, TransformerArchitecture | MLPArchitecture] = 
             ),
             "context_only": TransformerArchitecture(
                 **_SHARED_TRANSFORMER,
-                context_memory_tokens=6,
+                context_memory_tokens=CONTEXT_COUNT,
                 pooled_memory_tokens=0,
                 fusion_blocks=1,
             ),
             "pooled_market": TransformerArchitecture(
                 **_SHARED_TRANSFORMER,
                 context_memory_tokens=0,
-                pooled_memory_tokens=6,
+                pooled_memory_tokens=2 + POOLED_INDUCING_TOKEN_COUNT,
                 fusion_blocks=1,
             ),
             "context_pooled": TransformerArchitecture(
                 **_SHARED_TRANSFORMER,
-                context_memory_tokens=6,
-                pooled_memory_tokens=6,
+                context_memory_tokens=CONTEXT_COUNT,
+                pooled_memory_tokens=2 + POOLED_INDUCING_TOKEN_COUNT,
                 fusion_blocks=1,
             ),
             "mlp": MLPArchitecture(
@@ -467,11 +504,11 @@ NEURAL_ARCHITECTURES: Mapping[str, TransformerArchitecture | MLPArchitecture] = 
 )
 EXPECTED_TRAINABLE_PARAMETER_COUNTS: Mapping[str, int] = MappingProxyType(
     {
-        "temporal_only": 1_668_611,
-        "context_only": 2_603_779,
-        "pooled_market": 3_539_715,
-        "context_pooled": 3_539_715,
-        "mlp": 1_404_675,
+        "temporal_only": 1_670_147,
+        "context_only": 2_605_315,
+        "pooled_market": 3_541_251,
+        "context_pooled": 3_541_251,
+        "mlp": 1_646_339,
     }
 )
 
@@ -492,6 +529,22 @@ def architecture_for_model(
         raise ValueError(f"Unknown neural model: {model_name}") from error
 
 
+def model_consumes_context(
+    model_name: str, tcn_settings: TCNSettings | None = None
+) -> bool:
+    if model_name == "tcn":
+        if tcn_settings is None:
+            raise ValueError("TCN settings are required for model tcn")
+        return tcn_settings.fusion in ("context_only", "context_pooled")
+    if tcn_settings is not None:
+        raise ValueError(f"TCN settings are forbidden for model {model_name}")
+    if model_name in ("context_only", "context_pooled", "mlp", "xgboost"):
+        return True
+    if model_name in ("temporal_only", "pooled_market"):
+        return False
+    raise ValueError(f"Unknown model: {model_name}")
+
+
 def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
     if settings.fusion not in TCN_FUSIONS:
         raise ValueError(f"Invalid TCN fusion: {settings.fusion}")
@@ -507,9 +560,9 @@ def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
         raise ValueError(f"Invalid TCN block: {settings.block}")
     fusion_states = {
         "none": 0,
-        "context_only": 7,
+        "context_only": 1 + CONTEXT_COUNT,
         "pooled_market": 3,
-        "context_pooled": 9,
+        "context_pooled": 3 + CONTEXT_COUNT,
     }[settings.fusion]
     theoretical_patches = 1 + (TCN_KERNEL_SIZE - 1) * sum(dilations)
     equity_patches = min(
