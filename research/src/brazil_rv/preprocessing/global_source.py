@@ -5,9 +5,10 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from zoneinfo import ZoneInfo
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -143,19 +144,30 @@ def estimate_cost(
     client: HistoricalClient,
     requests: Sequence[HistoricalRequest],
 ) -> dict[str, object]:
+    estimate_plan = metadata_estimate_plan(requests)
     by_schema = {
         schema: {"request_count": 0, "estimated_cost_usd": 0.0}
         for schema in HISTORICAL_SCHEMAS
     }
+    for request in requests:
+        by_schema[request.schema]["request_count"] += 1
     try:
-        for request in requests:
+        for number, request in enumerate(estimate_plan, start=1):
+            print(
+                f"Estimating metadata {number}/{len(estimate_plan)}: "
+                f"{request.continuous_symbol} {request.schema} "
+                f"[{request.start}, {request.end})",
+                file=sys.stderr,
+                flush=True,
+            )
             cost = float(client.metadata.get_cost(**_request_kwargs(request)))
-            by_schema[request.schema]["request_count"] += 1
             by_schema[request.schema]["estimated_cost_usd"] += cost
     except Exception:
         raise RuntimeError("Databento cost estimate failed") from None
     return {
         "remaining_request_count": len(requests),
+        "remaining_download_request_count": len(requests),
+        "metadata_estimate_group_count": len(estimate_plan),
         "by_schema": by_schema,
         "total_usd": sum(
             float(summary["estimated_cost_usd"]) for summary in by_schema.values()
@@ -190,6 +202,27 @@ def request_plan(
                     )
                 )
     return tuple(planned)
+
+
+def metadata_estimate_plan(
+    requests: Sequence[HistoricalRequest],
+) -> tuple[HistoricalRequest, ...]:
+    groups: list[HistoricalRequest] = []
+    latest_by_contract: dict[tuple[str, str, str, str], int] = {}
+    for request in requests:
+        contract = (
+            GLOBAL_DATASET,
+            CONTINUOUS_STYPE,
+            request.continuous_symbol,
+            request.schema,
+        )
+        previous = latest_by_contract.get(contract)
+        if previous is not None and groups[previous].end == request.start:
+            groups[previous] = replace(groups[previous], end=request.end)
+        else:
+            latest_by_contract[contract] = len(groups)
+            groups.append(request)
+    return tuple(groups)
 
 
 def _request_contract(request: HistoricalRequest) -> dict[str, object]:

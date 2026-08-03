@@ -364,6 +364,169 @@ def _fake_acquisition(
     )
 
 
+def test_fresh_download_plan_coalesces_to_sixteen_full_interval_groups(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    request = RequestRange(date(2021, 6, 4), date(2026, 7, 18))
+    plan = request_plan(request, tmp_path)
+    groups = global_source_module.metadata_estimate_plan(plan)
+
+    assert len(plan) == 976
+    assert len(groups) == 16
+    assert {
+        (group.continuous_symbol, group.schema, group.start, group.end)
+        for group in groups
+    } == {
+        (symbol, schema, request.start, request.end)
+        for symbol in GLOBAL_CONTEXT_SYMBOLS
+        for schema in HISTORICAL_SCHEMAS
+    }
+
+    client = _FakeHistorical()
+    estimate = global_source_module.estimate_cost(client, plan)
+    capsys.readouterr()
+    assert estimate["remaining_request_count"] == 976
+    assert estimate["remaining_download_request_count"] == 976
+    assert estimate["metadata_estimate_group_count"] == 16
+    assert len(client.metadata.calls) == 16
+
+
+def test_valid_chunk_splits_metadata_ranges_and_is_not_estimated(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 4, 5))
+    plan = _fake_acquisition(tmp_path, request)
+    capsys.readouterr()
+    valid = [item for item in plan if item.schema == "ohlcv-1m"][1]
+    for item in plan:
+        if item != valid:
+            item.data_path.unlink()
+            item.descriptor_path.unlink()
+    missing = global_source_module.remaining_requests(tmp_path, plan)
+    groups = global_source_module.metadata_estimate_plan(missing)
+
+    assert valid not in missing
+
+    assert [
+        (group.start, group.end) for group in groups if group.schema == "ohlcv-1m"
+    ] == [(request.start, valid.start), (valid.end, request.end)]
+    assert [
+        (group.start, group.end) for group in groups if group.schema == "definition"
+    ] == [(request.start, request.end)]
+
+    client = _FakeHistorical()
+    estimate = global_source_module.estimate_cost(client, missing)
+    capsys.readouterr()
+    assert estimate["remaining_download_request_count"] == len(plan) - 1
+    assert estimate["metadata_estimate_group_count"] == 3
+    assert all(
+        call["end"] <= valid.start or call["start"] >= valid.end
+        for call in client.metadata.calls
+        if call["schema"] == "ohlcv-1m"
+    )
+
+
+def test_incomplete_chunk_remains_in_metadata_plan(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    request = RequestRange(date(2026, 1, 2), date(2026, 2, 4))
+    plan = _fake_acquisition(tmp_path, request)
+    capsys.readouterr()
+    incomplete = plan[2]
+    incomplete.data_path.unlink()
+    incomplete.descriptor_path.unlink()
+    partial = global_source_module._request_partial_path(incomplete)
+    partial.write_bytes(b"interrupted")
+
+    missing = global_source_module.remaining_requests(tmp_path, plan)
+
+    assert missing == (incomplete,)
+    assert global_source_module.metadata_estimate_plan(missing) == (incomplete,)
+    assert not partial.exists()
+
+
+def test_metadata_progress_is_flushed_before_provider_calls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, object, object]] = []
+
+    def record_print(*args: object, **kwargs: object) -> None:
+        events.append(("progress", args[0], kwargs))
+
+    class Metadata:
+        def get_cost(self, **kwargs: object) -> float:
+            events.append(("metadata", kwargs["schema"], None))
+            return 1.0
+
+    client = _FakeHistorical()
+    client.metadata = Metadata()
+    monkeypatch.setattr("builtins.print", record_print)
+    plan = request_plan(
+        RequestRange(date(2026, 1, 2), date(2026, 1, 3)),
+        tmp_path,
+        ("ES.v.0",),
+    )
+
+    global_source_module.estimate_cost(client, plan)
+
+    assert [event[0] for event in events] == [
+        "progress",
+        "metadata",
+        "progress",
+        "metadata",
+    ]
+    assert all(
+        event[2]["flush"] is True
+        and event[2]["file"] is global_source_module.sys.stderr
+        for event in events
+        if event[0] == "progress"
+    )
+    assert "Estimating metadata 1/2: ES.v.0 ohlcv-1m" in str(events[0][1])
+
+
+def test_estimate_command_cannot_enter_paid_download_path(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _FakeHistorical()
+    raw_dir = tmp_path / "raw"
+    monkeypatch.setattr(
+        global_source_module,
+        "parse_args",
+        lambda: global_source_module.argparse.Namespace(
+            command="estimate",
+            universe_pointer=tmp_path / "universe.txt",
+            raw_dir=raw_dir,
+        ),
+    )
+    monkeypatch.setattr(global_source_module, "resolve_pointer", lambda _: tmp_path)
+    monkeypatch.setattr(
+        global_source_module,
+        "authoritative_request_range",
+        lambda _: RequestRange(date(2026, 1, 2), date(2026, 1, 3)),
+    )
+    monkeypatch.setattr(global_source_module, "_historical_client", lambda: client)
+    monkeypatch.setattr(
+        global_source_module,
+        "_download_request",
+        lambda *_: pytest.fail("estimate entered paid download path"),
+    )
+
+    global_source_module.main()
+
+    report = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert report["remaining_download_request_count"] == 16
+    assert report["metadata_estimate_group_count"] == 16
+    assert len(client.metadata.calls) == 16
+    assert not client.timeseries.calls
+    assert not raw_dir.exists()
+
+
 def test_supported_symbology_and_cost_plan_cover_every_remaining_request(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -381,16 +544,23 @@ def test_supported_symbology_and_cost_plan_cover_every_remaining_request(
             confirmed_paid_download=False,
             symbols=("ES.v.0",),
         )
-    estimate = json.loads(capsys.readouterr().out.strip())
+    output = capsys.readouterr()
+    estimate = json.loads(output.out.strip())
+    assert output.err.strip().splitlines() == [
+        "Estimating metadata 1/2: ES.v.0 ohlcv-1m [2026-01-02, 2026-02-04)",
+        "Estimating metadata 2/2: ES.v.0 definition [2026-01-02, 2026-02-04)",
+    ]
     assert estimate == {
         "remaining_request_count": 4,
+        "remaining_download_request_count": 4,
+        "metadata_estimate_group_count": 2,
         "by_schema": {
-            "ohlcv-1m": {"request_count": 2, "estimated_cost_usd": 4.0},
-            "definition": {"request_count": 2, "estimated_cost_usd": 1.0},
+            "ohlcv-1m": {"request_count": 2, "estimated_cost_usd": 2.0},
+            "definition": {"request_count": 2, "estimated_cost_usd": 0.5},
         },
-        "total_usd": 5.0,
+        "total_usd": 2.5,
     }
-    assert len(client.metadata.calls) == len(expected_plan)
+    assert len(client.metadata.calls) == 2
     assert not client.timeseries.calls
 
     plan = download_history(
@@ -444,7 +614,7 @@ def test_resume_estimates_and_downloads_only_unfinished_requests(
             confirmed_paid_download=True,
             symbols=("ES.v.0",),
         )
-    assert len(first.metadata.calls) == 4
+    assert len(first.metadata.calls) == 2
     assert not tuple(tmp_path.rglob("*.partial"))
     assert not (tmp_path / "manifest.json").exists()
 
