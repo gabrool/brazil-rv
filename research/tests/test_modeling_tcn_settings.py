@@ -162,7 +162,7 @@ def test_matched_full_exact_history_and_full_parameter_equivalence() -> None:
     full_architecture = resolve_tcn_architecture(full_settings)
     matched_count = count_trainable_parameters(_model(settings))
     full_count = count_trainable_parameters(_model(full_settings))
-    assert matched_count == full_count == 1_040_131
+    assert matched_count == full_count == 1_072_899
     assert matched_count == expected_trainable_parameter_count("tcn", architecture)
     assert full_count == expected_trainable_parameter_count("tcn", full_architecture)
     assert BASELINE_TCN_SETTINGS == full_settings
@@ -183,9 +183,9 @@ def test_every_tcn_setting_instantiates_with_exact_parameter_count(
         architecture.fusion_states
         == {
             "none": 0,
-            "context_only": 15,
+            "context_only": 16,
             "pooled_market": 3,
-            "context_pooled": 17,
+            "context_pooled": 18,
         }[settings.fusion]
     )
     assert count_trainable_parameters(model) == expected_trainable_parameter_count(
@@ -402,8 +402,8 @@ def test_baseline_tcn_state_layout_count_and_seed_reproducibility() -> None:
         )
     )
     assert tuple(first_model.state_dict()) == tuple(expected_keys)
-    assert count_trainable_parameters(first_model) == 1_040_131
-    assert expected_trainable_parameter_count("tcn", architecture) == 1_040_131
+    assert count_trainable_parameters(first_model) == 1_072_899
+    assert expected_trainable_parameter_count("tcn", architecture) == 1_072_899
 
     for key in expected_keys:
         torch.testing.assert_close(

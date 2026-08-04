@@ -19,6 +19,8 @@ from .audit import audit_feature_store, validate_global_slow_fields
 from .contract import (
     CANONICAL_OUTPUT_POINTER,
     LOCAL_CONTEXT_FAMILIES,
+    EXPOSURE_BETA_CONTEXT_SYMBOLS,
+    FIXED_RATE_CONTEXT_SYMBOLS,
     CONTEXT_SESSION_MINUTES,
     CONTEXT_SESSION_START_MINUTE,
     GLOBAL_AVAILABILITY_RULE,
@@ -29,6 +31,8 @@ from .contract import (
     GLOBAL_SLOW_CHANNELS,
     GLOBAL_UNUSED_SLOW_CHANNEL_INDICES,
     LOCAL_CONTEXT_SYMBOLS,
+    LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL,
+    LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES,
     CONTRACT_VERSION,
     DECISION_CONTEXT_INDICES,
     DECISION_GLOBAL_INDICES,
@@ -65,12 +69,14 @@ from .io import (
     resolve_inputs,
     resolve_pointer,
     validate_physical_source_identity,
+    validate_rate_source_scale,
     validate_source_date_isolation,
 )
 from .transforms import (
     add_equity_cross_sectional_dynamic,
     add_slow_cross_sectional_ranks,
     build_causal_features,
+    build_liquidity_selected_rate_features,
     build_daily_changes,
     build_prior_rate_level,
     build_raw_returns,
@@ -278,11 +284,13 @@ def _populate_feature_store(
             CONTEXT_SESSION_START_MINUTE,
             CONTEXT_SESSION_MINUTES,
         )
+        if symbol in RATE_CONTEXT_SYMBOLS:
+            validate_rate_source_scale(bars, source_path)
         raw_grid, observed = dense_grid(
             bars, len(market_dates), CONTEXT_SESSION_MINUTES
         )
         valid_day = np.ones(len(market_dates), dtype=bool)
-        if symbol in RATE_CONTEXT_SYMBOLS:
+        if symbol in FIXED_RATE_CONTEXT_SYMBOLS:
             daily_close, daily_close_observed = full_session_final_closes(
                 source, market_dates
             )
@@ -306,6 +314,15 @@ def _populate_feature_store(
                 daily_close_observed,
                 is_rate=True,
             )
+        elif symbol == LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL:
+            result = build_liquidity_selected_rate_features(
+                raw_grid,
+                observed,
+                valid_day,
+                market_dates=market_dates,
+            )
+            daily_change = result.daily_change
+            daily_change_valid = result.daily_change_valid
         else:
             result = build_causal_features(
                 raw_grid,
@@ -319,7 +336,7 @@ def _populate_feature_store(
             daily_change_valid = result.daily_change_valid
         arrays["context_features.npy"][:, context_slot] = result.dynamic
         arrays["context_slow.npy"][:, context_slot] = result.slow
-        if symbol in RATE_CONTEXT_SYMBOLS:
+        if symbol in FIXED_RATE_CONTEXT_SYMBOLS:
             arrays["context_slow.npy"][:, context_slot, 30] = prior_rate
             arrays["context_slow.npy"][:, context_slot, 31] = expiry_scaled
         arrays["context_data_ready.npy"][:, context_slot] = result.data_ready
@@ -352,11 +369,14 @@ def _populate_feature_store(
         raise ValueError("No global context mapping rows were produced")
     global_coverage = pl.concat(global_coverage_parts, rechunk=True)
 
+    beta_slots = tuple(
+        LOCAL_CONTEXT_SYMBOLS.index(symbol) for symbol in EXPOSURE_BETA_CONTEXT_SYMBOLS
+    )
     exposure_betas = causal_exposure_betas(
         equity_change,
         equity_change_valid,
-        context_change,
-        context_change_valid,
+        context_change[:, beta_slots],
+        context_change_valid[:, beta_slots],
     )
     exposure_betas *= arrays["equity_data_ready.npy"][..., None]
     arrays["equity_slow.npy"][:, :, 20:26] = exposure_betas
@@ -552,7 +572,7 @@ def build_feature_store(*, created_at: datetime | None = None) -> tuple[Path, Pa
     started = clock.perf_counter()
     created_at = datetime.now(timezone.utc) if created_at is None else created_at
     output_dir = (
-        OUTPUT_BASE / f"m1_features_global_context_{created_at:%Y%m%dT%H%M%S%fZ}"
+        OUTPUT_BASE / f"m1_features_intraday_di_context_{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     partial = output_dir.with_name(f"{output_dir.name}.{uuid4().hex}.partial")
     if output_dir.exists():
@@ -615,6 +635,12 @@ def _context_index_frame(
     context_files: dict[str, Path], context_expiries: dict[str, object]
 ) -> pl.DataFrame:
     expiry_dates = [context_expiries.get(symbol) for symbol in LOCAL_CONTEXT_SYMBOLS]
+    rate_representation = {
+        symbol: "fixed_maturity" for symbol in FIXED_RATE_CONTEXT_SYMBOLS
+    }
+    rate_representation[LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL] = (
+        "liquidity_selected_unadjusted"
+    )
     return pl.DataFrame(
         {
             "context_slot": pl.Series(range(len(LOCAL_CONTEXT_SYMBOLS)), dtype=pl.Int8),
@@ -624,6 +650,27 @@ def _context_index_frame(
                 str(context_files[symbol]) for symbol in LOCAL_CONTEXT_SYMBOLS
             ],
             "expiry_date": pl.Series(expiry_dates, dtype=pl.Date),
+            "rate_representation": [
+                rate_representation.get(symbol) for symbol in LOCAL_CONTEXT_SYMBOLS
+            ],
+            "price_change_unit": [
+                "basis_points" if symbol in RATE_CONTEXT_SYMBOLS else "log_return"
+                for symbol in LOCAL_CONTEXT_SYMBOLS
+            ],
+            "fixed_expiry_applicable": [
+                symbol in FIXED_RATE_CONTEXT_SYMBOLS for symbol in LOCAL_CONTEXT_SYMBOLS
+            ],
+            "cross_session_price_features_applicable": [
+                symbol != LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+                for symbol in LOCAL_CONTEXT_SYMBOLS
+            ],
+            "absolute_rate_level_applicable": [
+                symbol in FIXED_RATE_CONTEXT_SYMBOLS for symbol in LOCAL_CONTEXT_SYMBOLS
+            ],
+            "session_boundary_price_state_reset": [
+                symbol == LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+                for symbol in LOCAL_CONTEXT_SYMBOLS
+            ],
         }
     )
 
@@ -658,6 +705,41 @@ def _validate_output(
         raise ValueError(f"Expected {EXPECTED_EQUITIES} equity slots")
     if tuple(context_index.get_column("symbol")) != LOCAL_CONTEXT_SYMBOLS:
         raise ValueError("Context axis does not match the required order")
+    expected_rate_representation = tuple(
+        "fixed_maturity"
+        if symbol in FIXED_RATE_CONTEXT_SYMBOLS
+        else (
+            "liquidity_selected_unadjusted"
+            if symbol == LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+            else None
+        )
+        for symbol in LOCAL_CONTEXT_SYMBOLS
+    )
+    if tuple(context_index["rate_representation"]) != expected_rate_representation:
+        raise ValueError("Context rate representation metadata is inconsistent")
+    for column, expected in (
+        (
+            "fixed_expiry_applicable",
+            tuple(
+                symbol in FIXED_RATE_CONTEXT_SYMBOLS for symbol in LOCAL_CONTEXT_SYMBOLS
+            ),
+        ),
+        (
+            "cross_session_price_features_applicable",
+            tuple(
+                symbol != LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+                for symbol in LOCAL_CONTEXT_SYMBOLS
+            ),
+        ),
+        (
+            "absolute_rate_level_applicable",
+            tuple(
+                symbol in FIXED_RATE_CONTEXT_SYMBOLS for symbol in LOCAL_CONTEXT_SYMBOLS
+            ),
+        ),
+    ):
+        if tuple(context_index[column]) != expected:
+            raise ValueError(f"Context applicability metadata is stale: {column}")
     if len(DECISION_EQUITY_INDICES) != 55 or len(HORIZONS) != 3:
         raise ValueError("Decision or horizon axis has the wrong cardinality")
     global_axis = (
@@ -713,6 +795,16 @@ def _validate_output(
         raise ValueError("Context rank and beta channels must be zero")
     if np.any(arrays["context_slow.npy"][:, :2, 30:32] != 0):
         raise ValueError("WIN/WDO DI-only slow channels must be zero")
+    liquidity_selected_slot = LOCAL_CONTEXT_SYMBOLS.index(
+        LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+    )
+    if np.any(
+        arrays["context_slow.npy"][:, liquidity_selected_slot][
+            ..., LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES
+        ]
+        != 0
+    ):
+        raise ValueError("DI1$N inapplicable slow channels must be zero")
     if np.any(arrays["global_features.npy"][..., 16:26] != 0):
         raise ValueError("Global equity-only dynamic channels must be zero")
     validate_global_slow_fields(
@@ -778,7 +870,7 @@ def _validate_output(
         active_counts != sample_index.get_column("active_equity_count").to_numpy()
     ):
         raise ValueError("Sample-index active equity count is inconsistent")
-    if len(context_expiries) != len(RATE_CONTEXT_SYMBOLS):
+    if len(context_expiries) != len(FIXED_RATE_CONTEXT_SYMBOLS):
         raise ValueError("Not every fixed-DI expiry was resolved")
     if sample_index.is_empty():
         raise ValueError("No feature-eligible sample exists")
@@ -799,6 +891,46 @@ def _write_feature_schema(output_dir: Path) -> None:
             {"index": index, "name": name}
             for index, name in enumerate(GLOBAL_SLOW_CHANNELS)
         ],
+        "local_context": {
+            "symbols": list(LOCAL_CONTEXT_SYMBOLS),
+            "fixed_maturity_rate_symbols": list(FIXED_RATE_CONTEXT_SYMBOLS),
+            "liquidity_selected_unadjusted_rate_symbol": LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL,
+            "exposure_beta_source_symbols": list(EXPOSURE_BETA_CONTEXT_SYMBOLS),
+            "rate_quote_unit": "annual_percentage_rate",
+            "rate_change_formula": "basis_points = 100 * (current - previous)",
+            "expiry_distance_basis": "calendar_days_to_authoritative_contract_expiry",
+            "applicability": {
+                symbol: {
+                    "rate_representation": (
+                        "fixed_maturity"
+                        if symbol in FIXED_RATE_CONTEXT_SYMBOLS
+                        else (
+                            "liquidity_selected_unadjusted"
+                            if symbol == LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+                            else None
+                        )
+                    ),
+                    "fixed_expiry_applicable": symbol in FIXED_RATE_CONTEXT_SYMBOLS,
+                    "cross_session_price_features_applicable": symbol
+                    != LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL,
+                    "absolute_rate_level_applicable": symbol
+                    in FIXED_RATE_CONTEXT_SYMBOLS,
+                }
+                for symbol in LOCAL_CONTEXT_SYMBOLS
+            },
+            "fixed_rate_semantics": {
+                "dynamic": "Session-local basis-point movements normalized by causal prior-session intraday volatility.",
+                "slow": "Legitimate cross-session, prior-rate-level, and calendar-day-to-exact-expiry fields are retained.",
+            },
+            "liquidity_selected_rate_semantics": {
+                "dynamic": "Only same-B3-session basis-point price anchors, intraday volatility, activity, range, observation, and coverage fields.",
+                "slow": "Only prior independently session-local direction, intraday volatility, activity, coverage, volatility regime, and calendar fields.",
+                "intentionally_zero_slow_channels": list(
+                    LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES
+                ),
+                "unsafe_path_rule": "No close-to-close chain, overnight gap, absolute rate level, expiry, or fabricated selected maturity.",
+            },
+        },
         "dynamic_semantics": {
             "0:5": "Existing causal normalized OHLC moves, robust volume surprise, and observed flag.",
             "6:16": "Causal instrument returns, realized volatility, cumulative volume, range, and source-quality state through the current minute.",
@@ -809,7 +941,7 @@ def _write_feature_schema(output_dir: Path) -> None:
             "17:20": "Point-in-time equity centered midranks; exactly zero for context instruments.",
             "20:26": "Causal equity betas to the six existing contexts; exactly zero for context instruments.",
             "26:30": "Deterministic current-date calendar encodings.",
-            "30:32": "Existing DI prior-rate and expiry fields; zero for equities, WIN, and WDO.",
+            "30:32": "Fixed-maturity DI prior-rate and calendar-day-to-exact-expiry fields; zero for equities, WIN, WDO, and DI1$N.",
         },
         "global_slow_semantics": {
             "0:13": "Causal completed-Globex-session state plus the decision-prefix return in position 1.",
@@ -824,7 +956,8 @@ def _write_feature_schema(output_dir: Path) -> None:
             "equity": [30, 31],
             "all_context": list(range(13, 15)) + list(range(17, 26)),
             "WIN_WDO": [30, 31],
-            "DI": list(range(20, 26)),
+            "fixed_maturity_DI": list(range(20, 26)),
+            "DI1$N": list(LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES),
             "context_dynamic": list(range(16, 26)),
         },
         "global_dynamic": list(range(16, 26)),
@@ -860,7 +993,7 @@ def _write_feature_schema(output_dir: Path) -> None:
         "masks": {
             "equity_membership": "monthly point-in-time universe membership",
             "equity_data_ready": "accepted identity interval and prior volatility state; optional features never tighten readiness",
-            "context_data_ready": "prior volatility state; DI also requires its existing prior-rate state",
+            "context_data_ready": "prior intraday-volatility state; fixed DI also requires prior-rate state, while DI1$N never requires absolute level or expiry",
             "label_mask": "membership, readiness, exact entry/exit endpoints, and a valid horizon cross-section",
             "horizon_mask": "at least 30 valid equity labels for the date, decision, and horizon",
             "global_data_ready": "per-instrument, per-decision prior volatility and observed-prefix readiness; never gates B3 samples",

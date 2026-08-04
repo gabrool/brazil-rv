@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-CONTRACT_VERSION = "M1_FEATURES_GLOBAL_CONTEXT"
+CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_CONTEXT"
 
 PROJECT_ROOT = Path(r"C:\Brazil-RV")
 UNIVERSE_POINTER = (
@@ -31,7 +31,15 @@ OUTPUT_BASE = PROJECT_ROOT / "quant-data/b3/processed/features"
 CANONICAL_OUTPUT_POINTER = OUTPUT_BASE / "m1_features_canonical_path.txt"
 
 EXPECTED_EQUITIES = 158
-LOCAL_CONTEXT_SYMBOLS = ("WIN$", "WDO$", "DI1F27", "DI1F28", "DI1F29", "DI1F31")
+LOCAL_CONTEXT_SYMBOLS = (
+    "WIN$",
+    "WDO$",
+    "DI1F27",
+    "DI1F28",
+    "DI1F29",
+    "DI1F31",
+    "DI1$N",
+)
 LOCAL_CONTEXT_FAMILIES = (
     "EQUITY_FUTURE",
     "FX_FUTURE",
@@ -39,8 +47,21 @@ LOCAL_CONTEXT_FAMILIES = (
     "RATE_FUTURE",
     "RATE_FUTURE",
     "RATE_FUTURE",
+    "RATE_FUTURE_LIQUIDITY_SELECTED_UNADJUSTED",
 )
-RATE_CONTEXT_SYMBOLS = frozenset(LOCAL_CONTEXT_SYMBOLS[2:])
+FIXED_RATE_CONTEXT_SYMBOLS = ("DI1F27", "DI1F28", "DI1F29", "DI1F31")
+LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL = "DI1$N"
+RATE_CONTEXT_SYMBOLS = frozenset(
+    (*FIXED_RATE_CONTEXT_SYMBOLS, LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL)
+)
+EXPOSURE_BETA_CONTEXT_SYMBOLS = (
+    "WIN$",
+    "WDO$",
+    "DI1F27",
+    "DI1F28",
+    "DI1F29",
+    "DI1F31",
+)
 GLOBAL_CONTEXT_SYMBOLS = (
     "ES.v.0",
     "NQ.v.0",
@@ -216,6 +237,8 @@ PRICE_VOL_FLOOR = 1e-5
 RATE_VOL_FLOOR_BP = 0.01
 PRICE_VOL_REFERENCE = 1e-4
 RATE_VOL_REFERENCE_BP = 0.1
+RATE_PERCENT_MIN = 1.0
+RATE_PERCENT_MAX = 50.0
 VOLUME_LOOKBACK_SESSIONS = 20
 VOLUME_MIN_OBSERVATIONS = 10
 MAD_NORMALIZATION = 1.4826
@@ -243,6 +266,14 @@ REAL_VOLUME_LOG_CENTER = 12.0
 REAL_VOLUME_LOG_SCALE = 4.0
 DOLLAR_VOLUME_LOG_CENTER = 18.0
 DOLLAR_VOLUME_LOG_SCALE = 4.0
+LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES = (
+    1,
+    2,
+    *range(13, 15),
+    *range(17, 26),
+    30,
+    31,
+)
 
 
 @dataclass(frozen=True)
@@ -295,6 +326,17 @@ def manifest_constants() -> dict[str, object]:
         "expected_equities": EXPECTED_EQUITIES,
         "local_context_symbols": list(LOCAL_CONTEXT_SYMBOLS),
         "local_context_families": list(LOCAL_CONTEXT_FAMILIES),
+        "fixed_rate_context_symbols": list(FIXED_RATE_CONTEXT_SYMBOLS),
+        "liquidity_selected_rate_context_symbol": (
+            LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+        ),
+        "exposure_beta_context_symbols": list(EXPOSURE_BETA_CONTEXT_SYMBOLS),
+        "rate_quote_unit": "annual_percentage_rate",
+        "rate_price_change_unit": "basis_points",
+        "rate_percentage_range": [RATE_PERCENT_MIN, RATE_PERCENT_MAX],
+        "rate_expiry_distance_basis": (
+            "calendar_days_to_authoritative_contract_expiry"
+        ),
         "global_context_symbols": list(GLOBAL_CONTEXT_SYMBOLS),
         "global_context_families": list(GLOBAL_CONTEXT_FAMILIES),
         "global_quote_directions": list(GLOBAL_QUOTE_DIRECTIONS),

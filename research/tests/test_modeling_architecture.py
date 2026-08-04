@@ -14,9 +14,14 @@ from brazil_rv.modeling.contract import (
     COMPILE_STEADY_STATE_PASS_COUNT,
     COMPILE_WARMUP_PASS_COUNT,
     EQUITY_COUNT,
+    FAMILY_EQUITY_FUTURE,
+    FAMILY_FX_FUTURE,
+    FAMILY_RATE_FUTURE,
     LOCAL_CONTEXT_COUNT,
     GH200_RUNTIME,
+    LOCAL_CONTEXT_SYMBOLS,
     INSTRUMENT_COUNT,
+    INSTRUMENT_FAMILY_IDS,
     NEURAL_MODELS,
     PATCH_INPUT_WIDTH,
     POOLED_INDUCING_TOKEN_COUNT,
@@ -117,7 +122,24 @@ def test_exact_public_model_contract() -> None:
     assert NEURAL_MODELS == SUPPORTED_MODELS[:-1]
     assert PATCH_INPUT_WIDTH == 130
     assert SLOW_FEATURE_COUNT == 32
-    assert TABULAR_FEATURE_COUNT == 1815
+    assert TABULAR_FEATURE_COUNT == 1932
+    assert LOCAL_CONTEXT_COUNT == 7
+    assert INSTRUMENT_COUNT == 173
+    assert LOCAL_CONTEXT_SYMBOLS == (
+        "WIN$",
+        "WDO$",
+        "DI1F27",
+        "DI1F28",
+        "DI1F29",
+        "DI1F31",
+        "DI1$N",
+    )
+    local_families = INSTRUMENT_FAMILY_IDS[EQUITY_COUNT : EQUITY_COUNT + 7]
+    assert local_families == (
+        FAMILY_EQUITY_FUTURE,
+        FAMILY_FX_FUTURE,
+        *(FAMILY_RATE_FUTURE,) * 5,
+    )
 
 
 def test_forward_shape_finiteness_and_parameter_count(
@@ -140,9 +162,9 @@ def test_forward_shape_finiteness_and_parameter_count(
 def test_transformer_architectures_and_memory_are_exact() -> None:
     for model_name, context_tokens, pooled_tokens, fusion_blocks in (
         ("temporal_only", 0, 0, 0),
-        ("context_only", 14, 0, 1),
+        ("context_only", 15, 0, 1),
         ("pooled_market", 0, 6, 1),
-        ("context_pooled", 14, 6, 1),
+        ("context_pooled", 15, 6, 1),
     ):
         architecture = architecture_for_model(model_name)
         assert (

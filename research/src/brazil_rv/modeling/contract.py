@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 from types import MappingProxyType
 
-FEATURE_CONTRACT_VERSION = "M1_FEATURES_GLOBAL_CONTEXT"
+FEATURE_CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_CONTEXT"
 
 
 def resolve_project_root() -> Path:
@@ -50,7 +50,7 @@ EXPECTED_DATE_COUNT = 1248
 EXPECTED_SAMPLE_COUNT = 59_565
 EXPECTED_DECISIONS_PER_DATE = 55
 EQUITY_COUNT = 158
-LOCAL_CONTEXT_COUNT = 6
+LOCAL_CONTEXT_COUNT = 7
 GLOBAL_CONTEXT_COUNT = 8
 CONTEXT_COUNT = LOCAL_CONTEXT_COUNT + GLOBAL_CONTEXT_COUNT
 INSTRUMENT_COUNT = EQUITY_COUNT + CONTEXT_COUNT
@@ -60,7 +60,15 @@ SLOW_FEATURE_COUNT = 32
 EQUITY_SLOW_COUNT = SLOW_FEATURE_COUNT
 CONTEXT_SLOW_COUNT = SLOW_FEATURE_COUNT
 CONTEXT_GENERIC_DYNAMIC_COUNT = 16
-LOCAL_CONTEXT_SYMBOLS = ("WIN$", "WDO$", "DI1F27", "DI1F28", "DI1F29", "DI1F31")
+LOCAL_CONTEXT_SYMBOLS = (
+    "WIN$",
+    "WDO$",
+    "DI1F27",
+    "DI1F28",
+    "DI1F29",
+    "DI1F31",
+    "DI1$N",
+)
 GLOBAL_CONTEXT_SYMBOLS = (
     "ES.v.0",
     "NQ.v.0",
@@ -101,7 +109,7 @@ TABULAR_FEATURE_COUNT = (
     + TABULAR_DECISION_TIME_COUNT
     + TABULAR_VALIDITY_COUNT
 )
-if PATCH_INPUT_WIDTH != 130 or TABULAR_FEATURE_COUNT != 1815:
+if PATCH_INPUT_WIDTH != 130 or TABULAR_FEATURE_COUNT != 1932:
     raise ValueError("Model input widths do not match the feature contract")
 
 FAMILY_EQUITY = 0
@@ -118,11 +126,13 @@ FAMILY_COUNT = 10
 INSTRUMENT_FAMILY_IDS = (
     (FAMILY_EQUITY,) * EQUITY_COUNT
     + (FAMILY_EQUITY_FUTURE, FAMILY_FX_FUTURE)
-    + (FAMILY_RATE_FUTURE,) * 4
+    + (FAMILY_RATE_FUTURE,) * 5
     + (FAMILY_EQUITY_INDEX,) * 2
     + (FAMILY_RATE_TREASURY,) * 2
     + (FAMILY_ENERGY, FAMILY_INDUSTRIAL_METAL, FAMILY_MAJOR_FX, FAMILY_EMERGING_FX)
 )
+if len(INSTRUMENT_FAMILY_IDS) != INSTRUMENT_COUNT:
+    raise ValueError("Instrument family layout does not match the instrument axis")
 GLOBAL_CONTEXT_SETTINGS = ("enabled", "masked")
 
 TRANSFORMER_MODELS = (
@@ -235,9 +245,9 @@ EXPECTED_ARRAY_SHAPES = {
     "equity_slow.npy": (1248, 158, 32),
     "equity_membership.npy": (1248, 158),
     "equity_data_ready.npy": (1248, 158),
-    "context_features.npy": (1248, 6, 465, 26),
-    "context_slow.npy": (1248, 6, 32),
-    "context_data_ready.npy": (1248, 6),
+    "context_features.npy": (1248, 7, 465, 26),
+    "context_slow.npy": (1248, 7, 32),
+    "context_data_ready.npy": (1248, 7),
     "global_features.npy": (1248, 8, 615, 26),
     "global_slow.npy": (1248, 8, 55, 32),
     "global_data_ready.npy": (1248, 8, 55),
@@ -508,7 +518,7 @@ EXPECTED_TRAINABLE_PARAMETER_COUNTS: Mapping[str, int] = MappingProxyType(
         "context_only": 2_605_315,
         "pooled_market": 3_541_251,
         "context_pooled": 3_541_251,
-        "mlp": 1_646_339,
+        "mlp": 1_676_291,
     }
 )
 
