@@ -643,13 +643,37 @@ def _sha256(path: Path) -> str:
 def _split_label(value: object) -> str:
     if TRAIN_START <= value <= TRAIN_END:
         return "train"
+    if TRAIN_END < value < VALIDATION_START:
+        return "embargo_1"
     if VALIDATION_START <= value <= VALIDATION_END:
         return "validation"
-    if value >= TEST_START:
+    if VALIDATION_END < value < TEST_START:
+        return "embargo_2"
+    if TEST_START <= value <= TEST_END:
         return "test"
     if value < TRAIN_START:
         return "warmup"
-    return "gap"
+    return "post_test"
+
+
+def _validated_split_counts(
+    sample_trade_dates: list[object],
+) -> dict[str, dict[str, int]]:
+    split_labels = [_split_label(value) for value in sample_trade_dates]
+    split_counts: dict[str, dict[str, int]] = {}
+    for split, expected_dates in EXPECTED_SPLIT_DATE_COUNTS.items():
+        positions = [
+            index for index, label in enumerate(split_labels) if label == split
+        ]
+        row_count = len(positions)
+        date_count = len({sample_trade_dates[index] for index in positions})
+        if (
+            date_count != expected_dates
+            or row_count != EXPECTED_SPLIT_SAMPLE_COUNTS[split]
+        ):
+            raise ValueError(f"{split} split counts do not match the contract")
+        split_counts[split] = {"date_count": date_count, "sample_count": row_count}
+    return split_counts
 
 
 def _date_groups(date_index: pl.DataFrame) -> pl.DataFrame:
@@ -1060,20 +1084,7 @@ def _generate_feature_audit(
     ] != str(last_eligible_date):
         raise ValueError("Manifest eligible-date boundaries are inconsistent")
     sample_trade_dates = sample_index.get_column("trade_date").to_list()
-    split_labels = [_split_label(value) for value in sample_trade_dates]
-    split_counts: dict[str, dict[str, int]] = {}
-    for split, expected_dates in EXPECTED_SPLIT_DATE_COUNTS.items():
-        positions = [
-            index for index, label in enumerate(split_labels) if label == split
-        ]
-        row_count = len(positions)
-        date_count = len({sample_trade_dates[index] for index in positions})
-        if (
-            date_count != expected_dates
-            or row_count != EXPECTED_SPLIT_SAMPLE_COUNTS[split]
-        ):
-            raise ValueError(f"{split} split counts do not match the contract")
-        split_counts[split] = {"date_count": date_count, "sample_count": row_count}
+    split_counts = _validated_split_counts(sample_trade_dates)
     unavailable_local_dates = int(
         (~arrays["context_data_ready.npy"][eligible_dates].all(axis=1)).sum()
     )
