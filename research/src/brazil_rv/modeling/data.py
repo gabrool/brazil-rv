@@ -27,13 +27,20 @@ from .contract import (
     EQUITY_COUNT,
     EXPECTED_ARRAY_SHAPES,
     EXPECTED_DECISIONS_PER_DATE,
+    EXPECTED_ELIGIBLE_DATE_COUNT,
+    EXPECTED_FIRST_ELIGIBLE_DATE,
+    EXPECTED_LAST_ELIGIBLE_DATE,
     EXPECTED_SAMPLE_COUNT,
+    EXPECTED_SPLIT_DATE_COUNTS,
+    EXPECTED_SPLIT_SAMPLE_COUNTS,
     FEATURE_CONTRACT_VERSION,
     FEATURE_STORE_POINTER,
     HORIZON_COUNT,
     INSTRUMENT_COUNT,
+    LOCAL_CONTEXT_AVAILABILITY_RULE,
     LOCAL_CONTEXT_COUNT,
     LOCAL_CONTEXT_SYMBOLS,
+    MIN_ACTIVE_EQUITIES,
     NEURAL_MODELS,
     PATCH_INPUT_WIDTH,
     PATCH_MINUTES,
@@ -104,8 +111,11 @@ def load_sample_index(store: Path) -> pl.DataFrame:
 
 
 def _validate_sample_index(sample_index: pl.DataFrame) -> None:
-    if sample_index.get_column("sample_id").n_unique() != sample_index.height:
-        raise ValueError("sample_id must be unique")
+    sample_ids = sample_index.get_column("sample_id").to_numpy()
+    if np.unique(sample_ids).size != sample_index.height or not np.array_equal(
+        np.sort(sample_ids), np.arange(sample_index.height)
+    ):
+        raise ValueError("sample_id must be unique and contiguous from zero")
     expected_decisions = list(range(EXPECTED_DECISIONS_PER_DATE))
     decisions_by_date = sample_index.group_by("trade_date").agg(
         pl.col("decision_idx").sort()
@@ -135,6 +145,13 @@ def validate_feature_store(store: Path) -> pl.DataFrame:
             f"Expected feature contract {FEATURE_CONTRACT_VERSION}, "
             f"found {manifest['contract_version']}"
         )
+    if (
+        manifest.get("local_context_availability_rule")
+        != LOCAL_CONTEXT_AVAILABILITY_RULE
+    ):
+        raise ValueError(
+            "Feature manifest has the wrong local-context availability rule"
+        )
     sample_index = load_sample_index(store)
     if sample_index.height != EXPECTED_SAMPLE_COUNT:
         raise ValueError(
@@ -147,6 +164,44 @@ def validate_feature_store(store: Path) -> pl.DataFrame:
             raise ValueError(
                 f"Expected {filename} shape {expected_shape}, found {array.shape}"
             )
+    context_ready = np.load(
+        store / "context_data_ready.npy", mmap_mode="r", allow_pickle=False
+    )
+    if context_ready.dtype != np.dtype(bool):
+        raise ValueError("context_data_ready.npy must have boolean dtype")
+    membership = np.load(
+        store / "equity_membership.npy", mmap_mode="r", allow_pickle=False
+    )
+    equity_ready = np.load(
+        store / "equity_data_ready.npy", mmap_mode="r", allow_pickle=False
+    )
+    active_by_date = (membership & equity_ready).sum(axis=1)
+    expected_eligible_dates = np.flatnonzero(active_by_date >= MIN_ACTIVE_EQUITIES)
+    sample_dates = np.sort(
+        sample_index.get_column("date_idx").unique().to_numpy().astype(np.int64)
+    )
+    if not np.array_equal(sample_dates, expected_eligible_dates):
+        raise ValueError(
+            "Sample dates must equal the dates meeting only the active-equity rule"
+        )
+    if sample_dates.size != EXPECTED_ELIGIBLE_DATE_COUNT:
+        raise ValueError(
+            f"Expected {EXPECTED_ELIGIBLE_DATE_COUNT} eligible dates, "
+            f"found {sample_dates.size}"
+        )
+    if (
+        sample_index.get_column("trade_date").min() != EXPECTED_FIRST_ELIGIBLE_DATE
+        or sample_index.get_column("trade_date").max() != EXPECTED_LAST_ELIGIBLE_DATE
+    ):
+        raise ValueError("Feature-eligible date boundaries do not match the contract")
+    repeated_active = active_by_date[
+        sample_index.get_column("date_idx").to_numpy().astype(np.int64)
+    ]
+    if np.any(repeated_active < MIN_ACTIVE_EQUITIES) or not np.array_equal(
+        repeated_active,
+        sample_index.get_column("active_equity_count").to_numpy(),
+    ):
+        raise ValueError("Sample-index active-equity counts are inconsistent")
     local_symbols = tuple(
         pl.read_parquet(store / "context_index.parquet")
         .sort("context_slot")
@@ -175,6 +230,14 @@ def validate_feature_store(store: Path) -> pl.DataFrame:
         for right in range(left + 1, len(split_ids))
     ):
         raise ValueError("Training, validation, and test rows must be disjoint")
+    for split, expected_dates in EXPECTED_SPLIT_DATE_COUNTS.items():
+        actual_dates = splits[split].get_column("trade_date").n_unique()
+        actual_samples = splits[split].height
+        if (
+            actual_dates != expected_dates
+            or actual_samples != EXPECTED_SPLIT_SAMPLE_COUNTS[split]
+        ):
+            raise ValueError(f"{split} split counts do not match the contract")
     if splits["train"].get_column("trade_date").n_unique() < EFFECTIVE_BATCH_SIZE:
         raise ValueError(
             f"Training requires at least {EFFECTIVE_BATCH_SIZE} distinct dates"
@@ -414,6 +477,7 @@ def build_tabular_batch(
     batch_size = date_idx.size
     if global_context not in GLOBAL_CONTEXT_SETTINGS:
         raise ValueError(f"Invalid global context setting: {global_context}")
+    local_ready = np.asarray(arrays["context_data_ready.npy"][date_idx], dtype=bool)
     readiness = np.asarray(arrays["global_data_ready.npy"][date_idx], dtype=bool)
     global_ready = readiness[
         np.arange(batch_size)[:, None],
@@ -475,7 +539,7 @@ def build_tabular_batch(
                     ],
                     dtype=np.float32,
                 )
-                group_valid = values[:, 5] > 0.5
+                group_valid = (values[:, 5] > 0.5) & local_ready[group, context_slot]
                 block[group] = (
                     values[:, :CONTEXT_GENERIC_DYNAMIC_COUNT] * group_valid[:, None]
                 )
@@ -502,8 +566,9 @@ def build_tabular_batch(
     ).reshape(batch_size, -1)
     output[:, :, cursor : cursor + global_dynamic.shape[-1]] = global_dynamic[:, None]
     cursor += global_dynamic.shape[-1]
-    context_slow = np.asarray(
-        arrays["context_slow.npy"][date_idx], dtype=np.float32
+    context_slow = (
+        np.asarray(arrays["context_slow.npy"][date_idx], dtype=np.float32)
+        * local_ready[..., None]
     ).reshape(batch_size, LOCAL_CONTEXT_COUNT * SLOW_FEATURE_COUNT)
     output[:, :, cursor : cursor + context_slow.shape[-1]] = context_slow[:, None]
     cursor += context_slow.shape[-1]
@@ -531,6 +596,9 @@ def build_tabular_batch(
         cursor += 1
     for valid in global_validity.reshape(batch_size, -1).T:
         output[:, :, cursor] = valid[:, None]
+        cursor += 1
+    for ready in local_ready.T:
+        output[:, :, cursor] = ready[:, None]
         cursor += 1
     for ready in global_ready.T:
         output[:, :, cursor] = ready[:, None]

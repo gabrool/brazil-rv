@@ -979,8 +979,8 @@ def _history_row(*, sam: bool, objective: str = "soft_spearman") -> dict[str, ob
         "optimizer": "sam_adamw" if sam else "adamw",
         "rho": 0.025 if sam else None,
         "seed": 11,
-        "optimizer_steps": 62,
-        "backward_passes": 992 if sam else 496,
+        "optimizer_steps": 77,
+        "backward_passes": 1_232 if sam else 616,
         "train_objective_loss": 0.8125,
         "validation_objective_loss": 0.75,
         "validation_primary_ic": 0.031,
@@ -1100,13 +1100,13 @@ def test_adamw_parameter_routing_is_complete_disjoint_and_semantic(
 def test_scheduler_warmup_cosine_endpoints_and_update_numbering() -> None:
     parameter = nn.Parameter(torch.ones(()))
     optimizer = torch.optim.AdamW([parameter], lr=ADAMW_LR)
-    training_sample_count = 31_405
+    training_sample_count = 39_380
     scheduler, steps_per_epoch, warmup_steps = build_scheduler(
         optimizer, training_sample_count
     )
     total_steps = steps_per_epoch * MAX_EPOCHS
 
-    assert steps_per_epoch == 62
+    assert steps_per_epoch == 77
     assert (
         steps_per_epoch
         == (training_sample_count + EFFECTIVE_BATCH_SIZE - 1) // EFFECTIVE_BATCH_SIZE

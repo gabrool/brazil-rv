@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import time
+from datetime import date, time
 from pathlib import Path
 
 import numpy as np
 
-CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_CONTEXT"
+CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT"
+LOCAL_CONTEXT_AVAILABILITY_RULE = (
+    "Local instruments never gate B3 samples; unavailable instruments are masked "
+    "by context_data_ready."
+)
+SAMPLE_ELIGIBILITY_RULE = (
+    "At least MIN_ACTIVE_EQUITIES satisfy membership and equity feature readiness; "
+    "local and global context readiness never gate samples."
+)
 
 PROJECT_ROOT = Path(r"C:\Brazil-RV")
 UNIVERSE_POINTER = (
@@ -219,7 +227,11 @@ if DYNAMIC_CHANNEL_COUNT != 26 or SLOW_CHANNEL_COUNT != 32 or GLOBAL_SLOW_COUNT 
     raise ValueError("Feature channel contract has the wrong width")
 
 EXPECTED_DATE_COUNT = 1248
-EXPECTED_SAMPLE_COUNT = 59_565
+EXPECTED_ELIGIBLE_DATE_COUNT = 1_228
+EXPECTED_SAMPLE_COUNT = 67_540
+EXPECTED_FIRST_ELIGIBLE_DATE = date(2021, 8, 16)
+EXPECTED_LAST_ELIGIBLE_DATE = date(2026, 7, 17)
+EXPECTED_ELIGIBLE_DATES_WITH_UNAVAILABLE_LOCAL_CONTEXT = 145
 
 DECISION_EQUITY_INDICES = tuple(15 + 5 * index for index in range(55))
 DECISION_CONTEXT_INDICES = tuple(75 + 5 * index for index in range(55))
@@ -347,7 +359,15 @@ def manifest_constants() -> dict[str, object]:
         "global_continuous_roll_rule": GLOBAL_CONTINUOUS_ROLL_RULE,
         "global_availability_rule": GLOBAL_AVAILABILITY_RULE,
         "expected_date_count": EXPECTED_DATE_COUNT,
+        "expected_eligible_date_count": EXPECTED_ELIGIBLE_DATE_COUNT,
         "expected_sample_count": EXPECTED_SAMPLE_COUNT,
+        "expected_first_eligible_date": str(EXPECTED_FIRST_ELIGIBLE_DATE),
+        "expected_last_eligible_date": str(EXPECTED_LAST_ELIGIBLE_DATE),
+        "expected_eligible_dates_with_unavailable_local_context": (
+            EXPECTED_ELIGIBLE_DATES_WITH_UNAVAILABLE_LOCAL_CONTEXT
+        ),
+        "sample_eligibility_rule": SAMPLE_ELIGIBILITY_RULE,
+        "local_context_availability_rule": LOCAL_CONTEXT_AVAILABILITY_RULE,
         "equity_session_start_minute": EQUITY_SESSION_START_MINUTE,
         "equity_session_minutes": EQUITY_SESSION_MINUTES,
         "context_session_start_minute": CONTEXT_SESSION_START_MINUTE,

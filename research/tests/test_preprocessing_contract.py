@@ -12,7 +12,12 @@ from numpy.lib.format import open_memmap
 from brazil_rv.preprocessing import audit as audit_module
 from brazil_rv.preprocessing import build as build_module
 from brazil_rv.preprocessing.contract import (
+    CONTRACT_VERSION,
     DECISION_EQUITY_INDICES,
+    EXPECTED_ELIGIBLE_DATE_COUNT,
+    EXPECTED_FIRST_ELIGIBLE_DATE,
+    EXPECTED_LAST_ELIGIBLE_DATE,
+    EXPECTED_SAMPLE_COUNT,
     EXPOSURE_BETA_CONTEXT_SYMBOLS,
     FIXED_RATE_CONTEXT_SYMBOLS,
     LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL,
@@ -22,13 +27,16 @@ from brazil_rv.preprocessing.contract import (
     EQUITY_SLOW_CHANNELS,
     GLOBAL_SLOW_CHANNELS,
     GLOBAL_UNUSED_SLOW_CHANNEL_INDICES,
+    LOCAL_CONTEXT_AVAILABILITY_RULE,
     LOCAL_CONTEXT_SYMBOLS,
     HORIZONS,
+    SAMPLE_ELIGIBILITY_RULE,
     SLOW_CHANNELS,
     output_array_specs,
 )
 from brazil_rv.preprocessing.build import (
     _context_index_frame,
+    _sample_date_is_eligible,
     _write_feature_schema,
 )
 from brazil_rv.preprocessing.io import (
@@ -118,16 +126,42 @@ def test_future_mutation_causality() -> None:
 
     baseline_active = int(np.full(30, baseline.data_ready[-1]).sum())
     changed_active = int(np.full(30, changed.data_ready[-1]).sum())
-    baseline_context_ready = np.full(
-        len(LOCAL_CONTEXT_SYMBOLS), baseline.data_ready[-1]
-    )
-    changed_context_ready = np.full(len(LOCAL_CONTEXT_SYMBOLS), changed.data_ready[-1])
-    baseline_feature_sample = baseline_context_ready.all() and baseline_active >= 30
-    changed_feature_sample = changed_context_ready.all() and changed_active >= 30
+    assert baseline_active == changed_active == 30
+    assert _sample_date_is_eligible(baseline_active)
+    assert _sample_date_is_eligible(changed_active)
 
-    assert baseline_active == changed_active
-    np.testing.assert_array_equal(baseline_context_ready, changed_context_ready)
-    assert baseline_feature_sample == changed_feature_sample
+
+@pytest.mark.parametrize("unavailable_local_count", (1, len(LOCAL_CONTEXT_SYMBOLS)))
+def test_local_and_global_readiness_never_gate_sample_or_targets(
+    unavailable_local_count: int,
+) -> None:
+    local_ready = np.ones(len(LOCAL_CONTEXT_SYMBOLS), dtype=bool)
+    local_ready[:unavailable_local_count] = False
+    global_ready = np.zeros(8, dtype=bool)
+    raw = np.repeat(
+        np.linspace(-0.02, 0.02, 30, dtype=np.float32).reshape(30, 1, 1), 3, axis=2
+    )
+    candidate = np.ones_like(raw, dtype=bool)
+    baseline = center_cross_section(raw, candidate, np.ones(30, dtype=np.float64))
+    changed = center_cross_section(
+        raw.copy(), candidate.copy(), np.ones(30, dtype=np.float64)
+    )
+
+    assert not local_ready.all()
+    assert not global_ready.any()
+    assert _sample_date_is_eligible(30)
+    assert not _sample_date_is_eligible(29)
+    for expected, actual in zip(baseline, changed, strict=True):
+        np.testing.assert_array_equal(actual, expected)
+
+
+def test_audited_eligibility_contract_is_exact() -> None:
+    assert CONTRACT_VERSION == "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT"
+    assert EXPECTED_ELIGIBLE_DATE_COUNT == 1_228
+    assert EXPECTED_SAMPLE_COUNT == 67_540
+    assert EXPECTED_FIRST_ELIGIBLE_DATE == date(2021, 8, 16)
+    assert EXPECTED_LAST_ELIGIBLE_DATE == date(2026, 7, 17)
+    assert EXPECTED_SAMPLE_COUNT == EXPECTED_ELIGIBLE_DATE_COUNT * 55
 
 
 def test_price_scale_invariance() -> None:
@@ -864,6 +898,40 @@ def test_unready_global_slow_row_must_remain_zero() -> None:
         audit_module.validate_global_slow_fields(slow, ready)
 
 
+def test_local_context_readiness_audit_reports_symbols_dates_and_splits() -> None:
+    trade_dates = [
+        date(2021, 8, 16),
+        date(2024, 7, 8),
+        date(2025, 7, 7),
+    ]
+    ready = np.ones((len(trade_dates), len(LOCAL_CONTEXT_SYMBOLS)), dtype=bool)
+    fixed_slot = LOCAL_CONTEXT_SYMBOLS.index("DI1F28")
+    ready[0, fixed_slot] = False
+    rows = audit_module.local_context_readiness_rows(
+        ready, trade_dates, np.arange(len(trade_dates))
+    )
+
+    assert [row["symbol"] for row in rows] == list(LOCAL_CONTEXT_SYMBOLS)
+    fixed = rows[fixed_slot]
+    assert fixed["research_ready_date_count"] == 2
+    assert fixed["eligible_ready_date_count"] == 2
+    assert fixed["first_ready_date"] == "2024-07-08"
+    assert fixed["last_ready_date"] == "2025-07-07"
+    assert fixed["train_date_count"] == 1
+    assert fixed["train_ready_date_count"] == 0
+    assert fixed["validation_date_count"] == 1
+    assert fixed["validation_ready_date_count"] == 1
+    assert fixed["test_date_count"] == 1
+    assert fixed["test_ready_date_count"] == 1
+
+    with pytest.raises(ValueError, match="date/symbol axes"):
+        audit_module.local_context_readiness_rows(
+            ready[:, :-1],
+            trade_dates,
+            np.arange(len(trade_dates)),
+        )
+
+
 def test_generated_schema_matches_channel_contract(tmp_path: Path) -> None:
     _write_feature_schema(tmp_path)
     schema = json.loads((tmp_path / "feature_schema.json").read_text(encoding="utf-8"))
@@ -889,6 +957,9 @@ def test_generated_schema_matches_channel_contract(tmp_path: Path) -> None:
     assert local["liquidity_selected_rate_semantics"][
         "intentionally_zero_slow_channels"
     ] == list(LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES)
+    assert schema["sample_eligibility_rule"] == SAMPLE_ELIGIBILITY_RULE
+    assert schema["local_context_availability_rule"] == LOCAL_CONTEXT_AVAILABILITY_RULE
+    assert local["availability_mask"] == "context_data_ready"
 
 
 def _atomic_build_paths(
@@ -905,7 +976,8 @@ def _atomic_build_paths(
     monkeypatch.setattr(build_module, "CANONICAL_OUTPUT_POINTER", pointer)
     created_at = datetime(2026, 1, 2, 3, 4, 5, 6789, tzinfo=UTC)
     final = (
-        output_base / f"m1_features_intraday_di_context_{created_at:%Y%m%dT%H%M%S%fZ}"
+        output_base
+        / f"m1_features_intraday_di_masked_context_{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     return pointer, previous, final, created_at
 

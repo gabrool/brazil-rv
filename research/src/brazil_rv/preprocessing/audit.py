@@ -12,6 +12,9 @@ from uuid import uuid4
 import numpy as np
 import polars as pl
 from ..modeling.contract import (
+    EXPECTED_SPLIT_DATE_COUNTS,
+    EXPECTED_SPLIT_SAMPLE_COUNTS,
+    TEST_END,
     TEST_START,
     TRAIN_END,
     TRAIN_START,
@@ -34,8 +37,15 @@ from .contract import (
     DECISION_EQUITY_INDICES,
     DYNAMIC_CHANNELS,
     EXPECTED_DATE_COUNT,
+    EXPECTED_ELIGIBLE_DATE_COUNT,
+    EXPECTED_ELIGIBLE_DATES_WITH_UNAVAILABLE_LOCAL_CONTEXT,
+    EXPECTED_FIRST_ELIGIBLE_DATE,
+    EXPECTED_LAST_ELIGIBLE_DATE,
     EXPECTED_SAMPLE_COUNT,
+    LOCAL_CONTEXT_AVAILABILITY_RULE,
+    SAMPLE_ELIGIBILITY_RULE,
     HORIZONS,
+    MIN_ACTIVE_EQUITIES,
     SLOW_CHANNELS,
     output_array_specs,
 )
@@ -48,6 +58,60 @@ CONTEXT_VISIBLE_MINUTES = max(DECISION_CONTEXT_INDICES)
 GLOBAL_VISIBLE_MINUTES = max(DECISION_GLOBAL_INDICES)
 DATE_CHUNK = 8
 TARGET_MEAN_TOLERANCE = 2e-6
+
+
+def local_context_readiness_rows(
+    context_ready: np.ndarray,
+    trade_dates: list[object] | tuple[object, ...],
+    eligible_dates: np.ndarray,
+) -> list[dict[str, object]]:
+    """Summarize date-level local readiness without treating it as eligibility."""
+    if context_ready.shape != (len(trade_dates), len(LOCAL_CONTEXT_SYMBOLS)):
+        raise ValueError("Local context readiness does not match the date/symbol axes")
+    eligible_dates = np.asarray(eligible_dates, dtype=np.int64)
+    rows: list[dict[str, object]] = []
+    for slot, symbol in enumerate(LOCAL_CONTEXT_SYMBOLS):
+        ready = np.asarray(context_ready[:, slot], dtype=bool)
+        ready_indices = np.flatnonzero(ready)
+        eligible_ready = ready[eligible_dates]
+        row: dict[str, object] = {
+            "context_slot": slot,
+            "symbol": symbol,
+            "research_ready_date_count": int(ready.sum()),
+            "research_date_count": len(trade_dates),
+            "research_readiness_fraction": float(ready.mean()),
+            "eligible_ready_date_count": int(eligible_ready.sum()),
+            "eligible_date_count": int(eligible_dates.size),
+            "eligible_readiness_fraction": float(eligible_ready.mean()),
+            "first_ready_date": (
+                str(trade_dates[int(ready_indices[0])]) if ready_indices.size else None
+            ),
+            "last_ready_date": (
+                str(trade_dates[int(ready_indices[-1])]) if ready_indices.size else None
+            ),
+        }
+        for split, start, end in (
+            ("train", TRAIN_START, TRAIN_END),
+            ("validation", VALIDATION_START, VALIDATION_END),
+            ("test", TEST_START, TEST_END),
+        ):
+            indices = np.asarray(
+                [
+                    index
+                    for index in eligible_dates
+                    if start <= trade_dates[int(index)] <= end
+                ],
+                dtype=np.int64,
+            )
+            count = int(ready[indices].sum())
+            row[f"{split}_ready_date_count"] = count
+            row[f"{split}_date_count"] = int(indices.size)
+            row[f"{split}_readiness_fraction"] = (
+                count / int(indices.size) if indices.size else 0.0
+            )
+        rows.append(row)
+    return rows
+
 
 DYNAMIC_BOUNDS: tuple[tuple[float, float], ...] = (
     (-10.0, 10.0),
@@ -803,6 +867,13 @@ def _generate_feature_audit(
         != EXPOSURE_BETA_CONTEXT_SYMBOLS
     ):
         raise ValueError("Manifest exposure-beta sources are stale")
+    if manifest.get("sample_eligibility_rule") != SAMPLE_ELIGIBILITY_RULE:
+        raise ValueError("Manifest sample-eligibility rule is stale")
+    if (
+        manifest.get("local_context_availability_rule")
+        != LOCAL_CONTEXT_AVAILABILITY_RULE
+    ):
+        raise ValueError("Manifest local-context availability rule is stale")
 
     date_index = pl.read_parquet(features_dir / "date_index.parquet")
     equity_index = pl.read_parquet(features_dir / "equity_index.parquet")
@@ -823,7 +894,9 @@ def _generate_feature_audit(
     ):
         raise ValueError("Date metadata does not preserve the 1,248-date contract")
     if sample_index.height != EXPECTED_SAMPLE_COUNT:
-        raise ValueError("Sample metadata does not preserve the 59,565-sample contract")
+        raise ValueError(
+            f"Sample metadata does not preserve the {EXPECTED_SAMPLE_COUNT:,}-sample contract"
+        )
     if tuple(context_index.get_column("symbol")) != LOCAL_CONTEXT_SYMBOLS:
         raise ValueError("Context index order does not match the feature contract")
     liquidity_selected = context_index.filter(
@@ -934,29 +1007,97 @@ def _generate_feature_audit(
     )
     if sample_index.height != eligible_dates.size * len(DECISION_EQUITY_INDICES):
         raise ValueError("Eligible dates do not contain exactly 55 samples each")
+    if eligible_dates.size != EXPECTED_ELIGIBLE_DATE_COUNT:
+        raise ValueError(
+            f"Expected {EXPECTED_ELIGIBLE_DATE_COUNT} eligible dates, "
+            f"found {eligible_dates.size}"
+        )
     if int(manifest["sample_count"]) != sample_index.height:
         raise ValueError("Manifest sample_count does not match sample_index")
+    if int(manifest["eligible_date_count"]) != eligible_dates.size:
+        raise ValueError("Manifest eligible_date_count does not match sample_index")
+    sample_ids = sample_index.get_column("sample_id").to_numpy()
+    if not np.array_equal(sample_ids, np.arange(sample_index.height)):
+        raise ValueError("sample_id must be unique and contiguous from zero")
+    expected_decisions = list(range(len(DECISION_EQUITY_INDICES)))
+    decisions_by_date = sample_index.group_by("date_idx").agg(
+        pl.col("decision_idx").sort()
+    )
+    if any(
+        decisions != expected_decisions
+        for decisions in decisions_by_date.get_column("decision_idx").to_list()
+    ):
+        raise ValueError("Every eligible date must contain decision_idx exactly 0..54")
     sample_dates = sample_index.get_column("date_idx").to_numpy().astype(np.int64)
-    if not arrays["context_data_ready.npy"][sample_dates].all():
-        raise ValueError("sample_index contains a context-unready date")
-    sample_active = (
-        arrays["equity_membership.npy"][sample_dates]
-        & arrays["equity_data_ready.npy"][sample_dates]
+    active_by_date = (
+        arrays["equity_membership.npy"] & arrays["equity_data_ready.npy"]
     ).sum(axis=1)
-    if np.any(sample_active < 30):
+    expected_eligible_dates = np.flatnonzero(active_by_date >= MIN_ACTIVE_EQUITIES)
+    if not np.array_equal(eligible_dates, expected_eligible_dates):
         raise ValueError(
-            "sample_index contains a date with fewer than 30 active equities"
+            "Sample dates must equal the dates meeting only the active-equity rule"
+        )
+    sample_active = active_by_date[sample_dates]
+    if np.any(sample_active < MIN_ACTIVE_EQUITIES):
+        raise ValueError(
+            f"sample_index contains a date with fewer than {MIN_ACTIVE_EQUITIES} active equities"
         )
     if not np.array_equal(
         sample_active,
         sample_index.get_column("active_equity_count").to_numpy(),
     ):
         raise ValueError("sample_index active-equity counts are inconsistent")
+    trade_dates = date_index.get_column("trade_date").to_list()
+    first_eligible_date = trade_dates[int(eligible_dates[0])]
+    last_eligible_date = trade_dates[int(eligible_dates[-1])]
+    if (
+        first_eligible_date != EXPECTED_FIRST_ELIGIBLE_DATE
+        or last_eligible_date != EXPECTED_LAST_ELIGIBLE_DATE
+    ):
+        raise ValueError("Eligible-date boundaries do not match the contract")
+    if manifest["first_feature_eligible_date"] != str(first_eligible_date) or manifest[
+        "last_feature_eligible_date"
+    ] != str(last_eligible_date):
+        raise ValueError("Manifest eligible-date boundaries are inconsistent")
+    sample_trade_dates = sample_index.get_column("trade_date").to_list()
+    split_labels = [_split_label(value) for value in sample_trade_dates]
+    split_counts: dict[str, dict[str, int]] = {}
+    for split, expected_dates in EXPECTED_SPLIT_DATE_COUNTS.items():
+        positions = [
+            index for index, label in enumerate(split_labels) if label == split
+        ]
+        row_count = len(positions)
+        date_count = len({sample_trade_dates[index] for index in positions})
+        if (
+            date_count != expected_dates
+            or row_count != EXPECTED_SPLIT_SAMPLE_COUNTS[split]
+        ):
+            raise ValueError(f"{split} split counts do not match the contract")
+        split_counts[split] = {"date_count": date_count, "sample_count": row_count}
+    unavailable_local_dates = int(
+        (~arrays["context_data_ready.npy"][eligible_dates].all(axis=1)).sum()
+    )
+    if (
+        unavailable_local_dates
+        != EXPECTED_ELIGIBLE_DATES_WITH_UNAVAILABLE_LOCAL_CONTEXT
+    ):
+        raise ValueError(
+            "Eligible-date local-context unavailability does not match the contract"
+        )
+    local_readiness = local_context_readiness_rows(
+        arrays["context_data_ready.npy"], trade_dates, eligible_dates
+    )
+    if manifest.get("local_context_readiness") != local_readiness:
+        raise ValueError("Manifest local-context readiness summary is inconsistent")
+    if (
+        manifest.get("eligible_dates_with_unavailable_local_context")
+        != unavailable_local_dates
+    ):
+        raise ValueError("Manifest unavailable-local-date count is inconsistent")
 
     feature_rows, security_observed, security_possible, security_active_days = (
         _collect_feature_stats(arrays, eligible_dates)
     )
-    trade_dates = date_index.get_column("trade_date").to_list()
     target_rows, yearly_rows = _target_stats(arrays, trade_dates, eligible_dates)
 
     date_groups = _date_groups(date_index)
@@ -1042,9 +1183,14 @@ def _generate_feature_audit(
         "contract_version": manifest["contract_version"],
         "date_count": EXPECTED_DATE_COUNT,
         "eligible_date_count": int(eligible_dates.size),
-        "first_eligible_date": str(trade_dates[int(eligible_dates[0])]),
-        "last_eligible_date": str(trade_dates[int(eligible_dates[-1])]),
+        "first_eligible_date": str(first_eligible_date),
+        "last_eligible_date": str(last_eligible_date),
         "sample_count": EXPECTED_SAMPLE_COUNT,
+        "sample_eligibility_rule": SAMPLE_ELIGIBILITY_RULE,
+        "local_context_availability_rule": LOCAL_CONTEXT_AVAILABILITY_RULE,
+        "eligible_dates_with_unavailable_local_context": unavailable_local_dates,
+        "split_counts": split_counts,
+        "local_context_readiness": local_readiness,
         "store_size_bytes": store_size,
         "active_equities": {
             "min": int(active_counts.min()),
@@ -1069,8 +1215,10 @@ def _generate_feature_audit(
             "valid targets are exact centered midranks inside (-1, 1)",
             "every valid target cross-section is centered at zero",
             "raw-return medians and horizon masks are consistent",
-            "membership, readiness, and exact label endpoints are enforced",
-            "date and sample counts are unchanged",
+            "membership, equity readiness, and exact label endpoints are enforced",
+            "local and global context readiness never gates B3 samples",
+            "unavailable local contexts are explicitly audited for ingress masking",
+            "eligible-date, sample, boundary, and split counts match the contract",
             "global source timestamps, OHLCV, hashes, and slot order are valid",
             "global decision slices contain no future bar",
             "global mapping changes suppress cross-contract returns",
@@ -1080,6 +1228,7 @@ def _generate_feature_audit(
         "output_files": [
             "audit_summary.json",
             "feature_stats.csv",
+            "local_context_readiness.csv",
             "target_stats.csv",
             "yearly_stats.csv",
             "security_stats.csv",
@@ -1092,6 +1241,7 @@ def _generate_feature_audit(
         ],
     }
     pl.DataFrame(feature_rows).write_csv(output_dir / "feature_stats.csv")
+    pl.DataFrame(local_readiness).write_csv(output_dir / "local_context_readiness.csv")
     pl.DataFrame(target_rows).write_csv(output_dir / "target_stats.csv")
     pl.DataFrame(yearly_rows).write_csv(output_dir / "yearly_stats.csv")
     security_stats.write_csv(output_dir / "security_stats.csv")

@@ -14,7 +14,11 @@ import polars as pl
 import pyarrow.parquet as pq
 from numpy.lib.format import open_memmap
 
-from .audit import audit_feature_store, validate_global_slow_fields
+from .audit import (
+    audit_feature_store,
+    local_context_readiness_rows,
+    validate_global_slow_fields,
+)
 
 from .contract import (
     CANONICAL_OUTPUT_POINTER,
@@ -43,11 +47,17 @@ from .contract import (
     EQUITY_SESSION_START_MINUTE,
     EQUITY_SLOW_CHANNELS,
     EXPECTED_DATE_COUNT,
+    EXPECTED_ELIGIBLE_DATE_COUNT,
+    EXPECTED_ELIGIBLE_DATES_WITH_UNAVAILABLE_LOCAL_CONTEXT,
     EXPECTED_EQUITIES,
+    EXPECTED_FIRST_ELIGIBLE_DATE,
+    EXPECTED_LAST_ELIGIBLE_DATE,
     EXPECTED_SAMPLE_COUNT,
     HORIZONS,
+    LOCAL_CONTEXT_AVAILABILITY_RULE,
     MIN_ACTIVE_EQUITIES,
     OUTPUT_BASE,
+    SAMPLE_ELIGIBILITY_RULE,
     RATE_CONTEXT_SYMBOLS,
     manifest_constants,
     output_array_specs,
@@ -84,6 +94,11 @@ from .transforms import (
     center_cross_section,
     time_to_expiry_scaled,
 )
+
+
+def _sample_date_is_eligible(active_equity_count: int) -> bool:
+    """Local and global context availability never gates a B3 sample date."""
+    return active_equity_count >= MIN_ACTIVE_EQUITIES
 
 
 _TEMPORARY_MEMMAP_FILENAMES = (
@@ -430,10 +445,7 @@ def _populate_feature_store(
 
         active_count = int(active.sum())
         context_ready_count = int(arrays["context_data_ready.npy"][date_idx].sum())
-        feature_eligible = (
-            context_ready_count == len(LOCAL_CONTEXT_SYMBOLS)
-            and active_count >= MIN_ACTIVE_EQUITIES
-        )
+        feature_eligible = _sample_date_is_eligible(active_count)
         valid_label_counts = label_mask.sum(axis=0)
         if feature_eligible:
             for decision_idx, decision_time in enumerate(DECISION_TIMES):
@@ -522,7 +534,17 @@ def _populate_feature_store(
         output_dir / "security_audit.parquet"
     )
 
+    eligible_dates = np.sort(
+        sample_index.get_column("date_idx").unique().to_numpy().astype(np.int64)
+    )
+    local_context_readiness = local_context_readiness_rows(
+        arrays["context_data_ready.npy"], market_dates, eligible_dates
+    )
+    eligible_dates_with_unavailable_local_context = int(
+        (~arrays["context_data_ready.npy"][eligible_dates].all(axis=1)).sum()
+    )
     first_feature_date = sample_index.item(0, "trade_date")
+    last_feature_date = sample_index.item(sample_index.height - 1, "trade_date")
     duration = clock.perf_counter() - started
     _write_feature_schema(output_dir)
     _write_manifest(
@@ -531,8 +553,11 @@ def _populate_feature_store(
         assignments,
         context_files,
         market_dates,
+        local_context_readiness,
+        eligible_dates_with_unavailable_local_context,
         sample_index.height,
         first_feature_date,
+        last_feature_date,
         research_start,
         research_end,
         created_at,
@@ -572,7 +597,8 @@ def build_feature_store(*, created_at: datetime | None = None) -> tuple[Path, Pa
     started = clock.perf_counter()
     created_at = datetime.now(timezone.utc) if created_at is None else created_at
     output_dir = (
-        OUTPUT_BASE / f"m1_features_intraday_di_context_{created_at:%Y%m%dT%H%M%S%fZ}"
+        OUTPUT_BASE
+        / f"m1_features_intraday_di_masked_context_{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     partial = output_dir.with_name(f"{output_dir.name}.{uuid4().hex}.partial")
     if output_dir.exists():
@@ -857,13 +883,48 @@ def _validate_output(
         if np.any(label_mask & ~required):
             raise ValueError(f"Inconsistent true label mask at date {date_idx}")
 
+    sample_ids = sample_index.get_column("sample_id").to_numpy()
+    if not np.array_equal(sample_ids, np.arange(sample_index.height)):
+        raise ValueError("sample_id must be unique and contiguous from zero")
     sample_dates = sample_index.get_column("date_idx").to_numpy()
-    if not arrays["context_data_ready.npy"][sample_dates].all():
-        raise ValueError("Sample index includes a date with unavailable context")
-    active_counts = (
-        arrays["equity_membership.npy"][sample_dates]
-        & arrays["equity_data_ready.npy"][sample_dates]
+    eligible_dates = np.unique(sample_dates)
+    active_by_date = (
+        arrays["equity_membership.npy"] & arrays["equity_data_ready.npy"]
     ).sum(axis=1)
+    expected_eligible_dates = np.flatnonzero(active_by_date >= MIN_ACTIVE_EQUITIES)
+    if not np.array_equal(eligible_dates, expected_eligible_dates):
+        raise ValueError(
+            "Sample dates must equal the dates meeting only the active-equity rule"
+        )
+    if eligible_dates.size != EXPECTED_ELIGIBLE_DATE_COUNT:
+        raise ValueError(
+            f"Expected {EXPECTED_ELIGIBLE_DATE_COUNT} eligible dates, "
+            f"found {eligible_dates.size}"
+        )
+    first_date = sample_index.get_column("trade_date").min()
+    last_date = sample_index.get_column("trade_date").max()
+    if (
+        first_date != EXPECTED_FIRST_ELIGIBLE_DATE
+        or last_date != EXPECTED_LAST_ELIGIBLE_DATE
+    ):
+        raise ValueError("Feature-eligible date boundaries do not match the contract")
+    expected_decisions = list(range(len(DECISION_EQUITY_INDICES)))
+    decisions_by_date = sample_index.group_by("date_idx").agg(
+        pl.col("decision_idx").sort()
+    )
+    if any(
+        decisions != expected_decisions
+        for decisions in decisions_by_date.get_column("decision_idx").to_list()
+    ):
+        raise ValueError("Every eligible date must contain decision_idx exactly 0..54")
+    unavailable_dates = int(
+        (~arrays["context_data_ready.npy"][eligible_dates].all(axis=1)).sum()
+    )
+    if unavailable_dates != EXPECTED_ELIGIBLE_DATES_WITH_UNAVAILABLE_LOCAL_CONTEXT:
+        raise ValueError(
+            "Eligible-date local-context unavailability does not match the contract"
+        )
+    active_counts = active_by_date[sample_dates]
     if np.any(active_counts < MIN_ACTIVE_EQUITIES):
         raise ValueError("Sample index includes fewer than 30 active equities")
     if np.any(
@@ -879,6 +940,8 @@ def _validate_output(
 def _write_feature_schema(output_dir: Path) -> None:
     schema = {
         "contract_version": CONTRACT_VERSION,
+        "sample_eligibility_rule": SAMPLE_ELIGIBILITY_RULE,
+        "local_context_availability_rule": LOCAL_CONTEXT_AVAILABILITY_RULE,
         "dynamic_channels": [
             {"index": index, "name": name}
             for index, name in enumerate(DYNAMIC_CHANNELS)
@@ -893,6 +956,8 @@ def _write_feature_schema(output_dir: Path) -> None:
         ],
         "local_context": {
             "symbols": list(LOCAL_CONTEXT_SYMBOLS),
+            "availability_mask": "context_data_ready",
+            "availability_behavior": LOCAL_CONTEXT_AVAILABILITY_RULE,
             "fixed_maturity_rate_symbols": list(FIXED_RATE_CONTEXT_SYMBOLS),
             "liquidity_selected_unadjusted_rate_symbol": LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL,
             "exposure_beta_source_symbols": list(EXPOSURE_BETA_CONTEXT_SYMBOLS),
@@ -993,7 +1058,7 @@ def _write_feature_schema(output_dir: Path) -> None:
         "masks": {
             "equity_membership": "monthly point-in-time universe membership",
             "equity_data_ready": "accepted identity interval and prior volatility state; optional features never tighten readiness",
-            "context_data_ready": "prior intraday-volatility state; fixed DI also requires prior-rate state, while DI1$N never requires absolute level or expiry",
+            "context_data_ready": "date-level local availability; false instruments are zeroed in dynamic, slow, history-mask, instrument-mask, and tabular inputs and never gate B3 samples",
             "label_mask": "membership, readiness, exact entry/exit endpoints, and a valid horizon cross-section",
             "horizon_mask": "at least 30 valid equity labels for the date, decision, and horizon",
             "global_data_ready": "per-instrument, per-decision prior volatility and observed-prefix readiness; never gates B3 samples",
@@ -1011,8 +1076,11 @@ def _write_manifest(
     assignments: pl.DataFrame,
     context_files: dict[str, Path],
     market_dates: tuple[object, ...],
+    local_context_readiness: list[dict[str, object]],
+    eligible_dates_with_unavailable_local_context: int,
     sample_count: int,
     first_feature_date: object,
+    last_feature_date: object,
     research_start: object,
     research_end: object,
     created_at: datetime,
@@ -1100,6 +1168,12 @@ def _write_manifest(
             symbol: str(context_files[symbol]) for symbol in LOCAL_CONTEXT_SYMBOLS
         },
         "local_context_symbols": list(LOCAL_CONTEXT_SYMBOLS),
+        "local_context_availability_rule": LOCAL_CONTEXT_AVAILABILITY_RULE,
+        "sample_eligibility_rule": SAMPLE_ELIGIBILITY_RULE,
+        "local_context_readiness": local_context_readiness,
+        "eligible_dates_with_unavailable_local_context": (
+            eligible_dates_with_unavailable_local_context
+        ),
         "constants": manifest_constants(),
         "outputs": outputs,
         "metadata_files": [
@@ -1115,9 +1189,10 @@ def _write_manifest(
             "security_audit.parquet",
         ],
         "date_count": len(market_dates),
+        "eligible_date_count": sample_count // len(DECISION_TIMES),
         "sample_count": sample_count,
         "first_feature_eligible_date": str(first_feature_date),
-        "last_date": str(market_dates[-1]),
+        "last_feature_eligible_date": str(last_feature_date),
         "build_duration_seconds": duration,
     }
     (output_dir / "manifest.json").write_text(
