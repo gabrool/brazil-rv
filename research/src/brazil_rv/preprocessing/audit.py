@@ -24,6 +24,7 @@ from .contract import (
     DECISION_GLOBAL_INDICES,
     GLOBAL_CONTEXT_SYMBOLS,
     GLOBAL_SLOW_CHANNELS,
+    GLOBAL_UNUSED_SLOW_CHANNEL_INDICES,
     LOCAL_CONTEXT_SYMBOLS,
     DECISION_CONTEXT_INDICES,
     DECISION_EQUITY_INDICES,
@@ -179,6 +180,15 @@ def _check_bounds(values: np.ndarray, bounds: tuple[float, float], name: str) ->
         raise ValueError(f"{name} is outside [{low}, {high}]")
 
 
+def validate_global_slow_fields(
+    global_slow: np.ndarray, global_ready: np.ndarray
+) -> None:
+    if np.any(global_slow[..., GLOBAL_UNUSED_SLOW_CHANNEL_INDICES] != 0):
+        raise ValueError("Global unused slow channels must be zero")
+    if np.any(global_slow[~global_ready] != 0):
+        raise ValueError("Unready global slow rows must be exactly zero")
+
+
 def _validate_family_fields(arrays: dict[str, np.ndarray]) -> None:
     context_dynamic = arrays["context_features.npy"]
     context_slow = arrays["context_slow.npy"]
@@ -200,12 +210,7 @@ def _validate_family_fields(arrays: dict[str, np.ndarray]) -> None:
         raise ValueError("WIN/WDO DI-only slow channels must be zero")
     if np.any(global_dynamic[..., 16:26] != 0):
         raise ValueError("Global equity-only dynamic channels must be zero")
-    if np.any(global_slow[..., 13:16] != 0):
-        raise ValueError("Global equity-liquidity slow channels must be zero")
-    if np.any(global_slow[..., 17:31] != 0):
-        raise ValueError("Global equity/local-context slow channels must be zero")
-    if np.any(global_slow[~global_ready] != 0):
-        raise ValueError("Unready global slow rows must be exactly zero")
+    validate_global_slow_fields(global_slow, global_ready)
 
 
 def _validate_targets(arrays: dict[str, np.ndarray]) -> None:

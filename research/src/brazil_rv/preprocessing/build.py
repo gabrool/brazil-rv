@@ -14,7 +14,7 @@ import polars as pl
 import pyarrow.parquet as pq
 from numpy.lib.format import open_memmap
 
-from .audit import audit_feature_store
+from .audit import audit_feature_store, validate_global_slow_fields
 
 from .contract import (
     CANONICAL_OUTPUT_POINTER,
@@ -27,6 +27,7 @@ from .contract import (
     GLOBAL_SESSION_START_MINUTE,
     GLOBAL_CONTEXT_SYMBOLS,
     GLOBAL_SLOW_CHANNELS,
+    GLOBAL_UNUSED_SLOW_CHANNEL_INDICES,
     LOCAL_CONTEXT_SYMBOLS,
     CONTRACT_VERSION,
     DECISION_CONTEXT_INDICES,
@@ -79,10 +80,50 @@ from .transforms import (
 )
 
 
+_TEMPORARY_MEMMAP_FILENAMES = (
+    ".equity_dynamic_valid.npy",
+    ".equity_slow_rank_valid.npy",
+)
+
+
+def _close_memmaps(memmaps: list[np.memmap]) -> None:
+    failure: Exception | None = None
+    for array in reversed(memmaps):
+        try:
+            array.flush()
+        except Exception as error:
+            failure = failure or error
+        mapping = getattr(array, "_mmap", None)
+        if mapping is not None:
+            try:
+                mapping.close()
+            except Exception as error:
+                failure = failure or error
+    if failure is not None:
+        raise RuntimeError(
+            "Failed to flush or close feature-store memmaps"
+        ) from failure
+
+
 def _construct_feature_store(
     output_dir: Path,
     created_at: datetime,
     started: float,
+) -> None:
+    memmaps: list[np.memmap] = []
+    try:
+        _populate_feature_store(output_dir, created_at, started, memmaps)
+    finally:
+        _close_memmaps(memmaps)
+    for filename in _TEMPORARY_MEMMAP_FILENAMES:
+        (output_dir / filename).unlink()
+
+
+def _populate_feature_store(
+    output_dir: Path,
+    created_at: datetime,
+    started: float,
+    memmaps: list[np.memmap],
 ) -> None:
     inputs = resolve_inputs()
     research_start, research_end = read_research_interval(inputs.universe_dir)
@@ -106,6 +147,7 @@ def _construct_feature_store(
             f"Expected {EXPECTED_DATE_COUNT} market dates, found {len(market_dates)}"
         )
     arrays = create_output_memmaps(output_dir, len(market_dates))
+    memmaps.extend(arrays.values())
 
     membership_rows = pl.read_parquet(
         inputs.universe_dir / "universe_membership_monthly.parquet"
@@ -128,6 +170,7 @@ def _construct_feature_store(
         dtype=bool,
         shape=(len(market_dates), EXPECTED_EQUITIES, EQUITY_SESSION_MINUTES, 4),
     )
+    memmaps.append(dynamic_valid)
     dynamic_valid[...] = False
     slow_rank_valid_path = output_dir / ".equity_slow_rank_valid.npy"
     slow_rank_valid = open_memmap(
@@ -136,6 +179,7 @@ def _construct_feature_store(
         dtype=bool,
         shape=(len(market_dates), EXPECTED_EQUITIES, 3),
     )
+    memmaps.append(slow_rank_valid)
     slow_rank_valid[...] = False
     security_audits: list[dict[str, object]] = []
     source_groups = assignments.partition_by("source_file", maintain_order=True)
@@ -420,15 +464,6 @@ def _construct_feature_store(
             }
         )
 
-    dynamic_valid.flush()
-    slow_rank_valid.flush()
-    del dynamic_valid, slow_rank_valid
-    dynamic_valid_path.unlink()
-    slow_rank_valid_path.unlink()
-
-    for array in arrays.values():
-        array.flush()
-
     date_index = _date_index_frame(market_dates)
     equity_index = _equity_index_frame(assignments)
     context_index = _context_index_frame(context_files, context_expiries)
@@ -494,6 +529,25 @@ def _canonical_pointer_targets(output_dir: Path) -> bool:
         return False
 
 
+def _remove_build_directories(*paths: Path | None) -> None:
+    failures: list[Exception] = []
+    for path in paths:
+        if path is None:
+            continue
+        try:
+            if path.exists():
+                shutil.rmtree(path)
+            if path.exists():
+                raise OSError(f"Incomplete feature artifact remains: {path}")
+        except Exception as error:
+            failures.append(error)
+    if failures:
+        detail = "; ".join(str(error) for error in failures)
+        raise RuntimeError(
+            f"Failed to remove incomplete feature artifacts: {detail}"
+        ) from failures[0]
+
+
 def build_feature_store(*, created_at: datetime | None = None) -> tuple[Path, Path]:
     started = clock.perf_counter()
     created_at = datetime.now(timezone.utc) if created_at is None else created_at
@@ -515,9 +569,10 @@ def build_feature_store(*, created_at: datetime | None = None) -> tuple[Path, Pa
         _promote(output_dir)
     except BaseException:
         if not promotion_started or not _canonical_pointer_targets(output_dir):
-            if audit_dir is not None:
-                shutil.rmtree(audit_dir, ignore_errors=True)
-            shutil.rmtree(output_dir if renamed else partial, ignore_errors=True)
+            _remove_build_directories(
+                audit_dir,
+                output_dir if renamed else partial,
+            )
         raise
     assert audit_dir is not None
     return output_dir, audit_dir
@@ -660,13 +715,9 @@ def _validate_output(
         raise ValueError("WIN/WDO DI-only slow channels must be zero")
     if np.any(arrays["global_features.npy"][..., 16:26] != 0):
         raise ValueError("Global equity-only dynamic channels must be zero")
-    if np.any(arrays["global_slow.npy"][..., 13:16] != 0):
-        raise ValueError("Global equity-liquidity slow channels must be zero")
-    if np.any(arrays["global_slow.npy"][..., 17:31] != 0):
-        raise ValueError("Global equity/local-context slow channels must be zero")
-    global_ready = arrays["global_data_ready.npy"]
-    if np.any(arrays["global_slow.npy"][~global_ready] != 0):
-        raise ValueError("Unready global slow rows must be exactly zero")
+    validate_global_slow_fields(
+        arrays["global_slow.npy"], arrays["global_data_ready.npy"]
+    )
 
     for date_idx in range(date_count):
         label_mask = arrays["label_mask.npy"][date_idx]
@@ -764,7 +815,9 @@ def _write_feature_schema(output_dir: Path) -> None:
             "0:13": "Causal completed-Globex-session state plus the decision-prefix return in position 1.",
             "13:16": "Equity liquidity fields; exactly zero.",
             "16": "Prior-five-session observed fraction.",
-            "17:31": "Equity rank/beta and local-rate fields; exactly zero.",
+            "17:26": "Equity rank and beta fields; exactly zero.",
+            "26:30": "Deterministic current-date calendar encodings.",
+            "30": "Unused local-rate field; exactly zero.",
             "31": "Mapped outright time to expiry, or zero when unavailable.",
         },
         "family_inapplicable_zero_fields": {
@@ -775,7 +828,7 @@ def _write_feature_schema(output_dir: Path) -> None:
             "context_dynamic": list(range(16, 26)),
         },
         "global_dynamic": list(range(16, 26)),
-        "global_slow": list(range(13, 16)) + list(range(17, 31)),
+        "global_slow": list(GLOBAL_UNUSED_SLOW_CHANNEL_INDICES),
         "grids": {
             "equity": {
                 "timezone": "America/Sao_Paulo",

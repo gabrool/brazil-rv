@@ -183,6 +183,11 @@ GLOBAL_SLOW_CHANNELS = (
     "unused_local_rate_level",
     "time_to_expiry_scaled",
 )
+GLOBAL_UNUSED_SLOW_CHANNEL_INDICES = (
+    *range(13, 16),
+    *range(17, 26),
+    30,
+)
 DYNAMIC_CHANNEL_COUNT = len(DYNAMIC_CHANNELS)
 SLOW_CHANNEL_COUNT = len(SLOW_CHANNELS)
 EQUITY_SLOW_COUNT = SLOW_CHANNEL_COUNT

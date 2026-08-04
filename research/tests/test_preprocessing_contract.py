@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 import pytest
+from numpy.lib.format import open_memmap
 
 from brazil_rv.preprocessing import audit as audit_module
 from brazil_rv.preprocessing import build as build_module
@@ -16,6 +17,7 @@ from brazil_rv.preprocessing.contract import (
     EQUITY_SESSION_MINUTES,
     EQUITY_SLOW_CHANNELS,
     GLOBAL_SLOW_CHANNELS,
+    GLOBAL_UNUSED_SLOW_CHANNEL_INDICES,
     HORIZONS,
     SLOW_CHANNELS,
     output_array_specs,
@@ -639,6 +641,43 @@ def test_context_family_zero_fields_and_deterministic_fixture() -> None:
     assert not first.slow[..., 30:32].any()
 
 
+def test_global_unused_slow_channel_indices_are_exact() -> None:
+    assert GLOBAL_UNUSED_SLOW_CHANNEL_INDICES == (
+        *range(13, 16),
+        *range(17, 26),
+        30,
+    )
+
+
+def test_global_slow_validation_accepts_calendar_and_expiry_channels() -> None:
+    slow = np.zeros((2, 1, 3, len(GLOBAL_SLOW_CHANNELS)), dtype=np.float32)
+    ready = np.ones(slow.shape[:-1], dtype=bool)
+    slow[..., 26:30] = [0.5, -0.5, 0.25, 0.75]
+    slow[..., 31] = 0.6
+
+    audit_module.validate_global_slow_fields(slow, ready)
+
+
+@pytest.mark.parametrize("channel", GLOBAL_UNUSED_SLOW_CHANNEL_INDICES)
+def test_every_unused_global_slow_channel_must_be_zero(channel: int) -> None:
+    slow = np.zeros((1, 1, 1, len(GLOBAL_SLOW_CHANNELS)), dtype=np.float32)
+    ready = np.ones(slow.shape[:-1], dtype=bool)
+    slow[..., channel] = 1.0
+
+    with pytest.raises(ValueError, match="Global unused slow channels"):
+        audit_module.validate_global_slow_fields(slow, ready)
+
+
+def test_unready_global_slow_row_must_remain_zero() -> None:
+    slow = np.zeros((1, 1, 2, len(GLOBAL_SLOW_CHANNELS)), dtype=np.float32)
+    ready = np.ones(slow.shape[:-1], dtype=bool)
+    ready[..., 1] = False
+    slow[..., 1, 26] = 1.0
+
+    with pytest.raises(ValueError, match="Unready global slow rows"):
+        audit_module.validate_global_slow_fields(slow, ready)
+
+
 def test_generated_schema_matches_channel_contract(tmp_path: Path) -> None:
     _write_feature_schema(tmp_path)
     schema = json.loads((tmp_path / "feature_schema.json").read_text(encoding="utf-8"))
@@ -647,6 +686,9 @@ def test_generated_schema_matches_channel_contract(tmp_path: Path) -> None:
     assert [row["name"] for row in schema["global_slow_channels"]] == list(
         GLOBAL_SLOW_CHANNELS
     )
+    assert schema["global_slow"] == list(GLOBAL_UNUSED_SLOW_CHANNEL_INDICES)
+    assert schema["global_slow_semantics"]["26:30"].startswith("Deterministic")
+    assert "17:31" not in schema["global_slow_semantics"]
     assert "average_one_based_midrank" in schema["stored_target"]
 
 
@@ -706,6 +748,106 @@ def test_feature_audit_summary_references_final_existing_store(
     assert audit_dir.is_dir()
     assert ".partial" not in summary["features_dir"]
     assert not tuple(audit_base.glob("*.partial"))
+
+
+def test_construct_feature_store_closes_memmaps_on_success(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "partial"
+    handles: list[np.memmap] = []
+
+    def populate(
+        path: Path,
+        _: datetime,
+        __: float,
+        memmaps: list[np.memmap],
+    ) -> None:
+        path.mkdir()
+        paths = (
+            path / "artifact.npy",
+            *(path / name for name in build_module._TEMPORARY_MEMMAP_FILENAMES),
+        )
+        for number, memmap_path in enumerate(paths):
+            array = open_memmap(memmap_path, mode="w+", dtype=np.float32, shape=(2,))
+            array[...] = number + 1
+            handles.append(array)
+            memmaps.append(array)
+
+    monkeypatch.setattr(build_module, "_populate_feature_store", populate)
+
+    build_module._construct_feature_store(output, datetime.now(UTC), 0.0)
+
+    assert all(handle._mmap.closed for handle in handles)
+    np.testing.assert_array_equal(np.load(output / "artifact.npy"), [1.0, 1.0])
+    assert all(
+        not (output / name).exists()
+        for name in build_module._TEMPORARY_MEMMAP_FILENAMES
+    )
+
+
+def test_feature_build_failure_closes_memmaps_before_removing_partial(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pointer, previous, final, created_at = _atomic_build_paths(monkeypatch, tmp_path)
+    handles: list[np.memmap] = []
+    real_rmtree = build_module.shutil.rmtree
+
+    def populate(
+        partial: Path,
+        _: datetime,
+        __: float,
+        memmaps: list[np.memmap],
+    ) -> None:
+        partial.mkdir()
+        array = open_memmap(
+            partial / "held.npy", mode="w+", dtype=np.float32, shape=(2,)
+        )
+        array[...] = 1.0
+        handles.append(array)
+        memmaps.append(array)
+        raise RuntimeError("injected failure after memmap creation")
+
+    def remove_after_close(path: Path) -> None:
+        assert handles and all(handle._mmap.closed for handle in handles)
+        real_rmtree(path)
+
+    monkeypatch.setattr(build_module, "_populate_feature_store", populate)
+    monkeypatch.setattr(build_module.shutil, "rmtree", remove_after_close)
+
+    with pytest.raises(RuntimeError, match="failure after memmap creation"):
+        build_module.build_feature_store(created_at=created_at)
+
+    assert pointer.read_text(encoding="utf-8") == str(previous)
+    assert previous.is_dir()
+    assert not final.exists()
+    assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
+
+
+def test_feature_build_cleanup_failure_is_not_suppressed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pointer, previous, final, created_at = _atomic_build_paths(monkeypatch, tmp_path)
+
+    def construct(partial: Path, *_: object) -> None:
+        partial.mkdir()
+        raise RuntimeError("injected build failure")
+
+    def fail_cleanup(_: Path) -> None:
+        raise PermissionError("injected Windows cleanup failure")
+
+    monkeypatch.setattr(build_module, "_construct_feature_store", construct)
+    monkeypatch.setattr(build_module.shutil, "rmtree", fail_cleanup)
+
+    with pytest.raises(RuntimeError, match="Failed to remove incomplete") as error:
+        build_module.build_feature_store(created_at=created_at)
+
+    assert isinstance(error.value.__cause__, PermissionError)
+    assert pointer.read_text(encoding="utf-8") == str(previous)
+    assert not final.exists()
+    assert tuple(final.parent.glob(f"{final.name}.*.partial"))
 
 
 def test_feature_build_renames_then_audits_then_promotes(
