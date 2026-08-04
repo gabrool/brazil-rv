@@ -15,9 +15,13 @@ from .contract import (
     CATALOGUE_PATH,
     CONTEXT_POINTER,
     GLOBAL_SOURCE_POINTER,
+    FIXED_RATE_CONTEXT_SYMBOLS,
     LOCAL_CONTEXT_SYMBOLS,
+    LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL,
     COTAHIST_POINTER,
     EXPECTED_EQUITIES,
+    RATE_PERCENT_MAX,
+    RATE_PERCENT_MIN,
     UNIVERSE_POINTER,
     output_array_specs,
 )
@@ -254,13 +258,21 @@ def discover_context_files(context_dir: Path) -> dict[str, Path]:
                 raise ValueError(f"Multiple context sources found for {symbol}")
             found[symbol] = path
     missing = [symbol for symbol in LOCAL_CONTEXT_SYMBOLS if symbol not in found]
+    if LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL in missing:
+        raise FileNotFoundError(
+            "Missing required DI1$N M1 source in canonical XP context archive "
+            f"{context_dir}. Extract only DI1$N for the research interval into "
+            "the XP context archive; do not substitute DI1$D or DI1$."
+        )
     if missing:
-        raise FileNotFoundError(f"Missing context sources: {missing}")
+        raise FileNotFoundError(
+            f"Missing context sources in canonical XP archive {context_dir}: {missing}"
+        )
     return found
 
 
 def load_context_expiries(catalogue_path: Path) -> dict[str, date]:
-    fixed_di = LOCAL_CONTEXT_SYMBOLS[2:]
+    fixed_di = FIXED_RATE_CONTEXT_SYMBOLS
     rows = (
         pl.read_parquet(catalogue_path, columns=["name", "expiration_time"])
         .filter(pl.col("name").is_in(fixed_di))
@@ -370,6 +382,21 @@ def validate_session_bars(bars: pl.DataFrame, source_path: Path) -> None:
     if not duplicates.is_empty():
         _raise_bar_error(
             "Duplicate used timestamp", source_path, duplicates.row(0, named=True)
+        )
+
+
+def validate_rate_source_scale(bars: pl.DataFrame, source_path: Path) -> None:
+    """Require DI OHLC values in annual percentage-rate units."""
+    if bars.is_empty():
+        return
+    values = bars.select("open", "high", "low", "close").to_numpy()
+    minimum = float(values.min())
+    maximum = float(values.max())
+    if minimum < RATE_PERCENT_MIN or maximum > RATE_PERCENT_MAX:
+        raise ValueError(
+            "DI OHLC must use annual percentage-rate units within "
+            f"[{RATE_PERCENT_MIN}, {RATE_PERCENT_MAX}]; "
+            f"source={source_path}, observed_range=[{minimum}, {maximum}]"
         )
 
 

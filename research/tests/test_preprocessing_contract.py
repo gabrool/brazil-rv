@@ -13,34 +13,47 @@ from brazil_rv.preprocessing import audit as audit_module
 from brazil_rv.preprocessing import build as build_module
 from brazil_rv.preprocessing.contract import (
     DECISION_EQUITY_INDICES,
+    EXPOSURE_BETA_CONTEXT_SYMBOLS,
+    FIXED_RATE_CONTEXT_SYMBOLS,
+    LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL,
+    LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES,
     DYNAMIC_CHANNELS,
     EQUITY_SESSION_MINUTES,
     EQUITY_SLOW_CHANNELS,
     GLOBAL_SLOW_CHANNELS,
     GLOBAL_UNUSED_SLOW_CHANNEL_INDICES,
+    LOCAL_CONTEXT_SYMBOLS,
     HORIZONS,
     SLOW_CHANNELS,
     output_array_specs,
 )
-from brazil_rv.preprocessing.build import _write_feature_schema
+from brazil_rv.preprocessing.build import (
+    _context_index_frame,
+    _write_feature_schema,
+)
 from brazil_rv.preprocessing.io import (
     create_output_memmaps,
     expand_membership,
+    discover_context_files,
     full_session_final_closes,
     validate_assignments,
     validate_physical_source_identity,
     validate_source_date_isolation,
+    validate_rate_source_scale,
 )
 from brazil_rv.preprocessing.transforms import (
     add_equity_cross_sectional_dynamic,
     build_causal_features,
     build_daily_changes,
+    build_dynamic_features,
+    build_liquidity_selected_rate_features,
     build_prior_rate_level,
     build_raw_returns,
     causal_exposure_betas,
     centered_midranks,
     center_cross_section,
     time_to_expiry_scaled,
+    rate_change_basis_points,
 )
 
 
@@ -105,8 +118,10 @@ def test_future_mutation_causality() -> None:
 
     baseline_active = int(np.full(30, baseline.data_ready[-1]).sum())
     changed_active = int(np.full(30, changed.data_ready[-1]).sum())
-    baseline_context_ready = np.full(6, baseline.data_ready[-1])
-    changed_context_ready = np.full(6, changed.data_ready[-1])
+    baseline_context_ready = np.full(
+        len(LOCAL_CONTEXT_SYMBOLS), baseline.data_ready[-1]
+    )
+    changed_context_ready = np.full(len(LOCAL_CONTEXT_SYMBOLS), changed.data_ready[-1])
     baseline_feature_sample = baseline_context_ready.all() and baseline_active >= 30
     changed_feature_sample = changed_context_ready.all() and changed_active >= 30
 
@@ -337,6 +352,172 @@ def test_di_causal_state_and_scaling() -> None:
     assert scaled_expiry[2] == 0.0
 
 
+def test_rate_units_and_source_scale_are_explicit() -> None:
+    movement = rate_change_basis_points(np.array([12.05]), 12.00)
+    np.testing.assert_allclose(movement, [5.0], atol=1e-12, rtol=0.0)
+    assert not np.isclose(movement[0], np.log(12.05 / 12.00))
+
+    percentage_bars = pl.DataFrame(
+        {
+            "open": [12.00],
+            "high": [12.06],
+            "low": [11.99],
+            "close": [12.05],
+        }
+    )
+    validate_rate_source_scale(percentage_bars, Path("DI1F27.parquet"))
+    decimal_bars = percentage_bars.with_columns(pl.all() / 100.0)
+    with pytest.raises(ValueError, match="annual percentage-rate units"):
+        validate_rate_source_scale(decimal_bars, Path("DI1F27.parquet"))
+
+
+def test_di1n_session_level_offset_and_cross_session_jump_invariance() -> None:
+    raw, observed = _synthetic_rate_grid()
+    valid = np.ones(raw.shape[0], dtype=bool)
+    baseline = build_liquidity_selected_rate_features(raw, observed, valid)
+
+    offset = raw.copy()
+    offset[20, :, :4] += 7.0
+    offset_result = build_liquidity_selected_rate_features(offset, observed, valid)
+    np.testing.assert_allclose(
+        baseline.dynamic,
+        offset_result.dynamic,
+        atol=2e-5,
+        rtol=0.0,
+    )
+    np.testing.assert_allclose(baseline.slow, offset_result.slow, atol=2e-5, rtol=0.0)
+
+    jumped = raw.copy()
+    jumped[21:, :, :4] += 15.0
+    jump_result = build_liquidity_selected_rate_features(jumped, observed, valid)
+    np.testing.assert_allclose(
+        baseline.dynamic[21:],
+        jump_result.dynamic[21:],
+        atol=2e-5,
+        rtol=0.0,
+    )
+    np.testing.assert_allclose(
+        baseline.slow[21:],
+        jump_result.slow[21:],
+        atol=2e-5,
+        rtol=0.0,
+    )
+    assert not baseline.daily_change_valid.any()
+    assert not jump_result.daily_change_valid.any()
+
+
+def test_di1n_session_boundaries_future_causality_and_missing_bars() -> None:
+    raw, observed = _synthetic_rate_grid()
+    valid = np.ones(raw.shape[0], dtype=bool)
+    sigma = np.ones(raw.shape[0], dtype=np.float64)
+    baseline_dynamic, _ = build_dynamic_features(
+        raw,
+        observed,
+        valid,
+        sigma,
+        is_rate=True,
+    )
+    changed_close = raw.copy()
+    changed_close[20, -1, 3] += 50.0
+    changed_dynamic, _ = build_dynamic_features(
+        changed_close,
+        observed,
+        valid,
+        sigma,
+        is_rate=True,
+    )
+    np.testing.assert_array_equal(baseline_dynamic[21], changed_dynamic[21])
+
+    baseline = build_liquidity_selected_rate_features(raw, observed, valid)
+    decision = DECISION_EQUITY_INDICES[0]
+    future = raw.copy()
+    future[20, decision:, :4] += 3.0
+    future[21:, :, :4] += 9.0
+    changed = build_liquidity_selected_rate_features(future, observed, valid)
+    np.testing.assert_array_equal(
+        baseline.dynamic[20, :decision],
+        changed.dynamic[20, :decision],
+    )
+    np.testing.assert_array_equal(baseline.slow[20], changed.slow[20])
+
+    missing = observed.copy()
+    missing[20, :5] = False
+    missing[20, 60] = False
+    missing_result = build_liquidity_selected_rate_features(raw, missing, valid)
+    assert missing_result.dynamic[20, 5, 0] == 0.0
+    assert missing_result.dynamic[20, 5, 5] == 1.0
+    assert not missing_result.dynamic[20, 5, 6:13].any()
+    assert not missing_result.dynamic[20, 60, :6].any()
+    assert missing_result.dynamic[20, 61, 5] == 1.0
+
+
+def test_di1n_slow_applicability_context_metadata_and_beta_sources(
+    tmp_path: Path,
+) -> None:
+    raw, observed = _synthetic_rate_grid()
+    result = build_liquidity_selected_rate_features(
+        raw,
+        observed,
+        np.ones(raw.shape[0], dtype=bool),
+    )
+    assert not result.slow[:, LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES].any()
+
+    context_slow = np.zeros(
+        (raw.shape[0], len(LOCAL_CONTEXT_SYMBOLS), len(SLOW_CHANNELS)),
+        dtype=np.float32,
+    )
+    audit_module.validate_liquidity_selected_rate_slow_fields(context_slow)
+    context_slow[
+        20,
+        LOCAL_CONTEXT_SYMBOLS.index(LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL),
+        30,
+    ] = 1.0
+    with pytest.raises(ValueError, match=r"DI1\$N inapplicable"):
+        audit_module.validate_liquidity_selected_rate_slow_fields(context_slow)
+
+    context_files = {
+        symbol: tmp_path / f"{symbol}.parquet" for symbol in LOCAL_CONTEXT_SYMBOLS
+    }
+    expiries = {symbol: date(2031, 1, 2) for symbol in FIXED_RATE_CONTEXT_SYMBOLS}
+    context_index = _context_index_frame(context_files, expiries)
+    assert tuple(context_index["symbol"]) == (
+        "WIN$",
+        "WDO$",
+        "DI1F27",
+        "DI1F28",
+        "DI1F29",
+        "DI1F31",
+        "DI1$N",
+    )
+    liquidity_selected = context_index.filter(
+        pl.col("symbol") == LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+    ).row(0, named=True)
+    assert liquidity_selected["rate_representation"] == "liquidity_selected_unadjusted"
+    assert liquidity_selected["expiry_date"] is None
+    assert not liquidity_selected["fixed_expiry_applicable"]
+    assert not liquidity_selected["cross_session_price_features_applicable"]
+    assert not liquidity_selected["absolute_rate_level_applicable"]
+    assert liquidity_selected["session_boundary_price_state_reset"]
+
+    fixed = context_index.filter(pl.col("symbol").is_in(FIXED_RATE_CONTEXT_SYMBOLS))
+    assert fixed["expiry_date"].null_count() == 0
+    assert fixed["fixed_expiry_applicable"].all()
+    assert fixed["cross_session_price_features_applicable"].all()
+    assert fixed["absolute_rate_level_applicable"].all()
+    assert EXPOSURE_BETA_CONTEXT_SYMBOLS == LOCAL_CONTEXT_SYMBOLS[:-1]
+
+
+def test_missing_di1n_source_preflight_is_actionable(tmp_path: Path) -> None:
+    for symbol in LOCAL_CONTEXT_SYMBOLS[:-1]:
+        pl.DataFrame({"symbol": [symbol]}).write_parquet(tmp_path / f"{symbol}.parquet")
+
+    with pytest.raises(
+        FileNotFoundError,
+        match=r"Missing required DI1\$N M1 source.*Extract only DI1\$N",
+    ):
+        discover_context_files(tmp_path)
+
+
 def test_di_prior_level_uses_full_session_final_close() -> None:
     market_dates = (date(2024, 1, 2), date(2024, 1, 3))
     source = pl.DataFrame(
@@ -386,6 +567,11 @@ def test_output_contract(tmp_path: Path) -> None:
         assert not arrays[filename].any()
         if np.issubdtype(spec.dtype, np.floating):
             assert np.isfinite(arrays[filename]).all()
+    assert specs["context_features.npy"].shape == (1, 7, 465, 26)
+    assert specs["context_slow.npy"].shape == (1, 7, 32)
+    assert specs["context_data_ready.npy"].shape == (1, 7)
+    assert LOCAL_CONTEXT_SYMBOLS[-1] == LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+    assert len(FIXED_RATE_CONTEXT_SYMBOLS) == 4
     assert DYNAMIC_CHANNELS == (
         "open_move_normalized",
         "high_move_normalized",
@@ -690,6 +876,19 @@ def test_generated_schema_matches_channel_contract(tmp_path: Path) -> None:
     assert schema["global_slow_semantics"]["26:30"].startswith("Deterministic")
     assert "17:31" not in schema["global_slow_semantics"]
     assert "average_one_based_midrank" in schema["stored_target"]
+    local = schema["local_context"]
+    assert tuple(local["symbols"]) == LOCAL_CONTEXT_SYMBOLS
+    assert tuple(local["fixed_maturity_rate_symbols"]) == FIXED_RATE_CONTEXT_SYMBOLS
+    assert (
+        local["liquidity_selected_unadjusted_rate_symbol"]
+        == LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+    )
+    assert tuple(local["exposure_beta_source_symbols"]) == EXPOSURE_BETA_CONTEXT_SYMBOLS
+    assert local["rate_quote_unit"] == "annual_percentage_rate"
+    assert local["rate_change_formula"] == "basis_points = 100 * (current - previous)"
+    assert local["liquidity_selected_rate_semantics"][
+        "intentionally_zero_slow_channels"
+    ] == list(LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES)
 
 
 def _atomic_build_paths(
@@ -705,7 +904,9 @@ def _atomic_build_paths(
     monkeypatch.setattr(build_module, "OUTPUT_BASE", output_base)
     monkeypatch.setattr(build_module, "CANONICAL_OUTPUT_POINTER", pointer)
     created_at = datetime(2026, 1, 2, 3, 4, 5, 6789, tzinfo=UTC)
-    final = output_base / f"m1_features_global_context_{created_at:%Y%m%dT%H%M%S%fZ}"
+    final = (
+        output_base / f"m1_features_intraday_di_context_{created_at:%Y%m%dT%H%M%S%fZ}"
+    )
     return pointer, previous, final, created_at
 
 

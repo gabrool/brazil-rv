@@ -22,10 +22,14 @@ from ..modeling.contract import (
 from .contract import (
     CANONICAL_OUTPUT_POINTER,
     DECISION_GLOBAL_INDICES,
+    EXPOSURE_BETA_CONTEXT_SYMBOLS,
+    FIXED_RATE_CONTEXT_SYMBOLS,
     GLOBAL_CONTEXT_SYMBOLS,
     GLOBAL_SLOW_CHANNELS,
     GLOBAL_UNUSED_SLOW_CHANNEL_INDICES,
     LOCAL_CONTEXT_SYMBOLS,
+    LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL,
+    LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES,
     DECISION_CONTEXT_INDICES,
     DECISION_EQUITY_INDICES,
     DYNAMIC_CHANNELS,
@@ -189,6 +193,15 @@ def validate_global_slow_fields(
         raise ValueError("Unready global slow rows must be exactly zero")
 
 
+def validate_liquidity_selected_rate_slow_fields(context_slow: np.ndarray) -> None:
+    slot = LOCAL_CONTEXT_SYMBOLS.index(LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL)
+    values = context_slow[:, slot][
+        ..., LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES
+    ]
+    if np.any(values != 0):
+        raise ValueError("DI1$N inapplicable slow channels must be zero")
+
+
 def _validate_family_fields(arrays: dict[str, np.ndarray]) -> None:
     context_dynamic = arrays["context_features.npy"]
     context_slow = arrays["context_slow.npy"]
@@ -196,6 +209,7 @@ def _validate_family_fields(arrays: dict[str, np.ndarray]) -> None:
     global_dynamic = arrays["global_features.npy"]
     global_slow = arrays["global_slow.npy"]
     global_ready = arrays["global_data_ready.npy"]
+    validate_liquidity_selected_rate_slow_fields(context_slow)
     if np.any(context_dynamic[..., 16:26] != 0):
         raise ValueError("Context cross-sectional dynamic channels must be zero")
     if np.any(equity_slow[..., 30:32] != 0):
@@ -775,6 +789,20 @@ def _generate_feature_audit(
         raise ValueError("Manifest global slow-channel order is stale")
     if tuple(constants["global_context_symbols"]) != GLOBAL_CONTEXT_SYMBOLS:
         raise ValueError("Manifest global symbol order is stale")
+    if tuple(constants["local_context_symbols"]) != LOCAL_CONTEXT_SYMBOLS:
+        raise ValueError("Manifest local symbol order is stale")
+    if tuple(constants["fixed_rate_context_symbols"]) != FIXED_RATE_CONTEXT_SYMBOLS:
+        raise ValueError("Manifest fixed-rate symbol set is stale")
+    if (
+        constants["liquidity_selected_rate_context_symbol"]
+        != LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+    ):
+        raise ValueError("Manifest liquidity-selected rate symbol is stale")
+    if (
+        tuple(constants["exposure_beta_context_symbols"])
+        != EXPOSURE_BETA_CONTEXT_SYMBOLS
+    ):
+        raise ValueError("Manifest exposure-beta sources are stale")
 
     date_index = pl.read_parquet(features_dir / "date_index.parquet")
     equity_index = pl.read_parquet(features_dir / "equity_index.parquet")
@@ -798,6 +826,32 @@ def _generate_feature_audit(
         raise ValueError("Sample metadata does not preserve the 59,565-sample contract")
     if tuple(context_index.get_column("symbol")) != LOCAL_CONTEXT_SYMBOLS:
         raise ValueError("Context index order does not match the feature contract")
+    liquidity_selected = context_index.filter(
+        pl.col("symbol") == LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
+    )
+    if liquidity_selected.height != 1:
+        raise ValueError("Context index must contain exactly one DI1$N row")
+    row = liquidity_selected.row(0, named=True)
+    if (
+        row["rate_representation"] != "liquidity_selected_unadjusted"
+        or row["fixed_expiry_applicable"]
+        or row["cross_session_price_features_applicable"]
+        or row["absolute_rate_level_applicable"]
+        or not row["session_boundary_price_state_reset"]
+        or row["expiry_date"] is not None
+    ):
+        raise ValueError("DI1$N context applicability metadata is inconsistent")
+    fixed = context_index.filter(pl.col("symbol").is_in(FIXED_RATE_CONTEXT_SYMBOLS))
+    if (
+        fixed.height != len(FIXED_RATE_CONTEXT_SYMBOLS)
+        or set(fixed["rate_representation"]) != {"fixed_maturity"}
+        or not fixed["fixed_expiry_applicable"].all()
+        or not fixed["cross_session_price_features_applicable"].all()
+        or not fixed["absolute_rate_level_applicable"].all()
+        or fixed["session_boundary_price_state_reset"].any()
+        or fixed["expiry_date"].null_count()
+    ):
+        raise ValueError("Fixed-DI context applicability metadata is inconsistent")
 
     arrays = _load_arrays(features_dir)
     _validate_shapes(arrays, manifest)

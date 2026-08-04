@@ -16,6 +16,7 @@ from .contract import (
     DOLLAR_VOLUME_LOG_SCALE,
     HORIZONS,
     MAD_NORMALIZATION,
+    LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES,
     MIN_ACTIVE_EQUITIES,
     MIN_ADJACENT_RETURNS_PER_DAY,
     OBSERVED_FRACTION_WINDOW,
@@ -149,6 +150,59 @@ def build_causal_features(
         data_ready=data_ready,
         daily_change=summaries["change"],
         daily_change_valid=summaries["change_valid"],
+    )
+
+
+def build_liquidity_selected_rate_features(
+    raw_grid: NDArray[np.float64],
+    observed: NDArray[np.bool_],
+    valid_day: NDArray[np.bool_],
+    *,
+    market_dates: tuple[date, ...] | None = None,
+) -> InstrumentFeatures:
+    """Build DI1$N features from independent B3-session price paths.
+
+    Each session is translated to a first-observed-open level of 10 before shared
+    causal transforms run. Within-session differences are unchanged, while no
+    absolute level or prior-session close can enter a later session.
+    """
+    session_local_grid = raw_grid.copy()
+    for date_idx in range(raw_grid.shape[0]):
+        positions = np.flatnonzero(observed[date_idx])
+        if positions.size == 0:
+            continue
+        level_offset = 10.0 - raw_grid[date_idx, positions[0], 0]
+        session_local_grid[date_idx, positions, :4] += level_offset
+
+    base = build_causal_features(
+        session_local_grid,
+        observed,
+        valid_day,
+        is_rate=True,
+        market_dates=market_dates,
+        include_dollar_volume=False,
+    )
+    slow = base.slow.copy()
+    slow[:, LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES] = 0.0
+    slow[:, 7:11] = 0.0
+    summaries = _daily_summaries(session_local_grid, observed, valid_day, is_rate=True)
+    for date_idx in np.flatnonzero(base.data_ready):
+        _populate_session_local_trailing_slow(
+            slow[int(date_idx)],
+            summaries,
+            float(base.sigma[date_idx]),
+            int(date_idx),
+            raw_grid.shape[1],
+        )
+    return InstrumentFeatures(
+        dynamic=base.dynamic,
+        dynamic_valid=base.dynamic_valid,
+        slow=slow,
+        slow_rank_valid=np.zeros_like(base.slow_rank_valid),
+        sigma=base.sigma,
+        data_ready=base.data_ready,
+        daily_change=np.zeros_like(base.daily_change),
+        daily_change_valid=np.zeros_like(base.daily_change_valid),
     )
 
 
@@ -451,6 +505,46 @@ def _daily_summaries(
             output["dollar_volume"][date_idx] = dollar_volume
             output["dollar_volume_valid"][date_idx] = True
     return output
+
+
+def _populate_session_local_trailing_slow(
+    output: NDArray[np.float32],
+    summaries: dict[str, NDArray[np.generic]],
+    sigma: float,
+    date_idx: int,
+    minute_count: int,
+) -> None:
+    daily_scale = sigma * np.sqrt(minute_count)
+    direction_indices = np.flatnonzero(
+        summaries["open_close_valid"][:date_idx].astype(bool)
+    )
+    rv_indices = np.flatnonzero(summaries["rv_valid"][:date_idx].astype(bool))
+    for channel_return, channel_rv, window, minimum in (
+        (7, 9, SLOW_SHORT_WINDOW, SLOW_SHORT_MIN_VALID),
+        (8, 10, SLOW_LONG_WINDOW, SLOW_LONG_MIN_VALID),
+    ):
+        indices = direction_indices[-window:]
+        if indices.size >= minimum:
+            changes = summaries["open_close"][indices].astype(np.float64)
+            output[channel_return] = np.float32(
+                np.clip(
+                    changes.sum() / (daily_scale * np.sqrt(indices.size)),
+                    -PRICE_FEATURE_CLIP,
+                    PRICE_FEATURE_CLIP,
+                )
+            )
+        indices = rv_indices[-window:]
+        if indices.size < minimum:
+            continue
+        intraday_rv = summaries["rv"][indices].astype(np.float64)
+        daily_rv_ratio = np.sqrt(np.mean(intraday_rv**2)) / sigma
+        output[channel_rv] = np.float32(
+            np.clip(
+                np.log(max(daily_rv_ratio, REALIZED_VOL_LOG_FLOOR)),
+                -REALIZED_VOL_LOG_CLIP,
+                REALIZED_VOL_LOG_CLIP,
+            )
+        )
 
 
 def _build_slow_day(
@@ -868,19 +962,31 @@ def _daily_variance(
     return float(np.mean(returns**2))
 
 
+def rate_change_basis_points(
+    current: NDArray[np.float64] | float,
+    previous: NDArray[np.float64] | float,
+) -> NDArray[np.float64]:
+    """Convert annual percentage-rate level changes to basis points."""
+    return 100.0 * (np.asarray(current, dtype=np.float64) - previous)
+
+
 def _price_change(
     current: NDArray[np.float64],
     previous: NDArray[np.float64] | float,
     *,
     is_rate: bool,
 ) -> NDArray[np.float64]:
-    return 100.0 * (current - previous) if is_rate else np.log(current / previous)
+    return (
+        rate_change_basis_points(current, previous)
+        if is_rate
+        else np.log(current / previous)
+    )
 
 
 def _scalar_price_change(current: float, previous: float, *, is_rate: bool) -> float:
-    return (
-        100.0 * (current - previous) if is_rate else float(np.log(current / previous))
-    )
+    if is_rate:
+        return float(rate_change_basis_points(current, previous))
+    return float(np.log(current / previous))
 
 
 def build_daily_changes(
