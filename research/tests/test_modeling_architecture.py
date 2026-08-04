@@ -122,7 +122,7 @@ def test_exact_public_model_contract() -> None:
     assert NEURAL_MODELS == SUPPORTED_MODELS[:-1]
     assert PATCH_INPUT_WIDTH == 130
     assert SLOW_FEATURE_COUNT == 32
-    assert TABULAR_FEATURE_COUNT == 1932
+    assert TABULAR_FEATURE_COUNT == 1939
     assert LOCAL_CONTEXT_COUNT == 7
     assert INSTRUMENT_COUNT == 173
     assert LOCAL_CONTEXT_SYMBOLS == (
@@ -206,6 +206,26 @@ def test_context_only_is_targeted_and_context_sensitive() -> None:
         baseline[:, 0], unrelated_output[:, 0], atol=0.0, rtol=0.0
     )
     assert not torch.equal(baseline[:, 0], context_output[:, 0])
+
+
+@pytest.mark.parametrize("model_name", ("context_only", "context_pooled"))
+def test_unavailable_local_context_cannot_affect_transformer_output(
+    model_name: str,
+) -> None:
+    torch.manual_seed(31)
+    model = TargetedCrossAssetTransformer(model_name).eval()
+    inputs = _inputs()
+    inputs["instrument_mask"][:, EQUITY_COUNT] = False
+    inputs["history_patch_mask"][:, EQUITY_COUNT] = False
+    inputs["patches"][:, EQUITY_COUNT] = 0.0
+    inputs["slow_features"][:, EQUITY_COUNT] = 0.0
+    changed = {key: value.clone() for key, value in inputs.items()}
+    changed["patches"][:, EQUITY_COUNT] = 10_000.0
+    changed["slow_features"][:, EQUITY_COUNT] = -10_000.0
+    with torch.no_grad():
+        baseline = _forward(model, model_name, inputs)
+        output = _forward(model, model_name, changed)
+    torch.testing.assert_close(baseline, output, atol=0.0, rtol=0.0)
 
 
 def test_pooled_market_active_and_inactive_isolation() -> None:

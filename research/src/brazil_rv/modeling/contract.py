@@ -7,7 +7,11 @@ from datetime import date
 from pathlib import Path
 from types import MappingProxyType
 
-FEATURE_CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_CONTEXT"
+FEATURE_CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT"
+LOCAL_CONTEXT_AVAILABILITY_RULE = (
+    "Local instruments never gate B3 samples; unavailable instruments are masked "
+    "by context_data_ready."
+)
 
 
 def resolve_project_root() -> Path:
@@ -39,7 +43,7 @@ FEATURE_STORE_POINTER = (
 )
 RUN_OUTPUT_BASE = PROJECT_ROOT / "quant-data" / "b3" / "processed" / "model_runs"
 
-TRAIN_START = date(2022, 3, 17)
+TRAIN_START = date(2021, 8, 16)
 TRAIN_END = date(2024, 6, 28)
 VALIDATION_START = date(2024, 7, 8)
 VALIDATION_END = date(2025, 6, 30)
@@ -47,8 +51,27 @@ TEST_START = date(2025, 7, 7)
 TEST_END = date(2026, 7, 17)
 
 EXPECTED_DATE_COUNT = 1248
-EXPECTED_SAMPLE_COUNT = 59_565
+EXPECTED_ELIGIBLE_DATE_COUNT = 1_228
+EXPECTED_SAMPLE_COUNT = 67_540
+EXPECTED_FIRST_ELIGIBLE_DATE = TRAIN_START
+EXPECTED_LAST_ELIGIBLE_DATE = TEST_END
 EXPECTED_DECISIONS_PER_DATE = 55
+MIN_ACTIVE_EQUITIES = 30
+EXPECTED_SPLIT_DATE_COUNTS: Mapping[str, int] = MappingProxyType(
+    {
+        "train": 716,
+        "embargo_1": 5,
+        "validation": 244,
+        "embargo_2": 4,
+        "test": 259,
+    }
+)
+EXPECTED_SPLIT_SAMPLE_COUNTS: Mapping[str, int] = MappingProxyType(
+    {
+        split: count * EXPECTED_DECISIONS_PER_DATE
+        for split, count in EXPECTED_SPLIT_DATE_COUNTS.items()
+    }
+)
 EQUITY_COUNT = 158
 LOCAL_CONTEXT_COUNT = 7
 GLOBAL_CONTEXT_COUNT = 8
@@ -98,9 +121,8 @@ TABULAR_CONTEXT_DYNAMIC_COUNT = (
 )
 TABULAR_CONTEXT_SLOW_COUNT = SLOW_FEATURE_COUNT * CONTEXT_COUNT
 TABULAR_DECISION_TIME_COUNT = 2
-TABULAR_VALIDITY_COUNT = (1 + CONTEXT_COUNT) * len(
-    TABULAR_OFFSETS
-) + GLOBAL_CONTEXT_COUNT
+TABULAR_VALIDITY_COUNT = (1 + CONTEXT_COUNT) * len(TABULAR_OFFSETS)
+TABULAR_READINESS_COUNT = LOCAL_CONTEXT_COUNT + GLOBAL_CONTEXT_COUNT
 TABULAR_FEATURE_COUNT = (
     TABULAR_EQUITY_SLOW_COUNT
     + TABULAR_EQUITY_DYNAMIC_COUNT
@@ -108,8 +130,9 @@ TABULAR_FEATURE_COUNT = (
     + TABULAR_CONTEXT_SLOW_COUNT
     + TABULAR_DECISION_TIME_COUNT
     + TABULAR_VALIDITY_COUNT
+    + TABULAR_READINESS_COUNT
 )
-if PATCH_INPUT_WIDTH != 130 or TABULAR_FEATURE_COUNT != 1932:
+if PATCH_INPUT_WIDTH != 130 or TABULAR_FEATURE_COUNT != 1939:
     raise ValueError("Model input widths do not match the feature contract")
 
 FAMILY_EQUITY = 0
@@ -518,7 +541,7 @@ EXPECTED_TRAINABLE_PARAMETER_COUNTS: Mapping[str, int] = MappingProxyType(
         "context_only": 2_605_315,
         "pooled_market": 3_541_251,
         "context_pooled": 3_541_251,
-        "mlp": 1_676_291,
+        "mlp": 1_678_083,
     }
 )
 

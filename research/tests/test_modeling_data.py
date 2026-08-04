@@ -11,6 +11,8 @@ import torch
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
     DECISION_GLOBAL_INDICES,
+    EXPECTED_SPLIT_DATE_COUNTS,
+    EXPECTED_SPLIT_SAMPLE_COUNTS,
     GLOBAL_CONTEXT_COUNT,
     GLOBAL_WINDOW_MINUTES,
     LOCAL_CONTEXT_COUNT,
@@ -66,6 +68,12 @@ def test_sample_index_integrity_rejects_invalid_rows() -> None:
         valid.with_columns(
             pl.when(pl.int_range(pl.len()) == 1)
             .then(pl.lit(0))
+            .otherwise(pl.col("sample_id"))
+            .alias("sample_id")
+        ),
+        valid.with_columns(
+            pl.when(pl.int_range(pl.len()) == valid.height - 1)
+            .then(pl.lit(valid.height))
             .otherwise(pl.col("sample_id"))
             .alias("sample_id")
         ),
@@ -342,7 +350,7 @@ def _sampler_rows() -> pl.DataFrame:
     first_date = date(2023, 1, 2)
     trade_dates = [
         first_date + timedelta(days=date_offset)
-        for date_offset in range(571)
+        for date_offset in range(716)
         for _ in range(55)
     ]
     return pl.DataFrame(
@@ -360,7 +368,7 @@ def test_date_stratified_effective_batches_are_distinct_and_deterministic() -> N
     repeated = DateStratifiedMicrobatchSampler(rows, GH200_RUNTIME, seed=11)
     repeated.set_epoch(3)
     assert requests == list(repeated)
-    assert len(requests) == 496
+    assert len(requests) == 616
     for start in range(0, len(requests), GH200_RUNTIME.accumulation_steps):
         group = requests[start : start + GH200_RUNTIME.accumulation_steps]
         assert len(group) == GH200_RUNTIME.accumulation_steps
@@ -445,6 +453,30 @@ def test_split_and_embargo_are_disjoint() -> None:
     assert set(splits["test"]["trade_date"]) == {TEST_START}
 
 
+def test_audited_split_counts_are_exact() -> None:
+    split_starts = {
+        "train": TRAIN_START,
+        "embargo_1": TRAIN_END + timedelta(days=1),
+        "validation": VALIDATION_START,
+        "embargo_2": VALIDATION_END + timedelta(days=1),
+        "test": TEST_START,
+    }
+    trade_dates = [
+        split_starts[split] + timedelta(days=offset)
+        for split, count in EXPECTED_SPLIT_DATE_COUNTS.items()
+        for offset in range(count)
+        for _ in range(55)
+    ]
+    rows = pl.DataFrame(
+        {"sample_id": np.arange(len(trade_dates)), "trade_date": trade_dates},
+        schema_overrides={"trade_date": pl.Date},
+    )
+    splits = split_sample_index(rows)
+    for split, expected_dates in EXPECTED_SPLIT_DATE_COUNTS.items():
+        assert splits[split]["trade_date"].n_unique() == expected_dates
+        assert splits[split].height == EXPECTED_SPLIT_SAMPLE_COUNTS[split]
+
+
 def test_family_specific_batches_construct_only_required_inputs(tmp_path: Path) -> None:
     store, rows = _synthetic_store(tmp_path)
     request = BatchRequest(indices=(0,), valid_count=1)
@@ -499,19 +531,22 @@ def test_unavailable_context_is_zeroed_before_tensor_construction(
     context = np.load(store / "context_features.npy", mmap_mode="r+")
     context_slow = np.load(store / "context_slow.npy", mmap_mode="r+")
     context_ready = np.load(store / "context_data_ready.npy", mmap_mode="r+")
-    context[0, 0] = 123.0
-    context_slow[0, 0] = 456.0
     context_ready[0, 0] = False
-    context.flush()
-    context_slow.flush()
     context_ready.flush()
 
     architecture = resolve_tcn_architecture(
         TCNSettings("context_only", 64, "short", "gelu")
     )
-    batch = VectorizedFeatureDataset(store, rows, "tcn", "enabled", architecture)[
-        BatchRequest(indices=(0,), valid_count=1)
-    ]
+    dataset = VectorizedFeatureDataset(store, rows, "tcn", "enabled", architecture)
+    request = BatchRequest(indices=(0,), valid_count=1)
+    baseline = dataset[request]
+    context[0, 0] = 123.0
+    context_slow[0, 0] = 456.0
+    context.flush()
+    context_slow.flush()
+    batch = dataset[request]
+    for key in baseline:
+        np.testing.assert_array_equal(batch[key], baseline[key])
     unavailable = EQUITY_COUNT
     ready = EQUITY_COUNT + 1
     assert not batch["patches"][0, unavailable].any()
@@ -522,6 +557,57 @@ def test_unavailable_context_is_zeroed_before_tensor_construction(
     assert batch["history_patch_mask"][0, ready, :15].all()
     assert batch["slow_features"][0, ready].any()
     assert batch["instrument_mask"][0, ready]
+
+
+def test_unavailable_local_context_is_masked_in_tabular_inputs(
+    tmp_path: Path,
+) -> None:
+    store, rows = _synthetic_store(tmp_path)
+    context = np.load(store / "context_features.npy", mmap_mode="r+")
+    context_slow = np.load(store / "context_slow.npy", mmap_mode="r+")
+    context_ready = np.load(store / "context_data_ready.npy", mmap_mode="r+")
+    context_ready[0, 0] = False
+    context_ready.flush()
+    request = BatchRequest(indices=(0,), valid_count=1)
+    dataset = VectorizedFeatureDataset(store, rows, "mlp", "enabled")
+    baseline = dataset[request]["tabular_features"]
+
+    context[0, 0] = 123.0
+    context_slow[0, 0] = 456.0
+    context.flush()
+    context_slow.flush()
+    changed = dataset[request]["tabular_features"]
+    np.testing.assert_array_equal(changed, baseline)
+
+    local_dynamic_start = (
+        SLOW_FEATURE_COUNT + len(TABULAR_OFFSETS) * DYNAMIC_CHANNEL_COUNT
+    )
+    local_slot_dynamic_width = len(TABULAR_OFFSETS) * 16
+    global_dynamic_stop = (
+        local_dynamic_start
+        + LOCAL_CONTEXT_COUNT * local_slot_dynamic_width
+        + GLOBAL_CONTEXT_COUNT * len(TABULAR_OFFSETS) * 16
+    )
+    local_slow_start = global_dynamic_stop
+    readiness_start = TABULAR_FEATURE_COUNT - (
+        LOCAL_CONTEXT_COUNT + GLOBAL_CONTEXT_COUNT
+    )
+    assert not baseline[
+        0, 0, local_dynamic_start : local_dynamic_start + local_slot_dynamic_width
+    ].any()
+    assert not baseline[
+        0, 0, local_slow_start : local_slow_start + SLOW_FEATURE_COUNT
+    ].any()
+    np.testing.assert_array_equal(
+        baseline[0, 0, readiness_start : readiness_start + LOCAL_CONTEXT_COUNT],
+        context_ready[0].astype(np.float32),
+    )
+    assert baseline[
+        0,
+        0,
+        local_slow_start + SLOW_FEATURE_COUNT : local_slow_start
+        + 2 * SLOW_FEATURE_COUNT,
+    ].any()
 
 
 def test_compact_tabular_offsets_validity_and_future_causality(tmp_path: Path) -> None:
@@ -564,6 +650,7 @@ def test_compact_tabular_offsets_validity_and_future_causality(tmp_path: Path) -
     )
     validity_start = TABULAR_FEATURE_COUNT - (
         (1 + LOCAL_CONTEXT_COUNT + GLOBAL_CONTEXT_COUNT) * len(TABULAR_OFFSETS)
+        + LOCAL_CONTEXT_COUNT
         + GLOBAL_CONTEXT_COUNT
     )
     assert features[0, 0, validity_start : validity_start + 5].tolist() == [
@@ -639,11 +726,16 @@ def test_masked_global_context_keeps_layout_and_contributes_exact_zeros(
         + len(TABULAR_OFFSETS)
         + LOCAL_CONTEXT_COUNT * len(TABULAR_OFFSETS)
     )
+    global_validity_stop = global_validity_start + GLOBAL_CONTEXT_COUNT * len(
+        TABULAR_OFFSETS
+    )
+    global_readiness_start = global_validity_stop + LOCAL_CONTEXT_COUNT
     global_columns = np.concatenate(
         (
             np.arange(global_dynamic_start, global_dynamic_stop),
             np.arange(global_slow_start, global_slow_stop),
-            np.arange(global_validity_start, TABULAR_FEATURE_COUNT),
+            np.arange(global_validity_start, global_validity_stop),
+            np.arange(global_readiness_start, TABULAR_FEATURE_COUNT),
         )
     )
     keep = np.ones(TABULAR_FEATURE_COUNT, dtype=bool)
