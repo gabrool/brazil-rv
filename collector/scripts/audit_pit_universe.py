@@ -3,13 +3,39 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import polars as pl
 
-SCRIPT_VERSION = "1"
+from build_point_in_time_universe import (
+    ACCEPTED_FILENAME,
+    load_parquets,
+    sha256_file,
+)
+from pit_universe import (
+    ACCEPTED_ASSIGNMENT_COUNT,
+    CANONICAL_CONFIG,
+    ELIGIBILITY_COLUMNS,
+    MIN_RESEARCH_CROSS_SECTION,
+    _review_records,
+    build_universe_tables,
+    eligibility_result,
+    valid_observation_expr,
+    validate_accepted_assignments,
+)
+
+SCRIPT_VERSION = "2"
+TABLE_NAMES = (
+    "universe_metrics_monthly",
+    "universe_membership_monthly",
+    "universe_changes",
+    "universe_union",
+    "security_master",
+    "ticker_history",
+    "universe_summary",
+)
 
 
 @dataclass(frozen=True)
@@ -20,17 +46,13 @@ class Check:
 
 
 def require(path: Path) -> Path:
-    if not path.exists():
+    if not path.is_file():
         raise FileNotFoundError(path)
     return path
 
 
-def bool_expr(col: str) -> pl.Expr:
-    # Parquet outputs preserve booleans; this also tolerates text if a future
-    # version writes them differently.
-    dtype = None
-    return pl.when(pl.col(col).cast(pl.String).str.to_lowercase().is_in(["true", "1"])) \
-        .then(True).otherwise(False)
+def frames_equal(left: pl.DataFrame, right: pl.DataFrame) -> bool:
+    return left.schema == right.schema and left.equals(right, null_equal=True)
 
 
 def compress_membership_intervals(membership: pl.DataFrame) -> pl.DataFrame:
@@ -39,20 +61,16 @@ def compress_membership_intervals(membership: pl.DataFrame) -> pl.DataFrame:
         "security_id", maintain_order=True
     ):
         data = group.to_dicts()
-        if not data:
-            continue
         start = data[0]["effective_from"]
         end = data[0]["effective_to_exclusive"]
         review_start = data[0]["review_date"]
         review_end = data[0]["review_date"]
-        tickers: set[str] = {str(data[0].get("ticker_asof") or "")}
         months = 1
-        shares = [float(data[0].get("market_share") or 0.0)]
-        presences = [float(data[0].get("presence_ratio") or 0.0)]
-        prior_end = end
+        tickers = {str(data[0]["ticker_asof"] or "")}
+        turnover = [float(data[0]["median_daily_turnover_brl"])]
+        trades = [float(data[0]["median_daily_trade_count"])]
 
         def emit() -> None:
-            nonlocal start, end, review_start, review_end, tickers, months, shares, presences
             rows.append(
                 {
                     "security_id": data[0]["security_id"],
@@ -61,318 +79,539 @@ def compress_membership_intervals(membership: pl.DataFrame) -> pl.DataFrame:
                     "first_review_date": review_start,
                     "last_review_date": review_end,
                     "membership_months": months,
-                    "tickers_asof": "|".join(sorted(t for t in tickers if t)),
-                    "median_market_share": float(sorted(shares)[len(shares) // 2]),
-                    "min_market_share": min(shares),
-                    "median_presence_ratio": float(sorted(presences)[len(presences) // 2]),
-                    "min_presence_ratio": min(presences),
+                    "tickers_asof": "|".join(
+                        sorted(ticker for ticker in tickers if ticker)
+                    ),
+                    "median_daily_turnover_brl": float(
+                        sorted(turnover)[len(turnover) // 2]
+                    ),
+                    "minimum_daily_turnover_brl": min(turnover),
+                    "median_daily_trade_count": float(sorted(trades)[len(trades) // 2]),
+                    "minimum_daily_trade_count": min(trades),
                 }
             )
 
+        prior_end = end
         for current in data[1:]:
-            current_start = current["effective_from"]
-            contiguous = prior_end == current_start
-            if not contiguous:
+            if prior_end != current["effective_from"]:
                 emit()
-                start = current_start
+                start = current["effective_from"]
                 review_start = current["review_date"]
-                tickers = set()
                 months = 0
-                shares = []
-                presences = []
+                tickers = set()
+                turnover = []
+                trades = []
             end = current["effective_to_exclusive"]
             review_end = current["review_date"]
             prior_end = end
-            tickers.add(str(current.get("ticker_asof") or ""))
             months += 1
-            shares.append(float(current.get("market_share") or 0.0))
-            presences.append(float(current.get("presence_ratio") or 0.0))
+            tickers.add(str(current["ticker_asof"] or ""))
+            turnover.append(float(current["median_daily_turnover_brl"]))
+            trades.append(float(current["median_daily_trade_count"]))
         emit()
-
-    if not rows:
-        return pl.DataFrame()
     return pl.DataFrame(rows, infer_schema_length=None).sort(
         ["effective_from", "security_id"]
     )
 
 
+def nearest_thresholds(metrics: pl.DataFrame) -> pl.DataFrame:
+    thresholds = {
+        "median_daily_turnover_brl": (
+            CANONICAL_CONFIG.minimum_median_daily_turnover_brl
+        ),
+        "median_daily_trade_count": (CANONICAL_CONFIG.minimum_median_daily_trade_count),
+    }
+    rows: list[dict[str, object]] = []
+    for group in metrics.partition_by(
+        ["review_date", "effective_from"], maintain_order=True
+    ):
+        review_date = group.item(0, "review_date")
+        effective_from = group.item(0, "effective_from")
+        for column, threshold in thresholds.items():
+            for status, selected in (
+                ("MEMBER", group.filter(pl.col("is_member"))),
+                ("REJECTED", group.filter(~pl.col("is_member"))),
+            ):
+                nearest = (
+                    selected.with_columns(
+                        (pl.col(column) - threshold).abs().alias("absolute_distance")
+                    )
+                    .sort(["absolute_distance", "security_id"])
+                    .head(10)
+                )
+                for rank, row in enumerate(nearest.to_dicts(), start=1):
+                    rows.append(
+                        {
+                            "review_date": review_date,
+                            "effective_from": effective_from,
+                            "metric": column,
+                            "status": status,
+                            "rank": rank,
+                            "security_id": row["security_id"],
+                            "ticker_asof": row["ticker_asof"],
+                            "source_assignment_type": row["source_assignment_type"],
+                            "value": row[column],
+                            "threshold": threshold,
+                            "signed_distance": row[column] - threshold,
+                            "selection_reason": row["selection_reason"],
+                        }
+                    )
+    return pl.DataFrame(rows, infer_schema_length=None).sort(
+        ["effective_from", "metric", "status", "rank"]
+    )
+
+
+def source_segments_do_not_overlap(
+    assignments: pl.DataFrame, valid_daily: pl.DataFrame
+) -> tuple[bool, int]:
+    overlap_count = 0
+    dates_by_id = {
+        row["security_id"]: set(row["trade_date"])
+        for row in valid_daily.filter(
+            pl.col("security_id").is_in(assignments["security_id"].to_list())
+        )
+        .group_by("security_id")
+        .agg(pl.col("trade_date").unique())
+        .iter_rows(named=True)
+    }
+    for group in assignments.partition_by("source_file"):
+        security_ids = group["security_id"].to_list()
+        claimed: set[object] = set()
+        for security_id in security_ids:
+            dates = dates_by_id.get(security_id, set())
+            overlap_count += len(claimed & dates)
+            claimed.update(dates)
+    return overlap_count == 0, overlap_count
+
+
+def future_append_invariance(
+    metrics: pl.DataFrame,
+    daily: pl.DataFrame,
+    assignments: pl.DataFrame,
+) -> tuple[bool, int]:
+    valid_daily = daily.filter(valid_observation_expr()).sort(
+        ["trade_date", "security_id"]
+    )
+    calendar = sorted(daily["trade_date"].unique().to_list())
+    first_seen = dict(
+        valid_daily.filter(
+            pl.col("security_id").is_in(assignments["security_id"].to_list())
+        )
+        .group_by("security_id")
+        .agg(pl.col("trade_date").min())
+        .iter_rows()
+    )
+    failures = 0
+    for group in metrics.partition_by(
+        ["review_date", "effective_from"], maintain_order=True
+    ):
+        review_date = group.item(0, "review_date")
+        future = valid_daily.filter(pl.col("trade_date") > review_date).head(1)
+        if not future.height:
+            continue
+        future = future.with_columns(
+            (pl.col("open_brl") * 1.5).alias("open_brl"),
+            (pl.col("high_brl") * 1.5).alias("high_brl"),
+            (pl.col("low_brl") * 1.5).alias("low_brl"),
+            (pl.col("close_brl") * 1.5).alias("close_brl"),
+            (pl.col("volume_brl") + 9_999_999.0).alias("volume_brl"),
+            (pl.col("trades") + 999).alias("trades"),
+        )
+        kwargs = {
+            "assignments": assignments,
+            "calendar": calendar,
+            "first_seen": first_seen,
+            "review_date": review_date,
+            "effective_from": group.item(0, "effective_from"),
+            "effective_to_exclusive": group.item(0, "effective_to_exclusive"),
+            "prior_members": set(
+                group.filter(pl.col("was_member"))["security_id"].to_list()
+            ),
+            "config": CANONICAL_CONFIG,
+        }
+        baseline = pl.DataFrame(
+            _review_records(valid_daily=valid_daily, **kwargs),
+            infer_schema_length=None,
+        )
+        changed = pl.DataFrame(
+            _review_records(valid_daily=pl.concat([valid_daily, future]), **kwargs),
+            infer_schema_length=None,
+        )
+        failures += int(not frames_equal(baseline, changed))
+    return failures == 0, failures
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Audit a point-in-time B3 universe.")
+    parser = argparse.ArgumentParser(
+        description="Audit a causal liquidity-gated point-in-time B3 universe."
+    )
     parser.add_argument("--universe-dir", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--low-market-share-threshold", type=float, default=0.93)
-    parser.add_argument("--top-n-nonmembers", type=int, default=25)
     args = parser.parse_args()
 
     if args.out.exists():
         raise FileExistsError(f"Output directory already exists: {args.out}")
-
     universe_dir = args.universe_dir.resolve()
-    files = {
-        "metrics": require(universe_dir / "universe_metrics_monthly.parquet"),
-        "membership": require(universe_dir / "universe_membership_monthly.parquet"),
-        "changes": require(universe_dir / "universe_changes.parquet"),
-        "union": require(universe_dir / "universe_union.parquet"),
-        "master": require(universe_dir / "security_master.parquet"),
-        "ticker_history": require(universe_dir / "ticker_history.parquet"),
-        "summary": require(universe_dir / "universe_summary.parquet"),
-        "manifest": require(universe_dir / "manifest.json"),
-    }
+    paths = {name: require(universe_dir / f"{name}.parquet") for name in TABLE_NAMES}
+    manifest_path = require(universe_dir / "manifest.json")
+    tables = {name: pl.read_parquet(path) for name, path in paths.items()}
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    metrics = pl.read_parquet(files["metrics"])
-    membership = pl.read_parquet(files["membership"])
-    changes = pl.read_parquet(files["changes"])
-    union = pl.read_parquet(files["union"])
-    master = pl.read_parquet(files["master"])
-    ticker_history = pl.read_parquet(files["ticker_history"])
-    summary = pl.read_parquet(files["summary"])
-    manifest = json.loads(files["manifest"].read_text(encoding="utf-8"))
-
-    args.out.mkdir(parents=True, exist_ok=False)
+    daily_root = Path(manifest["daily_root"])
+    accepted_path = Path(manifest["accepted_assignment_file"])
+    if accepted_path.name != ACCEPTED_FILENAME:
+        raise ValueError(f"Unexpected accepted assignment file: {accepted_path}")
+    assignments = validate_accepted_assignments(pl.read_parquet(accepted_path))
+    daily, _ = load_parquets(daily_root, "year=*/equities_daily_*.parquet")
+    observations, _ = load_parquets(daily_root, "year=*/ticker_observations_*.parquet")
+    recomputed, metadata = build_universe_tables(
+        daily, observations, assignments, CANONICAL_CONFIG
+    )
 
     checks: list[Check] = []
 
-    def add_check(name: str, passed: bool, details: str) -> None:
+    def add(name: str, passed: bool, details: str) -> None:
         checks.append(Check(name, bool(passed), details))
 
-    add_check(
-        "master_security_id_unique",
-        master["security_id"].n_unique() == master.height,
-        f"rows={master.height}, unique={master['security_id'].n_unique()}",
+    assignment_counts = {
+        assignment_type: count
+        for assignment_type, count in assignments.group_by("source_assignment_type")
+        .len()
+        .iter_rows()
+    }
+    add(
+        "accepted_assignment_axis",
+        assignments.height == ACCEPTED_ASSIGNMENT_COUNT,
+        f"rows={assignments.height}, composition={assignment_counts}",
     )
-    add_check(
-        "union_security_id_unique",
-        union["security_id"].n_unique() == union.height,
-        f"rows={union.height}, unique={union['security_id'].n_unique()}",
-    )
-    metric_dup = metrics.height - metrics.select(
-        pl.struct(["effective_from", "security_id"]).n_unique()
-    ).item()
-    member_dup = membership.height - membership.select(
-        pl.struct(["effective_from", "security_id"]).n_unique()
-    ).item()
-    add_check("metrics_key_unique", metric_dup == 0, f"duplicates={metric_dup}")
-    add_check("membership_key_unique", member_dup == 0, f"duplicates={member_dup}")
-
-    master_ids = set(master["security_id"].to_list())
-    union_ids = set(union["security_id"].to_list())
+    accepted_ids = set(assignments["security_id"].to_list())
+    metrics = tables["universe_metrics_monthly"]
+    membership = tables["universe_membership_monthly"]
+    summary = tables["universe_summary"]
+    metric_ids = set(metrics["security_id"].unique().to_list())
     member_ids = set(membership["security_id"].unique().to_list())
-    add_check(
-        "union_subset_of_master",
-        union_ids.issubset(master_ids),
-        f"missing={len(union_ids-master_ids)}",
+    add(
+        "candidate_axis_exactly_accepted",
+        metric_ids == accepted_ids,
+        f"candidate_only={len(metric_ids - accepted_ids)}, accepted_missing={len(accepted_ids - metric_ids)}",
     )
-    add_check(
-        "membership_matches_union",
-        member_ids == union_ids,
-        f"membership_only={len(member_ids-union_ids)}, union_only={len(union_ids-member_ids)}",
+    add(
+        "members_subset_of_accepted",
+        member_ids.issubset(accepted_ids),
+        f"unaccepted_members={len(member_ids - accepted_ids)}",
+    )
+    per_review = metrics.group_by("effective_from").agg(
+        pl.len().alias("rows"),
+        pl.col("security_id").n_unique().alias("unique_ids"),
+    )
+    add(
+        "one_candidate_per_review_security",
+        bool(
+            per_review.select(
+                (
+                    (pl.col("rows") == ACCEPTED_ASSIGNMENT_COUNT)
+                    & (pl.col("unique_ids") == ACCEPTED_ASSIGNMENT_COUNT)
+                ).all()
+            ).item()
+        ),
+        f"reviews={per_review.height}",
     )
 
-    # Summary/member reconciliation.
-    recomputed_summary = (
-        membership.group_by(["review_date", "effective_from"])
-        .agg(
-            pl.len().alias("member_count_recomputed"),
-            pl.col("market_share").sum().alias("member_market_share_sum_recomputed"),
-            pl.col("turnover_brl").sum().alias("member_turnover_brl_recomputed"),
+    effective_dates = summary["effective_from"].to_list()
+    expected_ends = {
+        effective_from: (
+            effective_dates[index + 1] if index + 1 < len(effective_dates) else None
         )
-        .sort("effective_from")
+        for index, effective_from in enumerate(effective_dates)
+    }
+    invalid_intervals = sum(
+        row["effective_to_exclusive"] != expected_ends[row["effective_from"]]
+        for row in metrics.select("effective_from", "effective_to_exclusive").iter_rows(
+            named=True
+        )
     )
-    summary_check = summary.join(
-        recomputed_summary, on=["review_date", "effective_from"], how="full", coalesce=True
-    ).with_columns(
-        (pl.col("member_count") == pl.col("member_count_recomputed")).alias("count_match"),
-        ((pl.col("member_market_share_sum") - pl.col("member_market_share_sum_recomputed")).abs() < 1e-12).alias("share_match"),
-    )
-    add_check(
-        "summary_reconciles_to_membership",
-        bool(summary_check.select((pl.col("count_match") & pl.col("share_match")).all()).item()),
-        f"rows={summary_check.height}",
-    )
-
-    latest_count = int(summary.sort("effective_from")["member_count"][-1])
-    add_check(
-        "latest_count_matches_manifest",
-        latest_count == int(manifest.get("latest_member_count", -1)),
-        f"summary={latest_count}, manifest={manifest.get('latest_member_count')}",
-    )
-    add_check(
-        "union_count_matches_manifest",
-        union.height == int(manifest.get("union_security_count", -1)),
-        f"union={union.height}, manifest={manifest.get('union_security_count')}",
-    )
-    add_check(
-        "parent_count_matches_manifest",
-        master.height == int(manifest.get("parent_security_count", -1)),
-        f"master={master.height}, manifest={manifest.get('parent_security_count')}",
+    add(
+        "ordered_exclusive_intervals",
+        invalid_intervals == 0 and effective_dates == sorted(effective_dates),
+        f"invalid_rows={invalid_intervals}",
     )
 
-    # Ticker history segment overlaps.
-    overlap_rows: list[dict[str, Any]] = []
-    for group in ticker_history.sort(["security_id", "valid_from"]).partition_by(
-        "security_id", maintain_order=True
-    ):
-        data = group.to_dicts()
-        for prior, current in zip(data, data[1:]):
-            if current["valid_from"] <= prior["valid_to"]:
-                overlap_rows.append(
-                    {
-                        "security_id": prior["security_id"],
-                        "prior_ticker": prior["ticker"],
-                        "prior_valid_from": prior["valid_from"],
-                        "prior_valid_to": prior["valid_to"],
-                        "current_ticker": current["ticker"],
-                        "current_valid_from": current["valid_from"],
-                        "current_valid_to": current["valid_to"],
-                    }
-                )
-    add_check(
+    eligibility_failures = 0
+    for row in metrics.iter_rows(named=True):
+        expected = eligibility_result(
+            accepted_identity=bool(row["accepted_identity"]),
+            age_sessions=int(row["age_sessions"]),
+            presence_sessions=int(row["presence_sessions"]),
+            recent_observation=bool(row["eligible_recency"]),
+            last_close_brl=row["last_close_brl"],
+            median_daily_turnover_brl=float(row["median_daily_turnover_brl"]),
+            median_daily_trade_count=float(row["median_daily_trade_count"]),
+        )
+        eligibility_failures += int(
+            any(row[key] != value for key, value in expected.items())
+            or row["is_member"] != row["equity_eligible"]
+        )
+    add(
+        "eligibility_recomputes_without_override",
+        eligibility_failures == 0,
+        f"failed_rows={eligibility_failures}",
+    )
+    add(
+        "members_pass_all_gates",
+        bool(
+            membership.select(
+                pl.all_horizontal(
+                    [pl.col(column) for column in ELIGIBILITY_COLUMNS]
+                ).all()
+            ).item()
+        ),
+        f"members={membership.height}",
+    )
+    nonmembers = metrics.filter(~pl.col("is_member"))
+    add(
+        "nonmembers_fail_at_least_one_gate",
+        bool(
+            nonmembers.select(
+                (
+                    ~pl.all_horizontal(
+                        [pl.col(column) for column in ELIGIBILITY_COLUMNS]
+                    )
+                ).all()
+            ).item()
+        ),
+        f"nonmembers={nonmembers.height}",
+    )
+
+    for name in TABLE_NAMES:
+        add(
+            f"{name}_exact_recomputation",
+            frames_equal(tables[name], recomputed[name]),
+            f"stored_rows={tables[name].height}, recomputed_rows={recomputed[name].height}",
+        )
+
+    reordered, _ = build_universe_tables(
+        daily.reverse(), observations.reverse(), assignments.reverse(), CANONICAL_CONFIG
+    )
+    reorder_failures = [
+        name
+        for name in TABLE_NAMES
+        if not frames_equal(recomputed[name], reordered[name])
+    ]
+    add(
+        "input_row_order_determinism",
+        not reorder_failures,
+        f"different_tables={reorder_failures}",
+    )
+
+    causal_pass, causal_failures = future_append_invariance(metrics, daily, assignments)
+    add(
+        "future_append_invariance_every_review",
+        causal_pass,
+        f"failed_reviews={causal_failures}",
+    )
+
+    ticker_history = tables["ticker_history"]
+    ticker_overlaps = 0
+    for group in ticker_history.partition_by("security_id", maintain_order=True):
+        rows = group.sort("valid_from").to_dicts()
+        ticker_overlaps += sum(
+            current["valid_from"] <= prior["valid_to"]
+            for prior, current in zip(rows, rows[1:], strict=False)
+        )
+    add(
         "ticker_segments_non_overlapping",
-        not overlap_rows,
-        f"overlaps={len(overlap_rows)}",
+        ticker_overlaps == 0,
+        f"overlaps={ticker_overlaps}",
+    )
+    source_pass, source_overlaps = source_segments_do_not_overlap(
+        assignments, daily.filter(valid_observation_expr())
+    )
+    add(
+        "accepted_source_identity_dates_non_overlapping",
+        source_pass,
+        f"overlaps={source_overlaps}",
     )
 
-    # Monthly diagnostics.
-    action_counts = (
-        changes.group_by(["review_date", "effective_from", "action"])
-        .agg(pl.len().alias("count"))
-        .pivot(on="action", index=["review_date", "effective_from"], values="count")
-        .fill_null(0)
+    numeric_columns = (
+        "presence_ratio",
+        "turnover_brl",
+        "market_turnover_brl",
+        "market_share",
+        "median_daily_turnover_brl",
+        "median_daily_trade_count",
     )
-    monthly = summary.join(action_counts, on=["review_date", "effective_from"], how="left").fill_null(0)
-    for col in ["ENTER", "EXIT"]:
-        if col not in monthly.columns:
-            monthly = monthly.with_columns(pl.lit(0).alias(col))
-    monthly = monthly.with_columns(
-        (1.0 - pl.col("member_market_share_sum")).alias("outside_market_share"),
-        (pl.col("ENTER") + pl.col("EXIT")).alias("gross_churn_count"),
-        ((pl.col("ENTER") + pl.col("EXIT")) / pl.col("member_count")).alias("gross_churn_rate"),
-        (pl.col("member_market_share_sum") < args.low_market_share_threshold).alias("low_market_share_flag"),
-    ).sort("effective_from")
+    nonfinite = sum(
+        metrics.filter(~pl.col(column).is_finite()).height for column in numeric_columns
+    )
+    member_price_nonfinite = membership.filter(
+        pl.col("last_close_brl").is_null() | ~pl.col("last_close_brl").is_finite()
+    ).height
+    add(
+        "required_numeric_fields_finite",
+        nonfinite == 0 and member_price_nonfinite == 0,
+        f"metric_nonfinite={nonfinite}, member_price_nonfinite={member_price_nonfinite}",
+    )
 
-    low_months = monthly.filter(pl.col("low_market_share_flag"))
-    top_nonmembers: list[pl.DataFrame] = []
-    for row in low_months.select(["review_date", "effective_from"]).iter_rows(named=True):
-        frame = (
-            metrics.filter(
-                (pl.col("effective_from") == row["effective_from"])
-                & (~pl.col("is_member"))
-                & (pl.col("market_share") > 0)
-            )
-            .sort("market_share", descending=True)
-            .head(args.top_n_nonmembers)
-            .select(
-                "review_date",
-                "effective_from",
-                "security_id",
-                "ticker_asof",
-                "issuer_short_name_asof",
-                "age_sessions",
-                "presence_ratio",
-                "market_share",
-                "last_close_brl",
-                "was_member",
-                "entry_pass",
-                "retention_pass",
-                "action",
-            )
+    forbidden_policy_fields = {
+        "target_count",
+        "core_count",
+        "buffer_count",
+        "entry_presence",
+        "retention_presence",
+        "entry_market_share",
+        "retention_market_share",
+        "entry_min_price_brl",
+        "retention_min_price_brl",
+    }
+    selection_contract = manifest.get("selection_contract", {})
+    add(
+        "manifest_count_and_rank_independent",
+        selection_contract.get("count_independent") is True
+        and selection_contract.get("rank_independent") is True
+        and selection_contract.get("is_member") == "equity_eligible"
+        and not (forbidden_policy_fields & set(manifest.get("config", {}))),
+        f"forbidden_config={sorted(forbidden_policy_fields & set(manifest.get('config', {})))}",
+    )
+    add(
+        "manifest_config_exact",
+        manifest.get("config") == CANONICAL_CONFIG.manifest_dict(),
+        f"config={manifest.get('config')}",
+    )
+    add(
+        "minimum_research_cross_section",
+        int(summary["member_count"].min()) >= MIN_RESEARCH_CROSS_SECTION,
+        f"minimum={int(summary['member_count'].min())}",
+    )
+    add(
+        "manifest_counts_reconcile",
+        int(manifest.get("accepted_identity_count", -1)) == ACCEPTED_ASSIGNMENT_COUNT
+        and int(manifest.get("review_count", -1)) == summary.height
+        and int(manifest.get("union_security_count", -1))
+        == tables["universe_union"].height
+        and int(manifest.get("latest_member_count", -1))
+        == int(summary["member_count"][-1])
+        and int(manifest.get("invalid_observation_count", -1))
+        == int(metadata["invalid_observation_count"]),
+        "manifest versus recomputed metadata",
+    )
+
+    accepted_hash_pass = manifest.get("accepted_assignment_sha256") == sha256_file(
+        accepted_path
+    )
+    source_hashes = manifest.get("cotahist_input_sha256", {})
+    source_hash_failures = [
+        path
+        for path, expected in source_hashes.items()
+        if not Path(path).is_file() or sha256_file(Path(path)) != expected
+    ]
+    parse_audit = manifest.get("cotahist_parse_audit")
+    parse_hash_pass = bool(
+        parse_audit
+        and Path(parse_audit["path"]).is_file()
+        and sha256_file(Path(parse_audit["path"])) == parse_audit["sha256"]
+    )
+    add(
+        "input_hashes_match_manifest",
+        accepted_hash_pass and not source_hash_failures and parse_hash_pass,
+        f"accepted={accepted_hash_pass}, source_failures={len(source_hash_failures)}, parse_audit={parse_hash_pass}",
+    )
+    implementation_hashes = manifest.get("implementation_sha256", {})
+    implementation_paths = {
+        path.name: path
+        for path in (
+            Path(__file__).resolve(),
+            Path(__file__).with_name("pit_universe.py").resolve(),
+            Path(__file__).with_name("build_point_in_time_universe.py").resolve(),
         )
-        if frame.height:
-            top_nonmembers.append(frame)
-    top_nonmembers_df = (
-        pl.concat(top_nonmembers, how="vertical_relaxed") if top_nonmembers else pl.DataFrame()
+    }
+    implementation_failures = [
+        name
+        for name, path in implementation_paths.items()
+        if implementation_hashes.get(name) != sha256_file(path)
+    ]
+    add(
+        "implementation_hashes_match_manifest",
+        not implementation_failures,
+        f"failures={implementation_failures}",
+    )
+    output_hashes = manifest.get("output_sha256", {})
+    output_hash_failures = [
+        filename
+        for filename, expected in output_hashes.items()
+        if not (universe_dir / filename).is_file()
+        or sha256_file(universe_dir / filename) != expected
+    ]
+    add(
+        "output_hashes_match_manifest",
+        not output_hash_failures,
+        f"failures={output_hash_failures}",
     )
 
-    fallback = master.filter(pl.col("security_id_is_fallback"))
-    multi_ticker = master.filter(pl.col("distinct_tickers") > 1)
-    latest_effective = membership["effective_from"].max()
-    latest_members = membership.filter(pl.col("effective_from") == latest_effective).sort(
-        "market_share", descending=True
-    )
+    args.out.mkdir(parents=True, exist_ok=False)
     intervals = compress_membership_intervals(membership)
-
-    # A useful status table for all union securities.
-    latest_observed = master.select(
-        "security_id",
-        "isin",
-        "latest_ticker",
-        "latest_issuer_short_name",
-        "first_observed_date",
-        "last_observed_date",
-        "observed_sessions",
-        "distinct_tickers",
-        "tickers",
-        "security_id_is_fallback",
-    )
-    union_status = union.join(latest_observed, on="security_id", how="left", suffix="_master").with_columns(
-        (pl.col("last_observed_date") == master["last_observed_date"].max()).alias("observed_on_dataset_last_date")
-    )
-
-    # Write outputs.
-    def write(name: str, frame: pl.DataFrame) -> None:
-        frame.write_parquet(args.out / f"{name}.parquet", compression="zstd", statistics=True)
-        csv_frame = frame
-        for col, dtype in zip(csv_frame.columns, csv_frame.dtypes):
-            if isinstance(dtype, pl.List):
-                csv_frame = csv_frame.with_columns(pl.col(col).list.join("|").alias(col))
-        csv_frame.write_csv(args.out / f"{name}.csv")
-
-    write("monthly_diagnostics", monthly)
-    write("low_market_share_months", low_months)
-    if top_nonmembers_df.height:
-        write("top_nonmembers_low_share_months", top_nonmembers_df)
-    else:
-        pl.DataFrame({"note": ["No low-market-share months"]}).write_csv(
-            args.out / "top_nonmembers_low_share_months.csv"
+    nearest = nearest_thresholds(metrics)
+    latest_effective = summary["effective_from"][-1]
+    latest_members = membership.filter(
+        pl.col("effective_from") == latest_effective
+    ).sort("median_daily_turnover_brl")
+    for name, frame in {
+        "monthly_diagnostics": summary,
+        "nearest_liquidity_thresholds": nearest,
+        "membership_intervals": intervals,
+        "latest_members": latest_members,
+    }.items():
+        frame.write_parquet(
+            args.out / f"{name}.parquet", compression="zstd", statistics=True
         )
-    write("fallback_security_ids", fallback)
-    write("multi_ticker_securities", multi_ticker)
-    write("latest_members", latest_members)
-    write("membership_intervals", intervals)
-    write("union_status", union_status)
-    if overlap_rows:
-        write("ticker_segment_overlaps", pl.DataFrame(overlap_rows, infer_schema_length=None))
+        frame.write_csv(args.out / f"{name}.csv")
 
-    check_df = pl.DataFrame(
-        [{"check": c.name, "passed": c.passed, "details": c.details} for c in checks]
+    check_frame = pl.DataFrame(
+        [
+            {"check": check.name, "passed": check.passed, "details": check.details}
+            for check in checks
+        ]
     )
-    check_df.write_csv(args.out / "integrity_checks.csv")
-
-    summary_payload = {
+    check_frame.write_csv(args.out / "integrity_checks.csv")
+    member_counts = summary["member_count"].to_list()
+    audit_summary = {
         "script_version": SCRIPT_VERSION,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "universe_dir": str(universe_dir),
         "output_dir": str(args.out.resolve()),
-        "manifest": manifest,
-        "counts": {
-            "parent_securities": master.height,
-            "union_securities": union.height,
-            "latest_members": latest_members.height,
-            "review_dates": summary.height,
-            "membership_rows": membership.height,
-            "membership_intervals": intervals.height,
-            "fallback_security_ids": fallback.height,
-            "multi_ticker_securities": multi_ticker.height,
-            "low_market_share_months": low_months.height,
+        "checks_passed": sum(check.passed for check in checks),
+        "check_count": len(checks),
+        "all_integrity_checks_passed": all(check.passed for check in checks),
+        "member_count": {
+            "minimum": min(member_counts),
+            "median": float(summary["member_count"].median()),
+            "mean": float(summary["member_count"].mean()),
+            "maximum": max(member_counts),
+            "latest": member_counts[-1],
         },
-        "ranges": {
-            "member_count_min": int(summary["member_count"].min()),
-            "member_count_max": int(summary["member_count"].max()),
-            "member_market_share_min": float(summary["member_market_share_sum"].min()),
-            "member_market_share_max": float(summary["member_market_share_sum"].max()),
+        "latest_effective_from": latest_effective.isoformat(),
+        "latest_gate_counts": {
+            column: int(summary[column][-1])
+            for column in summary.columns
+            if column.endswith("_count")
         },
-        "all_integrity_checks_passed": all(c.passed for c in checks),
+        "direct_member_rows": int(
+            membership.filter(pl.col("source_assignment_type") == "DIRECT_ISIN").height
+        ),
+        "recovered_member_rows": int(
+            membership.filter(
+                pl.col("source_assignment_type") == "RECOVERED_RELABELED"
+            ).height
+        ),
     }
     (args.out / "audit_summary.json").write_text(
-        json.dumps(summary_payload, indent=2, default=str), encoding="utf-8"
+        json.dumps(audit_summary, indent=2), encoding="utf-8"
     )
-
     print(f"Audit complete: {args.out}")
-    print(f"Integrity checks passed: {sum(c.passed for c in checks)}/{len(checks)}")
-    print(f"Low-market-share months: {low_months.height}")
-    print(f"Fallback security IDs: {fallback.height}")
-    print(f"Multi-ticker securities: {multi_ticker.height}")
-    return 0 if all(c.passed for c in checks) else 2
+    print(
+        f"Integrity checks passed: {audit_summary['checks_passed']}/"
+        f"{audit_summary['check_count']}"
+    )
+    return 0 if audit_summary["all_integrity_checks_passed"] else 2
 
 
 if __name__ == "__main__":
