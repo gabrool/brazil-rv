@@ -9,6 +9,16 @@ import polars as pl
 import pytest
 from numpy.lib.format import open_memmap
 
+from brazil_rv.modeling.contract import (
+    EXPECTED_SPLIT_DATE_COUNTS,
+    EXPECTED_SPLIT_SAMPLE_COUNTS,
+    TEST_END,
+    TEST_START,
+    TRAIN_END,
+    TRAIN_START,
+    VALIDATION_END,
+    VALIDATION_START,
+)
 from brazil_rv.preprocessing import audit as audit_module
 from brazil_rv.preprocessing import build as build_module
 from brazil_rv.preprocessing.contract import (
@@ -896,6 +906,51 @@ def test_unready_global_slow_row_must_remain_zero() -> None:
 
     with pytest.raises(ValueError, match="Unready global slow rows"):
         audit_module.validate_global_slow_fields(slow, ready)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    (
+        (TRAIN_START - timedelta(days=1), "warmup"),
+        (TRAIN_START, "train"),
+        (TRAIN_END, "train"),
+        (TRAIN_END + timedelta(days=1), "embargo_1"),
+        (VALIDATION_START - timedelta(days=1), "embargo_1"),
+        (VALIDATION_START, "validation"),
+        (VALIDATION_END, "validation"),
+        (VALIDATION_END + timedelta(days=1), "embargo_2"),
+        (TEST_START - timedelta(days=1), "embargo_2"),
+        (TEST_START, "test"),
+        (TEST_END, "test"),
+        (TEST_END + timedelta(days=1), "post_test"),
+    ),
+)
+def test_preprocessing_audit_split_label(value: date, expected: str) -> None:
+    assert audit_module._split_label(value) == expected
+
+
+def test_preprocessing_audit_validates_all_canonical_split_counts() -> None:
+    split_starts = {
+        "train": TRAIN_START,
+        "embargo_1": TRAIN_END + timedelta(days=1),
+        "validation": VALIDATION_START,
+        "embargo_2": VALIDATION_END + timedelta(days=1),
+        "test": TEST_START,
+    }
+    sample_trade_dates = [
+        split_starts[split] + timedelta(days=offset)
+        for split, date_count in EXPECTED_SPLIT_DATE_COUNTS.items()
+        for offset in range(date_count)
+        for _ in range(55)
+    ]
+
+    assert audit_module._validated_split_counts(sample_trade_dates) == {
+        split: {
+            "date_count": EXPECTED_SPLIT_DATE_COUNTS[split],
+            "sample_count": EXPECTED_SPLIT_SAMPLE_COUNTS[split],
+        }
+        for split in EXPECTED_SPLIT_DATE_COUNTS
+    }
 
 
 def test_local_context_readiness_audit_reports_symbols_dates_and_splits() -> None:
