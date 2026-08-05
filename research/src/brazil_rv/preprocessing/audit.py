@@ -218,6 +218,123 @@ class StreamingStats:
         }
 
 
+def _opening_feature_row(feature: str, stats: StreamingStats) -> dict[str, object]:
+    row = stats.row("equity_active_opening", feature)
+    return {
+        "feature": feature,
+        "valid_observation_count": stats.count,
+        "nonzero_count": stats.count - stats.zero_count,
+        "nonzero_rate": (
+            None if stats.count == 0 else (stats.count - stats.zero_count) / stats.count
+        ),
+        "mean": row["mean"],
+        "std": row["std"],
+        "min": row["min"],
+        "max": row["max"],
+    }
+
+
+def opening_feature_family_stats(
+    arrays: dict[str, np.ndarray], eligible_dates: np.ndarray
+) -> dict[str, object]:
+    """Audit equity opening features and fail on an expected but dead gap rank."""
+    eligible_dates = np.asarray(eligible_dates, dtype=np.int64)
+    stats = {
+        "return_since_open_normalized": StreamingStats(),
+        "overnight_gap_normalized": StreamingStats(),
+        "previous_open_to_close_return_normalized": StreamingStats(),
+        "overnight_gap_cross_section_rank": StreamingStats(),
+    }
+    early_open_equity_days = 0
+    computed_dates = 0
+    below_minimum_dates = 0
+    first_cutoff = DECISION_EQUITY_INDICES[0]
+
+    prior_completed_session = np.zeros(
+        (eligible_dates.size, arrays["equity_features.npy"].shape[1]), dtype=bool
+    )
+    if eligible_dates.size:
+        eligible_position = {
+            int(date_idx): position for position, date_idx in enumerate(eligible_dates)
+        }
+        completed = np.zeros(prior_completed_session.shape[1], dtype=bool)
+        for date_idx in range(int(eligible_dates[-1]) + 1):
+            if date_idx in eligible_position:
+                prior_completed_session[eligible_position[date_idx]] = completed
+            completed |= np.asarray(
+                arrays["equity_features.npy"][date_idx, :, :, 5] > 0.5
+            ).any(axis=1)
+
+    for start in range(0, eligible_dates.size, DATE_CHUNK):
+        indices = eligible_dates[start : start + DATE_CHUNK]
+        prior_completed = prior_completed_session[start : start + DATE_CHUNK]
+        dynamic = np.asarray(
+            arrays["equity_features.npy"][indices, :, :EQUITY_VISIBLE_MINUTES],
+            dtype=np.float32,
+        )
+        slow = np.asarray(arrays["equity_slow.npy"][indices], dtype=np.float32)
+        active = np.asarray(
+            arrays["equity_membership.npy"][indices]
+            & arrays["equity_data_ready.npy"][indices],
+            dtype=bool,
+        )
+        observed = dynamic[..., 5] > 0.5
+        dynamic_valid = observed & active[:, :, None]
+        stats["return_since_open_normalized"].update(dynamic[..., 6][dynamic_valid])
+
+        early_open_valid = active & observed[:, :, :first_cutoff].any(axis=2)
+        early_open_equity_days += int(early_open_valid.sum())
+        gap_valid = early_open_valid & prior_completed
+        stats["overnight_gap_normalized"].update(slow[..., 1][gap_valid])
+        stats["previous_open_to_close_return_normalized"].update(
+            slow[..., 3][active & prior_completed]
+        )
+
+        valid_population = gap_valid.sum(axis=1)
+        rank_expected = valid_population >= MIN_ACTIVE_EQUITIES
+        computed_dates += int(rank_expected.sum())
+        below_minimum_dates += int((~rank_expected).sum())
+        rank_valid = gap_valid & rank_expected[:, None]
+        rank_values = slow[..., 17]
+        stats["overnight_gap_cross_section_rank"].update(rank_values[rank_valid])
+        if np.any(rank_values[active & ~rank_valid] != 0.0):
+            raise ValueError(
+                "overnight_gap_cross_section_rank must be neutral outside valid "
+                "early-open cross-sections"
+            )
+        for local_date in np.flatnonzero(rank_expected):
+            values = rank_values[local_date, rank_valid[local_date]]
+            if abs(float(values.mean(dtype=np.float64))) > 1e-6:
+                raise ValueError(
+                    "overnight_gap_cross_section_rank is not centered on a valid "
+                    "early-open cross-section"
+                )
+
+    rank_stats = stats["overnight_gap_cross_section_rank"]
+    if computed_dates and (
+        rank_stats.count == 0 or rank_stats.minimum == rank_stats.maximum
+    ):
+        raise ValueError(
+            "overnight_gap_cross_section_rank is constant or entirely zero despite "
+            f"{computed_dates} dates meeting the {MIN_ACTIVE_EQUITIES}-equity "
+            "early-open population requirement"
+        )
+
+    decisions_per_date = len(DECISION_EQUITY_INDICES)
+    return {
+        "features": [
+            _opening_feature_row(feature, feature_stats)
+            for feature, feature_stats in stats.items()
+        ],
+        "equity_days_with_valid_early_open_proxy": early_open_equity_days,
+        "minimum_rank_population": MIN_ACTIVE_EQUITIES,
+        "rank_decision_cross_sections_computed": (computed_dates * decisions_per_date),
+        "rank_decision_cross_sections_below_minimum_population": (
+            below_minimum_dates * decisions_per_date
+        ),
+    }
+
+
 def _load_arrays(features_dir: Path) -> dict[str, np.ndarray]:
     return {
         filename: np.load(features_dir / filename, mmap_mode="r", allow_pickle=False)
@@ -1109,6 +1226,7 @@ def _generate_feature_audit(
     feature_rows, security_observed, security_possible, security_active_days = (
         _collect_feature_stats(arrays, eligible_dates)
     )
+    opening_feature_stats = opening_feature_family_stats(arrays, eligible_dates)
     target_rows, yearly_rows = _target_stats(arrays, trade_dates, eligible_dates)
 
     date_groups = _date_groups(date_index)
@@ -1210,6 +1328,7 @@ def _generate_feature_audit(
             "max": int(active_counts.max()),
         },
         "context_observed_input_fraction": context_density,
+        "opening_feature_family": opening_feature_stats,
         "global_context": global_readiness,
         "global_source": source_rows,
         "candidate_6l_audit_command": (
@@ -1230,6 +1349,8 @@ def _generate_feature_audit(
             "local and global context readiness never gates B3 samples",
             "unavailable local contexts are explicitly audited for ingress masking",
             "eligible-date, sample, boundary, and split counts match the contract",
+            "opening-feature validity and activation statistics are reported",
+            "expected overnight-gap ranks are finite, centered, and non-degenerate",
             "global source timestamps, OHLCV, hashes, and slot order are valid",
             "global decision slices contain no future bar",
             "global mapping changes suppress cross-contract returns",

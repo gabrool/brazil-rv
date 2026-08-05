@@ -86,6 +86,7 @@ from .transforms import (
     add_equity_cross_sectional_dynamic,
     add_slow_cross_sectional_ranks,
     build_causal_features,
+    build_equity_features,
     build_liquidity_selected_rate_features,
     build_daily_changes,
     build_prior_rate_level,
@@ -246,11 +247,10 @@ def _populate_feature_store(
                 dtype=bool,
                 count=len(market_dates),
             )
-            result = build_causal_features(
+            result = build_equity_features(
                 raw_grid,
                 observed,
                 identity_day,
-                is_rate=False,
                 market_dates=market_dates,
             )
             arrays["equity_features.npy"][:, slot] = result.dynamic

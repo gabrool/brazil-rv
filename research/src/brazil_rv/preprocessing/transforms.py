@@ -57,6 +57,24 @@ class InstrumentFeatures:
     daily_change_valid: NDArray[np.bool_]
 
 
+def build_equity_features(
+    raw_grid: NDArray[np.float64],
+    observed: NDArray[np.bool_],
+    valid_day: NDArray[np.bool_],
+    *,
+    market_dates: tuple[date, ...] | None = None,
+) -> InstrumentFeatures:
+    """Build equity features with first-observed opening-price semantics."""
+    return build_causal_features(
+        raw_grid,
+        observed,
+        valid_day,
+        is_rate=False,
+        market_dates=market_dates,
+        early_open_cutoff=DECISION_EQUITY_INDICES[0],
+    )
+
+
 def build_causal_features(
     raw_grid: NDArray[np.float64],
     observed: NDArray[np.bool_],
@@ -66,6 +84,7 @@ def build_causal_features(
     extra_ready: NDArray[np.bool_] | None = None,
     market_dates: tuple[date, ...] | None = None,
     include_dollar_volume: bool = True,
+    early_open_cutoff: int | None = None,
 ) -> InstrumentFeatures:
     """Build instrument features with state available strictly before each date."""
     date_count, minute_count, field_count = raw_grid.shape
@@ -79,6 +98,8 @@ def build_causal_features(
         market_dates = tuple(date(2000, 1, 3) for _ in range(date_count))
     if len(market_dates) != date_count:
         raise ValueError("market_dates must align to the date axis")
+    if early_open_cutoff is not None and not 0 < early_open_cutoff <= minute_count:
+        raise ValueError("early_open_cutoff must fall inside the minute grid")
 
     slow = np.zeros((date_count, 32), dtype=np.float32)
     # Overnight gap, trailing dollar volume, and trailing 20-day RV validity.
@@ -86,7 +107,13 @@ def build_causal_features(
     sigma_by_day = np.zeros(date_count, dtype=np.float64)
     data_ready = np.zeros(date_count, dtype=bool)
 
-    summaries = _daily_summaries(raw_grid, observed, valid_day, is_rate=is_rate)
+    summaries = _daily_summaries(
+        raw_grid,
+        observed,
+        valid_day,
+        is_rate=is_rate,
+        early_open_cutoff=early_open_cutoff,
+    )
     warmup_variances: list[float] = []
     ewma_variance: float | None = None
     volatility_floor = RATE_VOL_FLOOR_BP if is_rate else PRICE_VOL_FLOOR
@@ -140,6 +167,7 @@ def build_causal_features(
         data_ready,
         sigma_by_day,
         is_rate=is_rate,
+        first_observed_open=early_open_cutoff is not None,
     )
     return InstrumentFeatures(
         dynamic=dynamic,
@@ -214,6 +242,7 @@ def build_dynamic_features(
     *,
     is_rate: bool,
     mapping_changed: NDArray[np.bool_] | None = None,
+    first_observed_open: bool = False,
 ) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
     """Build causal minute features from volatility state fixed before each day."""
     date_count, minute_count, field_count = raw_grid.shape
@@ -243,6 +272,7 @@ def build_dynamic_features(
             int(date_idx),
             float(sigma_by_day[date_idx]),
             is_rate=is_rate,
+            first_observed_open=first_observed_open,
         )
     return dynamic, validity
 
@@ -258,6 +288,7 @@ def _build_dynamic_day(
     sigma: float,
     *,
     is_rate: bool,
+    first_observed_open: bool,
 ) -> None:
     current_raw = raw_grid[date_idx]
     current_observed = observed[date_idx]
@@ -302,10 +333,11 @@ def _build_dynamic_day(
     output[positions, 5] = 1.0
 
     roll_prefix = np.concatenate(([0], np.cumsum(current_mapping_changed)))
-    if current_observed[0]:
-        open_price = current_raw[0, 0]
+    open_position = int(positions[0]) if first_observed_open else 0
+    if current_observed[open_position]:
+        open_price = current_raw[open_position, 0]
         elapsed = positions + 1
-        same_contract = roll_prefix[positions + 1] == roll_prefix[1]
+        same_contract = roll_prefix[positions + 1] == roll_prefix[open_position + 1]
         usable_positions = positions[same_contract]
         since_open = _price_change(
             current_raw[usable_positions, 3], open_price, is_rate=is_rate
@@ -437,11 +469,14 @@ def _daily_summaries(
     valid_day: NDArray[np.bool_],
     *,
     is_rate: bool,
+    early_open_cutoff: int | None = None,
 ) -> dict[str, NDArray[np.generic]]:
     date_count, minute_count, _ = raw_grid.shape
     output: dict[str, NDArray[np.generic]] = {
         "open": np.zeros(date_count, dtype=np.float64),
         "open_valid": np.zeros(date_count, dtype=bool),
+        "early_open": np.zeros(date_count, dtype=np.float64),
+        "early_open_valid": np.zeros(date_count, dtype=bool),
         "close": np.zeros(date_count, dtype=np.float64),
         "close_valid": np.zeros(date_count, dtype=bool),
         "change": np.zeros(date_count, dtype=np.float64),
@@ -467,9 +502,23 @@ def _daily_summaries(
         if positions.size == 0:
             continue
         day = raw_grid[date_idx]
-        if day_observed[0]:
-            output["open"][date_idx] = day[0, 0]
-            output["open_valid"][date_idx] = True
+        if early_open_cutoff is None:
+            if day_observed[0]:
+                output["open"][date_idx] = day[0, 0]
+                output["open_valid"][date_idx] = True
+                output["early_open"][date_idx] = day[0, 0]
+                output["early_open_valid"][date_idx] = True
+        else:
+            session_open, session_open_valid = _completed_session_open(
+                day, day_observed
+            )
+            output["open"][date_idx] = session_open
+            output["open_valid"][date_idx] = session_open_valid
+            early_open, early_open_valid = _early_open_before_cutoff(
+                day, day_observed, early_open_cutoff
+            )
+            output["early_open"][date_idx] = early_open
+            output["early_open_valid"][date_idx] = early_open_valid
         final_idx = int(positions[-1])
         final_close = float(day[final_idx, 3])
         output["close"][date_idx] = final_close
@@ -505,6 +554,26 @@ def _daily_summaries(
             output["dollar_volume"][date_idx] = dollar_volume
             output["dollar_volume_valid"][date_idx] = True
     return output
+
+
+def _completed_session_open(
+    day: NDArray[np.float64], day_observed: NDArray[np.bool_]
+) -> tuple[float, bool]:
+    positions = np.flatnonzero(day_observed)
+    if positions.size == 0:
+        return 0.0, False
+    return float(day[int(positions[0]), 0]), True
+
+
+def _early_open_before_cutoff(
+    day: NDArray[np.float64],
+    day_observed: NDArray[np.bool_],
+    cutoff: int,
+) -> tuple[float, bool]:
+    positions = np.flatnonzero(day_observed[:cutoff])
+    if positions.size == 0:
+        return 0.0, False
+    return float(day[int(positions[0]), 0]), True
 
 
 def _populate_session_local_trailing_slow(
@@ -567,9 +636,9 @@ def _build_slow_day(
     daily_scale = sigma * np.sqrt(minute_count)
     previous_idx = int(completed[-1]) if completed.size else None
 
-    if previous_idx is not None and bool(summaries["open_valid"][date_idx]):
+    if previous_idx is not None and bool(summaries["early_open_valid"][date_idx]):
         gap = _scalar_price_change(
-            float(summaries["open"][date_idx]),
+            float(summaries["early_open"][date_idx]),
             float(summaries["close"][previous_idx]),
             is_rate=is_rate,
         )
