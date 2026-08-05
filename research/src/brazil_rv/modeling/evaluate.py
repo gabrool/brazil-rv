@@ -11,6 +11,10 @@ from pathlib import Path
 import polars as pl
 import torch
 
+from .context_ablation import (
+    get_context_ablation,
+    resolve_context_ablation_for_store,
+)
 from .contract import (
     ALLOWED_SEEDS,
     GLOBAL_CONTEXT_SETTINGS,
@@ -65,6 +69,7 @@ _CHECKPOINT_IDENTITY_FIELDS = (
     "parameter_count",
     "feature_manifest_contract_version",
     "global_context",
+    "context_ablation",
     "global_context_source_hashes",
     "global_context_normalized_store_hashes",
 )
@@ -147,6 +152,18 @@ def _validate_global_identity(
         )
     if not consumes_context and setting is not None:
         raise ValueError("Context-free identity has a global context setting")
+
+    ablation_metadata = identity.get("context_ablation")
+    if not isinstance(ablation_metadata, dict):
+        raise ValueError("Context-ablation identity is missing")
+    ablation_key = str(ablation_metadata.get("key"))
+    specification = get_context_ablation(ablation_key)
+    if ablation_metadata != specification.metadata():
+        raise ValueError("Context-ablation specification identity is invalid")
+    if ablation_key != "none" and not consumes_context:
+        raise ValueError("Context-free identity has a context ablation")
+    if ablation_key != "none" and setting != "enabled":
+        raise ValueError("Context ablations require enabled global context")
 
     feature_manifest = json.loads(
         (feature_store / "manifest.json").read_text(encoding="utf-8")
@@ -309,6 +326,9 @@ def _evaluate_neural(
     raw_temperature = objective["temperature"]
     temperature = None if raw_temperature is None else float(raw_temperature)
     model_name = str(checkpoint["model_name"])
+    context_ablation = resolve_context_ablation_for_store(
+        feature_store, str(manifest["context_ablation"]["key"])
+    )
     loader = create_evaluation_loader(
         feature_store,
         rows,
@@ -317,6 +337,7 @@ def _evaluate_neural(
         GH200_RUNTIME,
         int(manifest["seed"]),
         tcn_architecture,
+        context_ablation,
     )
     model = build_neural_model(model_name, tcn_architecture)
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -368,6 +389,9 @@ def main() -> None:
         Path(str(manifest["resolved_feature_store_path"])).expanduser().resolve()
     )
     sample_index = validate_feature_store(feature_store)
+    context_ablation = resolve_context_ablation_for_store(
+        feature_store, str(manifest["context_ablation"]["key"])
+    )
     training_rows = select_sample_split(sample_index, "train")
     rows = select_sample_split(sample_index, args.split)
     cache_report = warm_feature_store_cache(feature_store)
@@ -392,6 +416,7 @@ def main() -> None:
             training_rows,
             rows,
             str(manifest["global_context"]),
+            context_ablation,
             args.run_dir,
             evaluation_dir,
             booster_sha256,
@@ -427,6 +452,7 @@ def main() -> None:
         "parameter_count": manifest["parameter_count"],
         "optimizer_variant": manifest["optimizer_variant"],
         "global_context": manifest["global_context"],
+        "context_ablation": manifest["context_ablation"],
         "feature_manifest_contract_version": manifest[
             "feature_manifest_contract_version"
         ],

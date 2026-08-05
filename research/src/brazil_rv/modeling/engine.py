@@ -15,6 +15,7 @@ import torch
 import torch._functorch.config as functorch_config
 from torch import nn
 
+from .context_ablation import NO_CONTEXT_ABLATION, ResolvedContextAblation
 from .contract import (
     COMPILE_PARITY_GRADIENT_COSINE_MIN,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
@@ -1347,6 +1348,7 @@ def checkpoint_payload(
     global_context: str | None,
     feature_manifest: dict[str, object],
     git_commit_sha: str,
+    context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
 ) -> dict[str, object]:
     if getattr(model, "model_name", None) != model_name:
         raise ValueError("Checkpoint model name does not match the model")
@@ -1368,6 +1370,7 @@ def checkpoint_payload(
         "resolved_feature_store_path": str(feature_store),
         "feature_manifest_contract_version": feature_manifest["contract_version"],
         "global_context": global_context,
+        "context_ablation": context_ablation.metadata(),
         "global_context_source_hashes": feature_manifest["global_context"][
             "source_hashes"
         ],

@@ -16,6 +16,7 @@ import polars as pl
 import torch
 import xgboost as xgb
 
+from .context_ablation import ResolvedContextAblation
 from .contract import (
     EQUITY_COUNT,
     HORIZONS,
@@ -224,6 +225,7 @@ def _build_matrix_bundles(
     training_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
     global_context: str,
+    context_ablation: ResolvedContextAblation,
     cache_dir: Path,
     *,
     device: str,
@@ -238,6 +240,7 @@ def _build_matrix_bundles(
             horizon_index,
             global_context=global_context,
             device=device,
+            context_ablation=context_ablation,
         )
         validation_source = TabularRowIterator(
             store,
@@ -245,6 +248,7 @@ def _build_matrix_bundles(
             horizon_index,
             global_context=global_context,
             device=device,
+            context_ablation=context_ablation,
         )
         training = build_quantile_matrix(
             training_source, cache_dir / f"train_{horizon}m", device=device
@@ -398,6 +402,7 @@ def tune_xgboost(
     store: Path,
     training_rows: pl.DataFrame,
     global_context: str,
+    context_ablation: ResolvedContextAblation,
     cache_dir: Path,
     seed: int,
     *,
@@ -411,6 +416,7 @@ def tune_xgboost(
         split.training_rows,
         split.validation_rows,
         global_context,
+        context_ablation,
         cache_dir / "inner",
         device=device,
     )
@@ -496,6 +502,7 @@ def refit_xgboost(
     training_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
     global_context: str,
+    context_ablation: ResolvedContextAblation,
     cache_dir: Path,
     selected: dict[str, object],
     seed: int,
@@ -521,6 +528,7 @@ def refit_xgboost(
         training_rows,
         validation_rows,
         global_context,
+        context_ablation,
         cache_dir / "final",
         device=device,
     )
@@ -799,6 +807,7 @@ def train_xgboost_run(
     training_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
     global_context: str,
+    context_ablation: ResolvedContextAblation,
     run_dir: Path,
     seed: int,
 ) -> XGBoostRunResult:
@@ -810,6 +819,7 @@ def train_xgboost_run(
                 store,
                 training_rows,
                 global_context,
+                context_ablation,
                 cache_dir,
                 seed,
                 device=XGBOOST_DEVICE,
@@ -819,6 +829,7 @@ def train_xgboost_run(
                 training_rows,
                 validation_rows,
                 global_context,
+                context_ablation,
                 cache_dir,
                 selected,
                 seed,
@@ -889,6 +900,7 @@ def evaluate_saved_xgboost(
     training_rows: pl.DataFrame,
     rows: pl.DataFrame,
     global_context: str,
+    context_ablation: ResolvedContextAblation,
     run_dir: Path,
     work_dir: Path,
     expected_booster_sha256: object,
@@ -909,6 +921,7 @@ def evaluate_saved_xgboost(
                 training_rows,
                 rows,
                 global_context,
+                context_ablation,
                 cache_dir,
                 device=XGBOOST_DEVICE,
             )

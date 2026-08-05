@@ -21,6 +21,7 @@ import xgboost as xgb
 from torch import nn
 
 import brazil_rv.modeling.engine as engine_module
+from brazil_rv.modeling.context_ablation import get_context_ablation
 from brazil_rv.modeling.contract import (
     ADAMW_LR,
     ADAMW_WEIGHT_DECAY,
@@ -731,6 +732,7 @@ def _feature_manifest(feature_store: Path) -> dict[str, object]:
         "feature_manifest_contract_version": FEATURE_CONTRACT_VERSION,
         "global_context_source_hashes": source_hashes,
         "global_context_normalized_store_hashes": normalized_store_hashes,
+        "context_ablation": get_context_ablation("none").metadata(),
     }
 
 
@@ -874,6 +876,7 @@ def test_evaluation_identity_accepts_objective_metadata(
         "parameter_count",
         "feature_manifest_contract_version",
         "global_context",
+        "context_ablation",
         "global_context_source_hashes",
         "global_context_normalized_store_hashes",
     ),
