@@ -61,6 +61,8 @@ from brazil_rv.modeling.contract import (
 )
 from brazil_rv.modeling.evaluate import (
     _architecture_from_identity,
+    _evaluation_context_ablation_fields,
+    _normalize_context_ablation_identity,
     _validate_run_checkpoint_identity,
     _validate_xgboost_identity,
 )
@@ -861,6 +863,118 @@ def test_evaluation_identity_accepts_objective_metadata(
     _validate_run_checkpoint_identity(manifest, dict(manifest), tmp_path.resolve())
 
 
+def test_legacy_neural_identity_synthesizes_canonical_none(tmp_path: Path) -> None:
+    manifest = _matching_run_identity(tmp_path.resolve())
+    checkpoint = copy.deepcopy(manifest)
+    del manifest["context_ablation"]
+    del checkpoint["context_ablation"]
+
+    identity = _validate_run_checkpoint_identity(
+        manifest, checkpoint, tmp_path.resolve()
+    )
+
+    assert identity.metadata == get_context_ablation("none").metadata()
+    assert identity.source == "legacy_implicit_none"
+    assert "context_ablation" not in manifest
+    assert "context_ablation" not in checkpoint
+    assert _evaluation_context_ablation_fields(identity) == {
+        "context_ablation": get_context_ablation("none").metadata(),
+        "context_ablation_identity_source": "legacy_implicit_none",
+    }
+
+
+def test_explicit_neural_identity_remains_strict_and_records_source(
+    tmp_path: Path,
+) -> None:
+    manifest = _matching_run_identity(tmp_path.resolve())
+    identity = _validate_run_checkpoint_identity(
+        manifest, copy.deepcopy(manifest), tmp_path.resolve()
+    )
+
+    assert identity.metadata == get_context_ablation("none").metadata()
+    assert identity.source == "explicit_registry_metadata"
+    assert (
+        _evaluation_context_ablation_fields(identity)[
+            "context_ablation_identity_source"
+        ]
+        == "explicit_registry_metadata"
+    )
+
+
+@pytest.mark.parametrize("missing_from", ("manifest", "checkpoint"))
+def test_neural_context_ablation_presence_mismatch_fails(
+    missing_from: str, tmp_path: Path
+) -> None:
+    manifest = _matching_run_identity(tmp_path.resolve())
+    checkpoint = copy.deepcopy(manifest)
+    artifact = manifest if missing_from == "manifest" else checkpoint
+    del artifact["context_ablation"]
+
+    with pytest.raises(ValueError, match="context_ablation presence"):
+        _validate_run_checkpoint_identity(manifest, checkpoint, tmp_path.resolve())
+
+
+@pytest.mark.parametrize(
+    ("metadata", "match"),
+    (
+        (None, "explicit object"),
+        ({}, "valid key"),
+        (
+            {**get_context_ablation("none").metadata(), "key": "unknown"},
+            "Unknown context ablation",
+        ),
+        (
+            {
+                **get_context_ablation("none").metadata(),
+                "serialized_specification": "wrong",
+            },
+            "specification identity",
+        ),
+        (
+            {
+                **get_context_ablation("none").metadata(),
+                "specification_sha256": "0" * 64,
+            },
+            "specification identity",
+        ),
+    ),
+)
+def test_explicit_neural_context_ablation_metadata_must_be_canonical(
+    metadata: object, match: str, tmp_path: Path
+) -> None:
+    manifest = _matching_run_identity(tmp_path.resolve())
+    checkpoint = copy.deepcopy(manifest)
+    manifest["context_ablation"] = copy.deepcopy(metadata)
+    checkpoint["context_ablation"] = copy.deepcopy(metadata)
+
+    with pytest.raises(ValueError, match=match):
+        _validate_run_checkpoint_identity(manifest, checkpoint, tmp_path.resolve())
+
+
+def test_ablation_named_legacy_neural_run_cannot_fall_back_to_none(
+    tmp_path: Path,
+) -> None:
+    manifest = _matching_run_identity(tmp_path.resolve())
+    checkpoint = copy.deepcopy(manifest)
+    del manifest["context_ablation"]
+    del checkpoint["context_ablation"]
+    run_dir = tmp_path / "tcn_ablation-drop_win_seed29_legacy"
+
+    with pytest.raises(ValueError, match="Ablation-named"):
+        _validate_run_checkpoint_identity(
+            manifest, checkpoint, tmp_path.resolve(), run_dir
+        )
+
+
+def test_manifest_only_normalizer_rejects_explicit_noncanonical_metadata() -> None:
+    manifest = {"context_ablation": get_context_ablation("drop_win").metadata()}
+    identity = _normalize_context_ablation_identity(manifest)
+    assert identity.metadata["key"] == "drop_win"
+    malformed = {"context_ablation": {**identity.metadata, "description": "wrong"}}
+    with pytest.raises(ValueError, match="specification identity"):
+        _normalize_context_ablation_identity(malformed)
+
+
 @pytest.mark.parametrize(
     "field",
     (
@@ -1588,7 +1702,32 @@ def test_completed_xgboost_manifest_requires_bound_booster_hashes(
     booster, _ = _train_cpu_xgboost_test_model()
     hashes = save_boosters(run_dir, {index: booster for index in range(len(HORIZONS))})
     manifest = _completed_xgboost_manifest(feature_store, hashes)
-    assert _validate_xgboost_identity(manifest, feature_store, run_dir) == hashes
+    validated_hashes, explicit_identity = _validate_xgboost_identity(
+        manifest, feature_store, run_dir
+    )
+    assert validated_hashes == hashes
+    assert explicit_identity.source == "explicit_registry_metadata"
+
+    legacy_manifest = copy.deepcopy(manifest)
+    del legacy_manifest["context_ablation"]
+    legacy_hashes, legacy_identity = _validate_xgboost_identity(
+        legacy_manifest, feature_store, run_dir
+    )
+    assert legacy_hashes == hashes
+    assert legacy_identity.metadata == get_context_ablation("none").metadata()
+    assert legacy_identity.source == "legacy_implicit_none"
+
+    malformed_ablation = copy.deepcopy(manifest)
+    malformed_ablation["context_ablation"] = None
+    with pytest.raises(ValueError, match="explicit object"):
+        _validate_xgboost_identity(malformed_ablation, feature_store, run_dir)
+
+    with pytest.raises(ValueError, match="Ablation-named"):
+        _validate_xgboost_identity(
+            legacy_manifest,
+            feature_store,
+            tmp_path / "xgboost_ablation-drop_win_seed29_legacy",
+        )
 
     missing_hashes = copy.deepcopy(manifest)
     del missing_hashes["xgboost"]["booster_sha256"]  # type: ignore[index]

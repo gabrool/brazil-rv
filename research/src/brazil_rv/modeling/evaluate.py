@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -69,10 +69,85 @@ _CHECKPOINT_IDENTITY_FIELDS = (
     "parameter_count",
     "feature_manifest_contract_version",
     "global_context",
-    "context_ablation",
     "global_context_source_hashes",
     "global_context_normalized_store_hashes",
 )
+
+_EXPLICIT_ABLATION_IDENTITY = "explicit_registry_metadata"
+_LEGACY_ABLATION_IDENTITY = "legacy_implicit_none"
+
+
+@dataclass(frozen=True)
+class ContextAblationIdentity:
+    metadata: dict[str, object]
+    source: str
+
+
+def _validate_context_ablation_metadata(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValueError("context_ablation metadata must be an explicit object")
+    key = value.get("key")
+    if not isinstance(key, str):
+        raise ValueError("context_ablation metadata has no valid key")
+    expected = get_context_ablation(key).metadata()
+    if value != expected:
+        raise ValueError("context_ablation specification identity is invalid")
+    return expected
+
+
+def _ablation_named_run(manifest: dict[str, object], run_dir: Path | None) -> bool:
+    candidate = run_dir
+    if candidate is None and isinstance(manifest.get("run_dir"), str):
+        candidate = Path(str(manifest["run_dir"]))
+    return candidate is not None and "_ablation-" in candidate.name
+
+
+def _normalize_context_ablation_identity(
+    manifest: dict[str, object],
+    checkpoint: dict[str, object] | None = None,
+    *,
+    run_dir: Path | None = None,
+) -> ContextAblationIdentity:
+    manifest_has_metadata = "context_ablation" in manifest
+    if checkpoint is not None:
+        checkpoint_has_metadata = "context_ablation" in checkpoint
+        if manifest_has_metadata != checkpoint_has_metadata:
+            raise ValueError(
+                "Run/checkpoint identity mismatch: context_ablation presence"
+            )
+
+    if not manifest_has_metadata:
+        if _ablation_named_run(manifest, run_dir):
+            raise ValueError(
+                "Ablation-named run cannot use legacy implicit-none identity"
+            )
+        return ContextAblationIdentity(
+            get_context_ablation("none").metadata(),
+            _LEGACY_ABLATION_IDENTITY,
+        )
+
+    manifest_metadata = _validate_context_ablation_metadata(
+        manifest["context_ablation"]
+    )
+    if checkpoint is not None:
+        checkpoint_metadata = _validate_context_ablation_metadata(
+            checkpoint["context_ablation"]
+        )
+        if manifest_metadata != checkpoint_metadata:
+            raise ValueError("Run/checkpoint identity mismatch: context_ablation")
+    return ContextAblationIdentity(
+        manifest_metadata,
+        _EXPLICIT_ABLATION_IDENTITY,
+    )
+
+
+def _evaluation_context_ablation_fields(
+    identity: ContextAblationIdentity,
+) -> dict[str, object]:
+    return {
+        "context_ablation": identity.metadata,
+        "context_ablation_identity_source": identity.source,
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -153,13 +228,10 @@ def _validate_global_identity(
     if not consumes_context and setting is not None:
         raise ValueError("Context-free identity has a global context setting")
 
-    ablation_metadata = identity.get("context_ablation")
-    if not isinstance(ablation_metadata, dict):
-        raise ValueError("Context-ablation identity is missing")
-    ablation_key = str(ablation_metadata.get("key"))
-    specification = get_context_ablation(ablation_key)
-    if ablation_metadata != specification.metadata():
-        raise ValueError("Context-ablation specification identity is invalid")
+    ablation_metadata = _validate_context_ablation_metadata(
+        identity.get("context_ablation")
+    )
+    ablation_key = str(ablation_metadata["key"])
     if ablation_key != "none" and not consumes_context:
         raise ValueError("Context-free identity has a context ablation")
     if ablation_key != "none" and setting != "enabled":
@@ -186,7 +258,11 @@ def _validate_run_checkpoint_identity(
     manifest: dict[str, object],
     checkpoint: dict[str, object],
     feature_store: Path,
-) -> None:
+    run_dir: Path | None = None,
+) -> ContextAblationIdentity:
+    context_ablation_identity = _normalize_context_ablation_identity(
+        manifest, checkpoint, run_dir=run_dir
+    )
     for field in _CHECKPOINT_IDENTITY_FIELDS:
         if field not in manifest or field not in checkpoint:
             raise ValueError(f"Missing run/checkpoint identity field: {field}")
@@ -194,15 +270,20 @@ def _validate_run_checkpoint_identity(
             raise ValueError(f"Run/checkpoint identity mismatch: {field}")
     _validate_architecture_identity(manifest)
     _validate_objective_and_optimizer(manifest)
-    _validate_global_identity(manifest, feature_store)
+    normalized_manifest = {
+        **manifest,
+        "context_ablation": context_ablation_identity.metadata,
+    }
+    _validate_global_identity(normalized_manifest, feature_store)
     manifest_store = Path(str(manifest["resolved_feature_store_path"])).expanduser()
     if manifest_store.resolve() != feature_store:
         raise ValueError("Validated feature store does not match the run identity")
+    return context_ablation_identity
 
 
 def _validate_xgboost_identity(
     manifest: dict[str, object], feature_store: Path, run_dir: Path
-) -> dict[str, str]:
+) -> tuple[dict[str, str], ContextAblationIdentity]:
     if manifest.get("status") != "completed":
         raise ValueError("Standalone XGBoost evaluation requires a completed run")
     if (
@@ -232,7 +313,14 @@ def _validate_xgboost_identity(
     manifest_store = Path(str(manifest["resolved_feature_store_path"])).expanduser()
     if manifest_store.resolve() != feature_store:
         raise ValueError("Validated feature store does not match the run identity")
-    _validate_global_identity(manifest, feature_store)
+    context_ablation_identity = _normalize_context_ablation_identity(
+        manifest, run_dir=run_dir
+    )
+    normalized_manifest = {
+        **manifest,
+        "context_ablation": context_ablation_identity.metadata,
+    }
+    _validate_global_identity(normalized_manifest, feature_store)
 
     metadata = manifest.get("xgboost")
     if not isinstance(metadata, dict):
@@ -263,7 +351,10 @@ def _validate_xgboost_identity(
         raise ValueError("Completed XGBoost native CUDA qualification is invalid")
     if "booster_sha256" not in metadata:
         raise ValueError("Completed XGBoost booster SHA256 metadata is missing")
-    return validate_booster_hashes(run_dir, metadata["booster_sha256"])
+    return (
+        validate_booster_hashes(run_dir, metadata["booster_sha256"]),
+        context_ablation_identity,
+    )
 
 
 def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
@@ -301,6 +392,7 @@ def _evaluate_neural(
     dict[str, object],
     list[dict[str, object]],
     dict[str, object],
+    ContextAblationIdentity,
 ]:
     training_compile = manifest.get("compile")
     if not isinstance(training_compile, dict):
@@ -316,7 +408,12 @@ def _evaluate_neural(
         map_location="cpu",
         weights_only=False,
     )
-    _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+    context_ablation_identity = _validate_run_checkpoint_identity(
+        manifest,
+        checkpoint,
+        feature_store,
+        Path(str(manifest["run_dir"])),
+    )
     architecture = _architecture_from_identity(checkpoint)
     tcn_architecture = (
         architecture if isinstance(architecture, TCNArchitecture) else None
@@ -327,7 +424,7 @@ def _evaluate_neural(
     temperature = None if raw_temperature is None else float(raw_temperature)
     model_name = str(checkpoint["model_name"])
     context_ablation = resolve_context_ablation_for_store(
-        feature_store, str(manifest["context_ablation"]["key"])
+        feature_store, str(context_ablation_identity.metadata["key"])
     )
     loader = create_evaluation_loader(
         feature_store,
@@ -372,7 +469,7 @@ def _evaluate_neural(
         "peak_allocated_cuda_memory_bytes": torch.cuda.max_memory_allocated(),
         "peak_reserved_cuda_memory_bytes": torch.cuda.max_memory_reserved(),
     }
-    return summary, daily_rows, metadata
+    return summary, daily_rows, metadata, context_ablation_identity
 
 
 def main() -> None:
@@ -389,9 +486,6 @@ def main() -> None:
         Path(str(manifest["resolved_feature_store_path"])).expanduser().resolve()
     )
     sample_index = validate_feature_store(feature_store)
-    context_ablation = resolve_context_ablation_for_store(
-        feature_store, str(manifest["context_ablation"]["key"])
-    )
     training_rows = select_sample_split(sample_index, "train")
     rows = select_sample_split(sample_index, args.split)
     cache_report = warm_feature_store_cache(feature_store)
@@ -406,8 +500,12 @@ def main() -> None:
 
     model_family = str(manifest.get("model_family"))
     if model_family == "xgboost":
-        booster_sha256 = _validate_xgboost_identity(
-            manifest, feature_store, args.run_dir
+        (
+            booster_sha256,
+            context_ablation_identity,
+        ) = _validate_xgboost_identity(manifest, feature_store, args.run_dir)
+        context_ablation = resolve_context_ablation_for_store(
+            feature_store, str(context_ablation_identity.metadata["key"])
         )
         xgboost_runtime = validate_xgboost_runtime()
         started = time.perf_counter()
@@ -430,9 +528,12 @@ def main() -> None:
         }
         _atomic_write_parquet(evaluation_dir / "predictions.parquet", predictions)
     elif model_family in {"transformer", "tcn", "mlp"}:
-        summary, daily_rows, family_metadata = _evaluate_neural(
-            manifest, feature_store, rows
-        )
+        (
+            summary,
+            daily_rows,
+            family_metadata,
+            context_ablation_identity,
+        ) = _evaluate_neural(manifest, feature_store, rows)
     else:
         raise ValueError(f"Unknown model family in run manifest: {model_family}")
 
@@ -452,7 +553,7 @@ def main() -> None:
         "parameter_count": manifest["parameter_count"],
         "optimizer_variant": manifest["optimizer_variant"],
         "global_context": manifest["global_context"],
-        "context_ablation": manifest["context_ablation"],
+        **_evaluation_context_ablation_fields(context_ablation_identity),
         "feature_manifest_contract_version": manifest[
             "feature_manifest_contract_version"
         ],
