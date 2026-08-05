@@ -10,7 +10,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from brazil_rv.modeling import train
+from brazil_rv.modeling import process_lock, stage1_context_ablation, train
 from brazil_rv.modeling.analyze_context_ablation import (
     analyze_sweep,
     paired_moving_block_bootstrap,
@@ -494,28 +494,234 @@ def test_production_run_discovery_excludes_lock_directory(
     assert _production_run_directories() == {run_directory.resolve()}
 
 
-def test_process_lock_rejects_overlap_and_releases(tmp_path: Path) -> None:
-    lock_path = tmp_path / "production.lock"
-    with exclusive_process_lock(lock_path, "outer"):
-        owner = active_lock_owner(lock_path)
-        assert owner is not None
-        assert owner["purpose"] == "outer"
-        with pytest.raises(RuntimeError, match="already active"):
-            with exclusive_process_lock(lock_path, "inner"):
-                pass
+def _lock_payload(
+    *,
+    hostname: str = "lambda-a",
+    boot_id: str | None = "boot-a",
+    pid: int = 1234,
+    token: str = "owner-token",
+    purpose: str = "test lock",
+) -> dict[str, object]:
+    return {
+        "schema": process_lock.LOCK_SCHEMA,
+        "version": process_lock.LOCK_VERSION,
+        "pid": pid,
+        "hostname": hostname,
+        "boot_id": boot_id,
+        "purpose": purpose,
+        "token": token,
+        "created_at_utc": "2026-08-05T12:00:00+00:00",
+    }
 
-    assert not lock_path.exists()
 
-
-def test_process_lock_removes_stale_owner(tmp_path: Path) -> None:
-    lock_path = tmp_path / "stale.lock"
-    lock_path.write_text(
-        json.dumps({"pid": 2_147_483_647, "purpose": "stale"}),
-        encoding="utf-8",
+def _set_test_host(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    hostname: str = "lambda-a",
+    boot_id: str | None = "boot-a",
+) -> None:
+    monkeypatch.setattr(
+        process_lock,
+        "_current_host_identity",
+        lambda: process_lock.HostIdentity(hostname, boot_id),
     )
+
+
+def _forbid_pid_check(pid: int) -> bool:
+    raise AssertionError(f"foreign PID {pid} must not be queried locally")
+
+
+def test_same_host_live_pid_remains_active(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_test_host(monkeypatch)
+    monkeypatch.setattr(process_lock, "_pid_is_active", lambda pid: pid == 1234)
+    lock_path = tmp_path / "live.lock"
+    lock_path.write_text(json.dumps(_lock_payload()), encoding="utf-8")
+
+    owner = active_lock_owner(lock_path)
+
+    assert owner is not None
+    assert owner["status"] == "active_local"
+    assert owner["hostname"] == "lambda-a"
+    assert owner["boot_id"] == "boot-a"
+    assert lock_path.exists()
+
+
+def test_same_host_dead_pid_is_reclaimed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_test_host(monkeypatch)
+    monkeypatch.setattr(process_lock, "_pid_is_active", lambda pid: False)
+    lock_path = tmp_path / "dead.lock"
+    lock_path.write_text(json.dumps(_lock_payload()), encoding="utf-8")
 
     assert active_lock_owner(lock_path) is None
     assert not lock_path.exists()
+
+
+def test_foreign_hostname_is_never_reclaimed_from_local_pid_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_test_host(monkeypatch)
+    monkeypatch.setattr(process_lock, "_pid_is_active", _forbid_pid_check)
+    lock_path = tmp_path / "foreign.lock"
+    lock_path.write_text(
+        json.dumps(_lock_payload(hostname="lambda-b")), encoding="utf-8"
+    )
+
+    owner = active_lock_owner(lock_path)
+
+    assert owner is not None
+    assert owner["status"] == "foreign"
+    assert lock_path.exists()
+
+
+def test_same_hostname_different_boot_is_foreign(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_test_host(monkeypatch)
+    monkeypatch.setattr(process_lock, "_pid_is_active", _forbid_pid_check)
+    lock_path = tmp_path / "replaced-instance.lock"
+    lock_path.write_text(json.dumps(_lock_payload(boot_id="boot-b")), encoding="utf-8")
+
+    owner = active_lock_owner(lock_path)
+
+    assert owner is not None
+    assert owner["status"] == "foreign"
+    assert lock_path.exists()
+
+
+def test_legacy_lock_is_ambiguous_and_not_deleted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_test_host(monkeypatch)
+    monkeypatch.setattr(process_lock, "_pid_is_active", _forbid_pid_check)
+    lock_path = tmp_path / "legacy.lock"
+    lock_path.write_text(json.dumps({"pid": 1234}), encoding="utf-8")
+
+    owner = active_lock_owner(lock_path)
+
+    assert owner is not None
+    assert owner["status"] == "legacy_ambiguous"
+    assert lock_path.exists()
+
+
+def test_recent_partial_lock_is_initializing(tmp_path: Path) -> None:
+    lock_path = tmp_path / "partial.lock"
+    lock_path.write_text("{", encoding="utf-8")
+
+    owner = active_lock_owner(lock_path)
+
+    assert owner is not None
+    assert owner["status"] == "initializing"
+    assert lock_path.exists()
+
+
+def test_old_malformed_lock_requires_operator_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lock_path = tmp_path / "malformed.lock"
+    lock_path.write_text("{", encoding="utf-8")
+    monkeypatch.setattr(process_lock, "_lock_age_seconds", lambda path: 120.0)
+
+    owner = active_lock_owner(lock_path)
+
+    assert owner is not None
+    assert owner["status"] == "malformed_requires_operator_cleanup"
+    assert lock_path.exists()
+
+
+def test_ownership_token_mismatch_prevents_release(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_test_host(monkeypatch)
+    lock_path = tmp_path / "token.lock"
+    with exclusive_process_lock(lock_path, "outer"):
+        replacement = json.loads(lock_path.read_text(encoding="utf-8"))
+        replacement["token"] = "replacement-owner"
+        lock_path.write_text(json.dumps(replacement), encoding="utf-8")
+
+    assert lock_path.exists()
+    assert json.loads(lock_path.read_text(encoding="utf-8"))["token"] == (
+        "replacement-owner"
+    )
+    lock_path.unlink()
+
+
+def test_same_host_lock_attempts_are_exclusive_and_diagnostic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_test_host(monkeypatch)
+    monkeypatch.setattr(process_lock, "_pid_is_active", lambda pid: True)
+    lock_path = tmp_path / "production.lock"
+    with exclusive_process_lock(lock_path, "outer"):
+        payload = json.loads(lock_path.read_text(encoding="utf-8"))
+        assert {
+            "schema",
+            "version",
+            "pid",
+            "hostname",
+            "boot_id",
+            "purpose",
+            "token",
+            "created_at_utc",
+        } <= payload.keys()
+        with pytest.raises(RuntimeError) as captured:
+            with exclusive_process_lock(lock_path, "inner"):
+                pass
+        message = str(captured.value)
+        for expected in (
+            str(lock_path),
+            f"pid={payload['pid']}",
+            "hostname='lambda-a'",
+            "boot_id='boot-a'",
+            "purpose='outer'",
+            f"token='{payload['token']}'",
+            f"created_at_utc='{payload['created_at_utc']}'",
+        ):
+            assert expected in message
+
+    assert not lock_path.exists()
+
+
+def test_production_lock_blocks_stage1_sweep(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_test_host(monkeypatch)
+    monkeypatch.setattr(process_lock, "_pid_is_active", lambda pid: True)
+    production_lock = tmp_path / "production.lock"
+    monkeypatch.setattr(
+        stage1_context_ablation, "PRODUCTION_TRAINING_LOCK", production_lock
+    )
+    monkeypatch.setattr(
+        stage1_context_ablation,
+        "_prepare",
+        lambda require_clean: ("a" * 40, True, tmp_path / "store", {}),
+    )
+
+    with exclusive_process_lock(production_lock, "production training"):
+        with pytest.raises(RuntimeError, match="Another production training run"):
+            stage1_context_ablation.run_sweep(tmp_path / "state")
+
+
+def test_sweep_lock_blocks_second_sweep(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_test_host(monkeypatch)
+    monkeypatch.setattr(process_lock, "_pid_is_active", lambda pid: True)
+    monkeypatch.setattr(
+        stage1_context_ablation,
+        "_prepare",
+        lambda require_clean: ("a" * 40, True, tmp_path / "store", {}),
+    )
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    sweep_lock = state_dir / "sweep.lock"
+
+    with exclusive_process_lock(sweep_lock, "first sweep"):
+        with pytest.raises(RuntimeError, match="already active"):
+            stage1_context_ablation.run_sweep(state_dir)
 
 
 def _completed_run(
