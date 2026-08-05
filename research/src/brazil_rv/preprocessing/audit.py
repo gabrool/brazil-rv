@@ -250,24 +250,8 @@ def opening_feature_family_stats(
     below_minimum_dates = 0
     first_cutoff = DECISION_EQUITY_INDICES[0]
 
-    prior_completed_session = np.zeros(
-        (eligible_dates.size, arrays["equity_features.npy"].shape[1]), dtype=bool
-    )
-    if eligible_dates.size:
-        eligible_position = {
-            int(date_idx): position for position, date_idx in enumerate(eligible_dates)
-        }
-        completed = np.zeros(prior_completed_session.shape[1], dtype=bool)
-        for date_idx in range(int(eligible_dates[-1]) + 1):
-            if date_idx in eligible_position:
-                prior_completed_session[eligible_position[date_idx]] = completed
-            completed |= np.asarray(
-                arrays["equity_features.npy"][date_idx, :, :, 5] > 0.5
-            ).any(axis=1)
-
     for start in range(0, eligible_dates.size, DATE_CHUNK):
         indices = eligible_dates[start : start + DATE_CHUNK]
-        prior_completed = prior_completed_session[start : start + DATE_CHUNK]
         dynamic = np.asarray(
             arrays["equity_features.npy"][indices, :, :EQUITY_VISIBLE_MINUTES],
             dtype=np.float32,
@@ -284,11 +268,12 @@ def opening_feature_family_stats(
 
         early_open_valid = active & observed[:, :, :first_cutoff].any(axis=2)
         early_open_equity_days += int(early_open_valid.sum())
-        gap_valid = early_open_valid & prior_completed
+        # Readiness is fixed from completed prior sessions before the current-day
+        # update. Dynamic channel 5 is absent during warmup and cannot reconstruct
+        # those observations, so active early opens are the exact valid gap set.
+        gap_valid = early_open_valid
         stats["overnight_gap_normalized"].update(slow[..., 1][gap_valid])
-        stats["previous_open_to_close_return_normalized"].update(
-            slow[..., 3][active & prior_completed]
-        )
+        stats["previous_open_to_close_return_normalized"].update(slow[..., 3][active])
 
         valid_population = gap_valid.sum(axis=1)
         rank_expected = valid_population >= MIN_ACTIVE_EQUITIES
@@ -297,14 +282,22 @@ def opening_feature_family_stats(
         rank_valid = gap_valid & rank_expected[:, None]
         rank_values = slow[..., 17]
         stats["overnight_gap_cross_section_rank"].update(rank_values[rank_valid])
-        if np.any(rank_values[active & ~rank_valid] != 0.0):
+        if np.any(rank_values[~rank_valid] != 0.0):
             raise ValueError(
                 "overnight_gap_cross_section_rank must be neutral outside valid "
                 "early-open cross-sections"
             )
         for local_date in np.flatnonzero(rank_expected):
             values = rank_values[local_date, rank_valid[local_date]]
-            if abs(float(values.mean(dtype=np.float64))) > 1e-6:
+            expected = centered_midranks(
+                slow[local_date, rank_valid[local_date], 1].astype(np.float64)
+            )
+            if not np.allclose(values, expected, atol=TARGET_MEAN_TOLERANCE, rtol=0.0):
+                raise ValueError(
+                    "overnight_gap_cross_section_rank does not match centered "
+                    "midranks of overnight_gap_normalized"
+                )
+            if abs(float(values.mean(dtype=np.float64))) > TARGET_MEAN_TOLERANCE:
                 raise ValueError(
                     "overnight_gap_cross_section_rank is not centered on a valid "
                     "early-open cross-section"

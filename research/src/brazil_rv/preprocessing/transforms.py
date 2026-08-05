@@ -333,10 +333,14 @@ def _build_dynamic_day(
     output[positions, 5] = 1.0
 
     roll_prefix = np.concatenate(([0], np.cumsum(current_mapping_changed)))
-    open_position = int(positions[0]) if first_observed_open else 0
+    if first_observed_open:
+        open_position = int(positions[0])
+        elapsed = positions - open_position + 1
+    else:
+        open_position = 0
+        elapsed = positions + 1
     if current_observed[open_position]:
         open_price = current_raw[open_position, 0]
-        elapsed = positions + 1
         same_contract = roll_prefix[positions + 1] == roll_prefix[open_position + 1]
         usable_positions = positions[same_contract]
         since_open = _price_change(
