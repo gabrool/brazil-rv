@@ -85,6 +85,7 @@ from brazil_rv.modeling.model import build_neural_model
 from brazil_rv.modeling.sanity import (
     _checkpoint_predictions_compatible,
     _memorization_passes,
+    _sanity_checkpoint_payload,
 )
 from brazil_rv.modeling.data import TabularRowBatch
 from brazil_rv.modeling.xgboost_model import (
@@ -746,6 +747,50 @@ def _global_identity(feature_store: Path, model_name: str) -> dict[str, object]:
 def _read_feature_manifest(feature_store: Path) -> dict[str, object]:
     _feature_manifest(feature_store)
     return json.loads((feature_store / "manifest.json").read_text(encoding="utf-8"))
+
+
+def test_sanity_checkpoint_payload_records_canonical_provenance(
+    tmp_path: Path,
+) -> None:
+    source_hashes = {
+        "ES.v.0": "source-es-sha256",
+        "NQ.v.0": "source-nq-sha256",
+    }
+    normalized_store_hashes = {
+        "ES.v.0": "normalized-es-sha256",
+        "NQ.v.0": "normalized-nq-sha256",
+    }
+    contract_version = "test-sanity-feature-contract"
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "contract_version": contract_version,
+                "global_context": {
+                    "source_hashes": source_hashes,
+                    "normalized_store_hashes": normalized_store_hashes,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    model = _build_model("tcn")
+    optimizer, _ = build_optimizer(model)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+
+    payload = _sanity_checkpoint_payload(
+        model=model,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        feature_store=tmp_path,
+        git_commit_sha="sanity-test-sha",
+    )
+
+    assert payload["resolved_feature_store_path"] == str(tmp_path)
+    assert payload["feature_manifest_contract_version"] == contract_version
+    assert payload["global_context"] == "enabled"
+    assert payload["global_context_source_hashes"] == source_hashes
+    assert payload["global_context_normalized_store_hashes"] == normalized_store_hashes
+    assert payload["git_commit_sha"] == "sanity-test-sha"
 
 
 def _matching_run_identity(

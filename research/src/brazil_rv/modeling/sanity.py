@@ -127,6 +127,37 @@ def _checkpoint_predictions_compatible(
     )
 
 
+def _sanity_checkpoint_payload(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler.LRScheduler,
+    feature_store: Path,
+    git_commit_sha: str,
+) -> dict[str, object]:
+    feature_manifest = json.loads(
+        (feature_store / "manifest.json").read_text(encoding="utf-8")
+    )
+    return checkpoint_payload(
+        model=model,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        model_name=SANITY_MODEL,
+        architecture=SANITY_TCN_ARCHITECTURE,
+        tcn_settings=BASELINE_TCN_SETTINGS,
+        optimizer_variant="adamw",
+        objective=SANITY_OBJECTIVE,
+        temperature=SANITY_TEMPERATURE,
+        sam_rho=None,
+        seed=11,
+        epoch=0,
+        validation_score=0.0,
+        feature_store=feature_store,
+        global_context="enabled",
+        feature_manifest=feature_manifest,
+        git_commit_sha=git_commit_sha,
+    )
+
+
 def _checkpoint_compatibility(
     model: torch.nn.Module,
     evaluation_batch: dict[str, torch.Tensor],
@@ -146,22 +177,12 @@ def _checkpoint_compatibility(
         capture_output=True,
         text=True,
     ).stdout.strip()
-    checkpoint = checkpoint_payload(
-        model,
-        optimizer,
-        scheduler,
-        SANITY_MODEL,
-        SANITY_TCN_ARCHITECTURE,
-        BASELINE_TCN_SETTINGS,
-        "adamw",
-        SANITY_OBJECTIVE,
-        SANITY_TEMPERATURE,
-        None,
-        11,
-        0,
-        0.0,
-        feature_store,
-        git_commit_sha,
+    checkpoint = _sanity_checkpoint_payload(
+        model=model,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        feature_store=feature_store,
+        git_commit_sha=git_commit_sha,
     )
     with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as temporary:
         checkpoint_path = Path(temporary.name)
