@@ -14,6 +14,7 @@ import polars as pl
 import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
+from .context_ablation import NO_CONTEXT_ABLATION, ResolvedContextAblation
 from .contract import (
     ABSOLUTE_PATCH_COUNT,
     CONTEXT_GENERIC_DYNAMIC_COUNT,
@@ -345,16 +346,23 @@ def _build_patch_batch(
     context_cutoffs: np.ndarray,
     active_equities: np.ndarray,
     global_context: str | None,
+    context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
 ) -> dict[str, np.ndarray]:
     batch_size = date_idx.size
     needs_context = global_context is not None
     if needs_context and global_context not in GLOBAL_CONTEXT_SETTINGS:
         raise ValueError(f"Invalid global context setting: {global_context}")
+    if context_ablation.key != "none" and not needs_context:
+        raise ValueError("Context-free batches do not accept a context ablation")
+    if context_ablation.key != "none" and global_context != "enabled":
+        raise ValueError("Context ablations require enabled global context")
     local_ready = (
-        np.asarray(arrays["context_data_ready.npy"][date_idx], dtype=bool)
+        np.asarray(arrays["context_data_ready.npy"][date_idx], dtype=bool).copy()
         if needs_context
         else None
     )
+    if local_ready is not None and context_ablation.local_slots:
+        local_ready[:, context_ablation.local_slots] = False
     global_ready = None
     if needs_context:
         readiness = np.asarray(arrays["global_data_ready.npy"][date_idx], dtype=bool)
@@ -362,9 +370,11 @@ def _build_patch_batch(
             np.arange(batch_size)[:, None],
             np.arange(GLOBAL_CONTEXT_COUNT)[None, :],
             decision_idx[:, None],
-        ]
+        ].copy()
         if global_context == "masked":
             global_ready[:] = False
+        elif context_ablation.global_slots:
+            global_ready[:, context_ablation.global_slots] = False
 
     patches = np.zeros(
         (batch_size, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH),
@@ -378,10 +388,12 @@ def _build_patch_batch(
     slow_features = np.zeros(
         (batch_size, INSTRUMENT_COUNT, SLOW_FEATURE_COUNT), dtype=np.float32
     )
-    slow_features[:, :EQUITY_COUNT] = (
-        np.asarray(arrays["equity_slow.npy"][date_idx], dtype=np.float32)
-        * active_equities[..., None]
-    )
+    equity_slow = np.asarray(
+        arrays["equity_slow.npy"][date_idx], dtype=np.float32
+    ).copy()
+    if context_ablation.equity_slow_indices:
+        equity_slow[..., context_ablation.equity_slow_indices] = 0.0
+    slow_features[:, :EQUITY_COUNT] = equity_slow * active_equities[..., None]
     state_position = np.empty(batch_size, dtype=np.int64)
 
     for equity_cutoff in np.unique(equity_cutoffs):
@@ -472,29 +484,42 @@ def build_tabular_batch(
     context_cutoffs: np.ndarray,
     active_equities: np.ndarray,
     global_context: str,
+    context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
 ) -> dict[str, np.ndarray]:
     """Construct the exact shared MLP/XGBoost representation."""
     batch_size = date_idx.size
     if global_context not in GLOBAL_CONTEXT_SETTINGS:
         raise ValueError(f"Invalid global context setting: {global_context}")
-    local_ready = np.asarray(arrays["context_data_ready.npy"][date_idx], dtype=bool)
+    if context_ablation.key != "none" and global_context != "enabled":
+        raise ValueError("Context ablations require enabled global context")
+    local_ready = np.asarray(
+        arrays["context_data_ready.npy"][date_idx], dtype=bool
+    ).copy()
+    if context_ablation.local_slots:
+        local_ready[:, context_ablation.local_slots] = False
     readiness = np.asarray(arrays["global_data_ready.npy"][date_idx], dtype=bool)
     global_ready = readiness[
         np.arange(batch_size)[:, None],
         np.arange(GLOBAL_CONTEXT_COUNT)[None, :],
         decision_idx[:, None],
-    ]
+    ].copy()
     if global_context == "masked":
         global_ready[:] = False
+    elif context_ablation.global_slots:
+        global_ready[:, context_ablation.global_slots] = False
     global_cutoffs = np.asarray(DECISION_GLOBAL_INDICES)[decision_idx]
     global_grid = np.asarray(arrays["global_features.npy"][date_idx], dtype=np.float32)
     output = np.zeros(
         (batch_size, EQUITY_COUNT, TABULAR_FEATURE_COUNT), dtype=np.float32
     )
     cursor = 0
+    equity_slow = np.asarray(
+        arrays["equity_slow.npy"][date_idx], dtype=np.float32
+    ).copy()
+    if context_ablation.equity_slow_indices:
+        equity_slow[..., context_ablation.equity_slow_indices] = 0.0
     output[:, :, cursor : cursor + SLOW_FEATURE_COUNT] = (
-        np.asarray(arrays["equity_slow.npy"][date_idx], dtype=np.float32)
-        * active_equities[..., None]
+        equity_slow * active_equities[..., None]
     )
     cursor += SLOW_FEATURE_COUNT
 
@@ -618,6 +643,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         model_name: str,
         global_context: str | None,
         tcn_architecture: TCNArchitecture | None = None,
+        context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
     ) -> None:
         if model_name not in NEURAL_MODELS:
             raise ValueError(
@@ -640,10 +666,15 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             raise ValueError("Context-consuming models require global context setting")
         if not needs_context and global_context is not None:
             raise ValueError("Context-free models do not accept global context setting")
+        if not needs_context and context_ablation.key != "none":
+            raise ValueError("Context-free models do not accept context ablations")
+        if context_ablation.key != "none" and global_context != "enabled":
+            raise ValueError("Context ablations require enabled global context")
         self.store = store
         self.model_name = model_name
         self.needs_context = needs_context
         self.global_context = global_context
+        self.context_ablation = context_ablation
         self.rows = {
             column: np.asarray(sample_index.get_column(column).to_list())
             for column in (
@@ -703,6 +734,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 context_cutoffs,
                 active_equities,
                 self.global_context,
+                self.context_ablation,
             )
             inputs["tabular_features"][~common["sample_valid_mask"]] = 0.0
             inputs["equity_mask"][~common["sample_valid_mask"]] = False
@@ -715,6 +747,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 context_cutoffs,
                 active_equities,
                 self.global_context,
+                self.context_ablation,
             )
         return {**inputs, **common}
 
@@ -731,13 +764,18 @@ class TabularRowIterator:
         device: str,
         global_context: str,
         batch_size: int = 64,
+        context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
     ) -> None:
         if horizon_index not in range(HORIZON_COUNT):
             raise ValueError("horizon_index is outside the three-horizon contract")
         if device not in ("cpu", "cuda"):
             raise ValueError("TabularRowIterator device must be 'cpu' or 'cuda'")
         self.dataset = VectorizedFeatureDataset(
-            store, sample_index, "mlp", global_context
+            store,
+            sample_index,
+            "mlp",
+            global_context,
+            context_ablation=context_ablation,
         )
         self.horizon_index = horizon_index
         self.device = device
@@ -885,6 +923,7 @@ def create_training_loaders(
     runtime: RuntimeSettings,
     seed: int,
     tcn_architecture: TCNArchitecture | None = None,
+    context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
@@ -893,7 +932,12 @@ def create_training_loaders(
     sampler = DateStratifiedMicrobatchSampler(train_rows, runtime, seed)
     train_loader = _create_loader(
         VectorizedFeatureDataset(
-            store, train_rows, model_name, global_context, tcn_architecture
+            store,
+            train_rows,
+            model_name,
+            global_context,
+            tcn_architecture,
+            context_ablation,
         ),
         sampler,
         runtime,
@@ -901,7 +945,12 @@ def create_training_loaders(
     )
     validation_loader = _create_loader(
         VectorizedFeatureDataset(
-            store, validation_rows, model_name, global_context, tcn_architecture
+            store,
+            validation_rows,
+            model_name,
+            global_context,
+            tcn_architecture,
+            context_ablation,
         ),
         SequentialPaddedBatchSampler(
             validation_rows.height, runtime.evaluation_batch_size
@@ -920,10 +969,16 @@ def create_evaluation_loader(
     runtime: RuntimeSettings,
     seed: int,
     tcn_architecture: TCNArchitecture | None = None,
+    context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
         VectorizedFeatureDataset(
-            store, rows, model_name, global_context, tcn_architecture
+            store,
+            rows,
+            model_name,
+            global_context,
+            tcn_architecture,
+            context_ablation,
         ),
         SequentialPaddedBatchSampler(rows.height, runtime.evaluation_batch_size),
         runtime,
