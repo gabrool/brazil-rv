@@ -93,6 +93,9 @@ _US_EQUITIES = ("ES.v.0", "NQ.v.0")
 _US_RATES = ("ZT.v.0", "ZN.v.0")
 _COMMODITIES = ("CL.v.0", "HG.v.0")
 _GLOBAL_FX = ("6E.v.0", "6M.v.0")
+_GLOBAL_NON_RATES = tuple(
+    symbol for symbol in GLOBAL_CONTEXT_SYMBOLS if symbol not in _US_RATES
+)
 _FIXED_DI_BETAS = (
     "beta_to_DI1F27",
     "beta_to_DI1F28",
@@ -242,16 +245,71 @@ CONTEXT_ABLATIONS = MappingProxyType(
             _ALL_LOCAL_BETAS,
             "Remove all local and global contexts and every local-source equity beta.",
         ),
+        "drop_global_non_rates": _ablation(
+            "drop_global_non_rates",
+            (),
+            _GLOBAL_NON_RATES,
+            (),
+            "Remove every global context except the ZT and ZN rate futures.",
+        ),
     }
 )
 
 CONTEXT_ABLATION_KEYS = tuple(CONTEXT_ABLATIONS)
-INDIVIDUAL_CONTEXT_ABLATIONS = CONTEXT_ABLATION_KEYS[1:16]
-GROUP_CONTEXT_ABLATIONS = CONTEXT_ABLATION_KEYS[16:]
+INDIVIDUAL_CONTEXT_ABLATIONS = (
+    "drop_win",
+    "drop_wdo",
+    "drop_di1f27",
+    "drop_di1f28",
+    "drop_di1f29",
+    "drop_di1f31",
+    "drop_di1n",
+    "drop_es",
+    "drop_nq",
+    "drop_zt",
+    "drop_zn",
+    "drop_cl",
+    "drop_hg",
+    "drop_6e",
+    "drop_6m",
+)
+GROUP_CONTEXT_ABLATIONS = (
+    "drop_fixed_di",
+    "drop_all_di",
+    "drop_us_equities",
+    "drop_us_rates",
+    "drop_commodities",
+    "drop_global_fx",
+    "drop_all_local",
+    "drop_all_global",
+    "drop_all_context",
+)
 STAGE1_CONTEXT_ABLATION_ORDER = (
     "none",
-    *GROUP_CONTEXT_ABLATIONS,
-    *INDIVIDUAL_CONTEXT_ABLATIONS,
+    "drop_fixed_di",
+    "drop_all_di",
+    "drop_us_equities",
+    "drop_us_rates",
+    "drop_commodities",
+    "drop_global_fx",
+    "drop_all_local",
+    "drop_all_global",
+    "drop_all_context",
+    "drop_win",
+    "drop_wdo",
+    "drop_di1f27",
+    "drop_di1f28",
+    "drop_di1f29",
+    "drop_di1f31",
+    "drop_di1n",
+    "drop_es",
+    "drop_nq",
+    "drop_zt",
+    "drop_zn",
+    "drop_cl",
+    "drop_hg",
+    "drop_6e",
+    "drop_6m",
 )
 
 
@@ -282,6 +340,7 @@ def _validate_registry() -> None:
         "drop_all_local",
         "drop_all_global",
         "drop_all_context",
+        "drop_global_non_rates",
     )
     if CONTEXT_ABLATION_KEYS != expected_keys:
         raise ValueError("Context-ablation registry keys do not match the contract")
@@ -313,6 +372,12 @@ def _validate_registry() -> None:
         or len(set(STAGE1_CONTEXT_ABLATION_ORDER)) != 25
     ):
         raise ValueError("Stage-1 context-ablation order must contain 25 unique keys")
+    if STAGE1_CONTEXT_ABLATION_ORDER != (
+        "none",
+        *GROUP_CONTEXT_ABLATIONS,
+        *INDIVIDUAL_CONTEXT_ABLATIONS,
+    ):
+        raise ValueError("Stage-1 context-ablation order changed")
 
 
 _validate_registry()
