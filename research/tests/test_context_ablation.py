@@ -84,6 +84,7 @@ EXPECTED_KEYS = (
     "drop_all_local",
     "drop_all_global",
     "drop_all_context",
+    "drop_global_non_rates",
 )
 
 
@@ -168,7 +169,7 @@ def _patch_batch(store: Path, rows: pl.DataFrame, key: str, global_: str = "enab
 
 def test_registry_exact_keys_groups_and_stable_metadata() -> None:
     assert CONTEXT_ABLATION_KEYS == EXPECTED_KEYS
-    assert len(CONTEXT_ABLATIONS) == 25
+    assert len(CONTEXT_ABLATIONS) == 26
     assert len(INDIVIDUAL_CONTEXT_ABLATIONS) == 15
     assert len(GROUP_CONTEXT_ABLATIONS) == 9
     assert STAGE1_CONTEXT_ABLATION_ORDER == (
@@ -177,6 +178,7 @@ def test_registry_exact_keys_groups_and_stable_metadata() -> None:
         *INDIVIDUAL_CONTEXT_ABLATIONS,
     )
     assert len(set(STAGE1_CONTEXT_ABLATION_ORDER)) == 25
+    assert "drop_global_non_rates" not in STAGE1_CONTEXT_ABLATION_ORDER
     for specification in CONTEXT_ABLATIONS.values():
         metadata = specification.metadata()
         assert metadata["key"] == specification.key
@@ -222,6 +224,21 @@ def test_group_definitions_are_exact_unions() -> None:
         CONTEXT_ABLATIONS["drop_all_context"].removed_global_symbols
         == GLOBAL_CONTEXT_SYMBOLS
     )
+    non_rates = CONTEXT_ABLATIONS["drop_global_non_rates"]
+    assert non_rates.removed_local_symbols == ()
+    assert non_rates.removed_global_symbols == (
+        "ES.v.0",
+        "NQ.v.0",
+        "CL.v.0",
+        "HG.v.0",
+        "6E.v.0",
+        "6M.v.0",
+    )
+    assert set(GLOBAL_CONTEXT_SYMBOLS) - set(non_rates.removed_global_symbols) == {
+        "ZT.v.0",
+        "ZN.v.0",
+    }
+    assert non_rates.neutralized_equity_slow_features == ()
 
 
 def test_store_resolution_validates_axes_and_feature_names(tmp_path: Path) -> None:
@@ -320,7 +337,13 @@ def test_local_ablation_zeroes_all_paths_dependency_only_and_not_memmaps(
 
 @pytest.mark.parametrize(
     "key",
-    ("drop_us_rates", "drop_fixed_di", "drop_all_local", "drop_all_context"),
+    (
+        "drop_us_rates",
+        "drop_global_non_rates",
+        "drop_fixed_di",
+        "drop_all_local",
+        "drop_all_context",
+    ),
 )
 def test_family_and_all_context_ablation_masks_expected_slots(
     tmp_path: Path, key: str
@@ -475,7 +498,9 @@ def test_run_names_and_matrix_jobs_bind_ablation_identity() -> None:
     assert "_ablation-drop_win_seed29_" in ablated
     jobs = stage1_jobs()
     assert len(jobs) == 25
-    assert {job["context_ablation"] for job in jobs} == set(EXPECTED_KEYS)
+    assert {job["context_ablation"] for job in jobs} == set(
+        STAGE1_CONTEXT_ABLATION_ORDER
+    )
     assert {job["seed"] for job in jobs} == {29}
     assert all("--context-ablation" in job["command"] for job in jobs)
 
