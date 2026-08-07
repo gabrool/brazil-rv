@@ -85,6 +85,13 @@ EXPECTED_KEYS = (
     "drop_all_global",
     "drop_all_context",
     "drop_global_non_rates",
+    "drop_win_and_global_non_rates",
+    "drop_win_and_global_non_rates_except_es",
+    "drop_win_and_global_non_rates_except_nq",
+    "drop_win_and_global_non_rates_except_cl",
+    "drop_win_and_global_non_rates_except_hg",
+    "drop_win_and_global_non_rates_except_6e",
+    "drop_win_and_global_non_rates_except_6m",
 )
 
 
@@ -169,7 +176,7 @@ def _patch_batch(store: Path, rows: pl.DataFrame, key: str, global_: str = "enab
 
 def test_registry_exact_keys_groups_and_stable_metadata() -> None:
     assert CONTEXT_ABLATION_KEYS == EXPECTED_KEYS
-    assert len(CONTEXT_ABLATIONS) == 26
+    assert len(CONTEXT_ABLATIONS) == 33
     assert len(INDIVIDUAL_CONTEXT_ABLATIONS) == 15
     assert len(GROUP_CONTEXT_ABLATIONS) == 9
     assert STAGE1_CONTEXT_ABLATION_ORDER == (
@@ -364,6 +371,69 @@ def test_family_and_all_context_ablation_masks_expected_slots(
         assert not batch["slow_features"][:, :EQUITY_COUNT, index].any()
     assert batch["patches"].shape[1] == INSTRUMENT_COUNT
     assert batch["instrument_mask"][:, :3].all()
+
+
+def test_stage3_composite_masks_only_removed_paths_and_preserves_eligibility(
+    tmp_path: Path,
+) -> None:
+    store, rows = _synthetic_store(tmp_path)
+    baseline = _patch_batch(store, rows, "none")
+    key = "drop_win_and_global_non_rates_except_es"
+    changed = _patch_batch(store, rows, key)
+    resolved = _resolved(key)
+    removed_slots = {
+        *(EQUITY_COUNT + slot for slot in resolved.local_slots),
+        *(EQUITY_COUNT + LOCAL_CONTEXT_COUNT + slot for slot in resolved.global_slots),
+    }
+    kept_slots = set(range(EQUITY_COUNT, INSTRUMENT_COUNT)) - removed_slots
+    for slot in removed_slots:
+        assert not changed["patches"][:, slot].any()
+        assert not changed["slow_features"][:, slot].any()
+        assert not changed["history_patch_mask"][:, slot].any()
+        assert not changed["instrument_mask"][:, slot].any()
+    for slot in kept_slots:
+        np.testing.assert_array_equal(
+            changed["patches"][:, slot], baseline["patches"][:, slot]
+        )
+        np.testing.assert_array_equal(
+            changed["slow_features"][:, slot],
+            baseline["slow_features"][:, slot],
+        )
+        np.testing.assert_array_equal(
+            changed["history_patch_mask"][:, slot],
+            baseline["history_patch_mask"][:, slot],
+        )
+        np.testing.assert_array_equal(
+            changed["instrument_mask"][:, slot],
+            baseline["instrument_mask"][:, slot],
+        )
+    assert not changed["slow_features"][:, :EQUITY_COUNT, 20].any()
+    np.testing.assert_array_equal(
+        changed["slow_features"][:, :EQUITY_COUNT, :20],
+        baseline["slow_features"][:, :EQUITY_COUNT, :20],
+    )
+    np.testing.assert_array_equal(
+        changed["slow_features"][:, :EQUITY_COUNT, 21:],
+        baseline["slow_features"][:, :EQUITY_COUNT, 21:],
+    )
+    for field in (
+        "targets",
+        "label_mask",
+        "raw_returns",
+        "sample_valid_mask",
+        "sample_id",
+        "date_idx",
+        "decision_idx",
+    ):
+        np.testing.assert_array_equal(changed[field], baseline[field])
+    np.testing.assert_array_equal(
+        changed["patches"][:, :EQUITY_COUNT],
+        baseline["patches"][:, :EQUITY_COUNT],
+    )
+    np.testing.assert_array_equal(
+        changed["instrument_mask"][:, :EQUITY_COUNT],
+        baseline["instrument_mask"][:, :EQUITY_COUNT],
+    )
 
 
 def test_drop_all_global_matches_legacy_masked_semantics(tmp_path: Path) -> None:
