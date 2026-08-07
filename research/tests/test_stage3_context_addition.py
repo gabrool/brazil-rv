@@ -48,6 +48,9 @@ from brazil_rv.modeling.stage3_context_addition import (
 )
 
 NEW_COMMIT = "d" * 40
+EXPECTED_PRODUCTION_FEATURE_MANIFEST_SHA256 = (
+    "a02cc58a3fde75707a0cef134fbb1fbe22f6be726ea3e9e1196095e2e08c3035"
+)
 NON_RATE_GLOBALS = (
     "ES.v.0",
     "NQ.v.0",
@@ -198,7 +201,7 @@ def _source_stage2_state(
     )
     source_identity = source_configuration["feature_store"]
     assert isinstance(source_identity, dict)
-    source_identity["manifest_sha256"] = PACKAGED_FEATURE_MANIFEST_SHA256
+    source_identity["manifest_sha256"] = EXPECTED_PRODUCTION_FEATURE_MANIFEST_SHA256
     if recorded_feature_store is not None:
         source_identity["resolved_path"] = recorded_feature_store
     jobs: list[dict[str, object]] = []
@@ -268,7 +271,7 @@ def _fixture(
     configuration = _configuration(NEW_COMMIT, store, source_state)
     identity = configuration["feature_store"]
     assert isinstance(identity, dict)
-    identity["manifest_sha256"] = PACKAGED_FEATURE_MANIFEST_SHA256
+    identity["manifest_sha256"] = EXPECTED_PRODUCTION_FEATURE_MANIFEST_SHA256
     adopted = _validated_stage2_adoptions(source_state, configuration)
     return configuration, store, source_state, adopted
 
@@ -324,6 +327,69 @@ def _rewrite_source_state(
     configuration["source_stage2_state_sha256"] = hashlib.sha256(
         source_state.read_bytes()
     ).hexdigest()
+
+
+def test_packaged_feature_manifest_hash_matches_independent_authority() -> None:
+    assert (
+        PACKAGED_FEATURE_MANIFEST_SHA256 == EXPECTED_PRODUCTION_FEATURE_MANIFEST_SHA256
+    )
+
+
+def test_matching_authoritative_feature_identity_passes_stage3_preflight(
+    tmp_path: Path,
+) -> None:
+    configuration, _, source_state, adopted = _fixture(tmp_path)
+    current_identity = configuration["feature_store"]
+    source = json.loads(source_state.read_text(encoding="utf-8"))
+    source_identity = source["configuration"]["feature_store"]
+    assert isinstance(current_identity, dict)
+    assert current_identity["manifest_sha256"] == (
+        EXPECTED_PRODUCTION_FEATURE_MANIFEST_SHA256
+    )
+    assert source_identity["manifest_sha256"] == (
+        EXPECTED_PRODUCTION_FEATURE_MANIFEST_SHA256
+    )
+    assert set(adopted) == set(STAGE3_SEEDS)
+
+
+def test_feature_manifest_hash_mismatch_fails_before_training(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _feature_store(tmp_path / "feature_store")
+    mismatch = f"{EXPECTED_PRODUCTION_FEATURE_MANIFEST_SHA256[:-1]}4"
+    assert mismatch != EXPECTED_PRODUCTION_FEATURE_MANIFEST_SHA256
+    assert (
+        sum(
+            left != right
+            for left, right in zip(
+                mismatch,
+                EXPECTED_PRODUCTION_FEATURE_MANIFEST_SHA256,
+                strict=True,
+            )
+        )
+        == 1
+    )
+    monkeypatch.setattr(
+        stage3_context_addition,
+        "_git_identity",
+        lambda **kwargs: (NEW_COMMIT, True),
+    )
+    monkeypatch.setattr(stage3_context_addition, "resolve_feature_store", lambda: store)
+    monkeypatch.setattr(
+        stage3_context_addition, "validate_feature_store", lambda path: None
+    )
+    monkeypatch.setattr(
+        stage3_context_addition,
+        "_feature_store_identity",
+        lambda path: {"manifest_sha256": mismatch},
+    )
+    monkeypatch.setattr(
+        stage3_context_addition.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("hash mismatch attempted training"),
+    )
+    with pytest.raises(ValueError, match="not the packaged Stage-2 store"):
+        stage3_context_addition.dry_run_payload(tmp_path / "unused_state.json")
 
 
 def test_stage3_matrix_order_commands_and_counts_are_exact() -> None:
