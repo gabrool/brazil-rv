@@ -252,6 +252,55 @@ CONTEXT_ABLATIONS = MappingProxyType(
             (),
             "Remove every global context except the ZT and ZN rate futures.",
         ),
+        "drop_win_and_global_non_rates": _ablation(
+            "drop_win_and_global_non_rates",
+            ("WIN$",),
+            _GLOBAL_NON_RATES,
+            ("beta_to_WIN",),
+            "Remove WIN$, its equity beta, and every non-rate global context.",
+        ),
+        "drop_win_and_global_non_rates_except_es": _ablation(
+            "drop_win_and_global_non_rates_except_es",
+            ("WIN$",),
+            tuple(symbol for symbol in _GLOBAL_NON_RATES if symbol != "ES.v.0"),
+            ("beta_to_WIN",),
+            "Remove WIN$, its equity beta, and every non-rate global except ES.",
+        ),
+        "drop_win_and_global_non_rates_except_nq": _ablation(
+            "drop_win_and_global_non_rates_except_nq",
+            ("WIN$",),
+            tuple(symbol for symbol in _GLOBAL_NON_RATES if symbol != "NQ.v.0"),
+            ("beta_to_WIN",),
+            "Remove WIN$, its equity beta, and every non-rate global except NQ.",
+        ),
+        "drop_win_and_global_non_rates_except_cl": _ablation(
+            "drop_win_and_global_non_rates_except_cl",
+            ("WIN$",),
+            tuple(symbol for symbol in _GLOBAL_NON_RATES if symbol != "CL.v.0"),
+            ("beta_to_WIN",),
+            "Remove WIN$, its equity beta, and every non-rate global except CL.",
+        ),
+        "drop_win_and_global_non_rates_except_hg": _ablation(
+            "drop_win_and_global_non_rates_except_hg",
+            ("WIN$",),
+            tuple(symbol for symbol in _GLOBAL_NON_RATES if symbol != "HG.v.0"),
+            ("beta_to_WIN",),
+            "Remove WIN$, its equity beta, and every non-rate global except HG.",
+        ),
+        "drop_win_and_global_non_rates_except_6e": _ablation(
+            "drop_win_and_global_non_rates_except_6e",
+            ("WIN$",),
+            tuple(symbol for symbol in _GLOBAL_NON_RATES if symbol != "6E.v.0"),
+            ("beta_to_WIN",),
+            "Remove WIN$, its equity beta, and every non-rate global except 6E.",
+        ),
+        "drop_win_and_global_non_rates_except_6m": _ablation(
+            "drop_win_and_global_non_rates_except_6m",
+            ("WIN$",),
+            tuple(symbol for symbol in _GLOBAL_NON_RATES if symbol != "6M.v.0"),
+            ("beta_to_WIN",),
+            "Remove WIN$, its equity beta, and every non-rate global except 6M.",
+        ),
     }
 )
 
@@ -341,6 +390,13 @@ def _validate_registry() -> None:
         "drop_all_global",
         "drop_all_context",
         "drop_global_non_rates",
+        "drop_win_and_global_non_rates",
+        "drop_win_and_global_non_rates_except_es",
+        "drop_win_and_global_non_rates_except_nq",
+        "drop_win_and_global_non_rates_except_cl",
+        "drop_win_and_global_non_rates_except_hg",
+        "drop_win_and_global_non_rates_except_6e",
+        "drop_win_and_global_non_rates_except_6m",
     )
     if CONTEXT_ABLATION_KEYS != expected_keys:
         raise ValueError("Context-ablation registry keys do not match the contract")
