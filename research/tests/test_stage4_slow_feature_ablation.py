@@ -522,6 +522,10 @@ def test_dry_run_builds_three_adopted_controls_and_three_pending_treatments(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     configuration = {
+        "orchestrator_git_commit_sha": "current",
+        "feature_ablation_metadata_by_key": {
+            "drop_slow_low_prior": _resolved_feature("drop_slow_low_prior").metadata()
+        },
         "source_stage3_state_sha256": "source-sha",
         "source_stage3_producing_commit": "stage3-commit",
     }
@@ -550,6 +554,9 @@ def test_dry_run_builds_three_adopted_controls_and_three_pending_treatments(
         stage4_slow_feature_ablation,
         "_validated_stage3_adoptions",
         lambda path, config: adopted,
+    )
+    monkeypatch.setattr(
+        stage4_slow_feature_ablation, "RUN_OUTPUT_BASE", tmp_path / "no_runs"
     )
     payload = stage4_slow_feature_ablation.dry_run_payload(
         tmp_path / "stage3.json", tmp_path / "audit.json"

@@ -1087,3 +1087,266 @@ def test_stage4_atomic_state_write_replaces_and_cleans_failure(
         stage4_slow_feature_ablation._atomic_write_json(path, {"value": 2})
     assert json.loads(path.read_text(encoding="utf-8")) == {"value": 1}
     assert not path.with_name("state.json.tmp").exists()
+
+
+def _patch_synthetic_stage4_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    configuration: dict[str, object],
+    adopted: dict[int, tuple],
+    run_root: Path,
+) -> None:
+    run_root.mkdir(parents=True, exist_ok=True)
+    store = Path(str(configuration["feature_store"]["resolved_path"]))
+    monkeypatch.setattr(
+        stage4_slow_feature_ablation,
+        "_prepare",
+        lambda **kwargs: (STAGE4_COMMIT, True, store, configuration),
+    )
+    monkeypatch.setattr(
+        stage4_slow_feature_ablation,
+        "_validated_stage3_adoptions",
+        lambda *args: adopted,
+    )
+    monkeypatch.setattr(
+        stage4_slow_feature_ablation, "active_lock_owner", lambda path: None
+    )
+    monkeypatch.setattr(
+        stage4_slow_feature_ablation,
+        "PRODUCTION_TRAINING_LOCK",
+        tmp_path / "production.lock",
+    )
+    monkeypatch.setattr(
+        stage4_slow_feature_ablation, "_assert_invocation_identity", lambda *args: None
+    )
+    monkeypatch.setattr(stage4_slow_feature_ablation, "RUN_OUTPUT_BASE", run_root)
+
+
+@pytest.mark.parametrize("candidate_count", (1, 2))
+def test_pending_treatment_candidates_fail_closed_before_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    candidate_count: int,
+) -> None:
+    source_state, configuration, adopted = _strict_adoption_fixture(tmp_path)
+    state = _new_stage4_state(source_state, configuration, adopted)
+    pending = state["jobs"][3]
+    run_root = tmp_path / "production_runs"
+    for index in range(candidate_count):
+        _add_treatment_run(
+            run_root,
+            configuration,
+            pending,
+            suffix=f"_unbound_{index}",
+        )
+    _patch_synthetic_stage4_runner(
+        tmp_path, monkeypatch, configuration, adopted, run_root
+    )
+    monkeypatch.setattr(
+        stage4_slow_feature_ablation.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("pending treatment subprocess launched"),
+    )
+    state_dir = tmp_path / "pending_runner"
+    with pytest.raises(ValueError, match="artifact contamination for pending"):
+        stage4_slow_feature_ablation.run_sweep(
+            state_dir, source_state, tmp_path / "audit.json"
+        )
+    persisted = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))
+    persisted_pending = persisted["jobs"][3]
+    assert persisted_pending["status"] == "pending"
+    assert persisted_pending["result_origin"] is None
+    assert persisted_pending["run_dir"] is None
+
+
+def test_fresh_dry_run_rejects_preexisting_valid_treatment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_state, configuration, adopted = _strict_adoption_fixture(tmp_path)
+    state = _new_stage4_state(source_state, configuration, adopted)
+    run_root = tmp_path / "production_runs"
+    _add_treatment_run(run_root, configuration, state["jobs"][3])
+    _patch_synthetic_stage4_runner(
+        tmp_path, monkeypatch, configuration, adopted, run_root
+    )
+    with pytest.raises(ValueError, match="artifact contamination for pending"):
+        stage4_slow_feature_ablation.dry_run_payload(
+            source_state, tmp_path / "audit.json"
+        )
+
+
+def test_invalid_or_unrelated_candidates_do_not_block_pending_treatment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_state, configuration, adopted = _strict_adoption_fixture(tmp_path)
+    state = _new_stage4_state(source_state, configuration, adopted)
+    pending = state["jobs"][3]
+    run_root = tmp_path / "production_runs"
+    run_root.mkdir()
+
+    _add_treatment_run(run_root, configuration, state["jobs"][4], "_other_seed")
+    incomplete = run_root / "incomplete_matching"
+    incomplete.mkdir()
+    (incomplete / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "git_commit_sha": STAGE4_COMMIT,
+                "seed": 11,
+                "context_ablation": get_context_ablation(
+                    "drop_win_and_global_non_rates"
+                ).metadata(),
+                "feature_ablation": configuration["feature_ablation_metadata_by_key"][
+                    "drop_slow_low_prior"
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    corrupt = run_root / "corrupt_manifest"
+    corrupt.mkdir()
+    (corrupt / "run_manifest.json").write_text("{", encoding="utf-8")
+    incompatible = _add_treatment_run(
+        run_root, configuration, pending, "_incompatible_configuration"
+    )
+    incompatible_manifest = json.loads(
+        (incompatible / "run_manifest.json").read_text(encoding="utf-8")
+    )
+    incompatible_manifest["sam"]["rho"] = 0.5
+    (incompatible / "run_manifest.json").write_text(
+        json.dumps(incompatible_manifest), encoding="utf-8"
+    )
+
+    monkeypatch.setattr(stage4_slow_feature_ablation, "RUN_OUTPUT_BASE", run_root)
+    assert not stage4_slow_feature_ablation._complete_or_recover_job(
+        pending, configuration
+    )
+    assert pending["status"] == "pending"
+    assert pending["result_origin"] is None
+
+
+def test_running_treatment_uses_real_candidate_discovery_and_recovers_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_state, configuration, adopted = _strict_adoption_fixture(tmp_path)
+    state = _new_stage4_state(source_state, configuration, adopted)
+    running = state["jobs"][3]
+    running["status"] = "running"
+    run_root = tmp_path / "production_runs"
+    first = _add_treatment_run(run_root, configuration, running)
+    monkeypatch.setattr(stage4_slow_feature_ablation, "RUN_OUTPUT_BASE", run_root)
+
+    assert stage4_slow_feature_ablation._complete_or_recover_job(running, configuration)
+    assert running["status"] == "completed"
+    assert running["run_dir"] == str(first.resolve())
+    assert running["recovery_count"] == 1
+    assert running["last_recovery_at_utc"]
+    assert stage4_slow_feature_ablation._complete_or_recover_job(running, configuration)
+    assert running["recovery_count"] == 1
+
+    duplicate_running = _new_stage4_state(source_state, configuration, adopted)["jobs"][
+        3
+    ]
+    duplicate_running["status"] = "running"
+    _add_treatment_run(run_root, configuration, duplicate_running, "_duplicate")
+    with pytest.raises(ValueError, match="Multiple completed runs"):
+        stage4_slow_feature_ablation._complete_or_recover_job(
+            duplicate_running, configuration
+        )
+
+
+def test_failed_treatment_rejects_unbound_completed_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_state, configuration, adopted = _strict_adoption_fixture(tmp_path)
+    state = _new_stage4_state(source_state, configuration, adopted)
+    failed = state["jobs"][3]
+    failed.update({"status": "failed", "error": "synthetic interruption"})
+    state_dir = tmp_path / "failed_runner"
+    state_dir.mkdir()
+    (state_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
+    run_root = tmp_path / "production_runs"
+    _add_treatment_run(run_root, configuration, failed)
+    _patch_synthetic_stage4_runner(
+        tmp_path, monkeypatch, configuration, adopted, run_root
+    )
+    monkeypatch.setattr(
+        stage4_slow_feature_ablation.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("failed treatment subprocess launched"),
+    )
+
+    with pytest.raises(ValueError, match="operator inspection required"):
+        stage4_slow_feature_ablation.run_sweep(
+            state_dir, source_state, tmp_path / "audit.json"
+        )
+    persisted = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))
+    persisted_failed = persisted["jobs"][3]
+    assert persisted_failed["status"] == "failed"
+    assert persisted_failed["result_origin"] is None
+
+
+def test_clean_fresh_six_job_run_launches_exactly_three_treatments(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_state, configuration, adopted = _strict_adoption_fixture(tmp_path)
+    run_root = tmp_path / "production_runs"
+    _patch_synthetic_stage4_runner(
+        tmp_path, monkeypatch, configuration, adopted, run_root
+    )
+    launched: list[int] = []
+
+    def complete_synthetic_training(command, *, cwd, check):
+        assert cwd == stage4_slow_feature_ablation._RESEARCH
+        assert check is False
+        seed = int(command[-1])
+        launched.append(seed)
+        _add_treatment_run(
+            run_root,
+            configuration,
+            {"seed": seed},
+            suffix="_fresh_stage4",
+        )
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(
+        stage4_slow_feature_ablation.subprocess,
+        "run",
+        complete_synthetic_training,
+    )
+    state_path = stage4_slow_feature_ablation.run_sweep(
+        tmp_path / "fresh_runner", source_state, tmp_path / "audit.json"
+    )
+    completed = json.loads(state_path.read_text(encoding="utf-8"))
+    assert launched == [11, 29, 47]
+    controls = [
+        job for job in completed["jobs"] if job["result_origin"] == "adopted_stage3"
+    ]
+    treatments = [
+        job for job in completed["jobs"] if job["result_origin"] == "trained_stage4"
+    ]
+    assert [(job["logical_configuration"], job["seed"]) for job in controls] == [
+        ("full_slow", 11),
+        ("full_slow", 29),
+        ("full_slow", 47),
+    ]
+    assert [(job["logical_configuration"], job["seed"]) for job in treatments] == [
+        ("drop_slow_low_prior", 11),
+        ("drop_slow_low_prior", 29),
+        ("drop_slow_low_prior", 47),
+    ]
+
+
+def test_completed_treatment_never_substitutes_unrecorded_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_state, configuration, adopted = _strict_adoption_fixture(tmp_path)
+    state = _new_stage4_state(source_state, configuration, adopted)
+    _complete_treatments(tmp_path, state, configuration)
+    completed = state["jobs"][3]
+    recorded = Path(str(completed["run_dir"]))
+    (recorded / "run_manifest.json").write_text("{}", encoding="utf-8")
+    run_root = tmp_path / "unrecorded_runs"
+    _add_treatment_run(run_root, configuration, completed, "_substitute")
+    monkeypatch.setattr(stage4_slow_feature_ablation, "RUN_OUTPUT_BASE", run_root)
+    with pytest.raises(ValueError):
+        stage4_slow_feature_ablation._complete_or_recover_job(completed, configuration)

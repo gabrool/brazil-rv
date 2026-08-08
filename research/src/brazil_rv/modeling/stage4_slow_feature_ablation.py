@@ -770,6 +770,31 @@ def _candidate_treatment_runs(
     return tuple(sorted(candidates))
 
 
+def _valid_completed_treatment_candidates(
+    job: dict[str, object], configuration: dict[str, object]
+) -> tuple[tuple[Path, float, dict[str, str], str], ...]:
+    seed = int(job["seed"])
+    candidates = set(_candidate_treatment_runs(configuration, seed))
+    if job.get("run_dir"):
+        recorded = Path(str(job["run_dir"]))
+        if recorded.is_dir():
+            candidates.add(recorded.resolve())
+    completed = []
+    for run_dir in sorted(candidates):
+        try:
+            score, hashes, source = validate_stage4_completed_run(
+                run_dir,
+                configuration,
+                "drop_slow_low_prior",
+                seed,
+                str(configuration["orchestrator_git_commit_sha"]),
+            )
+        except (FileNotFoundError, KeyError, OSError, TypeError, ValueError):
+            continue
+        completed.append((run_dir, score, hashes, source))
+    return tuple(completed)
+
+
 def _completed_job_artifacts(
     job: dict[str, object], configuration: dict[str, object]
 ) -> tuple[Path, float, str, dict[str, str], str]:
@@ -786,29 +811,22 @@ def _completed_job_artifacts(
             allow_legacy_none=True,
         )
     elif job.get("result_origin") == "trained_stage4":
-        candidates = set(_candidate_treatment_runs(configuration, seed))
-        recorded = Path(str(job.get("run_dir")))
-        if recorded.is_dir():
-            candidates.add(recorded.resolve())
-        completed = []
-        for candidate in sorted(candidates):
-            try:
-                score, hashes, source = validate_stage4_completed_run(
-                    candidate,
-                    configuration,
-                    "drop_slow_low_prior",
-                    seed,
-                    str(configuration["orchestrator_git_commit_sha"]),
-                )
-            except (FileNotFoundError, KeyError, OSError, TypeError, ValueError):
-                continue
-            if hashes.get("run_manifest.json") == job.get("run_manifest_sha256"):
-                completed.append((candidate, score, hashes, source))
-        if len(completed) != 1:
+        if (
+            not isinstance(job.get("run_dir"), str)
+            or job.get("producing_git_commit_sha")
+            != configuration["orchestrator_git_commit_sha"]
+        ):
             raise ValueError(
-                f"Completed Stage-4 job requires one immutable run: {logical}/{seed}"
+                f"Completed Stage-4 job lacks immutable provenance: {logical}/{seed}"
             )
-        run_dir, score, hashes, source = completed[0]
+        run_dir = Path(str(job["run_dir"]))
+        score, hashes, source = validate_stage4_completed_run(
+            run_dir,
+            configuration,
+            "drop_slow_low_prior",
+            seed,
+            str(configuration["orchestrator_git_commit_sha"]),
+        )
     else:
         raise ValueError(f"Completed Stage-4 job has no valid origin: {logical}/{seed}")
     manifest_sha = hashes["run_manifest.json"]
@@ -830,62 +848,54 @@ def _completed_job_artifacts(
 def _complete_or_recover_job(
     job: dict[str, object], configuration: dict[str, object]
 ) -> bool:
-    was_running = job.get("status") == "running"
-    if job.get("status") == "completed":
-        run_dir, _, _, _, _ = _completed_job_artifacts(job, configuration)
-        job["run_dir"] = str(run_dir)
+    status = job.get("status")
+    if status == "completed":
+        _completed_job_artifacts(job, configuration)
         return True
     seed = int(job["seed"])
-    candidates = set(_candidate_treatment_runs(configuration, seed))
-    if job.get("run_dir"):
-        recorded = Path(str(job["run_dir"]))
-        if recorded.is_dir():
-            candidates.add(recorded.resolve())
-    completed = []
-    for run_dir in sorted(candidates):
-        try:
-            score, hashes, source = validate_stage4_completed_run(
-                run_dir,
-                configuration,
-                "drop_slow_low_prior",
-                seed,
-                str(configuration["orchestrator_git_commit_sha"]),
+    completed = _valid_completed_treatment_candidates(job, configuration)
+    if status == "pending":
+        if completed:
+            raise ValueError(
+                "Unbound completed treatment artifact contamination for pending "
+                f"Stage-4 seed {seed}: found {len(completed)} valid candidate(s)"
             )
-        except (FileNotFoundError, KeyError, OSError, TypeError, ValueError):
-            continue
-        completed.append((run_dir, score, hashes, source))
+        return False
+    if status == "failed":
+        if completed:
+            raise ValueError(
+                "Unbound completed treatment artifact exists for failed Stage-4 "
+                f"seed {seed}; operator inspection required"
+            )
+        return False
+    if status != "running":
+        raise ValueError(f"Unsupported Stage-4 treatment status: {status}")
     if len(completed) > 1:
         raise ValueError(f"Multiple completed runs match Stage-4 treatment seed {seed}")
-    if completed:
-        run_dir, score, hashes, source = completed[0]
-        if was_running:
-            job["recovery_count"] = int(job.get("recovery_count", 0)) + 1
-            job["last_recovery_at_utc"] = datetime.now(timezone.utc).isoformat()
-        job.update(
-            {
-                "status": "completed",
-                "result_origin": "trained_stage4",
-                "run_dir": str(run_dir),
-                "run_manifest_sha256": hashes["run_manifest.json"],
-                "output_sha256": hashes,
-                "feature_ablation_identity_source": source,
-                "producing_git_commit_sha": configuration[
-                    "orchestrator_git_commit_sha"
-                ],
-                "source_stage3_state": None,
-                "source_stage3_state_sha256": None,
-                "source_stage3_job": None,
-                "completed_at_utc": job.get("completed_at_utc")
-                or datetime.now(timezone.utc).isoformat(),
-                "primary_validation_ic": score,
-                "error": None,
-            }
-        )
-        return True
-    if was_running:
-        job["recovery_count"] = int(job.get("recovery_count", 0)) + 1
-        job["last_recovery_at_utc"] = datetime.now(timezone.utc).isoformat()
-    return False
+    job["recovery_count"] = int(job.get("recovery_count", 0)) + 1
+    job["last_recovery_at_utc"] = datetime.now(timezone.utc).isoformat()
+    if not completed:
+        return False
+    run_dir, score, hashes, source = completed[0]
+    job.update(
+        {
+            "status": "completed",
+            "result_origin": "trained_stage4",
+            "run_dir": str(run_dir),
+            "run_manifest_sha256": hashes["run_manifest.json"],
+            "output_sha256": hashes,
+            "feature_ablation_identity_source": source,
+            "producing_git_commit_sha": configuration["orchestrator_git_commit_sha"],
+            "source_stage3_state": None,
+            "source_stage3_state_sha256": None,
+            "source_stage3_job": None,
+            "completed_at_utc": job.get("completed_at_utc")
+            or datetime.now(timezone.utc).isoformat(),
+            "primary_validation_ic": score,
+            "error": None,
+        }
+    )
+    return True
 
 
 def _prepare(
@@ -947,6 +957,9 @@ def dry_run_payload(
     adopted = _validated_stage3_adoptions(stage3_state_path, configuration)
     state = _new_state(configuration, stage3_state_path, adopted)
     jobs = state["jobs"]
+    for job in jobs:
+        if job["status"] == "pending":
+            _complete_or_recover_job(job, configuration)
     return {
         "sweep_name": SWEEP_NAME,
         "dry_run": True,
