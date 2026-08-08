@@ -25,7 +25,11 @@ from .analyze_stage2_context_ablation import (
     _training_diagnostics,
     _validate_metrics_json,
 )
-from .audit_slow_features import validate_training_slow_audit
+from .audit_slow_features import (
+    AUDIT_NAME,
+    AUDIT_VERSION,
+    validate_training_slow_audit,
+)
 from .context_ablation import get_context_ablation
 from .contract import (
     FEATURE_CONTRACT_VERSION,
@@ -46,6 +50,7 @@ from .stage4_slow_feature_ablation import (
     SWEEP_NAME,
     _completed_job_artifacts,
     _reject_test_derived_metadata,
+    _feature_ablation_metadata,
     _validated_stage3_adoptions,
     stage4_jobs,
     validate_stage4_completed_run,
@@ -113,6 +118,9 @@ def _validate_configuration(configuration: dict[str, object]) -> None:
         if configuration.get(field) != value:
             raise ValueError(f"Stage-4 configuration is incompatible: {field}")
     feature_identity = configuration.get("feature_store")
+    expected_metadata = {
+        key: _feature_ablation_metadata(key) for key in ("none", "drop_slow_low_prior")
+    }
     metadata = configuration.get("feature_ablation_metadata_by_key")
     audit = configuration.get("training_slow_audit")
     if (
@@ -120,13 +128,15 @@ def _validate_configuration(configuration: dict[str, object]) -> None:
         or feature_identity.get("manifest_sha256") != PACKAGED_FEATURE_MANIFEST_SHA256
         or not isinstance(metadata, dict)
         or tuple(metadata) != ("none", "drop_slow_low_prior")
-        or any(not isinstance(metadata[key], dict) for key in metadata)
+        or metadata != expected_metadata
         or not isinstance(configuration.get("orchestrator_git_commit_sha"), str)
         or not isinstance(configuration.get("source_stage3_state"), str)
         or not isinstance(configuration.get("source_stage3_state_sha256"), str)
         or not isinstance(configuration.get("source_stage3_producing_commit"), str)
         or not isinstance(audit, dict)
         or not isinstance(audit.get("sha256"), str)
+        or audit.get("audit_name") != AUDIT_NAME
+        or audit.get("audit_version") != AUDIT_VERSION
     ):
         raise ValueError("Stage-4 configuration is missing strict provenance")
 
@@ -304,6 +314,7 @@ def analyze_sweep(
                 "context_ablation",
                 "context_ablation_metadata",
                 "feature_ablation",
+                "feature_ablation_metadata",
                 "seed",
                 "command",
                 "serialized_job_specification",

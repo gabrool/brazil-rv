@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -19,7 +19,10 @@ from brazil_rv.modeling.analyze_stage4_slow_feature_ablation import (
     _period_delta,
     _three_seed_summary,
 )
-from brazil_rv.modeling.audit_slow_features import compute_slow_statistics
+from brazil_rv.modeling.audit_slow_features import (
+    AUDIT_VERSION,
+    compute_slow_statistics,
+)
 from brazil_rv.modeling.context_ablation import (
     get_context_ablation,
     resolve_context_ablation,
@@ -43,7 +46,11 @@ from brazil_rv.modeling.feature_ablation import (
     resolve_feature_ablation_for_store,
 )
 from brazil_rv.modeling.stage3_context_addition import stage3_jobs
-from brazil_rv.preprocessing.contract import GLOBAL_SLOW_CHANNELS, SLOW_CHANNELS
+from brazil_rv.preprocessing.contract import (
+    GLOBAL_SLOW_CHANNELS,
+    GLOBAL_UNUSED_SLOW_CHANNEL_INDICES,
+    SLOW_CHANNELS,
+)
 
 REMOVED_NAMES = (
     "vol_regime",
@@ -59,6 +66,9 @@ REMOVED_NAMES = (
     "quarter_end_proximity",
 )
 REMOVED_INDICES = (0, 10, 11, 12, 14, 15, 16, 26, 27, 28, 29)
+
+
+REMOVED_GLOBAL_NAMES = tuple(GLOBAL_SLOW_CHANNELS[index] for index in REMOVED_INDICES)
 
 
 def _resolved_feature(key: str):
@@ -89,6 +99,7 @@ def _schema(path: Path) -> None:
                     {"index": index, "name": name}
                     for index, name in enumerate(GLOBAL_SLOW_CHANNELS)
                 ],
+                "global_slow": list(GLOBAL_UNUSED_SLOW_CHANNEL_INDICES),
             }
         ),
         encoding="utf-8",
@@ -164,10 +175,20 @@ def test_registry_and_schema_resolution_are_exact(tmp_path: Path) -> None:
     resolved = _resolved_feature("drop_slow_low_prior")
     assert resolved.specification.removed_slow_features == REMOVED_NAMES
     assert resolved.slow_indices == REMOVED_INDICES
-    assert resolved.metadata()["resolved_slow_features"] == [
-        {"name": name, "index": index}
-        for name, index in zip(REMOVED_NAMES, REMOVED_INDICES, strict=True)
+    metadata = resolved.metadata()
+    assert metadata["shared_position_count"] == 11
+    assert metadata["resolved_position_mapping"] == [
+        {
+            "index": index,
+            "equity_local_name": equity_name,
+            "global_name": global_name,
+            "global_structurally_unused": index in {14, 15},
+        }
+        for index, equity_name, global_name in zip(
+            REMOVED_INDICES, REMOVED_NAMES, REMOVED_GLOBAL_NAMES, strict=True
+        )
     ]
+    assert len(metadata["resolved_identity_sha256"]) == 64
     _schema(tmp_path / "feature_schema.json")
     assert (
         resolve_feature_ablation_for_store(tmp_path, "drop_slow_low_prior") == resolved
@@ -179,6 +200,24 @@ def test_registry_and_schema_resolution_are_exact(tmp_path: Path) -> None:
     )
     (tmp_path / "feature_schema.json").write_text(json.dumps(schema))
     with pytest.raises(ValueError, match="indices are not contiguous"):
+        resolve_feature_ablation_for_store(tmp_path, "drop_slow_low_prior")
+
+
+def test_registry_rejects_changed_global_axis_with_canonical_local_axis(
+    tmp_path: Path,
+) -> None:
+    schema_path = tmp_path / "feature_schema.json"
+    _schema(schema_path)
+    schema = json.loads(schema_path.read_text())
+    (
+        schema["global_slow_channels"][0]["name"],
+        schema["global_slow_channels"][1]["name"],
+    ) = (
+        schema["global_slow_channels"][1]["name"],
+        schema["global_slow_channels"][0]["name"],
+    )
+    schema_path.write_text(json.dumps(schema))
+    with pytest.raises(ValueError, match="global slow-feature axis is not canonical"):
         resolve_feature_ablation_for_store(tmp_path, "drop_slow_low_prior")
 
 
@@ -531,7 +570,6 @@ def test_dry_run_builds_three_adopted_controls_and_three_pending_treatments(
 def _write_validation_run(
     run_dir: Path, score: float, manifest: dict[str, object]
 ) -> None:
-    from datetime import date, timedelta
 
     run_dir.mkdir()
     dates = []
@@ -640,7 +678,7 @@ def test_validation_only_analyzer_requires_six_matched_runs_and_is_deterministic
             "path": str(audit),
             "sha256": hashlib.sha256(audit.read_bytes()).hexdigest(),
             "audit_name": "stage4_training_slow_feature_redundancy",
-            "audit_version": 1,
+            "audit_version": AUDIT_VERSION,
         },
     }
     jobs = []
