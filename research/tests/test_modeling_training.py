@@ -637,6 +637,7 @@ def test_padded_evaluation_matches_unpadded_reference() -> None:
         (real_predictions, np.repeat(real_predictions[-1:], 2, axis=0))
     )
     cpu_batch = {
+        "sample_id": torch.tensor([100, 101, -1, -1]),
         "targets": torch.from_numpy(
             np.concatenate((real_targets, np.zeros((2, 30, 3), np.float32)))
         ),
@@ -651,6 +652,7 @@ def test_padded_evaluation_matches_unpadded_reference() -> None:
         "decision_idx": torch.tensor([0, 1, -1, -1]),
     }
     filtered = _filter_evaluation_rows(torch.from_numpy(padded_predictions), cpu_batch)
+    np.testing.assert_array_equal(filtered["sample_id"], np.asarray([100, 101]))
     np.testing.assert_array_equal(filtered["predictions"], real_predictions)
     np.testing.assert_array_equal(filtered["targets"], real_targets)
     reference, reference_daily = create_metric_table(

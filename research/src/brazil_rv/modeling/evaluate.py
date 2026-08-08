@@ -38,10 +38,11 @@ from .data import (
     warm_feature_store_cache,
 )
 from .engine import (
+    EvaluationObservations,
     build_compile_metadata,
     clone_eager_reference_model,
+    collect_evaluation_observations,
     compile_model,
-    evaluate_model,
     objective_metadata,
     qualify_eager_compiled_model,
     require_compile_parity,
@@ -93,6 +94,16 @@ class ContextAblationIdentity:
 class FeatureAblationIdentity:
     metadata: dict[str, object]
     source: str
+
+
+@dataclass(frozen=True)
+class NeuralEvaluationResult:
+    observations: EvaluationObservations
+    summary: dict[str, object]
+    daily_rows: list[dict[str, object]]
+    metadata: dict[str, object]
+    context_ablation_identity: ContextAblationIdentity
+    feature_ablation_identity: FeatureAblationIdentity
 
 
 def _validate_context_ablation_metadata(value: object) -> dict[str, object]:
@@ -474,17 +485,11 @@ def _daily_frame(rows: list[dict[str, object]], feature_store: Path) -> pl.DataF
     )
 
 
-def _evaluate_neural(
+def collect_neural_evaluation(
     manifest: dict[str, object],
     feature_store: Path,
     rows: pl.DataFrame,
-) -> tuple[
-    dict[str, object],
-    list[dict[str, object]],
-    dict[str, object],
-    ContextAblationIdentity,
-    FeatureAblationIdentity,
-]:
+) -> NeuralEvaluationResult:
     training_compile = manifest.get("compile")
     if not isinstance(training_compile, dict):
         raise ValueError("Run manifest compile metadata is missing")
@@ -561,7 +566,9 @@ def _evaluate_neural(
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.synchronize()
     started = time.perf_counter()
-    summary, daily_rows = evaluate_model(model, loader, objective_name, temperature)
+    observations, summary, daily_rows = collect_evaluation_observations(
+        model, loader, objective_name, temperature
+    )
     torch.cuda.synchronize()
     metadata = {
         "compile": compile_metadata,
@@ -569,12 +576,34 @@ def _evaluate_neural(
         "peak_allocated_cuda_memory_bytes": torch.cuda.max_memory_allocated(),
         "peak_reserved_cuda_memory_bytes": torch.cuda.max_memory_reserved(),
     }
+    return NeuralEvaluationResult(
+        observations=observations,
+        summary=summary,
+        daily_rows=daily_rows,
+        metadata=metadata,
+        context_ablation_identity=context_ablation_identity,
+        feature_ablation_identity=feature_ablation_identity,
+    )
+
+
+def _evaluate_neural(
+    manifest: dict[str, object],
+    feature_store: Path,
+    rows: pl.DataFrame,
+) -> tuple[
+    dict[str, object],
+    list[dict[str, object]],
+    dict[str, object],
+    ContextAblationIdentity,
+    FeatureAblationIdentity,
+]:
+    result = collect_neural_evaluation(manifest, feature_store, rows)
     return (
-        summary,
-        daily_rows,
-        metadata,
-        context_ablation_identity,
-        feature_ablation_identity,
+        result.summary,
+        result.daily_rows,
+        result.metadata,
+        result.context_ablation_identity,
+        result.feature_ablation_identity,
     )
 
 
