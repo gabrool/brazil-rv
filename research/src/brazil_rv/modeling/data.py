@@ -57,6 +57,11 @@ from .contract import (
     VALIDATION_END,
     VALIDATION_START,
 )
+from .feature_ablation import (
+    NO_FEATURE_ABLATION,
+    ResolvedFeatureAblation,
+    apply_feature_ablation_to_slow_features,
+)
 
 FEATURE_ARRAY_FILES = (
     "equity_features.npy",
@@ -347,6 +352,7 @@ def _build_patch_batch(
     active_equities: np.ndarray,
     global_context: str | None,
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
+    feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
 ) -> dict[str, np.ndarray]:
     batch_size = date_idx.size
     needs_context = global_context is not None
@@ -467,6 +473,9 @@ def _build_patch_batch(
             decision_idx[:, None],
         ]
         slow_features[:, global_start:] = decision_slow * global_ready[..., None]
+    slow_features = apply_feature_ablation_to_slow_features(
+        slow_features, feature_ablation
+    )
     return {
         "patches": patches,
         "history_patch_mask": history_patch_mask,
@@ -485,6 +494,7 @@ def build_tabular_batch(
     active_equities: np.ndarray,
     global_context: str,
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
+    feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
 ) -> dict[str, np.ndarray]:
     """Construct the exact shared MLP/XGBoost representation."""
     batch_size = date_idx.size
@@ -518,6 +528,7 @@ def build_tabular_batch(
     ).copy()
     if context_ablation.equity_slow_indices:
         equity_slow[..., context_ablation.equity_slow_indices] = 0.0
+    equity_slow = apply_feature_ablation_to_slow_features(equity_slow, feature_ablation)
     output[:, :, cursor : cursor + SLOW_FEATURE_COUNT] = (
         equity_slow * active_equities[..., None]
     )
@@ -591,9 +602,10 @@ def build_tabular_batch(
     ).reshape(batch_size, -1)
     output[:, :, cursor : cursor + global_dynamic.shape[-1]] = global_dynamic[:, None]
     cursor += global_dynamic.shape[-1]
-    context_slow = (
+    context_slow = apply_feature_ablation_to_slow_features(
         np.asarray(arrays["context_slow.npy"][date_idx], dtype=np.float32)
-        * local_ready[..., None]
+        * local_ready[..., None],
+        feature_ablation,
     ).reshape(batch_size, LOCAL_CONTEXT_COUNT * SLOW_FEATURE_COUNT)
     output[:, :, cursor : cursor + context_slow.shape[-1]] = context_slow[:, None]
     cursor += context_slow.shape[-1]
@@ -603,7 +615,9 @@ def build_tabular_batch(
         np.arange(GLOBAL_CONTEXT_COUNT)[None, :],
         decision_idx[:, None],
     ]
-    decision_slow = (decision_slow * global_ready[..., None]).reshape(batch_size, -1)
+    decision_slow = apply_feature_ablation_to_slow_features(
+        decision_slow * global_ready[..., None], feature_ablation
+    ).reshape(batch_size, -1)
     output[:, :, cursor : cursor + decision_slow.shape[-1]] = decision_slow[:, None]
     cursor += decision_slow.shape[-1]
 
@@ -644,6 +658,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         global_context: str | None,
         tcn_architecture: TCNArchitecture | None = None,
         context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
+        feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
     ) -> None:
         if model_name not in NEURAL_MODELS:
             raise ValueError(
@@ -675,6 +690,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         self.needs_context = needs_context
         self.global_context = global_context
         self.context_ablation = context_ablation
+        self.feature_ablation = feature_ablation
         self.rows = {
             column: np.asarray(sample_index.get_column(column).to_list())
             for column in (
@@ -735,6 +751,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 active_equities,
                 self.global_context,
                 self.context_ablation,
+                self.feature_ablation,
             )
             inputs["tabular_features"][~common["sample_valid_mask"]] = 0.0
             inputs["equity_mask"][~common["sample_valid_mask"]] = False
@@ -748,6 +765,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 active_equities,
                 self.global_context,
                 self.context_ablation,
+                self.feature_ablation,
             )
         return {**inputs, **common}
 
@@ -765,6 +783,7 @@ class TabularRowIterator:
         global_context: str,
         batch_size: int = 64,
         context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
+        feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
     ) -> None:
         if horizon_index not in range(HORIZON_COUNT):
             raise ValueError("horizon_index is outside the three-horizon contract")
@@ -776,6 +795,7 @@ class TabularRowIterator:
             "mlp",
             global_context,
             context_ablation=context_ablation,
+            feature_ablation=feature_ablation,
         )
         self.horizon_index = horizon_index
         self.device = device
@@ -924,6 +944,7 @@ def create_training_loaders(
     seed: int,
     tcn_architecture: TCNArchitecture | None = None,
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
+    feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
@@ -938,6 +959,7 @@ def create_training_loaders(
             global_context,
             tcn_architecture,
             context_ablation,
+            feature_ablation,
         ),
         sampler,
         runtime,
@@ -951,6 +973,7 @@ def create_training_loaders(
             global_context,
             tcn_architecture,
             context_ablation,
+            feature_ablation,
         ),
         SequentialPaddedBatchSampler(
             validation_rows.height, runtime.evaluation_batch_size
@@ -970,6 +993,7 @@ def create_evaluation_loader(
     seed: int,
     tcn_architecture: TCNArchitecture | None = None,
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
+    feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
         VectorizedFeatureDataset(
@@ -979,6 +1003,7 @@ def create_evaluation_loader(
             global_context,
             tcn_architecture,
             context_ablation,
+            feature_ablation,
         ),
         SequentialPaddedBatchSampler(rows.height, runtime.evaluation_batch_size),
         runtime,

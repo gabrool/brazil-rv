@@ -16,6 +16,7 @@ import torch._functorch.config as functorch_config
 from torch import nn
 
 from .context_ablation import NO_CONTEXT_ABLATION, ResolvedContextAblation
+from .feature_ablation import ResolvedFeatureAblation
 from .contract import (
     COMPILE_PARITY_GRADIENT_COSINE_MIN,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
@@ -1349,11 +1350,12 @@ def checkpoint_payload(
     feature_manifest: dict[str, object],
     git_commit_sha: str,
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
+    feature_ablation: ResolvedFeatureAblation | None = None,
 ) -> dict[str, object]:
     if getattr(model, "model_name", None) != model_name:
         raise ValueError("Checkpoint model name does not match the model")
 
-    return {
+    payload = {
         "model_name": model_name,
         "optimizer_variant": optimizer_variant,
         "objective": objective_metadata(objective, temperature),
@@ -1379,3 +1381,6 @@ def checkpoint_payload(
         ],
         "git_commit_sha": git_commit_sha,
     }
+    if feature_ablation is not None:
+        payload["feature_ablation"] = feature_ablation.metadata()
+    return payload

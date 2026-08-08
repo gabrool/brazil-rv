@@ -49,7 +49,13 @@ from .engine import (
     validate_runtime,
     warmup_compiled_evaluation,
 )
+from .feature_ablation import (
+    get_feature_ablation,
+    resolve_feature_ablation,
+    resolve_feature_ablation_for_store,
+)
 from .model import build_neural_model
+from brazil_rv.preprocessing.contract import SLOW_CHANNELS
 from .xgboost_model import (
     evaluate_saved_xgboost,
     validate_booster_hashes,
@@ -79,6 +85,12 @@ _LEGACY_ABLATION_IDENTITY = "legacy_implicit_none"
 
 @dataclass(frozen=True)
 class ContextAblationIdentity:
+    metadata: dict[str, object]
+    source: str
+
+
+@dataclass(frozen=True)
+class FeatureAblationIdentity:
     metadata: dict[str, object]
     source: str
 
@@ -147,6 +159,71 @@ def _evaluation_context_ablation_fields(
     return {
         "context_ablation": identity.metadata,
         "context_ablation_identity_source": identity.source,
+    }
+
+
+def _validate_feature_ablation_metadata(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValueError("feature_ablation metadata must be an explicit object")
+    key = value.get("key")
+    if not isinstance(key, str):
+        raise ValueError("feature_ablation metadata has no valid key")
+    expected = resolve_feature_ablation(
+        get_feature_ablation(key), slow_features=SLOW_CHANNELS
+    ).metadata()
+    if value != expected:
+        raise ValueError("feature_ablation specification identity is invalid")
+    return expected
+
+
+def _normalize_feature_ablation_identity(
+    manifest: dict[str, object],
+    checkpoint: dict[str, object] | None = None,
+    *,
+    run_dir: Path | None = None,
+) -> FeatureAblationIdentity:
+    manifest_has_metadata = "feature_ablation" in manifest
+    if checkpoint is not None:
+        checkpoint_has_metadata = "feature_ablation" in checkpoint
+        if manifest_has_metadata != checkpoint_has_metadata:
+            raise ValueError(
+                "Run/checkpoint identity mismatch: feature_ablation presence"
+            )
+    if not manifest_has_metadata:
+        candidate = run_dir
+        if candidate is None and isinstance(manifest.get("run_dir"), str):
+            candidate = Path(str(manifest["run_dir"]))
+        if candidate is not None and "_feature-" in candidate.name:
+            raise ValueError(
+                "Feature-ablation-named run cannot use legacy implicit-none identity"
+            )
+        return FeatureAblationIdentity(
+            resolve_feature_ablation(
+                get_feature_ablation("none"), slow_features=SLOW_CHANNELS
+            ).metadata(),
+            _LEGACY_ABLATION_IDENTITY,
+        )
+    manifest_metadata = _validate_feature_ablation_metadata(
+        manifest["feature_ablation"]
+    )
+    if checkpoint is not None:
+        checkpoint_metadata = _validate_feature_ablation_metadata(
+            checkpoint["feature_ablation"]
+        )
+        if manifest_metadata != checkpoint_metadata:
+            raise ValueError("Run/checkpoint identity mismatch: feature_ablation")
+    return FeatureAblationIdentity(
+        manifest_metadata,
+        _EXPLICIT_ABLATION_IDENTITY,
+    )
+
+
+def _evaluation_feature_ablation_fields(
+    identity: FeatureAblationIdentity,
+) -> dict[str, object]:
+    return {
+        "feature_ablation": identity.metadata,
+        "feature_ablation_identity_source": identity.source,
     }
 
 
@@ -236,6 +313,11 @@ def _validate_global_identity(
         raise ValueError("Context-free identity has a context ablation")
     if ablation_key != "none" and setting != "enabled":
         raise ValueError("Context ablations require enabled global context")
+    feature_ablation = _validate_feature_ablation_metadata(
+        identity.get("feature_ablation")
+    )
+    if model_name == "xgboost" and feature_ablation["key"] != "none":
+        raise ValueError("XGBoost identity has a feature ablation")
 
     feature_manifest = json.loads(
         (feature_store / "manifest.json").read_text(encoding="utf-8")
@@ -263,6 +345,9 @@ def _validate_run_checkpoint_identity(
     context_ablation_identity = _normalize_context_ablation_identity(
         manifest, checkpoint, run_dir=run_dir
     )
+    feature_ablation_identity = _normalize_feature_ablation_identity(
+        manifest, checkpoint, run_dir=run_dir
+    )
     for field in _CHECKPOINT_IDENTITY_FIELDS:
         if field not in manifest or field not in checkpoint:
             raise ValueError(f"Missing run/checkpoint identity field: {field}")
@@ -273,6 +358,7 @@ def _validate_run_checkpoint_identity(
     normalized_manifest = {
         **manifest,
         "context_ablation": context_ablation_identity.metadata,
+        "feature_ablation": feature_ablation_identity.metadata,
     }
     _validate_global_identity(normalized_manifest, feature_store)
     manifest_store = Path(str(manifest["resolved_feature_store_path"])).expanduser()
@@ -316,9 +402,13 @@ def _validate_xgboost_identity(
     context_ablation_identity = _normalize_context_ablation_identity(
         manifest, run_dir=run_dir
     )
+    feature_ablation_identity = _normalize_feature_ablation_identity(
+        manifest, run_dir=run_dir
+    )
     normalized_manifest = {
         **manifest,
         "context_ablation": context_ablation_identity.metadata,
+        "feature_ablation": feature_ablation_identity.metadata,
     }
     _validate_global_identity(normalized_manifest, feature_store)
 
@@ -393,6 +483,7 @@ def _evaluate_neural(
     list[dict[str, object]],
     dict[str, object],
     ContextAblationIdentity,
+    FeatureAblationIdentity,
 ]:
     training_compile = manifest.get("compile")
     if not isinstance(training_compile, dict):
@@ -414,6 +505,11 @@ def _evaluate_neural(
         feature_store,
         Path(str(manifest["run_dir"])),
     )
+    feature_ablation_identity = _normalize_feature_ablation_identity(
+        manifest,
+        checkpoint,
+        run_dir=Path(str(manifest["run_dir"])),
+    )
     architecture = _architecture_from_identity(checkpoint)
     tcn_architecture = (
         architecture if isinstance(architecture, TCNArchitecture) else None
@@ -426,6 +522,9 @@ def _evaluate_neural(
     context_ablation = resolve_context_ablation_for_store(
         feature_store, str(context_ablation_identity.metadata["key"])
     )
+    feature_ablation = resolve_feature_ablation_for_store(
+        feature_store, str(feature_ablation_identity.metadata["key"])
+    )
     loader = create_evaluation_loader(
         feature_store,
         rows,
@@ -435,6 +534,7 @@ def _evaluate_neural(
         int(manifest["seed"]),
         tcn_architecture,
         context_ablation,
+        feature_ablation,
     )
     model = build_neural_model(model_name, tcn_architecture)
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -469,7 +569,13 @@ def _evaluate_neural(
         "peak_allocated_cuda_memory_bytes": torch.cuda.max_memory_allocated(),
         "peak_reserved_cuda_memory_bytes": torch.cuda.max_memory_reserved(),
     }
-    return summary, daily_rows, metadata, context_ablation_identity
+    return (
+        summary,
+        daily_rows,
+        metadata,
+        context_ablation_identity,
+        feature_ablation_identity,
+    )
 
 
 def main() -> None:
@@ -504,6 +610,9 @@ def main() -> None:
             booster_sha256,
             context_ablation_identity,
         ) = _validate_xgboost_identity(manifest, feature_store, args.run_dir)
+        feature_ablation_identity = _normalize_feature_ablation_identity(
+            manifest, run_dir=args.run_dir
+        )
         context_ablation = resolve_context_ablation_for_store(
             feature_store, str(context_ablation_identity.metadata["key"])
         )
@@ -533,6 +642,7 @@ def main() -> None:
             daily_rows,
             family_metadata,
             context_ablation_identity,
+            feature_ablation_identity,
         ) = _evaluate_neural(manifest, feature_store, rows)
     else:
         raise ValueError(f"Unknown model family in run manifest: {model_family}")
@@ -554,6 +664,7 @@ def main() -> None:
         "optimizer_variant": manifest["optimizer_variant"],
         "global_context": manifest["global_context"],
         **_evaluation_context_ablation_fields(context_ablation_identity),
+        **_evaluation_feature_ablation_fields(feature_ablation_identity),
         "feature_manifest_contract_version": manifest[
             "feature_manifest_contract_version"
         ],
