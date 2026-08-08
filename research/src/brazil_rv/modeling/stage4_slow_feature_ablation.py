@@ -14,6 +14,8 @@ from types import MappingProxyType
 
 import torch
 
+from brazil_rv.preprocessing.contract import SLOW_CHANNELS
+
 from .analyze_stage3_context_addition import (
     _validate_configuration as _validate_stage3_configuration,
 )
@@ -28,7 +30,11 @@ from .contract import (
     SplitBoundaries,
 )
 from .data import resolve_feature_store, validate_feature_store
-from .feature_ablation import get_feature_ablation, resolve_feature_ablation_for_store
+from .feature_ablation import (
+    get_feature_ablation,
+    resolve_feature_ablation,
+    resolve_feature_ablation_for_store,
+)
 from .process_lock import (
     PRODUCTION_TRAINING_LOCK,
     active_lock_owner,
@@ -152,6 +158,12 @@ def build_stage4_command(logical_configuration: str, seed: int) -> tuple[str, ..
     )
 
 
+def _feature_ablation_metadata(key: str) -> dict[str, object]:
+    return resolve_feature_ablation(
+        get_feature_ablation(key), slow_features=SLOW_CHANNELS
+    ).metadata()
+
+
 def _job_specification(logical_configuration: str, seed: int) -> dict[str, object]:
     feature_key = STAGE4_FEATURE_ABLATION_BY_LOGICAL_CONFIGURATION[
         logical_configuration
@@ -160,7 +172,7 @@ def _job_specification(logical_configuration: str, seed: int) -> dict[str, objec
         "logical_configuration": logical_configuration,
         "seed": seed,
         "context_ablation": get_context_ablation(FROZEN_CONTEXT_ABLATION).metadata(),
-        "feature_ablation_key": feature_key,
+        "feature_ablation": _feature_ablation_metadata(feature_key),
         "command": list(build_stage4_command(logical_configuration, seed)),
     }
 
@@ -182,6 +194,7 @@ def stage4_jobs() -> tuple[dict[str, object], ...]:
                         FROZEN_CONTEXT_ABLATION
                     ).metadata(),
                     "feature_ablation": feature_key,
+                    "feature_ablation_metadata": specification["feature_ablation"],
                     "seed": seed,
                     "command": list(build_stage4_command(logical, seed)),
                     "serialized_job_specification": serialized,
@@ -255,6 +268,22 @@ def _validate_feature_identity(
     return "explicit_registry_metadata"
 
 
+def _completed_run_validation_configuration(
+    configuration: dict[str, object], producing_commit: str
+) -> dict[str, object]:
+    if producing_commit != configuration.get("source_stage3_producing_commit"):
+        return configuration
+    source_path = configuration.get("source_stage3_feature_store_resolved_path")
+    feature_identity = configuration.get("feature_store")
+    if not isinstance(source_path, str) or not isinstance(feature_identity, dict):
+        raise ValueError("Stage-3 portable feature-store provenance is incomplete")
+    validation_configuration = dict(configuration)
+    source_identity = dict(feature_identity)
+    source_identity["resolved_path"] = source_path
+    validation_configuration["feature_store"] = source_identity
+    return validation_configuration
+
+
 def validate_stage4_completed_run(
     run_dir: Path,
     configuration: dict[str, object],
@@ -264,9 +293,12 @@ def validate_stage4_completed_run(
     *,
     allow_legacy_none: bool = False,
 ) -> tuple[float, dict[str, str], str]:
+    validation_configuration = _completed_run_validation_configuration(
+        configuration, producing_commit
+    )
     score = validate_stage3_completed_run(
         run_dir,
-        configuration,
+        validation_configuration,
         FROZEN_CONTEXT_ABLATION,
         seed,
         producing_commit,
@@ -505,7 +537,7 @@ def _new_state(
                     "result_origin": "adopted_stage3",
                     "run_dir": str(run_dir),
                     "run_manifest_sha256": manifest_sha,
-                    "output_sha256": hashes,
+                    "output_sha256": dict(hashes),
                     "feature_ablation_identity_source": identity_source,
                     "producing_git_commit_sha": configuration[
                         "source_stage3_producing_commit"
@@ -597,9 +629,17 @@ def _validate_adopted_job(
         or provenance.get("context_ablation") != FROZEN_CONTEXT_ABLATION
         or provenance.get("feature_ablation") != "none"
         or provenance.get("seed") != seed
+        or provenance.get("position")
+        != STAGE3_LOGICAL_CONFIGURATION_ORDER.index("core") * len(STAGE3_SEEDS)
+        + STAGE3_SEEDS.index(seed)
+        or provenance.get("result_origin") != source_job.get("result_origin")
+        or provenance.get("producing_git_commit_sha")
+        != source_job.get("producing_git_commit_sha")
         or provenance.get("run_dir") != source_job.get("run_dir")
         or provenance.get("run_manifest_sha256")
         != source_job.get("run_manifest_sha256")
+        or job.get("producing_git_commit_sha")
+        != configuration["source_stage3_producing_commit"]
         or job.get("run_manifest_sha256") != manifest_sha
         or job.get("output_sha256") != output_hashes
         or job.get("feature_ablation_identity_source") != identity_source
@@ -663,6 +703,7 @@ def _load_state(
             "context_ablation",
             "context_ablation_metadata",
             "feature_ablation",
+            "feature_ablation_metadata",
             "seed",
             "command",
             "serialized_job_specification",
@@ -789,6 +830,7 @@ def _completed_job_artifacts(
 def _complete_or_recover_job(
     job: dict[str, object], configuration: dict[str, object]
 ) -> bool:
+    was_running = job.get("status") == "running"
     if job.get("status") == "completed":
         run_dir, _, _, _, _ = _completed_job_artifacts(job, configuration)
         job["run_dir"] = str(run_dir)
@@ -816,6 +858,9 @@ def _complete_or_recover_job(
         raise ValueError(f"Multiple completed runs match Stage-4 treatment seed {seed}")
     if completed:
         run_dir, score, hashes, source = completed[0]
+        if was_running:
+            job["recovery_count"] = int(job.get("recovery_count", 0)) + 1
+            job["last_recovery_at_utc"] = datetime.now(timezone.utc).isoformat()
         job.update(
             {
                 "status": "completed",
@@ -837,7 +882,7 @@ def _complete_or_recover_job(
             }
         )
         return True
-    if job.get("status") == "running":
+    if was_running:
         job["recovery_count"] = int(job.get("recovery_count", 0)) + 1
         job["last_recovery_at_utc"] = datetime.now(timezone.utc).isoformat()
     return False
