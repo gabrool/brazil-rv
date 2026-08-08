@@ -7,7 +7,7 @@ import platform as system_platform
 import statistics
 import time
 from collections.abc import Iterable, Sized
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
@@ -49,6 +49,17 @@ from .contract import (
     expected_trainable_parameter_count,
 )
 from .metrics import create_metric_table
+
+
+@dataclass(frozen=True)
+class EvaluationObservations:
+    sample_id: np.ndarray
+    date_idx: np.ndarray
+    decision_idx: np.ndarray
+    predictions: np.ndarray
+    targets: np.ndarray
+    raw_returns: np.ndarray
+    label_mask: np.ndarray
 
 
 def validate_runtime() -> HardwareInfo:
@@ -1265,6 +1276,7 @@ def _filter_evaluation_rows(
         **{
             key: cpu_batch[key].numpy()[valid]
             for key in (
+                "sample_id",
                 "targets",
                 "raw_returns",
                 "label_mask",
@@ -1275,12 +1287,16 @@ def _filter_evaluation_rows(
     }
 
 
-def evaluate_model(
+def collect_evaluation_observations(
     model: nn.Module,
     loader: Iterable[dict[str, torch.Tensor]],
     objective: str,
     temperature: float | None,
-) -> tuple[dict[str, object], list[dict[str, object]]]:
+) -> tuple[
+    EvaluationObservations,
+    dict[str, object],
+    list[dict[str, object]],
+]:
     objective_metadata(objective, temperature)
     model.eval()
     total_loss = 0.0
@@ -1288,6 +1304,7 @@ def evaluate_model(
     collected: dict[str, list[np.ndarray]] = {
         key: []
         for key in (
+            "sample_id",
             "predictions",
             "targets",
             "raw_returns",
@@ -1328,6 +1345,21 @@ def evaluate_model(
         raise ValueError("Evaluation split contains no valid objective unit")
     summary["objective"] = objective_metadata(objective, temperature)
     summary["objective_loss"] = total_loss / total_loss_count
+    observations = EvaluationObservations(
+        **{key: arrays[key] for key in EvaluationObservations.__dataclass_fields__}
+    )
+    return observations, summary, daily_rows
+
+
+def evaluate_model(
+    model: nn.Module,
+    loader: Iterable[dict[str, torch.Tensor]],
+    objective: str,
+    temperature: float | None,
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    _, summary, daily_rows = collect_evaluation_observations(
+        model, loader, objective, temperature
+    )
     return summary, daily_rows
 
 
