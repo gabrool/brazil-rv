@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -8,8 +9,12 @@ import polars as pl
 import pytest
 
 from brazil_rv.preprocessing.contract import (
+    DECISION_EQUITY_INDICES,
+    DECISION_GLOBAL_INDICES,
+    DYNAMIC_CHANNELS,
     GLOBAL_CONTEXT_SYMBOLS,
     LOCAL_CONTEXT_SYMBOLS,
+    SLOW_CHANNELS,
 )
 
 from brazil_rv.modeling.analyze_stock_time_attribution import (
@@ -17,14 +22,19 @@ from brazil_rv.modeling.analyze_stock_time_attribution import (
     AnalysisInputs,
     Stage3AnalysisJob,
     STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION,
+    STAGE3_LOGICAL_CONFIGURATION_ORDER,
     _atomic_write_json,
     _atomic_write_npy,
     _adopt_or_infer_caches,
+    _build_context_time_deltas,
     _build_core_outputs,
     _build_liquidity_outputs,
     _build_opening_regimes,
     _daily_grid,
+    _job_cache_identity,
+    _load_analysis_metadata,
     _paired_delta_row,
+    _point_in_time_bucket_contribution_vector,
     _record_artifact,
     _reject_test_derived_path,
     _remove_recognized_partial_cache,
@@ -36,19 +46,27 @@ from brazil_rv.modeling.analyze_stock_time_attribution import (
     causal_observation_completeness,
     deterministic_liquidity_buckets,
     economic_stock_attribution,
+    economic_window_accounting,
     learn_overnight_thresholds,
     metric_reproduction_gate,
     moving_block_bootstrap,
+    moving_block_bootstrap_matrix,
     moving_block_bootstrap_indices,
     named_time_scopes,
     overnight_regimes,
     parse_args,
+    run_analysis,
     per_stock_time_series_skill,
     primary_time_bins,
+    standardized_rank_scores,
     STAGE3_SEEDS,
 )
 from brazil_rv.modeling.metrics import average_ranks, create_metric_table
-from brazil_rv.modeling.process_lock import exclusive_process_lock
+from brazil_rv.modeling.process_lock import (
+    PRODUCTION_TRAINING_LOCK,
+    ProcessLockLease,
+    exclusive_process_lock,
+)
 
 
 def _random_arrays(
@@ -98,8 +116,8 @@ def test_additive_spearman_skips_small_and_zero_variance_cross_sections() -> Non
     result = additive_spearman_contributions(predictions, targets, mask)
     assert np.isnan(result.sample_ic[0]).all()
     assert np.isnan(result.sample_ic[1, 0])
-    assert np.count_nonzero(result.contributions[0]) == 0
-    assert np.count_nonzero(result.contributions[1, :, 0]) == 0
+    assert np.isnan(result.contributions[0]).all()
+    assert np.isnan(result.contributions[1, :, 0]).all()
 
 
 def test_daily_horizon_primary_weighting_uses_dates_not_raw_samples() -> None:
@@ -439,10 +457,7 @@ def test_inference_failure_is_recorded_without_mutating_inputs(
         "pending_artifact": None,
     }
     state_path = tmp_path / "analysis_state.json"
-    monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution.active_lock_owner",
-        lambda path: None,
-    )
+
     monkeypatch.setattr(
         "brazil_rv.modeling.analyze_stock_time_attribution.validate_runtime",
         lambda: None,
@@ -578,6 +593,382 @@ def test_final_test_isolation_has_no_split_argument_and_rejects_test_paths() -> 
         )
 
 
+def test_mixed_valid_cells_are_nan_and_never_dilute_additive_aggregates() -> None:
+    predictions, targets, mask = _random_arrays(sample_count=3)
+    predictions[1, :, 0] = 1.0
+    mask[1, :, 1:] = False
+    result = additive_spearman_contributions(predictions, targets, mask)
+    assert np.isnan(result.contributions[1]).all()
+    aggregate = aggregate_additive_contributions(
+        result.contributions,
+        result.sample_ic,
+        np.asarray([0, 0, 1], dtype=np.int64),
+    )
+    expected = np.nanmean(np.stack([result.sample_ic[0], result.sample_ic[2]]), axis=0)
+    np.testing.assert_allclose(aggregate["horizon_ic"], expected, atol=5e-12)
+    np.testing.assert_allclose(
+        np.asarray(aggregate["horizon_contributions"]).sum(axis=0),
+        aggregate["horizon_ic"],
+        atol=5e-12,
+    )
+
+
+def test_population_rank_scores_hold_under_varying_universe_sizes() -> None:
+    for size in (3, 7, 30):
+        scores = standardized_rank_scores(np.arange(size, dtype=np.float64))
+        assert scores.mean() == pytest.approx(0.0, abs=1e-15)
+        assert np.std(scores, ddof=0) == pytest.approx(1.0, abs=1e-15)
+
+    predictions, targets, mask = _random_arrays(
+        sample_count=5, equity_count=40, horizon_count=1
+    )
+    mask[0, :10, 0] = False
+    result = per_stock_time_series_skill(
+        predictions,
+        targets,
+        mask,
+        np.arange(5, dtype=np.int64),
+        minimum_days=1,
+        minimum_coverage=0.5,
+        bootstrap_replications=8,
+    )
+    first = result["daily_prediction_scores"][0, 10:, 0]
+    second = result["daily_prediction_scores"][1, :, 0]
+    assert np.std(first, ddof=0) == pytest.approx(1.0)
+    assert np.std(second, ddof=0) == pytest.approx(1.0)
+    assert np.isnan(result["daily_prediction_scores"][0, :10, 0]).all()
+
+
+def test_economic_window_accounting_uses_flat_boundaries_and_daily_sums() -> None:
+    decision_count = 55
+    equity_count = 30
+    predictions = np.tile(
+        np.arange(equity_count, dtype=np.float32),
+        (decision_count, 1),
+    )[:, :, None]
+    returns = np.zeros_like(predictions)
+    returns[:, :3, 0] = -0.01
+    returns[:, -3:, 0] = 0.01
+    mask = np.ones_like(predictions, dtype=bool)
+    dates = np.zeros(decision_count, dtype=np.int64)
+    decisions = np.arange(decision_count, dtype=np.int64)
+
+    constant = economic_stock_attribution(predictions, returns, mask, dates, decisions)
+    accounting = economic_window_accounting(constant, dates, decisions)
+    assert accounting.daily_gross_contribution.sum() == pytest.approx(55 * 0.02)
+    assert accounting.daily_entry_turnover.sum() == pytest.approx(1.0)
+    assert accounting.daily_intraday_turnover.sum() == pytest.approx(0.0)
+    assert accounting.daily_exit_turnover.sum() == pytest.approx(1.0)
+    total = float(accounting.daily_total_turnover.sum())
+    gross = float(accounting.daily_gross_contribution.sum())
+    assert 10_000.0 * gross / total == pytest.approx(5_500.0)
+
+    alternating_predictions = predictions.copy()
+    alternating_predictions[1::2] *= -1.0
+    alternating_returns = np.zeros_like(returns)
+    for decision in range(decision_count):
+        order = np.argsort(alternating_predictions[decision, :, 0])
+        alternating_returns[decision, order[:3], 0] = -0.01
+        alternating_returns[decision, order[-3:], 0] = 0.01
+    alternating = economic_stock_attribution(
+        alternating_predictions,
+        alternating_returns,
+        mask,
+        dates,
+        decisions,
+    )
+    alternating_accounting = economic_window_accounting(alternating, dates, decisions)
+    assert alternating_accounting.daily_intraday_turnover.sum() == pytest.approx(
+        2.0 * (decision_count - 1)
+    )
+
+    sparse_mask = np.zeros_like(mask)
+    sparse_mask[[0, 53]] = True
+    sparse = economic_stock_attribution(
+        alternating_predictions,
+        alternating_returns,
+        sparse_mask,
+        dates,
+        decisions,
+    )
+    sparse_accounting = economic_window_accounting(sparse, dates, decisions)
+    assert sparse_accounting.daily_entry_turnover.sum() == pytest.approx(1.0)
+    assert sparse_accounting.daily_intraday_turnover.sum() == pytest.approx(2.0)
+    assert sparse_accounting.daily_exit_turnover.sum() == pytest.approx(1.0)
+
+    zero = economic_stock_attribution(
+        alternating_predictions,
+        np.zeros_like(returns),
+        mask,
+        dates,
+        decisions,
+    )
+    zero_accounting = economic_window_accounting(zero, dates, decisions)
+    zero_gross = float(zero_accounting.daily_gross_contribution.sum())
+    zero_turnover = float(zero_accounting.daily_total_turnover.sum())
+    assert zero_gross == 0.0
+    assert 10_000.0 * zero_gross / zero_turnover == 0.0
+
+
+def test_point_in_time_liquidity_vector_tracks_bucket_moves() -> None:
+    grid = np.full((2, 55, 3, 1), np.nan, dtype=np.float64)
+    grid[0, 0, :, 0] = [0.1, -0.05, -0.05]
+    grid[1, 0, :, 0] = [0.2, -0.1, -0.1]
+    buckets = np.asarray([[0, 0, 1], [1, 0, 1]], dtype=np.int8)
+    bucket_zero = _point_in_time_bucket_contribution_vector(grid, buckets, 0, (0,), 0)
+    bucket_one = _point_in_time_bucket_contribution_vector(grid, buckets, 1, (0,), 0)
+    assert bucket_zero[0] == pytest.approx(0.05)
+    assert bucket_one[0] == pytest.approx(0.10)
+    np.testing.assert_allclose(
+        bucket_zero + bucket_one,
+        np.asarray([0.15, -0.075, -0.075]),
+        atol=5e-12,
+    )
+
+
+def test_bootstrap_uses_only_finite_replicates_and_reports_unavailable() -> None:
+    values = np.full((12, 2), np.nan, dtype=np.float64)
+    values[0, 0] = 1.0
+    result = moving_block_bootstrap_matrix(
+        values, replications=100, block_length=3, seed=19
+    )
+    assert 0 < result["finite_replication_count"][0] < 100
+    assert result["finite_replication_count"][1] == 0
+    assert np.isnan(result["lower_95"][1])
+    assert np.isnan(result["probability_positive"][1])
+    assert result["probability_positive"][0] == 1.0
+
+
+def test_metadata_loader_reads_only_training_and_validation_dates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    feature_store = tmp_path / "feature-store"
+    feature_store.mkdir()
+    equity_count = 158
+    date_count = 32
+    equity_index = pl.DataFrame(
+        {
+            "equity_slot": np.arange(equity_count),
+            "security_id": [f"security-{index}" for index in range(equity_count)],
+            "isin": [f"BR{index:010d}" for index in range(equity_count)],
+            "latest_ticker": [f"T{index}" for index in range(equity_count)],
+            "xp_symbol": [f"Stock {index}" for index in range(equity_count)],
+        }
+    )
+    equity_index.write_parquet(feature_store / "equity_index.parquet")
+    trade_dates = [
+        *[date(2024, 5, 30) + timedelta(days=offset) for offset in range(30)],
+        date(2024, 7, 8),
+        date(2025, 7, 7),
+    ]
+    pl.DataFrame(
+        {"date_idx": np.arange(date_count), "trade_date": trade_dates}
+    ).write_parquet(feature_store / "date_index.parquet")
+    sample_index = pl.DataFrame(
+        {
+            "sample_id": np.arange(date_count),
+            "date_idx": np.arange(date_count),
+            "decision_idx": np.zeros(date_count, dtype=np.int64),
+            "trade_date": trade_dates,
+        }
+    )
+    validation_rows = sample_index.filter(pl.col("date_idx") == 30)
+    observed_channel = DYNAMIC_CHANNELS.index("observed")
+    equity_minutes = DECISION_EQUITY_INDICES[0]
+    global_minutes = DECISION_GLOBAL_INDICES[0]
+    arrays: dict[str, np.ndarray] = {
+        "equity_membership.npy": np.ones((date_count, equity_count), dtype=bool),
+        "equity_data_ready.npy": np.ones((date_count, equity_count), dtype=bool),
+        "equity_slow.npy": np.zeros(
+            (date_count, equity_count, len(SLOW_CHANNELS)), dtype=np.float32
+        ),
+        "equity_features.npy": np.ones(
+            (date_count, equity_count, equity_minutes, len(DYNAMIC_CHANNELS)),
+            dtype=np.float32,
+        ),
+        "context_features.npy": np.ones(
+            (
+                date_count,
+                len(LOCAL_CONTEXT_SYMBOLS),
+                75,
+                len(DYNAMIC_CHANNELS),
+            ),
+            dtype=np.float32,
+        ),
+        "context_data_ready.npy": np.ones(
+            (date_count, len(LOCAL_CONTEXT_SYMBOLS)), dtype=bool
+        ),
+        "global_features.npy": np.ones(
+            (
+                date_count,
+                len(GLOBAL_CONTEXT_SYMBOLS),
+                global_minutes,
+                len(DYNAMIC_CHANNELS),
+            ),
+            dtype=np.float32,
+        ),
+        "global_data_ready.npy": np.ones(
+            (date_count, len(GLOBAL_CONTEXT_SYMBOLS), 55), dtype=bool
+        ),
+    }
+    liquidity_channel = SLOW_CHANNELS.index("median_daily_dollar_volume_20d_log_scale")
+    arrays["equity_slow.npy"][:, :, liquidity_channel] = np.log1p(10_000_000.0)
+    arrays["equity_slow.npy"][31] = 999_999.0
+    arrays["equity_features.npy"][31] = 999_999.0
+    accessed_dates: list[int] = []
+
+    class GuardedArray:
+        def __init__(self, values: np.ndarray) -> None:
+            self.values = values
+            self.shape = values.shape
+
+        def __getitem__(self, key: object) -> np.ndarray:
+            if not isinstance(key, tuple) or not isinstance(key[0], np.ndarray):
+                raise AssertionError("Feature array was not date-indexed first")
+            selected = np.asarray(key[0], dtype=np.int64)
+            if np.any(selected == 31):
+                raise AssertionError("Final-test feature value was read")
+            accessed_dates.extend(selected.tolist())
+            return self.values[key]
+
+        def __array__(self, *args: object, **kwargs: object) -> np.ndarray:
+            del args, kwargs
+            raise AssertionError("Full feature array was materialized")
+
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution.np.load",
+        lambda path, **kwargs: GuardedArray(arrays[Path(path).name]),
+    )
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution._feature_axes",
+        lambda inputs: {
+            "liquidity_channel_name": "median_daily_dollar_volume_20d_log_scale",
+            "liquidity_channel_index": liquidity_channel,
+            "observed_channel_index": observed_channel,
+            "dollar_volume_log_affine": {"center": 0.0, "scale": 1.0},
+        },
+    )
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution._universe_liquidity_threshold",
+        lambda inputs: None,
+    )
+    inputs = AnalysisInputs(
+        state_path=tmp_path / "state.json",
+        state_sha256="state",
+        state={},
+        configuration={},
+        feature_store=feature_store,
+        feature_identity={"manifest_sha256": "feature"},
+        feature_manifest={},
+        sample_index=sample_index,
+        validation_rows=validation_rows,
+        jobs=(),
+        analyzer_git_commit_sha="commit",
+        analyzer_worktree_clean=True,
+        analyzer_source_sha256="source",
+    )
+    metadata = _load_analysis_metadata(
+        inputs,
+        {
+            "date_idx": np.asarray([30], dtype=np.int64),
+            "decision_idx": np.asarray([0], dtype=np.int64),
+        },
+    )
+    assert set(accessed_dates) == set(range(31))
+    assert metadata["active"].shape == (1, equity_count)
+    assert metadata["trade_dates"].shape == (1,)
+
+
+def test_dirty_execution_cache_identity_and_lock_ownership_fail_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    job = Stage3AnalysisJob(
+        position=0,
+        logical_configuration="core",
+        context_ablation=STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION["core"],
+        seed=11,
+        run_dir=run_dir,
+        run_manifest_path=run_dir / "run_manifest.json",
+        run_manifest_sha256="run",
+        checkpoint_path=run_dir / "best.pt",
+        checkpoint_sha256="checkpoint",
+        producing_git_commit_sha="producer",
+        manifest={},
+    )
+    inputs = AnalysisInputs(
+        state_path=tmp_path / "state.json",
+        state_sha256="state",
+        state={},
+        configuration={},
+        feature_store=tmp_path / "feature-store",
+        feature_identity={"manifest_sha256": "feature"},
+        feature_manifest={},
+        sample_index=pl.DataFrame(),
+        validation_rows=pl.DataFrame({"sample_id": [1]}),
+        jobs=(job,),
+        analyzer_git_commit_sha="commit",
+        analyzer_worktree_clean=False,
+        analyzer_source_sha256="source",
+        inference_code_sha256={"module.py": "hash"},
+    )
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution.validate_analysis_inputs",
+        lambda *args: inputs,
+    )
+    payload = __import__(
+        "brazil_rv.modeling.analyze_stock_time_attribution",
+        fromlist=["dry_run_payload"],
+    ).dry_run_payload(tmp_path / "state.json", tmp_path / "dry", "core")
+    assert payload["analyzer_worktree_clean"] is False
+    assert payload["artifacts_created"] is False
+    with pytest.raises(RuntimeError, match="clean worktree"):
+        run_analysis(tmp_path / "state.json", tmp_path / "run-output", "core")
+    assert not (tmp_path / "run-output").exists()
+
+    clean_inputs = AnalysisInputs(
+        **{
+            **inputs.__dict__,
+            "analyzer_worktree_clean": True,
+        }
+    )
+    identity = _job_cache_identity(clean_inputs, job)
+    assert "scope" not in identity
+    assert identity["inference_code_sha256"] == {"module.py": "hash"}
+
+    cache = tmp_path / "legacy-cache"
+    cache.mkdir()
+    manifest_path = cache / "manifest.json"
+    dirty_identity = {
+        **identity,
+        "analyzer_worktree_clean": False,
+    }
+    _atomic_write_json(
+        manifest_path,
+        {"status": "completed", "identity": dirty_identity},
+    )
+    with pytest.raises(ValueError, match="provenance"):
+        _validate_cache_manifest(manifest_path, dirty_identity)
+
+    with exclusive_process_lock(
+        PRODUCTION_TRAINING_LOCK, "synthetic inference holder"
+    ) as lease:
+        lease.assert_owned()
+        with pytest.raises(RuntimeError, match="already active"):
+            with exclusive_process_lock(
+                PRODUCTION_TRAINING_LOCK, "synthetic training competitor"
+            ):
+                raise AssertionError("competing owner acquired production lock")
+    lost = ProcessLockLease(
+        path=tmp_path / "missing.lock", token="missing", purpose="synthetic"
+    )
+    with pytest.raises(RuntimeError, match="ownership was lost"):
+        lost.assert_owned()
+
+
 def test_core_output_integration_reconstructs_and_emits_canonical_rows(
     tmp_path: Path,
 ) -> None:
@@ -628,6 +1019,7 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
         "adaptive_liquidity": np.zeros((date_count, equity_count), dtype=np.int8),
         "adaptive_liquidity_bucket_count": np.ones(date_count, dtype=np.int8),
         "equity_completeness": {
+            "observed_bars": np.ones((sample_count, equity_count), dtype=np.int64),
             "observed_fraction": np.tile(
                 np.linspace(0.7, 1.0, equity_count), (sample_count, 1)
             ),
@@ -686,6 +1078,16 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
         metadata,
     )
     opening = _build_opening_regimes(core_by_seed, shared, metadata)
+    for logical in STAGE3_LOGICAL_CONFIGURATION_ORDER:
+        for seed in STAGE3_SEEDS:
+            cache_paths[(logical, seed)] = cache_paths[("core", seed)]
+    context = _build_context_time_deltas(
+        cache_paths,
+        core_by_seed,
+        shared,
+        metadata,
+        bootstrap_replications=8,
+    )
 
     stock = outputs["stock_attribution"]
     assert stock.height == equity_count
@@ -739,7 +1141,31 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
         "overnight_regime",
         "retained_local_context",
         "retained_global_context",
+        "core_b3_bars_before_decision",
+        "core_retained_local_completeness",
+        "core_retained_global_completeness",
+        "core_retained_global_freshness",
+        "core_retained_context_preopen",
     }.issubset(set(opening["diagnostic_type"].unique()))
+    assert set(
+        opening.filter(pl.col("diagnostic_type").str.starts_with("core_"))[
+            "horizon_minutes"
+        ].drop_nulls()
+    ) == {0, 30, 60, 120}
+    assert set(
+        context.filter(pl.col("scope_type") == "decision_5m")["horizon_minutes"]
+    ) == {0, 30, 60, 120}
+    assert {
+        "b3_bars_before_decision",
+        "retained_local_completeness",
+        "retained_global_completeness",
+        "retained_global_freshness",
+        "retained_context_preopen",
+        "overnight_regime",
+        "added_context_freshness",
+    }.issubset(set(context["condition_type"].drop_nulls()))
+    finite_delta = context["mean_paired_ic_delta"].drop_nulls().to_numpy()
+    np.testing.assert_allclose(finite_delta, 0.0, atol=5e-12)
     time_values = time_5m.filter(pl.col("aggregation") == "across_seed")
     np.testing.assert_allclose(
         time_values["mean_gross_top_return"].to_numpy()

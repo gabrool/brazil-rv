@@ -6,7 +6,7 @@ import json
 import math
 import os
 import subprocess
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -43,8 +43,9 @@ from .contract import (
     VALIDATION_START,
 )
 from .data import (
+    _validate_sample_index,
+    load_sample_index,
     select_sample_split,
-    validate_feature_store,
 )
 from .engine import EvaluationObservations, validate_runtime
 from .evaluate import (
@@ -52,10 +53,10 @@ from .evaluate import (
     _validate_run_checkpoint_identity,
     collect_neural_evaluation,
 )
-from .metrics import average_ranks, create_metric_table
+from .metrics import average_ranks
 from .process_lock import (
     PRODUCTION_TRAINING_LOCK,
-    active_lock_owner,
+    ProcessLockLease,
     exclusive_process_lock,
 )
 from .stage2_context_ablation import (
@@ -78,8 +79,8 @@ from .stage3_context_addition import (
 )
 
 ANALYSIS_NAME = "stock_time_attribution"
-ANALYSIS_VERSION = 1
-CACHE_VERSION = 1
+ANALYSIS_VERSION = 2
+CACHE_VERSION = 2
 METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE = 1e-12
 RECONSTRUCTION_ABSOLUTE_TOLERANCE = 5e-12
 ECONOMIC_RECONSTRUCTION_ABSOLUTE_TOLERANCE = 5e-9
@@ -131,6 +132,20 @@ ADDED_CONTEXT_BY_LOGICAL_CONFIGURATION = {
     "core_plus_6e": "6E.v.0",
     "core_plus_6m": "6M.v.0",
 }
+INFERENCE_CODE_PATHS = (
+    "research/src/brazil_rv/preprocessing/contract.py",
+    "research/src/brazil_rv/preprocessing/transforms.py",
+    "research/src/brazil_rv/modeling/contract.py",
+    "research/src/brazil_rv/modeling/context_ablation.py",
+    "research/src/brazil_rv/modeling/feature_ablation.py",
+    "research/src/brazil_rv/modeling/data.py",
+    "research/src/brazil_rv/modeling/layers.py",
+    "research/src/brazil_rv/modeling/model.py",
+    "research/src/brazil_rv/modeling/engine.py",
+    "research/src/brazil_rv/modeling/metrics.py",
+    "research/src/brazil_rv/modeling/evaluate.py",
+    "research/src/brazil_rv/modeling/analyze_stock_time_attribution.py",
+)
 
 
 @dataclass(frozen=True)
@@ -149,6 +164,23 @@ class EconomicAttributionResult:
     top_selected: np.ndarray
     bottom_selected: np.ndarray
     signed_selected_return: np.ndarray
+
+
+@dataclass(frozen=True)
+class EconomicWindowAccounting:
+    dates: np.ndarray
+    daily_gross_contribution: np.ndarray
+    daily_entry_turnover: np.ndarray
+    daily_intraday_turnover: np.ndarray
+    daily_exit_turnover: np.ndarray
+
+    @property
+    def daily_total_turnover(self) -> np.ndarray:
+        return (
+            self.daily_entry_turnover
+            + self.daily_intraday_turnover
+            + self.daily_exit_turnover
+        )
 
 
 @dataclass(frozen=True)
@@ -181,6 +213,7 @@ class AnalysisInputs:
     analyzer_git_commit_sha: str
     analyzer_worktree_clean: bool
     analyzer_source_sha256: str
+    inference_code_sha256: dict[str, str] = field(default_factory=dict)
 
 
 def _sha256(path: Path) -> str:
@@ -363,12 +396,34 @@ def moving_block_bootstrap_matrix(
             out=replicated[start:stop],
             where=denominators > 0,
         )
+    finite_counts = finite.sum(axis=0)
+    estimate = np.divide(
+        filled.sum(axis=0),
+        finite_counts,
+        out=np.full(values.shape[1], np.nan, dtype=np.float64),
+        where=finite_counts > 0,
+    )
+    lower = np.full(values.shape[1], np.nan, dtype=np.float64)
+    upper = np.full_like(lower, np.nan)
+    probability_positive = np.full_like(lower, np.nan)
+    probability_negative = np.full_like(lower, np.nan)
+    finite_replication_count = np.isfinite(replicated).sum(axis=0).astype(np.int64)
+    for statistic in range(values.shape[1]):
+        finite_replicates = replicated[np.isfinite(replicated[:, statistic]), statistic]
+        if not finite_replicates.size:
+            continue
+        lower[statistic], upper[statistic] = np.quantile(
+            finite_replicates, (0.025, 0.975)
+        )
+        probability_positive[statistic] = np.mean(finite_replicates > 0.0)
+        probability_negative[statistic] = np.mean(finite_replicates < 0.0)
     return {
-        "estimate": np.nanmean(values, axis=0),
-        "lower_95": np.nanquantile(replicated, 0.025, axis=0),
-        "upper_95": np.nanquantile(replicated, 0.975, axis=0),
-        "probability_positive": np.nanmean(replicated > 0.0, axis=0),
-        "probability_negative": np.nanmean(replicated < 0.0, axis=0),
+        "estimate": estimate,
+        "lower_95": lower,
+        "upper_95": upper,
+        "probability_positive": probability_positive,
+        "probability_negative": probability_negative,
+        "finite_replication_count": finite_replication_count,
     }
 
 
@@ -391,6 +446,7 @@ def moving_block_bootstrap(
         "interval_upper_95": float(result["upper_95"][0]),
         "probability_positive": float(result["probability_positive"][0]),
         "probability_negative": float(result["probability_negative"][0]),
+        "finite_replication_count": int(result["finite_replication_count"][0]),
         "block_trading_days": block_length,
         "replications": replications,
         "bootstrap_seed": seed,
@@ -414,8 +470,8 @@ def additive_spearman_contributions(
     ):
         raise ValueError("Spearman arrays must share sample/equity/horizon shape")
     sample_count, equity_count, horizon_count = predictions.shape
-    contributions = np.zeros(
-        (sample_count, equity_count, horizon_count), dtype=np.float64
+    contributions = np.full(
+        (sample_count, equity_count, horizon_count), np.nan, dtype=np.float64
     )
     sample_ic = np.full((sample_count, horizon_count), np.nan, dtype=np.float64)
     for sample in range(sample_count):
@@ -423,21 +479,23 @@ def additive_spearman_contributions(
             valid = np.flatnonzero(label_mask[sample, :, horizon])
             if valid.size < minimum_equities:
                 continue
-            predicted_ranks = average_ranks(predictions[sample, valid, horizon])
-            target_ranks = average_ranks(targets[sample, valid, horizon])
-            predicted_centered = predicted_ranks - predicted_ranks.mean()
-            target_centered = target_ranks - target_ranks.mean()
-            denominator = math.sqrt(
-                float(np.sum(predicted_centered**2) * np.sum(target_centered**2))
+            predicted_scores = standardized_rank_scores(
+                predictions[sample, valid, horizon]
             )
-            if denominator == 0.0:
+            target_scores = standardized_rank_scores(targets[sample, valid, horizon])
+            if (
+                not np.isfinite(predicted_scores).all()
+                or not np.isfinite(target_scores).all()
+            ):
                 continue
-            values = predicted_centered * target_centered / denominator
+            values = predicted_scores * target_scores / valid.size
+            cell = np.zeros(equity_count, dtype=np.float64)
+            cell[valid] = values
             ic = float(values.sum())
-            contributions[sample, valid, horizon] = values
+            contributions[sample, :, horizon] = cell
             sample_ic[sample, horizon] = ic
             if not math.isclose(
-                float(contributions[sample, :, horizon].sum()),
+                float(cell.sum()),
                 ic,
                 rel_tol=0.0,
                 abs_tol=RECONSTRUCTION_ABSOLUTE_TOLERANCE,
@@ -601,13 +659,142 @@ def economic_stock_attribution(
     )
 
 
+def economic_window_accounting(
+    economic: EconomicAttributionResult,
+    date_idx: np.ndarray,
+    decision_idx: np.ndarray,
+    *,
+    decisions: tuple[int, ...] | None = None,
+    selected_samples: np.ndarray | None = None,
+    gross_contributions: np.ndarray | None = None,
+) -> EconomicWindowAccounting:
+    date_idx = np.asarray(date_idx, dtype=np.int64)
+    decision_idx = np.asarray(decision_idx, dtype=np.int64)
+    if date_idx.shape != decision_idx.shape or date_idx.shape != (
+        economic.weights.shape[0],
+    ):
+        raise ValueError("Economic window indices are misaligned")
+    selected = np.ones(date_idx.shape, dtype=bool)
+    if decisions is not None:
+        selected &= np.isin(decision_idx, decisions)
+    if selected_samples is not None:
+        sample_mask = np.asarray(selected_samples, dtype=bool)
+        if sample_mask.shape != selected.shape:
+            raise ValueError("Economic window sample selector is misaligned")
+        selected &= sample_mask
+    gross = (
+        economic.return_contributions
+        if gross_contributions is None
+        else np.asarray(gross_contributions, dtype=np.float64)
+    )
+    if gross.shape != economic.weights.shape:
+        raise ValueError("Economic gross contributions are misaligned")
+    dates = np.unique(date_idx)
+    shape = (dates.size, economic.weights.shape[1], economic.weights.shape[2])
+    daily_gross = np.full(shape, np.nan, dtype=np.float64)
+    daily_entry = np.full(shape, np.nan, dtype=np.float64)
+    daily_intraday = np.full(shape, np.nan, dtype=np.float64)
+    daily_exit = np.full(shape, np.nan, dtype=np.float64)
+    valid_position = (economic.top_selected | economic.bottom_selected).any(axis=1)
+    for day_position, day in enumerate(dates):
+        on_day = selected & (date_idx == day)
+        for horizon in range(economic.weights.shape[2]):
+            positions = np.flatnonzero(on_day & valid_position[:, horizon])
+            if not positions.size:
+                continue
+            positions = positions[np.argsort(decision_idx[positions], kind="stable")]
+            weights = economic.weights[positions, :, horizon]
+            daily_gross[day_position, :, horizon] = gross[positions, :, horizon].sum(
+                axis=0
+            )
+            daily_entry[day_position, :, horizon] = 0.5 * np.abs(weights[0])
+            daily_intraday[day_position, :, horizon] = (
+                0.5 * np.abs(np.diff(weights, axis=0)).sum(axis=0)
+                if positions.size > 1
+                else 0.0
+            )
+            daily_exit[day_position, :, horizon] = 0.5 * np.abs(weights[-1])
+    return EconomicWindowAccounting(
+        dates=dates,
+        daily_gross_contribution=daily_gross,
+        daily_entry_turnover=daily_entry,
+        daily_intraday_turnover=daily_intraday,
+        daily_exit_turnover=daily_exit,
+    )
+
+
+def _finite_axis_mean(values: np.ndarray, axis: int | tuple[int, ...]) -> np.ndarray:
+    values = np.asarray(values, dtype=np.float64)
+    finite = np.isfinite(values)
+    count = finite.sum(axis=axis)
+    return np.divide(
+        np.where(finite, values, 0.0).sum(axis=axis),
+        count,
+        out=np.full(count.shape, np.nan, dtype=np.float64),
+        where=count > 0,
+    )
+
+
+def _window_stock_means(
+    accounting: EconomicWindowAccounting,
+) -> dict[str, np.ndarray]:
+    return {
+        "gross": _finite_axis_mean(accounting.daily_gross_contribution, axis=0),
+        "entry": _finite_axis_mean(accounting.daily_entry_turnover, axis=0),
+        "intraday": _finite_axis_mean(accounting.daily_intraday_turnover, axis=0),
+        "exit": _finite_axis_mean(accounting.daily_exit_turnover, axis=0),
+        "total": _finite_axis_mean(accounting.daily_total_turnover, axis=0),
+    }
+
+
+def _window_portfolio_daily(
+    accounting: EconomicWindowAccounting,
+) -> dict[str, np.ndarray]:
+    def total(values: np.ndarray) -> np.ndarray:
+        result = np.nansum(values, axis=1)
+        result[~np.isfinite(values).any(axis=1)] = np.nan
+        return result
+
+    return {
+        "gross": total(accounting.daily_gross_contribution),
+        "entry": total(accounting.daily_entry_turnover),
+        "intraday": total(accounting.daily_intraday_turnover),
+        "exit": total(accounting.daily_exit_turnover),
+        "total": total(accounting.daily_total_turnover),
+    }
+
+
+def _window_bucket_daily(
+    accounting: EconomicWindowAccounting,
+    buckets: np.ndarray,
+    metadata: dict[str, object],
+    bucket: int,
+) -> dict[str, np.ndarray]:
+    positions = _metadata_date_positions(metadata, accounting.dates)
+    membership = np.asarray(buckets, dtype=np.int8)[positions] == bucket
+
+    def total(values: np.ndarray) -> np.ndarray:
+        valid_day = np.isfinite(values).any(axis=1)
+        result = np.nansum(np.where(membership[:, :, None], values, 0.0), axis=1)
+        result[~valid_day] = np.nan
+        return result
+
+    return {
+        "gross": total(accounting.daily_gross_contribution),
+        "entry": total(accounting.daily_entry_turnover),
+        "intraday": total(accounting.daily_intraday_turnover),
+        "exit": total(accounting.daily_exit_turnover),
+        "total": total(accounting.daily_total_turnover),
+    }
+
+
 def standardized_rank_scores(values: np.ndarray) -> np.ndarray:
     ranks = average_ranks(np.asarray(values))
     centered = ranks - ranks.mean()
-    norm = math.sqrt(float(np.sum(centered**2)))
-    if norm == 0.0:
+    population_std = float(np.std(ranks, ddof=0))
+    if population_std == 0.0:
         return np.full(ranks.shape, np.nan, dtype=np.float64)
-    return centered / norm
+    return centered / population_std
 
 
 def per_stock_time_series_skill(
@@ -669,6 +856,7 @@ def per_stock_time_series_skill(
     upper = np.full_like(skill, np.nan)
     probability_positive = np.full_like(skill, np.nan)
     probability_negative = np.full_like(skill, np.nan)
+    finite_replication_count = np.zeros(day_counts.shape, dtype=np.int64)
     indices = moving_block_bootstrap_indices(
         dates.size,
         replications=bootstrap_replications,
@@ -705,12 +893,17 @@ def per_stock_time_series_skill(
             out=replicated,
             where=(n >= 2) & (denominator > 0),
         )
-        lower[:, horizon] = np.nanquantile(replicated, 0.025, axis=0)
-        upper[:, horizon] = np.nanquantile(replicated, 0.975, axis=0)
-        probability_positive[:, horizon] = np.nanmean(replicated > 0.0, axis=0)
-        probability_negative[:, horizon] = np.nanmean(replicated < 0.0, axis=0)
-        for array in (lower, upper, probability_positive, probability_negative):
-            array[~accepted, horizon] = np.nan
+        finite_replication_count[:, horizon] = np.isfinite(replicated).sum(axis=0)
+        for equity in np.flatnonzero(accepted):
+            finite_replicates = replicated[np.isfinite(replicated[:, equity]), equity]
+            if not finite_replicates.size:
+                continue
+            lower[equity, horizon], upper[equity, horizon] = np.quantile(
+                finite_replicates, (0.025, 0.975)
+            )
+            probability_positive[equity, horizon] = np.mean(finite_replicates > 0.0)
+            probability_negative[equity, horizon] = np.mean(finite_replicates < 0.0)
+        finite_replication_count[~accepted, horizon] = 0
     return {
         "dates": dates,
         "daily_prediction_scores": daily_predictions,
@@ -722,6 +915,7 @@ def per_stock_time_series_skill(
         "interval_upper_95": upper,
         "probability_positive": probability_positive,
         "probability_negative": probability_negative,
+        "finite_replication_count": finite_replication_count,
     }
 
 
@@ -850,6 +1044,23 @@ def causal_observation_completeness(
     }
 
 
+def _inference_code_identity() -> dict[str, str]:
+    repository = Path(__file__).resolve().parents[4]
+    return {
+        relative: _sha256(repository / relative) for relative in INFERENCE_CODE_PATHS
+    }
+
+
+def _assert_repository_identity(inputs: AnalysisInputs) -> None:
+    commit, clean = _git_identity()
+    if not clean:
+        raise RuntimeError("Non-dry analysis requires a clean worktree")
+    if commit != inputs.analyzer_git_commit_sha:
+        raise RuntimeError("Repository commit changed during analysis")
+    if _inference_code_identity() != inputs.inference_code_sha256:
+        raise RuntimeError("Inference-affecting source changed during analysis")
+
+
 def _git_identity() -> tuple[str, bool]:
     repository = Path(__file__).resolve().parents[4]
     status = subprocess.run(
@@ -973,7 +1184,8 @@ def validate_analysis_inputs(
     if any(job.get("status") != "completed" for job in jobs):
         raise ValueError("Analyzer refuses a partially completed Stage-3 matrix")
     feature_store = _resolve_state_feature_store(configuration)
-    sample_index = validate_feature_store(feature_store)
+    sample_index = load_sample_index(feature_store)
+    _validate_sample_index(sample_index)
     feature_identity = _feature_store_identity(feature_store)
     configured_identity = configuration["feature_store"]
     if not isinstance(configured_identity, dict) or (
@@ -1076,6 +1288,7 @@ def validate_analysis_inputs(
         analyzer_git_commit_sha=commit,
         analyzer_worktree_clean=clean,
         analyzer_source_sha256=_sha256(Path(__file__).resolve()),
+        inference_code_sha256=_inference_code_identity(),
     )
 
 
@@ -1086,7 +1299,6 @@ def _split_boundaries() -> dict[str, str]:
 def _job_cache_identity(
     inputs: AnalysisInputs,
     job: Stage3AnalysisJob,
-    scope: str,
 ) -> dict[str, object]:
     sample_ids = (
         inputs.validation_rows.get_column("sample_id").to_numpy().astype(np.int64)
@@ -1095,7 +1307,6 @@ def _job_cache_identity(
         "analysis_name": ANALYSIS_NAME,
         "analysis_version": ANALYSIS_VERSION,
         "cache_version": CACHE_VERSION,
-        "scope": scope,
         "split": "validation",
         "logical_configuration": job.logical_configuration,
         "context_ablation": job.context_ablation,
@@ -1112,6 +1323,7 @@ def _job_cache_identity(
         "analyzer_git_commit_sha": inputs.analyzer_git_commit_sha,
         "analyzer_worktree_clean": inputs.analyzer_worktree_clean,
         "analyzer_source_sha256": inputs.analyzer_source_sha256,
+        "inference_code_sha256": inputs.inference_code_sha256,
         "stage3_state_path": str(inputs.state_path),
         "stage3_state_sha256": inputs.state_sha256,
         "feature_store_resolved_path": str(inputs.feature_store),
@@ -1140,6 +1352,17 @@ def _validate_cache_manifest(
 ) -> tuple[Path, dict[str, object]]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     _reject_test_derived_metadata(manifest, f"prediction cache {manifest_path}")
+    recorded_identity = manifest.get("identity")
+    if (
+        isinstance(recorded_identity, dict)
+        and recorded_identity.get("analysis_name") == ANALYSIS_NAME
+        and (
+            recorded_identity.get("cache_version") != CACHE_VERSION
+            or recorded_identity.get("analyzer_worktree_clean") is not True
+            or not isinstance(recorded_identity.get("inference_code_sha256"), dict)
+        )
+    ):
+        raise ValueError(f"Prediction cache provenance is invalid: {manifest_path}")
     if (
         manifest.get("status") != "completed"
         or manifest.get("identity") != expected_identity
@@ -1285,6 +1508,9 @@ def _shared_cache_identity(inputs: AnalysisInputs) -> dict[str, object]:
         "split": "validation",
         "stage3_state_sha256": inputs.state_sha256,
         "feature_store_identity": inputs.feature_identity,
+        "analyzer_git_commit_sha": inputs.analyzer_git_commit_sha,
+        "analyzer_worktree_clean": inputs.analyzer_worktree_clean,
+        "inference_code_sha256": inputs.inference_code_sha256,
         "sample_count": int(sample_ids.size),
         "sample_id_sha256": _array_sha256(sample_ids),
     }
@@ -1309,6 +1535,7 @@ def _write_or_validate_shared_cache(
     output_dir: Path,
     inputs: AnalysisInputs,
     observations: EvaluationObservations | None = None,
+    production_lock: ProcessLockLease | None = None,
 ) -> tuple[Path, dict[str, np.ndarray]]:
     shared_dir = output_dir / "cache" / "shared_validation"
     manifest_path = shared_dir / "manifest.json"
@@ -1359,6 +1586,8 @@ def _write_or_validate_shared_cache(
         path = shared_dir / f"{name}.npy"
         if path.exists():
             raise FileExistsError(f"Refusing to overwrite shared cache: {path}")
+        if production_lock is not None:
+            production_lock.assert_owned()
         _atomic_write_npy(path, values)
         files[name] = {
             "name": path.name,
@@ -1367,6 +1596,8 @@ def _write_or_validate_shared_cache(
             "dtype": str(values.dtype),
         }
         arrays[name] = np.load(path, mmap_mode="r", allow_pickle=False)
+    if production_lock is not None:
+        production_lock.assert_owned()
     _atomic_write_json(
         manifest_path,
         {
@@ -1383,10 +1614,10 @@ def _write_prediction_cache(
     output_dir: Path,
     inputs: AnalysisInputs,
     job: Stage3AnalysisJob,
-    scope: str,
     observations: EvaluationObservations,
     metric_gate: dict[str, object],
     shared_manifest_path: Path,
+    production_lock: ProcessLockLease | None = None,
 ) -> Path:
     cache_dir = _cache_directory(output_dir, job)
     manifest_path = cache_dir / "manifest.json"
@@ -1395,12 +1626,16 @@ def _write_prediction_cache(
     cache_dir.mkdir(parents=True, exist_ok=True)
     prediction_path = cache_dir / "predictions.npy"
     predictions = np.ascontiguousarray(observations.predictions, dtype=np.float32)
+    if production_lock is not None:
+        production_lock.assert_owned()
     _atomic_write_npy(prediction_path, predictions)
+    if production_lock is not None:
+        production_lock.assert_owned()
     _atomic_write_json(
         manifest_path,
         {
             "status": "completed",
-            "identity": _job_cache_identity(inputs, job, scope),
+            "identity": _job_cache_identity(inputs, job),
             "prediction_file": {
                 "name": prediction_path.name,
                 "sha256": _sha256(prediction_path),
@@ -1428,7 +1663,8 @@ def _analysis_configuration(inputs: AnalysisInputs, scope: str) -> dict[str, obj
         "analyzer_git_commit_sha": inputs.analyzer_git_commit_sha,
         "analyzer_worktree_clean": inputs.analyzer_worktree_clean,
         "analyzer_source_sha256": inputs.analyzer_source_sha256,
-        "jobs": [_job_cache_identity(inputs, job, scope) for job in inputs.jobs],
+        "inference_code_sha256": inputs.inference_code_sha256,
+        "jobs": [_job_cache_identity(inputs, job) for job in inputs.jobs],
     }
 
 
@@ -1520,6 +1756,7 @@ def dry_run_payload(
         "analyzer_git_commit_sha": inputs.analyzer_git_commit_sha,
         "analyzer_worktree_clean": inputs.analyzer_worktree_clean,
         "analyzer_source_sha256": inputs.analyzer_source_sha256,
+        "inference_code_sha256": inputs.inference_code_sha256,
         "models_loaded_onto_gpu": False,
         "artifacts_created": False,
         "jobs": [
@@ -1551,6 +1788,7 @@ def _adopt_or_infer_caches(
     scope: str,
     state: dict[str, object],
     state_path: Path,
+    production_lock: ProcessLockLease | None = None,
 ) -> tuple[dict[tuple[str, int], Path], dict[str, np.ndarray]]:
     cache_paths: dict[tuple[str, int], Path] = {}
     runtime_validated = False
@@ -1562,7 +1800,7 @@ def _adopt_or_infer_caches(
             raise ValueError("Analysis state job is malformed")
         cache_dir = _cache_directory(output_dir, job)
         manifest_path = cache_dir / "manifest.json"
-        expected_identity = _job_cache_identity(inputs, job, scope)
+        expected_identity = _job_cache_identity(inputs, job)
         if manifest_path.is_file():
             prediction_path, manifest = _validate_cache_manifest(
                 manifest_path, expected_identity
@@ -1612,8 +1850,7 @@ def _adopt_or_infer_caches(
             )
         if state.get("status") == "completed":
             raise ValueError("Completed analysis state is missing a prediction cache")
-        if owner := active_lock_owner(PRODUCTION_TRAINING_LOCK):
-            raise RuntimeError(f"Production training is active: {owner}")
+
         if not runtime_validated:
             validate_runtime()
             torch.set_float32_matmul_precision("high")
@@ -1644,20 +1881,22 @@ def _adopt_or_infer_caches(
                 evaluation.daily_rows,
             )
             shared_manifest, _ = _write_or_validate_shared_cache(
-                output_dir, inputs, evaluation.observations
+                output_dir, inputs, evaluation.observations, production_lock
             )
             manifest_path = _write_prediction_cache(
                 output_dir,
                 inputs,
                 job,
-                scope,
                 evaluation.observations,
                 gate,
                 shared_manifest,
+                production_lock,
             )
             prediction_path, _ = _validate_cache_manifest(
                 manifest_path, expected_identity
             )
+            if production_lock is not None:
+                production_lock.assert_owned()
         except BaseException as error:
             state_job.update(
                 {
@@ -1678,9 +1917,13 @@ def _adopt_or_infer_caches(
         )
         cache_paths[(job.logical_configuration, job.seed)] = prediction_path
         _atomic_write_json(state_path, state)
+    if production_lock is not None:
+        production_lock.assert_owned()
     state["status"] = "inference_completed"
     _atomic_write_json(state_path, state)
-    _, shared = _write_or_validate_shared_cache(output_dir, inputs)
+    _, shared = _write_or_validate_shared_cache(
+        output_dir, inputs, production_lock=production_lock
+    )
     return cache_paths, shared
 
 
@@ -1757,6 +2000,60 @@ def _universe_liquidity_threshold(
     }
 
 
+def _load_date_partition(
+    path: Path,
+    date_indices: np.ndarray,
+    *trailing_selection: object,
+) -> np.ndarray:
+    indices = np.asarray(date_indices, dtype=np.int64)
+    if (
+        indices.ndim != 1
+        or not indices.size
+        or np.any(indices < 0)
+        or np.unique(indices).size != indices.size
+    ):
+        raise ValueError(f"Invalid date partition for {path}")
+    source = np.load(path, mmap_mode="r", allow_pickle=False)
+    if np.any(indices >= source.shape[0]):
+        raise ValueError(f"Date partition exceeds {path.name}")
+    return np.asarray(source[(indices, *trailing_selection)])
+
+
+def _metadata_date_positions(
+    metadata: dict[str, object], date_idx: np.ndarray
+) -> np.ndarray:
+    mapping = metadata.get("date_position_by_index")
+    if not isinstance(mapping, dict):
+        raw_indices = metadata.get("validation_date_indices")
+        if raw_indices is None:
+            return np.asarray(date_idx, dtype=np.int64)
+        indices = np.asarray(raw_indices, dtype=np.int64)
+        mapping = {int(value): position for position, value in enumerate(indices)}
+    try:
+        return np.asarray(
+            [mapping[int(value)] for value in np.asarray(date_idx, dtype=np.int64)],
+            dtype=np.int64,
+        )
+    except KeyError as error:
+        raise ValueError(
+            f"Sample date is outside the validation partition: {error}"
+        ) from error
+
+
+def _market_overnight_gap(
+    active: np.ndarray,
+    observed: np.ndarray,
+    overnight_gap: np.ndarray,
+) -> np.ndarray:
+    early_observed = observed[:, :, : DECISION_EQUITY_INDICES[0]].any(axis=2)
+    result = np.full(active.shape[0], np.nan, dtype=np.float64)
+    for day in range(active.shape[0]):
+        valid = active[day] & early_observed[day] & np.isfinite(overnight_gap[day])
+        if valid.any():
+            result[day] = float(np.median(overnight_gap[day, valid]))
+    return result
+
+
 def _load_analysis_metadata(
     inputs: AnalysisInputs,
     shared: dict[str, np.ndarray],
@@ -1771,20 +2068,51 @@ def _load_analysis_metadata(
         raise ValueError("Equity axis does not contain 158 unique permanent identities")
     date_index = pl.read_parquet(store / "date_index.parquet").sort("date_idx")
     date_values = date_index.get_column("trade_date").to_numpy()
-    equity_slow = np.load(store / "equity_slow.npy", mmap_mode="r", allow_pickle=False)
-    membership = np.load(
-        store / "equity_membership.npy", mmap_mode="r", allow_pickle=False
+    training_indices = (
+        select_sample_split(inputs.sample_index, "train")
+        .get_column("date_idx")
+        .unique()
+        .sort()
+        .to_numpy()
+        .astype(np.int64)
     )
-    equity_ready = np.load(
-        store / "equity_data_ready.npy", mmap_mode="r", allow_pickle=False
+    validation_indices = (
+        inputs.validation_rows.get_column("date_idx")
+        .unique()
+        .sort()
+        .to_numpy()
+        .astype(np.int64)
     )
-    active = np.asarray(membership & equity_ready, dtype=bool)
+    sample_dates = np.asarray(shared["date_idx"], dtype=np.int64)
+    if not np.isin(sample_dates, validation_indices).all():
+        raise ValueError("Shared cache contains a non-validation date")
+    date_position_by_index = {
+        int(value): position for position, value in enumerate(validation_indices)
+    }
+    sample_date_positions = np.asarray(
+        [date_position_by_index[int(value)] for value in sample_dates], dtype=np.int64
+    )
+    sample_decisions = np.asarray(shared["decision_idx"], dtype=np.int64)
+    observed_channel = int(axes["observed_channel_index"])
+    liquidity_channel = int(axes["liquidity_channel_index"])
+    overnight_channel = SLOW_CHANNELS.index("overnight_gap_normalized")
+
+    membership = _load_date_partition(
+        store / "equity_membership.npy", validation_indices, slice(None)
+    ).astype(bool, copy=False)
+    equity_ready = _load_date_partition(
+        store / "equity_data_ready.npy", validation_indices, slice(None)
+    ).astype(bool, copy=False)
+    active = membership & equity_ready
+    normalized_liquidity = _load_date_partition(
+        store / "equity_slow.npy",
+        validation_indices,
+        slice(None),
+        liquidity_channel,
+    ).astype(np.float64, copy=False)
     affine = axes["dollar_volume_log_affine"]
     if not isinstance(affine, dict):
         raise RuntimeError("Liquidity affine metadata is malformed")
-    normalized_liquidity = np.asarray(
-        equity_slow[..., int(axes["liquidity_channel_index"])], dtype=np.float64
-    )
     dollar_liquidity = np.expm1(
         normalized_liquidity * float(affine["scale"]) + float(affine["center"])
     )
@@ -1799,76 +2127,105 @@ def _load_analysis_metadata(
         adaptive_liquidity[day], adaptive_counts[day] = adaptive_liquidity_buckets(
             dollar_liquidity[day], active[day]
         )
-    observed_channel = int(axes["observed_channel_index"])
-    equity_features = np.load(
-        store / "equity_features.npy", mmap_mode="r", allow_pickle=False
+
+    training_active = _load_date_partition(
+        store / "equity_membership.npy", training_indices, slice(None)
+    ).astype(bool, copy=False) & _load_date_partition(
+        store / "equity_data_ready.npy", training_indices, slice(None)
+    ).astype(bool, copy=False)
+    training_observed = _load_date_partition(
+        store / "equity_features.npy",
+        training_indices,
+        slice(None),
+        slice(None),
+        observed_channel,
+    ).astype(bool, copy=False)
+    training_overnight = _load_date_partition(
+        store / "equity_slow.npy",
+        training_indices,
+        slice(None),
+        overnight_channel,
+    ).astype(np.float64, copy=False)
+    training_market_gap = _market_overnight_gap(
+        training_active, training_observed, training_overnight
     )
-    first_decision_cutoff = DECISION_EQUITY_INDICES[0]
-    early_observed = np.asarray(
-        equity_features[:, :, :first_decision_cutoff, observed_channel], dtype=bool
-    ).any(axis=2)
-    overnight_gap = np.asarray(
-        equity_slow[..., SLOW_CHANNELS.index("overnight_gap_normalized")],
-        dtype=np.float64,
+    thresholds = learn_overnight_thresholds(training_market_gap)
+
+    equity_observed = _load_date_partition(
+        store / "equity_features.npy",
+        validation_indices,
+        slice(None),
+        slice(None),
+        observed_channel,
+    ).astype(bool, copy=False)
+    validation_overnight = _load_date_partition(
+        store / "equity_slow.npy",
+        validation_indices,
+        slice(None),
+        overnight_channel,
+    ).astype(np.float64, copy=False)
+    market_overnight_gap = _market_overnight_gap(
+        active, equity_observed, validation_overnight
     )
-    market_overnight_gap = np.full(active.shape[0], np.nan, dtype=np.float64)
-    for day in range(active.shape[0]):
-        valid = active[day] & early_observed[day] & np.isfinite(overnight_gap[day])
-        if valid.any():
-            market_overnight_gap[day] = float(np.median(overnight_gap[day, valid]))
-    training_dates = np.asarray(
-        [value <= np.datetime64(date(2024, 6, 28)) for value in date_values],
-        dtype=bool,
-    )
-    thresholds = learn_overnight_thresholds(market_overnight_gap[training_dates])
     regimes = overnight_regimes(market_overnight_gap, thresholds)
-    sample_dates = np.asarray(shared["date_idx"], dtype=np.int64)
-    sample_decisions = np.asarray(shared["decision_idx"], dtype=np.int64)
     equity_completeness = causal_observation_completeness(
-        np.asarray(equity_features[..., observed_channel], dtype=bool),
-        sample_dates,
+        equity_observed,
+        sample_date_positions,
         np.asarray(DECISION_EQUITY_INDICES, dtype=np.int64)[sample_decisions],
         readiness=active,
         preopen_cutoff=None,
     )
-    context_features = np.load(
-        store / "context_features.npy", mmap_mode="r", allow_pickle=False
-    )
-    context_ready = np.load(
-        store / "context_data_ready.npy", mmap_mode="r", allow_pickle=False
-    )
-    local_cutoffs = 75 + 5 * sample_decisions
+
+    context_observed = _load_date_partition(
+        store / "context_features.npy",
+        validation_indices,
+        slice(None),
+        slice(None),
+        observed_channel,
+    ).astype(bool, copy=False)
+    context_ready = _load_date_partition(
+        store / "context_data_ready.npy", validation_indices, slice(None)
+    ).astype(bool, copy=False)
     local_completeness = causal_observation_completeness(
-        np.asarray(context_features[..., observed_channel], dtype=bool),
-        sample_dates,
-        local_cutoffs,
-        readiness=np.asarray(context_ready, dtype=bool),
+        context_observed,
+        sample_date_positions,
+        75 + 5 * sample_decisions,
+        readiness=context_ready,
         preopen_cutoff=60,
     )
-    global_features = np.load(
-        store / "global_features.npy", mmap_mode="r", allow_pickle=False
-    )
-    global_ready = np.load(
-        store / "global_data_ready.npy", mmap_mode="r", allow_pickle=False
-    )
-    global_cutoffs = np.asarray(DECISION_GLOBAL_INDICES, dtype=np.int64)[
-        sample_decisions
-    ]
+
+    global_observed = _load_date_partition(
+        store / "global_features.npy",
+        validation_indices,
+        slice(None),
+        slice(None),
+        observed_channel,
+    ).astype(bool, copy=False)
+    global_ready = _load_date_partition(
+        store / "global_data_ready.npy",
+        validation_indices,
+        slice(None),
+        slice(None),
+    ).astype(bool, copy=False)
     global_completeness = causal_observation_completeness(
-        np.asarray(global_features[..., observed_channel], dtype=bool),
-        sample_dates,
-        global_cutoffs,
+        global_observed,
+        sample_date_positions,
+        np.asarray(DECISION_GLOBAL_INDICES, dtype=np.int64)[sample_decisions],
         readiness=None,
         preopen_cutoff=330,
     )
-    global_completeness["ready"] = np.asarray(
-        global_ready[sample_dates, :, sample_decisions], dtype=bool
-    )
+    global_completeness["ready"] = global_ready[
+        sample_date_positions, :, sample_decisions
+    ]
     return {
         "axes": axes,
         "equity_index": equity_index,
-        "date_index": date_index,
-        "trade_dates": date_values,
+        "date_index": date_index.filter(
+            pl.col("date_idx").is_in(validation_indices.tolist())
+        ),
+        "trade_dates": date_values[validation_indices],
+        "validation_date_indices": validation_indices,
+        "date_position_by_index": date_position_by_index,
         "active": active,
         "dollar_liquidity": dollar_liquidity,
         "liquidity_quintile": liquidity_quintile,
@@ -1888,7 +2245,7 @@ def _sample_trade_dates(
     metadata: dict[str, object], date_idx: np.ndarray
 ) -> np.ndarray:
     trade_dates = np.asarray(metadata["trade_dates"])
-    return trade_dates[np.asarray(date_idx, dtype=np.int64)]
+    return trade_dates[_metadata_date_positions(metadata, date_idx)]
 
 
 def _daily_grid(
@@ -1920,13 +2277,14 @@ def _grid_from_stock_values(
 ) -> tuple[np.ndarray, np.ndarray]:
     values = np.asarray(values, dtype=np.float64)
     dates = np.unique(date_idx)
-    result = np.zeros(
+    result = np.full(
         (
             dates.size,
             EXPECTED_DECISIONS_PER_DATE,
             values.shape[1],
             values.shape[2],
         ),
+        np.nan,
         dtype=np.float64,
     )
     date_position = {int(value): index for index, value in enumerate(dates)}
@@ -1982,15 +2340,7 @@ def _economic_reconstruction_checks(
     date_idx: np.ndarray,
     decision_idx: np.ndarray,
 ) -> dict[str, float | bool]:
-    _, daily = create_metric_table(
-        predictions,
-        np.zeros_like(predictions, dtype=np.float32),
-        raw_returns,
-        label_mask,
-        date_idx,
-        decision_idx,
-    )
-    del daily
+
     spread_from_stock = economic.return_contributions.sum(axis=1)
     intraday_from_stock = economic.intraday_turnover.sum(axis=1)
     maximum_spread_difference = 0.0
@@ -2034,55 +2384,6 @@ def _economic_reconstruction_checks(
         "maximum_intraday_turnover_absolute_difference": maximum_turnover_difference,
         "passed": True,
     }
-
-
-def _aggregate_stock_values(
-    values: np.ndarray,
-    valid_samples: np.ndarray,
-    date_idx: np.ndarray,
-) -> dict[str, np.ndarray]:
-    values = np.asarray(values, dtype=np.float64)
-    valid_samples = np.asarray(valid_samples, dtype=bool)
-    date_idx = np.asarray(date_idx, dtype=np.int64)
-    if (
-        values.ndim != 3
-        or valid_samples.shape != (values.shape[0], values.shape[2])
-        or date_idx.shape != (values.shape[0],)
-    ):
-        raise ValueError("Stock-value aggregation arrays are misaligned")
-    dates = np.unique(date_idx)
-    daily = np.full(
-        (dates.size, values.shape[1], values.shape[2]), np.nan, dtype=np.float64
-    )
-    for day_position, day in enumerate(dates):
-        on_day = date_idx == day
-        for horizon in range(values.shape[2]):
-            selected = on_day & valid_samples[:, horizon]
-            if selected.any():
-                daily[day_position, :, horizon] = values[selected, :, horizon].mean(
-                    axis=0
-                )
-    horizon = np.nanmean(daily, axis=0)
-    return {
-        "dates": dates,
-        "daily": daily,
-        "horizon": horizon,
-        "primary": np.nanmean(horizon, axis=1),
-    }
-
-
-def _first_valid_transition_mask(
-    valid_samples: np.ndarray, date_idx: np.ndarray, decision_idx: np.ndarray
-) -> np.ndarray:
-    result = np.asarray(valid_samples, dtype=bool).copy()
-    for day in np.unique(date_idx):
-        on_day = date_idx == day
-        for horizon in range(result.shape[1]):
-            positions = np.flatnonzero(on_day & result[:, horizon])
-            if positions.size:
-                first = positions[np.argmin(decision_idx[positions])]
-                result[first, horizon] = False
-    return result
 
 
 def _period_additive_summary(
@@ -2129,6 +2430,7 @@ def _build_core_outputs(
     del sample_id
     date_idx = np.asarray(shared["date_idx"], dtype=np.int64)
     decision_idx = np.asarray(shared["decision_idx"], dtype=np.int64)
+    date_positions = _metadata_date_positions(metadata, date_idx)
     targets = np.asarray(shared["targets"])
     raw_returns = np.asarray(shared["raw_returns"])
     label_mask = np.asarray(shared["label_mask"], dtype=bool)
@@ -2177,22 +2479,50 @@ def _build_core_outputs(
             decision_idx,
         )
         _, daily_ic = _daily_grid(additive.sample_ic, date_idx, decision_idx)
-        spread = economic.return_contributions.sum(axis=1)
-        top_return = np.where(
+        top_contributions = np.where(
             economic.top_selected, economic.return_contributions, 0.0
-        ).sum(axis=1)
-        bottom_return = -np.where(
+        )
+        bottom_contributions = np.where(
             economic.bottom_selected, economic.return_contributions, 0.0
-        ).sum(axis=1)
-        intraday_turnover = economic.intraday_turnover.sum(axis=1)
-        flat_entry = economic.flat_entry_turnover.sum(axis=1)
-        flat_exit = economic.flat_exit_turnover.sum(axis=1)
-        _, daily_spread = _daily_grid(spread, date_idx, decision_idx)
-        _, daily_top_return = _daily_grid(top_return, date_idx, decision_idx)
-        _, daily_bottom_return = _daily_grid(bottom_return, date_idx, decision_idx)
-        _, daily_turnover = _daily_grid(intraday_turnover, date_idx, decision_idx)
-        _, daily_entry = _daily_grid(flat_entry, date_idx, decision_idx)
-        _, daily_exit = _daily_grid(flat_exit, date_idx, decision_idx)
+        )
+        daily_spread = np.full_like(daily_ic, np.nan)
+        daily_top_return = np.full_like(daily_ic, np.nan)
+        daily_bottom_return = np.full_like(daily_ic, np.nan)
+        daily_turnover = np.full_like(daily_ic, np.nan)
+        daily_entry = np.full_like(daily_ic, np.nan)
+        daily_exit = np.full_like(daily_ic, np.nan)
+        for decision in range(EXPECTED_DECISIONS_PER_DATE):
+            decision_accounting = economic_window_accounting(
+                economic,
+                date_idx,
+                decision_idx,
+                decisions=(decision,),
+            )
+            decision_values = _window_portfolio_daily(decision_accounting)
+            top_values = _window_portfolio_daily(
+                economic_window_accounting(
+                    economic,
+                    date_idx,
+                    decision_idx,
+                    decisions=(decision,),
+                    gross_contributions=top_contributions,
+                )
+            )
+            bottom_values = _window_portfolio_daily(
+                economic_window_accounting(
+                    economic,
+                    date_idx,
+                    decision_idx,
+                    decisions=(decision,),
+                    gross_contributions=bottom_contributions,
+                )
+            )
+            daily_spread[:, decision] = decision_values["gross"]
+            daily_top_return[:, decision] = top_values["gross"]
+            daily_bottom_return[:, decision] = -bottom_values["gross"]
+            daily_turnover[:, decision] = decision_values["intraday"]
+            daily_entry[:, decision] = decision_values["entry"]
+            daily_exit[:, decision] = decision_values["exit"]
         valid_count = label_mask.sum(axis=1).astype(np.float64)
         _, daily_valid_count = _daily_grid(valid_count, date_idx, decision_idx)
         daily_coverage_values = label_mask.mean(axis=1).astype(np.float64)
@@ -2219,6 +2549,9 @@ def _build_core_outputs(
                         ),
                         "ic_interval_upper_95": _finite_or_none(
                             time_bootstrap["upper_95"][flat_index]
+                        ),
+                        "ic_bootstrap_finite_replication_count": int(
+                            time_bootstrap["finite_replication_count"][flat_index]
                         ),
                         "mean_gross_top_return": _finite_or_none(
                             np.nanmean(daily_top_return[:, decision, horizon_index])
@@ -2263,6 +2596,9 @@ def _build_core_outputs(
                     "mean_spearman_ic": _finite_or_none(np.nanmean(primary_values)),
                     "ic_interval_lower_95": primary_bootstrap["interval_lower_95"],
                     "ic_interval_upper_95": primary_bootstrap["interval_upper_95"],
+                    "ic_bootstrap_finite_replication_count": int(
+                        primary_bootstrap["finite_replication_count"]
+                    ),
                     "mean_gross_top_return": _finite_or_none(
                         np.nanmean(daily_top_return[:, decision])
                     ),
@@ -2293,12 +2629,32 @@ def _build_core_outputs(
         scope_daily: dict[str, dict[str, np.ndarray]] = {}
         for scope_index, (scope_name, decisions) in enumerate(scopes.items()):
             ic_values = _scope_daily_mean(daily_ic, decisions)
-            spread_values = _scope_daily_mean(daily_spread, decisions)
-            top_return_values = _scope_daily_mean(daily_top_return, decisions)
-            bottom_return_values = _scope_daily_mean(daily_bottom_return, decisions)
-            turnover_values = _scope_daily_mean(daily_turnover, decisions)
-            entry_values = _scope_daily_mean(daily_entry, decisions)
-            exit_values = _scope_daily_mean(daily_exit, decisions)
+            scope_accounting = economic_window_accounting(
+                economic, date_idx, decision_idx, decisions=decisions
+            )
+            scope_economic = _window_portfolio_daily(scope_accounting)
+            spread_values = scope_economic["gross"]
+            top_return_values = _window_portfolio_daily(
+                economic_window_accounting(
+                    economic,
+                    date_idx,
+                    decision_idx,
+                    decisions=decisions,
+                    gross_contributions=top_contributions,
+                )
+            )["gross"]
+            bottom_return_values = -_window_portfolio_daily(
+                economic_window_accounting(
+                    economic,
+                    date_idx,
+                    decision_idx,
+                    decisions=decisions,
+                    gross_contributions=bottom_contributions,
+                )
+            )["gross"]
+            turnover_values = scope_economic["intraday"]
+            entry_values = scope_economic["entry"]
+            exit_values = scope_economic["exit"]
             scope_daily[scope_name] = {
                 "ic": ic_values,
                 "spread": spread_values,
@@ -2332,6 +2688,9 @@ def _build_core_outputs(
                         ),
                         "ic_interval_upper_95": _finite_or_none(
                             scope_bootstrap["upper_95"][horizon_index]
+                        ),
+                        "ic_bootstrap_finite_replication_count": int(
+                            scope_bootstrap["finite_replication_count"][horizon_index]
                         ),
                         "mean_gross_top_return": _finite_or_none(
                             np.nanmean(top_return_values[:, horizon_index])
@@ -2378,6 +2737,9 @@ def _build_core_outputs(
                     ),
                     "ic_interval_upper_95": _finite_or_none(
                         primary_bootstrap["interval_upper_95"]
+                    ),
+                    "ic_bootstrap_finite_replication_count": int(
+                        primary_bootstrap["finite_replication_count"]
                     ),
                     "mean_gross_top_return": _finite_or_none(
                         np.nanmean(top_return_values)
@@ -2426,7 +2788,9 @@ def _build_core_outputs(
             additive.contributions, date_idx, decision_idx
         )
         for decision in range(EXPECTED_DECISIONS_PER_DATE):
-            mean_contribution = contribution_grid[:, decision].mean(axis=0)
+            mean_contribution = _finite_axis_mean(
+                contribution_grid[:, decision], axis=0
+            )
             for horizon_index, horizon in enumerate(HORIZONS):
                 for equity, identity in enumerate(identities):
                     stock_time_rows.append(
@@ -2445,7 +2809,37 @@ def _build_core_outputs(
                             "exploratory": True,
                         }
                     )
-            primary_contribution = mean_contribution.mean(axis=1)
+            for horizon_index in range(len(HORIZONS)):
+                expected_cell = float(
+                    _finite_axis_mean(daily_ic[:, decision, horizon_index], axis=0)
+                )
+                if not math.isclose(
+                    float(mean_contribution[:, horizon_index].sum()),
+                    expected_cell,
+                    rel_tol=0.0,
+                    abs_tol=RECONSTRUCTION_ABSOLUTE_TOLERANCE,
+                ):
+                    raise RuntimeError(
+                        "Stock/time decision cell failed additive reconstruction"
+                    )
+            decision_daily_stock = _finite_axis_mean(
+                contribution_grid[:, decision], axis=2
+            )
+            primary_contribution = _finite_axis_mean(decision_daily_stock, axis=0)
+            expected_primary_cell = float(
+                _finite_axis_mean(
+                    _finite_axis_mean(daily_ic[:, decision], axis=1), axis=0
+                )
+            )
+            if not math.isclose(
+                float(primary_contribution.sum()),
+                expected_primary_cell,
+                rel_tol=0.0,
+                abs_tol=RECONSTRUCTION_ABSOLUTE_TOLERANCE,
+            ):
+                raise RuntimeError(
+                    "Stock/time primary decision cell failed additive reconstruction"
+                )
             for equity, identity in enumerate(identities):
                 stock_time_rows.append(
                     {
@@ -2462,8 +2856,8 @@ def _build_core_outputs(
                     }
                 )
         for scope_name, decisions in scopes.items():
-            daily_stock = contribution_grid[:, decisions].mean(axis=1)
-            mean_stock = daily_stock.mean(axis=0)
+            daily_stock = _finite_axis_mean(contribution_grid[:, decisions], axis=1)
+            mean_stock = _finite_axis_mean(daily_stock, axis=0)
             for horizon_index, horizon in enumerate(HORIZONS):
                 for equity, identity in enumerate(identities):
                     stock_time_rows.append(
@@ -2486,7 +2880,35 @@ def _build_core_outputs(
                             "exploratory": scope_name.startswith("bin_"),
                         }
                     )
-            primary_stock = mean_stock.mean(axis=1)
+            scope_ic = _scope_daily_mean(daily_ic, decisions)
+            for horizon_index in range(len(HORIZONS)):
+                expected_cell = float(
+                    _finite_axis_mean(scope_ic[:, horizon_index], axis=0)
+                )
+                if not math.isclose(
+                    float(mean_stock[:, horizon_index].sum()),
+                    expected_cell,
+                    rel_tol=0.0,
+                    abs_tol=RECONSTRUCTION_ABSOLUTE_TOLERANCE,
+                ):
+                    raise RuntimeError(
+                        "Stock/time scope cell failed additive reconstruction"
+                    )
+            primary_stock = _finite_axis_mean(
+                _finite_axis_mean(daily_stock, axis=2), axis=0
+            )
+            expected_primary_cell = float(
+                _finite_axis_mean(_finite_axis_mean(scope_ic, axis=1), axis=0)
+            )
+            if not math.isclose(
+                float(primary_stock.sum()),
+                expected_primary_cell,
+                rel_tol=0.0,
+                abs_tol=RECONSTRUCTION_ABSOLUTE_TOLERANCE,
+            ):
+                raise RuntimeError(
+                    "Stock/time primary scope cell failed additive reconstruction"
+                )
             for equity, identity in enumerate(identities):
                 stock_time_rows.append(
                     {
@@ -2522,46 +2944,36 @@ def _build_core_outputs(
             scope_contributions[name] = _period_additive_summary(
                 additive, date_idx, selected
             )["primary_contributions"]
-        economic_valid = np.isfinite(additive.sample_ic)
-        economic_aggregate = _aggregate_stock_values(
-            economic.return_contributions,
-            economic_valid,
-            date_idx,
+        all_day_accounting = economic_window_accounting(
+            economic, date_idx, decision_idx
         )
-        long_aggregate = _aggregate_stock_values(
-            np.where(
-                economic.top_selected,
-                economic.return_contributions,
-                0.0,
-            ),
-            economic_valid,
-            date_idx,
+        all_day_means = _window_stock_means(all_day_accounting)
+        long_means = _window_stock_means(
+            economic_window_accounting(
+                economic,
+                date_idx,
+                decision_idx,
+                gross_contributions=top_contributions,
+            )
         )
-        short_aggregate = _aggregate_stock_values(
-            np.where(
-                economic.bottom_selected,
-                economic.return_contributions,
-                0.0,
-            ),
-            economic_valid,
-            date_idx,
+        short_means = _window_stock_means(
+            economic_window_accounting(
+                economic,
+                date_idx,
+                decision_idx,
+                gross_contributions=bottom_contributions,
+            )
         )
-        transition_valid = _first_valid_transition_mask(
-            economic_valid, date_idx, decision_idx
-        )
-        turnover_aggregate = _aggregate_stock_values(
-            economic.intraday_turnover,
-            transition_valid,
-            date_idx,
-        )
-        entry_valid = economic.flat_entry_turnover.sum(axis=1) > 0
-        exit_valid = economic.flat_exit_turnover.sum(axis=1) > 0
-        entry_aggregate = _aggregate_stock_values(
-            economic.flat_entry_turnover, entry_valid, date_idx
-        )
-        exit_aggregate = _aggregate_stock_values(
-            economic.flat_exit_turnover, exit_valid, date_idx
-        )
+        economic_aggregate = {
+            "primary": _finite_axis_mean(all_day_means["gross"], axis=1)
+        }
+        long_aggregate = {"primary": _finite_axis_mean(long_means["gross"], axis=1)}
+        short_aggregate = {"primary": _finite_axis_mean(short_means["gross"], axis=1)}
+        turnover_aggregate = {
+            "primary": _finite_axis_mean(all_day_means["intraday"], axis=1)
+        }
+        entry_aggregate = {"primary": _finite_axis_mean(all_day_means["entry"], axis=1)}
+        exit_aggregate = {"primary": _finite_axis_mean(all_day_means["exit"], axis=1)}
         skill = per_stock_time_series_skill(
             predictions,
             targets,
@@ -2579,11 +2991,12 @@ def _build_core_outputs(
             dtype=np.int64,
         )
         valid_opportunity_count = label_mask.sum(axis=(0, 2))
+        valid_contribution_count = np.isfinite(additive.contributions).sum(axis=(0, 2))
         conditional_contribution = np.divide(
-            additive.contributions.sum(axis=(0, 2)),
-            valid_opportunity_count,
+            np.nansum(additive.contributions, axis=(0, 2)),
+            valid_contribution_count,
             out=np.full(label_mask.shape[1], np.nan, dtype=np.float64),
-            where=valid_opportunity_count > 0,
+            where=valid_contribution_count > 0,
         )
         valid_date_count = np.asarray(
             [
@@ -2600,15 +3013,14 @@ def _build_core_outputs(
             (economic.signed_selected_return > 0)
             & (economic.top_selected | economic.bottom_selected)
         ).sum(axis=(0, 2))
-        validation_days = np.unique(date_idx)
-        mean_liquidity = np.nanmean(dollar_liquidity[validation_days], axis=0)
+        mean_liquidity = _finite_axis_mean(dollar_liquidity, axis=0)
         selected_liquidity_sum = np.zeros(label_mask.shape[1], dtype=np.float64)
         for sample in range(label_mask.shape[0]):
             selected_by_horizon = (
                 economic.top_selected[sample] | economic.bottom_selected[sample]
             ).sum(axis=1)
             selected_liquidity_sum += (
-                np.nan_to_num(dollar_liquidity[date_idx[sample]], nan=0.0)
+                np.nan_to_num(dollar_liquidity[date_positions[sample]], nan=0.0)
                 * selected_by_horizon
             )
         selected_liquidity = np.divide(
@@ -2851,6 +3263,9 @@ def _build_core_outputs(
                 "bootstrap_probability_negative": float(
                     stock_bootstrap["probability_negative"][equity]
                 ),
+                "bootstrap_finite_replication_count": int(
+                    stock_bootstrap["finite_replication_count"][equity]
+                ),
                 "opening_30_contribution": float(
                     np.mean(
                         [
@@ -2953,6 +3368,7 @@ def _build_core_outputs(
                     )
                 ),
                 "net_gross_spread_contribution": gross_contribution,
+                "mean_daily_gross_contribution": gross_contribution,
                 "long_gross_return_contribution": float(
                     np.nanmean(long_economic_values)
                 ),
@@ -2974,6 +3390,14 @@ def _build_core_outputs(
                 ),
                 "flat_entry_turnover_contribution": float(np.nanmean(entry_values)),
                 "flat_exit_turnover_contribution": float(np.nanmean(exit_values)),
+                "mean_daily_flat_entry_turnover": float(np.nanmean(entry_values)),
+                "mean_daily_intraday_one_way_turnover": float(
+                    np.nanmean(turnover_values)
+                ),
+                "mean_daily_flat_exit_turnover": float(np.nanmean(exit_values)),
+                "mean_daily_total_one_way_turnover": total_turnover,
+                "gross_return_unit": "decimal return summed within date then averaged across dates",
+                "turnover_unit": "one-way notional fraction summed within date then averaged across dates",
                 "gross_contribution_per_unit_turnover": (
                     gross_contribution / total_turnover if total_turnover > 0 else None
                 ),
@@ -3034,6 +3458,9 @@ def _build_core_outputs(
                     "mean_spearman_ic": float(ic_by_seed.mean()),
                     "ic_interval_lower_95": bootstrap["interval_lower_95"],
                     "ic_interval_upper_95": bootstrap["interval_upper_95"],
+                    "ic_bootstrap_finite_replication_count": int(
+                        bootstrap["finite_replication_count"]
+                    ),
                     "mean_gross_top_return": float(
                         np.mean(
                             [
@@ -3142,6 +3569,9 @@ def _build_core_outputs(
                 "mean_spearman_ic": float(np.nanmean(ic_by_seed)),
                 "ic_interval_lower_95": bootstrap["interval_lower_95"],
                 "ic_interval_upper_95": bootstrap["interval_upper_95"],
+                "ic_bootstrap_finite_replication_count": int(
+                    bootstrap["finite_replication_count"]
+                ),
                 "mean_gross_top_return": float(
                     np.mean(
                         [
@@ -3259,6 +3689,9 @@ def _build_core_outputs(
                     "mean_spearman_ic": float(np.nanmean(ic_by_seed)),
                     "ic_interval_lower_95": bootstrap["interval_lower_95"],
                     "ic_interval_upper_95": bootstrap["interval_upper_95"],
+                    "ic_bootstrap_finite_replication_count": int(
+                        bootstrap["finite_replication_count"]
+                    ),
                     "mean_gross_top_return": scope_metric("top_return"),
                     "mean_gross_bottom_return": scope_metric("bottom_return"),
                     "mean_gross_top_minus_bottom": scope_metric("spread"),
@@ -3323,12 +3756,52 @@ def _build_core_outputs(
         [stock_time_frame, across_stock_time.select(stock_time_frame.columns)],
         how="vertical_relaxed",
     )
+    time_5m_frame = pl.DataFrame(time_5m_rows, infer_schema_length=None)
+    time_bin_frame = pl.DataFrame(time_bin_rows, infer_schema_length=None)
+    for name, frame in (
+        ("time_5m", time_5m_frame),
+        ("time_bin", time_bin_frame),
+    ):
+        frame = frame.with_columns(
+            pl.col("mean_gross_top_minus_bottom").alias(
+                "mean_daily_gross_contribution"
+            ),
+            pl.col("mean_flat_entry_turnover").alias("mean_daily_flat_entry_turnover"),
+            pl.col("mean_intraday_one_way_turnover").alias(
+                "mean_daily_intraday_one_way_turnover"
+            ),
+            pl.col("mean_flat_exit_turnover").alias("mean_daily_flat_exit_turnover"),
+            (
+                pl.col("mean_flat_entry_turnover")
+                + pl.col("mean_intraday_one_way_turnover")
+                + pl.col("mean_flat_exit_turnover")
+            ).alias("mean_daily_total_one_way_turnover"),
+            pl.lit(
+                "decimal return summed within date then averaged across dates"
+            ).alias("gross_return_unit"),
+            pl.lit(
+                "one-way notional fraction summed within date then averaged across dates"
+            ).alias("turnover_unit"),
+        ).with_columns(
+            pl.when(pl.col("mean_daily_total_one_way_turnover") > 0)
+            .then(
+                10_000.0
+                * pl.col("mean_daily_gross_contribution")
+                / pl.col("mean_daily_total_one_way_turnover")
+            )
+            .otherwise(None)
+            .alias("break_even_one_way_cost_bps")
+        )
+        if name == "time_5m":
+            time_5m_frame = frame
+        else:
+            time_bin_frame = frame
     return (
         {
             "stock_attribution": pl.DataFrame(stock_rows, infer_schema_length=None),
             "stock_time_attribution": stock_time_frame,
-            "time_of_day_5m": pl.DataFrame(time_5m_rows, infer_schema_length=None),
-            "time_of_day_bins": pl.DataFrame(time_bin_rows, infer_schema_length=None),
+            "time_of_day_5m": time_5m_frame,
+            "time_of_day_bins": time_bin_frame,
         },
         core_by_seed,
         {
@@ -3347,13 +3820,18 @@ def _group_sample_sums(
     group_count: int,
 ) -> np.ndarray:
     values = np.asarray(values, dtype=np.float64)
-    result = np.zeros((values.shape[0], group_count, values.shape[2]), dtype=np.float64)
+    result = np.full(
+        (values.shape[0], group_count, values.shape[2]), np.nan, dtype=np.float64
+    )
+    valid_cell = np.isfinite(values).all(axis=1)
     for sample in range(values.shape[0]):
         groups = groups_by_date[date_idx[sample]]
         for group in range(group_count):
             members = groups == group
-            if members.any():
-                result[sample, group] = values[sample, members].sum(axis=0)
+            valid_horizons = valid_cell[sample]
+            result[sample, group, valid_horizons] = values[sample, members][
+                :, valid_horizons
+            ].sum(axis=0)
     return result
 
 
@@ -3411,6 +3889,25 @@ def _contribution_concentration(
     return float(np.sum(shares**2)), float(np.sort(shares)[-top_count:].sum())
 
 
+def _point_in_time_bucket_contribution_vector(
+    contribution_grid: np.ndarray,
+    buckets: np.ndarray,
+    bucket: int,
+    decisions: tuple[int, ...],
+    horizon: int,
+) -> np.ndarray:
+    values = np.asarray(contribution_grid[:, :, :, horizon], dtype=np.float64)
+    valid_cell = np.isfinite(values).all(axis=2)
+    membership = np.asarray(buckets, dtype=np.int8)[:, None, :] == bucket
+    masked = np.where(
+        valid_cell[:, :, None],
+        np.where(membership, values, 0.0),
+        np.nan,
+    )
+    daily = _finite_axis_mean(masked[:, decisions], axis=1)
+    return _finite_axis_mean(daily, axis=0)
+
+
 def _build_liquidity_outputs(
     cache_paths: dict[tuple[str, int], Path],
     core_by_seed: dict[int, dict[str, object]],
@@ -3418,6 +3915,7 @@ def _build_liquidity_outputs(
     metadata: dict[str, object],
 ) -> tuple[pl.DataFrame, pl.DataFrame, dict[str, object]]:
     date_idx = np.asarray(shared["date_idx"], dtype=np.int64)
+    date_positions = _metadata_date_positions(metadata, date_idx)
     decision_idx = np.asarray(shared["decision_idx"], dtype=np.int64)
     targets = np.asarray(shared["targets"])
     label_mask = np.asarray(shared["label_mask"], dtype=bool)
@@ -3436,6 +3934,7 @@ def _build_liquidity_outputs(
     rows: list[dict[str, object]] = []
     time_rows: list[dict[str, object]] = []
     checks: dict[str, object] = {}
+    all_decisions = tuple(range(EXPECTED_DECISIONS_PER_DATE))
     time_bins = {
         row["name"]: tuple(row["decision_indices"]) for row in _time_bin_metadata()
     }
@@ -3443,112 +3942,114 @@ def _build_liquidity_outputs(
         core = core_by_seed[seed]
         additive_values = np.asarray(core["contributions"])
         sample_ic = np.asarray(core["sample_ic"])
+        _, sample_ic_grid = _daily_grid(sample_ic, date_idx, decision_idx)
         economic = core["economic"]
         if not isinstance(economic, EconomicAttributionResult):
             raise TypeError("Core economic attribution is malformed")
         predictions = np.load(
             cache_paths[("core", seed)], mmap_mode="r", allow_pickle=False
         )
-        group_contribution = _group_sample_sums(additive_values, quintiles, date_idx, 5)
-        group_positive = _group_sample_sums(
-            np.maximum(additive_values, 0.0), quintiles, date_idx, 5
-        )
-        group_negative = _group_sample_sums(
-            np.minimum(additive_values, 0.0), quintiles, date_idx, 5
-        )
-        group_spread = _group_sample_sums(
-            economic.return_contributions, quintiles, date_idx, 5
-        )
-        group_turnover = _group_sample_sums(
-            economic.intraday_turnover, quintiles, date_idx, 5
-        )
-        group_entry = _group_sample_sums(
-            economic.flat_entry_turnover, quintiles, date_idx, 5
-        )
-        group_exit = _group_sample_sums(
-            economic.flat_exit_turnover, quintiles, date_idx, 5
-        )
-        group_coverage = _group_sample_counts(label_mask, quintiles, date_idx, 5)
-        group_active = _group_sample_counts(
-            np.broadcast_to((quintiles[date_idx] >= 0)[..., None], label_mask.shape),
-            quintiles,
-            date_idx,
-            5,
-        )
-        tail_mask = economic.top_selected | economic.bottom_selected
-        group_tail = _group_sample_counts(tail_mask, quintiles, date_idx, 5)
-        independent_ic = _independent_bucket_ic(
-            predictions,
-            targets,
-            label_mask,
-            adaptive,
-            date_idx,
-            5,
-        )
-        _, daily_contribution = _daily_grid(
-            group_contribution.reshape(group_contribution.shape[0], -1),
-            date_idx,
-            decision_idx,
-        )
-        daily_contribution = daily_contribution.reshape(
-            daily_contribution.shape[0],
-            daily_contribution.shape[1],
-            5,
-            len(HORIZONS),
-        )
-        daily_metrics: dict[str, np.ndarray] = {
-            "contribution": daily_contribution,
+        group_values = {
+            "contribution": _group_sample_sums(
+                additive_values, quintiles, date_positions, 5
+            ),
+            "positive": _group_sample_sums(
+                np.maximum(additive_values, 0.0), quintiles, date_positions, 5
+            ),
+            "negative": _group_sample_sums(
+                np.minimum(additive_values, 0.0), quintiles, date_positions, 5
+            ),
         }
-        for name, values in (
-            ("positive", group_positive),
-            ("negative", group_negative),
-            ("spread", group_spread),
-            ("turnover", group_turnover),
-            ("entry", group_entry),
-            ("exit", group_exit),
-            ("coverage", group_coverage),
-            ("active", group_active),
-            ("tail", group_tail),
-        ):
+        group_coverage = _group_sample_counts(label_mask, quintiles, date_positions, 5)
+        group_active = _group_sample_counts(
+            np.broadcast_to(
+                (quintiles[date_positions] >= 0)[..., None], label_mask.shape
+            ),
+            quintiles,
+            date_positions,
+            5,
+        )
+        group_tail = _group_sample_counts(
+            economic.top_selected | economic.bottom_selected,
+            quintiles,
+            date_positions,
+            5,
+        )
+        daily_metrics: dict[str, np.ndarray] = {}
+        for name, values in group_values.items():
             _, grid = _daily_grid(
                 values.reshape(values.shape[0], -1), date_idx, decision_idx
             )
             daily_metrics[name] = grid.reshape(
                 grid.shape[0], grid.shape[1], 5, len(HORIZONS)
             )
+        _, contribution_grid = _grid_from_stock_values(
+            additive_values, date_idx, decision_idx
+        )
+        independent_ic = _independent_bucket_ic(
+            predictions,
+            targets,
+            label_mask,
+            adaptive,
+            date_positions,
+            5,
+        )
+        _, adaptive_grid = _daily_grid(
+            independent_ic.reshape(independent_ic.shape[0], -1),
+            date_idx,
+            decision_idx,
+        )
+        adaptive_grid = adaptive_grid.reshape(
+            adaptive_grid.shape[0], adaptive_grid.shape[1], 5, len(HORIZONS)
+        )
+        all_day_metrics = {
+            name: _scope_daily_mean(values, all_decisions)
+            for name, values in daily_metrics.items()
+        }
+        all_day_accounting = economic_window_accounting(
+            economic, date_idx, decision_idx, decisions=all_decisions
+        )
+        maximum_difference = 0.0
         for group in range(5):
+            economic_daily = _window_bucket_daily(
+                all_day_accounting, quintiles, metadata, group
+            )
+            group_members = quintiles == group
+            group_liquidity = dollar_liquidity[group_members]
             for horizon_index, horizon in enumerate(HORIZONS):
                 contribution = float(
-                    np.nanmean(
-                        daily_metrics["contribution"][:, :, group, horizon_index]
+                    _finite_axis_mean(
+                        all_day_metrics["contribution"][:, group, horizon_index],
+                        axis=0,
                     )
                 )
-                spread = float(
-                    np.nanmean(daily_metrics["spread"][:, :, group, horizon_index])
-                )
-                intraday = float(
-                    np.nanmean(daily_metrics["turnover"][:, 1:, group, horizon_index])
+                gross = float(
+                    _finite_axis_mean(economic_daily["gross"][:, horizon_index], axis=0)
                 )
                 entry = float(
-                    np.nanmean(daily_metrics["entry"][:, :, group, horizon_index])
+                    _finite_axis_mean(economic_daily["entry"][:, horizon_index], axis=0)
+                )
+                intraday = float(
+                    _finite_axis_mean(
+                        economic_daily["intraday"][:, horizon_index], axis=0
+                    )
                 )
                 exit_value = float(
-                    np.nanmean(daily_metrics["exit"][:, :, group, horizon_index])
+                    _finite_axis_mean(economic_daily["exit"][:, horizon_index], axis=0)
                 )
-                total_turnover = intraday + entry + exit_value
-                selected_dates = np.unique(date_idx)
-                group_members = quintiles[selected_dates] == group
-                stock_contributions = np.zeros(label_mask.shape[1], dtype=np.float64)
-                for sample in range(label_mask.shape[0]):
-                    members = quintiles[date_idx[sample]] == group
-                    stock_contributions[members] += additive_values[
-                        sample, members, horizon_index
-                    ]
-                stock_contributions /= label_mask.shape[0]
+                total = float(
+                    _finite_axis_mean(economic_daily["total"][:, horizon_index], axis=0)
+                )
+                stock_vector = _point_in_time_bucket_contribution_vector(
+                    contribution_grid,
+                    quintiles,
+                    group,
+                    all_decisions,
+                    horizon_index,
+                )
                 herfindahl, top_decile_share = _contribution_concentration(
-                    stock_contributions[group_members.any(axis=0)]
+                    stock_vector[np.any(group_members, axis=0)]
                 )
-                group_liquidity = dollar_liquidity[selected_dates][group_members]
                 rows.append(
                     {
                         "aggregation": "seed",
@@ -3557,79 +4058,67 @@ def _build_liquidity_outputs(
                         "bucket": group + 1,
                         "horizon_minutes": horizon,
                         "additive_ic_contribution": contribution,
-                        "positive_contribution_mass": float(
-                            np.nanmean(
-                                daily_metrics["positive"][:, :, group, horizon_index]
+                        "positive_contribution_mass": _finite_or_none(
+                            float(
+                                _finite_axis_mean(
+                                    all_day_metrics["positive"][
+                                        :, group, horizon_index
+                                    ],
+                                    axis=0,
+                                )
                             )
                         ),
-                        "negative_contribution_mass": float(
-                            np.nanmean(
-                                daily_metrics["negative"][:, :, group, horizon_index]
+                        "negative_contribution_mass": _finite_or_none(
+                            float(
+                                _finite_axis_mean(
+                                    all_day_metrics["negative"][
+                                        :, group, horizon_index
+                                    ],
+                                    axis=0,
+                                )
                             )
                         ),
-                        "gross_spread_contribution": spread,
+                        "mean_daily_gross_contribution": gross,
+                        "gross_spread_contribution": gross,
+                        "mean_daily_intraday_one_way_turnover": intraday,
                         "intraday_one_way_turnover": intraday,
+                        "mean_daily_flat_entry_turnover": entry,
                         "flat_entry_turnover": entry,
+                        "mean_daily_flat_exit_turnover": exit_value,
                         "flat_exit_turnover": exit_value,
+                        "mean_daily_total_one_way_turnover": total,
                         "break_even_one_way_cost_bps": (
-                            10_000.0 * spread / total_turnover
-                            if total_turnover > 0
-                            else None
+                            10_000.0 * gross / total if total > 0 else None
                         ),
                         "tail_selection_frequency": float(
-                            np.divide(
-                                daily_metrics["tail"][:, :, group, horizon_index].sum(),
-                                max(
-                                    1.0,
-                                    daily_metrics["coverage"][
-                                        :, :, group, horizon_index
-                                    ].sum(),
-                                ),
-                            )
+                            group_tail[:, group, horizon_index].sum()
+                            / max(1.0, group_coverage[:, group, horizon_index].sum())
                         ),
                         "label_coverage": float(
-                            np.divide(
-                                daily_metrics["coverage"][
-                                    :, :, group, horizon_index
-                                ].sum(),
-                                max(
-                                    1.0,
-                                    daily_metrics["active"][
-                                        :, :, group, horizon_index
-                                    ].sum(),
-                                ),
-                            )
+                            group_coverage[:, group, horizon_index].sum()
+                            / max(1.0, group_active[:, group, horizon_index].sum())
                         ),
                         "stock_contribution_herfindahl": herfindahl,
                         "top_decile_absolute_contribution_share": top_decile_share,
                         "mean_point_in_time_dollar_liquidity_brl": _finite_or_none(
-                            np.nanmean(group_liquidity)
+                            float(_finite_axis_mean(group_liquidity, axis=0))
                         ),
                         "mean_distance_from_eligibility_threshold_brl": (
-                            float(np.nanmean(group_liquidity) - threshold)
+                            float(
+                                _finite_axis_mean(group_liquidity, axis=0) - threshold
+                            )
                             if threshold is not None
                             else None
                         ),
                         "independently_reranked_within_bucket_ic": None,
                         "adaptive_bucket_count_minimum": int(
-                            adaptive_count_by_date[selected_dates].min()
+                            adaptive_count_by_date.min()
                         ),
                     }
                 )
-        _, adaptive_daily = _daily_grid(
-            independent_ic.reshape(independent_ic.shape[0], -1),
-            date_idx,
-            decision_idx,
-        )
-        adaptive_daily = adaptive_daily.reshape(
-            adaptive_daily.shape[0],
-            adaptive_daily.shape[1],
-            5,
-            len(HORIZONS),
-        )
         for group in range(5):
             for horizon_index, horizon in enumerate(HORIZONS):
-                values = adaptive_daily[:, :, group, horizon_index]
+                values = adaptive_grid[:, :, group, horizon_index]
                 if not np.isfinite(values).any():
                     continue
                 rows.append(
@@ -3642,10 +4131,15 @@ def _build_liquidity_outputs(
                         "additive_ic_contribution": None,
                         "positive_contribution_mass": None,
                         "negative_contribution_mass": None,
+                        "mean_daily_gross_contribution": None,
                         "gross_spread_contribution": None,
+                        "mean_daily_intraday_one_way_turnover": None,
                         "intraday_one_way_turnover": None,
+                        "mean_daily_flat_entry_turnover": None,
                         "flat_entry_turnover": None,
+                        "mean_daily_flat_exit_turnover": None,
                         "flat_exit_turnover": None,
+                        "mean_daily_total_one_way_turnover": None,
                         "break_even_one_way_cost_bps": None,
                         "tail_selection_frequency": None,
                         "label_coverage": None,
@@ -3653,55 +4147,66 @@ def _build_liquidity_outputs(
                         "top_decile_absolute_contribution_share": None,
                         "mean_point_in_time_dollar_liquidity_brl": None,
                         "mean_distance_from_eligibility_threshold_brl": None,
-                        "independently_reranked_within_bucket_ic": float(
-                            np.nanmean(values)
+                        "independently_reranked_within_bucket_ic": _finite_mean_or_none(
+                            values
                         ),
                         "adaptive_bucket_count_minimum": int(
-                            adaptive_count_by_date[np.unique(date_idx)].min()
+                            adaptive_count_by_date.min()
                         ),
                     }
                 )
         for time_name, decisions in time_bins.items():
+            scope_contribution = _scope_daily_mean(
+                daily_metrics["contribution"], decisions
+            )
+            scope_accounting = economic_window_accounting(
+                economic, date_idx, decision_idx, decisions=decisions
+            )
             for group in range(5):
-                stock_vector = np.nanmean(
-                    additive_values[np.isin(decision_idx, decisions)],
-                    axis=(0, 2),
+                economic_daily = _window_bucket_daily(
+                    scope_accounting, quintiles, metadata, group
                 )
-                group_vector = stock_vector[
-                    np.any(quintiles[np.unique(date_idx)] == group, axis=0)
-                ]
-                herfindahl, top_share = _contribution_concentration(group_vector)
                 for horizon_index, horizon in enumerate(HORIZONS):
                     contribution = float(
-                        np.nanmean(
-                            daily_metrics["contribution"][
-                                :, decisions, group, horizon_index
-                            ]
+                        _finite_axis_mean(
+                            scope_contribution[:, group, horizon_index], axis=0
                         )
                     )
-                    spread = float(
-                        np.nanmean(
-                            daily_metrics["spread"][:, decisions, group, horizon_index]
-                        )
-                    )
-                    intraday = float(
-                        np.nanmean(
-                            daily_metrics["turnover"][
-                                :, decisions, group, horizon_index
-                            ]
+                    gross = float(
+                        _finite_axis_mean(
+                            economic_daily["gross"][:, horizon_index], axis=0
                         )
                     )
                     entry = float(
-                        np.nanmean(
-                            daily_metrics["entry"][:, decisions, group, horizon_index]
+                        _finite_axis_mean(
+                            economic_daily["entry"][:, horizon_index], axis=0
+                        )
+                    )
+                    intraday = float(
+                        _finite_axis_mean(
+                            economic_daily["intraday"][:, horizon_index], axis=0
                         )
                     )
                     exit_value = float(
-                        np.nanmean(
-                            daily_metrics["exit"][:, decisions, group, horizon_index]
+                        _finite_axis_mean(
+                            economic_daily["exit"][:, horizon_index], axis=0
                         )
                     )
-                    total = intraday + entry + exit_value
+                    total = float(
+                        _finite_axis_mean(
+                            economic_daily["total"][:, horizon_index], axis=0
+                        )
+                    )
+                    stock_vector = _point_in_time_bucket_contribution_vector(
+                        contribution_grid,
+                        quintiles,
+                        group,
+                        decisions,
+                        horizon_index,
+                    )
+                    herfindahl, top_share = _contribution_concentration(
+                        stock_vector[np.any(quintiles == group, axis=0)]
+                    )
                     time_rows.append(
                         {
                             "aggregation": "seed",
@@ -3711,53 +4216,80 @@ def _build_liquidity_outputs(
                             "decision_indices": json.dumps(list(decisions)),
                             "horizon_minutes": horizon,
                             "additive_ic_contribution": contribution,
-                            "gross_spread_contribution": spread,
+                            "mean_daily_gross_contribution": gross,
+                            "gross_spread_contribution": gross,
+                            "mean_daily_intraday_one_way_turnover": intraday,
                             "intraday_one_way_turnover": intraday,
+                            "mean_daily_flat_entry_turnover": entry,
                             "flat_entry_turnover": entry,
+                            "mean_daily_flat_exit_turnover": exit_value,
                             "flat_exit_turnover": exit_value,
+                            "mean_daily_total_one_way_turnover": total,
                             "break_even_one_way_cost_bps": (
-                                10_000.0 * spread / total if total > 0 else None
+                                10_000.0 * gross / total if total > 0 else None
                             ),
                             "stock_contribution_herfindahl": herfindahl,
                             "top_decile_absolute_contribution_share": top_share,
                         }
                     )
-        quintile_sum = float(
-            sum(
+            for horizon_index, horizon in enumerate(HORIZONS):
+                reconstructed = sum(
+                    row["additive_ic_contribution"]
+                    for row in time_rows
+                    if row["seed"] == seed
+                    and row["time_bin"] == time_name
+                    and row["horizon_minutes"] == horizon
+                )
+                expected = float(
+                    _finite_axis_mean(
+                        _scope_daily_mean(
+                            sample_ic_grid,
+                            decisions,
+                        )[:, horizon_index],
+                        axis=0,
+                    )
+                )
+                difference = abs(reconstructed - expected)
+                maximum_difference = max(maximum_difference, difference)
+                if difference > RECONSTRUCTION_ABSOLUTE_TOLERANCE:
+                    raise RuntimeError(
+                        "Liquidity/time cells failed additive reconstruction"
+                    )
+        for horizon_index, horizon in enumerate(HORIZONS):
+            reconstructed = sum(
                 row["additive_ic_contribution"]
                 for row in rows
                 if row["seed"] == seed
                 and row["bucket_kind"] == "daily_liquidity_quintile"
-                and row["horizon_minutes"] == HORIZONS[0]
+                and row["horizon_minutes"] == horizon
             )
-        )
-        expected_horizon = float(
-            np.nanmean(
-                sample_ic[:, 0].reshape(-1, EXPECTED_DECISIONS_PER_DATE), axis=1
-            ).mean()
-        )
-        difference = abs(quintile_sum - expected_horizon)
-        if difference > RECONSTRUCTION_ABSOLUTE_TOLERANCE:
-            raise RuntimeError("Liquidity quintiles failed additive reconstruction")
+            expected = float(
+                _finite_axis_mean(
+                    _scope_daily_mean(
+                        sample_ic_grid,
+                        all_decisions,
+                    )[:, horizon_index],
+                    axis=0,
+                )
+            )
+            difference = abs(reconstructed - expected)
+            maximum_difference = max(maximum_difference, difference)
+            if difference > RECONSTRUCTION_ABSOLUTE_TOLERANCE:
+                raise RuntimeError("Liquidity quintiles failed additive reconstruction")
         checks[str(seed)] = {
-            "quintile_horizon_30m_absolute_difference": difference,
+            "maximum_cell_absolute_difference": maximum_difference,
             "passed": True,
         }
     liquidity = pl.DataFrame(rows, infer_schema_length=None)
     liquidity_time = pl.DataFrame(time_rows, infer_schema_length=None)
-    group_columns = [
-        "bucket_kind",
-        "bucket",
-        "horizon_minutes",
-    ]
+    group_columns = ["bucket_kind", "bucket", "horizon_minutes"]
     numeric_columns = [
         name
         for name, dtype in liquidity.schema.items()
         if name not in {"seed", "aggregation", *group_columns} and dtype.is_numeric()
     ]
     across = (
-        liquidity.filter(pl.col("aggregation") == "seed")
-        .group_by(group_columns)
+        liquidity.group_by(group_columns)
         .agg([pl.col(column).mean().alias(column) for column in numeric_columns])
         .with_columns(
             pl.lit("across_seed").alias("aggregation"),
@@ -3845,6 +4377,160 @@ def _freshness_categories(
     }
 
 
+def _opening_condition_masks(
+    shared: dict[str, np.ndarray],
+    metadata: dict[str, object],
+) -> list[tuple[str, str, np.ndarray, str | None, str | None]]:
+    sample_count = np.asarray(shared["date_idx"]).size
+    date_positions = _metadata_date_positions(
+        metadata, np.asarray(shared["date_idx"], dtype=np.int64)
+    )
+    equity = metadata["equity_completeness"]
+    local = metadata["local_completeness"]
+    global_values = metadata["global_completeness"]
+    if not all(isinstance(value, dict) for value in (equity, local, global_values)):
+        raise TypeError("Completeness metadata is malformed")
+    result: list[tuple[str, str, np.ndarray, str | None, str | None]] = []
+
+    b3_before = (np.asarray(equity["observed_bars"], dtype=np.int64) > 0).sum(
+        axis=1
+    ) >= MIN_IC_EQUITIES
+    result.extend(
+        [
+            ("b3_bars_before_decision", "available", b3_before, None, None),
+            ("b3_bars_before_decision", "unavailable", ~b3_before, None, None),
+        ]
+    )
+
+    local_positions = np.asarray(
+        [
+            LOCAL_CONTEXT_SYMBOLS.index(symbol)
+            for symbol in EXPECTED_RETAINED_LOCAL_CONTEXTS
+        ]
+    )
+    global_positions = np.asarray(
+        [
+            GLOBAL_CONTEXT_SYMBOLS.index(symbol)
+            for symbol in EXPECTED_RETAINED_GLOBAL_CONTEXTS
+        ]
+    )
+    local_complete = np.all(
+        np.asarray(local["ready"])[:, local_positions]
+        & (
+            np.asarray(local["observed_fraction"], dtype=np.float64)[:, local_positions]
+            >= 0.95
+        ),
+        axis=1,
+    )
+    global_complete = np.all(
+        np.asarray(global_values["ready"])[:, global_positions]
+        & (
+            np.asarray(global_values["observed_fraction"], dtype=np.float64)[
+                :, global_positions
+            ]
+            >= 0.95
+        ),
+        axis=1,
+    )
+    result.extend(
+        [
+            (
+                "retained_local_completeness",
+                "complete",
+                local_complete,
+                None,
+                None,
+            ),
+            (
+                "retained_local_completeness",
+                "incomplete",
+                ~local_complete,
+                None,
+                None,
+            ),
+            (
+                "retained_global_completeness",
+                "complete",
+                global_complete,
+                None,
+                None,
+            ),
+            (
+                "retained_global_completeness",
+                "incomplete",
+                ~global_complete,
+                None,
+                None,
+            ),
+        ]
+    )
+    global_staleness = np.asarray(
+        global_values["minutes_since_most_recent_observed_bar"], dtype=np.float64
+    )[:, global_positions]
+    global_fresh = (
+        np.all(np.asarray(global_values["ready"])[:, global_positions], axis=1)
+        & np.isfinite(global_staleness).all(axis=1)
+        & (global_staleness <= RECENT_OBSERVED_MINUTES).all(axis=1)
+    )
+    result.extend(
+        [
+            (
+                "retained_global_freshness",
+                "fresh_within_30m",
+                global_fresh,
+                None,
+                "fresh_within_30m",
+            ),
+            (
+                "retained_global_freshness",
+                "stale_or_unready",
+                ~global_fresh,
+                None,
+                "stale_or_unready",
+            ),
+        ]
+    )
+    local_preopen = np.asarray(local["preopen_observed_fraction"], dtype=np.float64)[
+        :, local_positions
+    ]
+    global_preopen = np.asarray(
+        global_values["preopen_observed_fraction"], dtype=np.float64
+    )[:, global_positions]
+    preopen_complete = (
+        np.isfinite(local_preopen).all(axis=1)
+        & np.isfinite(global_preopen).all(axis=1)
+        & (local_preopen >= 0.95).all(axis=1)
+        & (global_preopen >= 0.95).all(axis=1)
+    )
+    result.extend(
+        [
+            (
+                "retained_context_preopen",
+                "complete",
+                preopen_complete,
+                None,
+                None,
+            ),
+            (
+                "retained_context_preopen",
+                "incomplete",
+                ~preopen_complete,
+                None,
+                None,
+            ),
+        ]
+    )
+    overnight = metadata["overnight_regimes"]
+    if not isinstance(overnight, dict):
+        raise TypeError("Overnight regimes are malformed")
+    for regime, day_mask in overnight.items():
+        sample_mask = np.asarray(day_mask, dtype=bool)[date_positions]
+        if sample_mask.shape != (sample_count,):
+            raise ValueError("Overnight regime mask is misaligned")
+        result.append(("overnight_regime", regime, sample_mask, regime, None))
+    return result
+
+
 def _build_opening_regimes(
     core_by_seed: dict[int, dict[str, object]],
     shared: dict[str, np.ndarray],
@@ -3852,6 +4538,7 @@ def _build_opening_regimes(
 ) -> pl.DataFrame:
     date_idx = np.asarray(shared["date_idx"], dtype=np.int64)
     decision_idx = np.asarray(shared["decision_idx"], dtype=np.int64)
+    date_positions = _metadata_date_positions(metadata, date_idx)
     label_mask = np.asarray(shared["label_mask"], dtype=bool)
     liquidity = np.asarray(metadata["liquidity_quintile"], dtype=np.int8)
     equity = metadata["equity_completeness"]
@@ -3876,7 +4563,7 @@ def _build_opening_regimes(
         for bin_name, decisions in bins.items():
             sample_selector = np.isin(decision_idx, decisions)
             for quintile in range(5):
-                sample_groups = liquidity[date_idx] == quintile
+                sample_groups = liquidity[date_positions] == quintile
                 for horizon_index, horizon in enumerate(HORIZONS):
                     for category, category_name in enumerate(
                         ("below_80pct", "80_to_95pct", "at_least_95pct")
@@ -3970,7 +4657,7 @@ def _build_opening_regimes(
         overnight = metadata["overnight_regimes"]
         if not isinstance(overnight, dict):
             raise TypeError("Overnight regimes are malformed")
-        sample_date_position = date_idx
+        sample_date_position = date_positions
         for regime_name, date_mask in overnight.items():
             for scope_name in ("opening_30", "opening_60"):
                 decisions = named_time_scopes()[scope_name]
@@ -3982,22 +4669,17 @@ def _build_opening_regimes(
                     decision_idx,
                     decisions,
                 )
-                spread = economic.return_contributions.sum(axis=1)
-                daily_spread = _daily_subset_mean(
-                    spread,
-                    selected,
-                    date_idx,
-                    decision_idx,
-                    decisions,
+                daily_economic = _window_portfolio_daily(
+                    economic_window_accounting(
+                        economic,
+                        date_idx,
+                        decision_idx,
+                        decisions=decisions,
+                        selected_samples=selected,
+                    )
                 )
-                turnover = economic.intraday_turnover.sum(axis=1)
-                daily_turnover = _daily_subset_mean(
-                    turnover,
-                    selected,
-                    date_idx,
-                    decision_idx,
-                    decisions,
-                )
+                daily_spread = daily_economic["gross"]
+                daily_turnover = daily_economic["intraday"]
                 for horizon_index, horizon in enumerate(HORIZONS):
                     rows.append(
                         {
@@ -4123,6 +4805,99 @@ def _build_opening_regimes(
                         ),
                     }
                 )
+    for seed in STAGE3_SEEDS:
+        core = core_by_seed[seed]
+        sample_ic = np.asarray(core["sample_ic"])
+        economic = core["economic"]
+        if not isinstance(economic, EconomicAttributionResult):
+            raise TypeError("Core economic attribution is malformed")
+        for (
+            condition_type,
+            category,
+            sample_mask,
+            regime,
+            freshness,
+        ) in _opening_condition_masks(shared, metadata):
+            for scope_name in ("opening_30", "opening_60"):
+                decisions = named_time_scopes()[scope_name]
+                daily_ic = _daily_subset_mean(
+                    sample_ic,
+                    sample_mask,
+                    date_idx,
+                    decision_idx,
+                    decisions,
+                )
+                daily_economic = _window_portfolio_daily(
+                    economic_window_accounting(
+                        economic,
+                        date_idx,
+                        decision_idx,
+                        decisions=decisions,
+                        selected_samples=sample_mask,
+                    )
+                )
+                for horizon_position in range(len(HORIZONS) + 1):
+                    if horizon_position < len(HORIZONS):
+                        horizon = HORIZONS[horizon_position]
+                        ic_values = daily_ic[:, horizon_position]
+                        gross = daily_economic["gross"][:, horizon_position]
+                        entry = daily_economic["entry"][:, horizon_position]
+                        intraday = daily_economic["intraday"][:, horizon_position]
+                        exit_values = daily_economic["exit"][:, horizon_position]
+                        total = daily_economic["total"][:, horizon_position]
+                    else:
+                        horizon = 0
+                        ic_values = _finite_axis_mean(daily_ic, axis=1)
+                        gross = _finite_axis_mean(daily_economic["gross"], axis=1)
+                        entry = _finite_axis_mean(daily_economic["entry"], axis=1)
+                        intraday = _finite_axis_mean(daily_economic["intraday"], axis=1)
+                        exit_values = _finite_axis_mean(daily_economic["exit"], axis=1)
+                        total = _finite_axis_mean(daily_economic["total"], axis=1)
+                    rows.append(
+                        {
+                            "diagnostic_type": f"core_{condition_type}",
+                            "condition_category": category,
+                            "seed": seed,
+                            "instrument": None,
+                            "time_scope": scope_name,
+                            "decision_indices": json.dumps(list(decisions)),
+                            "horizon_minutes": horizon,
+                            "liquidity_quintile": None,
+                            "history_category": None,
+                            "overnight_regime": regime,
+                            "freshness_category": freshness,
+                            "additive_ic_contribution": _finite_mean_or_none(ic_values),
+                            "independently_reranked_conditional_ic": None,
+                            "mean_observed_fraction": None,
+                            "mean_recent_observed_fraction": None,
+                            "readiness_fraction": None,
+                            "preopen_observed_fraction": None,
+                            "mean_staleness_minutes": None,
+                            "mean_daily_gross_contribution": _finite_mean_or_none(
+                                gross
+                            ),
+                            "gross_spread": _finite_mean_or_none(gross),
+                            "mean_daily_flat_entry_turnover": _finite_mean_or_none(
+                                entry
+                            ),
+                            "mean_daily_intraday_turnover": _finite_mean_or_none(
+                                intraday
+                            ),
+                            "intraday_turnover": _finite_mean_or_none(intraday),
+                            "mean_daily_flat_exit_turnover": _finite_mean_or_none(
+                                exit_values
+                            ),
+                            "mean_daily_total_turnover": _finite_mean_or_none(total),
+                            "break_even_one_way_cost_bps": (
+                                10_000.0
+                                * float(_finite_axis_mean(gross, axis=0))
+                                / float(_finite_axis_mean(total, axis=0))
+                                if float(_finite_axis_mean(total, axis=0)) > 0
+                                else None
+                            ),
+                            "valid_date_count": int(np.isfinite(ic_values).sum()),
+                        }
+                    )
     return pl.DataFrame(rows, infer_schema_length=None)
 
 
@@ -4144,25 +4919,41 @@ def _paired_delta_row(
     freshness: str | None,
     bootstrap_replications: int,
     bootstrap_seed: int,
+    condition_type: str | None = None,
+    condition_category: str | None = None,
+    current_entry: np.ndarray | None = None,
+    core_entry: np.ndarray | None = None,
+    current_exit: np.ndarray | None = None,
+    core_exit: np.ndarray | None = None,
+    current_total_turnover: np.ndarray | None = None,
+    core_total_turnover: np.ndarray | None = None,
 ) -> dict[str, object]:
     if current_ic.shape != core_ic.shape:
         raise ValueError("Same-seed context delta daily arrays are misaligned")
     valid = np.isfinite(current_ic) & np.isfinite(core_ic)
-    if not valid.any():
-        delta = np.full(current_ic.shape, np.nan, dtype=np.float64)
-        interval = {
-            "estimate": None,
-            "interval_lower_95": None,
-            "interval_upper_95": None,
-        }
-    else:
-        delta = current_ic - core_ic
-        bootstrap = moving_block_bootstrap(
-            delta,
-            replications=bootstrap_replications,
-            seed=bootstrap_seed,
+    delta = np.where(valid, current_ic - core_ic, np.nan)
+    bootstrap = moving_block_bootstrap(
+        delta,
+        replications=bootstrap_replications,
+        seed=bootstrap_seed,
+    )
+
+    def paired_mean(
+        current: np.ndarray | None, core: np.ndarray | None
+    ) -> float | None:
+        if current is None or core is None:
+            return None
+        current = np.asarray(current, dtype=np.float64)
+        core = np.asarray(core, dtype=np.float64)
+        if current.shape != valid.shape or core.shape != valid.shape:
+            raise ValueError("Paired economic daily arrays are misaligned")
+        selected = valid & np.isfinite(current) & np.isfinite(core)
+        return (
+            float(np.mean(current[selected] - core[selected]))
+            if selected.any()
+            else None
         )
-        interval = bootstrap
+
     return {
         "aggregation": "seed",
         "logical_configuration": logical,
@@ -4172,35 +4963,39 @@ def _paired_delta_row(
         "scope": scope_name,
         "decision_indices": json.dumps(list(decisions)),
         "horizon_minutes": horizon_minutes,
+        "condition_type": condition_type,
+        "condition_category": condition_category,
         "overnight_regime": regime,
         "freshness_category": freshness,
-        "mean_paired_ic_delta": (
-            _finite_or_none(np.nanmean(delta)) if valid.any() else None
+        "mean_paired_ic_delta": _finite_mean_or_none(delta),
+        "ic_delta_interval_lower_95": _finite_or_none(
+            float(bootstrap["interval_lower_95"])
         ),
-        "ic_delta_interval_lower_95": (
-            interval.get("interval_lower_95") if isinstance(interval, dict) else None
+        "ic_delta_interval_upper_95": _finite_or_none(
+            float(bootstrap["interval_upper_95"])
         ),
-        "ic_delta_interval_upper_95": (
-            interval.get("interval_upper_95") if isinstance(interval, dict) else None
+        "bootstrap_finite_replication_count": int(
+            bootstrap["finite_replication_count"]
         ),
-        "mean_paired_gross_spread_delta": _finite_or_none(
-            np.nanmean(current_spread - core_spread)
+        "mean_paired_gross_spread_delta": paired_mean(current_spread, core_spread),
+        "mean_paired_flat_entry_turnover_delta": paired_mean(current_entry, core_entry),
+        "mean_paired_intraday_turnover_delta": paired_mean(
+            current_turnover, core_turnover
         ),
-        "mean_paired_intraday_turnover_delta": _finite_or_none(
-            np.nanmean(current_turnover - core_turnover)
+        "mean_paired_flat_exit_turnover_delta": paired_mean(current_exit, core_exit),
+        "mean_paired_total_turnover_delta": paired_mean(
+            current_total_turnover, core_total_turnover
         ),
         "valid_date_count": int(valid.sum()),
         "preregistered_primary_question": (
             scope_name == "opening_30"
             and horizon_minutes == 0
-            and regime is None
-            and freshness in {None, "all_dates"}
+            and condition_type is None
         ),
         "exploratory": not (
             scope_name == "opening_30"
             and horizon_minutes == 0
-            and regime is None
-            and freshness in {None, "all_dates"}
+            and condition_type is None
         ),
     }
 
@@ -4233,11 +5028,29 @@ def _build_context_time_deltas(
     targets = np.asarray(shared["targets"])
     raw_returns = np.asarray(shared["raw_returns"])
     label_mask = np.asarray(shared["label_mask"], dtype=bool)
+    all_samples = np.ones(date_idx.shape, dtype=bool)
     rows: list[dict[str, object]] = []
     primary_bins = {
         row["name"]: tuple(row["decision_indices"]) for row in _time_bin_metadata()
     }
     scopes = {**primary_bins, **named_time_scopes()}
+    opening_conditions = _opening_condition_masks(shared, metadata)
+
+    def daily_economic(
+        result: EconomicAttributionResult,
+        decisions: tuple[int, ...],
+        sample_mask: np.ndarray,
+    ) -> dict[str, np.ndarray]:
+        return _window_portfolio_daily(
+            economic_window_accounting(
+                result,
+                date_idx,
+                decision_idx,
+                decisions=decisions,
+                selected_samples=sample_mask,
+            )
+        )
+
     for logical_index, logical in enumerate(STAGE3_LOGICAL_CONFIGURATION_ORDER[1:]):
         added = ADDED_CONTEXT_BY_LOGICAL_CONFIGURATION[logical]
         if added in LOCAL_CONTEXT_SYMBOLS:
@@ -4252,7 +5065,20 @@ def _build_context_time_deltas(
         stale = np.asarray(completeness["minutes_since_most_recent_observed_bar"])[
             ..., instrument_position
         ]
-        freshness_masks = _freshness_categories(ready, stale)
+        added_freshness = _freshness_categories(ready, stale)
+        conditional_masks = [
+            *opening_conditions,
+            *[
+                (
+                    "added_context_freshness",
+                    category,
+                    mask,
+                    None,
+                    category,
+                )
+                for category, mask in added_freshness.items()
+            ],
+        ]
         for seed in STAGE3_SEEDS:
             predictions = np.load(
                 cache_paths[(logical, seed)], mmap_mode="r", allow_pickle=False
@@ -4265,275 +5091,122 @@ def _build_context_time_deltas(
                 date_idx,
                 decision_idx,
             )
-            _, current_ic_grid = _daily_grid(additive.sample_ic, date_idx, decision_idx)
-            _, current_spread_grid = _daily_grid(
-                economic.return_contributions.sum(axis=1), date_idx, decision_idx
-            )
-            _, current_turnover_grid = _daily_grid(
-                economic.intraday_turnover.sum(axis=1), date_idx, decision_idx
-            )
             core = core_by_seed[seed]
-            core_ic_grid = np.asarray(core["daily_ic"])
             core_economic = core["economic"]
             if not isinstance(core_economic, EconomicAttributionResult):
                 raise TypeError("Core economic attribution is malformed")
-            _, core_spread_grid = _daily_grid(
-                core_economic.return_contributions.sum(axis=1), date_idx, decision_idx
-            )
-            _, core_turnover_grid = _daily_grid(
-                core_economic.intraday_turnover.sum(axis=1), date_idx, decision_idx
-            )
-            for scope_index, (scope_name, decisions) in enumerate(scopes.items()):
-                current_ic = _scope_daily_mean(current_ic_grid, decisions)
-                core_ic = _scope_daily_mean(core_ic_grid, decisions)
-                current_spread = _scope_daily_mean(current_spread_grid, decisions)
-                core_spread = _scope_daily_mean(core_spread_grid, decisions)
-                current_turnover = _scope_daily_mean(current_turnover_grid, decisions)
-                core_turnover = _scope_daily_mean(core_turnover_grid, decisions)
-                for horizon_index, horizon in enumerate(HORIZONS):
+            row_counter = 0
+
+            def append_scope(
+                scope_type: str,
+                scope_name: str,
+                decisions: tuple[int, ...],
+                sample_mask: np.ndarray,
+                condition_type: str | None = None,
+                condition_category: str | None = None,
+                regime: str | None = None,
+                freshness: str | None = None,
+            ) -> None:
+                nonlocal row_counter
+                current_ic = _daily_subset_mean(
+                    additive.sample_ic,
+                    sample_mask,
+                    date_idx,
+                    decision_idx,
+                    decisions,
+                )
+                core_ic = _daily_subset_mean(
+                    np.asarray(core["sample_ic"]),
+                    sample_mask,
+                    date_idx,
+                    decision_idx,
+                    decisions,
+                )
+                current_economic = daily_economic(economic, decisions, sample_mask)
+                core_economic_daily = daily_economic(
+                    core_economic, decisions, sample_mask
+                )
+                for horizon_position in range(len(HORIZONS) + 1):
+                    if horizon_position < len(HORIZONS):
+                        horizon = HORIZONS[horizon_position]
+
+                        def select(values: np.ndarray) -> np.ndarray:
+                            return values[:, horizon_position]
+
+                    else:
+                        horizon = 0
+
+                        def select(values: np.ndarray) -> np.ndarray:
+                            return _finite_axis_mean(values, axis=1)
+
                     rows.append(
                         _paired_delta_row(
                             logical=logical,
                             seed=seed,
-                            scope_type=(
-                                "decision_bin"
-                                if scope_name.startswith("bin_")
-                                else "named_scope"
-                            ),
+                            scope_type=scope_type,
                             scope_name=scope_name,
                             decisions=decisions,
                             horizon_minutes=horizon,
-                            current_ic=current_ic[:, horizon_index],
-                            core_ic=core_ic[:, horizon_index],
-                            current_spread=current_spread[:, horizon_index],
-                            core_spread=core_spread[:, horizon_index],
-                            current_turnover=current_turnover[:, horizon_index],
-                            core_turnover=core_turnover[:, horizon_index],
-                            regime=None,
-                            freshness=None,
+                            current_ic=select(current_ic),
+                            core_ic=select(core_ic),
+                            current_spread=select(current_economic["gross"]),
+                            core_spread=select(core_economic_daily["gross"]),
+                            current_turnover=select(current_economic["intraday"]),
+                            core_turnover=select(core_economic_daily["intraday"]),
+                            current_entry=select(current_economic["entry"]),
+                            core_entry=select(core_economic_daily["entry"]),
+                            current_exit=select(current_economic["exit"]),
+                            core_exit=select(core_economic_daily["exit"]),
+                            current_total_turnover=select(current_economic["total"]),
+                            core_total_turnover=select(core_economic_daily["total"]),
+                            condition_type=condition_type,
+                            condition_category=condition_category,
+                            regime=regime,
+                            freshness=freshness,
                             bootstrap_replications=bootstrap_replications,
                             bootstrap_seed=(
                                 BOOTSTRAP_SEED
-                                + logical_index * 100_000
-                                + seed * 1_000
-                                + scope_index * 10
-                                + horizon_index
+                                + logical_index * 10_000_000
+                                + seed * 100_000
+                                + row_counter
                             ),
                         )
                     )
-                rows.append(
-                    _paired_delta_row(
-                        logical=logical,
-                        seed=seed,
-                        scope_type=(
-                            "decision_bin"
-                            if scope_name.startswith("bin_")
-                            else "named_scope"
-                        ),
-                        scope_name=scope_name,
-                        decisions=decisions,
-                        horizon_minutes=0,
-                        current_ic=np.nanmean(current_ic, axis=1),
-                        core_ic=np.nanmean(core_ic, axis=1),
-                        current_spread=np.nanmean(current_spread, axis=1),
-                        core_spread=np.nanmean(core_spread, axis=1),
-                        current_turnover=np.nanmean(current_turnover, axis=1),
-                        core_turnover=np.nanmean(core_turnover, axis=1),
-                        regime=None,
-                        freshness=None,
-                        bootstrap_replications=bootstrap_replications,
-                        bootstrap_seed=(
-                            BOOTSTRAP_SEED
-                            + logical_index * 100_000
-                            + seed * 1_000
-                            + scope_index * 10
-                            + 9
-                        ),
-                    )
+                    row_counter += 1
+
+            for scope_name, decisions in scopes.items():
+                append_scope(
+                    "decision_bin" if scope_name.startswith("bin_") else "named_scope",
+                    scope_name,
+                    decisions,
+                    all_samples,
                 )
             for decision in range(EXPECTED_DECISIONS_PER_DATE):
-                decisions = (decision,)
-                for horizon_index, horizon in enumerate(HORIZONS):
-                    rows.append(
-                        _paired_delta_row(
-                            logical=logical,
-                            seed=seed,
-                            scope_type="decision_5m",
-                            scope_name=f"decision_{decision:02d}",
-                            decisions=decisions,
-                            horizon_minutes=horizon,
-                            current_ic=current_ic_grid[:, decision, horizon_index],
-                            core_ic=core_ic_grid[:, decision, horizon_index],
-                            current_spread=current_spread_grid[
-                                :, decision, horizon_index
-                            ],
-                            core_spread=core_spread_grid[:, decision, horizon_index],
-                            current_turnover=current_turnover_grid[
-                                :, decision, horizon_index
-                            ],
-                            core_turnover=core_turnover_grid[
-                                :, decision, horizon_index
-                            ],
-                            regime=None,
-                            freshness=None,
-                            bootstrap_replications=bootstrap_replications,
-                            bootstrap_seed=(
-                                BOOTSTRAP_SEED
-                                + logical_index * 1_000_000
-                                + seed * 10_000
-                                + decision * 10
-                                + horizon_index
-                            ),
-                        )
+                append_scope(
+                    "decision_5m",
+                    f"decision_{decision:02d}",
+                    (decision,),
+                    all_samples,
+                )
+            for (
+                condition_type,
+                category,
+                sample_mask,
+                regime,
+                freshness,
+            ) in conditional_masks:
+                for scope_name in ("opening_30", "opening_60"):
+                    append_scope(
+                        condition_type,
+                        scope_name,
+                        named_time_scopes()[scope_name],
+                        np.asarray(sample_mask, dtype=bool),
+                        condition_type,
+                        category,
+                        regime,
+                        freshness,
                     )
-            for regime_index, (regime_name, day_mask) in enumerate(
-                metadata["overnight_regimes"].items()
-            ):
-                sample_mask = np.asarray(day_mask, dtype=bool)[date_idx]
-                for scope_offset, scope_name in enumerate(("opening_30", "opening_60")):
-                    decisions = named_time_scopes()[scope_name]
-                    current_regime = _daily_subset_mean(
-                        additive.sample_ic,
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    core_regime = _daily_subset_mean(
-                        np.asarray(core["sample_ic"]),
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    current_spread = _daily_subset_mean(
-                        economic.return_contributions.sum(axis=1),
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    core_spread = _daily_subset_mean(
-                        core_economic.return_contributions.sum(axis=1),
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    current_turnover = _daily_subset_mean(
-                        economic.intraday_turnover.sum(axis=1),
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    core_turnover = _daily_subset_mean(
-                        core_economic.intraday_turnover.sum(axis=1),
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    rows.append(
-                        _paired_delta_row(
-                            logical=logical,
-                            seed=seed,
-                            scope_type="overnight_regime",
-                            scope_name=scope_name,
-                            decisions=decisions,
-                            horizon_minutes=0,
-                            current_ic=np.nanmean(current_regime, axis=1),
-                            core_ic=np.nanmean(core_regime, axis=1),
-                            current_spread=np.nanmean(current_spread, axis=1),
-                            core_spread=np.nanmean(core_spread, axis=1),
-                            current_turnover=np.nanmean(current_turnover, axis=1),
-                            core_turnover=np.nanmean(core_turnover, axis=1),
-                            regime=regime_name,
-                            freshness=None,
-                            bootstrap_replications=bootstrap_replications,
-                            bootstrap_seed=(
-                                BOOTSTRAP_SEED
-                                + logical_index * 100_000
-                                + seed * 1_000
-                                + regime_index * 10
-                                + scope_offset
-                            ),
-                        )
-                    )
-            for freshness_index, (freshness_name, sample_mask) in enumerate(
-                freshness_masks.items()
-            ):
-                for scope_offset, scope_name in enumerate(("opening_30", "opening_60")):
-                    decisions = named_time_scopes()[scope_name]
-                    current_fresh = _daily_subset_mean(
-                        additive.sample_ic,
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    core_fresh = _daily_subset_mean(
-                        np.asarray(core["sample_ic"]),
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    current_spread = _daily_subset_mean(
-                        economic.return_contributions.sum(axis=1),
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    core_spread = _daily_subset_mean(
-                        core_economic.return_contributions.sum(axis=1),
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    current_turnover = _daily_subset_mean(
-                        economic.intraday_turnover.sum(axis=1),
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    core_turnover = _daily_subset_mean(
-                        core_economic.intraday_turnover.sum(axis=1),
-                        sample_mask,
-                        date_idx,
-                        decision_idx,
-                        decisions,
-                    )
-                    rows.append(
-                        _paired_delta_row(
-                            logical=logical,
-                            seed=seed,
-                            scope_type="added_context_freshness",
-                            scope_name=scope_name,
-                            decisions=decisions,
-                            horizon_minutes=0,
-                            current_ic=np.nanmean(current_fresh, axis=1),
-                            core_ic=np.nanmean(core_fresh, axis=1),
-                            current_spread=np.nanmean(current_spread, axis=1),
-                            core_spread=np.nanmean(core_spread, axis=1),
-                            current_turnover=np.nanmean(current_turnover, axis=1),
-                            core_turnover=np.nanmean(core_turnover, axis=1),
-                            regime=None,
-                            freshness=freshness_name,
-                            bootstrap_replications=bootstrap_replications,
-                            bootstrap_seed=(
-                                BOOTSTRAP_SEED
-                                + logical_index * 100_000
-                                + seed * 1_000
-                                + freshness_index * 10
-                                + scope_offset
-                            ),
-                        )
-                    )
-    grouped: dict[tuple[object, ...], list[dict[str, object]]] = {}
+
     identity_fields = (
         "logical_configuration",
         "added_context",
@@ -4541,28 +5214,38 @@ def _build_context_time_deltas(
         "scope",
         "decision_indices",
         "horizon_minutes",
+        "condition_type",
+        "condition_category",
         "overnight_regime",
         "freshness_category",
         "preregistered_primary_question",
         "exploratory",
     )
+    grouped: dict[tuple[object, ...], list[dict[str, object]]] = {}
     for row in rows:
         key = tuple(row[field] for field in identity_fields)
         grouped.setdefault(key, []).append(row)
     across_rows: list[dict[str, object]] = []
     for key, seed_rows in grouped.items():
-        if len(seed_rows) != 3:
+        if len(seed_rows) != len(STAGE3_SEEDS):
             raise RuntimeError("Across-seed delta cell lacks three matched seeds")
         values_by_seed = {
             int(row["seed"]): float(row["mean_paired_ic_delta"])
             for row in seed_rows
             if row["mean_paired_ic_delta"] is not None
         }
-        if len(values_by_seed) != 3:
+        if len(values_by_seed) != len(STAGE3_SEEDS):
             continue
         values = np.asarray([values_by_seed[seed] for seed in STAGE3_SEEDS])
         positive, zero, negative = _sign_counts(values)
         row = {field: value for field, value in zip(identity_fields, key, strict=True)}
+
+        def mean_field(name: str) -> float | None:
+            values_for_field = [
+                value[name] for value in seed_rows if value[name] is not None
+            ]
+            return float(np.mean(values_for_field)) if values_for_field else None
+
         row.update(
             {
                 "aggregation": "across_seed",
@@ -4570,18 +5253,21 @@ def _build_context_time_deltas(
                 "mean_paired_ic_delta": float(values.mean()),
                 "ic_delta_interval_lower_95": None,
                 "ic_delta_interval_upper_95": None,
-                "mean_paired_gross_spread_delta": float(
-                    np.mean(
-                        [value["mean_paired_gross_spread_delta"] for value in seed_rows]
-                    )
+                "bootstrap_finite_replication_count": None,
+                "mean_paired_gross_spread_delta": mean_field(
+                    "mean_paired_gross_spread_delta"
                 ),
-                "mean_paired_intraday_turnover_delta": float(
-                    np.mean(
-                        [
-                            value["mean_paired_intraday_turnover_delta"]
-                            for value in seed_rows
-                        ]
-                    )
+                "mean_paired_flat_entry_turnover_delta": mean_field(
+                    "mean_paired_flat_entry_turnover_delta"
+                ),
+                "mean_paired_intraday_turnover_delta": mean_field(
+                    "mean_paired_intraday_turnover_delta"
+                ),
+                "mean_paired_flat_exit_turnover_delta": mean_field(
+                    "mean_paired_flat_exit_turnover_delta"
+                ),
+                "mean_paired_total_turnover_delta": mean_field(
+                    "mean_paired_total_turnover_delta"
                 ),
                 "valid_date_count": int(
                     min(value["valid_date_count"] for value in seed_rows)
@@ -4736,6 +5422,7 @@ def _analysis_summary(
             "analyzer_git_commit_sha": inputs.analyzer_git_commit_sha,
             "analyzer_worktree_clean": inputs.analyzer_worktree_clean,
             "analyzer_source_sha256": inputs.analyzer_source_sha256,
+            "inference_code_sha256": inputs.inference_code_sha256,
             "split_boundaries": _split_boundaries(),
             "job_count": len(inputs.jobs),
             "jobs": [
@@ -4774,9 +5461,7 @@ def _analysis_summary(
             "affine_metadata": metadata["axes"]["dollar_volume_log_affine"],
             "eligibility_threshold": metadata["eligibility_liquidity_threshold"],
             "adaptive_bucket_count_minimum_validation": int(
-                np.asarray(metadata["adaptive_liquidity_bucket_count"])[
-                    np.unique(inputs.validation_rows.get_column("date_idx").to_numpy())
-                ].min()
+                np.asarray(metadata["adaptive_liquidity_bucket_count"]).min()
             ),
         },
         "overnight_regime": {
@@ -4835,20 +5520,28 @@ def run_analysis(
     output_dir = output_dir.resolve()
     _reject_test_derived_path(output_dir, "analysis output path")
     inputs = validate_analysis_inputs(stage3_state_path, scope)
+    if not inputs.analyzer_worktree_clean:
+        raise RuntimeError("Non-dry analysis requires a clean worktree")
     output_dir.mkdir(parents=True, exist_ok=True)
     state_path = output_dir / "analysis_state.json"
     lock_path = output_dir / "analysis.lock"
     with exclusive_process_lock(lock_path, ANALYSIS_NAME):
-        if owner := active_lock_owner(PRODUCTION_TRAINING_LOCK):
-            raise RuntimeError(f"Production training is active: {owner}")
         state = _load_analysis_state(state_path, inputs, scope)
         if state.get("status") == "completed":
             _validate_completed_artifacts(state)
             return output_dir / "analysis_manifest.json"
         _atomic_write_json(state_path, state)
-        cache_paths, shared = _adopt_or_infer_caches(
-            output_dir, inputs, scope, state, state_path
-        )
+        with exclusive_process_lock(
+            PRODUCTION_TRAINING_LOCK, "stock/time attribution inference"
+        ) as production_lock:
+            cache_paths, shared = _adopt_or_infer_caches(
+                output_dir,
+                inputs,
+                scope,
+                state,
+                state_path,
+                production_lock,
+            )
         metadata = _load_analysis_metadata(inputs, shared)
         core_frames, core_by_seed, reconstruction = _build_core_outputs(
             cache_paths, shared, metadata
@@ -4867,6 +5560,7 @@ def run_analysis(
             "opening_regimes": opening,
             "context_time_deltas": context_deltas,
         }
+        _assert_repository_identity(inputs)
         artifact_specs = (
             (
                 "stock_attribution.parquet",

@@ -28,6 +28,21 @@ class HostIdentity:
     boot_id: str | None
 
 
+@dataclass(frozen=True)
+class ProcessLockLease:
+    path: Path
+    token: str
+    purpose: str
+
+    def assert_owned(self) -> None:
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, json.JSONDecodeError) as error:
+            raise RuntimeError(f"{self.purpose} lock ownership was lost") from error
+        if not isinstance(payload, dict) or payload.get("token") != self.token:
+            raise RuntimeError(f"{self.purpose} lock ownership was lost")
+
+
 def _current_host_identity() -> HostIdentity:
     try:
         boot_id = _BOOT_ID_PATH.read_text(encoding="utf-8").strip() or None
@@ -185,7 +200,7 @@ def active_lock_owner(path: Path) -> dict[str, object] | None:
 
 
 @contextmanager
-def exclusive_process_lock(path: Path, purpose: str) -> Iterator[None]:
+def exclusive_process_lock(path: Path, purpose: str) -> Iterator[ProcessLockLease]:
     path.parent.mkdir(parents=True, exist_ok=True)
     host_identity = _current_host_identity()
     token = uuid.uuid4().hex
@@ -218,7 +233,8 @@ def exclusive_process_lock(path: Path, purpose: str) -> Iterator[None]:
             _unlink_if_owned(path, token)
             raise
         break
+    lease = ProcessLockLease(path=path, token=token, purpose=purpose)
     try:
-        yield
+        yield lease
     finally:
         _unlink_if_owned(path, token)
