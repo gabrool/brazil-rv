@@ -64,6 +64,11 @@ from .data import (
     validate_feature_store,
     warm_feature_store_cache,
 )
+from .feature_ablation import (
+    FEATURE_ABLATION_KEYS,
+    ResolvedFeatureAblation,
+    resolve_feature_ablation_for_store,
+)
 from .engine import (
     build_compile_metadata,
     checkpoint_payload,
@@ -116,6 +121,8 @@ _HISTORY_COLUMNS = (
 def validate_cli_args(
     parser: argparse.ArgumentParser, args: argparse.Namespace
 ) -> argparse.Namespace:
+    if not hasattr(args, "feature_ablation"):
+        args.feature_ablation = "none"
     if args.model == "xgboost" and args.optimizer is not None:
         parser.error("--optimizer is not allowed when --model xgboost")
     if args.model == "xgboost" and args.objective is not None:
@@ -124,6 +131,8 @@ def validate_cli_args(
         parser.error("--soft-rank-temperature is not allowed when --model xgboost")
     if args.model == "xgboost" and args.sam_rho is not None:
         parser.error("--sam-rho is not allowed when --model xgboost")
+    if args.model == "xgboost" and args.feature_ablation != "none":
+        parser.error("--feature-ablation is allowed only for neural models")
     if args.model in NEURAL_MODELS and args.optimizer is None:
         parser.error("--optimizer is required for neural models")
     if args.model in NEURAL_MODELS and args.objective is None:
@@ -181,6 +190,9 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--context-ablation", choices=CONTEXT_ABLATION_KEYS, default="none"
     )
+    parser.add_argument(
+        "--feature-ablation", choices=FEATURE_ABLATION_KEYS, default="none"
+    )
     parser.add_argument("--seed", required=True, type=int, choices=ALLOWED_SEEDS)
     return validate_cli_args(parser, parser.parse_args(arguments))
 
@@ -229,13 +241,15 @@ def _run_directory_name(
     seed: int,
     created_at: datetime,
     context_ablation: str = "none",
+    feature_ablation: str = "none",
 ) -> str:
     context_part = "" if global_context is None else f"_global-{global_context}"
     ablation_part = (
         "" if context_ablation == "none" else f"_ablation-{context_ablation}"
     )
+    feature_part = "" if feature_ablation == "none" else f"_feature-{feature_ablation}"
     if optimizer_variant is None:
-        return f"{model_name}{context_part}{ablation_part}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
+        return f"{model_name}{context_part}{ablation_part}{feature_part}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
     if objective is None:
         raise ValueError("Neural run names require an objective")
     objective_metadata(objective, temperature)
@@ -252,7 +266,7 @@ def _run_directory_name(
         "" if temperature is None else f"_tau{experiment_decimal(temperature, 2)}"
     )
     return (
-        f"{model_part}{objective_part}{optimizer_part}{rho_part}{tau_part}{context_part}{ablation_part}_seed{seed}_"
+        f"{model_part}{objective_part}{optimizer_part}{rho_part}{tau_part}{context_part}{ablation_part}{feature_part}_seed{seed}_"
         f"{created_at:%Y%m%dT%H%M%S%fZ}"
     )
 
@@ -335,6 +349,7 @@ def _common_manifest(
     optimizer_variant: str | None,
     global_context: str | None,
     context_ablation: ResolvedContextAblation,
+    feature_ablation: ResolvedFeatureAblation,
     seed: int,
     commit_sha: str,
     feature_store: Path,
@@ -349,6 +364,7 @@ def _common_manifest(
         "optimizer_variant": optimizer_variant,
         "global_context": global_context,
         "context_ablation": context_ablation.metadata(),
+        "feature_ablation": feature_ablation.metadata(),
         "global_context_source_hashes": feature_manifest["global_context"][
             "source_hashes"
         ],
@@ -376,6 +392,7 @@ def _run_xgboost(
     *,
     args: argparse.Namespace,
     context_ablation: ResolvedContextAblation,
+    feature_ablation: ResolvedFeatureAblation,
     hardware: object,
     commit_sha: str,
     feature_store: Path,
@@ -394,6 +411,7 @@ def _run_xgboost(
             optimizer_variant=None,
             global_context=args.global_context,
             context_ablation=context_ablation,
+            feature_ablation=feature_ablation,
             seed=args.seed,
             commit_sha=commit_sha,
             feature_store=feature_store,
@@ -452,6 +470,7 @@ def _run_neural(
     *,
     args: argparse.Namespace,
     context_ablation: ResolvedContextAblation,
+    feature_ablation: ResolvedFeatureAblation,
     tcn_settings: TCNSettings | None,
     hardware: object,
     commit_sha: str,
@@ -482,6 +501,7 @@ def _run_neural(
         args.seed,
         tcn_architecture,
         context_ablation,
+        feature_ablation,
     )
     training_batch = next(iter(train_loader))
     evaluation_batch = next(iter(validation_loader))
@@ -531,6 +551,7 @@ def _run_neural(
             optimizer_variant=args.optimizer,
             global_context=args.global_context,
             context_ablation=context_ablation,
+            feature_ablation=feature_ablation,
             seed=args.seed,
             commit_sha=commit_sha,
             feature_store=feature_store,
@@ -691,6 +712,7 @@ def _run_neural(
                     feature_manifest,
                     commit_sha,
                     context_ablation,
+                    feature_ablation,
                 ),
             )
         else:
@@ -721,6 +743,7 @@ def _run_neural(
             feature_manifest,
             commit_sha,
             context_ablation,
+            feature_ablation,
         ),
     )
     if best_metrics is None or best_daily_rows is None:
@@ -763,6 +786,9 @@ def _run(args: argparse.Namespace) -> None:
     context_ablation = resolve_context_ablation_for_store(
         feature_store, args.context_ablation
     )
+    feature_ablation = resolve_feature_ablation_for_store(
+        feature_store, args.feature_ablation
+    )
     train_rows = select_sample_split(sample_index, "train")
     validation_rows = select_sample_split(sample_index, "validation")
     feature_manifest = json.loads(
@@ -782,6 +808,7 @@ def _run(args: argparse.Namespace) -> None:
         args.seed,
         created_at,
         args.context_ablation,
+        args.feature_ablation,
     )
     if run_dir.exists():
         raise FileExistsError(f"Run output already exists: {run_dir}")
@@ -791,6 +818,7 @@ def _run(args: argparse.Namespace) -> None:
         _run_neural(
             args=args,
             context_ablation=context_ablation,
+            feature_ablation=feature_ablation,
             tcn_settings=tcn_settings,
             hardware=hardware,
             commit_sha=commit_sha,
@@ -806,6 +834,7 @@ def _run(args: argparse.Namespace) -> None:
         _run_xgboost(
             args=args,
             context_ablation=context_ablation,
+            feature_ablation=feature_ablation,
             hardware=hardware,
             commit_sha=commit_sha,
             feature_store=feature_store,
