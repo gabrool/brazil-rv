@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import polars as pl
@@ -28,18 +29,23 @@ from brazil_rv.modeling.analyze_stock_time_attribution import (
     _adopt_or_infer_caches,
     _build_context_time_deltas,
     _build_core_outputs,
+    _coverage_summary,
     _build_liquidity_outputs,
     _build_opening_regimes,
     _daily_grid,
     _job_cache_identity,
+    _independent_bucket_ic,
+    _inference_code_identity,
     _load_analysis_metadata,
     _paired_delta_row,
     _point_in_time_bucket_contribution_vector,
     _record_artifact,
+    _opening_condition_masks,
     _reject_test_derived_path,
     _remove_recognized_partial_cache,
     _stock_identity_rows,
     _validate_cache_manifest,
+    _with_economic_ratios,
     adaptive_liquidity_buckets,
     additive_spearman_contributions,
     aggregate_additive_contributions,
@@ -58,9 +64,11 @@ from brazil_rv.modeling.analyze_stock_time_attribution import (
     run_analysis,
     per_stock_time_series_skill,
     primary_time_bins,
+    stock_contribution_opportunity_accounting,
     standardized_rank_scores,
     STAGE3_SEEDS,
 )
+from brazil_rv.modeling.engine import EvaluationObservations
 from brazil_rv.modeling.metrics import average_ranks, create_metric_table
 from brazil_rv.modeling.process_lock import (
     PRODUCTION_TRAINING_LOCK,
@@ -368,6 +376,9 @@ def test_cache_manifest_rejects_nested_identity_hash_shape_and_dtype(
     prediction_path = cache / "predictions.npy"
     _atomic_write_npy(prediction_path, predictions)
     identity = {
+        "cache_name": "stock_time_attribution",
+        "cache_version": 3,
+        "inference_code_sha256": {"cache.py": "hash"},
         "seed": 11,
         "context": {"key": "core", "hash": "abc"},
         "prediction_shape": [2, 3, 1],
@@ -381,6 +392,11 @@ def test_cache_manifest_rejects_nested_identity_hash_shape_and_dtype(
             {
                 "status": "completed",
                 "identity": cache_identity,
+                "creation_provenance": {
+                    "analyzer_worktree_clean": True,
+                    "analyzer_source_sha256": "source",
+                    "analyzer_git_commit_sha": "commit",
+                },
                 "prediction_file": {
                     "name": prediction_path.name,
                     "sha256": __import__("hashlib")
@@ -404,6 +420,40 @@ def test_cache_manifest_rejects_nested_identity_hash_shape_and_dtype(
     write_manifest(wrong_dtype)
     with pytest.raises(ValueError, match="shape or dtype"):
         _validate_cache_manifest(manifest_path, wrong_dtype)
+    legacy_identity = {**identity, "cache_version": 2}
+    write_manifest(legacy_identity)
+    with pytest.raises(ValueError, match="provenance"):
+        _validate_cache_manifest(manifest_path, legacy_identity)
+    _atomic_write_json(
+        manifest_path,
+        {
+            "status": "completed",
+            "identity": identity,
+        },
+    )
+    with pytest.raises(ValueError, match="provenance"):
+        _validate_cache_manifest(manifest_path, identity)
+    _atomic_write_json(
+        manifest_path,
+        {
+            "status": "completed",
+            "identity": identity,
+            "creation_provenance": {
+                "analyzer_worktree_clean": True,
+                "analyzer_source_sha256": "source",
+                "analyzer_git_commit_sha": "commit",
+            },
+            "prediction_file": {
+                "name": prediction_path.name,
+                "sha256": __import__("hashlib")
+                .sha256(prediction_path.read_bytes())
+                .hexdigest(),
+            },
+            "test_data_used": True,
+        },
+    )
+    with pytest.raises(ValueError, match="test-derived"):
+        _validate_cache_manifest(manifest_path, identity)
     write_manifest(identity)
     prediction_path.write_bytes(b"corrupt")
     with pytest.raises(ValueError, match="hash"):
@@ -942,13 +992,18 @@ def test_dirty_execution_cache_identity_and_lock_ownership_fail_closed(
     cache = tmp_path / "legacy-cache"
     cache.mkdir()
     manifest_path = cache / "manifest.json"
-    dirty_identity = {
-        **identity,
-        "analyzer_worktree_clean": False,
-    }
+    dirty_identity = identity
     _atomic_write_json(
         manifest_path,
-        {"status": "completed", "identity": dirty_identity},
+        {
+            "status": "completed",
+            "identity": dirty_identity,
+            "creation_provenance": {
+                "analyzer_worktree_clean": False,
+                "analyzer_source_sha256": "source",
+                "analyzer_git_commit_sha": "commit",
+            },
+        },
     )
     with pytest.raises(ValueError, match="provenance"):
         _validate_cache_manifest(manifest_path, dirty_identity)
@@ -1007,6 +1062,7 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
             np.datetime64("2024-12-16") + np.timedelta64(date_count, "D"),
         ),
         "equity_index": equity_index,
+        "active": np.ones((date_count, equity_count), dtype=bool),
         "dollar_liquidity": np.tile(
             np.linspace(2_000_000.0, 20_000_000.0, equity_count),
             (date_count, 1),
@@ -1019,7 +1075,15 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
         "adaptive_liquidity": np.zeros((date_count, equity_count), dtype=np.int8),
         "adaptive_liquidity_bucket_count": np.ones(date_count, dtype=np.int8),
         "equity_completeness": {
-            "observed_bars": np.ones((sample_count, equity_count), dtype=np.int64),
+            "scheduled_minutes": np.asarray(DECISION_EQUITY_INDICES, dtype=np.int64)[
+                decision_idx
+            ],
+            "observed_bars": np.floor(
+                np.asarray(DECISION_EQUITY_INDICES, dtype=np.float64)[
+                    decision_idx, None
+                ]
+                * np.tile(np.linspace(0.7, 1.0, equity_count), (sample_count, 1))
+            ).astype(np.int64),
             "observed_fraction": np.tile(
                 np.linspace(0.7, 1.0, equity_count), (sample_count, 1)
             ),
@@ -1099,6 +1163,7 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
         atol=5e-9,
         rtol=0.0,
     )
+    time_bins = outputs["time_of_day_bins"]
     time_5m = outputs["time_of_day_5m"]
     assert set(time_5m["horizon_minutes"].unique()) == {0, 30, 60, 120}
     assert time_5m.filter(pl.col("aggregation") == "across_seed").height == (
@@ -1130,7 +1195,7 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
             (pl.col("bucket_kind") == "daily_liquidity_quintile")
             & (pl.col("aggregation") == "across_seed")
         ).height
-        == 5 * 3
+        == 5 * 4
     )
     assert liquidity_time.filter(pl.col("aggregation") == "across_seed").height == (
         len(primary_time_bins()) * 5 * 3
@@ -1141,11 +1206,14 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
         "overnight_regime",
         "retained_local_context",
         "retained_global_context",
-        "core_b3_bars_before_decision",
+        "core_b3_history_count",
+        "core_b3_history_completeness",
         "core_retained_local_completeness",
         "core_retained_global_completeness",
         "core_retained_global_freshness",
         "core_retained_context_preopen",
+        "core_retained_local_preopen",
+        "core_retained_global_preopen",
     }.issubset(set(opening["diagnostic_type"].unique()))
     assert set(
         opening.filter(pl.col("diagnostic_type").str.starts_with("core_"))[
@@ -1156,12 +1224,15 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
         context.filter(pl.col("scope_type") == "decision_5m")["horizon_minutes"]
     ) == {0, 30, 60, 120}
     assert {
-        "b3_bars_before_decision",
+        "b3_history_count",
+        "b3_history_completeness",
         "retained_local_completeness",
         "retained_global_completeness",
         "retained_global_freshness",
         "retained_context_preopen",
         "overnight_regime",
+        "retained_local_preopen",
+        "retained_global_preopen",
         "added_context_freshness",
     }.issubset(set(context["condition_type"].drop_nulls()))
     finite_delta = context["mean_paired_ic_delta"].drop_nulls().to_numpy()
@@ -1174,3 +1245,1038 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
         atol=5e-9,
         rtol=0.0,
     )
+    coverage_columns = (
+        "mean_valid_equity_count",
+        "label_coverage",
+        "valid_decision_cell_count",
+        "valid_date_count",
+    )
+    for frame, keys in (
+        (time_5m, ("decision_idx", "horizon_minutes")),
+        (time_bins, ("scope", "horizon_minutes")),
+    ):
+        seed_coverage = (
+            frame.filter(pl.col("seed") == STAGE3_SEEDS[0])
+            .sort(keys)
+            .select(coverage_columns)
+            .to_numpy()
+        )
+        across_coverage = (
+            frame.filter(pl.col("aggregation") == "across_seed")
+            .sort(keys)
+            .select(coverage_columns)
+            .to_numpy()
+        )
+        np.testing.assert_allclose(seed_coverage, across_coverage, rtol=0.0, atol=0.0)
+    assert "decision_count" in time_bins.columns
+    assert set(time_bins["horizon_minutes"]) == {0, 30, 60, 120}
+
+    active_stock = stock.filter(pl.col("mean_daily_total_one_way_turnover") > 0)
+    np.testing.assert_allclose(
+        active_stock["gross_contribution_per_unit_turnover"].to_numpy(),
+        active_stock["mean_daily_gross_contribution"].to_numpy()
+        / active_stock["mean_daily_total_one_way_turnover"].to_numpy(),
+        rtol=0.0,
+        atol=1e-15,
+    )
+    np.testing.assert_allclose(
+        active_stock["break_even_one_way_cost_bps"].to_numpy(),
+        10_000.0 * active_stock["gross_contribution_per_unit_turnover"].to_numpy(),
+        rtol=0.0,
+        atol=1e-11,
+    )
+    across_liquidity = liquidity.filter(
+        (pl.col("aggregation") == "across_seed")
+        & (pl.col("mean_daily_total_one_way_turnover") > 0)
+    )
+    np.testing.assert_allclose(
+        across_liquidity["gross_contribution_per_unit_turnover"].to_numpy(),
+        across_liquidity["mean_daily_gross_contribution"].to_numpy()
+        / across_liquidity["mean_daily_total_one_way_turnover"].to_numpy(),
+        rtol=0.0,
+        atol=1e-15,
+    )
+
+    core_history = opening.filter(
+        pl.col("diagnostic_type").is_in(
+            ["core_b3_history_count", "core_b3_history_completeness"]
+        )
+    )
+    assert {
+        "category_lower_bound",
+        "category_upper_bound",
+        "category_unit",
+        "condition_sample_count",
+        "condition_date_count",
+        "mean_median_observed_bar_count",
+        "mean_median_observed_fraction",
+        "mean_fraction_eligible_meeting_expected_history",
+    }.issubset(core_history.columns)
+    assert core_history["condition_sample_count"].is_not_null().all()
+    assert set(core_history["horizon_minutes"]) == {0, 30, 60, 120}
+
+
+def test_fixed_liquidity_quintile_ic_reranks_within_each_date_bucket() -> None:
+    equity_count = 158
+    groups = np.full((2, equity_count), -1, dtype=np.int8)
+    groups[0, :150] = np.repeat(np.arange(5, dtype=np.int8), 30)
+    groups[1] = groups[0]
+    groups[1, 0] = 1
+    predictions = np.broadcast_to(
+        np.arange(equity_count, dtype=np.float32)[None, :, None],
+        (2, equity_count, 1),
+    ).copy()
+    targets = predictions.copy()
+    targets[:, :30, 0] = targets[:, :30, 0][:, ::-1]
+    mask = groups[:, :, None] >= 0
+    within = _independent_bucket_ic(
+        predictions,
+        targets,
+        mask,
+        groups,
+        np.asarray([0, 1], dtype=np.int64),
+        5,
+    )
+    assert np.isfinite(within[0, :, 0]).all()
+    assert within[0, 0, 0] == pytest.approx(-1.0)
+    assert np.isnan(within[1, 0, 0])
+    assert np.isfinite(within[1, 1:, 0]).all()
+    additive = additive_spearman_contributions(predictions, targets, mask)
+    additive_bucket = additive.contributions[0, groups[0] == 0, 0].sum()
+    assert additive_bucket != pytest.approx(within[0, 0, 0])
+
+
+def test_economic_ratios_recompute_from_across_seed_primitives() -> None:
+    seed_rows = pl.DataFrame(
+        {
+            "group": [1, 1],
+            "mean_daily_gross_contribution": [1.0, 3.0],
+            "mean_daily_total_one_way_turnover": [1.0, 9.0],
+            "gross_contribution_per_unit_turnover": [1.0, 1.0 / 3.0],
+            "break_even_one_way_cost_bps": [10_000.0, 10_000.0 / 3.0],
+        }
+    )
+    primitives = seed_rows.group_by("group").agg(
+        pl.col("mean_daily_gross_contribution").mean(),
+        pl.col("mean_daily_total_one_way_turnover").mean(),
+    )
+    across = _with_economic_ratios(primitives)
+    assert across["gross_contribution_per_unit_turnover"].item() == pytest.approx(0.4)
+    assert across["break_even_one_way_cost_bps"].item() == pytest.approx(4_000.0)
+    assert across["gross_contribution_per_unit_turnover"].item() != pytest.approx(
+        seed_rows["gross_contribution_per_unit_turnover"].mean()
+    )
+
+
+def test_stock_opportunity_support_is_not_diluted_by_ineligible_cells() -> None:
+    contributions = np.zeros((2, 31, 1), dtype=np.float64)
+    contributions[0, 0, 0] = 0.2
+    additive = __import__(
+        "brazil_rv.modeling.analyze_stock_time_attribution",
+        fromlist=["AdditiveSpearmanResult"],
+    ).AdditiveSpearmanResult(
+        contributions=contributions,
+        sample_ic=np.asarray([[0.2], [0.1]], dtype=np.float64),
+    )
+    label_mask = np.ones_like(contributions, dtype=bool)
+    label_mask[1, 0, 0] = False
+    accounting = stock_contribution_opportunity_accounting(additive, label_mask)
+    assert accounting["valid_opportunity_count"][0] == 1
+    assert accounting["portfolio_valid_cell_count"][0] == 2
+    assert accounting["conditional_contribution"][0] == pytest.approx(0.2)
+    assert accounting["unconditional_contribution"][0] == pytest.approx(0.1)
+
+
+def test_opening_history_categories_use_counts_completeness_and_readiness() -> None:
+    sample_count = 3
+    equity_count = 30
+    scheduled = np.asarray([15, 20, 25], dtype=np.int64)
+    observed = np.asarray(
+        [
+            np.full(equity_count, 15),
+            np.full(equity_count, 17),
+            np.full(equity_count, 15),
+        ],
+        dtype=np.int64,
+    )
+    local_ready = np.ones((sample_count, len(LOCAL_CONTEXT_SYMBOLS)), dtype=bool)
+    local_ready[1, LOCAL_CONTEXT_SYMBOLS.index("WDO$")] = False
+    global_ready = np.ones((sample_count, len(GLOBAL_CONTEXT_SYMBOLS)), dtype=bool)
+    global_ready[2, GLOBAL_CONTEXT_SYMBOLS.index("ZT.v.0")] = False
+    metadata = {
+        "active": np.ones((sample_count, equity_count), dtype=bool),
+        "equity_completeness": {
+            "scheduled_minutes": scheduled,
+            "observed_bars": observed,
+            "observed_fraction": observed / scheduled[:, None],
+        },
+        "local_completeness": {
+            "ready": local_ready,
+            "observed_fraction": np.ones_like(local_ready, dtype=np.float64),
+            "preopen_observed_fraction": np.ones_like(local_ready, dtype=np.float64),
+        },
+        "global_completeness": {
+            "ready": global_ready,
+            "observed_fraction": np.ones_like(global_ready, dtype=np.float64),
+            "preopen_observed_fraction": np.ones_like(global_ready, dtype=np.float64),
+            "minutes_since_most_recent_observed_bar": np.zeros_like(
+                global_ready, dtype=np.float64
+            ),
+        },
+        "overnight_regimes": {
+            "normal": np.ones(sample_count, dtype=bool),
+        },
+    }
+    conditions = {
+        (condition.condition_type, condition.category): condition
+        for condition in _opening_condition_masks(
+            {"date_idx": np.arange(sample_count, dtype=np.int64)}, metadata
+        )
+    }
+    np.testing.assert_array_equal(
+        conditions[("b3_history_count", "complete")].sample_mask,
+        [True, False, False],
+    )
+    np.testing.assert_array_equal(
+        conditions[("b3_history_count", "missing_1_to_5_bars")].sample_mask,
+        [False, True, False],
+    )
+    np.testing.assert_array_equal(
+        conditions[("b3_history_completeness", "below_80pct")].sample_mask,
+        [False, False, True],
+    )
+    assert conditions[("b3_history_completeness", "80_to_95pct")].category_unit
+    np.testing.assert_array_equal(
+        conditions[("retained_local_preopen", "complete")].sample_mask,
+        [True, False, True],
+    )
+    np.testing.assert_array_equal(
+        conditions[("retained_global_preopen", "complete")].sample_mask,
+        [True, True, False],
+    )
+    np.testing.assert_array_equal(
+        conditions[("retained_context_preopen", "complete")].sample_mask,
+        [True, False, False],
+    )
+
+
+def test_scope_coverage_is_date_weighted_and_h0_counts_finite_cells() -> None:
+    counts = np.zeros((2, 3, 3), dtype=np.float64)
+    coverage = np.zeros_like(counts)
+    counts[:, :2, 0] = [[30.0, 40.0], [50.0, 0.0]]
+    coverage[:, :2, 0] = [[0.3, 0.4], [0.5, 0.0]]
+    horizon = _coverage_summary(counts, coverage, (0, 1), 0)
+    assert horizon == {
+        "mean_valid_equity_count": pytest.approx(42.5),
+        "label_coverage": pytest.approx(0.425),
+        "valid_decision_cell_count": 3,
+        "valid_date_count": 2,
+    }
+    counts[:, :2, 1:] = [
+        [[0.0, 40.0], [50.0, 0.0]],
+        [[60.0, 70.0], [0.0, 0.0]],
+    ]
+    coverage[counts >= 30] = counts[counts >= 30] / 100.0
+    primary = _coverage_summary(counts, coverage, (0, 1), None)
+    assert primary["valid_decision_cell_count"] == 7
+    assert primary["valid_date_count"] == 2
+    assert primary["mean_valid_equity_count"] == pytest.approx(50.0)
+
+
+def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    feature_store = tmp_path / "feature-store"
+    feature_store.mkdir()
+    targets = np.linspace(-1.0, 1.0, 158 * 3, dtype=np.float32).reshape(1, 158, 3)
+    raw_returns = targets / 100.0
+    label_mask = np.ones_like(targets, dtype=bool)
+    jobs: list[Stage3AnalysisJob] = []
+    for position, (logical, seed) in enumerate(
+        (logical, seed)
+        for logical in STAGE3_LOGICAL_CONFIGURATION_ORDER
+        for seed in STAGE3_SEEDS
+    ):
+        run_dir = tmp_path / "runs" / f"{logical}_{seed}"
+        run_dir.mkdir(parents=True)
+        jobs.append(
+            Stage3AnalysisJob(
+                position=position,
+                logical_configuration=logical,
+                context_ablation=STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION[logical],
+                seed=seed,
+                run_dir=run_dir,
+                run_manifest_path=run_dir / "run_manifest.json",
+                run_manifest_sha256=f"run-{position}",
+                checkpoint_path=run_dir / "best.pt",
+                checkpoint_sha256=f"checkpoint-{position}",
+                producing_git_commit_sha="producer",
+                manifest={"synthetic_index": position},
+            )
+        )
+
+    def inputs_for(
+        selected: tuple[Stage3AnalysisJob, ...], reporting: str
+    ) -> AnalysisInputs:
+        return AnalysisInputs(
+            state_path=tmp_path / "stage3-state.json",
+            state_sha256="state",
+            state={},
+            configuration={},
+            feature_store=feature_store,
+            feature_identity={"manifest_sha256": "feature"},
+            feature_manifest={},
+            sample_index=pl.DataFrame(),
+            validation_rows=pl.DataFrame(
+                {
+                    "sample_id": [0],
+                    "date_idx": [0],
+                    "decision_idx": [0],
+                }
+            ),
+            jobs=selected,
+            analyzer_git_commit_sha=f"commit-{reporting}",
+            analyzer_worktree_clean=True,
+            analyzer_source_sha256=f"source-{reporting}",
+            inference_code_sha256=_inference_code_identity(),
+        )
+
+    calls: list[int] = []
+
+    def collect(manifest: dict[str, object], *args: object) -> SimpleNamespace:
+        del args
+        index = int(manifest["synthetic_index"])
+        calls.append(index)
+        observations = EvaluationObservations(
+            sample_id=np.asarray([0], dtype=np.int64),
+            date_idx=np.asarray([0], dtype=np.int64),
+            decision_idx=np.asarray([0], dtype=np.int64),
+            predictions=(targets + index / 1000.0).astype(np.float32),
+            targets=targets,
+            raw_returns=raw_returns,
+            label_mask=label_mask,
+        )
+        return SimpleNamespace(observations=observations, summary={}, daily_rows=[])
+
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution.validate_runtime",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution.collect_neural_evaluation",
+        collect,
+    )
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution.metric_reproduction_gate",
+        lambda *args: {"passed": True, "maximum_absolute_difference": 0.0},
+    )
+    cache_root = tmp_path / "portable-cache"
+    core_inputs = inputs_for(tuple(jobs[:3]), "core")
+    core_state = {
+        "status": "running",
+        "jobs": [{"status": "pending"} for _ in core_inputs.jobs],
+    }
+    core_output = tmp_path / "core-output"
+    core_output.mkdir()
+    core_paths, _ = _adopt_or_infer_caches(
+        cache_root,
+        core_inputs,
+        "core",
+        core_state,
+        core_output / "analysis_state.json",
+    )
+    assert calls == [0, 1, 2]
+
+    full_inputs = inputs_for(tuple(jobs), "reporting-only-change")
+    assert _job_cache_identity(core_inputs, jobs[0]) == _job_cache_identity(
+        full_inputs, jobs[0]
+    )
+    full_state = {
+        "status": "running",
+        "jobs": [{"status": "pending"} for _ in full_inputs.jobs],
+    }
+    full_output = tmp_path / "full-output"
+    full_output.mkdir()
+    _adopt_or_infer_caches(
+        cache_root,
+        full_inputs,
+        "full-stage3",
+        full_state,
+        full_output / "analysis_state.json",
+    )
+    assert calls == list(range(24))
+    assert full_state["jobs"][0]["cache_manifest_path"].startswith(str(cache_root))
+    assert core_paths[("core", 11)].parent.parent.parent == cache_root
+
+    changed_job = Stage3AnalysisJob(
+        **{**jobs[0].__dict__, "checkpoint_sha256": "changed-checkpoint"}
+    )
+    changed_inputs = inputs_for((changed_job,), "another-reporting-change")
+    with pytest.raises(ValueError, match="identity"):
+        _validate_cache_manifest(
+            core_paths[("core", 11)].parent / "manifest.json",
+            _job_cache_identity(changed_inputs, changed_job),
+        )
+    changed_code_inputs = AnalysisInputs(
+        **{
+            **core_inputs.__dict__,
+            "inference_code_sha256": {"inference.py": "changed"},
+        }
+    )
+    with pytest.raises(ValueError, match="identity"):
+        _validate_cache_manifest(
+            core_paths[("core", 11)].parent / "manifest.json",
+            _job_cache_identity(changed_code_inputs, jobs[0]),
+        )
+
+
+def test_full_synthetic_orchestration_core_full_cache_resume_and_artifacts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    analyzer = __import__(
+        "brazil_rv.modeling.analyze_stock_time_attribution",
+        fromlist=["FINAL_ARTIFACT_NAMES", "_sha256"],
+    )
+    date_count = 5
+    decision_count = 55
+    equity_count = 158
+    sample_count = date_count * decision_count
+    generator = np.random.default_rng(20260809)
+    date_idx = np.repeat(np.arange(date_count, dtype=np.int64), decision_count)
+    decision_idx = np.tile(np.arange(decision_count, dtype=np.int64), date_count)
+    sample_id = np.arange(sample_count, dtype=np.int64)
+    targets = generator.normal(size=(sample_count, equity_count, 3)).astype(np.float32)
+    raw_returns = (targets * 0.01).astype(np.float32)
+    label_mask = np.ones_like(targets, dtype=bool)
+    validation_rows = pl.DataFrame(
+        {
+            "sample_id": sample_id,
+            "date_idx": date_idx,
+            "decision_idx": decision_idx,
+        }
+    )
+    feature_store = tmp_path / "feature-store"
+    feature_store.mkdir()
+    feature_marker = feature_store / "manifest.json"
+    _atomic_write_json(feature_marker, {"manifest_version": 1})
+    stage3_state_path = tmp_path / "stage3-state.json"
+    _atomic_write_json(stage3_state_path, {"status": "completed"})
+
+    evaluations: dict[int, SimpleNamespace] = {}
+    jobs: list[Stage3AnalysisJob] = []
+    input_paths = [feature_marker, stage3_state_path]
+    for position, (logical, seed) in enumerate(
+        (logical, seed)
+        for logical in STAGE3_LOGICAL_CONFIGURATION_ORDER
+        for seed in STAGE3_SEEDS
+    ):
+        run_dir = tmp_path / "runs" / f"{logical}_{seed}"
+        run_dir.mkdir(parents=True)
+        run_manifest_path = run_dir / "run_manifest.json"
+        checkpoint_path = run_dir / "best.pt"
+        manifest = {
+            "synthetic_index": position,
+            "model_name": "tcn",
+            "model_family": "tcn",
+            "seed": seed,
+            "context_ablation": STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION[logical],
+            "feature_ablation": {"key": "none"},
+            "global_context": True,
+            "objective": {"name": "rank_ic", "temperature": None},
+            "compile": {"parity": {"passed": True}},
+        }
+        _atomic_write_json(run_manifest_path, manifest)
+        checkpoint_path.write_bytes(f"checkpoint-{position}".encode())
+        job_generator = np.random.default_rng(10_000 + position)
+        predictions = (
+            targets
+            + job_generator.normal(scale=0.2 + position / 200.0, size=targets.shape)
+        ).astype(np.float32)
+        summary, daily_rows = create_metric_table(
+            predictions,
+            targets,
+            raw_returns,
+            label_mask,
+            date_idx,
+            decision_idx,
+        )
+        _atomic_write_json(run_dir / "validation_metrics.json", summary)
+        pl.DataFrame(daily_rows).write_parquet(
+            run_dir / "validation_daily_metrics.parquet"
+        )
+        observations = EvaluationObservations(
+            sample_id=sample_id,
+            date_idx=date_idx,
+            decision_idx=decision_idx,
+            predictions=predictions,
+            targets=targets,
+            raw_returns=raw_returns,
+            label_mask=label_mask,
+        )
+        evaluations[position] = SimpleNamespace(
+            observations=observations,
+            summary=summary,
+            daily_rows=daily_rows,
+        )
+        jobs.append(
+            Stage3AnalysisJob(
+                position=position,
+                logical_configuration=logical,
+                context_ablation=STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION[logical],
+                seed=seed,
+                run_dir=run_dir,
+                run_manifest_path=run_manifest_path,
+                run_manifest_sha256=analyzer._sha256(run_manifest_path),
+                checkpoint_path=checkpoint_path,
+                checkpoint_sha256=analyzer._sha256(checkpoint_path),
+                producing_git_commit_sha="producer",
+                manifest=manifest,
+            )
+        )
+        input_paths.extend(
+            (
+                run_manifest_path,
+                checkpoint_path,
+                run_dir / "validation_metrics.json",
+                run_dir / "validation_daily_metrics.parquet",
+            )
+        )
+
+    scheduled = np.asarray(DECISION_EQUITY_INDICES, dtype=np.int64)[decision_idx]
+    observed_bars = np.broadcast_to(
+        scheduled[:, None], (sample_count, equity_count)
+    ).copy()
+    local_ready = np.ones((sample_count, len(LOCAL_CONTEXT_SYMBOLS)), dtype=bool)
+    global_ready = np.ones((sample_count, len(GLOBAL_CONTEXT_SYMBOLS)), dtype=bool)
+    fixed_quintiles = np.repeat(np.arange(5, dtype=np.int8), [32, 32, 32, 31, 31])
+    adaptive = np.empty((date_count, equity_count), dtype=np.int8)
+    adaptive_counts = np.empty(date_count, dtype=np.int8)
+    dollar_liquidity = np.tile(
+        np.linspace(2_000_000.0, 20_000_000.0, equity_count),
+        (date_count, 1),
+    )
+    for day in range(date_count):
+        adaptive[day], adaptive_counts[day] = adaptive_liquidity_buckets(
+            dollar_liquidity[day], np.ones(equity_count, dtype=bool)
+        )
+    metadata = {
+        "axes": {
+            "liquidity_channel_name": "median_daily_dollar_volume_20d_log_scale",
+            "liquidity_channel_index": 0,
+            "dollar_volume_log_affine": {"center": 0.0, "scale": 1.0},
+        },
+        "trade_dates": np.asarray(
+            [
+                np.datetime64("2024-12-27"),
+                np.datetime64("2024-12-28"),
+                np.datetime64("2024-12-29"),
+                np.datetime64("2024-12-31"),
+                np.datetime64("2025-01-02"),
+            ]
+        ),
+        "validation_date_indices": np.arange(date_count, dtype=np.int64),
+        "date_position_by_index": {index: index for index in range(date_count)},
+        "equity_index": pl.DataFrame(
+            {
+                "equity_slot": np.arange(equity_count),
+                "security_id": [
+                    f"security-{index:03d}" for index in range(equity_count)
+                ],
+                "isin": [f"BR{index:010d}" for index in range(equity_count)],
+                "latest_ticker": [f"T{index:03d}" for index in range(equity_count)],
+                "xp_symbol": [f"Stock {index:03d}" for index in range(equity_count)],
+            }
+        ),
+        "active": np.ones((date_count, equity_count), dtype=bool),
+        "dollar_liquidity": dollar_liquidity,
+        "liquidity_quintile": np.tile(fixed_quintiles, (date_count, 1)),
+        "adaptive_liquidity": adaptive,
+        "adaptive_liquidity_bucket_count": adaptive_counts,
+        "eligibility_liquidity_threshold": {"value_brl": 2_000_000.0},
+        "market_overnight_gap": np.linspace(-0.02, 0.02, date_count),
+        "overnight_thresholds": {
+            "large_absolute": 0.01,
+            "large_positive": 0.01,
+            "large_negative": -0.01,
+        },
+        "overnight_regimes": {
+            "normal": np.asarray([False, True, True, True, False]),
+            "large": np.asarray([True, False, False, False, True]),
+            "large_positive": np.asarray([False, False, False, False, True]),
+            "large_negative": np.asarray([True, False, False, False, False]),
+        },
+        "equity_completeness": {
+            "scheduled_minutes": scheduled,
+            "observed_bars": observed_bars,
+            "observed_fraction": np.ones_like(observed_bars, dtype=np.float64),
+            "recent_observed_fraction": np.ones_like(observed_bars, dtype=np.float64),
+            "ready": np.ones_like(observed_bars, dtype=bool),
+        },
+        "local_completeness": {
+            "observed_fraction": np.ones_like(local_ready, dtype=np.float64),
+            "preopen_observed_fraction": np.ones_like(local_ready, dtype=np.float64),
+            "minutes_since_most_recent_observed_bar": np.zeros_like(
+                local_ready, dtype=np.float64
+            ),
+            "ready": local_ready,
+        },
+        "global_completeness": {
+            "observed_fraction": np.ones_like(global_ready, dtype=np.float64),
+            "preopen_observed_fraction": np.ones_like(global_ready, dtype=np.float64),
+            "minutes_since_most_recent_observed_bar": np.zeros_like(
+                global_ready, dtype=np.float64
+            ),
+            "ready": global_ready,
+        },
+    }
+
+    def analysis_inputs(selected_jobs: tuple[Stage3AnalysisJob, ...]) -> AnalysisInputs:
+        return AnalysisInputs(
+            state_path=stage3_state_path,
+            state_sha256=analyzer._sha256(stage3_state_path),
+            state={"status": "completed"},
+            configuration={},
+            feature_store=feature_store,
+            feature_identity={"manifest_sha256": "synthetic-feature"},
+            feature_manifest={"manifest_version": 1},
+            sample_index=validation_rows,
+            validation_rows=validation_rows,
+            jobs=selected_jobs,
+            analyzer_git_commit_sha="analysis-commit",
+            analyzer_worktree_clean=True,
+            analyzer_source_sha256="reporting-source",
+            inference_code_sha256=_inference_code_identity(),
+        )
+
+    core_inputs = analysis_inputs(tuple(jobs[:3]))
+    full_inputs = analysis_inputs(tuple(jobs))
+    expected_matrix = tuple(
+        (logical, seed)
+        for logical in STAGE3_LOGICAL_CONFIGURATION_ORDER
+        for seed in STAGE3_SEEDS
+    )
+    assert (
+        tuple((job.logical_configuration, job.seed) for job in full_inputs.jobs)
+        == expected_matrix
+    )
+    requested_scopes: list[str] = []
+
+    def validate_inputs(path: Path, scope: str) -> AnalysisInputs:
+        assert path.resolve() == stage3_state_path.resolve()
+        requested_scopes.append(scope)
+        return core_inputs if scope == "core" else full_inputs
+
+    inference_calls: list[int] = []
+    runtime_validations: list[bool] = []
+
+    def collect(manifest: dict[str, object], *args: object) -> SimpleNamespace:
+        del args
+        position = int(manifest["synthetic_index"])
+        inference_calls.append(position)
+        return evaluations[position]
+
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution.validate_analysis_inputs",
+        validate_inputs,
+    )
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution.collect_neural_evaluation",
+        collect,
+    )
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution.validate_runtime",
+        lambda: runtime_validations.append(True),
+    )
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution._load_analysis_metadata",
+        lambda inputs, shared: metadata,
+    )
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution._git_identity",
+        lambda: ("analysis-commit", True),
+    )
+    monkeypatch.setattr(
+        "brazil_rv.modeling.analyze_stock_time_attribution.BOOTSTRAP_REPLICATIONS",
+        4,
+    )
+
+    before_inputs = {path: analyzer._sha256(path) for path in input_paths}
+    core_output = tmp_path / "core-output"
+    full_output = tmp_path / "full-output"
+    core_manifest_path = run_analysis(stage3_state_path, core_output, "core")
+    assert core_manifest_path.is_file()
+    assert inference_calls == [0, 1, 2]
+    cache_root = tmp_path / "_stock_time_attribution_cache"
+    core_cache_hashes = {
+        job.logical_configuration + str(job.seed): analyzer._sha256(
+            cache_root
+            / "predictions"
+            / f"{job.logical_configuration}_seed{job.seed}"
+            / "predictions.npy"
+        )
+        for job in jobs[:3]
+    }
+
+    full_manifest_path = run_analysis(stage3_state_path, full_output, "full-stage3")
+    assert full_manifest_path.is_file()
+    assert inference_calls == list(range(24))
+    assert runtime_validations == [True, True]
+    assert core_cache_hashes == {
+        job.logical_configuration + str(job.seed): analyzer._sha256(
+            cache_root
+            / "predictions"
+            / f"{job.logical_configuration}_seed{job.seed}"
+            / "predictions.npy"
+        )
+        for job in jobs[:3]
+    }
+
+    full_state_path = full_output / "analysis_state.json"
+    full_state = json.loads(full_state_path.read_text(encoding="utf-8"))
+    assert full_state["status"] == "completed"
+    assert full_state["pending_artifact"] is None
+    assert set(full_state["artifacts"]) == set(analyzer.FINAL_ARTIFACT_NAMES)
+    assert all(job["status"] == "completed" for job in full_state["jobs"])
+    full_manifest = json.loads(full_manifest_path.read_text(encoding="utf-8"))
+    assert len(full_manifest["prediction_cache_manifests"]) == 24
+    assert (
+        Path(full_manifest["shared_validation_manifest"]["path"]).parent
+        == cache_root / "shared_validation"
+    )
+    summary = json.loads((full_output / "summary.json").read_text(encoding="utf-8"))
+    assert summary["inputs"]["job_count"] == 24
+    assert all(count > 0 for count in summary["artifact_row_counts"].values())
+    assert all(
+        check["passed"] is True for check in summary["metric_reproduction_checks"]
+    )
+    before_resume_artifacts = {
+        name: analyzer._sha256(Path(values["path"]))
+        for name, values in full_state["artifacts"].items()
+    }
+    assert (
+        run_analysis(stage3_state_path, full_output, "full-stage3")
+        == full_manifest_path
+    )
+    assert inference_calls == list(range(24))
+    resumed_state = json.loads(full_state_path.read_text(encoding="utf-8"))
+    assert resumed_state["pending_artifact"] is None
+    assert before_resume_artifacts == {
+        name: analyzer._sha256(Path(values["path"]))
+        for name, values in resumed_state["artifacts"].items()
+    }
+    assert before_inputs == {path: analyzer._sha256(path) for path in input_paths}
+    assert requested_scopes == ["core", "full-stage3", "full-stage3"]
+
+
+def test_real_stage3_preflight_and_metadata_loading_remain_test_sealed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    analyzer = __import__(
+        "brazil_rv.modeling.analyze_stock_time_attribution",
+        fromlist=["validate_analysis_inputs"],
+    )
+    stage2 = __import__(
+        "brazil_rv.modeling.stage2_context_ablation",
+        fromlist=["_feature_store_identity", "_training_semantics"],
+    )
+    stage3 = __import__(
+        "brazil_rv.modeling.stage3_context_addition",
+        fromlist=["stage3_jobs"],
+    )
+    stage3_analyzer = __import__(
+        "brazil_rv.modeling.analyze_stage3_context_addition",
+        fromlist=["PACKAGED_FEATURE_MANIFEST_SHA256"],
+    )
+    feature_store = tmp_path / "feature-store"
+    feature_store.mkdir()
+    manifest_path = feature_store / "manifest.json"
+    _atomic_write_json(
+        manifest_path,
+        {
+            "contract_version": analyzer.FEATURE_CONTRACT_VERSION,
+            "global_context": {
+                "source_hashes": {"source": "hash"},
+                "normalized_store_hashes": {"store": "hash"},
+            },
+            "canonical_inputs": {},
+            "constants": {"dollar_volume_log_affine": {"center": 0.0, "scale": 1.0}},
+        },
+    )
+    _atomic_write_json(
+        feature_store / "feature_schema.json",
+        {
+            "slow_channels": [{"name": name} for name in SLOW_CHANNELS],
+            "dynamic_channels": [{"name": name} for name in DYNAMIC_CHANNELS],
+        },
+    )
+
+    training_dates = [
+        date(2021, 8, 16) + timedelta(days=offset) for offset in range(30)
+    ]
+    validation_dates = [
+        analyzer.VALIDATION_START,
+        date(2024, 12, 30),
+        date(2024, 12, 31),
+        date(2025, 1, 2),
+        analyzer.VALIDATION_END,
+    ]
+    trade_dates = [
+        *training_dates,
+        *validation_dates,
+        analyzer.SplitBoundaries().test_start,
+    ]
+    training_count = len(training_dates)
+    validation_indices = np.arange(training_count, training_count + 5, dtype=np.int64)
+    test_date_index = len(trade_dates) - 1
+    rows = []
+    for date_idx_value, trade_date in enumerate(trade_dates):
+        for decision in range(55):
+            rows.append(
+                {
+                    "sample_id": date_idx_value * 55 + decision,
+                    "date_idx": date_idx_value,
+                    "decision_idx": decision,
+                    "trade_date": trade_date,
+                    "equity_cutoff_index": int(DECISION_EQUITY_INDICES[decision]),
+                    "context_cutoff_index": 75 + 5 * decision,
+                    "active_equity_count": 158,
+                }
+            )
+    sample_index = pl.DataFrame(rows)
+    sample_index.write_parquet(feature_store / "sample_index.parquet")
+    pl.DataFrame(
+        {"date_idx": np.arange(len(trade_dates)), "trade_date": trade_dates}
+    ).write_parquet(feature_store / "date_index.parquet")
+    pl.DataFrame(
+        {
+            "equity_slot": np.arange(158),
+            "security_id": [f"security-{index:03d}" for index in range(158)],
+            "isin": [f"BR{index:010d}" for index in range(158)],
+            "latest_ticker": [f"T{index:03d}" for index in range(158)],
+            "xp_symbol": [f"Stock {index:03d}" for index in range(158)],
+        }
+    ).write_parquet(feature_store / "equity_index.parquet")
+
+    date_count = len(trade_dates)
+    observed_channel = DYNAMIC_CHANNELS.index("observed")
+    liquidity_channel = SLOW_CHANNELS.index("median_daily_dollar_volume_20d_log_scale")
+    overnight_channel = SLOW_CHANNELS.index("overnight_gap_normalized")
+    equity_slow = np.zeros((date_count, 158, len(SLOW_CHANNELS)), dtype=np.float32)
+    equity_slow[:, :, liquidity_channel] = np.log1p(
+        np.linspace(2_000_000.0, 20_000_000.0, 158)
+    )
+    equity_slow[:, :, overnight_channel] = np.linspace(-0.02, 0.02, date_count)[:, None]
+    equity_features = np.zeros(
+        (
+            date_count,
+            158,
+            DECISION_EQUITY_INDICES[-1],
+            len(DYNAMIC_CHANNELS),
+        ),
+        dtype=np.float32,
+    )
+    equity_features[..., observed_channel] = 1.0
+    context_features = np.zeros(
+        (
+            date_count,
+            len(LOCAL_CONTEXT_SYMBOLS),
+            75 + 5 * 54,
+            len(DYNAMIC_CHANNELS),
+        ),
+        dtype=np.float32,
+    )
+    context_features[..., observed_channel] = 1.0
+    global_features = np.zeros(
+        (
+            date_count,
+            len(GLOBAL_CONTEXT_SYMBOLS),
+            DECISION_GLOBAL_INDICES[-1],
+            len(DYNAMIC_CHANNELS),
+        ),
+        dtype=np.float32,
+    )
+    global_features[..., observed_channel] = 1.0
+    feature_arrays = {
+        "equity_membership.npy": np.ones((date_count, 158), dtype=bool),
+        "equity_data_ready.npy": np.ones((date_count, 158), dtype=bool),
+        "equity_slow.npy": equity_slow,
+        "equity_features.npy": equity_features,
+        "context_features.npy": context_features,
+        "context_data_ready.npy": np.ones(
+            (date_count, len(LOCAL_CONTEXT_SYMBOLS)), dtype=bool
+        ),
+        "global_features.npy": global_features,
+        "global_data_ready.npy": np.ones(
+            (date_count, len(GLOBAL_CONTEXT_SYMBOLS), 55), dtype=bool
+        ),
+    }
+
+    feature_identity = stage2._feature_store_identity(feature_store)
+    source_stage2_state = tmp_path / "stage2-state.json"
+    _atomic_write_json(source_stage2_state, {"status": "completed"})
+    configuration = {
+        "orchestrator_git_commit_sha": "a" * 40,
+        "feature_store": feature_identity,
+        "feature_contract": analyzer.FEATURE_CONTRACT_VERSION,
+        "local_context_symbols": list(LOCAL_CONTEXT_SYMBOLS),
+        "global_context_symbols": list(GLOBAL_CONTEXT_SYMBOLS),
+        "training_semantics": stage2._training_semantics(),
+        "split_boundaries": analyzer._split_boundaries(),
+        "logical_configuration_order": list(STAGE3_LOGICAL_CONFIGURATION_ORDER),
+        "context_ablation_by_logical_configuration": dict(
+            STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION
+        ),
+        "context_ablation_metadata_by_logical_configuration": {
+            logical: analyzer.get_context_ablation(key).metadata()
+            for logical, key in STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION.items()
+        },
+        "seeds": list(STAGE3_SEEDS),
+        "logical_job_count": 24,
+        "adopted_stage2_job_count": 3,
+        "new_training_job_count": 21,
+        "source_stage2_state": str(source_stage2_state),
+        "source_stage2_state_sha256": analyzer._sha256(source_stage2_state),
+        "source_stage2_feature_store_resolved_path": str(feature_store),
+        "required_stage2_producing_commit": stage3.STAGE2_PRODUCING_COMMIT,
+        "required_feature_manifest_sha256": feature_identity["manifest_sha256"],
+    }
+    state_jobs = []
+    for position, base in enumerate(stage3.stage3_jobs()):
+        logical = str(base["logical_configuration"])
+        seed = int(base["seed"])
+        run_dir = tmp_path / "runs" / f"{logical}_{seed}"
+        run_dir.mkdir(parents=True)
+        run_manifest_path = run_dir / "run_manifest.json"
+        _atomic_write_json(run_manifest_path, {"synthetic_index": position})
+        checkpoint_path = run_dir / "best.pt"
+        checkpoint_path.write_bytes(f"checkpoint-{position}".encode())
+        producing_commit = (
+            stage3.STAGE2_PRODUCING_COMMIT
+            if logical == analyzer.ADOPTED_STAGE2_LOGICAL_CONFIGURATION
+            else str(configuration["orchestrator_git_commit_sha"])
+        )
+        state_jobs.append(
+            {
+                **base,
+                "status": "completed",
+                "result_origin": (
+                    "adopted_stage2"
+                    if logical == analyzer.ADOPTED_STAGE2_LOGICAL_CONFIGURATION
+                    else "trained_stage3"
+                ),
+                "run_dir": str(run_dir),
+                "run_manifest_sha256": analyzer._sha256(run_manifest_path),
+                "producing_git_commit_sha": producing_commit,
+                "primary_validation_ic": 0.1,
+            }
+        )
+    stage3_state_path = tmp_path / "stage3-state.json"
+    _atomic_write_json(
+        stage3_state_path,
+        {
+            "state_version": stage3.STATE_VERSION,
+            "sweep_name": stage3.SWEEP_NAME,
+            "status": "completed",
+            "configuration": configuration,
+            "jobs": state_jobs,
+        },
+    )
+
+    monkeypatch.setattr(
+        stage3_analyzer,
+        "PACKAGED_FEATURE_MANIFEST_SHA256",
+        feature_identity["manifest_sha256"],
+    )
+    monkeypatch.setattr(
+        analyzer,
+        "_validated_stage2_adoptions",
+        lambda *args: {},
+    )
+    monkeypatch.setattr(
+        analyzer,
+        "_completed_job_artifacts",
+        lambda job, config: (
+            Path(str(job["run_dir"])).resolve(),
+            float(job["primary_validation_ic"]),
+            str(job["run_manifest_sha256"]),
+        ),
+    )
+    monkeypatch.setattr(
+        analyzer,
+        "validate_stage3_completed_run",
+        lambda run_dir, config, key, seed, commit: 0.1,
+    )
+    monkeypatch.setattr(
+        analyzer,
+        "_validate_checkpoint_identity",
+        lambda run_dir, manifest, store: (
+            (Path(run_dir) / "best.pt").resolve(),
+            analyzer._sha256(Path(run_dir) / "best.pt"),
+        ),
+    )
+    monkeypatch.setattr(
+        analyzer,
+        "_git_identity",
+        lambda: ("analysis-commit", True),
+    )
+
+    core_inputs = analyzer.validate_analysis_inputs(stage3_state_path, "core")
+    full_inputs = analyzer.validate_analysis_inputs(stage3_state_path, "full-stage3")
+    assert len(core_inputs.jobs) == 3
+    assert len(full_inputs.jobs) == 24
+    assert tuple(
+        (job.logical_configuration, job.seed) for job in full_inputs.jobs
+    ) == tuple(
+        (logical, seed)
+        for logical in STAGE3_LOGICAL_CONFIGURATION_ORDER
+        for seed in STAGE3_SEEDS
+    )
+
+    accessed_dates: list[int] = []
+    original_load = np.load
+
+    class GuardedArray:
+        def __init__(self, values: np.ndarray) -> None:
+            self.values = values
+            self.shape = values.shape
+
+        def __getitem__(self, key: object) -> np.ndarray:
+            if not isinstance(key, tuple) or not isinstance(key[0], np.ndarray):
+                raise AssertionError(
+                    "Feature array was materialized without date slicing"
+                )
+            selected = np.asarray(key[0], dtype=np.int64)
+            if np.any(selected == test_date_index):
+                raise AssertionError("Final-test feature date was accessed")
+            accessed_dates.extend(selected.tolist())
+            return self.values[key]
+
+        def __array__(self, *args: object, **kwargs: object) -> np.ndarray:
+            del args, kwargs
+            raise AssertionError("Full feature array was materialized")
+
+    def guarded_load(path: object, **kwargs: object) -> object:
+        name = Path(path).name
+        if (
+            Path(path).parent.resolve() == feature_store.resolve()
+            and name in feature_arrays
+        ):
+            return GuardedArray(feature_arrays[name])
+        return original_load(path, **kwargs)
+
+    monkeypatch.setattr(analyzer.np, "load", guarded_load)
+    validation_rows = full_inputs.validation_rows
+    shared = {
+        "date_idx": validation_rows["date_idx"].to_numpy().astype(np.int64),
+        "decision_idx": validation_rows["decision_idx"].to_numpy().astype(np.int64),
+    }
+    metadata = analyzer._load_analysis_metadata(full_inputs, shared)
+    assert metadata["active"].shape == (5, 158)
+    assert set(accessed_dates) == {
+        *range(training_count),
+        *validation_indices.tolist(),
+    }
+    assert test_date_index not in accessed_dates
