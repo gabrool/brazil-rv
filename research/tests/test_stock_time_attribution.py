@@ -19,32 +19,20 @@ from brazil_rv.preprocessing.contract import (
 )
 
 from brazil_rv.modeling.analyze_stock_time_attribution import (
-    METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE,
-    AnalysisInputs,
-    Stage3AnalysisJob,
-    STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION,
-    STAGE3_LOGICAL_CONFIGURATION_ORDER,
     _atomic_write_json,
-    _atomic_write_npy,
-    _adopt_or_infer_caches,
     _build_context_time_deltas,
     _build_core_outputs,
     _coverage_summary,
     _build_liquidity_outputs,
     _build_opening_regimes,
     _daily_grid,
-    _job_cache_identity,
     _independent_bucket_ic,
-    _inference_code_identity,
     _load_analysis_metadata,
     _paired_delta_row,
     _point_in_time_bucket_contribution_vector,
     _record_artifact,
     _opening_condition_masks,
-    _reject_test_derived_path,
-    _remove_recognized_partial_cache,
     _stock_identity_rows,
-    _validate_cache_manifest,
     _with_economic_ratios,
     adaptive_liquidity_buckets,
     additive_spearman_contributions,
@@ -54,7 +42,6 @@ from brazil_rv.modeling.analyze_stock_time_attribution import (
     economic_stock_attribution,
     economic_window_accounting,
     learn_overnight_thresholds,
-    metric_reproduction_gate,
     moving_block_bootstrap,
     moving_block_bootstrap_matrix,
     moving_block_bootstrap_indices,
@@ -66,7 +53,28 @@ from brazil_rv.modeling.analyze_stock_time_attribution import (
     primary_time_bins,
     stock_contribution_opportunity_accounting,
     standardized_rank_scores,
+)
+from brazil_rv.modeling.stage3_context_addition import (
+    STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION,
+    STAGE3_LOGICAL_CONFIGURATION_ORDER,
     STAGE3_SEEDS,
+)
+from brazil_rv.modeling.stock_time_cache import (
+    CACHE_VERSION,
+    INFERENCE_CODE_PATHS,
+    METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE,
+    adopt_or_infer_caches as _adopt_or_infer_caches,
+    atomic_write_npy as _atomic_write_npy,
+    job_cache_identity as _job_cache_identity,
+    metric_reproduction_gate,
+    remove_recognized_partial_cache as _remove_recognized_partial_cache,
+    validate_cache_manifest as _validate_cache_manifest,
+)
+from brazil_rv.modeling.stock_time_inference import (
+    AnalysisInputs,
+    Stage3AnalysisJob,
+    inference_code_identity as _inference_code_identity,
+    reject_test_derived_path as _reject_test_derived_path,
 )
 from brazil_rv.modeling.engine import EvaluationObservations
 from brazil_rv.modeling.metrics import average_ranks, create_metric_table
@@ -377,8 +385,11 @@ def test_cache_manifest_rejects_nested_identity_hash_shape_and_dtype(
     _atomic_write_npy(prediction_path, predictions)
     identity = {
         "cache_name": "stock_time_attribution",
-        "cache_version": 3,
-        "inference_code_sha256": {"cache.py": "hash"},
+        "cache_version": CACHE_VERSION,
+        "inference_code_sha256": {
+            path: f"hash-{position}"
+            for position, path in enumerate(INFERENCE_CODE_PATHS)
+        },
         "seed": 11,
         "context": {"key": "core", "hash": "abc"},
         "prediction_shape": [2, 3, 1],
@@ -420,9 +431,9 @@ def test_cache_manifest_rejects_nested_identity_hash_shape_and_dtype(
     write_manifest(wrong_dtype)
     with pytest.raises(ValueError, match="shape or dtype"):
         _validate_cache_manifest(manifest_path, wrong_dtype)
-    legacy_identity = {**identity, "cache_version": 2}
+    legacy_identity = {**identity, "cache_version": CACHE_VERSION - 1}
     write_manifest(legacy_identity)
-    with pytest.raises(ValueError, match="provenance"):
+    with pytest.raises(ValueError, match="version mismatch"):
         _validate_cache_manifest(manifest_path, legacy_identity)
     _atomic_write_json(
         manifest_path,
@@ -509,7 +520,7 @@ def test_inference_failure_is_recorded_without_mutating_inputs(
     state_path = tmp_path / "analysis_state.json"
 
     monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution.validate_runtime",
+        "brazil_rv.modeling.stock_time_cache.validate_runtime",
         lambda: None,
     )
 
@@ -518,14 +529,13 @@ def test_inference_failure_is_recorded_without_mutating_inputs(
         raise RuntimeError("synthetic inference failure")
 
     monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution.collect_neural_evaluation",
+        "brazil_rv.modeling.stock_time_cache.collect_neural_evaluation",
         fail_inference,
     )
     with pytest.raises(RuntimeError, match="synthetic inference failure"):
         _adopt_or_infer_caches(
             tmp_path / "output",
             inputs,
-            "core",
             state,
             state_path,
         )
@@ -963,7 +973,7 @@ def test_dirty_execution_cache_identity_and_lock_ownership_fail_closed(
         analyzer_git_commit_sha="commit",
         analyzer_worktree_clean=False,
         analyzer_source_sha256="source",
-        inference_code_sha256={"module.py": "hash"},
+        inference_code_sha256=_inference_code_identity(),
     )
     monkeypatch.setattr(
         "brazil_rv.modeling.analyze_stock_time_attribution.validate_analysis_inputs",
@@ -987,7 +997,7 @@ def test_dirty_execution_cache_identity_and_lock_ownership_fail_closed(
     )
     identity = _job_cache_identity(clean_inputs, job)
     assert "scope" not in identity
-    assert identity["inference_code_sha256"] == {"module.py": "hash"}
+    assert identity["inference_code_sha256"] == _inference_code_identity()
 
     cache = tmp_path / "legacy-cache"
     cache.mkdir()
@@ -1206,7 +1216,8 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
         "overnight_regime",
         "retained_local_context",
         "retained_global_context",
-        "core_b3_history_count",
+        "core_b3_observed_bar_count",
+        "core_b3_history_missingness",
         "core_b3_history_completeness",
         "core_retained_local_completeness",
         "core_retained_global_completeness",
@@ -1224,7 +1235,8 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
         context.filter(pl.col("scope_type") == "decision_5m")["horizon_minutes"]
     ) == {0, 30, 60, 120}
     assert {
-        "b3_history_count",
+        "b3_observed_bar_count",
+        "b3_history_missingness",
         "b3_history_completeness",
         "retained_local_completeness",
         "retained_global_completeness",
@@ -1299,20 +1311,26 @@ def test_core_output_integration_reconstructs_and_emits_canonical_rows(
 
     core_history = opening.filter(
         pl.col("diagnostic_type").is_in(
-            ["core_b3_history_count", "core_b3_history_completeness"]
+            [
+                "core_b3_observed_bar_count",
+                "core_b3_history_missingness",
+                "core_b3_history_completeness",
+            ]
         )
     )
     assert {
         "category_lower_bound",
         "category_upper_bound",
+        "category_lower_bound_inclusive",
+        "category_upper_bound_inclusive",
         "category_unit",
-        "condition_sample_count",
+        "condition_decision_cell_count",
         "condition_date_count",
         "mean_median_observed_bar_count",
-        "mean_median_observed_fraction",
+        "median_observed_fraction",
         "mean_fraction_eligible_meeting_expected_history",
     }.issubset(core_history.columns)
-    assert core_history["condition_sample_count"].is_not_null().all()
+    assert core_history["condition_decision_cell_count"].is_not_null().all()
     assert set(core_history["horizon_minutes"]) == {0, 30, 60, 120}
 
 
@@ -1434,11 +1452,11 @@ def test_opening_history_categories_use_counts_completeness_and_readiness() -> N
         )
     }
     np.testing.assert_array_equal(
-        conditions[("b3_history_count", "complete")].sample_mask,
+        conditions[("b3_history_missingness", "complete")].sample_mask,
         [True, False, False],
     )
     np.testing.assert_array_equal(
-        conditions[("b3_history_count", "missing_1_to_5_bars")].sample_mask,
+        conditions[("b3_history_missingness", "missing_1_to_5_bars")].sample_mask,
         [False, True, False],
     )
     np.testing.assert_array_equal(
@@ -1458,6 +1476,105 @@ def test_opening_history_categories_use_counts_completeness_and_readiness() -> N
         conditions[("retained_context_preopen", "complete")].sample_mask,
         [True, False, False],
     )
+
+
+def test_absolute_b3_observed_bar_bands_are_exact_exhaustive_and_distinct() -> None:
+    observed_counts = np.asarray(
+        [0, 30, 31, 60, 61, 90, 91, 120, 121, 180, 181], dtype=np.int64
+    )
+    sample_count = observed_counts.size
+    equity_count = 30
+    scheduled = np.maximum(observed_counts, 1)
+    observed = np.broadcast_to(
+        observed_counts[:, None], (sample_count, equity_count)
+    ).copy()
+    local_ready = np.ones((sample_count, len(LOCAL_CONTEXT_SYMBOLS)), dtype=bool)
+    global_ready = np.ones((sample_count, len(GLOBAL_CONTEXT_SYMBOLS)), dtype=bool)
+    metadata = {
+        "active": np.ones((sample_count, equity_count), dtype=bool),
+        "equity_completeness": {
+            "scheduled_minutes": scheduled,
+            "observed_bars": observed,
+            "observed_fraction": observed / scheduled[:, None],
+        },
+        "local_completeness": {
+            "ready": local_ready,
+            "observed_fraction": np.ones_like(local_ready, dtype=np.float64),
+            "preopen_observed_fraction": np.ones_like(local_ready, dtype=np.float64),
+        },
+        "global_completeness": {
+            "ready": global_ready,
+            "observed_fraction": np.ones_like(global_ready, dtype=np.float64),
+            "preopen_observed_fraction": np.ones_like(global_ready, dtype=np.float64),
+            "minutes_since_most_recent_observed_bar": np.zeros_like(
+                global_ready, dtype=np.float64
+            ),
+        },
+        "overnight_regimes": {"normal": np.ones(sample_count, dtype=bool)},
+    }
+    conditions = _opening_condition_masks(
+        {"date_idx": np.arange(sample_count, dtype=np.int64)}, metadata
+    )
+    absolute = [
+        condition
+        for condition in conditions
+        if condition.condition_type == "b3_observed_bar_count"
+    ]
+    assert [condition.category for condition in absolute] == [
+        "0_to_30_bars",
+        "31_to_60_bars",
+        "61_to_90_bars",
+        "91_to_120_bars",
+        "121_to_180_bars",
+        "over_180_bars",
+    ]
+    membership = np.stack([condition.sample_mask for condition in absolute])
+    np.testing.assert_array_equal(membership.sum(axis=0), np.ones(sample_count))
+    np.testing.assert_array_equal(
+        np.argmax(membership, axis=0),
+        np.asarray([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5]),
+    )
+    assert [condition.category_lower_bound for condition in absolute] == [
+        0.0,
+        30.0,
+        60.0,
+        90.0,
+        120.0,
+        180.0,
+    ]
+    assert [condition.category_upper_bound for condition in absolute] == [
+        30.0,
+        60.0,
+        90.0,
+        120.0,
+        180.0,
+        None,
+    ]
+    assert absolute[0].category_lower_bound_inclusive is True
+    assert all(
+        condition.category_lower_bound_inclusive is False for condition in absolute[1:]
+    )
+    assert all(
+        condition.category_upper_bound_inclusive is True for condition in absolute[:-1]
+    )
+    by_identity = {
+        (condition.condition_type, condition.category): condition
+        for condition in conditions
+    }
+    early = 1
+    late = 10
+    assert (
+        by_identity[("b3_history_missingness", "complete")]
+        .sample_mask[[early, late]]
+        .all()
+    )
+    assert (
+        by_identity[("b3_history_completeness", "at_least_95pct")]
+        .sample_mask[[early, late]]
+        .all()
+    )
+    assert membership[0, early]
+    assert membership[5, late]
 
 
 def test_scope_coverage_is_date_weighted_and_h0_counts_finite_cells() -> None:
@@ -1560,15 +1677,15 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
         return SimpleNamespace(observations=observations, summary={}, daily_rows=[])
 
     monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution.validate_runtime",
+        "brazil_rv.modeling.stock_time_cache.validate_runtime",
         lambda: None,
     )
     monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution.collect_neural_evaluation",
+        "brazil_rv.modeling.stock_time_cache.collect_neural_evaluation",
         collect,
     )
     monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution.metric_reproduction_gate",
+        "brazil_rv.modeling.stock_time_cache.metric_reproduction_gate",
         lambda *args: {"passed": True, "maximum_absolute_difference": 0.0},
     )
     cache_root = tmp_path / "portable-cache"
@@ -1582,11 +1699,27 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
     core_paths, _ = _adopt_or_infer_caches(
         cache_root,
         core_inputs,
-        "core",
         core_state,
         core_output / "analysis_state.json",
     )
     assert calls == [0, 1, 2]
+    core_cache_bytes = {
+        path.relative_to(cache_root): path.read_bytes()
+        for path in cache_root.rglob("*")
+        if path.is_file()
+    }
+    first_manifest = json.loads(
+        (core_paths[("core", 11)].parent / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert set(first_manifest["identity"]["inference_code_sha256"]) == set(
+        INFERENCE_CODE_PATHS
+    )
+    assert first_manifest["creation_provenance"]["analyzer_git_commit_sha"] == (
+        "commit-core"
+    )
+    assert first_manifest["creation_provenance"]["analyzer_source_sha256"] == (
+        "source-core"
+    )
 
     full_inputs = inputs_for(tuple(jobs), "reporting-only-change")
     assert _job_cache_identity(core_inputs, jobs[0]) == _job_cache_identity(
@@ -1601,13 +1734,37 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
     _adopt_or_infer_caches(
         cache_root,
         full_inputs,
-        "full-stage3",
         full_state,
         full_output / "analysis_state.json",
     )
     assert calls == list(range(24))
     assert full_state["jobs"][0]["cache_manifest_path"].startswith(str(cache_root))
     assert core_paths[("core", 11)].parent.parent.parent == cache_root
+    assert core_cache_bytes == {
+        relative: (cache_root / relative).read_bytes() for relative in core_cache_bytes
+    }
+    completed_cache_bytes = {
+        path.relative_to(cache_root): path.read_bytes()
+        for path in cache_root.rglob("*")
+        if path.is_file()
+    }
+    resumed_state = {
+        "status": "running",
+        "jobs": [{"status": "pending"} for _ in full_inputs.jobs],
+    }
+    resumed_output = tmp_path / "resumed-output"
+    resumed_output.mkdir()
+    _adopt_or_infer_caches(
+        cache_root,
+        full_inputs,
+        resumed_state,
+        resumed_output / "analysis_state.json",
+    )
+    assert calls == list(range(24))
+    assert completed_cache_bytes == {
+        relative: (cache_root / relative).read_bytes()
+        for relative in completed_cache_bytes
+    }
 
     changed_job = Stage3AnalysisJob(
         **{**jobs[0].__dict__, "checkpoint_sha256": "changed-checkpoint"}
@@ -1635,371 +1792,39 @@ def test_full_synthetic_orchestration_core_full_cache_resume_and_artifacts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    import copy
+
+    import torch
+
+    from brazil_rv.modeling import (
+        analyze_stage3_context_addition as stage3_analyzer,
+    )
+    from brazil_rv.modeling import stage2_context_ablation as stage2
+    from brazil_rv.modeling import stage3_context_addition as stage3
+    from brazil_rv.modeling import stock_time_cache as cache_semantics
+    from brazil_rv.modeling import stock_time_inference as inference_semantics
+    from brazil_rv.modeling.context_ablation import get_context_ablation
+    from brazil_rv.modeling.contract import (
+        FEATURE_CONTRACT_VERSION,
+        SplitBoundaries,
+        VALIDATION_END,
+        VALIDATION_START,
+    )
+    from brazil_rv.modeling.evaluate import _CHECKPOINT_IDENTITY_FIELDS
+
     analyzer = __import__(
         "brazil_rv.modeling.analyze_stock_time_attribution",
         fromlist=["FINAL_ARTIFACT_NAMES", "_sha256"],
     )
-    date_count = 5
-    decision_count = 55
-    equity_count = 158
-    sample_count = date_count * decision_count
-    generator = np.random.default_rng(20260809)
-    date_idx = np.repeat(np.arange(date_count, dtype=np.int64), decision_count)
-    decision_idx = np.tile(np.arange(decision_count, dtype=np.int64), date_count)
-    sample_id = np.arange(sample_count, dtype=np.int64)
-    targets = generator.normal(size=(sample_count, equity_count, 3)).astype(np.float32)
-    raw_returns = (targets * 0.01).astype(np.float32)
-    label_mask = np.ones_like(targets, dtype=bool)
-    validation_rows = pl.DataFrame(
-        {
-            "sample_id": sample_id,
-            "date_idx": date_idx,
-            "decision_idx": decision_idx,
-        }
-    )
     feature_store = tmp_path / "feature-store"
     feature_store.mkdir()
-    feature_marker = feature_store / "manifest.json"
-    _atomic_write_json(feature_marker, {"manifest_version": 1})
-    stage3_state_path = tmp_path / "stage3-state.json"
-    _atomic_write_json(stage3_state_path, {"status": "completed"})
-
-    evaluations: dict[int, SimpleNamespace] = {}
-    jobs: list[Stage3AnalysisJob] = []
-    input_paths = [feature_marker, stage3_state_path]
-    for position, (logical, seed) in enumerate(
-        (logical, seed)
-        for logical in STAGE3_LOGICAL_CONFIGURATION_ORDER
-        for seed in STAGE3_SEEDS
-    ):
-        run_dir = tmp_path / "runs" / f"{logical}_{seed}"
-        run_dir.mkdir(parents=True)
-        run_manifest_path = run_dir / "run_manifest.json"
-        checkpoint_path = run_dir / "best.pt"
-        manifest = {
-            "synthetic_index": position,
-            "model_name": "tcn",
-            "model_family": "tcn",
-            "seed": seed,
-            "context_ablation": STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION[logical],
-            "feature_ablation": {"key": "none"},
-            "global_context": True,
-            "objective": {"name": "rank_ic", "temperature": None},
-            "compile": {"parity": {"passed": True}},
-        }
-        _atomic_write_json(run_manifest_path, manifest)
-        checkpoint_path.write_bytes(f"checkpoint-{position}".encode())
-        job_generator = np.random.default_rng(10_000 + position)
-        predictions = (
-            targets
-            + job_generator.normal(scale=0.2 + position / 200.0, size=targets.shape)
-        ).astype(np.float32)
-        summary, daily_rows = create_metric_table(
-            predictions,
-            targets,
-            raw_returns,
-            label_mask,
-            date_idx,
-            decision_idx,
-        )
-        _atomic_write_json(run_dir / "validation_metrics.json", summary)
-        pl.DataFrame(daily_rows).write_parquet(
-            run_dir / "validation_daily_metrics.parquet"
-        )
-        observations = EvaluationObservations(
-            sample_id=sample_id,
-            date_idx=date_idx,
-            decision_idx=decision_idx,
-            predictions=predictions,
-            targets=targets,
-            raw_returns=raw_returns,
-            label_mask=label_mask,
-        )
-        evaluations[position] = SimpleNamespace(
-            observations=observations,
-            summary=summary,
-            daily_rows=daily_rows,
-        )
-        jobs.append(
-            Stage3AnalysisJob(
-                position=position,
-                logical_configuration=logical,
-                context_ablation=STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION[logical],
-                seed=seed,
-                run_dir=run_dir,
-                run_manifest_path=run_manifest_path,
-                run_manifest_sha256=analyzer._sha256(run_manifest_path),
-                checkpoint_path=checkpoint_path,
-                checkpoint_sha256=analyzer._sha256(checkpoint_path),
-                producing_git_commit_sha="producer",
-                manifest=manifest,
-            )
-        )
-        input_paths.extend(
-            (
-                run_manifest_path,
-                checkpoint_path,
-                run_dir / "validation_metrics.json",
-                run_dir / "validation_daily_metrics.parquet",
-            )
-        )
-
-    scheduled = np.asarray(DECISION_EQUITY_INDICES, dtype=np.int64)[decision_idx]
-    observed_bars = np.broadcast_to(
-        scheduled[:, None], (sample_count, equity_count)
-    ).copy()
-    local_ready = np.ones((sample_count, len(LOCAL_CONTEXT_SYMBOLS)), dtype=bool)
-    global_ready = np.ones((sample_count, len(GLOBAL_CONTEXT_SYMBOLS)), dtype=bool)
-    fixed_quintiles = np.repeat(np.arange(5, dtype=np.int8), [32, 32, 32, 31, 31])
-    adaptive = np.empty((date_count, equity_count), dtype=np.int8)
-    adaptive_counts = np.empty(date_count, dtype=np.int8)
-    dollar_liquidity = np.tile(
-        np.linspace(2_000_000.0, 20_000_000.0, equity_count),
-        (date_count, 1),
-    )
-    for day in range(date_count):
-        adaptive[day], adaptive_counts[day] = adaptive_liquidity_buckets(
-            dollar_liquidity[day], np.ones(equity_count, dtype=bool)
-        )
-    metadata = {
-        "axes": {
-            "liquidity_channel_name": "median_daily_dollar_volume_20d_log_scale",
-            "liquidity_channel_index": 0,
-            "dollar_volume_log_affine": {"center": 0.0, "scale": 1.0},
-        },
-        "trade_dates": np.asarray(
-            [
-                np.datetime64("2024-12-27"),
-                np.datetime64("2024-12-28"),
-                np.datetime64("2024-12-29"),
-                np.datetime64("2024-12-31"),
-                np.datetime64("2025-01-02"),
-            ]
-        ),
-        "validation_date_indices": np.arange(date_count, dtype=np.int64),
-        "date_position_by_index": {index: index for index in range(date_count)},
-        "equity_index": pl.DataFrame(
-            {
-                "equity_slot": np.arange(equity_count),
-                "security_id": [
-                    f"security-{index:03d}" for index in range(equity_count)
-                ],
-                "isin": [f"BR{index:010d}" for index in range(equity_count)],
-                "latest_ticker": [f"T{index:03d}" for index in range(equity_count)],
-                "xp_symbol": [f"Stock {index:03d}" for index in range(equity_count)],
-            }
-        ),
-        "active": np.ones((date_count, equity_count), dtype=bool),
-        "dollar_liquidity": dollar_liquidity,
-        "liquidity_quintile": np.tile(fixed_quintiles, (date_count, 1)),
-        "adaptive_liquidity": adaptive,
-        "adaptive_liquidity_bucket_count": adaptive_counts,
-        "eligibility_liquidity_threshold": {"value_brl": 2_000_000.0},
-        "market_overnight_gap": np.linspace(-0.02, 0.02, date_count),
-        "overnight_thresholds": {
-            "large_absolute": 0.01,
-            "large_positive": 0.01,
-            "large_negative": -0.01,
-        },
-        "overnight_regimes": {
-            "normal": np.asarray([False, True, True, True, False]),
-            "large": np.asarray([True, False, False, False, True]),
-            "large_positive": np.asarray([False, False, False, False, True]),
-            "large_negative": np.asarray([True, False, False, False, False]),
-        },
-        "equity_completeness": {
-            "scheduled_minutes": scheduled,
-            "observed_bars": observed_bars,
-            "observed_fraction": np.ones_like(observed_bars, dtype=np.float64),
-            "recent_observed_fraction": np.ones_like(observed_bars, dtype=np.float64),
-            "ready": np.ones_like(observed_bars, dtype=bool),
-        },
-        "local_completeness": {
-            "observed_fraction": np.ones_like(local_ready, dtype=np.float64),
-            "preopen_observed_fraction": np.ones_like(local_ready, dtype=np.float64),
-            "minutes_since_most_recent_observed_bar": np.zeros_like(
-                local_ready, dtype=np.float64
-            ),
-            "ready": local_ready,
-        },
-        "global_completeness": {
-            "observed_fraction": np.ones_like(global_ready, dtype=np.float64),
-            "preopen_observed_fraction": np.ones_like(global_ready, dtype=np.float64),
-            "minutes_since_most_recent_observed_bar": np.zeros_like(
-                global_ready, dtype=np.float64
-            ),
-            "ready": global_ready,
-        },
-    }
-
-    def analysis_inputs(selected_jobs: tuple[Stage3AnalysisJob, ...]) -> AnalysisInputs:
-        return AnalysisInputs(
-            state_path=stage3_state_path,
-            state_sha256=analyzer._sha256(stage3_state_path),
-            state={"status": "completed"},
-            configuration={},
-            feature_store=feature_store,
-            feature_identity={"manifest_sha256": "synthetic-feature"},
-            feature_manifest={"manifest_version": 1},
-            sample_index=validation_rows,
-            validation_rows=validation_rows,
-            jobs=selected_jobs,
-            analyzer_git_commit_sha="analysis-commit",
-            analyzer_worktree_clean=True,
-            analyzer_source_sha256="reporting-source",
-            inference_code_sha256=_inference_code_identity(),
-        )
-
-    core_inputs = analysis_inputs(tuple(jobs[:3]))
-    full_inputs = analysis_inputs(tuple(jobs))
-    expected_matrix = tuple(
-        (logical, seed)
-        for logical in STAGE3_LOGICAL_CONFIGURATION_ORDER
-        for seed in STAGE3_SEEDS
-    )
-    assert (
-        tuple((job.logical_configuration, job.seed) for job in full_inputs.jobs)
-        == expected_matrix
-    )
-    requested_scopes: list[str] = []
-
-    def validate_inputs(path: Path, scope: str) -> AnalysisInputs:
-        assert path.resolve() == stage3_state_path.resolve()
-        requested_scopes.append(scope)
-        return core_inputs if scope == "core" else full_inputs
-
-    inference_calls: list[int] = []
-    runtime_validations: list[bool] = []
-
-    def collect(manifest: dict[str, object], *args: object) -> SimpleNamespace:
-        del args
-        position = int(manifest["synthetic_index"])
-        inference_calls.append(position)
-        return evaluations[position]
-
-    monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution.validate_analysis_inputs",
-        validate_inputs,
-    )
-    monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution.collect_neural_evaluation",
-        collect,
-    )
-    monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution.validate_runtime",
-        lambda: runtime_validations.append(True),
-    )
-    monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution._load_analysis_metadata",
-        lambda inputs, shared: metadata,
-    )
-    monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution._git_identity",
-        lambda: ("analysis-commit", True),
-    )
-    monkeypatch.setattr(
-        "brazil_rv.modeling.analyze_stock_time_attribution.BOOTSTRAP_REPLICATIONS",
-        4,
-    )
-
-    before_inputs = {path: analyzer._sha256(path) for path in input_paths}
-    core_output = tmp_path / "core-output"
-    full_output = tmp_path / "full-output"
-    core_manifest_path = run_analysis(stage3_state_path, core_output, "core")
-    assert core_manifest_path.is_file()
-    assert inference_calls == [0, 1, 2]
-    cache_root = tmp_path / "_stock_time_attribution_cache"
-    core_cache_hashes = {
-        job.logical_configuration + str(job.seed): analyzer._sha256(
-            cache_root
-            / "predictions"
-            / f"{job.logical_configuration}_seed{job.seed}"
-            / "predictions.npy"
-        )
-        for job in jobs[:3]
-    }
-
-    full_manifest_path = run_analysis(stage3_state_path, full_output, "full-stage3")
-    assert full_manifest_path.is_file()
-    assert inference_calls == list(range(24))
-    assert runtime_validations == [True, True]
-    assert core_cache_hashes == {
-        job.logical_configuration + str(job.seed): analyzer._sha256(
-            cache_root
-            / "predictions"
-            / f"{job.logical_configuration}_seed{job.seed}"
-            / "predictions.npy"
-        )
-        for job in jobs[:3]
-    }
-
-    full_state_path = full_output / "analysis_state.json"
-    full_state = json.loads(full_state_path.read_text(encoding="utf-8"))
-    assert full_state["status"] == "completed"
-    assert full_state["pending_artifact"] is None
-    assert set(full_state["artifacts"]) == set(analyzer.FINAL_ARTIFACT_NAMES)
-    assert all(job["status"] == "completed" for job in full_state["jobs"])
-    full_manifest = json.loads(full_manifest_path.read_text(encoding="utf-8"))
-    assert len(full_manifest["prediction_cache_manifests"]) == 24
-    assert (
-        Path(full_manifest["shared_validation_manifest"]["path"]).parent
-        == cache_root / "shared_validation"
-    )
-    summary = json.loads((full_output / "summary.json").read_text(encoding="utf-8"))
-    assert summary["inputs"]["job_count"] == 24
-    assert all(count > 0 for count in summary["artifact_row_counts"].values())
-    assert all(
-        check["passed"] is True for check in summary["metric_reproduction_checks"]
-    )
-    before_resume_artifacts = {
-        name: analyzer._sha256(Path(values["path"]))
-        for name, values in full_state["artifacts"].items()
-    }
-    assert (
-        run_analysis(stage3_state_path, full_output, "full-stage3")
-        == full_manifest_path
-    )
-    assert inference_calls == list(range(24))
-    resumed_state = json.loads(full_state_path.read_text(encoding="utf-8"))
-    assert resumed_state["pending_artifact"] is None
-    assert before_resume_artifacts == {
-        name: analyzer._sha256(Path(values["path"]))
-        for name, values in resumed_state["artifacts"].items()
-    }
-    assert before_inputs == {path: analyzer._sha256(path) for path in input_paths}
-    assert requested_scopes == ["core", "full-stage3", "full-stage3"]
-
-
-def test_real_stage3_preflight_and_metadata_loading_remain_test_sealed(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    analyzer = __import__(
-        "brazil_rv.modeling.analyze_stock_time_attribution",
-        fromlist=["validate_analysis_inputs"],
-    )
-    stage2 = __import__(
-        "brazil_rv.modeling.stage2_context_ablation",
-        fromlist=["_feature_store_identity", "_training_semantics"],
-    )
-    stage3 = __import__(
-        "brazil_rv.modeling.stage3_context_addition",
-        fromlist=["stage3_jobs"],
-    )
-    stage3_analyzer = __import__(
-        "brazil_rv.modeling.analyze_stage3_context_addition",
-        fromlist=["PACKAGED_FEATURE_MANIFEST_SHA256"],
-    )
-    feature_store = tmp_path / "feature-store"
-    feature_store.mkdir()
-    manifest_path = feature_store / "manifest.json"
     _atomic_write_json(
-        manifest_path,
+        feature_store / "manifest.json",
         {
-            "contract_version": analyzer.FEATURE_CONTRACT_VERSION,
+            "contract_version": FEATURE_CONTRACT_VERSION,
             "global_context": {
-                "source_hashes": {"source": "hash"},
-                "normalized_store_hashes": {"store": "hash"},
+                "source_hashes": {"source": "synthetic-source"},
+                "normalized_store_hashes": {"store": "synthetic-store"},
             },
             "canonical_inputs": {},
             "constants": {"dollar_volume_log_affine": {"center": 0.0, "scale": 1.0}},
@@ -2017,35 +1842,31 @@ def test_real_stage3_preflight_and_metadata_loading_remain_test_sealed(
         date(2021, 8, 16) + timedelta(days=offset) for offset in range(30)
     ]
     validation_dates = [
-        analyzer.VALIDATION_START,
+        VALIDATION_START,
         date(2024, 12, 30),
         date(2024, 12, 31),
         date(2025, 1, 2),
-        analyzer.VALIDATION_END,
+        VALIDATION_END,
     ]
-    trade_dates = [
-        *training_dates,
-        *validation_dates,
-        analyzer.SplitBoundaries().test_start,
-    ]
+    final_test_date = SplitBoundaries().test_start
+    trade_dates = [*training_dates, *validation_dates, final_test_date]
     training_count = len(training_dates)
     validation_indices = np.arange(training_count, training_count + 5, dtype=np.int64)
-    test_date_index = len(trade_dates) - 1
-    rows = []
-    for date_idx_value, trade_date in enumerate(trade_dates):
-        for decision in range(55):
-            rows.append(
-                {
-                    "sample_id": date_idx_value * 55 + decision,
-                    "date_idx": date_idx_value,
-                    "decision_idx": decision,
-                    "trade_date": trade_date,
-                    "equity_cutoff_index": int(DECISION_EQUITY_INDICES[decision]),
-                    "context_cutoff_index": 75 + 5 * decision,
-                    "active_equity_count": 158,
-                }
-            )
-    sample_index = pl.DataFrame(rows)
+    final_test_index = len(trade_dates) - 1
+    sample_rows = [
+        {
+            "sample_id": date_index * 55 + decision,
+            "date_idx": date_index,
+            "decision_idx": decision,
+            "trade_date": trade_date,
+            "equity_cutoff_index": int(DECISION_EQUITY_INDICES[decision]),
+            "context_cutoff_index": 75 + 5 * decision,
+            "active_equity_count": 158,
+        }
+        for date_index, trade_date in enumerate(trade_dates)
+        for decision in range(55)
+    ]
+    sample_index = pl.DataFrame(sample_rows)
     sample_index.write_parquet(feature_store / "sample_index.parquet")
     pl.DataFrame(
         {"date_idx": np.arange(len(trade_dates)), "trade_date": trade_dates}
@@ -2064,179 +1885,326 @@ def test_real_stage3_preflight_and_metadata_loading_remain_test_sealed(
     observed_channel = DYNAMIC_CHANNELS.index("observed")
     liquidity_channel = SLOW_CHANNELS.index("median_daily_dollar_volume_20d_log_scale")
     overnight_channel = SLOW_CHANNELS.index("overnight_gap_normalized")
+
+    def write_feature_array(name: str, values: np.ndarray) -> None:
+        _atomic_write_npy(feature_store / name, values)
+
+    write_feature_array("equity_membership.npy", np.ones((date_count, 158), dtype=bool))
+    write_feature_array("equity_data_ready.npy", np.ones((date_count, 158), dtype=bool))
     equity_slow = np.zeros((date_count, 158, len(SLOW_CHANNELS)), dtype=np.float32)
     equity_slow[:, :, liquidity_channel] = np.log1p(
         np.linspace(2_000_000.0, 20_000_000.0, 158)
     )
     equity_slow[:, :, overnight_channel] = np.linspace(-0.02, 0.02, date_count)[:, None]
+    write_feature_array("equity_slow.npy", equity_slow)
+    del equity_slow
     equity_features = np.zeros(
-        (
-            date_count,
-            158,
-            DECISION_EQUITY_INDICES[-1],
-            len(DYNAMIC_CHANNELS),
-        ),
-        dtype=np.float32,
+        (date_count, 158, 405, len(DYNAMIC_CHANNELS)), dtype=np.float32
     )
     equity_features[..., observed_channel] = 1.0
+    equity_features[final_test_index] = -777.0
+    write_feature_array("equity_features.npy", equity_features)
+    del equity_features
+    write_feature_array(
+        "context_slow.npy",
+        np.zeros(
+            (date_count, len(LOCAL_CONTEXT_SYMBOLS), len(SLOW_CHANNELS)),
+            dtype=np.float32,
+        ),
+    )
     context_features = np.zeros(
         (
             date_count,
             len(LOCAL_CONTEXT_SYMBOLS),
-            75 + 5 * 54,
+            465,
             len(DYNAMIC_CHANNELS),
         ),
         dtype=np.float32,
     )
     context_features[..., observed_channel] = 1.0
+    context_features[final_test_index] = -777.0
+    write_feature_array("context_features.npy", context_features)
+    del context_features
+    write_feature_array(
+        "context_data_ready.npy",
+        np.ones((date_count, len(LOCAL_CONTEXT_SYMBOLS)), dtype=bool),
+    )
+    write_feature_array(
+        "global_slow.npy",
+        np.zeros(
+            (date_count, len(GLOBAL_CONTEXT_SYMBOLS), 55, len(SLOW_CHANNELS)),
+            dtype=np.float32,
+        ),
+    )
     global_features = np.zeros(
         (
             date_count,
             len(GLOBAL_CONTEXT_SYMBOLS),
-            DECISION_GLOBAL_INDICES[-1],
+            615,
             len(DYNAMIC_CHANNELS),
         ),
         dtype=np.float32,
     )
     global_features[..., observed_channel] = 1.0
-    feature_arrays = {
-        "equity_membership.npy": np.ones((date_count, 158), dtype=bool),
-        "equity_data_ready.npy": np.ones((date_count, 158), dtype=bool),
-        "equity_slow.npy": equity_slow,
-        "equity_features.npy": equity_features,
-        "context_features.npy": context_features,
-        "context_data_ready.npy": np.ones(
-            (date_count, len(LOCAL_CONTEXT_SYMBOLS)), dtype=bool
-        ),
-        "global_features.npy": global_features,
-        "global_data_ready.npy": np.ones(
-            (date_count, len(GLOBAL_CONTEXT_SYMBOLS), 55), dtype=bool
-        ),
-    }
+    global_features[final_test_index] = -777.0
+    write_feature_array("global_features.npy", global_features)
+    del global_features
+    write_feature_array(
+        "global_data_ready.npy",
+        np.ones((date_count, len(GLOBAL_CONTEXT_SYMBOLS), 55), dtype=bool),
+    )
+    dense_target_shape = (date_count, 158, 55, 3)
+    write_feature_array(
+        "raw_returns.npy", np.zeros(dense_target_shape, dtype=np.float32)
+    )
+    write_feature_array("targets.npy", np.zeros(dense_target_shape, dtype=np.float32))
+    write_feature_array("label_mask.npy", np.ones(dense_target_shape, dtype=bool))
+    write_feature_array(
+        "cross_section_median.npy",
+        np.zeros((date_count, 55, 3), dtype=np.float32),
+    )
+    write_feature_array("horizon_mask.npy", np.ones((date_count, 55, 3), dtype=bool))
 
-    feature_identity = stage2._feature_store_identity(feature_store)
-    source_stage2_state = tmp_path / "stage2-state.json"
-    _atomic_write_json(source_stage2_state, {"status": "completed"})
-    configuration = {
-        "orchestrator_git_commit_sha": "a" * 40,
-        "feature_store": feature_identity,
-        "feature_contract": analyzer.FEATURE_CONTRACT_VERSION,
-        "local_context_symbols": list(LOCAL_CONTEXT_SYMBOLS),
-        "global_context_symbols": list(GLOBAL_CONTEXT_SYMBOLS),
-        "training_semantics": stage2._training_semantics(),
-        "split_boundaries": analyzer._split_boundaries(),
-        "logical_configuration_order": list(STAGE3_LOGICAL_CONFIGURATION_ORDER),
-        "context_ablation_by_logical_configuration": dict(
-            STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION
-        ),
-        "context_ablation_metadata_by_logical_configuration": {
-            logical: analyzer.get_context_ablation(key).metadata()
-            for logical, key in STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION.items()
-        },
-        "seeds": list(STAGE3_SEEDS),
-        "logical_job_count": 24,
-        "adopted_stage2_job_count": 3,
-        "new_training_job_count": 21,
-        "source_stage2_state": str(source_stage2_state),
-        "source_stage2_state_sha256": analyzer._sha256(source_stage2_state),
-        "source_stage2_feature_store_resolved_path": str(feature_store),
-        "required_stage2_producing_commit": stage3.STAGE2_PRODUCING_COMMIT,
-        "required_feature_manifest_sha256": feature_identity["manifest_sha256"],
-    }
-    state_jobs = []
-    for position, base in enumerate(stage3.stage3_jobs()):
-        logical = str(base["logical_configuration"])
-        seed = int(base["seed"])
-        run_dir = tmp_path / "runs" / f"{logical}_{seed}"
-        run_dir.mkdir(parents=True)
-        run_manifest_path = run_dir / "run_manifest.json"
-        _atomic_write_json(run_manifest_path, {"synthetic_index": position})
-        checkpoint_path = run_dir / "best.pt"
-        checkpoint_path.write_bytes(f"checkpoint-{position}".encode())
-        producing_commit = (
-            stage3.STAGE2_PRODUCING_COMMIT
-            if logical == analyzer.ADOPTED_STAGE2_LOGICAL_CONFIGURATION
-            else str(configuration["orchestrator_git_commit_sha"])
+    def canonical_validation_dates() -> list[date]:
+        weekdays: list[date] = []
+        current = VALIDATION_START
+        while current <= VALIDATION_END:
+            if current.weekday() < 5:
+                weekdays.append(current)
+            current += timedelta(days=1)
+        indices = np.linspace(0, len(weekdays) - 1, 244, dtype=int)
+        result = [weekdays[index] for index in indices]
+        assert len(set(result)) == 244
+        return result
+
+    validation_artifact_dates = canonical_validation_dates()
+    metrics_by_position: dict[
+        int, tuple[dict[str, object], list[dict[str, object]]]
+    ] = {}
+
+    def write_completed_run(
+        run_dir: Path,
+        configuration: dict[str, object],
+        key: str,
+        seed: int,
+        commit: str,
+        score: float,
+        position: int,
+    ) -> None:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        identity = configuration["feature_store"]
+        assert isinstance(identity, dict)
+        manifest = {
+            **copy.deepcopy(configuration["training_semantics"]),
+            "status": "completed",
+            "seed": seed,
+            "git_commit_sha": commit,
+            "resolved_feature_store_path": str(feature_store),
+            "feature_manifest_contract_version": configuration["feature_contract"],
+            "split_boundaries": copy.deepcopy(configuration["split_boundaries"]),
+            "context_ablation": get_context_ablation(key).metadata(),
+            "global_context_source_hashes": identity["global_context_source_hashes"],
+            "global_context_normalized_store_hashes": identity[
+                "global_context_normalized_store_hashes"
+            ],
+            "resolved_source_paths": identity["canonical_inputs"],
+            "best_validation_primary_score": score,
+            "best_epoch": 2,
+            "stopped_epoch": 3,
+            "successful_optimizer_updates": 231,
+            "training_duration_seconds": 1.0,
+            "scheduler_steps": {"steps_per_epoch": 77},
+            "synthetic_index": position,
+        }
+        _atomic_write_json(run_dir / "run_manifest.json", manifest)
+        checkpoint = {
+            field: copy.deepcopy(manifest[field])
+            for field in _CHECKPOINT_IDENTITY_FIELDS
+        }
+        checkpoint["context_ablation"] = copy.deepcopy(manifest["context_ablation"])
+        torch.save(checkpoint, run_dir / "best.pt")
+        pl.DataFrame(
+            {
+                "epoch": [1, 2, 3],
+                "optimizer_steps": [77, 77, 77],
+                "epoch_seconds": [0.3, 0.3, 0.4],
+            }
+        ).write_csv(run_dir / "history.csv")
+        horizon_scores = {30: score - 0.0001, 60: score, 120: score + 0.0001}
+        daily_rows = [
+            {
+                "trade_date": trade_date,
+                "date_idx": date_index,
+                "horizon_minutes": horizon,
+                "spearman_ic": horizon_scores[horizon],
+                "rank_target_pearson_ic": horizon_scores[horizon] / 2.0,
+                "top_return": 0.002 + score,
+                "bottom_return": -0.001,
+                "top_minus_bottom": 0.003 + score,
+                "long_only_top": 0.002 + score,
+                "one_way_turnover": 0.4 + score,
+            }
+            for date_index, trade_date in enumerate(validation_artifact_dates)
+            for horizon in (30, 60, 120)
+        ]
+        summary = {
+            "primary_score": score,
+            "horizons": [
+                {
+                    "horizon_minutes": horizon,
+                    "mean_daily_spearman_ic": horizon_scores[horizon],
+                    "mean_top_minus_bottom": 0.003 + score,
+                    "mean_one_way_turnover": 0.4 + score,
+                }
+                for horizon in (30, 60, 120)
+            ],
+        }
+        _atomic_write_json(run_dir / "validation_metrics.json", summary)
+        pl.DataFrame(daily_rows).write_parquet(
+            run_dir / "validation_daily_metrics.parquet"
         )
-        state_jobs.append(
+        metrics_by_position[position] = (summary, daily_rows)
+
+    stage1_state = tmp_path / "stage1-state.json"
+    _atomic_write_json(stage1_state, {"status": "completed"})
+    source_configuration = stage2._configuration(
+        stage3.STAGE2_PRODUCING_COMMIT, feature_store, stage1_state
+    )
+    stage2_jobs: list[dict[str, object]] = []
+    adopted_key = stage3.ADOPTED_STAGE2_CONTEXT_ABLATION
+    adopted_logical = stage3.ADOPTED_STAGE2_LOGICAL_CONFIGURATION
+    for base in stage2.stage2_jobs():
+        key = str(base["context_ablation"])
+        seed = int(base["seed"])
+        run_dir = tmp_path / "stage2-runs" / f"{key}_{seed}"
+        position = STAGE3_LOGICAL_CONFIGURATION_ORDER.index(
+            adopted_logical
+        ) * 3 + STAGE3_SEEDS.index(seed)
+        score = 0.02 + position / 10_000.0
+        manifest_sha: str | None = None
+        if key == adopted_key:
+            write_completed_run(
+                run_dir,
+                source_configuration,
+                key,
+                seed,
+                stage3.STAGE2_PRODUCING_COMMIT,
+                score,
+                position,
+            )
+            manifest_sha = analyzer._sha256(run_dir / "run_manifest.json")
+        stage2_jobs.append(
             {
                 **base,
                 "status": "completed",
-                "result_origin": (
-                    "adopted_stage2"
-                    if logical == analyzer.ADOPTED_STAGE2_LOGICAL_CONFIGURATION
-                    else "trained_stage3"
-                ),
+                "result_origin": "trained_stage2",
                 "run_dir": str(run_dir),
-                "run_manifest_sha256": analyzer._sha256(run_manifest_path),
-                "producing_git_commit_sha": producing_commit,
-                "primary_validation_ic": 0.1,
+                "run_manifest_sha256": manifest_sha,
+                "producing_git_commit_sha": stage3.STAGE2_PRODUCING_COMMIT,
+                "source_stage1_state": None,
+                "source_stage1_job": None,
+                "primary_validation_ic": score if key == adopted_key else 0.0,
             }
         )
-    stage3_state_path = tmp_path / "stage3-state.json"
+    source_stage2_state = tmp_path / "stage2-state.json"
     _atomic_write_json(
-        stage3_state_path,
+        source_stage2_state,
         {
-            "state_version": stage3.STATE_VERSION,
-            "sweep_name": stage3.SWEEP_NAME,
+            "state_version": stage2.STATE_VERSION,
+            "sweep_name": stage2.SWEEP_NAME,
             "status": "completed",
-            "configuration": configuration,
-            "jobs": state_jobs,
+            "configuration": source_configuration,
+            "jobs": stage2_jobs,
         },
     )
 
+    feature_identity = stage2._feature_store_identity(feature_store)
+    monkeypatch.setattr(
+        stage3, "PACKAGED_FEATURE_MANIFEST_SHA256", feature_identity["manifest_sha256"]
+    )
     monkeypatch.setattr(
         stage3_analyzer,
         "PACKAGED_FEATURE_MANIFEST_SHA256",
         feature_identity["manifest_sha256"],
     )
-    monkeypatch.setattr(
-        analyzer,
-        "_validated_stage2_adoptions",
-        lambda *args: {},
+    isolated_run_root = tmp_path / "isolated-model-runs"
+    isolated_run_root.mkdir()
+    monkeypatch.setattr(stage3, "RUN_OUTPUT_BASE", isolated_run_root)
+    orchestrator_commit = "a" * 40
+    configuration = stage3._configuration(
+        orchestrator_commit, feature_store, source_stage2_state
     )
-    monkeypatch.setattr(
-        analyzer,
-        "_completed_job_artifacts",
-        lambda job, config: (
-            Path(str(job["run_dir"])).resolve(),
-            float(job["primary_validation_ic"]),
-            str(job["run_manifest_sha256"]),
-        ),
-    )
-    monkeypatch.setattr(
-        analyzer,
-        "validate_stage3_completed_run",
-        lambda run_dir, config, key, seed, commit: 0.1,
-    )
-    monkeypatch.setattr(
-        analyzer,
-        "_validate_checkpoint_identity",
-        lambda run_dir, manifest, store: (
-            (Path(run_dir) / "best.pt").resolve(),
-            analyzer._sha256(Path(run_dir) / "best.pt"),
-        ),
-    )
-    monkeypatch.setattr(
-        analyzer,
-        "_git_identity",
-        lambda: ("analysis-commit", True),
-    )
+    adopted = stage3._validated_stage2_adoptions(source_stage2_state, configuration)
+    stage3_state = stage3._new_state(configuration, source_stage2_state, adopted)
+    for position, job in enumerate(stage3_state["jobs"]):
+        logical = str(job["logical_configuration"])
+        seed = int(job["seed"])
+        if logical == adopted_logical:
+            continue
+        run_dir = tmp_path / "stage3-runs" / f"{logical}_{seed}"
+        score = 0.02 + position / 10_000.0
+        write_completed_run(
+            run_dir,
+            configuration,
+            str(job["context_ablation"]),
+            seed,
+            orchestrator_commit,
+            score,
+            position,
+        )
+        job.update(
+            {
+                "status": "completed",
+                "result_origin": "trained_stage3",
+                "run_dir": str(run_dir),
+                "run_manifest_sha256": analyzer._sha256(run_dir / "run_manifest.json"),
+                "producing_git_commit_sha": orchestrator_commit,
+                "primary_validation_ic": score,
+                "completed_at_utc": "2026-08-09T00:00:00+00:00",
+                "error": None,
+            }
+        )
+    stage3_state["status"] = "completed"
+    stage3_state["completed_at_utc"] = "2026-08-09T00:00:00+00:00"
+    stage3_state_path = tmp_path / "stage3-state.json"
+    _atomic_write_json(stage3_state_path, stage3_state)
 
-    core_inputs = analyzer.validate_analysis_inputs(stage3_state_path, "core")
-    full_inputs = analyzer.validate_analysis_inputs(stage3_state_path, "full-stage3")
-    assert len(core_inputs.jobs) == 3
-    assert len(full_inputs.jobs) == 24
-    assert tuple(
-        (job.logical_configuration, job.seed) for job in full_inputs.jobs
-    ) == tuple(
-        (logical, seed)
-        for logical in STAGE3_LOGICAL_CONFIGURATION_ORDER
-        for seed in STAGE3_SEEDS
-    )
+    validation_rows = sample_index.filter(
+        pl.col("trade_date").is_between(VALIDATION_START, VALIDATION_END)
+    ).sort("sample_id")
+    sample_id = validation_rows["sample_id"].to_numpy().astype(np.int64)
+    date_idx = validation_rows["date_idx"].to_numpy().astype(np.int64)
+    decision_idx = validation_rows["decision_idx"].to_numpy().astype(np.int64)
+    sample_count = validation_rows.height
+    generator = np.random.default_rng(20260809)
+    targets = generator.normal(size=(sample_count, 158, 3)).astype(np.float32)
+    raw_returns = (targets * 0.01).astype(np.float32)
+    label_mask = np.ones_like(targets, dtype=bool)
+    evaluations: dict[int, SimpleNamespace] = {}
+    for position in range(24):
+        job_generator = np.random.default_rng(10_000 + position)
+        predictions = (
+            targets
+            + job_generator.normal(scale=0.2 + position / 200.0, size=targets.shape)
+        ).astype(np.float32)
+        summary, daily_rows = metrics_by_position[position]
+        evaluations[position] = SimpleNamespace(
+            observations=EvaluationObservations(
+                sample_id=sample_id,
+                date_idx=date_idx,
+                decision_idx=decision_idx,
+                predictions=predictions,
+                targets=targets,
+                raw_returns=raw_returns,
+                label_mask=label_mask,
+            ),
+            summary=summary,
+            daily_rows=daily_rows,
+        )
 
-    accessed_dates: list[int] = []
     original_load = np.load
+    guarded_feature_arrays = {path.name for path in feature_store.glob("*.npy")}
+    accessed_feature_dates: list[int] = []
 
     class GuardedArray:
         def __init__(self, values: np.ndarray) -> None:
@@ -2249,34 +2217,168 @@ def test_real_stage3_preflight_and_metadata_loading_remain_test_sealed(
                     "Feature array was materialized without date slicing"
                 )
             selected = np.asarray(key[0], dtype=np.int64)
-            if np.any(selected == test_date_index):
-                raise AssertionError("Final-test feature date was accessed")
-            accessed_dates.extend(selected.tolist())
-            return self.values[key]
+            if np.any(selected == final_test_index):
+                raise AssertionError("Final-test feature observation was accessed")
+            accessed_feature_dates.extend(selected.tolist())
+            return np.asarray(self.values[key])
 
         def __array__(self, *args: object, **kwargs: object) -> np.ndarray:
             del args, kwargs
             raise AssertionError("Full feature array was materialized")
 
     def guarded_load(path: object, **kwargs: object) -> object:
-        name = Path(path).name
+        candidate = Path(path)
         if (
-            Path(path).parent.resolve() == feature_store.resolve()
-            and name in feature_arrays
+            candidate.parent.resolve() == feature_store.resolve()
+            and candidate.name in guarded_feature_arrays
         ):
-            return GuardedArray(feature_arrays[name])
+            return GuardedArray(original_load(candidate, **kwargs))
         return original_load(path, **kwargs)
 
+    inference_calls: list[int] = []
+    inference_row_dates: list[set[date]] = []
+    runtime_validations: list[bool] = []
+
+    def collect(
+        manifest: dict[str, object], store: Path, rows: pl.DataFrame
+    ) -> SimpleNamespace:
+        assert store.resolve() == feature_store.resolve()
+        row_dates = set(rows["trade_date"].to_list())
+        assert row_dates <= set(validation_dates)
+        assert final_test_date not in row_dates
+        inference_row_dates.append(row_dates)
+        position = int(manifest["synthetic_index"])
+        inference_calls.append(position)
+        return evaluations[position]
+
     monkeypatch.setattr(analyzer.np, "load", guarded_load)
-    validation_rows = full_inputs.validation_rows
-    shared = {
-        "date_idx": validation_rows["date_idx"].to_numpy().astype(np.int64),
-        "decision_idx": validation_rows["decision_idx"].to_numpy().astype(np.int64),
+    monkeypatch.setattr(cache_semantics, "collect_neural_evaluation", collect)
+    monkeypatch.setattr(
+        cache_semantics,
+        "validate_runtime",
+        lambda: runtime_validations.append(True),
+    )
+    monkeypatch.setattr(
+        inference_semantics, "_git_identity", lambda: ("analysis-commit", True)
+    )
+    monkeypatch.setattr(analyzer, "BOOTSTRAP_REPLICATIONS", 4)
+    monkeypatch.setattr(
+        analyzer, "PRODUCTION_TRAINING_LOCK", tmp_path / "production-training.lock"
+    )
+
+    immutable_inputs = [
+        path
+        for root in (
+            feature_store,
+            tmp_path / "stage2-runs",
+            tmp_path / "stage3-runs",
+        )
+        if root.exists()
+        for path in root.rglob("*")
+        if path.is_file()
+    ]
+    immutable_inputs.extend([stage1_state, source_stage2_state, stage3_state_path])
+    before_inputs = {path: analyzer._sha256(path) for path in immutable_inputs}
+
+    core_output = tmp_path / "core-output"
+    full_output = tmp_path / "full-output"
+    core_manifest_path = run_analysis(stage3_state_path, core_output, "core")
+    assert core_manifest_path.is_file()
+    assert inference_calls == [0, 1, 2]
+    cache_root = tmp_path / "_stock_time_attribution_cache"
+    core_cache_bytes = {
+        path.relative_to(cache_root): path.read_bytes()
+        for path in cache_root.rglob("*")
+        if path.is_file()
     }
-    metadata = analyzer._load_analysis_metadata(full_inputs, shared)
-    assert metadata["active"].shape == (5, 158)
-    assert set(accessed_dates) == {
+    for job in stage3_state["jobs"][:3]:
+        manifest = json.loads(
+            (
+                cache_root
+                / "predictions"
+                / f"{job['logical_configuration']}_seed{job['seed']}"
+                / "manifest.json"
+            ).read_text(encoding="utf-8")
+        )
+        assert set(manifest["identity"]["inference_code_sha256"]) == set(
+            INFERENCE_CODE_PATHS
+        )
+        assert manifest["creation_provenance"]["analyzer_git_commit_sha"] == (
+            "analysis-commit"
+        )
+        assert isinstance(
+            manifest["creation_provenance"]["analyzer_source_sha256"], str
+        )
+
+    full_manifest_path = run_analysis(stage3_state_path, full_output, "full-stage3")
+    assert full_manifest_path.is_file()
+    assert inference_calls == list(range(24))
+    assert runtime_validations == [True, True]
+    assert core_cache_bytes == {
+        relative: (cache_root / relative).read_bytes() for relative in core_cache_bytes
+    }
+    assert all(final_test_date not in dates for dates in inference_row_dates)
+    assert final_test_index not in accessed_feature_dates
+    assert set(accessed_feature_dates) == {
         *range(training_count),
         *validation_indices.tolist(),
     }
-    assert test_date_index not in accessed_dates
+
+    full_state_path = full_output / "analysis_state.json"
+    full_state = json.loads(full_state_path.read_text(encoding="utf-8"))
+    assert full_state["status"] == "completed"
+    assert full_state["pending_artifact"] is None
+    assert set(full_state["artifacts"]) == set(analyzer.FINAL_ARTIFACT_NAMES)
+    assert all(job["status"] == "completed" for job in full_state["jobs"])
+    full_manifest = json.loads(full_manifest_path.read_text(encoding="utf-8"))
+    assert full_manifest["analysis_version"] == 4
+    assert len(full_manifest["prediction_cache_manifests"]) == 24
+    assert full_manifest["configuration"]["inference_code_sha256"] == (
+        inference_semantics.inference_code_identity()
+    )
+    for name, metadata in full_manifest["artifacts"].items():
+        artifact = Path(str(metadata["path"]))
+        assert artifact.is_file(), name
+        assert analyzer._sha256(artifact) == metadata["sha256"]
+        assert full_state["artifacts"][name]["sha256"] == metadata["sha256"]
+    summary = json.loads((full_output / "summary.json").read_text(encoding="utf-8"))
+    assert summary["analysis_version"] == 4
+    assert summary["inputs"]["job_count"] == 24
+    assert all(count > 0 for count in summary["artifact_row_counts"].values())
+    assert all(
+        check["passed"] is True for check in summary["metric_reproduction_checks"]
+    )
+    warnings = " ".join(summary["coverage_warnings"])
+    assert "Fixed point-in-time liquidity-quintile IC" in warnings
+    assert "Adaptive fallback-bucket IC" in warnings
+    assert (
+        "Within-liquidity IC is emitted only for adaptive buckets meeting "
+        "MIN_IC_EQUITIES." not in warnings
+    )
+    assert summary["test_data_used"] is False
+    assert summary["final_test_remained_sealed"] is True
+
+    cache_bytes_before_resume = {
+        path.relative_to(cache_root): path.read_bytes()
+        for path in cache_root.rglob("*")
+        if path.is_file()
+    }
+    artifact_hashes_before_resume = {
+        name: analyzer._sha256(Path(str(values["path"])))
+        for name, values in full_state["artifacts"].items()
+    }
+    assert (
+        run_analysis(stage3_state_path, full_output, "full-stage3")
+        == full_manifest_path
+    )
+    assert inference_calls == list(range(24))
+    assert cache_bytes_before_resume == {
+        relative: (cache_root / relative).read_bytes()
+        for relative in cache_bytes_before_resume
+    }
+    resumed_state = json.loads(full_state_path.read_text(encoding="utf-8"))
+    assert artifact_hashes_before_resume == {
+        name: analyzer._sha256(Path(str(values["path"])))
+        for name, values in resumed_state["artifacts"].items()
+    }
+    assert before_inputs == {path: analyzer._sha256(path) for path in immutable_inputs}
