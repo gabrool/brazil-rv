@@ -287,8 +287,9 @@ def _architecture_from_identity(
 def _validate_architecture_identity(identity: dict[str, object]) -> None:
     model_name = str(identity["model_name"])
     architecture = _architecture_from_identity(identity)
-    expected = asdict(architecture)
-    if identity["architecture_constants"] != expected:
+    expected = json.loads(json.dumps(asdict(architecture)))
+    recorded = json.loads(json.dumps(identity["architecture_constants"]))
+    if recorded != expected:
         raise ValueError(f"Invalid architecture metadata for model: {model_name}")
     expected_parameter_count = expected_trainable_parameter_count(
         model_name, architecture

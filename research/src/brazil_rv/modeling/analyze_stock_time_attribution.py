@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
 import os
-import subprocess
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import polars as pl
-import torch
 
 from brazil_rv.preprocessing.contract import (
     DECISION_EQUITY_INDICES,
@@ -31,63 +28,40 @@ from .analyze_context_ablation import (
     BOOTSTRAP_REPLICATIONS,
     BOOTSTRAP_SEED,
 )
-from .analyze_stage3_context_addition import _validate_configuration
 from .context_ablation import get_context_ablation
 from .contract import (
     EXPECTED_DECISIONS_PER_DATE,
-    FEATURE_CONTRACT_VERSION,
-    FEATURE_STORE_POINTER,
     MIN_IC_EQUITIES,
-    SplitBoundaries,
-    VALIDATION_END,
-    VALIDATION_START,
 )
-from .data import (
-    _validate_sample_index,
-    load_sample_index,
-    select_sample_split,
-)
-from .engine import EvaluationObservations, validate_runtime
-from .evaluate import (
-    _normalize_feature_ablation_identity,
-    _validate_run_checkpoint_identity,
-    collect_neural_evaluation,
-)
+from .data import select_sample_split
 from .metrics import average_ranks
-from .process_lock import (
-    PRODUCTION_TRAINING_LOCK,
-    ProcessLockLease,
-    exclusive_process_lock,
-)
-from .stage2_context_ablation import (
-    _feature_store_identity,
-    feature_stores_equivalent,
-)
+from .process_lock import PRODUCTION_TRAINING_LOCK, exclusive_process_lock
 from .stage3_context_addition import (
-    ADOPTED_STAGE2_LOGICAL_CONFIGURATION,
-    STAGE2_PRODUCING_COMMIT,
-    STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION,
     STAGE3_LOGICAL_CONFIGURATION_ORDER,
     STAGE3_SEEDS,
-    STATE_VERSION as STAGE3_STATE_VERSION,
-    SWEEP_NAME as STAGE3_SWEEP_NAME,
-    _completed_job_artifacts,
     _reject_test_derived_metadata,
-    _validated_stage2_adoptions,
-    build_stage3_command,
-    validate_stage3_completed_run,
 )
 from .stock_time_cache import (
-    CACHE_VERSION,
-    INFERENCE_CODE_PATHS,
+    adopt_or_infer_caches as _adopt_or_infer_caches,
+    atomic_write_json as _atomic_write_json,
+    cache_directory as _cache_directory,
     default_cache_directory,
-    prediction_cache_directory,
+    job_cache_identity as _job_cache_identity,
+    sha256 as _sha256,
     shared_validation_directory,
+    split_boundaries as _split_boundaries,
+    validate_cache_manifest as _validate_cache_manifest,
+    write_or_validate_shared_cache as _write_or_validate_shared_cache,
+)
+from .stock_time_inference import (
+    AnalysisInputs,
+    assert_repository_identity as _assert_repository_identity,
+    reject_test_derived_path as _reject_test_derived_path,
+    validate_analysis_inputs,
 )
 
 ANALYSIS_NAME = "stock_time_attribution"
-ANALYSIS_VERSION = 3
-METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE = 1e-12
+ANALYSIS_VERSION = 4
 RECONSTRUCTION_ABSOLUTE_TOLERANCE = 5e-12
 ECONOMIC_RECONSTRUCTION_ABSOLUTE_TOLERANCE = 5e-9
 MIN_STOCK_SKILL_DAYS = 30
@@ -96,14 +70,6 @@ RECENT_OBSERVED_MINUTES = 30
 OVERNIGHT_LARGE_ABSOLUTE_QUANTILE = 0.80
 OVERNIGHT_SIGNED_TAIL_QUANTILE = 0.10
 SCOPE_CHOICES = ("core", "full-stage3")
-SHARED_ARRAY_NAMES = (
-    "sample_id",
-    "date_idx",
-    "decision_idx",
-    "targets",
-    "raw_returns",
-    "label_mask",
-)
 FINAL_ARTIFACT_NAMES = (
     "analysis_manifest.json",
     "summary.json",
@@ -176,39 +142,6 @@ class EconomicWindowAccounting:
 
 
 @dataclass(frozen=True)
-class Stage3AnalysisJob:
-    position: int
-    logical_configuration: str
-    context_ablation: str
-    seed: int
-    run_dir: Path
-    run_manifest_path: Path
-    run_manifest_sha256: str
-    checkpoint_path: Path
-    checkpoint_sha256: str
-    producing_git_commit_sha: str
-    manifest: dict[str, object]
-
-
-@dataclass(frozen=True)
-class AnalysisInputs:
-    state_path: Path
-    state_sha256: str
-    state: dict[str, object]
-    configuration: dict[str, object]
-    feature_store: Path
-    feature_identity: dict[str, object]
-    feature_manifest: dict[str, object]
-    sample_index: pl.DataFrame
-    validation_rows: pl.DataFrame
-    jobs: tuple[Stage3AnalysisJob, ...]
-    analyzer_git_commit_sha: str
-    analyzer_worktree_clean: bool
-    analyzer_source_sha256: str
-    inference_code_sha256: dict[str, str] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
 class OpeningCondition:
     condition_type: str
     category: str
@@ -217,55 +150,12 @@ class OpeningCondition:
     freshness_category: str | None = None
     category_lower_bound: float | None = None
     category_upper_bound: float | None = None
+    category_lower_bound_inclusive: bool | None = None
+    category_upper_bound_inclusive: bool | None = None
     category_unit: str | None = None
     median_observed_bar_count: np.ndarray | None = None
     median_observed_fraction: np.ndarray | None = None
     fraction_eligible_meeting_expected_history: np.ndarray | None = None
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        while chunk := source.read(8 * 1024**2):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _array_sha256(values: np.ndarray) -> str:
-    contiguous = np.ascontiguousarray(values)
-    digest = hashlib.sha256()
-    digest.update(str(contiguous.dtype).encode())
-    digest.update(np.asarray(contiguous.shape, dtype=np.int64).tobytes())
-    digest.update(memoryview(contiguous).cast("B"))
-    return digest.hexdigest()
-
-
-def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
-    temporary = path.with_name(f"{path.name}.tmp")
-    temporary.unlink(missing_ok=True)
-    try:
-        temporary.write_text(
-            json.dumps(payload, indent=2, allow_nan=False) + "\n",
-            encoding="utf-8",
-        )
-        os.replace(temporary, path)
-    except BaseException:
-        temporary.unlink(missing_ok=True)
-        raise
-
-
-def _atomic_write_npy(path: Path, values: np.ndarray) -> None:
-    temporary = path.with_name(f"{path.name}.tmp")
-    temporary.unlink(missing_ok=True)
-    try:
-        with temporary.open("wb") as output:
-            np.save(output, values, allow_pickle=False)
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary, path)
-    except BaseException:
-        temporary.unlink(missing_ok=True)
-        raise
 
 
 def _atomic_write_parquet(path: Path, frame: pl.DataFrame) -> None:
@@ -1112,657 +1002,6 @@ def causal_observation_completeness(
     }
 
 
-def _inference_code_identity() -> dict[str, str]:
-    repository = Path(__file__).resolve().parents[4]
-    return {
-        relative: _sha256(repository / relative) for relative in INFERENCE_CODE_PATHS
-    }
-
-
-def _assert_repository_identity(inputs: AnalysisInputs) -> None:
-    commit, clean = _git_identity()
-    if not clean:
-        raise RuntimeError("Non-dry analysis requires a clean worktree")
-    if commit != inputs.analyzer_git_commit_sha:
-        raise RuntimeError("Repository commit changed during analysis")
-    if _inference_code_identity() != inputs.inference_code_sha256:
-        raise RuntimeError("Inference-affecting source changed during analysis")
-
-
-def _git_identity() -> tuple[str, bool]:
-    repository = Path(__file__).resolve().parents[4]
-    status = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=repository,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout
-    commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=repository,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    return commit, not bool(status)
-
-
-def _reject_test_derived_path(path: Path, location: str) -> None:
-    normalized = str(path).replace("\\", "/").casefold()
-    forbidden = (
-        "/final_test/",
-        "/final-test/",
-        "/evaluations/test/",
-        "/test_evaluation/",
-        "/evaluation_test/",
-    )
-    if any(marker in f"/{normalized.strip('/')}/" for marker in forbidden):
-        raise ValueError(f"{location} is test-derived: {path}")
-
-
-def _resolve_state_feature_store(configuration: dict[str, object]) -> Path:
-    identity = configuration.get("feature_store")
-    if not isinstance(identity, dict) or not isinstance(
-        identity.get("resolved_path"), str
-    ):
-        raise ValueError("Stage-3 state lacks a resolved feature-store identity")
-    recorded = Path(str(identity["resolved_path"])).expanduser()
-    if recorded.is_dir():
-        return recorded.resolve()
-    pointer = FEATURE_STORE_POINTER
-    if not pointer.is_file():
-        raise FileNotFoundError(f"Recorded feature store is unavailable: {recorded}")
-    current = Path(pointer.read_text(encoding="utf-8").strip()).resolve()
-    if not feature_stores_equivalent(recorded, current) and (
-        _feature_store_identity(current).get("manifest_sha256")
-        != identity.get("manifest_sha256")
-    ):
-        raise ValueError("Current canonical feature store differs from Stage-3")
-    return current
-
-
-def _validate_checkpoint_identity(
-    run_dir: Path,
-    manifest: dict[str, object],
-    feature_store: Path,
-) -> tuple[Path, str]:
-    checkpoint_path = run_dir / "best.pt"
-    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    _validate_run_checkpoint_identity(
-        manifest,
-        checkpoint,
-        feature_store,
-        run_dir,
-    )
-    feature_identity = _normalize_feature_ablation_identity(
-        manifest, checkpoint, run_dir=run_dir
-    )
-    if feature_identity.metadata["key"] != "none":
-        raise ValueError("Stage-4 feature-ablation checkpoints are forbidden")
-    del checkpoint
-    return checkpoint_path, _sha256(checkpoint_path)
-
-
-def validate_analysis_inputs(
-    stage3_state_path: Path,
-    scope: str,
-) -> AnalysisInputs:
-    if scope not in SCOPE_CHOICES:
-        raise ValueError(f"Unknown analysis scope: {scope}")
-    stage3_state_path = stage3_state_path.resolve()
-    _reject_test_derived_path(stage3_state_path, "Stage-3 state path")
-    raw_state = stage3_state_path.read_bytes()
-    state_sha = hashlib.sha256(raw_state).hexdigest()
-    state = json.loads(raw_state)
-    _reject_test_derived_metadata(state, "Stage-3 state")
-    if (
-        state.get("state_version") != STAGE3_STATE_VERSION
-        or state.get("sweep_name") != STAGE3_SWEEP_NAME
-        or state.get("status") != "completed"
-    ):
-        raise ValueError("Analyzer requires a completed canonical Stage-3 state")
-    configuration = state.get("configuration")
-    jobs = state.get("jobs")
-    if not isinstance(configuration, dict) or not isinstance(jobs, list):
-        raise ValueError("Stage-3 state lacks configuration or jobs")
-    _validate_configuration(configuration)
-    source_stage2 = Path(str(configuration["source_stage2_state"]))
-    _validated_stage2_adoptions(source_stage2, configuration)
-    expected_order = tuple(
-        (
-            logical,
-            STAGE3_ABLATION_BY_LOGICAL_CONFIGURATION[logical],
-            seed,
-        )
-        for logical in STAGE3_LOGICAL_CONFIGURATION_ORDER
-        for seed in STAGE3_SEEDS
-    )
-    actual_order = tuple(
-        (
-            job.get("logical_configuration"),
-            job.get("context_ablation"),
-            job.get("seed"),
-        )
-        for job in jobs
-        if isinstance(job, dict)
-    )
-    if actual_order != expected_order or len(jobs) != 24:
-        raise ValueError("Analyzer requires the exact ordered canonical 24-job matrix")
-    if any(job.get("status") != "completed" for job in jobs):
-        raise ValueError("Analyzer refuses a partially completed Stage-3 matrix")
-    feature_store = _resolve_state_feature_store(configuration)
-    sample_index = load_sample_index(feature_store)
-    _validate_sample_index(sample_index)
-    feature_identity = _feature_store_identity(feature_store)
-    configured_identity = configuration["feature_store"]
-    if not isinstance(configured_identity, dict) or (
-        feature_identity["manifest_sha256"]
-        != configured_identity.get("manifest_sha256")
-    ):
-        raise ValueError("Feature-store manifest identity differs from Stage-3")
-    feature_manifest = json.loads(
-        (feature_store / "manifest.json").read_text(encoding="utf-8")
-    )
-    validation_rows = select_sample_split(sample_index, "validation").sort("sample_id")
-    if (
-        validation_rows.get_column("trade_date").min() != VALIDATION_START
-        or validation_rows.get_column("trade_date").max() != VALIDATION_END
-    ):
-        raise ValueError("Validation rows have the wrong boundaries")
-    selected_logicals = (
-        ("core",) if scope == "core" else STAGE3_LOGICAL_CONFIGURATION_ORDER
-    )
-    resolved: list[Stage3AnalysisJob] = []
-    all_run_dirs: list[Path] = []
-    for position, job in enumerate(jobs):
-        if not isinstance(job, dict):
-            raise ValueError("Stage-3 job is malformed")
-        logical = str(job["logical_configuration"])
-        key = str(job["context_ablation"])
-        seed = int(job["seed"])
-        if job.get("context_ablation_metadata") != get_context_ablation(
-            key
-        ).metadata() or job.get("command") != list(build_stage3_command(logical, seed)):
-            raise ValueError(f"Stage-3 job metadata is invalid: {logical}/{seed}")
-        run_dir, score, manifest_sha = _completed_job_artifacts(job, configuration)
-        all_run_dirs.append(run_dir.resolve())
-        if logical not in selected_logicals:
-            continue
-        should_be_adopted = logical == ADOPTED_STAGE2_LOGICAL_CONFIGURATION
-        producing_commit = (
-            STAGE2_PRODUCING_COMMIT
-            if should_be_adopted
-            else str(configuration["orchestrator_git_commit_sha"])
-        )
-        if job.get("producing_git_commit_sha") != producing_commit:
-            raise ValueError(f"Stage-3 producing commit is invalid: {logical}/{seed}")
-        validated_score = validate_stage3_completed_run(
-            run_dir, configuration, key, seed, producing_commit
-        )
-        if not math.isclose(
-            score,
-            validated_score,
-            rel_tol=0.0,
-            abs_tol=METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE,
-        ):
-            raise ValueError(f"Stage-3 score changed: {logical}/{seed}")
-        manifest_path = run_dir / "run_manifest.json"
-        if manifest_sha != job.get("run_manifest_sha256"):
-            raise ValueError(f"Run-manifest hash changed: {logical}/{seed}")
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        _reject_test_derived_metadata(manifest, f"run manifest {logical}/{seed}")
-        manifest["run_dir"] = str(run_dir.resolve())
-        checkpoint_path, checkpoint_sha = _validate_checkpoint_identity(
-            run_dir, manifest, feature_store
-        )
-        resolved.append(
-            Stage3AnalysisJob(
-                position=position,
-                logical_configuration=logical,
-                context_ablation=key,
-                seed=seed,
-                run_dir=run_dir.resolve(),
-                run_manifest_path=manifest_path.resolve(),
-                run_manifest_sha256=manifest_sha,
-                checkpoint_path=checkpoint_path.resolve(),
-                checkpoint_sha256=checkpoint_sha,
-                producing_git_commit_sha=producing_commit,
-                manifest=manifest,
-            )
-        )
-    if len(set(all_run_dirs)) != 24:
-        raise ValueError("Stage-3 state contains duplicate run identities")
-    expected_selected_count = 3 if scope == "core" else 24
-    if len(resolved) != expected_selected_count:
-        raise ValueError("Resolved inference matrix has the wrong size")
-    checkpoint_identities = {
-        (job.checkpoint_path, job.checkpoint_sha256) for job in resolved
-    }
-    if len(checkpoint_identities) != expected_selected_count:
-        raise ValueError("Selected jobs contain duplicate checkpoint identities")
-    commit, clean = _git_identity()
-    return AnalysisInputs(
-        state_path=stage3_state_path,
-        state_sha256=state_sha,
-        state=state,
-        configuration=configuration,
-        feature_store=feature_store,
-        feature_identity=feature_identity,
-        feature_manifest=feature_manifest,
-        sample_index=sample_index,
-        validation_rows=validation_rows,
-        jobs=tuple(resolved),
-        analyzer_git_commit_sha=commit,
-        analyzer_worktree_clean=clean,
-        analyzer_source_sha256=_sha256(Path(__file__).resolve()),
-        inference_code_sha256=_inference_code_identity(),
-    )
-
-
-def _split_boundaries() -> dict[str, str]:
-    return {key: str(value) for key, value in asdict(SplitBoundaries()).items()}
-
-
-def _job_cache_identity(
-    inputs: AnalysisInputs,
-    job: Stage3AnalysisJob,
-) -> dict[str, object]:
-    sample_ids = (
-        inputs.validation_rows.get_column("sample_id").to_numpy().astype(np.int64)
-    )
-    return {
-        "cache_name": ANALYSIS_NAME,
-        "cache_version": CACHE_VERSION,
-        "split": "validation",
-        "logical_configuration": job.logical_configuration,
-        "context_ablation": job.context_ablation,
-        "context_ablation_specification": get_context_ablation(
-            job.context_ablation
-        ).metadata(),
-        "seed": job.seed,
-        "run_manifest_sha256": job.run_manifest_sha256,
-        "checkpoint_sha256": job.checkpoint_sha256,
-        "producing_training_commit_sha": job.producing_git_commit_sha,
-        "inference_configuration": {
-            key: job.manifest.get(key)
-            for key in (
-                "model_name",
-                "model_family",
-                "tcn_settings",
-                "architecture_constants",
-                "global_context",
-                "objective",
-                "seed",
-                "context_ablation",
-                "feature_ablation",
-                "compile",
-            )
-        },
-        "inference_code_sha256": inputs.inference_code_sha256,
-        "feature_manifest_sha256": inputs.feature_identity["manifest_sha256"],
-        "feature_contract": FEATURE_CONTRACT_VERSION,
-        "split_boundaries": _split_boundaries(),
-        "sample_count": int(sample_ids.size),
-        "sample_id_sha256": _array_sha256(sample_ids),
-        "prediction_shape": [int(sample_ids.size), 158, len(HORIZONS)],
-        "prediction_dtype": "float32",
-    }
-
-
-def _cache_directory(cache_dir: Path, job: Stage3AnalysisJob) -> Path:
-    return prediction_cache_directory(
-        cache_dir,
-        job.logical_configuration,
-        job.seed,
-    )
-
-
-def _cache_creation_provenance(
-    inputs: AnalysisInputs, job: Stage3AnalysisJob | None = None
-) -> dict[str, object]:
-    provenance: dict[str, object] = {
-        "stage3_state_path": str(inputs.state_path),
-        "stage3_state_sha256": inputs.state_sha256,
-        "analyzer_git_commit_sha": inputs.analyzer_git_commit_sha,
-        "analyzer_worktree_clean": inputs.analyzer_worktree_clean,
-        "analyzer_source_sha256": inputs.analyzer_source_sha256,
-    }
-    if job is not None:
-        provenance["run_dir"] = str(job.run_dir)
-        provenance["run_manifest_path"] = str(job.run_manifest_path)
-        provenance["run_manifest_sha256"] = job.run_manifest_sha256
-        provenance["checkpoint_path"] = str(job.checkpoint_path)
-        provenance["producing_git_commit_sha"] = job.producing_git_commit_sha
-    return provenance
-
-
-def _validate_cache_manifest(
-    manifest_path: Path,
-    expected_identity: dict[str, object],
-) -> tuple[Path, dict[str, object]]:
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    _reject_test_derived_metadata(manifest, f"prediction cache {manifest_path}")
-    recorded_identity = manifest.get("identity")
-    creation_provenance = manifest.get("creation_provenance")
-    if (
-        isinstance(recorded_identity, dict)
-        and recorded_identity.get("cache_name") == ANALYSIS_NAME
-        and (
-            recorded_identity.get("cache_version") != CACHE_VERSION
-            or not isinstance(recorded_identity.get("inference_code_sha256"), dict)
-        )
-    ):
-        raise ValueError(f"Prediction cache provenance is invalid: {manifest_path}")
-    if (
-        manifest.get("status") != "completed"
-        or manifest.get("identity") != expected_identity
-    ):
-        raise ValueError(f"Prediction cache identity is invalid: {manifest_path}")
-    if (
-        not isinstance(creation_provenance, dict)
-        or creation_provenance.get("analyzer_worktree_clean") is not True
-        or not isinstance(creation_provenance.get("analyzer_source_sha256"), str)
-        or not isinstance(creation_provenance.get("analyzer_git_commit_sha"), str)
-    ):
-        raise ValueError(f"Prediction cache provenance is invalid: {manifest_path}")
-    prediction = manifest.get("prediction_file")
-    if not isinstance(prediction, dict):
-        raise ValueError(f"Prediction cache file metadata is missing: {manifest_path}")
-    prediction_path = manifest_path.parent / str(prediction.get("name"))
-    if not prediction_path.is_file() or _sha256(prediction_path) != prediction.get(
-        "sha256"
-    ):
-        raise ValueError(f"Prediction cache hash is invalid: {manifest_path}")
-    array = np.load(prediction_path, mmap_mode="r", allow_pickle=False)
-    if (
-        list(array.shape) != expected_identity["prediction_shape"]
-        or str(array.dtype) != expected_identity["prediction_dtype"]
-    ):
-        raise ValueError(f"Prediction cache shape or dtype is invalid: {manifest_path}")
-    return prediction_path, manifest
-
-
-def metric_reproduction_gate(
-    run_dir: Path,
-    recomputed_summary: dict[str, object],
-    recomputed_daily_rows: list[dict[str, object]],
-    *,
-    tolerance: float = METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE,
-) -> dict[str, object]:
-    recorded = json.loads(
-        (run_dir / "validation_metrics.json").read_text(encoding="utf-8")
-    )
-    recorded_primary = float(recorded["primary_score"])
-    recomputed_primary = float(recomputed_summary["primary_score"])
-    primary_difference = abs(recomputed_primary - recorded_primary)
-    recorded_horizons = {
-        int(row["horizon_minutes"]): row for row in recorded["horizons"]
-    }
-    recomputed_horizons = {
-        int(row["horizon_minutes"]): row for row in recomputed_summary["horizons"]
-    }
-    if recorded_horizons.keys() != recomputed_horizons.keys():
-        raise ValueError("Recorded and recomputed metric horizons differ")
-    horizon_differences = {
-        f"{horizon}m": abs(
-            float(recomputed_horizons[horizon]["mean_daily_spearman_ic"])
-            - float(recorded_horizons[horizon]["mean_daily_spearman_ic"])
-        )
-        for horizon in recorded_horizons
-    }
-    recomputed_daily = pl.DataFrame(recomputed_daily_rows).sort(
-        "date_idx", "horizon_minutes"
-    )
-    recorded_daily = pl.read_parquet(run_dir / "validation_daily_metrics.parquet").sort(
-        "date_idx", "horizon_minutes"
-    )
-    if not np.array_equal(
-        recomputed_daily.select("date_idx", "horizon_minutes").to_numpy(),
-        recorded_daily.select("date_idx", "horizon_minutes").to_numpy(),
-    ):
-        raise ValueError("Recorded and recomputed daily metric rows are misaligned")
-    daily_differences: dict[str, float] = {}
-    for column in (
-        "spearman_ic",
-        "rank_target_pearson_ic",
-        "top_return",
-        "bottom_return",
-        "top_minus_bottom",
-        "long_only_top",
-        "one_way_turnover",
-    ):
-        left = recomputed_daily.get_column(column).to_numpy()
-        right = recorded_daily.get_column(column).to_numpy()
-        if not np.array_equal(np.isnan(left), np.isnan(right)):
-            raise ValueError(f"Daily metric finiteness changed: {column}")
-        finite = np.isfinite(left) & np.isfinite(right)
-        daily_differences[column] = (
-            float(np.max(np.abs(left[finite] - right[finite]))) if finite.any() else 0.0
-        )
-    maximum_difference = max(
-        [primary_difference, *horizon_differences.values(), *daily_differences.values()]
-    )
-    if maximum_difference > tolerance:
-        raise ValueError(
-            f"Fresh inference failed validation metric parity: {maximum_difference}"
-        )
-    return {
-        "recomputed_primary_ic": recomputed_primary,
-        "recorded_primary_ic": recorded_primary,
-        "absolute_primary_difference": primary_difference,
-        "horizon_absolute_differences": horizon_differences,
-        "daily_metric_maximum_absolute_differences": daily_differences,
-        "maximum_absolute_difference": maximum_difference,
-        "absolute_tolerance": tolerance,
-        "passed": True,
-    }
-
-
-def _validate_observation_alignment(
-    observations: EvaluationObservations,
-    validation_rows: pl.DataFrame,
-) -> None:
-    expected_sample_id = (
-        validation_rows.get_column("sample_id").to_numpy().astype(np.int64)
-    )
-    expected_date_idx = (
-        validation_rows.get_column("date_idx").to_numpy().astype(np.int64)
-    )
-    expected_decision_idx = (
-        validation_rows.get_column("decision_idx").to_numpy().astype(np.int64)
-    )
-    for name, actual, expected in (
-        ("sample_id", observations.sample_id, expected_sample_id),
-        ("date_idx", observations.date_idx, expected_date_idx),
-        ("decision_idx", observations.decision_idx, expected_decision_idx),
-    ):
-        if actual.dtype != np.int64 or not np.array_equal(actual, expected):
-            raise ValueError(f"Collected {name} is not aligned to validation rows")
-    expected_shape = (validation_rows.height, 158, len(HORIZONS))
-    if (
-        observations.predictions.shape != expected_shape
-        or observations.predictions.dtype != np.float32
-        or observations.targets.shape != expected_shape
-        or observations.targets.dtype != np.float32
-        or observations.raw_returns.shape != expected_shape
-        or observations.raw_returns.dtype != np.float32
-        or observations.label_mask.shape != expected_shape
-        or observations.label_mask.dtype != np.bool_
-    ):
-        raise ValueError(
-            "Collected observation arrays violate the dense cache contract"
-        )
-
-
-def _shared_cache_identity(inputs: AnalysisInputs) -> dict[str, object]:
-    sample_ids = (
-        inputs.validation_rows.get_column("sample_id").to_numpy().astype(np.int64)
-    )
-    return {
-        "cache_name": ANALYSIS_NAME,
-        "cache_version": CACHE_VERSION,
-        "split": "validation",
-        "feature_manifest_sha256": inputs.feature_identity["manifest_sha256"],
-        "feature_contract": FEATURE_CONTRACT_VERSION,
-        "split_boundaries": _split_boundaries(),
-        "inference_code_sha256": inputs.inference_code_sha256,
-        "sample_count": int(sample_ids.size),
-        "sample_id_sha256": _array_sha256(sample_ids),
-    }
-
-
-def _remove_recognized_partial_cache(
-    directory: Path,
-    expected_names: set[str],
-) -> None:
-    files = list(directory.iterdir())
-    allowed = expected_names | {f"{name}.tmp" for name in expected_names}
-    unexpected = [path for path in files if path.is_dir() or path.name not in allowed]
-    if unexpected:
-        raise ValueError(
-            f"Ambiguous incomplete cache contains unexpected entries: {unexpected}"
-        )
-    for path in files:
-        path.unlink()
-
-
-def _write_or_validate_shared_cache(
-    cache_root: Path,
-    inputs: AnalysisInputs,
-    observations: EvaluationObservations | None = None,
-    production_lock: ProcessLockLease | None = None,
-) -> tuple[Path, dict[str, np.ndarray]]:
-    shared_dir = shared_validation_directory(cache_root)
-    manifest_path = shared_dir / "manifest.json"
-    expected_identity = _shared_cache_identity(inputs)
-    if manifest_path.is_file():
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        _reject_test_derived_metadata(manifest, f"shared cache {manifest_path}")
-        provenance = manifest.get("creation_provenance")
-        if (
-            manifest.get("status") != "completed"
-            or manifest.get("identity") != expected_identity
-            or not isinstance(provenance, dict)
-            or provenance.get("analyzer_worktree_clean") is not True
-            or not isinstance(provenance.get("analyzer_source_sha256"), str)
-            or not isinstance(provenance.get("analyzer_git_commit_sha"), str)
-        ):
-            raise ValueError("Shared validation cache identity is invalid")
-        files = manifest.get("files")
-        if not isinstance(files, dict) or set(files) != set(SHARED_ARRAY_NAMES):
-            raise ValueError("Shared validation cache file matrix is invalid")
-        arrays: dict[str, np.ndarray] = {}
-        for name in SHARED_ARRAY_NAMES:
-            metadata = files[name]
-            if not isinstance(metadata, dict):
-                raise ValueError("Shared validation cache metadata is malformed")
-            path = shared_dir / str(metadata.get("name"))
-            if not path.is_file() or _sha256(path) != metadata.get("sha256"):
-                raise ValueError(f"Shared validation cache hash is invalid: {name}")
-            array = np.load(path, mmap_mode="r", allow_pickle=False)
-            if list(array.shape) != metadata.get("shape") or str(
-                array.dtype
-            ) != metadata.get("dtype"):
-                raise ValueError(f"Shared validation cache contract changed: {name}")
-            arrays[name] = array
-        if observations is not None:
-            for name in SHARED_ARRAY_NAMES:
-                if not np.array_equal(arrays[name], getattr(observations, name)):
-                    raise ValueError(f"Inference shared array changed: {name}")
-        return manifest_path, arrays
-    if shared_dir.exists() and any(shared_dir.iterdir()):
-        if observations is None:
-            raise ValueError("Incomplete shared validation cache cannot be resumed")
-        _remove_recognized_partial_cache(
-            shared_dir,
-            {*(f"{name}.npy" for name in SHARED_ARRAY_NAMES), "manifest.json"},
-        )
-    if observations is None:
-        raise FileNotFoundError("Shared validation cache has not been created")
-    shared_dir.mkdir(parents=True, exist_ok=True)
-    files: dict[str, object] = {}
-    arrays = {}
-    for name in SHARED_ARRAY_NAMES:
-        values = np.ascontiguousarray(getattr(observations, name))
-        path = shared_dir / f"{name}.npy"
-        if path.exists():
-            raise FileExistsError(f"Refusing to overwrite shared cache: {path}")
-        if production_lock is not None:
-            production_lock.assert_owned()
-        _atomic_write_npy(path, values)
-        files[name] = {
-            "name": path.name,
-            "sha256": _sha256(path),
-            "shape": list(values.shape),
-            "dtype": str(values.dtype),
-        }
-        arrays[name] = np.load(path, mmap_mode="r", allow_pickle=False)
-    if production_lock is not None:
-        production_lock.assert_owned()
-    _atomic_write_json(
-        manifest_path,
-        {
-            "status": "completed",
-            "identity": expected_identity,
-            "creation_provenance": _cache_creation_provenance(inputs),
-            "files": files,
-            "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        },
-    )
-    return manifest_path, arrays
-
-
-def _write_prediction_cache(
-    cache_root: Path,
-    inputs: AnalysisInputs,
-    job: Stage3AnalysisJob,
-    observations: EvaluationObservations,
-    metric_gate: dict[str, object],
-    shared_manifest_path: Path,
-    production_lock: ProcessLockLease | None = None,
-) -> Path:
-    job_cache_dir = _cache_directory(cache_root, job)
-    manifest_path = job_cache_dir / "manifest.json"
-    if manifest_path.exists() or (
-        job_cache_dir.exists() and any(job_cache_dir.iterdir())
-    ):
-        raise FileExistsError(
-            f"Refusing to overwrite prediction cache: {job_cache_dir}"
-        )
-    job_cache_dir.mkdir(parents=True, exist_ok=True)
-    prediction_path = job_cache_dir / "predictions.npy"
-    predictions = np.ascontiguousarray(observations.predictions, dtype=np.float32)
-    if production_lock is not None:
-        production_lock.assert_owned()
-    _atomic_write_npy(prediction_path, predictions)
-    if production_lock is not None:
-        production_lock.assert_owned()
-    _atomic_write_json(
-        manifest_path,
-        {
-            "status": "completed",
-            "identity": _job_cache_identity(inputs, job),
-            "creation_provenance": _cache_creation_provenance(inputs, job),
-            "prediction_file": {
-                "name": prediction_path.name,
-                "sha256": _sha256(prediction_path),
-                "shape": list(predictions.shape),
-                "dtype": str(predictions.dtype),
-            },
-            "shared_validation_manifest": {
-                "relative_path": os.path.relpath(
-                    shared_manifest_path, manifest_path.parent
-                ),
-                "sha256": _sha256(shared_manifest_path),
-            },
-            "metric_reproduction_gate": metric_gate,
-            "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        },
-    )
-    return manifest_path
-
-
 def _analysis_configuration(
     inputs: AnalysisInputs, scope: str, cache_dir: Path
 ) -> dict[str, object]:
@@ -1910,157 +1149,6 @@ def dry_run_payload(
         "training_performed": False,
         "test_data_used": False,
     }
-
-
-def _adopt_or_infer_caches(
-    cache_root: Path,
-    inputs: AnalysisInputs,
-    scope: str,
-    state: dict[str, object],
-    state_path: Path,
-    production_lock: ProcessLockLease | None = None,
-) -> tuple[dict[tuple[str, int], Path], dict[str, np.ndarray]]:
-    cache_paths: dict[tuple[str, int], Path] = {}
-    runtime_validated = False
-    state_jobs = state["jobs"]
-    if not isinstance(state_jobs, list):
-        raise ValueError("Analysis state jobs are malformed")
-    for job, state_job in zip(inputs.jobs, state_jobs, strict=True):
-        if not isinstance(state_job, dict):
-            raise ValueError("Analysis state job is malformed")
-        cache_dir = _cache_directory(cache_root, job)
-        manifest_path = cache_dir / "manifest.json"
-        expected_identity = _job_cache_identity(inputs, job)
-        if manifest_path.is_file():
-            prediction_path, manifest = _validate_cache_manifest(
-                manifest_path, expected_identity
-            )
-            shared_metadata = manifest.get("shared_validation_manifest")
-            if not isinstance(shared_metadata, dict) or not isinstance(
-                shared_metadata.get("relative_path"), str
-            ):
-                raise ValueError(
-                    f"Prediction cache shared provenance is invalid: {manifest_path}"
-                )
-            shared_path = (
-                manifest_path.parent / str(shared_metadata["relative_path"])
-            ).resolve()
-            if (
-                shared_path
-                != (shared_validation_directory(cache_root) / "manifest.json").resolve()
-                or not shared_path.is_file()
-                or _sha256(shared_path) != shared_metadata.get("sha256")
-            ):
-                raise ValueError(
-                    f"Prediction cache shared provenance is invalid: {manifest_path}"
-                )
-            gate = manifest.get("metric_reproduction_gate")
-            if not isinstance(gate, dict) or gate.get("passed") is not True:
-                raise ValueError(
-                    f"Prediction cache lacks metric parity: {manifest_path}"
-                )
-            state_job.update(
-                {
-                    "status": "completed",
-                    "cache_manifest_path": str(manifest_path),
-                    "cache_manifest_sha256": _sha256(manifest_path),
-                    "completed_at_utc": state_job.get("completed_at_utc")
-                    or manifest.get("created_at_utc"),
-                    "error": None,
-                }
-            )
-            cache_paths[(job.logical_configuration, job.seed)] = prediction_path
-            _atomic_write_json(state_path, state)
-            continue
-        if cache_dir.exists() and any(cache_dir.iterdir()):
-            if (
-                state_job.get("status") == "completed"
-                or state.get("status") == "completed"
-            ):
-                raise ValueError(
-                    "Completed analysis state is missing a prediction cache"
-                )
-            _remove_recognized_partial_cache(
-                cache_dir,
-                {"predictions.npy", "manifest.json"},
-            )
-        if state.get("status") == "completed":
-            raise ValueError("Completed analysis state is missing a prediction cache")
-
-        if not runtime_validated:
-            validate_runtime()
-            torch.set_float32_matmul_precision("high")
-            runtime_validated = True
-        state_job.update(
-            {
-                "status": "running",
-                "started_at_utc": datetime.now(timezone.utc).isoformat(),
-                "completed_at_utc": None,
-                "cache_manifest_path": None,
-                "cache_manifest_sha256": None,
-                "error": None,
-            }
-        )
-        _atomic_write_json(state_path, state)
-        try:
-            evaluation = collect_neural_evaluation(
-                job.manifest,
-                inputs.feature_store,
-                inputs.validation_rows,
-            )
-            _validate_observation_alignment(
-                evaluation.observations, inputs.validation_rows
-            )
-            gate = metric_reproduction_gate(
-                job.run_dir,
-                evaluation.summary,
-                evaluation.daily_rows,
-            )
-            shared_manifest, _ = _write_or_validate_shared_cache(
-                cache_root, inputs, evaluation.observations, production_lock
-            )
-            manifest_path = _write_prediction_cache(
-                cache_root,
-                inputs,
-                job,
-                evaluation.observations,
-                gate,
-                shared_manifest,
-                production_lock,
-            )
-            prediction_path, _ = _validate_cache_manifest(
-                manifest_path, expected_identity
-            )
-            if production_lock is not None:
-                production_lock.assert_owned()
-        except BaseException as error:
-            state_job.update(
-                {
-                    "status": "failed",
-                    "error": f"{type(error).__name__}: {error}",
-                }
-            )
-            _atomic_write_json(state_path, state)
-            raise
-        state_job.update(
-            {
-                "status": "completed",
-                "cache_manifest_path": str(manifest_path),
-                "cache_manifest_sha256": _sha256(manifest_path),
-                "completed_at_utc": datetime.now(timezone.utc).isoformat(),
-                "error": None,
-            }
-        )
-        cache_paths[(job.logical_configuration, job.seed)] = prediction_path
-        _atomic_write_json(state_path, state)
-    if production_lock is not None:
-        production_lock.assert_owned()
-    state["status"] = "inference_completed"
-    _atomic_write_json(state_path, state)
-    _, shared = _write_or_validate_shared_cache(
-        cache_root, inputs, production_lock=production_lock
-    )
-    return cache_paths, shared
 
 
 def _feature_axes(inputs: AnalysisInputs) -> dict[str, object]:
@@ -4792,6 +3880,59 @@ def _opening_condition_masks(
         "median_observed_fraction": median_fraction,
         "fraction_eligible_meeting_expected_history": meeting_expected_fraction,
     }
+    for category, mask, lower, upper, lower_inclusive in (
+        (
+            "0_to_30_bars",
+            np.isfinite(median_bar_count)
+            & (median_bar_count >= 0.0)
+            & (median_bar_count <= 30.0),
+            0.0,
+            30.0,
+            True,
+        ),
+        (
+            "31_to_60_bars",
+            (median_bar_count > 30.0) & (median_bar_count <= 60.0),
+            30.0,
+            60.0,
+            False,
+        ),
+        (
+            "61_to_90_bars",
+            (median_bar_count > 60.0) & (median_bar_count <= 90.0),
+            60.0,
+            90.0,
+            False,
+        ),
+        (
+            "91_to_120_bars",
+            (median_bar_count > 90.0) & (median_bar_count <= 120.0),
+            90.0,
+            120.0,
+            False,
+        ),
+        (
+            "121_to_180_bars",
+            (median_bar_count > 120.0) & (median_bar_count <= 180.0),
+            120.0,
+            180.0,
+            False,
+        ),
+        ("over_180_bars", median_bar_count > 180.0, 180.0, None, False),
+    ):
+        result.append(
+            OpeningCondition(
+                "b3_observed_bar_count",
+                category,
+                mask,
+                category_lower_bound=lower,
+                category_upper_bound=upper,
+                category_lower_bound_inclusive=lower_inclusive,
+                category_upper_bound_inclusive=(True if upper is not None else None),
+                category_unit="observed_current_session_b3_equity_bars",
+                **diagnostic_fields,
+            )
+        )
     for category, mask, lower, upper in (
         (
             "complete",
@@ -4809,11 +3950,13 @@ def _opening_condition_masks(
     ):
         result.append(
             OpeningCondition(
-                "b3_history_count",
+                "b3_history_missingness",
                 category,
                 mask,
                 category_lower_bound=lower,
                 category_upper_bound=upper,
+                category_lower_bound_inclusive=(category == "complete"),
+                category_upper_bound_inclusive=(upper is not None),
                 category_unit="missing_bars_from_expected_current_session_history",
                 **diagnostic_fields,
             )
@@ -4835,6 +3978,8 @@ def _opening_condition_masks(
                 mask,
                 category_lower_bound=lower,
                 category_upper_bound=upper,
+                category_lower_bound_inclusive=True,
+                category_upper_bound_inclusive=(category == "at_least_95pct"),
                 category_unit="observed_fraction_of_expected_current_session_history",
                 **diagnostic_fields,
             )
@@ -4961,9 +4106,14 @@ def _opening_condition_masks(
 
 
 def _opening_condition_metadata(
-    condition: OpeningCondition, date_idx: np.ndarray
+    condition: OpeningCondition,
+    date_idx: np.ndarray,
+    decision_idx: np.ndarray,
+    decisions: tuple[int, ...],
 ) -> dict[str, object]:
-    mask = np.asarray(condition.sample_mask, dtype=bool)
+    mask = np.asarray(condition.sample_mask, dtype=bool) & np.isin(
+        decision_idx, decisions
+    )
 
     def selected_mean(values: np.ndarray | None) -> float | None:
         if values is None:
@@ -4971,18 +4121,25 @@ def _opening_condition_metadata(
         selected = np.asarray(values, dtype=np.float64)[mask]
         return _finite_mean_or_none(selected)
 
+    def selected_median(values: np.ndarray | None) -> float | None:
+        if values is None:
+            return None
+        selected = np.asarray(values, dtype=np.float64)[mask]
+        finite = selected[np.isfinite(selected)]
+        return float(np.median(finite)) if finite.size else None
+
     return {
         "category_lower_bound": condition.category_lower_bound,
         "category_upper_bound": condition.category_upper_bound,
+        "category_lower_bound_inclusive": condition.category_lower_bound_inclusive,
+        "category_upper_bound_inclusive": condition.category_upper_bound_inclusive,
         "category_unit": condition.category_unit,
-        "condition_sample_count": int(mask.sum()),
+        "condition_decision_cell_count": int(mask.sum()),
         "condition_date_count": int(np.unique(date_idx[mask]).size),
         "mean_median_observed_bar_count": selected_mean(
             condition.median_observed_bar_count
         ),
-        "mean_median_observed_fraction": selected_mean(
-            condition.median_observed_fraction
-        ),
+        "median_observed_fraction": selected_median(condition.median_observed_fraction),
         "mean_fraction_eligible_meeting_expected_history": selected_mean(
             condition.fraction_eligible_meeting_expected_history
         ),
@@ -5150,8 +4307,8 @@ def _build_opening_regimes(
                             "liquidity_quintile": None,
                             "history_category": None,
                             "overnight_regime": regime_name,
-                            "additive_ic_contribution": _finite_or_none(
-                                np.nanmean(daily_ic[:, horizon_index])
+                            "additive_ic_contribution": _finite_mean_or_none(
+                                daily_ic[:, horizon_index]
                             ),
                             "independently_reranked_conditional_ic": None,
                             "mean_observed_fraction": None,
@@ -5159,11 +4316,11 @@ def _build_opening_regimes(
                             "readiness_fraction": None,
                             "preopen_observed_fraction": None,
                             "mean_staleness_minutes": None,
-                            "gross_spread": _finite_or_none(
-                                np.nanmean(daily_spread[:, horizon_index])
+                            "gross_spread": _finite_mean_or_none(
+                                daily_spread[:, horizon_index]
                             ),
-                            "intraday_turnover": _finite_or_none(
-                                np.nanmean(daily_turnover[:, horizon_index])
+                            "intraday_turnover": _finite_mean_or_none(
+                                daily_turnover[:, horizon_index]
                             ),
                             "valid_date_count": int(
                                 np.isfinite(daily_ic[:, horizon_index]).sum()
@@ -5271,9 +4428,11 @@ def _build_opening_regimes(
             raise TypeError("Core economic attribution is malformed")
         for condition in _opening_condition_masks(shared, metadata):
             sample_mask = np.asarray(condition.sample_mask, dtype=bool)
-            condition_metadata = _opening_condition_metadata(condition, date_idx)
             for scope_name in ("opening_30", "opening_60"):
                 decisions = named_time_scopes()[scope_name]
+                condition_metadata = _opening_condition_metadata(
+                    condition, date_idx, decision_idx, decisions
+                )
                 daily_ic = _daily_subset_mean(
                     sample_ic,
                     sample_mask,
@@ -5937,7 +5096,8 @@ def _analysis_summary(
         },
         "coverage_warnings": [
             "Individual stock by five-minute estimates are exploratory and noisy.",
-            "Within-liquidity IC is emitted only for adaptive buckets meeting MIN_IC_EQUITIES.",
+            f"Fixed point-in-time liquidity-quintile IC is null when a quintile has fewer than {MIN_IC_EQUITIES} eligible labels in a decision cell (MIN_IC_EQUITIES={MIN_IC_EQUITIES}).",
+            f"Adaptive fallback-bucket IC is null when a fallback bucket has fewer than {MIN_IC_EQUITIES} eligible labels in a decision cell (MIN_IC_EQUITIES={MIN_IC_EQUITIES}); empty aggregate estimates remain null.",
             "The existing intraday turnover metric has no previous portfolio at the first decision; flat entry and exit are reported separately.",
             "Gross signal-spread diagnostics use overlapping decisions/horizons and are not an executable annualized portfolio.",
             "Opening-history and context-completeness results are descriptive and do not identify a causal opening mechanism.",
@@ -6012,7 +5172,6 @@ def run_analysis(
                 cache_paths, shared = _adopt_or_infer_caches(
                     cache_root,
                     inputs,
-                    scope,
                     state,
                     state_path,
                     production_lock,
