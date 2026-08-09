@@ -77,10 +77,16 @@ from .stage3_context_addition import (
     build_stage3_command,
     validate_stage3_completed_run,
 )
+from .stock_time_cache import (
+    CACHE_VERSION,
+    INFERENCE_CODE_PATHS,
+    default_cache_directory,
+    prediction_cache_directory,
+    shared_validation_directory,
+)
 
 ANALYSIS_NAME = "stock_time_attribution"
-ANALYSIS_VERSION = 2
-CACHE_VERSION = 2
+ANALYSIS_VERSION = 3
 METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE = 1e-12
 RECONSTRUCTION_ABSOLUTE_TOLERANCE = 5e-12
 ECONOMIC_RECONSTRUCTION_ABSOLUTE_TOLERANCE = 5e-9
@@ -132,20 +138,6 @@ ADDED_CONTEXT_BY_LOGICAL_CONFIGURATION = {
     "core_plus_6e": "6E.v.0",
     "core_plus_6m": "6M.v.0",
 }
-INFERENCE_CODE_PATHS = (
-    "research/src/brazil_rv/preprocessing/contract.py",
-    "research/src/brazil_rv/preprocessing/transforms.py",
-    "research/src/brazil_rv/modeling/contract.py",
-    "research/src/brazil_rv/modeling/context_ablation.py",
-    "research/src/brazil_rv/modeling/feature_ablation.py",
-    "research/src/brazil_rv/modeling/data.py",
-    "research/src/brazil_rv/modeling/layers.py",
-    "research/src/brazil_rv/modeling/model.py",
-    "research/src/brazil_rv/modeling/engine.py",
-    "research/src/brazil_rv/modeling/metrics.py",
-    "research/src/brazil_rv/modeling/evaluate.py",
-    "research/src/brazil_rv/modeling/analyze_stock_time_attribution.py",
-)
 
 
 @dataclass(frozen=True)
@@ -214,6 +206,21 @@ class AnalysisInputs:
     analyzer_worktree_clean: bool
     analyzer_source_sha256: str
     inference_code_sha256: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class OpeningCondition:
+    condition_type: str
+    category: str
+    sample_mask: np.ndarray
+    overnight_regime: str | None = None
+    freshness_category: str | None = None
+    category_lower_bound: float | None = None
+    category_upper_bound: float | None = None
+    category_unit: str | None = None
+    median_observed_bar_count: np.ndarray | None = None
+    median_observed_fraction: np.ndarray | None = None
+    fraction_eligible_meeting_expected_history: np.ndarray | None = None
 
 
 def _sha256(path: Path) -> str:
@@ -291,6 +298,24 @@ def _finite_mean_or_none(values: np.ndarray) -> float | None:
     finite = np.asarray(values, dtype=np.float64)
     finite = finite[np.isfinite(finite)]
     return float(finite.mean()) if finite.size else None
+
+
+def _with_economic_ratios(
+    frame: pl.DataFrame,
+    *,
+    gross_column: str = "mean_daily_gross_contribution",
+    total_turnover_column: str = "mean_daily_total_one_way_turnover",
+) -> pl.DataFrame:
+    return frame.with_columns(
+        pl.when(pl.col(total_turnover_column) > 0)
+        .then(pl.col(gross_column) / pl.col(total_turnover_column))
+        .otherwise(None)
+        .alias("gross_contribution_per_unit_turnover"),
+        pl.when(pl.col(total_turnover_column) > 0)
+        .then(10_000.0 * pl.col(gross_column) / pl.col(total_turnover_column))
+        .otherwise(None)
+        .alias("break_even_one_way_cost_bps"),
+    )
 
 
 def _correlation(left: np.ndarray, right: np.ndarray) -> float:
@@ -504,6 +529,49 @@ def additive_spearman_contributions(
                     "Per-stock Spearman contribution failed to reconstruct"
                 )
     return AdditiveSpearmanResult(contributions, sample_ic)
+
+
+def stock_contribution_opportunity_accounting(
+    additive: AdditiveSpearmanResult, label_mask: np.ndarray
+) -> dict[str, np.ndarray]:
+    label_mask = np.asarray(label_mask, dtype=bool)
+    if label_mask.shape != additive.contributions.shape:
+        raise ValueError("Stock opportunity mask is misaligned")
+    portfolio_valid = np.isfinite(additive.sample_ic)
+    stock_valid_support = label_mask & portfolio_valid[:, None, :]
+    valid_opportunity_count = stock_valid_support.sum(axis=(0, 2))
+    conditional_numerator = np.where(
+        stock_valid_support, additive.contributions, 0.0
+    ).sum(axis=(0, 2))
+    conditional_contribution = np.divide(
+        conditional_numerator,
+        valid_opportunity_count,
+        out=np.full(label_mask.shape[1], np.nan, dtype=np.float64),
+        where=valid_opportunity_count > 0,
+    )
+    portfolio_valid_support = np.broadcast_to(
+        portfolio_valid[:, None, :], label_mask.shape
+    )
+    portfolio_valid_cell_count = portfolio_valid_support.sum(axis=(0, 2))
+    unconditional_numerator = np.where(
+        portfolio_valid_support,
+        np.nan_to_num(additive.contributions, nan=0.0),
+        0.0,
+    ).sum(axis=(0, 2))
+    unconditional_contribution = np.divide(
+        unconditional_numerator,
+        portfolio_valid_cell_count,
+        out=np.full(label_mask.shape[1], np.nan, dtype=np.float64),
+        where=portfolio_valid_cell_count > 0,
+    )
+    return {
+        "valid_opportunity_count": valid_opportunity_count,
+        "conditional_contribution_numerator": conditional_numerator,
+        "conditional_contribution": conditional_contribution,
+        "portfolio_valid_cell_count": portfolio_valid_cell_count,
+        "unconditional_contribution_numerator": unconditional_numerator,
+        "unconditional_contribution": unconditional_contribution,
+    }
 
 
 def aggregate_additive_contributions(
@@ -1304,8 +1372,7 @@ def _job_cache_identity(
         inputs.validation_rows.get_column("sample_id").to_numpy().astype(np.int64)
     )
     return {
-        "analysis_name": ANALYSIS_NAME,
-        "analysis_version": ANALYSIS_VERSION,
+        "cache_name": ANALYSIS_NAME,
         "cache_version": CACHE_VERSION,
         "split": "validation",
         "logical_configuration": job.logical_configuration,
@@ -1314,20 +1381,25 @@ def _job_cache_identity(
             job.context_ablation
         ).metadata(),
         "seed": job.seed,
-        "run_dir": str(job.run_dir),
-        "run_manifest_path": str(job.run_manifest_path),
         "run_manifest_sha256": job.run_manifest_sha256,
-        "checkpoint_path": str(job.checkpoint_path),
         "checkpoint_sha256": job.checkpoint_sha256,
-        "producing_git_commit_sha": job.producing_git_commit_sha,
-        "analyzer_git_commit_sha": inputs.analyzer_git_commit_sha,
-        "analyzer_worktree_clean": inputs.analyzer_worktree_clean,
-        "analyzer_source_sha256": inputs.analyzer_source_sha256,
+        "producing_training_commit_sha": job.producing_git_commit_sha,
+        "inference_configuration": {
+            key: job.manifest.get(key)
+            for key in (
+                "model_name",
+                "model_family",
+                "tcn_settings",
+                "architecture_constants",
+                "global_context",
+                "objective",
+                "seed",
+                "context_ablation",
+                "feature_ablation",
+                "compile",
+            )
+        },
         "inference_code_sha256": inputs.inference_code_sha256,
-        "stage3_state_path": str(inputs.state_path),
-        "stage3_state_sha256": inputs.state_sha256,
-        "feature_store_resolved_path": str(inputs.feature_store),
-        "feature_store_identity": inputs.feature_identity,
         "feature_manifest_sha256": inputs.feature_identity["manifest_sha256"],
         "feature_contract": FEATURE_CONTRACT_VERSION,
         "split_boundaries": _split_boundaries(),
@@ -1338,12 +1410,31 @@ def _job_cache_identity(
     }
 
 
-def _cache_directory(output_dir: Path, job: Stage3AnalysisJob) -> Path:
-    return (
-        output_dir
-        / "cache"
-        / f"{job.position:02d}_{job.logical_configuration}_seed{job.seed}"
+def _cache_directory(cache_dir: Path, job: Stage3AnalysisJob) -> Path:
+    return prediction_cache_directory(
+        cache_dir,
+        job.logical_configuration,
+        job.seed,
     )
+
+
+def _cache_creation_provenance(
+    inputs: AnalysisInputs, job: Stage3AnalysisJob | None = None
+) -> dict[str, object]:
+    provenance: dict[str, object] = {
+        "stage3_state_path": str(inputs.state_path),
+        "stage3_state_sha256": inputs.state_sha256,
+        "analyzer_git_commit_sha": inputs.analyzer_git_commit_sha,
+        "analyzer_worktree_clean": inputs.analyzer_worktree_clean,
+        "analyzer_source_sha256": inputs.analyzer_source_sha256,
+    }
+    if job is not None:
+        provenance["run_dir"] = str(job.run_dir)
+        provenance["run_manifest_path"] = str(job.run_manifest_path)
+        provenance["run_manifest_sha256"] = job.run_manifest_sha256
+        provenance["checkpoint_path"] = str(job.checkpoint_path)
+        provenance["producing_git_commit_sha"] = job.producing_git_commit_sha
+    return provenance
 
 
 def _validate_cache_manifest(
@@ -1353,12 +1444,12 @@ def _validate_cache_manifest(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     _reject_test_derived_metadata(manifest, f"prediction cache {manifest_path}")
     recorded_identity = manifest.get("identity")
+    creation_provenance = manifest.get("creation_provenance")
     if (
         isinstance(recorded_identity, dict)
-        and recorded_identity.get("analysis_name") == ANALYSIS_NAME
+        and recorded_identity.get("cache_name") == ANALYSIS_NAME
         and (
             recorded_identity.get("cache_version") != CACHE_VERSION
-            or recorded_identity.get("analyzer_worktree_clean") is not True
             or not isinstance(recorded_identity.get("inference_code_sha256"), dict)
         )
     ):
@@ -1368,6 +1459,13 @@ def _validate_cache_manifest(
         or manifest.get("identity") != expected_identity
     ):
         raise ValueError(f"Prediction cache identity is invalid: {manifest_path}")
+    if (
+        not isinstance(creation_provenance, dict)
+        or creation_provenance.get("analyzer_worktree_clean") is not True
+        or not isinstance(creation_provenance.get("analyzer_source_sha256"), str)
+        or not isinstance(creation_provenance.get("analyzer_git_commit_sha"), str)
+    ):
+        raise ValueError(f"Prediction cache provenance is invalid: {manifest_path}")
     prediction = manifest.get("prediction_file")
     if not isinstance(prediction, dict):
         raise ValueError(f"Prediction cache file metadata is missing: {manifest_path}")
@@ -1502,14 +1600,12 @@ def _shared_cache_identity(inputs: AnalysisInputs) -> dict[str, object]:
         inputs.validation_rows.get_column("sample_id").to_numpy().astype(np.int64)
     )
     return {
-        "analysis_name": ANALYSIS_NAME,
-        "analysis_version": ANALYSIS_VERSION,
+        "cache_name": ANALYSIS_NAME,
         "cache_version": CACHE_VERSION,
         "split": "validation",
-        "stage3_state_sha256": inputs.state_sha256,
-        "feature_store_identity": inputs.feature_identity,
-        "analyzer_git_commit_sha": inputs.analyzer_git_commit_sha,
-        "analyzer_worktree_clean": inputs.analyzer_worktree_clean,
+        "feature_manifest_sha256": inputs.feature_identity["manifest_sha256"],
+        "feature_contract": FEATURE_CONTRACT_VERSION,
+        "split_boundaries": _split_boundaries(),
         "inference_code_sha256": inputs.inference_code_sha256,
         "sample_count": int(sample_ids.size),
         "sample_id_sha256": _array_sha256(sample_ids),
@@ -1532,19 +1628,25 @@ def _remove_recognized_partial_cache(
 
 
 def _write_or_validate_shared_cache(
-    output_dir: Path,
+    cache_root: Path,
     inputs: AnalysisInputs,
     observations: EvaluationObservations | None = None,
     production_lock: ProcessLockLease | None = None,
 ) -> tuple[Path, dict[str, np.ndarray]]:
-    shared_dir = output_dir / "cache" / "shared_validation"
+    shared_dir = shared_validation_directory(cache_root)
     manifest_path = shared_dir / "manifest.json"
     expected_identity = _shared_cache_identity(inputs)
     if manifest_path.is_file():
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        _reject_test_derived_metadata(manifest, f"shared cache {manifest_path}")
+        provenance = manifest.get("creation_provenance")
         if (
             manifest.get("status") != "completed"
             or manifest.get("identity") != expected_identity
+            or not isinstance(provenance, dict)
+            or provenance.get("analyzer_worktree_clean") is not True
+            or not isinstance(provenance.get("analyzer_source_sha256"), str)
+            or not isinstance(provenance.get("analyzer_git_commit_sha"), str)
         ):
             raise ValueError("Shared validation cache identity is invalid")
         files = manifest.get("files")
@@ -1603,6 +1705,7 @@ def _write_or_validate_shared_cache(
         {
             "status": "completed",
             "identity": expected_identity,
+            "creation_provenance": _cache_creation_provenance(inputs),
             "files": files,
             "created_at_utc": datetime.now(timezone.utc).isoformat(),
         },
@@ -1611,7 +1714,7 @@ def _write_or_validate_shared_cache(
 
 
 def _write_prediction_cache(
-    output_dir: Path,
+    cache_root: Path,
     inputs: AnalysisInputs,
     job: Stage3AnalysisJob,
     observations: EvaluationObservations,
@@ -1619,12 +1722,16 @@ def _write_prediction_cache(
     shared_manifest_path: Path,
     production_lock: ProcessLockLease | None = None,
 ) -> Path:
-    cache_dir = _cache_directory(output_dir, job)
-    manifest_path = cache_dir / "manifest.json"
-    if manifest_path.exists() or (cache_dir.exists() and any(cache_dir.iterdir())):
-        raise FileExistsError(f"Refusing to overwrite prediction cache: {cache_dir}")
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    prediction_path = cache_dir / "predictions.npy"
+    job_cache_dir = _cache_directory(cache_root, job)
+    manifest_path = job_cache_dir / "manifest.json"
+    if manifest_path.exists() or (
+        job_cache_dir.exists() and any(job_cache_dir.iterdir())
+    ):
+        raise FileExistsError(
+            f"Refusing to overwrite prediction cache: {job_cache_dir}"
+        )
+    job_cache_dir.mkdir(parents=True, exist_ok=True)
+    prediction_path = job_cache_dir / "predictions.npy"
     predictions = np.ascontiguousarray(observations.predictions, dtype=np.float32)
     if production_lock is not None:
         production_lock.assert_owned()
@@ -1636,14 +1743,19 @@ def _write_prediction_cache(
         {
             "status": "completed",
             "identity": _job_cache_identity(inputs, job),
+            "creation_provenance": _cache_creation_provenance(inputs, job),
             "prediction_file": {
                 "name": prediction_path.name,
                 "sha256": _sha256(prediction_path),
                 "shape": list(predictions.shape),
                 "dtype": str(predictions.dtype),
             },
-            "shared_validation_manifest_path": str(shared_manifest_path),
-            "shared_validation_manifest_sha256": _sha256(shared_manifest_path),
+            "shared_validation_manifest": {
+                "relative_path": os.path.relpath(
+                    shared_manifest_path, manifest_path.parent
+                ),
+                "sha256": _sha256(shared_manifest_path),
+            },
             "metric_reproduction_gate": metric_gate,
             "created_at_utc": datetime.now(timezone.utc).isoformat(),
         },
@@ -1651,11 +1763,14 @@ def _write_prediction_cache(
     return manifest_path
 
 
-def _analysis_configuration(inputs: AnalysisInputs, scope: str) -> dict[str, object]:
+def _analysis_configuration(
+    inputs: AnalysisInputs, scope: str, cache_dir: Path
+) -> dict[str, object]:
     return {
         "analysis_name": ANALYSIS_NAME,
         "analysis_version": ANALYSIS_VERSION,
         "scope": scope,
+        "cache_dir": str(cache_dir),
         "split": "validation",
         "stage3_state_path": str(inputs.state_path),
         "stage3_state_sha256": inputs.state_sha256,
@@ -1671,13 +1786,14 @@ def _analysis_configuration(inputs: AnalysisInputs, scope: str) -> dict[str, obj
 def _new_analysis_state(
     inputs: AnalysisInputs,
     scope: str,
+    cache_dir: Path,
 ) -> dict[str, object]:
     now = datetime.now(timezone.utc).isoformat()
     return {
         "analysis_name": ANALYSIS_NAME,
         "analysis_version": ANALYSIS_VERSION,
         "status": "running",
-        "configuration": _analysis_configuration(inputs, scope),
+        "configuration": _analysis_configuration(inputs, scope, cache_dir),
         "created_at_utc": now,
         "completed_at_utc": None,
         "jobs": [
@@ -1703,10 +1819,11 @@ def _load_analysis_state(
     path: Path,
     inputs: AnalysisInputs,
     scope: str,
+    cache_dir: Path,
 ) -> dict[str, object]:
-    expected = _analysis_configuration(inputs, scope)
+    expected = _analysis_configuration(inputs, scope, cache_dir)
     if not path.exists():
-        return _new_analysis_state(inputs, scope)
+        return _new_analysis_state(inputs, scope, cache_dir)
     state = json.loads(path.read_text(encoding="utf-8"))
     _reject_test_derived_metadata(state, "analysis state")
     if (
@@ -1734,12 +1851,24 @@ def _load_analysis_state(
     return state
 
 
+def _resolve_cache_directory(output_dir: Path, cache_dir: Path | None) -> Path:
+    resolved = (
+        default_cache_directory(output_dir, ANALYSIS_NAME)
+        if cache_dir is None
+        else cache_dir.resolve()
+    )
+    _reject_test_derived_path(resolved, "analysis cache path")
+    return resolved
+
+
 def dry_run_payload(
     stage3_state_path: Path,
     output_dir: Path,
     scope: str,
+    cache_dir: Path | None = None,
 ) -> dict[str, object]:
     _reject_test_derived_path(output_dir.resolve(), "analysis output path")
+    resolved_cache_dir = _resolve_cache_directory(output_dir, cache_dir)
     inputs = validate_analysis_inputs(stage3_state_path, scope)
     return {
         "analysis_name": ANALYSIS_NAME,
@@ -1750,6 +1879,7 @@ def dry_run_payload(
         "stage3_state_path": str(inputs.state_path),
         "stage3_state_sha256": inputs.state_sha256,
         "output_dir": str(output_dir.resolve()),
+        "cache_dir": str(resolved_cache_dir),
         "feature_store_identity": inputs.feature_identity,
         "validation_sample_count": inputs.validation_rows.height,
         "inference_job_count": len(inputs.jobs),
@@ -1770,7 +1900,7 @@ def dry_run_payload(
                 "checkpoint_path": str(job.checkpoint_path),
                 "checkpoint_sha256": job.checkpoint_sha256,
                 "planned_cache_manifest": str(
-                    _cache_directory(output_dir.resolve(), job) / "manifest.json"
+                    _cache_directory(resolved_cache_dir, job) / "manifest.json"
                 ),
             }
             for job in inputs.jobs
@@ -1783,7 +1913,7 @@ def dry_run_payload(
 
 
 def _adopt_or_infer_caches(
-    output_dir: Path,
+    cache_root: Path,
     inputs: AnalysisInputs,
     scope: str,
     state: dict[str, object],
@@ -1798,22 +1928,28 @@ def _adopt_or_infer_caches(
     for job, state_job in zip(inputs.jobs, state_jobs, strict=True):
         if not isinstance(state_job, dict):
             raise ValueError("Analysis state job is malformed")
-        cache_dir = _cache_directory(output_dir, job)
+        cache_dir = _cache_directory(cache_root, job)
         manifest_path = cache_dir / "manifest.json"
         expected_identity = _job_cache_identity(inputs, job)
         if manifest_path.is_file():
             prediction_path, manifest = _validate_cache_manifest(
                 manifest_path, expected_identity
             )
-            shared_path = Path(str(manifest.get("shared_validation_manifest_path")))
+            shared_metadata = manifest.get("shared_validation_manifest")
+            if not isinstance(shared_metadata, dict) or not isinstance(
+                shared_metadata.get("relative_path"), str
+            ):
+                raise ValueError(
+                    f"Prediction cache shared provenance is invalid: {manifest_path}"
+                )
+            shared_path = (
+                manifest_path.parent / str(shared_metadata["relative_path"])
+            ).resolve()
             if (
-                shared_path.resolve()
-                != (
-                    output_dir / "cache" / "shared_validation" / "manifest.json"
-                ).resolve()
+                shared_path
+                != (shared_validation_directory(cache_root) / "manifest.json").resolve()
                 or not shared_path.is_file()
-                or _sha256(shared_path)
-                != manifest.get("shared_validation_manifest_sha256")
+                or _sha256(shared_path) != shared_metadata.get("sha256")
             ):
                 raise ValueError(
                     f"Prediction cache shared provenance is invalid: {manifest_path}"
@@ -1881,10 +2017,10 @@ def _adopt_or_infer_caches(
                 evaluation.daily_rows,
             )
             shared_manifest, _ = _write_or_validate_shared_cache(
-                output_dir, inputs, evaluation.observations, production_lock
+                cache_root, inputs, evaluation.observations, production_lock
             )
             manifest_path = _write_prediction_cache(
-                output_dir,
+                cache_root,
                 inputs,
                 job,
                 evaluation.observations,
@@ -1922,7 +2058,7 @@ def _adopt_or_infer_caches(
     state["status"] = "inference_completed"
     _atomic_write_json(state_path, state)
     _, shared = _write_or_validate_shared_cache(
-        output_dir, inputs, production_lock=production_lock
+        cache_root, inputs, production_lock=production_lock
     )
     return cache_paths, shared
 
@@ -2307,6 +2443,41 @@ def _scope_daily_mean(grid: np.ndarray, decisions: tuple[int, ...]) -> np.ndarra
     )
 
 
+def _coverage_summary(
+    daily_valid_count: np.ndarray,
+    daily_coverage: np.ndarray,
+    decisions: tuple[int, ...],
+    horizon_index: int | None,
+) -> dict[str, float | int | None]:
+    counts = np.asarray(daily_valid_count[:, decisions], dtype=np.float64)
+    coverage = np.asarray(daily_coverage[:, decisions], dtype=np.float64)
+    if horizon_index is not None:
+        counts = counts[..., horizon_index]
+        coverage = coverage[..., horizon_index]
+    else:
+        counts = counts.reshape(counts.shape[0], -1)
+        coverage = coverage.reshape(coverage.shape[0], -1)
+    valid = np.isfinite(counts) & (counts >= MIN_IC_EQUITIES)
+    daily_count = np.divide(
+        np.where(valid, counts, 0.0).sum(axis=1),
+        valid.sum(axis=1),
+        out=np.full(counts.shape[0], np.nan, dtype=np.float64),
+        where=valid.sum(axis=1) > 0,
+    )
+    daily_coverage_value = np.divide(
+        np.where(valid, coverage, 0.0).sum(axis=1),
+        valid.sum(axis=1),
+        out=np.full(counts.shape[0], np.nan, dtype=np.float64),
+        where=valid.sum(axis=1) > 0,
+    )
+    return {
+        "mean_valid_equity_count": _finite_mean_or_none(daily_count),
+        "label_coverage": _finite_mean_or_none(daily_coverage_value),
+        "valid_decision_cell_count": int(valid.sum()),
+        "valid_date_count": int(valid.any(axis=1).sum()),
+    }
+
+
 def _time_bin_metadata() -> list[dict[str, object]]:
     rows = []
     for index, decisions in enumerate(primary_time_bins()):
@@ -2357,8 +2528,12 @@ def _economic_reconstruction_checks(
                 np.argsort(predictions[sample, valid, horizon], kind="mergesort")
             ]
             expected_spread = float(
-                raw_returns[sample, ranked[-k:], horizon].mean()
-                - raw_returns[sample, ranked[:k], horizon].mean()
+                np.asarray(
+                    raw_returns[sample, ranked[-k:], horizon], dtype=np.float64
+                ).mean()
+                - np.asarray(
+                    raw_returns[sample, ranked[:k], horizon], dtype=np.float64
+                ).mean()
             )
             maximum_spread_difference = max(
                 maximum_spread_difference,
@@ -2420,12 +2595,14 @@ def _build_core_outputs(
     shared: dict[str, np.ndarray],
     metadata: dict[str, object],
     *,
-    bootstrap_replications: int = BOOTSTRAP_REPLICATIONS,
+    bootstrap_replications: int | None = None,
 ) -> tuple[
     dict[str, pl.DataFrame],
     dict[int, dict[str, object]],
     dict[str, object],
 ]:
+    if bootstrap_replications is None:
+        bootstrap_replications = BOOTSTRAP_REPLICATIONS
     sample_id = np.asarray(shared["sample_id"], dtype=np.int64)
     del sample_id
     date_idx = np.asarray(shared["date_idx"], dtype=np.int64)
@@ -2455,6 +2632,10 @@ def _build_core_outputs(
         **{row["name"]: tuple(row["decision_indices"]) for row in bin_metadata},
         **named_time_scopes(),
     }
+    valid_count = label_mask.sum(axis=1).astype(np.float64)
+    _, daily_valid_count = _daily_grid(valid_count, date_idx, decision_idx)
+    coverage_values = label_mask.mean(axis=1).astype(np.float64)
+    _, daily_coverage = _daily_grid(coverage_values, date_idx, decision_idx)
     for seed in STAGE3_SEEDS:
         predictions = np.load(
             cache_paths[("core", seed)], mmap_mode="r", allow_pickle=False
@@ -2523,10 +2704,6 @@ def _build_core_outputs(
             daily_turnover[:, decision] = decision_values["intraday"]
             daily_entry[:, decision] = decision_values["entry"]
             daily_exit[:, decision] = decision_values["exit"]
-        valid_count = label_mask.sum(axis=1).astype(np.float64)
-        _, daily_valid_count = _daily_grid(valid_count, date_idx, decision_idx)
-        daily_coverage_values = label_mask.mean(axis=1).astype(np.float64)
-        _, daily_coverage = _daily_grid(daily_coverage_values, date_idx, decision_idx)
         time_bootstrap = moving_block_bootstrap_matrix(
             daily_ic.reshape(daily_ic.shape[0], -1),
             replications=bootstrap_replications,
@@ -2536,6 +2713,9 @@ def _build_core_outputs(
             for horizon_index, horizon in enumerate(HORIZONS):
                 flat_index = decision * len(HORIZONS) + horizon_index
                 values = daily_ic[:, decision, horizon_index]
+                coverage = _coverage_summary(
+                    daily_valid_count, daily_coverage, (decision,), horizon_index
+                )
                 time_5m_rows.append(
                     {
                         "aggregation": "seed",
@@ -2571,13 +2751,8 @@ def _build_core_outputs(
                         "mean_flat_exit_turnover": _finite_or_none(
                             np.nanmean(daily_exit[:, decision, horizon_index])
                         ),
-                        "mean_valid_equity_count": _finite_or_none(
-                            np.nanmean(daily_valid_count[:, decision, horizon_index])
-                        ),
-                        "label_coverage": _finite_or_none(
-                            np.nanmean(daily_coverage[:, decision, horizon_index])
-                        ),
-                        "valid_date_count": int(np.isfinite(values).sum()),
+                        **coverage,
+                        "finite_ic_date_count": int(np.isfinite(values).sum()),
                     }
                 )
             primary_values = np.nanmean(daily_ic[:, decision], axis=1)
@@ -2585,6 +2760,9 @@ def _build_core_outputs(
                 primary_values,
                 replications=bootstrap_replications,
                 seed=BOOTSTRAP_SEED + seed * 1000 + decision,
+            )
+            primary_coverage = _coverage_summary(
+                daily_valid_count, daily_coverage, (decision,), None
             )
             time_5m_rows.append(
                 {
@@ -2617,13 +2795,8 @@ def _build_core_outputs(
                     "mean_flat_exit_turnover": _finite_or_none(
                         np.nanmean(daily_exit[:, decision])
                     ),
-                    "mean_valid_equity_count": _finite_or_none(
-                        np.nanmean(daily_valid_count[:, decision])
-                    ),
-                    "label_coverage": _finite_or_none(
-                        np.nanmean(daily_coverage[:, decision])
-                    ),
-                    "valid_date_count": int(np.isfinite(primary_values).sum()),
+                    **primary_coverage,
+                    "finite_ic_date_count": int(np.isfinite(primary_values).sum()),
                 }
             )
         scope_daily: dict[str, dict[str, np.ndarray]] = {}
@@ -2670,6 +2843,9 @@ def _build_core_outputs(
                 seed=BOOTSTRAP_SEED + seed * 100 + scope_index,
             )
             for horizon_index, horizon in enumerate(HORIZONS):
+                coverage = _coverage_summary(
+                    daily_valid_count, daily_coverage, decisions, horizon_index
+                )
                 time_bin_rows.append(
                     {
                         "aggregation": "seed",
@@ -2710,7 +2886,8 @@ def _build_core_outputs(
                         "mean_flat_exit_turnover": _finite_or_none(
                             np.nanmean(exit_values[:, horizon_index])
                         ),
-                        "valid_date_count": int(
+                        **coverage,
+                        "finite_ic_date_count": int(
                             np.isfinite(ic_values[:, horizon_index]).sum()
                         ),
                     }
@@ -2720,6 +2897,9 @@ def _build_core_outputs(
                 primary_daily,
                 replications=bootstrap_replications,
                 seed=BOOTSTRAP_SEED + seed * 1000 + scope_index,
+            )
+            primary_coverage = _coverage_summary(
+                daily_valid_count, daily_coverage, decisions, None
             )
             time_bin_rows.append(
                 {
@@ -2757,7 +2937,8 @@ def _build_core_outputs(
                         np.nanmean(entry_values)
                     ),
                     "mean_flat_exit_turnover": _finite_or_none(np.nanmean(exit_values)),
-                    "valid_date_count": int(np.isfinite(primary_daily).sum()),
+                    **primary_coverage,
+                    "finite_ic_date_count": int(np.isfinite(primary_daily).sum()),
                 }
             )
         bin_daily = []
@@ -2990,14 +3171,13 @@ def _build_core_outputs(
             ],
             dtype=np.int64,
         )
-        valid_opportunity_count = label_mask.sum(axis=(0, 2))
-        valid_contribution_count = np.isfinite(additive.contributions).sum(axis=(0, 2))
-        conditional_contribution = np.divide(
-            np.nansum(additive.contributions, axis=(0, 2)),
-            valid_contribution_count,
-            out=np.full(label_mask.shape[1], np.nan, dtype=np.float64),
-            where=valid_contribution_count > 0,
-        )
+        opportunity = stock_contribution_opportunity_accounting(additive, label_mask)
+        valid_opportunity_count = opportunity["valid_opportunity_count"]
+        conditional_numerator = opportunity["conditional_contribution_numerator"]
+        conditional_contribution = opportunity["conditional_contribution"]
+        portfolio_valid_cell_count = opportunity["portfolio_valid_cell_count"]
+        unconditional_numerator = opportunity["unconditional_contribution_numerator"]
+        unconditional_contribution = opportunity["unconditional_contribution"]
         valid_date_count = np.asarray(
             [
                 np.unique(date_idx[label_mask[:, equity].any(axis=1)]).size
@@ -3051,7 +3231,11 @@ def _build_core_outputs(
             "valid_sample_count": valid_sample_count,
             "valid_decision_count": valid_decision_count,
             "valid_opportunity_count": valid_opportunity_count,
+            "conditional_contribution_numerator": conditional_numerator,
             "conditional_contribution": conditional_contribution,
+            "portfolio_valid_cell_count": portfolio_valid_cell_count,
+            "unconditional_contribution_numerator": unconditional_numerator,
+            "unconditional_contribution": unconditional_contribution,
             "valid_date_count": valid_date_count,
             "top_count": top_count,
             "bottom_count": bottom_count,
@@ -3060,7 +3244,7 @@ def _build_core_outputs(
             "selected_hit_count": selected_hits,
             "mean_liquidity": mean_liquidity,
             "selected_liquidity": selected_liquidity,
-            "skill": np.nanmean(skill["skill"], axis=1),
+            "skill": _finite_axis_mean(skill["skill"], axis=1),
             "skill_valid_days": np.nanmin(skill["valid_day_count"], axis=1),
             "skill_coverage": np.nanmin(skill["coverage"], axis=1),
         }
@@ -3170,6 +3354,30 @@ def _build_core_outputs(
                 ]
             )
         )
+        valid_opportunities = int(
+            sum(
+                stock_seed_arrays[seed]["valid_opportunity_count"][equity]
+                for seed in STAGE3_SEEDS
+            )
+        )
+        conditional_numerator = float(
+            sum(
+                stock_seed_arrays[seed]["conditional_contribution_numerator"][equity]
+                for seed in STAGE3_SEEDS
+            )
+        )
+        portfolio_valid_cells = int(
+            sum(
+                stock_seed_arrays[seed]["portfolio_valid_cell_count"][equity]
+                for seed in STAGE3_SEEDS
+            )
+        )
+        unconditional_numerator = float(
+            sum(
+                stock_seed_arrays[seed]["unconditional_contribution_numerator"][equity]
+                for seed in STAGE3_SEEDS
+            )
+        )
         stock_rows.append(
             {
                 **identity,
@@ -3184,14 +3392,25 @@ def _build_core_outputs(
                 "portfolio_positive_contribution_mass": portfolio_positive_mass,
                 "portfolio_negative_contribution_mass": portfolio_negative_mass,
                 "portfolio_net_primary_ic": net_primary,
-                "contribution_per_valid_opportunity": _finite_or_none(
-                    np.nanmean(
-                        [
-                            stock_seed_arrays[seed]["conditional_contribution"][equity]
-                            for seed in STAGE3_SEEDS
-                        ]
-                    )
+                "contribution_per_valid_opportunity": (
+                    conditional_numerator / valid_opportunities
+                    if valid_opportunities > 0
+                    else None
                 ),
+                "contribution_per_valid_opportunity_unit": (
+                    "additive Spearman contribution per label-valid stock/horizon "
+                    "in a portfolio-valid cross-section, pooled across seeds"
+                ),
+                "contribution_per_portfolio_valid_cell": (
+                    unconditional_numerator / portfolio_valid_cells
+                    if portfolio_valid_cells > 0
+                    else None
+                ),
+                "contribution_per_portfolio_valid_cell_unit": (
+                    "additive Spearman contribution per stock/horizon in a "
+                    "portfolio-valid cross-section, pooled across seeds"
+                ),
+                "portfolio_valid_cell_count": portfolio_valid_cells,
                 "valid_sample_count": int(
                     min(
                         stock_seed_arrays[seed]["valid_sample_count"][equity]
@@ -3204,7 +3423,8 @@ def _build_core_outputs(
                         for seed in STAGE3_SEEDS
                     )
                 ),
-                "valid_opportunity_count": int(
+                "valid_opportunity_count": valid_opportunities,
+                "minimum_seed_valid_opportunity_count": int(
                     min(
                         stock_seed_arrays[seed]["valid_opportunity_count"][equity]
                         for seed in STAGE3_SEEDS
@@ -3315,12 +3535,13 @@ def _build_core_outputs(
                         ]
                     )
                 ),
-                "per_stock_time_series_skill": _finite_or_none(
-                    np.nanmean(
+                "per_stock_time_series_skill": _finite_mean_or_none(
+                    np.asarray(
                         [
                             stock_seed_arrays[seed]["skill"][equity]
                             for seed in STAGE3_SEEDS
-                        ]
+                        ],
+                        dtype=np.float64,
                     )
                 ),
                 "per_stock_time_series_skill_minimum_valid_days": int(
@@ -3339,33 +3560,27 @@ def _build_core_outputs(
                         ]
                     )
                 ),
-                "top_selection_frequency": float(
-                    np.mean(
-                        [
+                "top_selection_frequency": (
+                    float(
+                        sum(
                             stock_seed_arrays[seed]["top_count"][equity]
-                            / max(
-                                1,
-                                stock_seed_arrays[seed]["valid_opportunity_count"][
-                                    equity
-                                ],
-                            )
                             for seed in STAGE3_SEEDS
-                        ]
+                        )
+                        / valid_opportunities
                     )
+                    if valid_opportunities > 0
+                    else None
                 ),
-                "bottom_selection_frequency": float(
-                    np.mean(
-                        [
+                "bottom_selection_frequency": (
+                    float(
+                        sum(
                             stock_seed_arrays[seed]["bottom_count"][equity]
-                            / max(
-                                1,
-                                stock_seed_arrays[seed]["valid_opportunity_count"][
-                                    equity
-                                ],
-                            )
                             for seed in STAGE3_SEEDS
-                        ]
+                        )
+                        / valid_opportunities
                     )
+                    if valid_opportunities > 0
+                    else None
                 ),
                 "net_gross_spread_contribution": gross_contribution,
                 "mean_daily_gross_contribution": gross_contribution,
@@ -3447,6 +3662,9 @@ def _build_core_outputs(
                 across_daily,
                 replications=bootstrap_replications,
                 seed=BOOTSTRAP_SEED + decision * 10 + horizon_index,
+            )
+            coverage = _coverage_summary(
+                daily_valid_count, daily_coverage, (decision,), horizon_index
             )
             time_5m_rows.append(
                 {
@@ -3531,13 +3749,8 @@ def _build_core_outputs(
                             ]
                         )
                     ),
-                    "mean_valid_equity_count": float(
-                        np.nanmean(daily_valid_count[:, decision, horizon_index])
-                    ),
-                    "label_coverage": float(
-                        np.nanmean(daily_coverage[:, decision, horizon_index])
-                    ),
-                    "valid_date_count": int(np.isfinite(across_daily).sum()),
+                    **coverage,
+                    "finite_ic_date_count": int(np.isfinite(across_daily).sum()),
                     "across_seed_minimum_ic": float(ic_by_seed.min()),
                     "across_seed_maximum_ic": float(ic_by_seed.max()),
                     "positive_seed_count": positive,
@@ -3558,6 +3771,9 @@ def _build_core_outputs(
             across_daily,
             replications=bootstrap_replications,
             seed=BOOTSTRAP_SEED + decision * 10 + len(HORIZONS),
+        )
+        primary_coverage = _coverage_summary(
+            daily_valid_count, daily_coverage, (decision,), None
         )
         time_5m_rows.append(
             {
@@ -3620,11 +3836,8 @@ def _build_core_outputs(
                         ]
                     )
                 ),
-                "mean_valid_equity_count": float(
-                    np.nanmean(daily_valid_count[:, decision])
-                ),
-                "label_coverage": float(np.nanmean(daily_coverage[:, decision])),
-                "valid_date_count": int(np.isfinite(across_daily).sum()),
+                **primary_coverage,
+                "finite_ic_date_count": int(np.isfinite(across_daily).sum()),
                 "across_seed_minimum_ic": float(np.nanmin(ic_by_seed)),
                 "across_seed_maximum_ic": float(np.nanmax(ic_by_seed)),
                 "positive_seed_count": positive,
@@ -3636,6 +3849,12 @@ def _build_core_outputs(
         for horizon_position in range(len(HORIZONS) + 1):
             horizon = (
                 HORIZONS[horizon_position] if horizon_position < len(HORIZONS) else 0
+            )
+            coverage = _coverage_summary(
+                daily_valid_count,
+                daily_coverage,
+                decisions,
+                horizon_position if horizon else None,
             )
             if horizon:
                 ic_daily_by_seed = np.stack(
@@ -3698,7 +3917,8 @@ def _build_core_outputs(
                     "mean_intraday_one_way_turnover": scope_metric("turnover"),
                     "mean_flat_entry_turnover": scope_metric("entry"),
                     "mean_flat_exit_turnover": scope_metric("exit"),
-                    "valid_date_count": int(np.isfinite(across_daily).sum()),
+                    **coverage,
+                    "finite_ic_date_count": int(np.isfinite(across_daily).sum()),
                     "across_seed_minimum_ic": float(np.nanmin(ic_by_seed)),
                     "across_seed_maximum_ic": float(np.nanmax(ic_by_seed)),
                     "positive_seed_count": positive,
@@ -3782,16 +4002,8 @@ def _build_core_outputs(
             pl.lit(
                 "one-way notional fraction summed within date then averaged across dates"
             ).alias("turnover_unit"),
-        ).with_columns(
-            pl.when(pl.col("mean_daily_total_one_way_turnover") > 0)
-            .then(
-                10_000.0
-                * pl.col("mean_daily_gross_contribution")
-                / pl.col("mean_daily_total_one_way_turnover")
-            )
-            .otherwise(None)
-            .alias("break_even_one_way_cost_bps")
         )
+        frame = _with_economic_ratios(frame)
         if name == "time_5m":
             time_5m_frame = frame
         else:
@@ -3986,22 +4198,25 @@ def _build_liquidity_outputs(
         _, contribution_grid = _grid_from_stock_values(
             additive_values, date_idx, decision_idx
         )
-        independent_ic = _independent_bucket_ic(
-            predictions,
-            targets,
-            label_mask,
-            adaptive,
-            date_positions,
-            5,
-        )
-        _, adaptive_grid = _daily_grid(
-            independent_ic.reshape(independent_ic.shape[0], -1),
-            date_idx,
-            decision_idx,
-        )
-        adaptive_grid = adaptive_grid.reshape(
-            adaptive_grid.shape[0], adaptive_grid.shape[1], 5, len(HORIZONS)
-        )
+
+        def independent_grid(groups: np.ndarray) -> np.ndarray:
+            values = _independent_bucket_ic(
+                predictions,
+                targets,
+                label_mask,
+                groups,
+                date_positions,
+                5,
+            )
+            _, grid = _daily_grid(
+                values.reshape(values.shape[0], -1), date_idx, decision_idx
+            )
+            return grid.reshape(grid.shape[0], grid.shape[1], 5, len(HORIZONS))
+
+        fixed_grid = independent_grid(quintiles)
+        adaptive_grid = independent_grid(adaptive)
+        all_day_fixed_ic = _scope_daily_mean(fixed_grid, all_decisions)
+        all_day_adaptive_ic = _scope_daily_mean(adaptive_grid, all_decisions)
         all_day_metrics = {
             name: _scope_daily_mean(values, all_decisions)
             for name, values in daily_metrics.items()
@@ -4087,6 +4302,9 @@ def _build_liquidity_outputs(
                         "mean_daily_flat_exit_turnover": exit_value,
                         "flat_exit_turnover": exit_value,
                         "mean_daily_total_one_way_turnover": total,
+                        "gross_contribution_per_unit_turnover": (
+                            gross / total if total > 0 else None
+                        ),
                         "break_even_one_way_cost_bps": (
                             10_000.0 * gross / total if total > 0 else None
                         ),
@@ -4110,15 +4328,101 @@ def _build_liquidity_outputs(
                             if threshold is not None
                             else None
                         ),
-                        "independently_reranked_within_bucket_ic": None,
+                        "independently_reranked_within_bucket_ic": _finite_mean_or_none(
+                            all_day_fixed_ic[:, group, horizon_index]
+                        ),
                         "adaptive_bucket_count_minimum": int(
                             adaptive_count_by_date.min()
                         ),
                     }
                 )
+            primary_contribution = float(
+                _finite_axis_mean(
+                    _finite_axis_mean(
+                        all_day_metrics["contribution"][:, group], axis=1
+                    ),
+                    axis=0,
+                )
+            )
+            primary_positive = float(
+                _finite_axis_mean(
+                    _finite_axis_mean(all_day_metrics["positive"][:, group], axis=1),
+                    axis=0,
+                )
+            )
+            primary_negative = float(
+                _finite_axis_mean(
+                    _finite_axis_mean(all_day_metrics["negative"][:, group], axis=1),
+                    axis=0,
+                )
+            )
+            primary_economic = {
+                name: float(
+                    _finite_axis_mean(
+                        _finite_axis_mean(economic_daily[name], axis=1), axis=0
+                    )
+                )
+                for name in ("gross", "entry", "intraday", "exit", "total")
+            }
+            primary_total = primary_economic["total"]
+            rows.append(
+                {
+                    "aggregation": "seed",
+                    "seed": seed,
+                    "bucket_kind": "daily_liquidity_quintile",
+                    "bucket": group + 1,
+                    "horizon_minutes": 0,
+                    "additive_ic_contribution": primary_contribution,
+                    "positive_contribution_mass": primary_positive,
+                    "negative_contribution_mass": primary_negative,
+                    "mean_daily_gross_contribution": primary_economic["gross"],
+                    "gross_spread_contribution": primary_economic["gross"],
+                    "mean_daily_intraday_one_way_turnover": primary_economic[
+                        "intraday"
+                    ],
+                    "intraday_one_way_turnover": primary_economic["intraday"],
+                    "mean_daily_flat_entry_turnover": primary_economic["entry"],
+                    "flat_entry_turnover": primary_economic["entry"],
+                    "mean_daily_flat_exit_turnover": primary_economic["exit"],
+                    "flat_exit_turnover": primary_economic["exit"],
+                    "mean_daily_total_one_way_turnover": primary_total,
+                    "gross_contribution_per_unit_turnover": (
+                        primary_economic["gross"] / primary_total
+                        if primary_total > 0
+                        else None
+                    ),
+                    "break_even_one_way_cost_bps": (
+                        10_000.0 * primary_economic["gross"] / primary_total
+                        if primary_total > 0
+                        else None
+                    ),
+                    "tail_selection_frequency": float(
+                        group_tail[:, group].sum()
+                        / max(1.0, group_coverage[:, group].sum())
+                    ),
+                    "label_coverage": float(
+                        group_coverage[:, group].sum()
+                        / max(1.0, group_active[:, group].sum())
+                    ),
+                    "stock_contribution_herfindahl": None,
+                    "top_decile_absolute_contribution_share": None,
+                    "mean_point_in_time_dollar_liquidity_brl": _finite_or_none(
+                        float(_finite_axis_mean(group_liquidity, axis=0))
+                    ),
+                    "mean_distance_from_eligibility_threshold_brl": (
+                        float(_finite_axis_mean(group_liquidity, axis=0) - threshold)
+                        if threshold is not None
+                        else None
+                    ),
+                    "independently_reranked_within_bucket_ic": _finite_mean_or_none(
+                        _finite_axis_mean(all_day_fixed_ic[:, group], axis=1)
+                    ),
+                    "adaptive_bucket_count_minimum": int(adaptive_count_by_date.min()),
+                }
+            )
         for group in range(5):
             for horizon_index, horizon in enumerate(HORIZONS):
-                values = adaptive_grid[:, :, group, horizon_index]
+                values = all_day_adaptive_ic[:, group, horizon_index]
                 if not np.isfinite(values).any():
                     continue
                 rows.append(
@@ -4140,6 +4444,7 @@ def _build_liquidity_outputs(
                         "mean_daily_flat_exit_turnover": None,
                         "flat_exit_turnover": None,
                         "mean_daily_total_one_way_turnover": None,
+                        "gross_contribution_per_unit_turnover": None,
                         "break_even_one_way_cost_bps": None,
                         "tail_selection_frequency": None,
                         "label_coverage": None,
@@ -4155,10 +4460,48 @@ def _build_liquidity_outputs(
                         ),
                     }
                 )
+            primary_values = _finite_axis_mean(all_day_adaptive_ic[:, group], axis=1)
+            if np.isfinite(primary_values).any():
+                rows.append(
+                    {
+                        "aggregation": "seed",
+                        "seed": seed,
+                        "bucket_kind": "adaptive_independent_ic_bucket",
+                        "bucket": group + 1,
+                        "horizon_minutes": 0,
+                        "additive_ic_contribution": None,
+                        "positive_contribution_mass": None,
+                        "negative_contribution_mass": None,
+                        "mean_daily_gross_contribution": None,
+                        "gross_spread_contribution": None,
+                        "mean_daily_intraday_one_way_turnover": None,
+                        "intraday_one_way_turnover": None,
+                        "mean_daily_flat_entry_turnover": None,
+                        "flat_entry_turnover": None,
+                        "mean_daily_flat_exit_turnover": None,
+                        "flat_exit_turnover": None,
+                        "mean_daily_total_one_way_turnover": None,
+                        "gross_contribution_per_unit_turnover": None,
+                        "break_even_one_way_cost_bps": None,
+                        "tail_selection_frequency": None,
+                        "label_coverage": None,
+                        "stock_contribution_herfindahl": None,
+                        "top_decile_absolute_contribution_share": None,
+                        "mean_point_in_time_dollar_liquidity_brl": None,
+                        "mean_distance_from_eligibility_threshold_brl": None,
+                        "independently_reranked_within_bucket_ic": _finite_mean_or_none(
+                            primary_values
+                        ),
+                        "adaptive_bucket_count_minimum": int(
+                            adaptive_count_by_date.min()
+                        ),
+                    }
+                )
         for time_name, decisions in time_bins.items():
             scope_contribution = _scope_daily_mean(
                 daily_metrics["contribution"], decisions
             )
+            scope_fixed_ic = _scope_daily_mean(fixed_grid, decisions)
             scope_accounting = economic_window_accounting(
                 economic, date_idx, decision_idx, decisions=decisions
             )
@@ -4225,10 +4568,16 @@ def _build_liquidity_outputs(
                             "mean_daily_flat_exit_turnover": exit_value,
                             "flat_exit_turnover": exit_value,
                             "mean_daily_total_one_way_turnover": total,
+                            "gross_contribution_per_unit_turnover": (
+                                gross / total if total > 0 else None
+                            ),
                             "break_even_one_way_cost_bps": (
                                 10_000.0 * gross / total if total > 0 else None
                             ),
                             "stock_contribution_herfindahl": herfindahl,
+                            "independently_reranked_within_bucket_ic": _finite_mean_or_none(
+                                scope_fixed_ic[:, group, horizon_index]
+                            ),
                             "top_decile_absolute_contribution_share": top_share,
                         }
                     )
@@ -4276,6 +4625,27 @@ def _build_liquidity_outputs(
             maximum_difference = max(maximum_difference, difference)
             if difference > RECONSTRUCTION_ABSOLUTE_TOLERANCE:
                 raise RuntimeError("Liquidity quintiles failed additive reconstruction")
+        reconstructed_primary = sum(
+            row["additive_ic_contribution"]
+            for row in rows
+            if row["seed"] == seed
+            and row["bucket_kind"] == "daily_liquidity_quintile"
+            and row["horizon_minutes"] == 0
+        )
+        expected_primary = float(
+            _finite_axis_mean(
+                _finite_axis_mean(
+                    _scope_daily_mean(sample_ic_grid, all_decisions), axis=1
+                ),
+                axis=0,
+            )
+        )
+        primary_difference = abs(reconstructed_primary - expected_primary)
+        maximum_difference = max(maximum_difference, primary_difference)
+        if primary_difference > RECONSTRUCTION_ABSOLUTE_TOLERANCE:
+            raise RuntimeError(
+                "Liquidity quintile h0 rows failed additive reconstruction"
+            )
         checks[str(seed)] = {
             "maximum_cell_absolute_difference": maximum_difference,
             "passed": True,
@@ -4283,10 +4653,16 @@ def _build_liquidity_outputs(
     liquidity = pl.DataFrame(rows, infer_schema_length=None)
     liquidity_time = pl.DataFrame(time_rows, infer_schema_length=None)
     group_columns = ["bucket_kind", "bucket", "horizon_minutes"]
+    derived_economic_columns = {
+        "gross_contribution_per_unit_turnover",
+        "break_even_one_way_cost_bps",
+    }
     numeric_columns = [
         name
         for name, dtype in liquidity.schema.items()
-        if name not in {"seed", "aggregation", *group_columns} and dtype.is_numeric()
+        if name
+        not in {"seed", "aggregation", *group_columns, *derived_economic_columns}
+        and dtype.is_numeric()
     ]
     across = (
         liquidity.group_by(group_columns)
@@ -4296,6 +4672,7 @@ def _build_liquidity_outputs(
             pl.lit(None, dtype=pl.Int64).alias("seed"),
         )
     )
+    across = _with_economic_ratios(across)
     for column in liquidity.columns:
         if column not in across.columns:
             across = across.with_columns(pl.lit(None).alias(column))
@@ -4311,7 +4688,8 @@ def _build_liquidity_outputs(
     time_numeric = [
         name
         for name, dtype in liquidity_time.schema.items()
-        if name not in {"seed", "aggregation", *time_group_columns}
+        if name
+        not in {"seed", "aggregation", *time_group_columns, *derived_economic_columns}
         and dtype.is_numeric()
     ]
     time_across = (
@@ -4322,6 +4700,7 @@ def _build_liquidity_outputs(
             pl.lit(None, dtype=pl.Int64).alias("seed"),
         )
     )
+    time_across = _with_economic_ratios(time_across)
     for column in liquidity_time.columns:
         if column not in time_across.columns:
             time_across = time_across.with_columns(pl.lit(None).alias(column))
@@ -4380,7 +4759,7 @@ def _freshness_categories(
 def _opening_condition_masks(
     shared: dict[str, np.ndarray],
     metadata: dict[str, object],
-) -> list[tuple[str, str, np.ndarray, str | None, str | None]]:
+) -> list[OpeningCondition]:
     sample_count = np.asarray(shared["date_idx"]).size
     date_positions = _metadata_date_positions(
         metadata, np.asarray(shared["date_idx"], dtype=np.int64)
@@ -4390,17 +4769,76 @@ def _opening_condition_masks(
     global_values = metadata["global_completeness"]
     if not all(isinstance(value, dict) for value in (equity, local, global_values)):
         raise TypeError("Completeness metadata is malformed")
-    result: list[tuple[str, str, np.ndarray, str | None, str | None]] = []
-
-    b3_before = (np.asarray(equity["observed_bars"], dtype=np.int64) > 0).sum(
-        axis=1
-    ) >= MIN_IC_EQUITIES
-    result.extend(
-        [
-            ("b3_bars_before_decision", "available", b3_before, None, None),
-            ("b3_bars_before_decision", "unavailable", ~b3_before, None, None),
-        ]
-    )
+    result: list[OpeningCondition] = []
+    active = np.asarray(metadata["active"], dtype=bool)[date_positions]
+    observed_bars = np.asarray(equity["observed_bars"], dtype=np.float64)
+    observed_fraction = np.asarray(equity["observed_fraction"], dtype=np.float64)
+    scheduled_minutes = np.asarray(equity["scheduled_minutes"], dtype=np.float64)
+    median_bar_count = np.full(sample_count, np.nan, dtype=np.float64)
+    median_fraction = np.full(sample_count, np.nan, dtype=np.float64)
+    meeting_expected_fraction = np.full(sample_count, np.nan, dtype=np.float64)
+    for sample in range(sample_count):
+        eligible = active[sample]
+        if not eligible.any() or scheduled_minutes[sample] <= 0:
+            continue
+        median_bar_count[sample] = float(np.median(observed_bars[sample, eligible]))
+        median_fraction[sample] = float(np.median(observed_fraction[sample, eligible]))
+        meeting_expected_fraction[sample] = float(
+            np.mean(observed_bars[sample, eligible] >= scheduled_minutes[sample])
+        )
+    missing_bar_count = scheduled_minutes - median_bar_count
+    diagnostic_fields = {
+        "median_observed_bar_count": median_bar_count,
+        "median_observed_fraction": median_fraction,
+        "fraction_eligible_meeting_expected_history": meeting_expected_fraction,
+    }
+    for category, mask, lower, upper in (
+        (
+            "complete",
+            np.isfinite(missing_bar_count) & (missing_bar_count <= 0.5),
+            0.0,
+            0.5,
+        ),
+        (
+            "missing_1_to_5_bars",
+            (missing_bar_count > 0.5) & (missing_bar_count <= 5.0),
+            0.5,
+            5.0,
+        ),
+        ("missing_over_5_bars", missing_bar_count > 5.0, 5.0, None),
+    ):
+        result.append(
+            OpeningCondition(
+                "b3_history_count",
+                category,
+                mask,
+                category_lower_bound=lower,
+                category_upper_bound=upper,
+                category_unit="missing_bars_from_expected_current_session_history",
+                **diagnostic_fields,
+            )
+        )
+    for category, mask, lower, upper in (
+        ("below_80pct", (median_fraction >= 0.0) & (median_fraction < 0.80), 0.0, 0.80),
+        (
+            "80_to_95pct",
+            (median_fraction >= 0.80) & (median_fraction < 0.95),
+            0.80,
+            0.95,
+        ),
+        ("at_least_95pct", median_fraction >= 0.95, 0.95, 1.0),
+    ):
+        result.append(
+            OpeningCondition(
+                "b3_history_completeness",
+                category,
+                mask,
+                category_lower_bound=lower,
+                category_upper_bound=upper,
+                category_unit="observed_fraction_of_expected_current_session_history",
+                **diagnostic_fields,
+            )
+        )
 
     local_positions = np.asarray(
         [
@@ -4434,33 +4872,15 @@ def _opening_condition_masks(
     )
     result.extend(
         [
-            (
-                "retained_local_completeness",
-                "complete",
-                local_complete,
-                None,
-                None,
+            OpeningCondition("retained_local_completeness", "complete", local_complete),
+            OpeningCondition(
+                "retained_local_completeness", "incomplete", ~local_complete
             ),
-            (
-                "retained_local_completeness",
-                "incomplete",
-                ~local_complete,
-                None,
-                None,
+            OpeningCondition(
+                "retained_global_completeness", "complete", global_complete
             ),
-            (
-                "retained_global_completeness",
-                "complete",
-                global_complete,
-                None,
-                None,
-            ),
-            (
-                "retained_global_completeness",
-                "incomplete",
-                ~global_complete,
-                None,
-                None,
+            OpeningCondition(
+                "retained_global_completeness", "incomplete", ~global_complete
             ),
         ]
     )
@@ -4474,19 +4894,17 @@ def _opening_condition_masks(
     )
     result.extend(
         [
-            (
+            OpeningCondition(
                 "retained_global_freshness",
                 "fresh_within_30m",
                 global_fresh,
-                None,
-                "fresh_within_30m",
+                freshness_category="fresh_within_30m",
             ),
-            (
+            OpeningCondition(
                 "retained_global_freshness",
                 "stale_or_unready",
                 ~global_fresh,
-                None,
-                "stale_or_unready",
+                freshness_category="stale_or_unready",
             ),
         ]
     )
@@ -4496,30 +4914,34 @@ def _opening_condition_masks(
     global_preopen = np.asarray(
         global_values["preopen_observed_fraction"], dtype=np.float64
     )[:, global_positions]
-    preopen_complete = (
-        np.isfinite(local_preopen).all(axis=1)
-        & np.isfinite(global_preopen).all(axis=1)
+    local_ready = np.all(np.asarray(local["ready"])[:, local_positions], axis=1)
+    global_ready = np.all(
+        np.asarray(global_values["ready"])[:, global_positions], axis=1
+    )
+    local_preopen_complete = (
+        local_ready
+        & np.isfinite(local_preopen).all(axis=1)
         & (local_preopen >= 0.95).all(axis=1)
+    )
+    global_preopen_complete = (
+        global_ready
+        & np.isfinite(global_preopen).all(axis=1)
         & (global_preopen >= 0.95).all(axis=1)
     )
-    result.extend(
-        [
-            (
-                "retained_context_preopen",
-                "complete",
-                preopen_complete,
-                None,
-                None,
-            ),
-            (
-                "retained_context_preopen",
-                "incomplete",
-                ~preopen_complete,
-                None,
-                None,
-            ),
-        ]
-    )
+    for condition_type, complete in (
+        ("retained_local_preopen", local_preopen_complete),
+        ("retained_global_preopen", global_preopen_complete),
+        (
+            "retained_context_preopen",
+            local_preopen_complete & global_preopen_complete,
+        ),
+    ):
+        result.extend(
+            [
+                OpeningCondition(condition_type, "complete", complete),
+                OpeningCondition(condition_type, "incomplete", ~complete),
+            ]
+        )
     overnight = metadata["overnight_regimes"]
     if not isinstance(overnight, dict):
         raise TypeError("Overnight regimes are malformed")
@@ -4527,8 +4949,44 @@ def _opening_condition_masks(
         sample_mask = np.asarray(day_mask, dtype=bool)[date_positions]
         if sample_mask.shape != (sample_count,):
             raise ValueError("Overnight regime mask is misaligned")
-        result.append(("overnight_regime", regime, sample_mask, regime, None))
+        result.append(
+            OpeningCondition(
+                "overnight_regime",
+                regime,
+                sample_mask,
+                overnight_regime=regime,
+            )
+        )
     return result
+
+
+def _opening_condition_metadata(
+    condition: OpeningCondition, date_idx: np.ndarray
+) -> dict[str, object]:
+    mask = np.asarray(condition.sample_mask, dtype=bool)
+
+    def selected_mean(values: np.ndarray | None) -> float | None:
+        if values is None:
+            return None
+        selected = np.asarray(values, dtype=np.float64)[mask]
+        return _finite_mean_or_none(selected)
+
+    return {
+        "category_lower_bound": condition.category_lower_bound,
+        "category_upper_bound": condition.category_upper_bound,
+        "category_unit": condition.category_unit,
+        "condition_sample_count": int(mask.sum()),
+        "condition_date_count": int(np.unique(date_idx[mask]).size),
+        "mean_median_observed_bar_count": selected_mean(
+            condition.median_observed_bar_count
+        ),
+        "mean_median_observed_fraction": selected_mean(
+            condition.median_observed_fraction
+        ),
+        "mean_fraction_eligible_meeting_expected_history": selected_mean(
+            condition.fraction_eligible_meeting_expected_history
+        ),
+    }
 
 
 def _build_opening_regimes(
@@ -4811,13 +5269,9 @@ def _build_opening_regimes(
         economic = core["economic"]
         if not isinstance(economic, EconomicAttributionResult):
             raise TypeError("Core economic attribution is malformed")
-        for (
-            condition_type,
-            category,
-            sample_mask,
-            regime,
-            freshness,
-        ) in _opening_condition_masks(shared, metadata):
+        for condition in _opening_condition_masks(shared, metadata):
+            sample_mask = np.asarray(condition.sample_mask, dtype=bool)
+            condition_metadata = _opening_condition_metadata(condition, date_idx)
             for scope_name in ("opening_30", "opening_60"):
                 decisions = named_time_scopes()[scope_name]
                 daily_ic = _daily_subset_mean(
@@ -4853,10 +5307,12 @@ def _build_opening_regimes(
                         intraday = _finite_axis_mean(daily_economic["intraday"], axis=1)
                         exit_values = _finite_axis_mean(daily_economic["exit"], axis=1)
                         total = _finite_axis_mean(daily_economic["total"], axis=1)
+                    mean_gross = _finite_mean_or_none(gross)
+                    mean_total = _finite_mean_or_none(total)
                     rows.append(
                         {
-                            "diagnostic_type": f"core_{condition_type}",
-                            "condition_category": category,
+                            "diagnostic_type": f"core_{condition.condition_type}",
+                            "condition_category": condition.category,
                             "seed": seed,
                             "instrument": None,
                             "time_scope": scope_name,
@@ -4864,8 +5320,8 @@ def _build_opening_regimes(
                             "horizon_minutes": horizon,
                             "liquidity_quintile": None,
                             "history_category": None,
-                            "overnight_regime": regime,
-                            "freshness_category": freshness,
+                            "overnight_regime": condition.overnight_regime,
+                            "freshness_category": condition.freshness_category,
                             "additive_ic_contribution": _finite_mean_or_none(ic_values),
                             "independently_reranked_conditional_ic": None,
                             "mean_observed_fraction": None,
@@ -4873,9 +5329,7 @@ def _build_opening_regimes(
                             "readiness_fraction": None,
                             "preopen_observed_fraction": None,
                             "mean_staleness_minutes": None,
-                            "mean_daily_gross_contribution": _finite_mean_or_none(
-                                gross
-                            ),
+                            "mean_daily_gross_contribution": mean_gross,
                             "gross_spread": _finite_mean_or_none(gross),
                             "mean_daily_flat_entry_turnover": _finite_mean_or_none(
                                 entry
@@ -4887,14 +5341,22 @@ def _build_opening_regimes(
                             "mean_daily_flat_exit_turnover": _finite_mean_or_none(
                                 exit_values
                             ),
-                            "mean_daily_total_turnover": _finite_mean_or_none(total),
-                            "break_even_one_way_cost_bps": (
-                                10_000.0
-                                * float(_finite_axis_mean(gross, axis=0))
-                                / float(_finite_axis_mean(total, axis=0))
-                                if float(_finite_axis_mean(total, axis=0)) > 0
+                            "mean_daily_total_turnover": mean_total,
+                            "gross_contribution_per_unit_turnover": (
+                                mean_gross / mean_total
+                                if mean_gross is not None
+                                and mean_total is not None
+                                and mean_total > 0
                                 else None
                             ),
+                            "break_even_one_way_cost_bps": (
+                                10_000.0 * mean_gross / mean_total
+                                if mean_gross is not None
+                                and mean_total is not None
+                                and mean_total > 0
+                                else None
+                            ),
+                            **condition_metadata,
                             "valid_date_count": int(np.isfinite(ic_values).sum()),
                         }
                     )
@@ -5006,8 +5468,10 @@ def _build_context_time_deltas(
     shared: dict[str, np.ndarray],
     metadata: dict[str, object],
     *,
-    bootstrap_replications: int = BOOTSTRAP_REPLICATIONS,
+    bootstrap_replications: int | None = None,
 ) -> pl.DataFrame:
+    if bootstrap_replications is None:
+        bootstrap_replications = BOOTSTRAP_REPLICATIONS
     if not all(
         (logical, seed) in cache_paths
         for logical in STAGE3_LOGICAL_CONFIGURATION_ORDER
@@ -5069,12 +5533,11 @@ def _build_context_time_deltas(
         conditional_masks = [
             *opening_conditions,
             *[
-                (
+                OpeningCondition(
                     "added_context_freshness",
                     category,
                     mask,
-                    None,
-                    category,
+                    freshness_category=category,
                 )
                 for category, mask in added_freshness.items()
             ],
@@ -5188,23 +5651,17 @@ def _build_context_time_deltas(
                     (decision,),
                     all_samples,
                 )
-            for (
-                condition_type,
-                category,
-                sample_mask,
-                regime,
-                freshness,
-            ) in conditional_masks:
+            for condition in conditional_masks:
                 for scope_name in ("opening_30", "opening_60"):
                     append_scope(
-                        condition_type,
+                        condition.condition_type,
                         scope_name,
                         named_time_scopes()[scope_name],
-                        np.asarray(sample_mask, dtype=bool),
-                        condition_type,
-                        category,
-                        regime,
-                        freshness,
+                        np.asarray(condition.sample_mask, dtype=bool),
+                        condition.condition_type,
+                        condition.category,
+                        condition.overnight_regime,
+                        condition.freshness_category,
                     )
 
     identity_fields = (
@@ -5375,11 +5832,11 @@ def _validate_completed_artifacts(state: dict[str, object]) -> None:
 
 
 def _cache_metric_gates(
-    inputs: AnalysisInputs, output_dir: Path
+    inputs: AnalysisInputs, cache_dir: Path
 ) -> list[dict[str, object]]:
     gates = []
     for job in inputs.jobs:
-        manifest_path = _cache_directory(output_dir, job) / "manifest.json"
+        manifest_path = _cache_directory(cache_dir, job) / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         gates.append(
             {
@@ -5396,17 +5853,18 @@ def _analysis_summary(
     scope: str,
     output_dir: Path,
     metadata: dict[str, object],
+    cache_dir: Path,
     reconstruction: dict[str, object],
     liquidity_checks: dict[str, object],
     frames: dict[str, pl.DataFrame],
 ) -> dict[str, object]:
     prediction_bytes = sum(
-        (_cache_directory(output_dir, job) / "predictions.npy").stat().st_size
+        (_cache_directory(cache_dir, job) / "predictions.npy").stat().st_size
         for job in inputs.jobs
     )
     shared_bytes = sum(
         path.stat().st_size
-        for path in (output_dir / "cache" / "shared_validation").glob("*.npy")
+        for path in shared_validation_directory(cache_dir).glob("*.npy")
     )
     return {
         "analysis_name": ANALYSIS_NAME,
@@ -5443,7 +5901,7 @@ def _analysis_summary(
                 for job in inputs.jobs
             ],
         },
-        "metric_reproduction_checks": _cache_metric_gates(inputs, output_dir),
+        "metric_reproduction_checks": _cache_metric_gates(inputs, cache_dir),
         "stock_contribution_reconstruction_checks": reconstruction,
         "time_decomposition_reconstruction_checks": reconstruction["by_seed"],
         "gross_spread_and_turnover_reconstruction_checks": {
@@ -5516,32 +5974,49 @@ def run_analysis(
     stage3_state_path: Path,
     output_dir: Path,
     scope: str,
+    cache_dir: Path | None = None,
 ) -> Path:
     output_dir = output_dir.resolve()
     _reject_test_derived_path(output_dir, "analysis output path")
+    cache_root = _resolve_cache_directory(output_dir, cache_dir)
     inputs = validate_analysis_inputs(stage3_state_path, scope)
     if not inputs.analyzer_worktree_clean:
         raise RuntimeError("Non-dry analysis requires a clean worktree")
     output_dir.mkdir(parents=True, exist_ok=True)
+    cache_root.mkdir(parents=True, exist_ok=True)
     state_path = output_dir / "analysis_state.json"
     lock_path = output_dir / "analysis.lock"
     with exclusive_process_lock(lock_path, ANALYSIS_NAME):
-        state = _load_analysis_state(state_path, inputs, scope)
+        state = _load_analysis_state(state_path, inputs, scope, cache_root)
         if state.get("status") == "completed":
             _validate_completed_artifacts(state)
+            _write_or_validate_shared_cache(cache_root, inputs)
+            for job in inputs.jobs:
+                _validate_cache_manifest(
+                    _cache_directory(cache_root, job) / "manifest.json",
+                    _job_cache_identity(inputs, job),
+                )
+            if any(
+                gate.get("passed") is not True
+                for gate in _cache_metric_gates(inputs, cache_root)
+            ):
+                raise ValueError("Completed analysis cache lacks metric parity")
             return output_dir / "analysis_manifest.json"
         _atomic_write_json(state_path, state)
         with exclusive_process_lock(
             PRODUCTION_TRAINING_LOCK, "stock/time attribution inference"
         ) as production_lock:
-            cache_paths, shared = _adopt_or_infer_caches(
-                output_dir,
-                inputs,
-                scope,
-                state,
-                state_path,
-                production_lock,
-            )
+            with exclusive_process_lock(
+                cache_root / "cache.lock", "stock/time attribution cache"
+            ):
+                cache_paths, shared = _adopt_or_infer_caches(
+                    cache_root,
+                    inputs,
+                    scope,
+                    state,
+                    state_path,
+                    production_lock,
+                )
         metadata = _load_analysis_metadata(inputs, shared)
         core_frames, core_by_seed, reconstruction = _build_core_outputs(
             cache_paths, shared, metadata
@@ -5630,6 +6105,7 @@ def run_analysis(
             scope,
             output_dir,
             metadata,
+            cache_root,
             reconstruction,
             liquidity_checks,
             frames,
@@ -5646,23 +6122,21 @@ def run_analysis(
             "analysis_version": ANALYSIS_VERSION,
             "status": "completed",
             "created_at_utc": datetime.now(timezone.utc).isoformat(),
-            "configuration": _analysis_configuration(inputs, scope),
+            "configuration": _analysis_configuration(inputs, scope, cache_root),
             "artifacts": state["artifacts"],
             "prediction_cache_manifests": [
                 {
-                    "path": str(_cache_directory(output_dir, job) / "manifest.json"),
+                    "path": str(_cache_directory(cache_root, job) / "manifest.json"),
                     "sha256": _sha256(
-                        _cache_directory(output_dir, job) / "manifest.json"
+                        _cache_directory(cache_root, job) / "manifest.json"
                     ),
                 }
                 for job in inputs.jobs
             ],
             "shared_validation_manifest": {
-                "path": str(
-                    output_dir / "cache" / "shared_validation" / "manifest.json"
-                ),
+                "path": str(shared_validation_directory(cache_root) / "manifest.json"),
                 "sha256": _sha256(
-                    output_dir / "cache" / "shared_validation" / "manifest.json"
+                    shared_validation_directory(cache_root) / "manifest.json"
                 ),
             },
             "selection": None,
@@ -5686,6 +6160,7 @@ def parse_args(arguments: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--stage3-state", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--cache-dir", type=Path)
     parser.add_argument("--scope", choices=SCOPE_CHOICES, required=True)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(arguments)
@@ -5698,14 +6173,14 @@ def main() -> None:
     if args.dry_run:
         print(
             json.dumps(
-                dry_run_payload(stage3_state, output_dir, args.scope),
+                dry_run_payload(stage3_state, output_dir, args.scope, args.cache_dir),
                 indent=2,
                 allow_nan=False,
             ),
             flush=True,
         )
         return
-    manifest = run_analysis(stage3_state, output_dir, args.scope)
+    manifest = run_analysis(stage3_state, output_dir, args.scope, args.cache_dir)
     print(f"Completed stock/time attribution analysis: {manifest}", flush=True)
 
 
