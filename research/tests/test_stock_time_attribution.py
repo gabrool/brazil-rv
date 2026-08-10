@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import copy
 import json
+import math
 from dataclasses import asdict
 from datetime import date, timedelta
 from pathlib import Path
@@ -63,13 +65,21 @@ from brazil_rv.modeling.stage3_context_addition import (
 from brazil_rv.modeling.stock_time_cache import (
     CACHE_VERSION,
     INFERENCE_CODE_PATHS,
-    METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE,
+    METRIC_REPRODUCTION_DAILY_IC_ABSOLUTE_TOLERANCE,
+    METRIC_REPRODUCTION_DAILY_THRESHOLDS,
+    METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE,
+    METRIC_REPRODUCTION_GATE_SCHEMA_VERSION,
+    METRIC_REPRODUCTION_HORIZON_IC_ABSOLUTE_TOLERANCE,
+    METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE,
+    METRIC_REPRODUCTION_TURNOVER_ABSOLUTE_TOLERANCE,
     adopt_or_infer_caches as _adopt_or_infer_caches,
     atomic_write_npy as _atomic_write_npy,
     job_cache_identity as _job_cache_identity,
     metric_reproduction_gate,
+    metric_reproduction_thresholds,
     remove_recognized_partial_cache as _remove_recognized_partial_cache,
     validate_cache_manifest as _validate_cache_manifest,
+    validate_metric_reproduction_gate as _validate_metric_reproduction_gate,
 )
 from brazil_rv.modeling.stock_time_inference import (
     AnalysisInputs,
@@ -78,7 +88,7 @@ from brazil_rv.modeling.stock_time_inference import (
     reject_test_derived_path as _reject_test_derived_path,
 )
 from brazil_rv.modeling.engine import EvaluationObservations
-from brazil_rv.modeling.metrics import average_ranks, create_metric_table
+from brazil_rv.modeling.metrics import average_ranks
 from brazil_rv.modeling.process_lock import (
     PRODUCTION_TRAINING_LOCK,
     ProcessLockLease,
@@ -100,6 +110,66 @@ def _random_arrays(
     )
     mask = np.ones_like(predictions, dtype=bool)
     return predictions, targets, mask
+
+
+def _metric_payloads() -> tuple[dict[str, object], list[dict[str, object]]]:
+    summary: dict[str, object] = {
+        "primary_score": 0.0,
+        "horizons": [
+            {
+                "horizon_minutes": horizon,
+                "mean_daily_spearman_ic": 0.0,
+            }
+            for horizon in (30, 60, 120)
+        ],
+    }
+    daily_rows = [
+        {
+            "date_idx": date_index,
+            "horizon_minutes": horizon,
+            "spearman_ic": 0.0,
+            "rank_target_pearson_ic": 0.0,
+            "top_return": 0.0,
+            "bottom_return": 0.0,
+            "top_minus_bottom": 0.0,
+            "long_only_top": 0.0,
+            "one_way_turnover": 0.0,
+        }
+        for date_index in (793, 794)
+        for horizon in (30, 60, 120)
+    ]
+    return summary, daily_rows
+
+
+def _write_recorded_metric_artifacts(
+    run_dir: Path,
+    summary: dict[str, object],
+    daily_rows: list[dict[str, object]],
+    trade_dates: dict[int, date] | None = None,
+) -> None:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    _atomic_write_json(run_dir / "validation_metrics.json", summary)
+    if trade_dates is None:
+        trade_dates = {
+            date_index: date(2024, 9, 18) + timedelta(days=position)
+            for position, date_index in enumerate(
+                sorted({int(row["date_idx"]) for row in daily_rows})
+            )
+        }
+    recorded_rows = [
+        {"trade_date": trade_dates[int(row["date_idx"])], **copy.deepcopy(row)}
+        for row in daily_rows
+    ]
+    pl.DataFrame(recorded_rows).write_parquet(
+        run_dir / "validation_daily_metrics.parquet"
+    )
+
+
+def _valid_metric_gate(tmp_path: Path) -> dict[str, object]:
+    summary, daily_rows = _metric_payloads()
+    run_dir = tmp_path / "valid-metric-gate"
+    _write_recorded_metric_artifacts(run_dir, summary, daily_rows)
+    return metric_reproduction_gate(run_dir, summary, daily_rows)
 
 
 def test_average_rank_ties_are_stable_exact_midranks() -> None:
@@ -353,32 +423,276 @@ def test_same_seed_delta_rejects_misalignment_and_is_deterministic() -> None:
         _paired_delta_row(**kwargs)
 
 
-def test_metric_reproduction_gate_passes_and_fails_closed(tmp_path: Path) -> None:
-    predictions, targets, mask = _random_arrays(sample_count=4)
-    returns = np.random.default_rng(4).normal(size=predictions.shape).astype(np.float32)
-    dates = np.asarray([10, 10, 11, 11], dtype=np.int64)
-    decisions = np.asarray([0, 1, 0, 1], dtype=np.int64)
-    summary, daily_rows = create_metric_table(
-        predictions, targets, returns, mask, dates, decisions
+def test_metric_reproduction_gate_accepts_exact_gh200_diagnostic(
+    tmp_path: Path,
+) -> None:
+    recorded_summary, recorded_daily = _metric_payloads()
+    recorded_summary["primary_score"] = 0.04176565907570362
+    recorded_horizons = recorded_summary["horizons"]
+    assert isinstance(recorded_horizons, list)
+    for row, value in zip(recorded_horizons, (0.02, 0.03, 0.04), strict=True):
+        assert isinstance(row, dict)
+        row["mean_daily_spearman_ic"] = value
+    turnover_row = next(
+        row
+        for row in recorded_daily
+        if row["date_idx"] == 794 and row["horizon_minutes"] == 60
     )
-    (tmp_path / "validation_metrics.json").write_text(
-        json.dumps(summary), encoding="utf-8"
+    turnover_row["one_way_turnover"] = 1.1428170594837261
+    _write_recorded_metric_artifacts(
+        tmp_path,
+        recorded_summary,
+        recorded_daily,
+        {793: date(2024, 9, 18), 794: date(2024, 9, 19)},
     )
-    pl.DataFrame(daily_rows).write_parquet(
-        tmp_path / "validation_daily_metrics.parquet"
+
+    recomputed_summary = copy.deepcopy(recorded_summary)
+    recomputed_summary["primary_score"] = 0.04176573994209834
+    recomputed_horizons = recomputed_summary["horizons"]
+    assert isinstance(recomputed_horizons, list)
+    for row, difference in zip(
+        recomputed_horizons,
+        (
+            3.701404472505887e-08,
+            7.025438509417059e-08,
+            2.0935884377515368e-07,
+        ),
+        strict=True,
+    ):
+        assert isinstance(row, dict)
+        row["mean_daily_spearman_ic"] = (
+            float(row["mean_daily_spearman_ic"]) + difference
+        )
+    recomputed_daily = copy.deepcopy(recorded_daily)
+    recomputed_daily[0]["spearman_ic"] = 2.7086860318291384e-05
+    recomputed_daily[1]["rank_target_pearson_ic"] = 9.971929088893605e-06
+    recomputed_turnover = next(
+        row
+        for row in recomputed_daily
+        if row["date_idx"] == 794 and row["horizon_minutes"] == 60
     )
-    result = metric_reproduction_gate(tmp_path, summary, daily_rows)
-    assert result["passed"] is True
-    mutated = dict(summary)
-    mutated["primary_score"] = float(summary["primary_score"]) + 1e-5
-    with pytest.raises(ValueError, match="parity"):
-        metric_reproduction_gate(tmp_path, mutated, daily_rows)
-    assert METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE < 1e-5
+    recomputed_turnover["one_way_turnover"] = 1.1411335578002246
+
+    gate = metric_reproduction_gate(tmp_path, recomputed_summary, recomputed_daily)
+    assert gate["schema_version"] == METRIC_REPRODUCTION_GATE_SCHEMA_VERSION
+    assert gate["passed"] is True
+    assert gate["thresholds"] == metric_reproduction_thresholds()
+    assert gate["primary_ic"]["absolute_difference"] == pytest.approx(
+        8.086639471938106e-08
+    )
+    assert [
+        gate["horizons"][f"{horizon}m"]["absolute_difference"]
+        for horizon in (30, 60, 120)
+    ] == pytest.approx(
+        [
+            3.701404472505887e-08,
+            7.025438509417059e-08,
+            2.0935884377515368e-07,
+        ]
+    )
+    assert gate["daily_metrics"]["spearman_ic"][
+        "maximum_absolute_difference"
+    ] == pytest.approx(2.7086860318291384e-05)
+    assert gate["daily_metrics"]["rank_target_pearson_ic"][
+        "maximum_absolute_difference"
+    ] == pytest.approx(9.971929088893605e-06)
+    turnover = gate["daily_metrics"]["one_way_turnover"]
+    assert turnover["maximum_absolute_difference"] == pytest.approx(
+        0.0016835016835015093
+    )
+    assert turnover["worst_row"] == {
+        "date_idx": 794,
+        "trade_date": "2024-09-19",
+        "horizon_minutes": 60,
+        "recorded": 1.1428170594837261,
+        "recomputed": 1.1411335578002246,
+        "absolute_difference": pytest.approx(0.0016835016835015093),
+    }
+
+
+@pytest.mark.parametrize("location", ("primary", "horizon"))
+def test_metric_reproduction_scalar_ic_boundaries(
+    tmp_path: Path, location: str
+) -> None:
+    recorded_summary, daily_rows = _metric_payloads()
+    _write_recorded_metric_artifacts(tmp_path, recorded_summary, daily_rows)
+    threshold = (
+        METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE
+        if location == "primary"
+        else METRIC_REPRODUCTION_HORIZON_IC_ABSOLUTE_TOLERANCE
+    )
+
+    at_boundary = copy.deepcopy(recorded_summary)
+    if location == "primary":
+        at_boundary["primary_score"] = threshold
+    else:
+        horizons = at_boundary["horizons"]
+        assert isinstance(horizons, list) and isinstance(horizons[0], dict)
+        horizons[0]["mean_daily_spearman_ic"] = threshold
+    assert metric_reproduction_gate(tmp_path, at_boundary, daily_rows)["passed"]
+
+    above_boundary = copy.deepcopy(at_boundary)
+    above = math.nextafter(threshold, math.inf)
+    if location == "primary":
+        above_boundary["primary_score"] = above
+    else:
+        horizons = above_boundary["horizons"]
+        assert isinstance(horizons, list) and isinstance(horizons[0], dict)
+        horizons[0]["mean_daily_spearman_ic"] = above
+    with pytest.raises(ValueError, match="validation metric parity"):
+        metric_reproduction_gate(tmp_path, above_boundary, daily_rows)
+
+
+@pytest.mark.parametrize("metric", ("spearman_ic", "rank_target_pearson_ic"))
+def test_metric_reproduction_daily_ic_boundaries(tmp_path: Path, metric: str) -> None:
+    summary, recorded_daily = _metric_payloads()
+    _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
+    at_boundary = copy.deepcopy(recorded_daily)
+    at_boundary[0][metric] = METRIC_REPRODUCTION_DAILY_IC_ABSOLUTE_TOLERANCE
+    assert metric_reproduction_gate(tmp_path, summary, at_boundary)["passed"]
+    above_boundary = copy.deepcopy(at_boundary)
+    above_boundary[0][metric] = math.nextafter(
+        METRIC_REPRODUCTION_DAILY_IC_ABSOLUTE_TOLERANCE, math.inf
+    )
+    with pytest.raises(ValueError, match="validation metric parity"):
+        metric_reproduction_gate(tmp_path, summary, above_boundary)
+
+
+@pytest.mark.parametrize(
+    "metric",
+    ("top_return", "bottom_return", "top_minus_bottom", "long_only_top"),
+)
+def test_metric_reproduction_economic_return_boundaries(
+    tmp_path: Path, metric: str
+) -> None:
+    summary, recorded_daily = _metric_payloads()
+    _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
+    at_boundary = copy.deepcopy(recorded_daily)
+    at_boundary[0][metric] = METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE
+    assert metric_reproduction_gate(tmp_path, summary, at_boundary)["passed"]
+    above_boundary = copy.deepcopy(at_boundary)
+    above_boundary[0][metric] = math.nextafter(
+        METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE,
+        math.inf,
+    )
+    with pytest.raises(ValueError, match="validation metric parity"):
+        metric_reproduction_gate(tmp_path, summary, above_boundary)
+
+
+def test_metric_reproduction_turnover_boundaries(tmp_path: Path) -> None:
+    summary, recorded_daily = _metric_payloads()
+    _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
+    for accepted in (
+        0.0016835016835015093,
+        METRIC_REPRODUCTION_TURNOVER_ABSOLUTE_TOLERANCE,
+    ):
+        recomputed = copy.deepcopy(recorded_daily)
+        recomputed[0]["one_way_turnover"] += accepted
+        assert metric_reproduction_gate(tmp_path, summary, recomputed)["passed"]
+    recomputed = copy.deepcopy(recorded_daily)
+    recomputed[0]["one_way_turnover"] += math.nextafter(
+        METRIC_REPRODUCTION_TURNOVER_ABSOLUTE_TOLERANCE, math.inf
+    )
+    with pytest.raises(ValueError, match="validation metric parity"):
+        metric_reproduction_gate(tmp_path, summary, recomputed)
+
+
+@pytest.mark.parametrize("metric", ("spearman_ic", "top_return"))
+def test_turnover_allowance_does_not_leak_to_other_metrics(
+    tmp_path: Path, metric: str
+) -> None:
+    summary, recorded_daily = _metric_payloads()
+    _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
+    recomputed = copy.deepcopy(recorded_daily)
+    recomputed[0][metric] = 0.0016835016835015093
+    with pytest.raises(ValueError, match="validation metric parity"):
+        metric_reproduction_gate(tmp_path, summary, recomputed)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "row_count",
+        "row_order",
+        "date_idx",
+        "horizon",
+        "missing_column",
+        "extra_column",
+        "nan_pattern",
+        "infinity",
+    ),
+)
+def test_metric_reproduction_rejects_exact_structure_and_finiteness_mismatches(
+    tmp_path: Path, mutation: str
+) -> None:
+    summary, recorded_daily = _metric_payloads()
+    _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
+    recomputed = copy.deepcopy(recorded_daily)
+    if mutation == "row_count":
+        recomputed.pop()
+    elif mutation == "row_order":
+        recomputed.reverse()
+    elif mutation == "date_idx":
+        recomputed[0]["date_idx"] = 999
+    elif mutation == "horizon":
+        recomputed[0]["horizon_minutes"] = 45
+    elif mutation == "missing_column":
+        for row in recomputed:
+            del row["top_return"]
+    elif mutation == "extra_column":
+        for row in recomputed:
+            row["unexpected_metric"] = 0.0
+    elif mutation == "nan_pattern":
+        recomputed[0]["spearman_ic"] = math.nan
+    elif mutation == "infinity":
+        recomputed[0]["spearman_ic"] = math.inf
+    else:
+        raise AssertionError(mutation)
+    with pytest.raises(ValueError, match="validation metric parity"):
+        metric_reproduction_gate(tmp_path, summary, recomputed)
+
+
+def test_metric_reproduction_allows_only_matching_nan_patterns(
+    tmp_path: Path,
+) -> None:
+    summary, recorded_daily = _metric_payloads()
+    recorded_daily[0]["spearman_ic"] = math.nan
+    _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
+    gate = metric_reproduction_gate(tmp_path, summary, recorded_daily)
+    assert gate["passed"] is True
+    assert json.dumps(gate, allow_nan=False)
+
+
+def test_metric_reproduction_failure_reports_every_failed_comparison(
+    tmp_path: Path,
+) -> None:
+    summary, recorded_daily = _metric_payloads()
+    _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
+    recomputed = copy.deepcopy(recorded_daily)
+    recomputed[0]["spearman_ic"] = 0.001
+    recomputed[1]["top_return"] = 0.002
+    with pytest.raises(ValueError, match="validation metric parity") as exc_info:
+        metric_reproduction_gate(tmp_path, summary, recomputed)
+    details = json.loads(str(exc_info.value).split("\n", 1)[1])
+    failures = {row["metric"]: row for row in details["failures"]}
+    assert set(failures) == {"spearman_ic", "top_return"}
+    for metric, expected in (("spearman_ic", 0.001), ("top_return", 0.002)):
+        failure = failures[metric]
+        assert failure["recorded"] == 0.0
+        assert failure["recomputed"] == expected
+        assert failure["maximum_absolute_difference"] == expected
+        assert failure["difference"] == expected
+        assert failure["threshold"] == METRIC_REPRODUCTION_DAILY_THRESHOLDS[metric]
+        assert failure["passed"] is False
+        assert failure["worst_row"]["date_idx"] == 793
+        assert failure["worst_row"]["trade_date"] == "2024-09-18"
+        assert failure["worst_row"]["horizon_minutes"] in (30, 60)
 
 
 def test_cache_manifest_rejects_nested_identity_hash_shape_and_dtype(
     tmp_path: Path,
 ) -> None:
+    valid_gate = _valid_metric_gate(tmp_path)
     cache = tmp_path / "cache"
     cache.mkdir()
     predictions = np.zeros((2, 3, 1), dtype=np.float32)
@@ -415,6 +729,7 @@ def test_cache_manifest_rejects_nested_identity_hash_shape_and_dtype(
                     .sha256(prediction_path.read_bytes())
                     .hexdigest(),
                 },
+                "metric_reproduction_gate": copy.deepcopy(valid_gate),
             },
         )
 
@@ -565,18 +880,17 @@ def test_inference_failure_is_recorded_without_mutating_inputs_or_writing_cache(
             del args, kwargs
             return evaluation
 
-        def fail_metric_reproduction(*args: object, **kwargs: object) -> None:
-            del args, kwargs
-            raise ValueError(message)
-
         monkeypatch.setattr(
             "brazil_rv.modeling.stock_time_cache.collect_neural_evaluation",
             successful_inference,
         )
-        monkeypatch.setattr(
-            "brazil_rv.modeling.stock_time_cache.metric_reproduction_gate",
-            fail_metric_reproduction,
+        recorded_summary, recorded_daily = _metric_payloads()
+        _write_recorded_metric_artifacts(run_dir, recorded_summary, recorded_daily)
+        evaluation.summary = copy.deepcopy(recorded_summary)
+        evaluation.summary["primary_score"] = (
+            METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE * 2.0
         )
+        evaluation.daily_rows = recorded_daily
     cache_root = tmp_path / "output"
     with pytest.raises(error_type, match=message):
         _adopt_or_infer_caches(
@@ -586,7 +900,8 @@ def test_inference_failure_is_recorded_without_mutating_inputs_or_writing_cache(
             state_path,
         )
     assert state["jobs"][0]["status"] == "failed"
-    assert state["jobs"][0]["error"] == f"{error_type.__name__}: {message}"
+    assert state["jobs"][0]["error"].startswith(f"{error_type.__name__}: ")
+    assert message in state["jobs"][0]["error"]
     persisted = json.loads(state_path.read_text(encoding="utf-8"))
     assert persisted["jobs"][0]["status"] == "failed"
     assert run_marker.read_text(encoding="utf-8") == "run"
@@ -1651,6 +1966,7 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    valid_gate = _valid_metric_gate(tmp_path)
     feature_store = tmp_path / "feature-store"
     feature_store.mkdir()
     targets = np.linspace(-1.0, 1.0, 158 * 3, dtype=np.float32).reshape(1, 158, 3)
@@ -1733,7 +2049,7 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
     )
     monkeypatch.setattr(
         "brazil_rv.modeling.stock_time_cache.metric_reproduction_gate",
-        lambda *args: {"passed": True, "maximum_absolute_difference": 0.0},
+        lambda *args: copy.deepcopy(valid_gate),
     )
     cache_root = tmp_path / "portable-cache"
     core_inputs = inputs_for(tuple(jobs[:3]), "core")
@@ -1767,6 +2083,8 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
     assert first_manifest["creation_provenance"]["analyzer_source_sha256"] == (
         "source-core"
     )
+    assert first_manifest["metric_reproduction_gate"] == valid_gate
+    _validate_metric_reproduction_gate(first_manifest["metric_reproduction_gate"])
 
     full_inputs = inputs_for(tuple(jobs), "reporting-only-change")
     assert _job_cache_identity(core_inputs, jobs[0]) == _job_cache_identity(
@@ -1826,6 +2144,7 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
     for changed_path in (
         "research/src/brazil_rv/modeling/contract.py",
         "research/src/brazil_rv/modeling/engine.py",
+        "research/src/brazil_rv/modeling/stock_time_cache.py",
     ):
         changed_hashes = dict(core_inputs.inference_code_sha256)
         changed_hashes[changed_path] = "changed-code-hash"
@@ -1840,26 +2159,90 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
                 manifest_path,
                 _job_cache_identity(changed_code_inputs, jobs[0]),
             )
-
-    rejected_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    rejected_manifest["metric_reproduction_gate"] = {"passed": False}
-    _atomic_write_json(manifest_path, rejected_manifest)
-    rejected_state = {"status": "running", "jobs": [{"status": "pending"}]}
-    with pytest.raises(ValueError, match="lacks metric parity"):
+    mismatched_hash_state = {
+        "status": "running",
+        "jobs": [{"status": "pending"} for _ in changed_code_inputs.jobs],
+    }
+    with pytest.raises(ValueError, match="identity"):
         _adopt_or_infer_caches(
             cache_root,
-            inputs_for((jobs[0],), "rejected-metric-gate"),
-            rejected_state,
-            tmp_path / "rejected-metric-gate-state.json",
+            changed_code_inputs,
+            mismatched_hash_state,
+            tmp_path / "mismatched-hash-state.json",
         )
+
+    def mutate_gate(manifest: dict[str, object], mutation: str) -> None:
+        gate = manifest["metric_reproduction_gate"]
+        assert isinstance(gate, dict)
+        if mutation == "passed_false":
+            primary = gate["primary_ic"]
+            assert isinstance(primary, dict)
+            primary["recomputed"] = float(primary["recorded"]) + 2e-6
+            primary["absolute_difference"] = 2e-6
+            primary["passed"] = False
+            gate["passed"] = False
+        elif mutation == "missing_version":
+            del gate["schema_version"]
+        elif mutation == "legacy_gate":
+            manifest["metric_reproduction_gate"] = {"passed": True}
+        elif mutation == "missing_metric":
+            daily_metrics = gate["daily_metrics"]
+            assert isinstance(daily_metrics, dict)
+            del daily_metrics["spearman_ic"]
+        elif mutation == "altered_threshold":
+            thresholds = gate["thresholds"]
+            assert isinstance(thresholds, dict)
+            daily_thresholds = thresholds["daily_metric_absolute_tolerances"]
+            assert isinstance(daily_thresholds, dict)
+            daily_thresholds["one_way_turnover"] = 0.01
+            daily_metrics = gate["daily_metrics"]
+            assert isinstance(daily_metrics, dict)
+            turnover = daily_metrics["one_way_turnover"]
+            assert isinstance(turnover, dict)
+            turnover["threshold"] = 0.01
+        elif mutation == "inconsistent_pass":
+            daily_metrics = gate["daily_metrics"]
+            assert isinstance(daily_metrics, dict)
+            spearman = daily_metrics["spearman_ic"]
+            assert isinstance(spearman, dict)
+            spearman["passed"] = False
+        elif mutation == "missing_metric_pass":
+            daily_metrics = gate["daily_metrics"]
+            assert isinstance(daily_metrics, dict)
+            spearman = daily_metrics["spearman_ic"]
+            assert isinstance(spearman, dict)
+            del spearman["passed"]
+        else:
+            raise AssertionError(mutation)
+
+    for mutation in (
+        "passed_false",
+        "missing_version",
+        "legacy_gate",
+        "missing_metric",
+        "altered_threshold",
+        "inconsistent_pass",
+        "missing_metric_pass",
+    ):
+        rejected_manifest = copy.deepcopy(first_manifest)
+        mutate_gate(rejected_manifest, mutation)
+        _atomic_write_json(manifest_path, rejected_manifest)
+        rejected_state = {"status": "running", "jobs": [{"status": "pending"}]}
+        with pytest.raises(
+            ValueError, match="Metric reproduction gate|lacks metric parity"
+        ):
+            _adopt_or_infer_caches(
+                cache_root,
+                inputs_for((jobs[0],), f"rejected-{mutation}"),
+                rejected_state,
+                tmp_path / f"rejected-{mutation}-state.json",
+            )
 
 
 def test_full_synthetic_orchestration_core_full_cache_resume_and_artifacts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import copy
-
     import torch
 
     from brazil_rv.modeling import (
@@ -2136,7 +2519,11 @@ def test_full_synthetic_orchestration_core_full_cache_resume_and_artifacts(
         pl.DataFrame(daily_rows).write_parquet(
             run_dir / "validation_daily_metrics.parquet"
         )
-        metrics_by_position[position] = (summary, daily_rows)
+        recomputed_daily_rows = [
+            {key: value for key, value in row.items() if key != "trade_date"}
+            for row in daily_rows
+        ]
+        metrics_by_position[position] = (summary, recomputed_daily_rows)
 
     stage1_state = tmp_path / "stage1-state.json"
     _atomic_write_json(stage1_state, {"status": "completed"})
@@ -2394,6 +2781,7 @@ def test_full_synthetic_orchestration_core_full_cache_resume_and_artifacts(
         assert isinstance(
             manifest["creation_provenance"]["analyzer_source_sha256"], str
         )
+        _validate_metric_reproduction_gate(manifest["metric_reproduction_gate"])
 
     full_manifest_path = run_analysis(stage3_state_path, full_output, "full-stage3")
     assert full_manifest_path.is_file()
