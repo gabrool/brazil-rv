@@ -42,7 +42,7 @@ from .stage3_context_addition import (
 )
 from .stock_time_cache import (
     INFERENCE_CODE_PATHS,
-    METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE,
+    METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE,
     sha256,
 )
 
@@ -264,7 +264,7 @@ def validate_analysis_inputs(stage3_state_path: Path, scope: str) -> AnalysisInp
             score,
             validated_score,
             rel_tol=0.0,
-            abs_tol=METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE,
+            abs_tol=METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE,
         ):
             raise ValueError(f"Stage-3 score changed: {logical}/{seed}")
         manifest_path = run_dir / "run_manifest.json"

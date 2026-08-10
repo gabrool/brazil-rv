@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -27,7 +29,33 @@ if TYPE_CHECKING:
 
 ANALYSIS_NAME = "stock_time_attribution"
 CACHE_VERSION = 4
-METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE = 1e-12
+METRIC_REPRODUCTION_GATE_SCHEMA_VERSION = 1
+METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE = 1e-6
+METRIC_REPRODUCTION_HORIZON_IC_ABSOLUTE_TOLERANCE = 1e-6
+METRIC_REPRODUCTION_DAILY_IC_ABSOLUTE_TOLERANCE = 1e-4
+METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE = 1e-12
+METRIC_REPRODUCTION_TURNOVER_ABSOLUTE_TOLERANCE = 5e-3
+METRIC_REPRODUCTION_DAILY_THRESHOLDS = MappingProxyType(
+    {
+        "spearman_ic": METRIC_REPRODUCTION_DAILY_IC_ABSOLUTE_TOLERANCE,
+        "rank_target_pearson_ic": (METRIC_REPRODUCTION_DAILY_IC_ABSOLUTE_TOLERANCE),
+        "top_return": METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE,
+        "bottom_return": METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE,
+        "top_minus_bottom": (METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE),
+        "long_only_top": (METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE),
+        "one_way_turnover": METRIC_REPRODUCTION_TURNOVER_ABSOLUTE_TOLERANCE,
+    }
+)
+_DAILY_KEY_COLUMNS = ("date_idx", "horizon_minutes")
+_RECORDED_DAILY_COLUMNS = (
+    "trade_date",
+    *_DAILY_KEY_COLUMNS,
+    *METRIC_REPRODUCTION_DAILY_THRESHOLDS,
+)
+_RECOMPUTED_DAILY_COLUMNS = (
+    *_DAILY_KEY_COLUMNS,
+    *METRIC_REPRODUCTION_DAILY_THRESHOLDS,
+)
 SHARED_ARRAY_NAMES = (
     "sample_id",
     "date_idx",
@@ -70,6 +98,18 @@ def prediction_cache_directory(
 
 def shared_validation_directory(cache_dir: Path) -> Path:
     return cache_dir / "shared_validation"
+
+
+def metric_reproduction_thresholds() -> dict[str, object]:
+    return {
+        "primary_ic_absolute_tolerance": (
+            METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE
+        ),
+        "horizon_mean_daily_spearman_ic_absolute_tolerance": (
+            METRIC_REPRODUCTION_HORIZON_IC_ABSOLUTE_TOLERANCE
+        ),
+        "daily_metric_absolute_tolerances": dict(METRIC_REPRODUCTION_DAILY_THRESHOLDS),
+    }
 
 
 def sha256(path: Path) -> str:
@@ -252,6 +292,7 @@ def validate_cache_manifest(
     _validate_creation_provenance(
         manifest.get("creation_provenance"), "Prediction cache"
     )
+    validate_metric_reproduction_gate(manifest.get("metric_reproduction_gate"))
     prediction = manifest.get("prediction_file")
     if not isinstance(prediction, dict):
         raise ValueError(f"Prediction cache file metadata is missing: {manifest_path}")
@@ -269,80 +310,519 @@ def validate_cache_manifest(
     return prediction_path, manifest
 
 
+def _metric_gate_error(failures: list[dict[str, object]]) -> None:
+    details = {
+        "schema_version": METRIC_REPRODUCTION_GATE_SCHEMA_VERSION,
+        "failures": failures,
+    }
+    raise ValueError(
+        "Fresh inference failed validation metric parity:\n"
+        + json.dumps(details, indent=2, sort_keys=True, allow_nan=False)
+    )
+
+
+def _finite_metric(
+    value: object,
+    location: str,
+    failures: list[dict[str, object]],
+) -> float | None:
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        failures.append(
+            {"check": "finite_metric", "location": location, "value": repr(value)}
+        )
+        return None
+    if not math.isfinite(result):
+        failures.append(
+            {"check": "finite_metric", "location": location, "value": str(result)}
+        )
+        return None
+    return result
+
+
+def _summary_horizons(
+    summary: dict[str, object],
+    location: str,
+    failures: list[dict[str, object]],
+) -> dict[int, dict[str, object]] | None:
+    raw_rows = summary.get("horizons")
+    if not isinstance(raw_rows, list) or any(
+        not isinstance(row, dict) for row in raw_rows
+    ):
+        failures.append({"check": "horizon_schema", "location": location})
+        return None
+    rows = tuple(row for row in raw_rows if isinstance(row, dict))
+    horizon_values = tuple(row.get("horizon_minutes") for row in rows)
+    if any(
+        not isinstance(horizon, int) or isinstance(horizon, bool)
+        for horizon in horizon_values
+    ):
+        failures.append({"check": "horizon_type", "location": location})
+        return None
+    if horizon_values != HORIZONS:
+        failures.append(
+            {
+                "check": "required_horizon_order",
+                "location": location,
+                "expected": list(HORIZONS),
+                "actual": list(horizon_values),
+            }
+        )
+        return None
+    for row in rows:
+        _finite_metric(
+            row.get("mean_daily_spearman_ic"),
+            f"{location}.horizons.{row['horizon_minutes']}",
+            failures,
+        )
+    return {int(row["horizon_minutes"]): row for row in rows}
+
+
+def _daily_structure_failures(
+    recorded: pl.DataFrame,
+    recomputed: pl.DataFrame,
+) -> list[dict[str, object]]:
+    failures: list[dict[str, object]] = []
+    for location, frame, expected_columns in (
+        ("recorded_daily", recorded, _RECORDED_DAILY_COLUMNS),
+        ("recomputed_daily", recomputed, _RECOMPUTED_DAILY_COLUMNS),
+    ):
+        if set(frame.columns) != set(expected_columns):
+            failures.append(
+                {
+                    "check": "required_daily_columns",
+                    "location": location,
+                    "expected": list(expected_columns),
+                    "actual": frame.columns,
+                }
+            )
+    if failures:
+        return failures
+    if recorded.height != recomputed.height or recorded.height == 0:
+        failures.append(
+            {
+                "check": "daily_row_count",
+                "recorded": recorded.height,
+                "recomputed": recomputed.height,
+            }
+        )
+    for location, frame in (
+        ("recorded_daily", recorded),
+        ("recomputed_daily", recomputed),
+    ):
+        key_rows = frame.select(_DAILY_KEY_COLUMNS).rows()
+        if key_rows != frame.sort(_DAILY_KEY_COLUMNS).select(_DAILY_KEY_COLUMNS).rows():
+            failures.append({"check": "daily_row_order", "location": location})
+        if len(key_rows) != len(set(key_rows)):
+            failures.append({"check": "duplicate_daily_key", "location": location})
+        if any(
+            not isinstance(date_index, int)
+            or isinstance(date_index, bool)
+            or not isinstance(horizon, int)
+            or isinstance(horizon, bool)
+            for date_index, horizon in key_rows
+        ):
+            failures.append({"check": "daily_key_type", "location": location})
+        if set(frame.get_column("horizon_minutes").to_list()) != set(HORIZONS):
+            failures.append(
+                {
+                    "check": "required_daily_horizons",
+                    "location": location,
+                    "expected": list(HORIZONS),
+                    "actual": sorted(
+                        str(value)
+                        for value in set(frame.get_column("horizon_minutes").to_list())
+                    ),
+                }
+            )
+    if (
+        recorded.select(_DAILY_KEY_COLUMNS).rows()
+        != recomputed.select(_DAILY_KEY_COLUMNS).rows()
+    ):
+        failures.append(
+            {
+                "check": "daily_key_alignment",
+                "key_columns": list(_DAILY_KEY_COLUMNS),
+            }
+        )
+    if recorded.get_column("trade_date").null_count() != 0:
+        failures.append({"check": "recorded_trade_date_missing"})
+    return failures
+
+
+def _gate_number(value: object, location: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"Metric reproduction gate provenance is invalid: {location}")
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError(f"Metric reproduction gate provenance is invalid: {location}")
+    return result
+
+
+def _validate_gate_comparison(
+    value: object,
+    *,
+    location: str,
+    threshold: float,
+    difference_field: str,
+    extra_fields: set[str] | None = None,
+    with_values: bool = True,
+) -> bool:
+    required = {
+        difference_field,
+        "threshold",
+        "passed",
+        *(extra_fields or set()),
+    }
+    if with_values:
+        required.update(("recorded", "recomputed"))
+    if not isinstance(value, dict) or set(value) != required:
+        raise ValueError(
+            f"Metric reproduction gate provenance is invalid: {location} schema"
+        )
+    difference = _gate_number(value[difference_field], f"{location}.{difference_field}")
+    values_match = True
+    if with_values:
+        recorded = _gate_number(value["recorded"], f"{location}.recorded")
+        recomputed = _gate_number(value["recomputed"], f"{location}.recomputed")
+        values_match = difference == abs(recomputed - recorded)
+    if value["threshold"] != threshold or not values_match:
+        raise ValueError(
+            f"Metric reproduction gate provenance is invalid: {location} values"
+        )
+    expected_pass = difference <= threshold
+    if not isinstance(value["passed"], bool) or value["passed"] is not expected_pass:
+        raise ValueError(
+            f"Metric reproduction gate provenance is invalid: {location} pass status"
+        )
+    return expected_pass
+
+
+def validate_metric_reproduction_gate(value: object) -> dict[str, object]:
+    required = {
+        "schema_version",
+        "passed",
+        "thresholds",
+        "daily_rows",
+        "primary_ic",
+        "horizons",
+        "daily_metrics",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise ValueError("Metric reproduction gate provenance is invalid: schema")
+    try:
+        json.dumps(value, sort_keys=True, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "Metric reproduction gate provenance is invalid: JSON"
+        ) from exc
+    if (
+        not isinstance(value["schema_version"], int)
+        or isinstance(value["schema_version"], bool)
+        or value["schema_version"] != METRIC_REPRODUCTION_GATE_SCHEMA_VERSION
+    ):
+        raise ValueError("Metric reproduction gate provenance is invalid: version")
+    if value["thresholds"] != metric_reproduction_thresholds():
+        raise ValueError("Metric reproduction gate provenance is invalid: thresholds")
+
+    daily_rows = value["daily_rows"]
+    if not isinstance(daily_rows, dict) or set(daily_rows) != {
+        "recorded_count",
+        "recomputed_count",
+        "key_columns",
+        "metric_columns",
+    }:
+        raise ValueError(
+            "Metric reproduction gate provenance is invalid: daily row schema"
+        )
+    recorded_count = daily_rows["recorded_count"]
+    recomputed_count = daily_rows["recomputed_count"]
+    if (
+        not isinstance(recorded_count, int)
+        or isinstance(recorded_count, bool)
+        or recorded_count <= 0
+        or not isinstance(recomputed_count, int)
+        or isinstance(recomputed_count, bool)
+        or recomputed_count != recorded_count
+        or daily_rows["key_columns"] != list(_DAILY_KEY_COLUMNS)
+        or daily_rows["metric_columns"] != list(METRIC_REPRODUCTION_DAILY_THRESHOLDS)
+    ):
+        raise ValueError(
+            "Metric reproduction gate provenance is invalid: daily row metadata"
+        )
+
+    passes = [
+        _validate_gate_comparison(
+            value["primary_ic"],
+            location="primary_ic",
+            threshold=METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE,
+            difference_field="absolute_difference",
+        )
+    ]
+    horizons = value["horizons"]
+    expected_horizon_keys = {f"{horizon}m" for horizon in HORIZONS}
+    if not isinstance(horizons, dict) or set(horizons) != expected_horizon_keys:
+        raise ValueError(
+            "Metric reproduction gate provenance is invalid: horizon schema"
+        )
+    for horizon in HORIZONS:
+        key = f"{horizon}m"
+        row = horizons[key]
+        passed = _validate_gate_comparison(
+            row,
+            location=f"horizons.{key}",
+            threshold=METRIC_REPRODUCTION_HORIZON_IC_ABSOLUTE_TOLERANCE,
+            difference_field="absolute_difference",
+            extra_fields={"horizon_minutes"},
+        )
+        if not isinstance(row, dict) or row["horizon_minutes"] != horizon:
+            raise ValueError(
+                f"Metric reproduction gate provenance is invalid: horizons.{key}"
+            )
+        passes.append(passed)
+
+    daily_metrics = value["daily_metrics"]
+    if not isinstance(daily_metrics, dict) or set(daily_metrics) != set(
+        METRIC_REPRODUCTION_DAILY_THRESHOLDS
+    ):
+        raise ValueError(
+            "Metric reproduction gate provenance is invalid: daily metric schema"
+        )
+    for metric, threshold in METRIC_REPRODUCTION_DAILY_THRESHOLDS.items():
+        row = daily_metrics[metric]
+        passed = _validate_gate_comparison(
+            row,
+            location=f"daily_metrics.{metric}",
+            threshold=threshold,
+            difference_field="maximum_absolute_difference",
+            extra_fields={"worst_row"},
+            with_values=False,
+        )
+        if not isinstance(row, dict):
+            raise ValueError(
+                f"Metric reproduction gate provenance is invalid: {metric}"
+            )
+        worst = row["worst_row"]
+        if not isinstance(worst, dict) or set(worst) != {
+            "date_idx",
+            "trade_date",
+            "horizon_minutes",
+            "recorded",
+            "recomputed",
+            "absolute_difference",
+        }:
+            raise ValueError(
+                f"Metric reproduction gate provenance is invalid: {metric} worst row"
+            )
+        date_index = worst["date_idx"]
+        horizon = worst["horizon_minutes"]
+        trade_date = worst["trade_date"]
+        if (
+            not isinstance(date_index, int)
+            or isinstance(date_index, bool)
+            or not isinstance(trade_date, str)
+            or not isinstance(horizon, int)
+            or isinstance(horizon, bool)
+            or horizon not in HORIZONS
+        ):
+            raise ValueError(
+                f"Metric reproduction gate provenance is invalid: {metric} worst key"
+            )
+        try:
+            date.fromisoformat(trade_date)
+        except ValueError as exc:
+            raise ValueError(
+                f"Metric reproduction gate provenance is invalid: {metric} worst date"
+            ) from exc
+        worst_recorded = _gate_number(
+            worst["recorded"], f"daily_metrics.{metric}.worst_row.recorded"
+        )
+        worst_recomputed = _gate_number(
+            worst["recomputed"], f"daily_metrics.{metric}.worst_row.recomputed"
+        )
+        worst_difference = _gate_number(
+            worst["absolute_difference"],
+            f"daily_metrics.{metric}.worst_row.absolute_difference",
+        )
+        if (
+            worst_difference != abs(worst_recomputed - worst_recorded)
+            or worst_difference != row["maximum_absolute_difference"]
+        ):
+            raise ValueError(
+                f"Metric reproduction gate provenance is invalid: {metric} worst row"
+            )
+        passes.append(passed)
+
+    expected_pass = all(passes)
+    if not isinstance(value["passed"], bool) or value["passed"] is not expected_pass:
+        raise ValueError(
+            "Metric reproduction gate provenance is invalid: overall pass status"
+        )
+    if value["passed"] is not True:
+        raise ValueError("Prediction cache lacks metric parity")
+    return value
+
+
 def metric_reproduction_gate(
     run_dir: Path,
     recomputed_summary: dict[str, object],
     recomputed_daily_rows: list[dict[str, object]],
-    *,
-    tolerance: float = METRIC_REPRODUCTION_ABSOLUTE_TOLERANCE,
 ) -> dict[str, object]:
     recorded = json.loads(
         (run_dir / "validation_metrics.json").read_text(encoding="utf-8")
     )
-    recorded_primary = float(recorded["primary_score"])
-    recomputed_primary = float(recomputed_summary["primary_score"])
+    failures: list[dict[str, object]] = []
+    if not isinstance(recorded, dict):
+        _metric_gate_error([{"check": "recorded_summary_schema"}])
+    recorded_primary = _finite_metric(
+        recorded.get("primary_score"), "recorded.primary_score", failures
+    )
+    recomputed_primary = _finite_metric(
+        recomputed_summary.get("primary_score"),
+        "recomputed.primary_score",
+        failures,
+    )
+    recorded_horizons = _summary_horizons(recorded, "recorded", failures)
+    recomputed_horizons = _summary_horizons(recomputed_summary, "recomputed", failures)
+    if failures:
+        _metric_gate_error(failures)
+    assert recorded_primary is not None
+    assert recomputed_primary is not None
+    assert recorded_horizons is not None
+    assert recomputed_horizons is not None
     primary_difference = abs(recomputed_primary - recorded_primary)
-    recorded_horizons = {
-        int(row["horizon_minutes"]): row for row in recorded["horizons"]
+    primary_result = {
+        "recorded": recorded_primary,
+        "recomputed": recomputed_primary,
+        "absolute_difference": primary_difference,
+        "threshold": METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE,
+        "passed": (
+            primary_difference <= METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE
+        ),
     }
-    recomputed_horizons = {
-        int(row["horizon_minutes"]): row for row in recomputed_summary["horizons"]
-    }
-    if recorded_horizons.keys() != recomputed_horizons.keys():
-        raise ValueError("Recorded and recomputed metric horizons differ")
-    horizon_differences = {
-        f"{horizon}m": abs(
-            float(recomputed_horizons[horizon]["mean_daily_spearman_ic"])
-            - float(recorded_horizons[horizon]["mean_daily_spearman_ic"])
+    horizon_results: dict[str, object] = {}
+    for horizon in HORIZONS:
+        recorded_value = float(recorded_horizons[horizon]["mean_daily_spearman_ic"])
+        recomputed_value = float(recomputed_horizons[horizon]["mean_daily_spearman_ic"])
+        difference = abs(recomputed_value - recorded_value)
+        horizon_results[f"{horizon}m"] = {
+            "horizon_minutes": horizon,
+            "recorded": recorded_value,
+            "recomputed": recomputed_value,
+            "absolute_difference": difference,
+            "threshold": METRIC_REPRODUCTION_HORIZON_IC_ABSOLUTE_TOLERANCE,
+            "passed": (difference <= METRIC_REPRODUCTION_HORIZON_IC_ABSOLUTE_TOLERANCE),
+        }
+
+    recomputed_daily = pl.DataFrame(recomputed_daily_rows)
+    recorded_daily = pl.read_parquet(run_dir / "validation_daily_metrics.parquet")
+    structure_failures = _daily_structure_failures(recorded_daily, recomputed_daily)
+    if structure_failures:
+        _metric_gate_error(structure_failures)
+
+    daily_arrays: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    failures = []
+    for column in METRIC_REPRODUCTION_DAILY_THRESHOLDS:
+        if (
+            recorded_daily.get_column(column).null_count() != 0
+            or recomputed_daily.get_column(column).null_count() != 0
+        ):
+            failures.append({"check": "daily_metric_null", "metric": column})
+            continue
+        try:
+            recorded_values = np.asarray(
+                recorded_daily.get_column(column).to_list(), dtype=np.float64
+            )
+            recomputed_values = np.asarray(
+                recomputed_daily.get_column(column).to_list(), dtype=np.float64
+            )
+        except (TypeError, ValueError):
+            failures.append({"check": "daily_metric_type", "metric": column})
+            continue
+        if np.isinf(recorded_values).any() or np.isinf(recomputed_values).any():
+            failures.append({"check": "daily_metric_infinity", "metric": column})
+            continue
+        if not np.array_equal(np.isnan(recorded_values), np.isnan(recomputed_values)):
+            failures.append({"check": "daily_metric_nan_pattern", "metric": column})
+            continue
+        if not np.isfinite(recorded_values).any():
+            failures.append(
+                {"check": "daily_metric_has_no_finite_value", "metric": column}
+            )
+            continue
+        daily_arrays[column] = (recorded_values, recomputed_values)
+    if failures:
+        _metric_gate_error(failures)
+
+    daily_results: dict[str, object] = {}
+    trade_dates = recorded_daily.get_column("trade_date").to_list()
+    date_indices = recorded_daily.get_column("date_idx").to_list()
+    horizon_minutes = recorded_daily.get_column("horizon_minutes").to_list()
+    for column, threshold in METRIC_REPRODUCTION_DAILY_THRESHOLDS.items():
+        recorded_values, recomputed_values = daily_arrays[column]
+        finite = np.isfinite(recorded_values)
+        differences = np.abs(recomputed_values - recorded_values)
+        finite_positions = np.flatnonzero(finite)
+        worst_position = int(finite_positions[np.argmax(differences[finite_positions])])
+        maximum_difference = float(differences[worst_position])
+        trade_date = trade_dates[worst_position]
+        trade_date_text = (
+            trade_date.isoformat()
+            if hasattr(trade_date, "isoformat")
+            else str(trade_date)
         )
-        for horizon in recorded_horizons
-    }
-    recomputed_daily = pl.DataFrame(recomputed_daily_rows).sort(
-        "date_idx", "horizon_minutes"
-    )
-    recorded_daily = pl.read_parquet(run_dir / "validation_daily_metrics.parquet").sort(
-        "date_idx", "horizon_minutes"
-    )
-    if not np.array_equal(
-        recomputed_daily.select("date_idx", "horizon_minutes").to_numpy(),
-        recorded_daily.select("date_idx", "horizon_minutes").to_numpy(),
-    ):
-        raise ValueError("Recorded and recomputed daily metric rows are misaligned")
-    daily_differences: dict[str, float] = {}
-    for column in (
-        "spearman_ic",
-        "rank_target_pearson_ic",
-        "top_return",
-        "bottom_return",
-        "top_minus_bottom",
-        "long_only_top",
-        "one_way_turnover",
-    ):
-        left = recomputed_daily.get_column(column).to_numpy()
-        right = recorded_daily.get_column(column).to_numpy()
-        if not np.array_equal(np.isnan(left), np.isnan(right)):
-            raise ValueError(f"Daily metric finiteness changed: {column}")
-        finite = np.isfinite(left) & np.isfinite(right)
-        daily_differences[column] = (
-            float(np.max(np.abs(left[finite] - right[finite]))) if finite.any() else 0.0
-        )
-    maximum_difference = max(
-        [primary_difference, *horizon_differences.values(), *daily_differences.values()]
-    )
-    if maximum_difference > tolerance:
-        raise ValueError(
-            f"Fresh inference failed validation metric parity: {maximum_difference}"
-        )
-    return {
-        "recomputed_primary_ic": recomputed_primary,
-        "recorded_primary_ic": recorded_primary,
-        "absolute_primary_difference": primary_difference,
-        "horizon_absolute_differences": horizon_differences,
-        "daily_metric_maximum_absolute_differences": daily_differences,
-        "maximum_absolute_difference": maximum_difference,
-        "absolute_tolerance": tolerance,
+        daily_results[column] = {
+            "maximum_absolute_difference": maximum_difference,
+            "threshold": threshold,
+            "passed": maximum_difference <= threshold,
+            "worst_row": {
+                "date_idx": int(date_indices[worst_position]),
+                "trade_date": trade_date_text,
+                "horizon_minutes": int(horizon_minutes[worst_position]),
+                "recorded": float(recorded_values[worst_position]),
+                "recomputed": float(recomputed_values[worst_position]),
+                "absolute_difference": maximum_difference,
+            },
+        }
+
+    failed_comparisons: list[dict[str, object]] = []
+    if primary_result["passed"] is not True:
+        failed_comparisons.append({"metric": "primary_ic", **primary_result})
+    for key, result in horizon_results.items():
+        if isinstance(result, dict) and result["passed"] is not True:
+            failed_comparisons.append({"metric": key, **result})
+    for metric, result in daily_results.items():
+        if isinstance(result, dict) and result["passed"] is not True:
+            worst_row = result["worst_row"]
+            assert isinstance(worst_row, dict)
+            failed_comparisons.append(
+                {
+                    "metric": metric,
+                    "recorded": worst_row["recorded"],
+                    "recomputed": worst_row["recomputed"],
+                    "difference": result["maximum_absolute_difference"],
+                    **result,
+                }
+            )
+    if failed_comparisons:
+        _metric_gate_error(failed_comparisons)
+
+    gate = {
+        "schema_version": METRIC_REPRODUCTION_GATE_SCHEMA_VERSION,
         "passed": True,
+        "thresholds": metric_reproduction_thresholds(),
+        "daily_rows": {
+            "recorded_count": recorded_daily.height,
+            "recomputed_count": recomputed_daily.height,
+            "key_columns": list(_DAILY_KEY_COLUMNS),
+            "metric_columns": list(METRIC_REPRODUCTION_DAILY_THRESHOLDS),
+        },
+        "primary_ic": primary_result,
+        "horizons": horizon_results,
+        "daily_metrics": daily_results,
     }
+    return validate_metric_reproduction_gate(gate)
 
 
 def validate_observation_alignment(
@@ -477,6 +957,7 @@ def _write_prediction_cache(
     shared_manifest_path: Path,
     production_lock: ProcessLockLease | None = None,
 ) -> Path:
+    validate_metric_reproduction_gate(metric_gate)
     job_cache_dir = cache_directory(cache_root, job)
     manifest_path = job_cache_dir / "manifest.json"
     if manifest_path.exists() or (
@@ -558,11 +1039,6 @@ def adopt_or_infer_caches(
             ):
                 raise ValueError(
                     f"Prediction cache shared provenance is invalid: {manifest_path}"
-                )
-            gate = manifest.get("metric_reproduction_gate")
-            if not isinstance(gate, dict) or gate.get("passed") is not True:
-                raise ValueError(
-                    f"Prediction cache lacks metric parity: {manifest_path}"
                 )
             state_job.update(
                 {
