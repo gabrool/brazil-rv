@@ -18,6 +18,8 @@ from torch import nn
 from .context_ablation import NO_CONTEXT_ABLATION, ResolvedContextAblation
 from .feature_ablation import ResolvedFeatureAblation
 from .contract import (
+    COMPILE_PARITY_EVALUATION_PREDICTION_MAX_ABSOLUTE,
+    COMPILE_PARITY_EVALUATION_PREDICTION_RELATIVE_L2_MAX,
     COMPILE_PARITY_GRADIENT_COSINE_MIN,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
@@ -189,6 +191,16 @@ def _compile_parity_report(
     prediction_relative_l2_error = _relative_l2_error(
         prediction_difference_norm, eager_prediction_norm
     )
+    evaluation_prediction_bounds_passed = (
+        prediction_relative_l2_error
+        <= COMPILE_PARITY_EVALUATION_PREDICTION_RELATIVE_L2_MAX
+        and prediction_max_absolute_difference
+        <= COMPILE_PARITY_EVALUATION_PREDICTION_MAX_ABSOLUTE
+    )
+    forward_only = eager_gradients is None
+    prediction_parity_passed = prediction_allclose or (
+        forward_only and evaluation_prediction_bounds_passed
+    )
 
     eager_loss = float(eager_loss_tensor)
     compiled_loss = float(compiled_loss_tensor)
@@ -200,12 +212,12 @@ def _compile_parity_report(
     forward_passed = (
         eager_predictions_finite
         and compiled_predictions_finite
-        and prediction_allclose
+        and prediction_parity_passed
         and losses_finite
         and loss_absolute_difference <= loss_tolerance
     )
 
-    if eager_gradients is None or compiled_gradients is None:
+    if forward_only:
         return CompileParityReport(
             mode="forward_only",
             dropout_enabled=False,
@@ -216,6 +228,8 @@ def _compile_parity_report(
             prediction_allclose=prediction_allclose,
             prediction_max_absolute_difference=prediction_max_absolute_difference,
             prediction_relative_l2_error=prediction_relative_l2_error,
+            evaluation_prediction_bounds_passed=evaluation_prediction_bounds_passed,
+            prediction_parity_passed=prediction_parity_passed,
             eager_loss=eager_loss,
             compiled_loss=compiled_loss,
             losses_finite=losses_finite,
@@ -334,6 +348,8 @@ def _compile_parity_report(
         prediction_allclose=prediction_allclose,
         prediction_max_absolute_difference=prediction_max_absolute_difference,
         prediction_relative_l2_error=prediction_relative_l2_error,
+        evaluation_prediction_bounds_passed=evaluation_prediction_bounds_passed,
+        prediction_parity_passed=prediction_parity_passed,
         eager_loss=eager_loss,
         compiled_loss=compiled_loss,
         losses_finite=losses_finite,

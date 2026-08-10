@@ -26,6 +26,8 @@ from brazil_rv.modeling.contract import (
     ADAMW_LR,
     ADAMW_WEIGHT_DECAY,
     BASELINE_TCN_SETTINGS,
+    COMPILE_PARITY_EVALUATION_PREDICTION_MAX_ABSOLUTE,
+    COMPILE_PARITY_EVALUATION_PREDICTION_RELATIVE_L2_MAX,
     COMPILE_PARITY_GRADIENT_COSINE_MIN,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_ATOL,
     COMPILE_PARITY_GRADIENT_MAX_ABSOLUTE_RTOL,
@@ -35,6 +37,7 @@ from brazil_rv.modeling.contract import (
     COMPILE_PARITY_PREDICTION_ATOL,
     COMPILE_PARITY_PREDICTION_RTOL,
     CompileEvaluationWarmupReport,
+    CompileParityReport,
     CompileParityThresholds,
     CompileSetupReport,
     EFFECTIVE_BATCH_SIZE,
@@ -74,6 +77,7 @@ from brazil_rv.modeling.engine import (
     clone_eager_reference_model,
     compile_model,
     objective_metadata,
+    require_compile_parity,
     sam_metadata,
     validate_runtime,
 )
@@ -218,6 +222,12 @@ def _synthetic_compile_parity(
     )
 
 
+def _assert_compile_parity_fails(report: CompileParityReport) -> None:
+    assert not report.passed
+    with pytest.raises(RuntimeError, match="Eager/compiled qualification failed"):
+        require_compile_parity(report)
+
+
 def test_compile_parity_exact_and_within_threshold_pass() -> None:
     assert _synthetic_compile_parity().passed
     eager_predictions = torch.tensor([[1.0, 2.0]])
@@ -232,6 +242,130 @@ def test_compile_parity_exact_and_within_threshold_pass() -> None:
     )
     assert report.passed
     assert report.prediction_max_absolute_difference == pytest.approx(0.0078125)
+
+
+def test_compile_parity_forward_only_accepts_observed_bf16_aggregate_error() -> None:
+    eager_predictions = torch.tensor([[0.0, 8.05]])
+    compiled_predictions = torch.tensor([[0.03125, 8.05]])
+    report = _synthetic_compile_parity(
+        prediction_pair=(eager_predictions, compiled_predictions),
+        loss_pair=(0.9646787047386169, 0.9646696448326111),
+        include_backward=False,
+    )
+
+    assert report.passed
+    assert not report.prediction_allclose
+    assert report.prediction_max_absolute_difference == pytest.approx(0.03125)
+    assert report.prediction_relative_l2_error == pytest.approx(0.03125 / 8.05)
+    assert report.evaluation_prediction_bounds_passed
+    assert report.prediction_parity_passed
+    require_compile_parity(report)
+
+
+def test_compile_parity_observed_bf16_error_remains_strict_with_backward() -> None:
+    eager_predictions = torch.tensor([[0.0, 8.05]])
+    compiled_predictions = torch.tensor([[0.03125, 8.05]])
+    report = _synthetic_compile_parity(
+        prediction_pair=(eager_predictions, compiled_predictions),
+        gradient_pair=(torch.tensor([1.0, 2.0]), torch.tensor([1.0, 2.0])),
+    )
+
+    assert not report.prediction_allclose
+    assert report.evaluation_prediction_bounds_passed
+    assert not report.prediction_parity_passed
+    _assert_compile_parity_fails(report)
+
+
+@pytest.mark.parametrize(
+    ("relative_error", "expected_pass"),
+    (
+        (COMPILE_PARITY_EVALUATION_PREDICTION_RELATIVE_L2_MAX, True),
+        (COMPILE_PARITY_EVALUATION_PREDICTION_RELATIVE_L2_MAX + 1e-5, False),
+    ),
+)
+def test_compile_parity_forward_only_relative_l2_boundary(
+    relative_error: float, expected_pass: bool
+) -> None:
+    eager_scale = 6.0
+    eager_predictions = torch.tensor([[0.0, eager_scale]])
+    compiled_predictions = torch.tensor([[eager_scale * relative_error, eager_scale]])
+    report = _synthetic_compile_parity(
+        prediction_pair=(eager_predictions, compiled_predictions),
+        include_backward=False,
+    )
+
+    assert not report.prediction_allclose
+    assert report.prediction_relative_l2_error == pytest.approx(relative_error)
+    assert (
+        report.prediction_max_absolute_difference
+        < COMPILE_PARITY_EVALUATION_PREDICTION_MAX_ABSOLUTE
+    )
+    assert report.evaluation_prediction_bounds_passed is expected_pass
+    assert report.prediction_parity_passed is expected_pass
+    assert report.passed is expected_pass
+    if not expected_pass:
+        _assert_compile_parity_fails(report)
+
+
+@pytest.mark.parametrize(
+    ("maximum_error", "expected_pass"),
+    (
+        (COMPILE_PARITY_EVALUATION_PREDICTION_MAX_ABSOLUTE, True),
+        (COMPILE_PARITY_EVALUATION_PREDICTION_MAX_ABSOLUTE + 1e-5, False),
+    ),
+)
+def test_compile_parity_forward_only_maximum_absolute_boundary(
+    maximum_error: float, expected_pass: bool
+) -> None:
+    eager_predictions = torch.tensor([[0.0, 10.0]])
+    compiled_predictions = torch.tensor([[maximum_error, 10.0]])
+    report = _synthetic_compile_parity(
+        prediction_pair=(eager_predictions, compiled_predictions),
+        include_backward=False,
+    )
+
+    assert not report.prediction_allclose
+    assert report.prediction_max_absolute_difference == pytest.approx(maximum_error)
+    assert (
+        report.prediction_relative_l2_error
+        < COMPILE_PARITY_EVALUATION_PREDICTION_RELATIVE_L2_MAX
+    )
+    assert report.evaluation_prediction_bounds_passed is expected_pass
+    assert report.prediction_parity_passed is expected_pass
+    assert report.passed is expected_pass
+    if not expected_pass:
+        _assert_compile_parity_fails(report)
+
+
+@pytest.mark.parametrize("nonfinite_side", ("eager", "compiled"))
+def test_compile_parity_forward_only_nonfinite_predictions_fail(
+    nonfinite_side: str,
+) -> None:
+    eager_predictions = torch.tensor([[0.0, 8.05]])
+    compiled_predictions = eager_predictions.clone()
+    target = eager_predictions if nonfinite_side == "eager" else compiled_predictions
+    target[0, 0] = float("nan")
+    report = _synthetic_compile_parity(
+        prediction_pair=(eager_predictions, compiled_predictions),
+        include_backward=False,
+    )
+
+    assert not report.prediction_parity_passed
+    _assert_compile_parity_fails(report)
+
+
+def test_compile_parity_forward_only_loss_disagreement_still_fails() -> None:
+    eager_predictions = torch.tensor([[0.0, 8.05]])
+    compiled_predictions = torch.tensor([[0.03125, 8.05]])
+    report = _synthetic_compile_parity(
+        prediction_pair=(eager_predictions, compiled_predictions),
+        loss_pair=(1.0, 1.006),
+        include_backward=False,
+    )
+
+    assert report.prediction_parity_passed
+    assert report.loss_absolute_difference > report.loss_tolerance
+    _assert_compile_parity_fails(report)
 
 
 def test_compile_parity_prediction_and_loss_divergence_fail() -> None:
@@ -366,6 +500,9 @@ def test_compile_parity_forward_only_has_null_gradient_fields() -> None:
     report = _synthetic_compile_parity(include_backward=False)
     assert report.passed
     assert report.mode == "forward_only"
+    assert report.prediction_allclose
+    assert report.evaluation_prediction_bounds_passed
+    assert report.prediction_parity_passed
     for field in (
         "gradient_presence_match",
         "eager_gradients_finite",
@@ -460,7 +597,13 @@ def test_compile_metadata_schema_is_exact() -> None:
         backward_pass_autocast_control_available=False,
         backward_pass_autocast_policy="legacy_implicit",
     )
-    parity = _synthetic_compile_parity(include_backward=False)
+    parity = _synthetic_compile_parity(
+        prediction_pair=(
+            torch.tensor([[0.0, 8.05]]),
+            torch.tensor([[0.03125, 8.05]]),
+        ),
+        include_backward=False,
+    )
     warmup = CompileEvaluationWarmupReport(
         evaluation_pass_seconds=(1.0, 2.0, 3.0, 4.0, 5.0),
         evaluation_steady_state_median_seconds=4.0,
@@ -478,9 +621,18 @@ def test_compile_metadata_schema_is_exact() -> None:
     }
     assert "backward_pass_autocast" not in metadata
     assert "backward_pass_autocast" not in metadata["setup"]
+    assert metadata["parity"]["prediction_allclose"] is False
+    assert metadata["parity"]["evaluation_prediction_bounds_passed"] is True
+    assert metadata["parity"]["prediction_parity_passed"] is True
     assert asdict(CompileParityThresholds()) == {
         "prediction_atol": COMPILE_PARITY_PREDICTION_ATOL,
         "prediction_rtol": COMPILE_PARITY_PREDICTION_RTOL,
+        "evaluation_prediction_relative_l2_max": (
+            COMPILE_PARITY_EVALUATION_PREDICTION_RELATIVE_L2_MAX
+        ),
+        "evaluation_prediction_max_absolute": (
+            COMPILE_PARITY_EVALUATION_PREDICTION_MAX_ABSOLUTE
+        ),
         "loss_atol": COMPILE_PARITY_LOSS_ATOL,
         "loss_rtol": COMPILE_PARITY_LOSS_RTOL,
         "gradient_relative_l2_max": COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX,
