@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -1810,6 +1811,7 @@ def test_full_synthetic_orchestration_core_full_cache_resume_and_artifacts(
         VALIDATION_END,
         VALIDATION_START,
     )
+    from brazil_rv.modeling.contract import TCNSettings, architecture_for_model
     from brazil_rv.modeling.evaluate import _CHECKPOINT_IDENTITY_FIELDS
 
     analyzer = __import__(
@@ -1993,9 +1995,15 @@ def test_full_synthetic_orchestration_core_full_cache_resume_and_artifacts(
     ) -> None:
         run_dir.mkdir(parents=True, exist_ok=True)
         identity = configuration["feature_store"]
+        training_semantics = copy.deepcopy(configuration["training_semantics"])
         assert isinstance(identity, dict)
+        assert isinstance(training_semantics, dict)
+        tcn_settings = training_semantics["tcn_settings"]
+        assert isinstance(tcn_settings, dict)
+        architecture = architecture_for_model("tcn", TCNSettings(**tcn_settings))
+        training_semantics["architecture_constants"] = asdict(architecture)
         manifest = {
-            **copy.deepcopy(configuration["training_semantics"]),
+            **training_semantics,
             "status": "completed",
             "seed": seed,
             "git_commit_sha": commit,
@@ -2016,12 +2024,12 @@ def test_full_synthetic_orchestration_core_full_cache_resume_and_artifacts(
             "scheduler_steps": {"steps_per_epoch": 77},
             "synthetic_index": position,
         }
-        _atomic_write_json(run_dir / "run_manifest.json", manifest)
         checkpoint = {
             field: copy.deepcopy(manifest[field])
             for field in _CHECKPOINT_IDENTITY_FIELDS
         }
         checkpoint["context_ablation"] = copy.deepcopy(manifest["context_ablation"])
+        _atomic_write_json(run_dir / "run_manifest.json", manifest)
         torch.save(checkpoint, run_dir / "best.pt")
         pl.DataFrame(
             {
@@ -2279,6 +2287,18 @@ def test_full_synthetic_orchestration_core_full_cache_resume_and_artifacts(
     ]
     immutable_inputs.extend([stage1_state, source_stage2_state, stage3_state_path])
     before_inputs = {path: analyzer._sha256(path) for path in immutable_inputs}
+
+    first_run_dir = Path(str(stage3_state["jobs"][0]["run_dir"]))
+    persisted_manifest = json.loads(
+        (first_run_dir / "run_manifest.json").read_text(encoding="utf-8")
+    )
+    persisted_checkpoint = torch.load(
+        first_run_dir / "best.pt", map_location="cpu", weights_only=False
+    )
+    assert isinstance(persisted_manifest["architecture_constants"]["dilations"], list)
+    assert isinstance(
+        persisted_checkpoint["architecture_constants"]["dilations"], tuple
+    )
 
     core_output = tmp_path / "core-output"
     full_output = tmp_path / "full-output"

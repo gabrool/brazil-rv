@@ -824,6 +824,74 @@ def _matching_run_identity(
     }
 
 
+def _json_round_tripped_tcn_identity(
+    tmp_path: Path,
+) -> tuple[dict[str, object], dict[str, object], Path]:
+    feature_store = (tmp_path / "feature-store").resolve()
+    checkpoint = _matching_run_identity(feature_store)
+    manifest_path = tmp_path / "run_manifest.json"
+    _atomic_write_json(manifest_path, checkpoint)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return manifest, checkpoint, feature_store
+
+
+def test_evaluation_identity_accepts_production_json_tuple_normalization(
+    tmp_path: Path,
+) -> None:
+    manifest, checkpoint, feature_store = _json_round_tripped_tcn_identity(tmp_path)
+    assert isinstance(checkpoint["architecture_constants"], dict)
+    assert isinstance(manifest["architecture_constants"], dict)
+    assert isinstance(checkpoint["architecture_constants"]["dilations"], tuple)
+    assert isinstance(manifest["architecture_constants"]["dilations"], list)
+
+    _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+
+@pytest.mark.parametrize("change", ("value", "sequence_order"))
+def test_evaluation_identity_json_normalization_remains_strict(
+    change: str, tmp_path: Path
+) -> None:
+    manifest, checkpoint, feature_store = _json_round_tripped_tcn_identity(tmp_path)
+    constants = checkpoint["architecture_constants"]
+    assert isinstance(constants, dict)
+    if change == "value":
+        constants["kernel_size"] = int(constants["kernel_size"]) + 1
+    else:
+        dilations = constants["dilations"]
+        assert isinstance(dilations, tuple)
+        constants["dilations"] = tuple(reversed(dilations))
+
+    with pytest.raises(ValueError, match="architecture_constants"):
+        _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+
+@pytest.mark.parametrize("missing_from", ("manifest", "checkpoint"))
+def test_evaluation_identity_json_normalization_does_not_hide_missing_fields(
+    missing_from: str, tmp_path: Path
+) -> None:
+    manifest, checkpoint, feature_store = _json_round_tripped_tcn_identity(tmp_path)
+    identity = manifest if missing_from == "manifest" else checkpoint
+    del identity["architecture_constants"]
+
+    with pytest.raises(
+        ValueError,
+        match="Missing run/checkpoint identity field: architecture_constants",
+    ):
+        _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+
+def test_evaluation_identity_json_normalization_rejects_non_finite_numbers(
+    tmp_path: Path,
+) -> None:
+    manifest = _matching_run_identity(tmp_path.resolve())
+    checkpoint = copy.deepcopy(manifest)
+    manifest["parameter_count"] = float("nan")
+    checkpoint["parameter_count"] = float("nan")
+
+    with pytest.raises(ValueError, match="not JSON-compatible: parameter_count"):
+        _validate_run_checkpoint_identity(manifest, checkpoint, tmp_path.resolve())
+
+
 @pytest.mark.parametrize("model_name", NEURAL_MODELS)
 def test_evaluation_identity_accepts_every_model_architecture(
     model_name: str,

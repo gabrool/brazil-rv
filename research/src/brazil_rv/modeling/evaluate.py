@@ -84,6 +84,25 @@ _EXPLICIT_ABLATION_IDENTITY = "explicit_registry_metadata"
 _LEGACY_ABLATION_IDENTITY = "legacy_implicit_none"
 
 
+def _canonical_json_identity(value: object) -> str:
+    def validate(item: object) -> None:
+        if isinstance(item, dict):
+            if any(not isinstance(key, str) for key in item):
+                raise TypeError("JSON identity object keys must be strings")
+            for nested in item.values():
+                validate(nested)
+            return
+        if isinstance(item, (list, tuple)):
+            for nested in item:
+                validate(nested)
+            return
+        if item is not None and not isinstance(item, (str, int, float, bool)):
+            raise TypeError("Identity metadata is not JSON-compatible")
+
+    validate(value)
+    return json.dumps(value, allow_nan=False, sort_keys=True, separators=(",", ":"))
+
+
 @dataclass(frozen=True)
 class ContextAblationIdentity:
     metadata: dict[str, object]
@@ -287,8 +306,8 @@ def _architecture_from_identity(
 def _validate_architecture_identity(identity: dict[str, object]) -> None:
     model_name = str(identity["model_name"])
     architecture = _architecture_from_identity(identity)
-    expected = json.loads(json.dumps(asdict(architecture)))
-    recorded = json.loads(json.dumps(identity["architecture_constants"]))
+    expected = _canonical_json_identity(asdict(architecture))
+    recorded = _canonical_json_identity(identity["architecture_constants"])
     if recorded != expected:
         raise ValueError(f"Invalid architecture metadata for model: {model_name}")
     expected_parameter_count = expected_trainable_parameter_count(
@@ -363,7 +382,14 @@ def _validate_run_checkpoint_identity(
     for field in _CHECKPOINT_IDENTITY_FIELDS:
         if field not in manifest or field not in checkpoint:
             raise ValueError(f"Missing run/checkpoint identity field: {field}")
-        if manifest[field] != checkpoint[field]:
+        try:
+            manifest_value = _canonical_json_identity(manifest[field])
+            checkpoint_value = _canonical_json_identity(checkpoint[field])
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                f"Run/checkpoint identity field is not JSON-compatible: {field}"
+            ) from error
+        if manifest_value != checkpoint_value:
             raise ValueError(f"Run/checkpoint identity mismatch: {field}")
     _validate_architecture_identity(manifest)
     _validate_objective_and_optimizer(manifest)
