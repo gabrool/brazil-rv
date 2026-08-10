@@ -472,9 +472,19 @@ def test_cache_manifest_rejects_nested_identity_hash_shape_and_dtype(
         _validate_cache_manifest(manifest_path, identity)
 
 
-def test_inference_failure_is_recorded_without_mutating_inputs(
+@pytest.mark.parametrize(
+    ("failure_stage", "error_type", "message"),
+    (
+        ("inference", RuntimeError, "synthetic inference failure"),
+        ("metric_reproduction", ValueError, "validation metric parity"),
+    ),
+)
+def test_inference_failure_is_recorded_without_mutating_inputs_or_writing_cache(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    failure_stage: str,
+    error_type: type[Exception],
+    message: str,
 ) -> None:
     run_dir = tmp_path / "run"
     feature_store = tmp_path / "feature-store"
@@ -506,7 +516,9 @@ def test_inference_failure_is_recorded_without_mutating_inputs(
         feature_identity={"manifest_sha256": "feature-sha"},
         feature_manifest={},
         sample_index=pl.DataFrame(),
-        validation_rows=pl.DataFrame({"sample_id": [7]}),
+        validation_rows=pl.DataFrame(
+            {"sample_id": [7], "date_idx": [0], "decision_idx": [0]}
+        ),
         jobs=(job,),
         analyzer_git_commit_sha="analyzer",
         analyzer_worktree_clean=True,
@@ -529,23 +541,57 @@ def test_inference_failure_is_recorded_without_mutating_inputs(
         del args, kwargs
         raise RuntimeError("synthetic inference failure")
 
-    monkeypatch.setattr(
-        "brazil_rv.modeling.stock_time_cache.collect_neural_evaluation",
-        fail_inference,
-    )
-    with pytest.raises(RuntimeError, match="synthetic inference failure"):
+    if failure_stage == "inference":
+        monkeypatch.setattr(
+            "brazil_rv.modeling.stock_time_cache.collect_neural_evaluation",
+            fail_inference,
+        )
+    else:
+        shape = (1, 158, 3)
+        observations = EvaluationObservations(
+            sample_id=np.asarray([7], dtype=np.int64),
+            date_idx=np.asarray([0], dtype=np.int64),
+            decision_idx=np.asarray([0], dtype=np.int64),
+            predictions=np.zeros(shape, dtype=np.float32),
+            targets=np.zeros(shape, dtype=np.float32),
+            raw_returns=np.zeros(shape, dtype=np.float32),
+            label_mask=np.ones(shape, dtype=bool),
+        )
+        evaluation = SimpleNamespace(
+            observations=observations, summary={}, daily_rows=[]
+        )
+
+        def successful_inference(*args: object, **kwargs: object) -> SimpleNamespace:
+            del args, kwargs
+            return evaluation
+
+        def fail_metric_reproduction(*args: object, **kwargs: object) -> None:
+            del args, kwargs
+            raise ValueError(message)
+
+        monkeypatch.setattr(
+            "brazil_rv.modeling.stock_time_cache.collect_neural_evaluation",
+            successful_inference,
+        )
+        monkeypatch.setattr(
+            "brazil_rv.modeling.stock_time_cache.metric_reproduction_gate",
+            fail_metric_reproduction,
+        )
+    cache_root = tmp_path / "output"
+    with pytest.raises(error_type, match=message):
         _adopt_or_infer_caches(
-            tmp_path / "output",
+            cache_root,
             inputs,
             state,
             state_path,
         )
     assert state["jobs"][0]["status"] == "failed"
-    assert state["jobs"][0]["error"] == "RuntimeError: synthetic inference failure"
+    assert state["jobs"][0]["error"] == f"{error_type.__name__}: {message}"
     persisted = json.loads(state_path.read_text(encoding="utf-8"))
     assert persisted["jobs"][0]["status"] == "failed"
     assert run_marker.read_text(encoding="utf-8") == "run"
     assert feature_marker.read_text(encoding="utf-8") == "feature"
+    assert not cache_root.exists()
 
 
 def test_interrupted_cache_recovery_removes_only_recognized_partial_files(
@@ -1776,16 +1822,35 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
             core_paths[("core", 11)].parent / "manifest.json",
             _job_cache_identity(changed_inputs, changed_job),
         )
-    changed_code_inputs = AnalysisInputs(
-        **{
-            **core_inputs.__dict__,
-            "inference_code_sha256": {"inference.py": "changed"},
-        }
-    )
-    with pytest.raises(ValueError, match="identity"):
-        _validate_cache_manifest(
-            core_paths[("core", 11)].parent / "manifest.json",
-            _job_cache_identity(changed_code_inputs, jobs[0]),
+    manifest_path = core_paths[("core", 11)].parent / "manifest.json"
+    for changed_path in (
+        "research/src/brazil_rv/modeling/contract.py",
+        "research/src/brazil_rv/modeling/engine.py",
+    ):
+        changed_hashes = dict(core_inputs.inference_code_sha256)
+        changed_hashes[changed_path] = "changed-code-hash"
+        changed_code_inputs = AnalysisInputs(
+            **{
+                **core_inputs.__dict__,
+                "inference_code_sha256": changed_hashes,
+            }
+        )
+        with pytest.raises(ValueError, match="identity"):
+            _validate_cache_manifest(
+                manifest_path,
+                _job_cache_identity(changed_code_inputs, jobs[0]),
+            )
+
+    rejected_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rejected_manifest["metric_reproduction_gate"] = {"passed": False}
+    _atomic_write_json(manifest_path, rejected_manifest)
+    rejected_state = {"status": "running", "jobs": [{"status": "pending"}]}
+    with pytest.raises(ValueError, match="lacks metric parity"):
+        _adopt_or_infer_caches(
+            cache_root,
+            inputs_for((jobs[0],), "rejected-metric-gate"),
+            rejected_state,
+            tmp_path / "rejected-metric-gate-state.json",
         )
 
 

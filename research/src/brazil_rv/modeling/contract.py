@@ -237,6 +237,8 @@ COMPILE_WARMUP_PASS_COUNT = 5
 COMPILE_STEADY_STATE_PASS_COUNT = 3
 COMPILE_PARITY_PREDICTION_ATOL = 2e-2
 COMPILE_PARITY_PREDICTION_RTOL = 5e-3
+COMPILE_PARITY_EVALUATION_PREDICTION_RELATIVE_L2_MAX = 5e-3
+COMPILE_PARITY_EVALUATION_PREDICTION_MAX_ABSOLUTE = 4e-2
 COMPILE_PARITY_LOSS_ATOL = 5e-4
 COMPILE_PARITY_LOSS_RTOL = 5e-3
 COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX = 0.06
@@ -346,6 +348,12 @@ class CompileSetupReport:
 class CompileParityThresholds:
     prediction_atol: float = COMPILE_PARITY_PREDICTION_ATOL
     prediction_rtol: float = COMPILE_PARITY_PREDICTION_RTOL
+    evaluation_prediction_relative_l2_max: float = (
+        COMPILE_PARITY_EVALUATION_PREDICTION_RELATIVE_L2_MAX
+    )
+    evaluation_prediction_max_absolute: float = (
+        COMPILE_PARITY_EVALUATION_PREDICTION_MAX_ABSOLUTE
+    )
     loss_atol: float = COMPILE_PARITY_LOSS_ATOL
     loss_rtol: float = COMPILE_PARITY_LOSS_RTOL
     gradient_relative_l2_max: float = COMPILE_PARITY_GRADIENT_RELATIVE_L2_MAX
@@ -366,6 +374,8 @@ class CompileParityReport:
     prediction_allclose: bool
     prediction_max_absolute_difference: float
     prediction_relative_l2_error: float
+    evaluation_prediction_bounds_passed: bool
+    prediction_parity_passed: bool
 
     eager_loss: float
     compiled_loss: float
