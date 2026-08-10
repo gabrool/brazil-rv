@@ -65,9 +65,10 @@ from brazil_rv.modeling.stage3_context_addition import (
 from brazil_rv.modeling.stock_time_cache import (
     CACHE_VERSION,
     INFERENCE_CODE_PATHS,
+    METRIC_REPRODUCTION_BLOCKING_DAILY_THRESHOLDS,
     METRIC_REPRODUCTION_DAILY_IC_ABSOLUTE_TOLERANCE,
-    METRIC_REPRODUCTION_DAILY_THRESHOLDS,
-    METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE,
+    METRIC_REPRODUCTION_ECONOMIC_IDENTITY_ABSOLUTE_TOLERANCE,
+    METRIC_REPRODUCTION_ECONOMIC_METRICS,
     METRIC_REPRODUCTION_GATE_SCHEMA_VERSION,
     METRIC_REPRODUCTION_HORIZON_IC_ABSOLUTE_TOLERANCE,
     METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE,
@@ -75,8 +76,8 @@ from brazil_rv.modeling.stock_time_cache import (
     adopt_or_infer_caches as _adopt_or_infer_caches,
     atomic_write_npy as _atomic_write_npy,
     job_cache_identity as _job_cache_identity,
+    metric_reproduction_contract_metadata,
     metric_reproduction_gate,
-    metric_reproduction_thresholds,
     remove_recognized_partial_cache as _remove_recognized_partial_cache,
     validate_cache_manifest as _validate_cache_manifest,
     validate_metric_reproduction_gate as _validate_metric_reproduction_gate,
@@ -121,6 +122,10 @@ def _metric_payloads() -> tuple[dict[str, object], list[dict[str, object]]]:
             {
                 "horizon_minutes": horizon,
                 "mean_daily_spearman_ic": 0.0,
+                "mean_top_return": 0.0,
+                "mean_bottom_return": 0.0,
+                "mean_top_minus_bottom": 0.0,
+                "mean_long_only_top": 0.0,
             }
             for horizon in (30, 60, 120)
         ],
@@ -478,12 +483,13 @@ def test_metric_reproduction_gate_accepts_exact_gh200_diagnostic(
     gate = metric_reproduction_gate(tmp_path, recomputed_summary, recomputed_daily)
     assert gate["schema_version"] == METRIC_REPRODUCTION_GATE_SCHEMA_VERSION
     assert gate["passed"] is True
-    assert gate["thresholds"] == metric_reproduction_thresholds()
-    assert gate["primary_ic"]["absolute_difference"] == pytest.approx(
+    assert gate["contract"] == metric_reproduction_contract_metadata()
+    blocking = gate["blocking_comparisons"]
+    assert blocking["primary_ic"]["absolute_difference"] == pytest.approx(
         8.086639471938106e-08
     )
     assert [
-        gate["horizons"][f"{horizon}m"]["absolute_difference"]
+        blocking["horizons"][f"{horizon}m"]["absolute_difference"]
         for horizon in (30, 60, 120)
     ] == pytest.approx(
         [
@@ -492,13 +498,13 @@ def test_metric_reproduction_gate_accepts_exact_gh200_diagnostic(
             2.0935884377515368e-07,
         ]
     )
-    assert gate["daily_metrics"]["spearman_ic"][
+    assert blocking["daily_metrics"]["spearman_ic"][
         "maximum_absolute_difference"
     ] == pytest.approx(2.7086860318291384e-05)
-    assert gate["daily_metrics"]["rank_target_pearson_ic"][
+    assert blocking["daily_metrics"]["rank_target_pearson_ic"][
         "maximum_absolute_difference"
     ] == pytest.approx(9.971929088893605e-06)
-    turnover = gate["daily_metrics"]["one_way_turnover"]
+    turnover = blocking["daily_metrics"]["one_way_turnover"]
     assert turnover["maximum_absolute_difference"] == pytest.approx(
         0.0016835016835015093
     )
@@ -510,6 +516,10 @@ def test_metric_reproduction_gate_accepts_exact_gh200_diagnostic(
         "recomputed": 1.1411335578002246,
         "absolute_difference": pytest.approx(0.0016835016835015093),
     }
+    assert all(
+        diagnostic["role"] == "diagnostic_only"
+        for diagnostic in gate["economic_diagnostics"].values()
+    )
 
 
 @pytest.mark.parametrize(
@@ -541,22 +551,40 @@ def test_persisted_stage3_score_rejects_larger_differences(
 
 def test_persisted_and_fresh_metric_tolerances_are_separate_and_exact() -> None:
     assert STAGE3_PERSISTED_SCORE_ABSOLUTE_TOLERANCE == 1e-12
-    assert metric_reproduction_thresholds() == {
-        "primary_ic_absolute_tolerance": 1e-6,
-        "horizon_mean_daily_spearman_ic_absolute_tolerance": 1e-6,
-        "daily_metric_absolute_tolerances": {
-            "spearman_ic": 1e-4,
-            "rank_target_pearson_ic": 1e-4,
-            "top_return": 1e-12,
-            "bottom_return": 1e-12,
-            "top_minus_bottom": 1e-12,
-            "long_only_top": 1e-12,
-            "one_way_turnover": 0.005,
+    assert CACHE_VERSION == 4
+    assert METRIC_REPRODUCTION_GATE_SCHEMA_VERSION == 2
+    assert METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE == 1e-6
+    assert METRIC_REPRODUCTION_HORIZON_IC_ABSOLUTE_TOLERANCE == 1e-6
+    assert METRIC_REPRODUCTION_DAILY_IC_ABSOLUTE_TOLERANCE == 1e-4
+    assert METRIC_REPRODUCTION_TURNOVER_ABSOLUTE_TOLERANCE == 0.005
+    assert METRIC_REPRODUCTION_ECONOMIC_IDENTITY_ABSOLUTE_TOLERANCE == 1e-12
+    assert metric_reproduction_contract_metadata() == {
+        "roles": {
+            "primary_ic": "blocking",
+            "horizon_mean_daily_spearman_ic": "blocking",
+            "daily_spearman_ic": "blocking",
+            "daily_rank_target_pearson_ic": "blocking",
+            "daily_one_way_turnover": "blocking",
+            "economic_returns": "diagnostic_only",
+            "economic_identities": "blocking",
+            "structural_checks": "blocking",
         },
+        "blocking_thresholds": {
+            "primary_ic_absolute_tolerance": 1e-6,
+            "horizon_mean_daily_spearman_ic_absolute_tolerance": 1e-6,
+            "daily_metric_absolute_tolerances": {
+                "spearman_ic": 1e-4,
+                "rank_target_pearson_ic": 1e-4,
+                "one_way_turnover": 0.005,
+            },
+            "economic_identity_absolute_tolerance": 1e-12,
+        },
+        "economic_diagnostic_metrics": list(METRIC_REPRODUCTION_ECONOMIC_METRICS),
     }
-    assert "research/src/brazil_rv/modeling/stock_time_inference.py" in (
-        INFERENCE_CODE_PATHS
-    )
+    assert {
+        "research/src/brazil_rv/modeling/stock_time_cache.py",
+        "research/src/brazil_rv/modeling/stock_time_inference.py",
+    } <= set(INFERENCE_CODE_PATHS)
 
 
 @pytest.mark.parametrize("location", ("primary", "horizon"))
@@ -607,25 +635,180 @@ def test_metric_reproduction_daily_ic_boundaries(tmp_path: Path, metric: str) ->
         metric_reproduction_gate(tmp_path, summary, above_boundary)
 
 
+def test_metric_reproduction_core_29_economic_diagnostics_are_non_blocking(
+    tmp_path: Path,
+) -> None:
+    recorded_summary, recorded_daily = _metric_payloads()
+    for row in recorded_daily:
+        row["date_idx"] = 859 if row["date_idx"] == 793 else 860
+    recomputed_summary = copy.deepcopy(recorded_summary)
+    recomputed_daily = copy.deepcopy(recorded_daily)
+    recorded_bottom = 0.0017431467218557372
+    recomputed_bottom = 0.001741926875547506
+    recorded_spread = -0.00023786670677840117
+    recomputed_spread = -0.0002366468604701698
+    top_return = recorded_bottom + recorded_spread
+    recorded_row = next(
+        row
+        for row in recorded_daily
+        if row["date_idx"] == 860 and row["horizon_minutes"] == 120
+    )
+    recomputed_row = next(
+        row
+        for row in recomputed_daily
+        if row["date_idx"] == 860 and row["horizon_minutes"] == 120
+    )
+    recorded_row.update(
+        {
+            "top_return": top_return,
+            "bottom_return": recorded_bottom,
+            "top_minus_bottom": recorded_spread,
+            "long_only_top": top_return,
+        }
+    )
+    recomputed_row.update(
+        {
+            "top_return": top_return,
+            "bottom_return": recomputed_bottom,
+            "top_minus_bottom": recomputed_spread,
+            "long_only_top": top_return,
+        }
+    )
+    for summary, bottom, spread in (
+        (recorded_summary, recorded_bottom, recorded_spread),
+        (recomputed_summary, recomputed_bottom, recomputed_spread),
+    ):
+        horizons = summary["horizons"]
+        assert isinstance(horizons, list)
+        horizon = next(row for row in horizons if row["horizon_minutes"] == 120)
+        horizon.update(
+            {
+                "mean_top_return": top_return / 2.0,
+                "mean_bottom_return": bottom / 2.0,
+                "mean_top_minus_bottom": spread / 2.0,
+                "mean_long_only_top": top_return / 2.0,
+            }
+        )
+    _write_recorded_metric_artifacts(
+        tmp_path,
+        recorded_summary,
+        recorded_daily,
+        {859: date(2024, 12, 25), 860: date(2024, 12, 26)},
+    )
+
+    gate = metric_reproduction_gate(tmp_path, recomputed_summary, recomputed_daily)
+
+    assert gate["passed"] is True
+    diagnostics = gate["economic_diagnostics"]
+    bottom = diagnostics["bottom_return"]
+    spread = diagnostics["top_minus_bottom"]
+    assert bottom["maximum_absolute_difference"] == 1.2198463082311803e-6
+    assert spread["maximum_absolute_difference"] == 1.21984630823137e-6
+    assert bottom["mean_absolute_difference"] == 1.2198463082311803e-6 / 6.0
+    assert spread["mean_absolute_difference"] == 1.21984630823137e-6 / 6.0
+    assert diagnostics["top_return"]["maximum_absolute_difference"] == 0.0
+    assert diagnostics["long_only_top"]["maximum_absolute_difference"] == 0.0
+    for result in (bottom, spread):
+        assert result["role"] == "diagnostic_only"
+        assert "threshold" not in result
+        assert "passed" not in result
+        assert result["worst_row"]["date_idx"] == 860
+        assert result["worst_row"]["trade_date"] == "2024-12-26"
+        assert result["worst_row"]["horizon_minutes"] == 120
+    assert bottom["worst_row"]["recorded"] == recorded_bottom
+    assert bottom["worst_row"]["recomputed"] == recomputed_bottom
+    assert spread["worst_row"]["recorded"] == recorded_spread
+    assert spread["worst_row"]["recomputed"] == recomputed_spread
+    assert bottom["horizons"]["120m"] == {
+        "horizon_minutes": 120,
+        "recorded_mean": recorded_bottom / 2.0,
+        "recomputed_mean": recomputed_bottom / 2.0,
+        "absolute_difference": abs(recomputed_bottom / 2.0 - recorded_bottom / 2.0),
+    }
+    assert spread["horizons"]["120m"] == {
+        "horizon_minutes": 120,
+        "recorded_mean": recorded_spread / 2.0,
+        "recomputed_mean": recomputed_spread / 2.0,
+        "absolute_difference": abs(recomputed_spread / 2.0 - recorded_spread / 2.0),
+    }
+    assert gate["economic_identity_checks"]["passed"] is True
+
+
+@pytest.mark.parametrize("source", ("recorded", "recomputed"))
 @pytest.mark.parametrize(
     "metric",
-    ("top_return", "bottom_return", "top_minus_bottom", "long_only_top"),
+    ("long_only_top", "top_minus_bottom"),
 )
-def test_metric_reproduction_economic_return_boundaries(
-    tmp_path: Path, metric: str
+@pytest.mark.parametrize(
+    "difference",
+    (math.nextafter(1e-12, 0.0), 1e-12),
+)
+def test_daily_economic_identity_boundary_is_inclusive(
+    tmp_path: Path, source: str, metric: str, difference: float
 ) -> None:
-    summary, recorded_daily = _metric_payloads()
+    summary, baseline_daily = _metric_payloads()
+    recorded_daily = copy.deepcopy(baseline_daily)
+    recomputed_daily = copy.deepcopy(baseline_daily)
+    target = recorded_daily if source == "recorded" else recomputed_daily
+    target[0][metric] = difference
     _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
-    at_boundary = copy.deepcopy(recorded_daily)
-    at_boundary[0][metric] = METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE
-    assert metric_reproduction_gate(tmp_path, summary, at_boundary)["passed"]
-    above_boundary = copy.deepcopy(at_boundary)
-    above_boundary[0][metric] = math.nextafter(
-        METRIC_REPRODUCTION_ECONOMIC_RETURN_ABSOLUTE_TOLERANCE,
-        math.inf,
+
+    gate = metric_reproduction_gate(tmp_path, summary, recomputed_daily)
+
+    assert gate["passed"] is True
+    assert gate["economic_identity_checks"]["threshold"] == 1e-12
+
+
+@pytest.mark.parametrize("source", ("recorded", "recomputed"))
+@pytest.mark.parametrize("metric", ("long_only_top", "top_minus_bottom"))
+def test_daily_economic_identity_above_boundary_is_blocking(
+    tmp_path: Path, source: str, metric: str
+) -> None:
+    summary, baseline_daily = _metric_payloads()
+    recorded_daily = copy.deepcopy(baseline_daily)
+    recomputed_daily = copy.deepcopy(baseline_daily)
+    target = recorded_daily if source == "recorded" else recomputed_daily
+    target[0][metric] = math.nextafter(
+        METRIC_REPRODUCTION_ECONOMIC_IDENTITY_ABSOLUTE_TOLERANCE, math.inf
     )
-    with pytest.raises(ValueError, match="validation metric parity"):
-        metric_reproduction_gate(tmp_path, summary, above_boundary)
+    _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
+
+    with pytest.raises(ValueError, match="validation metric parity") as exc_info:
+        metric_reproduction_gate(tmp_path, summary, recomputed_daily)
+    failures = json.loads(str(exc_info.value).split("\n", 1)[1])["failures"]
+    assert any(
+        failure.get("check") == "economic_identity"
+        and failure.get("source") == source
+        and failure.get("scope") == "daily"
+        for failure in failures
+    )
+
+
+@pytest.mark.parametrize("source", ("recorded", "recomputed"))
+@pytest.mark.parametrize("field", ("mean_long_only_top", "mean_top_minus_bottom"))
+def test_horizon_economic_identity_above_boundary_is_blocking(
+    tmp_path: Path, source: str, field: str
+) -> None:
+    recorded_summary, daily_rows = _metric_payloads()
+    recomputed_summary = copy.deepcopy(recorded_summary)
+    target = recorded_summary if source == "recorded" else recomputed_summary
+    horizons = target["horizons"]
+    assert isinstance(horizons, list)
+    horizons[1][field] = math.nextafter(
+        METRIC_REPRODUCTION_ECONOMIC_IDENTITY_ABSOLUTE_TOLERANCE, math.inf
+    )
+    _write_recorded_metric_artifacts(tmp_path, recorded_summary, daily_rows)
+
+    with pytest.raises(ValueError, match="validation metric parity") as exc_info:
+        metric_reproduction_gate(tmp_path, recomputed_summary, daily_rows)
+    failures = json.loads(str(exc_info.value).split("\n", 1)[1])["failures"]
+    assert any(
+        failure.get("check") == "economic_identity"
+        and failure.get("source") == source
+        and failure.get("scope") == "horizon_summary"
+        and failure.get("horizon_minutes") == 60
+        for failure in failures
+    )
 
 
 def test_metric_reproduction_turnover_boundaries(tmp_path: Path) -> None:
@@ -646,14 +829,33 @@ def test_metric_reproduction_turnover_boundaries(tmp_path: Path) -> None:
         metric_reproduction_gate(tmp_path, summary, recomputed)
 
 
-@pytest.mark.parametrize("metric", ("spearman_ic", "top_return"))
-def test_turnover_allowance_does_not_leak_to_other_metrics(
+@pytest.mark.parametrize("metric", ("spearman_ic", "rank_target_pearson_ic"))
+def test_turnover_allowance_does_not_leak_to_daily_ic(
     tmp_path: Path, metric: str
 ) -> None:
     summary, recorded_daily = _metric_payloads()
     _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
     recomputed = copy.deepcopy(recorded_daily)
     recomputed[0][metric] = 0.0016835016835015093
+    with pytest.raises(ValueError, match="validation metric parity"):
+        metric_reproduction_gate(tmp_path, summary, recomputed)
+
+
+def test_economic_diagnostics_do_not_override_blocking_turnover(tmp_path: Path) -> None:
+    summary, recorded_daily = _metric_payloads()
+    _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
+    recomputed = copy.deepcopy(recorded_daily)
+    recomputed[0].update(
+        {
+            "top_return": 2.0,
+            "bottom_return": 1.0,
+            "top_minus_bottom": 1.0,
+            "long_only_top": 2.0,
+            "one_way_turnover": math.nextafter(
+                METRIC_REPRODUCTION_TURNOVER_ABSOLUTE_TOLERANCE, math.inf
+            ),
+        }
+    )
     with pytest.raises(ValueError, match="validation metric parity"):
         metric_reproduction_gate(tmp_path, summary, recomputed)
 
@@ -719,19 +921,22 @@ def test_metric_reproduction_failure_reports_every_failed_comparison(
     _write_recorded_metric_artifacts(tmp_path, summary, recorded_daily)
     recomputed = copy.deepcopy(recorded_daily)
     recomputed[0]["spearman_ic"] = 0.001
-    recomputed[1]["top_return"] = 0.002
+    recomputed[1]["one_way_turnover"] = 0.006
     with pytest.raises(ValueError, match="validation metric parity") as exc_info:
         metric_reproduction_gate(tmp_path, summary, recomputed)
     details = json.loads(str(exc_info.value).split("\n", 1)[1])
     failures = {row["metric"]: row for row in details["failures"]}
-    assert set(failures) == {"spearman_ic", "top_return"}
-    for metric, expected in (("spearman_ic", 0.001), ("top_return", 0.002)):
+    assert set(failures) == {"spearman_ic", "one_way_turnover"}
+    for metric, expected in (("spearman_ic", 0.001), ("one_way_turnover", 0.006)):
         failure = failures[metric]
         assert failure["recorded"] == 0.0
         assert failure["recomputed"] == expected
         assert failure["maximum_absolute_difference"] == expected
         assert failure["difference"] == expected
-        assert failure["threshold"] == METRIC_REPRODUCTION_DAILY_THRESHOLDS[metric]
+        assert (
+            failure["threshold"]
+            == METRIC_REPRODUCTION_BLOCKING_DAILY_THRESHOLDS[metric]
+        )
         assert failure["passed"] is False
         assert failure["worst_row"]["date_idx"] == 793
         assert failure["worst_row"]["trade_date"] == "2024-09-18"
@@ -2194,6 +2399,7 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
         "research/src/brazil_rv/modeling/contract.py",
         "research/src/brazil_rv/modeling/engine.py",
         "research/src/brazil_rv/modeling/stock_time_cache.py",
+        "research/src/brazil_rv/modeling/stock_time_inference.py",
     ):
         changed_hashes = dict(core_inputs.inference_code_sha256)
         changed_hashes[changed_path] = "changed-code-hash"
@@ -2224,7 +2430,9 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
         gate = manifest["metric_reproduction_gate"]
         assert isinstance(gate, dict)
         if mutation == "passed_false":
-            primary = gate["primary_ic"]
+            blocking = gate["blocking_comparisons"]
+            assert isinstance(blocking, dict)
+            primary = blocking["primary_ic"]
             assert isinstance(primary, dict)
             primary["recomputed"] = float(primary["recorded"]) + 2e-6
             primary["absolute_difference"] = 2e-6
@@ -2232,50 +2440,209 @@ def test_portable_cache_reuses_core_for_full_scope_and_rejects_semantic_changes(
             gate["passed"] = False
         elif mutation == "missing_version":
             del gate["schema_version"]
+        elif mutation == "schema_v1":
+            gate["schema_version"] = 1
         elif mutation == "legacy_gate":
             manifest["metric_reproduction_gate"] = {"passed": True}
-        elif mutation == "missing_metric":
-            daily_metrics = gate["daily_metrics"]
+        elif mutation == "missing_blocking_metric":
+            blocking = gate["blocking_comparisons"]
+            assert isinstance(blocking, dict)
+            daily_metrics = blocking["daily_metrics"]
             assert isinstance(daily_metrics, dict)
             del daily_metrics["spearman_ic"]
+        elif mutation in {
+            "blocking_role",
+            "missing_blocking_threshold",
+            "inconsistent_pass",
+            "missing_metric_pass",
+        }:
+            blocking = gate["blocking_comparisons"]
+            assert isinstance(blocking, dict)
+            primary = blocking["primary_ic"]
+            assert isinstance(primary, dict)
+            if mutation == "blocking_role":
+                primary["role"] = "diagnostic_only"
+            elif mutation == "missing_blocking_threshold":
+                del primary["threshold"]
+            elif mutation == "inconsistent_pass":
+                primary["passed"] = False
+            else:
+                del primary["passed"]
         elif mutation == "altered_threshold":
-            thresholds = gate["thresholds"]
+            contract = gate["contract"]
+            assert isinstance(contract, dict)
+            thresholds = contract["blocking_thresholds"]
             assert isinstance(thresholds, dict)
-            daily_thresholds = thresholds["daily_metric_absolute_tolerances"]
-            assert isinstance(daily_thresholds, dict)
-            daily_thresholds["one_way_turnover"] = 0.01
-            daily_metrics = gate["daily_metrics"]
-            assert isinstance(daily_metrics, dict)
-            turnover = daily_metrics["one_way_turnover"]
-            assert isinstance(turnover, dict)
-            turnover["threshold"] = 0.01
-        elif mutation == "inconsistent_pass":
-            daily_metrics = gate["daily_metrics"]
-            assert isinstance(daily_metrics, dict)
-            spearman = daily_metrics["spearman_ic"]
-            assert isinstance(spearman, dict)
-            spearman["passed"] = False
-        elif mutation == "missing_metric_pass":
-            daily_metrics = gate["daily_metrics"]
-            assert isinstance(daily_metrics, dict)
-            spearman = daily_metrics["spearman_ic"]
-            assert isinstance(spearman, dict)
-            del spearman["passed"]
+            thresholds["primary_ic_absolute_tolerance"] = 2e-6
+        elif mutation in {
+            "diagnostic_role",
+            "diagnostic_threshold",
+            "diagnostic_pass",
+            "missing_diagnostic_max",
+            "missing_diagnostic_mean",
+            "malformed_worst",
+            "missing_diagnostic_horizon",
+            "inconsistent_diagnostic",
+            "negative_diagnostic",
+            "non_numeric_diagnostic",
+            "nan_diagnostic",
+            "infinite_diagnostic",
+            "mean_above_max",
+            "inconsistent_horizon_diagnostic",
+        }:
+            diagnostics = gate["economic_diagnostics"]
+            assert isinstance(diagnostics, dict)
+            diagnostic = diagnostics["top_return"]
+            assert isinstance(diagnostic, dict)
+            if mutation == "diagnostic_role":
+                diagnostic["role"] = "blocking"
+            elif mutation == "diagnostic_threshold":
+                diagnostic["threshold"] = 1e-12
+            elif mutation == "diagnostic_pass":
+                diagnostic["passed"] = True
+            elif mutation == "missing_diagnostic_max":
+                del diagnostic["maximum_absolute_difference"]
+            elif mutation == "missing_diagnostic_mean":
+                del diagnostic["mean_absolute_difference"]
+            elif mutation == "malformed_worst":
+                worst = diagnostic["worst_row"]
+                assert isinstance(worst, dict)
+                del worst["trade_date"]
+            elif mutation == "missing_diagnostic_horizon":
+                horizons = diagnostic["horizons"]
+                assert isinstance(horizons, dict)
+                del horizons["30m"]
+            elif mutation == "inconsistent_diagnostic":
+                diagnostic["maximum_absolute_difference"] = 1e-6
+            elif mutation == "negative_diagnostic":
+                diagnostic["mean_absolute_difference"] = -1e-6
+            elif mutation == "non_numeric_diagnostic":
+                diagnostic["maximum_absolute_difference"] = "invalid"
+            elif mutation == "nan_diagnostic":
+                diagnostic["maximum_absolute_difference"] = math.nan
+            elif mutation == "infinite_diagnostic":
+                diagnostic["maximum_absolute_difference"] = math.inf
+            elif mutation == "mean_above_max":
+                diagnostic["mean_absolute_difference"] = 1e-6
+            else:
+                horizons = diagnostic["horizons"]
+                assert isinstance(horizons, dict)
+                horizon = horizons["30m"]
+                assert isinstance(horizon, dict)
+                horizon["absolute_difference"] = 1e-6
+        elif mutation == "missing_diagnostic":
+            diagnostics = gate["economic_diagnostics"]
+            assert isinstance(diagnostics, dict)
+            del diagnostics["top_return"]
+        elif mutation in {
+            "missing_identity_checks",
+            "missing_identity_role",
+            "altered_identity_threshold",
+            "missing_identity_report",
+            "inconsistent_identity",
+            "failed_identity",
+        }:
+            if mutation == "missing_identity_checks":
+                del gate["economic_identity_checks"]
+                return
+            identities = gate["economic_identity_checks"]
+            assert isinstance(identities, dict)
+            if mutation == "missing_identity_role":
+                del identities["role"]
+            elif mutation == "altered_identity_threshold":
+                identities["threshold"] = 2e-12
+            else:
+                daily = identities["daily"]
+                assert isinstance(daily, dict)
+                recorded = daily["recorded"]
+                assert isinstance(recorded, dict)
+                check = recorded["long_only_top_equals_top_return"]
+                assert isinstance(check, dict)
+                if mutation == "missing_identity_report":
+                    del recorded["long_only_top_equals_top_return"]
+                elif mutation == "inconsistent_identity":
+                    check["maximum_absolute_difference"] = 2e-12
+                else:
+                    worst = check["worst_row"]
+                    assert isinstance(worst, dict)
+                    worst["long_only_top"] = 2e-12
+                    worst["absolute_difference"] = 2e-12
+                    check["maximum_absolute_difference"] = 2e-12
+                    check["passed"] = False
+                    identities["passed"] = False
+                    gate["passed"] = False
+        elif mutation == "overall_inconsistent":
+            gate["passed"] = False
+        elif mutation == "missing_contract_role":
+            contract = gate["contract"]
+            assert isinstance(contract, dict)
+            roles = contract["roles"]
+            assert isinstance(roles, dict)
+            del roles["economic_returns"]
+        elif mutation == "missing_structural_role":
+            structural = gate["structural_checks"]
+            assert isinstance(structural, dict)
+            del structural["role"]
+        elif mutation == "structural_count_mismatch":
+            structural = gate["structural_checks"]
+            assert isinstance(structural, dict)
+            structural["recomputed_count"] = int(structural["recorded_count"]) + 1
+        elif mutation == "structural_metric_order":
+            structural = gate["structural_checks"]
+            assert isinstance(structural, dict)
+            metric_columns = structural["metric_columns"]
+            assert isinstance(metric_columns, list)
+            metric_columns.reverse()
         else:
             raise AssertionError(mutation)
 
     for mutation in (
         "passed_false",
         "missing_version",
+        "schema_v1",
         "legacy_gate",
-        "missing_metric",
+        "missing_blocking_metric",
+        "blocking_role",
+        "diagnostic_role",
+        "missing_blocking_threshold",
         "altered_threshold",
         "inconsistent_pass",
         "missing_metric_pass",
+        "missing_diagnostic",
+        "diagnostic_threshold",
+        "diagnostic_pass",
+        "missing_diagnostic_max",
+        "missing_diagnostic_mean",
+        "malformed_worst",
+        "missing_diagnostic_horizon",
+        "inconsistent_diagnostic",
+        "negative_diagnostic",
+        "non_numeric_diagnostic",
+        "nan_diagnostic",
+        "infinite_diagnostic",
+        "mean_above_max",
+        "inconsistent_horizon_diagnostic",
+        "missing_identity_checks",
+        "missing_identity_role",
+        "altered_identity_threshold",
+        "missing_identity_report",
+        "inconsistent_identity",
+        "failed_identity",
+        "overall_inconsistent",
+        "missing_contract_role",
+        "missing_structural_role",
+        "structural_count_mismatch",
+        "structural_metric_order",
     ):
         rejected_manifest = copy.deepcopy(first_manifest)
         mutate_gate(rejected_manifest, mutation)
-        _atomic_write_json(manifest_path, rejected_manifest)
+        if mutation in {"nan_diagnostic", "infinite_diagnostic"}:
+            manifest_path.write_text(
+                json.dumps(rejected_manifest, allow_nan=True),
+                encoding="utf-8",
+            )
+        else:
+            _atomic_write_json(manifest_path, rejected_manifest)
         rejected_state = {"status": "running", "jobs": [{"status": "pending"}]}
         with pytest.raises(
             ValueError, match="Metric reproduction gate|lacks metric parity"
@@ -2558,7 +2925,10 @@ def test_full_synthetic_orchestration_core_full_cache_resume_and_artifacts(
                 {
                     "horizon_minutes": horizon,
                     "mean_daily_spearman_ic": horizon_scores[horizon],
+                    "mean_top_return": 0.002 + score,
+                    "mean_bottom_return": -0.001,
                     "mean_top_minus_bottom": 0.003 + score,
+                    "mean_long_only_top": 0.002 + score,
                     "mean_one_way_turnover": 0.4 + score,
                 }
                 for horizon in (30, 60, 120)
