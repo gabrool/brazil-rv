@@ -83,7 +83,9 @@ from brazil_rv.modeling.stock_time_cache import (
 )
 from brazil_rv.modeling.stock_time_inference import (
     AnalysisInputs,
+    STAGE3_PERSISTED_SCORE_ABSOLUTE_TOLERANCE,
     Stage3AnalysisJob,
+    _validate_persisted_stage3_score,
     inference_code_identity as _inference_code_identity,
     reject_test_derived_path as _reject_test_derived_path,
 )
@@ -508,6 +510,53 @@ def test_metric_reproduction_gate_accepts_exact_gh200_diagnostic(
         "recomputed": 1.1411335578002246,
         "absolute_difference": pytest.approx(0.0016835016835015093),
     }
+
+
+@pytest.mark.parametrize(
+    "difference",
+    (
+        0.0,
+        math.nextafter(1e-12, 0.0),
+        1e-12,
+    ),
+)
+def test_persisted_stage3_score_strict_boundary_passes(difference: float) -> None:
+    _validate_persisted_stage3_score(0.0, difference, "core", 11)
+
+
+@pytest.mark.parametrize(
+    "difference",
+    (
+        math.nextafter(1e-12, math.inf),
+        1e-9,
+        5e-7,
+    ),
+)
+def test_persisted_stage3_score_rejects_larger_differences(
+    difference: float,
+) -> None:
+    with pytest.raises(ValueError, match="Stage-3 score changed: core/11"):
+        _validate_persisted_stage3_score(0.0, difference, "core", 11)
+
+
+def test_persisted_and_fresh_metric_tolerances_are_separate_and_exact() -> None:
+    assert STAGE3_PERSISTED_SCORE_ABSOLUTE_TOLERANCE == 1e-12
+    assert metric_reproduction_thresholds() == {
+        "primary_ic_absolute_tolerance": 1e-6,
+        "horizon_mean_daily_spearman_ic_absolute_tolerance": 1e-6,
+        "daily_metric_absolute_tolerances": {
+            "spearman_ic": 1e-4,
+            "rank_target_pearson_ic": 1e-4,
+            "top_return": 1e-12,
+            "bottom_return": 1e-12,
+            "top_minus_bottom": 1e-12,
+            "long_only_top": 1e-12,
+            "one_way_turnover": 0.005,
+        },
+    }
+    assert "research/src/brazil_rv/modeling/stock_time_inference.py" in (
+        INFERENCE_CODE_PATHS
+    )
 
 
 @pytest.mark.parametrize("location", ("primary", "horizon"))

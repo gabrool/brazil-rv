@@ -42,9 +42,10 @@ from .stage3_context_addition import (
 )
 from .stock_time_cache import (
     INFERENCE_CODE_PATHS,
-    METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE,
     sha256,
 )
+
+STAGE3_PERSISTED_SCORE_ABSOLUTE_TOLERANCE = 1e-12
 
 
 @dataclass(frozen=True)
@@ -167,6 +168,21 @@ def _validate_checkpoint_identity(
     return checkpoint_path, sha256(checkpoint_path)
 
 
+def _validate_persisted_stage3_score(
+    score: float,
+    validated_score: float,
+    logical: str,
+    seed: int,
+) -> None:
+    if not math.isclose(
+        score,
+        validated_score,
+        rel_tol=0.0,
+        abs_tol=STAGE3_PERSISTED_SCORE_ABSOLUTE_TOLERANCE,
+    ):
+        raise ValueError(f"Stage-3 score changed: {logical}/{seed}")
+
+
 def validate_analysis_inputs(stage3_state_path: Path, scope: str) -> AnalysisInputs:
     if scope not in {"core", "full-stage3"}:
         raise ValueError(f"Unknown analysis scope: {scope}")
@@ -260,13 +276,7 @@ def validate_analysis_inputs(stage3_state_path: Path, scope: str) -> AnalysisInp
         validated_score = validate_stage3_completed_run(
             run_dir, configuration, key, seed, producing_commit
         )
-        if not math.isclose(
-            score,
-            validated_score,
-            rel_tol=0.0,
-            abs_tol=METRIC_REPRODUCTION_PRIMARY_IC_ABSOLUTE_TOLERANCE,
-        ):
-            raise ValueError(f"Stage-3 score changed: {logical}/{seed}")
+        _validate_persisted_stage3_score(score, validated_score, logical, seed)
         manifest_path = run_dir / "run_manifest.json"
         if manifest_sha != job.get("run_manifest_sha256"):
             raise ValueError(f"Run-manifest hash changed: {logical}/{seed}")
