@@ -18,7 +18,6 @@ import urllib.parse
 import urllib.request
 import zipfile
 from bisect import bisect_left
-from calendar import monthrange
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -78,6 +77,15 @@ USER_AGENT = (
 MANUAL_MARKET_CAP_FILENAME = re.compile(
     r"^Bolsa_Valores_Mensal_(\d{4})-(\d{2})\.csv$", re.IGNORECASE
 )
+MARKET_CAP_REQUIRED_START_MONTH = "2020-06"
+MIN_COMPLETE_MARKET_CAP_ISSUERS = 21
+MARKET_CAP_HISTORY_LIMITATION = (
+    "The current official B3 monthly application exposes only its latest two "
+    "reference months. Its first-party application sends only company, language, "
+    "keyword, pageNumber, and pageSize; it exposes no historical date selector or "
+    "supported historical request parameter. Older official B3 CSV exports must be "
+    "provided through batch manual ingestion."
+)
 
 RAW_SUBDIRECTORY = {
     "classification": "classification",
@@ -124,6 +132,10 @@ class FeatureInputs:
     assignments_dir: Path
     cotahist_dir: Path
     feature_store: Path
+    universe_pointer: Path = UNIVERSE_POINTER
+    assignments_pointer: Path = ASSIGNMENTS_POINTER
+    cotahist_pointer: Path = COTAHIST_POINTER
+    feature_store_pointer: Path = CANONICAL_OUTPUT_POINTER
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -485,17 +497,40 @@ def acquire_official_sources(
 
 def market_cap_manual_instructions(raw_dir: Path = RAW_BASE) -> str:
     return (
+        f"{MARKET_CAP_HISTORY_LIMITATION}\n"
+        "\n"
         "Download only official B3 'Bolsa de Valores - Mensal' CSV exports from:\n"
         f"  {MARKET_CAP_PAGE_URL}\n"
-        "The current B3 page exposes the latest and prior completed month and has no "
-        "historical month selector. For an older official export obtained from B3, "
-        "rename it to Bolsa_Valores_Mensal_YYYY-MM.csv, where YYYY-MM is the newest "
-        "BRL reference month inside the file, then run:\n"
+        "Place all official historical exports in one otherwise-empty directory. "
+        "Name each Bolsa_Valores_Mensal_YYYY-MM.csv, where YYYY-MM is the newest "
+        "BRL reference calendar month inside that file, then run one batch command:\n"
         "  uv run python -m brazil_rv.preprocessing.human_priors "
-        f'ingest-market-cap --file <PATH> --raw-dir "{raw_dir}"\n'
-        "Do not substitute CVM, Receita Federal, or third-party data. Missing official "
-        "months remain explicit in metadata_audit.json and metadata_audit.md."
+        f'ingest-market-cap-dir --directory <DIRECTORY> --raw-dir "{raw_dir}"\n'
+        "Every CSV is validated before the cache is modified. Do not substitute CVM, "
+        "Receita Federal, third-party, or unofficial data. Strict build refuses missing "
+        "months; --allow-incomplete-market-cap creates a diagnostic-only artifact."
     )
+
+
+def _validate_manual_market_cap(
+    path: Path,
+) -> tuple[bytes, pl.DataFrame, tuple[date, ...]]:
+    match = MANUAL_MARKET_CAP_FILENAME.fullmatch(path.name)
+    if match is None:
+        raise ValueError(
+            "Manual B3 market-cap filename must be Bolsa_Valores_Mensal_YYYY-MM.csv"
+        )
+    data = path.read_bytes()
+    parsed = parse_market_cap_csv(data)
+    reference_dates = tuple(parsed["reference_date"].unique().sort().to_list())
+    expected_month = f"{int(match.group(1)):04d}-{int(match.group(2)):02d}"
+    latest_month = max(parsed["reference_month"].to_list())
+    if latest_month != expected_month:
+        raise ValueError(
+            f"Filename month {expected_month} does not match the newest B3 "
+            f"reference calendar month {latest_month}"
+        )
+    return data, parsed, reference_dates
 
 
 def ingest_manual_market_cap(
@@ -504,23 +539,7 @@ def ingest_manual_market_cap(
     *,
     retrieved_at: datetime | None = None,
 ) -> RawSource:
-    match = MANUAL_MARKET_CAP_FILENAME.fullmatch(path.name)
-    if match is None:
-        raise ValueError(
-            "Manual B3 market-cap filename must be "
-            "Bolsa_Valores_Mensal_YYYY-MM.csv.\n"
-            + market_cap_manual_instructions(raw_dir)
-        )
-    data = path.read_bytes()
-    parsed = parse_market_cap_csv(data)
-    reference_dates = parsed["reference_date"].unique().sort().to_list()
-    expected_month = (int(match.group(1)), int(match.group(2)))
-    latest = max(reference_dates)
-    if (latest.year, latest.month) != expected_month:
-        raise ValueError(
-            f"Filename month {expected_month[0]:04d}-{expected_month[1]:02d} does "
-            f"not match the newest BRL reference date {latest}"
-        )
+    data, _, reference_dates = _validate_manual_market_cap(path)
     retrieved_at = (
         datetime.now(UTC) if retrieved_at is None else retrieved_at.astimezone(UTC)
     )
@@ -537,6 +556,54 @@ def ingest_manual_market_cap(
     )
     _write_raw_manifest(raw_dir)
     return source
+
+
+def ingest_market_cap_directory(
+    directory: Path,
+    raw_dir: Path = RAW_BASE,
+    *,
+    retrieved_at: datetime | None = None,
+) -> tuple[RawSource, ...]:
+    if not directory.is_dir():
+        raise FileNotFoundError(
+            f"Manual B3 market-cap directory is missing: {directory}"
+        )
+    csv_files = sorted(directory.glob("*.csv"))
+    if not csv_files:
+        raise FileNotFoundError(
+            f"No manual B3 market-cap CSV files found under {directory}"
+        )
+    invalid_names = [
+        path.name
+        for path in csv_files
+        if MANUAL_MARKET_CAP_FILENAME.fullmatch(path.name) is None
+    ]
+    if invalid_names:
+        raise ValueError(
+            "Manual market-cap directory contains unexpected CSV filenames: "
+            f"{invalid_names}"
+        )
+
+    validated = [(path, *_validate_manual_market_cap(path)) for path in csv_files]
+    retrieved_at = (
+        datetime.now(UTC) if retrieved_at is None else retrieved_at.astimezone(UTC)
+    )
+    sources = tuple(
+        _cache_source(
+            raw_dir=raw_dir,
+            kind="market_cap",
+            data=data,
+            extension=".csv",
+            source_url=MARKET_CAP_PAGE_URL,
+            content_type="text/csv; charset=utf-8",
+            retrieved_at=retrieved_at,
+            reference_dates=reference_dates,
+            acquisition_method="manual_official_b3_batch_download",
+        )
+        for _, data, _, reference_dates in validated
+    )
+    _write_raw_manifest(raw_dir)
+    return sources
 
 
 def _xlsx_rows(data: bytes) -> list[dict[int, str]]:
@@ -753,23 +820,38 @@ def parse_market_cap_csv(
         break
     if header_index is None or issuer_column is None or not value_columns:
         raise ValueError("B3 market-cap CSV schema drift: required columns not found")
+    reference_months = {
+        f"{reference_date.year:04d}-{reference_date.month:02d}"
+        for _, reference_date in value_columns
+    }
+    if len(reference_months) != len(value_columns):
+        raise ValueError("B3 market-cap CSV contains duplicate calendar-month columns")
     parsed: list[dict[str, object]] = []
     snapshot_date = None
     if rows and rows[0] and re.fullmatch(r"\d{8}", rows[0][0].strip()):
         snapshot_date = datetime.strptime(rows[0][0].strip(), "%Y%m%d").date()
     retrieved_at_utc = retrieved_at_utc or datetime.now(UTC)
+    source_issuers: set[str] = set()
+    declared_issuer_count: int | None = None
     for row in rows[header_index + 1 :]:
         if issuer_column >= len(row):
             continue
         issuer_name = row[issuer_column].strip()
-        if not issuer_name or normalize_identity_name(issuer_name).startswith("TOTAL"):
+        normalized_issuer = normalize_identity_name(issuer_name)
+        total_match = re.fullmatch(r"TOTALGERAL(\d+)", normalized_issuer)
+        if total_match:
+            declared_issuer_count = int(total_match.group(1))
             continue
+        if not issuer_name or normalized_issuer.startswith("TOTAL"):
+            continue
+        source_issuers.add(normalized_issuer)
         for column, reference_date in value_columns:
             if column >= len(row) or not row[column].strip():
                 continue
             parsed.append(
                 {
                     "reference_date": reference_date,
+                    "reference_month": f"{reference_date.year:04d}-{reference_date.month:02d}",
                     "issuer_name": issuer_name,
                     "market_cap_brl": _parse_brl(row[column]),
                     "source_snapshot_date": snapshot_date,
@@ -780,11 +862,25 @@ def parse_market_cap_csv(
             )
     if not parsed:
         raise ValueError("B3 market-cap CSV contains no issuer observations")
+    if declared_issuer_count is None:
+        raise ValueError(
+            "B3 market-cap CSV is missing the 'Total Geral (N)' completeness footer"
+        )
+    if len(source_issuers) < MIN_COMPLETE_MARKET_CAP_ISSUERS:
+        raise ValueError(
+            "B3 market-cap CSV appears pagination-truncated: "
+            f"only {len(source_issuers)} issuer rows were returned"
+        )
+    if len(source_issuers) != declared_issuer_count:
+        raise ValueError(
+            "B3 market-cap CSV issuer rows do not match its completeness footer: "
+            f"rows={len(source_issuers)}, declared={declared_issuer_count}"
+        )
     frame = pl.from_dicts(parsed, infer_schema_length=None).sort(
         "reference_date", "issuer_name"
     )
     duplicates = frame.filter(
-        pl.struct("reference_date", "issuer_name").is_duplicated()
+        pl.struct("reference_month", "issuer_name").is_duplicated()
     )
     if not duplicates.is_empty():
         raise ValueError("B3 market-cap CSV has duplicate issuer/month rows")
@@ -1148,6 +1244,7 @@ def reconcile_market_cap(
             matched.append(
                 {
                     "reference_date": row["reference_date"],
+                    "reference_month": row["reference_month"],
                     "issuer_id": issuer_id,
                     "issuer_name": issuer_name,
                     "market_cap_brl": row["market_cap_brl"],
@@ -1186,6 +1283,7 @@ def reconcile_market_cap(
         else pl.DataFrame(
             schema={
                 "reference_date": pl.Date,
+                "reference_month": pl.String,
                 "issuer_id": pl.String,
                 "issuer_name": pl.String,
                 "market_cap_brl": pl.Float64,
@@ -1200,9 +1298,11 @@ def reconcile_market_cap(
     duplicate_groups = 0
     conflict_groups = 0
     for group in matched_frame.partition_by(
-        ["reference_date", "issuer_id"], maintain_order=True
+        ["reference_month", "issuer_id"], maintain_order=True
     ):
-        rows = group.sort("retrieved_at_utc", "source_file").to_dicts()
+        rows = group.sort(
+            "reference_date", "retrieved_at_utc", "source_file"
+        ).to_dicts()
         values = [float(row["market_cap_brl"]) for row in rows]
         if len(rows) > 1:
             duplicate_groups += 1
@@ -1214,7 +1314,7 @@ def reconcile_market_cap(
                     {
                         "source_type": "market_cap",
                         "source_file": str(row["source_file"]),
-                        "source_key": f"{row['reference_date']}:{row['issuer_id']}",
+                        "source_key": f"{row['reference_month']}:{row['issuer_id']}",
                         "source_name": str(row["issuer_name"]),
                         "reason": "CONFLICTING_ISSUER_MONTH_VALUES",
                         "candidate_issuer_id": str(row["issuer_id"]),
@@ -1713,11 +1813,11 @@ def unit_overlap_audit(
     eligible_dates: np.ndarray,
     membership: np.ndarray,
     data_ready: np.ndarray,
-) -> tuple[dict[str, object], pl.DataFrame]:
+) -> tuple[dict[str, object], pl.DataFrame, pl.DataFrame]:
     slot_by_security = {
         security_id: slot for slot, security_id in enumerate(security_ids)
     }
-    rows: list[dict[str, object]] = []
+    component_rows: list[dict[str, object]] = []
     for component in components.to_dicts():
         unit_id = component["unit_security_id"]
         component_id = component["component_security_id"]
@@ -1736,73 +1836,163 @@ def unit_overlap_audit(
                 & data_ready[:, component_slot]
                 & eligible_dates
             )
-            both_active = both_members & both_ready
             member_overlap = int(both_members.sum())
             ready_overlap = int(both_ready.sum())
-            active_overlap = int(both_active.sum())
+            active_overlap = int((both_members & both_ready).sum())
         else:
             member_overlap = ready_overlap = active_overlap = 0
-        rows.append(
+        component_rows.append(
             {
                 **component,
-                "pit_membership_overlap_date_count": member_overlap,
-                "m1_readiness_overlap_date_count": ready_overlap,
-                "active_model_overlap_date_count": active_overlap,
-                "exact_parity_possible": bool(
-                    component_id is not None and active_overlap > 0
-                ),
-                "parity_limitation": (
-                    ""
-                    if component_id is not None and active_overlap > 0
-                    else "COMPONENT_ABSENT_FROM_ACCEPTED_UNIVERSE"
-                    if component_id is None
-                    else "NO_ACTIVE_M1_DATE_OVERLAP"
-                ),
+                "component_pit_membership_overlap_date_count": member_overlap,
+                "component_m1_readiness_overlap_date_count": ready_overlap,
+                "component_fully_active_overlap_date_count": active_overlap,
             }
         )
-    frame = pl.from_dicts(rows, infer_schema_length=None).sort(
+    component_frame = pl.from_dicts(component_rows, infer_schema_length=None).sort(
         "unit_ticker", "component_share_class"
     )
-    present = frame.filter(pl.col("unit_security_id").is_not_null())
+
+    parity_rows: list[dict[str, object]] = []
+    for group in components.partition_by("unit_ticker", maintain_order=True):
+        rows = group.sort("component_share_class").to_dicts()
+        unit_ids = sorted(
+            {str(row["unit_security_id"]) for row in rows if row["unit_security_id"]}
+        )
+        unit_id = unit_ids[0] if len(unit_ids) == 1 else None
+        mapped_components = [
+            row
+            for row in rows
+            if row["mapping_status"] == "MAPPED"
+            and row["component_security_id"] is not None
+        ]
+        problems = [
+            f"{row['component_share_class']}:{row['mapping_status']}"
+            for row in rows
+            if row not in mapped_components
+        ]
+        pit_overlap = ready_overlap = fully_active_overlap = 0
+        if unit_id is not None and len(mapped_components) == len(rows):
+            component_ids = [
+                str(row["component_security_id"]) for row in mapped_components
+            ]
+            slots = [slot_by_security[unit_id]] + [
+                slot_by_security[component_id] for component_id in component_ids
+            ]
+            all_members = np.all(membership[:, slots], axis=1) & eligible_dates
+            all_ready = np.all(data_ready[:, slots], axis=1) & eligible_dates
+            pit_overlap = int(all_members.sum())
+            ready_overlap = int(all_ready.sum())
+            fully_active_overlap = int((all_members & all_ready).sum())
+
+        if unit_id is None:
+            limitation = "UNIT_NOT_IN_ACCEPTED_UNIVERSE"
+        elif len(mapped_components) != len(rows):
+            limitation = "MISSING_OR_AMBIGUOUS_COMPONENTS"
+        elif pit_overlap == 0:
+            limitation = "NO_SIMULTANEOUS_PIT_MEMBERSHIP"
+        elif ready_overlap == 0:
+            limitation = "NO_SIMULTANEOUS_M1_READINESS"
+        elif fully_active_overlap == 0:
+            limitation = "NO_SIMULTANEOUS_PIT_AND_M1_READY_DATE"
+        else:
+            limitation = ""
+        parity_rows.append(
+            {
+                "unit_ticker": rows[0]["unit_ticker"],
+                "unit_security_id": unit_id,
+                "required_component_count": len(rows),
+                "mapped_component_count": len(mapped_components),
+                "missing_or_ambiguous_components": " | ".join(problems),
+                "pit_all_component_overlap_date_count": pit_overlap,
+                "m1_ready_all_component_overlap_date_count": ready_overlap,
+                "fully_active_all_component_overlap_date_count": fully_active_overlap,
+                "exact_parity_possible": fully_active_overlap > 0,
+                "exact_parity_limitation": limitation,
+            }
+        )
+    parity_frame = pl.from_dicts(parity_rows, infer_schema_length=None).sort(
+        "unit_ticker"
+    )
+    present = parity_frame.filter(pl.col("unit_security_id").is_not_null())
+    limitation_counts = {
+        str(row["exact_parity_limitation"]): int(row["len"])
+        for row in parity_frame.filter(~pl.col("exact_parity_possible"))
+        .group_by("exact_parity_limitation")
+        .len()
+        .to_dicts()
+    }
     audit = {
         "units_in_accepted_universe": present["unit_security_id"].n_unique(),
         "unit_tickers_in_accepted_universe": present["unit_ticker"]
         .unique()
         .sort()
         .to_list(),
-        "component_rows": frame.height,
+        "component_rows": component_frame.height,
         "mapped_component_security_rows": int(
-            frame["component_security_id"].is_not_null().sum()
+            component_frame["component_security_id"].is_not_null().sum()
         ),
-        "exact_parity_impossible_rows": int((~frame["exact_parity_possible"]).sum()),
+        "unit_rows": parity_frame.height,
+        "units_with_exact_parity_possible": int(
+            parity_frame["exact_parity_possible"].sum()
+        ),
+        "units_with_exact_parity_impossible": int(
+            (~parity_frame["exact_parity_possible"]).sum()
+        ),
+        "exact_parity_limitation_counts": limitation_counts,
     }
-    return audit, frame
+    return audit, component_frame, parity_frame
 
 
-def _month_ends(start: date, end: date) -> list[date]:
-    values: list[date] = []
-    cursor = date(start.year, start.month, 1)
-    final = date(end.year, end.month, 1)
-    while cursor <= final:
-        values.append(
-            date(cursor.year, cursor.month, monthrange(cursor.year, cursor.month)[1])
-        )
-        cursor = (
-            date(cursor.year + 1, 1, 1)
-            if cursor.month == 12
-            else date(cursor.year, cursor.month + 1, 1)
-        )
+def _month_key(value: date) -> str:
+    return f"{value.year:04d}-{value.month:02d}"
+
+
+def _parse_month_key(value: str) -> tuple[int, int]:
+    match = re.fullmatch(r"(\d{4})-(\d{2})", value)
+    if match is None or not 1 <= int(match.group(2)) <= 12:
+        raise ValueError(f"Invalid calendar-month key: {value!r}")
+    return int(match.group(1)), int(match.group(2))
+
+
+def _calendar_months(start: str, end: str) -> list[str]:
+    year, month = _parse_month_key(start)
+    end_year, end_month = _parse_month_key(end)
+    values: list[str] = []
+    while (year, month) <= (end_year, end_month):
+        values.append(f"{year:04d}-{month:02d}")
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
     return values
 
 
-def _last_completed_month_end(as_of: date) -> date:
-    first = date(as_of.year, as_of.month, 1)
-    prior = (
-        date(first.year - 1, 12, 1)
-        if first.month == 1
-        else date(first.year, first.month - 1, 1)
+def _last_completed_month(as_of: date) -> str:
+    year, month = (
+        (as_of.year - 1, 12) if as_of.month == 1 else (as_of.year, as_of.month - 1)
     )
-    return date(prior.year, prior.month, monthrange(prior.year, prior.month)[1])
+    return f"{year:04d}-{month:02d}"
+
+
+def market_cap_month_coverage(
+    reference_dates: Sequence[date],
+    *,
+    as_of: date,
+    required_start_month: str = MARKET_CAP_REQUIRED_START_MONTH,
+) -> dict[str, object]:
+    available = sorted({_month_key(value) for value in reference_dates})
+    required_end_month = _last_completed_month(as_of)
+    expected = _calendar_months(required_start_month, required_end_month)
+    missing = sorted(set(expected) - set(available))
+    return {
+        "required_start_month": required_start_month,
+        "required_end_month": required_end_month,
+        "distinct_reference_month_count": len(available),
+        "available_reference_months": available,
+        "first_reference_month": available[0] if available else None,
+        "last_reference_month": available[-1] if available else None,
+        "missing_reference_months": missing,
+        "missing_reference_month_count": len(missing),
+        "market_cap_history_complete": not missing,
+    }
 
 
 def market_cap_audit(
@@ -1812,6 +2002,7 @@ def market_cap_audit(
     mapping_stats: dict[str, object],
     *,
     as_of: date,
+    source_reference_dates: Sequence[date] | None = None,
 ) -> tuple[dict[str, object], pl.DataFrame]:
     cap_by_issuer: dict[str, list[tuple[date, float]]] = defaultdict(list)
     for row in market_cap.sort("reference_date").to_dicts():
@@ -1856,17 +2047,20 @@ def market_cap_audit(
     for issuer_id, issuer_name in sorted(issuer_names.items()):
         observations = cap_by_issuer.get(issuer_id, [])
         references = sorted(value[0] for value in observations)
-        internal_missing: list[date] = []
+        internal_missing: list[str] = []
         if references:
-            expected_internal = _month_ends(references[0], references[-1])
-            internal_missing = sorted(set(expected_internal) - set(references))
+            observed_months = sorted({_month_key(value) for value in references})
+            expected_internal = _calendar_months(
+                observed_months[0], observed_months[-1]
+            )
+            internal_missing = sorted(set(expected_internal) - set(observed_months))
             if internal_missing:
                 discontinuities.append(
                     {
                         "issuer_id": issuer_id,
                         "issuer_name": issuer_name,
                         "missing_months_between_first_and_last": [
-                            str(value) for value in internal_missing
+                            value for value in internal_missing
                         ],
                     }
                 )
@@ -1893,13 +2087,19 @@ def market_cap_audit(
             }
         )
     coverage = pl.from_dicts(coverage_rows, infer_schema_length=None).sort("issuer_id")
-    expected_months = _month_ends(date(2020, 6, 1), _last_completed_month_end(as_of))
-    available_months = (
+    available_reference_dates = (
         market_cap["reference_date"].unique().sort().to_list()
         if market_cap.height
         else []
     )
-    missing_months = sorted(set(expected_months) - set(available_months))
+    month_coverage = market_cap_month_coverage(
+        (
+            available_reference_dates
+            if source_reference_dates is None
+            else source_reference_dates
+        ),
+        as_of=as_of,
+    )
     total_active = peers.height
     total_joined = sum(joined_by_security.values())
     no_cap_securities = sorted(
@@ -1909,11 +2109,10 @@ def market_cap_audit(
     )
     audit = {
         **mapping_stats,
-        "expected_month_start": "2020-06-30",
-        "expected_month_end": str(expected_months[-1]),
-        "available_reference_months": [str(value) for value in available_months],
-        "missing_reference_months": [str(value) for value in missing_months],
-        "missing_reference_month_count": len(missing_months),
+        **month_coverage,
+        "available_reference_dates": [
+            str(value) for value in available_reference_dates
+        ],
         "eligible_security_day_count": total_active,
         "strictly_lagged_joined_security_day_count": total_joined,
         "strictly_lagged_security_day_coverage_fraction": (
@@ -1947,8 +2146,19 @@ def market_cap_audit(
 def _render_markdown(audit: dict[str, object]) -> str:
     classification = audit["classification_and_peer_coverage"]
     policies = classification["candidate_policy_coverage"]
+    status = (
+        "> **COMPLETE:** Official B3 market-cap calendar-month coverage is complete."
+        if audit["market_cap_history_complete"]
+        else (
+            "> **DIAGNOSTIC ONLY — INCOMPLETE MARKET-CAP HISTORY:** This artifact is "
+            "not eligible for downstream market-cap features and is not a complete "
+            "PIT metadata audit."
+        )
+    )
     lines = [
         "# B3 human-prior metadata audit",
+        "",
+        status,
         "",
         "This audit uses the current B3 classification and unit snapshots as descriptive "
         "metadata across the historical PIT universe. It does not treat either snapshot "
@@ -2024,8 +2234,9 @@ def _render_markdown(audit: dict[str, object]) -> str:
             "## Units",
             "",
             f"- Units in the accepted universe: {audit['units']['units_in_accepted_universe']}",
-            f"- Component rows with no exact parity path: "
-            f"{audit['units']['exact_parity_impossible_rows']}",
+            f"- Units with exact parity possible: "
+            f"{audit['units']['units_with_exact_parity_possible']}",
+            f"- Units with exact parity impossible: {audit['units']['units_with_exact_parity_impossible']}",
             "",
             "## Monthly market capitalization",
             "",
@@ -2033,7 +2244,11 @@ def _render_markdown(audit: dict[str, object]) -> str:
             f"{audit['market_cap']['issuer_name_mapping_fraction']:.2%}",
             f"- Strictly lagged eligible security-day coverage: "
             f"{audit['market_cap']['strictly_lagged_security_day_coverage_fraction']:.2%}",
-            f"- Missing official monthly references: "
+            f"- Calendar-month history complete: "
+            f"{audit['market_cap']['market_cap_history_complete']}",
+            f"- Available calendar months: "
+            f"{audit['market_cap']['distinct_reference_month_count']}",
+            f"- Missing official calendar months: "
             f"{audit['market_cap']['missing_reference_month_count']}",
             f"- Conflicting issuer-month groups excluded: "
             f"{audit['market_cap']['conflicting_issuer_month_groups']}",
@@ -2044,6 +2259,81 @@ def _render_markdown(audit: dict[str, object]) -> str:
         ]
     )
     return "\n".join(lines)
+
+
+def validate_raw_sources(
+    raw_dir: Path = RAW_BASE,
+    *,
+    as_of: date | None = None,
+    inputs: FeatureInputs | None = None,
+    assignments_loader: Callable[[Path], pl.DataFrame] = load_assignments,
+) -> dict[str, object]:
+    as_of = date.today() if as_of is None else as_of
+    inputs = _resolve_feature_inputs() if inputs is None else inputs
+    _validate_feature_inputs(inputs)
+    classification, raw_market_cap, units, sources = _load_raw_tables(raw_dir)
+    assignments = assignments_loader(inputs.assignments_dir)
+    ticker_history = pl.read_parquet(inputs.universe_dir / "ticker_history.parquet")
+    security_metadata, _, security_exceptions = reconcile_security_metadata(
+        assignments, ticker_history, classification
+    )
+    market_cap, market_exceptions, market_stats = reconcile_market_cap(
+        raw_market_cap, classification, security_metadata
+    )
+    accepted_issuers = set(
+        security_metadata.filter(pl.col("issuer_id").is_not_null())[
+            "issuer_id"
+        ].to_list()
+    )
+    market_issuers = set(market_cap["issuer_id"].to_list())
+    month_coverage = market_cap_month_coverage(
+        raw_market_cap["reference_date"].to_list(), as_of=as_of
+    )
+    return {
+        "build_mode_if_built_now": (
+            "complete"
+            if month_coverage["market_cap_history_complete"]
+            else "diagnostic_only_incomplete_market_cap"
+        ),
+        "eligible_for_strict_build": month_coverage["market_cap_history_complete"],
+        "classification": {
+            "row_count": classification.height,
+            "issuer_count": classification["issuer_id"].n_unique(),
+        },
+        "market_cap": {
+            "row_count": raw_market_cap.height,
+            "source_issuer_count": raw_market_cap["issuer_name"].n_unique(),
+            "all_company_footer_validated": True,
+            **month_coverage,
+            "mapped_accepted_universe_issuer_count": len(
+                accepted_issuers & market_issuers
+            ),
+            "mapping_exception_count": market_exceptions.height,
+            "duplicate_issuer_month_groups": market_stats[
+                "duplicate_issuer_month_groups"
+            ],
+            "conflicting_issuer_month_groups": market_stats[
+                "conflicting_issuer_month_groups"
+            ],
+        },
+        "units": {
+            "unit_count": units["unit_ticker"].n_unique(),
+            "component_count": units.height,
+        },
+        "security_mapping_exception_count": security_exceptions.height,
+        "sources": [
+            {
+                "kind": source.kind,
+                "path": str(source.path.resolve()),
+                "source_url": source.source_url,
+                "sha256": source.sha256,
+                "retrieved_at_utc": source.retrieved_at_utc.isoformat(),
+                "reference_dates": [str(value) for value in source.reference_dates],
+            }
+            for source in sources
+        ],
+        "suspicious_truncation_or_schema_mismatch": [],
+    }
 
 
 def _repository_root() -> Path:
@@ -2071,13 +2361,7 @@ def _repository_state() -> tuple[str, list[str]]:
     return commit, status
 
 
-def _resolve_feature_inputs() -> FeatureInputs:
-    inputs = FeatureInputs(
-        universe_dir=resolve_pointer(UNIVERSE_POINTER),
-        assignments_dir=resolve_pointer(ASSIGNMENTS_POINTER),
-        cotahist_dir=resolve_pointer(COTAHIST_POINTER),
-        feature_store=resolve_pointer(CANONICAL_OUTPUT_POINTER),
-    )
+def _validate_feature_inputs(inputs: FeatureInputs) -> None:
     manifest = json.loads(
         (inputs.feature_store / "manifest.json").read_text(encoding="utf-8")
     )
@@ -2093,6 +2377,16 @@ def _resolve_feature_inputs() -> FeatureInputs:
             raise ValueError(
                 f"Canonical feature store {name} does not match the current pointer"
             )
+
+
+def _resolve_feature_inputs() -> FeatureInputs:
+    inputs = FeatureInputs(
+        universe_dir=resolve_pointer(UNIVERSE_POINTER),
+        assignments_dir=resolve_pointer(ASSIGNMENTS_POINTER),
+        cotahist_dir=resolve_pointer(COTAHIST_POINTER),
+        feature_store=resolve_pointer(CANONICAL_OUTPUT_POINTER),
+    )
+    _validate_feature_inputs(inputs)
     return inputs
 
 
@@ -2185,17 +2479,30 @@ def build_human_priors(
     pointer: Path = CANONICAL_POINTER,
     *,
     created_at: datetime | None = None,
+    allow_incomplete_market_cap: bool = False,
+    inputs: FeatureInputs | None = None,
+    assignments_loader: Callable[[Path], pl.DataFrame] = load_assignments,
+    repository_state: Callable[[], tuple[str, list[str]]] = _repository_state,
 ) -> Path:
     created_at = datetime.now(UTC) if created_at is None else created_at.astimezone(UTC)
-    inputs = _resolve_feature_inputs()
+    inputs = _resolve_feature_inputs() if inputs is None else inputs
+    _validate_feature_inputs(inputs)
     classification, raw_market_cap, raw_units, raw_sources = _load_raw_tables(raw_dir)
-    assignments = load_assignments(inputs.assignments_dir)
+    assignments = assignments_loader(inputs.assignments_dir)
     ticker_history = pl.read_parquet(inputs.universe_dir / "ticker_history.parquet")
     security_metadata, classification_review, security_exceptions = (
         reconcile_security_metadata(assignments, ticker_history, classification)
     )
     market_cap, market_exceptions, market_stats = reconcile_market_cap(
         raw_market_cap, classification, security_metadata
+    )
+    accepted_issuer_ids = set(
+        security_metadata.filter(pl.col("issuer_id").is_not_null())[
+            "issuer_id"
+        ].to_list()
+    )
+    market_stats["mapped_accepted_universe_issuer_count"] = len(
+        accepted_issuer_ids & set(market_cap["issuer_id"].to_list())
     )
     unit_components, unit_exceptions = normalize_unit_components(
         raw_units, classification, security_metadata
@@ -2239,7 +2546,7 @@ def build_human_priors(
         eligible_dates,
         membership,
     )
-    units_audit, unit_overlap = unit_overlap_audit(
+    units_audit, unit_overlap, unit_parity = unit_overlap_audit(
         unit_components,
         security_ids,
         eligible_dates,
@@ -2252,10 +2559,27 @@ def build_human_priors(
         security_metadata,
         market_stats,
         as_of=created_at.date(),
+        source_reference_dates=raw_market_cap["reference_date"].to_list(),
+    )
+    market_cap_complete = bool(market_audit["market_cap_history_complete"])
+    if not market_cap_complete and not allow_incomplete_market_cap:
+        missing = ", ".join(market_audit["missing_reference_months"])
+        raise ValueError(
+            "Official B3 market-cap history is incomplete for "
+            f"{market_audit['required_start_month']} through "
+            f"{market_audit['required_end_month']}; missing calendar months: "
+            f"{missing}. Batch-ingest official files or rerun with "
+            "--allow-incomplete-market-cap for a diagnostic-only build."
+        )
+    build_mode = (
+        "complete" if market_cap_complete else "diagnostic_incomplete_market_cap"
     )
     audit = {
         "schema_version": SCHEMA_VERSION,
         "created_at_utc": created_at.isoformat(),
+        "build_mode": build_mode,
+        "market_cap_history_complete": market_cap_complete,
+        "eligible_for_downstream_market_cap_features": market_cap_complete,
         "scope": {
             "accepted_security_count": len(security_ids),
             "eligible_model_date_count": int(eligible_dates.sum()),
@@ -2283,7 +2607,9 @@ def build_human_priors(
         "grouping_policy_selected": None,
     }
 
-    output_dir = output_base / f"human_priors_{created_at:%Y%m%dT%H%M%S%fZ}"
+    output_dir = output_base / (
+        f"human_priors_{build_mode}_{created_at:%Y%m%dT%H%M%S%fZ}"
+    )
     partial = output_dir.with_name(f"{output_dir.name}.partial")
     if output_dir.exists() or partial.exists():
         raise FileExistsError(f"B3 human-prior output already exists: {output_dir}")
@@ -2312,10 +2638,11 @@ def build_human_priors(
         classification_review.write_csv(partial / "security_classification_review.csv")
         issuer_groups.write_csv(partial / "issuer_peer_groups.csv")
         unit_overlap.write_csv(partial / "unit_overlap_audit.csv")
+        unit_parity.write_csv(partial / "unit_parity_coverage.csv")
         market_coverage.write_csv(partial / "market_cap_coverage.csv")
         mapping_exceptions.write_csv(partial / "mapping_exceptions.csv")
 
-        commit, status = _repository_state()
+        commit, status = repository_state()
         outputs = sorted(
             path for path in partial.iterdir() if path.name != "manifest.json"
         )
@@ -2325,29 +2652,52 @@ def build_human_priors(
             "repository_commit": commit,
             "repository_status_porcelain": status,
             "implementation_sha256": _sha256_file(Path(__file__).resolve()),
+            "build_mode": build_mode,
+            "market_cap_history_complete": market_cap_complete,
+            "eligible_for_downstream_market_cap_features": market_cap_complete,
+            "canonical_pointer_published": market_cap_complete,
             "official_b3_pages": {
                 "classification": CLASSIFICATION_PAGE_URL,
                 "market_cap_monthly": MARKET_CAP_PAGE_URL,
                 "units": UNITS_PAGE_URL,
             },
+            "official_b3_endpoints": {
+                "classification_download_base": CLASSIFICATION_API_BASE,
+                "classification_request": {"language": "pt-br"},
+                "market_cap_current_download_base": MARKET_CAP_API_BASE,
+                "market_cap_current_request": {
+                    "company": "",
+                    "language": "pt-br",
+                    "keyword": "",
+                    "pageNumber": 1,
+                    "pageSize": 20,
+                },
+                "units_direct_page": UNITS_PAGE_URL,
+            },
+            "market_cap_historical_acquisition_limitation": MARKET_CAP_HISTORY_LIMITATION,
+            "market_cap_export_completeness_rule": (
+                "Every CSV must contain more than 20 distinct company rows and a "
+                "Total Geral (N) footer whose declared N exactly matches those rows; "
+                "otherwise it is rejected as truncated."
+            ),
             "canonical_inputs": {
                 "point_in_time_universe": _manifest_input(
-                    UNIVERSE_POINTER,
+                    inputs.universe_pointer,
                     inputs.universe_dir,
                     ("ticker_history.parquet",),
                 ),
                 "accepted_xp_assignments": _manifest_input(
-                    ASSIGNMENTS_POINTER,
+                    inputs.assignments_pointer,
                     inputs.assignments_dir,
                     ("xp_accepted_source_assignments_v1.parquet",),
                 ),
                 "parsed_cotahist": _manifest_input(
-                    COTAHIST_POINTER,
+                    inputs.cotahist_pointer,
                     inputs.cotahist_dir,
                     ("parse_audit.json",),
                 ),
                 "feature_store": _manifest_input(
-                    CANONICAL_OUTPUT_POINTER,
+                    inputs.feature_store_pointer,
                     inputs.feature_store,
                     (
                         "date_index.parquet",
@@ -2375,15 +2725,18 @@ def build_human_priors(
                 "security_metadata": str(security_metadata.schema),
                 "issuer_market_cap_monthly": str(market_cap.schema),
                 "unit_components": str(unit_components.schema),
+                "unit_parity_coverage": str(unit_parity.schema),
             },
             "classification_is_point_in_time": False,
             "grouping_policy_selected": None,
             "output_dir": str(output_dir.resolve()),
             "output_sha256": {path.name: _sha256_file(path) for path in outputs},
+            "artifact_status": {path.name: build_mode for path in outputs},
         }
         _atomic_json(partial / "manifest.json", manifest)
         os.replace(partial, output_dir)
-        _atomic_pointer(pointer, output_dir)
+        if market_cap_complete:
+            _atomic_pointer(pointer, output_dir)
     except BaseException:
         shutil.rmtree(partial, ignore_errors=True)
         raise
@@ -2407,11 +2760,26 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     ingest.add_argument("--file", type=Path, required=True)
     ingest.add_argument("--raw-dir", type=Path, default=RAW_BASE)
     build = subparsers.add_parser(
-        "build", help="Normalize the cache and generate the complete PIT audit."
+        "build", help="Normalize the cache and generate the PIT metadata audit."
     )
     build.add_argument("--raw-dir", type=Path, default=RAW_BASE)
     build.add_argument("--output-base", type=Path, default=OUTPUT_BASE)
     build.add_argument("--pointer", type=Path, default=CANONICAL_POINTER)
+    build.add_argument(
+        "--allow-incomplete-market-cap",
+        action="store_true",
+        help="Create a diagnostic-only artifact instead of failing on missing months.",
+    )
+    ingest_directory = subparsers.add_parser(
+        "ingest-market-cap-dir",
+        help="Prevalidate and batch-cache official B3 monthly CSV exports.",
+    )
+    ingest_directory.add_argument("--directory", type=Path, required=True)
+    ingest_directory.add_argument("--raw-dir", type=Path, default=RAW_BASE)
+    validate = subparsers.add_parser(
+        "validate-raw", help="Validate the existing raw cache without network access."
+    )
+    validate.add_argument("--raw-dir", type=Path, default=RAW_BASE)
     instructions = subparsers.add_parser(
         "instructions", help="Print official manual market-cap instructions."
     )
@@ -2425,16 +2793,47 @@ def main(arguments: Sequence[str] | None = None) -> int:
         acquired = acquire_official_sources(args.raw_dir, refresh=args.refresh)
         for kind, source in acquired.items():
             print(f"{kind}: {source.path} sha256={source.sha256}")
+        print(json.dumps(validate_raw_sources(args.raw_dir), indent=2))
         print(market_cap_manual_instructions(args.raw_dir))
     elif args.command == "ingest-market-cap":
         source = ingest_manual_market_cap(args.file, args.raw_dir)
         print(f"market_cap: {source.path} sha256={source.sha256}")
+        print(json.dumps(validate_raw_sources(args.raw_dir), indent=2))
+    elif args.command == "ingest-market-cap-dir":
+        sources = ingest_market_cap_directory(args.directory, args.raw_dir)
+        print(f"validated_and_cached_files: {len(sources)}")
+        print(json.dumps(validate_raw_sources(args.raw_dir), indent=2))
+    elif args.command == "validate-raw":
+        print(json.dumps(validate_raw_sources(args.raw_dir), indent=2))
     elif args.command == "build":
+        output = build_human_priors(
+            raw_dir=args.raw_dir,
+            output_base=args.output_base,
+            pointer=args.pointer,
+            allow_incomplete_market_cap=args.allow_incomplete_market_cap,
+        )
+        audit = json.loads((output / "metadata_audit.json").read_text(encoding="utf-8"))
+        market = audit["market_cap"]
+        print(output)
         print(
-            build_human_priors(
-                raw_dir=args.raw_dir,
-                output_base=args.output_base,
-                pointer=args.pointer,
+            json.dumps(
+                {
+                    "distinct_market_cap_reference_months": market[
+                        "distinct_reference_month_count"
+                    ],
+                    "first_market_cap_reference_month": market["first_reference_month"],
+                    "last_market_cap_reference_month": market["last_reference_month"],
+                    "missing_market_cap_calendar_months": market[
+                        "missing_reference_months"
+                    ],
+                    "source_issuer_count": market["source_distinct_issuer_names"],
+                    "mapped_accepted_universe_issuer_count": market[
+                        "mapped_accepted_universe_issuer_count"
+                    ],
+                    "build_mode": audit["build_mode"],
+                    "market_cap_history_complete": audit["market_cap_history_complete"],
+                },
+                indent=2,
             )
         )
     else:

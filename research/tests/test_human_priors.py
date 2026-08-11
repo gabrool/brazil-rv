@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
+import json
 import zipfile
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from html import escape
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -13,19 +17,26 @@ import pytest
 from brazil_rv.preprocessing.human_priors import (
     CLASSIFICATION_API_BASE,
     MARKET_CAP_API_BASE,
+    SCHEMA_VERSION,
     UNITS_PAGE_URL,
+    FeatureInputs,
     HttpPayload,
     acquire_official_sources,
     active_security_days,
     add_self_excluded_peer_counts,
+    build_human_priors,
+    ingest_market_cap_directory,
     issuer_peer_audit,
     market_cap_audit,
+    market_cap_month_coverage,
     normalize_unit_components,
     parse_classification_xlsx,
     parse_market_cap_csv,
     parse_units_html,
     reconcile_security_metadata,
     strictly_lagged_market_cap_index,
+    unit_overlap_audit,
+    validate_raw_sources,
 )
 
 
@@ -80,14 +91,41 @@ def _classification_xlsx() -> bytes:
     )
 
 
-def _market_cap_csv() -> bytes:
-    return (
-        "20260804|||||\n"
-        "IBOV|IBRX100|Empresa|Valor (R$) em 31/07/2026|"
-        "Valor (R$) em 30/06/2026|Var (%)\n"
-        "X|X|BANCO X|1.234,50|1200,00|2,88\n"
-        "X|X|ENERGIA Y|987,65|900,00|9,74\n"
-    ).encode()
+def _market_cap_csv(
+    reference_dates: tuple[date, ...] = (date(2026, 7, 31), date(2026, 6, 30)),
+    issuer_names: tuple[str, ...] | None = None,
+) -> bytes:
+    issuer_names = issuer_names or (
+        "BANCO X",
+        "ENERGIA Y",
+        *(f"COMPANY {index:02d}" for index in range(1, 20)),
+    )
+    header = [
+        "IBOV",
+        "IBRX100",
+        "Empresa",
+        *(f"Valor (R$) em {value:%d/%m/%Y}" for value in reference_dates),
+        "Var (%)",
+    ]
+    rows = ["20260804" + "|" * (len(header) - 1), "|".join(header)]
+    for issuer_index, issuer_name in enumerate(issuer_names, start=1):
+        values = [
+            f"{1000 + issuer_index * 10 + offset:.2f}"
+            for offset, _ in enumerate(reference_dates)
+        ]
+        rows.append("|".join(("", "", issuer_name, *values, "0.00")))
+    rows.append(
+        "|".join(
+            (
+                "",
+                "",
+                f"Total Geral ({len(issuer_names)})",
+                *("0.00" for _ in reference_dates),
+                "0.00",
+            )
+        )
+    )
+    return ("\n".join(rows) + "\n").encode()
 
 
 def _units_html() -> bytes:
@@ -165,13 +203,27 @@ def test_parse_b3_classification_workbook() -> None:
 def test_parse_monthly_market_cap_long_form() -> None:
     parsed = parse_market_cap_csv(_market_cap_csv(), source_file="market.csv")
 
-    assert parsed.height == 4
+    assert parsed.height == 42
     banco = parsed.filter(pl.col("issuer_name") == "BANCO X")
     assert banco["reference_date"].to_list() == [
         date(2026, 6, 30),
         date(2026, 7, 31),
     ]
-    assert banco["market_cap_brl"].to_list() == [1200.0, 1234.5]
+    assert banco["reference_month"].to_list() == ["2026-06", "2026-07"]
+    assert banco["market_cap_brl"].to_list() == [1011.0, 1010.0]
+
+
+def test_market_cap_export_rejects_twenty_company_truncation() -> None:
+    with pytest.raises(ValueError, match="pagination-truncated"):
+        parse_market_cap_csv(
+            _market_cap_csv(issuer_names=tuple(f"ISSUER {i}" for i in range(20)))
+        )
+
+
+def test_market_cap_export_rejects_footer_count_mismatch() -> None:
+    payload = _market_cap_csv().replace(b"Total Geral (21)", b"Total Geral (344)")
+    with pytest.raises(ValueError, match="completeness footer"):
+        parse_market_cap_csv(payload)
 
 
 def test_parse_unit_composition_into_component_rows() -> None:
@@ -248,6 +300,66 @@ def test_strict_market_cap_lag_excludes_same_day() -> None:
     assert strictly_lagged_market_cap_index(references, date(2026, 5, 31)) is None
     assert strictly_lagged_market_cap_index(references, date(2026, 6, 30)) == 0
     assert strictly_lagged_market_cap_index(references, date(2026, 7, 1)) == 1
+
+
+def test_market_cap_coverage_uses_calendar_months_not_calendar_end_dates() -> None:
+    coverage = market_cap_month_coverage(
+        [date(2021, 1, 29), date(2021, 2, 26), date(2021, 3, 30)],
+        as_of=date(2021, 4, 15),
+        required_start_month="2021-01",
+    )
+
+    assert coverage["available_reference_months"] == [
+        "2021-01",
+        "2021-02",
+        "2021-03",
+    ]
+    assert coverage["missing_reference_months"] == []
+    assert coverage["market_cap_history_complete"] is True
+
+
+def test_market_cap_coverage_reports_a_genuinely_missing_calendar_month() -> None:
+    coverage = market_cap_month_coverage(
+        [date(2021, 1, 29), date(2021, 3, 30)],
+        as_of=date(2021, 4, 1),
+        required_start_month="2021-01",
+    )
+
+    assert coverage["missing_reference_months"] == ["2021-02"]
+    assert coverage["market_cap_history_complete"] is False
+
+
+def test_batch_manual_ingestion_validates_every_file_before_cache_mutation(
+    tmp_path: Path,
+) -> None:
+    downloads = tmp_path / "downloads"
+    downloads.mkdir()
+    (downloads / "Bolsa_Valores_Mensal_2021-01.csv").write_bytes(
+        _market_cap_csv((date(2021, 1, 29),))
+    )
+    (downloads / "Bolsa_Valores_Mensal_2021-02.csv").write_bytes(
+        _market_cap_csv((date(2021, 2, 26),))
+    )
+    malformed = downloads / "unexpected.csv"
+    malformed.write_bytes(b"not an official export")
+    raw_dir = tmp_path / "raw"
+
+    with pytest.raises(ValueError, match="unexpected CSV filenames"):
+        ingest_market_cap_directory(downloads, raw_dir)
+    assert not (raw_dir / "market_cap").exists()
+
+    malformed.unlink()
+    sources = ingest_market_cap_directory(
+        downloads,
+        raw_dir,
+        retrieved_at=datetime(2021, 3, 2, tzinfo=UTC),
+    )
+
+    assert len(sources) == 2
+    assert [source.reference_dates for source in sources] == [
+        (date(2021, 1, 29),),
+        (date(2021, 2, 26),),
+    ]
 
 
 def test_same_issuer_audit_reports_share_class_groups_and_single_member_periods() -> (
@@ -345,6 +457,63 @@ def test_market_cap_audit_joins_only_strictly_prior_months() -> None:
     assert coverage.row(named=True)["strictly_lagged_joined_security_day_count"] == 2
 
 
+def test_issuer_discontinuity_uses_calendar_month_keys() -> None:
+    peers = pl.DataFrame(
+        schema={
+            "trade_date": pl.Date,
+            "security_id": pl.String,
+            "issuer_id": pl.String,
+        }
+    )
+    market_cap = pl.DataFrame(
+        {
+            "reference_date": [date(2026, 1, 30), date(2026, 3, 30)],
+            "reference_month": ["2026-01", "2026-03"],
+            "issuer_id": ["ISSUER_X"] * 2,
+            "issuer_name": ["BANCO X"] * 2,
+            "market_cap_brl": [100.0, 110.0],
+            "matching_method": ["EXACT"] * 2,
+            "source_file": ["market.csv"] * 2,
+            "source_url": ["https://b3.example/market"] * 2,
+            "retrieved_at_utc": [datetime(2026, 4, 1, tzinfo=UTC)] * 2,
+        }
+    )
+    metadata = pl.DataFrame(
+        {
+            "security_id": ["SEC_ON"],
+            "issuer_id": ["ISSUER_X"],
+            "issuer_name": ["BANCO X"],
+        }
+    )
+    mapping_stats = {
+        "source_row_count": 2,
+        "source_distinct_issuer_names": 1,
+        "mapped_distinct_issuer_names": 1,
+        "issuer_name_mapping_fraction": 1.0,
+        "normalized_row_count": 2,
+        "normalized_issuer_count": 1,
+        "duplicate_issuer_month_groups": 0,
+        "conflicting_issuer_month_groups": 0,
+    }
+
+    audit, _ = market_cap_audit(
+        peers,
+        market_cap,
+        metadata,
+        mapping_stats,
+        as_of=date(2026, 4, 1),
+        source_reference_dates=market_cap["reference_date"].to_list(),
+    )
+
+    assert audit["issuer_discontinuities"] == [
+        {
+            "issuer_id": "ISSUER_X",
+            "issuer_name": "BANCO X",
+            "missing_months_between_first_and_last": ["2026-02"],
+        }
+    ]
+
+
 def test_unit_component_normalization_preserves_missing_universe_component() -> None:
     classification = _classification_frame().head(1)
     units = parse_units_html(_units_html(), date(2026, 8, 11))
@@ -369,6 +538,126 @@ def test_unit_component_normalization_preserves_missing_universe_component() -> 
     assert pn["component_security_id"] is None
     assert pn["mapping_status"] == "COMPONENT_NOT_IN_ACCEPTED_UNIVERSE"
     assert exceptions.is_empty()
+
+
+def _normalized_unit_components(
+    *,
+    pn_security_id: str | None = "SEC_PN",
+    pn_status: str = "MAPPED",
+) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "unit_security_id": ["SEC_UNIT", "SEC_UNIT"],
+            "unit_ticker": ["BANC11", "BANC11"],
+            "component_issuer_id": ["ISSUER_X", "ISSUER_X"],
+            "component_share_class": ["ON", "PN"],
+            "component_security_id": ["SEC_ON", pn_security_id],
+            "component_quantity": [1, 2],
+            "mapping_status": ["MAPPED", pn_status],
+            "unit_snapshot_date": [date(2026, 8, 11)] * 2,
+            "source_file": ["units.html"] * 2,
+            "source_url": ["https://b3.example/units"] * 2,
+        }
+    )
+
+
+def _unit_parity(
+    membership: np.ndarray,
+    readiness: np.ndarray,
+    *,
+    components: pl.DataFrame | None = None,
+) -> tuple[dict[str, object], pl.DataFrame, pl.DataFrame]:
+    return unit_overlap_audit(
+        _normalized_unit_components() if components is None else components,
+        ["SEC_UNIT", "SEC_ON", "SEC_PN"],
+        np.ones(membership.shape[0], dtype=bool),
+        membership,
+        readiness,
+    )
+
+
+def test_unit_parity_tracks_all_available_components_at_unit_level() -> None:
+    audit, component_rows, unit_rows = _unit_parity(
+        np.ones((2, 3), dtype=bool),
+        np.ones((2, 3), dtype=bool),
+    )
+
+    assert component_rows.height == 2
+    assert audit["mapped_component_security_rows"] == 2
+    row = unit_rows.row(named=True)
+    assert row["required_component_count"] == 2
+    assert row["mapped_component_count"] == 2
+
+
+def test_unit_parity_rejects_one_absent_component() -> None:
+    _, _, unit_rows = _unit_parity(
+        np.ones((2, 3), dtype=bool),
+        np.ones((2, 3), dtype=bool),
+        components=_normalized_unit_components(
+            pn_security_id=None,
+            pn_status="COMPONENT_NOT_IN_ACCEPTED_UNIVERSE",
+        ),
+    )
+
+    row = unit_rows.row(named=True)
+    assert row["mapped_component_count"] == 1
+    assert row["exact_parity_possible"] is False
+    assert row["exact_parity_limitation"] == "MISSING_OR_AMBIGUOUS_COMPONENTS"
+    assert (
+        "PN:COMPONENT_NOT_IN_ACCEPTED_UNIVERSE"
+        in row["missing_or_ambiguous_components"]
+    )
+
+
+def test_unit_parity_rejects_components_never_simultaneously_pit_members() -> None:
+    membership = np.array(
+        [[True, True, False], [True, False, True]],
+        dtype=bool,
+    )
+    _, _, unit_rows = _unit_parity(
+        membership,
+        np.ones_like(membership),
+    )
+
+    row = unit_rows.row(named=True)
+    assert row["pit_all_component_overlap_date_count"] == 0
+    assert row["exact_parity_possible"] is False
+    assert row["exact_parity_limitation"] == "NO_SIMULTANEOUS_PIT_MEMBERSHIP"
+
+
+def test_unit_parity_rejects_pit_overlap_without_all_component_readiness() -> None:
+    membership = np.ones((2, 3), dtype=bool)
+    readiness = np.array(
+        [[True, True, False], [True, True, False]],
+        dtype=bool,
+    )
+    _, _, unit_rows = _unit_parity(membership, readiness)
+
+    row = unit_rows.row(named=True)
+    assert row["pit_all_component_overlap_date_count"] == 2
+    assert row["m1_ready_all_component_overlap_date_count"] == 0
+    assert row["exact_parity_possible"] is False
+    assert row["exact_parity_limitation"] == "NO_SIMULTANEOUS_M1_READINESS"
+
+
+def test_multi_component_unit_parity_requires_one_fully_active_overlap() -> None:
+    membership = np.array(
+        [[True, True, True], [True, True, False], [True, False, True]],
+        dtype=bool,
+    )
+    readiness = np.array(
+        [[True, True, True], [True, True, True], [True, True, True]],
+        dtype=bool,
+    )
+    audit, _, unit_rows = _unit_parity(membership, readiness)
+
+    row = unit_rows.row(named=True)
+    assert row["pit_all_component_overlap_date_count"] == 1
+    assert row["m1_ready_all_component_overlap_date_count"] == 3
+    assert row["fully_active_all_component_overlap_date_count"] == 1
+    assert row["exact_parity_possible"] is True
+    assert row["exact_parity_limitation"] == ""
+    assert audit["units_with_exact_parity_possible"] == 1
 
 
 def test_acquisition_is_cached_and_network_free_on_repeat(tmp_path) -> None:
@@ -429,3 +718,329 @@ def test_acquisition_is_cached_and_network_free_on_repeat(tmp_path) -> None:
 def test_malformed_responses_and_schema_drift_fail_clearly(parser, payload) -> None:
     with pytest.raises(ValueError):
         parser(payload)
+
+
+def _classification_xlsx_for_issuers(issuer_names: tuple[str, ...]) -> bytes:
+    rows = [
+        ["SETOR", "SUBSETOR", "SEGMENTO", "EMISSOR", "", ""],
+        ["", "", "", "NOME DE PREGÃO", "CÓDIGO", "SEGMENTO DE NEGOCIAÇÃO"],
+    ]
+    for index, issuer_name in enumerate(issuer_names):
+        rows.append(
+            [
+                "Financeiro" if index == 0 else "",
+                "Intermediários" if index == 0 else "",
+                "Bancos" if index == 0 else "",
+                issuer_name,
+                "BANC" if index == 0 else f"C{index:03d}",
+                "NM",
+            ]
+        )
+    return _xlsx_bytes(rows)
+
+
+def _populate_raw_fixture(
+    raw_dir: Path,
+    *,
+    issuer_names: tuple[str, ...],
+    reference_dates: tuple[date, ...],
+) -> None:
+    classification = _classification_xlsx_for_issuers(issuer_names)
+    market_cap = _market_cap_csv(reference_dates, issuer_names)
+
+    def fetch(url: str) -> HttpPayload:
+        if url.startswith(CLASSIFICATION_API_BASE):
+            return HttpPayload(classification, "application/octet-stream", url)
+        if url.startswith(MARKET_CAP_API_BASE):
+            return HttpPayload(base64.b64encode(market_cap), "text/plain", url)
+        assert url == UNITS_PAGE_URL
+        return HttpPayload(_units_html(), "text/html", url)
+
+    acquire_official_sources(
+        raw_dir,
+        now=datetime(2020, 8, 15, 12, 0, tzinfo=UTC),
+        fetch=fetch,
+    )
+
+
+def _canonical_build_fixture(
+    root: Path,
+) -> tuple[
+    FeatureInputs,
+    tuple[str, ...],
+    tuple[str, ...],
+    Callable[[Path], pl.DataFrame],
+]:
+    universe_dir = root / "universe"
+    assignments_dir = root / "assignments"
+    cotahist_dir = root / "cotahist"
+    feature_store = root / "feature_store"
+    pointers = root / "pointers"
+    for directory in (
+        universe_dir,
+        assignments_dir,
+        cotahist_dir,
+        feature_store,
+        pointers,
+    ):
+        directory.mkdir(parents=True)
+
+    issuer_names = ("BANCO X", *(f"COMPANY {index:02d}" for index in range(1, 28)))
+    security_ids = tuple(f"SEC{index:03d}" for index in range(30))
+    security_issuer_names = (
+        "BANCO X",
+        "BANCO X",
+        "BANCO X",
+        *(f"COMPANY {index:02d}" for index in range(1, 28)),
+    )
+    tickers = (
+        "BANC11",
+        "BANC3",
+        "BANC4",
+        *(f"C{index:03d}3" for index in range(1, 28)),
+    )
+    share_classes = ("UNIT", "ON", "PN", *("ON" for _ in range(27)))
+    isins = tuple(f"BRFIXTURE{index:04d}" for index in range(30))
+    assignments = pl.DataFrame(
+        {
+            "security_id": security_ids,
+            "isin": isins,
+            "latest_ticker": tickers,
+        }
+    )
+    assignments.write_parquet(
+        assignments_dir / "xp_accepted_source_assignments_v1.parquet"
+    )
+    (assignments_dir / "decision_manifest.json").write_text(
+        json.dumps({"fixture": True}), encoding="utf-8"
+    )
+    ticker_history = pl.DataFrame(
+        {
+            "security_id": security_ids,
+            "ticker": tickers,
+            "valid_from": [date(2020, 1, 1)] * 30,
+            "valid_to": [date(2099, 12, 31)] * 30,
+            "isin": isins,
+            "issuer_short_name": security_issuer_names,
+            "security_spec": share_classes,
+        }
+    )
+    ticker_history.write_parquet(universe_dir / "ticker_history.parquet")
+    (universe_dir / "manifest.json").write_text(
+        json.dumps({"fixture": True}), encoding="utf-8"
+    )
+    (cotahist_dir / "parse_audit.json").write_text(
+        json.dumps({"fixture": True}), encoding="utf-8"
+    )
+
+    dates = [date(2020, 8, 3), date(2020, 8, 4), date(2020, 8, 5)]
+    pl.DataFrame({"date_idx": range(len(dates)), "trade_date": dates}).write_parquet(
+        feature_store / "date_index.parquet"
+    )
+    pl.DataFrame({"equity_slot": range(30), "security_id": security_ids}).write_parquet(
+        feature_store / "equity_index.parquet"
+    )
+    np.save(feature_store / "equity_membership.npy", np.ones((3, 30), dtype=bool))
+    np.save(feature_store / "equity_data_ready.npy", np.ones((3, 30), dtype=bool))
+    (feature_store / "manifest.json").write_text(
+        json.dumps(
+            {
+                "eligible_date_count": 3,
+                "canonical_inputs": {
+                    "point_in_time_universe": {
+                        "resolved_path": str(universe_dir.resolve())
+                    },
+                    "accepted_xp_assignments": {
+                        "resolved_path": str(assignments_dir.resolve())
+                    },
+                    "parsed_cotahist": {"resolved_path": str(cotahist_dir.resolve())},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    pointer_values = {
+        "universe": universe_dir,
+        "assignments": assignments_dir,
+        "cotahist": cotahist_dir,
+        "feature_store": feature_store,
+    }
+    pointer_paths = {name: pointers / f"{name}_path.txt" for name in pointer_values}
+    for name, path in pointer_paths.items():
+        path.write_text(str(pointer_values[name].resolve()), encoding="utf-8")
+    inputs = FeatureInputs(
+        universe_dir=universe_dir,
+        assignments_dir=assignments_dir,
+        cotahist_dir=cotahist_dir,
+        feature_store=feature_store,
+        universe_pointer=pointer_paths["universe"],
+        assignments_pointer=pointer_paths["assignments"],
+        cotahist_pointer=pointer_paths["cotahist"],
+        feature_store_pointer=pointer_paths["feature_store"],
+    )
+    return inputs, issuer_names, security_ids, lambda _: assignments
+
+
+def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> None:
+    inputs, issuer_names, _, assignments_loader = _canonical_build_fixture(
+        tmp_path / "canonical"
+    )
+    raw_complete = tmp_path / "raw_complete"
+    _populate_raw_fixture(
+        raw_complete,
+        issuer_names=issuer_names,
+        reference_dates=(date(2020, 7, 31), date(2020, 6, 30)),
+    )
+    output_base = tmp_path / "outputs"
+    pointer = tmp_path / "human_priors_path.txt"
+    output = build_human_priors(
+        raw_dir=raw_complete,
+        output_base=output_base,
+        pointer=pointer,
+        created_at=datetime(2020, 8, 15, 13, 0, tzinfo=UTC),
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+        repository_state=lambda: ("fixture-commit", []),
+    )
+
+    required = {
+        "manifest.json",
+        "security_metadata.parquet",
+        "issuer_market_cap_monthly.parquet",
+        "unit_components.parquet",
+        "metadata_audit.json",
+        "metadata_audit.md",
+        "sector_subsector_group_sizes.csv",
+        "security_classification_review.csv",
+        "issuer_peer_groups.csv",
+        "unit_overlap_audit.csv",
+        "unit_parity_coverage.csv",
+        "market_cap_coverage.csv",
+        "mapping_exceptions.csv",
+    }
+    assert {path.name for path in output.iterdir()} == required
+    assert pointer.read_text(encoding="utf-8") == str(output.resolve())
+    assert not list(output_base.glob("*.partial"))
+
+    security_metadata = pl.read_parquet(output / "security_metadata.parquet")
+    banco = security_metadata.filter(
+        pl.col("ticker").is_in(["BANC11", "BANC3", "BANC4"])
+    )
+    assert banco["issuer_id"].n_unique() == 1
+    parity = pl.read_csv(output / "unit_parity_coverage.csv").row(named=True)
+    assert parity["required_component_count"] == 2
+    assert parity["mapped_component_count"] == 2
+    assert parity["exact_parity_possible"] is True
+    assert (
+        "exact_parity_possible"
+        not in pl.read_csv(output / "unit_overlap_audit.csv").columns
+    )
+
+    audit = json.loads((output / "metadata_audit.json").read_text(encoding="utf-8"))
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert audit["build_mode"] == "complete"
+    assert audit["market_cap_history_complete"] is True
+    assert audit["market_cap"]["missing_reference_months"] == []
+    assert audit["units"]["units_with_exact_parity_possible"] == 1
+    assert manifest["schema_version"] == SCHEMA_VERSION
+    assert manifest["repository_commit"] == "fixture-commit"
+    assert manifest["canonical_pointer_published"] is True
+    assert (
+        manifest["implementation_sha256"]
+        == hashlib.sha256(
+            Path(build_human_priors.__code__.co_filename).read_bytes()
+        ).hexdigest()
+    )
+    assert all(
+        entry["artifact_sha256"] for entry in manifest["canonical_inputs"].values()
+    )
+    assert {
+        name: hashlib.sha256((output / name).read_bytes()).hexdigest()
+        for name in manifest["output_sha256"]
+    } == manifest["output_sha256"]
+    assert set(manifest["artifact_status"].values()) == {"complete"}
+
+    raw_validation = validate_raw_sources(
+        raw_complete,
+        as_of=date(2020, 8, 15),
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+    )
+    assert raw_validation["build_mode_if_built_now"] == "complete"
+    assert raw_validation["eligible_for_strict_build"] is True
+    assert raw_validation["classification"]["issuer_count"] == 28
+    assert raw_validation["market_cap"]["distinct_reference_month_count"] == 2
+    assert raw_validation["market_cap"]["source_issuer_count"] == 28
+    assert raw_validation["market_cap"]["mapped_accepted_universe_issuer_count"] == 28
+    assert raw_validation["units"] == {"unit_count": 1, "component_count": 2}
+    assert all(
+        source["source_url"] and source["sha256"]
+        for source in raw_validation["sources"]
+    )
+
+    prior_pointer = pointer.read_text(encoding="utf-8")
+
+    def forced_failure() -> tuple[str, list[str]]:
+        raise RuntimeError("forced publication failure")
+
+    with pytest.raises(RuntimeError, match="forced publication failure"):
+        build_human_priors(
+            raw_dir=raw_complete,
+            output_base=output_base,
+            pointer=pointer,
+            created_at=datetime(2020, 8, 15, 14, 0, tzinfo=UTC),
+            inputs=inputs,
+            assignments_loader=assignments_loader,
+            repository_state=forced_failure,
+        )
+    assert pointer.read_text(encoding="utf-8") == prior_pointer
+    assert not list(output_base.glob("*.partial"))
+
+    raw_incomplete = tmp_path / "raw_incomplete"
+    _populate_raw_fixture(
+        raw_incomplete,
+        issuer_names=issuer_names,
+        reference_dates=(date(2020, 7, 31),),
+    )
+    with pytest.raises(ValueError, match="missing calendar months: 2020-06"):
+        build_human_priors(
+            raw_dir=raw_incomplete,
+            output_base=output_base,
+            pointer=pointer,
+            created_at=datetime(2020, 8, 15, 15, 0, tzinfo=UTC),
+            inputs=inputs,
+            assignments_loader=assignments_loader,
+            repository_state=lambda: ("fixture-commit", []),
+        )
+    assert pointer.read_text(encoding="utf-8") == prior_pointer
+    assert not list(output_base.glob("*.partial"))
+
+    diagnostic = build_human_priors(
+        raw_dir=raw_incomplete,
+        output_base=output_base,
+        pointer=pointer,
+        created_at=datetime(2020, 8, 15, 16, 0, tzinfo=UTC),
+        allow_incomplete_market_cap=True,
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+        repository_state=lambda: ("fixture-commit", []),
+    )
+    diagnostic_audit = json.loads(
+        (diagnostic / "metadata_audit.json").read_text(encoding="utf-8")
+    )
+    diagnostic_manifest = json.loads(
+        (diagnostic / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert diagnostic_audit["build_mode"] == "diagnostic_incomplete_market_cap"
+    assert diagnostic_audit["market_cap_history_complete"] is False
+    assert diagnostic_audit["eligible_for_downstream_market_cap_features"] is False
+    assert diagnostic_manifest["canonical_pointer_published"] is False
+    assert set(diagnostic_manifest["artifact_status"].values()) == {
+        "diagnostic_incomplete_market_cap"
+    }
+    assert "DIAGNOSTIC ONLY" in (diagnostic / "metadata_audit.md").read_text(
+        encoding="utf-8"
+    )
+    assert pointer.read_text(encoding="utf-8") == prior_pointer
+    assert not list(output_base.glob("*.partial"))
