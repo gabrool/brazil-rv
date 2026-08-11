@@ -40,7 +40,7 @@ from .contract import (
 )
 from .io import load_assignments, resolve_pointer
 
-SCHEMA_VERSION = "B3_HUMAN_PRIORS_V2"
+SCHEMA_VERSION = "B3_HUMAN_PRIORS_V3"
 RAW_SCHEMA_VERSION = "B3_HUMAN_PRIORS_RAW_V1"
 RAW_BASE = PROJECT_ROOT / "quant-data/b3/raw/b3/human_priors"
 OUTPUT_BASE = PROJECT_ROOT / "quant-data/b3/interim/b3/human_priors_v1"
@@ -90,6 +90,12 @@ MARKET_CAP_HISTORY_LIMITATION = (
     "supported historical request parameter. Older official B3 CSV exports must be "
     "provided through batch manual ingestion."
 )
+MARKET_CAP_OMISSION_REASON = (
+    "Market cap was explicitly omitted because the free official B3 application "
+    "currently exposes only its latest two reference months and no supported "
+    "historical date selector or request parameter."
+)
+SELECTED_GROUPING_POLICY = "subsector_if_at_least_two_others_else_sector"
 
 RAW_SUBDIRECTORY = {
     "classification": "classification",
@@ -543,17 +549,23 @@ def market_cap_manual_instructions(raw_dir: Path = RAW_BASE) -> str:
     return (
         f"{MARKET_CAP_HISTORY_LIMITATION}\n"
         "\n"
-        "Download only official B3 'Bolsa de Valores - Mensal' CSV exports from:\n"
+        "The public application currently exposes only its latest two reference "
+        "months; it does not provide all missing historical files for manual "
+        "download. Its public page is:\n"
         f"  {MARKET_CAP_PAGE_URL}\n"
-        "Place all official historical exports in one otherwise-empty directory. "
-        "Name each Bolsa_Valores_Mensal_YYYY-MM.csv, where YYYY-MM is the newest "
-        "BRL reference calendar month inside that file, then run one batch command:\n"
+        "Batch ingestion accepts historical first-party exports only when you already "
+        "possess them or obtain them directly from B3. Place those exports in one "
+        "otherwise-empty directory and name each "
+        "Bolsa_Valores_Mensal_YYYY-MM.csv, where YYYY-MM is the newest BRL reference "
+        "calendar month inside that file, then run:\n"
         "  uv run python -m brazil_rv.preprocessing.human_priors "
         f'ingest-market-cap-dir --directory <DIRECTORY> --raw-dir "{raw_dir}"\n'
-        "Every CSV is validated before the cache is modified. Do not substitute CVM, "
-        "Receita Federal, third-party, or unofficial data. Strict build refuses raw "
-        "or usable normalized month gaps, empty normalized data, and reconciliation "
-        "conflicts; --allow-incomplete-market-cap creates a diagnostic-only artifact."
+        "Every CSV is validated before the cache is modified. Unsupported request "
+        "parameters, unofficial mirrors, CVM, Receita Federal, and third-party "
+        "substitutions are prohibited. Strict builds still refuse raw or usable "
+        "normalized month gaps, empty normalized data, and reconciliation conflicts; "
+        "--allow-incomplete-market-cap remains diagnostic-only. Use --omit-market-cap "
+        "to build the supported non-market-cap human-prior feature set."
     )
 
 
@@ -1917,6 +1929,140 @@ def add_self_excluded_peer_counts(
     return joined.sort("trade_date", "equity_slot")
 
 
+def select_peer_policy(peers: pl.DataFrame) -> pl.DataFrame:
+    use_subsector = pl.col("same_subsector_peer_count") >= 2
+    return peers.with_columns(
+        pl.when(use_subsector)
+        .then(pl.lit("SUBSECTOR"))
+        .otherwise(pl.lit("SECTOR"))
+        .alias("selected_peer_relation"),
+        pl.when(use_subsector)
+        .then(pl.col("subsector_group_key"))
+        .otherwise(pl.col("sector_group_key"))
+        .alias("selected_peer_group_key"),
+        pl.when(use_subsector)
+        .then(pl.col("same_subsector_peer_count"))
+        .otherwise(pl.col("same_sector_peer_count"))
+        .alias("selected_other_active_peer_count"),
+        (~use_subsector).alias("sector_fallback_used"),
+    ).sort("date_idx", "equity_slot")
+
+
+def _peer_group_index(security_metadata: pl.DataFrame) -> pl.DataFrame:
+    metadata = _with_hierarchy_group_keys(security_metadata)
+    sectors = (
+        metadata.select(
+            pl.lit("SECTOR").alias("peer_relation"),
+            pl.col("sector_group_key").alias("peer_group_key"),
+            "sector",
+            pl.lit(None, dtype=pl.String).alias("subsector"),
+        )
+        .filter(pl.col("peer_group_key").is_not_null())
+        .unique()
+    )
+    subsectors = (
+        metadata.select(
+            pl.lit("SUBSECTOR").alias("peer_relation"),
+            pl.col("subsector_group_key").alias("peer_group_key"),
+            "sector",
+            "subsector",
+        )
+        .filter(pl.col("peer_group_key").is_not_null())
+        .unique()
+    )
+    return (
+        pl.concat([sectors, subsectors])
+        .sort("peer_relation", "sector", "subsector", "peer_group_key")
+        .with_row_index("peer_group_id")
+        .with_columns(pl.col("peer_group_id").cast(pl.Int32))
+        .select(
+            "peer_group_id",
+            "peer_relation",
+            "peer_group_key",
+            "sector",
+            "subsector",
+        )
+    )
+
+
+def build_selected_peer_policy_outputs(
+    peers: pl.DataFrame,
+    security_metadata: pl.DataFrame,
+    equity_index: pl.DataFrame,
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, dict[str, object]]:
+    group_index = _peer_group_index(security_metadata)
+    indexed_metadata = security_metadata
+    for relation, key_column, id_column in (
+        ("SECTOR", "sector_group_key", "sector_peer_group_id"),
+        ("SUBSECTOR", "subsector_group_key", "subsector_peer_group_id"),
+    ):
+        lookup = group_index.filter(pl.col("peer_relation") == relation).select(
+            pl.col("peer_group_key").alias(key_column),
+            pl.col("peer_group_id").alias(id_column),
+        )
+        indexed_metadata = indexed_metadata.join(
+            lookup, on=key_column, how="left", validate="m:1"
+        )
+    indexed_metadata = (
+        equity_index.select("equity_slot", "security_id")
+        .join(indexed_metadata, on="security_id", how="left", validate="1:1")
+        .sort("equity_slot")
+    )
+
+    selected = select_peer_policy(peers)
+    policy = selected.join(
+        group_index.select(
+            pl.col("peer_relation").alias("selected_peer_relation"),
+            pl.col("peer_group_key").alias("selected_peer_group_key"),
+            pl.col("peer_group_id").alias("selected_peer_group_id"),
+        ),
+        on=["selected_peer_relation", "selected_peer_group_key"],
+        how="left",
+        validate="m:1",
+    )
+    missing_group_ids = policy.filter(
+        pl.col("selected_peer_group_key").is_not_null()
+        & pl.col("selected_peer_group_id").is_null()
+    )
+    if not missing_group_ids.is_empty():
+        raise ValueError("Selected peer groups are missing deterministic group IDs")
+    daily = policy.select(
+        "date_idx",
+        "equity_slot",
+        "selected_peer_relation",
+        "selected_peer_group_id",
+        "selected_other_active_peer_count",
+        "sector_fallback_used",
+        "same_sector_peer_count",
+        "same_subsector_peer_count",
+    ).sort("date_idx", "equity_slot")
+    relation_counts = {
+        str(row["selected_peer_relation"]): int(row["len"])
+        for row in selected.group_by("selected_peer_relation")
+        .len()
+        .sort("selected_peer_relation")
+        .to_dicts()
+    }
+    policy_audit = {
+        "policy": SELECTED_GROUPING_POLICY,
+        "rule": (
+            "Use the parent-qualified subsector when at least two other active "
+            "accepted securities are present on the model date; otherwise use the "
+            "parent-qualified sector."
+        ),
+        "minimum_other_active_subsector_peers": 2,
+        "security_day_count": selected.height,
+        "subsector_selected_security_day_count": relation_counts.get("SUBSECTOR", 0),
+        "sector_fallback_security_day_count": relation_counts.get("SECTOR", 0),
+        "selected_peer_count_coverage": _peer_coverage(
+            selected["selected_other_active_peer_count"].to_list()
+        ),
+        "economic_segment_peers_enabled": False,
+        "unit_parity_features_enabled": False,
+    }
+    return indexed_metadata, group_index, daily, policy_audit
+
+
 def strictly_lagged_market_cap_index(
     reference_dates: Sequence[date], model_date: date
 ) -> int | None:
@@ -2671,13 +2817,21 @@ def _render_markdown(audit: dict[str, object]) -> str:
         for row in audit["mapping_exception_counts_by_source_type_and_reason"]
     )
     status = (
-        "> **COMPLETE:** Official B3 market-cap data passed raw and normalized "
-        "publication-readiness checks."
-        if audit["market_cap_data_ready"]
+        (
+            "> **COMPLETE — MARKET CAP OMITTED:** The requested non-market-cap "
+            "human-prior feature set passed its publication contract. No market-cap "
+            "dataset or feature was emitted."
+        )
+        if audit["market_cap_mode"] == "omitted"
         else (
-            "> **DIAGNOSTIC ONLY — MARKET-CAP DATA NOT READY:** This artifact is not "
-            "eligible for downstream market-cap features and is not a complete PIT "
-            "metadata audit."
+            "> **COMPLETE:** Official B3 market-cap data passed raw and normalized "
+            "publication-readiness checks."
+            if audit["market_cap_data_ready"]
+            else (
+                "> **DIAGNOSTIC ONLY — MARKET-CAP DATA NOT READY:** This artifact is not "
+                "eligible for downstream market-cap features and is not a complete PIT "
+                "metadata audit."
+            )
         )
     )
     lines = [
@@ -2687,7 +2841,8 @@ def _render_markdown(audit: dict[str, object]) -> str:
         "",
         "This audit uses the current B3 classification and unit snapshots as descriptive "
         "metadata across the historical PIT universe. It does not treat either snapshot "
-        "as point-in-time historical truth and does not select a sector/subsector policy.",
+        "as point-in-time historical truth. The selected peer policy uses subsector only "
+        "when at least two other active accepted securities exist, otherwise sector.",
         "",
         "## Scope",
         "",
@@ -2734,6 +2889,12 @@ def _render_markdown(audit: dict[str, object]) -> str:
             "Reused economic-segment labels across parent paths: "
             f"**{len(classification['taxonomy_label_collisions']['economic_segment'])}**.",
             "",
+            "Selected policy: "
+            f"**{audit['grouping_policy_selected']}**. Two other subsector peers means "
+            "a date-specific active group size of at least three including the focal "
+            "security. Sector peer counts remain separately available; economic-segment "
+            "and unit-parity features are disabled.",
+            "",
             "## Candidate-policy coverage (evidence only)",
             "",
             "| Candidate | ≥1 peer | ≥2 peers | ≥3 peers | ≥5 peers |",
@@ -2779,6 +2940,13 @@ def _render_markdown(audit: dict[str, object]) -> str:
             "",
             "## Monthly market capitalization",
             "",
+            f"- Mode: {audit['market_cap_mode']}",
+            f"- Requested: {audit['market_cap_requested']}",
+            f"- Output artifacts emitted: {audit['market_cap_outputs_emitted']}",
+            f"- Omission reason: "
+            f"{audit['market_cap_omission_reason'] or 'not applicable'}",
+            f"- Source data ready before feature-set selection: "
+            f"{audit['market_cap_source_data_ready']}",
             f"- Issuer-name mapping coverage: "
             f"{audit['market_cap']['issuer_name_mapping_fraction']:.2%}",
             f"- Strictly lagged eligible security-day coverage: "
@@ -2807,8 +2975,8 @@ def _render_markdown(audit: dict[str, object]) -> str:
             f"{audit['market_cap']['conflicting_issuer_month_groups']}",
             f"- Market-cap data ready: {audit['market_cap_data_ready']}",
             "",
-            "See the CSV outputs for exact groups, questionable classifications, unit "
-            "overlaps, market-cap coverage, and unresolved deterministic mappings.",
+            "See the emitted artifacts for exact groups, selected date-specific peer "
+            "relations, questionable classifications, and deterministic mapping audits.",
             "",
         ]
     )
@@ -3070,12 +3238,17 @@ def build_human_priors(
     *,
     created_at: datetime | None = None,
     allow_incomplete_market_cap: bool = False,
+    omit_market_cap: bool = False,
     inputs: FeatureInputs | None = None,
     assignments_loader: Callable[[Path], pl.DataFrame] = load_assignments,
     repository_state: Callable[[], tuple[str, list[str]]] = _repository_state,
     pointer_publisher: Callable[[Path, Path], None] = _atomic_pointer,
     reviewed_aliases_path: Path | None = None,
 ) -> Path:
+    if allow_incomplete_market_cap and omit_market_cap:
+        raise ValueError(
+            "Market-cap diagnostic and omission modes are mutually exclusive"
+        )
     created_at = datetime.now(UTC) if created_at is None else created_at.astimezone(UTC)
     inputs = _resolve_feature_inputs() if inputs is None else inputs
     _validate_feature_inputs(inputs)
@@ -3131,6 +3304,10 @@ def build_human_priors(
     classification_audit, group_sizes = classification_peer_audit(
         peers, security_metadata, classification
     )
+    security_metadata, peer_group_index, peer_policy, selected_policy_audit = (
+        build_selected_peer_policy_outputs(peers, security_metadata, equity_index)
+    )
+    classification_audit["selected_policy"] = selected_policy_audit
     issuer_audit, issuer_groups = issuer_peer_audit(
         peers,
         security_metadata,
@@ -3154,8 +3331,30 @@ def build_human_priors(
         as_of=created_at.date(),
         source_reference_dates=raw_market_cap["reference_date"].to_list(),
     )
-    market_cap_data_ready = bool(market_audit["market_cap_data_ready"])
-    if not market_cap_data_ready and not allow_incomplete_market_cap:
+    market_cap_source_data_ready = bool(market_audit["market_cap_data_ready"])
+    market_cap_requested = not omit_market_cap
+    market_cap_data_ready = market_cap_source_data_ready and market_cap_requested
+    market_cap_mode = (
+        "omitted"
+        if omit_market_cap
+        else "required"
+        if market_cap_source_data_ready
+        else "diagnostic"
+    )
+    market_cap_omission_reason = MARKET_CAP_OMISSION_REASON if omit_market_cap else None
+    market_audit = {
+        **market_audit,
+        "market_cap_mode": market_cap_mode,
+        "market_cap_requested": market_cap_requested,
+        "market_cap_source_data_ready": market_cap_source_data_ready,
+        "market_cap_data_ready": market_cap_data_ready,
+        "market_cap_omission_reason": market_cap_omission_reason,
+    }
+    if (
+        market_cap_requested
+        and not market_cap_data_ready
+        and not allow_incomplete_market_cap
+    ):
         raise ValueError(
             "Official B3 market-cap data is not ready for publication for "
             f"{market_audit['required_start_month']} through "
@@ -3164,13 +3363,39 @@ def build_human_priors(
             "Batch-ingest or correct official files, then rerun, or use "
             "--allow-incomplete-market-cap for a diagnostic-only build."
         )
+    publication_eligible = market_cap_data_ready or omit_market_cap
     build_mode = (
-        "complete" if market_cap_data_ready else "diagnostic_market_cap_not_ready"
+        "complete_market_cap_omitted"
+        if omit_market_cap
+        else "complete"
+        if market_cap_data_ready
+        else "diagnostic_market_cap_not_ready"
     )
+    peer_policy_output_contract = {
+        "security_day_artifact": "peer_policy_security_days.parquet",
+        "security_day_key": ["date_idx", "equity_slot"],
+        "security_metadata_artifact": "security_metadata.parquet",
+        "security_metadata_join": {"equity_slot": "equity_slot"},
+        "peer_group_artifact": "peer_group_index.parquet",
+        "peer_group_join": {
+            "selected_peer_group_id": "peer_group_id",
+        },
+        "selected_relation_values": ["SECTOR", "SUBSECTOR"],
+        "security_day_count": peer_policy.height,
+        "unresolved_classification_behavior": (
+            "Issuer and peer-group IDs remain null; no taxonomy or issuer mapping is "
+            "invented."
+        ),
+    }
     audit = {
         "schema_version": SCHEMA_VERSION,
         "created_at_utc": created_at.isoformat(),
         "build_mode": build_mode,
+        "market_cap_mode": market_cap_mode,
+        "market_cap_requested": market_cap_requested,
+        "market_cap_source_data_ready": market_cap_source_data_ready,
+        "market_cap_omission_reason": market_cap_omission_reason,
+        "market_cap_outputs_emitted": market_cap_requested,
         "raw_market_cap_history_complete": market_audit[
             "raw_market_cap_history_complete"
         ],
@@ -3204,7 +3429,9 @@ def build_human_priors(
         "market_cap": market_audit,
         **exception_audit,
         "reviewed_aliases": alias_audit,
-        "grouping_policy_selected": None,
+        "grouping_policy_selected": SELECTED_GROUPING_POLICY,
+        "selected_peer_policy": selected_policy_audit,
+        "peer_policy_output_contract": peer_policy_output_contract,
     }
 
     output_dir = output_base / (
@@ -3221,11 +3448,22 @@ def build_human_priors(
             compression="zstd",
             statistics=True,
         )
-        market_cap.write_parquet(
-            partial / "issuer_market_cap_monthly.parquet",
+        peer_group_index.write_parquet(
+            partial / "peer_group_index.parquet",
             compression="zstd",
             statistics=True,
         )
+        peer_policy.write_parquet(
+            partial / "peer_policy_security_days.parquet",
+            compression="zstd",
+            statistics=True,
+        )
+        if market_cap_requested:
+            market_cap.write_parquet(
+                partial / "issuer_market_cap_monthly.parquet",
+                compression="zstd",
+                statistics=True,
+            )
         unit_components.write_parquet(
             partial / "unit_components.parquet",
             compression="zstd",
@@ -3240,7 +3478,8 @@ def build_human_priors(
         issuer_groups.write_csv(partial / "issuer_peer_groups.csv")
         unit_overlap.write_csv(partial / "unit_overlap_audit.csv")
         unit_parity.write_csv(partial / "unit_parity_coverage.csv")
-        market_coverage.write_csv(partial / "market_cap_coverage.csv")
+        if market_cap_requested:
+            market_coverage.write_csv(partial / "market_cap_coverage.csv")
         mapping_exceptions.write_csv(partial / "mapping_exceptions.csv")
 
         commit, status = repository_state()
@@ -3254,6 +3493,11 @@ def build_human_priors(
             "repository_status_porcelain": status,
             "implementation_sha256": _sha256_file(Path(__file__).resolve()),
             "build_mode": build_mode,
+            "market_cap_mode": market_cap_mode,
+            "market_cap_requested": market_cap_requested,
+            "market_cap_source_data_ready": market_cap_source_data_ready,
+            "market_cap_omission_reason": market_cap_omission_reason,
+            "market_cap_outputs_emitted": market_cap_requested,
             "raw_market_cap_history_complete": market_audit[
                 "raw_market_cap_history_complete"
             ],
@@ -3283,7 +3527,7 @@ def build_human_priors(
             ],
             "market_cap_data_ready": market_cap_data_ready,
             "eligible_for_downstream_market_cap_features": market_cap_data_ready,
-            "canonical_pointer_published": market_cap_data_ready,
+            "canonical_pointer_published": publication_eligible,
             "mapping_exception_count": exception_audit["mapping_exception_count"],
             "mapping_exception_candidate_row_count": exception_audit[
                 "mapping_exception_candidate_row_count"
@@ -3371,12 +3615,18 @@ def build_human_priors(
             ],
             "normalized_schemas": {
                 "security_metadata": str(security_metadata.schema),
-                "issuer_market_cap_monthly": str(market_cap.schema),
+                "peer_group_index": str(peer_group_index.schema),
+                "peer_policy_security_days": str(peer_policy.schema),
+                "issuer_market_cap_monthly": (
+                    str(market_cap.schema) if market_cap_requested else None
+                ),
                 "unit_components": str(unit_components.schema),
                 "unit_parity_coverage": str(unit_parity.schema),
             },
             "classification_is_point_in_time": False,
-            "grouping_policy_selected": None,
+            "grouping_policy_selected": SELECTED_GROUPING_POLICY,
+            "selected_peer_policy": selected_policy_audit,
+            "peer_policy_output_contract": peer_policy_output_contract,
             "output_dir": str(output_dir.resolve()),
             "output_sha256": {path.name: _sha256_file(path) for path in outputs},
             "artifact_status": {path.name: build_mode for path in outputs},
@@ -3384,7 +3634,7 @@ def build_human_priors(
         _atomic_json(partial / "manifest.json", manifest)
         os.replace(partial, output_dir)
         output_finalized = True
-        if market_cap_data_ready:
+        if publication_eligible:
             pointer_publisher(pointer, output_dir)
     except BaseException:
         shutil.rmtree(partial, ignore_errors=True)
@@ -3416,12 +3666,21 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     build.add_argument("--raw-dir", type=Path, default=RAW_BASE)
     build.add_argument("--output-base", type=Path, default=OUTPUT_BASE)
     build.add_argument("--pointer", type=Path, default=CANONICAL_POINTER)
-    build.add_argument(
+    market_cap_mode = build.add_mutually_exclusive_group()
+    market_cap_mode.add_argument(
         "--allow-incomplete-market-cap",
         action="store_true",
         help=(
             "Create a diagnostic-only artifact instead of failing market-cap "
             "publication-readiness checks."
+        ),
+    )
+    market_cap_mode.add_argument(
+        "--omit-market-cap",
+        action="store_true",
+        help=(
+            "Publish the requested non-market-cap human-prior feature set without "
+            "emitting market-cap data or features."
         ),
     )
     build.add_argument(
@@ -3482,6 +3741,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
             output_base=args.output_base,
             pointer=args.pointer,
             allow_incomplete_market_cap=args.allow_incomplete_market_cap,
+            omit_market_cap=args.omit_market_cap,
             reviewed_aliases_path=args.reviewed_aliases,
         )
         audit = json.loads((output / "metadata_audit.json").read_text(encoding="utf-8"))
@@ -3490,6 +3750,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         print(
             json.dumps(
                 {
+                    "market_cap_mode": audit["market_cap_mode"],
+                    "market_cap_requested": audit["market_cap_requested"],
                     "raw_market_cap_reference_months": market[
                         "raw_distinct_reference_month_count"
                     ],
