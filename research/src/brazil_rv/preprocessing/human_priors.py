@@ -40,7 +40,7 @@ from .contract import (
 )
 from .io import load_assignments, resolve_pointer
 
-SCHEMA_VERSION = "B3_HUMAN_PRIORS_V3"
+SCHEMA_VERSION = "B3_HUMAN_PRIORS_V4"
 RAW_SCHEMA_VERSION = "B3_HUMAN_PRIORS_RAW_V1"
 RAW_BASE = PROJECT_ROOT / "quant-data/b3/raw/b3/human_priors"
 OUTPUT_BASE = PROJECT_ROOT / "quant-data/b3/interim/b3/human_priors_v1"
@@ -1319,18 +1319,22 @@ def _reviewed_alias_provenance(
 def reviewed_alias_audit(
     reviewed_aliases: pl.DataFrame,
     security_metadata: pl.DataFrame,
-    market_cap: pl.DataFrame,
+    market_cap: pl.DataFrame | None,
 ) -> dict[str, object]:
     security_applied = security_metadata.filter(
         pl.col("reviewed_alias_alias_id").is_not_null()
     )
-    market_cap_applied = market_cap.filter(
-        pl.col("reviewed_alias_alias_id").is_not_null()
-    )
-    applied_ids = sorted(
-        set(security_applied["reviewed_alias_alias_id"].to_list())
-        | set(market_cap_applied["reviewed_alias_alias_id"].to_list())
-    )
+    applied_ids = set(security_applied["reviewed_alias_alias_id"].to_list())
+    if market_cap is None:
+        market_cap_evaluation_status = "NOT_EVALUATED"
+        market_cap_rows_mapped = None
+    else:
+        market_cap_applied = market_cap.filter(
+            pl.col("reviewed_alias_alias_id").is_not_null()
+        )
+        applied_ids.update(market_cap_applied["reviewed_alias_alias_id"].to_list())
+        market_cap_evaluation_status = "EVALUATED"
+        market_cap_rows_mapped = market_cap_applied.height
     source_files = sorted(
         value
         for value in reviewed_aliases["alias_source_file"].unique().to_list()
@@ -1339,9 +1343,10 @@ def reviewed_alias_audit(
     return {
         "configured_alias_count": reviewed_aliases.height,
         "configured_alias_ids": reviewed_aliases["alias_id"].to_list(),
-        "applied_alias_ids": applied_ids,
+        "applied_alias_ids": sorted(applied_ids),
         "security_rows_mapped_by_reviewed_alias": security_applied.height,
-        "market_cap_rows_mapped_by_reviewed_alias": market_cap_applied.height,
+        "market_cap_evaluation_status": market_cap_evaluation_status,
+        "market_cap_rows_mapped_by_reviewed_alias": market_cap_rows_mapped,
         "source_files": source_files,
     }
 
@@ -1931,20 +1936,33 @@ def add_self_excluded_peer_counts(
 
 def select_peer_policy(peers: pl.DataFrame) -> pl.DataFrame:
     use_subsector = pl.col("same_subsector_peer_count") >= 2
+    use_sector = (~use_subsector) & pl.col("sector_group_key").is_not_null()
+    available = use_subsector | use_sector
     return peers.with_columns(
         pl.when(use_subsector)
         .then(pl.lit("SUBSECTOR"))
-        .otherwise(pl.lit("SECTOR"))
+        .when(use_sector)
+        .then(pl.lit("SECTOR"))
+        .otherwise(pl.lit(None, dtype=pl.String))
         .alias("selected_peer_relation"),
         pl.when(use_subsector)
         .then(pl.col("subsector_group_key"))
-        .otherwise(pl.col("sector_group_key"))
+        .when(use_sector)
+        .then(pl.col("sector_group_key"))
+        .otherwise(pl.lit(None, dtype=pl.String))
         .alias("selected_peer_group_key"),
         pl.when(use_subsector)
         .then(pl.col("same_subsector_peer_count"))
-        .otherwise(pl.col("same_sector_peer_count"))
+        .when(use_sector)
+        .then(pl.col("same_sector_peer_count"))
+        .otherwise(pl.lit(None, dtype=pl.Int32))
         .alias("selected_other_active_peer_count"),
-        (~use_subsector).alias("sector_fallback_used"),
+        use_sector.alias("sector_fallback_used"),
+        available.alias("peer_policy_available"),
+        pl.when(available)
+        .then(pl.lit(None, dtype=pl.String))
+        .otherwise(pl.lit("UNRESOLVED_CLASSIFICATION"))
+        .alias("peer_policy_unavailable_reason"),
     ).sort("date_idx", "equity_slot")
 
 
@@ -2020,12 +2038,30 @@ def build_selected_peer_policy_outputs(
         how="left",
         validate="m:1",
     )
-    missing_group_ids = policy.filter(
-        pl.col("selected_peer_group_key").is_not_null()
-        & pl.col("selected_peer_group_id").is_null()
+    invalid_available = policy.filter(
+        pl.col("peer_policy_available")
+        & (
+            pl.col("selected_peer_relation").is_null()
+            | pl.col("selected_peer_group_key").is_null()
+            | pl.col("selected_peer_group_id").is_null()
+            | pl.col("selected_other_active_peer_count").is_null()
+        )
     )
-    if not missing_group_ids.is_empty():
-        raise ValueError("Selected peer groups are missing deterministic group IDs")
+    if not invalid_available.is_empty():
+        raise ValueError("Available peer policies require a deterministic group ID")
+    invalid_unavailable = policy.filter(
+        (~pl.col("peer_policy_available"))
+        & (
+            pl.col("selected_peer_relation").is_not_null()
+            | pl.col("selected_peer_group_key").is_not_null()
+            | pl.col("selected_peer_group_id").is_not_null()
+            | pl.col("selected_other_active_peer_count").is_not_null()
+            | pl.col("sector_fallback_used")
+            | pl.col("peer_policy_unavailable_reason").is_null()
+        )
+    )
+    if not invalid_unavailable.is_empty():
+        raise ValueError("Unavailable peer policies must not invent a peer group")
     daily = policy.select(
         "date_idx",
         "equity_slot",
@@ -2033,30 +2069,45 @@ def build_selected_peer_policy_outputs(
         "selected_peer_group_id",
         "selected_other_active_peer_count",
         "sector_fallback_used",
+        "peer_policy_available",
+        "peer_policy_unavailable_reason",
         "same_sector_peer_count",
         "same_subsector_peer_count",
     ).sort("date_idx", "equity_slot")
+    available = selected.filter(pl.col("peer_policy_available"))
     relation_counts = {
         str(row["selected_peer_relation"]): int(row["len"])
-        for row in selected.group_by("selected_peer_relation")
+        for row in available.group_by("selected_peer_relation")
         .len()
         .sort("selected_peer_relation")
         .to_dicts()
     }
+    subsector_count = relation_counts.get("SUBSECTOR", 0)
+    sector_fallback_count = relation_counts.get("SECTOR", 0)
+    unavailable_count = selected.height - available.height
+    if subsector_count + sector_fallback_count + unavailable_count != selected.height:
+        raise ValueError("Selected peer-policy counts do not reconcile")
+    selected_coverage = _peer_coverage(
+        available["selected_other_active_peer_count"].to_list()
+    )
+    selected_coverage["denominator"] = "policy_available_security_days"
     policy_audit = {
         "policy": SELECTED_GROUPING_POLICY,
         "rule": (
             "Use the parent-qualified subsector when at least two other active "
             "accepted securities are present on the model date; otherwise use the "
-            "parent-qualified sector."
+            "parent-qualified sector when classification is available."
         ),
         "minimum_other_active_subsector_peers": 2,
         "security_day_count": selected.height,
-        "subsector_selected_security_day_count": relation_counts.get("SUBSECTOR", 0),
-        "sector_fallback_security_day_count": relation_counts.get("SECTOR", 0),
-        "selected_peer_count_coverage": _peer_coverage(
-            selected["selected_other_active_peer_count"].to_list()
+        "policy_available_security_day_count": available.height,
+        "policy_unavailable_security_day_count": unavailable_count,
+        "policy_available_fraction": (
+            available.height / selected.height if selected.height else 0.0
         ),
+        "subsector_selected_security_day_count": subsector_count,
+        "sector_fallback_security_day_count": sector_fallback_count,
+        "selected_peer_count_coverage": selected_coverage,
         "economic_segment_peers_enabled": False,
         "unit_parity_features_enabled": False,
     }
@@ -2816,6 +2867,12 @@ def _render_markdown(audit: dict[str, object]) -> str:
         f"{row['candidate_row_count']} candidates"
         for row in audit["mapping_exception_counts_by_source_type_and_reason"]
     )
+    market_cap_omitted = audit["market_cap_mode"] == "omitted"
+    market_alias_detail = (
+        "not evaluated"
+        if market_cap_omitted
+        else str(audit["reviewed_aliases"]["market_cap_rows_mapped_by_reviewed_alias"])
+    )
     status = (
         (
             "> **COMPLETE — MARKET CAP OMITTED:** The requested non-market-cap "
@@ -2858,8 +2915,7 @@ def _render_markdown(audit: dict[str, object]) -> str:
         f"{audit['reviewed_aliases']['configured_alias_count']}",
         f"- Security rows mapped by reviewed alias: "
         f"{audit['reviewed_aliases']['security_rows_mapped_by_reviewed_alias']}",
-        f"- Market-cap rows mapped by reviewed alias: "
-        f"{audit['reviewed_aliases']['market_cap_rows_mapped_by_reviewed_alias']}",
+        f"- Market-cap alias application: {market_alias_detail}",
         "",
         "## Peer evidence",
         "",
@@ -2938,43 +2994,66 @@ def _render_markdown(audit: dict[str, object]) -> str:
             f"{audit['units']['units_with_exact_parity_possible']}",
             f"- Units with exact parity impossible: {audit['units']['units_with_exact_parity_impossible']}",
             "",
-            "## Monthly market capitalization",
-            "",
-            f"- Mode: {audit['market_cap_mode']}",
-            f"- Requested: {audit['market_cap_requested']}",
-            f"- Output artifacts emitted: {audit['market_cap_outputs_emitted']}",
-            f"- Omission reason: "
-            f"{audit['market_cap_omission_reason'] or 'not applicable'}",
-            f"- Source data ready before feature-set selection: "
-            f"{audit['market_cap_source_data_ready']}",
-            f"- Issuer-name mapping coverage: "
-            f"{audit['market_cap']['issuer_name_mapping_fraction']:.2%}",
-            f"- Strictly lagged eligible security-day coverage: "
-            f"{audit['market_cap']['strictly_lagged_security_day_coverage_fraction']:.2%}",
-            f"- Raw calendar-month history complete: "
-            f"{audit['market_cap']['raw_market_cap_history_complete']}",
-            f"- Raw available calendar months: "
-            f"{audit['market_cap']['raw_distinct_reference_month_count']}",
-            f"- Missing raw calendar months: "
-            f"{audit['market_cap']['raw_missing_reference_month_count']}",
-            f"- Usable normalized calendar-month history complete: "
-            f"{audit['market_cap']['usable_market_cap_history_complete']}",
-            f"- Usable normalized calendar months: "
-            f"{audit['market_cap']['usable_distinct_reference_month_count']}",
-            f"- Missing usable normalized calendar months: "
-            f"{audit['market_cap']['usable_missing_reference_month_count']}",
-            f"- Total normalized observations: "
-            f"{audit['market_cap']['total_normalized_market_cap_row_count']}",
-            f"- Accepted-universe normalized observations: "
-            f"{audit['market_cap']['accepted_universe_normalized_market_cap_row_count']}",
-            f"- Mapped accepted-universe issuers: "
-            f"{audit['market_cap']['mapped_accepted_universe_issuer_count']}",
-            f"- Usable definition: "
-            f"{audit['market_cap']['usable_market_cap_definition']}",
-            f"- Conflicting issuer-month groups excluded: "
-            f"{audit['market_cap']['conflicting_issuer_month_groups']}",
-            f"- Market-cap data ready: {audit['market_cap_data_ready']}",
-            "",
+        ]
+    )
+    if market_cap_omitted:
+        lines.extend(
+            [
+                "## Monthly market capitalization",
+                "",
+                "- Evaluation status: NOT_EVALUATED",
+                "- Mode: omitted",
+                "- Requested: False",
+                "- Output artifacts emitted: False",
+                f"- Omission reason: {audit['market_cap_omission_reason']}",
+                "- No market-cap source was discovered, read, parsed, reconciled, "
+                "validated, or checksummed.",
+                "",
+            ]
+        )
+    else:
+        market = audit["market_cap"]
+        lines.extend(
+            [
+                "## Monthly market capitalization",
+                "",
+                f"- Evaluation status: {audit['market_cap_evaluation_status']}",
+                f"- Mode: {audit['market_cap_mode']}",
+                f"- Requested: {audit['market_cap_requested']}",
+                f"- Output artifacts emitted: {audit['market_cap_outputs_emitted']}",
+                f"- Source data ready before feature-set selection: "
+                f"{audit['market_cap_source_data_ready']}",
+                f"- Issuer-name mapping coverage: "
+                f"{market['issuer_name_mapping_fraction']:.2%}",
+                f"- Strictly lagged eligible security-day coverage: "
+                f"{market['strictly_lagged_security_day_coverage_fraction']:.2%}",
+                f"- Raw calendar-month history complete: "
+                f"{market['raw_market_cap_history_complete']}",
+                f"- Raw available calendar months: "
+                f"{market['raw_distinct_reference_month_count']}",
+                f"- Missing raw calendar months: "
+                f"{market['raw_missing_reference_month_count']}",
+                f"- Usable normalized calendar-month history complete: "
+                f"{market['usable_market_cap_history_complete']}",
+                f"- Usable normalized calendar months: "
+                f"{market['usable_distinct_reference_month_count']}",
+                f"- Missing usable normalized calendar months: "
+                f"{market['usable_missing_reference_month_count']}",
+                f"- Total normalized observations: "
+                f"{market['total_normalized_market_cap_row_count']}",
+                f"- Accepted-universe normalized observations: "
+                f"{market['accepted_universe_normalized_market_cap_row_count']}",
+                f"- Mapped accepted-universe issuers: "
+                f"{market['mapped_accepted_universe_issuer_count']}",
+                f"- Usable definition: {market['usable_market_cap_definition']}",
+                f"- Conflicting issuer-month groups excluded: "
+                f"{market['conflicting_issuer_month_groups']}",
+                f"- Market-cap data ready: {audit['market_cap_data_ready']}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
             "See the emitted artifacts for exact groups, selected date-specific peer "
             "relations, questionable classifications, and deterministic mapping audits.",
             "",
@@ -3150,16 +3229,24 @@ def _resolve_feature_inputs() -> FeatureInputs:
 
 def _load_raw_tables(
     raw_dir: Path,
+    *,
+    include_market_cap: bool = True,
 ) -> tuple[
     pl.DataFrame,
-    pl.DataFrame,
+    pl.DataFrame | None,
     pl.DataFrame,
     tuple[RawSource, ...],
 ]:
     classification_sources = discover_raw_sources(raw_dir, "classification")
     units_sources = discover_raw_sources(raw_dir, "units")
-    market_sources = discover_raw_sources(raw_dir, "market_cap")
-    if not classification_sources or not units_sources or not market_sources:
+    market_sources = (
+        discover_raw_sources(raw_dir, "market_cap") if include_market_cap else ()
+    )
+    if (
+        not classification_sources
+        or not units_sources
+        or (include_market_cap and not market_sources)
+    ):
         raise FileNotFoundError(
             "B3 human-prior raw cache is incomplete. Run the acquire command first."
         )
@@ -3179,17 +3266,21 @@ def _load_raw_tables(
         source_url=units_source.source_url,
         retrieved_at_utc=units_source.retrieved_at_utc,
     )
-    market = pl.concat(
-        [
-            parse_market_cap_csv(
-                source.path.read_bytes(),
-                source_file=str(source.path.resolve()),
-                source_url=source.source_url,
-                retrieved_at_utc=source.retrieved_at_utc,
-            )
-            for source in market_sources
-        ],
-        how="vertical_relaxed",
+    market = (
+        pl.concat(
+            [
+                parse_market_cap_csv(
+                    source.path.read_bytes(),
+                    source_file=str(source.path.resolve()),
+                    source_url=source.source_url,
+                    retrieved_at_utc=source.retrieved_at_utc,
+                )
+                for source in market_sources
+            ],
+            how="vertical_relaxed",
+        )
+        if include_market_cap
+        else None
     )
     return (
         classification,
@@ -3252,7 +3343,9 @@ def build_human_priors(
     created_at = datetime.now(UTC) if created_at is None else created_at.astimezone(UTC)
     inputs = _resolve_feature_inputs() if inputs is None else inputs
     _validate_feature_inputs(inputs)
-    classification, raw_market_cap, raw_units, raw_sources = _load_raw_tables(raw_dir)
+    classification, raw_market_cap, raw_units, raw_sources = _load_raw_tables(
+        raw_dir, include_market_cap=not omit_market_cap
+    )
     reviewed_aliases = (
         load_reviewed_aliases(reviewed_aliases_path, classification)
         if reviewed_aliases_path is not None
@@ -3265,15 +3358,22 @@ def build_human_priors(
             assignments, ticker_history, classification, reviewed_aliases
         )
     )
-    market_cap, market_exceptions, market_stats = reconcile_market_cap(
-        raw_market_cap, classification, security_metadata, reviewed_aliases
-    )
+    exception_frames = [security_exceptions]
+    if raw_market_cap is None:
+        market_cap = None
+        market_stats = None
+    else:
+        market_cap, market_exceptions, market_stats = reconcile_market_cap(
+            raw_market_cap, classification, security_metadata, reviewed_aliases
+        )
+        exception_frames.append(market_exceptions)
     alias_audit = reviewed_alias_audit(reviewed_aliases, security_metadata, market_cap)
     unit_components, unit_exceptions = normalize_unit_components(
         raw_units, classification, security_metadata
     )
+    exception_frames.append(unit_exceptions)
     mapping_exceptions = pl.concat(
-        [security_exceptions, market_exceptions, unit_exceptions],
+        exception_frames,
         how="vertical_relaxed",
     ).sort("source_type", "source_key", "exception_id", "candidate_rank")
     exception_audit = mapping_exception_audit(mapping_exceptions)
@@ -3323,38 +3423,47 @@ def build_human_priors(
         membership,
         data_ready,
     )
-    market_audit, market_coverage = market_cap_audit(
-        peers,
-        market_cap,
-        security_metadata,
-        market_stats,
-        as_of=created_at.date(),
-        source_reference_dates=raw_market_cap["reference_date"].to_list(),
-    )
-    market_cap_source_data_ready = bool(market_audit["market_cap_data_ready"])
     market_cap_requested = not omit_market_cap
-    market_cap_data_ready = market_cap_source_data_ready and market_cap_requested
-    market_cap_mode = (
-        "omitted"
-        if omit_market_cap
-        else "required"
-        if market_cap_source_data_ready
-        else "diagnostic"
-    )
-    market_cap_omission_reason = MARKET_CAP_OMISSION_REASON if omit_market_cap else None
-    market_audit = {
-        **market_audit,
-        "market_cap_mode": market_cap_mode,
-        "market_cap_requested": market_cap_requested,
-        "market_cap_source_data_ready": market_cap_source_data_ready,
-        "market_cap_data_ready": market_cap_data_ready,
-        "market_cap_omission_reason": market_cap_omission_reason,
-    }
+    if omit_market_cap:
+        market_audit = None
+        market_coverage = None
+        market_cap_source_data_ready = None
+        market_cap_data_ready = False
+        market_cap_mode = "omitted"
+        market_cap_evaluation_status = "NOT_EVALUATED"
+        market_cap_omission_reason = MARKET_CAP_OMISSION_REASON
+    else:
+        assert raw_market_cap is not None
+        assert market_cap is not None
+        assert market_stats is not None
+        market_audit, market_coverage = market_cap_audit(
+            peers,
+            market_cap,
+            security_metadata,
+            market_stats,
+            as_of=created_at.date(),
+            source_reference_dates=raw_market_cap["reference_date"].to_list(),
+        )
+        market_cap_source_data_ready = bool(market_audit["market_cap_data_ready"])
+        market_cap_data_ready = market_cap_source_data_ready
+        market_cap_mode = "required" if market_cap_data_ready else "diagnostic"
+        market_cap_evaluation_status = "EVALUATED"
+        market_cap_omission_reason = None
+        market_audit = {
+            **market_audit,
+            "market_cap_mode": market_cap_mode,
+            "market_cap_requested": market_cap_requested,
+            "market_cap_evaluation_status": market_cap_evaluation_status,
+            "market_cap_source_data_ready": market_cap_source_data_ready,
+            "market_cap_data_ready": market_cap_data_ready,
+            "market_cap_omission_reason": market_cap_omission_reason,
+        }
     if (
         market_cap_requested
         and not market_cap_data_ready
         and not allow_incomplete_market_cap
     ):
+        assert market_audit is not None
         raise ValueError(
             "Official B3 market-cap data is not ready for publication for "
             f"{market_audit['required_start_month']} through "
@@ -3380,12 +3489,16 @@ def build_human_priors(
         "peer_group_join": {
             "selected_peer_group_id": "peer_group_id",
         },
-        "selected_relation_values": ["SECTOR", "SUBSECTOR"],
+        "allowed_non_null_selected_relation_values": ["SECTOR", "SUBSECTOR"],
         "security_day_count": peer_policy.height,
         "unresolved_classification_behavior": (
-            "Issuer and peer-group IDs remain null; no taxonomy or issuer mapping is "
-            "invented."
+            "The selected relation, group ID, and peer count remain null; policy "
+            "availability is false with reason UNRESOLVED_CLASSIFICATION."
         ),
+        "availability_fields": {
+            "available": "peer_policy_available",
+            "unavailable_reason": "peer_policy_unavailable_reason",
+        },
     }
     audit = {
         "schema_version": SCHEMA_VERSION,
@@ -3393,15 +3506,16 @@ def build_human_priors(
         "build_mode": build_mode,
         "market_cap_mode": market_cap_mode,
         "market_cap_requested": market_cap_requested,
+        "market_cap_evaluation_status": market_cap_evaluation_status,
         "market_cap_source_data_ready": market_cap_source_data_ready,
         "market_cap_omission_reason": market_cap_omission_reason,
         "market_cap_outputs_emitted": market_cap_requested,
-        "raw_market_cap_history_complete": market_audit[
-            "raw_market_cap_history_complete"
-        ],
-        "usable_market_cap_history_complete": market_audit[
-            "usable_market_cap_history_complete"
-        ],
+        "raw_market_cap_history_complete": (
+            market_audit["raw_market_cap_history_complete"] if market_audit else None
+        ),
+        "usable_market_cap_history_complete": (
+            market_audit["usable_market_cap_history_complete"] if market_audit else None
+        ),
         "market_cap_data_ready": market_cap_data_ready,
         "eligible_for_downstream_market_cap_features": market_cap_data_ready,
         "scope": {
@@ -3495,36 +3609,51 @@ def build_human_priors(
             "build_mode": build_mode,
             "market_cap_mode": market_cap_mode,
             "market_cap_requested": market_cap_requested,
+            "market_cap_evaluation_status": market_cap_evaluation_status,
             "market_cap_source_data_ready": market_cap_source_data_ready,
             "market_cap_omission_reason": market_cap_omission_reason,
             "market_cap_outputs_emitted": market_cap_requested,
-            "raw_market_cap_history_complete": market_audit[
-                "raw_market_cap_history_complete"
-            ],
-            "raw_missing_reference_months": market_audit[
-                "raw_missing_reference_months"
-            ],
-            "usable_market_cap_history_complete": market_audit[
-                "usable_market_cap_history_complete"
-            ],
-            "usable_missing_reference_months": market_audit[
-                "usable_missing_reference_months"
-            ],
-            "total_normalized_market_cap_row_count": market_audit[
-                "total_normalized_market_cap_row_count"
-            ],
-            "accepted_universe_normalized_market_cap_row_count": market_audit[
-                "accepted_universe_normalized_market_cap_row_count"
-            ],
-            "mapped_accepted_universe_issuer_count": market_audit[
-                "mapped_accepted_universe_issuer_count"
-            ],
-            "usable_market_cap_definition": market_audit[
-                "usable_market_cap_definition"
-            ],
-            "conflicting_issuer_month_groups": market_audit[
-                "conflicting_issuer_month_groups"
-            ],
+            "raw_market_cap_history_complete": (
+                market_audit["raw_market_cap_history_complete"]
+                if market_audit
+                else None
+            ),
+            "raw_missing_reference_months": (
+                market_audit["raw_missing_reference_months"] if market_audit else None
+            ),
+            "usable_market_cap_history_complete": (
+                market_audit["usable_market_cap_history_complete"]
+                if market_audit
+                else None
+            ),
+            "usable_missing_reference_months": (
+                market_audit["usable_missing_reference_months"]
+                if market_audit
+                else None
+            ),
+            "total_normalized_market_cap_row_count": (
+                market_audit["total_normalized_market_cap_row_count"]
+                if market_audit
+                else None
+            ),
+            "accepted_universe_normalized_market_cap_row_count": (
+                market_audit["accepted_universe_normalized_market_cap_row_count"]
+                if market_audit
+                else None
+            ),
+            "mapped_accepted_universe_issuer_count": (
+                market_audit["mapped_accepted_universe_issuer_count"]
+                if market_audit
+                else None
+            ),
+            "usable_market_cap_definition": (
+                market_audit["usable_market_cap_definition"] if market_audit else None
+            ),
+            "conflicting_issuer_month_groups": (
+                market_audit["conflicting_issuer_month_groups"]
+                if market_audit
+                else None
+            ),
             "market_cap_data_ready": market_cap_data_ready,
             "eligible_for_downstream_market_cap_features": market_cap_data_ready,
             "canonical_pointer_published": publication_eligible,
@@ -3618,7 +3747,9 @@ def build_human_priors(
                 "peer_group_index": str(peer_group_index.schema),
                 "peer_policy_security_days": str(peer_policy.schema),
                 "issuer_market_cap_monthly": (
-                    str(market_cap.schema) if market_cap_requested else None
+                    str(market_cap.schema)
+                    if market_cap_requested and market_cap is not None
+                    else None
                 ),
                 "unit_components": str(unit_components.schema),
                 "unit_parity_coverage": str(unit_parity.schema),
@@ -3745,47 +3876,73 @@ def main(arguments: Sequence[str] | None = None) -> int:
             reviewed_aliases_path=args.reviewed_aliases,
         )
         audit = json.loads((output / "metadata_audit.json").read_text(encoding="utf-8"))
-        market = audit["market_cap"]
         print(output)
         print(
             json.dumps(
                 {
                     "market_cap_mode": audit["market_cap_mode"],
                     "market_cap_requested": audit["market_cap_requested"],
-                    "raw_market_cap_reference_months": market[
-                        "raw_distinct_reference_month_count"
+                    "market_cap_evaluation_status": audit[
+                        "market_cap_evaluation_status"
                     ],
-                    "raw_missing_market_cap_calendar_months": market[
-                        "raw_missing_reference_months"
-                    ],
-                    "raw_market_cap_history_complete": market[
+                    "raw_market_cap_reference_months": (
+                        audit["market_cap"]["raw_distinct_reference_month_count"]
+                        if audit["market_cap"]
+                        else None
+                    ),
+                    "raw_missing_market_cap_calendar_months": (
+                        audit["market_cap"]["raw_missing_reference_months"]
+                        if audit["market_cap"]
+                        else None
+                    ),
+                    "raw_market_cap_history_complete": audit[
                         "raw_market_cap_history_complete"
                     ],
-                    "usable_market_cap_reference_months": market[
-                        "usable_distinct_reference_month_count"
-                    ],
-                    "usable_missing_market_cap_calendar_months": market[
-                        "usable_missing_reference_months"
-                    ],
-                    "usable_market_cap_history_complete": market[
+                    "usable_market_cap_reference_months": (
+                        audit["market_cap"]["usable_distinct_reference_month_count"]
+                        if audit["market_cap"]
+                        else None
+                    ),
+                    "usable_missing_market_cap_calendar_months": (
+                        audit["market_cap"]["usable_missing_reference_months"]
+                        if audit["market_cap"]
+                        else None
+                    ),
+                    "usable_market_cap_history_complete": audit[
                         "usable_market_cap_history_complete"
                     ],
-                    "source_issuer_count": market["source_distinct_issuer_names"],
-                    "mapped_accepted_universe_issuer_count": market[
-                        "mapped_accepted_universe_issuer_count"
-                    ],
-                    "total_normalized_market_cap_row_count": market[
-                        "total_normalized_market_cap_row_count"
-                    ],
-                    "accepted_universe_normalized_market_cap_row_count": market[
-                        "accepted_universe_normalized_market_cap_row_count"
-                    ],
-                    "usable_market_cap_definition": market[
-                        "usable_market_cap_definition"
-                    ],
-                    "conflicting_issuer_month_groups": market[
-                        "conflicting_issuer_month_groups"
-                    ],
+                    "source_issuer_count": (
+                        audit["market_cap"]["source_distinct_issuer_names"]
+                        if audit["market_cap"]
+                        else None
+                    ),
+                    "mapped_accepted_universe_issuer_count": (
+                        audit["market_cap"]["mapped_accepted_universe_issuer_count"]
+                        if audit["market_cap"]
+                        else None
+                    ),
+                    "total_normalized_market_cap_row_count": (
+                        audit["market_cap"]["total_normalized_market_cap_row_count"]
+                        if audit["market_cap"]
+                        else None
+                    ),
+                    "accepted_universe_normalized_market_cap_row_count": (
+                        audit["market_cap"][
+                            "accepted_universe_normalized_market_cap_row_count"
+                        ]
+                        if audit["market_cap"]
+                        else None
+                    ),
+                    "usable_market_cap_definition": (
+                        audit["market_cap"]["usable_market_cap_definition"]
+                        if audit["market_cap"]
+                        else None
+                    ),
+                    "conflicting_issuer_month_groups": (
+                        audit["market_cap"]["conflicting_issuer_month_groups"]
+                        if audit["market_cap"]
+                        else None
+                    ),
                     "build_mode": audit["build_mode"],
                     "market_cap_data_ready": audit["market_cap_data_ready"],
                     "eligible_for_downstream_market_cap_features": audit[
