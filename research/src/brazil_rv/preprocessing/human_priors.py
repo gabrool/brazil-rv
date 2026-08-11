@@ -79,6 +79,10 @@ MANUAL_MARKET_CAP_FILENAME = re.compile(
 )
 MARKET_CAP_REQUIRED_START_MONTH = "2020-06"
 MIN_COMPLETE_MARKET_CAP_ISSUERS = 21
+MARKET_CAP_USABLE_DEFINITION = (
+    "Normalized issuer-month observations mapped to non-null issuer IDs present "
+    "in the accepted model universe."
+)
 MARKET_CAP_HISTORY_LIMITATION = (
     "The current official B3 monthly application exposes only its latest two "
     "reference months. Its first-party application sends only company, language, "
@@ -1340,8 +1344,8 @@ def reconcile_market_cap(
         "issuer_name_mapping_fraction": (
             len(mapped_names) / len(source_names) if source_names else 0.0
         ),
-        "normalized_row_count": output.height,
-        "normalized_issuer_count": (
+        "total_normalized_market_cap_row_count": output.height,
+        "total_normalized_market_cap_issuer_count": (
             output["issuer_id"].n_unique() if output.height else 0
         ),
         "duplicate_issuer_month_groups": duplicate_groups,
@@ -2000,7 +2004,8 @@ def market_cap_readiness(
     raw_reference_dates: Sequence[date],
     usable_reference_dates: Sequence[date],
     *,
-    normalized_row_count: int,
+    accepted_universe_normalized_row_count: int,
+    mapped_accepted_universe_issuer_count: int,
     conflicting_issuer_month_groups: int,
     as_of: date,
 ) -> dict[str, object]:
@@ -2016,8 +2021,12 @@ def market_cap_readiness(
             "missing usable normalized calendar months: "
             + ", ".join(usable["missing_reference_months"])
         )
-    if normalized_row_count == 0:
-        reasons.append("normalized market-cap data is empty")
+    if accepted_universe_normalized_row_count == 0:
+        reasons.append("accepted-universe normalized market-cap data is empty")
+    if mapped_accepted_universe_issuer_count == 0:
+        reasons.append(
+            "no normalized market-cap issuer maps to the accepted model universe"
+        )
     if conflicting_issuer_month_groups:
         reasons.append(
             f"conflicting issuer-month groups: {conflicting_issuer_month_groups}"
@@ -2025,7 +2034,8 @@ def market_cap_readiness(
     ready = (
         bool(raw["market_cap_history_complete"])
         and bool(usable["market_cap_history_complete"])
-        and normalized_row_count > 0
+        and accepted_universe_normalized_row_count > 0
+        and mapped_accepted_universe_issuer_count > 0
         and conflicting_issuer_month_groups == 0
     )
     return {
@@ -2047,7 +2057,13 @@ def market_cap_readiness(
         "usable_missing_reference_months": usable["missing_reference_months"],
         "usable_missing_reference_month_count": usable["missing_reference_month_count"],
         "usable_market_cap_history_complete": usable["market_cap_history_complete"],
-        "normalized_market_cap_row_count": normalized_row_count,
+        "accepted_universe_normalized_market_cap_row_count": (
+            accepted_universe_normalized_row_count
+        ),
+        "mapped_accepted_universe_issuer_count": (
+            mapped_accepted_universe_issuer_count
+        ),
+        "usable_market_cap_definition": MARKET_CAP_USABLE_DEFINITION,
         "market_cap_data_ready": ready,
         "market_cap_not_ready_reasons": reasons,
     }
@@ -2100,6 +2116,9 @@ def market_cap_audit(
         .unique("issuer_id")
         .to_dicts()
     }
+    accepted_market_cap = market_cap.filter(
+        pl.col("issuer_id").is_in(sorted(issuer_names))
+    )
     coverage_rows: list[dict[str, object]] = []
     discontinuities: list[dict[str, object]] = []
     for issuer_id, issuer_name in sorted(issuer_names.items()):
@@ -2145,19 +2164,28 @@ def market_cap_audit(
             }
         )
     coverage = pl.from_dicts(coverage_rows, infer_schema_length=None).sort("issuer_id")
-    available_reference_dates = (
+    total_available_reference_dates = (
         market_cap["reference_date"].unique().sort().to_list()
         if market_cap.height
         else []
     )
+    accepted_reference_dates = (
+        accepted_market_cap["reference_date"].unique().sort().to_list()
+        if accepted_market_cap.height
+        else []
+    )
+    mapped_accepted_universe_issuer_count = (
+        accepted_market_cap["issuer_id"].n_unique() if accepted_market_cap.height else 0
+    )
     readiness = market_cap_readiness(
         (
-            available_reference_dates
+            total_available_reference_dates
             if source_reference_dates is None
             else source_reference_dates
         ),
-        available_reference_dates,
-        normalized_row_count=market_cap.height,
+        accepted_reference_dates,
+        accepted_universe_normalized_row_count=accepted_market_cap.height,
+        mapped_accepted_universe_issuer_count=(mapped_accepted_universe_issuer_count),
         conflicting_issuer_month_groups=int(
             mapping_stats["conflicting_issuer_month_groups"]
         ),
@@ -2173,8 +2201,8 @@ def market_cap_audit(
     audit = {
         **mapping_stats,
         **readiness,
-        "available_reference_dates": [
-            str(value) for value in available_reference_dates
+        "total_normalized_available_reference_dates": [
+            str(value) for value in total_available_reference_dates
         ],
         "eligible_security_day_count": total_active,
         "strictly_lagged_joined_security_day_count": total_joined,
@@ -2320,8 +2348,14 @@ def _render_markdown(audit: dict[str, object]) -> str:
             f"{audit['market_cap']['usable_distinct_reference_month_count']}",
             f"- Missing usable normalized calendar months: "
             f"{audit['market_cap']['usable_missing_reference_month_count']}",
-            f"- Usable normalized observations: "
-            f"{audit['market_cap']['normalized_market_cap_row_count']}",
+            f"- Total normalized observations: "
+            f"{audit['market_cap']['total_normalized_market_cap_row_count']}",
+            f"- Accepted-universe normalized observations: "
+            f"{audit['market_cap']['accepted_universe_normalized_market_cap_row_count']}",
+            f"- Mapped accepted-universe issuers: "
+            f"{audit['market_cap']['mapped_accepted_universe_issuer_count']}",
+            f"- Usable definition: "
+            f"{audit['market_cap']['usable_market_cap_definition']}",
             f"- Conflicting issuer-month groups excluded: "
             f"{audit['market_cap']['conflicting_issuer_month_groups']}",
             f"- Market-cap data ready: {audit['market_cap_data_ready']}",
@@ -2358,11 +2392,18 @@ def validate_raw_sources(
             "issuer_id"
         ].to_list()
     )
-    market_issuers = set(market_cap["issuer_id"].to_list())
+    accepted_market_cap = market_cap.filter(
+        pl.col("issuer_id").is_in(sorted(accepted_issuers))
+    )
     readiness = market_cap_readiness(
         raw_market_cap["reference_date"].to_list(),
-        market_cap["reference_date"].to_list(),
-        normalized_row_count=market_cap.height,
+        accepted_market_cap["reference_date"].to_list(),
+        accepted_universe_normalized_row_count=accepted_market_cap.height,
+        mapped_accepted_universe_issuer_count=(
+            accepted_market_cap["issuer_id"].n_unique()
+            if accepted_market_cap.height
+            else 0
+        ),
         conflicting_issuer_month_groups=int(
             market_stats["conflicting_issuer_month_groups"]
         ),
@@ -2384,9 +2425,12 @@ def validate_raw_sources(
             "source_issuer_count": raw_market_cap["issuer_name"].n_unique(),
             "all_company_footer_validated": True,
             **readiness,
-            "mapped_accepted_universe_issuer_count": len(
-                accepted_issuers & market_issuers
-            ),
+            "total_normalized_market_cap_row_count": market_stats[
+                "total_normalized_market_cap_row_count"
+            ],
+            "total_normalized_market_cap_issuer_count": market_stats[
+                "total_normalized_market_cap_issuer_count"
+            ],
             "mapping_exception_count": market_exceptions.height,
             "duplicate_issuer_month_groups": market_stats[
                 "duplicate_issuer_month_groups"
@@ -2562,6 +2606,7 @@ def build_human_priors(
     inputs: FeatureInputs | None = None,
     assignments_loader: Callable[[Path], pl.DataFrame] = load_assignments,
     repository_state: Callable[[], tuple[str, list[str]]] = _repository_state,
+    pointer_publisher: Callable[[Path, Path], None] = _atomic_pointer,
 ) -> Path:
     created_at = datetime.now(UTC) if created_at is None else created_at.astimezone(UTC)
     inputs = _resolve_feature_inputs() if inputs is None else inputs
@@ -2574,14 +2619,6 @@ def build_human_priors(
     )
     market_cap, market_exceptions, market_stats = reconcile_market_cap(
         raw_market_cap, classification, security_metadata
-    )
-    accepted_issuer_ids = set(
-        security_metadata.filter(pl.col("issuer_id").is_not_null())[
-            "issuer_id"
-        ].to_list()
-    )
-    market_stats["mapped_accepted_universe_issuer_count"] = len(
-        accepted_issuer_ids & set(market_cap["issuer_id"].to_list())
     )
     unit_components, unit_exceptions = normalize_unit_components(
         raw_units, classification, security_metadata
@@ -2699,6 +2736,7 @@ def build_human_priors(
     if output_dir.exists() or partial.exists():
         raise FileExistsError(f"B3 human-prior output already exists: {output_dir}")
     partial.mkdir(parents=True)
+    output_finalized = False
     try:
         security_metadata.write_parquet(
             partial / "security_metadata.parquet",
@@ -2750,8 +2788,17 @@ def build_human_priors(
             "usable_missing_reference_months": market_audit[
                 "usable_missing_reference_months"
             ],
-            "normalized_market_cap_row_count": market_audit[
-                "normalized_market_cap_row_count"
+            "total_normalized_market_cap_row_count": market_audit[
+                "total_normalized_market_cap_row_count"
+            ],
+            "accepted_universe_normalized_market_cap_row_count": market_audit[
+                "accepted_universe_normalized_market_cap_row_count"
+            ],
+            "mapped_accepted_universe_issuer_count": market_audit[
+                "mapped_accepted_universe_issuer_count"
+            ],
+            "usable_market_cap_definition": market_audit[
+                "usable_market_cap_definition"
             ],
             "conflicting_issuer_month_groups": market_audit[
                 "conflicting_issuer_month_groups"
@@ -2838,10 +2885,13 @@ def build_human_priors(
         }
         _atomic_json(partial / "manifest.json", manifest)
         os.replace(partial, output_dir)
+        output_finalized = True
         if market_cap_data_ready:
-            _atomic_pointer(pointer, output_dir)
+            pointer_publisher(pointer, output_dir)
     except BaseException:
         shutil.rmtree(partial, ignore_errors=True)
+        if output_finalized:
+            shutil.rmtree(output_dir, ignore_errors=True)
         raise
     return output_dir
 
@@ -2946,8 +2996,14 @@ def main(arguments: Sequence[str] | None = None) -> int:
                     "mapped_accepted_universe_issuer_count": market[
                         "mapped_accepted_universe_issuer_count"
                     ],
-                    "normalized_market_cap_row_count": market[
-                        "normalized_market_cap_row_count"
+                    "total_normalized_market_cap_row_count": market[
+                        "total_normalized_market_cap_row_count"
+                    ],
+                    "accepted_universe_normalized_market_cap_row_count": market[
+                        "accepted_universe_normalized_market_cap_row_count"
+                    ],
+                    "usable_market_cap_definition": market[
+                        "usable_market_cap_definition"
                     ],
                     "conflicting_issuer_month_groups": market[
                         "conflicting_issuer_month_groups"

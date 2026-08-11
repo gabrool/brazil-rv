@@ -444,8 +444,8 @@ def test_market_cap_audit_joins_only_strictly_prior_months() -> None:
         "source_distinct_issuer_names": 1,
         "mapped_distinct_issuer_names": 1,
         "issuer_name_mapping_fraction": 1.0,
-        "normalized_row_count": 2,
-        "normalized_issuer_count": 1,
+        "total_normalized_market_cap_row_count": 2,
+        "total_normalized_market_cap_issuer_count": 1,
         "duplicate_issuer_month_groups": 0,
         "conflicting_issuer_month_groups": 0,
     }
@@ -496,8 +496,8 @@ def test_issuer_discontinuity_uses_calendar_month_keys() -> None:
         "source_distinct_issuer_names": 1,
         "mapped_distinct_issuer_names": 1,
         "issuer_name_mapping_fraction": 1.0,
-        "normalized_row_count": 2,
-        "normalized_issuer_count": 1,
+        "total_normalized_market_cap_row_count": 2,
+        "total_normalized_market_cap_issuer_count": 1,
         "duplicate_issuer_month_groups": 0,
         "conflicting_issuer_month_groups": 0,
     }
@@ -751,8 +751,13 @@ def _populate_raw_fixture(
     issuer_names: tuple[str, ...],
     reference_dates: tuple[date, ...],
     market_cap_payload: bytes | None = None,
+    classification_issuer_names: tuple[str, ...] | None = None,
 ) -> None:
-    classification = _classification_xlsx_for_issuers(issuer_names)
+    classification = _classification_xlsx_for_issuers(
+        issuer_names
+        if classification_issuer_names is None
+        else classification_issuer_names
+    )
     market_cap = (
         _market_cap_csv(reference_dates, issuer_names)
         if market_cap_payload is None
@@ -957,11 +962,23 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
     assert audit["eligible_for_downstream_market_cap_features"] is True
     assert audit["market_cap"]["raw_missing_reference_months"] == []
     assert audit["market_cap"]["usable_missing_reference_months"] == []
+    assert audit["market_cap"]["total_normalized_market_cap_row_count"] == 56
+    assert (
+        audit["market_cap"]["accepted_universe_normalized_market_cap_row_count"] == 56
+    )
+    assert audit["market_cap"]["mapped_accepted_universe_issuer_count"] == 28
     assert audit["units"]["units_with_exact_parity_possible"] == 1
     assert manifest["schema_version"] == SCHEMA_VERSION
     assert manifest["repository_commit"] == "fixture-commit"
     assert manifest["market_cap_data_ready"] is True
     assert manifest["canonical_pointer_published"] is True
+    assert manifest["total_normalized_market_cap_row_count"] == 56
+    assert manifest["accepted_universe_normalized_market_cap_row_count"] == 56
+    assert manifest["mapped_accepted_universe_issuer_count"] == 28
+    assert (
+        manifest["usable_market_cap_definition"]
+        == audit["market_cap"]["usable_market_cap_definition"]
+    )
     assert (
         manifest["implementation_sha256"]
         == hashlib.sha256(
@@ -989,6 +1006,13 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
     assert raw_validation["market_cap"]["raw_distinct_reference_month_count"] == 2
     assert raw_validation["market_cap"]["usable_distinct_reference_month_count"] == 2
     assert raw_validation["market_cap"]["market_cap_data_ready"] is True
+    assert raw_validation["market_cap"]["total_normalized_market_cap_row_count"] == 56
+    assert (
+        raw_validation["market_cap"][
+            "accepted_universe_normalized_market_cap_row_count"
+        ]
+        == 56
+    )
     assert raw_validation["market_cap"]["source_issuer_count"] == 28
     assert raw_validation["market_cap"]["mapped_accepted_universe_issuer_count"] == 28
     assert raw_validation["units"] == {"unit_count": 1, "component_count": 2}
@@ -1066,6 +1090,52 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
     assert not list(output_base.glob("*.partial"))
 
 
+def test_complete_build_removes_new_artifact_when_pointer_publication_fails(
+    tmp_path: Path,
+) -> None:
+    inputs, issuer_names, _, assignments_loader = _canonical_build_fixture(
+        tmp_path / "canonical"
+    )
+    raw_dir = tmp_path / "raw"
+    _populate_raw_fixture(
+        raw_dir,
+        issuer_names=issuer_names,
+        reference_dates=(date(2020, 7, 31), date(2020, 6, 30)),
+    )
+    output_base = tmp_path / "outputs"
+    existing_output = output_base / "preexisting_complete_artifact"
+    existing_output.mkdir(parents=True)
+    sentinel = existing_output / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+    pointer = tmp_path / "human_priors_path.txt"
+    old_pointer = str(existing_output.resolve())
+    pointer.write_text(old_pointer, encoding="utf-8")
+    expected_output = output_base / "human_priors_complete_20200815T130000000000Z"
+
+    def fail_pointer_publication(actual_pointer: Path, target: Path) -> None:
+        assert actual_pointer == pointer
+        assert target == expected_output
+        raise RuntimeError("forced pointer publication failure")
+
+    with pytest.raises(RuntimeError, match="forced pointer publication failure"):
+        build_human_priors(
+            raw_dir=raw_dir,
+            output_base=output_base,
+            pointer=pointer,
+            created_at=datetime(2020, 8, 15, 13, 0, tzinfo=UTC),
+            inputs=inputs,
+            assignments_loader=assignments_loader,
+            repository_state=lambda: ("fixture-commit", []),
+            pointer_publisher=fail_pointer_publication,
+        )
+
+    assert pointer.read_text(encoding="utf-8") == old_pointer
+    assert not expected_output.exists()
+    assert sentinel.read_text(encoding="utf-8") == "keep"
+    assert {path.name for path in output_base.iterdir()} == {existing_output.name}
+    assert not list(output_base.glob("*.partial"))
+
+
 def test_build_rejects_raw_complete_but_empty_normalized_market_cap(
     tmp_path: Path,
 ) -> None:
@@ -1087,10 +1157,7 @@ def test_build_rejects_raw_complete_but_empty_normalized_market_cap(
 
     with pytest.raises(
         ValueError,
-        match=(
-            "missing usable normalized calendar months: 2020-06, 2020-07; "
-            "normalized market-cap data is empty"
-        ),
+        match="accepted-universe normalized market-cap data is empty",
     ):
         build_human_priors(
             raw_dir=raw_dir,
@@ -1120,12 +1187,94 @@ def test_build_rejects_raw_complete_but_empty_normalized_market_cap(
     assert audit["usable_market_cap_history_complete"] is False
     assert audit["market_cap_data_ready"] is False
     assert audit["eligible_for_downstream_market_cap_features"] is False
-    assert audit["market_cap"]["normalized_market_cap_row_count"] == 0
+    assert audit["market_cap"]["total_normalized_market_cap_row_count"] == 0
+    assert audit["market_cap"]["accepted_universe_normalized_market_cap_row_count"] == 0
+    assert audit["market_cap"]["mapped_accepted_universe_issuer_count"] == 0
     assert audit["market_cap"]["usable_missing_reference_months"] == [
         "2020-06",
         "2020-07",
     ]
     assert pl.read_parquet(diagnostic / "issuer_market_cap_monthly.parquet").is_empty()
+    assert manifest["canonical_pointer_published"] is False
+    assert pointer.read_text(encoding="utf-8") == "prior"
+    assert not list(output_base.glob("*.partial"))
+
+
+def test_build_rejects_market_cap_only_for_issuers_outside_accepted_universe(
+    tmp_path: Path,
+) -> None:
+    inputs, issuer_names, _, assignments_loader = _canonical_build_fixture(
+        tmp_path / "canonical"
+    )
+    reference_dates = (date(2020, 7, 31), date(2020, 6, 30))
+    outside_issuers = tuple(f"OUTSIDE {index:02d}" for index in range(1, 29))
+    raw_dir = tmp_path / "raw"
+    _populate_raw_fixture(
+        raw_dir,
+        issuer_names=issuer_names,
+        reference_dates=reference_dates,
+        market_cap_payload=_market_cap_csv(reference_dates, outside_issuers),
+        classification_issuer_names=(*issuer_names, *outside_issuers),
+    )
+    raw_validation = validate_raw_sources(
+        raw_dir,
+        as_of=date(2020, 8, 15),
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+    )
+    assert raw_validation["market_cap"]["raw_market_cap_history_complete"] is True
+    assert raw_validation["market_cap"]["total_normalized_market_cap_row_count"] == 56
+    assert (
+        raw_validation["market_cap"][
+            "accepted_universe_normalized_market_cap_row_count"
+        ]
+        == 0
+    )
+    assert raw_validation["market_cap"]["mapped_accepted_universe_issuer_count"] == 0
+    assert raw_validation["market_cap"]["usable_market_cap_history_complete"] is False
+    assert raw_validation["market_cap"]["market_cap_data_ready"] is False
+
+    output_base = tmp_path / "outputs"
+    pointer = tmp_path / "human_priors_path.txt"
+    pointer.write_text("prior", encoding="utf-8")
+    with pytest.raises(
+        ValueError,
+        match="no normalized market-cap issuer maps to the accepted model universe",
+    ):
+        build_human_priors(
+            raw_dir=raw_dir,
+            output_base=output_base,
+            pointer=pointer,
+            created_at=datetime(2020, 8, 15, 13, 0, tzinfo=UTC),
+            inputs=inputs,
+            assignments_loader=assignments_loader,
+            repository_state=lambda: ("fixture-commit", []),
+        )
+    assert pointer.read_text(encoding="utf-8") == "prior"
+    assert not list(output_base.glob("*.partial"))
+
+    diagnostic = build_human_priors(
+        raw_dir=raw_dir,
+        output_base=output_base,
+        pointer=pointer,
+        created_at=datetime(2020, 8, 15, 14, 0, tzinfo=UTC),
+        allow_incomplete_market_cap=True,
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+        repository_state=lambda: ("fixture-commit", []),
+    )
+    audit = json.loads((diagnostic / "metadata_audit.json").read_text(encoding="utf-8"))
+    manifest = json.loads((diagnostic / "manifest.json").read_text(encoding="utf-8"))
+    assert audit["raw_market_cap_history_complete"] is True
+    assert audit["usable_market_cap_history_complete"] is False
+    assert audit["market_cap_data_ready"] is False
+    assert audit["eligible_for_downstream_market_cap_features"] is False
+    assert audit["market_cap"]["total_normalized_market_cap_row_count"] == 56
+    assert audit["market_cap"]["accepted_universe_normalized_market_cap_row_count"] == 0
+    assert audit["market_cap"]["mapped_accepted_universe_issuer_count"] == 0
+    assert (
+        pl.read_parquet(diagnostic / "issuer_market_cap_monthly.parquet").height == 56
+    )
     assert manifest["canonical_pointer_published"] is False
     assert pointer.read_text(encoding="utf-8") == "prior"
     assert not list(output_base.glob("*.partial"))
@@ -1186,7 +1335,12 @@ def test_build_rejects_raw_month_missing_after_normalization(tmp_path: Path) -> 
     assert audit["market_cap_data_ready"] is False
     assert audit["market_cap"]["raw_missing_reference_months"] == []
     assert audit["market_cap"]["usable_missing_reference_months"] == ["2020-06"]
-    assert audit["market_cap"]["normalized_market_cap_row_count"] == len(issuer_names)
+    assert audit["market_cap"][
+        "accepted_universe_normalized_market_cap_row_count"
+    ] == len(issuer_names)
+    assert audit["market_cap"]["total_normalized_market_cap_row_count"] == len(
+        issuer_names
+    )
     assert pointer.read_text(encoding="utf-8") == "prior"
     assert not list(output_base.glob("*.partial"))
 
