@@ -17,7 +17,9 @@ import pytest
 from brazil_rv.preprocessing.human_priors import (
     CLASSIFICATION_API_BASE,
     MARKET_CAP_API_BASE,
+    MARKET_CAP_OMISSION_REASON,
     SCHEMA_VERSION,
+    SELECTED_GROUPING_POLICY,
     UNITS_PAGE_URL,
     FeatureInputs,
     HttpPayload,
@@ -30,13 +32,16 @@ from brazil_rv.preprocessing.human_priors import (
     issuer_peer_audit,
     mapping_exception_audit,
     market_cap_audit,
+    market_cap_manual_instructions,
     market_cap_month_coverage,
     normalize_unit_components,
     parse_classification_xlsx,
+    parse_args,
     parse_market_cap_csv,
     parse_units_html,
     reconcile_market_cap,
     reconcile_security_metadata,
+    select_peer_policy,
     strictly_lagged_market_cap_index,
     unit_overlap_audit,
     validate_reviewed_aliases,
@@ -511,6 +516,65 @@ def test_identical_economic_segments_under_different_subsectors_are_not_peers() 
     assert peers["economic_segment_group_key"].n_unique() == 2
 
 
+def test_selected_peer_policy_uses_dated_active_counts_and_sector_fallback() -> None:
+    metadata = pl.DataFrame(
+        {
+            "security_id": ["A1", "A2", "A3", "A4"],
+            "issuer_id": ["IA1", "IA2", "IA3", "IA4"],
+            "sector": ["Sector"] * 4,
+            "subsector": ["Shared", "Shared", "Shared", "Other"],
+            "economic_segment": ["EA1", "EA2", "EA3", "EA4"],
+        }
+    )
+    active = pl.DataFrame(
+        {
+            "date_idx": [0, 0, 0, 0, 1, 1, 1],
+            "trade_date": [date(2026, 8, 10)] * 4 + [date(2026, 8, 11)] * 3,
+            "equity_slot": [0, 1, 2, 3, 0, 1, 3],
+            "security_id": ["A1", "A2", "A3", "A4", "A1", "A2", "A4"],
+        }
+    )
+    selected = select_peer_policy(add_self_excluded_peer_counts(active, metadata))
+    first = selected.filter(
+        (pl.col("security_id") == "A1") & (pl.col("date_idx") == 0)
+    ).row(named=True)
+    second = selected.filter(
+        (pl.col("security_id") == "A1") & (pl.col("date_idx") == 1)
+    ).row(named=True)
+
+    assert first["same_subsector_peer_count"] == 2
+    assert first["selected_peer_relation"] == "SUBSECTOR"
+    assert first["selected_other_active_peer_count"] == 2
+    assert first["sector_fallback_used"] is False
+    assert first["selected_peer_group_key"] == '["Sector","Shared"]'
+    assert second["same_subsector_peer_count"] == 1
+    assert second["same_sector_peer_count"] == 2
+    assert second["selected_peer_relation"] == "SECTOR"
+    assert second["selected_other_active_peer_count"] == 2
+    assert second["sector_fallback_used"] is True
+    assert second["selected_peer_group_key"] == '["Sector"]'
+
+
+def test_selected_subsector_keys_remain_parent_qualified() -> None:
+    metadata = pl.DataFrame(
+        {
+            "security_id": ["A1", "A2", "A3", "B1", "B2", "B3"],
+            "issuer_id": ["IA1", "IA2", "IA3", "IB1", "IB2", "IB3"],
+            "sector": ["Sector A"] * 3 + ["Sector B"] * 3,
+            "subsector": ["Shared"] * 6,
+            "economic_segment": ["EA1", "EA2", "EA3", "EB1", "EB2", "EB3"],
+        }
+    )
+    selected = select_peer_policy(_single_day_peer_counts(metadata))
+
+    assert selected["selected_peer_relation"].unique().to_list() == ["SUBSECTOR"]
+    assert selected["selected_other_active_peer_count"].unique().to_list() == [2]
+    assert set(selected["selected_peer_group_key"].unique().to_list()) == {
+        '["Sector A","Shared"]',
+        '["Sector B","Shared"]',
+    }
+
+
 def test_candidate_policy_coverage_uses_hierarchical_subsector_groups() -> None:
     metadata = pl.DataFrame(
         {
@@ -572,6 +636,35 @@ def test_strict_market_cap_lag_excludes_same_day() -> None:
     assert strictly_lagged_market_cap_index(references, date(2026, 5, 31)) is None
     assert strictly_lagged_market_cap_index(references, date(2026, 6, 30)) == 0
     assert strictly_lagged_market_cap_index(references, date(2026, 7, 1)) == 1
+
+
+def test_market_cap_modes_are_mutually_exclusive() -> None:
+    with pytest.raises(SystemExit):
+        parse_args(["build", "--allow-incomplete-market-cap", "--omit-market-cap"])
+    parsed = parse_args(["build", "--omit-market-cap"])
+    assert parsed.omit_market_cap is True
+    assert parsed.allow_incomplete_market_cap is False
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        build_human_priors(
+            allow_incomplete_market_cap=True,
+            omit_market_cap=True,
+        )
+
+
+def test_market_cap_instructions_describe_supported_paths_only(tmp_path: Path) -> None:
+    instructions = market_cap_manual_instructions(tmp_path)
+
+    assert "latest two reference months" in instructions
+    assert "already possess them or obtain them directly from B3" in instructions
+    assert "Unsupported request parameters" in instructions
+    assert "unofficial mirrors" in instructions
+    assert "CVM" in instructions
+    assert "Receita Federal" in instructions
+    assert "third-party substitutions" in instructions
+    assert "--omit-market-cap" in instructions
+    assert MARKET_CAP_OMISSION_REASON.startswith(
+        "Market cap was explicitly omitted because"
+    )
 
 
 def test_market_cap_coverage_uses_calendar_months_not_calendar_end_dates() -> None:
@@ -1189,6 +1282,8 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
     required = {
         "manifest.json",
         "security_metadata.parquet",
+        "peer_group_index.parquet",
+        "peer_policy_security_days.parquet",
         "issuer_market_cap_monthly.parquet",
         "unit_components.parquet",
         "metadata_audit.json",
@@ -1222,10 +1317,18 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
     audit = json.loads((output / "metadata_audit.json").read_text(encoding="utf-8"))
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
     assert audit["build_mode"] == "complete"
+    assert audit["market_cap_mode"] == "required"
+    assert audit["market_cap_requested"] is True
+    assert audit["market_cap_source_data_ready"] is True
+    assert audit["market_cap_outputs_emitted"] is True
     assert audit["raw_market_cap_history_complete"] is True
     assert audit["usable_market_cap_history_complete"] is True
     assert audit["market_cap_data_ready"] is True
     assert audit["eligible_for_downstream_market_cap_features"] is True
+    assert audit["grouping_policy_selected"] == SELECTED_GROUPING_POLICY
+    assert audit["selected_peer_policy"]["minimum_other_active_subsector_peers"] == 2
+    assert audit["selected_peer_policy"]["economic_segment_peers_enabled"] is False
+    assert audit["selected_peer_policy"]["unit_parity_features_enabled"] is False
     assert audit["market_cap"]["raw_missing_reference_months"] == []
     assert audit["market_cap"]["usable_missing_reference_months"] == []
     assert audit["market_cap"]["total_normalized_market_cap_row_count"] == 56
@@ -1236,8 +1339,28 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
     assert audit["units"]["units_with_exact_parity_possible"] == 1
     assert manifest["schema_version"] == SCHEMA_VERSION
     assert manifest["repository_commit"] == "fixture-commit"
+    assert manifest["market_cap_mode"] == "required"
+    assert manifest["market_cap_requested"] is True
     assert manifest["market_cap_data_ready"] is True
     assert manifest["canonical_pointer_published"] is True
+    assert manifest["grouping_policy_selected"] == SELECTED_GROUPING_POLICY
+    assert manifest["peer_policy_output_contract"]["security_day_key"] == [
+        "date_idx",
+        "equity_slot",
+    ]
+    assert manifest["peer_policy_output_contract"]["security_day_count"] == 90
+    peer_policy = pl.read_parquet(output / "peer_policy_security_days.parquet")
+    assert peer_policy.height == 90
+    assert peer_policy["selected_peer_relation"].unique().to_list() == ["SUBSECTOR"]
+    assert peer_policy["selected_other_active_peer_count"].unique().to_list() == [29]
+    assert peer_policy["sector_fallback_used"].unique().to_list() == [False]
+    assert peer_policy["same_sector_peer_count"].unique().to_list() == [29]
+    assert peer_policy["same_subsector_peer_count"].unique().to_list() == [29]
+    assert "economic_segment" not in " ".join(peer_policy.columns)
+    assert "unit" not in " ".join(peer_policy.columns)
+    group_index = pl.read_parquet(output / "peer_group_index.parquet")
+    assert group_index["peer_relation"].to_list() == ["SECTOR", "SUBSECTOR"]
+    assert group_index["peer_group_id"].to_list() == [0, 1]
     assert manifest["total_normalized_market_cap_row_count"] == 56
     assert manifest["accepted_universe_normalized_market_cap_row_count"] == 56
     assert manifest["mapped_accepted_universe_issuer_count"] == 28
@@ -1341,10 +1464,14 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
         (diagnostic / "manifest.json").read_text(encoding="utf-8")
     )
     assert diagnostic_audit["build_mode"] == "diagnostic_market_cap_not_ready"
+    assert diagnostic_audit["market_cap_mode"] == "diagnostic"
+    assert diagnostic_audit["market_cap_requested"] is True
     assert diagnostic_audit["raw_market_cap_history_complete"] is False
     assert diagnostic_audit["usable_market_cap_history_complete"] is False
     assert diagnostic_audit["market_cap_data_ready"] is False
     assert diagnostic_audit["eligible_for_downstream_market_cap_features"] is False
+    assert diagnostic_audit["market_cap_outputs_emitted"] is True
+    assert diagnostic_manifest["market_cap_requested"] is True
     assert diagnostic_manifest["canonical_pointer_published"] is False
     assert set(diagnostic_manifest["artifact_status"].values()) == {
         "diagnostic_market_cap_not_ready"
@@ -1353,6 +1480,104 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
         encoding="utf-8"
     )
     assert pointer.read_text(encoding="utf-8") == prior_pointer
+    assert not list(output_base.glob("*.partial"))
+
+    omitted = build_human_priors(
+        raw_dir=raw_incomplete,
+        output_base=output_base,
+        pointer=pointer,
+        created_at=datetime(2020, 8, 15, 17, 0, tzinfo=UTC),
+        omit_market_cap=True,
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+        repository_state=lambda: ("fixture-commit", []),
+    )
+    omitted_files = {path.name for path in omitted.iterdir()}
+    assert omitted_files == required - {
+        "issuer_market_cap_monthly.parquet",
+        "market_cap_coverage.csv",
+    }
+    assert pointer.read_text(encoding="utf-8") == str(omitted.resolve())
+    omitted_audit = json.loads(
+        (omitted / "metadata_audit.json").read_text(encoding="utf-8")
+    )
+    omitted_manifest = json.loads(
+        (omitted / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert omitted_audit["build_mode"] == "complete_market_cap_omitted"
+    assert omitted_audit["market_cap_mode"] == "omitted"
+    assert omitted_audit["market_cap_requested"] is False
+    assert omitted_audit["market_cap_source_data_ready"] is False
+    assert omitted_audit["market_cap_data_ready"] is False
+    assert omitted_audit["eligible_for_downstream_market_cap_features"] is False
+    assert omitted_audit["market_cap_outputs_emitted"] is False
+    assert omitted_audit["market_cap_omission_reason"] == MARKET_CAP_OMISSION_REASON
+    assert omitted_audit["grouping_policy_selected"] == SELECTED_GROUPING_POLICY
+    assert omitted_audit["market_cap"]["market_cap_data_ready"] is False
+    assert omitted_manifest["market_cap_mode"] == "omitted"
+    assert omitted_manifest["market_cap_requested"] is False
+    assert omitted_manifest["market_cap_data_ready"] is False
+    assert omitted_manifest["eligible_for_downstream_market_cap_features"] is False
+    assert omitted_manifest["market_cap_outputs_emitted"] is False
+    assert omitted_manifest["canonical_pointer_published"] is True
+    assert omitted_manifest["normalized_schemas"]["issuer_market_cap_monthly"] is None
+    assert set(omitted_manifest["artifact_status"].values()) == {
+        "complete_market_cap_omitted"
+    }
+    assert "issuer_market_cap_monthly.parquet" not in omitted_manifest["output_sha256"]
+    assert "market_cap_coverage.csv" not in omitted_manifest["output_sha256"]
+    assert "COMPLETE — MARKET CAP OMITTED" in (omitted / "metadata_audit.md").read_text(
+        encoding="utf-8"
+    )
+    omitted_metadata = pl.read_parquet(omitted / "security_metadata.parquet")
+    assert omitted_metadata["equity_slot"].to_list() == list(range(30))
+    assert omitted_metadata["issuer_id"].null_count() == 0
+    assert omitted_metadata["sector_group_key"].null_count() == 0
+    assert omitted_metadata["subsector_group_key"].null_count() == 0
+    assert omitted_metadata["sector_peer_group_id"].null_count() == 0
+    assert omitted_metadata["subsector_peer_group_id"].null_count() == 0
+    assert pl.read_parquet(omitted / "peer_policy_security_days.parquet").height == 90
+
+    deterministic_pointer = tmp_path / "deterministic_human_priors_path.txt"
+    deterministic = build_human_priors(
+        raw_dir=raw_incomplete,
+        output_base=tmp_path / "deterministic_outputs",
+        pointer=deterministic_pointer,
+        created_at=datetime(2020, 8, 15, 17, 0, tzinfo=UTC),
+        omit_market_cap=True,
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+        repository_state=lambda: ("fixture-commit", []),
+    )
+    deterministic_manifest = json.loads(
+        (deterministic / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert deterministic_manifest["output_sha256"] == omitted_manifest["output_sha256"]
+    assert deterministic_pointer.read_text(encoding="utf-8") == str(
+        deterministic.resolve()
+    )
+
+    omitted_complete_source = build_human_priors(
+        raw_dir=raw_complete,
+        output_base=output_base,
+        pointer=pointer,
+        created_at=datetime(2020, 8, 15, 18, 0, tzinfo=UTC),
+        omit_market_cap=True,
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+        repository_state=lambda: ("fixture-commit", []),
+    )
+    omitted_complete_audit = json.loads(
+        (omitted_complete_source / "metadata_audit.json").read_text(encoding="utf-8")
+    )
+    assert omitted_complete_audit["market_cap_source_data_ready"] is True
+    assert omitted_complete_audit["market_cap_data_ready"] is False
+    assert (
+        omitted_complete_audit["eligible_for_downstream_market_cap_features"] is False
+    )
+    assert not (omitted_complete_source / "issuer_market_cap_monthly.parquet").exists()
+    assert not (omitted_complete_source / "market_cap_coverage.csv").exists()
+    assert pointer.read_text(encoding="utf-8") == str(omitted_complete_source.resolve())
     assert not list(output_base.glob("*.partial"))
 
 
