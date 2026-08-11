@@ -507,8 +507,9 @@ def market_cap_manual_instructions(raw_dir: Path = RAW_BASE) -> str:
         "  uv run python -m brazil_rv.preprocessing.human_priors "
         f'ingest-market-cap-dir --directory <DIRECTORY> --raw-dir "{raw_dir}"\n'
         "Every CSV is validated before the cache is modified. Do not substitute CVM, "
-        "Receita Federal, third-party, or unofficial data. Strict build refuses missing "
-        "months; --allow-incomplete-market-cap creates a diagnostic-only artifact."
+        "Receita Federal, third-party, or unofficial data. Strict build refuses raw "
+        "or usable normalized month gaps, empty normalized data, and reconciliation "
+        "conflicts; --allow-incomplete-market-cap creates a diagnostic-only artifact."
     )
 
 
@@ -1995,6 +1996,63 @@ def market_cap_month_coverage(
     }
 
 
+def market_cap_readiness(
+    raw_reference_dates: Sequence[date],
+    usable_reference_dates: Sequence[date],
+    *,
+    normalized_row_count: int,
+    conflicting_issuer_month_groups: int,
+    as_of: date,
+) -> dict[str, object]:
+    raw = market_cap_month_coverage(raw_reference_dates, as_of=as_of)
+    usable = market_cap_month_coverage(usable_reference_dates, as_of=as_of)
+    reasons: list[str] = []
+    if not raw["market_cap_history_complete"]:
+        reasons.append(
+            "missing raw calendar months: " + ", ".join(raw["missing_reference_months"])
+        )
+    if not usable["market_cap_history_complete"]:
+        reasons.append(
+            "missing usable normalized calendar months: "
+            + ", ".join(usable["missing_reference_months"])
+        )
+    if normalized_row_count == 0:
+        reasons.append("normalized market-cap data is empty")
+    if conflicting_issuer_month_groups:
+        reasons.append(
+            f"conflicting issuer-month groups: {conflicting_issuer_month_groups}"
+        )
+    ready = (
+        bool(raw["market_cap_history_complete"])
+        and bool(usable["market_cap_history_complete"])
+        and normalized_row_count > 0
+        and conflicting_issuer_month_groups == 0
+    )
+    return {
+        "required_start_month": raw["required_start_month"],
+        "required_end_month": raw["required_end_month"],
+        "raw_distinct_reference_month_count": raw["distinct_reference_month_count"],
+        "raw_available_reference_months": raw["available_reference_months"],
+        "raw_first_reference_month": raw["first_reference_month"],
+        "raw_last_reference_month": raw["last_reference_month"],
+        "raw_missing_reference_months": raw["missing_reference_months"],
+        "raw_missing_reference_month_count": raw["missing_reference_month_count"],
+        "raw_market_cap_history_complete": raw["market_cap_history_complete"],
+        "usable_distinct_reference_month_count": usable[
+            "distinct_reference_month_count"
+        ],
+        "usable_available_reference_months": usable["available_reference_months"],
+        "usable_first_reference_month": usable["first_reference_month"],
+        "usable_last_reference_month": usable["last_reference_month"],
+        "usable_missing_reference_months": usable["missing_reference_months"],
+        "usable_missing_reference_month_count": usable["missing_reference_month_count"],
+        "usable_market_cap_history_complete": usable["market_cap_history_complete"],
+        "normalized_market_cap_row_count": normalized_row_count,
+        "market_cap_data_ready": ready,
+        "market_cap_not_ready_reasons": reasons,
+    }
+
+
 def market_cap_audit(
     peers: pl.DataFrame,
     market_cap: pl.DataFrame,
@@ -2092,11 +2150,16 @@ def market_cap_audit(
         if market_cap.height
         else []
     )
-    month_coverage = market_cap_month_coverage(
+    readiness = market_cap_readiness(
         (
             available_reference_dates
             if source_reference_dates is None
             else source_reference_dates
+        ),
+        available_reference_dates,
+        normalized_row_count=market_cap.height,
+        conflicting_issuer_month_groups=int(
+            mapping_stats["conflicting_issuer_month_groups"]
         ),
         as_of=as_of,
     )
@@ -2109,7 +2172,7 @@ def market_cap_audit(
     )
     audit = {
         **mapping_stats,
-        **month_coverage,
+        **readiness,
         "available_reference_dates": [
             str(value) for value in available_reference_dates
         ],
@@ -2147,12 +2210,13 @@ def _render_markdown(audit: dict[str, object]) -> str:
     classification = audit["classification_and_peer_coverage"]
     policies = classification["candidate_policy_coverage"]
     status = (
-        "> **COMPLETE:** Official B3 market-cap calendar-month coverage is complete."
-        if audit["market_cap_history_complete"]
+        "> **COMPLETE:** Official B3 market-cap data passed raw and normalized "
+        "publication-readiness checks."
+        if audit["market_cap_data_ready"]
         else (
-            "> **DIAGNOSTIC ONLY — INCOMPLETE MARKET-CAP HISTORY:** This artifact is "
-            "not eligible for downstream market-cap features and is not a complete "
-            "PIT metadata audit."
+            "> **DIAGNOSTIC ONLY — MARKET-CAP DATA NOT READY:** This artifact is not "
+            "eligible for downstream market-cap features and is not a complete PIT "
+            "metadata audit."
         )
     )
     lines = [
@@ -2244,14 +2308,23 @@ def _render_markdown(audit: dict[str, object]) -> str:
             f"{audit['market_cap']['issuer_name_mapping_fraction']:.2%}",
             f"- Strictly lagged eligible security-day coverage: "
             f"{audit['market_cap']['strictly_lagged_security_day_coverage_fraction']:.2%}",
-            f"- Calendar-month history complete: "
-            f"{audit['market_cap']['market_cap_history_complete']}",
-            f"- Available calendar months: "
-            f"{audit['market_cap']['distinct_reference_month_count']}",
-            f"- Missing official calendar months: "
-            f"{audit['market_cap']['missing_reference_month_count']}",
+            f"- Raw calendar-month history complete: "
+            f"{audit['market_cap']['raw_market_cap_history_complete']}",
+            f"- Raw available calendar months: "
+            f"{audit['market_cap']['raw_distinct_reference_month_count']}",
+            f"- Missing raw calendar months: "
+            f"{audit['market_cap']['raw_missing_reference_month_count']}",
+            f"- Usable normalized calendar-month history complete: "
+            f"{audit['market_cap']['usable_market_cap_history_complete']}",
+            f"- Usable normalized calendar months: "
+            f"{audit['market_cap']['usable_distinct_reference_month_count']}",
+            f"- Missing usable normalized calendar months: "
+            f"{audit['market_cap']['usable_missing_reference_month_count']}",
+            f"- Usable normalized observations: "
+            f"{audit['market_cap']['normalized_market_cap_row_count']}",
             f"- Conflicting issuer-month groups excluded: "
             f"{audit['market_cap']['conflicting_issuer_month_groups']}",
+            f"- Market-cap data ready: {audit['market_cap_data_ready']}",
             "",
             "See the CSV outputs for exact groups, questionable classifications, unit "
             "overlaps, market-cap coverage, and unresolved deterministic mappings.",
@@ -2286,16 +2359,22 @@ def validate_raw_sources(
         ].to_list()
     )
     market_issuers = set(market_cap["issuer_id"].to_list())
-    month_coverage = market_cap_month_coverage(
-        raw_market_cap["reference_date"].to_list(), as_of=as_of
+    readiness = market_cap_readiness(
+        raw_market_cap["reference_date"].to_list(),
+        market_cap["reference_date"].to_list(),
+        normalized_row_count=market_cap.height,
+        conflicting_issuer_month_groups=int(
+            market_stats["conflicting_issuer_month_groups"]
+        ),
+        as_of=as_of,
     )
     return {
         "build_mode_if_built_now": (
             "complete"
-            if month_coverage["market_cap_history_complete"]
-            else "diagnostic_only_incomplete_market_cap"
+            if readiness["market_cap_data_ready"]
+            else "diagnostic_market_cap_not_ready"
         ),
-        "eligible_for_strict_build": month_coverage["market_cap_history_complete"],
+        "eligible_for_strict_build": readiness["market_cap_data_ready"],
         "classification": {
             "row_count": classification.height,
             "issuer_count": classification["issuer_id"].n_unique(),
@@ -2304,7 +2383,7 @@ def validate_raw_sources(
             "row_count": raw_market_cap.height,
             "source_issuer_count": raw_market_cap["issuer_name"].n_unique(),
             "all_company_footer_validated": True,
-            **month_coverage,
+            **readiness,
             "mapped_accepted_universe_issuer_count": len(
                 accepted_issuers & market_issuers
             ),
@@ -2561,25 +2640,31 @@ def build_human_priors(
         as_of=created_at.date(),
         source_reference_dates=raw_market_cap["reference_date"].to_list(),
     )
-    market_cap_complete = bool(market_audit["market_cap_history_complete"])
-    if not market_cap_complete and not allow_incomplete_market_cap:
-        missing = ", ".join(market_audit["missing_reference_months"])
+    market_cap_data_ready = bool(market_audit["market_cap_data_ready"])
+    if not market_cap_data_ready and not allow_incomplete_market_cap:
         raise ValueError(
-            "Official B3 market-cap history is incomplete for "
+            "Official B3 market-cap data is not ready for publication for "
             f"{market_audit['required_start_month']} through "
-            f"{market_audit['required_end_month']}; missing calendar months: "
-            f"{missing}. Batch-ingest official files or rerun with "
+            f"{market_audit['required_end_month']}: "
+            f"{'; '.join(market_audit['market_cap_not_ready_reasons'])}. "
+            "Batch-ingest or correct official files, then rerun, or use "
             "--allow-incomplete-market-cap for a diagnostic-only build."
         )
     build_mode = (
-        "complete" if market_cap_complete else "diagnostic_incomplete_market_cap"
+        "complete" if market_cap_data_ready else "diagnostic_market_cap_not_ready"
     )
     audit = {
         "schema_version": SCHEMA_VERSION,
         "created_at_utc": created_at.isoformat(),
         "build_mode": build_mode,
-        "market_cap_history_complete": market_cap_complete,
-        "eligible_for_downstream_market_cap_features": market_cap_complete,
+        "raw_market_cap_history_complete": market_audit[
+            "raw_market_cap_history_complete"
+        ],
+        "usable_market_cap_history_complete": market_audit[
+            "usable_market_cap_history_complete"
+        ],
+        "market_cap_data_ready": market_cap_data_ready,
+        "eligible_for_downstream_market_cap_features": market_cap_data_ready,
         "scope": {
             "accepted_security_count": len(security_ids),
             "eligible_model_date_count": int(eligible_dates.sum()),
@@ -2653,9 +2738,27 @@ def build_human_priors(
             "repository_status_porcelain": status,
             "implementation_sha256": _sha256_file(Path(__file__).resolve()),
             "build_mode": build_mode,
-            "market_cap_history_complete": market_cap_complete,
-            "eligible_for_downstream_market_cap_features": market_cap_complete,
-            "canonical_pointer_published": market_cap_complete,
+            "raw_market_cap_history_complete": market_audit[
+                "raw_market_cap_history_complete"
+            ],
+            "raw_missing_reference_months": market_audit[
+                "raw_missing_reference_months"
+            ],
+            "usable_market_cap_history_complete": market_audit[
+                "usable_market_cap_history_complete"
+            ],
+            "usable_missing_reference_months": market_audit[
+                "usable_missing_reference_months"
+            ],
+            "normalized_market_cap_row_count": market_audit[
+                "normalized_market_cap_row_count"
+            ],
+            "conflicting_issuer_month_groups": market_audit[
+                "conflicting_issuer_month_groups"
+            ],
+            "market_cap_data_ready": market_cap_data_ready,
+            "eligible_for_downstream_market_cap_features": market_cap_data_ready,
+            "canonical_pointer_published": market_cap_data_ready,
             "official_b3_pages": {
                 "classification": CLASSIFICATION_PAGE_URL,
                 "market_cap_monthly": MARKET_CAP_PAGE_URL,
@@ -2735,7 +2838,7 @@ def build_human_priors(
         }
         _atomic_json(partial / "manifest.json", manifest)
         os.replace(partial, output_dir)
-        if market_cap_complete:
+        if market_cap_data_ready:
             _atomic_pointer(pointer, output_dir)
     except BaseException:
         shutil.rmtree(partial, ignore_errors=True)
@@ -2768,7 +2871,10 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     build.add_argument(
         "--allow-incomplete-market-cap",
         action="store_true",
-        help="Create a diagnostic-only artifact instead of failing on missing months.",
+        help=(
+            "Create a diagnostic-only artifact instead of failing market-cap "
+            "publication-readiness checks."
+        ),
     )
     ingest_directory = subparsers.add_parser(
         "ingest-market-cap-dir",
@@ -2818,20 +2924,39 @@ def main(arguments: Sequence[str] | None = None) -> int:
         print(
             json.dumps(
                 {
-                    "distinct_market_cap_reference_months": market[
-                        "distinct_reference_month_count"
+                    "raw_market_cap_reference_months": market[
+                        "raw_distinct_reference_month_count"
                     ],
-                    "first_market_cap_reference_month": market["first_reference_month"],
-                    "last_market_cap_reference_month": market["last_reference_month"],
-                    "missing_market_cap_calendar_months": market[
-                        "missing_reference_months"
+                    "raw_missing_market_cap_calendar_months": market[
+                        "raw_missing_reference_months"
+                    ],
+                    "raw_market_cap_history_complete": market[
+                        "raw_market_cap_history_complete"
+                    ],
+                    "usable_market_cap_reference_months": market[
+                        "usable_distinct_reference_month_count"
+                    ],
+                    "usable_missing_market_cap_calendar_months": market[
+                        "usable_missing_reference_months"
+                    ],
+                    "usable_market_cap_history_complete": market[
+                        "usable_market_cap_history_complete"
                     ],
                     "source_issuer_count": market["source_distinct_issuer_names"],
                     "mapped_accepted_universe_issuer_count": market[
                         "mapped_accepted_universe_issuer_count"
                     ],
+                    "normalized_market_cap_row_count": market[
+                        "normalized_market_cap_row_count"
+                    ],
+                    "conflicting_issuer_month_groups": market[
+                        "conflicting_issuer_month_groups"
+                    ],
                     "build_mode": audit["build_mode"],
-                    "market_cap_history_complete": audit["market_cap_history_complete"],
+                    "market_cap_data_ready": audit["market_cap_data_ready"],
+                    "eligible_for_downstream_market_cap_features": audit[
+                        "eligible_for_downstream_market_cap_features"
+                    ],
                 },
                 indent=2,
             )

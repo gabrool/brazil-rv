@@ -94,12 +94,14 @@ def _classification_xlsx() -> bytes:
 def _market_cap_csv(
     reference_dates: tuple[date, ...] = (date(2026, 7, 31), date(2026, 6, 30)),
     issuer_names: tuple[str, ...] | None = None,
+    missing_values: set[tuple[str, date]] | None = None,
 ) -> bytes:
     issuer_names = issuer_names or (
         "BANCO X",
         "ENERGIA Y",
         *(f"COMPANY {index:02d}" for index in range(1, 20)),
     )
+    missing_values = missing_values or set()
     header = [
         "IBOV",
         "IBRX100",
@@ -110,8 +112,12 @@ def _market_cap_csv(
     rows = ["20260804" + "|" * (len(header) - 1), "|".join(header)]
     for issuer_index, issuer_name in enumerate(issuer_names, start=1):
         values = [
-            f"{1000 + issuer_index * 10 + offset:.2f}"
-            for offset, _ in enumerate(reference_dates)
+            (
+                ""
+                if (issuer_name, reference_date) in missing_values
+                else f"{1000 + issuer_index * 10 + offset:.2f}"
+            )
+            for offset, reference_date in enumerate(reference_dates)
         ]
         rows.append("|".join(("", "", issuer_name, *values, "0.00")))
     rows.append(
@@ -744,9 +750,14 @@ def _populate_raw_fixture(
     *,
     issuer_names: tuple[str, ...],
     reference_dates: tuple[date, ...],
+    market_cap_payload: bytes | None = None,
 ) -> None:
     classification = _classification_xlsx_for_issuers(issuer_names)
-    market_cap = _market_cap_csv(reference_dates, issuer_names)
+    market_cap = (
+        _market_cap_csv(reference_dates, issuer_names)
+        if market_cap_payload is None
+        else market_cap_payload
+    )
 
     def fetch(url: str) -> HttpPayload:
         if url.startswith(CLASSIFICATION_API_BASE):
@@ -940,11 +951,16 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
     audit = json.loads((output / "metadata_audit.json").read_text(encoding="utf-8"))
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
     assert audit["build_mode"] == "complete"
-    assert audit["market_cap_history_complete"] is True
-    assert audit["market_cap"]["missing_reference_months"] == []
+    assert audit["raw_market_cap_history_complete"] is True
+    assert audit["usable_market_cap_history_complete"] is True
+    assert audit["market_cap_data_ready"] is True
+    assert audit["eligible_for_downstream_market_cap_features"] is True
+    assert audit["market_cap"]["raw_missing_reference_months"] == []
+    assert audit["market_cap"]["usable_missing_reference_months"] == []
     assert audit["units"]["units_with_exact_parity_possible"] == 1
     assert manifest["schema_version"] == SCHEMA_VERSION
     assert manifest["repository_commit"] == "fixture-commit"
+    assert manifest["market_cap_data_ready"] is True
     assert manifest["canonical_pointer_published"] is True
     assert (
         manifest["implementation_sha256"]
@@ -970,7 +986,9 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
     assert raw_validation["build_mode_if_built_now"] == "complete"
     assert raw_validation["eligible_for_strict_build"] is True
     assert raw_validation["classification"]["issuer_count"] == 28
-    assert raw_validation["market_cap"]["distinct_reference_month_count"] == 2
+    assert raw_validation["market_cap"]["raw_distinct_reference_month_count"] == 2
+    assert raw_validation["market_cap"]["usable_distinct_reference_month_count"] == 2
+    assert raw_validation["market_cap"]["market_cap_data_ready"] is True
     assert raw_validation["market_cap"]["source_issuer_count"] == 28
     assert raw_validation["market_cap"]["mapped_accepted_universe_issuer_count"] == 28
     assert raw_validation["units"] == {"unit_count": 1, "component_count": 2}
@@ -1003,7 +1021,7 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
         issuer_names=issuer_names,
         reference_dates=(date(2020, 7, 31),),
     )
-    with pytest.raises(ValueError, match="missing calendar months: 2020-06"):
+    with pytest.raises(ValueError, match="missing raw calendar months: 2020-06"):
         build_human_priors(
             raw_dir=raw_incomplete,
             output_base=output_base,
@@ -1032,15 +1050,204 @@ def test_build_human_priors_end_to_end_and_failure_semantics(tmp_path: Path) -> 
     diagnostic_manifest = json.loads(
         (diagnostic / "manifest.json").read_text(encoding="utf-8")
     )
-    assert diagnostic_audit["build_mode"] == "diagnostic_incomplete_market_cap"
-    assert diagnostic_audit["market_cap_history_complete"] is False
+    assert diagnostic_audit["build_mode"] == "diagnostic_market_cap_not_ready"
+    assert diagnostic_audit["raw_market_cap_history_complete"] is False
+    assert diagnostic_audit["usable_market_cap_history_complete"] is False
+    assert diagnostic_audit["market_cap_data_ready"] is False
     assert diagnostic_audit["eligible_for_downstream_market_cap_features"] is False
     assert diagnostic_manifest["canonical_pointer_published"] is False
     assert set(diagnostic_manifest["artifact_status"].values()) == {
-        "diagnostic_incomplete_market_cap"
+        "diagnostic_market_cap_not_ready"
     }
     assert "DIAGNOSTIC ONLY" in (diagnostic / "metadata_audit.md").read_text(
         encoding="utf-8"
     )
     assert pointer.read_text(encoding="utf-8") == prior_pointer
+    assert not list(output_base.glob("*.partial"))
+
+
+def test_build_rejects_raw_complete_but_empty_normalized_market_cap(
+    tmp_path: Path,
+) -> None:
+    inputs, issuer_names, _, assignments_loader = _canonical_build_fixture(
+        tmp_path / "canonical"
+    )
+    reference_dates = (date(2020, 7, 31), date(2020, 6, 30))
+    unmatched_issuers = tuple(f"UNMATCHED {index:02d}" for index in range(1, 29))
+    raw_dir = tmp_path / "raw"
+    _populate_raw_fixture(
+        raw_dir,
+        issuer_names=issuer_names,
+        reference_dates=reference_dates,
+        market_cap_payload=_market_cap_csv(reference_dates, unmatched_issuers),
+    )
+    output_base = tmp_path / "outputs"
+    pointer = tmp_path / "human_priors_path.txt"
+    pointer.write_text("prior", encoding="utf-8")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "missing usable normalized calendar months: 2020-06, 2020-07; "
+            "normalized market-cap data is empty"
+        ),
+    ):
+        build_human_priors(
+            raw_dir=raw_dir,
+            output_base=output_base,
+            pointer=pointer,
+            created_at=datetime(2020, 8, 15, 13, 0, tzinfo=UTC),
+            inputs=inputs,
+            assignments_loader=assignments_loader,
+            repository_state=lambda: ("fixture-commit", []),
+        )
+    assert pointer.read_text(encoding="utf-8") == "prior"
+    assert not list(output_base.glob("*.partial"))
+
+    diagnostic = build_human_priors(
+        raw_dir=raw_dir,
+        output_base=output_base,
+        pointer=pointer,
+        created_at=datetime(2020, 8, 15, 14, 0, tzinfo=UTC),
+        allow_incomplete_market_cap=True,
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+        repository_state=lambda: ("fixture-commit", []),
+    )
+    audit = json.loads((diagnostic / "metadata_audit.json").read_text(encoding="utf-8"))
+    manifest = json.loads((diagnostic / "manifest.json").read_text(encoding="utf-8"))
+    assert audit["raw_market_cap_history_complete"] is True
+    assert audit["usable_market_cap_history_complete"] is False
+    assert audit["market_cap_data_ready"] is False
+    assert audit["eligible_for_downstream_market_cap_features"] is False
+    assert audit["market_cap"]["normalized_market_cap_row_count"] == 0
+    assert audit["market_cap"]["usable_missing_reference_months"] == [
+        "2020-06",
+        "2020-07",
+    ]
+    assert pl.read_parquet(diagnostic / "issuer_market_cap_monthly.parquet").is_empty()
+    assert manifest["canonical_pointer_published"] is False
+    assert pointer.read_text(encoding="utf-8") == "prior"
+    assert not list(output_base.glob("*.partial"))
+
+
+def test_build_rejects_raw_month_missing_after_normalization(tmp_path: Path) -> None:
+    inputs, issuer_names, _, assignments_loader = _canonical_build_fixture(
+        tmp_path / "canonical"
+    )
+    reference_dates = (date(2020, 7, 31), date(2020, 6, 30))
+    unmatched_issuers = tuple(f"UNMATCHED {index:02d}" for index in range(1, 22))
+    all_market_issuers = (*issuer_names, *unmatched_issuers)
+    missing_values = {(issuer_name, date(2020, 6, 30)) for issuer_name in issuer_names}
+    raw_dir = tmp_path / "raw"
+    _populate_raw_fixture(
+        raw_dir,
+        issuer_names=issuer_names,
+        reference_dates=reference_dates,
+        market_cap_payload=_market_cap_csv(
+            reference_dates,
+            all_market_issuers,
+            missing_values,
+        ),
+    )
+    output_base = tmp_path / "outputs"
+    pointer = tmp_path / "human_priors_path.txt"
+    pointer.write_text("prior", encoding="utf-8")
+
+    with pytest.raises(
+        ValueError,
+        match="missing usable normalized calendar months: 2020-06",
+    ):
+        build_human_priors(
+            raw_dir=raw_dir,
+            output_base=output_base,
+            pointer=pointer,
+            created_at=datetime(2020, 8, 15, 13, 0, tzinfo=UTC),
+            inputs=inputs,
+            assignments_loader=assignments_loader,
+            repository_state=lambda: ("fixture-commit", []),
+        )
+    assert pointer.read_text(encoding="utf-8") == "prior"
+    assert not list(output_base.glob("*.partial"))
+
+    diagnostic = build_human_priors(
+        raw_dir=raw_dir,
+        output_base=output_base,
+        pointer=pointer,
+        created_at=datetime(2020, 8, 15, 14, 0, tzinfo=UTC),
+        allow_incomplete_market_cap=True,
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+        repository_state=lambda: ("fixture-commit", []),
+    )
+    audit = json.loads((diagnostic / "metadata_audit.json").read_text(encoding="utf-8"))
+    assert audit["raw_market_cap_history_complete"] is True
+    assert audit["usable_market_cap_history_complete"] is False
+    assert audit["market_cap_data_ready"] is False
+    assert audit["market_cap"]["raw_missing_reference_months"] == []
+    assert audit["market_cap"]["usable_missing_reference_months"] == ["2020-06"]
+    assert audit["market_cap"]["normalized_market_cap_row_count"] == len(issuer_names)
+    assert pointer.read_text(encoding="utf-8") == "prior"
+    assert not list(output_base.glob("*.partial"))
+
+
+def test_build_rejects_conflicts_with_complete_raw_and_usable_months(
+    tmp_path: Path,
+) -> None:
+    inputs, issuer_names, _, assignments_loader = _canonical_build_fixture(
+        tmp_path / "canonical"
+    )
+    reference_dates = (date(2020, 7, 31), date(2020, 6, 30))
+    raw_dir = tmp_path / "raw"
+    _populate_raw_fixture(
+        raw_dir,
+        issuer_names=issuer_names,
+        reference_dates=reference_dates,
+    )
+    downloads = tmp_path / "downloads"
+    downloads.mkdir()
+    conflicting_payload = _market_cap_csv(reference_dates, issuer_names).replace(
+        b"BANCO X|1010.00", b"BANCO X|9999.00"
+    )
+    (downloads / "Bolsa_Valores_Mensal_2020-07.csv").write_bytes(conflicting_payload)
+    ingest_market_cap_directory(downloads, raw_dir)
+    output_base = tmp_path / "outputs"
+    pointer = tmp_path / "human_priors_path.txt"
+    pointer.write_text("prior", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="conflicting issuer-month groups: 1"):
+        build_human_priors(
+            raw_dir=raw_dir,
+            output_base=output_base,
+            pointer=pointer,
+            created_at=datetime(2020, 8, 15, 13, 0, tzinfo=UTC),
+            inputs=inputs,
+            assignments_loader=assignments_loader,
+            repository_state=lambda: ("fixture-commit", []),
+        )
+    assert pointer.read_text(encoding="utf-8") == "prior"
+    assert not list(output_base.glob("*.partial"))
+
+    diagnostic = build_human_priors(
+        raw_dir=raw_dir,
+        output_base=output_base,
+        pointer=pointer,
+        created_at=datetime(2020, 8, 15, 14, 0, tzinfo=UTC),
+        allow_incomplete_market_cap=True,
+        inputs=inputs,
+        assignments_loader=assignments_loader,
+        repository_state=lambda: ("fixture-commit", []),
+    )
+    audit = json.loads((diagnostic / "metadata_audit.json").read_text(encoding="utf-8"))
+    manifest = json.loads((diagnostic / "manifest.json").read_text(encoding="utf-8"))
+    assert audit["raw_market_cap_history_complete"] is True
+    assert audit["usable_market_cap_history_complete"] is True
+    assert audit["market_cap_data_ready"] is False
+    assert audit["eligible_for_downstream_market_cap_features"] is False
+    assert audit["market_cap"]["raw_missing_reference_months"] == []
+    assert audit["market_cap"]["usable_missing_reference_months"] == []
+    assert audit["market_cap"]["conflicting_issuer_month_groups"] == 1
+    assert manifest["conflicting_issuer_month_groups"] == 1
+    assert manifest["canonical_pointer_published"] is False
+    assert pointer.read_text(encoding="utf-8") == "prior"
     assert not list(output_base.glob("*.partial"))
