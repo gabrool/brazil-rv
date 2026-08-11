@@ -36,6 +36,8 @@ from .contract import (
     DECISION_CONTEXT_INDICES,
     DECISION_EQUITY_INDICES,
     DYNAMIC_CHANNELS,
+    EQUITY_PEER_CHANNELS,
+    EQUITY_PEER_VALID_CHANNELS,
     EXPECTED_DATE_COUNT,
     EXPECTED_ELIGIBLE_DATE_COUNT,
     EXPECTED_ELIGIBLE_DATES_WITH_UNAVAILABLE_LOCAL_CONTEXT,
@@ -50,6 +52,13 @@ from .contract import (
     output_array_specs,
 )
 from .global_source import load_global_symbol, validate_normalized_bars
+from .human_prior_input import (
+    HumanPriorArtifact,
+    load_human_priors,
+    validate_human_prior_reference_inputs,
+    validate_unchanged_base_outputs,
+)
+from .peer_features import validate_peer_arrays
 from .transforms import centered_midranks
 
 AUDIT_BASE = CANONICAL_OUTPUT_POINTER.parent.parent / "feature_audits"
@@ -216,6 +225,190 @@ class StreamingStats:
             "max": None if self.count == 0 else self.maximum,
             "zero_rate": None if self.count == 0 else self.zero_count / self.count,
         }
+
+
+def _peer_feature_audit(
+    arrays: dict[str, np.ndarray],
+    eligible_dates: np.ndarray,
+    human_priors: HumanPriorArtifact,
+    build_audit: dict[str, object],
+) -> dict[str, object]:
+    features = arrays["equity_peer_features.npy"]
+    valid = arrays["equity_peer_valid.npy"]
+    validate_peer_arrays(features, valid, date_chunk=DATE_CHUNK)
+    active = arrays["equity_membership.npy"] & arrays["equity_data_ready.npy"]
+    feature_to_valid = (0, 1, 0, 1, 2, 3)
+    invalid_counts = np.zeros(len(EQUITY_PEER_CHANNELS), dtype=np.int64)
+    zero_invalid_counts = np.zeros_like(invalid_counts)
+    nonzero_false_counts = np.zeros_like(invalid_counts)
+    nonfinite_counts = np.zeros_like(invalid_counts)
+
+    for start in range(0, EXPECTED_DATE_COUNT, DATE_CHUNK):
+        stop = min(start + DATE_CHUNK, EXPECTED_DATE_COUNT)
+        values = np.asarray(features[start:stop])
+        masks = np.asarray(valid[start:stop])
+        active_cells = np.broadcast_to(active[start:stop, :, None, None], masks.shape)
+        if np.any(masks & ~active_cells):
+            raise ValueError("Peer validity is true for an inactive security")
+        selected_available = np.broadcast_to(
+            human_priors.policy_available[start:stop, :, None], masks[..., 0].shape
+        )
+        if np.any(masks[..., :2] & ~selected_available[..., None]):
+            raise ValueError("Selected-peer validity is true for an unavailable policy")
+        for feature_channel, valid_channel in enumerate(feature_to_valid):
+            channel_values = values[..., feature_channel]
+            invalid = ~masks[..., valid_channel]
+            invalid_counts[feature_channel] += int(invalid.sum())
+            zero_invalid_counts[feature_channel] += int(
+                np.count_nonzero(channel_values[invalid] == 0.0)
+            )
+            nonzero_false_counts[feature_channel] += int(
+                np.count_nonzero(channel_values[invalid] != 0.0)
+            )
+            nonfinite_counts[feature_channel] += int(
+                np.count_nonzero(~np.isfinite(channel_values))
+            )
+
+    if nonzero_false_counts.any():
+        raise ValueError("A peer feature is nonzero under a false validity mask")
+    if nonfinite_counts.any():
+        raise ValueError("A peer feature contains a non-finite value")
+
+    coverage_count = np.zeros(len(EQUITY_PEER_VALID_CHANNELS), dtype=np.int64)
+    decision_count = np.zeros(
+        (len(DECISION_EQUITY_INDICES), len(EQUITY_PEER_VALID_CHANNELS)),
+        dtype=np.int64,
+    )
+    relation_count = {
+        relation: np.zeros(2, dtype=np.int64) for relation in ("SUBSECTOR", "SECTOR")
+    }
+    relation_denominator = {relation: 0 for relation in relation_count}
+    feature_stats = [StreamingStats() for _ in EQUITY_PEER_CHANNELS]
+    active_security_days = int(active[eligible_dates].sum())
+    cell_denominator = active_security_days * features.shape[2]
+    decision_minutes = np.asarray(DECISION_EQUITY_INDICES, dtype=np.int64) - 1
+
+    for start in range(0, eligible_dates.size, DATE_CHUNK):
+        indices = eligible_dates[start : start + DATE_CHUNK]
+        values = np.asarray(features[indices])
+        masks = np.asarray(valid[indices])
+        active_dates = np.asarray(active[indices])
+        domain = np.broadcast_to(active_dates[:, :, None], masks.shape[:-1])
+        for channel in range(len(EQUITY_PEER_VALID_CHANNELS)):
+            use = masks[..., channel] & domain
+            coverage_count[channel] += int(use.sum())
+        decision_domain = active_dates[:, :, None, None]
+        decision_count += (masks[:, :, decision_minutes, :] & decision_domain).sum(
+            axis=(0, 1), dtype=np.int64
+        )
+        relation = human_priors.selected_relation[indices]
+        for relation_name in relation_count:
+            relation_days = active_dates & (relation == relation_name)
+            relation_denominator[relation_name] += (
+                int(relation_days.sum()) * features.shape[2]
+            )
+            for channel in range(2):
+                relation_count[relation_name][channel] += int(
+                    (masks[..., channel] & relation_days[:, :, None]).sum()
+                )
+        for feature_channel, valid_channel in enumerate(feature_to_valid):
+            use = masks[..., valid_channel] & domain
+            feature_stats[feature_channel].update(values[..., feature_channel][use])
+
+    ngrd3_selected_valid = int(valid[:, human_priors.ngrd3_slot, :, :2].sum())
+    if ngrd3_selected_valid:
+        raise ValueError("NGRD3 must never have selected-peer validity")
+    coverage = {
+        name: {
+            "valid_count": int(coverage_count[channel]),
+            "denominator": cell_denominator,
+            "fraction": (
+                float(coverage_count[channel] / cell_denominator)
+                if cell_denominator
+                else 0.0
+            ),
+            "denominator_definition": "eligible active equity-minute cells",
+        }
+        for channel, name in enumerate(EQUITY_PEER_VALID_CHANNELS)
+    }
+    decision_coverage = [
+        {
+            "decision_idx": decision_idx,
+            "equity_cutoff_index": int(cutoff),
+            "feature_minute_idx": int(cutoff - 1),
+            "validity_channel": channel,
+            "validity_name": EQUITY_PEER_VALID_CHANNELS[channel],
+            "valid_count": int(decision_count[decision_idx, channel]),
+            "denominator": active_security_days,
+            "fraction": (
+                float(decision_count[decision_idx, channel] / active_security_days)
+                if active_security_days
+                else 0.0
+            ),
+        }
+        for decision_idx, cutoff in enumerate(DECISION_EQUITY_INDICES)
+        for channel in range(len(EQUITY_PEER_VALID_CHANNELS))
+    ]
+    by_relation = {
+        relation_name: {
+            EQUITY_PEER_VALID_CHANNELS[channel]: {
+                "valid_count": int(relation_count[relation_name][channel]),
+                "denominator": relation_denominator[relation_name],
+                "fraction": (
+                    float(
+                        relation_count[relation_name][channel]
+                        / relation_denominator[relation_name]
+                    )
+                    if relation_denominator[relation_name]
+                    else 0.0
+                ),
+            }
+            for channel in range(2)
+        }
+        for relation_name in relation_count
+    }
+    invalid_storage = {
+        name: {
+            "invalid_count": int(invalid_counts[channel]),
+            "zero_filled_invalid_count": int(zero_invalid_counts[channel]),
+            "nonzero_under_false_mask_count": int(nonzero_false_counts[channel]),
+            "nonfinite_count": int(nonfinite_counts[channel]),
+        }
+        for channel, name in enumerate(EQUITY_PEER_CHANNELS)
+    }
+    base_checks = build_audit.get("base_outputs_unchanged", {})
+    if not base_checks or not all(base_checks.values()):
+        raise ValueError("Peer build audit does not confirm unchanged base outputs")
+    if build_audit.get("sample_count") != EXPECTED_SAMPLE_COUNT:
+        raise ValueError("Peer build changed the sample count")
+    if build_audit.get("eligible_date_count") != EXPECTED_ELIGIBLE_DATE_COUNT:
+        raise ValueError("Peer build changed the eligible-date count")
+    count_summaries = build_audit["usable_peer_counts_when_valid"]
+    for channel, name in enumerate(EQUITY_PEER_VALID_CHANNELS):
+        minimum = count_summaries[name]["minimum"]
+        required = 2 if channel < 2 else 1
+        if minimum is not None and minimum < required:
+            raise ValueError(f"Usable peer count is too small for {name}")
+
+    return {
+        "classification_is_point_in_time": False,
+        "validity_coverage": coverage,
+        "decision_time_coverage": decision_coverage,
+        "selected_peer_coverage_by_relation": by_relation,
+        "same_issuer_coverage": {
+            name: coverage[name] for name in EQUITY_PEER_VALID_CHANNELS[2:]
+        },
+        "invalid_storage": invalid_storage,
+        "ngrd3_selected_peer_valid_count": ngrd3_selected_valid,
+        "usable_peer_counts_when_valid": count_summaries,
+        "numeric_distributions": [
+            stats.row("eligible_active_valid", name)
+            for stats, name in zip(feature_stats, EQUITY_PEER_CHANNELS, strict=True)
+        ],
+        "base_outputs_unchanged": base_checks,
+        "sample_count": EXPECTED_SAMPLE_COUNT,
+        "eligible_date_count": EXPECTED_ELIGIBLE_DATE_COUNT,
+    }
 
 
 def _opening_feature_row(feature: str, stats: StreamingStats) -> dict[str, object]:
@@ -979,6 +1172,10 @@ def _generate_feature_audit(
     constants = manifest["constants"]
     if tuple(constants["dynamic_channels"]) != DYNAMIC_CHANNELS:
         raise ValueError("Manifest dynamic-channel order is stale")
+    if tuple(constants["equity_peer_channels"]) != EQUITY_PEER_CHANNELS:
+        raise ValueError("Manifest peer-feature channel order is stale")
+    if tuple(constants["equity_peer_valid_channels"]) != EQUITY_PEER_VALID_CHANNELS:
+        raise ValueError("Manifest peer-validity channel order is stale")
     if tuple(constants["equity_slow_channels"]) != SLOW_CHANNELS:
         raise ValueError("Manifest equity slow-channel order is stale")
     if tuple(constants["context_slow_channels"]) != SLOW_CHANNELS:
@@ -1067,11 +1264,12 @@ def _generate_feature_audit(
     required_metadata = {
         "global_context_index.parquet",
         "global_coverage.parquet",
+        "peer_feature_build_audit.json",
     }
     if not required_metadata <= set(manifest["metadata_files"]):
-        raise ValueError("Manifest does not require every global artifact")
+        raise ValueError("Manifest does not require every audit metadata artifact")
     if any(not (features_dir / name).is_file() for name in required_metadata):
-        raise FileNotFoundError("A required global artifact is missing")
+        raise FileNotFoundError("A required audit metadata artifact is missing")
     if tuple(global_axis["continuous_symbol"]) != GLOBAL_CONTEXT_SYMBOLS:
         raise ValueError("Global context index order does not match the contract")
     expected_coverage_rows = (
@@ -1216,6 +1414,41 @@ def _generate_feature_audit(
     ):
         raise ValueError("Manifest unavailable-local-date count is inconsistent")
 
+    human_prior_entry = manifest["canonical_inputs"]["human_priors"]
+    human_priors = load_human_priors(
+        Path(human_prior_entry["pointer"]),
+        Path(human_prior_entry["resolved_path"]),
+        trade_dates,
+        tuple(equity_index.sort("equity_slot")["security_id"]),
+    )
+    if human_prior_entry != human_priors.manifest_entry():
+        raise ValueError("Feature manifest human-prior lineage is inconsistent")
+    reference_input_checks = validate_human_prior_reference_inputs(
+        human_priors,
+        arrays["equity_membership.npy"],
+        arrays["equity_data_ready.npy"],
+    )
+    build_peer_audit = json.loads(
+        (features_dir / "peer_feature_build_audit.json").read_text(encoding="utf-8")
+    )
+    if build_peer_audit.get("human_prior_reference_inputs") != reference_input_checks:
+        raise ValueError("Peer build audit reference-input checks are inconsistent")
+    base_output_checks = validate_unchanged_base_outputs(
+        human_priors,
+        date_index.sort("date_idx"),
+        equity_index.sort("equity_slot"),
+        arrays["equity_membership.npy"],
+        arrays["equity_data_ready.npy"],
+        arrays["targets.npy"],
+        arrays["label_mask.npy"],
+        sample_index,
+    )
+    if build_peer_audit.get("base_outputs_unchanged") != base_output_checks:
+        raise ValueError("Peer build audit base-output checks are inconsistent")
+    peer_feature_audit = _peer_feature_audit(
+        arrays, eligible_dates, human_priors, build_peer_audit
+    )
+
     feature_rows, security_observed, security_possible, security_active_days = (
         _collect_feature_stats(arrays, eligible_dates)
     )
@@ -1322,6 +1555,7 @@ def _generate_feature_audit(
         },
         "context_observed_input_fraction": context_density,
         "opening_feature_family": opening_feature_stats,
+        "peer_features": peer_feature_audit,
         "global_context": global_readiness,
         "global_source": source_rows,
         "candidate_6l_audit_command": (
@@ -1349,6 +1583,7 @@ def _generate_feature_audit(
             "global mapping changes suppress cross-contract returns",
             "global readiness does not gate B3 sample eligibility",
             "global feature distributions are reported by symbol, year, and split",
+            "peer validity, zero filling, coverage, counts, lineage, and distributions pass",
         ],
         "output_files": [
             "audit_summary.json",
@@ -1363,6 +1598,7 @@ def _generate_feature_audit(
             "global_minute_coverage.csv",
             "global_coverage.parquet",
             "global_rolls.parquet",
+            "peer_feature_audit.json",
         ],
     }
     pl.DataFrame(feature_rows).write_csv(output_dir / "feature_stats.csv")
@@ -1376,6 +1612,9 @@ def _generate_feature_audit(
     global_minute_summary.write_csv(output_dir / "global_minute_coverage.csv")
     global_coverage_report.write_parquet(output_dir / "global_coverage.parquet")
     global_roll_rows.write_parquet(output_dir / "global_rolls.parquet")
+    (output_dir / "peer_feature_audit.json").write_text(
+        json.dumps(peer_feature_audit, indent=2, allow_nan=False), encoding="utf-8"
+    )
     (output_dir / "audit_summary.json").write_text(
         json.dumps(summary, indent=2), encoding="utf-8"
     )

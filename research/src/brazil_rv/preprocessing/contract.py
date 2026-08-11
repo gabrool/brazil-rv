@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT"
+CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT_HUMAN_PRIORS_V4"
 LOCAL_CONTEXT_AVAILABILITY_RULE = (
     "Local instruments never gate B3 samples; unavailable instruments are masked "
     "by context_data_ready."
@@ -31,6 +31,9 @@ CONTEXT_POINTER = PROJECT_ROOT / "quant-data/b3/raw/xp/milestone3_long_history_p
 GLOBAL_SOURCE_POINTER = (
     PROJECT_ROOT
     / "quant-data/b3/interim/global_context/global_context_canonical_path.txt"
+)
+HUMAN_PRIORS_POINTER = (
+    PROJECT_ROOT / "quant-data/b3/interim/b3/human_priors_v1_canonical_path.txt"
 )
 CATALOGUE_PATH = (
     PROJECT_ROOT / "quant-data/b3/raw/xp/catalogue_canonical/symbol_catalogue.parquet"
@@ -141,6 +144,20 @@ DYNAMIC_CHANNELS = (
     "cross_section_return_rank_60m",
     "cross_section_volume_rank",
     "cross_section_volatility_rank_30m",
+)
+EQUITY_PEER_CHANNELS = (
+    "return_vs_selected_peer_median_15m",
+    "return_vs_selected_peer_median_60m",
+    "selected_peer_return_rank_15m",
+    "selected_peer_return_rank_60m",
+    "return_vs_issuer_peer_median_15m",
+    "return_vs_issuer_peer_median_60m",
+)
+EQUITY_PEER_VALID_CHANNELS = (
+    "selected_peer_15m_valid",
+    "selected_peer_60m_valid",
+    "issuer_peer_15m_valid",
+    "issuer_peer_60m_valid",
 )
 SLOW_CHANNELS = (
     "vol_regime",
@@ -311,6 +328,14 @@ def output_array_specs(date_count: int) -> dict[str, OutputArraySpec]:
         ),
         "equity_membership.npy": OutputArraySpec(np.dtype(bool), (d, n)),
         "equity_data_ready.npy": OutputArraySpec(np.dtype(bool), (d, n)),
+        "equity_peer_features.npy": OutputArraySpec(
+            np.dtype(np.float32),
+            (d, n, EQUITY_SESSION_MINUTES, len(EQUITY_PEER_CHANNELS)),
+        ),
+        "equity_peer_valid.npy": OutputArraySpec(
+            np.dtype(bool),
+            (d, n, EQUITY_SESSION_MINUTES, len(EQUITY_PEER_VALID_CHANNELS)),
+        ),
         "context_features.npy": OutputArraySpec(
             np.dtype(np.float32), (d, c, CONTEXT_SESSION_MINUTES, f)
         ),
@@ -374,6 +399,8 @@ def manifest_constants() -> dict[str, object]:
         "context_session_minutes": CONTEXT_SESSION_MINUTES,
         "dynamic_channels": list(DYNAMIC_CHANNELS),
         "equity_slow_channels": list(SLOW_CHANNELS),
+        "equity_peer_channels": list(EQUITY_PEER_CHANNELS),
+        "equity_peer_valid_channels": list(EQUITY_PEER_VALID_CHANNELS),
         "global_session_start_minute": GLOBAL_SESSION_START_MINUTE,
         "global_session_end_minute": GLOBAL_SESSION_END_MINUTE,
         "global_session_minutes": GLOBAL_SESSION_MINUTES,

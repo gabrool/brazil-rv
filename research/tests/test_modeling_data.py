@@ -38,12 +38,14 @@ from brazil_rv.modeling.contract import (
 from brazil_rv.modeling.data import (
     BatchRequest,
     DateStratifiedMicrobatchSampler,
+    FEATURE_ARRAY_FILES,
     SequentialPaddedBatchSampler,
     TabularRowIterator,
     VectorizedFeatureDataset,
     _validate_sample_index,
     split_sample_index,
 )
+from brazil_rv.preprocessing.peer_features import validate_peer_arrays
 
 
 def _valid_sample_index() -> pl.DataFrame:
@@ -133,6 +135,12 @@ def _synthetic_store(path: Path) -> tuple[Path, pl.DataFrame]:
         ).astype(np.float32),
         "equity_membership.npy": membership,
         "equity_data_ready.npy": ready,
+        "equity_peer_features.npy": generator.uniform(
+            -0.9, 0.9, size=(date_count, EQUITY_COUNT, 405, 6)
+        ).astype(np.float32),
+        "equity_peer_valid.npy": np.ones(
+            (date_count, EQUITY_COUNT, 405, 4), dtype=bool
+        ),
         "context_features.npy": context,
         "context_slow.npy": generator.normal(
             size=(date_count, LOCAL_CONTEXT_COUNT, SLOW_FEATURE_COUNT)
@@ -324,6 +332,31 @@ def test_vectorized_batch_equivalence_and_masks(tmp_path: Path) -> None:
     assert not actual["instrument_mask"][0, 2]
     assert not actual["patches"][0, 2].any()
     assert actual["state_position"].tolist() == [15, 17]
+
+
+def test_current_model_batches_ignore_peer_arrays(tmp_path: Path) -> None:
+    store, rows = _synthetic_store(tmp_path)
+    request = BatchRequest(indices=(0, 1), valid_count=2)
+    validate_peer_arrays(
+        np.load(store / "equity_peer_features.npy", mmap_mode="r"),
+        np.load(store / "equity_peer_valid.npy", mmap_mode="r"),
+    )
+    baseline = VectorizedFeatureDataset(store, rows, "context_pooled", "enabled")[
+        request
+    ]
+    assert "equity_peer_features.npy" not in FEATURE_ARRAY_FILES
+    assert "equity_peer_valid.npy" not in FEATURE_ARRAY_FILES
+    peer_features = np.load(store / "equity_peer_features.npy", mmap_mode="r+")
+    peer_valid = np.load(store / "equity_peer_valid.npy", mmap_mode="r+")
+    peer_features[...] = 1_000_000.0
+    peer_valid[...] = False
+    peer_features.flush()
+    peer_valid.flush()
+    changed = VectorizedFeatureDataset(store, rows, "context_pooled", "enabled")[
+        request
+    ]
+    for key in baseline:
+        np.testing.assert_array_equal(changed[key], baseline[key])
 
 
 def test_vectorized_future_prefix_isolation(tmp_path: Path) -> None:

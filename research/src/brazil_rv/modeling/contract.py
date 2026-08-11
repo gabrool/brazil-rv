@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 from types import MappingProxyType
 
-FEATURE_CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT"
+FEATURE_CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT_HUMAN_PRIORS_V4"
 LOCAL_CONTEXT_AVAILABILITY_RULE = (
     "Local instruments never gate B3 samples; unavailable instruments are masked "
     "by context_data_ready."
@@ -270,6 +270,8 @@ EXPECTED_ARRAY_SHAPES = {
     "equity_slow.npy": (1248, 158, 32),
     "equity_membership.npy": (1248, 158),
     "equity_data_ready.npy": (1248, 158),
+    "equity_peer_features.npy": (1248, 158, 405, 6),
+    "equity_peer_valid.npy": (1248, 158, 405, 4),
     "context_features.npy": (1248, 7, 465, 26),
     "context_slow.npy": (1248, 7, 32),
     "context_data_ready.npy": (1248, 7),

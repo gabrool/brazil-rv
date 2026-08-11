@@ -33,6 +33,8 @@ from brazil_rv.preprocessing.contract import (
     LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL,
     LIQUIDITY_SELECTED_RATE_ZERO_SLOW_CHANNEL_INDICES,
     DYNAMIC_CHANNELS,
+    EQUITY_PEER_CHANNELS,
+    EQUITY_PEER_VALID_CHANNELS,
     EQUITY_SESSION_MINUTES,
     EQUITY_SLOW_CHANNELS,
     GLOBAL_SLOW_CHANNELS,
@@ -166,7 +168,7 @@ def test_local_and_global_readiness_never_gate_sample_or_targets(
 
 
 def test_audited_eligibility_contract_is_exact() -> None:
-    assert CONTRACT_VERSION == "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT"
+    assert CONTRACT_VERSION == "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT_HUMAN_PRIORS_V4"
     assert EXPECTED_ELIGIBLE_DATE_COUNT == 1_228
     assert EXPECTED_SAMPLE_COUNT == 67_540
     assert EXPECTED_FIRST_ELIGIBLE_DATE == date(2021, 8, 16)
@@ -614,6 +616,10 @@ def test_output_contract(tmp_path: Path) -> None:
     assert specs["context_features.npy"].shape == (1, 7, 465, 26)
     assert specs["context_slow.npy"].shape == (1, 7, 32)
     assert specs["context_data_ready.npy"].shape == (1, 7)
+    assert specs["equity_peer_features.npy"].shape == (1, 158, 405, 6)
+    assert specs["equity_peer_features.npy"].dtype == np.dtype(np.float32)
+    assert specs["equity_peer_valid.npy"].shape == (1, 158, 405, 4)
+    assert specs["equity_peer_valid.npy"].dtype == np.dtype(bool)
     assert LOCAL_CONTEXT_SYMBOLS[-1] == LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL
     assert len(FIXED_RATE_CONTEXT_SYMBOLS) == 4
     assert DYNAMIC_CHANNELS == (
@@ -996,6 +1002,19 @@ def test_generated_schema_matches_channel_contract(tmp_path: Path) -> None:
         GLOBAL_SLOW_CHANNELS
     )
     assert schema["global_slow"] == list(GLOBAL_UNUSED_SLOW_CHANNEL_INDICES)
+    peer = schema["equity_peer_features"]
+    assert [row["name"] for row in peer["numeric_channels"]] == list(
+        EQUITY_PEER_CHANNELS
+    )
+    assert [row["name"] for row in peer["validity_channels"]] == list(
+        EQUITY_PEER_VALID_CHANNELS
+    )
+    assert peer["validity_to_numeric_channels"] == {
+        "0": [0, 2],
+        "1": [1, 3],
+        "2": [4],
+        "3": [5],
+    }
     assert schema["global_slow_semantics"]["26:30"].startswith("Deterministic")
     assert "17:31" not in schema["global_slow_semantics"]
     assert "average_one_based_midrank" in schema["stored_target"]
@@ -1032,7 +1051,7 @@ def _atomic_build_paths(
     created_at = datetime(2026, 1, 2, 3, 4, 5, 6789, tzinfo=UTC)
     final = (
         output_base
-        / f"m1_features_intraday_di_masked_context_{created_at:%Y%m%dT%H%M%S%fZ}"
+        / f"m1_features_intraday_di_masked_context_human_priors_v4_{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     return pointer, previous, final, created_at
 

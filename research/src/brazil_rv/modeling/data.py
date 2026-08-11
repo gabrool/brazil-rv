@@ -14,6 +14,7 @@ import polars as pl
 import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
+from ..preprocessing.peer_features import validate_peer_arrays
 from .context_ablation import NO_CONTEXT_ABLATION, ResolvedContextAblation
 from .contract import (
     ABSOLUTE_PATCH_COUNT,
@@ -170,6 +171,10 @@ def validate_feature_store(store: Path) -> pl.DataFrame:
             raise ValueError(
                 f"Expected {filename} shape {expected_shape}, found {array.shape}"
             )
+    validate_peer_arrays(
+        np.load(store / "equity_peer_features.npy", mmap_mode="r", allow_pickle=False),
+        np.load(store / "equity_peer_valid.npy", mmap_mode="r", allow_pickle=False),
+    )
     context_ready = np.load(
         store / "context_data_ready.npy", mmap_mode="r", allow_pickle=False
     )

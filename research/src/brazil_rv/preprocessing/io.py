@@ -15,6 +15,7 @@ from .contract import (
     CATALOGUE_PATH,
     CONTEXT_POINTER,
     GLOBAL_SOURCE_POINTER,
+    HUMAN_PRIORS_POINTER,
     FIXED_RATE_CONTEXT_SYMBOLS,
     LOCAL_CONTEXT_SYMBOLS,
     LIQUIDITY_SELECTED_RATE_CONTEXT_SYMBOL,
@@ -45,6 +46,7 @@ class CanonicalInputs:
     context_dir: Path
     catalogue_path: Path
     global_source_dir: Path
+    human_priors_dir: Path
 
     def manifest_entries(self) -> dict[str, dict[str, str]]:
         return {
@@ -69,6 +71,10 @@ class CanonicalInputs:
                 "pointer": str(GLOBAL_SOURCE_POINTER),
                 "resolved_path": str(self.global_source_dir),
             },
+            "human_priors": {
+                "pointer": str(HUMAN_PRIORS_POINTER),
+                "resolved_path": str(self.human_priors_dir),
+            },
         }
 
 
@@ -87,6 +93,7 @@ def resolve_inputs() -> CanonicalInputs:
         context_dir=resolve_pointer(CONTEXT_POINTER),
         catalogue_path=CATALOGUE_PATH,
         global_source_dir=resolve_pointer(GLOBAL_SOURCE_POINTER),
+        human_priors_dir=resolve_pointer(HUMAN_PRIORS_POINTER),
     )
 
 

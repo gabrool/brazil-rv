@@ -43,6 +43,8 @@ from .contract import (
     DECISION_EQUITY_INDICES,
     DECISION_TIMES,
     DYNAMIC_CHANNELS,
+    EQUITY_PEER_CHANNELS,
+    EQUITY_PEER_VALID_CHANNELS,
     EQUITY_SESSION_MINUTES,
     EQUITY_SESSION_START_MINUTE,
     EQUITY_SLOW_CHANNELS,
@@ -54,6 +56,7 @@ from .contract import (
     EXPECTED_LAST_ELIGIBLE_DATE,
     EXPECTED_SAMPLE_COUNT,
     HORIZONS,
+    HUMAN_PRIORS_POINTER,
     LOCAL_CONTEXT_AVAILABILITY_RULE,
     MIN_ACTIVE_EQUITIES,
     OUTPUT_BASE,
@@ -63,6 +66,12 @@ from .contract import (
     output_array_specs,
 )
 from .global_features import build_global_instrument_features
+from .human_prior_input import (
+    load_human_priors,
+    validate_human_prior_reference_inputs,
+    validate_unchanged_base_outputs,
+)
+from .peer_features import build_peer_features, validate_peer_arrays
 from .io import (
     cotahist_files,
     create_output_memmaps,
@@ -100,6 +109,35 @@ from .transforms import (
 def _sample_date_is_eligible(active_equity_count: int) -> bool:
     """Local and global context availability never gates a B3 sample date."""
     return active_equity_count >= MIN_ACTIVE_EQUITIES
+
+
+def _peer_count_summaries(histograms: np.ndarray) -> dict[str, object]:
+    summaries: dict[str, object] = {}
+    values = np.arange(histograms.shape[1], dtype=np.int64)
+    for channel, name in enumerate(EQUITY_PEER_VALID_CHANNELS):
+        histogram = histograms[channel]
+        populated = np.flatnonzero(histogram)
+        count = int(histogram.sum())
+        if count == 0:
+            summaries[name] = {
+                "valid_value_count": 0,
+                "minimum": None,
+                "median": None,
+                "maximum": None,
+            }
+            continue
+        cumulative = np.cumsum(histogram)
+        lower_position = (count - 1) // 2
+        upper_position = count // 2
+        lower = int(values[np.searchsorted(cumulative, lower_position + 1)])
+        upper = int(values[np.searchsorted(cumulative, upper_position + 1)])
+        summaries[name] = {
+            "valid_value_count": count,
+            "minimum": int(populated[0]),
+            "median": 0.5 * (lower + upper),
+            "maximum": int(populated[-1]),
+        }
+    return summaries
 
 
 _TEMPORARY_MEMMAP_FILENAMES = (
@@ -168,6 +206,13 @@ def _populate_feature_store(
         raise ValueError(
             f"Expected {EXPECTED_DATE_COUNT} market dates, found {len(market_dates)}"
         )
+    human_priors = load_human_priors(
+        HUMAN_PRIORS_POINTER,
+        inputs.human_priors_dir,
+        market_dates,
+        security_ids,
+    )
+
     arrays = create_output_memmaps(output_dir, len(market_dates))
     memmaps.extend(arrays.values())
 
@@ -284,6 +329,10 @@ def _populate_feature_store(
             print(f"Processed equity source {source_number}/{len(source_groups)}")
 
     all_market_dates = frozenset(market_dates)
+    reference_input_checks = validate_human_prior_reference_inputs(
+        human_priors, membership, arrays["equity_data_ready.npy"]
+    )
+
     context_change = np.zeros(
         (len(market_dates), len(LOCAL_CONTEXT_SYMBOLS)), dtype=np.float64
     )
@@ -399,9 +448,14 @@ def _populate_feature_store(
     sample_rows: list[dict[str, object]] = []
     daily_audits: list[dict[str, object]] = []
     security_label_counts = np.zeros((EXPECTED_EQUITIES, len(HORIZONS)), dtype=np.int64)
+    peer_count_histograms = np.zeros(
+        (len(EQUITY_PEER_VALID_CHANNELS), EXPECTED_EQUITIES), dtype=np.int64
+    )
     sample_id = 0
     for date_idx, trade_date in enumerate(market_dates):
         active = membership[date_idx] & arrays["equity_data_ready.npy"][date_idx]
+        active_count = int(active.sum())
+        feature_eligible = _sample_date_is_eligible(active_count)
         add_equity_cross_sectional_dynamic(
             arrays["equity_features.npy"][date_idx],
             dynamic_valid[date_idx],
@@ -410,6 +464,26 @@ def _populate_feature_store(
         add_slow_cross_sectional_ranks(
             arrays["equity_slow.npy"][date_idx], slow_rank_valid[date_idx], active
         )
+        peer_result = build_peer_features(
+            np.take(arrays["equity_features.npy"][date_idx], (7, 9), axis=2),
+            np.asarray(dynamic_valid[date_idx, :, :, :2]),
+            active,
+            human_priors.selected_relation[date_idx],
+            human_priors.selected_group_id[date_idx],
+            human_priors.sector_group_id,
+            human_priors.subsector_group_id,
+            human_priors.issuer_ids,
+        )
+        arrays["equity_peer_features.npy"][date_idx] = peer_result.features
+        arrays["equity_peer_valid.npy"][date_idx] = peer_result.valid
+        if feature_eligible:
+            for channel in range(len(EQUITY_PEER_VALID_CHANNELS)):
+                counts = peer_result.usable_peer_count[..., channel][
+                    peer_result.valid[..., channel]
+                ]
+                peer_count_histograms[channel] += np.bincount(
+                    counts, minlength=EXPECTED_EQUITIES
+                )
         observed = arrays["equity_features.npy"][date_idx, :, :, 5].astype(bool)
         entry_observed = observed[:, DECISION_EQUITY_INDICES]
         exit_observed = np.stack(
@@ -443,9 +517,7 @@ def _populate_feature_store(
         arrays["horizon_mask.npy"][date_idx] = horizon_mask
         security_label_counts += label_mask.sum(axis=1)
 
-        active_count = int(active.sum())
         context_ready_count = int(arrays["context_data_ready.npy"][date_idx].sum())
-        feature_eligible = _sample_date_is_eligible(active_count)
         valid_label_counts = label_mask.sum(axis=0)
         if feature_eligible:
             for decision_idx, decision_time in enumerate(DECISION_TIMES):
@@ -504,6 +576,16 @@ def _populate_feature_store(
         raise ValueError(
             f"Expected {EXPECTED_SAMPLE_COUNT} samples, found {sample_index.height}"
         )
+    base_output_checks = validate_unchanged_base_outputs(
+        human_priors,
+        date_index,
+        equity_index,
+        arrays["equity_membership.npy"],
+        arrays["equity_data_ready.npy"],
+        arrays["targets.npy"],
+        arrays["label_mask.npy"],
+        sample_index,
+    )
     _validate_output(
         arrays,
         assignments,
@@ -547,9 +629,22 @@ def _populate_feature_store(
     last_feature_date = sample_index.item(sample_index.height - 1, "trade_date")
     duration = clock.perf_counter() - started
     _write_feature_schema(output_dir)
+    peer_build_audit = {
+        "schema_version": CONTRACT_VERSION,
+        "human_prior_reference_inputs": reference_input_checks,
+        "base_outputs_unchanged": base_output_checks,
+        "usable_peer_counts_when_valid": _peer_count_summaries(peer_count_histograms),
+        "sample_count": sample_index.height,
+        "eligible_date_count": int(eligible_dates.size),
+    }
+    (output_dir / "peer_feature_build_audit.json").write_text(
+        json.dumps(peer_build_audit, indent=2, allow_nan=False), encoding="utf-8"
+    )
+    canonical_inputs = inputs.manifest_entries()
+    canonical_inputs["human_priors"] = human_priors.manifest_entry()
     _write_manifest(
         output_dir,
-        inputs.manifest_entries(),
+        canonical_inputs,
         assignments,
         context_files,
         market_dates,
@@ -598,7 +693,7 @@ def build_feature_store(*, created_at: datetime | None = None) -> tuple[Path, Pa
     created_at = datetime.now(timezone.utc) if created_at is None else created_at
     output_dir = (
         OUTPUT_BASE
-        / f"m1_features_intraday_di_masked_context_{created_at:%Y%m%dT%H%M%S%fZ}"
+        / f"m1_features_intraday_di_masked_context_human_priors_v4_{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     partial = output_dir.with_name(f"{output_dir.name}.{uuid4().hex}.partial")
     if output_dir.exists():
@@ -811,6 +906,9 @@ def _validate_output(
             if not np.isfinite(arrays[filename][date_idx]).all():
                 raise ValueError(f"Non-finite value in {filename} at date {date_idx}")
 
+    validate_peer_arrays(
+        arrays["equity_peer_features.npy"], arrays["equity_peer_valid.npy"]
+    )
     if np.any(arrays["context_features.npy"][..., 16:26] != 0):
         raise ValueError("Context cross-sectional dynamic channels must be zero")
     if np.any(arrays["equity_slow.npy"][..., 30:32] != 0):
@@ -946,6 +1044,33 @@ def _write_feature_schema(output_dir: Path) -> None:
             {"index": index, "name": name}
             for index, name in enumerate(DYNAMIC_CHANNELS)
         ],
+        "equity_peer_features": {
+            "numeric_array": "equity_peer_features.npy",
+            "numeric_dtype": "float32",
+            "numeric_shape": "[date, equity, 405, 6]",
+            "numeric_channels": [
+                {"index": index, "name": name}
+                for index, name in enumerate(EQUITY_PEER_CHANNELS)
+            ],
+            "validity_array": "equity_peer_valid.npy",
+            "validity_dtype": "bool",
+            "validity_shape": "[date, equity, 405, 4]",
+            "validity_channels": [
+                {"index": index, "name": name}
+                for index, name in enumerate(EQUITY_PEER_VALID_CHANNELS)
+            ],
+            "validity_to_numeric_channels": {
+                "0": [0, 2],
+                "1": [1, 3],
+                "2": [4],
+                "3": [5],
+            },
+            "source_dynamic_channels": {"15m": 7, "60m": 9},
+            "selected_policy": "subsector_if_at_least_two_others_else_sector",
+            "classification_is_point_in_time": False,
+            "invalid_storage": "Every governed numeric value is exactly zero.",
+            "current_models_consume_arrays": False,
+        },
         "slow_channels": [
             {"index": index, "name": name}
             for index, name in enumerate(EQUITY_SLOW_CHANNELS)
@@ -1187,6 +1312,7 @@ def _write_manifest(
             "sample_index.parquet",
             "daily_audit.parquet",
             "security_audit.parquet",
+            "peer_feature_build_audit.json",
         ],
         "date_count": len(market_dates),
         "eligible_date_count": sample_count // len(DECISION_TIMES),

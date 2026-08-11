@@ -90,7 +90,7 @@ def _schema(path: Path) -> None:
     path.write_text(
         json.dumps(
             {
-                "contract_version": "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT",
+                "contract_version": "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT_HUMAN_PRIORS_V4",
                 "slow_channels": [
                     {"index": index, "name": name}
                     for index, name in enumerate(SLOW_CHANNELS)
@@ -655,7 +655,7 @@ def test_validation_only_analyzer_requires_six_matched_runs_and_is_deterministic
             "resolved_path": str(tmp_path / "store"),
             "manifest_sha256": stage4_slow_feature_ablation.PACKAGED_FEATURE_MANIFEST_SHA256,
         },
-        "feature_contract": "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT",
+        "feature_contract": "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT_HUMAN_PRIORS_V4",
         "retained_context_symbols": list(
             stage4_slow_feature_ablation.EXPECTED_RETAINED_CONTEXTS
         ),

@@ -865,11 +865,11 @@ def add_equity_cross_sectional_dynamic(
             if destinations[0] is None:
                 continue
 
-            leave_one_out_median = _leave_one_out_medians(values)
+            leave_one_out_median = leave_one_out_medians(values)
             leave_one_out_mad = np.empty(values.size, dtype=np.float64)
             for median in np.unique(leave_one_out_median):
                 group = leave_one_out_median == median
-                distance_medians = _leave_one_out_medians(np.abs(values - median))
+                distance_medians = leave_one_out_medians(np.abs(values - median))
                 leave_one_out_mad[group] = distance_medians[group]
             positions = np.full(dynamic.shape[0], -1, dtype=np.int32)
             positions[valid_slots] = np.arange(valid_slots.size, dtype=np.int32)
@@ -902,7 +902,7 @@ def add_equity_cross_sectional_dynamic(
             )
 
 
-def _leave_one_out_medians(values: NDArray[np.float64]) -> NDArray[np.float64]:
+def leave_one_out_medians(values: NDArray[np.float64]) -> NDArray[np.float64]:
     """Return the median after removing each corresponding value."""
     size = values.size
     if size < 2:
