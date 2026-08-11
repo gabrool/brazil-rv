@@ -25,17 +25,21 @@ from brazil_rv.preprocessing.human_priors import (
     active_security_days,
     add_self_excluded_peer_counts,
     build_human_priors,
+    classification_peer_audit,
     ingest_market_cap_directory,
     issuer_peer_audit,
+    mapping_exception_audit,
     market_cap_audit,
     market_cap_month_coverage,
     normalize_unit_components,
     parse_classification_xlsx,
     parse_market_cap_csv,
     parse_units_html,
+    reconcile_market_cap,
     reconcile_security_metadata,
     strictly_lagged_market_cap_index,
     unit_overlap_audit,
+    validate_reviewed_aliases,
     validate_raw_sources,
 )
 
@@ -185,6 +189,37 @@ def _accepted_security_inputs() -> tuple[pl.DataFrame, pl.DataFrame]:
     return assignments, ticker_history
 
 
+def _reviewed_alias(
+    *,
+    alias_id: str = "ALIAS-001",
+    source_key: str = "SEC_FUZZY",
+    normalized_source_name: str = "",
+    issuer_id: str = "B3_ISSUER_CODE:BANC",
+    relationship_type: str = "NAME_CONTINUITY",
+    effective_from: date | None = None,
+    effective_to: date | None = None,
+) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "alias_id": [alias_id],
+            "source_type": ["security_classification"],
+            "source_key": [source_key],
+            "normalized_source_name": [normalized_source_name],
+            "issuer_id": [issuer_id],
+            "relationship_type": [relationship_type],
+            "effective_from": [effective_from],
+            "effective_to": [effective_to],
+            "reviewed_by": ["reviewer@example.com"],
+            "reviewed_at_utc": ["2026-08-11T20:00:00+00:00"],
+            "review_reference": ["review-ticket-001"],
+        },
+        schema_overrides={
+            "effective_from": pl.Date,
+            "effective_to": pl.Date,
+        },
+    )
+
+
 def test_parse_b3_classification_workbook() -> None:
     parsed = parse_classification_xlsx(
         _classification_xlsx(),
@@ -265,7 +300,138 @@ def test_deterministic_reconciliation_groups_share_classes_and_rejects_fuzzy() -
     assert fuzzy["mapping_status"] == "UNRESOLVED"
     assert fuzzy["matching_method"] == "UNRESOLVED"
     assert "B3_ISSUER_CODE:BANC" in fuzzy["fuzzy_candidates"]
-    assert exceptions.filter(pl.col("source_key") == "SEC_FUZZY").height > 0
+    fuzzy_exceptions = exceptions.filter(pl.col("source_key") == "SEC_FUZZY")
+    assert fuzzy_exceptions["exception_id"].n_unique() == 1
+    assert fuzzy_exceptions["candidate_rank"].sort().to_list() == [1, 2]
+    exception_audit = mapping_exception_audit(fuzzy_exceptions)
+    assert exception_audit["mapping_exception_count"] == 1
+    assert exception_audit["mapping_exception_candidate_row_count"] == 2
+
+
+def test_reviewed_alias_maps_exact_source_key_with_full_provenance() -> None:
+    assignments, ticker_history = _accepted_security_inputs()
+    metadata, _, exceptions = reconcile_security_metadata(
+        assignments,
+        ticker_history,
+        _classification_frame(),
+        _reviewed_alias(),
+    )
+
+    mapped = metadata.filter(pl.col("security_id") == "SEC_FUZZY").row(named=True)
+    assert mapped["mapping_status"] == "MAPPED"
+    assert mapped["issuer_id"] == "B3_ISSUER_CODE:BANC"
+    assert mapped["matching_method"] == "REVIEWED_ALIAS_NAME_CONTINUITY"
+    assert mapped["reviewed_alias_alias_id"] == "ALIAS-001"
+    assert mapped["reviewed_alias_reviewed_by"] == "reviewer@example.com"
+    assert mapped["reviewed_alias_review_reference"] == "review-ticket-001"
+    assert exceptions.filter(pl.col("source_key") == "SEC_FUZZY").is_empty()
+
+
+def test_reviewed_alias_respects_effective_dates() -> None:
+    assignments, ticker_history = _accepted_security_inputs()
+    aliases = _reviewed_alias(
+        source_key="",
+        normalized_source_name="BANCOXX",
+        effective_from=date(2027, 1, 1),
+    )
+    current, _, _ = reconcile_security_metadata(
+        assignments, ticker_history, _classification_frame(), aliases
+    )
+    assert (
+        current.filter(pl.col("security_id") == "SEC_FUZZY")["mapping_status"].item()
+        == "UNRESOLVED"
+    )
+
+    future_classification = _classification_frame().with_columns(
+        pl.lit(date(2027, 1, 2)).alias("classification_snapshot_date")
+    )
+    future, _, _ = reconcile_security_metadata(
+        assignments, ticker_history, future_classification, aliases
+    )
+    assert (
+        future.filter(pl.col("security_id") == "SEC_FUZZY")["matching_method"].item()
+        == "REVIEWED_ALIAS_NAME_CONTINUITY"
+    )
+
+
+def test_reviewed_alias_validation_rejects_conflicting_overlaps() -> None:
+    aliases = pl.concat(
+        [
+            _reviewed_alias(
+                alias_id="ALIAS-001",
+                source_key="",
+                normalized_source_name="BANCOXX",
+                effective_to=date(2026, 12, 31),
+            ),
+            _reviewed_alias(
+                alias_id="ALIAS-002",
+                source_key="",
+                normalized_source_name="BANCOXX",
+                issuer_id="B3_ISSUER_CODE:ENRG",
+                effective_from=date(2026, 6, 1),
+            ),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="conflicting, or overlapping"):
+        validate_reviewed_aliases(aliases, _classification_frame())
+
+
+def test_merger_successor_is_unresolved_without_explicit_reviewed_alias() -> None:
+    assignments, ticker_history = _accepted_security_inputs()
+    ticker_history = ticker_history.with_columns(
+        pl.when(pl.col("security_id") == "SEC_FUZZY")
+        .then(pl.lit("BANCO X SUCCESSOR"))
+        .otherwise(pl.col("issuer_short_name"))
+        .alias("issuer_short_name")
+    )
+    unresolved, _, _ = reconcile_security_metadata(
+        assignments, ticker_history, _classification_frame()
+    )
+    assert (
+        unresolved.filter(pl.col("security_id") == "SEC_FUZZY")["mapping_status"].item()
+        == "UNRESOLVED"
+    )
+
+    explicit, _, _ = reconcile_security_metadata(
+        assignments,
+        ticker_history,
+        _classification_frame(),
+        _reviewed_alias(relationship_type="MERGER_SUCCESSOR"),
+    )
+    assert (
+        explicit.filter(pl.col("security_id") == "SEC_FUZZY")["matching_method"].item()
+        == "REVIEWED_ALIAS_MERGER_SUCCESSOR"
+    )
+
+
+def test_security_reviewed_alias_does_not_leak_into_market_cap_matching() -> None:
+    assignments, ticker_history = _accepted_security_inputs()
+    classification = _classification_frame()
+    aliases = _reviewed_alias()
+    metadata, _, _ = reconcile_security_metadata(
+        assignments, ticker_history, classification, aliases
+    )
+    market_cap = pl.DataFrame(
+        {
+            "reference_date": [date(2026, 8, 11)],
+            "reference_month": ["2026-08"],
+            "issuer_name": ["BANCOXX"],
+            "market_cap_brl": [100.0],
+            "source_file": ["market.csv"],
+            "source_url": ["https://b3.example/market"],
+            "retrieved_at_utc": [datetime(2026, 8, 12, tzinfo=UTC)],
+        }
+    )
+
+    normalized, exceptions, _ = reconcile_market_cap(
+        market_cap, classification, metadata, aliases
+    )
+
+    assert normalized.is_empty()
+    assert exceptions["exception_id"].n_unique() == 1
+    assert exceptions["source_type"].unique().to_list() == ["market_cap"]
+    assert exceptions["reason"].unique().to_list() == ["NO_EXACT_ISSUER_NAME"]
 
 
 def test_self_excluded_peer_counts_respect_pit_membership_and_readiness() -> None:
@@ -298,6 +464,106 @@ def test_self_excluded_peer_counts_respect_pit_membership_and_readiness() -> Non
     assert first["same_sector_peer_count"] == 2
     assert first["same_subsector_peer_count"] == 1
     assert first["same_economic_segment_peer_count"] == 1
+
+
+def _single_day_peer_counts(metadata: pl.DataFrame) -> pl.DataFrame:
+    security_ids = metadata["security_id"].to_list()
+    active = pl.DataFrame(
+        {
+            "date_idx": [0] * len(security_ids),
+            "trade_date": [date(2026, 8, 11)] * len(security_ids),
+            "equity_slot": range(len(security_ids)),
+            "security_id": security_ids,
+        }
+    )
+    return add_self_excluded_peer_counts(active, metadata)
+
+
+def test_identical_subsector_labels_under_different_sectors_are_not_peers() -> None:
+    metadata = pl.DataFrame(
+        {
+            "security_id": ["A1", "A2", "B1", "B2"],
+            "issuer_id": ["IA1", "IA2", "IB1", "IB2"],
+            "sector": ["Sector A", "Sector A", "Sector B", "Sector B"],
+            "subsector": ["Shared", "Shared", "Shared", "Shared"],
+            "economic_segment": ["A1", "A2", "B1", "B2"],
+        }
+    )
+    peers = _single_day_peer_counts(metadata)
+
+    assert peers["same_subsector_peer_count"].to_list() == [1, 1, 1, 1]
+    assert peers["subsector_group_key"].n_unique() == 2
+
+
+def test_identical_economic_segments_under_different_subsectors_are_not_peers() -> None:
+    metadata = pl.DataFrame(
+        {
+            "security_id": ["A1", "A2", "B1", "B2"],
+            "issuer_id": ["IA1", "IA2", "IB1", "IB2"],
+            "sector": ["Sector"] * 4,
+            "subsector": ["Parent A", "Parent A", "Parent B", "Parent B"],
+            "economic_segment": ["Shared", "Shared", "Shared", "Shared"],
+        }
+    )
+    peers = _single_day_peer_counts(metadata)
+
+    assert peers["same_economic_segment_peer_count"].to_list() == [1, 1, 1, 1]
+    assert peers["economic_segment_group_key"].n_unique() == 2
+
+
+def test_candidate_policy_coverage_uses_hierarchical_subsector_groups() -> None:
+    metadata = pl.DataFrame(
+        {
+            "security_id": ["A1", "A2", "B1", "B2"],
+            "issuer_id": ["IA1", "IA2", "IB1", "IB2"],
+            "sector": ["Sector A", "Sector A", "Sector B", "Sector B"],
+            "subsector": ["Shared", "Other A", "Shared", "Other B"],
+            "economic_segment": ["EA1", "EA2", "EB1", "EB2"],
+        }
+    )
+    peers = _single_day_peer_counts(metadata)
+    audit, group_sizes = classification_peer_audit(
+        peers,
+        metadata,
+        metadata.select("sector", "subsector", "economic_segment"),
+    )
+
+    policies = audit["candidate_policy_coverage"]
+    assert policies["subsector_only"]["percentage_with_at_least"]["1"] == 0.0
+    assert (
+        policies["subsector_if_at_least_one_other_else_sector"][
+            "percentage_with_at_least"
+        ]["1"]
+        == 100.0
+    )
+    assert (
+        policies["subsector_if_at_least_two_others_else_sector"][
+            "percentage_with_at_least"
+        ]["1"]
+        == 100.0
+    )
+    shared = group_sizes.filter(
+        (pl.col("level") == "subsector") & (pl.col("group") == "Shared")
+    )
+    assert shared.height == 2
+    assert shared["group_key"].n_unique() == 2
+    assert audit["taxonomy_label_collisions"]["subsector"] == [
+        {
+            "label": "Shared",
+            "hierarchical_groups": [
+                {
+                    "group_key": '["Sector A","Shared"]',
+                    "sector": "Sector A",
+                    "subsector": "Shared",
+                },
+                {
+                    "group_key": '["Sector B","Shared"]',
+                    "sector": "Sector B",
+                    "subsector": "Shared",
+                },
+            ],
+        }
+    ]
 
 
 def test_strict_market_cap_lag_excludes_same_day() -> None:

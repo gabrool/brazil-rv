@@ -40,7 +40,7 @@ from .contract import (
 )
 from .io import load_assignments, resolve_pointer
 
-SCHEMA_VERSION = "B3_HUMAN_PRIORS_V1"
+SCHEMA_VERSION = "B3_HUMAN_PRIORS_V2"
 RAW_SCHEMA_VERSION = "B3_HUMAN_PRIORS_RAW_V1"
 RAW_BASE = PROJECT_ROOT / "quant-data/b3/raw/b3/human_priors"
 OUTPUT_BASE = PROJECT_ROOT / "quant-data/b3/interim/b3/human_priors_v1"
@@ -98,6 +98,8 @@ RAW_SUBDIRECTORY = {
 }
 
 EXCEPTION_SCHEMA = {
+    "exception_id": pl.String,
+    "candidate_rank": pl.Int32,
     "source_type": pl.String,
     "source_file": pl.String,
     "source_key": pl.String,
@@ -107,6 +109,44 @@ EXCEPTION_SCHEMA = {
     "candidate_issuer_name": pl.String,
     "candidate_score": pl.Float64,
     "status": pl.String,
+}
+
+REVIEWED_ALIAS_COLUMNS = (
+    "alias_id",
+    "source_type",
+    "source_key",
+    "normalized_source_name",
+    "issuer_id",
+    "relationship_type",
+    "effective_from",
+    "effective_to",
+    "reviewed_by",
+    "reviewed_at_utc",
+    "review_reference",
+)
+REVIEWED_ALIAS_SCHEMA = {
+    "alias_id": pl.String,
+    "source_type": pl.String,
+    "source_key": pl.String,
+    "normalized_source_name": pl.String,
+    "issuer_id": pl.String,
+    "relationship_type": pl.String,
+    "effective_from": pl.Date,
+    "effective_to": pl.Date,
+    "reviewed_by": pl.String,
+    "reviewed_at_utc": pl.String,
+    "review_reference": pl.String,
+    "alias_source_file": pl.String,
+}
+REVIEWED_ALIAS_PROVENANCE_SCHEMA = {
+    f"reviewed_alias_{name}": data_type
+    for name, data_type in REVIEWED_ALIAS_SCHEMA.items()
+}
+REVIEWED_ALIAS_SOURCE_TYPES = {"security_classification", "market_cap"}
+REVIEWED_ALIAS_RELATIONSHIP_TYPES = {
+    "NAME_CONTINUITY",
+    "TICKER_CONTINUITY",
+    "MERGER_SUCCESSOR",
 }
 
 
@@ -986,14 +1026,312 @@ def normalize_share_class(value: object) -> str:
     return {"OR": "ON", "UNT": "UNIT"}.get(text, text)
 
 
+HIERARCHY_LEVELS = {
+    "sector": ("sector",),
+    "subsector": ("sector", "subsector"),
+    "economic_segment": ("sector", "subsector", "economic_segment"),
+}
+
+
+def _hierarchy_group_key(values: Sequence[object]) -> str | None:
+    if any(value is None for value in values):
+        return None
+    return json.dumps(
+        [str(value) for value in values],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+
+
+def _with_hierarchy_group_keys(frame: pl.DataFrame) -> pl.DataFrame:
+    return frame.with_columns(
+        pl.struct(columns)
+        .map_elements(
+            lambda row, columns=columns: _hierarchy_group_key(
+                [row[column] for column in columns]
+            ),
+            return_dtype=pl.String,
+        )
+        .alias(f"{level}_group_key")
+        for level, columns in HIERARCHY_LEVELS.items()
+    )
+
+
 def _empty_exceptions() -> pl.DataFrame:
     return pl.DataFrame(schema=EXCEPTION_SCHEMA)
+
+
+def _exception_id(row: dict[str, object]) -> str:
+    identity = json.dumps(
+        [row["source_type"], row["source_key"], row["reason"]],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return f"EXC-{hashlib.sha256(identity.encode('utf-8')).hexdigest()[:24]}"
 
 
 def _exception_frame(rows: list[dict[str, object]]) -> pl.DataFrame:
     if not rows:
         return _empty_exceptions()
-    return pl.from_dicts(rows, schema=EXCEPTION_SCHEMA, strict=False)
+    enriched = [{**row, "exception_id": _exception_id(row)} for row in rows]
+    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for row in enriched:
+        grouped[str(row["exception_id"])].append(row)
+    for candidates in grouped.values():
+        ordered = sorted(
+            candidates,
+            key=lambda row: (
+                row.get("candidate_score") is None,
+                -float(row.get("candidate_score") or 0.0),
+                str(row.get("candidate_issuer_id") or ""),
+                str(row.get("candidate_issuer_name") or ""),
+                str(row.get("source_file") or ""),
+            ),
+        )
+        for rank, row in enumerate(ordered, start=1):
+            row["candidate_rank"] = rank
+    return pl.from_dicts(enriched, schema=EXCEPTION_SCHEMA, strict=False)
+
+
+def mapping_exception_audit(exceptions: pl.DataFrame) -> dict[str, object]:
+    counts = (
+        exceptions.group_by("source_type", "reason")
+        .agg(
+            pl.col("exception_id").n_unique().alias("unique_exception_count"),
+            pl.len().alias("candidate_row_count"),
+        )
+        .sort("source_type", "reason")
+        .to_dicts()
+    )
+    return {
+        "mapping_exception_count": exceptions["exception_id"].n_unique(),
+        "mapping_exception_candidate_row_count": exceptions.height,
+        "mapping_exception_counts_by_source_type_and_reason": counts,
+    }
+
+
+def _empty_reviewed_aliases() -> pl.DataFrame:
+    return pl.DataFrame(schema=REVIEWED_ALIAS_SCHEMA)
+
+
+def _alias_date(value: object, field: str, alias_id: str) -> date | None:
+    if value is None or str(value).strip() == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value).strip())
+    except ValueError:
+        raise ValueError(
+            f"Reviewed alias {alias_id!r} has invalid {field}: {value!r}"
+        ) from None
+
+
+def _alias_reviewed_at(value: object, alias_id: str) -> str:
+    text = str(value or "").strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        raise ValueError(
+            f"Reviewed alias {alias_id!r} has invalid reviewed_at_utc: {value!r}"
+        ) from None
+    if parsed.tzinfo is None:
+        raise ValueError(
+            f"Reviewed alias {alias_id!r} reviewed_at_utc must include a timezone"
+        )
+    return parsed.astimezone(UTC).isoformat()
+
+
+def validate_reviewed_aliases(
+    reviewed_aliases: pl.DataFrame | None,
+    classification: pl.DataFrame,
+) -> pl.DataFrame:
+    if reviewed_aliases is None or reviewed_aliases.is_empty():
+        return _empty_reviewed_aliases()
+    missing = set(REVIEWED_ALIAS_COLUMNS) - set(reviewed_aliases.columns)
+    if missing:
+        raise ValueError(f"Reviewed aliases are missing columns: {sorted(missing)}")
+    known_issuer_ids = set(classification["issuer_id"].to_list())
+    normalized_rows: list[dict[str, object]] = []
+    alias_ids: set[str] = set()
+    for raw in reviewed_aliases.to_dicts():
+        alias_id = str(raw["alias_id"] or "").strip()
+        if not alias_id:
+            raise ValueError("Reviewed alias_id cannot be empty")
+        if alias_id in alias_ids:
+            raise ValueError(f"Duplicate reviewed alias_id: {alias_id}")
+        alias_ids.add(alias_id)
+        source_type = str(raw["source_type"] or "").strip()
+        if source_type not in REVIEWED_ALIAS_SOURCE_TYPES:
+            raise ValueError(
+                f"Reviewed alias {alias_id!r} has unknown source_type: {source_type!r}"
+            )
+        source_key = str(raw["source_key"] or "").strip()
+        normalized_source_name = str(raw["normalized_source_name"] or "").strip()
+        if bool(source_key) == bool(normalized_source_name):
+            raise ValueError(
+                f"Reviewed alias {alias_id!r} must set exactly one of source_key "
+                "or normalized_source_name"
+            )
+        if normalized_source_name and (
+            normalize_identity_name(normalized_source_name) != normalized_source_name
+        ):
+            raise ValueError(
+                f"Reviewed alias {alias_id!r} normalized_source_name is not canonical"
+            )
+        issuer_id = str(raw["issuer_id"] or "").strip()
+        if issuer_id not in known_issuer_ids:
+            raise ValueError(
+                f"Reviewed alias {alias_id!r} references unknown issuer_id: {issuer_id}"
+            )
+        relationship_type = str(raw["relationship_type"] or "").strip()
+        if relationship_type not in REVIEWED_ALIAS_RELATIONSHIP_TYPES:
+            raise ValueError(
+                f"Reviewed alias {alias_id!r} has unknown relationship_type: "
+                f"{relationship_type!r}"
+            )
+        effective_from = _alias_date(raw["effective_from"], "effective_from", alias_id)
+        effective_to = _alias_date(raw["effective_to"], "effective_to", alias_id)
+        if effective_from and effective_to and effective_from > effective_to:
+            raise ValueError(
+                f"Reviewed alias {alias_id!r} effective_from is after effective_to"
+            )
+        reviewed_by = str(raw["reviewed_by"] or "").strip()
+        review_reference = str(raw["review_reference"] or "").strip()
+        if not reviewed_by or not review_reference:
+            raise ValueError(
+                f"Reviewed alias {alias_id!r} requires reviewed_by and review_reference"
+            )
+        normalized_rows.append(
+            {
+                "alias_id": alias_id,
+                "source_type": source_type,
+                "source_key": source_key,
+                "normalized_source_name": normalized_source_name,
+                "issuer_id": issuer_id,
+                "relationship_type": relationship_type,
+                "effective_from": effective_from,
+                "effective_to": effective_to,
+                "reviewed_by": reviewed_by,
+                "reviewed_at_utc": _alias_reviewed_at(raw["reviewed_at_utc"], alias_id),
+                "review_reference": review_reference,
+                "alias_source_file": str(raw.get("alias_source_file") or ""),
+            }
+        )
+
+    windows: dict[tuple[str, str, str], list[dict[str, object]]] = defaultdict(list)
+    for row in normalized_rows:
+        selector_type = "source_key" if row["source_key"] else "normalized_source_name"
+        selector_value = str(row[selector_type])
+        windows[(str(row["source_type"]), selector_type, selector_value)].append(row)
+    for selector, rows in windows.items():
+        ordered = sorted(
+            rows,
+            key=lambda row: row["effective_from"] or date.min,
+        )
+        previous: dict[str, object] | None = None
+        for row in ordered:
+            if previous is not None and (row["effective_from"] or date.min) <= (
+                previous["effective_to"] or date.max
+            ):
+                raise ValueError(
+                    "Reviewed aliases have duplicate, conflicting, or overlapping "
+                    f"entries for {selector}: {previous['alias_id']}, {row['alias_id']}"
+                )
+            previous = row
+    return pl.from_dicts(
+        normalized_rows,
+        schema=REVIEWED_ALIAS_SCHEMA,
+        strict=False,
+    ).sort("source_type", "source_key", "normalized_source_name", "effective_from")
+
+
+def load_reviewed_aliases(path: Path, classification: pl.DataFrame) -> pl.DataFrame:
+    if not path.is_file():
+        raise FileNotFoundError(f"Reviewed alias CSV does not exist: {path}")
+    aliases = pl.read_csv(path, infer_schema_length=None, null_values=[""])
+    aliases = aliases.with_columns(
+        pl.lit(str(path.resolve())).alias("alias_source_file")
+    )
+    return validate_reviewed_aliases(aliases, classification)
+
+
+def _reviewed_alias_for(
+    reviewed_aliases: pl.DataFrame,
+    *,
+    source_type: str,
+    source_key: str,
+    source_name: str,
+    effective_date: date,
+) -> dict[str, object] | None:
+    if reviewed_aliases.is_empty():
+        return None
+    normalized_name = normalize_identity_name(source_name)
+    matches = [
+        row
+        for row in reviewed_aliases.filter(
+            pl.col("source_type") == source_type
+        ).to_dicts()
+        if (
+            (row["source_key"] and row["source_key"] == source_key)
+            or (
+                row["normalized_source_name"]
+                and row["normalized_source_name"] == normalized_name
+            )
+        )
+        and (row["effective_from"] is None or row["effective_from"] <= effective_date)
+        and (row["effective_to"] is None or effective_date <= row["effective_to"])
+    ]
+    if len(matches) > 1:
+        raise ValueError(
+            "Multiple reviewed aliases apply to "
+            f"{source_type}:{source_key} on {effective_date}: "
+            f"{sorted(row['alias_id'] for row in matches)}"
+        )
+    return matches[0] if matches else None
+
+
+def _reviewed_alias_provenance(
+    reviewed_alias: dict[str, object] | None,
+) -> dict[str, object]:
+    return {
+        f"reviewed_alias_{column}": (
+            reviewed_alias[column] if reviewed_alias is not None else None
+        )
+        for column in REVIEWED_ALIAS_SCHEMA
+    }
+
+
+def reviewed_alias_audit(
+    reviewed_aliases: pl.DataFrame,
+    security_metadata: pl.DataFrame,
+    market_cap: pl.DataFrame,
+) -> dict[str, object]:
+    security_applied = security_metadata.filter(
+        pl.col("reviewed_alias_alias_id").is_not_null()
+    )
+    market_cap_applied = market_cap.filter(
+        pl.col("reviewed_alias_alias_id").is_not_null()
+    )
+    applied_ids = sorted(
+        set(security_applied["reviewed_alias_alias_id"].to_list())
+        | set(market_cap_applied["reviewed_alias_alias_id"].to_list())
+    )
+    source_files = sorted(
+        value
+        for value in reviewed_aliases["alias_source_file"].unique().to_list()
+        if value
+    )
+    return {
+        "configured_alias_count": reviewed_aliases.height,
+        "configured_alias_ids": reviewed_aliases["alias_id"].to_list(),
+        "applied_alias_ids": applied_ids,
+        "security_rows_mapped_by_reviewed_alias": security_applied.height,
+        "market_cap_rows_mapped_by_reviewed_alias": market_cap_applied.height,
+        "source_files": source_files,
+    }
 
 
 def _fuzzy_candidates(
@@ -1026,7 +1364,9 @@ def reconcile_security_metadata(
     assignments: pl.DataFrame,
     ticker_history: pl.DataFrame,
     classification: pl.DataFrame,
+    reviewed_aliases: pl.DataFrame | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    reviewed_aliases = validate_reviewed_aliases(reviewed_aliases, classification)
     required_assignment = {"security_id", "isin", "latest_ticker"}
     required_history = {
         "security_id",
@@ -1080,6 +1420,7 @@ def reconcile_security_metadata(
         cotahist_name = str(security["issuer_short_name"])
         share_class = normalize_share_class(security["security_spec"])
         matches: list[dict[str, object]] = []
+        reviewed_alias: dict[str, object] | None = None
         method = ""
         if "security_id" in classification.columns:
             matches = classification.filter(
@@ -1111,6 +1452,19 @@ def reconcile_security_metadata(
                 if _compatible_share_class(share_class, row.get("share_class"))
             ]
             method = "EXACT_NORMALIZED_B3_ISSUER_NAME"
+        if not matches:
+            reviewed_alias = _reviewed_alias_for(
+                reviewed_aliases,
+                source_type="security_classification",
+                source_key=security_id,
+                source_name=cotahist_name,
+                effective_date=snapshot,
+            )
+            if reviewed_alias is not None:
+                matches = classification.filter(
+                    pl.col("issuer_id") == reviewed_alias["issuer_id"]
+                ).to_dicts()
+                method = f"REVIEWED_ALIAS_{reviewed_alias['relationship_type']}"
 
         issuer_ids = {str(row["issuer_id"]) for row in matches}
         mapped = len(issuer_ids) == 1
@@ -1178,6 +1532,7 @@ def reconcile_security_metadata(
             "mapping_status": status,
             "source_file": str(classification["source_file"][0]),
             "source_url": str(classification["source_url"][0]),
+            **_reviewed_alias_provenance(reviewed_alias),
         }
         metadata_rows.append(common)
         review_rows.append(
@@ -1188,10 +1543,21 @@ def reconcile_security_metadata(
                 "best_fuzzy_score": candidate_score,
             }
         )
-    metadata = pl.from_dicts(metadata_rows, infer_schema_length=None).sort(
-        "security_id"
+    metadata = _with_hierarchy_group_keys(
+        pl.from_dicts(
+            metadata_rows,
+            infer_schema_length=None,
+            schema_overrides=REVIEWED_ALIAS_PROVENANCE_SCHEMA,
+        )
+    ).sort("security_id")
+    review = _with_hierarchy_group_keys(
+        pl.from_dicts(
+            review_rows,
+            infer_schema_length=None,
+            schema_overrides=REVIEWED_ALIAS_PROVENANCE_SCHEMA,
+        )
     )
-    review = pl.from_dicts(review_rows, infer_schema_length=None).sort("security_id")
+    review = review.sort("security_id")
     return metadata, review, _exception_frame(exception_rows)
 
 
@@ -1207,11 +1573,16 @@ def _issuer_aliases(
                 "EXACT_NORMALIZED_B3_ISSUER_NAME",
             )
         )
-    for row in (
-        security_metadata.filter(pl.col("issuer_id").is_not_null())
-        .select("issuer_id", "issuer_name", "cotahist_issuer_name")
-        .to_dicts()
-    ):
+    exact_security_metadata = security_metadata.filter(
+        pl.col("issuer_id").is_not_null()
+    )
+    if "reviewed_alias_alias_id" in exact_security_metadata.columns:
+        exact_security_metadata = exact_security_metadata.filter(
+            pl.col("reviewed_alias_alias_id").is_null()
+        )
+    for row in exact_security_metadata.select(
+        "issuer_id", "issuer_name", "cotahist_issuer_name"
+    ).to_dicts():
         candidates[normalize_identity_name(row["cotahist_issuer_name"])].add(
             (
                 str(row["issuer_id"]),
@@ -1233,7 +1604,9 @@ def reconcile_market_cap(
     market_cap: pl.DataFrame,
     classification: pl.DataFrame,
     security_metadata: pl.DataFrame,
+    reviewed_aliases: pl.DataFrame | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame, dict[str, object]]:
+    reviewed_aliases = validate_reviewed_aliases(reviewed_aliases, classification)
     aliases = _issuer_aliases(classification, security_metadata)
     matched: list[dict[str, object]] = []
     exceptions: list[dict[str, object]] = []
@@ -1257,6 +1630,37 @@ def reconcile_market_cap(
                     "source_file": row["source_file"],
                     "source_url": row["source_url"],
                     "retrieved_at_utc": row["retrieved_at_utc"],
+                    **_reviewed_alias_provenance(None),
+                }
+            )
+            mapped_names.add(normalized_name)
+            continue
+        source_key = f"{row['reference_date']}:{row['issuer_name']}"
+        reviewed_alias = _reviewed_alias_for(
+            reviewed_aliases,
+            source_type="market_cap",
+            source_key=source_key,
+            source_name=str(row["issuer_name"]),
+            effective_date=row["reference_date"],
+        )
+        if reviewed_alias is not None:
+            issuer = classification.filter(
+                pl.col("issuer_id") == reviewed_alias["issuer_id"]
+            ).row(named=True)
+            matched.append(
+                {
+                    "reference_date": row["reference_date"],
+                    "reference_month": row["reference_month"],
+                    "issuer_id": issuer["issuer_id"],
+                    "issuer_name": issuer["issuer_name"],
+                    "market_cap_brl": row["market_cap_brl"],
+                    "matching_method": (
+                        f"REVIEWED_ALIAS_{reviewed_alias['relationship_type']}"
+                    ),
+                    "source_file": row["source_file"],
+                    "source_url": row["source_url"],
+                    "retrieved_at_utc": row["retrieved_at_utc"],
+                    **_reviewed_alias_provenance(reviewed_alias),
                 }
             )
             mapped_names.add(normalized_name)
@@ -1283,7 +1687,11 @@ def reconcile_market_cap(
             )
 
     matched_frame = (
-        pl.from_dicts(matched, infer_schema_length=None)
+        pl.from_dicts(
+            matched,
+            infer_schema_length=None,
+            schema_overrides=REVIEWED_ALIAS_PROVENANCE_SCHEMA,
+        )
         if matched
         else pl.DataFrame(
             schema={
@@ -1296,6 +1704,7 @@ def reconcile_market_cap(
                 "source_file": pl.String,
                 "source_url": pl.String,
                 "retrieved_at_utc": pl.Datetime(time_zone="UTC"),
+                **REVIEWED_ALIAS_PROVENANCE_SCHEMA,
             }
         )
     )
@@ -1473,9 +1882,17 @@ def active_security_days(
 def add_self_excluded_peer_counts(
     active: pl.DataFrame, security_metadata: pl.DataFrame
 ) -> pl.DataFrame:
+    security_metadata = _with_hierarchy_group_keys(security_metadata)
     joined = active.join(
         security_metadata.select(
-            "security_id", "issuer_id", "sector", "subsector", "economic_segment"
+            "security_id",
+            "issuer_id",
+            "sector",
+            "subsector",
+            "economic_segment",
+            "sector_group_key",
+            "subsector_group_key",
+            "economic_segment_group_key",
         ),
         on="security_id",
         how="left",
@@ -1483,9 +1900,9 @@ def add_self_excluded_peer_counts(
     )
     for group, output in (
         ("issuer_id", "same_issuer_peer_count"),
-        ("sector", "same_sector_peer_count"),
-        ("subsector", "same_subsector_peer_count"),
-        ("economic_segment", "same_economic_segment_peer_count"),
+        ("sector_group_key", "same_sector_peer_count"),
+        ("subsector_group_key", "same_subsector_peer_count"),
+        ("economic_segment_group_key", "same_economic_segment_peer_count"),
     ):
         counts = (
             joined.filter(pl.col(group).is_not_null())
@@ -1548,41 +1965,39 @@ def classification_peer_audit(
     security_metadata: pl.DataFrame,
     classification: pl.DataFrame,
 ) -> tuple[dict[str, object], pl.DataFrame]:
-    level_definitions = (
-        ("sector", "same_sector_peer_count"),
-        ("subsector", "same_subsector_peer_count"),
-        ("economic_segment", "same_economic_segment_peer_count"),
-    )
+    security_metadata = _with_hierarchy_group_keys(security_metadata)
     audit: dict[str, object] = {}
     group_rows: list[dict[str, object]] = []
-    for level, peer_column in level_definitions:
-        mapped = security_metadata.filter(pl.col(level).is_not_null())
-        static = mapped.group_by(level).len().rename({"len": "accepted_security_count"})
+    for level, hierarchy_columns in HIERARCHY_LEVELS.items():
+        group_key_column = f"{level}_group_key"
+        peer_column = f"same_{level}_peer_count"
+        mapped = security_metadata.filter(pl.col(group_key_column).is_not_null())
+        static = mapped.group_by(group_key_column).agg(
+            *(pl.col(column).first() for column in hierarchy_columns),
+            pl.len().alias("accepted_security_count"),
+        )
         dynamic = (
-            peers.filter(pl.col(level).is_not_null())
-            .group_by("trade_date", level)
+            peers.filter(pl.col(group_key_column).is_not_null())
+            .group_by("trade_date", group_key_column)
             .len()
             .rename({"len": "active_group_size"})
         )
         level_rows: list[dict[str, object]] = []
-        for row in static.sort(level).to_dicts():
+        for row in static.sort(*hierarchy_columns).to_dicts():
             group_name = str(row[level])
-            sizes = dynamic.filter(pl.col(level) == group_name)[
+            group_key = str(row[group_key_column])
+            sizes = dynamic.filter(pl.col(group_key_column) == group_key)[
                 "active_group_size"
             ].to_list()
-            group_peer_values = peers.filter(pl.col(level) == group_name)[
+            group_peer_values = peers.filter(pl.col(group_key_column) == group_key)[
                 peer_column
             ].to_list()
-            sectors = (
-                security_metadata.filter(pl.col(level) == group_name)["sector"]
-                .drop_nulls()
-                .unique()
-                .sort()
-                .to_list()
-            )
             summary = {
                 "level": level,
-                "sector": " | ".join(str(value) for value in sectors),
+                "group_key": group_key,
+                "sector": row.get("sector"),
+                "subsector": row.get("subsector"),
+                "economic_segment": row.get("economic_segment"),
                 "group": group_name,
                 "accepted_security_count": int(row["accepted_security_count"]),
                 "active_group_size_min": int(min(sizes)) if sizes else 0,
@@ -1643,17 +2058,29 @@ def classification_peer_audit(
             ],
         }
 
-    sector_counts = (
-        classification.group_by("subsector")
-        .agg(pl.col("sector").n_unique().alias("sector_count"))
-        .sort("subsector")
-    )
-    violations = sector_counts.filter(pl.col("sector_count") != 1)
-    audit["subsector_sector_nesting"] = {
-        "every_subsector_belongs_to_exactly_one_sector": violations.is_empty(),
-        "subsector_count": sector_counts.height,
-        "violations": violations.to_dicts(),
-    }
+    collisions: dict[str, list[dict[str, object]]] = {}
+    for level in ("subsector", "economic_segment"):
+        hierarchy_columns = HIERARCHY_LEVELS[level]
+        paths_by_label: dict[str, set[tuple[str, ...]]] = defaultdict(set)
+        for row in classification.select(*hierarchy_columns).unique().to_dicts():
+            paths_by_label[str(row[level])].add(
+                tuple(str(row[column]) for column in hierarchy_columns)
+            )
+        collisions[level] = [
+            {
+                "label": label,
+                "hierarchical_groups": [
+                    {
+                        "group_key": _hierarchy_group_key(path),
+                        **dict(zip(hierarchy_columns, path, strict=True)),
+                    }
+                    for path in sorted(paths)
+                ],
+            }
+            for label, paths in sorted(paths_by_label.items())
+            if len(paths) > 1
+        ]
+    audit["taxonomy_label_collisions"] = collisions
 
     sector = peers["same_sector_peer_count"].to_numpy()
     subsector = peers["same_subsector_peer_count"].to_numpy()
@@ -1683,7 +2110,7 @@ def classification_peer_audit(
     }
     audit["candidate_policy_coverage"] = policies
     group_sizes = pl.from_dicts(group_rows, infer_schema_length=None).sort(
-        "level", "sector", "group"
+        "level", "sector", "subsector", "economic_segment", "group_key"
     )
     return audit, group_sizes
 
@@ -2237,6 +2664,12 @@ def market_cap_audit(
 def _render_markdown(audit: dict[str, object]) -> str:
     classification = audit["classification_and_peer_coverage"]
     policies = classification["candidate_policy_coverage"]
+    exception_breakdown = "; ".join(
+        f"{row['source_type']}/{row['reason']}: "
+        f"{row['unique_exception_count']} exceptions, "
+        f"{row['candidate_row_count']} candidates"
+        for row in audit["mapping_exception_counts_by_source_type_and_reason"]
+    )
     status = (
         "> **COMPLETE:** Official B3 market-cap data passed raw and normalized "
         "publication-readiness checks."
@@ -2262,7 +2695,16 @@ def _render_markdown(audit: dict[str, object]) -> str:
         f"- Eligible security-days: {audit['scope']['eligible_security_day_count']}",
         f"- Accepted securities: {audit['scope']['accepted_security_count']}",
         f"- Exactly classified securities: {audit['scope']['mapped_security_count']}",
-        f"- Mapping exceptions: {audit['mapping_exception_count']}",
+        f"- Unique unresolved mapping exceptions: {audit['mapping_exception_count']}",
+        f"- Mapping-exception candidate rows: "
+        f"{audit['mapping_exception_candidate_row_count']}",
+        f"- Mapping-exception breakdown: {exception_breakdown or 'none'}",
+        f"- Reviewed aliases configured: "
+        f"{audit['reviewed_aliases']['configured_alias_count']}",
+        f"- Security rows mapped by reviewed alias: "
+        f"{audit['reviewed_aliases']['security_rows_mapped_by_reviewed_alias']}",
+        f"- Market-cap rows mapped by reviewed alias: "
+        f"{audit['reviewed_aliases']['market_cap_rows_mapped_by_reviewed_alias']}",
         "",
         "## Peer evidence",
         "",
@@ -2284,8 +2726,13 @@ def _render_markdown(audit: dict[str, object]) -> str:
     lines.extend(
         [
             "",
-            "Subsector-to-sector nesting is one-to-one: "
-            f"**{classification['subsector_sector_nesting']['every_subsector_belongs_to_exactly_one_sector']}**.",
+            "Peer groups use hierarchical identities: sector; sector/subsector; and "
+            "sector/subsector/economic segment.",
+            "",
+            "Reused subsector labels across sectors: "
+            f"**{len(classification['taxonomy_label_collisions']['subsector'])}**.",
+            "Reused economic-segment labels across parent paths: "
+            f"**{len(classification['taxonomy_label_collisions']['economic_segment'])}**.",
             "",
             "## Candidate-policy coverage (evidence only)",
             "",
@@ -2374,19 +2821,28 @@ def validate_raw_sources(
     as_of: date | None = None,
     inputs: FeatureInputs | None = None,
     assignments_loader: Callable[[Path], pl.DataFrame] = load_assignments,
+    reviewed_aliases_path: Path | None = None,
 ) -> dict[str, object]:
     as_of = date.today() if as_of is None else as_of
     inputs = _resolve_feature_inputs() if inputs is None else inputs
     _validate_feature_inputs(inputs)
     classification, raw_market_cap, units, sources = _load_raw_tables(raw_dir)
+    reviewed_aliases = (
+        load_reviewed_aliases(reviewed_aliases_path, classification)
+        if reviewed_aliases_path is not None
+        else _empty_reviewed_aliases()
+    )
     assignments = assignments_loader(inputs.assignments_dir)
     ticker_history = pl.read_parquet(inputs.universe_dir / "ticker_history.parquet")
     security_metadata, _, security_exceptions = reconcile_security_metadata(
-        assignments, ticker_history, classification
+        assignments, ticker_history, classification, reviewed_aliases
     )
     market_cap, market_exceptions, market_stats = reconcile_market_cap(
-        raw_market_cap, classification, security_metadata
+        raw_market_cap, classification, security_metadata, reviewed_aliases
     )
+    alias_audit = reviewed_alias_audit(reviewed_aliases, security_metadata, market_cap)
+    security_exception_audit = mapping_exception_audit(security_exceptions)
+    market_exception_audit = mapping_exception_audit(market_exceptions)
     accepted_issuers = set(
         security_metadata.filter(pl.col("issuer_id").is_not_null())[
             "issuer_id"
@@ -2431,7 +2887,12 @@ def validate_raw_sources(
             "total_normalized_market_cap_issuer_count": market_stats[
                 "total_normalized_market_cap_issuer_count"
             ],
-            "mapping_exception_count": market_exceptions.height,
+            "mapping_exception_count": market_exception_audit[
+                "mapping_exception_count"
+            ],
+            "mapping_exception_candidate_row_count": market_exception_audit[
+                "mapping_exception_candidate_row_count"
+            ],
             "duplicate_issuer_month_groups": market_stats[
                 "duplicate_issuer_month_groups"
             ],
@@ -2443,7 +2904,13 @@ def validate_raw_sources(
             "unit_count": units["unit_ticker"].n_unique(),
             "component_count": units.height,
         },
-        "security_mapping_exception_count": security_exceptions.height,
+        "security_mapping_exception_count": security_exception_audit[
+            "mapping_exception_count"
+        ],
+        "security_mapping_exception_candidate_row_count": security_exception_audit[
+            "mapping_exception_candidate_row_count"
+        ],
+        "reviewed_aliases": alias_audit,
         "sources": [
             {
                 "kind": source.kind,
@@ -2607,26 +3074,36 @@ def build_human_priors(
     assignments_loader: Callable[[Path], pl.DataFrame] = load_assignments,
     repository_state: Callable[[], tuple[str, list[str]]] = _repository_state,
     pointer_publisher: Callable[[Path, Path], None] = _atomic_pointer,
+    reviewed_aliases_path: Path | None = None,
 ) -> Path:
     created_at = datetime.now(UTC) if created_at is None else created_at.astimezone(UTC)
     inputs = _resolve_feature_inputs() if inputs is None else inputs
     _validate_feature_inputs(inputs)
     classification, raw_market_cap, raw_units, raw_sources = _load_raw_tables(raw_dir)
+    reviewed_aliases = (
+        load_reviewed_aliases(reviewed_aliases_path, classification)
+        if reviewed_aliases_path is not None
+        else _empty_reviewed_aliases()
+    )
     assignments = assignments_loader(inputs.assignments_dir)
     ticker_history = pl.read_parquet(inputs.universe_dir / "ticker_history.parquet")
     security_metadata, classification_review, security_exceptions = (
-        reconcile_security_metadata(assignments, ticker_history, classification)
+        reconcile_security_metadata(
+            assignments, ticker_history, classification, reviewed_aliases
+        )
     )
     market_cap, market_exceptions, market_stats = reconcile_market_cap(
-        raw_market_cap, classification, security_metadata
+        raw_market_cap, classification, security_metadata, reviewed_aliases
     )
+    alias_audit = reviewed_alias_audit(reviewed_aliases, security_metadata, market_cap)
     unit_components, unit_exceptions = normalize_unit_components(
         raw_units, classification, security_metadata
     )
     mapping_exceptions = pl.concat(
         [security_exceptions, market_exceptions, unit_exceptions],
         how="vertical_relaxed",
-    ).sort("source_type", "source_key", "candidate_issuer_id")
+    ).sort("source_type", "source_key", "exception_id", "candidate_rank")
+    exception_audit = mapping_exception_audit(mapping_exceptions)
 
     date_index = pl.read_parquet(inputs.feature_store / "date_index.parquet").sort(
         "date_idx"
@@ -2725,7 +3202,8 @@ def build_human_priors(
         "same_issuer": issuer_audit,
         "units": units_audit,
         "market_cap": market_audit,
-        "mapping_exception_count": mapping_exceptions.height,
+        **exception_audit,
+        "reviewed_aliases": alias_audit,
         "grouping_policy_selected": None,
     }
 
@@ -2806,6 +3284,26 @@ def build_human_priors(
             "market_cap_data_ready": market_cap_data_ready,
             "eligible_for_downstream_market_cap_features": market_cap_data_ready,
             "canonical_pointer_published": market_cap_data_ready,
+            "mapping_exception_count": exception_audit["mapping_exception_count"],
+            "mapping_exception_candidate_row_count": exception_audit[
+                "mapping_exception_candidate_row_count"
+            ],
+            "mapping_exception_counts_by_source_type_and_reason": exception_audit[
+                "mapping_exception_counts_by_source_type_and_reason"
+            ],
+            "reviewed_aliases": {
+                **alias_audit,
+                "input_path": (
+                    str(reviewed_aliases_path.resolve())
+                    if reviewed_aliases_path is not None
+                    else None
+                ),
+                "input_sha256": (
+                    _sha256_file(reviewed_aliases_path)
+                    if reviewed_aliases_path is not None
+                    else None
+                ),
+            },
             "official_b3_pages": {
                 "classification": CLASSIFICATION_PAGE_URL,
                 "market_cap_monthly": MARKET_CAP_PAGE_URL,
@@ -2926,6 +3424,11 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
             "publication-readiness checks."
         ),
     )
+    build.add_argument(
+        "--reviewed-aliases",
+        type=Path,
+        help="Explicitly reviewed issuer-alias CSV; fuzzy candidates remain unresolved.",
+    )
     ingest_directory = subparsers.add_parser(
         "ingest-market-cap-dir",
         help="Prevalidate and batch-cache official B3 monthly CSV exports.",
@@ -2936,6 +3439,11 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
         "validate-raw", help="Validate the existing raw cache without network access."
     )
     validate.add_argument("--raw-dir", type=Path, default=RAW_BASE)
+    validate.add_argument(
+        "--reviewed-aliases",
+        type=Path,
+        help="Explicitly reviewed issuer-alias CSV; fuzzy candidates remain unresolved.",
+    )
     instructions = subparsers.add_parser(
         "instructions", help="Print official manual market-cap instructions."
     )
@@ -2960,13 +3468,21 @@ def main(arguments: Sequence[str] | None = None) -> int:
         print(f"validated_and_cached_files: {len(sources)}")
         print(json.dumps(validate_raw_sources(args.raw_dir), indent=2))
     elif args.command == "validate-raw":
-        print(json.dumps(validate_raw_sources(args.raw_dir), indent=2))
+        print(
+            json.dumps(
+                validate_raw_sources(
+                    args.raw_dir, reviewed_aliases_path=args.reviewed_aliases
+                ),
+                indent=2,
+            )
+        )
     elif args.command == "build":
         output = build_human_priors(
             raw_dir=args.raw_dir,
             output_base=args.output_base,
             pointer=args.pointer,
             allow_incomplete_market_cap=args.allow_incomplete_market_cap,
+            reviewed_aliases_path=args.reviewed_aliases,
         )
         audit = json.loads((output / "metadata_audit.json").read_text(encoding="utf-8"))
         market = audit["market_cap"]
