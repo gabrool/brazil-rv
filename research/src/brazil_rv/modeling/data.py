@@ -46,6 +46,8 @@ from .contract import (
     NEURAL_MODELS,
     PATCH_INPUT_WIDTH,
     PATCH_MINUTES,
+    PEER_FEATURE_MODES,
+    PEER_STATE_WIDTH,
     RuntimeSettings,
     SLOW_FEATURE_COUNT,
     TABULAR_FEATURE_COUNT,
@@ -57,6 +59,7 @@ from .contract import (
     TRAIN_START,
     VALIDATION_END,
     VALIDATION_START,
+    validate_peer_feature_mode,
 )
 from .feature_ablation import (
     NO_FEATURE_ABLATION,
@@ -78,6 +81,10 @@ FEATURE_ARRAY_FILES = (
     "global_data_ready.npy",
     "label_mask.npy",
     "raw_returns.npy",
+)
+PEER_ARRAY_FILES = (
+    "equity_peer_features.npy",
+    "equity_peer_valid.npy",
 )
 CACHE_BUFFER_BYTES = 64 * 1024**2
 
@@ -275,17 +282,24 @@ def split_sample_index(sample_index: pl.DataFrame) -> dict[str, pl.DataFrame]:
     }
 
 
-def warm_feature_store_cache(store: Path) -> CacheWarmupReport:
+def warm_feature_store_cache(
+    store: Path, peer_features: str = "none"
+) -> CacheWarmupReport:
+    if peer_features not in PEER_FEATURE_MODES:
+        raise ValueError(f"Invalid peer-feature mode: {peer_features}")
+    filenames = FEATURE_ARRAY_FILES + (
+        PEER_ARRAY_FILES if peer_features != "none" else ()
+    )
     started = time.perf_counter()
     buffer = bytearray(CACHE_BUFFER_BYTES)
     bytes_read = 0
-    for filename in FEATURE_ARRAY_FILES:
+    for filename in filenames:
         with (store / filename).open("rb", buffering=0) as source:
             while read_count := source.readinto(buffer):
                 bytes_read += read_count
     return CacheWarmupReport(
         bytes_read=bytes_read,
-        files_read=len(FEATURE_ARRAY_FILES),
+        files_read=len(filenames),
         seconds=time.perf_counter() - started,
     )
 
@@ -346,6 +360,53 @@ def _common_batch(
         rows["date_idx"][positions].astype(np.int64, copy=False),
         rows["decision_idx"][positions].astype(np.int64, copy=False),
     )
+
+
+def _build_peer_state(
+    arrays: dict[str, np.ndarray],
+    date_idx: np.ndarray,
+    equity_cutoffs: np.ndarray,
+    active_equities: np.ndarray,
+    peer_features: str,
+) -> np.ndarray:
+    batch_size = date_idx.size
+    state = np.zeros((batch_size, EQUITY_COUNT, PEER_STATE_WIDTH), dtype=np.float32)
+    if peer_features == "masked_control":
+        return state
+    if peer_features not in ("selected", "selected_plus_issuer"):
+        raise ValueError(f"Invalid peer-feature batch mode: {peer_features}")
+
+    for equity_cutoff in np.unique(equity_cutoffs):
+        group = np.flatnonzero(equity_cutoffs == equity_cutoff)
+        feature_minute_idx = int(equity_cutoff) - 1
+        numeric = np.asarray(
+            arrays["equity_peer_features.npy"][
+                date_idx[group], :, feature_minute_idx, :
+            ],
+            dtype=np.float32,
+        )
+        valid = np.asarray(
+            arrays["equity_peer_valid.npy"][date_idx[group], :, feature_minute_idx, :],
+            dtype=bool,
+        )
+        selected_15 = valid[..., 0]
+        selected_60 = valid[..., 1]
+        state[group, :, 0] = np.where(selected_15, numeric[..., 0], 0.0)
+        state[group, :, 1] = np.where(selected_60, numeric[..., 1], 0.0)
+        state[group, :, 2] = np.where(selected_15, numeric[..., 2], 0.0)
+        state[group, :, 3] = np.where(selected_60, numeric[..., 3], 0.0)
+        state[group, :, 4] = selected_15
+        state[group, :, 5] = selected_60
+        if peer_features == "selected_plus_issuer":
+            issuer_15 = valid[..., 2]
+            issuer_60 = valid[..., 3]
+            state[group, :, 6] = np.where(issuer_15, numeric[..., 4], 0.0)
+            state[group, :, 7] = np.where(issuer_60, numeric[..., 5], 0.0)
+            state[group, :, 8] = issuer_15
+            state[group, :, 9] = issuer_60
+
+    state *= active_equities[..., None]
+    return state
 
 
 def _build_patch_batch(
@@ -664,6 +725,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         tcn_architecture: TCNArchitecture | None = None,
         context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
         feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
+        peer_features: str = "none",
     ) -> None:
         if model_name not in NEURAL_MODELS:
             raise ValueError(
@@ -690,12 +752,14 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             raise ValueError("Context-free models do not accept context ablations")
         if context_ablation.key != "none" and global_context != "enabled":
             raise ValueError("Context ablations require enabled global context")
+        peer_features = validate_peer_feature_mode(model_name, peer_features)
         self.store = store
         self.model_name = model_name
         self.needs_context = needs_context
         self.global_context = global_context
         self.context_ablation = context_ablation
         self.feature_ablation = feature_ablation
+        self.peer_features = peer_features
         self.rows = {
             column: np.asarray(sample_index.get_column(column).to_list())
             for column in (
@@ -727,6 +791,8 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                     if not name.startswith(("context_", "global_"))
                 )
             )
+            if self.peer_features != "none":
+                filenames = (*filenames, *PEER_ARRAY_FILES)
             self._arrays = {
                 filename: np.load(
                     self.store / filename, mmap_mode="r", allow_pickle=False
@@ -772,6 +838,15 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 self.context_ablation,
                 self.feature_ablation,
             )
+            if self.peer_features != "none":
+                inputs["peer_state"] = _build_peer_state(
+                    arrays,
+                    source_date_idx,
+                    equity_cutoffs,
+                    active_equities,
+                    self.peer_features,
+                )
+                inputs["peer_state"][~common["sample_valid_mask"]] = 0.0
         return {**inputs, **common}
 
 
@@ -950,6 +1025,7 @@ def create_training_loaders(
     tcn_architecture: TCNArchitecture | None = None,
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
     feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
+    peer_features: str = "none",
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
@@ -965,6 +1041,7 @@ def create_training_loaders(
             tcn_architecture,
             context_ablation,
             feature_ablation,
+            peer_features,
         ),
         sampler,
         runtime,
@@ -979,6 +1056,7 @@ def create_training_loaders(
             tcn_architecture,
             context_ablation,
             feature_ablation,
+            peer_features,
         ),
         SequentialPaddedBatchSampler(
             validation_rows.height, runtime.evaluation_batch_size
@@ -999,6 +1077,7 @@ def create_evaluation_loader(
     tcn_architecture: TCNArchitecture | None = None,
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
     feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
+    peer_features: str = "none",
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
         VectorizedFeatureDataset(
@@ -1009,6 +1088,7 @@ def create_evaluation_loader(
             tcn_architecture,
             context_ablation,
             feature_ablation,
+            peer_features,
         ),
         SequentialPaddedBatchSampler(rows.height, runtime.evaluation_batch_size),
         runtime,

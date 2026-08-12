@@ -841,6 +841,7 @@ def _completed_run(
             ),
         },
         "parameter_count": configuration["parameter_count"],
+        "peer_features": configuration["peer_features"],
         "optimizer_variant": configuration["optimizer_variant"],
         "objective": configuration["objective"],
         "sam": configuration["sam"],

@@ -20,6 +20,7 @@ from .contract import (
     TRANSFORMER_MODELS,
     TCNArchitecture,
     TransformerArchitecture,
+    validate_peer_feature_mode,
     architecture_for_model,
 )
 from .layers import (
@@ -230,10 +231,13 @@ class TargetedCrossAssetTransformer(nn.Module):
 
 
 def build_neural_model(
-    model_name: str, tcn_architecture: TCNArchitecture | None = None
+    model_name: str,
+    tcn_architecture: TCNArchitecture | None = None,
+    peer_features: str = "none",
 ) -> nn.Module:
     if model_name not in NEURAL_MODELS:
         raise ValueError(f"Unknown neural model: {model_name}")
+    peer_features = validate_peer_feature_mode(model_name, peer_features)
     if model_name in TRANSFORMER_MODELS:
         if tcn_architecture is not None:
             raise ValueError(f"TCN architecture is forbidden for model {model_name}")
@@ -243,7 +247,7 @@ def build_neural_model(
     if model_name == "tcn":
         if tcn_architecture is None:
             raise ValueError("TCN architecture is required for model tcn")
-        return SharedCausalTCN(tcn_architecture)
+        return SharedCausalTCN(tcn_architecture, peer_features)
     if tcn_architecture is not None:
         raise ValueError("TCN architecture is forbidden for model mlp")
     return ResidualTabularMLP()

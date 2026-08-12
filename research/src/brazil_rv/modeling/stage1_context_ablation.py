@@ -25,6 +25,7 @@ from .contract import (
     TCNSettings,
     architecture_for_model,
     expected_trainable_parameter_count,
+    peer_feature_metadata,
 )
 from .data import resolve_feature_store, validate_feature_store
 from .engine import objective_metadata, sam_metadata
@@ -61,6 +62,8 @@ def build_stage1_command(key: str) -> tuple[str, ...]:
         "full",
         "--tcn-block",
         "swiglu",
+        "--peer-features",
+        "none",
         "--optimizer",
         "sam_adamw",
         "--objective",
@@ -126,6 +129,7 @@ def _configuration(commit: str, feature_store: Path) -> dict[str, object]:
         "model_name": "tcn",
         "tcn_settings": asdict(STAGE1_TCN_SETTINGS),
         "parameter_count": expected_trainable_parameter_count("tcn", architecture),
+        "peer_features": peer_feature_metadata("tcn", architecture, "none"),
         "optimizer_variant": "sam_adamw",
         "objective": objective_metadata("soft_spearman", STAGE1_TEMPERATURE),
         "sam": sam_metadata("sam_adamw", STAGE1_SAM_RHO),
@@ -202,6 +206,7 @@ def validate_completed_run(
         "model_family": "tcn",
         "tcn_settings": configuration["tcn_settings"],
         "parameter_count": configuration["parameter_count"],
+        "peer_features": configuration["peer_features"],
         "optimizer_variant": configuration["optimizer_variant"],
         "objective": configuration["objective"],
         "sam": configuration["sam"],

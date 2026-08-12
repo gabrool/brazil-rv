@@ -30,6 +30,7 @@ from .contract import (
     architecture_for_model,
     expected_trainable_parameter_count,
     model_consumes_context,
+    peer_feature_metadata,
 )
 from .data import (
     create_evaluation_loader,
@@ -74,6 +75,7 @@ _CHECKPOINT_IDENTITY_FIELDS = (
     "tcn_settings",
     "architecture_constants",
     "parameter_count",
+    "peer_features",
     "feature_manifest_contract_version",
     "global_context",
     "global_context_source_hashes",
@@ -303,6 +305,26 @@ def _architecture_from_identity(
     return architecture_for_model(model_name, settings)
 
 
+def _validate_peer_feature_identity(
+    identity: dict[str, object], architecture: NeuralArchitecture | None = None
+) -> str:
+    metadata = identity.get("peer_features")
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("mode"), str):
+        raise ValueError("Peer-feature identity metadata is missing")
+    model_name = str(identity["model_name"])
+    if model_name in NEURAL_MODELS and architecture is None:
+        architecture = _architecture_from_identity(identity)
+    try:
+        expected = peer_feature_metadata(
+            model_name, architecture, str(metadata["mode"])
+        )
+    except ValueError as error:
+        raise ValueError("Invalid peer-feature identity metadata") from error
+    if _canonical_json_identity(metadata) != _canonical_json_identity(expected):
+        raise ValueError("Invalid peer-feature identity metadata")
+    return str(metadata["mode"])
+
+
 def _validate_architecture_identity(identity: dict[str, object]) -> None:
     model_name = str(identity["model_name"])
     architecture = _architecture_from_identity(identity)
@@ -310,8 +332,9 @@ def _validate_architecture_identity(identity: dict[str, object]) -> None:
     recorded = _canonical_json_identity(identity["architecture_constants"])
     if recorded != expected:
         raise ValueError(f"Invalid architecture metadata for model: {model_name}")
+    peer_mode = _validate_peer_feature_identity(identity, architecture)
     expected_parameter_count = expected_trainable_parameter_count(
-        model_name, architecture
+        model_name, architecture, peer_mode
     )
     if identity.get("parameter_count") != expected_parameter_count:
         raise ValueError(f"Invalid parameter count for model: {model_name}")
@@ -415,6 +438,8 @@ def _validate_xgboost_identity(
         or manifest.get("model_family") != "xgboost"
     ):
         raise ValueError("Invalid XGBoost run identity")
+    if _validate_peer_feature_identity(manifest) != "none":
+        raise ValueError("XGBoost peer-feature mode must be none")
     if manifest.get("seed") not in ALLOWED_SEEDS:
         raise ValueError("Invalid XGBoost run seed identity")
     commit_sha = manifest.get("git_commit_sha")
@@ -543,6 +568,7 @@ def collect_neural_evaluation(
         run_dir=Path(str(manifest["run_dir"])),
     )
     architecture = _architecture_from_identity(checkpoint)
+    peer_mode = _validate_peer_feature_identity(checkpoint, architecture)
     tcn_architecture = (
         architecture if isinstance(architecture, TCNArchitecture) else None
     )
@@ -567,8 +593,9 @@ def collect_neural_evaluation(
         tcn_architecture,
         context_ablation,
         feature_ablation,
+        peer_mode,
     )
-    model = build_neural_model(model_name, tcn_architecture)
+    model = build_neural_model(model_name, tcn_architecture, peer_mode)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to("cuda")
     eager_reference = clone_eager_reference_model(model)
@@ -650,7 +677,8 @@ def main() -> None:
     sample_index = validate_feature_store(feature_store)
     training_rows = select_sample_split(sample_index, "train")
     rows = select_sample_split(sample_index, args.split)
-    cache_report = warm_feature_store_cache(feature_store)
+    peer_mode = _validate_peer_feature_identity(manifest)
+    cache_report = warm_feature_store_cache(feature_store, peer_mode)
 
     created_at = datetime.now(timezone.utc)
     evaluation_dir = (

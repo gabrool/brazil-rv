@@ -24,6 +24,7 @@ from brazil_rv.modeling.contract import (
     HORIZON_COUNT,
     INSTRUMENT_COUNT,
     PATCH_INPUT_WIDTH,
+    PEER_STATE_ORDER,
     SLOW_FEATURE_COUNT,
     TABULAR_FEATURE_COUNT,
     TABULAR_OFFSETS,
@@ -39,11 +40,13 @@ from brazil_rv.modeling.data import (
     BatchRequest,
     DateStratifiedMicrobatchSampler,
     FEATURE_ARRAY_FILES,
+    PEER_ARRAY_FILES,
     SequentialPaddedBatchSampler,
     TabularRowIterator,
     VectorizedFeatureDataset,
     _validate_sample_index,
     split_sample_index,
+    warm_feature_store_cache,
 )
 from brazil_rv.preprocessing.peer_features import validate_peer_arrays
 
@@ -346,6 +349,7 @@ def test_current_model_batches_ignore_peer_arrays(tmp_path: Path) -> None:
     ]
     assert "equity_peer_features.npy" not in FEATURE_ARRAY_FILES
     assert "equity_peer_valid.npy" not in FEATURE_ARRAY_FILES
+    assert "peer_state" not in baseline
     peer_features = np.load(store / "equity_peer_features.npy", mmap_mode="r+")
     peer_valid = np.load(store / "equity_peer_valid.npy", mmap_mode="r+")
     peer_features[...] = 1_000_000.0
@@ -357,6 +361,143 @@ def test_current_model_batches_ignore_peer_arrays(tmp_path: Path) -> None:
     ]
     for key in baseline:
         np.testing.assert_array_equal(changed[key], baseline[key])
+
+
+def test_cache_warming_reads_peer_arrays_only_for_enabled_modes(tmp_path: Path) -> None:
+    store, _ = _synthetic_store(tmp_path)
+    legacy = warm_feature_store_cache(store, "none")
+    selected = warm_feature_store_cache(store, "selected")
+    peer_bytes = sum((store / filename).stat().st_size for filename in PEER_ARRAY_FILES)
+    assert legacy.files_read == len(FEATURE_ARRAY_FILES)
+    assert selected.files_read == len(FEATURE_ARRAY_FILES) + len(PEER_ARRAY_FILES)
+    assert selected.bytes_read == legacy.bytes_read + peer_bytes
+
+
+def _peer_tcn_dataset(
+    store: Path, rows: pl.DataFrame, mode: str
+) -> VectorizedFeatureDataset:
+    architecture = resolve_tcn_architecture(
+        TCNSettings("context_only", 64, "short", "gelu")
+    )
+    return VectorizedFeatureDataset(
+        store,
+        rows,
+        "tcn",
+        "enabled",
+        architecture,
+        peer_features=mode,
+    )
+
+
+def test_peer_state_modes_use_exact_order_masks_and_zero_domains(
+    tmp_path: Path,
+) -> None:
+    store, rows = _synthetic_store(tmp_path)
+    numeric = np.load(store / "equity_peer_features.npy", mmap_mode="r+")
+    valid = np.load(store / "equity_peer_valid.npy", mmap_mode="r+")
+    numeric[...] = 7.0
+    valid[...] = False
+    numeric[0, 0, 14] = np.asarray([0.1, np.nan, 0.3, np.nan, 0.5, np.nan])
+    valid[0, 0, 14] = np.asarray([True, False, True, False])
+    numeric.flush()
+    valid.flush()
+    request = BatchRequest(indices=(0, 1), valid_count=1)
+
+    assert PEER_STATE_ORDER == (
+        "return_vs_selected_peer_median_15m",
+        "return_vs_selected_peer_median_60m",
+        "selected_peer_return_rank_15m",
+        "selected_peer_return_rank_60m",
+        "selected_peer_15m_valid",
+        "selected_peer_60m_valid",
+        "return_vs_issuer_peer_median_15m",
+        "return_vs_issuer_peer_median_60m",
+        "issuer_peer_15m_valid",
+        "issuer_peer_60m_valid",
+    )
+    expected = {
+        "masked_control": np.zeros(10, dtype=np.float32),
+        "selected": np.asarray(
+            [0.1, 0.0, 0.3, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            dtype=np.float32,
+        ),
+        "selected_plus_issuer": np.asarray(
+            [0.1, 0.0, 0.3, 0.0, 1.0, 0.0, 0.5, 0.0, 1.0, 0.0],
+            dtype=np.float32,
+        ),
+    }
+    for mode, expected_state in expected.items():
+        dataset = _peer_tcn_dataset(store, rows, mode)
+        batch = dataset[request]
+        assert batch["peer_state"].shape == (2, EQUITY_COUNT, 10)
+        assert batch["peer_state"].dtype == np.float32
+        np.testing.assert_array_equal(batch["peer_state"][0, 0], expected_state)
+        assert not batch["peer_state"][0, 1].any()
+        assert not batch["peer_state"][0, 2:].any()
+        assert not batch["peer_state"][1].any()
+        assert dataset._arrays is not None
+        assert "equity_peer_features.npy" in dataset._arrays
+        assert "equity_peer_valid.npy" in dataset._arrays
+
+
+def test_first_decision_represents_unavailable_peer_windows_explicitly(
+    tmp_path: Path,
+) -> None:
+    store, rows = _synthetic_store(tmp_path)
+    valid = np.load(store / "equity_peer_valid.npy", mmap_mode="r+")
+    valid[0, :, 14] = False
+    valid.flush()
+    state = _peer_tcn_dataset(store, rows, "selected_plus_issuer")[
+        BatchRequest(indices=(0,), valid_count=1)
+    ]["peer_state"]
+    assert not state.any()
+
+
+def test_peer_state_reads_cutoff_minus_one_and_never_future_minutes(
+    tmp_path: Path,
+) -> None:
+    store, rows = _synthetic_store(tmp_path)
+    request = BatchRequest(indices=(0,), valid_count=1)
+    baseline = _peer_tcn_dataset(store, rows, "selected")[request]["peer_state"]
+    numeric = np.load(store / "equity_peer_features.npy", mmap_mode="r+")
+    valid = np.load(store / "equity_peer_valid.npy", mmap_mode="r+")
+    numeric[0, :, 15:] = -9.0
+    valid[0, :, 15:] = False
+    numeric.flush()
+    valid.flush()
+    future_changed = _peer_tcn_dataset(store, rows, "selected")[request]["peer_state"]
+    np.testing.assert_array_equal(future_changed, baseline)
+
+    numeric[0, 0, 14, 0] = 0.75
+    valid[0, 0, 14, 0] = True
+    numeric.flush()
+    valid.flush()
+    current_changed = _peer_tcn_dataset(store, rows, "selected")[request]["peer_state"]
+    assert current_changed[0, 0, 0] == np.float32(0.75)
+    assert not np.array_equal(current_changed, baseline)
+
+
+def test_selected_mode_ignores_issuer_data_while_plus_issuer_consumes_it(
+    tmp_path: Path,
+) -> None:
+    store, rows = _synthetic_store(tmp_path)
+    request = BatchRequest(indices=(0,), valid_count=1)
+    selected_before = _peer_tcn_dataset(store, rows, "selected")[request]["peer_state"]
+    plus_before = _peer_tcn_dataset(store, rows, "selected_plus_issuer")[request][
+        "peer_state"
+    ]
+    numeric = np.load(store / "equity_peer_features.npy", mmap_mode="r+")
+    valid = np.load(store / "equity_peer_valid.npy", mmap_mode="r+")
+    numeric[0, :, 14, 4:] = 0.875
+    valid[0, :, 14, 2:] = True
+    numeric.flush()
+    valid.flush()
+    selected_after = _peer_tcn_dataset(store, rows, "selected")[request]["peer_state"]
+    plus_after = _peer_tcn_dataset(store, rows, "selected_plus_issuer")[request][
+        "peer_state"
+    ]
+    np.testing.assert_array_equal(selected_after, selected_before)
+    assert not np.array_equal(plus_after, plus_before)
 
 
 def test_vectorized_future_prefix_isolation(tmp_path: Path) -> None:

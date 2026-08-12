@@ -13,12 +13,14 @@ from .contract import (
     MLP_DEPTH,
     MLP_SWIGLU_WIDTH,
     MLP_WIDTH,
+    PEER_STATE_WIDTH,
     RESIDUAL_DROPOUT,
     RMS_NORM_EPS,
     TABULAR_FEATURE_COUNT,
     TARGETED_FUSION_GATE_BIAS,
     STATE_TOKEN_SLOT,
     TCNArchitecture,
+    validate_peer_feature_mode,
 )
 from .layers import CausalTCNResidualBlock, MuonLinear, SwiGLU
 
@@ -26,9 +28,12 @@ from .layers import CausalTCNResidualBlock, MuonLinear, SwiGLU
 class SharedCausalTCN(nn.Module):
     model_name = "tcn"
 
-    def __init__(self, architecture: TCNArchitecture) -> None:
+    def __init__(
+        self, architecture: TCNArchitecture, peer_features: str = "none"
+    ) -> None:
         super().__init__()
         self.architecture = architecture
+        self.peer_features = validate_peer_feature_mode(self.model_name, peer_features)
         width = architecture.width
         self.input_projection = nn.Linear(
             architecture.patch_input_width, width, bias=False
@@ -65,6 +70,10 @@ class SharedCausalTCN(nn.Module):
         if architecture.fusion_mode != "none":
             nn.init.zeros_(self.fusion_gate.weight)
             nn.init.constant_(self.fusion_gate.bias, TARGETED_FUSION_GATE_BIAS)
+        self.peer_adapter: nn.Linear | None = None
+        if self.peer_features != "none":
+            self.peer_adapter = nn.Linear(PEER_STATE_WIDTH, width, bias=False)
+            nn.init.zeros_(self.peer_adapter.weight)
 
     @staticmethod
     def _initialize_module(module: nn.Module) -> None:
@@ -125,12 +134,26 @@ class SharedCausalTCN(nn.Module):
         instrument_mask: torch.Tensor,
         slow_features: torch.Tensor,
         state_position: torch.Tensor,
+        peer_state: torch.Tensor | None = None,
     ) -> torch.Tensor:
         states = self._instrument_states(
             patches, history_patch_mask, slow_features, state_position
         )
         equity_states = states[:, :EQUITY_COUNT]
         equity_mask = instrument_mask[:, :EQUITY_COUNT]
+        if self.peer_adapter is None:
+            if peer_state is not None:
+                raise ValueError("Peer state is forbidden when peer features are none")
+        else:
+            if peer_state is None:
+                raise ValueError("Peer state is required for peer-enabled TCN")
+            if peer_state.shape != (
+                equity_states.shape[0],
+                EQUITY_COUNT,
+                PEER_STATE_WIDTH,
+            ):
+                raise ValueError("Peer state has the wrong shape")
+            equity_states = equity_states + self.peer_adapter(peer_state)
         fusion_mode = self.architecture.fusion_mode
         if fusion_mode != "none":
             shared_parts: list[torch.Tensor] = []

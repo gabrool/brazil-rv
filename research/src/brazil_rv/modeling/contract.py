@@ -189,6 +189,38 @@ TCN_KERNEL_SIZE = 3
 TCN_FUSIONS = ("none", "context_only", "pooled_market", "context_pooled")
 TCN_WIDTHS = (64, 128, 192, 256)
 TCN_BLOCK_VARIANTS = ("gelu", "silu", "swiglu")
+PEER_FEATURE_MODES = (
+    "none",
+    "masked_control",
+    "selected",
+    "selected_plus_issuer",
+)
+PEER_STATE_WIDTH = 10
+PEER_NUMERIC_SOURCE_CHANNELS = (
+    "return_vs_selected_peer_median_15m",
+    "return_vs_selected_peer_median_60m",
+    "selected_peer_return_rank_15m",
+    "selected_peer_return_rank_60m",
+    "return_vs_issuer_peer_median_15m",
+    "return_vs_issuer_peer_median_60m",
+)
+PEER_VALIDITY_SOURCE_CHANNELS = (
+    "selected_peer_15m_valid",
+    "selected_peer_60m_valid",
+    "issuer_peer_15m_valid",
+    "issuer_peer_60m_valid",
+)
+PEER_STATE_ORDER = (
+    *PEER_NUMERIC_SOURCE_CHANNELS[:4],
+    *PEER_VALIDITY_SOURCE_CHANNELS[:2],
+    *PEER_NUMERIC_SOURCE_CHANNELS[4:],
+    *PEER_VALIDITY_SOURCE_CHANNELS[2:],
+)
+PEER_DECISION_MINUTE_RULE = "equity_cutoff_index - 1"
+PEER_INJECTION_POINT = (
+    "additive residual into equity states after temporal state construction and "
+    "before existing TCN fusion and prediction head"
+)
 TCN_RECEPTIVE_FIELDS: Mapping[str, tuple[int, ...]] = MappingProxyType(
     {
         "short": (1, 1, 1, 1, 1, 2),
@@ -590,6 +622,14 @@ def model_consumes_context(
     raise ValueError(f"Unknown model: {model_name}")
 
 
+def validate_peer_feature_mode(model_name: str, mode: str) -> str:
+    if mode not in PEER_FEATURE_MODES:
+        raise ValueError(f"Invalid peer-feature mode: {mode}")
+    if mode != "none" and model_name != "tcn":
+        raise ValueError("Peer features are supported only for model tcn")
+    return mode
+
+
 def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
     if settings.fusion not in TCN_FUSIONS:
         raise ValueError(f"Invalid TCN fusion: {settings.fusion}")
@@ -650,10 +690,50 @@ def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
     )
 
 
+def peer_feature_metadata(
+    model_name: str,
+    architecture: NeuralArchitecture | None,
+    mode: str,
+) -> dict[str, object]:
+    mode = validate_peer_feature_mode(model_name, mode)
+    enabled = mode != "none"
+    if enabled and not isinstance(architecture, TCNArchitecture):
+        raise ValueError("Peer-enabled TCN architecture metadata is missing")
+    return {
+        "schema_version": "TCN_PEER_STATE_V1",
+        "mode": mode,
+        "source_arrays": {
+            "numeric": "equity_peer_features.npy",
+            "validity": "equity_peer_valid.npy",
+        },
+        "source_numeric_channels": list(PEER_NUMERIC_SOURCE_CHANNELS),
+        "source_validity_channels": list(PEER_VALIDITY_SOURCE_CHANNELS),
+        "state_order": list(PEER_STATE_ORDER),
+        "decision_minute_rule": PEER_DECISION_MINUTE_RULE,
+        "state_width": PEER_STATE_WIDTH,
+        "reads_peer_arrays": enabled,
+        "selected_channels_enabled": mode in ("selected", "selected_plus_issuer"),
+        "issuer_channels_enabled": mode == "selected_plus_issuer",
+        "adapter": (
+            None
+            if not enabled
+            else {
+                "input_width": PEER_STATE_WIDTH,
+                "output_width": architecture.width,
+                "bias": False,
+                "zero_initialized": True,
+                "injection_point": PEER_INJECTION_POINT,
+            }
+        ),
+    }
+
+
 def expected_trainable_parameter_count(
     model_name: str,
     architecture: TransformerArchitecture | TCNArchitecture | MLPArchitecture,
+    peer_features: str = "none",
 ) -> int:
+    peer_features = validate_peer_feature_mode(model_name, peer_features)
     if isinstance(architecture, TCNArchitecture):
         width = architecture.width
         if architecture.block == "swiglu":
@@ -681,6 +761,8 @@ def expected_trainable_parameter_count(
                 + width
                 + 2 * width
             )
+        if peer_features != "none":
+            count += PEER_STATE_WIDTH * width
         return count
     return EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_name]
 

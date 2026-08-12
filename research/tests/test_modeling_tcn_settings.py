@@ -15,6 +15,8 @@ from brazil_rv.modeling.contract import (
     EQUITY_COUNT,
     INSTRUMENT_COUNT,
     PATCH_INPUT_WIDTH,
+    PEER_FEATURE_MODES,
+    PEER_STATE_WIDTH,
     SLOW_FEATURE_COUNT,
     TCN_BLOCK_VARIANTS,
     TCN_FUSIONS,
@@ -222,6 +224,112 @@ def test_tcn_parameter_counts_increase_strictly_with_width() -> None:
         ]
         assert counts == sorted(counts)
         assert len(set(counts)) == len(counts)
+
+
+@pytest.mark.parametrize("fusion", ("context_only", "context_pooled"))
+@pytest.mark.parametrize("peer_mode", PEER_FEATURE_MODES[1:])
+def test_peer_adapter_preserves_incumbent_initialization_and_predictions(
+    fusion: str, peer_mode: str
+) -> None:
+    settings = TCNSettings(fusion, 64, "short", "gelu")
+    architecture = resolve_tcn_architecture(settings)
+    torch.manual_seed(41)
+    legacy = build_neural_model("tcn", architecture, "none").eval()
+    torch.manual_seed(41)
+    selected = build_neural_model("tcn", architecture, peer_mode).eval()
+    common = set(legacy.state_dict())
+    assert set(selected.state_dict()) == {*common, "peer_adapter.weight"}
+    for name in common:
+        torch.testing.assert_close(
+            selected.state_dict()[name], legacy.state_dict()[name], atol=0.0, rtol=0.0
+        )
+    assert selected.peer_adapter is not None
+    assert torch.count_nonzero(selected.peer_adapter.weight) == 0
+
+    inputs = _inputs()
+    peer_state = torch.randn(1, EQUITY_COUNT, PEER_STATE_WIDTH)
+    peer_state[:, 4:, :] = 0.0
+    with torch.no_grad():
+        legacy_predictions = _forward(legacy, inputs)
+        selected_predictions = selected(
+            inputs["patches"],
+            inputs["history_patch_mask"],
+            inputs["instrument_mask"],
+            inputs["slow_features"],
+            inputs["state_position"],
+            peer_state,
+        )
+    torch.testing.assert_close(
+        selected_predictions, legacy_predictions, atol=0.0, rtol=0.0
+    )
+
+
+def test_peer_enabled_tcn_keeps_inactive_predictions_at_exact_zero() -> None:
+    architecture = resolve_tcn_architecture(
+        TCNSettings("context_pooled", 64, "short", "gelu")
+    )
+    model = build_neural_model("tcn", architecture, "selected_plus_issuer").eval()
+    assert model.peer_adapter is not None
+    with torch.no_grad():
+        model.peer_adapter.weight.fill_(0.25)
+    inputs = _inputs()
+    peer_state = torch.ones(1, EQUITY_COUNT, PEER_STATE_WIDTH)
+    with torch.no_grad():
+        predictions = model(
+            inputs["patches"],
+            inputs["history_patch_mask"],
+            inputs["instrument_mask"],
+            inputs["slow_features"],
+            inputs["state_position"],
+            peer_state,
+        )
+    inactive = ~inputs["instrument_mask"][:, :EQUITY_COUNT]
+    assert torch.equal(predictions[inactive], torch.zeros_like(predictions[inactive]))
+
+
+def test_all_enabled_peer_modes_match_counts_and_gradient_semantics() -> None:
+    settings = TCNSettings("context_pooled", 64, "short", "gelu")
+    architecture = resolve_tcn_architecture(settings)
+    legacy_count = expected_trainable_parameter_count("tcn", architecture, "none")
+    enabled_counts = {
+        expected_trainable_parameter_count("tcn", architecture, mode)
+        for mode in PEER_FEATURE_MODES
+        if mode != "none"
+    }
+    assert enabled_counts == {legacy_count + PEER_STATE_WIDTH * architecture.width}
+
+    inputs = _inputs()
+    real_state = torch.zeros(1, EQUITY_COUNT, PEER_STATE_WIDTH)
+    real_state[:, :4] = torch.randn(1, 4, PEER_STATE_WIDTH)
+    real_model = build_neural_model("tcn", architecture, "selected")
+    real_predictions = real_model(
+        inputs["patches"],
+        inputs["history_patch_mask"],
+        inputs["instrument_mask"],
+        inputs["slow_features"],
+        inputs["state_position"],
+        real_state,
+    )
+    real_predictions.square().sum().backward()
+    assert real_model.peer_adapter is not None
+    assert torch.count_nonzero(real_model.peer_adapter.weight.grad) > 0
+
+    control_model = build_neural_model("tcn", architecture, "masked_control")
+    before = control_model.peer_adapter.weight.detach().clone()
+    control_predictions = control_model(
+        inputs["patches"],
+        inputs["history_patch_mask"],
+        inputs["instrument_mask"],
+        inputs["slow_features"],
+        inputs["state_position"],
+        torch.zeros_like(real_state),
+    )
+    control_predictions.square().sum().backward()
+    assert torch.count_nonzero(control_model.peer_adapter.weight.grad) == 0
+    torch.optim.SGD(control_model.parameters(), lr=0.1).step()
+    torch.testing.assert_close(
+        control_model.peer_adapter.weight, before, atol=0, rtol=0
+    )
 
 
 def test_none_has_no_fusion_modules() -> None:
@@ -549,6 +657,79 @@ def test_cli_accepts_every_legal_tcn_setting() -> None:
     for settings in LEGAL_SETTINGS:
         args = train.parse_args(_tcn_cli(settings))
         assert train._tcn_settings_from_args(args) == settings
+
+
+def test_peer_cli_defaults_to_none_and_accepts_exact_tcn_modes() -> None:
+    default = train.parse_args(_tcn_cli(BASELINE_TCN_SETTINGS))
+    assert default.peer_features == "none"
+    for mode in PEER_FEATURE_MODES[1:]:
+        args = train.parse_args(
+            [*_tcn_cli(BASELINE_TCN_SETTINGS), "--peer-features", mode]
+        )
+        assert args.peer_features == mode
+
+
+@pytest.mark.parametrize(
+    "model_name",
+    (
+        "temporal_only",
+        "context_only",
+        "pooled_market",
+        "context_pooled",
+        "mlp",
+        "xgboost",
+    ),
+)
+def test_peer_cli_rejects_non_tcn_models(
+    model_name: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    arguments = ["--model", model_name, "--seed", "11", "--peer-features", "selected"]
+    if model_name != "xgboost":
+        arguments.extend(["--optimizer", "adamw", "--soft-rank-temperature", "0.10"])
+    with pytest.raises(SystemExit):
+        train.parse_args(arguments)
+    assert "supported only for --model tcn" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "model_name",
+    ("temporal_only", "context_only", "pooled_market", "context_pooled", "mlp"),
+)
+def test_direct_model_construction_rejects_non_tcn_peer_modes(
+    model_name: str,
+) -> None:
+    with pytest.raises(ValueError, match="supported only for model tcn"):
+        build_neural_model(model_name, peer_features="selected")
+
+
+def test_run_names_and_metadata_distinguish_peer_modes() -> None:
+    created_at = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    architecture = resolve_tcn_architecture(BASELINE_TCN_SETTINGS)
+    names = {
+        mode: train._run_directory_name(
+            "tcn",
+            BASELINE_TCN_SETTINGS,
+            "adamw",
+            "soft_spearman",
+            0.1,
+            None,
+            "enabled",
+            11,
+            created_at,
+            peer_features=mode,
+        )
+        for mode in PEER_FEATURE_MODES
+    }
+    assert len(set(names.values())) == len(PEER_FEATURE_MODES)
+    assert "_peer-" not in names["none"]
+    for mode in PEER_FEATURE_MODES[1:]:
+        assert f"_peer-{mode}_" in names[mode]
+        metadata = train._model_metadata(
+            "tcn", architecture, BASELINE_TCN_SETTINGS, mode
+        )["peer_features"]
+        assert metadata["mode"] == mode
+        assert metadata["state_width"] == PEER_STATE_WIDTH
+        assert metadata["adapter"]["output_width"] == architecture.width
 
 
 @pytest.mark.parametrize(

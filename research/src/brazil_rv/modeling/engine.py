@@ -48,6 +48,7 @@ from .contract import (
     SOFT_RANK_TEMPERATURES,
     SOFT_SPEARMAN_CORRELATION_EPS,
     TCNSettings,
+    peer_feature_metadata,
     expected_trainable_parameter_count,
 )
 from .metrics import create_metric_table
@@ -587,6 +588,8 @@ def _to_cuda(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
             "state_position",
         )
     )
+    if "peer_state" in batch:
+        model_keys = (*model_keys, "peer_state")
     return {
         key: batch[key].to("cuda", non_blocking=True)
         for key in (*model_keys, "targets", "label_mask")
@@ -596,6 +599,15 @@ def _to_cuda(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
 def _predict(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
     if "tabular_features" in batch:
         return model(batch["tabular_features"], batch["equity_mask"])
+    if "peer_state" in batch:
+        return model(
+            batch["patches"],
+            batch["history_patch_mask"],
+            batch["instrument_mask"],
+            batch["slow_features"],
+            batch["state_position"],
+            batch["peer_state"],
+        )
     return model(
         batch["patches"],
         batch["history_patch_mask"],
@@ -1399,9 +1411,12 @@ def checkpoint_payload(
     git_commit_sha: str,
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
     feature_ablation: ResolvedFeatureAblation | None = None,
+    peer_features: str = "none",
 ) -> dict[str, object]:
     if getattr(model, "model_name", None) != model_name:
         raise ValueError("Checkpoint model name does not match the model")
+    if getattr(model, "peer_features", "none") != peer_features:
+        raise ValueError("Checkpoint peer mode does not match the model")
 
     payload = {
         "model_name": model_name,
@@ -1416,7 +1431,10 @@ def checkpoint_payload(
         "scheduler_state_dict": scheduler.state_dict(),
         "tcn_settings": None if tcn_settings is None else asdict(tcn_settings),
         "architecture_constants": asdict(architecture),
-        "parameter_count": expected_trainable_parameter_count(model_name, architecture),
+        "parameter_count": expected_trainable_parameter_count(
+            model_name, architecture, peer_features
+        ),
+        "peer_features": peer_feature_metadata(model_name, architecture, peer_features),
         "resolved_feature_store_path": str(feature_store),
         "feature_manifest_contract_version": feature_manifest["contract_version"],
         "global_context": global_context,

@@ -36,6 +36,7 @@ from .contract import (
     VALIDATION_START,
     architecture_for_model,
     expected_trainable_parameter_count,
+    peer_feature_metadata,
 )
 from .data import resolve_feature_store, validate_feature_store
 from .engine import objective_metadata, sam_metadata
@@ -89,6 +90,8 @@ def build_stage2_command(key: str, seed: int) -> tuple[str, ...]:
         "full",
         "--tcn-block",
         "swiglu",
+        "--peer-features",
+        "none",
         "--optimizer",
         "sam_adamw",
         "--objective",
@@ -189,6 +192,7 @@ def _training_semantics() -> dict[str, object]:
         "tcn_settings": asdict(STAGE2_TCN_SETTINGS),
         "architecture_constants": _json_value(asdict(architecture)),
         "parameter_count": expected_trainable_parameter_count("tcn", architecture),
+        "peer_features": peer_feature_metadata("tcn", architecture, "none"),
         "optimizer_variant": "sam_adamw",
         "objective": objective_metadata("soft_spearman", STAGE2_TEMPERATURE),
         "sam": sam_metadata("sam_adamw", STAGE2_SAM_RHO),
@@ -370,6 +374,7 @@ def _validated_stage1_adoptions(
         "model_name": semantics["model_name"],
         "tcn_settings": semantics["tcn_settings"],
         "parameter_count": semantics["parameter_count"],
+        "peer_features": semantics["peer_features"],
         "optimizer_variant": semantics["optimizer_variant"],
         "objective": semantics["objective"],
         "sam": semantics["sam"],

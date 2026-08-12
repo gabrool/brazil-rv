@@ -35,6 +35,7 @@ from .contract import (
     NEURAL_OBJECTIVES,
     OPTIMIZER_VARIANTS,
     PROJECT_ROOT,
+    PEER_FEATURE_MODES,
     RUN_OUTPUT_BASE,
     SAM_RHOS,
     SOFT_RANK_TEMPERATURES,
@@ -56,6 +57,7 @@ from .contract import (
     XGBOOST_OBJECTIVE,
     architecture_for_model,
     expected_trainable_parameter_count,
+    peer_feature_metadata,
 )
 from .data import (
     create_training_loaders,
@@ -123,6 +125,10 @@ def validate_cli_args(
 ) -> argparse.Namespace:
     if not hasattr(args, "feature_ablation"):
         args.feature_ablation = "none"
+    if not hasattr(args, "peer_features"):
+        args.peer_features = "none"
+    if args.peer_features != "none" and args.model != "tcn":
+        parser.error("--peer-features is supported only for --model tcn")
     if args.model == "xgboost" and args.optimizer is not None:
         parser.error("--optimizer is not allowed when --model xgboost")
     if args.model == "xgboost" and args.objective is not None:
@@ -193,6 +199,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--feature-ablation", choices=FEATURE_ABLATION_KEYS, default="none"
     )
+    parser.add_argument("--peer-features", choices=PEER_FEATURE_MODES, default="none")
     parser.add_argument("--seed", required=True, type=int, choices=ALLOWED_SEEDS)
     return validate_cli_args(parser, parser.parse_args(arguments))
 
@@ -220,13 +227,17 @@ def _model_metadata(
     model_name: str,
     architecture: NeuralArchitecture,
     tcn_settings: TCNSettings | None,
+    peer_features: str = "none",
 ) -> dict[str, object]:
     return {
         "model_name": model_name,
         "model_family": architecture.family,
         "tcn_settings": None if tcn_settings is None else asdict(tcn_settings),
         "architecture_constants": asdict(architecture),
-        "parameter_count": expected_trainable_parameter_count(model_name, architecture),
+        "parameter_count": expected_trainable_parameter_count(
+            model_name, architecture, peer_features
+        ),
+        "peer_features": peer_feature_metadata(model_name, architecture, peer_features),
     }
 
 
@@ -242,12 +253,14 @@ def _run_directory_name(
     created_at: datetime,
     context_ablation: str = "none",
     feature_ablation: str = "none",
+    peer_features: str = "none",
 ) -> str:
     context_part = "" if global_context is None else f"_global-{global_context}"
     ablation_part = (
         "" if context_ablation == "none" else f"_ablation-{context_ablation}"
     )
     feature_part = "" if feature_ablation == "none" else f"_feature-{feature_ablation}"
+    peer_part = "" if peer_features == "none" else f"_peer-{peer_features}"
     if optimizer_variant is None:
         return f"{model_name}{context_part}{ablation_part}{feature_part}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
     if objective is None:
@@ -266,7 +279,7 @@ def _run_directory_name(
         "" if temperature is None else f"_tau{experiment_decimal(temperature, 2)}"
     )
     return (
-        f"{model_part}{objective_part}{optimizer_part}{rho_part}{tau_part}{context_part}{ablation_part}{feature_part}_seed{seed}_"
+        f"{model_part}{objective_part}{optimizer_part}{rho_part}{tau_part}{context_part}{ablation_part}{feature_part}{peer_part}_seed{seed}_"
         f"{created_at:%Y%m%dT%H%M%S%fZ}"
     )
 
@@ -422,6 +435,7 @@ def _run_xgboost(
         "tcn_settings": None,
         "architecture_constants": None,
         "parameter_count": None,
+        "peer_features": peer_feature_metadata("xgboost", None, args.peer_features),
         "compile": None,
         "precision": None,
         "bf16": None,
@@ -502,12 +516,17 @@ def _run_neural(
         tcn_architecture,
         context_ablation,
         feature_ablation,
+        args.peer_features,
     )
     training_batch = next(iter(train_loader))
     evaluation_batch = next(iter(validation_loader))
 
-    model = build_neural_model(args.model, tcn_architecture).to("cuda")
-    model_metadata = _model_metadata(args.model, architecture, tcn_settings)
+    model = build_neural_model(args.model, tcn_architecture, args.peer_features).to(
+        "cuda"
+    )
+    model_metadata = _model_metadata(
+        args.model, architecture, tcn_settings, args.peer_features
+    )
     parameter_count = count_trainable_parameters(model)
     expected_parameter_count = int(model_metadata["parameter_count"])
     if parameter_count != expected_parameter_count:
@@ -713,6 +732,7 @@ def _run_neural(
                     commit_sha,
                     context_ablation,
                     feature_ablation,
+                    args.peer_features,
                 ),
             )
         else:
@@ -744,6 +764,7 @@ def _run_neural(
             commit_sha,
             context_ablation,
             feature_ablation,
+            args.peer_features,
         ),
     )
     if best_metrics is None or best_daily_rows is None:
@@ -794,7 +815,7 @@ def _run(args: argparse.Namespace) -> None:
     feature_manifest = json.loads(
         (feature_store / "manifest.json").read_text(encoding="utf-8")
     )
-    cache_report = warm_feature_store_cache(feature_store)
+    cache_report = warm_feature_store_cache(feature_store, args.peer_features)
 
     created_at = datetime.now(timezone.utc)
     run_dir = RUN_OUTPUT_BASE / _run_directory_name(
@@ -809,6 +830,7 @@ def _run(args: argparse.Namespace) -> None:
         created_at,
         args.context_ablation,
         args.feature_ablation,
+        args.peer_features,
     )
     if run_dir.exists():
         raise FileExistsError(f"Run output already exists: {run_dir}")

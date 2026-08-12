@@ -139,6 +139,8 @@ def build_stage4_command(logical_configuration: str, seed: int) -> tuple[str, ..
         "full",
         "--tcn-block",
         "swiglu",
+        "--peer-features",
+        "none",
         "--optimizer",
         "sam_adamw",
         "--objective",

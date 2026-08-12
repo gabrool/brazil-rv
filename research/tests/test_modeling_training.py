@@ -61,6 +61,7 @@ from brazil_rv.modeling.contract import (
     XGBOOST_VERSION,
     architecture_for_model,
     model_consumes_context,
+    peer_feature_metadata,
 )
 from brazil_rv.modeling.evaluate import (
     _architecture_from_identity,
@@ -130,6 +131,32 @@ def _build_model(model_name: str) -> nn.Module:
         model_name,
         architecture if model_name == "tcn" else None,
     )
+
+
+def test_shared_prediction_routing_includes_peer_state_only_when_present() -> None:
+    class InputCounter(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.inputs: tuple[torch.Tensor, ...] = ()
+
+        def forward(self, *inputs: torch.Tensor) -> torch.Tensor:
+            self.inputs = inputs
+            return torch.tensor(len(inputs))
+
+    batch = {
+        "patches": torch.tensor(1),
+        "history_patch_mask": torch.tensor(2),
+        "instrument_mask": torch.tensor(3),
+        "slow_features": torch.tensor(4),
+        "state_position": torch.tensor(5),
+    }
+    model = InputCounter()
+    assert engine_module._predict(model, batch).item() == 5
+    assert model.inputs == tuple(batch.values())
+
+    peer_batch = {**batch, "peer_state": torch.tensor(6)}
+    assert engine_module._predict(model, peer_batch).item() == 6
+    assert model.inputs == tuple(peer_batch.values())
 
 
 def test_compile_setup_modern_explicit_off(
@@ -959,12 +986,14 @@ def _matching_run_identity(
     objective: str = "soft_spearman",
     temperature: float | None = 0.1,
     sam_rho: float | None = None,
+    peer_features: str = "none",
 ) -> dict[str, object]:
     return {
         **_model_metadata(
             model_name,
             _architecture(model_name),
             _tcn_settings(model_name),
+            peer_features,
         ),
         "optimizer_variant": optimizer_variant,
         "objective": objective_metadata(objective, temperature),
@@ -997,6 +1026,45 @@ def test_evaluation_identity_accepts_production_json_tuple_normalization(
     assert isinstance(manifest["architecture_constants"]["dilations"], list)
 
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+
+def test_peer_identity_is_required_and_manifest_checkpoint_bound(
+    tmp_path: Path,
+) -> None:
+    manifest, checkpoint, feature_store = _json_round_tripped_tcn_identity(tmp_path)
+    missing = copy.deepcopy(manifest)
+    del missing["peer_features"]
+    with pytest.raises(
+        ValueError, match="Missing run/checkpoint identity field: peer_features"
+    ):
+        _validate_run_checkpoint_identity(missing, checkpoint, feature_store)
+
+    mismatch = copy.deepcopy(checkpoint)
+    mismatch["peer_features"] = peer_feature_metadata(
+        "tcn", _architecture("tcn"), "selected"
+    )
+    with pytest.raises(
+        ValueError, match="Run/checkpoint identity mismatch: peer_features"
+    ):
+        _validate_run_checkpoint_identity(manifest, mismatch, feature_store)
+
+
+def test_selected_peer_identity_reconstructs_mode_aware_parameter_count(
+    tmp_path: Path,
+) -> None:
+    feature_store = (tmp_path / "feature-store").resolve()
+    checkpoint = _matching_run_identity(feature_store, peer_features="selected")
+    manifest_path = tmp_path / "run_manifest.json"
+    _atomic_write_json(manifest_path, checkpoint)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+    malformed = copy.deepcopy(manifest)
+    malformed["peer_features"]["adapter"]["zero_initialized"] = False
+    with pytest.raises(ValueError, match="Invalid peer-feature identity metadata"):
+        _validate_run_checkpoint_identity(
+            malformed, copy.deepcopy(malformed), feature_store
+        )
 
 
 @pytest.mark.parametrize("change", ("value", "sequence_order"))
@@ -1562,6 +1630,71 @@ def test_checkpoint_round_trip_eager(model_name: str, tmp_path: Path) -> None:
         )
 
 
+def test_peer_checkpoint_records_mode_representation_and_restores_adapter(
+    tmp_path: Path,
+) -> None:
+    architecture = _architecture("tcn")
+    model = build_neural_model("tcn", architecture, "selected")
+    optimizer, _ = build_optimizer(model)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+    feature_manifest = _read_feature_manifest(tmp_path)
+    payload = checkpoint_payload(
+        model,
+        optimizer,
+        scheduler,
+        "tcn",
+        architecture,
+        BASELINE_TCN_SETTINGS,
+        "adamw",
+        "soft_spearman",
+        0.1,
+        None,
+        11,
+        1,
+        0.0,
+        tmp_path,
+        "enabled",
+        feature_manifest,
+        "test-sha",
+        peer_features="selected",
+    )
+    assert payload["peer_features"]["mode"] == "selected"
+    assert payload["peer_features"]["adapter"] == {
+        "input_width": 10,
+        "output_width": architecture.width,
+        "bias": False,
+        "zero_initialized": True,
+        "injection_point": (
+            "additive residual into equity states after temporal state construction "
+            "and before existing TCN fusion and prediction head"
+        ),
+    }
+    assert "peer_adapter.weight" in payload["model_state_dict"]
+    restored = build_neural_model("tcn", architecture, "selected")
+    restored.load_state_dict(payload["model_state_dict"])
+
+    with pytest.raises(ValueError, match="Checkpoint peer mode does not match"):
+        checkpoint_payload(
+            model,
+            optimizer,
+            scheduler,
+            "tcn",
+            architecture,
+            BASELINE_TCN_SETTINGS,
+            "adamw",
+            "soft_spearman",
+            0.1,
+            None,
+            11,
+            1,
+            0.0,
+            tmp_path,
+            "enabled",
+            feature_manifest,
+            "test-sha",
+        )
+
+
 @pytest.mark.parametrize(
     "settings",
     (
@@ -1888,6 +2021,7 @@ def _completed_xgboost_manifest(
         "optimizer_variant": None,
         "architecture_constants": None,
         "parameter_count": None,
+        "peer_features": peer_feature_metadata("xgboost", None, "none"),
         "compile": None,
         "bf16": None,
         "seed": 11,

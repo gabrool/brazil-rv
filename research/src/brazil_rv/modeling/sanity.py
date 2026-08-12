@@ -26,6 +26,7 @@ from .contract import (
     SANITY_MIN_SPEARMAN,
     SANITY_SMOKE_SAMPLE_COUNT,
     architecture_for_model,
+    peer_feature_metadata,
 )
 from .data import (
     BatchRequest,
@@ -461,6 +462,9 @@ def main() -> None:
     )
     report = {
         "model_name": SANITY_MODEL,
+        "peer_features": peer_feature_metadata(
+            SANITY_MODEL, SANITY_TCN_ARCHITECTURE, "none"
+        ),
         "global_context": "enabled",
         "objective": SANITY_OBJECTIVE,
         "soft_rank_temperature": SANITY_TEMPERATURE,

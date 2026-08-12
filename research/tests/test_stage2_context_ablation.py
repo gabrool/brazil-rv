@@ -389,6 +389,7 @@ def _stage1_state(
         "model_name": semantics["model_name"],
         "tcn_settings": semantics["tcn_settings"],
         "parameter_count": semantics["parameter_count"],
+        "peer_features": semantics["peer_features"],
         "optimizer_variant": semantics["optimizer_variant"],
         "objective": semantics["objective"],
         "sam": semantics["sam"],
