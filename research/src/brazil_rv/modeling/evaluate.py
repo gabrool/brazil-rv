@@ -744,6 +744,7 @@ def main() -> None:
         "model_family": manifest["model_family"],
         "tcn_settings": manifest["tcn_settings"],
         "architecture_constants": manifest["architecture_constants"],
+        "peer_features": manifest["peer_features"],
         "parameter_count": manifest["parameter_count"],
         "optimizer_variant": manifest["optimizer_variant"],
         "global_context": manifest["global_context"],

@@ -235,8 +235,10 @@ def test_peer_adapter_preserves_incumbent_initialization_and_predictions(
     architecture = resolve_tcn_architecture(settings)
     torch.manual_seed(41)
     legacy = build_neural_model("tcn", architecture, "none").eval()
+    legacy_rng_state = torch.get_rng_state()
     torch.manual_seed(41)
     selected = build_neural_model("tcn", architecture, peer_mode).eval()
+    assert torch.equal(torch.get_rng_state(), legacy_rng_state)
     common = set(legacy.state_dict())
     assert set(selected.state_dict()) == {*common, "peer_adapter.weight"}
     for name in common:
@@ -262,6 +264,33 @@ def test_peer_adapter_preserves_incumbent_initialization_and_predictions(
     torch.testing.assert_close(
         selected_predictions, legacy_predictions, atol=0.0, rtol=0.0
     )
+
+
+@pytest.mark.parametrize("fusion", ("context_only", "context_pooled"))
+def test_masked_control_matches_none_in_train_mode_with_identical_dropout(
+    fusion: str,
+) -> None:
+    architecture = resolve_tcn_architecture(TCNSettings(fusion, 64, "short", "gelu"))
+    torch.manual_seed(43)
+    legacy = build_neural_model("tcn", architecture, "none").train()
+    torch.manual_seed(43)
+    control = build_neural_model("tcn", architecture, "masked_control").train()
+    inputs = _inputs()
+    peer_state = torch.zeros(1, EQUITY_COUNT, PEER_STATE_WIDTH)
+    torch.manual_seed(47)
+    forward_rng_state = torch.get_rng_state()
+    with torch.no_grad():
+        legacy_predictions = _forward(legacy, inputs)
+        torch.set_rng_state(forward_rng_state)
+        control_predictions = control(
+            inputs["patches"],
+            inputs["history_patch_mask"],
+            inputs["instrument_mask"],
+            inputs["slow_features"],
+            inputs["state_position"],
+            peer_state,
+        )
+    assert torch.equal(control_predictions, legacy_predictions)
 
 
 def test_peer_enabled_tcn_keeps_inactive_predictions_at_exact_zero() -> None:

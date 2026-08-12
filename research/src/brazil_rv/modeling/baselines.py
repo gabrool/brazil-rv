@@ -72,8 +72,9 @@ class SharedCausalTCN(nn.Module):
             nn.init.constant_(self.fusion_gate.bias, TARGETED_FUSION_GATE_BIAS)
         self.peer_adapter: nn.Linear | None = None
         if self.peer_features != "none":
-            self.peer_adapter = nn.Linear(PEER_STATE_WIDTH, width, bias=False)
-            nn.init.zeros_(self.peer_adapter.weight)
+            with torch.random.fork_rng(devices=[]):
+                self.peer_adapter = nn.Linear(PEER_STATE_WIDTH, width, bias=False)
+                nn.init.zeros_(self.peer_adapter.weight)
 
     @staticmethod
     def _initialize_module(module: nn.Module) -> None:
