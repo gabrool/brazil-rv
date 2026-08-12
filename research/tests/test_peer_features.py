@@ -342,6 +342,38 @@ def test_duplicate_peer_policy_key_fails_closed(tmp_path: Path) -> None:
         load_human_priors(pointer, sidecar, trade_dates, security_ids)
 
 
+def test_null_peer_policy_availability_fails_closed(tmp_path: Path) -> None:
+    pointer, sidecar, trade_dates, security_ids, _, _ = _write_sidecar(tmp_path)
+    policy_path = sidecar / "peer_policy_security_days.parquet"
+    policy_schema = pl.read_parquet_schema(policy_path)
+    pl.DataFrame(
+        {
+            "date_idx": [0],
+            "equity_slot": [157],
+            "selected_peer_relation": [None],
+            "selected_peer_group_id": [None],
+            "selected_other_active_peer_count": [None],
+            "sector_fallback_used": [False],
+            "peer_policy_available": [None],
+            "peer_policy_unavailable_reason": ["UNRESOLVED_CLASSIFICATION"],
+            "same_sector_peer_count": [0],
+            "same_subsector_peer_count": [0],
+        },
+        schema=policy_schema,
+    ).write_parquet(policy_path)
+    manifest_path = sidecar / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["peer_policy_output_contract"]["security_day_count"] = 1
+    manifest["output_sha256"][policy_path.name] = _sha256(policy_path)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(
+        ValueError,
+        match="Peer-policy availability must be non-null boolean",
+    ):
+        load_human_priors(pointer, sidecar, trade_dates, security_ids)
+
+
 def test_reference_membership_or_readiness_mismatch_fails_before_use(
     tmp_path: Path,
 ) -> None:

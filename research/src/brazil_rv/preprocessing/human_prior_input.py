@@ -253,9 +253,19 @@ def load_human_priors(
             "Invalid subsector group ID",
         )
 
-    peer_policy = pl.read_parquet(
-        resolved_dir / "peer_policy_security_days.parquet"
-    ).sort("date_idx", "equity_slot")
+    peer_policy = pl.read_parquet(resolved_dir / "peer_policy_security_days.parquet")
+    availability = peer_policy["peer_policy_available"]
+    _require(
+        availability.dtype == pl.Boolean and availability.null_count() == 0,
+        "Peer-policy availability must be non-null boolean",
+    )
+    available = peer_policy.filter(pl.col("peer_policy_available"))
+    unavailable = peer_policy.filter(~pl.col("peer_policy_available"))
+    _require(
+        available.height + unavailable.height == peer_policy.height,
+        "Peer-policy availability must be non-null boolean",
+    )
+    peer_policy = peer_policy.sort("date_idx", "equity_slot")
     _require(
         not peer_policy.select("date_idx", "equity_slot").is_duplicated().any(),
         "Duplicate peer-policy (date_idx, equity_slot) key",
@@ -273,8 +283,6 @@ def load_human_priors(
     contract_count = manifest["peer_policy_output_contract"]["security_day_count"]
     _require(peer_policy.height == contract_count, "Peer-policy row count mismatch")
 
-    available = peer_policy.filter(pl.col("peer_policy_available"))
-    unavailable = peer_policy.filter(~pl.col("peer_policy_available"))
     invalid_available = available.filter(
         pl.col("selected_peer_relation").is_null()
         | ~pl.col("selected_peer_relation").is_in(allowed_relations)
