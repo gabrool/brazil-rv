@@ -795,9 +795,7 @@ def _run_neural(
             args.sam_rho,
             epoch=epoch,
             profiler_trace_path=(
-                profiler_trace_path
-                if profile_bounded_phases and epoch == 1
-                else None
+                profiler_trace_path if profile_bounded_phases and epoch == 1 else None
             ),
         )
         validation_performance: dict[str, object] = {}
@@ -899,11 +897,7 @@ def _run_neural(
         epoch_artifact_io_seconds = (
             time.perf_counter()
             - artifact_started
-            + float(
-                training["performance"][
-                    "profiler_trace_artifact_io_wall_seconds"
-                ]
-            )
+            + float(training["performance"]["profiler_trace_artifact_io_wall_seconds"])
         )
         performance_epochs.append(
             {
@@ -1004,9 +998,7 @@ def _run_neural(
                 else None
             ),
             "bounded_validation_scope": (
-                "first_validation_batch_of_epoch_1"
-                if profile_bounded_phases
-                else None
+                "first_validation_batch_of_epoch_1" if profile_bounded_phases else None
             ),
             "cuda_synchronization_policy": (
                 "one synchronization at each bounded CUDA profiling boundary only"

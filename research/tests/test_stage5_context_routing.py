@@ -126,12 +126,8 @@ def _valid_performance_artifacts(
         json.dumps({"traceEvents": [{"name": "bounded-update", "ph": "X"}]}),
         encoding="utf-8",
     )
-    training_phases = {
-        name: 0.01 for name in stage5.SAM_BOUNDED_CUDA_PHASES
-    }
-    validation_phases = {
-        name: 0.02 for name in stage5.VALIDATION_BOUNDED_CUDA_PHASES
-    }
+    training_phases = {name: 0.01 for name in stage5.SAM_BOUNDED_CUDA_PHASES}
+    validation_phases = {name: 0.02 for name in stage5.VALIDATION_BOUNDED_CUDA_PHASES}
     profile: dict[str, object] = {
         "version": stage5.PERFORMANCE_PROFILE_VERSION,
         "run_profile": "experiment",
@@ -162,9 +158,7 @@ def _valid_performance_artifacts(
                 "training": {
                     "main_process_dataloader_wait_seconds": 0.1,
                     "worker_batch_construction_seconds_sum": 0.2,
-                    "worker_timing_scope": (
-                        "sum_across_workers_may_overlap_wall_time"
-                    ),
+                    "worker_timing_scope": ("sum_across_workers_may_overlap_wall_time"),
                     "h2d_bytes": 100,
                     "h2d_enqueue_wall_seconds": 0.01,
                     "effective_update_wall_seconds": 0.6,
@@ -176,9 +170,7 @@ def _valid_performance_artifacts(
                 "validation": {
                     "main_process_dataloader_wait_seconds": 0.2,
                     "worker_batch_construction_seconds_sum": 0.3,
-                    "worker_timing_scope": (
-                        "sum_across_workers_may_overlap_wall_time"
-                    ),
+                    "worker_timing_scope": ("sum_across_workers_may_overlap_wall_time"),
                     "h2d_bytes": 200,
                     "h2d_enqueue_wall_seconds": 0.02,
                     "device_to_host_and_result_collection_wall_seconds": 0.4,
@@ -707,9 +699,7 @@ def test_stage5_call_order_is_preflight_then_session_audit_and_training(
     monkeypatch.setattr(stage5, "_ensure_audit", audit)
     monkeypatch.setattr(stage5, "_configuration", lambda *_: {})
     monkeypatch.setattr(stage5, "_source_incumbents", lambda *_: {})
-    monkeypatch.setattr(
-        stage5, "_load_state", lambda *_: {"status": "running"}
-    )
+    monkeypatch.setattr(stage5, "_load_state", lambda *_: {"status": "running"})
     monkeypatch.setattr(stage5, "_persist_state", lambda *_: None)
     monkeypatch.setattr(stage5, "_log", lambda *_: None)
     monkeypatch.setattr(stage5, "_finalize_outputs", lambda *_: None)
@@ -916,9 +906,7 @@ def test_session_performance_summary_includes_all_artifact_io(tmp_path: Path) ->
     assert payload["runs"][0]["bounded_training_update"]["scope"] == (
         "first_completed_effective_training_update_of_epoch_1"
     )
-    assert "sampled CUDA timings are not aggregated" in payload[
-        "bounded_sample_policy"
-    ]
+    assert "sampled CUDA timings are not aggregated" in payload["bounded_sample_policy"]
 
 
 @pytest.mark.parametrize(
@@ -942,8 +930,8 @@ def test_performance_and_trace_validation_fail_closed(
     elif drift == "negative":
         profile["epochs"][0]["training"]["h2d_enqueue_wall_seconds"] = -0.1
     elif drift == "nonfinite":
-        profile["epochs"][0]["validation"]["total_validation_wall_seconds"] = (
-            float("nan")
+        profile["epochs"][0]["validation"]["total_validation_wall_seconds"] = float(
+            "nan"
         )
     elif drift == "identity":
         profile["run_profile_identity_sha256"] = "drifted"

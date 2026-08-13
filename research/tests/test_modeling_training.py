@@ -1075,9 +1075,7 @@ def test_run_profile_identity_is_explicitly_bound_and_legacy_absence_is_producti
     old_manifest["run_profile"]["schema_version"] = "B3_MODEL_RUN_PROFILE_V1"
     old_checkpoint["run_profile"]["schema_version"] = "B3_MODEL_RUN_PROFILE_V1"
     with pytest.raises(ValueError, match="run-profile identity mismatch"):
-        _validate_run_checkpoint_identity(
-            old_manifest, old_checkpoint, feature_store
-        )
+        _validate_run_checkpoint_identity(old_manifest, old_checkpoint, feature_store)
 
     missing = copy.deepcopy(checkpoint)
     del missing["run_profile"]
