@@ -228,10 +228,6 @@ def _to_device(
     }
 
 
-def _to_cuda(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-    return _to_device(batch, torch.device("cuda"))
-
-
 def _predict(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
     if "tabular_features" in batch:
         return model(batch["tabular_features"], batch["equity_mask"])

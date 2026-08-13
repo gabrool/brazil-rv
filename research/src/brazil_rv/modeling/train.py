@@ -31,7 +31,6 @@ from .contract import (
     RUN_OUTPUT_BASE,
     SAM_RHOS,
     SOFT_RANK_TEMPERATURES,
-    SUPPORTED_MODELS,
     TCN_BLOCK_VARIANTS,
     TCN_FUSIONS,
     TCN_RECEPTIVE_FIELDS,
@@ -61,41 +60,28 @@ from .engine import (
 )
 from .model import build_neural_model, count_trainable_parameters
 from .optim import build_optimizer, build_scheduler
-from .xgboost_model import train_xgboost_run
 
 
 def validate_cli_args(
     parser: argparse.ArgumentParser, args: argparse.Namespace
 ) -> argparse.Namespace:
-    if args.model == "xgboost":
-        if (
-            args.optimizer is not None
-            or args.objective is not None
-            or args.temperature is not None
-            or args.sam_rho is not None
-        ):
-            parser.error(
-                "Neural objective and optimizer options are not valid for XGBoost"
-            )
-        args.peer_features = "none"
-    else:
-        args.optimizer = args.optimizer or "sam_adamw"
-        args.objective = args.objective or "soft_spearman"
-        if args.objective == "soft_spearman":
-            args.temperature = 0.50 if args.temperature is None else args.temperature
-        elif args.temperature is not None:
-            parser.error("rank_huber does not accept --soft-rank-temperature")
-        if args.optimizer == "sam_adamw":
-            args.sam_rho = 0.125 if args.sam_rho is None else args.sam_rho
-        elif args.sam_rho is not None:
-            parser.error("AdamW does not accept --sam-rho")
-        args.peer_features = (
-            ("selected" if args.model == "tcn" else "none")
-            if args.peer_features is None
-            else args.peer_features
-        )
-        if args.model != "tcn" and args.peer_features != "none":
-            parser.error("Peer features are supported only for TCN")
+    args.optimizer = args.optimizer or "sam_adamw"
+    args.objective = args.objective or "soft_spearman"
+    if args.objective == "soft_spearman":
+        args.temperature = 0.50 if args.temperature is None else args.temperature
+    elif args.temperature is not None:
+        parser.error("rank_huber does not accept --soft-rank-temperature")
+    if args.optimizer == "sam_adamw":
+        args.sam_rho = 0.125 if args.sam_rho is None else args.sam_rho
+    elif args.sam_rho is not None:
+        parser.error("AdamW does not accept --sam-rho")
+    args.peer_features = (
+        ("selected" if args.model == "tcn" else "none")
+        if args.peer_features is None
+        else args.peer_features
+    )
+    if args.model != "tcn" and args.peer_features != "none":
+        parser.error("Peer features are supported only for TCN")
     settings = _tcn_settings_from_args(args)
     consumes_context = model_consumes_context(args.model, settings)
     if consumes_context:
@@ -109,7 +95,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train one current full-universe model"
     )
-    parser.add_argument("--model", choices=SUPPORTED_MODELS, default="tcn")
+    parser.add_argument("--model", choices=NEURAL_MODELS, default="tcn")
     parser.add_argument("--optimizer", choices=OPTIMIZER_VARIANTS)
     parser.add_argument("--objective", choices=NEURAL_OBJECTIVES)
     parser.add_argument(
@@ -177,9 +163,7 @@ def _model_metadata(
 
 
 def _run_directory_name(args: argparse.Namespace, created_at: datetime) -> str:
-    if args.model == "xgboost":
-        model = "xgboost"
-    elif args.model == "tcn":
+    if args.model == "tcn":
         model = f"tcn_{args.tcn_fusion}_w{args.tcn_width}_rf{args.tcn_receptive_field}_b{args.tcn_block}"
         if (
             args.slow_routing != "late_only"
@@ -188,12 +172,11 @@ def _run_directory_name(args: argparse.Namespace, created_at: datetime) -> str:
             model += f"_slow-{args.slow_routing}_macro-{args.macro_temporal_routing}"
     else:
         model = args.model
-    if args.model in NEURAL_MODELS:
-        model += f"_{args.objective}_{args.optimizer}"
-        if args.sam_rho is not None:
-            model += f"_rho{experiment_decimal(args.sam_rho, 3)}"
-        if args.temperature is not None:
-            model += f"_tau{experiment_decimal(args.temperature, 2)}"
+    model += f"_{args.objective}_{args.optimizer}"
+    if args.sam_rho is not None:
+        model += f"_rho{experiment_decimal(args.sam_rho, 3)}"
+    if args.temperature is not None:
+        model += f"_tau{experiment_decimal(args.temperature, 2)}"
     if args.global_context is not None:
         model += f"_global-{args.global_context}"
     if args.peer_features != "none":
@@ -201,12 +184,11 @@ def _run_directory_name(args: argparse.Namespace, created_at: datetime) -> str:
     return f"{model}_seed{args.seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
 
 
-def set_seeds(seed: int, *, neural: bool) -> None:
+def set_seeds(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
-    if neural:
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def _atomic_json(path: Path, value: dict[str, object]) -> None:
@@ -237,6 +219,7 @@ def _run_neural(
     validation_rows: pl.DataFrame,
     run_dir: Path,
 ) -> None:
+    torch.set_float32_matmul_precision("high")
     settings = _tcn_settings_from_args(args)
     architecture = architecture_for_model(args.model, settings)
     loaders = create_training_loaders(
@@ -369,15 +352,10 @@ def _run(args: argparse.Namespace) -> Path:
     sample_index = load_sample_index(store)
     train_rows = select_sample_split(sample_index, "train")
     validation_rows = select_sample_split(sample_index, "validation")
-    set_seeds(args.seed, neural=args.model in NEURAL_MODELS)
+    set_seeds(args.seed)
     run_dir = args.output_base / _run_directory_name(args, datetime.now(timezone.utc))
     run_dir.mkdir(parents=True, exist_ok=False)
-    if args.model == "xgboost":
-        train_xgboost_run(
-            store, train_rows, validation_rows, args.global_context, run_dir, args.seed
-        )
-    else:
-        _run_neural(args, store, train_rows, validation_rows, run_dir)
+    _run_neural(args, store, train_rows, validation_rows, run_dir)
     return run_dir
 
 

@@ -7,8 +7,13 @@ import torch
 from torch import nn
 
 from brazil_rv.modeling.contract import (
+    ABSOLUTE_PATCH_COUNT,
     BASELINE_TCN_SETTINGS,
+    EQUITY_COUNT,
+    PATCH_INPUT_WIDTH,
     RuntimeSettings,
+    SLOW_FEATURE_COUNT,
+    TABULAR_FEATURE_COUNT,
     architecture_for_model,
 )
 from brazil_rv.modeling.engine import (
@@ -217,4 +222,38 @@ def test_direct_cli_defaults_to_full_incumbent_and_removed_surfaces_are_rejected
         "sam_adamw",
         0.50,
         0.125,
+    )
+
+
+def test_each_retained_neural_family_has_a_finite_forward_pass() -> None:
+    transformer = build_neural_model("temporal_only").eval()
+    transformer_output = transformer(
+        torch.zeros(1, EQUITY_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH),
+        torch.ones(1, EQUITY_COUNT, ABSOLUTE_PATCH_COUNT, dtype=torch.bool),
+        torch.ones(1, EQUITY_COUNT, dtype=torch.bool),
+        torch.zeros(1, EQUITY_COUNT, SLOW_FEATURE_COUNT),
+        torch.tensor([32]),
+    )
+    tcn_architecture = architecture_for_model("tcn", BASELINE_TCN_SETTINGS)
+    tcn = build_neural_model("tcn", tcn_architecture, "selected", equity_count=4).eval()
+    instrument_count = 4 + 15
+    tcn_output = tcn(
+        torch.zeros(1, instrument_count, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH),
+        torch.ones(1, instrument_count, ABSOLUTE_PATCH_COUNT, dtype=torch.bool),
+        torch.ones(1, instrument_count, dtype=torch.bool),
+        torch.zeros(1, instrument_count, SLOW_FEATURE_COUNT),
+        torch.tensor([32]),
+        torch.zeros(1, 4, 6),
+    )
+    mlp = build_neural_model("mlp").eval()
+    mlp_output = mlp(
+        torch.zeros(1, EQUITY_COUNT, TABULAR_FEATURE_COUNT),
+        torch.ones(1, EQUITY_COUNT, dtype=torch.bool),
+    )
+    assert transformer_output.shape == (1, EQUITY_COUNT, 3)
+    assert tcn_output.shape == (1, 4, 3)
+    assert mlp_output.shape == (1, EQUITY_COUNT, 3)
+    assert all(
+        torch.isfinite(output).all()
+        for output in (transformer_output, tcn_output, mlp_output)
     )

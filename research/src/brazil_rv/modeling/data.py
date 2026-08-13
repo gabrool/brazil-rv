@@ -72,17 +72,6 @@ class BatchRequest:
     valid_count: int
 
 
-@dataclass(frozen=True)
-class TabularRowBatch:
-    features: np.ndarray | torch.Tensor
-    labels: np.ndarray | torch.Tensor
-    weights: np.ndarray | torch.Tensor
-    sample_id: np.ndarray
-    date_idx: np.ndarray
-    decision_idx: np.ndarray
-    equity_slot: np.ndarray
-
-
 def resolve_feature_store(pointer: Path = FEATURE_STORE_POINTER) -> Path:
     store = Path(pointer.read_text(encoding="utf-8").strip())
     if not store.is_dir():
@@ -128,13 +117,6 @@ def select_sample_split(sample_index: pl.DataFrame, split: str) -> pl.DataFrame:
         return sample_index.filter(filters[split])
     except KeyError as error:
         raise ValueError(f"Unknown split: {split}") from error
-
-
-def split_sample_index(sample_index: pl.DataFrame) -> dict[str, pl.DataFrame]:
-    return {
-        name: select_sample_split(sample_index, name)
-        for name in ("train", "embargo_1", "validation", "embargo_2", "test")
-    }
 
 
 def _common_batch(
@@ -593,54 +575,6 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         for value in inputs.values():
             value[padded] = 0
         return {**inputs, **common}
-
-
-class TabularRowIterator:
-    def __init__(
-        self,
-        store: Path,
-        sample_index: pl.DataFrame,
-        horizon_index: int,
-        *,
-        device: str,
-        global_context: str,
-        batch_size: int = 64,
-    ) -> None:
-        if horizon_index not in range(HORIZON_COUNT) or device not in ("cpu", "cuda"):
-            raise ValueError("Invalid horizon or device")
-        self.dataset = VectorizedFeatureDataset(
-            store, sample_index, "mlp", global_context
-        )
-        self.horizon_index = horizon_index
-        self.device = device
-        self.batch_size = batch_size
-
-    def __iter__(self) -> Iterator[TabularRowBatch]:
-        slots = np.arange(EQUITY_COUNT, dtype=np.int16)
-        for start in range(0, len(self.dataset), self.batch_size):
-            stop = min(start + self.batch_size, len(self.dataset))
-            batch = self.dataset[BatchRequest(tuple(range(start, stop)), stop - start)]
-            valid = batch["label_mask"][:, :, self.horizon_index]
-            counts = valid.sum(axis=1)
-            sample, equity = np.nonzero(valid)
-            if sample.size == 0:
-                continue
-            features = batch["tabular_features"][sample, equity]
-            labels = batch["targets"][sample, equity, self.horizon_index]
-            weights = (1 / counts[sample]).astype(np.float32)
-            if self.device == "cuda":
-                features = torch.from_numpy(features).cuda()
-                labels = torch.from_numpy(labels).cuda()
-                weights = torch.from_numpy(weights).cuda()
-            yield TabularRowBatch(
-                features,
-                labels,
-                weights,
-                batch["sample_id"][sample],
-                batch["date_idx"][sample],
-                batch["decision_idx"][sample],
-                slots[equity],
-            )
 
 
 class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):

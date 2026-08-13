@@ -42,7 +42,6 @@ from .transforms import build_dynamic_features
 
 B3_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 GLOBEX_TIMEZONE = ZoneInfo("America/Chicago")
-GLOBEX_ROLLOVER_HOUR = 17
 GLOBEX_CLOSE_HOUR = 16
 GLOBEX_SESSION_MINUTES = 23 * 60
 

@@ -7,8 +7,6 @@ from datetime import date
 from pathlib import Path
 from types import MappingProxyType
 
-FEATURE_CONTRACT_VERSION = "M1_FEATURES_INTRADAY_DI_MASKED_CONTEXT_HUMAN_PRIORS_V4"
-
 
 def resolve_project_root() -> Path:
     configured = os.environ.get("BRAZIL_RV_ROOT")
@@ -135,12 +133,10 @@ TRANSFORMER_MODELS = (
     "context_pooled",
 )
 NEURAL_MODELS = (*TRANSFORMER_MODELS, "tcn", "mlp")
-SUPPORTED_MODELS = (*NEURAL_MODELS, "xgboost")
 GLOBAL_CONTEXT_SETTINGS = ("enabled", "masked")
 OPTIMIZER_VARIANTS = ("adamw", "sam_adamw")
 NEURAL_OBJECTIVES = ("soft_spearman", "rank_huber")
 ALLOWED_SEEDS = (11, 29, 47)
-DEFAULT_NEURAL_OBJECTIVE = "soft_spearman"
 SOFT_RANK_TEMPERATURES = (0.05, 0.10, 0.20, 0.50)
 SAM_RHOS = (0.025, 0.050, 0.075, 0.100, 0.125)
 SOFT_RANK_STANDARDIZATION_EPS = 1e-6
@@ -225,36 +221,9 @@ ADAMW_WEIGHT_DECAY = 0.01
 WARMUP_FRACTION = 0.05
 FINAL_LR_FACTOR = 0.1
 
-MUON_LR = 0.02
-MUON_MOMENTUM = 0.95
-MUON_NESTEROV = True
-MUON_NS_COEFFICIENTS = (3.4445, -4.7750, 2.0315)
-MUON_EPS = 1e-7
-MUON_NS_STEPS = 5
-MUON_WEIGHT_DECAY = 0.01
-MUON_ADJUST_LR_FN = "original"
-
 MLP_WIDTH = 256
 MLP_DEPTH = 3
 MLP_SWIGLU_WIDTH = 512
-
-XGBOOST_VERSION = "3.2.0"
-XGBOOST_OBJECTIVE = "reg:pseudohubererror"
-XGBOOST_HUBER_SLOPE = 1.0
-XGBOOST_TREE_METHOD = "hist"
-XGBOOST_DEVICE = "cuda"
-XGBOOST_INNER_VALIDATION_FRACTION = 0.20
-XGBOOST_INNER_EMBARGO_DATES = 5
-XGBOOST_EARLY_STOPPING_ROUNDS = 50
-XGBOOST_MAX_BOOSTING_ROUNDS = 4_000
-
-SANITY_SMOKE_SAMPLE_COUNT = 512
-SANITY_MEMORIZATION_SAMPLE_COUNT = 8
-SANITY_DECISION_INDEX = 27
-SANITY_MAX_STEPS = 1_000
-SANITY_MAX_LOSS = 0.10
-SANITY_MAX_LOSS_RATIO = 0.50
-SANITY_MIN_SPEARMAN = 0.50
 
 
 @dataclass(frozen=True)
@@ -429,7 +398,7 @@ def model_consumes_context(
         return tcn_settings.fusion in ("context_only", "context_pooled")
     if tcn_settings is not None:
         raise ValueError(f"TCN settings are forbidden for {model_name}")
-    return model_name in ("context_only", "context_pooled", "mlp", "xgboost")
+    return model_name in ("context_only", "context_pooled", "mlp")
 
 
 def validate_peer_feature_mode(model_name: str, mode: str) -> str:
@@ -532,31 +501,3 @@ def peer_feature_metadata(
         "state_order": list(PEER_STATE_ORDER),
         "state_width": PEER_STATE_WIDTH,
     }
-
-
-@dataclass(frozen=True)
-class XGBoostCandidate:
-    max_depth: int
-    learning_rate: float
-    min_child_weight: int
-
-
-XGBOOST_CANDIDATES = tuple(
-    XGBoostCandidate(depth, rate, weight)
-    for depth in (4, 6, 8)
-    for rate in (0.03, 0.07)
-    for weight in (10, 50)
-)
-XGBOOST_FIXED_PARAMETERS: Mapping[str, object] = MappingProxyType(
-    {
-        "subsample": 0.80,
-        "colsample_bytree": 0.80,
-        "reg_lambda": 5.0,
-        "reg_alpha": 0.1,
-        "max_bin": 256,
-        "objective": XGBOOST_OBJECTIVE,
-        "huber_slope": XGBOOST_HUBER_SLOPE,
-        "tree_method": XGBOOST_TREE_METHOD,
-        "device": XGBOOST_DEVICE,
-    }
-)

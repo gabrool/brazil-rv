@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 import torch
 
 from brazil_rv.modeling.baselines import SharedCausalTCN, apply_context_film
@@ -81,12 +82,19 @@ def test_isolated_slow_film_is_zero_initialized_and_incumbent_neutral() -> None:
     torch.testing.assert_close(incumbent(**inputs), film(**inputs), atol=0, rtol=0)
 
 
-def test_every_current_routing_mode_builds_without_historical_scaffold() -> None:
-    for route in ("early_concat", "film", "early_concat_film"):
-        slow = _model(route, "late_only")
-        macro = _model("late_only", route)
-        assert slow.routing is not None
-        assert macro.routing is not None
+@pytest.mark.parametrize(
+    ("slow", "macro"),
+    [(route, "late_only") for route in ("early_concat", "film", "early_concat_film")]
+    + [("late_only", route) for route in ("early_concat", "film", "early_concat_film")],
+)
+def test_every_current_routing_mode_has_finite_forward_without_scaffold(
+    slow: str, macro: str
+) -> None:
+    model = _model(slow, macro).eval()
+    output = model(**_inputs())
+    assert output.shape == (1, 4, 3)
+    assert torch.isfinite(output).all()
+    assert model.routing is not None
     assert "context_routing_experiment" not in TCNSettings.__dataclass_fields__
 
 
