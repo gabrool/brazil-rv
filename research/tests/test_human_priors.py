@@ -84,9 +84,12 @@ def _xlsx_bytes(rows: list[list[str]]) -> bytes:
     )
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr("[Content_Types].xml", content_types)
-        archive.writestr("xl/workbook.xml", workbook)
-        archive.writestr("xl/worksheets/sheet1.xml", sheet)
+        for filename, value in (
+            ("[Content_Types].xml", content_types),
+            ("xl/workbook.xml", workbook),
+            ("xl/worksheets/sheet1.xml", sheet),
+        ):
+            archive.writestr(zipfile.ZipInfo(filename, (2026, 1, 1, 0, 0, 0)), value)
     return buffer.getvalue()
 
 
