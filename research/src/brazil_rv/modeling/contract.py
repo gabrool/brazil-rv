@@ -196,7 +196,7 @@ CONTEXT_ROUTING_MODES = (
     "film",
     "early_concat_film",
 )
-CONTEXT_ROUTING_SCHEMA_VERSION = "TCN_CONTEXT_ROUTING_V1"
+CONTEXT_ROUTING_SCHEMA_VERSION = "TCN_CONTEXT_ROUTING_V2"
 CONTEXT_ROUTING_MACRO_SYMBOLS = (
     "WDO$",
     "DI1F27",
@@ -213,6 +213,16 @@ CONTEXT_ROUTING_SOURCE_COUNT = (
     CONTEXT_ROUTING_LOCAL_SOURCE_COUNT + CONTEXT_ROUTING_GLOBAL_SOURCE_COUNT
 )
 CONTEXT_ROUTING_PATCH_SOURCE_WIDTH = PATCH_MINUTES * CONTEXT_GENERIC_DYNAMIC_COUNT
+CONTEXT_ROUTING_MACRO_EARLY_SOURCE_WIDTH = CONTEXT_ROUTING_PATCH_SOURCE_WIDTH + 1
+CONTEXT_ROUTING_EXCLUDED_GLOBAL_SLOW_CHANNEL = (
+    "previous_b3_close_to_decision_return_normalized"
+)
+CONTEXT_ROUTING_GLOBAL_SLOW_WIDTH = SLOW_FEATURE_COUNT - 1
+CONTEXT_ROUTING_MACRO_SLOW_INPUT_WIDTH = (
+    CONTEXT_ROUTING_LOCAL_SOURCE_COUNT * SLOW_FEATURE_COUNT
+    + CONTEXT_ROUTING_GLOBAL_SOURCE_COUNT * CONTEXT_ROUTING_GLOBAL_SLOW_WIDTH
+    + CONTEXT_ROUTING_SOURCE_COUNT
+)
 if (
     CONTEXT_ROUTING_MACRO_SYMBOLS[:CONTEXT_ROUTING_LOCAL_SOURCE_COUNT]
     != LOCAL_CONTEXT_SYMBOLS[1:]
@@ -767,20 +777,51 @@ def context_routing_parameter_count(architecture: TCNArchitecture) -> int:
     width = architecture.width
     slow_condition = (
         SLOW_FEATURE_COUNT * width
-        + (
-            CONTEXT_ROUTING_SOURCE_COUNT * SLOW_FEATURE_COUNT
-            + CONTEXT_ROUTING_SOURCE_COUNT
-        )
-        * width
+        + CONTEXT_ROUTING_MACRO_SLOW_INPUT_WIDTH * width
         + 2 * width
     )
     early_inputs = width * width + (
-        CONTEXT_ROUTING_SOURCE_COUNT * CONTEXT_ROUTING_PATCH_SOURCE_WIDTH * width
+        CONTEXT_ROUTING_SOURCE_COUNT * CONTEXT_ROUTING_MACRO_EARLY_SOURCE_WIDTH * width
+        + width * width
     )
     per_block_film = 2 * width * width + (
         CONTEXT_ROUTING_SOURCE_COUNT * width * rank + rank * 2 * width
     )
     return slow_condition + early_inputs + architecture.residual_blocks * per_block_film
+
+
+def context_routing_active_parameter_count(architecture: TCNArchitecture) -> int:
+    if architecture.context_routing_experiment == "legacy":
+        return 0
+    if architecture.context_routing_experiment != "factorial_v1":
+        raise ValueError("Unknown context-routing experiment in architecture")
+    rank = architecture.context_routing_rank
+    if rank is None:
+        raise ValueError("factorial_v1 architecture is missing its routing rank")
+    width = architecture.width
+    count = 0
+    if architecture.slow_routing != "late_only":
+        count += (
+            SLOW_FEATURE_COUNT * width
+            + CONTEXT_ROUTING_MACRO_SLOW_INPUT_WIDTH * width
+            + 2 * width
+        )
+    if architecture.slow_routing in ("early_concat", "early_concat_film"):
+        count += width * width
+    if architecture.slow_routing in ("film", "early_concat_film"):
+        count += architecture.residual_blocks * 2 * width * width
+    if architecture.macro_temporal_routing in ("early_concat", "early_concat_film"):
+        count += (
+            CONTEXT_ROUTING_SOURCE_COUNT
+            * CONTEXT_ROUTING_MACRO_EARLY_SOURCE_WIDTH
+            * width
+            + width * width
+        )
+    if architecture.macro_temporal_routing in ("film", "early_concat_film"):
+        count += architecture.residual_blocks * (
+            CONTEXT_ROUTING_SOURCE_COUNT * width * rank + rank * 2 * width
+        )
+    return count
 
 
 def context_routing_metadata(architecture: TCNArchitecture) -> dict[str, object]:
@@ -792,6 +833,7 @@ def context_routing_metadata(architecture: TCNArchitecture) -> dict[str, object]
         "macro_temporal_early_concat": macro in ("early_concat", "early_concat_film"),
         "macro_temporal_film": macro in ("film", "early_concat_film"),
     }
+    active_components = [name for name, active in enabled.items() if active]
     return {
         "schema_version": CONTEXT_ROUTING_SCHEMA_VERSION,
         "experiment": architecture.context_routing_experiment,
@@ -811,13 +853,22 @@ def context_routing_metadata(architecture: TCNArchitecture) -> dict[str, object]
         "slow_condition": {
             "equity_projection": f"bias_free_linear_{SLOW_FEATURE_COUNT}_to_width",
             "macro_projection": (
-                "bias_free_linear_"
-                f"{CONTEXT_ROUTING_SOURCE_COUNT * SLOW_FEATURE_COUNT + CONTEXT_ROUTING_SOURCE_COUNT}"
-                "_to_width"
+                f"bias_free_linear_{CONTEXT_ROUTING_MACRO_SLOW_INPUT_WIDTH}_to_width"
             ),
             "combination": "sum_then_layer_norm",
+            "excluded_global_slow_channel": (
+                CONTEXT_ROUTING_EXCLUDED_GLOBAL_SLOW_CHANNEL
+            ),
+            "incumbent_late_path": "unchanged",
         },
         "macro_patch_source_width": CONTEXT_ROUTING_PATCH_SOURCE_WIDTH,
+        "macro_early_source_width_with_availability": (
+            CONTEXT_ROUTING_MACRO_EARLY_SOURCE_WIDTH
+        ),
+        "macro_early_design": (
+            "bias_free_input_projection_then_silu_then_non_affine_layer_norm_"
+            "then_zero_initialized_bias_free_output_projection"
+        ),
         "macro_dynamic_channel_count": CONTEXT_GENERIC_DYNAMIC_COUNT,
         "film_rank": architecture.context_routing_rank,
         "injection_points": {
@@ -835,12 +886,18 @@ def context_routing_metadata(architecture: TCNArchitecture) -> dict[str, object]
         },
         "zero_initialization_rules": {
             "slow_early_input_adapter": True,
-            "macro_early_input_projection": True,
+            "macro_early_output_projection": True,
             "slow_film_gamma_beta_projection": True,
             "macro_film_gamma_beta_projection": True,
         },
         "enabled_routes": enabled,
-        "routing_parameter_count": context_routing_parameter_count(architecture),
+        "active_components": active_components,
+        "routing_scaffold_parameter_count": context_routing_parameter_count(
+            architecture
+        ),
+        "active_routing_parameter_count": context_routing_active_parameter_count(
+            architecture
+        ),
     }
 
 

@@ -4,10 +4,15 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from brazil_rv.preprocessing.contract import GLOBAL_SLOW_CHANNELS
+
 from .context_routing import align_macro_histories, causal_patch_mask
 from .contract import (
     CONTEXT_COUNT,
     CONTEXT_GENERIC_DYNAMIC_COUNT,
+    CONTEXT_ROUTING_EXCLUDED_GLOBAL_SLOW_CHANNEL,
+    CONTEXT_ROUTING_MACRO_EARLY_SOURCE_WIDTH,
+    CONTEXT_ROUTING_MACRO_SLOW_INPUT_WIDTH,
     CONTEXT_ROUTING_PATCH_SOURCE_WIDTH,
     CONTEXT_ROUTING_SOURCE_COUNT,
     DYNAMIC_CHANNEL_COUNT,
@@ -31,6 +36,17 @@ from .contract import (
 from .layers import CausalTCNResidualBlock, MuonLinear, SwiGLU
 
 
+_GLOBAL_SLOW_EXCLUDED_INDEX = GLOBAL_SLOW_CHANNELS.index(
+    CONTEXT_ROUTING_EXCLUDED_GLOBAL_SLOW_CHANNEL
+)
+
+
+def apply_context_film(
+    hidden: torch.Tensor, gamma_total: torch.Tensor, beta_total: torch.Tensor
+) -> torch.Tensor:
+    return (1.0 + torch.tanh(gamma_total)) * hidden + beta_total
+
+
 class _ContextRoutingScaffold(nn.Module):
     def __init__(self, architecture: TCNArchitecture) -> None:
         super().__init__()
@@ -42,18 +58,20 @@ class _ContextRoutingScaffold(nn.Module):
             architecture.slow_width, width, bias=False
         )
         self.macro_slow_projection = nn.Linear(
-            CONTEXT_ROUTING_SOURCE_COUNT * architecture.slow_width
-            + CONTEXT_ROUTING_SOURCE_COUNT,
+            CONTEXT_ROUTING_MACRO_SLOW_INPUT_WIDTH,
             width,
             bias=False,
         )
         self.slow_condition_norm = nn.LayerNorm(width)
         self.slow_early_input_adapter = nn.Linear(width, width, bias=False)
         self.macro_early_input_projection = nn.Linear(
-            CONTEXT_ROUTING_SOURCE_COUNT * CONTEXT_ROUTING_PATCH_SOURCE_WIDTH,
+            CONTEXT_ROUTING_SOURCE_COUNT * CONTEXT_ROUTING_MACRO_EARLY_SOURCE_WIDTH,
             width,
             bias=False,
         )
+        self.macro_early_activation = nn.SiLU()
+        self.macro_early_norm = nn.LayerNorm(width, elementwise_affine=False)
+        self.macro_early_output_projection = nn.Linear(width, width, bias=False)
         self.slow_film = nn.ModuleList(
             [
                 nn.Linear(width, 2 * width, bias=False)
@@ -73,7 +91,7 @@ class _ContextRoutingScaffold(nn.Module):
 
     def zero_final_projections(self) -> None:
         nn.init.zeros_(self.slow_early_input_adapter.weight)
-        nn.init.zeros_(self.macro_early_input_projection.weight)
+        nn.init.zeros_(self.macro_early_output_projection.weight)
         for slow, macro in zip(self.slow_film, self.macro_film, strict=True):
             nn.init.zeros_(slow.weight)
             nn.init.zeros_(macro[-1].weight)
@@ -144,8 +162,9 @@ class SharedCausalTCN(nn.Module):
             if module.bias is not None:
                 nn.init.zeros_(module.bias)
         elif isinstance(module, nn.LayerNorm):
-            nn.init.ones_(module.weight)
-            nn.init.zeros_(module.bias)
+            if module.elementwise_affine:
+                nn.init.ones_(module.weight)
+                nn.init.zeros_(module.bias)
 
     @staticmethod
     def _route_has_early(route: str) -> bool:
@@ -184,12 +203,19 @@ class SharedCausalTCN(nn.Module):
         local_stop = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
         global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT + 2
         global_stop = global_start + 2
-        macro_slow = torch.cat(
+        local_slow = slow_features[:, local_start:local_stop]
+        global_slow = torch.cat(
             (
-                slow_features[:, local_start:local_stop],
-                slow_features[:, global_start:global_stop],
+                slow_features[
+                    :, global_start:global_stop, :_GLOBAL_SLOW_EXCLUDED_INDEX
+                ],
+                slow_features[
+                    :,
+                    global_start:global_stop,
+                    _GLOBAL_SLOW_EXCLUDED_INDEX + 1 :,
+                ],
             ),
-            dim=1,
+            dim=-1,
         )
         macro_ready = torch.cat(
             (
@@ -200,8 +226,9 @@ class SharedCausalTCN(nn.Module):
         )
         macro_input = torch.cat(
             (
-                macro_slow.reshape(macro_slow.shape[0], -1),
-                macro_ready.to(macro_slow.dtype),
+                local_slow.reshape(local_slow.shape[0], -1),
+                global_slow.reshape(global_slow.shape[0], -1),
+                macro_ready.to(local_slow.dtype),
             ),
             dim=-1,
         )
@@ -215,7 +242,9 @@ class SharedCausalTCN(nn.Module):
         history_patch_mask: torch.Tensor,
         state_position: torch.Tensor,
     ) -> torch.Tensor:
-        macro, _ = self._macro_sources(patches, history_patch_mask, state_position)
+        macro, available = self._macro_sources(
+            patches, history_patch_mask, state_position
+        )
         batch_size, source_count, patch_count, _ = macro.shape
         meaningful = macro.reshape(
             batch_size,
@@ -224,16 +253,25 @@ class SharedCausalTCN(nn.Module):
             PATCH_MINUTES,
             DYNAMIC_CHANNEL_COUNT,
         )[..., :CONTEXT_GENERIC_DYNAMIC_COUNT]
-        return (
-            meaningful.reshape(
-                batch_size,
-                source_count,
-                patch_count,
-                CONTEXT_ROUTING_PATCH_SOURCE_WIDTH,
-            )
-            .permute(0, 2, 1, 3)
-            .reshape(batch_size, patch_count, -1)
+        values = meaningful.reshape(
+            batch_size,
+            source_count,
+            patch_count,
+            CONTEXT_ROUTING_PATCH_SOURCE_WIDTH,
         )
+        values = values * available[..., None].to(values.dtype)
+        source_input = torch.cat(
+            (values, available[..., None].to(values.dtype)), dim=-1
+        )
+        return source_input.permute(0, 2, 1, 3).reshape(batch_size, patch_count, -1)
+
+    def _macro_early_input(self, macro_input: torch.Tensor) -> torch.Tensor:
+        if self.routing is None:
+            raise AssertionError("Macro early input requires factorial routing")
+        latent = self.routing.macro_early_input_projection(macro_input)
+        latent = self.routing.macro_early_activation(latent)
+        latent = self.routing.macro_early_norm(latent)
+        return self.routing.macro_early_output_projection(latent)
 
     def _apply_film(
         self,
@@ -291,7 +329,7 @@ class SharedCausalTCN(nn.Module):
         if gamma is None or beta is None:
             return hidden
         equity = streams[:, :EQUITY_COUNT]
-        modulated = (1.0 + gamma) * equity + beta
+        modulated = apply_context_film(equity, gamma, beta)
         return torch.cat((modulated, streams[:, EQUITY_COUNT:]), dim=1).reshape(
             batch_size * INSTRUMENT_COUNT,
             architecture.width,
@@ -350,9 +388,7 @@ class SharedCausalTCN(nn.Module):
             macro_input = self._macro_raw_input(
                 patches, history_patch_mask, state_position
             )
-            macro_early = self.routing.macro_early_input_projection(
-                macro_input
-            ).permute(0, 2, 1)[:, None]
+            macro_early = self._macro_early_input(macro_input).permute(0, 2, 1)[:, None]
             macro_valid = (
                 causal_patch_mask(state_position)[:, None, None, :]
                 & instrument_mask[:, :EQUITY_COUNT, None, None]

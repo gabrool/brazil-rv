@@ -168,8 +168,8 @@ def test_factorial_scaffold_preserves_initialization_predictions_and_counts() ->
             assert torch.equal(_forward(model, inputs, peer), expected)
 
     assert len(structures) == 1
-    assert counts == {514_179}
-    assert context_routing_parameter_count(architecture) == 236_160
+    assert counts == {518_659}
+    assert context_routing_parameter_count(architecture) == 240_640
     assert routing_reference is not None
     assert routing_reference
 

@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-import numpy as np
 import torch
 
 from .analyze_stage2_context_ablation import (
@@ -24,15 +23,39 @@ from .audit_realized_distributions import (
     AUDIT_JSON,
     AUDIT_NAME,
     AUDIT_VERSION,
+    FEATURE_PARQUET,
+    TARGET_PARQUET,
     run_realized_distribution_audit,
     validate_realized_distribution_audit,
 )
 from .context_ablation import resolve_context_ablation_for_store
+from .context_routing_adaptive import (
+    CONDITIONAL_ROUTING_RUN_COUNT_MAXIMUM,
+    ISSUER_RUN_COUNT_MAXIMUM,
+    ISSUER_RUN_COUNT_MINIMUM,
+    MANDATORY_ROUTING_RUN_COUNT,
+    ROUTING_RUN_COUNT_MAXIMUM,
+    ROUTING_RUN_COUNT_MINIMUM,
+    TOTAL_TRAINING_RUN_COUNT_MAXIMUM,
+    TOTAL_TRAINING_RUN_COUNT_MINIMUM,
+    joint_synthesis_gate,
+    seed29_candidate_gate,
+    select_candidate,
+    three_seed_candidate_gate,
+    within_source_combination_gate,
+)
+from .context_routing_artifacts import (
+    create_validated_archive,
+    publish_output_pointer,
+    sha256_file,
+    validate_archive,
+    validate_archive_sha256,
+    write_archive_sha256,
+)
 from .contract import (
     ALLOWED_SEEDS,
     CONTEXT_ROUTING_MODES,
     FEATURE_CONTRACT_VERSION,
-    HORIZONS,
     PROJECT_ROOT,
     RUN_OUTPUT_BASE,
     VALIDATION_END,
@@ -45,6 +68,10 @@ from .contract import (
     peer_feature_metadata,
 )
 from .data import resolve_feature_store, validate_feature_store
+from .routing_identity_preflight import (
+    PREFLIGHT_VERSION,
+    run_routing_identity_preflight,
+)
 from .engine import objective_metadata, sam_metadata
 from .evaluate import _validate_run_checkpoint_identity
 from .feature_ablation import resolve_feature_ablation_for_store
@@ -59,10 +86,13 @@ from .stage3_context_addition import (
     _reject_test_derived_metadata,
 )
 
-EXPERIMENT_NAME = "stage5_context_routing_factorial_v1"
-STATE_VERSION = 1
+EXPERIMENT_NAME = "stage5_context_routing_adaptive_v1"
+STATE_VERSION = 2
 PEER_PRIMARY_STATE_POINTER = (
-    RUN_OUTPUT_BASE / "_ops" / "peer_primary_matrix_canonical_path.txt"
+    RUN_OUTPUT_BASE / "_ops" / "peer_primary_matrix_current_path.txt"
+)
+OUTPUT_POINTER = (
+    RUN_OUTPUT_BASE / "_ops" / "context_routing_sequence_outputs_current_path.txt"
 )
 FROZEN_CONTEXT_ABLATION = "drop_win_and_global_non_rates"
 FROZEN_FEATURE_ABLATION = "none"
@@ -72,9 +102,7 @@ FROZEN_TCN_BASE = {
     "receptive_field": "full",
     "block": "swiglu",
 }
-ROUTING_MODE_ORDER = CONTEXT_ROUTING_MODES
 ISSUER_SEED_ORDER = (29, 11, 47)
-ROUTING_SEEDS = ALLOWED_SEEDS
 _REQUIRED_OUTPUTS = (
     "run_manifest.json",
     "best.pt",
@@ -85,7 +113,17 @@ _REQUIRED_OUTPUTS = (
 )
 _REPOSITORY = PROJECT_ROOT / "quant" / "b3-quant"
 _RESEARCH = _REPOSITORY / "research"
-SUMMARY_JSON = "stage5_context_routing_summary.json"
+SUMMARY_JSON = "experiment_summary.json"
+SUMMARY_MARKDOWN = "experiment_summary.md"
+PLAN_JSON = "plan.json"
+PAIRED_RESULTS_JSON = "paired_results.json"
+PREFLIGHT_JSON = "routing_identity_preflight.json"
+EXPERIMENT_LOG = "experiment.log"
+COMPLETED_RUN_PATHS_JSON = "completed_run_paths.json"
+ARTIFACT_HASHES_JSON = "artifact_hashes.json"
+RUNBOOK = "operator_runbook.md"
+ARCHIVE_NAME = "context_routing_sequence_outputs.zip"
+ARCHIVE_SHA256_NAME = f"{ARCHIVE_NAME}.sha256"
 
 
 @dataclass(frozen=True)
@@ -240,89 +278,89 @@ def build_training_command(
 
 def routing_stage(slow_routing: str, macro_temporal_routing: str) -> str:
     if slow_routing == "late_only" and macro_temporal_routing == "late_only":
-        return "scaffold_control"
+        raise ValueError("Adaptive routing never trains an all-off scaffold control")
     if slow_routing != "late_only" and macro_temporal_routing == "late_only":
         return "slow_only"
     if slow_routing == "late_only" and macro_temporal_routing != "late_only":
         return "macro_temporal_only"
-    return "joint_factorial"
+    return "joint_synthesis"
+
+
+def _finalize_job_specification(specification: dict[str, object]) -> dict[str, object]:
+    serialized = json.dumps(specification, sort_keys=True, separators=(",", ":"))
+    return {
+        **specification,
+        "serialized_job_specification": serialized,
+        "job_specification_sha256": hashlib.sha256(serialized.encode()).hexdigest(),
+    }
+
+
+def routing_job(
+    slow_routing: str,
+    macro_temporal_routing: str,
+    seed: int,
+    stage: str,
+) -> dict[str, object]:
+    if (
+        slow_routing not in CONTEXT_ROUTING_MODES
+        or macro_temporal_routing not in CONTEXT_ROUTING_MODES
+        or (slow_routing == "late_only" and macro_temporal_routing == "late_only")
+    ):
+        raise ValueError("Adaptive routing jobs require at least one enabled route")
+    specification = {
+        "job_id": (
+            f"routing:slow={slow_routing}:macro={macro_temporal_routing}:seed={seed}"
+        ),
+        "job_kind": "routing",
+        "stage": stage,
+        "seed": seed,
+        "peer_features": "selected",
+        "slow_routing": slow_routing,
+        "macro_temporal_routing": macro_temporal_routing,
+        "context_routing_experiment": "factorial_v1",
+        "command": list(
+            build_training_command(
+                seed=seed,
+                peer_features="selected",
+                slow_routing=slow_routing,
+                macro_temporal_routing=macro_temporal_routing,
+                context_routing_experiment="factorial_v1",
+            )
+        ),
+    }
+    return _finalize_job_specification(specification)
 
 
 def routing_jobs() -> tuple[dict[str, object], ...]:
-    jobs: list[dict[str, object]] = []
-    combinations = [
-        ("late_only", "late_only"),
-        *((slow, "late_only") for slow in ROUTING_MODE_ORDER[1:]),
-        *(("late_only", macro) for macro in ROUTING_MODE_ORDER[1:]),
-        *(
-            (slow, macro)
-            for slow in ROUTING_MODE_ORDER[1:]
-            for macro in ROUTING_MODE_ORDER[1:]
+    return (
+        routing_job("early_concat", "late_only", 29, "mandatory_seed29_screen"),
+        routing_job("film", "late_only", 29, "mandatory_seed29_screen"),
+        routing_job("late_only", "early_concat", 29, "mandatory_seed29_screen"),
+        routing_job("late_only", "film", 29, "mandatory_seed29_screen"),
+    )
+
+
+def issuer_job(seed: int) -> dict[str, object]:
+    if seed not in ISSUER_SEED_ORDER:
+        raise ValueError("Issuer job seed is outside the frozen contract")
+    specification = {
+        "job_id": f"issuer:seed={seed}",
+        "job_kind": "issuer",
+        "stage": "seed29_screen" if seed == 29 else "matched_seed_confirmation",
+        "seed": seed,
+        "peer_features": "selected_plus_issuer",
+        "slow_routing": "late_only",
+        "macro_temporal_routing": "late_only",
+        "context_routing_experiment": "legacy",
+        "command": list(
+            build_training_command(seed=seed, peer_features="selected_plus_issuer")
         ),
-    ]
-    if len(combinations) != 16 or len(set(combinations)) != 16:
-        raise RuntimeError("Routing matrix must contain the complete 4x4 factorial")
-    for slow, macro in combinations:
-        for seed in ROUTING_SEEDS:
-            specification = {
-                "job_kind": "routing",
-                "stage": routing_stage(slow, macro),
-                "seed": seed,
-                "peer_features": "selected",
-                "slow_routing": slow,
-                "macro_temporal_routing": macro,
-                "context_routing_experiment": "factorial_v1",
-                "command": list(
-                    build_training_command(
-                        seed=seed,
-                        peer_features="selected",
-                        slow_routing=slow,
-                        macro_temporal_routing=macro,
-                        context_routing_experiment="factorial_v1",
-                    )
-                ),
-            }
-            serialized = json.dumps(
-                specification, sort_keys=True, separators=(",", ":")
-            )
-            jobs.append(
-                {
-                    **specification,
-                    "serialized_job_specification": serialized,
-                    "job_specification_sha256": hashlib.sha256(
-                        serialized.encode()
-                    ).hexdigest(),
-                }
-            )
-    return tuple(jobs)
+    }
+    return _finalize_job_specification(specification)
 
 
 def issuer_jobs() -> tuple[dict[str, object], ...]:
-    jobs = []
-    for seed in ISSUER_SEED_ORDER:
-        specification = {
-            "job_kind": "issuer",
-            "stage": "seed29_screen" if seed == 29 else "matched_seed_confirmation",
-            "seed": seed,
-            "peer_features": "selected_plus_issuer",
-            "slow_routing": "late_only",
-            "macro_temporal_routing": "late_only",
-            "context_routing_experiment": "legacy",
-            "command": list(
-                build_training_command(seed=seed, peer_features="selected_plus_issuer")
-            ),
-        }
-        serialized = json.dumps(specification, sort_keys=True, separators=(",", ":"))
-        jobs.append(
-            {
-                **specification,
-                "serialized_job_specification": serialized,
-                "job_specification_sha256": hashlib.sha256(
-                    serialized.encode()
-                ).hexdigest(),
-            }
-        )
-    return tuple(jobs)
+    return tuple(issuer_job(seed) for seed in ISSUER_SEED_ORDER)
 
 
 def _artifact_hashes(run_dir: Path) -> dict[str, str]:
@@ -525,250 +563,81 @@ def _source_incumbents(
     return {seed: values[0] for seed, values in candidates.items()}
 
 
-def _metric_delta(
-    treatment: dict[str, object], control: dict[str, object]
-) -> dict[str, object]:
-    treatment_horizons = treatment["horizons"]
-    control_horizons = control["horizons"]
-    if not isinstance(treatment_horizons, dict) or not isinstance(
-        control_horizons, dict
-    ):
-        raise ValueError("Validation horizon metrics are malformed")
-    horizons = {}
-    for horizon in (f"{value}m" for value in HORIZONS):
-        current = treatment_horizons[horizon]
-        baseline = control_horizons[horizon]
-        horizons[horizon] = {
-            "control_ic": baseline["spearman_ic"],
-            "treatment_ic": current["spearman_ic"],
-            "delta_ic": float(current["spearman_ic"]) - float(baseline["spearman_ic"]),
-            "control_gross_spread": baseline["gross_top_minus_bottom"],
-            "treatment_gross_spread": current["gross_top_minus_bottom"],
-            "delta_gross_spread": float(current["gross_top_minus_bottom"])
-            - float(baseline["gross_top_minus_bottom"]),
-            "control_turnover": baseline["one_way_turnover"],
-            "treatment_turnover": current["one_way_turnover"],
-            "delta_turnover": float(current["one_way_turnover"])
-            - float(baseline["one_way_turnover"]),
-        }
-    return {
-        "control_primary_ic": control["primary_ic"],
-        "treatment_primary_ic": treatment["primary_ic"],
-        "delta_primary_ic": float(treatment["primary_ic"])
-        - float(control["primary_ic"]),
-        "control_mean_gross_spread": control["mean_gross_top_minus_bottom"],
-        "treatment_mean_gross_spread": treatment["mean_gross_top_minus_bottom"],
-        "delta_mean_gross_spread": float(treatment["mean_gross_top_minus_bottom"])
-        - float(control["mean_gross_top_minus_bottom"]),
-        "control_mean_turnover": control["mean_one_way_turnover"],
-        "treatment_mean_turnover": treatment["mean_one_way_turnover"],
-        "delta_mean_turnover": float(treatment["mean_one_way_turnover"])
-        - float(control["mean_one_way_turnover"]),
-        "horizons": horizons,
-    }
-
-
 def issuer_seed29_gate(
     incumbent: CompletedRun,
     issuer: CompletedRun,
 ) -> dict[str, object]:
     if incumbent.seed != 29 or issuer.seed != 29:
         raise ValueError("Issuer first-stage gate requires the matched seed 29 pair")
-    delta = _metric_delta(issuer.metrics, incumbent.metrics)
-    horizon_values = list(delta["horizons"].values())
-    positive_horizons = sum(float(row["delta_ic"]) > 0.0 for row in horizon_values)
-    deteriorated_spreads = sum(
-        float(row["delta_gross_spread"]) < 0.0 for row in horizon_values
-    )
-    passed = (
-        float(delta["delta_primary_ic"]) > 0.0
-        and positive_horizons >= 2
-        and deteriorated_spreads <= 1
-    )
-    return {
-        "stage": "seed29_screen",
-        "passed": passed,
-        "criteria": {
-            "positive_paired_primary_ic_delta": float(delta["delta_primary_ic"]) > 0.0,
-            "positive_horizon_ic_delta_count": positive_horizons,
-            "minimum_positive_horizon_count": 2,
-            "gross_spread_deterioration_count": deteriorated_spreads,
-            "maximum_gross_spread_deterioration_count": 1,
-        },
-        "paired_metrics": delta,
-        "transaction_cost_modeling": False,
-    }
+    return seed29_candidate_gate(incumbent.metrics, issuer.metrics)
 
 
 def issuer_three_seed_gate(
     incumbents: dict[int, CompletedRun],
     issuers: dict[int, CompletedRun],
 ) -> dict[str, object]:
-    if (
-        tuple(sorted(incumbents)) != ALLOWED_SEEDS
-        or tuple(sorted(issuers)) != ALLOWED_SEEDS
-    ):
-        raise ValueError("Issuer confirmation requires matched seeds 11, 29, and 47")
-    paired = {
-        seed: _metric_delta(issuers[seed].metrics, incumbents[seed].metrics)
-        for seed in ALLOWED_SEEDS
-    }
-    primary = np.asarray(
-        [paired[seed]["delta_primary_ic"] for seed in ALLOWED_SEEDS],
-        dtype=np.float64,
+    return three_seed_candidate_gate(
+        {seed: run.metrics for seed, run in incumbents.items()},
+        {seed: run.metrics for seed, run in issuers.items()},
     )
-    horizon_means = {
-        f"{horizon}m": float(
-            np.mean(
-                [
-                    paired[seed]["horizons"][f"{horizon}m"]["delta_ic"]
-                    for seed in ALLOWED_SEEDS
-                ]
-            )
-        )
-        for horizon in HORIZONS
-    }
-    passed = (
-        float(primary.mean()) > 0.0
-        and int((primary > 0.0).sum()) >= 2
-        and sum(value > 0.0 for value in horizon_means.values()) >= 2
-    )
-    return {
-        "stage": "three_seed_confirmation",
-        "passed": passed,
-        "criteria": {
-            "mean_paired_primary_effect": float(primary.mean()),
-            "positive_paired_primary_seed_count": int((primary > 0.0).sum()),
-            "minimum_positive_seed_count": 2,
-            "mean_horizon_effects": horizon_means,
-            "positive_mean_horizon_effect_count": sum(
-                value > 0.0 for value in horizon_means.values()
-            ),
-            "minimum_positive_mean_horizon_count": 2,
-        },
-        "paired_by_seed": {str(seed): paired[seed] for seed in ALLOWED_SEEDS},
-        "transaction_cost_modeling": False,
-    }
 
 
-def routing_summary(
-    incumbents: dict[int, CompletedRun],
-    runs: dict[tuple[str, str, int], CompletedRun],
+def routing_seed29_gate(
+    incumbent: CompletedRun,
+    candidate: CompletedRun,
 ) -> dict[str, object]:
-    expected = {
-        (slow, macro, seed)
-        for slow in ROUTING_MODE_ORDER
-        for macro in ROUTING_MODE_ORDER
-        for seed in ROUTING_SEEDS
-    }
-    if set(runs) != expected:
-        raise ValueError(
-            "Routing summary requires the complete 4x4 matched-seed matrix"
-        )
-    control = {seed: runs[("late_only", "late_only", seed)] for seed in ROUTING_SEEDS}
-    scaffold = {
-        str(seed): _metric_delta(control[seed].metrics, incumbents[seed].metrics)
-        for seed in ROUTING_SEEDS
-    }
-    arms = {}
-    for slow in ROUTING_MODE_ORDER:
-        for macro in ROUTING_MODE_ORDER:
-            identity = f"slow={slow}|macro={macro}"
-            arms[identity] = {
-                "stage": routing_stage(slow, macro),
-                "paired_vs_factorial_control": {
-                    str(seed): _metric_delta(
-                        runs[(slow, macro, seed)].metrics,
-                        control[seed].metrics,
-                    )
-                    for seed in ROUTING_SEEDS
-                },
-            }
+    if incumbent.seed != 29 or candidate.seed != 29:
+        raise ValueError("Routing first-stage gate requires a matched seed-29 pair")
+    return seed29_candidate_gate(incumbent.metrics, candidate.metrics)
 
-    effects: dict[str, list[dict[str, object]]] = {
-        "slow_early_concat": [],
-        "slow_film": [],
-        "macro_temporal_early_concat": [],
-        "macro_temporal_film": [],
-    }
-    for seed in ROUTING_SEEDS:
-        for macro in ROUTING_MODE_ORDER:
-            for film in (False, True):
-                off = "film" if film else "late_only"
-                on = "early_concat_film" if film else "early_concat"
-                effects["slow_early_concat"].append(
-                    _metric_delta(
-                        runs[(on, macro, seed)].metrics,
-                        runs[(off, macro, seed)].metrics,
-                    )
-                )
-            for early in (False, True):
-                off = "early_concat" if early else "late_only"
-                on = "early_concat_film" if early else "film"
-                effects["slow_film"].append(
-                    _metric_delta(
-                        runs[(on, macro, seed)].metrics,
-                        runs[(off, macro, seed)].metrics,
-                    )
-                )
-        for slow in ROUTING_MODE_ORDER:
-            for film in (False, True):
-                off = "film" if film else "late_only"
-                on = "early_concat_film" if film else "early_concat"
-                effects["macro_temporal_early_concat"].append(
-                    _metric_delta(
-                        runs[(slow, on, seed)].metrics,
-                        runs[(slow, off, seed)].metrics,
-                    )
-                )
-            for early in (False, True):
-                off = "early_concat" if early else "late_only"
-                on = "early_concat_film" if early else "film"
-                effects["macro_temporal_film"].append(
-                    _metric_delta(
-                        runs[(slow, on, seed)].metrics,
-                        runs[(slow, off, seed)].metrics,
-                    )
-                )
 
-    main_effects = {}
-    for name, comparisons in effects.items():
-        main_effects[name] = {
-            "matched_comparison_count": len(comparisons),
-            "mean_delta_primary_ic": float(
-                np.mean([row["delta_primary_ic"] for row in comparisons])
-            ),
-            "positive_primary_comparison_count": sum(
-                float(row["delta_primary_ic"]) > 0.0 for row in comparisons
-            ),
-            "mean_delta_gross_spread": float(
-                np.mean([row["delta_mean_gross_spread"] for row in comparisons])
-            ),
-            "mean_delta_turnover": float(
-                np.mean([row["delta_mean_turnover"] for row in comparisons])
-            ),
-            "mean_horizon_ic_delta": {
-                f"{horizon}m": float(
-                    np.mean(
-                        [
-                            row["horizons"][f"{horizon}m"]["delta_ic"]
-                            for row in comparisons
-                        ]
-                    )
-                )
-                for horizon in HORIZONS
-            },
-        }
+def routing_three_seed_gate(
+    incumbents: dict[int, CompletedRun],
+    candidates: dict[int, CompletedRun],
+) -> dict[str, object]:
+    return three_seed_candidate_gate(
+        {seed: run.metrics for seed, run in incumbents.items()},
+        {seed: run.metrics for seed, run in candidates.items()},
+    )
+
+
+def _selection_candidate(
+    run: CompletedRun, gate: dict[str, object]
+) -> dict[str, object]:
     return {
-        "matrix": "complete_4x4_factorial_across_seeds_11_29_47",
-        "run_count": len(runs),
-        "factorial_scaffold_vs_exact_legacy_incumbent": scaffold,
-        "arms": arms,
-        "independent_main_effects": main_effects,
-        "winner_selected": False,
-        "final_holdout_status": "sealed_not_accessed",
-        "transaction_cost_modeling": False,
+        "identity": (f"slow={run.slow_routing}|macro={run.macro_temporal_routing}"),
+        "slow_routing": run.slow_routing,
+        "macro_temporal_routing": run.macro_temporal_routing,
+        "gate": gate,
     }
+
+
+def _peer_primary_provenance(peer_primary_state: Path) -> dict[str, object]:
+    provenance: dict[str, object] = {
+        "resolved_state_path": str(peer_primary_state),
+        "resolved_state_sha256": _sha256(peer_primary_state),
+        "authoritative_pointer_path": str(PEER_PRIMARY_STATE_POINTER),
+    }
+    if PEER_PRIMARY_STATE_POINTER.is_file():
+        pointer_target = resolve_peer_primary_state()
+        provenance.update(
+            {
+                "authoritative_pointer_sha256": _sha256(PEER_PRIMARY_STATE_POINTER),
+                "authoritative_pointer_target": str(pointer_target),
+                "explicit_cli_override": not pointer_target.samefile(
+                    peer_primary_state
+                ),
+            }
+        )
+    else:
+        provenance.update(
+            {
+                "authoritative_pointer_sha256": None,
+                "authoritative_pointer_target": None,
+                "explicit_cli_override": True,
+            }
+        )
+    return provenance
 
 
 def _configuration(
@@ -784,8 +653,7 @@ def _configuration(
         "orchestrator_git_commit_sha": commit,
         "feature_store": _feature_store_identity(feature_store),
         "feature_contract": FEATURE_CONTRACT_VERSION,
-        "source_peer_primary_state": str(peer_primary_state),
-        "source_peer_primary_state_sha256": _sha256(peer_primary_state),
+        "source_peer_primary": _peer_primary_provenance(peer_primary_state),
         "context_ablation": resolve_context_ablation_for_store(
             feature_store, FROZEN_CONTEXT_ABLATION
         ).metadata(),
@@ -808,8 +676,18 @@ def _configuration(
             "state_dict_structure_equal_across_arms": True,
         },
         "seeds": list(ALLOWED_SEEDS),
-        "issuer_job_count_maximum": 3,
-        "routing_job_count": 48,
+        "identity_preflight": {
+            "version": PREFLIGHT_VERSION,
+            "execution_modes": ["eager", "compiled"],
+            "deterministic_sam_steps": 3,
+            "all_off_scaffold_control_training": False,
+        },
+        "issuer_run_count_minimum": ISSUER_RUN_COUNT_MINIMUM,
+        "issuer_run_count_maximum": ISSUER_RUN_COUNT_MAXIMUM,
+        "routing_run_count_minimum": ROUTING_RUN_COUNT_MINIMUM,
+        "routing_run_count_maximum": ROUTING_RUN_COUNT_MAXIMUM,
+        "total_training_run_count_minimum": TOTAL_TRAINING_RUN_COUNT_MINIMUM,
+        "total_training_run_count_maximum": TOTAL_TRAINING_RUN_COUNT_MAXIMUM,
         "final_holdout_status": "sealed_not_accessed",
     }
 
@@ -825,9 +703,9 @@ def _new_job(base: dict[str, object]) -> dict[str, object]:
         "started_at_utc": None,
         "completed_at_utc": None,
         "primary_validation_ic": None,
+        "context_routing": None,
         "recovery_count": 0,
         "last_recovery_at_utc": None,
-        "skip_reason": None,
         "error": None,
     }
 
@@ -836,6 +714,7 @@ def _new_state(
     configuration: dict[str, object],
     incumbents: dict[int, tuple[CompletedRun, dict[str, object]]],
     audit_path: Path,
+    preflight_path: Path,
 ) -> dict[str, object]:
     now = datetime.now(timezone.utc).isoformat()
     return {
@@ -845,8 +724,15 @@ def _new_state(
         "configuration": configuration,
         "created_at_utc": now,
         "completed_at_utc": None,
+        "routing_identity_preflight": {
+            "path": str(preflight_path),
+            "sha256": _sha256(preflight_path),
+            "version": PREFLIGHT_VERSION,
+            "status": "passed",
+        },
         "realized_distribution_audit": {
-            "path": str(audit_path),
+            "path": str(audit_path.parent),
+            "audit_json": str(audit_path),
             "sha256": _sha256(audit_path),
             "audit_name": AUDIT_NAME,
             "audit_version": AUDIT_VERSION,
@@ -861,11 +747,16 @@ def _new_state(
             }
             for seed, (run, provenance) in incumbents.items()
         },
-        "issuer_jobs": [_new_job(base) for base in issuer_jobs()],
-        "routing_jobs": [_new_job(base) for base in routing_jobs()],
+        "issuer_jobs": [],
+        "routing_jobs": [],
+        "decisions": [],
         "issuer_screen": None,
         "routing_summary": None,
-        "summary_artifact": None,
+        "output_contract": {
+            "archive": ARCHIVE_NAME,
+            "archive_sha256": ARCHIVE_SHA256_NAME,
+            "output_pointer": str(OUTPUT_POINTER),
+        },
     }
 
 
@@ -876,8 +767,6 @@ def _configurations_match(
     right = dict(current)
     left_feature = left.pop("feature_store", None)
     right_feature = right.pop("feature_store", None)
-    left.pop("source_peer_primary_state", None)
-    right.pop("source_peer_primary_state", None)
     return (
         left == right
         and isinstance(left_feature, dict)
@@ -886,16 +775,14 @@ def _configurations_match(
     )
 
 
-def _validate_job_shape(
-    recorded: list[object],
-    expected: tuple[dict[str, object], ...],
-    *,
-    allow_skipped: bool,
-) -> list[dict[str, object]]:
-    if not isinstance(recorded, list) or len(recorded) != len(expected):
-        raise ValueError("Stage-5 state has the wrong job count")
-    result = []
+def _validate_dynamic_jobs(recorded: object, job_kind: str) -> list[dict[str, object]]:
+    if not isinstance(recorded, list):
+        raise ValueError("Adaptive job state must be a list")
+    result: list[dict[str, object]] = []
+    identities: set[str] = set()
+    statuses = {"pending", "running", "failed", "completed"}
     immutable = (
+        "job_id",
         "job_kind",
         "stage",
         "seed",
@@ -907,21 +794,30 @@ def _validate_job_shape(
         "serialized_job_specification",
         "job_specification_sha256",
     )
-    statuses = {"pending", "running", "failed", "completed"}
-    if allow_skipped:
-        statuses.add("skipped")
-    for job, base in zip(recorded, expected, strict=True):
-        if not isinstance(job, dict):
-            raise ValueError("Stage-5 job is malformed")
+    for job in recorded:
+        if not isinstance(job, dict) or job.get("job_kind") != job_kind:
+            raise ValueError("Adaptive job state contains a malformed job")
+        if job_kind == "issuer":
+            expected = issuer_job(int(job["seed"]))
+        else:
+            expected = routing_job(
+                str(job["slow_routing"]),
+                str(job["macro_temporal_routing"]),
+                int(job["seed"]),
+                str(job["stage"]),
+            )
         recovery = job.get("recovery_count")
+        identity = str(job.get("job_id"))
         if (
             job.get("status") not in statuses
-            or any(job.get(field) != base[field] for field in immutable)
+            or any(job.get(field) != expected[field] for field in immutable)
             or not isinstance(recovery, int)
             or isinstance(recovery, bool)
             or recovery < 0
+            or identity in identities
         ):
-            raise ValueError("Stage-5 job identity drifted")
+            raise ValueError("Adaptive job identity drifted")
+        identities.add(identity)
         result.append(job)
     return result
 
@@ -931,9 +827,10 @@ def _load_state(
     configuration: dict[str, object],
     incumbents: dict[int, tuple[CompletedRun, dict[str, object]]],
     audit_path: Path,
+    preflight_path: Path,
 ) -> dict[str, object]:
     if not state_path.exists():
-        return _new_state(configuration, incumbents, audit_path)
+        return _new_state(configuration, incumbents, audit_path, preflight_path)
     state = json.loads(state_path.read_text(encoding="utf-8"))
     _reject_test_derived_metadata(state, "Stage-5 state")
     if (
@@ -944,8 +841,15 @@ def _load_state(
         or not _configurations_match(state["configuration"], configuration)
     ):
         raise ValueError("Stage-5 state has an incompatible identity")
-    _validate_job_shape(state.get("issuer_jobs"), issuer_jobs(), allow_skipped=True)
-    _validate_job_shape(state.get("routing_jobs"), routing_jobs(), allow_skipped=False)
+    _validate_dynamic_jobs(state.get("issuer_jobs"), "issuer")
+    _validate_dynamic_jobs(state.get("routing_jobs"), "routing")
+    decisions = state.get("decisions")
+    if (
+        not isinstance(decisions, list)
+        or any(not isinstance(item, dict) for item in decisions)
+        or len({item.get("decision_id") for item in decisions}) != len(decisions)
+    ):
+        raise ValueError("Stage-5 adaptive decisions are malformed or duplicated")
     audit = state.get("realized_distribution_audit")
     if (
         not isinstance(audit, dict)
@@ -954,6 +858,14 @@ def _load_state(
         or audit.get("audit_version") != AUDIT_VERSION
     ):
         raise ValueError("Stage-5 audit provenance changed")
+    preflight = state.get("routing_identity_preflight")
+    if (
+        not isinstance(preflight, dict)
+        or preflight.get("sha256") != _sha256(preflight_path)
+        or preflight.get("version") != PREFLIGHT_VERSION
+        or preflight.get("status") != "passed"
+    ):
+        raise ValueError("Stage-5 routing identity preflight provenance changed")
     for seed, (run, provenance) in incumbents.items():
         recorded = state.get("incumbent_runs", {}).get(str(seed))
         expected = {
@@ -966,6 +878,127 @@ def _load_state(
         if recorded != expected:
             raise ValueError(f"Stage-5 incumbent provenance changed for seed {seed}")
     return state
+
+
+def _ensure_job(
+    state: dict[str, object], specification: dict[str, object]
+) -> dict[str, object]:
+    key = "issuer_jobs" if specification["job_kind"] == "issuer" else "routing_jobs"
+    jobs = state[key]
+    if not isinstance(jobs, list):
+        raise ValueError("Adaptive job collection is malformed")
+    matches = [job for job in jobs if job.get("job_id") == specification["job_id"]]
+    if len(matches) > 1:
+        raise ValueError("Adaptive job identity is duplicated")
+    if matches:
+        job = matches[0]
+        for field, value in specification.items():
+            if job.get(field) != value:
+                raise ValueError("Persisted adaptive job specification drifted")
+        return job
+    job = _new_job(specification)
+    jobs.append(job)
+    return job
+
+
+def _record_decision(
+    state: dict[str, object], decision_id: str, payload: dict[str, object]
+) -> dict[str, object]:
+    record = {"decision_id": decision_id, **payload}
+    decisions = state["decisions"]
+    if not isinstance(decisions, list):
+        raise ValueError("Adaptive decision state is malformed")
+    matches = [item for item in decisions if item.get("decision_id") == decision_id]
+    if len(matches) > 1:
+        raise ValueError("Adaptive decision identity is duplicated")
+    if matches:
+        if matches[0] != record:
+            raise ValueError(f"Adaptive decision changed on restart: {decision_id}")
+        return matches[0]
+    decisions.append(record)
+    return record
+
+
+def _plan_payload(state: dict[str, object]) -> dict[str, object]:
+    return {
+        "experiment_name": EXPERIMENT_NAME,
+        "state_version": STATE_VERSION,
+        "status": state["status"],
+        "precommitted_adaptive_sequence": {
+            "mandatory_seed29": [
+                "slow_early_concat_only",
+                "slow_film_only",
+                "macro_temporal_early_concat_only",
+                "macro_temporal_film_only",
+            ],
+            "within_source_combination": "only_if_both_individual_routes_pass",
+            "joint_synthesis": "only_if_each_source_has_an_eligible_selection",
+            "confirmation_seeds": [11, 47],
+            "confirmation_scope": "single_selected_candidate_only",
+            "all_off_scaffold_control_training": False,
+        },
+        "run_counts": {
+            "issuer_minimum": ISSUER_RUN_COUNT_MINIMUM,
+            "issuer_maximum": ISSUER_RUN_COUNT_MAXIMUM,
+            "routing_mandatory": MANDATORY_ROUTING_RUN_COUNT,
+            "routing_conditional_maximum": CONDITIONAL_ROUTING_RUN_COUNT_MAXIMUM,
+            "routing_minimum": ROUTING_RUN_COUNT_MINIMUM,
+            "routing_maximum": ROUTING_RUN_COUNT_MAXIMUM,
+            "total_minimum": TOTAL_TRAINING_RUN_COUNT_MINIMUM,
+            "total_maximum": TOTAL_TRAINING_RUN_COUNT_MAXIMUM,
+        },
+        "jobs": [*state["issuer_jobs"], *state["routing_jobs"]],
+        "decisions": state["decisions"],
+        "final_holdout_status": "sealed_not_accessed",
+    }
+
+
+def _paired_results_payload(state: dict[str, object]) -> dict[str, object]:
+    routing_jobs = []
+    for job in state["routing_jobs"]:
+        routing_jobs.append(
+            {
+                key: job.get(key)
+                for key in (
+                    "job_id",
+                    "stage",
+                    "seed",
+                    "slow_routing",
+                    "macro_temporal_routing",
+                    "status",
+                    "run_dir",
+                    "primary_validation_ic",
+                    "output_sha256",
+                    "context_routing",
+                )
+            }
+        )
+    return {
+        "experiment_name": EXPERIMENT_NAME,
+        "status": state["status"],
+        "issuer_screen": state["issuer_screen"],
+        "adaptive_decisions": state["decisions"],
+        "routing_runs": routing_jobs,
+        "routing_summary": state["routing_summary"],
+        "final_holdout_status": "sealed_not_accessed",
+        "transaction_cost_modeling": False,
+    }
+
+
+def _persist_state(state_path: Path, state: dict[str, object]) -> None:
+    _atomic_write_json(state_path, state)
+    _atomic_write_json(state_path.parent / PLAN_JSON, _plan_payload(state))
+    _atomic_write_json(
+        state_path.parent / PAIRED_RESULTS_JSON, _paired_results_payload(state)
+    )
+
+
+def _log(state_dir: Path, message: str) -> None:
+    timestamp = datetime.now(timezone.utc).isoformat()
+    with (state_dir / EXPERIMENT_LOG).open("a", encoding="utf-8") as output:
+        output.write(f"{timestamp} {message}\n")
+        output.flush()
+        os.fsync(output.fileno())
 
 
 def _production_run_directories() -> set[Path]:
@@ -1034,6 +1067,17 @@ def _bind_completed_job(
     run: CompletedRun,
     commit: str,
 ) -> None:
+    routing_metadata = None
+    if job["job_kind"] == "routing":
+        architecture = architecture_for_model(
+            "tcn",
+            _settings(
+                str(job["slow_routing"]),
+                str(job["macro_temporal_routing"]),
+                "factorial_v1",
+            ),
+        )
+        routing_metadata = context_routing_metadata(architecture)
     job.update(
         {
             "status": "completed",
@@ -1044,7 +1088,7 @@ def _bind_completed_job(
             "completed_at_utc": job.get("completed_at_utc")
             or datetime.now(timezone.utc).isoformat(),
             "primary_validation_ic": run.primary_ic,
-            "skip_reason": None,
+            "context_routing": routing_metadata,
             "error": None,
         }
     )
@@ -1074,8 +1118,6 @@ def _recover_job(
         ):
             raise ValueError("Completed Stage-5 job state disagrees with artifacts")
         return run
-    if status == "skipped":
-        return None
     if status == "pending" and candidates:
         raise ValueError("Unbound completed run contaminates a pending Stage-5 job")
     if status == "failed" and candidates:
@@ -1100,7 +1142,7 @@ def _launch_job(
 ) -> CompletedRun:
     recovered = _recover_job(job, feature_store, commit)
     if recovered is not None:
-        _atomic_write_json(state_path, state)
+        _persist_state(state_path, state)
         return recovered
     if owner := active_lock_owner(PRODUCTION_TRAINING_LOCK):
         raise RuntimeError(f"Another production training run is active: {owner}")
@@ -1115,16 +1157,17 @@ def _launch_job(
             "started_at_utc": datetime.now(timezone.utc).isoformat(),
             "completed_at_utc": None,
             "primary_validation_ic": None,
-            "skip_reason": None,
+            "context_routing": None,
             "error": None,
         }
     )
-    _atomic_write_json(state_path, state)
+    _persist_state(state_path, state)
+    _log(state_path.parent, f"launch {job['job_id']}")
     try:
         result = subprocess.run(job["command"], cwd=_RESEARCH, check=False)
     except OSError as error:
         job.update({"status": "failed", "error": str(error)})
-        _atomic_write_json(state_path, state)
+        _persist_state(state_path, state)
         raise RuntimeError("Could not start Stage-5 training") from error
     created = tuple(
         sorted(path for path in _production_run_directories() if path not in before)
@@ -1141,7 +1184,7 @@ def _launch_job(
                 ),
             }
         )
-        _atomic_write_json(state_path, state)
+        _persist_state(state_path, state)
         raise RuntimeError(str(job["error"]))
     run = validate_completed_run(
         created[0],
@@ -1154,8 +1197,25 @@ def _launch_job(
         producing_commit=commit,
     )
     _bind_completed_job(job, run, commit)
-    _atomic_write_json(state_path, state)
+    _persist_state(state_path, state)
+    _log(state_path.parent, f"complete {job['job_id']} primary_ic={run.primary_ic:.8f}")
     return run
+
+
+def _ensure_preflight(state_dir: Path) -> Path:
+    path = state_dir / PREFLIGHT_JSON
+    if path.is_file():
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        _reject_test_derived_metadata(payload, "routing identity preflight")
+        if (
+            payload.get("version") != PREFLIGHT_VERSION
+            or payload.get("status") != "passed"
+            or payload.get("steps") != 3
+        ):
+            raise RuntimeError("Existing routing identity preflight did not pass")
+        return path
+    run_routing_identity_preflight(path)
+    return path
 
 
 def _ensure_audit(
@@ -1185,51 +1245,546 @@ def _assert_invocation_identity(
     configuration: dict[str, object],
     peer_primary_state: Path,
     audit_path: Path,
+    preflight_path: Path,
+    state: dict[str, object],
 ) -> None:
     current_commit, _ = _git_identity(require_clean=True)
     current_store = resolve_feature_store().resolve()
     current_identity = _feature_store_identity(current_store)
+    source = configuration["source_peer_primary"]
+    if not isinstance(source, dict):
+        raise ValueError("Peer-primary provenance is malformed")
     if (
         current_commit != commit
         or not _feature_identities_equivalent(
             current_identity, configuration["feature_store"]
         )
         or not feature_store.samefile(current_store)
-        or _sha256(peer_primary_state)
-        != configuration["source_peer_primary_state_sha256"]
-        or _sha256(audit_path)
-        != json.loads(
-            (audit_path.parent.parent / "state.json").read_text(encoding="utf-8")
-        )["realized_distribution_audit"]["sha256"]
+        or _sha256(peer_primary_state) != source["resolved_state_sha256"]
+        or _sha256(audit_path) != state["realized_distribution_audit"]["sha256"]
+        or _sha256(preflight_path) != state["routing_identity_preflight"]["sha256"]
     ):
         raise RuntimeError(
-            "Git, authoritative source, audit, or canonical feature store changed mid-run"
+            "Git, incumbent source, audit, preflight, or feature store changed mid-run"
         )
 
 
-def _summary_payload(
+def _run_authorized_job(
     state: dict[str, object],
-    incumbents: dict[int, CompletedRun],
-    issuer_runs: dict[int, CompletedRun],
-    routing_runs: dict[tuple[str, str, int], CompletedRun],
+    state_path: Path,
+    specification: dict[str, object],
+    feature_store: Path,
+    commit: str,
+    peer_primary_state: Path,
+    audit_path: Path,
+    preflight_path: Path,
+) -> CompletedRun:
+    job = _ensure_job(state, specification)
+    _persist_state(state_path, state)
+    _assert_invocation_identity(
+        commit,
+        feature_store,
+        state["configuration"],
+        peer_primary_state,
+        audit_path,
+        preflight_path,
+        state,
+    )
+    return _launch_job(job, state, state_path, feature_store, commit)
+
+
+def _routing_key(run: CompletedRun) -> tuple[str, str, int]:
+    return (run.slow_routing, run.macro_temporal_routing, run.seed)
+
+
+def _candidate_for_selection(
+    candidates: list[dict[str, object]], identity: str
 ) -> dict[str, object]:
-    issuer = state["issuer_screen"]
-    routing = routing_summary(incumbents, routing_runs)
+    matches = [
+        candidate for candidate in candidates if candidate["identity"] == identity
+    ]
+    if len(matches) != 1:
+        raise ValueError(f"Selected adaptive candidate is unavailable: {identity}")
+    return matches[0]
+
+
+def _run_adaptive_sequence(
+    state: dict[str, object],
+    state_path: Path,
+    feature_store: Path,
+    commit: str,
+    peer_primary_state: Path,
+    audit_path: Path,
+    preflight_path: Path,
+    incumbents: dict[int, CompletedRun],
+) -> None:
+    issuer_runs: dict[int, CompletedRun] = {}
+    issuer_runs[29] = _run_authorized_job(
+        state,
+        state_path,
+        issuer_job(29),
+        feature_store,
+        commit,
+        peer_primary_state,
+        audit_path,
+        preflight_path,
+    )
+    issuer_seed29 = issuer_seed29_gate(incumbents[29], issuer_runs[29])
+    state["issuer_screen"] = {"seed29": issuer_seed29, "three_seed": None}
+    _record_decision(
+        state,
+        "issuer_seed29_confirmation_eligibility",
+        {
+            "decision": "run" if issuer_seed29["passed"] else "skip",
+            "reason": (
+                "seed29_issuer_gate_passed"
+                if issuer_seed29["passed"]
+                else "seed29_issuer_gate_failed"
+            ),
+            "gate": issuer_seed29,
+        },
+    )
+    if issuer_seed29["passed"]:
+        for seed in (11, 47):
+            issuer_runs[seed] = _run_authorized_job(
+                state,
+                state_path,
+                issuer_job(seed),
+                feature_store,
+                commit,
+                peer_primary_state,
+                audit_path,
+                preflight_path,
+            )
+        state["issuer_screen"]["three_seed"] = issuer_three_seed_gate(
+            incumbents, issuer_runs
+        )
+    else:
+        for seed in (11, 47):
+            _record_decision(
+                state,
+                f"issuer_confirmation_seed_{seed}",
+                {
+                    "decision": "skip",
+                    "reason": "seed29_issuer_gate_failed",
+                    "seed": seed,
+                },
+            )
+    _persist_state(state_path, state)
+
+    routing_runs: dict[tuple[str, str, int], CompletedRun] = {}
+    gates: dict[tuple[str, str], dict[str, object]] = {}
+    for specification in routing_jobs():
+        run = _run_authorized_job(
+            state,
+            state_path,
+            specification,
+            feature_store,
+            commit,
+            peer_primary_state,
+            audit_path,
+            preflight_path,
+        )
+        key = _routing_key(run)
+        routing_runs[key] = run
+        gate = routing_seed29_gate(incumbents[29], run)
+        gates[key[:2]] = gate
+        _record_decision(
+            state,
+            f"routing_seed29_gate:slow={key[0]}:macro={key[1]}",
+            {
+                "decision": "eligible" if gate["passed"] else "ineligible",
+                "reason": "seed29_gate_passed"
+                if gate["passed"]
+                else "seed29_gate_failed",
+                "slow_routing": key[0],
+                "macro_temporal_routing": key[1],
+                "gate": gate,
+            },
+        )
+        _persist_state(state_path, state)
+
+    slow_candidates = [
+        _selection_candidate(
+            routing_runs[(route, "late_only", 29)], gates[(route, "late_only")]
+        )
+        for route in ("early_concat", "film")
+    ]
+    slow_combination = within_source_combination_gate(
+        gates[("early_concat", "late_only")], gates[("film", "late_only")]
+    )
+    _record_decision(state, "slow_within_source_combination", slow_combination)
+    if slow_combination["should_run"]:
+        run = _run_authorized_job(
+            state,
+            state_path,
+            routing_job(
+                "early_concat_film",
+                "late_only",
+                29,
+                "conditional_within_source",
+            ),
+            feature_store,
+            commit,
+            peer_primary_state,
+            audit_path,
+            preflight_path,
+        )
+        routing_runs[_routing_key(run)] = run
+        gate = routing_seed29_gate(incumbents[29], run)
+        gates[(run.slow_routing, run.macro_temporal_routing)] = gate
+        slow_candidates.append(_selection_candidate(run, gate))
+        _record_decision(
+            state,
+            "routing_seed29_gate:slow=early_concat_film:macro=late_only",
+            {
+                "decision": "eligible" if gate["passed"] else "ineligible",
+                "reason": "seed29_gate_passed"
+                if gate["passed"]
+                else "seed29_gate_failed",
+                "slow_routing": run.slow_routing,
+                "macro_temporal_routing": run.macro_temporal_routing,
+                "gate": gate,
+            },
+        )
+    slow_selection = select_candidate(slow_candidates)
+    _record_decision(state, "slow_source_selection", slow_selection)
+    _persist_state(state_path, state)
+
+    macro_candidates = [
+        _selection_candidate(
+            routing_runs[("late_only", route, 29)], gates[("late_only", route)]
+        )
+        for route in ("early_concat", "film")
+    ]
+    macro_combination = within_source_combination_gate(
+        gates[("late_only", "early_concat")], gates[("late_only", "film")]
+    )
+    _record_decision(
+        state, "macro_temporal_within_source_combination", macro_combination
+    )
+    if macro_combination["should_run"]:
+        run = _run_authorized_job(
+            state,
+            state_path,
+            routing_job(
+                "late_only",
+                "early_concat_film",
+                29,
+                "conditional_within_source",
+            ),
+            feature_store,
+            commit,
+            peer_primary_state,
+            audit_path,
+            preflight_path,
+        )
+        routing_runs[_routing_key(run)] = run
+        gate = routing_seed29_gate(incumbents[29], run)
+        gates[(run.slow_routing, run.macro_temporal_routing)] = gate
+        macro_candidates.append(_selection_candidate(run, gate))
+        _record_decision(
+            state,
+            "routing_seed29_gate:slow=late_only:macro=early_concat_film",
+            {
+                "decision": "eligible" if gate["passed"] else "ineligible",
+                "reason": "seed29_gate_passed"
+                if gate["passed"]
+                else "seed29_gate_failed",
+                "slow_routing": run.slow_routing,
+                "macro_temporal_routing": run.macro_temporal_routing,
+                "gate": gate,
+            },
+        )
+    macro_selection = select_candidate(macro_candidates)
+    _record_decision(state, "macro_temporal_source_selection", macro_selection)
+    _persist_state(state_path, state)
+
+    joint_decision = joint_synthesis_gate(slow_selection, macro_selection)
+    _record_decision(state, "joint_synthesis_eligibility", joint_decision)
+    joint_candidate = None
+    if joint_decision["should_run"]:
+        selected_slow = slow_selection["selected"]
+        selected_macro = macro_selection["selected"]
+        run = _run_authorized_job(
+            state,
+            state_path,
+            routing_job(
+                str(selected_slow["slow_routing"]),
+                str(selected_macro["macro_temporal_routing"]),
+                29,
+                "conditional_joint_synthesis",
+            ),
+            feature_store,
+            commit,
+            peer_primary_state,
+            audit_path,
+            preflight_path,
+        )
+        routing_runs[_routing_key(run)] = run
+        gate = routing_seed29_gate(incumbents[29], run)
+        gates[(run.slow_routing, run.macro_temporal_routing)] = gate
+        joint_candidate = _selection_candidate(run, gate)
+        _record_decision(
+            state,
+            f"routing_seed29_gate:slow={run.slow_routing}:macro={run.macro_temporal_routing}",
+            {
+                "decision": "eligible" if gate["passed"] else "ineligible",
+                "reason": "seed29_gate_passed"
+                if gate["passed"]
+                else "seed29_gate_failed",
+                "slow_routing": run.slow_routing,
+                "macro_temporal_routing": run.macro_temporal_routing,
+                "gate": gate,
+            },
+        )
+
+    final_candidates = []
+    for selection, candidates in (
+        (slow_selection, slow_candidates),
+        (macro_selection, macro_candidates),
+    ):
+        if selection["selected"] is not None:
+            final_candidates.append(
+                _candidate_for_selection(candidates, selection["selected"]["identity"])
+            )
+    if joint_candidate is not None:
+        final_candidates.append(joint_candidate)
+    final_selection = select_candidate(final_candidates)
+    _record_decision(state, "final_routing_candidate_selection", final_selection)
+    confirmation = None
+    selected = final_selection["selected"]
+    if selected is None:
+        for seed in (11, 47):
+            _record_decision(
+                state,
+                f"routing_confirmation_seed_{seed}",
+                {
+                    "decision": "skip",
+                    "reason": "no_seed29_routing_candidate_eligible",
+                    "seed": seed,
+                },
+            )
+    else:
+        selected_key = (
+            str(selected["slow_routing"]),
+            str(selected["macro_temporal_routing"]),
+            29,
+        )
+        selected_runs = {29: routing_runs[selected_key]}
+        for seed in (11, 47):
+            selected_runs[seed] = _run_authorized_job(
+                state,
+                state_path,
+                routing_job(
+                    selected_key[0],
+                    selected_key[1],
+                    seed,
+                    "selected_candidate_confirmation",
+                ),
+                feature_store,
+                commit,
+                peer_primary_state,
+                audit_path,
+                preflight_path,
+            )
+        confirmation = routing_three_seed_gate(incumbents, selected_runs)
+        _record_decision(
+            state,
+            "selected_routing_candidate_confirmation",
+            {
+                "decision": "confirmed" if confirmation["passed"] else "not_confirmed",
+                "reason": (
+                    "three_seed_confirmation_passed"
+                    if confirmation["passed"]
+                    else "three_seed_confirmation_failed"
+                ),
+                "selected": selected,
+                "gate": confirmation,
+            },
+        )
+
+    state["routing_summary"] = {
+        "sequence": "precommitted_adaptive_seed29_then_single_candidate_confirmation",
+        "mandatory_seed29_run_count": MANDATORY_ROUTING_RUN_COUNT,
+        "actual_routing_run_count": len(state["routing_jobs"]),
+        "slow_combination_decision": slow_combination,
+        "slow_selection": slow_selection,
+        "macro_temporal_combination_decision": macro_combination,
+        "macro_temporal_selection": macro_selection,
+        "joint_synthesis_decision": joint_decision,
+        "final_selection": final_selection,
+        "three_seed_confirmation": confirmation,
+        "all_off_scaffold_control_training": False,
+        "final_holdout_status": "sealed_not_accessed",
+        "transaction_cost_modeling": False,
+    }
+    _persist_state(state_path, state)
+
+
+def _summary_payload(state: dict[str, object]) -> dict[str, object]:
     return {
         "experiment_name": EXPERIMENT_NAME,
         "state_version": STATE_VERSION,
-        "status": "completed",
+        "status": state["status"],
         "created_at_utc": state["created_at_utc"],
-        "completed_at_utc": datetime.now(timezone.utc).isoformat(),
+        "completed_at_utc": state["completed_at_utc"],
         "configuration": state["configuration"],
+        "routing_identity_preflight": state["routing_identity_preflight"],
         "realized_distribution_audit": state["realized_distribution_audit"],
-        "issuer_screen": issuer,
-        "issuer_completed_seed_count": len(issuer_runs),
-        "routing": routing,
+        "issuer_screen": state["issuer_screen"],
+        "routing": state["routing_summary"],
+        "completed_job_counts": {
+            "issuer": sum(job["status"] == "completed" for job in state["issuer_jobs"]),
+            "routing": sum(
+                job["status"] == "completed" for job in state["routing_jobs"]
+            ),
+        },
         "final_holdout_status": "sealed_not_accessed",
-        "winner_selected": False,
         "transaction_cost_modeling": False,
     }
+
+
+def _summary_markdown(summary: dict[str, object]) -> str:
+    routing = summary["routing"]
+    selected = routing["final_selection"]["selected"]
+    selected_text = "none" if selected is None else str(selected["identity"])
+    confirmation = routing["three_seed_confirmation"]
+    confirmed = (
+        "not run" if confirmation is None else str(confirmation["passed"]).lower()
+    )
+    return (
+        "# Context-routing adaptive sequence\n\n"
+        f"- Status: {summary['status']}\n"
+        f"- Issuer training runs: {summary['completed_job_counts']['issuer']}\n"
+        f"- Routing training runs: {summary['completed_job_counts']['routing']}\n"
+        f"- Selected routing candidate: {selected_text}\n"
+        f"- Three-seed confirmation passed: {confirmed}\n"
+        "- All-off scaffold control trained: no\n"
+        "- Held-out test accessed: no\n"
+    )
+
+
+def _completed_run_paths_payload(state: dict[str, object]) -> dict[str, object]:
+    return {
+        "source_peer_primary": state["configuration"]["source_peer_primary"],
+        "incumbents": state["incumbent_runs"],
+        "completed_jobs": [
+            {
+                "job_id": job["job_id"],
+                "run_dir": job["run_dir"],
+                "producing_git_commit_sha": job["producing_git_commit_sha"],
+                "output_sha256": job["output_sha256"],
+                "context_routing": job["context_routing"],
+            }
+            for job in [*state["issuer_jobs"], *state["routing_jobs"]]
+            if job["status"] == "completed"
+        ],
+        "routing_identity_preflight": state["routing_identity_preflight"],
+        "realized_distribution_audit": state["realized_distribution_audit"],
+        "final_holdout_status": "sealed_not_accessed",
+    }
+
+
+def _runbook_text(state_dir: Path, peer_primary_state: Path) -> str:
+    module = "brazil_rv.modeling.stage5_context_routing"
+    common = (
+        f'uv run --frozen python -m {module} --state-dir "{state_dir}" '
+        f'--peer-primary-state "{peer_primary_state}"'
+    )
+    return (
+        "# Operator runbook\n\n"
+        "Run from the repository `research` directory on the single GH200 host.\n\n"
+        f"- Dry run: `{common} --dry-run`\n"
+        f"- Launch: `{common}`\n"
+        f"- Resume: `{common}`\n"
+        f'- Status: `uv run --frozen python -m {module} --state-dir "{state_dir}" --status`\n'
+        f'- Retrieve current output path: `Get-Content -LiteralPath "{OUTPUT_POINTER}"`\n'
+        "\nThe launch and resume commands are intentionally identical. The held-out test remains sealed.\n"
+    )
+
+
+def _archive_members() -> tuple[str, ...]:
+    return (
+        PLAN_JSON,
+        "state.json",
+        PREFLIGHT_JSON,
+        f"realized_distribution_audit/{AUDIT_JSON}",
+        f"realized_distribution_audit/{FEATURE_PARQUET}",
+        f"realized_distribution_audit/{TARGET_PARQUET}",
+        PAIRED_RESULTS_JSON,
+        SUMMARY_JSON,
+        SUMMARY_MARKDOWN,
+        EXPERIMENT_LOG,
+        COMPLETED_RUN_PATHS_JSON,
+        RUNBOOK,
+        ARTIFACT_HASHES_JSON,
+    )
+
+
+def _expected_archive_hashes(state_dir: Path) -> dict[str, str]:
+    return {
+        member: sha256_file(state_dir.joinpath(*Path(member).parts))
+        for member in _archive_members()
+    }
+
+
+def _finalize_outputs(
+    state_dir: Path, state: dict[str, object], peer_primary_state: Path
+) -> None:
+    archive_path = state_dir / ARCHIVE_NAME
+    sidecar_path = state_dir / ARCHIVE_SHA256_NAME
+    if archive_path.is_file():
+        expected = _expected_archive_hashes(state_dir)
+        validate_archive(archive_path, expected)
+        if sidecar_path.exists():
+            validate_archive_sha256(archive_path, sidecar_path)
+        else:
+            write_archive_sha256(archive_path, sidecar_path)
+        publish_output_pointer(
+            OUTPUT_POINTER, state_dir, archive_path, sidecar_path, expected
+        )
+        return
+
+    summary = _summary_payload(state)
+    _atomic_write_json(state_dir / SUMMARY_JSON, summary)
+    (state_dir / SUMMARY_MARKDOWN).write_text(
+        _summary_markdown(summary), encoding="utf-8"
+    )
+    _atomic_write_json(
+        state_dir / COMPLETED_RUN_PATHS_JSON,
+        _completed_run_paths_payload(state),
+    )
+    (state_dir / RUNBOOK).write_text(
+        _runbook_text(state_dir, peer_primary_state), encoding="utf-8"
+    )
+    payload_members = tuple(
+        member for member in _archive_members() if member != ARTIFACT_HASHES_JSON
+    )
+    payload_hashes = {
+        member: sha256_file(state_dir.joinpath(*Path(member).parts))
+        for member in payload_members
+    }
+    _atomic_write_json(
+        state_dir / ARTIFACT_HASHES_JSON,
+        {
+            "experiment_name": EXPERIMENT_NAME,
+            "source_provenance": state["configuration"]["source_peer_primary"],
+            "payload_sha256": payload_hashes,
+            "run_output_sha256": {
+                job["job_id"]: job["output_sha256"]
+                for job in [*state["issuer_jobs"], *state["routing_jobs"]]
+                if job["status"] == "completed"
+            },
+        },
+    )
+    expected = create_validated_archive(state_dir, _archive_members(), archive_path)
+    write_archive_sha256(archive_path, sidecar_path)
+    validate_archive(archive_path, expected)
+    validate_archive_sha256(archive_path, sidecar_path)
+    publish_output_pointer(
+        OUTPUT_POINTER, state_dir, archive_path, sidecar_path, expected
+    )
 
 
 def dry_run_payload(peer_primary_state: Path) -> dict[str, object]:
@@ -1244,32 +1799,75 @@ def dry_run_payload(peer_primary_state: Path) -> dict[str, object]:
         "worktree_clean": clean,
         "orchestrator_git_commit_sha": commit,
         "resolved_feature_store_path": str(feature_store),
-        "source_peer_primary_state": str(peer_primary_state),
-        "source_peer_primary_state_sha256": _sha256(peer_primary_state),
+        "source_peer_primary": configuration["source_peer_primary"],
         "incumbent_runs": {
             str(seed): str(values[0].run_dir) for seed, values in incumbents.items()
         },
-        "realized_distribution_audit_will_run_first": True,
-        "issuer_seed29_job_count": 1,
-        "issuer_confirmation_job_count_if_seed29_passes": 2,
-        "routing_job_count": len(routing_jobs()),
-        "routing_matrix": "complete_4x4_factorial_across_three_seeds",
+        "routing_identity_preflight_will_run_first": True,
+        "realized_distribution_audit_will_run_after_preflight": True,
+        "issuer_runs": {
+            "mandatory": ISSUER_RUN_COUNT_MINIMUM,
+            "conditional": ISSUER_RUN_COUNT_MAXIMUM - ISSUER_RUN_COUNT_MINIMUM,
+            "minimum": ISSUER_RUN_COUNT_MINIMUM,
+            "maximum": ISSUER_RUN_COUNT_MAXIMUM,
+        },
+        "routing_runs": {
+            "mandatory": MANDATORY_ROUTING_RUN_COUNT,
+            "conditional_maximum": CONDITIONAL_ROUTING_RUN_COUNT_MAXIMUM,
+            "minimum": ROUTING_RUN_COUNT_MINIMUM,
+            "maximum": ROUTING_RUN_COUNT_MAXIMUM,
+        },
+        "total_training_runs": {
+            "minimum": TOTAL_TRAINING_RUN_COUNT_MINIMUM,
+            "maximum": TOTAL_TRAINING_RUN_COUNT_MAXIMUM,
+        },
+        "all_off_scaffold_control_training": False,
         "final_holdout_status": "sealed_not_accessed",
         "configuration": configuration,
     }
 
 
 def format_dry_run(payload: dict[str, object]) -> str:
+    issuer = payload["issuer_runs"]
+    routing = payload["routing_runs"]
+    total = payload["total_training_runs"]
     return "\n".join(
         (
-            f"incumbent runs: {len(payload['incumbent_runs'])}",
-            "realized-distribution audit runs first: yes",
-            "issuer screen: seed 29, then seeds 11 and 47 only if it passes",
-            f"routing training jobs: {payload['routing_job_count']}",
-            "routing matrix: complete 4x4 factorial across seeds 11,29,47",
+            f"incumbent runs reused: {len(payload['incumbent_runs'])}",
+            "routing identity preflight runs first: yes (eager + compiled, 3 SAM steps)",
+            "realized-distribution audit follows preflight: yes",
+            (
+                "issuer runs: "
+                f"mandatory={issuer['mandatory']} conditional={issuer['conditional']} "
+                f"min={issuer['minimum']} max={issuer['maximum']}"
+            ),
+            (
+                "routing runs: "
+                f"mandatory={routing['mandatory']} "
+                f"conditional_max={routing['conditional_maximum']} "
+                f"min={routing['minimum']} max={routing['maximum']}"
+            ),
+            f"total training runs: min={total['minimum']} max={total['maximum']}",
+            "all-off scaffold control training: no",
             "held-out test accessed: no",
         )
     )
+
+
+def status_payload(state_dir: Path) -> dict[str, object]:
+    state_path = state_dir.resolve() / "state.json"
+    if not state_path.is_file():
+        raise FileNotFoundError(f"Experiment state does not exist: {state_path}")
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    return {
+        "experiment_name": state.get("experiment_name"),
+        "status": state.get("status"),
+        "issuer_jobs": len(state.get("issuer_jobs", [])),
+        "routing_jobs": len(state.get("routing_jobs", [])),
+        "decisions": len(state.get("decisions", [])),
+        "completed_at_utc": state.get("completed_at_utc"),
+        "output_pointer": str(OUTPUT_POINTER),
+    }
 
 
 def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
@@ -1278,104 +1876,49 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
     validate_feature_store(feature_store)
     feature_identity = _feature_store_identity(feature_store)
     configuration = _configuration(commit, feature_store, peer_primary_state)
+    incumbents_with_provenance = _source_incumbents(peer_primary_state, feature_store)
+    incumbents = {
+        seed: values[0] for seed, values in incumbents_with_provenance.items()
+    }
     state_dir = state_dir.resolve()
     if state_dir == feature_store or state_dir.is_relative_to(feature_store):
         raise ValueError(
             "Stage-5 state and audit artifacts must be outside the feature store"
         )
-    incumbents_with_provenance = _source_incumbents(peer_primary_state, feature_store)
-    incumbents = {
-        seed: values[0] for seed, values in incumbents_with_provenance.items()
-    }
     state_dir.mkdir(parents=True, exist_ok=True)
     state_path = state_dir / "state.json"
     with exclusive_process_lock(state_dir / "experiment.lock", EXPERIMENT_NAME):
+        log_path = state_dir / EXPERIMENT_LOG
+        if not log_path.exists():
+            log_path.touch()
+        preflight_path = _ensure_preflight(state_dir)
         audit_path = _ensure_audit(state_dir, feature_store, feature_identity)
-        if owner := active_lock_owner(PRODUCTION_TRAINING_LOCK):
-            raise RuntimeError(f"Another production training run is active: {owner}")
         state = _load_state(
             state_path,
             configuration,
             incumbents_with_provenance,
             audit_path,
+            preflight_path,
         )
-        _atomic_write_json(state_path, state)
-
-        issuer_runs: dict[int, CompletedRun] = {}
-        seed29_job = state["issuer_jobs"][0]
-        _assert_invocation_identity(
-            commit, feature_store, configuration, peer_primary_state, audit_path
+        _persist_state(state_path, state)
+        if state["status"] == "completed":
+            _finalize_outputs(state_dir, state, peer_primary_state)
+            return state_path
+        _run_adaptive_sequence(
+            state,
+            state_path,
+            feature_store,
+            commit,
+            peer_primary_state,
+            audit_path,
+            preflight_path,
+            incumbents,
         )
-        issuer_runs[29] = _launch_job(
-            seed29_job, state, state_path, feature_store, commit
-        )
-        seed29_result = issuer_seed29_gate(incumbents[29], issuer_runs[29])
-        state["issuer_screen"] = {"seed29": seed29_result, "three_seed": None}
-        _atomic_write_json(state_path, state)
-
-        if seed29_result["passed"]:
-            for job in state["issuer_jobs"][1:]:
-                _assert_invocation_identity(
-                    commit,
-                    feature_store,
-                    configuration,
-                    peer_primary_state,
-                    audit_path,
-                )
-                run = _launch_job(job, state, state_path, feature_store, commit)
-                issuer_runs[int(job["seed"])] = run
-            state["issuer_screen"]["three_seed"] = issuer_three_seed_gate(
-                incumbents, issuer_runs
-            )
-        else:
-            for job in state["issuer_jobs"][1:]:
-                if job["status"] == "completed":
-                    raise ValueError(
-                        "Issuer confirmation run exists although the seed-29 gate failed"
-                    )
-                job.update(
-                    {
-                        "status": "skipped",
-                        "skip_reason": "seed29_issuer_gate_failed",
-                        "error": None,
-                    }
-                )
-        _atomic_write_json(state_path, state)
-
-        routing_runs: dict[tuple[str, str, int], CompletedRun] = {}
-        total = len(state["routing_jobs"])
-        for position, job in enumerate(state["routing_jobs"], start=1):
-            _assert_invocation_identity(
-                commit,
-                feature_store,
-                configuration,
-                peer_primary_state,
-                audit_path,
-            )
-            run = _launch_job(job, state, state_path, feature_store, commit)
-            identity = (
-                str(job["slow_routing"]),
-                str(job["macro_temporal_routing"]),
-                int(job["seed"]),
-            )
-            routing_runs[identity] = run
-            print(
-                f"[routing {position}/{total}] {identity[0]} / {identity[1]} "
-                f"seed={identity[2]} IC={run.primary_ic:.8f}",
-                flush=True,
-            )
-
-        summary = _summary_payload(state, incumbents, issuer_runs, routing_runs)
-        summary_path = state_dir / SUMMARY_JSON
-        _atomic_write_json(summary_path, summary)
-        state["routing_summary"] = summary["routing"]
-        state["summary_artifact"] = {
-            "path": str(summary_path),
-            "sha256": _sha256(summary_path),
-        }
         state["status"] = "completed"
-        state["completed_at_utc"] = summary["completed_at_utc"]
-        _atomic_write_json(state_path, state)
+        state["completed_at_utc"] = datetime.now(timezone.utc).isoformat()
+        _persist_state(state_path, state)
+        _log(state_dir, "adaptive sequence completed; finalizing archive")
+        _finalize_outputs(state_dir, state, peer_primary_state)
     return state_path
 
 
@@ -1383,12 +1926,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--peer-primary-state", type=Path)
-    parser.add_argument("--dry-run", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true")
+    mode.add_argument("--status", action="store_true")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.status:
+        print(json.dumps(status_payload(args.state_dir), indent=2), flush=True)
+        return
     peer_primary_state = resolve_peer_primary_state(args.peer_primary_state)
     if args.dry_run:
         print(format_dry_run(dry_run_payload(peer_primary_state)), flush=True)

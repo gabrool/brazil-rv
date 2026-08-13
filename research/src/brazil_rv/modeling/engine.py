@@ -6,7 +6,7 @@ import math
 import platform as system_platform
 import statistics
 import time
-from collections.abc import Iterable, Sized
+from collections.abc import Callable, Iterable, Sized
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -1066,6 +1066,7 @@ def _run_sam_update(
     rho: float,
     loss_count: int,
     check_predictions_finite: bool,
+    observer: Callable[[str, nn.Module], None] | None = None,
 ) -> dict[str, float | int | bool | None]:
     rho = validate_sam_rho(rho)
     parameters = tuple(model.parameters())
@@ -1086,6 +1087,8 @@ def _run_sam_update(
         first_gradient_norm = _gradient_l2_norm(model)
         if not _host_flags(torch.isfinite(first_gradient_norm))[0]:
             raise FloatingPointError("First-pass SAM gradient norm is non-finite")
+        if observer is not None:
+            observer("first_gradients", model)
 
         scale = rho / (first_gradient_norm + SAM_NORM_EPS)
         perturbation_norm, perturbations_finite = _apply_sam_perturbation(
@@ -1098,6 +1101,8 @@ def _run_sam_update(
             raise FloatingPointError("SAM perturbation is non-finite")
         if not perturbation_norm_ok:
             raise FloatingPointError("SAM perturbation norm is non-finite")
+        if observer is not None:
+            observer("perturbed_parameters", model)
 
         optimizer.zero_grad(set_to_none=True)
         _restore_rng_state(model, rng_state)
@@ -1131,7 +1136,11 @@ def _run_sam_update(
         second_gradient_norm = _gradient_l2_norm(model)
         if not _host_flags(torch.isfinite(second_gradient_norm))[0]:
             raise FloatingPointError("Second-pass SAM gradient norm is non-finite")
+        if observer is not None:
+            observer("second_gradients", model)
         gradient_norm = _optimizer_update(model, optimizer, scheduler)
+        if observer is not None:
+            observer("updated_parameters", model)
 
         predictions_finite = (
             None
@@ -1182,6 +1191,7 @@ def run_effective_batch_update(
     sam_rho: float | None,
     *,
     check_predictions_finite: bool = False,
+    sam_observer: Callable[[str, nn.Module], None] | None = None,
 ) -> dict[str, float | int | bool | None]:
     if len(effective_batch) != runtime.accumulation_steps:
         raise ValueError(
@@ -1194,6 +1204,8 @@ def run_effective_batch_update(
     if loss_count == 0:
         raise ValueError("Effective batch contains no valid objective unit")
     if optimizer_variant == "adamw":
+        if sam_observer is not None:
+            raise ValueError("A SAM observer requires optimizer_variant='sam_adamw'")
         return _run_adamw_update(
             model,
             effective_batch,
@@ -1215,6 +1227,7 @@ def run_effective_batch_update(
         sam_rho,
         loss_count,
         check_predictions_finite,
+        sam_observer,
     )
 
 
