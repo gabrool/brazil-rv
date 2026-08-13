@@ -234,6 +234,7 @@ def build_neural_model(
     model_name: str,
     tcn_architecture: TCNArchitecture | None = None,
     peer_features: str = "none",
+    equity_count: int = EQUITY_COUNT,
 ) -> nn.Module:
     if model_name not in NEURAL_MODELS:
         raise ValueError(f"Unknown neural model: {model_name}")
@@ -247,7 +248,7 @@ def build_neural_model(
     if model_name == "tcn":
         if tcn_architecture is None:
             raise ValueError("TCN architecture is required for model tcn")
-        return SharedCausalTCN(tcn_architecture, peer_features)
+        return SharedCausalTCN(tcn_architecture, peer_features, equity_count)
     if tcn_architecture is not None:
         raise ValueError("TCN architecture is forbidden for model mlp")
     return ResidualTabularMLP()

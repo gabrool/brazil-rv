@@ -18,6 +18,7 @@ from ..preprocessing.peer_features import validate_peer_arrays
 from .context_ablation import NO_CONTEXT_ABLATION, ResolvedContextAblation
 from .contract import (
     ABSOLUTE_PATCH_COUNT,
+    CONTEXT_COUNT,
     CONTEXT_GENERIC_DYNAMIC_COUNT,
     DECISION_GLOBAL_INDICES,
     GLOBAL_CONTEXT_COUNT,
@@ -38,7 +39,6 @@ from .contract import (
     FEATURE_CONTRACT_VERSION,
     FEATURE_STORE_POINTER,
     HORIZON_COUNT,
-    INSTRUMENT_COUNT,
     LOCAL_CONTEXT_AVAILABILITY_RULE,
     LOCAL_CONTEXT_COUNT,
     LOCAL_CONTEXT_SYMBOLS,
@@ -61,6 +61,7 @@ from .contract import (
     VALIDATION_START,
     validate_peer_feature_mode,
 )
+from .run_profiles import RunProfile
 from .feature_ablation import (
     NO_FEATURE_ABLATION,
     ResolvedFeatureAblation,
@@ -309,6 +310,7 @@ def _common_batch(
     rows: dict[str, np.ndarray],
     positions: np.ndarray,
     valid_count: int,
+    equity_slots: tuple[int, ...],
 ) -> tuple[
     dict[str, np.ndarray], np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
 ]:
@@ -323,18 +325,21 @@ def _common_batch(
         arrays["equity_membership.npy"][date_idx]
         & arrays["equity_data_ready.npy"][date_idx],
         dtype=bool,
-    )
-    targets = np.zeros((batch_size, EQUITY_COUNT, HORIZON_COUNT), dtype=np.float32)
+    )[:, equity_slots]
+    equity_count = len(equity_slots)
+    targets = np.zeros((batch_size, equity_count, HORIZON_COUNT), dtype=np.float32)
     label_mask = np.zeros_like(targets, dtype=bool)
     raw_returns = np.zeros_like(targets)
     for decision in np.unique(decision_idx):
         group = np.flatnonzero(decision_idx == decision)
-        targets[group] = arrays["targets.npy"][date_idx[group], :, int(decision), :]
-        label_mask[group] = arrays["label_mask.npy"][
-            date_idx[group], :, int(decision), :
+        targets[group] = arrays["targets.npy"][date_idx[group]][
+            :, equity_slots, int(decision), :
         ]
-        raw_returns[group] = arrays["raw_returns.npy"][
-            date_idx[group], :, int(decision), :
+        label_mask[group] = arrays["label_mask.npy"][date_idx[group]][
+            :, equity_slots, int(decision), :
+        ]
+        raw_returns[group] = arrays["raw_returns.npy"][date_idx[group]][
+            :, equity_slots, int(decision), :
         ]
     padded = ~sample_valid_mask
     targets[padded] = 0.0
@@ -368,9 +373,12 @@ def _build_peer_state(
     equity_cutoffs: np.ndarray,
     active_equities: np.ndarray,
     peer_features: str,
+    equity_slots: tuple[int, ...],
 ) -> np.ndarray:
     batch_size = date_idx.size
-    state = np.zeros((batch_size, EQUITY_COUNT, PEER_STATE_WIDTH), dtype=np.float32)
+    state = np.zeros(
+        (batch_size, len(equity_slots), PEER_STATE_WIDTH), dtype=np.float32
+    )
     if peer_features == "masked_control":
         return state
     if peer_features not in ("selected", "selected_plus_issuer"):
@@ -380,13 +388,15 @@ def _build_peer_state(
         group = np.flatnonzero(equity_cutoffs == equity_cutoff)
         feature_minute_idx = int(equity_cutoff) - 1
         numeric = np.asarray(
-            arrays["equity_peer_features.npy"][
-                date_idx[group], :, feature_minute_idx, :
+            arrays["equity_peer_features.npy"][date_idx[group]][
+                :, equity_slots, feature_minute_idx, :
             ],
             dtype=np.float32,
         )
         valid = np.asarray(
-            arrays["equity_peer_valid.npy"][date_idx[group], :, feature_minute_idx, :],
+            arrays["equity_peer_valid.npy"][date_idx[group]][
+                :, equity_slots, feature_minute_idx, :
+            ],
             dtype=bool,
         )
         selected_15 = valid[..., 0]
@@ -419,8 +429,11 @@ def _build_patch_batch(
     global_context: str | None,
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
     feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
+    equity_slots: tuple[int, ...] = tuple(range(EQUITY_COUNT)),
 ) -> dict[str, np.ndarray]:
     batch_size = date_idx.size
+    equity_count = len(equity_slots)
+    instrument_count = equity_count + CONTEXT_COUNT
     needs_context = global_context is not None
     if needs_context and global_context not in GLOBAL_CONTEXT_SETTINGS:
         raise ValueError(f"Invalid global context setting: {global_context}")
@@ -449,23 +462,23 @@ def _build_patch_batch(
             global_ready[:, context_ablation.global_slots] = False
 
     patches = np.zeros(
-        (batch_size, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH),
+        (batch_size, instrument_count, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH),
         dtype=np.float32,
     )
     history_patch_mask = np.zeros(
-        (batch_size, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT), dtype=bool
+        (batch_size, instrument_count, ABSOLUTE_PATCH_COUNT), dtype=bool
     )
-    instrument_mask = np.zeros((batch_size, INSTRUMENT_COUNT), dtype=bool)
-    instrument_mask[:, :EQUITY_COUNT] = active_equities
+    instrument_mask = np.zeros((batch_size, instrument_count), dtype=bool)
+    instrument_mask[:, :equity_count] = active_equities
     slow_features = np.zeros(
-        (batch_size, INSTRUMENT_COUNT, SLOW_FEATURE_COUNT), dtype=np.float32
+        (batch_size, instrument_count, SLOW_FEATURE_COUNT), dtype=np.float32
     )
     equity_slow = np.asarray(
-        arrays["equity_slow.npy"][date_idx], dtype=np.float32
+        arrays["equity_slow.npy"][date_idx][:, equity_slots], dtype=np.float32
     ).copy()
     if context_ablation.equity_slow_indices:
         equity_slow[..., context_ablation.equity_slow_indices] = 0.0
-    slow_features[:, :EQUITY_COUNT] = equity_slow * active_equities[..., None]
+    slow_features[:, :equity_count] = equity_slow * active_equities[..., None]
     state_position = np.empty(batch_size, dtype=np.int64)
 
     for equity_cutoff in np.unique(equity_cutoffs):
@@ -477,17 +490,19 @@ def _build_patch_batch(
             raise ValueError("Equity and context patch clocks are misaligned")
         state_position[group] = state
         equity_prefix = np.asarray(
-            arrays["equity_features.npy"][date_idx[group], :, : int(equity_cutoff), :],
+            arrays["equity_features.npy"][date_idx[group]][
+                :, equity_slots, : int(equity_cutoff), :
+            ],
             dtype=np.float32,
-        ).reshape(group.size, EQUITY_COUNT, equity_patch_count, PATCH_INPUT_WIDTH)
+        ).reshape(group.size, equity_count, equity_patch_count, PATCH_INPUT_WIDTH)
         patches[
             group,
-            :EQUITY_COUNT,
+            :equity_count,
             EQUITY_ABSOLUTE_START_PATCH:state,
         ] = equity_prefix * active_equities[group, :, None, None]
         history_patch_mask[
             group,
-            :EQUITY_COUNT,
+            :equity_count,
             EQUITY_ABSOLUTE_START_PATCH:state,
         ] = active_equities[group, :, None]
         if needs_context:
@@ -497,16 +512,16 @@ def _build_patch_batch(
                 dtype=np.float32,
             ).reshape(group.size, LOCAL_CONTEXT_COUNT, state, PATCH_INPUT_WIDTH)
             patches[
-                group, EQUITY_COUNT : EQUITY_COUNT + LOCAL_CONTEXT_COUNT, :state
+                group, equity_count : equity_count + LOCAL_CONTEXT_COUNT, :state
             ] = context_prefix * ready[..., None, None]
             history_patch_mask[
-                group, EQUITY_COUNT : EQUITY_COUNT + LOCAL_CONTEXT_COUNT, :state
+                group, equity_count : equity_count + LOCAL_CONTEXT_COUNT, :state
             ] = ready[..., None]
 
     if needs_context:
-        global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
-        instrument_mask[:, EQUITY_COUNT:global_start] = local_ready
-        slow_features[:, EQUITY_COUNT:global_start] = (
+        global_start = equity_count + LOCAL_CONTEXT_COUNT
+        instrument_mask[:, equity_count:global_start] = local_ready
+        slow_features[:, equity_count:global_start] = (
             np.asarray(arrays["context_slow.npy"][date_idx], dtype=np.float32)
             * local_ready[..., None]
         )
@@ -726,6 +741,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
         feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
         peer_features: str = "none",
+        run_profile: RunProfile | None = None,
     ) -> None:
         if model_name not in NEURAL_MODELS:
             raise ValueError(
@@ -760,6 +776,11 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         self.context_ablation = context_ablation
         self.feature_ablation = feature_ablation
         self.peer_features = peer_features
+        self.equity_slots = (
+            tuple(range(EQUITY_COUNT))
+            if run_profile is None
+            else run_profile.equity_slots
+        )
         self.rows = {
             column: np.asarray(sample_index.get_column(column).to_list())
             for column in (
@@ -811,7 +832,9 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             context_cutoffs,
             source_date_idx,
             source_decision_idx,
-        ) = _common_batch(arrays, self.rows, positions, request.valid_count)
+        ) = _common_batch(
+            arrays, self.rows, positions, request.valid_count, self.equity_slots
+        )
         if self.model_name == "mlp":
             inputs = build_tabular_batch(
                 arrays,
@@ -837,6 +860,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 self.global_context,
                 self.context_ablation,
                 self.feature_ablation,
+                self.equity_slots,
             )
             if self.peer_features != "none":
                 inputs["peer_state"] = _build_peer_state(
@@ -845,6 +869,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                     equity_cutoffs,
                     active_equities,
                     self.peer_features,
+                    self.equity_slots,
                 )
                 inputs["peer_state"][~common["sample_valid_mask"]] = 0.0
         return {**inputs, **common}
@@ -912,12 +937,22 @@ class TabularRowIterator:
 
 class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
     def __init__(
-        self, sample_index: pl.DataFrame, runtime: RuntimeSettings, seed: int
+        self,
+        sample_index: pl.DataFrame,
+        runtime: RuntimeSettings,
+        seed: int,
+        decision_grouped: bool = False,
     ) -> None:
         self.runtime = runtime
         self.seed = seed
         self.epoch = 0
         self.sample_count = sample_index.height
+        self.decision_indices = (
+            sample_index.get_column("decision_idx").to_numpy()
+            if decision_grouped
+            else None
+        )
+        self.decision_grouped = decision_grouped
         positions_by_date: dict[object, list[int]] = {}
         for position, trade_date in enumerate(
             sample_index.get_column("trade_date").to_list()
@@ -953,6 +988,11 @@ class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
                 trade_date = self.dates[int(date_position)]
                 choices = self.positions_by_date[trade_date]
                 effective_indices.append(int(choices[generator.integers(len(choices))]))
+            if self.decision_grouped:
+                assert self.decision_indices is not None
+                effective_indices.sort(
+                    key=lambda position: int(self.decision_indices[position])
+                )
             for start in range(0, EFFECTIVE_BATCH_SIZE, self.runtime.microbatch_size):
                 indices = tuple(
                     effective_indices[start : start + self.runtime.microbatch_size]
@@ -976,6 +1016,33 @@ class SequentialPaddedBatchSampler(Sampler[BatchRequest]):
             valid_count = len(real_indices)
             real_indices.extend([real_indices[-1]] * (self.batch_size - valid_count))
             yield BatchRequest(tuple(real_indices), valid_count)
+
+
+class DecisionGroupedPaddedBatchSampler(Sampler[BatchRequest]):
+    def __init__(self, sample_index: pl.DataFrame, batch_size: int) -> None:
+        self.batch_size = batch_size
+        positions: dict[int, list[int]] = {}
+        for position, decision in enumerate(
+            sample_index.get_column("decision_idx").to_list()
+        ):
+            positions.setdefault(int(decision), []).append(position)
+        self.positions_by_decision = tuple(
+            (decision, tuple(group)) for decision, group in sorted(positions.items())
+        )
+
+    def __len__(self) -> int:
+        return sum(
+            math.ceil(len(group) / self.batch_size)
+            for _, group in self.positions_by_decision
+        )
+
+    def __iter__(self) -> Iterator[BatchRequest]:
+        for _, group in self.positions_by_decision:
+            for start in range(0, len(group), self.batch_size):
+                real = list(group[start : start + self.batch_size])
+                valid_count = len(real)
+                real.extend([real[-1]] * (self.batch_size - valid_count))
+                yield BatchRequest(tuple(real), valid_count)
 
 
 def tensorize_vectorized_batch(
@@ -1026,12 +1093,18 @@ def create_training_loaders(
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
     feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
     peer_features: str = "none",
+    run_profile: RunProfile | None = None,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
     DateStratifiedMicrobatchSampler,
 ]:
-    sampler = DateStratifiedMicrobatchSampler(train_rows, runtime, seed)
+    decision_grouped = bool(
+        run_profile is not None and run_profile.decision_grouped_batches
+    )
+    sampler = DateStratifiedMicrobatchSampler(
+        train_rows, runtime, seed, decision_grouped=decision_grouped
+    )
     train_loader = _create_loader(
         VectorizedFeatureDataset(
             store,
@@ -1042,6 +1115,7 @@ def create_training_loaders(
             context_ablation,
             feature_ablation,
             peer_features,
+            run_profile,
         ),
         sampler,
         runtime,
@@ -1057,9 +1131,16 @@ def create_training_loaders(
             context_ablation,
             feature_ablation,
             peer_features,
+            run_profile,
         ),
-        SequentialPaddedBatchSampler(
-            validation_rows.height, runtime.evaluation_batch_size
+        (
+            DecisionGroupedPaddedBatchSampler(
+                validation_rows, runtime.evaluation_batch_size
+            )
+            if decision_grouped
+            else SequentialPaddedBatchSampler(
+                validation_rows.height, runtime.evaluation_batch_size
+            )
         ),
         runtime,
         seed,
@@ -1078,6 +1159,7 @@ def create_evaluation_loader(
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
     feature_ablation: ResolvedFeatureAblation = NO_FEATURE_ABLATION,
     peer_features: str = "none",
+    run_profile: RunProfile | None = None,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
         VectorizedFeatureDataset(
@@ -1089,8 +1171,15 @@ def create_evaluation_loader(
             context_ablation,
             feature_ablation,
             peer_features,
+            run_profile,
         ),
-        SequentialPaddedBatchSampler(rows.height, runtime.evaluation_batch_size),
+        (
+            DecisionGroupedPaddedBatchSampler(rows, runtime.evaluation_batch_size)
+            if run_profile is not None and run_profile.decision_grouped_batches
+            else SequentialPaddedBatchSampler(
+                rows.height, runtime.evaluation_batch_size
+            )
+        ),
         runtime,
         seed,
     )

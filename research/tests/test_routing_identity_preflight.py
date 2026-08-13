@@ -216,6 +216,31 @@ def test_soft_spearman_structural_bias_null_directions() -> None:
     assert float(fusion_norm.weight.grad.abs().max()) > 1e-5
 
 
+def test_preflight_identity_binds_experiment_profile_and_packed_shape() -> None:
+    profile = {
+        "schema_version": "B3_MODEL_RUN_PROFILE_V1",
+        "name": "experiment",
+        "equity_count": 48,
+        "equity_slots": list(range(48)),
+        "decision_indices": list(range(0, 55, 3)),
+        "maximum_epochs": 3,
+        "identity_sha256": "profile-identity",
+    }
+    identity = build_routing_preflight_identity("a" * 40, profile, 9_728)
+
+    assert identity["run_profile"] == profile
+    assert identity["packed_shape"] == {
+        "equity_count": 48,
+        "instrument_count": 63,
+    }
+    assert identity["optimizer"]["train_sample_count"] == 9_728
+    assert identity["optimizer"]["maximum_epochs"] == 3
+    assert identity["synthetic_fixture"]["packed_equity_count"] == 48
+    assert identity["synthetic_fixture"]["packed_instrument_count"] == 63
+    assert identity["synthetic_fixture"]["valid_nonzero_values"] > 0
+    assert identity["synthetic_fixture"]["unavailable_nonzero_values"] == 0
+
+
 def test_approved_null_directions_remain_in_identity_and_parity() -> None:
     identity = build_routing_preflight_identity("a" * 40)
     expected_exceptions = set(preflight._ZERO_GRADIENT_EXCEPTIONS)

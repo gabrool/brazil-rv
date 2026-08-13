@@ -31,7 +31,6 @@ from .contract import (
     FEATURE_STORE_POINTER,
     GLOBAL_CONTEXT_SETTINGS,
     GH200_RUNTIME,
-    MAX_EPOCHS,
     MIN_IC_IMPROVEMENT,
     NEURAL_MODELS,
     NEURAL_OBJECTIVES,
@@ -92,6 +91,14 @@ from .engine import (
 from .model import build_neural_model, count_trainable_parameters
 from .optim import build_optimizer, build_scheduler
 from .process_lock import PRODUCTION_TRAINING_LOCK, exclusive_process_lock
+from .run_profiles import (
+    RUN_PROFILE_NAMES,
+    RunProfile,
+    filter_profile_rows,
+    resolve_run_profile,
+    write_run_profile,
+)
+from .session_preparation import validate_session_preparation
 from .xgboost_model import train_xgboost_run, validate_xgboost_runtime
 
 
@@ -126,6 +133,10 @@ _HISTORY_COLUMNS = (
 def validate_cli_args(
     parser: argparse.ArgumentParser, args: argparse.Namespace
 ) -> argparse.Namespace:
+    if not hasattr(args, "run_profile"):
+        args.run_profile = "production"
+    if not hasattr(args, "session_preparation_artifact"):
+        args.session_preparation_artifact = None
     if not hasattr(args, "feature_ablation"):
         args.feature_ablation = "none"
     if not hasattr(args, "peer_features"):
@@ -137,6 +148,8 @@ def validate_cli_args(
     ):
         if not hasattr(args, field):
             setattr(args, field, None)
+    if args.run_profile == "experiment" and args.model != "tcn":
+        parser.error("--run-profile experiment is supported only for --model tcn")
     if args.peer_features != "none" and args.model != "tcn":
         parser.error("--peer-features is supported only for --model tcn")
     if args.model == "xgboost" and args.optimizer is not None:
@@ -224,6 +237,10 @@ def validate_cli_args(
 def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, choices=SUPPORTED_MODELS)
+    parser.add_argument(
+        "--run-profile", choices=RUN_PROFILE_NAMES, default="production"
+    )
+    parser.add_argument("--session-preparation-artifact", type=Path)
     parser.add_argument("--optimizer", choices=OPTIMIZER_VARIANTS)
     parser.add_argument("--objective", choices=NEURAL_OBJECTIVES)
     parser.add_argument(
@@ -312,6 +329,7 @@ def _run_directory_name(
     context_ablation: str = "none",
     feature_ablation: str = "none",
     peer_features: str = "none",
+    run_profile: str = "production",
 ) -> str:
     context_part = "" if global_context is None else f"_global-{global_context}"
     ablation_part = (
@@ -319,8 +337,9 @@ def _run_directory_name(
     )
     feature_part = "" if feature_ablation == "none" else f"_feature-{feature_ablation}"
     peer_part = "" if peer_features == "none" else f"_peer-{peer_features}"
+    profile_part = "" if run_profile == "production" else "_profile-experiment"
     if optimizer_variant is None:
-        return f"{model_name}{context_part}{ablation_part}{feature_part}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
+        return f"{model_name}{context_part}{ablation_part}{feature_part}{profile_part}_seed{seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
     if objective is None:
         raise ValueError("Neural run names require an objective")
     objective_metadata(objective, temperature)
@@ -343,7 +362,7 @@ def _run_directory_name(
         "" if temperature is None else f"_tau{experiment_decimal(temperature, 2)}"
     )
     return (
-        f"{model_part}{objective_part}{optimizer_part}{rho_part}{tau_part}{context_part}{ablation_part}{feature_part}{peer_part}_seed{seed}_"
+        f"{model_part}{objective_part}{optimizer_part}{rho_part}{tau_part}{context_part}{ablation_part}{feature_part}{peer_part}{profile_part}_seed{seed}_"
         f"{created_at:%Y%m%dT%H%M%S%fZ}"
     )
 
@@ -377,14 +396,35 @@ def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
     os.replace(temporary, path)
 
 
-def _atomic_write_history(path: Path, rows: list[dict[str, object]]) -> None:
+def _atomic_write_history(
+    path: Path,
+    rows: list[dict[str, object]],
+    run_profile: RunProfile | None = None,
+) -> None:
     temporary = path.with_name(f"{path.name}.tmp")
     temporary.unlink(missing_ok=True)
     try:
         with temporary.open("w", newline="", encoding="utf-8") as output:
-            writer = csv.DictWriter(output, fieldnames=_HISTORY_COLUMNS)
+            experiment = run_profile is not None and run_profile.name == "experiment"
+            fields = (
+                (*_HISTORY_COLUMNS, "run_profile", "run_profile_identity_sha256")
+                if experiment
+                else _HISTORY_COLUMNS
+            )
+            writer = csv.DictWriter(output, fieldnames=fields)
             writer.writeheader()
-            writer.writerows(rows)
+            writer.writerows(
+                (
+                    {
+                        **row,
+                        "run_profile": run_profile.name,
+                        "run_profile_identity_sha256": run_profile.identity_sha256,
+                    }
+                    if experiment
+                    else row
+                )
+                for row in rows
+            )
         os.replace(temporary, path)
     except BaseException:
         temporary.unlink(missing_ok=True)
@@ -409,6 +449,7 @@ def _write_daily_metrics(
     path: Path,
     rows: list[dict[str, object]],
     feature_store: Path,
+    run_profile: RunProfile | None = None,
 ) -> None:
     dates = dict(
         pl.read_parquet(feature_store / "date_index.parquet")
@@ -416,6 +457,15 @@ def _write_daily_metrics(
         .iter_rows()
     )
     with_dates = [{"trade_date": dates[int(row["date_idx"])], **row} for row in rows]
+    if run_profile is not None and run_profile.name == "experiment":
+        with_dates = [
+            {
+                **row,
+                "run_profile": run_profile.name,
+                "run_profile_identity_sha256": run_profile.identity_sha256,
+            }
+            for row in with_dates
+        ]
     _atomic_write_parquet(path, pl.DataFrame(with_dates))
 
 
@@ -433,6 +483,7 @@ def _common_manifest(
     feature_manifest: dict[str, object],
     hardware: object,
     created_at: datetime,
+    run_profile: RunProfile,
 ) -> dict[str, object]:
     return {
         "status": "running",
@@ -462,6 +513,8 @@ def _common_manifest(
         "training_started_at_utc": datetime.now(timezone.utc).isoformat(),
         "completed_at_utc": None,
         "training_duration_seconds": None,
+        "run_profile": run_profile.metadata(),
+        "run_profile_identity_sha256": run_profile.identity_sha256,
     }
 
 
@@ -479,6 +532,7 @@ def _run_xgboost(
     cache_report: object,
     created_at: datetime,
     run_dir: Path,
+    run_profile: RunProfile,
 ) -> None:
     xgboost_runtime = validate_xgboost_runtime()
     manifest = {
@@ -495,6 +549,7 @@ def _run_xgboost(
             feature_manifest=feature_manifest,
             hardware=hardware,
             created_at=created_at,
+            run_profile=run_profile,
         ),
         "tcn_settings": None,
         "architecture_constants": None,
@@ -559,6 +614,7 @@ def _run_neural(
     cache_report: object,
     created_at: datetime,
     run_dir: Path,
+    run_profile: RunProfile,
 ) -> None:
     if args.optimizer is None:
         raise AssertionError("Validated neural CLI is missing its optimizer")
@@ -581,13 +637,14 @@ def _run_neural(
         context_ablation,
         feature_ablation,
         args.peer_features,
+        run_profile,
     )
     training_batch = next(iter(train_loader))
     evaluation_batch = next(iter(validation_loader))
 
-    model = build_neural_model(args.model, tcn_architecture, args.peer_features).to(
-        "cuda"
-    )
+    model = build_neural_model(
+        args.model, tcn_architecture, args.peer_features, run_profile.equity_count
+    ).to("cuda")
     model_metadata = _model_metadata(
         args.model, architecture, tcn_settings, args.peer_features
     )
@@ -600,7 +657,7 @@ def _run_neural(
         )
     optimizer, _ = build_optimizer(model)
     scheduler, steps_per_epoch, warmup_steps = build_scheduler(
-        optimizer, train_rows.height
+        optimizer, train_rows.height, run_profile.maximum_epochs
     )
     eager_reference = clone_eager_reference_model(model)
     compile_setup = compile_model(model, runtime)
@@ -641,6 +698,7 @@ def _run_neural(
             feature_manifest=feature_manifest,
             hardware=hardware,
             created_at=created_at,
+            run_profile=run_profile,
         ),
         **model_metadata,
         "objective": objective_metadata(args.objective, args.temperature),
@@ -654,12 +712,16 @@ def _run_neural(
         "precision": "bf16",
         "bf16": True,
         "grad_scaler_used": False,
-        "training_constants": asdict(TrainingConstants()),
+        "training_constants": asdict(
+            TrainingConstants(maximum_epochs=run_profile.maximum_epochs)
+        ),
         "optimizer_constants": {"adamw": asdict(AdamWConstants())},
-        "scheduler_constants": asdict(SchedulerConstants()),
+        "scheduler_constants": asdict(
+            SchedulerConstants(maximum_epochs=run_profile.maximum_epochs)
+        ),
         "scheduler_steps": {
             "steps_per_epoch": steps_per_epoch,
-            "total_steps": steps_per_epoch * MAX_EPOCHS,
+            "total_steps": steps_per_epoch * run_profile.maximum_epochs,
             "warmup_steps": warmup_steps,
         },
         "pytorch_version": hardware.pytorch_version,
@@ -674,7 +736,8 @@ def _run_neural(
             "multiprocessing_context": "spawn",
             "host_arrays": "read_only_memmap",
             "evaluation_padding": "repeat_last_and_mask",
-            "sam_replay": "retain_eight_cpu_pinned_batches",
+            "sam_replay": "one_device_transfer_per_effective_batch_reused_by_both_passes",
+            "decision_grouped_batches": run_profile.decision_grouped_batches,
             "sam_rng_replay": "restore_cpu_and_cuda_state_before_second_pass",
         },
         "peak_memory": {
@@ -698,6 +761,7 @@ def _run_neural(
 
     started = time.perf_counter()
     history: list[dict[str, object]] = []
+    performance_epochs: list[dict[str, object]] = []
     best_score = float("-inf")
     best_epoch = 0
     best_metrics: dict[str, object] | None = None
@@ -707,11 +771,12 @@ def _run_neural(
     run_peak_allocated = 0
     run_peak_reserved = 0
 
-    for epoch in range(1, MAX_EPOCHS + 1):
+    for epoch in range(1, run_profile.maximum_epochs + 1):
         sampler.set_epoch(epoch - 1)
         torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
         epoch_started = time.perf_counter()
+        training_started = time.perf_counter()
         training = train_one_epoch(
             model,
             train_loader,
@@ -723,10 +788,13 @@ def _run_neural(
             args.temperature,
             args.sam_rho,
         )
+        training_seconds = time.perf_counter() - training_started
+        validation_started = time.perf_counter()
         validation, daily_rows = evaluate_model(
             model, validation_loader, args.objective, args.temperature
         )
         torch.cuda.synchronize()
+        validation_seconds = time.perf_counter() - validation_started
         epoch_seconds = time.perf_counter() - epoch_started
         peak_allocated = torch.cuda.max_memory_allocated()
         peak_reserved = torch.cuda.max_memory_reserved()
@@ -768,6 +836,7 @@ def _run_neural(
                 "peak_reserved_cuda_memory_bytes": peak_reserved,
             }
         )
+        artifact_started = time.perf_counter()
         if primary_score > best_score + MIN_IC_IMPROVEMENT:
             best_score = primary_score
             best_epoch = epoch
@@ -797,15 +866,26 @@ def _run_neural(
                     context_ablation,
                     feature_ablation,
                     args.peer_features,
+                    run_profile.metadata(),
                 ),
             )
         else:
             evaluations_without_improvement += 1
         stopped_epoch = epoch
-        _atomic_write_history(run_dir / "history.csv", history)
+        _atomic_write_history(run_dir / "history.csv", history, run_profile)
+        performance_epochs.append(
+            {
+                "epoch": epoch,
+                "training_seconds": training_seconds,
+                "validation_seconds": validation_seconds,
+                "artifact_io_seconds": time.perf_counter() - artifact_started,
+                "epoch_seconds": epoch_seconds,
+            }
+        )
         if evaluations_without_improvement >= EARLY_STOP_PATIENCE:
             break
 
+    final_artifact_started = time.perf_counter()
     _atomic_torch_save(
         run_dir / "final.pt",
         checkpoint_payload(
@@ -829,14 +909,35 @@ def _run_neural(
             context_ablation,
             feature_ablation,
             args.peer_features,
+            run_profile.metadata(),
         ),
     )
     if best_metrics is None or best_daily_rows is None:
         raise RuntimeError("Training did not produce a best checkpoint")
+    best_metrics["run_profile"] = run_profile.metadata()
+    best_metrics["run_profile_identity_sha256"] = run_profile.identity_sha256
     _atomic_write_json(run_dir / "validation_metrics.json", best_metrics)
     _write_daily_metrics(
-        run_dir / "validation_daily_metrics.parquet", best_daily_rows, feature_store
+        run_dir / "validation_daily_metrics.parquet",
+        best_daily_rows,
+        feature_store,
+        run_profile,
     )
+    final_artifact_io_seconds = time.perf_counter() - final_artifact_started
+    performance_profile = {
+        "version": "B3_PERFORMANCE_PROFILE_V1",
+        "run_profile": run_profile.name,
+        "run_profile_identity_sha256": run_profile.identity_sha256,
+        "epochs": performance_epochs,
+        "final_artifact_io_seconds": final_artifact_io_seconds,
+        "bounded_trace": {
+            "scope": "first_epoch",
+            "training_seconds": performance_epochs[0]["training_seconds"],
+            "validation_seconds": performance_epochs[0]["validation_seconds"],
+            "artifact_io_seconds": performance_epochs[0]["artifact_io_seconds"],
+        },
+    }
+    _atomic_write_json(run_dir / "performance_profile.json", performance_profile)
     completed_manifest = {
         **manifest,
         "status": "completed",
@@ -867,20 +968,40 @@ def _run(args: argparse.Namespace) -> None:
         torch.set_float32_matmul_precision("high")
 
     feature_store = resolve_feature_store()
-    sample_index = validate_feature_store(feature_store)
+    run_profile = resolve_run_profile(args.run_profile, feature_store)
+    preparation_value = args.session_preparation_artifact or os.environ.get(
+        "BRAZIL_RV_SESSION_PREPARATION_ARTIFACT"
+    )
+    if preparation_value is None:
+        sample_index = validate_feature_store(feature_store)
+        cache_report = warm_feature_store_cache(feature_store, args.peer_features)
+    else:
+        sample_index, cache_report = validate_session_preparation(
+            Path(preparation_value).expanduser().resolve(),
+            feature_store,
+            commit_sha,
+            run_profile,
+        )
     context_ablation = resolve_context_ablation_for_store(
         feature_store, args.context_ablation
     )
     feature_ablation = resolve_feature_ablation_for_store(
         feature_store, args.feature_ablation
     )
-    train_rows = select_sample_split(sample_index, "train")
-    validation_rows = select_sample_split(sample_index, "validation")
+    train_rows = filter_profile_rows(
+        select_sample_split(sample_index, "train"),
+        feature_store,
+        run_profile,
+    )
+    validation_rows = filter_profile_rows(
+        select_sample_split(sample_index, "validation"),
+        feature_store,
+        run_profile,
+        require_training_dates=False,
+    )
     feature_manifest = json.loads(
         (feature_store / "manifest.json").read_text(encoding="utf-8")
     )
-    cache_report = warm_feature_store_cache(feature_store, args.peer_features)
-
     created_at = datetime.now(timezone.utc)
     run_dir = RUN_OUTPUT_BASE / _run_directory_name(
         args.model,
@@ -895,10 +1016,12 @@ def _run(args: argparse.Namespace) -> None:
         args.context_ablation,
         args.feature_ablation,
         args.peer_features,
+        args.run_profile,
     )
     if run_dir.exists():
         raise FileExistsError(f"Run output already exists: {run_dir}")
     run_dir.mkdir(parents=True)
+    write_run_profile(run_dir / "run_profile.json", run_profile)
 
     if neural:
         _run_neural(
@@ -915,6 +1038,7 @@ def _run(args: argparse.Namespace) -> None:
             cache_report=cache_report,
             created_at=created_at,
             run_dir=run_dir,
+            run_profile=run_profile,
         )
     else:
         _run_xgboost(
@@ -930,6 +1054,7 @@ def _run(args: argparse.Namespace) -> None:
             cache_report=cache_report,
             created_at=created_at,
             run_dir=run_dir,
+            run_profile=run_profile,
         )
     print(f"Completed run: {run_dir}")
 

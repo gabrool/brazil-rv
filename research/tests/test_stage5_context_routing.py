@@ -10,6 +10,8 @@ from brazil_rv.modeling import stage5_context_routing as stage5
 from brazil_rv.modeling import train
 from brazil_rv.modeling.audit_realized_distributions import AUDIT_JSON
 from brazil_rv.modeling.context_routing_adaptive import (
+    CONTROL_RUN_COUNT_MAXIMUM,
+    CONTROL_RUN_COUNT_MINIMUM,
     ROUTING_RUN_COUNT_MAXIMUM,
     ROUTING_RUN_COUNT_MINIMUM,
     TOTAL_TRAINING_RUN_COUNT_MAXIMUM,
@@ -29,6 +31,7 @@ from brazil_rv.modeling.stage5_context_routing import (
     _record_decision,
     _recover_job,
     build_training_command,
+    control_job,
     issuer_jobs,
     issuer_seed29_gate,
     issuer_three_seed_gate,
@@ -138,8 +141,13 @@ def test_adaptive_jobs_are_mandatory_only_and_frozen() -> None:
     assert [job["seed"] for job in issuer_jobs()] == [29, 11, 47]
     assert ROUTING_RUN_COUNT_MINIMUM == 4
     assert ROUTING_RUN_COUNT_MAXIMUM == 9
-    assert TOTAL_TRAINING_RUN_COUNT_MINIMUM == 5
-    assert TOTAL_TRAINING_RUN_COUNT_MAXIMUM == 12
+    assert CONTROL_RUN_COUNT_MINIMUM == 1
+    assert CONTROL_RUN_COUNT_MAXIMUM == 3
+    assert TOTAL_TRAINING_RUN_COUNT_MINIMUM == 6
+    assert TOTAL_TRAINING_RUN_COUNT_MAXIMUM == 15
+    assert control_job(29)["command"] == list(
+        build_training_command(seed=29, peer_features="selected")
+    )
     assert routing_stage("early_concat", "late_only") == "slow_only"
     assert routing_stage("late_only", "film") == "macro_temporal_only"
     assert routing_stage("film", "film") == "joint_synthesis"
@@ -157,6 +165,7 @@ def test_adaptive_jobs_are_mandatory_only_and_frozen() -> None:
             context_routing_experiment="factorial_v1",
         )[3:]
     )
+    assert parsed.run_profile == "experiment"
     assert parsed.context_routing_experiment == "factorial_v1"
     assert parsed.slow_routing == "early_concat"
     assert parsed.macro_temporal_routing == "film"
@@ -414,8 +423,36 @@ def test_runbook_is_atomic_and_available_before_preflight_failure(
     state_dir = tmp_path / "state"
     monkeypatch.setattr(stage5, "_git_identity", lambda **_: ("a" * 40, True))
     monkeypatch.setattr(stage5, "resolve_feature_store", lambda: feature_store)
-    monkeypatch.setattr(stage5, "validate_feature_store", lambda _: None)
-    monkeypatch.setattr(stage5, "build_routing_preflight_identity", lambda _: {})
+    profile = stage5.RunProfile(
+        name="experiment",
+        equity_slots=(0,),
+        security_ids=("SEC",),
+        symbols=("EQ",),
+        decision_indices=(0,),
+        maximum_epochs=3,
+        minimum_active_equities=1,
+        minimum_training_dates=1,
+        decision_grouped_batches=True,
+        provenance={},
+        selection=(),
+        identity_sha256="profile",
+    )
+    monkeypatch.setattr(stage5, "resolve_run_profile", lambda *_: profile)
+    monkeypatch.setattr(
+        stage5,
+        "prepare_feature_store_session",
+        lambda path, *_: path.write_text("{}", encoding="utf-8"),
+    )
+    monkeypatch.setattr(
+        stage5,
+        "validate_session_preparation",
+        lambda *_: (object(), object()),
+    )
+    monkeypatch.setattr(stage5, "filter_profile_rows", lambda rows, *_: rows)
+    monkeypatch.setattr(
+        stage5, "select_sample_split", lambda *_: type("Rows", (), {"height": 19})()
+    )
+    monkeypatch.setattr(stage5, "build_routing_preflight_identity", lambda *_: {})
     monkeypatch.setattr(stage5, "_feature_store_identity", lambda _: {})
     monkeypatch.setattr(stage5, "_configuration", lambda *_: {})
     monkeypatch.setattr(stage5, "_source_incumbents", lambda *_: {})
@@ -446,6 +483,7 @@ def test_runbook_is_atomic_and_available_before_preflight_failure(
 def test_dry_run_reports_adaptive_minimum_and_maximum() -> None:
     payload = {
         "incumbent_runs": {"11": "a", "29": "b", "47": "c"},
+        "control_runs": {"minimum": 1, "maximum": 3},
         "issuer_runs": {"mandatory": 1, "conditional": 2, "minimum": 1, "maximum": 3},
         "routing_runs": {
             "mandatory": 4,
@@ -453,11 +491,12 @@ def test_dry_run_reports_adaptive_minimum_and_maximum() -> None:
             "minimum": 4,
             "maximum": 9,
         },
-        "total_training_runs": {"minimum": 5, "maximum": 12},
+        "total_training_runs": {"minimum": 6, "maximum": 15},
     }
     output = stage5.format_dry_run(payload)
     assert "routing runs: mandatory=4 conditional_max=5 min=4 max=9" in output
-    assert "total training runs: min=5 max=12" in output
+    assert "matched control runs: min=1 max=3" in output
+    assert "total training runs: min=6 max=15" in output
     assert "all-off scaffold control training: no" in output
     assert "held-out test accessed: no" in output
 
@@ -523,3 +562,59 @@ def test_audit_directory_is_promoted_once_and_reused(
     assert first.is_file()
     assert len(calls) == 1
     assert len(validated) == 2
+
+
+def test_session_performance_summary_includes_all_artifact_io(tmp_path: Path) -> None:
+    session = tmp_path / "session_preparation.json"
+    session.write_text(
+        json.dumps(
+            {
+                "cache_warmup": {"mode": "selected", "seconds": 0.25},
+                "performance": {"total_preparation_seconds": 0.5},
+            }
+        ),
+        encoding="utf-8",
+    )
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "performance_profile.json").write_text(
+        json.dumps(
+            {
+                "run_profile_identity_sha256": "profile-hash",
+                "epochs": [
+                    {
+                        "training_seconds": 1.0,
+                        "validation_seconds": 2.0,
+                        "artifact_io_seconds": 3.0,
+                    }
+                ],
+                "final_artifact_io_seconds": 4.0,
+                "bounded_trace": {"scope": "first_epoch"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    state = {
+        "control_jobs": [
+            {
+                "status": "completed",
+                "job_id": "control-seed-29",
+                "run_dir": str(run_dir),
+            }
+        ],
+        "issuer_jobs": [],
+        "routing_jobs": [],
+        "configuration": {
+            "run_profile_identity_sha256": "profile-hash",
+            "session_preparation": {"path": str(session)},
+        },
+        "session_phase_performance": {"routing_identity_preflight_seconds": 5.0},
+    }
+    payload = stage5._session_performance_payload(state)
+    assert payload["totals"] == {
+        "training_seconds": 1.0,
+        "validation_seconds": 2.0,
+        "artifact_io_seconds": 7.0,
+    }
+    assert payload["run_count"] == 1
+    assert payload["runs"][0]["bounded_trace"] == {"scope": "first_epoch"}

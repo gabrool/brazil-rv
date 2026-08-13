@@ -876,6 +876,31 @@ def test_padded_evaluation_matches_unpadded_reference() -> None:
         )
 
 
+def test_validation_metrics_are_invariant_to_decision_grouped_row_order() -> None:
+    generator = np.random.default_rng(41)
+    predictions = generator.normal(size=(12, 30, 3)).astype(np.float32)
+    targets = generator.normal(size=predictions.shape).astype(np.float32)
+    returns = generator.normal(size=predictions.shape).astype(np.float32)
+    mask = np.ones(predictions.shape, dtype=bool)
+    dates = np.repeat(np.asarray([5, 6, 7], dtype=np.int64), 4)
+    decisions = np.tile(np.asarray([0, 3, 6, 9], dtype=np.int64), 3)
+    grouped = np.lexsort((dates, decisions))
+
+    reference = create_metric_table(
+        predictions, targets, returns, mask, dates, decisions
+    )
+    reordered = create_metric_table(
+        predictions[grouped],
+        targets[grouped],
+        returns[grouped],
+        mask[grouped],
+        dates[grouped],
+        decisions[grouped],
+    )
+
+    assert reordered == reference
+
+
 def test_daily_ic_aggregation_with_ties() -> None:
     tied = np.repeat(np.arange(10, dtype=np.float32), 3)
     predictions = np.empty((2, 30, 3), dtype=np.float32)
@@ -1026,6 +1051,32 @@ def test_evaluation_identity_accepts_production_json_tuple_normalization(
     assert isinstance(manifest["architecture_constants"]["dilations"], list)
 
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+
+def test_run_profile_identity_is_explicitly_bound_and_legacy_absence_is_production(
+    tmp_path: Path,
+) -> None:
+    manifest, checkpoint, feature_store = _json_round_tripped_tcn_identity(tmp_path)
+    _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+    profile = {
+        "schema_version": "B3_MODEL_RUN_PROFILE_V1",
+        "name": "experiment",
+        "identity_sha256": "profile-hash",
+    }
+    for identity in (manifest, checkpoint):
+        identity["run_profile"] = copy.deepcopy(profile)
+        identity["run_profile_identity_sha256"] = "profile-hash"
+    _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+    missing = copy.deepcopy(checkpoint)
+    del missing["run_profile"]
+    with pytest.raises(ValueError, match="run_profile presence"):
+        _validate_run_checkpoint_identity(manifest, missing, feature_store)
+    modified = copy.deepcopy(checkpoint)
+    modified["run_profile"]["identity_sha256"] = "changed"
+    with pytest.raises(ValueError, match="run-profile identity mismatch"):
+        _validate_run_checkpoint_identity(manifest, modified, feature_store)
 
 
 def test_peer_identity_is_required_and_manifest_checkpoint_bound(

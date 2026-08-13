@@ -924,8 +924,7 @@ def _accumulate_objective_gradients(
         if check_predictions_finite
         else None
     )
-    for buffered_batch in effective_batch:
-        batch = _to_cuda(buffered_batch)
+    for batch in effective_batch:
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             predictions = _predict(model, batch)
         microbatch_loss_sum, _ = _objective_loss_sum(
@@ -1200,7 +1199,8 @@ def run_effective_batch_update(
         )
     objective_metadata(objective, temperature)
     sam_metadata(optimizer_variant, sam_rho)
-    loss_count = _objective_loss_count(effective_batch, objective)
+    device_effective_batch = [_to_cuda(batch) for batch in effective_batch]
+    loss_count = _objective_loss_count(device_effective_batch, objective)
     if loss_count == 0:
         raise ValueError("Effective batch contains no valid objective unit")
     if optimizer_variant == "adamw":
@@ -1208,7 +1208,7 @@ def run_effective_batch_update(
             raise ValueError("A SAM observer requires optimizer_variant='sam_adamw'")
         return _run_adamw_update(
             model,
-            effective_batch,
+            device_effective_batch,
             optimizer,
             scheduler,
             objective,
@@ -1219,7 +1219,7 @@ def run_effective_batch_update(
     assert sam_rho is not None
     return _run_sam_update(
         model,
-        effective_batch,
+        device_effective_batch,
         optimizer,
         scheduler,
         objective,
@@ -1427,6 +1427,7 @@ def checkpoint_payload(
     context_ablation: ResolvedContextAblation = NO_CONTEXT_ABLATION,
     feature_ablation: ResolvedFeatureAblation | None = None,
     peer_features: str = "none",
+    run_profile: dict[str, object] | None = None,
 ) -> dict[str, object]:
     if getattr(model, "model_name", None) != model_name:
         raise ValueError("Checkpoint model name does not match the model")
@@ -1469,4 +1470,7 @@ def checkpoint_payload(
     }
     if feature_ablation is not None:
         payload["feature_ablation"] = feature_ablation.metadata()
+    if run_profile is not None:
+        payload["run_profile"] = run_profile
+        payload["run_profile_identity_sha256"] = run_profile.get("identity_sha256")
     return payload

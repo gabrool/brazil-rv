@@ -17,12 +17,12 @@ from brazil_rv.modeling.contract import (
     ADAMW_EPS,
     ADAMW_LR,
     ADAMW_WEIGHT_DECAY,
+    CONTEXT_COUNT,
     EQUITY_COUNT,
     EXPECTED_SPLIT_SAMPLE_COUNTS,
     FINAL_LR_FACTOR,
     GH200_RUNTIME,
     HORIZON_COUNT,
-    INSTRUMENT_COUNT,
     LOCAL_CONTEXT_COUNT,
     PATCH_INPUT_WIDTH,
     PEER_STATE_WIDTH,
@@ -325,25 +325,26 @@ class _SamCapture:
         }
 
 
-def _synthetic_batch() -> dict[str, torch.Tensor]:
+def _synthetic_batch(equity_count: int = EQUITY_COUNT) -> dict[str, torch.Tensor]:
     batch_size = 1
-    active_equities = 32
+    active_equities = min(32, equity_count)
+    instrument_count = equity_count + CONTEXT_COUNT
     state_position = 15
     patches = torch.zeros(
         batch_size,
-        INSTRUMENT_COUNT,
+        instrument_count,
         ABSOLUTE_PATCH_COUNT,
         PATCH_INPUT_WIDTH,
     )
     history = torch.zeros(
-        batch_size, INSTRUMENT_COUNT, ABSOLUTE_PATCH_COUNT, dtype=torch.bool
+        batch_size, instrument_count, ABSOLUTE_PATCH_COUNT, dtype=torch.bool
     )
     history[:, :active_equities, 12:state_position] = True
-    wdo_di_start = EQUITY_COUNT + 1
-    history[:, wdo_di_start : EQUITY_COUNT + LOCAL_CONTEXT_COUNT, :state_position] = (
+    wdo_di_start = equity_count + 1
+    history[:, wdo_di_start : equity_count + LOCAL_CONTEXT_COUNT, :state_position] = (
         True
     )
-    global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+    global_start = equity_count + LOCAL_CONTEXT_COUNT
     zt_zn = slice(global_start + 2, global_start + 4)
     history[:, zt_zn] = True
     rows = history.nonzero(as_tuple=False)
@@ -355,11 +356,11 @@ def _synthetic_batch() -> dict[str, torch.Tensor]:
         .float()
         .div(1000.0)
     )
-    instrument = torch.zeros(batch_size, INSTRUMENT_COUNT, dtype=torch.bool)
+    instrument = torch.zeros(batch_size, instrument_count, dtype=torch.bool)
     instrument[:, :active_equities] = True
-    instrument[:, wdo_di_start : EQUITY_COUNT + LOCAL_CONTEXT_COUNT] = True
+    instrument[:, wdo_di_start : equity_count + LOCAL_CONTEXT_COUNT] = True
     instrument[:, zt_zn] = True
-    slow = torch.zeros(batch_size, INSTRUMENT_COUNT, SLOW_FEATURE_COUNT)
+    slow = torch.zeros(batch_size, instrument_count, SLOW_FEATURE_COUNT)
     slow_rows = instrument.nonzero(as_tuple=False)
     slow_channels = torch.arange(SLOW_FEATURE_COUNT)
     slow[instrument] = (
@@ -369,16 +370,16 @@ def _synthetic_batch() -> dict[str, torch.Tensor]:
         .float()
         .div(1000.0)
     )
-    peer = torch.zeros(batch_size, EQUITY_COUNT, PEER_STATE_WIDTH)
+    peer = torch.zeros(batch_size, equity_count, PEER_STATE_WIDTH)
     equity_rows = torch.arange(active_equities)[:, None]
     peer_channels = torch.arange(PEER_STATE_WIDTH)[None, :]
     peer[:, :active_equities] = (
         (equity_rows * 3 + peer_channels * 7).remainder(43).add(1).float().div(1000.0)
     )
-    targets = torch.zeros(batch_size, EQUITY_COUNT, HORIZON_COUNT)
+    targets = torch.zeros(batch_size, equity_count, HORIZON_COUNT)
     ranks = torch.linspace(-0.95, 0.95, active_equities)
     targets[:, :active_equities] = ranks[None, :, None]
-    label_mask = torch.zeros(batch_size, EQUITY_COUNT, HORIZON_COUNT, dtype=torch.bool)
+    label_mask = torch.zeros(batch_size, equity_count, HORIZON_COUNT, dtype=torch.bool)
     label_mask[:, :active_equities] = True
     return {
         "patches": patches,
@@ -395,16 +396,19 @@ def _synthetic_batch() -> dict[str, torch.Tensor]:
 def _fixture_metadata(batch: dict[str, torch.Tensor]) -> dict[str, Any]:
     history = batch["history_patch_mask"]
     patches = batch["patches"]
-    global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+    equity_count = patches.shape[1] - CONTEXT_COUNT
+    global_start = equity_count + LOCAL_CONTEXT_COUNT
     source_slices = {
-        "equity": slice(0, EQUITY_COUNT),
-        "wdo": slice(EQUITY_COUNT + 1, EQUITY_COUNT + 2),
-        "di": slice(EQUITY_COUNT + 2, EQUITY_COUNT + LOCAL_CONTEXT_COUNT),
+        "equity": slice(0, equity_count),
+        "wdo": slice(equity_count + 1, equity_count + 2),
+        "di": slice(equity_count + 2, equity_count + LOCAL_CONTEXT_COUNT),
         "zt": slice(global_start + 2, global_start + 3),
         "zn": slice(global_start + 3, global_start + 4),
     }
     return {
         "physical_microbatch_size": 1,
+        "packed_equity_count": equity_count,
+        "packed_instrument_count": patches.shape[1],
         "accumulation_steps": GH200_RUNTIME.accumulation_steps,
         "active_equities": 32,
         "state_position": 15,
@@ -435,27 +439,52 @@ def _settings(experiment: str) -> TCNSettings:
     )
 
 
-def _seeded_models(device: str = "cuda") -> tuple[nn.Module, nn.Module]:
+def _seeded_models(
+    device: str = "cuda", equity_count: int = EQUITY_COUNT
+) -> tuple[nn.Module, nn.Module]:
     with torch.random.fork_rng():
         torch.manual_seed(PREFLIGHT_SEED)
         legacy = build_neural_model(
-            "tcn", resolve_tcn_architecture(_settings("legacy")), "selected"
+            "tcn",
+            resolve_tcn_architecture(_settings("legacy")),
+            "selected",
+            equity_count,
         ).to(device)
         torch.manual_seed(PREFLIGHT_SEED)
         scaffold = build_neural_model(
-            "tcn", resolve_tcn_architecture(_settings("factorial_v1")), "selected"
+            "tcn",
+            resolve_tcn_architecture(_settings("factorial_v1")),
+            "selected",
+            equity_count,
         ).to(device)
     return legacy, scaffold
 
 
-def build_routing_preflight_identity(git_commit: str) -> dict[str, Any]:
+def build_routing_preflight_identity(
+    git_commit: str,
+    run_profile: dict[str, Any] | None = None,
+    train_sample_count: int | None = None,
+) -> dict[str, Any]:
     if len(git_commit) != 40 or any(
         character not in "0123456789abcdef" for character in git_commit
     ):
         raise ValueError("Preflight identity requires a full lowercase Git commit SHA")
+    profile = run_profile or {
+        "name": "production",
+        "equity_count": EQUITY_COUNT,
+        "maximum_epochs": 20,
+    }
+    equity_count = int(profile.get("equity_count", -1))
+    maximum_epochs = int(profile.get("maximum_epochs", -1))
+    if equity_count <= 0 or maximum_epochs <= 0:
+        raise ValueError("Preflight run profile has invalid packed dimensions")
+    if train_sample_count is None:
+        train_sample_count = EXPECTED_SPLIT_SAMPLE_COUNTS["train"]
+    if train_sample_count <= 0:
+        raise ValueError("Preflight training sample count must be positive")
     legacy_architecture = resolve_tcn_architecture(_settings("legacy"))
     factorial_architecture = resolve_tcn_architecture(_settings("factorial_v1"))
-    legacy, scaffold = _seeded_models("cpu")
+    legacy, scaffold = _seeded_models("cpu", equity_count)
     legacy_base = _parameter_identity(legacy, routing=False)
     scaffold_base = _parameter_identity(scaffold, routing=False)
     if legacy_base != scaffold_base or _parameter_identity(legacy, routing=True):
@@ -472,6 +501,11 @@ def build_routing_preflight_identity(git_commit: str) -> dict[str, Any]:
     ]
     identity = {
         "git": {"commit": git_commit, "clean_worktree": True},
+        "run_profile": profile,
+        "packed_shape": {
+            "equity_count": equity_count,
+            "instrument_count": equity_count + CONTEXT_COUNT,
+        },
         "legacy_architecture": {
             "settings": asdict(_settings("legacy")),
             "resolved": asdict(legacy_architecture),
@@ -497,7 +531,8 @@ def build_routing_preflight_identity(git_commit: str) -> dict[str, Any]:
             "scheduler": "linear_warmup_cosine_decay",
             "warmup_fraction": WARMUP_FRACTION,
             "final_lr_factor": FINAL_LR_FACTOR,
-            "train_sample_count": EXPECTED_SPLIT_SAMPLE_COUNTS["train"],
+            "train_sample_count": train_sample_count,
+            "maximum_epochs": maximum_epochs,
         },
         "sam": sam_metadata("sam_adamw", 0.125),
         "runtime": asdict(GH200_RUNTIME),
@@ -508,7 +543,7 @@ def build_routing_preflight_identity(git_commit: str) -> dict[str, Any]:
             "required_comparisons": required_comparisons,
             "inactive_routing_gradients_and_updates_required_absent": True,
         },
-        "synthetic_fixture": _fixture_metadata(_synthetic_batch()),
+        "synthetic_fixture": _fixture_metadata(_synthetic_batch(equity_count)),
     }
     return _json_normalize(identity)
 
@@ -531,8 +566,14 @@ def _record_comparison(
     )
 
 
-def _run_execution(execution: str, batch: dict[str, torch.Tensor]) -> dict[str, Any]:
-    legacy, scaffold = _seeded_models()
+def _run_execution(
+    execution: str,
+    batch: dict[str, torch.Tensor],
+    equity_count: int,
+    train_sample_count: int,
+    maximum_epochs: int,
+) -> dict[str, Any]:
+    legacy, scaffold = _seeded_models(equity_count=equity_count)
     compile_setups: dict[str, Any] = {}
     if execution == "compiled":
         compile_setups = {
@@ -558,10 +599,10 @@ def _run_execution(execution: str, batch: dict[str, torch.Tensor]) -> dict[str, 
     legacy_optimizer, _ = build_optimizer(legacy)
     scaffold_optimizer, _ = build_optimizer(scaffold)
     legacy_scheduler, _, _ = build_scheduler(
-        legacy_optimizer, EXPECTED_SPLIT_SAMPLE_COUNTS["train"]
+        legacy_optimizer, train_sample_count, maximum_epochs
     )
     scaffold_scheduler, _, _ = build_scheduler(
-        scaffold_optimizer, EXPECTED_SPLIT_SAMPLE_COUNTS["train"]
+        scaffold_optimizer, train_sample_count, maximum_epochs
     )
     cuda_batch = _to_cuda(batch)
     effective_batch = [batch] * GH200_RUNTIME.accumulation_steps
@@ -1133,12 +1174,24 @@ def run_routing_identity_preflight(
         hardware = validate_runtime()
         current_environment = _json_normalize(asdict(hardware))
         payload["environment"] = current_environment
-        batch = _synthetic_batch()
+        equity_count = int(expected_identity["packed_shape"]["equity_count"])
+        train_sample_count = int(expected_identity["optimizer"]["train_sample_count"])
+        maximum_epochs = int(expected_identity["optimizer"]["maximum_epochs"])
+        batch = _synthetic_batch(equity_count)
         _require(
             _fixture_metadata(batch) == expected_identity["synthetic_fixture"],
             "generated fixture drifted from expected identity",
         )
-        executions = [_run_execution(mode, batch) for mode in PREFLIGHT_EXECUTIONS]
+        executions = [
+            _run_execution(
+                mode,
+                batch,
+                equity_count,
+                train_sample_count,
+                maximum_epochs,
+            )
+            for mode in PREFLIGHT_EXECUTIONS
+        ]
         comparisons = [
             comparison
             for execution in executions

@@ -58,6 +58,11 @@ from .feature_ablation import (
     resolve_feature_ablation_for_store,
 )
 from .model import build_neural_model
+from .run_profiles import (
+    RUN_PROFILE_SCHEMA_VERSION,
+    filter_profile_rows,
+    resolve_run_profile,
+)
 from brazil_rv.preprocessing.contract import SLOW_CHANNELS
 from .xgboost_model import (
     evaluate_saved_xgboost,
@@ -440,6 +445,24 @@ def _validate_run_checkpoint_identity(
     feature_ablation_identity = _normalize_feature_ablation_identity(
         manifest, checkpoint, run_dir=run_dir
     )
+    manifest_profile = manifest.get("run_profile")
+    checkpoint_profile = checkpoint.get("run_profile")
+    if (manifest_profile is None) != (checkpoint_profile is None):
+        raise ValueError("Run/checkpoint identity mismatch: run_profile presence")
+    if manifest_profile is not None:
+        if (
+            not isinstance(manifest_profile, dict)
+            or not isinstance(checkpoint_profile, dict)
+            or manifest_profile.get("schema_version") != RUN_PROFILE_SCHEMA_VERSION
+            or manifest_profile.get("name") not in {"production", "experiment"}
+            or manifest.get("run_profile_identity_sha256")
+            != manifest_profile.get("identity_sha256")
+            or checkpoint.get("run_profile_identity_sha256")
+            != checkpoint_profile.get("identity_sha256")
+            or _canonical_json_identity(manifest_profile)
+            != _canonical_json_identity(checkpoint_profile)
+        ):
+            raise ValueError("Run/checkpoint run-profile identity mismatch")
     for field in _CHECKPOINT_IDENTITY_FIELDS:
         if field not in manifest or field not in checkpoint:
             raise ValueError(f"Missing run/checkpoint identity field: {field}")
@@ -631,6 +654,16 @@ def collect_neural_evaluation(
     feature_ablation = resolve_feature_ablation_for_store(
         feature_store, str(feature_ablation_identity.metadata["key"])
     )
+    recorded_profile = manifest.get("run_profile")
+    profile_name = (
+        "production" if recorded_profile is None else str(recorded_profile["name"])
+    )
+    run_profile = resolve_run_profile(profile_name, feature_store)
+    if recorded_profile is not None and recorded_profile != run_profile.metadata():
+        raise ValueError("Run profile no longer matches its canonical policy")
+    rows = filter_profile_rows(
+        rows, feature_store, run_profile, require_training_dates=False
+    )
     loader = create_evaluation_loader(
         feature_store,
         rows,
@@ -642,8 +675,11 @@ def collect_neural_evaluation(
         context_ablation,
         feature_ablation,
         peer_mode,
+        run_profile,
     )
-    model = build_neural_model(model_name, tcn_architecture, peer_mode)
+    model = build_neural_model(
+        model_name, tcn_architecture, peer_mode, run_profile.equity_count
+    )
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to("cuda")
     eager_reference = clone_eager_reference_model(model)

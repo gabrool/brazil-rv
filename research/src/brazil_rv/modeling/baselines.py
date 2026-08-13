@@ -18,7 +18,6 @@ from .contract import (
     DYNAMIC_CHANNEL_COUNT,
     EQUITY_COUNT,
     HORIZON_COUNT,
-    INSTRUMENT_COUNT,
     LOCAL_CONTEXT_COUNT,
     MLP_DEPTH,
     MLP_SWIGLU_WIDTH,
@@ -101,10 +100,17 @@ class SharedCausalTCN(nn.Module):
     model_name = "tcn"
 
     def __init__(
-        self, architecture: TCNArchitecture, peer_features: str = "none"
+        self,
+        architecture: TCNArchitecture,
+        peer_features: str = "none",
+        equity_count: int = EQUITY_COUNT,
     ) -> None:
         super().__init__()
+        if equity_count <= 0:
+            raise ValueError("equity_count must be positive")
         self.architecture = architecture
+        self.equity_count = equity_count
+        self.instrument_count = equity_count + CONTEXT_COUNT
         self.peer_features = validate_peer_feature_mode(self.model_name, peer_features)
         width = architecture.width
         self.input_projection = nn.Linear(
@@ -174,15 +180,15 @@ class SharedCausalTCN(nn.Module):
     def _route_has_film(route: str) -> bool:
         return route in ("film", "early_concat_film")
 
-    @staticmethod
     def _macro_sources(
+        self,
         values: torch.Tensor,
         masks: torch.Tensor,
         state_position: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        local_start = EQUITY_COUNT + 1
-        local_stop = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
-        global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT + 2
+        local_start = self.equity_count + 1
+        local_stop = self.equity_count + LOCAL_CONTEXT_COUNT
+        global_start = self.equity_count + LOCAL_CONTEXT_COUNT + 2
         global_stop = global_start + 2
         return align_macro_histories(
             values[:, local_start:local_stop],
@@ -199,9 +205,9 @@ class SharedCausalTCN(nn.Module):
     ) -> torch.Tensor:
         if self.routing is None:
             raise AssertionError("Slow condition requires factorial routing")
-        local_start = EQUITY_COUNT + 1
-        local_stop = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
-        global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT + 2
+        local_start = self.equity_count + 1
+        local_stop = self.equity_count + LOCAL_CONTEXT_COUNT
+        global_start = self.equity_count + LOCAL_CONTEXT_COUNT + 2
         global_stop = global_start + 2
         local_slow = slow_features[:, local_start:local_stop]
         global_slow = torch.cat(
@@ -232,7 +238,9 @@ class SharedCausalTCN(nn.Module):
             ),
             dim=-1,
         )
-        equity = self.routing.equity_slow_projection(slow_features[:, :EQUITY_COUNT])
+        equity = self.routing.equity_slow_projection(
+            slow_features[:, : self.equity_count]
+        )
         macro = self.routing.macro_slow_projection(macro_input)
         return self.routing.slow_condition_norm(equity + macro[:, None, :])
 
@@ -288,7 +296,7 @@ class SharedCausalTCN(nn.Module):
         batch_size = history_patch_mask.shape[0]
         streams = hidden.reshape(
             batch_size,
-            INSTRUMENT_COUNT,
+            self.instrument_count,
             architecture.width,
             history_patch_mask.shape[2],
         )
@@ -299,7 +307,7 @@ class SharedCausalTCN(nn.Module):
                 raise AssertionError("Slow FiLM requires the slow condition")
             parameters = self.routing.slow_film[block_index](slow_condition)
             slow_gamma, slow_beta = parameters.chunk(2, dim=-1)
-            slow_valid = history_patch_mask[:, :EQUITY_COUNT, :, None].permute(
+            slow_valid = history_patch_mask[:, : self.equity_count, :, None].permute(
                 0, 1, 3, 2
             )
             gamma = slow_gamma[..., None] * slow_valid.to(slow_gamma.dtype)
@@ -320,7 +328,7 @@ class SharedCausalTCN(nn.Module):
             macro_beta = macro_beta.permute(0, 2, 1)[:, None]
             macro_valid = (
                 causal_patch_mask(state_position)[:, None, None, :]
-                & instrument_mask[:, :EQUITY_COUNT, None, None]
+                & instrument_mask[:, : self.equity_count, None, None]
             )
             macro_gamma = macro_gamma * macro_valid.to(macro_gamma.dtype)
             macro_beta = macro_beta * macro_valid.to(macro_beta.dtype)
@@ -328,10 +336,10 @@ class SharedCausalTCN(nn.Module):
             beta = macro_beta if beta is None else beta + macro_beta
         if gamma is None or beta is None:
             return hidden
-        equity = streams[:, :EQUITY_COUNT]
+        equity = streams[:, : self.equity_count]
         modulated = apply_context_film(equity, gamma, beta)
-        return torch.cat((modulated, streams[:, EQUITY_COUNT:]), dim=1).reshape(
-            batch_size * INSTRUMENT_COUNT,
+        return torch.cat((modulated, streams[:, self.equity_count :]), dim=1).reshape(
+            batch_size * self.instrument_count,
             architecture.width,
             history_patch_mask.shape[2],
         )
@@ -347,9 +355,9 @@ class SharedCausalTCN(nn.Module):
         architecture = self.architecture
         batch_size = patches.shape[0]
         instrument_count = (
-            INSTRUMENT_COUNT
+            self.instrument_count
             if architecture.fusion_mode in ("context_only", "context_pooled")
-            else EQUITY_COUNT
+            else self.equity_count
         )
         patches = patches[:, :instrument_count]
         history_patch_mask = history_patch_mask[:, :instrument_count]
@@ -372,13 +380,13 @@ class SharedCausalTCN(nn.Module):
             slow_early = self.routing.slow_early_input_adapter(slow_condition)[
                 ..., None
             ]
-            slow_valid = history_patch_mask[:, :EQUITY_COUNT, None, :].to(
+            slow_valid = history_patch_mask[:, : self.equity_count, None, :].to(
                 slow_early.dtype
             )
             hidden = torch.cat(
                 (
-                    hidden[:, :EQUITY_COUNT] + slow_early * slow_valid,
-                    hidden[:, EQUITY_COUNT:],
+                    hidden[:, : self.equity_count] + slow_early * slow_valid,
+                    hidden[:, self.equity_count :],
                 ),
                 dim=1,
             )
@@ -391,13 +399,13 @@ class SharedCausalTCN(nn.Module):
             macro_early = self._macro_early_input(macro_input).permute(0, 2, 1)[:, None]
             macro_valid = (
                 causal_patch_mask(state_position)[:, None, None, :]
-                & instrument_mask[:, :EQUITY_COUNT, None, None]
+                & instrument_mask[:, : self.equity_count, None, None]
             )
             hidden = torch.cat(
                 (
-                    hidden[:, :EQUITY_COUNT]
+                    hidden[:, : self.equity_count]
                     + macro_early * macro_valid.to(macro_early.dtype),
-                    hidden[:, EQUITY_COUNT:],
+                    hidden[:, self.equity_count :],
                 ),
                 dim=1,
             )
@@ -428,10 +436,10 @@ class SharedCausalTCN(nn.Module):
             masked.shape[2],
         ).permute(0, 1, 3, 2)
         gather_positions = state_position[:, None].expand(-1, instrument_count)
-        if instrument_count == INSTRUMENT_COUNT:
+        if instrument_count == self.instrument_count:
             global_slots = (
                 torch.arange(instrument_count, device=patches.device)
-                >= EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+                >= self.equity_count + LOCAL_CONTEXT_COUNT
             )
             gather_positions = torch.where(
                 global_slots[None], STATE_TOKEN_SLOT, gather_positions
@@ -458,8 +466,8 @@ class SharedCausalTCN(nn.Module):
             slow_features,
             state_position,
         )
-        equity_states = states[:, :EQUITY_COUNT]
-        equity_mask = instrument_mask[:, :EQUITY_COUNT]
+        equity_states = states[:, : self.equity_count]
+        equity_mask = instrument_mask[:, : self.equity_count]
         if self.peer_adapter is None:
             if peer_state is not None:
                 raise ValueError("Peer state is forbidden when peer features are none")
@@ -468,7 +476,7 @@ class SharedCausalTCN(nn.Module):
                 raise ValueError("Peer state is required for peer-enabled TCN")
             if peer_state.shape != (
                 equity_states.shape[0],
-                EQUITY_COUNT,
+                self.equity_count,
                 PEER_STATE_WIDTH,
             ):
                 raise ValueError("Peer state has the wrong shape")
@@ -479,8 +487,8 @@ class SharedCausalTCN(nn.Module):
             if fusion_mode in ("context_only", "context_pooled"):
                 shared_parts.append(
                     (
-                        states[:, EQUITY_COUNT:]
-                        * instrument_mask[:, EQUITY_COUNT:, None].to(states.dtype)
+                        states[:, self.equity_count :]
+                        * instrument_mask[:, self.equity_count :, None].to(states.dtype)
                     ).reshape(states.shape[0], CONTEXT_COUNT * self.architecture.width)
                 )
             if fusion_mode in ("pooled_market", "context_pooled"):
@@ -493,7 +501,7 @@ class SharedCausalTCN(nn.Module):
                 )
                 shared_parts.extend((mean, dispersion))
             shared = torch.cat(shared_parts, dim=-1)
-            shared = shared[:, None].expand(-1, EQUITY_COUNT, -1)
+            shared = shared[:, None].expand(-1, self.equity_count, -1)
             fusion_input = torch.cat((equity_states, shared), dim=-1)
             fused = self.fusion_output(F.gelu(self.fusion_input(fusion_input)))
             fused = self.dropout(F.gelu(fused))

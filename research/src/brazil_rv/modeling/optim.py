@@ -79,9 +79,12 @@ def learning_rate_factor(step: int, total_steps: int, warmup_steps: int) -> floa
 def build_scheduler(
     optimizer: torch.optim.Optimizer,
     training_sample_count: int,
+    maximum_epochs: int = MAX_EPOCHS,
 ) -> tuple[torch.optim.lr_scheduler.LambdaLR, int, int]:
+    if maximum_epochs <= 0:
+        raise ValueError("maximum_epochs must be positive")
     steps_per_epoch = math.ceil(training_sample_count / EFFECTIVE_BATCH_SIZE)
-    total_steps = steps_per_epoch * MAX_EPOCHS
+    total_steps = steps_per_epoch * maximum_epochs
     warmup_steps = max(1, math.floor(WARMUP_FRACTION * total_steps))
 
     def schedule(last_epoch: int) -> float:

@@ -418,6 +418,33 @@ def test_eager_and_compiled_updates_match(
         torch.testing.assert_close(compiled, eager, atol=2e-7, rtol=2e-7)
 
 
+def test_sam_transfers_each_effective_microbatch_once(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    batches = _microbatches()
+    transferred: list[int] = []
+
+    def transfer(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        transferred.append(id(batch))
+        return batch
+
+    monkeypatch.setattr(engine, "_to_cuda", transfer)
+    model = _CrossSectionModel()
+    run_effective_batch_update(
+        model,
+        batches,
+        _adamw(model),
+        None,
+        GH200_RUNTIME,
+        "sam_adamw",
+        "soft_spearman",
+        0.1,
+        0.025,
+    )
+
+    assert transferred == [id(batch) for batch in batches]
+
+
 @pytest.mark.parametrize("rho", SAM_RHOS)
 @pytest.mark.parametrize(
     ("objective", "temperature"),
