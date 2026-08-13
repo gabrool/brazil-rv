@@ -74,6 +74,8 @@ from .feature_ablation import (
     resolve_feature_ablation_for_store,
 )
 from .engine import (
+    PERFORMANCE_PROFILE_VERSION,
+    PROFILER_TRACE_FILENAME,
     build_compile_metadata,
     checkpoint_payload,
     clone_eager_reference_model,
@@ -770,13 +772,17 @@ def _run_neural(
     stopped_epoch = 0
     run_peak_allocated = 0
     run_peak_reserved = 0
+    bounded_training_update: dict[str, object] | None = None
+    bounded_validation_batch: dict[str, object] | None = None
+    profiler_trace: dict[str, object] | None = None
+    profiler_trace_path = run_dir / PROFILER_TRACE_FILENAME
+    profile_bounded_phases = run_profile.name == "experiment"
 
     for epoch in range(1, run_profile.maximum_epochs + 1):
         sampler.set_epoch(epoch - 1)
         torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
         epoch_started = time.perf_counter()
-        training_started = time.perf_counter()
         training = train_one_epoch(
             model,
             train_loader,
@@ -787,14 +793,31 @@ def _run_neural(
             args.objective,
             args.temperature,
             args.sam_rho,
+            epoch=epoch,
+            profiler_trace_path=(
+                profiler_trace_path
+                if profile_bounded_phases and epoch == 1
+                else None
+            ),
         )
-        training_seconds = time.perf_counter() - training_started
-        validation_started = time.perf_counter()
+        validation_performance: dict[str, object] = {}
         validation, daily_rows = evaluate_model(
-            model, validation_loader, args.objective, args.temperature
+            model,
+            validation_loader,
+            args.objective,
+            args.temperature,
+            performance=validation_performance,
+            profile_first_batch=profile_bounded_phases and epoch == 1,
         )
         torch.cuda.synchronize()
-        validation_seconds = time.perf_counter() - validation_started
+        if epoch == 1 and profile_bounded_phases:
+            bounded_training_update = training["bounded_training_update"]
+            bounded_validation_batch = validation_performance.pop(
+                "bounded_validation_batch"
+            )
+            profiler_trace = training["profiler_trace"]
+        else:
+            validation_performance.pop("bounded_validation_batch", None)
         epoch_seconds = time.perf_counter() - epoch_started
         peak_allocated = torch.cuda.max_memory_allocated()
         peak_reserved = torch.cuda.max_memory_reserved()
@@ -873,13 +896,35 @@ def _run_neural(
             evaluations_without_improvement += 1
         stopped_epoch = epoch
         _atomic_write_history(run_dir / "history.csv", history, run_profile)
+        epoch_artifact_io_seconds = (
+            time.perf_counter()
+            - artifact_started
+            + float(
+                training["performance"][
+                    "profiler_trace_artifact_io_wall_seconds"
+                ]
+            )
+        )
         performance_epochs.append(
             {
                 "epoch": epoch,
-                "training_seconds": training_seconds,
-                "validation_seconds": validation_seconds,
-                "artifact_io_seconds": time.perf_counter() - artifact_started,
-                "epoch_seconds": epoch_seconds,
+                "aggregate_wall_clock": {
+                    "training_seconds": training["performance"][
+                        "total_epoch_training_wall_seconds"
+                    ],
+                    "validation_seconds": validation_performance[
+                        "total_validation_wall_seconds"
+                    ],
+                    "artifact_io_seconds": epoch_artifact_io_seconds,
+                    "epoch_seconds": time.perf_counter() - epoch_started,
+                },
+                "training": training["performance"],
+                "validation": validation_performance,
+                "training_decision_grouping": training["decision_grouping"],
+                "peak_cuda_memory": {
+                    "allocated_bytes": peak_allocated,
+                    "reserved_bytes": peak_reserved,
+                },
             }
         )
         if evaluations_without_improvement >= EARLY_STOP_PATIENCE:
@@ -924,17 +969,72 @@ def _run_neural(
         run_profile,
     )
     final_artifact_io_seconds = time.perf_counter() - final_artifact_started
+    if profile_bounded_phases and (
+        bounded_training_update is None
+        or bounded_validation_batch is None
+        or profiler_trace is None
+    ):
+        raise RuntimeError("Bounded performance profiling did not complete")
+    whole_run_wall_seconds = time.perf_counter() - started
+    aggregate_training_seconds = sum(
+        float(epoch["aggregate_wall_clock"]["training_seconds"])
+        for epoch in performance_epochs
+    )
+    aggregate_validation_seconds = sum(
+        float(epoch["aggregate_wall_clock"]["validation_seconds"])
+        for epoch in performance_epochs
+    )
+    aggregate_artifact_io_seconds = final_artifact_io_seconds + sum(
+        float(epoch["aggregate_wall_clock"]["artifact_io_seconds"])
+        for epoch in performance_epochs
+    )
     performance_profile = {
-        "version": "B3_PERFORMANCE_PROFILE_V1",
+        "version": PERFORMANCE_PROFILE_VERSION,
         "run_profile": run_profile.name,
         "run_profile_identity_sha256": run_profile.identity_sha256,
+        "measurement_contract": {
+            "aggregate_wall_clock_clock": "time.perf_counter",
+            "bounded_sampling_enabled": profile_bounded_phases,
+            "bounded_cuda_clock": (
+                "torch.cuda.Event" if profile_bounded_phases else None
+            ),
+            "bounded_training_scope": (
+                "first_completed_effective_training_update_of_epoch_1"
+                if profile_bounded_phases
+                else None
+            ),
+            "bounded_validation_scope": (
+                "first_validation_batch_of_epoch_1"
+                if profile_bounded_phases
+                else None
+            ),
+            "cuda_synchronization_policy": (
+                "one synchronization at each bounded CUDA profiling boundary only"
+                if profile_bounded_phases
+                else "bounded_cuda_profiling_not_collected_for_production"
+            ),
+            "sampled_cuda_timings_are_not_extrapolated": True,
+            "worker_construction_is_sum_across_workers_and_may_overlap": True,
+        },
         "epochs": performance_epochs,
-        "final_artifact_io_seconds": final_artifact_io_seconds,
-        "bounded_trace": {
-            "scope": "first_epoch",
-            "training_seconds": performance_epochs[0]["training_seconds"],
-            "validation_seconds": performance_epochs[0]["validation_seconds"],
-            "artifact_io_seconds": performance_epochs[0]["artifact_io_seconds"],
+        "bounded_training_update": bounded_training_update,
+        "bounded_validation_batch": bounded_validation_batch,
+        "profiler_trace": profiler_trace,
+        "final_artifact_io_wall_seconds": final_artifact_io_seconds,
+        "whole_run": {
+            "training_wall_seconds": aggregate_training_seconds,
+            "validation_wall_seconds": aggregate_validation_seconds,
+            "artifact_io_wall_seconds": aggregate_artifact_io_seconds,
+            "run_wall_seconds": whole_run_wall_seconds,
+            "h2d_bytes": sum(
+                int(epoch["training"]["h2d_bytes"])
+                + int(epoch["validation"]["h2d_bytes"])
+                for epoch in performance_epochs
+            ),
+        },
+        "peak_cuda_memory": {
+            "allocated_bytes": run_peak_allocated,
+            "reserved_bytes": run_peak_reserved,
         },
     }
     _atomic_write_json(run_dir / "performance_profile.json", performance_profile)

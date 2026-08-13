@@ -37,6 +37,7 @@ from brazil_rv.modeling.contract import (
     resolve_tcn_architecture,
 )
 from brazil_rv.modeling.data import (
+    BATCH_CONSTRUCTION_SECONDS_KEY,
     BatchRequest,
     DateStratifiedMicrobatchSampler,
     FEATURE_ARRAY_FILES,
@@ -360,6 +361,10 @@ def test_current_model_batches_ignore_peer_arrays(tmp_path: Path) -> None:
         request
     ]
     for key in baseline:
+        if key == BATCH_CONSTRUCTION_SECONDS_KEY:
+            assert float(baseline[key]) >= 0.0
+            assert float(changed[key]) >= 0.0
+            continue
         np.testing.assert_array_equal(changed[key], baseline[key])
 
 
@@ -517,6 +522,10 @@ def test_vectorized_future_prefix_isolation(tmp_path: Path) -> None:
         request
     ]
     for key in baseline:
+        if key == BATCH_CONSTRUCTION_SECONDS_KEY:
+            assert float(baseline[key]) >= 0.0
+            assert float(changed[key]) >= 0.0
+            continue
         np.testing.assert_array_equal(changed[key], baseline[key])
 
 
@@ -720,6 +729,10 @@ def test_unavailable_context_is_zeroed_before_tensor_construction(
     context_slow.flush()
     batch = dataset[request]
     for key in baseline:
+        if key == BATCH_CONSTRUCTION_SECONDS_KEY:
+            assert float(baseline[key]) >= 0.0
+            assert float(batch[key]) >= 0.0
+            continue
         np.testing.assert_array_equal(batch[key], baseline[key])
     unavailable = EQUITY_COUNT
     ready = EQUITY_COUNT + 1

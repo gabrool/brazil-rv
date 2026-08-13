@@ -21,7 +21,7 @@ from .contract import (
     TRAIN_START,
 )
 
-RUN_PROFILE_SCHEMA_VERSION = "B3_MODEL_RUN_PROFILE_V1"
+RUN_PROFILE_SCHEMA_VERSION = "B3_MODEL_RUN_PROFILE_V2"
 RUN_PROFILE_NAMES = ("production", "experiment")
 EXPERIMENT_EQUITY_COUNT = 48
 EXPERIMENT_DECISION_INDICES = tuple(range(0, EXPECTED_DECISIONS_PER_DATE, 3))
@@ -207,7 +207,7 @@ def _production_profile(store: Path, manifest: dict[str, Any]) -> RunProfile:
         symbols=symbols,
         decision_indices=tuple(range(EXPECTED_DECISIONS_PER_DATE)),
         maximum_epochs=MAX_EPOCHS,
-        decision_grouped_batches=False,
+        decision_grouped_batches=True,
         provenance=provenance,
         selection=selection,
     )
@@ -220,7 +220,7 @@ def _production_profile(store: Path, manifest: dict[str, Any]) -> RunProfile:
         maximum_epochs=MAX_EPOCHS,
         minimum_active_equities=MIN_ACTIVE_EQUITIES,
         minimum_training_dates=MINIMUM_TRAINING_DATES,
-        decision_grouped_batches=False,
+        decision_grouped_batches=True,
         provenance=provenance,
         selection=selection,
         identity_sha256=_identity_sha256(payload),

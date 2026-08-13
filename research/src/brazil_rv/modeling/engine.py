@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import os
 import math
 import platform as system_platform
 import statistics
 import time
-from collections.abc import Callable, Iterable, Sized
+from collections.abc import Callable, Iterable, Iterator, Sized
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -53,7 +56,67 @@ from .contract import (
     peer_feature_metadata,
     expected_trainable_parameter_count,
 )
+from .data import BATCH_CONSTRUCTION_SECONDS_KEY
 from .metrics import create_metric_table
+
+
+PERFORMANCE_PROFILE_VERSION = "B3_PERFORMANCE_PROFILE_V2"
+PROFILER_TRACE_FILENAME = "bounded_training_update_trace.json"
+SAM_BOUNDED_CUDA_PHASES = (
+    "h2d_transfer",
+    "sam_first_forward_backward",
+    "sam_perturbation",
+    "sam_second_forward_backward",
+    "sam_exact_parameter_restoration",
+    "optimizer_scheduler_update",
+    "effective_update_total",
+)
+ADAMW_BOUNDED_CUDA_PHASES = (
+    "h2d_transfer",
+    "adamw_forward_backward",
+    "optimizer_scheduler_update",
+    "effective_update_total",
+)
+VALIDATION_BOUNDED_CUDA_PHASES = (
+    "h2d_transfer",
+    "compiled_forward",
+)
+
+
+class _CudaPhaseRecorder:
+    """Record one bounded group of asynchronous CUDA phases with one sync."""
+
+    def __init__(self) -> None:
+        self._events: dict[str, tuple[torch.cuda.Event, torch.cuda.Event]] = {}
+
+    @contextmanager
+    def phase(self, name: str) -> Iterator[None]:
+        if name in self._events:
+            raise ValueError(f"CUDA profiling phase was recorded twice: {name}")
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+        start.record()
+        try:
+            yield
+        finally:
+            end.record()
+            self._events[name] = (start, end)
+
+    def finish(self) -> dict[str, float]:
+        torch.cuda.synchronize()
+        return {
+            name: float(start.elapsed_time(end)) / 1000.0
+            for name, (start, end) in self._events.items()
+        }
+
+
+@contextmanager
+def _cuda_phase(recorder: _CudaPhaseRecorder | None, name: str) -> Iterator[None]:
+    if recorder is None:
+        yield
+    else:
+        with recorder.phase(name):
+            yield
 
 
 @dataclass(frozen=True)
@@ -578,23 +641,40 @@ def objective_loss(
     return loss_sum / loss_count.clamp_min(1)
 
 
-def _to_cuda(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-    model_keys = (
-        ("tabular_features", "equity_mask")
-        if "tabular_features" in batch
-        else (
+def _model_transfer_keys(batch: dict[str, torch.Tensor]) -> tuple[str, ...]:
+    if "tabular_features" in batch:
+        model_keys = ("tabular_features", "equity_mask")
+    elif "patches" in batch:
+        model_keys = (
             "patches",
             "history_patch_mask",
             "instrument_mask",
             "slow_features",
             "state_position",
         )
-    )
+    else:
+        return tuple(
+            key
+            for key, value in batch.items()
+            if key != BATCH_CONSTRUCTION_SECONDS_KEY
+            and isinstance(value, torch.Tensor)
+        )
     if "peer_state" in batch:
         model_keys = (*model_keys, "peer_state")
+    return (*model_keys, "targets", "label_mask")
+
+
+def _batch_h2d_bytes(batch: dict[str, torch.Tensor]) -> int:
+    return sum(
+        batch[key].numel() * batch[key].element_size()
+        for key in _model_transfer_keys(batch)
+    )
+
+
+def _to_cuda(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     return {
         key: batch[key].to("cuda", non_blocking=True)
-        for key in (*model_keys, "targets", "label_mask")
+        for key in _model_transfer_keys(batch)
     }
 
 
@@ -1024,17 +1104,20 @@ def _run_adamw_update(
     temperature: float | None,
     loss_count: int,
     check_predictions_finite: bool,
+    phase_recorder: _CudaPhaseRecorder | None = None,
 ) -> dict[str, float | int | bool | None]:
     optimizer.zero_grad(set_to_none=True)
-    loss_sum, predictions_finite = _accumulate_objective_gradients(
-        model,
-        effective_batch,
-        objective,
-        temperature,
-        loss_count,
-        check_predictions_finite=check_predictions_finite,
-    )
-    gradient_norm = _optimizer_update(model, optimizer, scheduler)
+    with _cuda_phase(phase_recorder, "adamw_forward_backward"):
+        loss_sum, predictions_finite = _accumulate_objective_gradients(
+            model,
+            effective_batch,
+            objective,
+            temperature,
+            loss_count,
+            check_predictions_finite=check_predictions_finite,
+        )
+    with _cuda_phase(phase_recorder, "optimizer_scheduler_update"):
+        gradient_norm = _optimizer_update(model, optimizer, scheduler)
     diagnostic_tensors = [loss_sum, gradient_norm]
     if predictions_finite is not None:
         diagnostic_tensors.append(predictions_finite.float())
@@ -1066,6 +1149,7 @@ def _run_sam_update(
     loss_count: int,
     check_predictions_finite: bool,
     observer: Callable[[str, nn.Module], None] | None = None,
+    phase_recorder: _CudaPhaseRecorder | None = None,
 ) -> dict[str, float | int | bool | None]:
     rho = validate_sam_rho(rho)
     parameters = tuple(model.parameters())
@@ -1074,25 +1158,29 @@ def _run_sam_update(
     rng_state = _rng_state(model)
     optimizer.zero_grad(set_to_none=True)
     try:
-        first_loss_sum, first_predictions_finite = _accumulate_objective_gradients(
-            model,
-            effective_batch,
-            objective,
-            temperature,
-            loss_count,
-            check_predictions_finite=check_predictions_finite,
-        )
-        first_pass_end_rng = _rng_state(model)
-        first_gradient_norm = _gradient_l2_norm(model)
+        with _cuda_phase(phase_recorder, "sam_first_forward_backward"):
+            first_loss_sum, first_predictions_finite = (
+                _accumulate_objective_gradients(
+                    model,
+                    effective_batch,
+                    objective,
+                    temperature,
+                    loss_count,
+                    check_predictions_finite=check_predictions_finite,
+                )
+            )
+            first_pass_end_rng = _rng_state(model)
+            first_gradient_norm = _gradient_l2_norm(model)
         if not _host_flags(torch.isfinite(first_gradient_norm))[0]:
             raise FloatingPointError("First-pass SAM gradient norm is non-finite")
         if observer is not None:
             observer("first_gradients", model)
 
         scale = rho / (first_gradient_norm + SAM_NORM_EPS)
-        perturbation_norm, perturbations_finite = _apply_sam_perturbation(
-            parameters, scale
-        )
+        with _cuda_phase(phase_recorder, "sam_perturbation"):
+            perturbation_norm, perturbations_finite = _apply_sam_perturbation(
+                parameters, scale
+            )
         perturbations_ok, perturbation_norm_ok = _host_flags(
             perturbations_finite, torch.isfinite(perturbation_norm)
         )
@@ -1106,19 +1194,23 @@ def _run_sam_update(
         optimizer.zero_grad(set_to_none=True)
         _restore_rng_state(model, rng_state)
         try:
-            second_loss_sum, second_predictions_finite = (
-                _accumulate_objective_gradients(
-                    model,
-                    effective_batch,
-                    objective,
-                    temperature,
-                    loss_count,
-                    check_predictions_finite=check_predictions_finite,
+            with _cuda_phase(phase_recorder, "sam_second_forward_backward"):
+                second_loss_sum, second_predictions_finite = (
+                    _accumulate_objective_gradients(
+                        model,
+                        effective_batch,
+                        objective,
+                        temperature,
+                        loss_count,
+                        check_predictions_finite=check_predictions_finite,
+                    )
                 )
-            )
-            second_pass_end_rng = _rng_state(model)
+                second_pass_end_rng = _rng_state(model)
         finally:
-            _restore_parameters(parameters, initial_parameters)
+            with _cuda_phase(
+                phase_recorder, "sam_exact_parameter_restoration"
+            ):
+                _restore_parameters(parameters, initial_parameters)
 
         restoration_exact, restored_finite = _host_flags(
             _tensor_pairs_equal(
@@ -1137,7 +1229,8 @@ def _run_sam_update(
             raise FloatingPointError("Second-pass SAM gradient norm is non-finite")
         if observer is not None:
             observer("second_gradients", model)
-        gradient_norm = _optimizer_update(model, optimizer, scheduler)
+        with _cuda_phase(phase_recorder, "optimizer_scheduler_update"):
+            gradient_norm = _optimizer_update(model, optimizer, scheduler)
         if observer is not None:
             observer("updated_parameters", model)
 
@@ -1191,7 +1284,8 @@ def run_effective_batch_update(
     *,
     check_predictions_finite: bool = False,
     sam_observer: Callable[[str, nn.Module], None] | None = None,
-) -> dict[str, float | int | bool | None]:
+    profile_cuda_phases: bool = False,
+) -> dict[str, object]:
     if len(effective_batch) != runtime.accumulation_steps:
         raise ValueError(
             f"Effective batch requires exactly {runtime.accumulation_steps} "
@@ -1199,36 +1293,124 @@ def run_effective_batch_update(
         )
     objective_metadata(objective, temperature)
     sam_metadata(optimizer_variant, sam_rho)
-    device_effective_batch = [_to_cuda(batch) for batch in effective_batch]
-    loss_count = _objective_loss_count(device_effective_batch, objective)
-    if loss_count == 0:
-        raise ValueError("Effective batch contains no valid objective unit")
-    if optimizer_variant == "adamw":
-        if sam_observer is not None:
-            raise ValueError("A SAM observer requires optimizer_variant='sam_adamw'")
-        return _run_adamw_update(
-            model,
-            device_effective_batch,
-            optimizer,
-            scheduler,
-            objective,
-            temperature,
-            loss_count,
-            check_predictions_finite,
-        )
-    assert sam_rho is not None
-    return _run_sam_update(
-        model,
-        device_effective_batch,
-        optimizer,
-        scheduler,
-        objective,
-        temperature,
-        sam_rho,
-        loss_count,
-        check_predictions_finite,
-        sam_observer,
-    )
+    recorder = _CudaPhaseRecorder() if profile_cuda_phases else None
+    update_started = time.perf_counter()
+    h2d_bytes = sum(_batch_h2d_bytes(batch) for batch in effective_batch)
+    with _cuda_phase(recorder, "effective_update_total"):
+        h2d_started = time.perf_counter()
+        with _cuda_phase(recorder, "h2d_transfer"):
+            device_effective_batch = [_to_cuda(batch) for batch in effective_batch]
+        h2d_enqueue_seconds = time.perf_counter() - h2d_started
+        loss_count = _objective_loss_count(device_effective_batch, objective)
+        if loss_count == 0:
+            raise ValueError("Effective batch contains no valid objective unit")
+        if optimizer_variant == "adamw":
+            if sam_observer is not None:
+                raise ValueError("A SAM observer requires optimizer_variant='sam_adamw'")
+            result = _run_adamw_update(
+                model,
+                device_effective_batch,
+                optimizer,
+                scheduler,
+                objective,
+                temperature,
+                loss_count,
+                check_predictions_finite,
+                recorder,
+            )
+        else:
+            assert sam_rho is not None
+            result = _run_sam_update(
+                model,
+                device_effective_batch,
+                optimizer,
+                scheduler,
+                objective,
+                temperature,
+                sam_rho,
+                loss_count,
+                check_predictions_finite,
+                sam_observer,
+                recorder,
+            )
+    bounded_cuda = None if recorder is None else recorder.finish()
+    return {
+        **result,
+        "h2d_bytes": h2d_bytes,
+        "h2d_enqueue_seconds": h2d_enqueue_seconds,
+        "total_effective_update_wall_seconds": time.perf_counter() - update_started,
+        "bounded_cuda_phase_seconds": bounded_cuda,
+    }
+
+
+def _worker_construction_seconds(batch: dict[str, torch.Tensor]) -> float:
+    value = batch.get(BATCH_CONSTRUCTION_SECONDS_KEY)
+    if value is None:
+        return 0.0
+    if value.device.type != "cpu" or value.numel() != 1:
+        raise ValueError("Worker batch-construction diagnostic is malformed")
+    seconds = float(value)
+    if not math.isfinite(seconds) or seconds < 0.0:
+        raise ValueError("Worker batch-construction duration is invalid")
+    return seconds
+
+
+def _unique_decision_count(batch: dict[str, torch.Tensor]) -> int:
+    decisions = batch.get("decision_idx")
+    if decisions is None:
+        return 0
+    valid = decisions[decisions >= 0]
+    return int(torch.unique(valid).numel())
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _profile_effective_update(
+    operation: Callable[[], dict[str, object]],
+    trace_path: Path,
+    epoch: int,
+    effective_update_index: int,
+) -> tuple[dict[str, object], dict[str, object]]:
+    temporary = trace_path.with_name(f".{trace_path.name}.{os.getpid()}.tmp")
+    temporary.unlink(missing_ok=True)
+    try:
+        with torch.profiler.profile(
+            activities=(
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ),
+            record_shapes=False,
+            profile_memory=False,
+            with_stack=False,
+        ) as profiler:
+            result = operation()
+        export_started = time.perf_counter()
+        profiler.export_chrome_trace(str(temporary))
+        payload = json.loads(temporary.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict) or not isinstance(
+            payload.get("traceEvents"), list
+        ):
+            raise ValueError("Bounded profiler did not emit a Chrome trace")
+        os.replace(temporary, trace_path)
+        trace_sha256 = _sha256_file(trace_path)
+        trace_artifact_io_seconds = time.perf_counter() - export_started
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    return result, {
+        "filename": trace_path.name,
+        "scope": "first_completed_effective_training_update_of_epoch_1",
+        "sha256": trace_sha256,
+        "profiled_epoch": epoch,
+        "effective_update_index": effective_update_index,
+        "trace_artifact_io_wall_seconds": trace_artifact_io_seconds,
+    }
 
 
 def train_one_epoch(
@@ -1241,11 +1423,17 @@ def train_one_epoch(
     objective: str,
     temperature: float | None,
     sam_rho: float | None,
-) -> dict[str, float | int | bool | None]:
+    *,
+    epoch: int = 0,
+    profiler_trace_path: Path | None = None,
+) -> dict[str, object]:
     if not isinstance(loader, Sized):
         raise TypeError("Training loader must expose its physical microbatch count")
     if len(loader) % runtime.accumulation_steps:
         raise ValueError("Training epoch would end inside an effective batch")
+    if profiler_trace_path is not None and epoch != 1:
+        raise ValueError("The bounded profiler trace is allowed only for epoch 1")
+    epoch_started = time.perf_counter()
     model.train()
     optimizer.zero_grad(set_to_none=True)
     loss_sum = 0.0
@@ -1257,26 +1445,78 @@ def train_one_epoch(
     second_gradient_norms: list[float] = []
     backward_passes = 0
     effective_batch: list[dict[str, torch.Tensor]] = []
+    loader_wait_seconds = 0.0
+    worker_construction_seconds = 0.0
+    h2d_bytes = 0
+    h2d_enqueue_seconds = 0.0
+    effective_update_seconds = 0.0
+    physical_decision_counts: list[int] = []
+    effective_decision_counts: list[int] = []
+    bounded_update: dict[str, object] | None = None
+    profiler_trace: dict[str, object] | None = None
 
-    for cpu_batch in loader:
+    iterator = iter(loader)
+    for _ in range(len(loader)):
+        wait_started = time.perf_counter()
+        cpu_batch = next(iterator)
+        loader_wait_seconds += time.perf_counter() - wait_started
+        worker_construction_seconds += _worker_construction_seconds(cpu_batch)
+        physical_decision_counts.append(_unique_decision_count(cpu_batch))
         effective_batch.append(cpu_batch)
         if len(effective_batch) != runtime.accumulation_steps:
             continue
-        update = run_effective_batch_update(
-            model,
-            effective_batch,
-            optimizer,
-            scheduler,
-            runtime,
-            optimizer_variant,
-            objective,
-            temperature,
-            sam_rho,
+        effective_decision_counts.append(
+            len(
+                {
+                    int(value)
+                    for batch in effective_batch
+                    for value in batch.get("decision_idx", torch.empty(0, dtype=torch.long))
+                    .tolist()
+                    if int(value) >= 0
+                }
+            )
         )
+        update_index = optimizer_steps
+
+        def execute() -> dict[str, object]:
+            return run_effective_batch_update(
+                model,
+                effective_batch,
+                optimizer,
+                scheduler,
+                runtime,
+                optimizer_variant,
+                objective,
+                temperature,
+                sam_rho,
+                profile_cuda_phases=profiler_trace_path is not None
+                and update_index == 0,
+            )
+
+        if profiler_trace_path is not None and update_index == 0:
+            update, profiler_trace = _profile_effective_update(
+                execute, profiler_trace_path, epoch, update_index
+            )
+            bounded_update = {
+                "scope": "first_completed_effective_training_update_of_epoch_1",
+                "profiled_epoch": epoch,
+                "effective_update_index": update_index,
+                "h2d_bytes": update["h2d_bytes"],
+                "h2d_enqueue_wall_seconds": update["h2d_enqueue_seconds"],
+                "total_effective_update_wall_seconds": update[
+                    "total_effective_update_wall_seconds"
+                ],
+                "cuda_phase_seconds": update["bounded_cuda_phase_seconds"],
+            }
+        else:
+            update = execute()
         loss_sum += float(update["loss_sum"])
         loss_count += int(update["loss_count"])
         optimizer_steps += 1
         backward_passes += int(update["backward_passes"])
+        h2d_bytes += int(update["h2d_bytes"])
+        h2d_enqueue_seconds += float(update["h2d_enqueue_seconds"])
+        effective_update_seconds += float(update["total_effective_update_wall_seconds"])
         gradient_norms.append(float(update["gradient_norm"]))
         if update["first_pass_gradient_norm"] is not None:
             first_gradient_norms.append(float(update["first_pass_gradient_norm"]))
@@ -1305,6 +1545,36 @@ def train_one_epoch(
         ),
         "all_finite": True,
         "adamw_lr": optimizer.param_groups[0]["lr"],
+        "performance": {
+            "main_process_dataloader_wait_seconds": loader_wait_seconds,
+            "worker_batch_construction_seconds_sum": worker_construction_seconds,
+            "worker_timing_scope": "sum_across_workers_may_overlap_wall_time",
+            "h2d_bytes": h2d_bytes,
+            "h2d_enqueue_wall_seconds": h2d_enqueue_seconds,
+            "effective_update_wall_seconds": effective_update_seconds,
+            "total_epoch_training_wall_seconds": (
+                time.perf_counter()
+                - epoch_started
+                - (
+                    0.0
+                    if profiler_trace is None
+                    else float(profiler_trace["trace_artifact_io_wall_seconds"])
+                )
+            ),
+            "profiler_trace_artifact_io_wall_seconds": (
+                0.0
+                if profiler_trace is None
+                else float(profiler_trace["trace_artifact_io_wall_seconds"])
+            ),
+            "physical_microbatch_count": len(physical_decision_counts),
+            "effective_update_count": optimizer_steps,
+        },
+        "decision_grouping": {
+            "physical_microbatch_unique_decision_counts": physical_decision_counts,
+            "effective_batch_unique_decision_counts": effective_decision_counts,
+        },
+        "bounded_training_update": bounded_update,
+        "profiler_trace": profiler_trace,
     }
 
 
@@ -1335,12 +1605,16 @@ def collect_evaluation_observations(
     loader: Iterable[dict[str, torch.Tensor]],
     objective: str,
     temperature: float | None,
+    *,
+    performance: dict[str, object] | None = None,
+    profile_first_batch: bool = False,
 ) -> tuple[
     EvaluationObservations,
     dict[str, object],
     list[dict[str, object]],
 ]:
     objective_metadata(objective, temperature)
+    evaluation_started = time.perf_counter()
     model.eval()
     total_loss = 0.0
     total_loss_count = 0
@@ -1356,12 +1630,35 @@ def collect_evaluation_observations(
             "decision_idx",
         )
     }
+    loader_wait_seconds = 0.0
+    worker_construction_seconds = 0.0
+    h2d_bytes = 0
+    h2d_enqueue_seconds = 0.0
+    result_collection_seconds = 0.0
+    bounded_validation: dict[str, object] | None = None
+    iterator = iter(loader)
+    batch_index = 0
     with torch.no_grad():
-        for cpu_batch in loader:
-            batch = _to_cuda(cpu_batch)
+        while True:
+            wait_started = time.perf_counter()
+            try:
+                cpu_batch = next(iterator)
+            except StopIteration:
+                break
+            loader_wait_seconds += time.perf_counter() - wait_started
+            worker_construction_seconds += _worker_construction_seconds(cpu_batch)
+            batch_bytes = _batch_h2d_bytes(cpu_batch)
+            h2d_bytes += batch_bytes
+            recorder = _CudaPhaseRecorder() if profile_first_batch and batch_index == 0 else None
+            enqueue_started = time.perf_counter()
+            with _cuda_phase(recorder, "h2d_transfer"):
+                batch = _to_cuda(cpu_batch)
+            batch_enqueue_seconds = time.perf_counter() - enqueue_started
+            h2d_enqueue_seconds += batch_enqueue_seconds
             valid_count = int(cpu_batch["sample_valid_mask"].sum())
-            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-                predictions = _predict(model, batch)
+            with _cuda_phase(recorder, "compiled_forward"):
+                with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                    predictions = _predict(model, batch)
             loss_sum, loss_count = _objective_loss_sum(
                 predictions[:valid_count],
                 batch["targets"][:valid_count],
@@ -1369,13 +1666,25 @@ def collect_evaluation_observations(
                 objective,
                 temperature,
             )
+            collection_started = time.perf_counter()
             total_loss += float(loss_sum)
             total_loss_count += int(loss_count)
             valid_arrays = _filter_evaluation_rows(predictions, cpu_batch)
+            result_collection_seconds += time.perf_counter() - collection_started
+            if recorder is not None:
+                bounded_validation = {
+                    "scope": "first_validation_batch_of_epoch_1",
+                    "batch_index": batch_index,
+                    "h2d_bytes": batch_bytes,
+                    "h2d_enqueue_wall_seconds": batch_enqueue_seconds,
+                    "cuda_phase_seconds": recorder.finish(),
+                }
             for key, values in valid_arrays.items():
                 collected[key].append(values)
+            batch_index += 1
 
     arrays = {key: np.concatenate(parts, axis=0) for key, parts in collected.items()}
+    metric_started = time.perf_counter()
     summary, daily_rows = create_metric_table(
         arrays["predictions"],
         arrays["targets"],
@@ -1384,6 +1693,7 @@ def collect_evaluation_observations(
         arrays["date_idx"],
         arrays["decision_idx"],
     )
+    metric_seconds = time.perf_counter() - metric_started
     if total_loss_count == 0:
         raise ValueError("Evaluation split contains no valid objective unit")
     summary["objective"] = objective_metadata(objective, temperature)
@@ -1391,6 +1701,24 @@ def collect_evaluation_observations(
     observations = EvaluationObservations(
         **{key: arrays[key] for key in EvaluationObservations.__dataclass_fields__}
     )
+    if performance is not None:
+        performance.update(
+            {
+                "main_process_dataloader_wait_seconds": loader_wait_seconds,
+                "worker_batch_construction_seconds_sum": worker_construction_seconds,
+                "worker_timing_scope": "sum_across_workers_may_overlap_wall_time",
+                "h2d_bytes": h2d_bytes,
+                "h2d_enqueue_wall_seconds": h2d_enqueue_seconds,
+                "device_to_host_and_result_collection_wall_seconds": (
+                    result_collection_seconds
+                ),
+                "metric_construction_wall_seconds": metric_seconds,
+                "total_validation_wall_seconds": time.perf_counter()
+                - evaluation_started,
+                "batch_count": batch_index,
+                "bounded_validation_batch": bounded_validation,
+            }
+        )
     return observations, summary, daily_rows
 
 
@@ -1399,9 +1727,17 @@ def evaluate_model(
     loader: Iterable[dict[str, torch.Tensor]],
     objective: str,
     temperature: float | None,
+    *,
+    performance: dict[str, object] | None = None,
+    profile_first_batch: bool = False,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     _, summary, daily_rows = collect_evaluation_observations(
-        model, loader, objective, temperature
+        model,
+        loader,
+        objective,
+        temperature,
+        performance=performance,
+        profile_first_batch=profile_first_batch,
     )
     return summary, daily_rows
 

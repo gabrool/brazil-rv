@@ -83,6 +83,7 @@ from brazil_rv.modeling.engine import (
     validate_runtime,
 )
 from brazil_rv.modeling.metrics import create_metric_table
+from brazil_rv.modeling.run_profiles import RUN_PROFILE_SCHEMA_VERSION
 from brazil_rv.modeling.train import (
     _HISTORY_COLUMNS,
     _atomic_write_history,
@@ -1060,7 +1061,7 @@ def test_run_profile_identity_is_explicitly_bound_and_legacy_absence_is_producti
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
 
     profile = {
-        "schema_version": "B3_MODEL_RUN_PROFILE_V1",
+        "schema_version": RUN_PROFILE_SCHEMA_VERSION,
         "name": "experiment",
         "identity_sha256": "profile-hash",
     }
@@ -1068,6 +1069,15 @@ def test_run_profile_identity_is_explicitly_bound_and_legacy_absence_is_producti
         identity["run_profile"] = copy.deepcopy(profile)
         identity["run_profile_identity_sha256"] = "profile-hash"
     _validate_run_checkpoint_identity(manifest, checkpoint, feature_store)
+
+    old_manifest = copy.deepcopy(manifest)
+    old_checkpoint = copy.deepcopy(checkpoint)
+    old_manifest["run_profile"]["schema_version"] = "B3_MODEL_RUN_PROFILE_V1"
+    old_checkpoint["run_profile"]["schema_version"] = "B3_MODEL_RUN_PROFILE_V1"
+    with pytest.raises(ValueError, match="run-profile identity mismatch"):
+        _validate_run_checkpoint_identity(
+            old_manifest, old_checkpoint, feature_store
+        )
 
     missing = copy.deepcopy(checkpoint)
     del missing["run_profile"]
