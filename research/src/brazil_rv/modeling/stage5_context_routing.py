@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import os
+import shlex
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
@@ -70,9 +71,11 @@ from .contract import (
 from .data import resolve_feature_store, validate_feature_store
 from .routing_identity_preflight import (
     PREFLIGHT_VERSION,
+    build_routing_preflight_identity,
     run_routing_identity_preflight,
+    validate_routing_identity_preflight,
 )
-from .engine import objective_metadata, sam_metadata
+from .engine import objective_metadata, sam_metadata, validate_runtime
 from .evaluate import _validate_run_checkpoint_identity
 from .feature_ablation import resolve_feature_ablation_for_store
 from .process_lock import (
@@ -122,7 +125,7 @@ EXPERIMENT_LOG = "experiment.log"
 COMPLETED_RUN_PATHS_JSON = "completed_run_paths.json"
 ARTIFACT_HASHES_JSON = "artifact_hashes.json"
 RUNBOOK = "operator_runbook.md"
-ARCHIVE_NAME = "context_routing_sequence_outputs.zip"
+ARCHIVE_NAME = "context_routing_sequence_outputs.tar.gz"
 ARCHIVE_SHA256_NAME = f"{ARCHIVE_NAME}.sha256"
 
 
@@ -152,6 +155,17 @@ def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
             json.dumps(payload, indent=2, allow_nan=False) + "\n",
             encoding="utf-8",
         )
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _atomic_write_text(path: Path, value: str) -> None:
+    temporary = path.with_name(f"{path.name}.tmp")
+    temporary.unlink(missing_ok=True)
+    try:
+        temporary.write_text(value, encoding="utf-8")
         os.replace(temporary, path)
     except BaseException:
         temporary.unlink(missing_ok=True)
@@ -1202,19 +1216,18 @@ def _launch_job(
     return run
 
 
-def _ensure_preflight(state_dir: Path) -> Path:
+def _ensure_preflight(state_dir: Path, expected_identity: dict[str, object]) -> Path:
     path = state_dir / PREFLIGHT_JSON
     if path.is_file():
         payload = json.loads(path.read_text(encoding="utf-8"))
         _reject_test_derived_metadata(payload, "routing identity preflight")
-        if (
-            payload.get("version") != PREFLIGHT_VERSION
-            or payload.get("status") != "passed"
-            or payload.get("steps") != 3
-        ):
-            raise RuntimeError("Existing routing identity preflight did not pass")
+        validate_routing_identity_preflight(
+            payload,
+            expected_identity,
+            asdict(validate_runtime()),
+        )
         return path
-    run_routing_identity_preflight(path)
+    run_routing_identity_preflight(path, expected_identity)
     return path
 
 
@@ -1688,19 +1701,49 @@ def _completed_run_paths_payload(state: dict[str, object]) -> dict[str, object]:
 
 def _runbook_text(state_dir: Path, peer_primary_state: Path) -> str:
     module = "brazil_rv.modeling.stage5_context_routing"
+    repository = shlex.quote(str(_RESEARCH))
+    state = shlex.quote(str(state_dir))
+    peer = shlex.quote(str(peer_primary_state))
+    pointer = shlex.quote(str(OUTPUT_POINTER))
     common = (
-        f'uv run --frozen python -m {module} --state-dir "{state_dir}" '
-        f'--peer-primary-state "{peer_primary_state}"'
+        f"uv run --frozen python -m {module} --state-dir {state} "
+        f"--peer-primary-state {peer}"
     )
     return (
         "# Operator runbook\n\n"
-        "Run from the repository `research` directory on the single GH200 host.\n\n"
-        f"- Dry run: `{common} --dry-run`\n"
-        f"- Launch: `{common}`\n"
-        f"- Resume: `{common}`\n"
-        f'- Status: `uv run --frozen python -m {module} --state-dir "{state_dir}" --status`\n'
-        f'- Retrieve current output path: `Get-Content -LiteralPath "{OUTPUT_POINTER}"`\n'
-        "\nThe launch and resume commands are intentionally identical. The held-out test remains sealed.\n"
+        "The primary commands below are for Ubuntu/bash on the single GH200 host. "
+        "Launch and resume are intentionally identical. The held-out test remains sealed.\n\n"
+        "## Ubuntu/bash\n\n"
+        "```bash\n"
+        "set -euo pipefail\n"
+        f"cd {repository}\n\n"
+        "# Validate invocation without running preflight, audit, or training.\n"
+        f"{common} --dry-run\n\n"
+        "# Launch.\n"
+        f"{common}\n\n"
+        "# Resume (the command is intentionally identical).\n"
+        f"{common}\n\n"
+        "# Status.\n"
+        f"uv run --frozen python -m {module} --state-dir {state} --status\n\n"
+        "# Inspect the atomic output pointer and archive members.\n"
+        f"OUTPUT_POINTER={pointer}\n"
+        'OUTPUT_DIR="$(<"$OUTPUT_POINTER")"\n'
+        f'ARCHIVE="$OUTPUT_DIR/{ARCHIVE_NAME}"\n'
+        "printf '%s\\n' \"$OUTPUT_DIR\"\n"
+        'tar -tzf "$ARCHIVE"\n\n'
+        "# Verify the archive SHA-256 sidecar.\n"
+        f'(cd "$OUTPUT_DIR" && sha256sum --check {shlex.quote(ARCHIVE_SHA256_NAME)})\n\n'
+        "# Retrieve the archive and sidecar into the current directory.\n"
+        'cp -- "$ARCHIVE" "$ARCHIVE.sha256" .\n'
+        "```\n\n"
+        "## Windows/PowerShell retrieval example\n\n"
+        "```powershell\n"
+        f"$outputDir = Get-Content -LiteralPath '{OUTPUT_POINTER}'\n"
+        f"$archive = Join-Path $outputDir '{ARCHIVE_NAME}'\n"
+        "$digest = Get-FileHash -Algorithm SHA256 -LiteralPath $archive\n"
+        "$digest\n"
+        'Copy-Item -LiteralPath $archive, "$archive.sha256" -Destination .\n'
+        "```\n"
     )
 
 
@@ -1729,9 +1772,7 @@ def _expected_archive_hashes(state_dir: Path) -> dict[str, str]:
     }
 
 
-def _finalize_outputs(
-    state_dir: Path, state: dict[str, object], peer_primary_state: Path
-) -> None:
+def _finalize_outputs(state_dir: Path, state: dict[str, object]) -> None:
     archive_path = state_dir / ARCHIVE_NAME
     sidecar_path = state_dir / ARCHIVE_SHA256_NAME
     if archive_path.is_file():
@@ -1754,9 +1795,6 @@ def _finalize_outputs(
     _atomic_write_json(
         state_dir / COMPLETED_RUN_PATHS_JSON,
         _completed_run_paths_payload(state),
-    )
-    (state_dir / RUNBOOK).write_text(
-        _runbook_text(state_dir, peer_primary_state), encoding="utf-8"
     )
     payload_members = tuple(
         member for member in _archive_members() if member != ARTIFACT_HASHES_JSON
@@ -1887,11 +1925,15 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
         )
     state_dir.mkdir(parents=True, exist_ok=True)
     state_path = state_dir / "state.json"
+    _atomic_write_text(
+        state_dir / RUNBOOK, _runbook_text(state_dir, peer_primary_state)
+    )
+    expected_preflight_identity = build_routing_preflight_identity(commit)
     with exclusive_process_lock(state_dir / "experiment.lock", EXPERIMENT_NAME):
         log_path = state_dir / EXPERIMENT_LOG
         if not log_path.exists():
             log_path.touch()
-        preflight_path = _ensure_preflight(state_dir)
+        preflight_path = _ensure_preflight(state_dir, expected_preflight_identity)
         audit_path = _ensure_audit(state_dir, feature_store, feature_identity)
         state = _load_state(
             state_path,
@@ -1902,7 +1944,7 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
         )
         _persist_state(state_path, state)
         if state["status"] == "completed":
-            _finalize_outputs(state_dir, state, peer_primary_state)
+            _finalize_outputs(state_dir, state)
             return state_path
         _run_adaptive_sequence(
             state,
@@ -1918,7 +1960,7 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
         state["completed_at_utc"] = datetime.now(timezone.utc).isoformat()
         _persist_state(state_path, state)
         _log(state_dir, "adaptive sequence completed; finalizing archive")
-        _finalize_outputs(state_dir, state, peer_primary_state)
+        _finalize_outputs(state_dir, state)
     return state_path
 
 

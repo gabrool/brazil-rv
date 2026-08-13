@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 import json
 from pathlib import Path
 
@@ -19,7 +20,7 @@ from brazil_rv.modeling.context_routing_adaptive import (
     three_seed_candidate_gate,
     within_source_combination_gate,
 )
-from brazil_rv.modeling.contract import ALLOWED_SEEDS, HORIZONS
+from brazil_rv.modeling.contract import ALLOWED_SEEDS, HORIZONS, HardwareInfo
 from brazil_rv.modeling.stage5_context_routing import (
     CompletedRun,
     _ensure_job,
@@ -370,7 +371,10 @@ def test_decision_restart_is_idempotent_and_fails_on_drift() -> None:
 def test_preflight_failure_is_fail_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def fail(path: Path) -> None:
+    expected_identity: dict[str, object] = {}
+
+    def fail(path: Path, identity: dict[str, object]) -> None:
+        assert identity is expected_identity
         path.write_text(
             json.dumps(
                 {"version": stage5.PREFLIGHT_VERSION, "status": "failed", "steps": 3}
@@ -381,9 +385,62 @@ def test_preflight_failure_is_fail_closed(
 
     monkeypatch.setattr(stage5, "run_routing_identity_preflight", fail)
     with pytest.raises(RuntimeError, match="identity mismatch"):
-        stage5._ensure_preflight(tmp_path)
-    with pytest.raises(RuntimeError, match="did not pass"):
-        stage5._ensure_preflight(tmp_path)
+        stage5._ensure_preflight(tmp_path, expected_identity)
+    monkeypatch.setattr(
+        stage5,
+        "validate_runtime",
+        lambda: HardwareInfo(
+            "GH200",
+            (9, 0),
+            100 * 1024**3,
+            "aarch64",
+            "Linux",
+            "2.13.0",
+            "12.6",
+            90100,
+        ),
+    )
+    with pytest.raises(ValueError, match="top-level artifact"):
+        stage5._ensure_preflight(tmp_path, expected_identity)
+
+
+def test_runbook_is_atomic_and_available_before_preflight_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    feature_store = tmp_path / "feature-store"
+    feature_store.mkdir()
+    peer_state = tmp_path / "peer-primary.json"
+    peer_state.write_text("{}", encoding="utf-8")
+    state_dir = tmp_path / "state"
+    monkeypatch.setattr(stage5, "_git_identity", lambda **_: ("a" * 40, True))
+    monkeypatch.setattr(stage5, "resolve_feature_store", lambda: feature_store)
+    monkeypatch.setattr(stage5, "validate_feature_store", lambda _: None)
+    monkeypatch.setattr(stage5, "build_routing_preflight_identity", lambda _: {})
+    monkeypatch.setattr(stage5, "_feature_store_identity", lambda _: {})
+    monkeypatch.setattr(stage5, "_configuration", lambda *_: {})
+    monkeypatch.setattr(stage5, "_source_incumbents", lambda *_: {})
+    monkeypatch.setattr(stage5, "exclusive_process_lock", lambda *_: nullcontext())
+
+    def fail_preflight(path: Path, identity: dict[str, object]) -> Path:
+        assert identity == {}
+        runbook = path / stage5.RUNBOOK
+        assert runbook.is_file()
+        text = runbook.read_text(encoding="utf-8")
+        assert "## Ubuntu/bash" in text
+        assert "# Launch." in text
+        assert "# Resume" in text
+        assert "--status" in text
+        assert "OUTPUT_POINTER=" in text
+        assert "sha256sum --check" in text
+        assert "tar -tzf" in text
+        assert stage5.ARCHIVE_NAME.endswith(".tar.gz")
+        raise RuntimeError("preflight stopped")
+
+    monkeypatch.setattr(stage5, "_ensure_preflight", fail_preflight)
+    with pytest.raises(RuntimeError, match="preflight stopped"):
+        stage5.run_experiment(state_dir, peer_state)
+    assert (state_dir / stage5.RUNBOOK).is_file()
+    assert not (state_dir / f"{stage5.RUNBOOK}.tmp").exists()
 
 
 def test_dry_run_reports_adaptive_minimum_and_maximum() -> None:

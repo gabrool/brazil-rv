@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-import stat
-import zipfile
+import tarfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -66,29 +65,32 @@ def validate_archive(
 ) -> dict[str, str]:
     if not archive_path.is_file() or archive_path.is_symlink():
         raise FileNotFoundError(f"Validated archive does not exist: {archive_path}")
-    with zipfile.ZipFile(archive_path, "r") as archive:
-        infos = archive.infolist()
-        names = [info.filename for info in infos]
+    with tarfile.open(archive_path, "r:gz") as archive:
+        infos = archive.getmembers()
+        names = [info.name for info in infos]
         if len(names) != len({name.casefold() for name in names}):
             raise ValueError("Archive contains duplicate members")
         if set(names) != set(expected_sha256):
             raise ValueError("Archive member list does not match the explicit contract")
         observed: dict[str, str] = {}
         for info in infos:
-            relative = PurePosixPath(info.filename)
+            relative = PurePosixPath(info.name)
             if (
                 relative.is_absolute()
-                or "\\" in info.filename
+                or "\\" in info.name
                 or any(part in ("", ".", "..") for part in relative.parts)
             ):
-                raise ValueError(f"Archive contains unsafe member: {info.filename}")
-            if stat.S_ISLNK(info.external_attr >> 16):
-                raise ValueError(f"Archive contains a symlink: {info.filename}")
+                raise ValueError(f"Archive contains unsafe member: {info.name}")
+            if not info.isfile():
+                raise ValueError(f"Archive contains a non-regular member: {info.name}")
+            source = archive.extractfile(info)
+            if source is None:
+                raise ValueError(f"Archive member cannot be read: {info.name}")
             digest = hashlib.sha256()
-            with archive.open(info, "r") as source:
+            with source:
                 for chunk in iter(lambda: source.read(1024 * 1024), b""):
                     digest.update(chunk)
-            observed[info.filename] = digest.hexdigest()
+            observed[info.name] = digest.hexdigest()
         if observed != expected_sha256:
             raise ValueError("Archive content hashes do not match source artifacts")
         return observed
@@ -103,11 +105,13 @@ def create_validated_archive(
     temporary = archive_path.with_name(f"{archive_path.name}.tmp")
     temporary.unlink(missing_ok=True)
     try:
-        with zipfile.ZipFile(
-            temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
-        ) as archive:
+        with tarfile.open(temporary, "w:gz", format=tarfile.PAX_FORMAT) as archive:
             for name, snapshot in snapshots.items():
-                archive.write(snapshot["path"], arcname=name)
+                info = archive.gettarinfo(str(snapshot["path"]), arcname=name)
+                if not info.isfile():
+                    raise ValueError(f"Archive member is not a regular file: {name}")
+                with snapshot["path"].open("rb") as source:
+                    archive.addfile(info, source)
         for name, snapshot in snapshots.items():
             path = snapshot["path"]
             details = path.stat()

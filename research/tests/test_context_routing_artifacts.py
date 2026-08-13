@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -25,10 +27,10 @@ def test_archive_is_explicit_validated_hashed_and_published_atomically(
     nested.mkdir()
     (nested / "report.json").write_text("audit\n", encoding="utf-8")
     members = ("state.json", "audit/report.json")
-    archive = output / "outputs.zip"
+    archive = output / "outputs.tar.gz"
     expected = create_validated_archive(output, members, archive)
     assert validate_archive(archive, expected) == expected
-    sidecar = output / "outputs.zip.sha256"
+    sidecar = output / "outputs.tar.gz.sha256"
     digest = write_archive_sha256(archive, sidecar)
     assert validate_archive_sha256(archive, sidecar) == digest
 
@@ -41,9 +43,9 @@ def test_archive_is_explicit_validated_hashed_and_published_atomically(
 def test_completed_archive_restart_recovers_a_missing_sidecar(tmp_path: Path) -> None:
     output = tmp_path / "output"
     output.mkdir()
-    archive = output / "context_routing_sequence_outputs.zip"
+    archive = output / "context_routing_sequence_outputs.tar.gz"
     archive.write_bytes(b"archive")
-    sidecar = output / "context_routing_sequence_outputs.zip.sha256"
+    sidecar = output / "context_routing_sequence_outputs.tar.gz.sha256"
     digest = write_archive_sha256(archive, sidecar)
     assert digest == sha256_file(archive)
     sidecar.unlink()
@@ -70,7 +72,7 @@ def test_archive_rejects_missing_escape_and_duplicate_members(
     output.mkdir()
     (output / "state.json").write_text("state", encoding="utf-8")
     with pytest.raises((FileNotFoundError, ValueError)):
-        create_validated_archive(output, members, output / "outputs.zip")
+        create_validated_archive(output, members, output / "outputs.tar.gz")
 
 
 def test_archive_rejects_symlink_members(
@@ -87,7 +89,7 @@ def test_archive_rejects_symlink_members(
         lambda self: self == link or original(self),
     )
     with pytest.raises(ValueError, match="symlink"):
-        create_validated_archive(output, ("link.json",), output / "outputs.zip")
+        create_validated_archive(output, ("link.json",), output / "outputs.tar.gz")
 
 
 def test_archive_rejects_inputs_that_mutate_during_creation(
@@ -108,8 +110,8 @@ def test_archive_rejects_inputs_that_mutate_during_creation(
 
     monkeypatch.setattr(artifacts, "sha256_file", unstable)
     with pytest.raises(RuntimeError, match="mutated"):
-        create_validated_archive(output, ("state.json",), output / "outputs.zip")
-    assert not (output / "outputs.zip.tmp").exists()
+        create_validated_archive(output, ("state.json",), output / "outputs.tar.gz")
+    assert not (output / "outputs.tar.gz.tmp").exists()
 
 
 def test_pointer_is_not_published_when_archive_validation_fails(
@@ -119,9 +121,9 @@ def test_pointer_is_not_published_when_archive_validation_fails(
     output.mkdir()
     source = output / "state.json"
     source.write_text("state", encoding="utf-8")
-    archive = output / "outputs.zip"
+    archive = output / "outputs.tar.gz"
     expected = create_validated_archive(output, ("state.json",), archive)
-    sidecar = output / "outputs.zip.sha256"
+    sidecar = output / "outputs.tar.gz.sha256"
     write_archive_sha256(archive, sidecar)
     source.write_text("changed", encoding="utf-8")
     pointer = tmp_path / "current.txt"
@@ -130,3 +132,29 @@ def test_pointer_is_not_published_when_archive_validation_fails(
     with pytest.raises(ValueError, match="hashes"):
         publish_output_pointer(pointer, output, archive, sidecar, bad_expected)
     assert not pointer.exists()
+
+
+@pytest.mark.parametrize("kind", ["path_escape", "duplicate", "symlink"])
+def test_archive_validation_rejects_unsafe_tar_members(
+    tmp_path: Path, kind: str
+) -> None:
+    archive_path = tmp_path / "unsafe.tar.gz"
+    with tarfile.open(archive_path, "w:gz") as archive:
+        if kind == "path_escape":
+            info = tarfile.TarInfo("../escape.json")
+            content = b"escape"
+            info.size = len(content)
+            archive.addfile(info, io.BytesIO(content))
+        elif kind == "duplicate":
+            for content in (b"first", b"second"):
+                info = tarfile.TarInfo("state.json")
+                info.size = len(content)
+                archive.addfile(info, io.BytesIO(content))
+        else:
+            info = tarfile.TarInfo("state.json")
+            info.type = tarfile.SYMTYPE
+            info.linkname = "target.json"
+            archive.addfile(info)
+    expected = {("../escape.json" if kind == "path_escape" else "state.json"): "0" * 64}
+    with pytest.raises(ValueError, match="unsafe|duplicate|non-regular"):
+        validate_archive(archive_path, expected)
