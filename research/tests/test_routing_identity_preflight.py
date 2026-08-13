@@ -6,8 +6,10 @@ from pathlib import Path
 
 import pytest
 import torch
+from torch import nn
 
 from brazil_rv.modeling.contract import EQUITY_COUNT, GH200_RUNTIME, LOCAL_CONTEXT_COUNT
+from brazil_rv.modeling.engine import soft_spearman_loss
 from brazil_rv.modeling import routing_identity_preflight as preflight
 from brazil_rv.modeling.routing_identity_preflight import (
     build_routing_preflight_identity,
@@ -90,17 +92,23 @@ def _comparison(
         }
     if quantity == "base_parameter_coverage":
         names = [row["name"] for row in identity["parameter_identities"]["base"]]
+        exceptions = set(preflight._ZERO_GRADIENT_EXCEPTIONS)
         report = {
             "per_parameter": {
                 name: {
-                    "first_pass_gradient": True,
-                    "second_pass_gradient": True,
-                    "parameter_update": True,
+                    "first_pass_gradient": name not in exceptions,
+                    "second_pass_gradient": name not in exceptions,
+                    "parameter_update": name not in exceptions,
                 }
                 for name in names
             },
-            "legitimate_zero_gradient_exceptions": [],
-            "exception_policy": "No base parameter is expected to have zero gradients or updates.",
+            "legitimate_zero_gradient_exceptions": [
+                {"name": name, "justification": justification}
+                for name, justification in sorted(
+                    preflight._ZERO_GRADIENT_EXCEPTIONS.items()
+                )
+            ],
+            "exception_policy": "Only the explicitly justified parameters may remain unexercised.",
             "unexercised_expected_parameters": [],
             "passed": True,
         }
@@ -173,6 +181,116 @@ def _passed_payload(
         "executions": executions,
         "maximum_observed_errors": {"absolute": 0.0, "relative_l2": 0.0},
     }
+
+
+def _coverage_comparisons(payload: dict[str, object]) -> list[dict[str, object]]:
+    return [
+        comparison
+        for execution in payload["executions"]
+        for comparison in execution["comparisons"]
+        if comparison["quantity"] == "base_parameter_coverage"
+    ]
+
+
+def test_soft_spearman_structural_bias_null_directions() -> None:
+    torch.manual_seed(17)
+    fusion_norm = nn.LayerNorm(7)
+    prediction_head = nn.Linear(7, 3)
+    states = torch.randn(2, 11, 7)
+    targets = torch.linspace(-0.9, 0.9, 11).reshape(1, 11, 1).expand(2, -1, 3)
+    mask = torch.ones_like(targets, dtype=torch.bool)
+
+    predictions = prediction_head(fusion_norm(states))
+    shifted = soft_spearman_loss(
+        predictions + torch.tensor([3.0, -5.0, 11.0]), targets, mask, 0.5
+    )
+    loss = soft_spearman_loss(predictions, targets, mask, 0.5)
+    loss.backward()
+
+    torch.testing.assert_close(shifted, loss, atol=2e-6, rtol=0.0)
+    assert prediction_head.bias.grad is not None
+    assert fusion_norm.bias.grad is not None
+    assert float(prediction_head.bias.grad.abs().max()) < 2e-6
+    assert float(fusion_norm.bias.grad.abs().max()) < 2e-6
+    assert float(prediction_head.weight.grad.abs().max()) > 1e-5
+    assert float(fusion_norm.weight.grad.abs().max()) > 1e-5
+
+
+def test_approved_null_directions_remain_in_identity_and_parity() -> None:
+    identity = build_routing_preflight_identity("a" * 40)
+    expected_exceptions = set(preflight._ZERO_GRADIENT_EXCEPTIONS)
+    identity_names = {row["name"] for row in identity["parameter_identities"]["base"]}
+    legacy, scaffold = preflight._seeded_models("cpu")
+    legacy_base = preflight._parameter_snapshot(legacy, routing=False)
+    scaffold_base = preflight._parameter_snapshot(scaffold, routing=False)
+    for name, parameter in legacy.named_parameters():
+        if not name.startswith("routing."):
+            parameter.grad = torch.zeros_like(parameter)
+    gradients = preflight._gradient_snapshot(legacy, routing=False)
+    updates = preflight._difference_snapshot(legacy_base, legacy_base)
+    comparison = compare_tensor_mappings(legacy_base, scaffold_base, atol=0.0, rtol=0.0)
+    changed = {name: value.clone() for name, value in legacy_base.items()}
+    changed["prediction_head.bias"].add_(1.0)
+
+    assert expected_exceptions == {"fusion_norm.bias", "prediction_head.bias"}
+    assert expected_exceptions <= identity_names
+    assert expected_exceptions <= legacy_base.keys()
+    assert comparison["passed"] is True
+    assert comparison["tensor_count"] == len(legacy_base)
+    assert expected_exceptions <= gradients.keys()
+    assert expected_exceptions <= updates.keys()
+    assert preflight._mapping_hash(changed) != preflight._mapping_hash(legacy_base)
+
+
+def test_artifact_with_only_approved_null_directions_is_reusable(
+    expected_identity: dict[str, object], environment: dict[str, object]
+) -> None:
+    payload = _passed_payload(expected_identity, environment)
+    assert (
+        validate_routing_identity_preflight(payload, expected_identity, environment)
+        is payload
+    )
+
+
+def test_unapproved_unexercised_parameter_is_rejected(
+    expected_identity: dict[str, object], environment: dict[str, object]
+) -> None:
+    payload = _passed_payload(expected_identity, environment)
+    coverage = _coverage_comparisons(payload)[0]["legacy"]
+    name = next(
+        name
+        for name in coverage["per_parameter"]
+        if name not in preflight._ZERO_GRADIENT_EXCEPTIONS
+    )
+    coverage["per_parameter"][name]["first_pass_gradient"] = False
+    coverage["unexercised_expected_parameters"] = [name]
+    coverage["passed"] = False
+    with pytest.raises(
+        ValueError, match="contains unexercised expected base parameters"
+    ):
+        validate_routing_identity_preflight(payload, expected_identity, environment)
+
+
+@pytest.mark.parametrize("declaration_drift", ["missing", "extra", "modified"])
+def test_exception_declaration_drift_is_rejected(
+    declaration_drift: str,
+    expected_identity: dict[str, object],
+    environment: dict[str, object],
+) -> None:
+    payload = _passed_payload(expected_identity, environment)
+    declarations = _coverage_comparisons(payload)[0]["legacy"][
+        "legitimate_zero_gradient_exceptions"
+    ]
+    if declaration_drift == "missing":
+        declarations.pop()
+    elif declaration_drift == "extra":
+        declarations.append(
+            {"name": "unexpected.bias", "justification": "not approved"}
+        )
+    else:
+        declarations[0]["justification"] += " altered"
+    with pytest.raises(ValueError, match="zero-gradient exceptions drifted"):
+        validate_routing_identity_preflight(payload, expected_identity, environment)
 
 
 def test_complete_passed_artifact_is_reusable(

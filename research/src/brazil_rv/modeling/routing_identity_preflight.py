@@ -85,7 +85,18 @@ _TENSOR_QUANTITIES = {
     "second_pass_base_gradients",
     "base_parameter_updates",
 }
-_ZERO_GRADIENT_EXCEPTIONS: dict[str, str] = {}
+_ZERO_GRADIENT_EXCEPTIONS = {
+    "fusion_norm.bias": (
+        "The LayerNorm bias immediately before the shared prediction head adds the "
+        "same hidden shift to every equity, producing only a constant per-horizon "
+        "prediction shift; cross-sectional soft-Spearman is shift-invariant, and "
+        "this bias is excluded from weight decay."
+    ),
+    "prediction_head.bias": (
+        "Adds a constant per-horizon shift across equities; cross-sectional "
+        "soft-Spearman is shift-invariant, and this bias is excluded from weight decay."
+    ),
+}
 
 
 def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -799,11 +810,6 @@ def _validate_coverage(comparison: dict[str, Any], expected_names: list[str]) ->
             },
             f"{model_name} coverage report",
         )
-        _require(report["passed"] is True, f"{model_name} coverage did not pass")
-        _require(
-            report["unexercised_expected_parameters"] == [],
-            f"{model_name} contains unexercised expected base parameters",
-        )
         _require(
             report["legitimate_zero_gradient_exceptions"] == expected_exceptions,
             f"{model_name} zero-gradient exceptions drifted",
@@ -813,17 +819,32 @@ def _validate_coverage(comparison: dict[str, Any], expected_names: list[str]) ->
             isinstance(per_parameter, dict) and list(per_parameter) == expected_names,
             f"{model_name} per-parameter coverage identities drifted",
         )
+        unexercised: list[str] = []
         for name, coverage in per_parameter.items():
             _exact_keys(
                 coverage,
                 {"first_pass_gradient", "second_pass_gradient", "parameter_update"},
                 f"coverage for {name}",
             )
-            if name not in _ZERO_GRADIENT_EXCEPTIONS:
-                _require(
-                    all(value is True for value in coverage.values()),
-                    f"base parameter {name} was not fully exercised",
-                )
+            _require(
+                all(type(value) is bool for value in coverage.values()),
+                f"coverage for {name} must contain booleans",
+            )
+            if name not in _ZERO_GRADIENT_EXCEPTIONS and not all(coverage.values()):
+                unexercised.append(name)
+        _require(
+            report["unexercised_expected_parameters"] == unexercised,
+            f"{model_name} unexercised parameter summary is inconsistent",
+        )
+        _require(
+            report["passed"] is (not unexercised),
+            f"{model_name} stored coverage status is inconsistent",
+        )
+        _require(
+            not unexercised,
+            f"{model_name} contains unexercised expected base parameters: "
+            f"{unexercised}",
+        )
 
 
 def _validate_comparison(
