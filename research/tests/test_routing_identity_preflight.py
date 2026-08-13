@@ -10,6 +10,7 @@ from torch import nn
 
 from brazil_rv.modeling.contract import EQUITY_COUNT, GH200_RUNTIME, LOCAL_CONTEXT_COUNT
 from brazil_rv.modeling.engine import soft_spearman_loss
+from brazil_rv.modeling.run_profiles import RUN_PROFILE_SCHEMA_VERSION
 from brazil_rv.modeling import routing_identity_preflight as preflight
 from brazil_rv.modeling.routing_identity_preflight import (
     build_routing_preflight_identity,
@@ -218,7 +219,7 @@ def test_soft_spearman_structural_bias_null_directions() -> None:
 
 def test_preflight_identity_binds_experiment_profile_and_packed_shape() -> None:
     profile = {
-        "schema_version": "B3_MODEL_RUN_PROFILE_V1",
+        "schema_version": RUN_PROFILE_SCHEMA_VERSION,
         "name": "experiment",
         "equity_count": 48,
         "equity_slots": list(range(48)),

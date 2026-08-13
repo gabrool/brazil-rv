@@ -72,9 +72,9 @@ from .contract import (
     peer_feature_metadata,
 )
 from .data import (
+    load_sample_index,
     resolve_feature_store,
     select_sample_split,
-    validate_feature_store,
 )
 from .routing_identity_preflight import (
     PREFLIGHT_VERSION,
@@ -82,7 +82,15 @@ from .routing_identity_preflight import (
     run_routing_identity_preflight,
     validate_routing_identity_preflight,
 )
-from .engine import objective_metadata, sam_metadata, validate_runtime
+from .engine import (
+    PERFORMANCE_PROFILE_VERSION,
+    PROFILER_TRACE_FILENAME,
+    SAM_BOUNDED_CUDA_PHASES,
+    VALIDATION_BOUNDED_CUDA_PHASES,
+    objective_metadata,
+    sam_metadata,
+    validate_runtime,
+)
 from .evaluate import _validate_run_checkpoint_identity
 from .feature_ablation import resolve_feature_ablation_for_store
 from .run_profiles import (
@@ -133,7 +141,11 @@ _REQUIRED_OUTPUTS = (
     "validation_metrics.json",
     "validation_daily_metrics.parquet",
 )
-_EXPERIMENT_REQUIRED_OUTPUTS = ("run_profile.json", "performance_profile.json")
+_EXPERIMENT_REQUIRED_OUTPUTS = (
+    "run_profile.json",
+    "performance_profile.json",
+    PROFILER_TRACE_FILENAME,
+)
 _REPOSITORY = PROJECT_ROOT / "quant" / "b3-quant"
 _RESEARCH = _REPOSITORY / "research"
 SUMMARY_JSON = "experiment_summary.json"
@@ -432,6 +444,394 @@ def _artifact_hashes(run_dir: Path, *, experiment_profile: bool) -> dict[str, st
     return hashes
 
 
+def _exact_keys(value: object, expected: set[str], label: str) -> dict[str, object]:
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError(f"{label} has an incomplete or unexpected schema")
+    return value
+
+
+def _nonnegative_number(value: object, label: str) -> float:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        or float(value) < 0.0
+    ):
+        raise ValueError(f"{label} must be finite and nonnegative")
+    return float(value)
+
+
+def _nonnegative_integer(value: object, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{label} must be a nonnegative integer")
+    return value
+
+
+def _same_total(actual: float, expected: float, label: str) -> None:
+    if not math.isclose(actual, expected, rel_tol=1e-12, abs_tol=1e-12):
+        raise ValueError(f"{label} is inconsistent with its per-epoch values")
+
+
+def _validate_cuda_phases(
+    value: object, expected: tuple[str, ...], label: str
+) -> dict[str, object]:
+    phases = _exact_keys(value, set(expected), label)
+    for name in expected:
+        _nonnegative_number(phases[name], f"{label}.{name}")
+    return phases
+
+
+def _validate_performance_profile(
+    run_dir: Path, expected_profile_identity_sha256: str
+) -> dict[str, object]:
+    path = run_dir / "performance_profile.json"
+    try:
+        profile = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("Run performance profile is unreadable") from error
+    profile = _exact_keys(
+        profile,
+        {
+            "version",
+            "run_profile",
+            "run_profile_identity_sha256",
+            "measurement_contract",
+            "epochs",
+            "bounded_training_update",
+            "bounded_validation_batch",
+            "profiler_trace",
+            "final_artifact_io_wall_seconds",
+            "whole_run",
+            "peak_cuda_memory",
+        },
+        "Run performance profile",
+    )
+    expected_contract = {
+        "aggregate_wall_clock_clock": "time.perf_counter",
+        "bounded_sampling_enabled": True,
+        "bounded_cuda_clock": "torch.cuda.Event",
+        "bounded_training_scope": (
+            "first_completed_effective_training_update_of_epoch_1"
+        ),
+        "bounded_validation_scope": "first_validation_batch_of_epoch_1",
+        "cuda_synchronization_policy": (
+            "one synchronization at each bounded CUDA profiling boundary only"
+        ),
+        "sampled_cuda_timings_are_not_extrapolated": True,
+        "worker_construction_is_sum_across_workers_and_may_overlap": True,
+    }
+    if (
+        profile["version"] != PERFORMANCE_PROFILE_VERSION
+        or profile["run_profile"] != "experiment"
+        or profile["run_profile_identity_sha256"]
+        != expected_profile_identity_sha256
+        or profile["measurement_contract"] != expected_contract
+    ):
+        raise ValueError("Run performance profile has a mismatched identity or policy")
+
+    epochs = profile["epochs"]
+    if not isinstance(epochs, list) or len(epochs) != 3:
+        raise ValueError(
+            "Experiment performance profile must contain exactly three epochs"
+        )
+    training_total = 0.0
+    validation_total = 0.0
+    artifact_total = 0.0
+    h2d_total = 0
+    allocated_peak = 0
+    reserved_peak = 0
+    for expected_epoch, value in enumerate(epochs, start=1):
+        epoch = _exact_keys(
+            value,
+            {
+                "epoch",
+                "aggregate_wall_clock",
+                "training",
+                "validation",
+                "training_decision_grouping",
+                "peak_cuda_memory",
+            },
+            "Performance epoch",
+        )
+        if epoch["epoch"] != expected_epoch:
+            raise ValueError("Performance epochs must be sequential and one-based")
+        aggregate = _exact_keys(
+            epoch["aggregate_wall_clock"],
+            {
+                "training_seconds",
+                "validation_seconds",
+                "artifact_io_seconds",
+                "epoch_seconds",
+            },
+            "Epoch aggregate wall clock",
+        )
+        for name in aggregate:
+            _nonnegative_number(aggregate[name], f"Epoch aggregate {name}")
+
+        training = _exact_keys(
+            epoch["training"],
+            {
+                "main_process_dataloader_wait_seconds",
+                "worker_batch_construction_seconds_sum",
+                "worker_timing_scope",
+                "h2d_bytes",
+                "h2d_enqueue_wall_seconds",
+                "effective_update_wall_seconds",
+                "total_epoch_training_wall_seconds",
+                "profiler_trace_artifact_io_wall_seconds",
+                "physical_microbatch_count",
+                "effective_update_count",
+            },
+            "Epoch training performance",
+        )
+        validation = _exact_keys(
+            epoch["validation"],
+            {
+                "main_process_dataloader_wait_seconds",
+                "worker_batch_construction_seconds_sum",
+                "worker_timing_scope",
+                "h2d_bytes",
+                "h2d_enqueue_wall_seconds",
+                "device_to_host_and_result_collection_wall_seconds",
+                "metric_construction_wall_seconds",
+                "total_validation_wall_seconds",
+                "batch_count",
+            },
+            "Epoch validation performance",
+        )
+        for label, values in (("training", training), ("validation", validation)):
+            if values["worker_timing_scope"] != (
+                "sum_across_workers_may_overlap_wall_time"
+            ):
+                raise ValueError(f"Epoch {label} worker timing scope is invalid")
+            for name, item in values.items():
+                if name == "worker_timing_scope" or name.endswith("count"):
+                    continue
+                if name == "h2d_bytes":
+                    continue
+                _nonnegative_number(item, f"Epoch {label} {name}")
+            _nonnegative_integer(values["h2d_bytes"], f"Epoch {label} H2D bytes")
+        physical_count = _nonnegative_integer(
+            training["physical_microbatch_count"], "Physical microbatch count"
+        )
+        update_count = _nonnegative_integer(
+            training["effective_update_count"], "Effective update count"
+        )
+        _nonnegative_integer(validation["batch_count"], "Validation batch count")
+        if physical_count == 0 or update_count == 0 or validation["batch_count"] == 0:
+            raise ValueError("Performance profile contains an empty execution phase")
+
+        grouping = _exact_keys(
+            epoch["training_decision_grouping"],
+            {
+                "physical_microbatch_unique_decision_counts",
+                "effective_batch_unique_decision_counts",
+            },
+            "Training decision grouping",
+        )
+        physical = grouping["physical_microbatch_unique_decision_counts"]
+        effective = grouping["effective_batch_unique_decision_counts"]
+        if (
+            not isinstance(physical, list)
+            or not isinstance(effective, list)
+            or len(physical) != physical_count
+            or len(effective) != update_count
+        ):
+            raise ValueError("Training decision-grouping counts are incomplete")
+        for name, counts in (("physical", physical), ("effective", effective)):
+            for count in counts:
+                if _nonnegative_integer(count, f"{name} unique decision count") == 0:
+                    raise ValueError("Executed batches must contain a decision time")
+
+        peak = _exact_keys(
+            epoch["peak_cuda_memory"],
+            {"allocated_bytes", "reserved_bytes"},
+            "Epoch peak CUDA memory",
+        )
+        allocated_peak = max(
+            allocated_peak,
+            _nonnegative_integer(peak["allocated_bytes"], "Allocated CUDA bytes"),
+        )
+        reserved_peak = max(
+            reserved_peak,
+            _nonnegative_integer(peak["reserved_bytes"], "Reserved CUDA bytes"),
+        )
+        _same_total(
+            float(aggregate["training_seconds"]),
+            float(training["total_epoch_training_wall_seconds"]),
+            "Epoch training wall time",
+        )
+        _same_total(
+            float(aggregate["validation_seconds"]),
+            float(validation["total_validation_wall_seconds"]),
+            "Epoch validation wall time",
+        )
+        training_total += float(aggregate["training_seconds"])
+        validation_total += float(aggregate["validation_seconds"])
+        artifact_total += float(aggregate["artifact_io_seconds"])
+        h2d_total += int(training["h2d_bytes"]) + int(validation["h2d_bytes"])
+
+    bounded_training = _exact_keys(
+        profile["bounded_training_update"],
+        {
+            "scope",
+            "profiled_epoch",
+            "effective_update_index",
+            "h2d_bytes",
+            "h2d_enqueue_wall_seconds",
+            "total_effective_update_wall_seconds",
+            "cuda_phase_seconds",
+        },
+        "Bounded training update",
+    )
+    if (
+        bounded_training["scope"]
+        != "first_completed_effective_training_update_of_epoch_1"
+        or bounded_training["profiled_epoch"] != 1
+        or bounded_training["effective_update_index"] != 0
+    ):
+        raise ValueError("Bounded training update has the wrong scope")
+    _nonnegative_integer(bounded_training["h2d_bytes"], "Bounded training H2D bytes")
+    _nonnegative_number(
+        bounded_training["h2d_enqueue_wall_seconds"], "Bounded training enqueue"
+    )
+    _nonnegative_number(
+        bounded_training["total_effective_update_wall_seconds"],
+        "Bounded total effective update",
+    )
+    _validate_cuda_phases(
+        bounded_training["cuda_phase_seconds"],
+        SAM_BOUNDED_CUDA_PHASES,
+        "Bounded training CUDA phases",
+    )
+
+    bounded_validation = _exact_keys(
+        profile["bounded_validation_batch"],
+        {
+            "scope",
+            "batch_index",
+            "h2d_bytes",
+            "h2d_enqueue_wall_seconds",
+            "cuda_phase_seconds",
+        },
+        "Bounded validation batch",
+    )
+    if (
+        bounded_validation["scope"] != "first_validation_batch_of_epoch_1"
+        or bounded_validation["batch_index"] != 0
+    ):
+        raise ValueError("Bounded validation batch has the wrong scope")
+    _nonnegative_integer(
+        bounded_validation["h2d_bytes"], "Bounded validation H2D bytes"
+    )
+    _nonnegative_number(
+        bounded_validation["h2d_enqueue_wall_seconds"],
+        "Bounded validation enqueue",
+    )
+    _validate_cuda_phases(
+        bounded_validation["cuda_phase_seconds"],
+        VALIDATION_BOUNDED_CUDA_PHASES,
+        "Bounded validation CUDA phases",
+    )
+
+    trace = _exact_keys(
+        profile["profiler_trace"],
+        {
+            "filename",
+            "scope",
+            "sha256",
+            "profiled_epoch",
+            "effective_update_index",
+            "trace_artifact_io_wall_seconds",
+        },
+        "Profiler trace metadata",
+    )
+    if (
+        trace["filename"] != PROFILER_TRACE_FILENAME
+        or trace["scope"]
+        != "first_completed_effective_training_update_of_epoch_1"
+        or trace["profiled_epoch"] != 1
+        or trace["effective_update_index"] != 0
+        or not isinstance(trace["sha256"], str)
+        or len(trace["sha256"]) != 64
+    ):
+        raise ValueError("Profiler trace metadata has the wrong identity or scope")
+    trace_io = _nonnegative_number(
+        trace["trace_artifact_io_wall_seconds"], "Profiler trace artifact I/O"
+    )
+    _same_total(
+        float(epochs[0]["training"]["profiler_trace_artifact_io_wall_seconds"]),
+        trace_io,
+        "Profiler trace artifact I/O",
+    )
+    trace_path = (run_dir / str(trace["filename"])).resolve()
+    if trace_path.parent != run_dir.resolve() or not trace_path.is_file():
+        raise ValueError("Profiler trace is missing or escapes the run directory")
+    if _sha256(trace_path) != trace["sha256"]:
+        raise ValueError("Profiler trace hash does not match its metadata")
+    try:
+        trace_payload = json.loads(trace_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("Profiler trace is not parseable Chrome-trace JSON") from error
+    if (
+        not isinstance(trace_payload, dict)
+        or not isinstance(trace_payload.get("traceEvents"), list)
+        or not trace_payload["traceEvents"]
+    ):
+        raise ValueError("Profiler trace does not contain Chrome trace events")
+
+    final_artifact = _nonnegative_number(
+        profile["final_artifact_io_wall_seconds"], "Final artifact I/O"
+    )
+    artifact_total += final_artifact
+    whole = _exact_keys(
+        profile["whole_run"],
+        {
+            "training_wall_seconds",
+            "validation_wall_seconds",
+            "artifact_io_wall_seconds",
+            "run_wall_seconds",
+            "h2d_bytes",
+        },
+        "Whole-run performance",
+    )
+    for name in (
+        "training_wall_seconds",
+        "validation_wall_seconds",
+        "artifact_io_wall_seconds",
+        "run_wall_seconds",
+    ):
+        _nonnegative_number(whole[name], f"Whole-run {name}")
+    _nonnegative_integer(whole["h2d_bytes"], "Whole-run H2D bytes")
+    _same_total(float(whole["training_wall_seconds"]), training_total, "Training")
+    _same_total(
+        float(whole["validation_wall_seconds"]), validation_total, "Validation"
+    )
+    _same_total(float(whole["artifact_io_wall_seconds"]), artifact_total, "Artifact I/O")
+    if whole["h2d_bytes"] != h2d_total:
+        raise ValueError("Whole-run H2D bytes are inconsistent")
+    if float(whole["run_wall_seconds"]) + 1e-12 < (
+        training_total + validation_total + artifact_total
+    ):
+        raise ValueError("Whole-run wall time is shorter than additive phases")
+
+    peak = _exact_keys(
+        profile["peak_cuda_memory"],
+        {"allocated_bytes", "reserved_bytes"},
+        "Whole-run peak CUDA memory",
+    )
+    if (
+        _nonnegative_integer(peak["allocated_bytes"], "Peak allocated CUDA bytes")
+        != allocated_peak
+        or _nonnegative_integer(
+            peak["reserved_bytes"], "Peak reserved CUDA bytes"
+        )
+        != reserved_peak
+    ):
+        raise ValueError("Whole-run peak CUDA memory is inconsistent")
+    return profile
+
+
 def _manifest_peer_mode(manifest: dict[str, object]) -> str | None:
     peer = manifest.get("peer_features")
     return str(peer.get("mode")) if isinstance(peer, dict) else None
@@ -457,6 +857,9 @@ def validate_completed_run(
         if recorded_profile != expected_profile.metadata():
             raise ValueError("Stage-5 run has a mismatched experiment profile")
         validate_run_profile_artifact(run_dir / "run_profile.json", expected_profile)
+        _validate_performance_profile(
+            run_dir, expected_profile.identity_sha256
+        )
     elif (
         recorded_profile is not None and recorded_profile != expected_profile.metadata()
     ):
@@ -1904,10 +2307,15 @@ def _runbook_text(state_dir: Path, peer_primary_state: Path) -> str:
 def _session_performance_payload(state: dict[str, object]) -> dict[str, object]:
     runs = []
     totals = {
-        "training_seconds": 0.0,
-        "validation_seconds": 0.0,
-        "artifact_io_seconds": 0.0,
+        "training_wall_seconds": 0.0,
+        "validation_wall_seconds": 0.0,
+        "artifact_io_wall_seconds": 0.0,
+        "run_wall_seconds": 0.0,
+        "h2d_bytes": 0,
     }
+    expected_identity = str(
+        state["configuration"]["run_profile_identity_sha256"]
+    )
     for job in [
         *state["control_jobs"],
         *state["issuer_jobs"],
@@ -1915,45 +2323,50 @@ def _session_performance_payload(state: dict[str, object]) -> dict[str, object]:
     ]:
         if job["status"] != "completed":
             continue
-        path = Path(str(job["run_dir"])) / "performance_profile.json"
-        profile = json.loads(path.read_text(encoding="utf-8"))
-        if profile.get("run_profile_identity_sha256") != state["configuration"][
-            "run_profile_identity_sha256"
-        ] or not isinstance(profile.get("epochs"), list):
-            raise ValueError("Run performance profile has a mismatched identity")
-        run_totals = {
-            key: sum(float(epoch[key]) for epoch in profile["epochs"]) for key in totals
-        }
-        run_totals["artifact_io_seconds"] += float(
-            profile.get("final_artifact_io_seconds", 0.0)
-        )
-        for key, value in run_totals.items():
-            totals[key] += value
+        run_dir = Path(str(job["run_dir"]))
+        profile_path = run_dir / "performance_profile.json"
+        trace_path = run_dir / PROFILER_TRACE_FILENAME
+        profile = _validate_performance_profile(run_dir, expected_identity)
+        recorded_hashes = job.get("output_sha256")
+        if (
+            not isinstance(recorded_hashes, dict)
+            or recorded_hashes.get("performance_profile.json")
+            != _sha256(profile_path)
+            or recorded_hashes.get(PROFILER_TRACE_FILENAME) != _sha256(trace_path)
+        ):
+            raise ValueError("Completed job performance provenance changed")
+        whole = profile["whole_run"]
+        for key in totals:
+            totals[key] += whole[key]
         runs.append(
             {
                 "job_id": job["job_id"],
                 "run_dir": job["run_dir"],
-                "performance_profile_sha256": _sha256(path),
-                "totals": run_totals,
-                "bounded_trace": profile.get("bounded_trace"),
+                "performance_profile_sha256": _sha256(profile_path),
+                "profiler_trace_sha256": _sha256(trace_path),
+                "additive_totals": {key: whole[key] for key in totals},
+                "bounded_training_update": profile["bounded_training_update"],
+                "bounded_validation_batch": profile["bounded_validation_batch"],
+                "profiler_trace": profile["profiler_trace"],
             }
         )
     session_path = Path(str(state["configuration"]["session_preparation"]["path"]))
     session = json.loads(session_path.read_text(encoding="utf-8"))
     return {
-        "version": "B3_SESSION_PERFORMANCE_SUMMARY_V1",
+        "version": "B3_SESSION_PERFORMANCE_SUMMARY_V2",
         "experiment_name": EXPERIMENT_NAME,
-        "run_profile_identity_sha256": state["configuration"][
-            "run_profile_identity_sha256"
-        ],
+        "run_profile_identity_sha256": expected_identity,
         "session_preparation_sha256": _sha256(session_path),
         "cache_warmup": session["cache_warmup"],
         "session_preparation_performance": session.get("performance"),
         "orchestrator_phases": state.get("session_phase_performance"),
         "run_count": len(runs),
         "runs": runs,
-        "totals": totals,
-        "bounded_trace_policy": "one first-epoch phase trace per trained run",
+        "additive_totals": totals,
+        "bounded_sample_policy": (
+            "one first-effective-update and one first-validation-batch sample per run; "
+            "sampled CUDA timings are not aggregated or extrapolated"
+        ),
     }
 
 
@@ -2049,30 +2462,39 @@ def _finalize_outputs(state_dir: Path, state: dict[str, object]) -> None:
 def dry_run_payload(peer_primary_state: Path) -> dict[str, object]:
     commit, clean = _git_identity(require_clean=False)
     feature_store = resolve_feature_store().resolve()
-    validate_feature_store(feature_store)
     run_profile = resolve_run_profile("experiment", feature_store)
-    configuration = _configuration(
-        commit, feature_store, peer_primary_state, run_profile, None
+    train_rows = filter_profile_rows(
+        select_sample_split(load_sample_index(feature_store), "train"),
+        feature_store,
+        run_profile,
     )
-    incumbents = _source_incumbents(peer_primary_state, feature_store)
+    preflight_identity = build_routing_preflight_identity(
+        commit, run_profile.metadata(), train_rows.height
+    )
     return {
         "experiment_name": EXPERIMENT_NAME,
         "dry_run": True,
         "worktree_clean": clean,
         "orchestrator_git_commit_sha": commit,
         "resolved_feature_store_path": str(feature_store),
-        "source_peer_primary": configuration["source_peer_primary"],
-        "incumbent_runs": {
-            str(seed): str(values[0].run_dir) for seed, values in incumbents.items()
-        },
+        "source_peer_primary_state": str(peer_primary_state.resolve()),
         "run_profile": run_profile.metadata(),
-        "session_preparation_will_run_before_preflight": True,
-        "routing_identity_preflight_will_run_first": True,
+        "routing_identity_preflight": preflight_identity,
+        "execution_order": [
+            "runbook",
+            "experiment_lock",
+            "minimal_profile_and_preflight_identity",
+            "routing_identity_preflight",
+            "session_validation_and_cache_warmup",
+            "train_and_validation_input_filtering",
+            "realized_distribution_audit",
+            "incumbent_resolution",
+            "adaptive_training_sequence",
+        ],
         "control_runs": {
             "minimum": CONTROL_RUN_COUNT_MINIMUM,
             "maximum": CONTROL_RUN_COUNT_MAXIMUM,
         },
-        "realized_distribution_audit_will_run_after_preflight": True,
         "issuer_runs": {
             "mandatory": ISSUER_RUN_COUNT_MINIMUM,
             "conditional": ISSUER_RUN_COUNT_MAXIMUM - ISSUER_RUN_COUNT_MINIMUM,
@@ -2091,7 +2513,6 @@ def dry_run_payload(peer_primary_state: Path) -> dict[str, object]:
         },
         "all_off_scaffold_control_training": False,
         "final_holdout_status": "sealed_not_accessed",
-        "configuration": configuration,
     }
 
 
@@ -2100,11 +2521,12 @@ def format_dry_run(payload: dict[str, object]) -> str:
     issuer = payload["issuer_runs"]
     routing = payload["routing_runs"]
     total = payload["total_training_runs"]
+    order = " -> ".join(payload["execution_order"])
     return "\n".join(
         (
-            f"incumbent runs reused: {len(payload['incumbent_runs'])}",
-            "routing identity preflight runs first: yes (eager + compiled, 3 SAM steps)",
-            "realized-distribution audit follows preflight: yes",
+            f"execution order: {order}",
+            "routing identity preflight: eager + compiled, 3 SAM steps",
+            "incumbent resolution occurs only after preflight, session, and audit",
             (
                 f"matched control runs: min={controls['minimum']} "
                 f"max={controls['maximum']}"
@@ -2159,8 +2581,23 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
     )
 
     with exclusive_process_lock(state_dir / "experiment.lock", EXPERIMENT_NAME):
-        preparation_started = time.perf_counter()
+        identity_started = time.perf_counter()
         run_profile = resolve_run_profile("experiment", feature_store)
+        preflight_train_rows = filter_profile_rows(
+            select_sample_split(load_sample_index(feature_store), "train"),
+            feature_store,
+            run_profile,
+        )
+        expected_preflight_identity = build_routing_preflight_identity(
+            commit, run_profile.metadata(), preflight_train_rows.height
+        )
+        identity_seconds = time.perf_counter() - identity_started
+
+        preflight_started = time.perf_counter()
+        preflight_path = _ensure_preflight(state_dir, expected_preflight_identity)
+        preflight_seconds = time.perf_counter() - preflight_started
+
+        session_started = time.perf_counter()
         profile_path = state_dir / "run_profile.json"
         if profile_path.is_file():
             validate_run_profile_artifact(profile_path, run_profile)
@@ -2174,12 +2611,33 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
         sample_index, _ = validate_session_preparation(
             session_path, feature_store, commit, run_profile
         )
+        session_seconds = time.perf_counter() - session_started
+
+        filtering_started = time.perf_counter()
         train_rows = filter_profile_rows(
             select_sample_split(sample_index, "train"),
             feature_store,
             run_profile,
         )
+        validation_rows = filter_profile_rows(
+            select_sample_split(sample_index, "validation"),
+            feature_store,
+            run_profile,
+            require_training_dates=False,
+        )
+        if (
+            train_rows.get_column("sample_id").to_list()
+            != preflight_train_rows.get_column("sample_id").to_list()
+            or validation_rows.is_empty()
+        ):
+            raise ValueError("Post-preflight profile inputs changed or are empty")
+        filtering_seconds = time.perf_counter() - filtering_started
+
         feature_identity = _feature_store_identity(feature_store)
+        audit_started = time.perf_counter()
+        audit_path = _ensure_audit(state_dir, feature_store, feature_identity)
+        audit_seconds = time.perf_counter() - audit_started
+
         configuration = _configuration(
             commit,
             feature_store,
@@ -2190,19 +2648,9 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
         incumbents_with_provenance = _source_incumbents(
             peer_primary_state, feature_store
         )
-        expected_preflight_identity = build_routing_preflight_identity(
-            commit, run_profile.metadata(), train_rows.height
-        )
-        preparation_seconds = time.perf_counter() - preparation_started
         log_path = state_dir / EXPERIMENT_LOG
         if not log_path.exists():
             log_path.touch()
-        preflight_started = time.perf_counter()
-        preflight_path = _ensure_preflight(state_dir, expected_preflight_identity)
-        preflight_seconds = time.perf_counter() - preflight_started
-        audit_started = time.perf_counter()
-        audit_path = _ensure_audit(state_dir, feature_store, feature_identity)
-        audit_seconds = time.perf_counter() - audit_started
         state = _load_state(
             state_path,
             configuration,
@@ -2213,8 +2661,10 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
         state.setdefault(
             "session_phase_performance",
             {
-                "profile_and_session_preparation_seconds": preparation_seconds,
+                "minimal_profile_and_preflight_identity_seconds": identity_seconds,
                 "routing_identity_preflight_seconds": preflight_seconds,
+                "session_validation_and_cache_warmup_seconds": session_seconds,
+                "train_and_validation_input_filtering_seconds": filtering_seconds,
                 "realized_distribution_audit_seconds": audit_seconds,
             },
         )

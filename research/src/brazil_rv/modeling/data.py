@@ -88,6 +88,7 @@ PEER_ARRAY_FILES = (
     "equity_peer_valid.npy",
 )
 CACHE_BUFFER_BYTES = 64 * 1024**2
+BATCH_CONSTRUCTION_SECONDS_KEY = "__worker_batch_construction_seconds__"
 
 
 @dataclass(frozen=True)
@@ -823,6 +824,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         return self._arrays
 
     def __getitem__(self, request: BatchRequest) -> dict[str, np.ndarray]:
+        construction_started = time.perf_counter()
         arrays = self._open_arrays()
         positions = np.asarray(request.indices, dtype=np.int64)
         (
@@ -872,7 +874,11 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                     self.equity_slots,
                 )
                 inputs["peer_state"][~common["sample_valid_mask"]] = 0.0
-        return {**inputs, **common}
+        batch = {**inputs, **common}
+        batch[BATCH_CONSTRUCTION_SECONDS_KEY] = np.asarray(
+            time.perf_counter() - construction_started, dtype=np.float64
+        )
+        return batch
 
 
 class TabularRowIterator:

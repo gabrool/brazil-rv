@@ -9,10 +9,13 @@ import polars as pl
 import pytest
 import torch
 
+import brazil_rv.modeling.data as modeling_data
 from brazil_rv.modeling.contract import CONTEXT_COUNT, EQUITY_COUNT
 from brazil_rv.modeling.data import (
     DecisionGroupedPaddedBatchSampler,
     DateStratifiedMicrobatchSampler,
+    create_evaluation_loader,
+    create_training_loaders,
 )
 from brazil_rv.modeling.routing_identity_preflight import (
     _seeded_models,
@@ -100,6 +103,12 @@ def test_experiment_profile_is_training_only_deterministic_and_hashed(
         is False
     )
     assert resolve_run_profile("experiment", store).metadata() == profile.metadata()
+    production = resolve_run_profile("production", store)
+    assert production.metadata()["schema_version"] == RUN_PROFILE_SCHEMA_VERSION
+    assert production.equity_count == EQUITY_COUNT
+    assert len(production.decision_indices) == 55
+    assert production.decision_grouped_batches is True
+    assert profile.decision_grouped_batches is True
 
     artifact = tmp_path / "run_profile.json"
     write_run_profile(artifact, profile)
@@ -145,17 +154,22 @@ def test_experiment_profile_filters_decisions_and_requires_512_training_dates(
     assert filtered.get_column("profile_active_equity_count").min() == 35
 
 
-def test_decision_grouping_preserves_selected_multiset_and_date_uniqueness() -> None:
+@pytest.mark.parametrize(
+    "decision_indices", (tuple(range(55)), EXPERIMENT_DECISION_INDICES)
+)
+def test_decision_grouping_preserves_selected_multiset_and_date_uniqueness(
+    decision_indices: tuple[int, ...],
+) -> None:
     first = date(2022, 1, 3)
     rows = pl.DataFrame(
         [
             {
-                "sample_id": day * 19 + decision_position,
+                "sample_id": day * len(decision_indices) + decision_position,
                 "trade_date": first + timedelta(days=day),
                 "decision_idx": decision,
             }
             for day in range(600)
-            for decision_position, decision in enumerate(EXPERIMENT_DECISION_INDICES)
+            for decision_position, decision in enumerate(decision_indices)
         ],
         schema_overrides={"trade_date": pl.Date},
     )
@@ -179,12 +193,66 @@ def test_decision_grouping_preserves_selected_multiset_and_date_uniqueness() -> 
     assert grouped_decisions == sorted(grouped_decisions)
     assert len(set(grouped_dates)) == 512
 
-    validation = DecisionGroupedPaddedBatchSampler(rows.head(101), 16)
+    validation_rows = rows.head(101)
+    validation = DecisionGroupedPaddedBatchSampler(validation_rows, 16)
+    real_positions = []
     for request in validation:
-        decisions = rows[list(request.indices[: request.valid_count])].get_column(
-            "decision_idx"
-        )
+        real = list(request.indices[: request.valid_count])
+        padded = list(request.indices[request.valid_count :])
+        real_positions.extend(real)
+        decisions = validation_rows[real].get_column("decision_idx")
         assert decisions.n_unique() == 1
+        assert all(position == real[-1] for position in padded)
+    assert sorted(real_positions) == list(range(validation_rows.height))
+
+
+@pytest.mark.parametrize("profile_name", ("production", "experiment"))
+def test_standard_loaders_apply_grouping_for_both_profiles(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile_name: str
+) -> None:
+    store = _profile_store(tmp_path)
+    profile = resolve_run_profile(profile_name, store)
+    first = date(2022, 1, 3)
+    rows = pl.DataFrame(
+        {
+            "sample_id": np.arange(512, dtype=np.int64),
+            "trade_date": [first + timedelta(days=index) for index in range(512)],
+            "decision_idx": np.arange(512, dtype=np.int64) % 55,
+        },
+        schema_overrides={"trade_date": pl.Date},
+    )
+    captured: list[object] = []
+    monkeypatch.setattr(modeling_data, "VectorizedFeatureDataset", lambda *_: object())
+
+    def capture_loader(_: object, sampler: object, *__: object) -> object:
+        captured.append(sampler)
+        return sampler
+
+    monkeypatch.setattr(modeling_data, "_create_loader", capture_loader)
+    _, validation_loader, sampler = create_training_loaders(
+        store,
+        rows,
+        rows,
+        "tcn",
+        "enabled",
+        GH200_RUNTIME,
+        29,
+        run_profile=profile,
+    )
+    evaluation_loader = create_evaluation_loader(
+        store,
+        rows,
+        "tcn",
+        "enabled",
+        GH200_RUNTIME,
+        29,
+        run_profile=profile,
+    )
+
+    assert sampler.decision_grouped is True
+    assert isinstance(validation_loader, DecisionGroupedPaddedBatchSampler)
+    assert isinstance(evaluation_loader, DecisionGroupedPaddedBatchSampler)
+    assert len(captured) == 3
 
 
 def test_tcn_profile_packing_changes_only_runtime_tensor_axes() -> None:

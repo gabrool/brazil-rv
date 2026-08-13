@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +26,7 @@ from brazil_rv.modeling.contract import (
     SOFT_RANK_TEMPERATURES,
     architecture_for_model,
 )
+from brazil_rv.modeling.data import BATCH_CONSTRUCTION_SECONDS_KEY
 from brazil_rv.modeling.engine import (
     checkpoint_payload,
     objective_loss,
@@ -423,12 +425,19 @@ def test_sam_transfers_each_effective_microbatch_once(
 ) -> None:
     batches = _microbatches()
     transferred: list[int] = []
+    predicted: list[int] = []
 
     def transfer(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        transferred.append(id(batch))
-        return batch
+        device_batch = dict(batch)
+        transferred.append(id(device_batch))
+        return device_batch
+
+    def predict(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        predicted.append(id(batch))
+        return model(batch["features"])
 
     monkeypatch.setattr(engine, "_to_cuda", transfer)
+    monkeypatch.setattr(engine, "_predict", predict)
     model = _CrossSectionModel()
     run_effective_batch_update(
         model,
@@ -442,7 +451,195 @@ def test_sam_transfers_each_effective_microbatch_once(
         0.025,
     )
 
-    assert transferred == [id(batch) for batch in batches]
+    assert len(transferred) == len(batches)
+    assert predicted[:8] == predicted[8:] == transferred
+
+
+def test_h2d_bytes_cover_exactly_model_tensors_and_exclude_diagnostics() -> None:
+    batch = {
+        "patches": torch.zeros(2, 3, 4, dtype=torch.float32),
+        "history_patch_mask": torch.ones(2, 3, dtype=torch.bool),
+        "instrument_mask": torch.ones(2, 3, dtype=torch.bool),
+        "slow_features": torch.zeros(2, 3, 5, dtype=torch.float32),
+        "state_position": torch.zeros(2, 3, dtype=torch.int64),
+        "peer_state": torch.zeros(2, 3, 6, dtype=torch.float32),
+        "targets": torch.zeros(2, 3, dtype=torch.float64),
+        "label_mask": torch.ones(2, 3, dtype=torch.bool),
+        BATCH_CONSTRUCTION_SECONDS_KEY: torch.tensor(0.25, dtype=torch.float64),
+        "reserved_but_not_transferred": torch.ones(99, dtype=torch.float32),
+    }
+    expected_keys = (
+        "patches",
+        "history_patch_mask",
+        "instrument_mask",
+        "slow_features",
+        "state_position",
+        "peer_state",
+        "targets",
+        "label_mask",
+    )
+    expected = sum(
+        batch[key].numel() * batch[key].element_size() for key in expected_keys
+    )
+
+    assert engine._model_transfer_keys(batch) == expected_keys
+    assert engine._batch_h2d_bytes(batch) == expected
+
+
+class _FakeCudaPhaseRecorder:
+    def __init__(self) -> None:
+        self.names: list[str] = []
+
+    def phase(self, name: str) -> nullcontext[None]:
+        self.names.append(name)
+        return nullcontext()
+
+    def finish(self) -> dict[str, float]:
+        return {name: index / 1000 for index, name in enumerate(self.names)}
+
+
+def test_bounded_sam_cuda_trace_has_every_required_phase(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(engine, "_CudaPhaseRecorder", _FakeCudaPhaseRecorder)
+    model = _CrossSectionModel()
+    update = run_effective_batch_update(
+        model,
+        _microbatches(),
+        _adamw(model),
+        _CountingScheduler(),
+        GH200_RUNTIME,
+        "sam_adamw",
+        "soft_spearman",
+        0.1,
+        0.025,
+        profile_cuda_phases=True,
+    )
+
+    phases = update["bounded_cuda_phase_seconds"]
+    assert set(phases) == set(engine.SAM_BOUNDED_CUDA_PHASES)
+    assert all(isinstance(value, float) and value >= 0.0 for value in phases.values())
+
+
+def test_unprofiled_update_has_no_cuda_profiler_or_explicit_sync_overhead(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def forbidden(*_: object, **__: object) -> object:
+        raise AssertionError("bounded profiling was unexpectedly activated")
+
+    monkeypatch.setattr(engine, "_CudaPhaseRecorder", forbidden)
+    monkeypatch.setattr(engine.torch.profiler, "profile", forbidden)
+    monkeypatch.setattr(engine.torch.cuda, "synchronize", forbidden)
+    model = _CrossSectionModel()
+    update = run_effective_batch_update(
+        model,
+        _microbatches(),
+        _adamw(model),
+        None,
+        GH200_RUNTIME,
+        "sam_adamw",
+        "soft_spearman",
+        0.1,
+        0.025,
+    )
+
+    assert update["bounded_cuda_phase_seconds"] is None
+
+
+def test_worker_timing_reaches_epoch_profile_but_not_device_batches(
+    cpu_engine: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    batches = [
+        {
+            **batch,
+            "decision_idx": torch.tensor([index % 3]),
+            BATCH_CONSTRUCTION_SECONDS_KEY: torch.tensor(
+                (index + 1) / 100, dtype=torch.float64
+            ),
+        }
+        for index, batch in enumerate(_microbatches())
+    ]
+    transferred_keys: list[tuple[str, ...]] = []
+
+    def transfer(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        keys = engine._model_transfer_keys(batch)
+        transferred_keys.append(keys)
+        return {key: batch[key] for key in keys}
+
+    monkeypatch.setattr(engine, "_to_cuda", transfer)
+    model = _CrossSectionModel()
+    result = train_one_epoch(
+        model,
+        batches,
+        _adamw(model),
+        _CountingScheduler(),
+        GH200_RUNTIME,
+        "sam_adamw",
+        "rank_huber",
+        None,
+        0.025,
+    )
+
+    performance = result["performance"]
+    assert performance["worker_batch_construction_seconds_sum"] == pytest.approx(
+        0.36
+    )
+    assert performance["worker_timing_scope"] == (
+        "sum_across_workers_may_overlap_wall_time"
+    )
+    assert result["decision_grouping"] == {
+        "physical_microbatch_unique_decision_counts": [1] * 8,
+        "effective_batch_unique_decision_counts": [3],
+    }
+    assert all(
+        BATCH_CONSTRUCTION_SECONDS_KEY not in keys for keys in transferred_keys
+    )
+
+
+def test_profiler_trace_is_bounded_parseable_hashed_and_atomically_replaced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class FakeProfiler:
+        def __enter__(self) -> "FakeProfiler":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def export_chrome_trace(self, path: str) -> None:
+            Path(path).write_text(
+                json.dumps({"traceEvents": [{"name": "one-update", "ph": "X"}]}),
+                encoding="utf-8",
+            )
+
+    monkeypatch.setattr(
+        engine.torch.profiler, "profile", lambda **_: FakeProfiler()
+    )
+    replacements: list[tuple[Path, Path]] = []
+    replace = engine.os.replace
+
+    def observed_replace(source: Path, destination: Path) -> None:
+        replacements.append((Path(source), Path(destination)))
+        replace(source, destination)
+
+    monkeypatch.setattr(engine.os, "replace", observed_replace)
+    trace_path = tmp_path / engine.PROFILER_TRACE_FILENAME
+    result, metadata = engine._profile_effective_update(
+        lambda: {"completed": True}, trace_path, 1, 0
+    )
+
+    assert result == {"completed": True}
+    assert json.loads(trace_path.read_text(encoding="utf-8"))["traceEvents"]
+    assert metadata["filename"] == engine.PROFILER_TRACE_FILENAME
+    assert metadata["scope"] == (
+        "first_completed_effective_training_update_of_epoch_1"
+    )
+    assert metadata["profiled_epoch"] == 1
+    assert metadata["effective_update_index"] == 0
+    assert metadata["sha256"] == engine._sha256_file(trace_path)
+    assert replacements == [(replacements[0][0], trace_path)]
+    assert replacements[0][0].name.startswith(f".{trace_path.name}.")
+    assert not replacements[0][0].exists()
 
 
 @pytest.mark.parametrize("rho", SAM_RHOS)
