@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -258,9 +259,9 @@ def test_adaptive_jobs_are_mandatory_only_and_frozen() -> None:
         ("late_only", "early_concat", 29),
         ("late_only", "film", 29),
     }
-    assert stage5.PEER_PRIMARY_STATE_POINTER.name == (
-        "peer_primary_matrix_current_path.txt"
-    )
+    assert not hasattr(stage5, "PEER_PRIMARY_STATE_POINTER")
+    assert not hasattr(stage5, "resolve_peer_primary_state")
+    assert not hasattr(stage5, "_source_incumbents")
     assert (
         stage5.OUTPUT_POINTER.name
         == "context_routing_sequence_outputs_current_path.txt"
@@ -302,7 +303,7 @@ def test_adaptive_jobs_are_mandatory_only_and_frozen() -> None:
     assert parsed.context_ablation == "drop_win_and_global_non_rates"
 
 
-def test_factorial_cli_rejects_drift_from_the_frozen_incumbent() -> None:
+def test_factorial_cli_rejects_drift_from_the_frozen_control() -> None:
     command = list(
         build_training_command(
             seed=11,
@@ -316,7 +317,7 @@ def test_factorial_cli_rejects_drift_from_the_frozen_incumbent() -> None:
 
 
 def test_issuer_sequential_gates_use_paired_validation_contract() -> None:
-    incumbent29 = _run(29, _metrics(0.0))
+    control29 = _run(29, _metrics(0.0))
     passing29 = _run(
         29,
         _metrics(
@@ -327,7 +328,7 @@ def test_issuer_sequential_gates_use_paired_validation_contract() -> None:
         ),
         peer="selected_plus_issuer",
     )
-    screen = issuer_seed29_gate(incumbent29, passing29)
+    screen = issuer_seed29_gate(control29, passing29)
     assert screen["passed"] is True
     assert screen["criteria"]["positive_horizon_ic_delta_count"] == 2
     assert screen["criteria"]["gross_spread_deterioration_count"] == 1
@@ -341,9 +342,9 @@ def test_issuer_sequential_gates_use_paired_validation_contract() -> None:
         ),
         peer="selected_plus_issuer",
     )
-    assert issuer_seed29_gate(incumbent29, failing29)["passed"] is False
+    assert issuer_seed29_gate(control29, failing29)["passed"] is False
 
-    incumbents = {seed: _run(seed, _metrics(0.0)) for seed in ALLOWED_SEEDS}
+    controls = {seed: _run(seed, _metrics(0.0)) for seed in ALLOWED_SEEDS}
     effects = {11: 0.10, 29: 0.10, 47: -0.05}
     issuers = {
         seed: _run(
@@ -353,7 +354,7 @@ def test_issuer_sequential_gates_use_paired_validation_contract() -> None:
         )
         for seed, effect in effects.items()
     }
-    confirmation = issuer_three_seed_gate(incumbents, issuers)
+    confirmation = issuer_three_seed_gate(controls, issuers)
     assert confirmation["passed"] is True
     assert confirmation["criteria"]["positive_paired_primary_seed_count"] == 2
     assert confirmation["criteria"]["positive_mean_horizon_effect_count"] == 2
@@ -413,13 +414,12 @@ def test_new_state_does_not_precreate_conditional_or_mandatory_jobs(
     preflight = tmp_path / "preflight.json"
     audit.write_text("audit", encoding="utf-8")
     preflight.write_text("preflight", encoding="utf-8")
-    incumbents = {
-        seed: (_run(seed, _metrics(0.0)), {"source": seed}) for seed in ALLOWED_SEEDS
-    }
-    state = _new_state({}, incumbents, audit, preflight)
+    state = _new_state({}, audit, preflight)
     assert state["issuer_jobs"] == []
     assert state["routing_jobs"] == []
     assert state["decisions"] == []
+    assert "incumbent_runs" not in state
+    assert "source_peer_primary" not in state["configuration"]
     specification = routing_jobs()[0]
     job = _ensure_job(state, specification)
     assert state["routing_jobs"] == [job]
@@ -547,8 +547,6 @@ def test_runbook_is_atomic_and_available_before_preflight_failure(
 ) -> None:
     feature_store = tmp_path / "feature-store"
     feature_store.mkdir()
-    peer_state = tmp_path / "peer-primary.json"
-    peer_state.write_text("{}", encoding="utf-8")
     state_dir = tmp_path / "state"
     monkeypatch.setattr(stage5, "_git_identity", lambda **_: ("a" * 40, True))
     monkeypatch.setattr(stage5, "resolve_feature_store", lambda: feature_store)
@@ -586,7 +584,6 @@ def test_runbook_is_atomic_and_available_before_preflight_failure(
     monkeypatch.setattr(stage5, "build_routing_preflight_identity", lambda *_: {})
     monkeypatch.setattr(stage5, "_feature_store_identity", lambda _: {})
     monkeypatch.setattr(stage5, "_configuration", lambda *_: {})
-    monkeypatch.setattr(stage5, "_source_incumbents", lambda *_: {})
     monkeypatch.setattr(stage5, "exclusive_process_lock", lambda *_: nullcontext())
 
     def fail_preflight(path: Path, identity: dict[str, object]) -> Path:
@@ -598,6 +595,7 @@ def test_runbook_is_atomic_and_available_before_preflight_failure(
         assert "# Launch." in text
         assert "# Resume" in text
         assert "--status" in text
+        assert "peer-primary" not in text
         assert "OUTPUT_POINTER=" in text
         assert "sha256sum --check" in text
         assert "tar -tzf" in text
@@ -606,7 +604,7 @@ def test_runbook_is_atomic_and_available_before_preflight_failure(
 
     monkeypatch.setattr(stage5, "_ensure_preflight", fail_preflight)
     with pytest.raises(RuntimeError, match="preflight stopped"):
-        stage5.run_experiment(state_dir, peer_state)
+        stage5.run_experiment(state_dir)
     assert (state_dir / stage5.RUNBOOK).is_file()
     assert not (state_dir / f"{stage5.RUNBOOK}.tmp").exists()
     assert not (state_dir / stage5.SESSION_PREPARATION_FILENAME).exists()
@@ -621,8 +619,6 @@ def test_stage5_call_order_is_preflight_then_session_audit_and_training(
     calls: list[str] = []
     feature_store = tmp_path / "feature-store"
     feature_store.mkdir()
-    peer_state = tmp_path / "peer-primary.json"
-    peer_state.write_text("{}", encoding="utf-8")
     state_dir = tmp_path / "state"
 
     class Column:
@@ -698,7 +694,6 @@ def test_stage5_call_order_is_preflight_then_session_audit_and_training(
 
     monkeypatch.setattr(stage5, "_ensure_audit", audit)
     monkeypatch.setattr(stage5, "_configuration", lambda *_: {})
-    monkeypatch.setattr(stage5, "_source_incumbents", lambda *_: {})
     monkeypatch.setattr(stage5, "_load_state", lambda *_: {"status": "running"})
     monkeypatch.setattr(stage5, "_persist_state", lambda *_: None)
     monkeypatch.setattr(stage5, "_log", lambda *_: None)
@@ -709,7 +704,7 @@ def test_stage5_call_order_is_preflight_then_session_audit_and_training(
         lambda *_: calls.append("training"),
     )
 
-    stage5.run_experiment(state_dir, peer_state)
+    stage5.run_experiment(state_dir)
 
     assert calls == ["runbook", "preflight", "session", "inputs", "audit", "training"]
 
@@ -718,9 +713,7 @@ def test_dry_run_uses_only_minimal_preflight_identity_reads(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     feature_store = tmp_path / "feature-store"
-    peer_state = tmp_path / "peer-primary.json"
     feature_store.mkdir()
-    peer_state.write_text("{}", encoding="utf-8")
     profile = stage5.RunProfile(
         name="experiment",
         equity_slots=(0,),
@@ -747,16 +740,11 @@ def test_dry_run_uses_only_minimal_preflight_identity_reads(
     )
     monkeypatch.setattr(
         stage5,
-        "_source_incumbents",
-        lambda *_: (_ for _ in ()).throw(AssertionError("incumbents resolved")),
-    )
-    monkeypatch.setattr(
-        stage5,
         "_feature_store_identity",
         lambda *_: (_ for _ in ()).throw(AssertionError("full identity resolved")),
     )
 
-    payload = stage5.dry_run_payload(peer_state)
+    payload = stage5.dry_run_payload()
 
     assert payload["routing_identity_preflight"] == {"identity": "ok"}
     assert payload["execution_order"][3] == "routing_identity_preflight"
@@ -773,7 +761,6 @@ def test_dry_run_reports_adaptive_minimum_and_maximum() -> None:
             "session_validation_and_cache_warmup",
             "train_and_validation_input_filtering",
             "realized_distribution_audit",
-            "incumbent_resolution",
             "adaptive_training_sequence",
         ],
         "control_runs": {"minimum": 1, "maximum": 3},
@@ -791,13 +778,116 @@ def test_dry_run_reports_adaptive_minimum_and_maximum() -> None:
         "runbook -> experiment_lock -> minimal_profile_and_preflight_identity "
         "-> routing_identity_preflight -> session_validation_and_cache_warmup "
         "-> train_and_validation_input_filtering -> realized_distribution_audit "
-        "-> incumbent_resolution -> adaptive_training_sequence"
+        "-> adaptive_training_sequence"
     ) in output
     assert "routing runs: mandatory=4 conditional_max=5 min=4 max=9" in output
     assert "matched control runs: min=1 max=3" in output
     assert "total training runs: min=6 max=15" in output
     assert "all-off scaffold control training: no" in output
     assert "held-out test accessed: no" in output
+
+
+def test_stage5_cli_and_output_contract_have_no_peer_primary_dependency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "stage5_context_routing",
+            "--state-dir",
+            str(tmp_path),
+            "--peer-primary-state",
+            str(tmp_path / "old-state.json"),
+        ],
+    )
+    with pytest.raises(SystemExit):
+        stage5.parse_args()
+
+    payload = stage5._completed_run_paths_payload(
+        {
+            "control_jobs": [],
+            "issuer_jobs": [],
+            "routing_jobs": [],
+            "routing_identity_preflight": {"status": "passed"},
+            "realized_distribution_audit": {"status": "passed"},
+        }
+    )
+    serialized = json.dumps(payload, sort_keys=True)
+    assert "peer_primary" not in serialized
+    assert "incumbent" not in serialized
+
+
+@pytest.mark.parametrize(("effect", "expected_count"), [(-0.1, 6), (0.1, 15)])
+def test_adaptive_sequence_uses_fresh_controls_and_reuses_confirmation_controls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    effect: float,
+    expected_count: int,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    def run_job(
+        _: dict[str, object],
+        __: Path,
+        specification: dict[str, object],
+        *___: object,
+    ) -> CompletedRun:
+        calls.append(specification)
+        primary = 0.0 if specification["job_kind"] == "control" else effect
+        return _run(
+            int(specification["seed"]),
+            _metrics(primary),
+            peer=str(specification["peer_features"]),
+            slow=str(specification["slow_routing"]),
+            macro=str(specification["macro_temporal_routing"]),
+            experiment=str(specification["context_routing_experiment"]),
+        )
+
+    monkeypatch.setattr(stage5, "_run_authorized_job", run_job)
+    monkeypatch.setattr(stage5, "_persist_state", lambda *_: None)
+    state: dict[str, object] = {
+        "control_jobs": [],
+        "issuer_jobs": [],
+        "routing_jobs": [],
+        "decisions": [],
+    }
+    stage5._run_adaptive_sequence(
+        state,
+        tmp_path / "state.json",
+        tmp_path / "feature-store",
+        "a" * 40,
+        tmp_path / "audit.json",
+        tmp_path / "preflight.json",
+    )
+
+    assert len(calls) == expected_count
+    control_calls = [call for call in calls if call["job_kind"] == "control"]
+    assert [call["seed"] for call in control_calls] == (
+        [29] if effect < 0 else [29, 11, 47]
+    )
+
+
+def test_bound_run_validation_error_names_job_run_and_original_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specification = routing_jobs()[0]
+    job = _new_job(specification)
+    bound = tmp_path / "bound-run"
+    bound.mkdir()
+    job["run_dir"] = str(bound)
+    monkeypatch.setattr(stage5, "_production_run_directories", lambda: set())
+
+    def reject(*_: object, **__: object) -> CompletedRun:
+        raise ValueError("original checkpoint identity failure")
+
+    monkeypatch.setattr(stage5, "validate_completed_run", reject)
+    with pytest.raises(ValueError) as raised:
+        stage5._candidate_runs(job, tmp_path, "a" * 40)
+    message = str(raised.value)
+    assert str(job["job_id"]) in message
+    assert str(bound.resolve()) in message
+    assert "original checkpoint identity failure" in message
 
 
 def test_running_job_recovers_only_one_validated_completed_artifact(

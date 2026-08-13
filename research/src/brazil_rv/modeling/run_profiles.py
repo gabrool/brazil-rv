@@ -123,6 +123,42 @@ def _profile_payload(
     }
 
 
+def _portable_path_candidates(value: str) -> tuple[Path, ...]:
+    candidates = [Path(value).expanduser()]
+    windows_parts = PureWindowsPath(value).parts
+    if "quant-data" in windows_parts:
+        offset = windows_parts.index("quant-data")
+        candidates.append(PROJECT_ROOT.joinpath(*windows_parts[offset:]))
+    return tuple(dict.fromkeys(candidates))
+
+
+def _exact_directory_matches(
+    candidates: tuple[Path, ...],
+    expected_name: str,
+    checked: list[str],
+) -> tuple[Path, ...]:
+    matches: list[Path] = []
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        checked.append(str(resolved))
+        if candidate.is_dir() and candidate.name == expected_name:
+            matches.append(resolved)
+    return tuple(dict.fromkeys(matches))
+
+
+def _single_portable_match(
+    candidates: tuple[Path, ...],
+    expected_name: str,
+    checked: list[str],
+) -> Path | None:
+    matches = _exact_directory_matches(candidates, expected_name, checked)
+    if len(matches) > 1:
+        raise ValueError(
+            f"PIT-universe identity is ambiguous; exact checked candidates: {' | '.join(checked)}"
+        )
+    return matches[0] if matches else None
+
+
 def _resolved_universe(feature_manifest: dict[str, Any]) -> Path:
     canonical = feature_manifest.get("canonical_inputs")
     if not isinstance(canonical, dict):
@@ -133,9 +169,15 @@ def _resolved_universe(feature_manifest: dict[str, Any]) -> Path:
     ):
         raise ValueError("Feature manifest is missing its PIT-universe identity")
     recorded = str(universe["resolved_path"])
-    path = Path(recorded).expanduser()
-    if path.is_dir():
-        return path.resolve()
+    expected_name = PureWindowsPath(recorded).name
+    checked: list[str] = []
+    recorded_candidates = _portable_path_candidates(recorded)
+    direct = _single_portable_match(recorded_candidates[:1], expected_name, checked)
+    if direct is not None:
+        return direct
+    mapped = _single_portable_match(recorded_candidates[1:], expected_name, checked)
+    if mapped is not None:
+        return mapped
     pointer = (
         PROJECT_ROOT
         / "quant-data"
@@ -145,25 +187,21 @@ def _resolved_universe(feature_manifest: dict[str, Any]) -> Path:
         / "pit_v1_canonical_path.txt"
     )
     if not pointer.is_file():
-        raise FileNotFoundError(f"Resolved PIT universe does not exist: {recorded}")
+        raise FileNotFoundError(
+            "Resolved PIT universe does not exist; "
+            f"recorded={recorded}; exact checked candidates={' | '.join(checked)}"
+        )
     pointer_value = pointer.read_text(encoding="utf-8").strip()
-    candidates = [Path(pointer_value).expanduser()]
-    windows_parts = PureWindowsPath(pointer_value).parts
-    if "quant-data" in windows_parts:
-        offset = windows_parts.index("quant-data")
-        candidates.append(PROJECT_ROOT.joinpath(*windows_parts[offset:]))
-    expected_name = PureWindowsPath(recorded).name
-    matches = [
-        candidate.resolve()
-        for candidate in candidates
-        if candidate.is_dir() and candidate.name == expected_name
-    ]
-    if len(matches) != 1:
+    pointer_match = _single_portable_match(
+        _portable_path_candidates(pointer_value), expected_name, checked
+    )
+    if pointer_match is None:
         raise FileNotFoundError(
             "Canonical PIT universe cannot be portably resolved to the feature "
-            f"manifest identity: {recorded}"
+            f"manifest identity; recorded={recorded}; "
+            f"exact checked candidates={' | '.join(checked)}"
         )
-    return matches[0]
+    return pointer_match
 
 
 def _equity_axis(store: Path) -> pl.DataFrame:

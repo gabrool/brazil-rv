@@ -116,11 +116,8 @@ from .stage3_context_addition import (
     _reject_test_derived_metadata,
 )
 
-EXPERIMENT_NAME = "stage5_context_routing_experiment_profile_v2"
-STATE_VERSION = 3
-PEER_PRIMARY_STATE_POINTER = (
-    RUN_OUTPUT_BASE / "_ops" / "peer_primary_matrix_current_path.txt"
-)
+EXPERIMENT_NAME = "stage5_context_routing_experiment_profile_v3"
+STATE_VERSION = 4
 OUTPUT_POINTER = (
     RUN_OUTPUT_BASE / "_ops" / "context_routing_sequence_outputs_current_path.txt"
 )
@@ -224,25 +221,6 @@ def _git_identity(*, require_clean: bool) -> tuple[str, bool]:
         text=True,
     ).stdout.strip()
     return commit, clean
-
-
-def resolve_peer_primary_state(explicit: Path | None = None) -> Path:
-    source = PEER_PRIMARY_STATE_POINTER if explicit is None else explicit
-    source = source.expanduser().resolve()
-    if source.suffix.lower() == ".txt":
-        if not source.is_file():
-            raise FileNotFoundError(
-                f"Peer-primary state pointer does not exist: {source}"
-            )
-        target = Path(source.read_text(encoding="utf-8").strip()).expanduser()
-        if not target.is_absolute():
-            target = source.parent / target
-        source = target.resolve()
-    if not source.is_file():
-        raise FileNotFoundError(
-            f"Authoritative peer-primary state does not exist: {source}"
-        )
-    return source
 
 
 def _settings(
@@ -857,7 +835,7 @@ def validate_completed_run(
     elif (
         recorded_profile is not None and recorded_profile != expected_profile.metadata()
     ):
-        raise ValueError("Legacy incumbent has a mismatched production profile")
+        raise ValueError("Legacy control has a mismatched production profile")
     settings = _settings(
         slow_routing, macro_temporal_routing, context_routing_experiment
     )
@@ -965,116 +943,40 @@ def validate_completed_run(
     )
 
 
-def _source_incumbents(
-    state_path: Path,
-    feature_store: Path,
-) -> dict[int, tuple[CompletedRun, dict[str, object]]]:
-    raw = state_path.read_bytes()
-    state = json.loads(raw)
-    _reject_test_derived_metadata(state, "peer-primary source state")
-    if state.get("status") != "completed" or not isinstance(state.get("jobs"), list):
-        raise ValueError(
-            "Peer-primary adoption requires a completed authoritative state"
-        )
-    candidates: dict[int, list[tuple[CompletedRun, dict[str, object]]]] = {
-        seed: [] for seed in ALLOWED_SEEDS
-    }
-    for position, job in enumerate(state["jobs"]):
-        if not isinstance(job, dict) or job.get("status") != "completed":
-            continue
-        run_value = job.get("run_dir")
-        if not isinstance(run_value, str):
-            continue
-        run_dir = Path(run_value).expanduser().resolve()
-        manifest_path = run_dir / "run_manifest.json"
-        if not manifest_path.is_file():
-            continue
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        seed = manifest.get("seed")
-        if seed not in candidates or _manifest_peer_mode(manifest) != "selected":
-            continue
-        try:
-            completed = validate_completed_run(
-                run_dir,
-                feature_store,
-                seed=int(seed),
-                peer_features="selected",
-                slow_routing="late_only",
-                macro_temporal_routing="late_only",
-                context_routing_experiment="legacy",
-            )
-        except (KeyError, OSError, TypeError, ValueError):
-            continue
-        manifest_hash = completed.output_sha256["run_manifest.json"]
-        if (
-            job.get("run_manifest_sha256") is not None
-            and job.get("run_manifest_sha256") != manifest_hash
-        ):
-            raise ValueError("Authoritative peer-primary job manifest hash disagrees")
-        candidates[int(seed)].append(
-            (
-                completed,
-                {
-                    "position": position,
-                    "run_dir": str(run_dir),
-                    "run_manifest_sha256": manifest_hash,
-                    "source_job_identity": {
-                        key: job.get(key)
-                        for key in (
-                            "logical_configuration",
-                            "configuration",
-                            "seed",
-                            "result_origin",
-                            "producing_git_commit_sha",
-                        )
-                        if key in job
-                    },
-                },
-            )
-        )
-    if any(len(values) != 1 for values in candidates.values()):
-        counts = {seed: len(values) for seed, values in candidates.items()}
-        raise ValueError(
-            "Authoritative peer-primary state must identify exactly one frozen "
-            f"selected incumbent per seed: {counts}"
-        )
-    return {seed: values[0] for seed, values in candidates.items()}
-
-
 def issuer_seed29_gate(
-    incumbent: CompletedRun,
+    control: CompletedRun,
     issuer: CompletedRun,
 ) -> dict[str, object]:
-    if incumbent.seed != 29 or issuer.seed != 29:
+    if control.seed != 29 or issuer.seed != 29:
         raise ValueError("Issuer first-stage gate requires the matched seed 29 pair")
-    return seed29_candidate_gate(incumbent.metrics, issuer.metrics)
+    return seed29_candidate_gate(control.metrics, issuer.metrics)
 
 
 def issuer_three_seed_gate(
-    incumbents: dict[int, CompletedRun],
+    controls: dict[int, CompletedRun],
     issuers: dict[int, CompletedRun],
 ) -> dict[str, object]:
     return three_seed_candidate_gate(
-        {seed: run.metrics for seed, run in incumbents.items()},
+        {seed: run.metrics for seed, run in controls.items()},
         {seed: run.metrics for seed, run in issuers.items()},
     )
 
 
 def routing_seed29_gate(
-    incumbent: CompletedRun,
+    control: CompletedRun,
     candidate: CompletedRun,
 ) -> dict[str, object]:
-    if incumbent.seed != 29 or candidate.seed != 29:
+    if control.seed != 29 or candidate.seed != 29:
         raise ValueError("Routing first-stage gate requires a matched seed-29 pair")
-    return seed29_candidate_gate(incumbent.metrics, candidate.metrics)
+    return seed29_candidate_gate(control.metrics, candidate.metrics)
 
 
 def routing_three_seed_gate(
-    incumbents: dict[int, CompletedRun],
+    controls: dict[int, CompletedRun],
     candidates: dict[int, CompletedRun],
 ) -> dict[str, object]:
     return three_seed_candidate_gate(
-        {seed: run.metrics for seed, run in incumbents.items()},
+        {seed: run.metrics for seed, run in controls.items()},
         {seed: run.metrics for seed, run in candidates.items()},
     )
 
@@ -1090,38 +992,9 @@ def _selection_candidate(
     }
 
 
-def _peer_primary_provenance(peer_primary_state: Path) -> dict[str, object]:
-    provenance: dict[str, object] = {
-        "resolved_state_path": str(peer_primary_state),
-        "resolved_state_sha256": _sha256(peer_primary_state),
-        "authoritative_pointer_path": str(PEER_PRIMARY_STATE_POINTER),
-    }
-    if PEER_PRIMARY_STATE_POINTER.is_file():
-        pointer_target = resolve_peer_primary_state()
-        provenance.update(
-            {
-                "authoritative_pointer_sha256": _sha256(PEER_PRIMARY_STATE_POINTER),
-                "authoritative_pointer_target": str(pointer_target),
-                "explicit_cli_override": not pointer_target.samefile(
-                    peer_primary_state
-                ),
-            }
-        )
-    else:
-        provenance.update(
-            {
-                "authoritative_pointer_sha256": None,
-                "authoritative_pointer_target": None,
-                "explicit_cli_override": True,
-            }
-        )
-    return provenance
-
-
 def _configuration(
     commit: str,
     feature_store: Path,
-    peer_primary_state: Path,
     run_profile: RunProfile,
     session_preparation_path: Path | None,
 ) -> dict[str, object]:
@@ -1144,14 +1017,13 @@ def _configuration(
                 "status": "passed",
             }
         ),
-        "source_peer_primary": _peer_primary_provenance(peer_primary_state),
         "context_ablation": resolve_context_ablation_for_store(
             feature_store, FROZEN_CONTEXT_ABLATION
         ).metadata(),
         "feature_ablation": resolve_feature_ablation_for_store(
             feature_store, FROZEN_FEATURE_ABLATION
         ).metadata(),
-        "legacy_incumbent": {
+        "legacy_control": {
             "tcn_settings": asdict(_settings()),
             "architecture": asdict(legacy),
             "peer_features": peer_feature_metadata("tcn", legacy, "selected"),
@@ -1205,7 +1077,6 @@ def _new_job(base: dict[str, object]) -> dict[str, object]:
 
 def _new_state(
     configuration: dict[str, object],
-    incumbents: dict[int, tuple[CompletedRun, dict[str, object]]],
     audit_path: Path,
     preflight_path: Path,
 ) -> dict[str, object]:
@@ -1229,16 +1100,6 @@ def _new_state(
             "sha256": _sha256(audit_path),
             "audit_name": AUDIT_NAME,
             "audit_version": AUDIT_VERSION,
-        },
-        "incumbent_runs": {
-            str(seed): {
-                "run_dir": str(run.run_dir),
-                "primary_validation_ic": run.primary_ic,
-                "producing_git_commit_sha": run.producing_git_commit_sha,
-                "output_sha256": run.output_sha256,
-                "source_provenance": provenance,
-            }
-            for seed, (run, provenance) in incumbents.items()
         },
         "control_jobs": [],
         "issuer_jobs": [],
@@ -1321,12 +1182,11 @@ def _validate_dynamic_jobs(recorded: object, job_kind: str) -> list[dict[str, ob
 def _load_state(
     state_path: Path,
     configuration: dict[str, object],
-    incumbents: dict[int, tuple[CompletedRun, dict[str, object]]],
     audit_path: Path,
     preflight_path: Path,
 ) -> dict[str, object]:
     if not state_path.exists():
-        return _new_state(configuration, incumbents, audit_path, preflight_path)
+        return _new_state(configuration, audit_path, preflight_path)
     state = json.loads(state_path.read_text(encoding="utf-8"))
     _reject_test_derived_metadata(state, "Stage-5 state")
     if (
@@ -1363,17 +1223,6 @@ def _load_state(
         or preflight.get("status") != "passed"
     ):
         raise ValueError("Stage-5 routing identity preflight provenance changed")
-    for seed, (run, provenance) in incumbents.items():
-        recorded = state.get("incumbent_runs", {}).get(str(seed))
-        expected = {
-            "run_dir": str(run.run_dir),
-            "primary_validation_ic": run.primary_ic,
-            "producing_git_commit_sha": run.producing_git_commit_sha,
-            "output_sha256": run.output_sha256,
-            "source_provenance": provenance,
-        }
-        if recorded != expected:
-            raise ValueError(f"Stage-5 incumbent provenance changed for seed {seed}")
     return state
 
 
@@ -1526,9 +1375,7 @@ def _candidate_runs(
 ) -> tuple[CompletedRun, ...]:
     candidates = set()
     if isinstance(job.get("run_dir"), str):
-        recorded = Path(str(job["run_dir"]))
-        if recorded.is_dir():
-            candidates.add(recorded.resolve())
+        candidates.add(Path(str(job["run_dir"])).resolve())
     for run_dir in _production_run_directories():
         manifest_path = run_dir / "run_manifest.json"
         if not manifest_path.is_file():
@@ -1552,6 +1399,11 @@ def _candidate_runs(
         ):
             candidates.add(run_dir)
     completed = []
+    bound_run = (
+        Path(str(job["run_dir"])).resolve()
+        if isinstance(job.get("run_dir"), str)
+        else None
+    )
     for run_dir in sorted(candidates):
         try:
             completed.append(
@@ -1567,7 +1419,12 @@ def _candidate_runs(
                     run_profile_name="experiment",
                 )
             )
-        except (FileNotFoundError, KeyError, OSError, TypeError, ValueError):
+        except (FileNotFoundError, KeyError, OSError, TypeError, ValueError) as error:
+            if bound_run == run_dir:
+                raise ValueError(
+                    f"Stage-5 job {job['job_id']} rejected its bound run "
+                    f"{run_dir}: {error}"
+                ) from error
             continue
     return tuple(completed)
 
@@ -1762,7 +1619,6 @@ def _assert_invocation_identity(
     commit: str,
     feature_store: Path,
     configuration: dict[str, object],
-    peer_primary_state: Path,
     audit_path: Path,
     preflight_path: Path,
     state: dict[str, object],
@@ -1772,8 +1628,7 @@ def _assert_invocation_identity(
     current_identity = _feature_store_identity(current_store)
     current_profile = resolve_run_profile("experiment", current_store)
     session = configuration.get("session_preparation")
-    source = configuration["source_peer_primary"]
-    if not isinstance(source, dict) or not isinstance(session, dict):
+    if not isinstance(session, dict):
         raise ValueError("Invocation provenance is malformed")
     session_path = Path(str(session.get("path"))).resolve()
     if (
@@ -1784,13 +1639,10 @@ def _assert_invocation_identity(
         or not feature_store.samefile(current_store)
         or current_profile.metadata() != configuration.get("run_profile")
         or _sha256(session_path) != session.get("sha256")
-        or _sha256(peer_primary_state) != source["resolved_state_sha256"]
         or _sha256(audit_path) != state["realized_distribution_audit"]["sha256"]
         or _sha256(preflight_path) != state["routing_identity_preflight"]["sha256"]
     ):
-        raise RuntimeError(
-            "Git, incumbent source, audit, preflight, or feature store changed mid-run"
-        )
+        raise RuntimeError("Git, audit, preflight, or feature store changed mid-run")
 
 
 def _run_authorized_job(
@@ -1799,7 +1651,6 @@ def _run_authorized_job(
     specification: dict[str, object],
     feature_store: Path,
     commit: str,
-    peer_primary_state: Path,
     audit_path: Path,
     preflight_path: Path,
 ) -> CompletedRun:
@@ -1809,7 +1660,6 @@ def _run_authorized_job(
         commit,
         feature_store,
         state["configuration"],
-        peer_primary_state,
         audit_path,
         preflight_path,
         state,
@@ -1837,7 +1687,6 @@ def _run_adaptive_sequence(
     state_path: Path,
     feature_store: Path,
     commit: str,
-    peer_primary_state: Path,
     audit_path: Path,
     preflight_path: Path,
 ) -> None:
@@ -1848,7 +1697,6 @@ def _run_adaptive_sequence(
         control_job(29),
         feature_store,
         commit,
-        peer_primary_state,
         audit_path,
         preflight_path,
     )
@@ -1859,7 +1707,6 @@ def _run_adaptive_sequence(
         issuer_job(29),
         feature_store,
         commit,
-        peer_primary_state,
         audit_path,
         preflight_path,
     )
@@ -1886,7 +1733,6 @@ def _run_adaptive_sequence(
                 control_job(seed),
                 feature_store,
                 commit,
-                peer_primary_state,
                 audit_path,
                 preflight_path,
             )
@@ -1896,7 +1742,6 @@ def _run_adaptive_sequence(
                 issuer_job(seed),
                 feature_store,
                 commit,
-                peer_primary_state,
                 audit_path,
                 preflight_path,
             )
@@ -1925,7 +1770,6 @@ def _run_adaptive_sequence(
             specification,
             feature_store,
             commit,
-            peer_primary_state,
             audit_path,
             preflight_path,
         )
@@ -1970,7 +1814,6 @@ def _run_adaptive_sequence(
             ),
             feature_store,
             commit,
-            peer_primary_state,
             audit_path,
             preflight_path,
         )
@@ -2019,7 +1862,6 @@ def _run_adaptive_sequence(
             ),
             feature_store,
             commit,
-            peer_primary_state,
             audit_path,
             preflight_path,
         )
@@ -2061,7 +1903,6 @@ def _run_adaptive_sequence(
             ),
             feature_store,
             commit,
-            peer_primary_state,
             audit_path,
             preflight_path,
         )
@@ -2124,7 +1965,6 @@ def _run_adaptive_sequence(
                     control_job(seed),
                     feature_store,
                     commit,
-                    peer_primary_state,
                     audit_path,
                     preflight_path,
                 )
@@ -2139,7 +1979,6 @@ def _run_adaptive_sequence(
                 ),
                 feature_store,
                 commit,
-                peer_primary_state,
                 audit_path,
                 preflight_path,
             )
@@ -2227,8 +2066,6 @@ def _summary_markdown(summary: dict[str, object]) -> str:
 
 def _completed_run_paths_payload(state: dict[str, object]) -> dict[str, object]:
     return {
-        "source_peer_primary": state["configuration"]["source_peer_primary"],
-        "incumbents": state["incumbent_runs"],
         "completed_jobs": [
             {
                 "job_id": job["job_id"],
@@ -2250,16 +2087,12 @@ def _completed_run_paths_payload(state: dict[str, object]) -> dict[str, object]:
     }
 
 
-def _runbook_text(state_dir: Path, peer_primary_state: Path) -> str:
+def _runbook_text(state_dir: Path) -> str:
     module = "brazil_rv.modeling.stage5_context_routing"
     repository = shlex.quote(str(_RESEARCH))
     state = shlex.quote(str(state_dir))
-    peer = shlex.quote(str(peer_primary_state))
     pointer = shlex.quote(str(OUTPUT_POINTER))
-    common = (
-        f"uv run --frozen python -m {module} --state-dir {state} "
-        f"--peer-primary-state {peer}"
-    )
+    common = f"uv run --frozen python -m {module} --state-dir {state}"
     return (
         "# Operator runbook\n\n"
         "The primary commands below are for Ubuntu/bash on the single GH200 host. "
@@ -2428,7 +2261,6 @@ def _finalize_outputs(state_dir: Path, state: dict[str, object]) -> None:
         state_dir / ARTIFACT_HASHES_JSON,
         {
             "experiment_name": EXPERIMENT_NAME,
-            "source_provenance": state["configuration"]["source_peer_primary"],
             "payload_sha256": payload_hashes,
             "run_output_sha256": {
                 job["job_id"]: job["output_sha256"]
@@ -2450,7 +2282,7 @@ def _finalize_outputs(state_dir: Path, state: dict[str, object]) -> None:
     )
 
 
-def dry_run_payload(peer_primary_state: Path) -> dict[str, object]:
+def dry_run_payload() -> dict[str, object]:
     commit, clean = _git_identity(require_clean=False)
     feature_store = resolve_feature_store().resolve()
     run_profile = resolve_run_profile("experiment", feature_store)
@@ -2468,7 +2300,6 @@ def dry_run_payload(peer_primary_state: Path) -> dict[str, object]:
         "worktree_clean": clean,
         "orchestrator_git_commit_sha": commit,
         "resolved_feature_store_path": str(feature_store),
-        "source_peer_primary_state": str(peer_primary_state.resolve()),
         "run_profile": run_profile.metadata(),
         "routing_identity_preflight": preflight_identity,
         "execution_order": [
@@ -2479,7 +2310,6 @@ def dry_run_payload(peer_primary_state: Path) -> dict[str, object]:
             "session_validation_and_cache_warmup",
             "train_and_validation_input_filtering",
             "realized_distribution_audit",
-            "incumbent_resolution",
             "adaptive_training_sequence",
         ],
         "control_runs": {
@@ -2517,7 +2347,7 @@ def format_dry_run(payload: dict[str, object]) -> str:
         (
             f"execution order: {order}",
             "routing identity preflight: eager + compiled, 3 SAM steps",
-            "incumbent resolution occurs only after preflight, session, and audit",
+            "fresh matched controls are trained within this Stage-5 session",
             (
                 f"matched control runs: min={controls['minimum']} "
                 f"max={controls['maximum']}"
@@ -2557,7 +2387,7 @@ def status_payload(state_dir: Path) -> dict[str, object]:
     }
 
 
-def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
+def run_experiment(state_dir: Path) -> Path:
     commit, _ = _git_identity(require_clean=True)
     feature_store = resolve_feature_store().resolve()
     state_dir = state_dir.resolve()
@@ -2567,9 +2397,7 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
         )
     state_dir.mkdir(parents=True, exist_ok=True)
     state_path = state_dir / "state.json"
-    _atomic_write_text(
-        state_dir / RUNBOOK, _runbook_text(state_dir, peer_primary_state)
-    )
+    _atomic_write_text(state_dir / RUNBOOK, _runbook_text(state_dir))
 
     with exclusive_process_lock(state_dir / "experiment.lock", EXPERIMENT_NAME):
         identity_started = time.perf_counter()
@@ -2632,12 +2460,8 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
         configuration = _configuration(
             commit,
             feature_store,
-            peer_primary_state,
             run_profile,
             session_path,
-        )
-        incumbents_with_provenance = _source_incumbents(
-            peer_primary_state, feature_store
         )
         log_path = state_dir / EXPERIMENT_LOG
         if not log_path.exists():
@@ -2645,7 +2469,6 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
         state = _load_state(
             state_path,
             configuration,
-            incumbents_with_provenance,
             audit_path,
             preflight_path,
         )
@@ -2668,7 +2491,6 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
             state_path,
             feature_store,
             commit,
-            peer_primary_state,
             audit_path,
             preflight_path,
         )
@@ -2683,7 +2505,6 @@ def run_experiment(state_dir: Path, peer_primary_state: Path) -> Path:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--state-dir", required=True, type=Path)
-    parser.add_argument("--peer-primary-state", type=Path)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true")
     mode.add_argument("--status", action="store_true")
@@ -2695,11 +2516,10 @@ def main() -> None:
     if args.status:
         print(json.dumps(status_payload(args.state_dir), indent=2), flush=True)
         return
-    peer_primary_state = resolve_peer_primary_state(args.peer_primary_state)
     if args.dry_run:
-        print(format_dry_run(dry_run_payload(peer_primary_state)), flush=True)
+        print(format_dry_run(dry_run_payload()), flush=True)
         return
-    state_path = run_experiment(args.state_dir.resolve(), peer_primary_state)
+    state_path = run_experiment(args.state_dir.resolve())
     print(f"Stage-5 context-routing experiment completed: {state_path}", flush=True)
 
 
