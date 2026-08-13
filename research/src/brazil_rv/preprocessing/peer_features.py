@@ -9,7 +9,6 @@ from numpy.typing import NDArray
 from .contract import PRICE_FEATURE_CLIP
 from .transforms import centered_midranks, leave_one_out_medians
 
-SELECTED_RELATIONS = ("SECTOR", "SUBSECTOR")
 VALIDITY_TO_FEATURE_CHANNELS = ((0, 2), (1, 3), (4,), (5,))
 
 

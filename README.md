@@ -1,9 +1,9 @@
-﻿# B3 Quant Research
+# B3 Quant Research
 
-Native-Windows data collection and research environment for Brazilian market data.
+Native-Windows collection and offline research for Brazilian M1 market data.
 
-## Directories
+- `collector/`: MT5 and broker acquisition
+- `research/`: feature engineering, neural modeling, evaluation, and attribution
+- `ops/`: Lambda GH200 availability and reviewed-instance bootstrap
 
-- collector: MT5 and broker data acquisition
-- research: feature engineering, backtesting, and PyTorch models
-- external data root: C:\quant-data\b3
+See [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) for current causality, model, held-out, command, and operational contracts.

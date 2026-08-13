@@ -18,7 +18,6 @@ from .contract import (
 from .data import create_evaluation_loader, load_sample_index, select_sample_split
 from .engine import EvaluationObservations, collect_evaluation_observations
 from .model import build_neural_model
-from .xgboost_model import evaluate_saved_xgboost
 
 REQUIRED_CHECKPOINT_KEYS = {
     "model_name",
@@ -53,8 +52,10 @@ def _atomic_json(path: Path, value: dict[str, object]) -> None:
 def load_current_neural_run(
     run_dir: Path,
 ) -> tuple[torch.nn.Module, dict[str, object], Path]:
-    checkpoint_path = run_dir / "best_checkpoint.pt"
-    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    torch.set_float32_matmul_precision("high")
+    checkpoint = torch.load(
+        run_dir / "best_checkpoint.pt", map_location="cpu", weights_only=False
+    )
     missing = REQUIRED_CHECKPOINT_KEYS - set(checkpoint)
     if missing:
         raise ValueError(f"Checkpoint is missing required keys: {sorted(missing)}")
@@ -131,29 +132,14 @@ def evaluate_run(run_dir: Path, split: str) -> Path:
         run_dir / f"evaluation_{split}_{datetime.now(timezone.utc):%Y%m%dT%H%M%S%fZ}"
     )
     output.mkdir(exist_ok=False)
-    if manifest.get("model", {}).get("model_name") == "xgboost":
-        store = Path(str(manifest["feature_store"]))
-        sample_index = load_sample_index(store)
-        training_rows = select_sample_split(sample_index, "train")
-        rows = select_sample_split(sample_index, split)
-        _, summary, daily, predictions = evaluate_saved_xgboost(
-            store,
-            training_rows,
-            rows,
-            manifest["global_context"],
-            run_dir,
-            output,
-        )
-        predictions.write_parquet(output / "predictions.parquet")
-    else:
-        observations, summary, daily, _, _ = collect_neural_evaluation(run_dir, split)
-        pl.DataFrame(
-            {
-                "sample_id": observations.sample_id,
-                "date_idx": observations.date_idx,
-                "decision_idx": observations.decision_idx,
-            }
-        ).write_parquet(output / "sample_index.parquet")
+    observations, summary, daily, _, _ = collect_neural_evaluation(run_dir, split)
+    pl.DataFrame(
+        {
+            "sample_id": observations.sample_id,
+            "date_idx": observations.date_idx,
+            "decision_idx": observations.decision_idx,
+        }
+    ).write_parquet(output / "sample_index.parquet")
     _atomic_json(output / "metrics.json", summary)
     pl.DataFrame(daily).write_parquet(output / "daily_metrics.parquet")
     _atomic_json(
