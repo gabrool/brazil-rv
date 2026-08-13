@@ -30,6 +30,7 @@ from .contract import (
     TARGETED_FUSION_GATE_BIAS,
     STATE_TOKEN_SLOT,
     TCNArchitecture,
+    routing_enabled,
     validate_peer_feature_mode,
 )
 from .layers import CausalTCNResidualBlock, MuonLinear, SwiGLU
@@ -46,54 +47,82 @@ def apply_context_film(
     return (1.0 + torch.tanh(gamma_total)) * hidden + beta_total
 
 
-class _ContextRoutingScaffold(nn.Module):
+class _ContextRouting(nn.Module):
     def __init__(self, architecture: TCNArchitecture) -> None:
         super().__init__()
         width = architecture.width
         rank = architecture.context_routing_rank
-        if rank is None:
-            raise ValueError("factorial_v1 routing requires a conditioner rank")
-        self.equity_slow_projection = nn.Linear(
-            architecture.slow_width, width, bias=False
+        slow = architecture.slow_routing
+        macro = architecture.macro_temporal_routing
+        slow_enabled = slow != "late_only"
+        self.equity_slow_projection = (
+            nn.Linear(architecture.slow_width, width, bias=False)
+            if slow_enabled
+            else None
         )
-        self.macro_slow_projection = nn.Linear(
-            CONTEXT_ROUTING_MACRO_SLOW_INPUT_WIDTH,
-            width,
-            bias=False,
+        self.macro_slow_projection = (
+            nn.Linear(CONTEXT_ROUTING_MACRO_SLOW_INPUT_WIDTH, width, bias=False)
+            if slow_enabled
+            else None
         )
-        self.slow_condition_norm = nn.LayerNorm(width)
-        self.slow_early_input_adapter = nn.Linear(width, width, bias=False)
-        self.macro_early_input_projection = nn.Linear(
-            CONTEXT_ROUTING_SOURCE_COUNT * CONTEXT_ROUTING_MACRO_EARLY_SOURCE_WIDTH,
-            width,
-            bias=False,
+        self.slow_condition_norm = nn.LayerNorm(width) if slow_enabled else None
+        self.slow_early_input_adapter = (
+            nn.Linear(width, width, bias=False)
+            if slow in ("early_concat", "early_concat_film")
+            else None
         )
-        self.macro_early_activation = nn.SiLU()
-        self.macro_early_norm = nn.LayerNorm(width, elementwise_affine=False)
-        self.macro_early_output_projection = nn.Linear(width, width, bias=False)
-        self.slow_film = nn.ModuleList(
-            [
-                nn.Linear(width, 2 * width, bias=False)
-                for _ in range(architecture.residual_blocks)
-            ]
+        self.slow_film = (
+            nn.ModuleList(
+                [
+                    nn.Linear(width, 2 * width, bias=False)
+                    for _ in range(architecture.residual_blocks)
+                ]
+            )
+            if slow in ("film", "early_concat_film")
+            else None
         )
-        self.macro_film = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Linear(CONTEXT_ROUTING_SOURCE_COUNT * width, rank, bias=False),
-                    nn.SiLU(),
-                    nn.Linear(rank, 2 * width, bias=False),
-                )
-                for _ in range(architecture.residual_blocks)
-            ]
+        if macro in ("early_concat", "early_concat_film"):
+            self.macro_early_input_projection = nn.Linear(
+                CONTEXT_ROUTING_SOURCE_COUNT * CONTEXT_ROUTING_MACRO_EARLY_SOURCE_WIDTH,
+                width,
+                bias=False,
+            )
+            self.macro_early_activation = nn.SiLU()
+            self.macro_early_norm = nn.LayerNorm(width, elementwise_affine=False)
+            self.macro_early_output_projection = nn.Linear(width, width, bias=False)
+        else:
+            self.macro_early_input_projection = None
+            self.macro_early_activation = None
+            self.macro_early_norm = None
+            self.macro_early_output_projection = None
+        self.macro_film = (
+            nn.ModuleList(
+                [
+                    nn.Sequential(
+                        nn.Linear(
+                            CONTEXT_ROUTING_SOURCE_COUNT * width, rank, bias=False
+                        ),
+                        nn.SiLU(),
+                        nn.Linear(rank, 2 * width, bias=False),
+                    )
+                    for _ in range(architecture.residual_blocks)
+                ]
+            )
+            if macro in ("film", "early_concat_film")
+            else None
         )
 
     def zero_final_projections(self) -> None:
-        nn.init.zeros_(self.slow_early_input_adapter.weight)
-        nn.init.zeros_(self.macro_early_output_projection.weight)
-        for slow, macro in zip(self.slow_film, self.macro_film, strict=True):
-            nn.init.zeros_(slow.weight)
-            nn.init.zeros_(macro[-1].weight)
+        if self.slow_early_input_adapter is not None:
+            nn.init.zeros_(self.slow_early_input_adapter.weight)
+        if self.macro_early_output_projection is not None:
+            nn.init.zeros_(self.macro_early_output_projection.weight)
+        if self.slow_film is not None:
+            for layer in self.slow_film:
+                nn.init.zeros_(layer.weight)
+        if self.macro_film is not None:
+            for layer in self.macro_film:
+                nn.init.zeros_(layer[-1].weight)
 
 
 class SharedCausalTCN(nn.Module):
@@ -154,10 +183,10 @@ class SharedCausalTCN(nn.Module):
                 self.peer_adapter = nn.Linear(PEER_STATE_WIDTH, width, bias=False)
                 nn.init.zeros_(self.peer_adapter.weight)
 
-        self.routing: _ContextRoutingScaffold | None = None
-        if architecture.context_routing_experiment == "factorial_v1":
+        self.routing: _ContextRouting | None = None
+        if routing_enabled(architecture):
             with torch.random.fork_rng(devices=[]):
-                self.routing = _ContextRoutingScaffold(architecture)
+                self.routing = _ContextRouting(architecture)
                 self.routing.apply(self._initialize_module)
                 self.routing.zero_final_projections()
 
@@ -204,7 +233,10 @@ class SharedCausalTCN(nn.Module):
         instrument_mask: torch.Tensor,
     ) -> torch.Tensor:
         if self.routing is None:
-            raise AssertionError("Slow condition requires factorial routing")
+            raise AssertionError("Slow condition requires active routing")
+        assert self.routing.equity_slow_projection is not None
+        assert self.routing.macro_slow_projection is not None
+        assert self.routing.slow_condition_norm is not None
         local_start = self.equity_count + 1
         local_stop = self.equity_count + LOCAL_CONTEXT_COUNT
         global_start = self.equity_count + LOCAL_CONTEXT_COUNT + 2
@@ -275,7 +307,11 @@ class SharedCausalTCN(nn.Module):
 
     def _macro_early_input(self, macro_input: torch.Tensor) -> torch.Tensor:
         if self.routing is None:
-            raise AssertionError("Macro early input requires factorial routing")
+            raise AssertionError("Macro early input requires active routing")
+        assert self.routing.macro_early_input_projection is not None
+        assert self.routing.macro_early_activation is not None
+        assert self.routing.macro_early_norm is not None
+        assert self.routing.macro_early_output_projection is not None
         latent = self.routing.macro_early_input_projection(macro_input)
         latent = self.routing.macro_early_activation(latent)
         latent = self.routing.macro_early_norm(latent)
@@ -291,7 +327,7 @@ class SharedCausalTCN(nn.Module):
         slow_condition: torch.Tensor | None,
     ) -> torch.Tensor:
         if self.routing is None:
-            raise AssertionError("FiLM requires factorial routing")
+            raise AssertionError("FiLM requires active routing")
         architecture = self.architecture
         batch_size = history_patch_mask.shape[0]
         streams = hidden.reshape(
@@ -305,6 +341,7 @@ class SharedCausalTCN(nn.Module):
         if self._route_has_film(architecture.slow_routing):
             if slow_condition is None:
                 raise AssertionError("Slow FiLM requires the slow condition")
+            assert self.routing.slow_film is not None
             parameters = self.routing.slow_film[block_index](slow_condition)
             slow_gamma, slow_beta = parameters.chunk(2, dim=-1)
             slow_valid = history_patch_mask[:, : self.equity_count, :, None].permute(
@@ -322,6 +359,7 @@ class SharedCausalTCN(nn.Module):
                 history_patch_mask.shape[2],
                 CONTEXT_ROUTING_SOURCE_COUNT * architecture.width,
             )
+            assert self.routing.macro_film is not None
             parameters = self.routing.macro_film[block_index](macro_input)
             macro_gamma, macro_beta = parameters.chunk(2, dim=-1)
             macro_gamma = macro_gamma.permute(0, 2, 1)[:, None]
