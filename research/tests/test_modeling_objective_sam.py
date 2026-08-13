@@ -581,9 +581,7 @@ def test_worker_timing_reaches_epoch_profile_but_not_device_batches(
     )
 
     performance = result["performance"]
-    assert performance["worker_batch_construction_seconds_sum"] == pytest.approx(
-        0.36
-    )
+    assert performance["worker_batch_construction_seconds_sum"] == pytest.approx(0.36)
     assert performance["worker_timing_scope"] == (
         "sum_across_workers_may_overlap_wall_time"
     )
@@ -591,9 +589,7 @@ def test_worker_timing_reaches_epoch_profile_but_not_device_batches(
         "physical_microbatch_unique_decision_counts": [1] * 8,
         "effective_batch_unique_decision_counts": [3],
     }
-    assert all(
-        BATCH_CONSTRUCTION_SECONDS_KEY not in keys for keys in transferred_keys
-    )
+    assert all(BATCH_CONSTRUCTION_SECONDS_KEY not in keys for keys in transferred_keys)
 
 
 def test_profiler_trace_is_bounded_parseable_hashed_and_atomically_replaced(
@@ -612,9 +608,7 @@ def test_profiler_trace_is_bounded_parseable_hashed_and_atomically_replaced(
                 encoding="utf-8",
             )
 
-    monkeypatch.setattr(
-        engine.torch.profiler, "profile", lambda **_: FakeProfiler()
-    )
+    monkeypatch.setattr(engine.torch.profiler, "profile", lambda **_: FakeProfiler())
     replacements: list[tuple[Path, Path]] = []
     replace = engine.os.replace
 
@@ -631,9 +625,7 @@ def test_profiler_trace_is_bounded_parseable_hashed_and_atomically_replaced(
     assert result == {"completed": True}
     assert json.loads(trace_path.read_text(encoding="utf-8"))["traceEvents"]
     assert metadata["filename"] == engine.PROFILER_TRACE_FILENAME
-    assert metadata["scope"] == (
-        "first_completed_effective_training_update_of_epoch_1"
-    )
+    assert metadata["scope"] == ("first_completed_effective_training_update_of_epoch_1")
     assert metadata["profiled_epoch"] == 1
     assert metadata["effective_update_index"] == 0
     assert metadata["sha256"] == engine._sha256_file(trace_path)

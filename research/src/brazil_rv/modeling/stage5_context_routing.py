@@ -523,8 +523,7 @@ def _validate_performance_profile(
     if (
         profile["version"] != PERFORMANCE_PROFILE_VERSION
         or profile["run_profile"] != "experiment"
-        or profile["run_profile_identity_sha256"]
-        != expected_profile_identity_sha256
+        or profile["run_profile_identity_sha256"] != expected_profile_identity_sha256
         or profile["measurement_contract"] != expected_contract
     ):
         raise ValueError("Run performance profile has a mismatched identity or policy")
@@ -748,8 +747,7 @@ def _validate_performance_profile(
     )
     if (
         trace["filename"] != PROFILER_TRACE_FILENAME
-        or trace["scope"]
-        != "first_completed_effective_training_update_of_epoch_1"
+        or trace["scope"] != "first_completed_effective_training_update_of_epoch_1"
         or trace["profiled_epoch"] != 1
         or trace["effective_update_index"] != 0
         or not isinstance(trace["sha256"], str)
@@ -804,10 +802,10 @@ def _validate_performance_profile(
         _nonnegative_number(whole[name], f"Whole-run {name}")
     _nonnegative_integer(whole["h2d_bytes"], "Whole-run H2D bytes")
     _same_total(float(whole["training_wall_seconds"]), training_total, "Training")
+    _same_total(float(whole["validation_wall_seconds"]), validation_total, "Validation")
     _same_total(
-        float(whole["validation_wall_seconds"]), validation_total, "Validation"
+        float(whole["artifact_io_wall_seconds"]), artifact_total, "Artifact I/O"
     )
-    _same_total(float(whole["artifact_io_wall_seconds"]), artifact_total, "Artifact I/O")
     if whole["h2d_bytes"] != h2d_total:
         raise ValueError("Whole-run H2D bytes are inconsistent")
     if float(whole["run_wall_seconds"]) + 1e-12 < (
@@ -823,9 +821,7 @@ def _validate_performance_profile(
     if (
         _nonnegative_integer(peak["allocated_bytes"], "Peak allocated CUDA bytes")
         != allocated_peak
-        or _nonnegative_integer(
-            peak["reserved_bytes"], "Peak reserved CUDA bytes"
-        )
+        or _nonnegative_integer(peak["reserved_bytes"], "Peak reserved CUDA bytes")
         != reserved_peak
     ):
         raise ValueError("Whole-run peak CUDA memory is inconsistent")
@@ -857,9 +853,7 @@ def validate_completed_run(
         if recorded_profile != expected_profile.metadata():
             raise ValueError("Stage-5 run has a mismatched experiment profile")
         validate_run_profile_artifact(run_dir / "run_profile.json", expected_profile)
-        _validate_performance_profile(
-            run_dir, expected_profile.identity_sha256
-        )
+        _validate_performance_profile(run_dir, expected_profile.identity_sha256)
     elif (
         recorded_profile is not None and recorded_profile != expected_profile.metadata()
     ):
@@ -2313,9 +2307,7 @@ def _session_performance_payload(state: dict[str, object]) -> dict[str, object]:
         "run_wall_seconds": 0.0,
         "h2d_bytes": 0,
     }
-    expected_identity = str(
-        state["configuration"]["run_profile_identity_sha256"]
-    )
+    expected_identity = str(state["configuration"]["run_profile_identity_sha256"])
     for job in [
         *state["control_jobs"],
         *state["issuer_jobs"],
@@ -2330,8 +2322,7 @@ def _session_performance_payload(state: dict[str, object]) -> dict[str, object]:
         recorded_hashes = job.get("output_sha256")
         if (
             not isinstance(recorded_hashes, dict)
-            or recorded_hashes.get("performance_profile.json")
-            != _sha256(profile_path)
+            or recorded_hashes.get("performance_profile.json") != _sha256(profile_path)
             or recorded_hashes.get(PROFILER_TRACE_FILENAME) != _sha256(trace_path)
         ):
             raise ValueError("Completed job performance provenance changed")

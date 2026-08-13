@@ -656,8 +656,7 @@ def _model_transfer_keys(batch: dict[str, torch.Tensor]) -> tuple[str, ...]:
         return tuple(
             key
             for key, value in batch.items()
-            if key != BATCH_CONSTRUCTION_SECONDS_KEY
-            and isinstance(value, torch.Tensor)
+            if key != BATCH_CONSTRUCTION_SECONDS_KEY and isinstance(value, torch.Tensor)
         )
     if "peer_state" in batch:
         model_keys = (*model_keys, "peer_state")
@@ -1159,15 +1158,13 @@ def _run_sam_update(
     optimizer.zero_grad(set_to_none=True)
     try:
         with _cuda_phase(phase_recorder, "sam_first_forward_backward"):
-            first_loss_sum, first_predictions_finite = (
-                _accumulate_objective_gradients(
-                    model,
-                    effective_batch,
-                    objective,
-                    temperature,
-                    loss_count,
-                    check_predictions_finite=check_predictions_finite,
-                )
+            first_loss_sum, first_predictions_finite = _accumulate_objective_gradients(
+                model,
+                effective_batch,
+                objective,
+                temperature,
+                loss_count,
+                check_predictions_finite=check_predictions_finite,
             )
             first_pass_end_rng = _rng_state(model)
             first_gradient_norm = _gradient_l2_norm(model)
@@ -1207,9 +1204,7 @@ def _run_sam_update(
                 )
                 second_pass_end_rng = _rng_state(model)
         finally:
-            with _cuda_phase(
-                phase_recorder, "sam_exact_parameter_restoration"
-            ):
+            with _cuda_phase(phase_recorder, "sam_exact_parameter_restoration"):
                 _restore_parameters(parameters, initial_parameters)
 
         restoration_exact, restored_finite = _host_flags(
@@ -1306,7 +1301,9 @@ def run_effective_batch_update(
             raise ValueError("Effective batch contains no valid objective unit")
         if optimizer_variant == "adamw":
             if sam_observer is not None:
-                raise ValueError("A SAM observer requires optimizer_variant='sam_adamw'")
+                raise ValueError(
+                    "A SAM observer requires optimizer_variant='sam_adamw'"
+                )
             result = _run_adamw_update(
                 model,
                 device_effective_batch,
@@ -1470,8 +1467,9 @@ def train_one_epoch(
                 {
                     int(value)
                     for batch in effective_batch
-                    for value in batch.get("decision_idx", torch.empty(0, dtype=torch.long))
-                    .tolist()
+                    for value in batch.get(
+                        "decision_idx", torch.empty(0, dtype=torch.long)
+                    ).tolist()
                     if int(value) >= 0
                 }
             )
@@ -1649,7 +1647,11 @@ def collect_evaluation_observations(
             worker_construction_seconds += _worker_construction_seconds(cpu_batch)
             batch_bytes = _batch_h2d_bytes(cpu_batch)
             h2d_bytes += batch_bytes
-            recorder = _CudaPhaseRecorder() if profile_first_batch and batch_index == 0 else None
+            recorder = (
+                _CudaPhaseRecorder()
+                if profile_first_batch and batch_index == 0
+                else None
+            )
             enqueue_started = time.perf_counter()
             with _cuda_phase(recorder, "h2d_transfer"):
                 batch = _to_cuda(cpu_batch)
