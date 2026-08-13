@@ -10,6 +10,7 @@ import pytest
 import torch
 
 import brazil_rv.modeling.data as modeling_data
+import brazil_rv.modeling.run_profiles as run_profiles
 from brazil_rv.modeling.contract import CONTEXT_COUNT, EQUITY_COUNT
 from brazil_rv.modeling.data import (
     DecisionGroupedPaddedBatchSampler,
@@ -24,6 +25,8 @@ from brazil_rv.modeling.routing_identity_preflight import (
 from brazil_rv.modeling.run_profiles import (
     EXPERIMENT_DECISION_INDICES,
     RUN_PROFILE_SCHEMA_VERSION,
+    _resolved_universe,
+    _single_portable_match,
     filter_profile_rows,
     resolve_run_profile,
     validate_run_profile_artifact,
@@ -83,6 +86,86 @@ def _profile_store(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return store
+
+
+def _universe_manifest(recorded: str) -> dict[str, object]:
+    return {"canonical_inputs": {"point_in_time_universe": {"resolved_path": recorded}}}
+
+
+def test_pit_universe_resolves_native_and_windows_quant_data_suffix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    native = tmp_path / "native-pit"
+    native.mkdir()
+    assert _resolved_universe(_universe_manifest(str(native))) == native.resolve()
+
+    monkeypatch.setattr(run_profiles, "PROJECT_ROOT", tmp_path)
+    mapped = tmp_path / "quant-data" / "b3" / "interim" / "universe" / "pit-2026"
+    mapped.mkdir(parents=True)
+    recorded = r"D:\archive\quant-data\b3\interim\universe\pit-2026"
+    assert _resolved_universe(_universe_manifest(recorded)) == mapped.resolve()
+
+
+def test_pit_universe_pointer_fallback_uses_same_portable_exact_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(run_profiles, "PROJECT_ROOT", tmp_path)
+    expected = tmp_path / "quant-data" / "b3" / "interim" / "universe" / "pit-2026"
+    expected.mkdir(parents=True)
+    pointer = expected.parent / "pit_v1_canonical_path.txt"
+    pointer.write_text(
+        r"E:\canonical\quant-data\b3\interim\universe\pit-2026",
+        encoding="utf-8",
+    )
+    recorded = r"D:\old-host\universe\pit-2026"
+    assert _resolved_universe(_universe_manifest(recorded)) == expected.resolve()
+
+
+def test_pit_universe_resolution_fails_usefully_without_searching(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(run_profiles, "PROJECT_ROOT", tmp_path)
+    unrelated = tmp_path / "somewhere" / "nested" / "pit-2026"
+    unrelated.mkdir(parents=True)
+    recorded = r"D:\old-host\quant-data\b3\interim\universe\pit-2026"
+    with pytest.raises(FileNotFoundError) as raised:
+        _resolved_universe(_universe_manifest(recorded))
+    message = str(raised.value)
+    assert recorded in message
+    assert (
+        str(tmp_path / "quant-data" / "b3" / "interim" / "universe" / "pit-2026")
+        in message
+    )
+    assert str(unrelated) not in message
+
+
+def test_pit_universe_rejects_wrong_identity_and_ambiguous_exact_candidates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(run_profiles, "PROJECT_ROOT", tmp_path)
+    pointer = (
+        tmp_path
+        / "quant-data"
+        / "b3"
+        / "interim"
+        / "universe"
+        / "pit_v1_canonical_path.txt"
+    )
+    wrong = tmp_path / "wrong-name"
+    wrong.mkdir()
+    pointer.parent.mkdir(parents=True)
+    pointer.write_text(str(wrong), encoding="utf-8")
+    with pytest.raises(FileNotFoundError, match="manifest identity"):
+        _resolved_universe(_universe_manifest(str(tmp_path / "expected-name")))
+
+    first = tmp_path / "first" / "same-name"
+    second = tmp_path / "second" / "same-name"
+    first.mkdir(parents=True)
+    second.mkdir(parents=True)
+    checked: list[str] = []
+    with pytest.raises(ValueError, match="ambiguous"):
+        _single_portable_match((first, second), "same-name", checked)
+    assert checked == [str(first.resolve()), str(second.resolve())]
 
 
 def test_experiment_profile_is_training_only_deterministic_and_hashed(
