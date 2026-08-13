@@ -47,6 +47,8 @@ from .contract import (
     SOFT_RANK_STANDARDIZATION_EPS,
     SOFT_RANK_TEMPERATURES,
     SOFT_SPEARMAN_CORRELATION_EPS,
+    TCNArchitecture,
+    context_routing_metadata,
     TCNSettings,
     peer_feature_metadata,
     expected_trainable_parameter_count,
@@ -1435,6 +1437,11 @@ def checkpoint_payload(
             model_name, architecture, peer_features
         ),
         "peer_features": peer_feature_metadata(model_name, architecture, peer_features),
+        "context_routing": (
+            context_routing_metadata(architecture)
+            if isinstance(architecture, TCNArchitecture)
+            else None
+        ),
         "resolved_feature_store_path": str(feature_store),
         "feature_manifest_contract_version": feature_manifest["contract_version"],
         "global_context": global_context,

@@ -23,6 +23,8 @@ from .context_ablation import (
 )
 from .contract import (
     ALLOWED_SEEDS,
+    CONTEXT_ROUTING_EXPERIMENTS,
+    CONTEXT_ROUTING_MODES,
     DEFAULT_NEURAL_OBJECTIVE,
     EARLY_STOP_PATIENCE,
     EFFECTIVE_BATCH_SIZE,
@@ -57,6 +59,7 @@ from .contract import (
     XGBOOST_OBJECTIVE,
     architecture_for_model,
     expected_trainable_parameter_count,
+    context_routing_metadata,
     peer_feature_metadata,
 )
 from .data import (
@@ -127,6 +130,13 @@ def validate_cli_args(
         args.feature_ablation = "none"
     if not hasattr(args, "peer_features"):
         args.peer_features = "none"
+    for field in (
+        "slow_routing",
+        "macro_temporal_routing",
+        "context_routing_experiment",
+    ):
+        if not hasattr(args, field):
+            setattr(args, field, None)
     if args.peer_features != "none" and args.model != "tcn":
         parser.error("--peer-features is supported only for --model tcn")
     if args.model == "xgboost" and args.optimizer is not None:
@@ -151,6 +161,20 @@ def validate_cli_args(
         parser.error("--sam-rho is required for --optimizer sam_adamw")
     if args.optimizer == "adamw" and args.sam_rho is not None:
         parser.error("--sam-rho is forbidden for --optimizer adamw")
+    routing_values = (
+        args.slow_routing,
+        args.macro_temporal_routing,
+        args.context_routing_experiment,
+    )
+    if args.model == "tcn":
+        if args.slow_routing is None:
+            args.slow_routing = "late_only"
+        if args.macro_temporal_routing is None:
+            args.macro_temporal_routing = "late_only"
+        if args.context_routing_experiment is None:
+            args.context_routing_experiment = "legacy"
+    elif any(value is not None for value in routing_values):
+        parser.error("Context-routing arguments are supported only for --model tcn")
     tcn_values = (
         args.tcn_fusion,
         args.tcn_width,
@@ -173,6 +197,27 @@ def validate_cli_args(
         parser.error("--context-ablation is forbidden for context-free models")
     if args.global_context == "masked" and args.context_ablation != "none":
         parser.error("--global-context masked cannot be combined with an ablation")
+    settings = _tcn_settings_from_args(args)
+    if settings is not None and settings.context_routing_experiment == "factorial_v1":
+        frozen = (
+            settings.fusion == "context_pooled"
+            and settings.width == 64
+            and settings.receptive_field == "full"
+            and settings.block == "swiglu"
+            and args.peer_features == "selected"
+            and args.global_context == "enabled"
+            and args.context_ablation == "drop_win_and_global_non_rates"
+            and args.feature_ablation == "none"
+            and args.objective == "soft_spearman"
+            and args.temperature == 0.50
+            and args.optimizer == "sam_adamw"
+            and args.sam_rho == 0.125
+        )
+        if not frozen:
+            parser.error(
+                "factorial_v1 routing requires the frozen width-64 context_pooled "
+                "SwiGLU/full selected-peer incumbent configuration"
+            )
     return args
 
 
@@ -192,6 +237,11 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--tcn-width", type=int, choices=TCN_WIDTHS)
     parser.add_argument("--tcn-receptive-field", choices=TCN_RECEPTIVE_FIELDS)
     parser.add_argument("--tcn-block", choices=TCN_BLOCK_VARIANTS)
+    parser.add_argument("--slow-routing", choices=CONTEXT_ROUTING_MODES)
+    parser.add_argument("--macro-temporal-routing", choices=CONTEXT_ROUTING_MODES)
+    parser.add_argument(
+        "--context-routing-experiment", choices=CONTEXT_ROUTING_EXPERIMENTS
+    )
     parser.add_argument("--global-context", choices=GLOBAL_CONTEXT_SETTINGS)
     parser.add_argument(
         "--context-ablation", choices=CONTEXT_ABLATION_KEYS, default="none"
@@ -220,6 +270,9 @@ def _tcn_settings_from_args(args: argparse.Namespace) -> TCNSettings | None:
         width=args.tcn_width,
         receptive_field=args.tcn_receptive_field,
         block=args.tcn_block,
+        slow_routing=args.slow_routing,
+        macro_temporal_routing=args.macro_temporal_routing,
+        context_routing_experiment=args.context_routing_experiment,
     )
 
 
@@ -233,6 +286,11 @@ def _model_metadata(
         "model_name": model_name,
         "model_family": architecture.family,
         "tcn_settings": None if tcn_settings is None else asdict(tcn_settings),
+        "context_routing": (
+            context_routing_metadata(architecture)
+            if isinstance(architecture, TCNArchitecture)
+            else None
+        ),
         "architecture_constants": asdict(architecture),
         "parameter_count": expected_trainable_parameter_count(
             model_name, architecture, peer_features
@@ -272,6 +330,12 @@ def _run_directory_name(
             f"tcn_{tcn_settings.fusion}_w{tcn_settings.width}_"
             f"rf{tcn_settings.receptive_field}_b{tcn_settings.block}"
         )
+        if tcn_settings.context_routing_experiment != "legacy":
+            model_part += (
+                f"_routing-{tcn_settings.context_routing_experiment}"
+                f"_slow-{tcn_settings.slow_routing}"
+                f"_macro-{tcn_settings.macro_temporal_routing}"
+            )
     objective_part = f"_{objective}"
     optimizer_part = f"_{optimizer_variant}"
     rho_part = "" if sam_rho is None else f"_rho{experiment_decimal(sam_rho, 3)}"

@@ -4,8 +4,13 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from .context_routing import align_macro_histories, causal_patch_mask
 from .contract import (
     CONTEXT_COUNT,
+    CONTEXT_GENERIC_DYNAMIC_COUNT,
+    CONTEXT_ROUTING_PATCH_SOURCE_WIDTH,
+    CONTEXT_ROUTING_SOURCE_COUNT,
+    DYNAMIC_CHANNEL_COUNT,
     EQUITY_COUNT,
     HORIZON_COUNT,
     INSTRUMENT_COUNT,
@@ -13,6 +18,7 @@ from .contract import (
     MLP_DEPTH,
     MLP_SWIGLU_WIDTH,
     MLP_WIDTH,
+    PATCH_MINUTES,
     PEER_STATE_WIDTH,
     RESIDUAL_DROPOUT,
     RMS_NORM_EPS,
@@ -23,6 +29,54 @@ from .contract import (
     validate_peer_feature_mode,
 )
 from .layers import CausalTCNResidualBlock, MuonLinear, SwiGLU
+
+
+class _ContextRoutingScaffold(nn.Module):
+    def __init__(self, architecture: TCNArchitecture) -> None:
+        super().__init__()
+        width = architecture.width
+        rank = architecture.context_routing_rank
+        if rank is None:
+            raise ValueError("factorial_v1 routing requires a conditioner rank")
+        self.equity_slow_projection = nn.Linear(
+            architecture.slow_width, width, bias=False
+        )
+        self.macro_slow_projection = nn.Linear(
+            CONTEXT_ROUTING_SOURCE_COUNT * architecture.slow_width
+            + CONTEXT_ROUTING_SOURCE_COUNT,
+            width,
+            bias=False,
+        )
+        self.slow_condition_norm = nn.LayerNorm(width)
+        self.slow_early_input_adapter = nn.Linear(width, width, bias=False)
+        self.macro_early_input_projection = nn.Linear(
+            CONTEXT_ROUTING_SOURCE_COUNT * CONTEXT_ROUTING_PATCH_SOURCE_WIDTH,
+            width,
+            bias=False,
+        )
+        self.slow_film = nn.ModuleList(
+            [
+                nn.Linear(width, 2 * width, bias=False)
+                for _ in range(architecture.residual_blocks)
+            ]
+        )
+        self.macro_film = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Linear(CONTEXT_ROUTING_SOURCE_COUNT * width, rank, bias=False),
+                    nn.SiLU(),
+                    nn.Linear(rank, 2 * width, bias=False),
+                )
+                for _ in range(architecture.residual_blocks)
+            ]
+        )
+
+    def zero_final_projections(self) -> None:
+        nn.init.zeros_(self.slow_early_input_adapter.weight)
+        nn.init.zeros_(self.macro_early_input_projection.weight)
+        for slow, macro in zip(self.slow_film, self.macro_film, strict=True):
+            nn.init.zeros_(slow.weight)
+            nn.init.zeros_(macro[-1].weight)
 
 
 class SharedCausalTCN(nn.Module):
@@ -76,6 +130,13 @@ class SharedCausalTCN(nn.Module):
                 self.peer_adapter = nn.Linear(PEER_STATE_WIDTH, width, bias=False)
                 nn.init.zeros_(self.peer_adapter.weight)
 
+        self.routing: _ContextRoutingScaffold | None = None
+        if architecture.context_routing_experiment == "factorial_v1":
+            with torch.random.fork_rng(devices=[]):
+                self.routing = _ContextRoutingScaffold(architecture)
+                self.routing.apply(self._initialize_module)
+                self.routing.zero_final_projections()
+
     @staticmethod
     def _initialize_module(module: nn.Module) -> None:
         if isinstance(module, (nn.Linear, nn.Conv1d)):
@@ -86,10 +147,162 @@ class SharedCausalTCN(nn.Module):
             nn.init.ones_(module.weight)
             nn.init.zeros_(module.bias)
 
+    @staticmethod
+    def _route_has_early(route: str) -> bool:
+        return route in ("early_concat", "early_concat_film")
+
+    @staticmethod
+    def _route_has_film(route: str) -> bool:
+        return route in ("film", "early_concat_film")
+
+    @staticmethod
+    def _macro_sources(
+        values: torch.Tensor,
+        masks: torch.Tensor,
+        state_position: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        local_start = EQUITY_COUNT + 1
+        local_stop = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+        global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT + 2
+        global_stop = global_start + 2
+        return align_macro_histories(
+            values[:, local_start:local_stop],
+            values[:, global_start:global_stop],
+            state_position,
+            masks[:, local_start:local_stop],
+            masks[:, global_start:global_stop],
+        )
+
+    def _slow_condition(
+        self,
+        slow_features: torch.Tensor,
+        instrument_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.routing is None:
+            raise AssertionError("Slow condition requires factorial routing")
+        local_start = EQUITY_COUNT + 1
+        local_stop = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+        global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT + 2
+        global_stop = global_start + 2
+        macro_slow = torch.cat(
+            (
+                slow_features[:, local_start:local_stop],
+                slow_features[:, global_start:global_stop],
+            ),
+            dim=1,
+        )
+        macro_ready = torch.cat(
+            (
+                instrument_mask[:, local_start:local_stop],
+                instrument_mask[:, global_start:global_stop],
+            ),
+            dim=1,
+        )
+        macro_input = torch.cat(
+            (
+                macro_slow.reshape(macro_slow.shape[0], -1),
+                macro_ready.to(macro_slow.dtype),
+            ),
+            dim=-1,
+        )
+        equity = self.routing.equity_slow_projection(slow_features[:, :EQUITY_COUNT])
+        macro = self.routing.macro_slow_projection(macro_input)
+        return self.routing.slow_condition_norm(equity + macro[:, None, :])
+
+    def _macro_raw_input(
+        self,
+        patches: torch.Tensor,
+        history_patch_mask: torch.Tensor,
+        state_position: torch.Tensor,
+    ) -> torch.Tensor:
+        macro, _ = self._macro_sources(patches, history_patch_mask, state_position)
+        batch_size, source_count, patch_count, _ = macro.shape
+        meaningful = macro.reshape(
+            batch_size,
+            source_count,
+            patch_count,
+            PATCH_MINUTES,
+            DYNAMIC_CHANNEL_COUNT,
+        )[..., :CONTEXT_GENERIC_DYNAMIC_COUNT]
+        return (
+            meaningful.reshape(
+                batch_size,
+                source_count,
+                patch_count,
+                CONTEXT_ROUTING_PATCH_SOURCE_WIDTH,
+            )
+            .permute(0, 2, 1, 3)
+            .reshape(batch_size, patch_count, -1)
+        )
+
+    def _apply_film(
+        self,
+        hidden: torch.Tensor,
+        block_index: int,
+        history_patch_mask: torch.Tensor,
+        instrument_mask: torch.Tensor,
+        state_position: torch.Tensor,
+        slow_condition: torch.Tensor | None,
+    ) -> torch.Tensor:
+        if self.routing is None:
+            raise AssertionError("FiLM requires factorial routing")
+        architecture = self.architecture
+        batch_size = history_patch_mask.shape[0]
+        streams = hidden.reshape(
+            batch_size,
+            INSTRUMENT_COUNT,
+            architecture.width,
+            history_patch_mask.shape[2],
+        )
+        gamma: torch.Tensor | None = None
+        beta: torch.Tensor | None = None
+        if self._route_has_film(architecture.slow_routing):
+            if slow_condition is None:
+                raise AssertionError("Slow FiLM requires the slow condition")
+            parameters = self.routing.slow_film[block_index](slow_condition)
+            slow_gamma, slow_beta = parameters.chunk(2, dim=-1)
+            slow_valid = history_patch_mask[:, :EQUITY_COUNT, :, None].permute(
+                0, 1, 3, 2
+            )
+            gamma = slow_gamma[..., None] * slow_valid.to(slow_gamma.dtype)
+            beta = slow_beta[..., None] * slow_valid.to(slow_beta.dtype)
+        if self._route_has_film(architecture.macro_temporal_routing):
+            sequences = streams.permute(0, 1, 3, 2)
+            macro, _ = self._macro_sources(
+                sequences, history_patch_mask, state_position
+            )
+            macro_input = macro.permute(0, 2, 1, 3).reshape(
+                batch_size,
+                history_patch_mask.shape[2],
+                CONTEXT_ROUTING_SOURCE_COUNT * architecture.width,
+            )
+            parameters = self.routing.macro_film[block_index](macro_input)
+            macro_gamma, macro_beta = parameters.chunk(2, dim=-1)
+            macro_gamma = macro_gamma.permute(0, 2, 1)[:, None]
+            macro_beta = macro_beta.permute(0, 2, 1)[:, None]
+            macro_valid = (
+                causal_patch_mask(state_position)[:, None, None, :]
+                & instrument_mask[:, :EQUITY_COUNT, None, None]
+            )
+            macro_gamma = macro_gamma * macro_valid.to(macro_gamma.dtype)
+            macro_beta = macro_beta * macro_valid.to(macro_beta.dtype)
+            gamma = macro_gamma if gamma is None else gamma + macro_gamma
+            beta = macro_beta if beta is None else beta + macro_beta
+        if gamma is None or beta is None:
+            return hidden
+        equity = streams[:, :EQUITY_COUNT]
+        modulated = (1.0 + gamma) * equity + beta
+        return torch.cat((modulated, streams[:, EQUITY_COUNT:]), dim=1).reshape(
+            batch_size * INSTRUMENT_COUNT,
+            architecture.width,
+            history_patch_mask.shape[2],
+        )
+
     def _instrument_states(
         self,
         patches: torch.Tensor,
         history_patch_mask: torch.Tensor,
+        instrument_mask: torch.Tensor,
         slow_features: torch.Tensor,
         state_position: torch.Tensor,
     ) -> torch.Tensor:
@@ -102,17 +315,82 @@ class SharedCausalTCN(nn.Module):
         )
         patches = patches[:, :instrument_count]
         history_patch_mask = history_patch_mask[:, :instrument_count]
+        instrument_mask = instrument_mask[:, :instrument_count]
         slow_features = slow_features[:, :instrument_count]
         masked = patches * history_patch_mask[..., None].to(patches.dtype)
-        hidden = self.input_projection(masked).reshape(
-            batch_size * instrument_count, masked.shape[2], architecture.width
+        hidden = self.input_projection(masked).permute(0, 1, 3, 2)
+
+        slow_condition = None
+        if self.routing is not None and (
+            self._route_has_early(architecture.slow_routing)
+            or self._route_has_film(architecture.slow_routing)
+        ):
+            slow_condition = self._slow_condition(slow_features, instrument_mask)
+        if self.routing is not None and self._route_has_early(
+            architecture.slow_routing
+        ):
+            if slow_condition is None:
+                raise AssertionError("Slow early routing requires the slow condition")
+            slow_early = self.routing.slow_early_input_adapter(slow_condition)[
+                ..., None
+            ]
+            slow_valid = history_patch_mask[:, :EQUITY_COUNT, None, :].to(
+                slow_early.dtype
+            )
+            hidden = torch.cat(
+                (
+                    hidden[:, :EQUITY_COUNT] + slow_early * slow_valid,
+                    hidden[:, EQUITY_COUNT:],
+                ),
+                dim=1,
+            )
+        if self.routing is not None and self._route_has_early(
+            architecture.macro_temporal_routing
+        ):
+            macro_input = self._macro_raw_input(
+                patches, history_patch_mask, state_position
+            )
+            macro_early = self.routing.macro_early_input_projection(
+                macro_input
+            ).permute(0, 2, 1)[:, None]
+            macro_valid = (
+                causal_patch_mask(state_position)[:, None, None, :]
+                & instrument_mask[:, :EQUITY_COUNT, None, None]
+            )
+            hidden = torch.cat(
+                (
+                    hidden[:, :EQUITY_COUNT]
+                    + macro_early * macro_valid.to(macro_early.dtype),
+                    hidden[:, EQUITY_COUNT:],
+                ),
+                dim=1,
+            )
+
+        hidden = hidden.reshape(
+            batch_size * instrument_count,
+            architecture.width,
+            masked.shape[2],
         )
-        hidden = hidden.transpose(1, 2)
-        for block in self.blocks:
+        for block_index, block in enumerate(self.blocks):
             hidden = block(hidden)
-        hidden = hidden.transpose(1, 2).reshape(
-            batch_size, instrument_count, masked.shape[2], architecture.width
-        )
+            if self.routing is not None and (
+                self._route_has_film(architecture.slow_routing)
+                or self._route_has_film(architecture.macro_temporal_routing)
+            ):
+                hidden = self._apply_film(
+                    hidden,
+                    block_index,
+                    history_patch_mask,
+                    instrument_mask,
+                    state_position,
+                    slow_condition,
+                )
+        hidden = hidden.reshape(
+            batch_size,
+            instrument_count,
+            architecture.width,
+            masked.shape[2],
+        ).permute(0, 1, 3, 2)
         gather_positions = state_position[:, None].expand(-1, instrument_count)
         if instrument_count == INSTRUMENT_COUNT:
             global_slots = (
@@ -138,7 +416,11 @@ class SharedCausalTCN(nn.Module):
         peer_state: torch.Tensor | None = None,
     ) -> torch.Tensor:
         states = self._instrument_states(
-            patches, history_patch_mask, slow_features, state_position
+            patches,
+            history_patch_mask,
+            instrument_mask,
+            slow_features,
+            state_position,
         )
         equity_states = states[:, :EQUITY_COUNT]
         equity_mask = instrument_mask[:, :EQUITY_COUNT]

@@ -189,6 +189,37 @@ TCN_KERNEL_SIZE = 3
 TCN_FUSIONS = ("none", "context_only", "pooled_market", "context_pooled")
 TCN_WIDTHS = (64, 128, 192, 256)
 TCN_BLOCK_VARIANTS = ("gelu", "silu", "swiglu")
+CONTEXT_ROUTING_EXPERIMENTS = ("legacy", "factorial_v1")
+CONTEXT_ROUTING_MODES = (
+    "late_only",
+    "early_concat",
+    "film",
+    "early_concat_film",
+)
+CONTEXT_ROUTING_SCHEMA_VERSION = "TCN_CONTEXT_ROUTING_V1"
+CONTEXT_ROUTING_MACRO_SYMBOLS = (
+    "WDO$",
+    "DI1F27",
+    "DI1F28",
+    "DI1F29",
+    "DI1F31",
+    "DI1$N",
+    "ZT.v.0",
+    "ZN.v.0",
+)
+CONTEXT_ROUTING_LOCAL_SOURCE_COUNT = 6
+CONTEXT_ROUTING_GLOBAL_SOURCE_COUNT = 2
+CONTEXT_ROUTING_SOURCE_COUNT = (
+    CONTEXT_ROUTING_LOCAL_SOURCE_COUNT + CONTEXT_ROUTING_GLOBAL_SOURCE_COUNT
+)
+CONTEXT_ROUTING_PATCH_SOURCE_WIDTH = PATCH_MINUTES * CONTEXT_GENERIC_DYNAMIC_COUNT
+if (
+    CONTEXT_ROUTING_MACRO_SYMBOLS[:CONTEXT_ROUTING_LOCAL_SOURCE_COUNT]
+    != LOCAL_CONTEXT_SYMBOLS[1:]
+    or CONTEXT_ROUTING_MACRO_SYMBOLS[CONTEXT_ROUTING_LOCAL_SOURCE_COUNT:]
+    != GLOBAL_CONTEXT_SYMBOLS[2:4]
+):
+    raise ValueError("Context-routing symbols do not match their canonical slots")
 PEER_FEATURE_MODES = (
     "none",
     "masked_control",
@@ -474,6 +505,9 @@ class TCNSettings:
     width: int
     receptive_field: str
     block: str
+    slow_routing: str = "late_only"
+    macro_temporal_routing: str = "late_only"
+    context_routing_experiment: str = "legacy"
 
 
 BASELINE_TCN_SETTINGS = TCNSettings(
@@ -507,6 +541,10 @@ class TCNArchitecture:
     fusion_width: int
     dropout: float
     output_horizons: int
+    slow_routing: str = "late_only"
+    macro_temporal_routing: str = "late_only"
+    context_routing_experiment: str = "legacy"
+    context_routing_rank: int | None = None
 
 
 @dataclass(frozen=True)
@@ -643,6 +681,26 @@ def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
         ) from error
     if settings.block not in TCN_BLOCK_VARIANTS:
         raise ValueError(f"Invalid TCN block: {settings.block}")
+    if settings.slow_routing not in CONTEXT_ROUTING_MODES:
+        raise ValueError(f"Invalid slow routing: {settings.slow_routing}")
+    if settings.macro_temporal_routing not in CONTEXT_ROUTING_MODES:
+        raise ValueError(
+            f"Invalid macro-temporal routing: {settings.macro_temporal_routing}"
+        )
+    if settings.context_routing_experiment not in CONTEXT_ROUTING_EXPERIMENTS:
+        raise ValueError(
+            f"Invalid context-routing experiment: {settings.context_routing_experiment}"
+        )
+    if settings.context_routing_experiment == "legacy" and (
+        settings.slow_routing != "late_only"
+        or settings.macro_temporal_routing != "late_only"
+    ):
+        raise ValueError("Legacy context routing supports only late_only routes")
+    if (
+        settings.context_routing_experiment == "factorial_v1"
+        and settings.fusion != "context_pooled"
+    ):
+        raise ValueError("factorial_v1 context routing requires context_pooled fusion")
     fusion_states = {
         "none": 0,
         "context_only": 1 + CONTEXT_COUNT,
@@ -687,7 +745,103 @@ def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
         fusion_width=2 * settings.width,
         dropout=RESIDUAL_DROPOUT,
         output_horizons=HORIZON_COUNT,
+        slow_routing=settings.slow_routing,
+        macro_temporal_routing=settings.macro_temporal_routing,
+        context_routing_experiment=settings.context_routing_experiment,
+        context_routing_rank=(
+            min(32, settings.width)
+            if settings.context_routing_experiment == "factorial_v1"
+            else None
+        ),
     )
+
+
+def context_routing_parameter_count(architecture: TCNArchitecture) -> int:
+    if architecture.context_routing_experiment == "legacy":
+        return 0
+    if architecture.context_routing_experiment != "factorial_v1":
+        raise ValueError("Unknown context-routing experiment in architecture")
+    rank = architecture.context_routing_rank
+    if rank is None:
+        raise ValueError("factorial_v1 architecture is missing its routing rank")
+    width = architecture.width
+    slow_condition = (
+        SLOW_FEATURE_COUNT * width
+        + (
+            CONTEXT_ROUTING_SOURCE_COUNT * SLOW_FEATURE_COUNT
+            + CONTEXT_ROUTING_SOURCE_COUNT
+        )
+        * width
+        + 2 * width
+    )
+    early_inputs = width * width + (
+        CONTEXT_ROUTING_SOURCE_COUNT * CONTEXT_ROUTING_PATCH_SOURCE_WIDTH * width
+    )
+    per_block_film = 2 * width * width + (
+        CONTEXT_ROUTING_SOURCE_COUNT * width * rank + rank * 2 * width
+    )
+    return slow_condition + early_inputs + architecture.residual_blocks * per_block_film
+
+
+def context_routing_metadata(architecture: TCNArchitecture) -> dict[str, object]:
+    slow = architecture.slow_routing
+    macro = architecture.macro_temporal_routing
+    enabled = {
+        "slow_early_concat": slow in ("early_concat", "early_concat_film"),
+        "slow_film": slow in ("film", "early_concat_film"),
+        "macro_temporal_early_concat": macro in ("early_concat", "early_concat_film"),
+        "macro_temporal_film": macro in ("film", "early_concat_film"),
+    }
+    return {
+        "schema_version": CONTEXT_ROUTING_SCHEMA_VERSION,
+        "experiment": architecture.context_routing_experiment,
+        "slow_routing": slow,
+        "macro_temporal_routing": macro,
+        "scaffold_instantiated": architecture.context_routing_experiment
+        == "factorial_v1",
+        "ordered_source_symbols": list(CONTEXT_ROUTING_MACRO_SYMBOLS),
+        "alignment_rules": {
+            "local": "absolute_target_patch_t_maps_to_local_source_patch_t",
+            "global": (
+                "global_source_position=(ABSOLUTE_PATCH_COUNT-state_position)+t; "
+                "valid only for 0<=t<state_position"
+            ),
+            "decision_cutoff": "all injected temporal state is masked at t>=state_position",
+        },
+        "slow_condition": {
+            "equity_projection": f"bias_free_linear_{SLOW_FEATURE_COUNT}_to_width",
+            "macro_projection": (
+                "bias_free_linear_"
+                f"{CONTEXT_ROUTING_SOURCE_COUNT * SLOW_FEATURE_COUNT + CONTEXT_ROUTING_SOURCE_COUNT}"
+                "_to_width"
+            ),
+            "combination": "sum_then_layer_norm",
+        },
+        "macro_patch_source_width": CONTEXT_ROUTING_PATCH_SOURCE_WIDTH,
+        "macro_dynamic_channel_count": CONTEXT_GENERIC_DYNAMIC_COUNT,
+        "film_rank": architecture.context_routing_rank,
+        "injection_points": {
+            "slow_early_concat": "additive_projection_after_base_input_projection",
+            "macro_temporal_early_concat": (
+                "shared_additive_projection_after_base_input_projection"
+            ),
+            "slow_film": "after_each_shared_tcn_residual_block_on_equities_only",
+            "macro_temporal_film": (
+                "after_each_shared_tcn_residual_block_on_equities_only"
+            ),
+            "incumbent_slow": "unchanged_post_tcn_slow_projection",
+            "incumbent_peer": "unchanged_direct_post_tcn_peer_adapter",
+            "incumbent_fusion": "unchanged_context_pooled_late_fusion",
+        },
+        "zero_initialization_rules": {
+            "slow_early_input_adapter": True,
+            "macro_early_input_projection": True,
+            "slow_film_gamma_beta_projection": True,
+            "macro_film_gamma_beta_projection": True,
+        },
+        "enabled_routes": enabled,
+        "routing_parameter_count": context_routing_parameter_count(architecture),
+    }
 
 
 def peer_feature_metadata(
@@ -763,6 +917,7 @@ def expected_trainable_parameter_count(
             )
         if peer_features != "none":
             count += PEER_STATE_WIDTH * width
+        count += context_routing_parameter_count(architecture)
         return count
     return EXPECTED_TRAINABLE_PARAMETER_COUNTS[model_name]
 

@@ -26,6 +26,7 @@ from .contract import (
     XGBOOST_DEVICE,
     XGBOOST_FIXED_PARAMETERS,
     XGBOOST_OBJECTIVE,
+    context_routing_metadata,
     XGBOOST_VERSION,
     architecture_for_model,
     expected_trainable_parameter_count,
@@ -325,9 +326,46 @@ def _validate_peer_feature_identity(
     return str(metadata["mode"])
 
 
+def _normalized_context_routing_identity(
+    identity: dict[str, object],
+    architecture: NeuralArchitecture,
+) -> dict[str, object] | None:
+    metadata = identity.get("context_routing")
+    if not isinstance(architecture, TCNArchitecture):
+        if metadata is not None:
+            raise ValueError("Context-routing metadata is allowed only for TCN")
+        return None
+    expected = context_routing_metadata(architecture)
+    if metadata is None:
+        if architecture.context_routing_experiment != "legacy":
+            raise ValueError("Factorial TCN identity is missing context routing")
+        return expected
+    if not isinstance(metadata, dict) or _canonical_json_identity(
+        metadata
+    ) != _canonical_json_identity(expected):
+        raise ValueError("Invalid context-routing identity metadata")
+    return expected
+
+
 def _validate_architecture_identity(identity: dict[str, object]) -> None:
     model_name = str(identity["model_name"])
     architecture = _architecture_from_identity(identity)
+    recorded_fields = identity.get("architecture_constants")
+    if not isinstance(recorded_fields, dict):
+        raise ValueError(f"Invalid architecture metadata for model: {model_name}")
+    if (
+        isinstance(architecture, TCNArchitecture)
+        and architecture.context_routing_experiment == "legacy"
+    ):
+        expected_fields = asdict(architecture)
+        for field in (
+            "slow_routing",
+            "macro_temporal_routing",
+            "context_routing_experiment",
+            "context_routing_rank",
+        ):
+            recorded_fields.setdefault(field, expected_fields[field])
+    _normalized_context_routing_identity(identity, architecture)
     expected = _canonical_json_identity(asdict(architecture))
     recorded = _canonical_json_identity(identity["architecture_constants"])
     if recorded != expected:
@@ -414,6 +452,16 @@ def _validate_run_checkpoint_identity(
             ) from error
         if manifest_value != checkpoint_value:
             raise ValueError(f"Run/checkpoint identity mismatch: {field}")
+    manifest_routing = _normalized_context_routing_identity(
+        manifest, _architecture_from_identity(manifest)
+    )
+    checkpoint_routing = _normalized_context_routing_identity(
+        checkpoint, _architecture_from_identity(checkpoint)
+    )
+    if _canonical_json_identity(manifest_routing) != _canonical_json_identity(
+        checkpoint_routing
+    ):
+        raise ValueError("Run/checkpoint context-routing identity mismatch")
     _validate_architecture_identity(manifest)
     _validate_objective_and_optimizer(manifest)
     normalized_manifest = {
@@ -744,6 +792,11 @@ def main() -> None:
         "model_family": manifest["model_family"],
         "tcn_settings": manifest["tcn_settings"],
         "architecture_constants": manifest["architecture_constants"],
+        "context_routing": (
+            context_routing_metadata(_architecture_from_identity(manifest))
+            if manifest["model_name"] == "tcn"
+            else None
+        ),
         "peer_features": manifest["peer_features"],
         "parameter_count": manifest["parameter_count"],
         "optimizer_variant": manifest["optimizer_variant"],
