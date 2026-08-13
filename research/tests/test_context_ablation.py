@@ -43,7 +43,11 @@ from brazil_rv.modeling.contract import (
     VALIDATION_START,
     architecture_for_model,
 )
-from brazil_rv.modeling.data import BatchRequest, VectorizedFeatureDataset
+from brazil_rv.modeling.data import (
+    BATCH_CONSTRUCTION_SECONDS_KEY,
+    BatchRequest,
+    VectorizedFeatureDataset,
+)
 from brazil_rv.modeling.process_lock import (
     active_lock_owner,
     exclusive_process_lock,
@@ -93,6 +97,21 @@ EXPECTED_KEYS = (
     "drop_win_and_global_non_rates_except_6e",
     "drop_win_and_global_non_rates_except_6m",
 )
+
+
+def _assert_batches_equal(
+    actual: dict[str, np.ndarray], expected: dict[str, np.ndarray]
+) -> None:
+    assert actual.keys() == expected.keys()
+    for batch in (actual, expected):
+        timing = batch[BATCH_CONSTRUCTION_SECONDS_KEY]
+        assert timing.shape == ()
+        assert timing.dtype == np.dtype(np.float64)
+        assert np.isfinite(timing)
+        assert timing >= 0
+    for key in actual:
+        if key != BATCH_CONSTRUCTION_SECONDS_KEY:
+            np.testing.assert_array_equal(actual[key], expected[key])
 
 
 def _resolved(key: str):
@@ -290,8 +309,7 @@ def test_none_is_bitwise_identical_and_ablation_preserves_common_batch(
     request = BatchRequest((0, 1), 2)
     legacy = VectorizedFeatureDataset(store, rows, "context_pooled", "enabled")[request]
     explicit = _patch_batch(store, rows, "none")
-    for key in legacy:
-        np.testing.assert_array_equal(explicit[key], legacy[key])
+    _assert_batches_equal(explicit, legacy)
 
     ablated = _patch_batch(store, rows, "drop_win")
     for key in (
@@ -440,8 +458,7 @@ def test_drop_all_global_matches_legacy_masked_semantics(tmp_path: Path) -> None
     store, rows = _synthetic_store(tmp_path)
     dropped = _patch_batch(store, rows, "drop_all_global")
     masked = _patch_batch(store, rows, "none", "masked")
-    for key in dropped:
-        np.testing.assert_array_equal(dropped[key], masked[key])
+    _assert_batches_equal(dropped, masked)
 
 
 def test_tabular_ablation_zeroes_values_validity_readiness_and_dependency(
