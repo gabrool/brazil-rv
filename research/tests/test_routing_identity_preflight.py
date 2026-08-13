@@ -114,6 +114,28 @@ def environment() -> dict[str, object]:
     }
 
 
+def _sam_diagnostics(**overrides: object) -> dict[str, object]:
+    diagnostics: dict[str, object] = {
+        "all_finite": True,
+        "backward_passes": 16,
+        "bounded_cuda_phase_seconds": None,
+        "first_pass_gradient_norm": 6.351141929626465,
+        "gradient_norm": 6.351141929626465,
+        "h2d_bytes": 4096,
+        "h2d_enqueue_seconds": 0.001,
+        "loss_count": 8,
+        "loss_sum": 1.25,
+        "perturbation_norm": 0.125,
+        "predictions_finite": True,
+        "rng_replay_exact": True,
+        "second_loss_sum": 1.5,
+        "second_pass_gradient_norm": 6.351141929626465,
+        "total_effective_update_wall_seconds": 0.01,
+    }
+    diagnostics.update(overrides)
+    return diagnostics
+
+
 def _comparison(
     execution: str,
     step: int,
@@ -133,10 +155,16 @@ def _comparison(
     if quantity in ("prediction_rng_state", "update_rng_state"):
         return {**base, "left_sha256": "1" * 64, "right_sha256": "1" * 64}
     if quantity == "sam_scalar_diagnostics":
+        legacy = _sam_diagnostics()
+        scaffold = _sam_diagnostics(
+            gradient_norm=6.351142406463623,
+            second_pass_gradient_norm=6.351142406463623,
+            h2d_enqueue_seconds=0.002,
+            total_effective_update_wall_seconds=0.02,
+        )
         return {
             **base,
-            "legacy": {"gradient_norm": 1.0},
-            "scaffold": {"gradient_norm": 1.0},
+            **preflight._compare_sam_scalar_diagnostics(legacy, scaffold),
         }
     if quantity == "base_parameter_coverage":
         names = [row["name"] for row in identity["parameter_identities"]["base"]]
@@ -231,6 +259,15 @@ def _passed_payload(
     }
 
 
+def _sam_comparisons(payload: dict[str, object]) -> list[dict[str, object]]:
+    return [
+        comparison
+        for execution in payload["executions"]
+        for comparison in execution["comparisons"]
+        if comparison["quantity"] == "sam_scalar_diagnostics"
+    ]
+
+
 def _coverage_comparisons(payload: dict[str, object]) -> list[dict[str, object]]:
     return [
         comparison
@@ -238,6 +275,99 @@ def _coverage_comparisons(payload: dict[str, object]) -> list[dict[str, object]]
         for comparison in execution["comparisons"]
         if comparison["quantity"] == "base_parameter_coverage"
     ]
+
+
+def test_sam_diagnostics_accept_timing_differences_and_observed_norm_delta() -> None:
+    legacy = _sam_diagnostics()
+    scaffold = _sam_diagnostics(
+        gradient_norm=6.351142406463623,
+        second_pass_gradient_norm=6.351142406463623,
+        h2d_enqueue_seconds=10.0,
+        total_effective_update_wall_seconds=20.0,
+    )
+
+    comparison = preflight._compare_sam_scalar_diagnostics(legacy, scaffold)
+
+    assert comparison["passed"] is True
+    assert comparison["legacy"] is legacy
+    assert comparison["scaffold"] is scaffold
+
+
+def test_sam_diagnostics_accept_different_valid_bounded_cuda_timings() -> None:
+    legacy_timings = {
+        phase: float(index + 1) / 1000
+        for index, phase in enumerate(preflight.SAM_BOUNDED_CUDA_PHASES)
+    }
+    scaffold_timings = {
+        phase: float(index + 1) / 10
+        for index, phase in enumerate(preflight.SAM_BOUNDED_CUDA_PHASES)
+    }
+
+    comparison = preflight._compare_sam_scalar_diagnostics(
+        _sam_diagnostics(bounded_cuda_phase_seconds=legacy_timings),
+        _sam_diagnostics(bounded_cuda_phase_seconds=scaffold_timings),
+    )
+
+    assert comparison["passed"] is True
+
+
+def test_sam_diagnostics_reject_deterministic_and_continuous_drift() -> None:
+    deterministic = preflight._compare_sam_scalar_diagnostics(
+        _sam_diagnostics(), _sam_diagnostics(loss_count=9)
+    )
+    continuous = preflight._compare_sam_scalar_diagnostics(
+        _sam_diagnostics(), _sam_diagnostics(gradient_norm=6.36)
+    )
+
+    assert deterministic["passed"] is False
+    assert continuous["passed"] is False
+
+
+@pytest.mark.parametrize(
+    ("mutation", "value"),
+    (
+        ("missing", None),
+        ("extra", None),
+        ("loss_count", 8.0),
+        ("loss_sum", float("nan")),
+        ("gradient_norm", float("inf")),
+        ("h2d_enqueue_seconds", -0.001),
+        ("total_effective_update_wall_seconds", -0.001),
+        (
+            "bounded_cuda_phase_seconds",
+            {phase: 0.001 for phase in preflight.SAM_BOUNDED_CUDA_PHASES},
+        ),
+    ),
+)
+def test_sam_diagnostic_malformed_records_fail_closed(
+    mutation: str,
+    value: object,
+    expected_identity: dict[str, object],
+    environment: dict[str, object],
+) -> None:
+    payload = _passed_payload(expected_identity, environment)
+    scaffold = _sam_comparisons(payload)[0]["scaffold"]
+    if mutation == "missing":
+        scaffold.pop("loss_sum")
+    elif mutation == "extra":
+        scaffold["unexpected"] = 1
+    else:
+        scaffold[mutation] = value
+
+    with pytest.raises(ValueError, match="stored SAM diagnostics status"):
+        validate_routing_identity_preflight(payload, expected_identity, environment)
+
+
+def test_sam_diagnostic_forged_passed_status_is_rejected(
+    expected_identity: dict[str, object], environment: dict[str, object]
+) -> None:
+    payload = _passed_payload(expected_identity, environment)
+    comparison = _sam_comparisons(payload)[0]
+    comparison["scaffold"]["rng_replay_exact"] = False
+    comparison["passed"] = True
+
+    with pytest.raises(ValueError, match="stored SAM diagnostics status"):
+        validate_routing_identity_preflight(payload, expected_identity, environment)
 
 
 def test_soft_spearman_structural_bias_null_directions() -> None:
@@ -374,6 +504,15 @@ def test_complete_passed_artifact_is_reusable(
         validate_routing_identity_preflight(payload, expected_identity, environment)
         is payload
     )
+
+
+def test_previous_preflight_version_is_not_reusable(
+    expected_identity: dict[str, object], environment: dict[str, object]
+) -> None:
+    payload = _passed_payload(expected_identity, environment)
+    payload["version"] = "ROUTING_IDENTITY_PREFLIGHT_V1"
+    with pytest.raises(ValueError, match="version mismatch"):
+        validate_routing_identity_preflight(payload, expected_identity, environment)
 
 
 def test_minimal_passed_payload_is_rejected(

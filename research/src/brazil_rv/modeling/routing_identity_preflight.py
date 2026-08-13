@@ -37,6 +37,7 @@ from brazil_rv.modeling.engine import (
     _rng_state,
     _rng_states_equal,
     _to_cuda,
+    SAM_BOUNDED_CUDA_PHASES,
     compile_model,
     objective_metadata,
     objective_loss,
@@ -48,7 +49,7 @@ from brazil_rv.modeling.model import build_neural_model
 from brazil_rv.modeling.optim import build_optimizer, build_scheduler
 
 
-PREFLIGHT_VERSION = "ROUTING_IDENTITY_PREFLIGHT_V1"
+PREFLIGHT_VERSION = "ROUTING_IDENTITY_PREFLIGHT_V2"
 PREFLIGHT_STEPS = 3
 PREFLIGHT_SEED = 29
 PREFLIGHT_TOLERANCES = {
@@ -84,6 +85,41 @@ _TENSOR_QUANTITIES = {
     "sam_base_perturbations",
     "second_pass_base_gradients",
     "base_parameter_updates",
+}
+_SAM_DIAGNOSTIC_FIELDS = {
+    "all_finite",
+    "backward_passes",
+    "bounded_cuda_phase_seconds",
+    "first_pass_gradient_norm",
+    "gradient_norm",
+    "h2d_bytes",
+    "h2d_enqueue_seconds",
+    "loss_count",
+    "loss_sum",
+    "perturbation_norm",
+    "predictions_finite",
+    "rng_replay_exact",
+    "second_loss_sum",
+    "second_pass_gradient_norm",
+    "total_effective_update_wall_seconds",
+}
+_SAM_DISCRETE_BOOLEAN_FIELDS = {
+    "all_finite",
+    "predictions_finite",
+    "rng_replay_exact",
+}
+_SAM_DISCRETE_INTEGER_FIELDS = {"backward_passes", "h2d_bytes", "loss_count"}
+_SAM_CONTINUOUS_TOLERANCE_PREFIXES = {
+    "loss_sum": "loss",
+    "second_loss_sum": "loss",
+    "first_pass_gradient_norm": "gradient",
+    "gradient_norm": "gradient",
+    "second_pass_gradient_norm": "gradient",
+    "perturbation_norm": "perturbation",
+}
+_SAM_WALL_TIMING_FIELDS = {
+    "h2d_enqueue_seconds",
+    "total_effective_update_wall_seconds",
 }
 _ZERO_GRADIENT_EXCEPTIONS = {
     "fusion_norm.bias": (
@@ -742,11 +778,9 @@ def _run_execution(
             execution=execution,
             step=step,
             quantity="sam_scalar_diagnostics",
-            comparison={
-                "passed": legacy_diagnostics == scaffold_diagnostics,
-                "legacy": legacy_diagnostics,
-                "scaffold": scaffold_diagnostics,
-            },
+            comparison=_compare_sam_scalar_diagnostics(
+                legacy_diagnostics, scaffold_diagnostics
+            ),
         )
 
     legacy_coverage = legacy_capture.coverage_report()
@@ -815,6 +849,75 @@ def _valid_sha256(value: Any) -> bool:
 
 def _finite_number(value: Any) -> bool:
     return type(value) in (int, float) and math.isfinite(float(value))
+
+
+def _valid_bounded_cuda_timings(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and set(value) == set(SAM_BOUNDED_CUDA_PHASES)
+        and all(_finite_number(item) and float(item) >= 0.0 for item in value.values())
+    )
+
+
+def _sam_scalar_diagnostics_pass(
+    legacy: Any,
+    scaffold: Any,
+) -> bool:
+    if not isinstance(legacy, dict) or not isinstance(scaffold, dict):
+        return False
+    if set(legacy) != _SAM_DIAGNOSTIC_FIELDS or set(scaffold) != _SAM_DIAGNOSTIC_FIELDS:
+        return False
+    for diagnostics in (legacy, scaffold):
+        if not all(
+            type(diagnostics[field]) is bool for field in _SAM_DISCRETE_BOOLEAN_FIELDS
+        ):
+            return False
+        if not all(
+            type(diagnostics[field]) is int and diagnostics[field] >= 0
+            for field in _SAM_DISCRETE_INTEGER_FIELDS
+        ):
+            return False
+        if not all(
+            _finite_number(diagnostics[field])
+            for field in _SAM_CONTINUOUS_TOLERANCE_PREFIXES
+        ):
+            return False
+        if not all(
+            _finite_number(diagnostics[field]) and float(diagnostics[field]) >= 0.0
+            for field in _SAM_WALL_TIMING_FIELDS
+        ):
+            return False
+    if any(
+        legacy[field] != scaffold[field]
+        for field in _SAM_DISCRETE_BOOLEAN_FIELDS | _SAM_DISCRETE_INTEGER_FIELDS
+    ):
+        return False
+    for field, tolerance_prefix in _SAM_CONTINUOUS_TOLERANCE_PREFIXES.items():
+        if not math.isclose(
+            float(legacy[field]),
+            float(scaffold[field]),
+            abs_tol=PREFLIGHT_TOLERANCES[f"{tolerance_prefix}_atol"],
+            rel_tol=PREFLIGHT_TOLERANCES[f"{tolerance_prefix}_rtol"],
+        ):
+            return False
+    legacy_bounded = legacy["bounded_cuda_phase_seconds"]
+    scaffold_bounded = scaffold["bounded_cuda_phase_seconds"]
+    if legacy_bounded is None or scaffold_bounded is None:
+        return legacy_bounded is None and scaffold_bounded is None
+    return _valid_bounded_cuda_timings(legacy_bounded) and _valid_bounded_cuda_timings(
+        scaffold_bounded
+    )
+
+
+def _compare_sam_scalar_diagnostics(
+    legacy: dict[str, Any],
+    scaffold: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "passed": _sam_scalar_diagnostics_pass(legacy, scaffold),
+        "legacy": legacy,
+        "scaffold": scaffold,
+    }
 
 
 def _validate_coverage(comparison: dict[str, Any], expected_names: list[str]) -> None:
@@ -943,11 +1046,14 @@ def _validate_comparison(
             {"execution", "step", "quantity", "passed", "legacy", "scaffold"},
             "SAM diagnostics comparison",
         )
-        _require(
-            isinstance(comparison["legacy"], dict)
-            and comparison["legacy"] == comparison["scaffold"],
-            "SAM diagnostics differ or are malformed",
+        policy_passed = _sam_scalar_diagnostics_pass(
+            comparison["legacy"], comparison["scaffold"]
         )
+        _require(
+            comparison["passed"] is policy_passed,
+            "stored SAM diagnostics status is inconsistent",
+        )
+        _require(policy_passed, "SAM diagnostics violate the comparison policy")
         return
     if quantity == "base_parameter_coverage":
         _validate_coverage(comparison, expected_base_names)
