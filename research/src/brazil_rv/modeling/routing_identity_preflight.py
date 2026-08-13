@@ -119,7 +119,7 @@ def _tensor_hash(tensor: torch.Tensor) -> str:
     digest = hashlib.sha256()
     digest.update(str(value.dtype).encode())
     digest.update(str(tuple(value.shape)).encode())
-    digest.update(value.view(torch.uint8).numpy().tobytes())
+    digest.update(value.reshape(-1).view(torch.uint8).numpy().tobytes())
     return digest.hexdigest()
 
 

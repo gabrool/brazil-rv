@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import hashlib
 import json
 from pathlib import Path
 
@@ -19,6 +20,52 @@ from brazil_rv.modeling.routing_identity_preflight import (
     validate_routing_identity_preflight,
     run_routing_identity_preflight,
 )
+
+
+def _previous_non_scalar_tensor_hash(tensor: torch.Tensor) -> str:
+    value = tensor.detach().contiguous().cpu()
+    digest = hashlib.sha256()
+    digest.update(str(value.dtype).encode())
+    digest.update(str(tuple(value.shape)).encode())
+    digest.update(value.view(torch.uint8).numpy().tobytes())
+    return digest.hexdigest()
+
+
+@pytest.mark.parametrize("dtype", (torch.float32, torch.bfloat16))
+def test_tensor_hash_supports_zero_dimensional_floating_scalars(
+    dtype: torch.dtype,
+) -> None:
+    scalar = torch.tensor(1.25, dtype=dtype)
+    clone = scalar.clone()
+    changed = torch.tensor(1.5, dtype=dtype)
+
+    assert scalar.shape == torch.Size([])
+    assert preflight._tensor_hash(scalar) == preflight._tensor_hash(clone)
+    assert preflight._tensor_hash(scalar) != preflight._tensor_hash(changed)
+
+
+def test_mapping_hash_supports_scalar_and_non_scalar_tensors() -> None:
+    values = {
+        "gradient_norm": torch.tensor(0.75, dtype=torch.float32),
+        "weights": torch.arange(6, dtype=torch.float32).reshape(2, 3),
+    }
+    clone = {name: value.clone() for name, value in values.items()}
+    changed = {**clone, "gradient_norm": torch.tensor(0.5)}
+
+    assert preflight._mapping_hash(values) == preflight._mapping_hash(clone)
+    assert preflight._mapping_hash(values) != preflight._mapping_hash(changed)
+
+
+@pytest.mark.parametrize(
+    "tensor",
+    (
+        torch.tensor([1.0, -2.0, 3.5], dtype=torch.float32),
+        torch.arange(12, dtype=torch.int64).reshape(3, 4),
+        torch.empty(0, dtype=torch.float32),
+    ),
+)
+def test_tensor_hash_preserves_previous_non_scalar_bytes(tensor: torch.Tensor) -> None:
+    assert preflight._tensor_hash(tensor) == _previous_non_scalar_tensor_hash(tensor)
 
 
 def test_tensor_comparison_records_hashes_and_maximum_errors() -> None:
