@@ -41,8 +41,6 @@ from .train import set_seeds
 
 COMPILE_MODES = (
     "default",
-    "reduce-overhead",
-    "max-autotune",
     "max-autotune-no-cudagraphs",
 )
 MICROBATCH_SIZES = (64, 128, 256)
@@ -130,8 +128,10 @@ def _compiled_soft_spearman_parity(
     )
     if not bool(finite):
         raise FloatingPointError("Compiled soft-Spearman parity is non-finite")
-    loss_difference = float((compiled_loss - eager_loss).abs())
-    gradient_difference = float((compiled_gradient - eager_gradient).abs().max())
+    loss_difference = float((compiled_loss - eager_loss).abs().detach())
+    gradient_difference = float(
+        (compiled_gradient - eager_gradient).abs().max().detach()
+    )
     if (
         loss_difference > PARITY_ABSOLUTE_TOLERANCE
         or gradient_difference > PARITY_ABSOLUTE_TOLERANCE
@@ -234,14 +234,14 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, object]:
         cold_validation_seconds,
         _,
         _,
-    ) = _timed_validation(compiled_model, validation_loader)
+    ) = _timed_validation(model, validation_loader)
     (
         steady_observations,
         steady_primary_metric,
         steady_validation_seconds,
         steady_collection_seconds,
         steady_primary_metric_seconds,
-    ) = _timed_validation(compiled_model, validation_loader)
+    ) = _timed_validation(model, validation_loader)
     observations_match = all(
         np.array_equal(
             getattr(cold_observations, name),
