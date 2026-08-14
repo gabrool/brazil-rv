@@ -24,6 +24,7 @@ from .contract import (
     CANONICAL_DROPPED_LOCAL_SLOTS,
     CANONICAL_RETAINED_GLOBAL_SLOTS,
     EXPECTED_DECISIONS_PER_DATE,
+    GLOBAL_WINDOW_MINUTES,
     HORIZONS,
     MIN_IC_EQUITIES,
     TRAIN_END,
@@ -575,11 +576,16 @@ def causal_observation_completeness(
     *,
     readiness: np.ndarray | None = None,
     preopen_cutoff: int | None = None,
+    current_window_length: int | None = None,
 ) -> dict[str, np.ndarray]:
     observed = np.asarray(observed, dtype=bool)
     date_idx = np.asarray(date_idx, dtype=np.int64)
     cutoffs = np.asarray(cutoffs, dtype=np.int64)
-    if observed.ndim != 3 or date_idx.shape != cutoffs.shape:
+    if (
+        observed.ndim != 3
+        or date_idx.shape != cutoffs.shape
+        or (current_window_length is not None and current_window_length <= 0)
+    ):
         raise ValueError("Completeness arrays are misaligned")
     sample_count, instrument_count = date_idx.size, observed.shape[1]
     counts = np.zeros((sample_count, instrument_count), dtype=np.int32)
@@ -595,15 +601,20 @@ def causal_observation_completeness(
             or cutoff > observed.shape[2]
         ):
             raise ValueError("Completeness cutoff is outside the causal grid")
-        prefix = observed[day, :, :cutoff]
-        counts[sample] = prefix.sum(axis=1)
-        fractions[sample] = counts[sample] / cutoff
-        last = np.where(prefix, np.arange(cutoff), -1).max(axis=1)
+        start = (
+            max(0, cutoff - current_window_length)
+            if current_window_length is not None
+            else 0
+        )
+        current = observed[day, :, start:cutoff]
+        counts[sample] = current.sum(axis=1)
+        fractions[sample] = counts[sample] / current.shape[1]
+        last = np.where(current, np.arange(current.shape[1]), -1).max(axis=1)
         present = last >= 0
-        staleness[sample, present] = cutoff - 1 - last[present]
+        staleness[sample, present] = current.shape[1] - 1 - last[present]
         if preopen_cutoff is not None:
             width = min(cutoff, preopen_cutoff)
-            preopen[sample] = prefix[:, :width].mean(axis=1)
+            preopen[sample] = observed[day, :, :width].mean(axis=1)
         if readiness is not None:
             ready[sample] = readiness[day]
     return {
@@ -718,6 +729,7 @@ def _opening_diagnostics(
         inverse,
         np.asarray(DECISION_GLOBAL_INDICES)[decision_idx],
         preopen_cutoff=330,
+        current_window_length=GLOBAL_WINDOW_MINUTES,
     )
     global_values["ready"] = np.asarray(
         global_ready_store[unique_dates][inverse, :, decision_idx], dtype=bool

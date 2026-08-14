@@ -111,6 +111,9 @@ Test-Case 'Operations never auto-terminate or start training' {
     Assert-True ($watcher -notmatch '/instance-operations/terminate') 'Automatic termination endpoint is present.'
     Assert-True ($bootstrap -notmatch 'modeling\.train(?! --help)') 'Bootstrap starts training.'
     Assert-True ($bootstrap -notmatch 'pytest|modeling\.sanity') 'Bootstrap runs paid-instance model/test preflights.'
+    Assert-True ($bootstrap -match 'uv sync --frozen --no-default-groups') 'Bootstrap does not select the minimal runtime.'
+    Assert-True ($bootstrap -notmatch '--group\s+(dev|preprocessing|notebook)') 'Bootstrap installs a non-modeling dependency group.'
+    Assert-True ($bootstrap -notmatch '\bruff\b') 'Bootstrap installs or runs Ruff.'
 }
 
 Write-Host "$script:Passed compact Lambda safety tests passed."
