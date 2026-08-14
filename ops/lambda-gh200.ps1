@@ -20,6 +20,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Security
 
 $script:ApiBaseUri = 'https://cloud.lambda.ai/api/v1'
 $script:TargetRegion = 'us-east-3'
@@ -133,8 +134,8 @@ function Remove-StoredCredential {
 function Get-ApiKey {
     if ([IO.File]::Exists($script:CredentialPath)) {
         $protected = [IO.File]::ReadAllBytes($script:CredentialPath)
-        $bytes = [Security.Cryptography.ProtectedData]::Unprotect(
-            $protected, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser
+        $bytes = [System.Security.Cryptography.ProtectedData]::Unprotect(
+            $protected, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser
         )
         $key = [Text.Encoding]::UTF8.GetString($bytes)
         [Array]::Clear($bytes, 0, $bytes.Length)
@@ -147,8 +148,8 @@ function Get-ApiKey {
         if ([string]::IsNullOrWhiteSpace($key)) { throw 'Lambda API key is empty.' }
         $bytes = [Text.Encoding]::UTF8.GetBytes($key)
         try {
-            $protected = [Security.Cryptography.ProtectedData]::Protect(
-                $bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser
+            $protected = [System.Security.Cryptography.ProtectedData]::Protect(
+                $bytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser
             )
             [IO.File]::WriteAllBytes($script:CredentialPath, $protected)
         }
