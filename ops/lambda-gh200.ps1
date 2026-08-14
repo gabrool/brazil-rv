@@ -251,7 +251,7 @@ function Find-Gh200InstanceType {
     $items = @()
     if ($InstanceTypes -is [Collections.IDictionary]) { $items = @($InstanceTypes.Values) }
     else { $items = @($InstanceTypes.PSObject.Properties | ForEach-Object Value) }
-    $matches = @()
+    $candidates = @()
     foreach ($item in $items) {
         $type = Get-Value $item 'instance_type'
         $specs = Get-Value $type 'specs'
@@ -260,17 +260,17 @@ function Find-Gh200InstanceType {
             $available = @((Get-Value $item 'regions_with_capacity_available') | Where-Object {
                 (Get-Value $_ 'name') -eq $script:TargetRegion
             }).Count -gt 0
-            $matches += [pscustomobject]@{
+            $candidates += [pscustomobject]@{
                 Name = [string](Get-Value $type 'name')
                 PriceCentsPerHour = [int](Get-Value $type 'price_cents_per_hour')
                 Available = $available
             }
         }
     }
-    if ($matches.Count -ne 1 -or [string]::IsNullOrWhiteSpace($matches[0].Name)) {
-        throw "Expected exactly one single-GPU GH200 type; found $($matches.Count)."
+    if ($candidates.Count -ne 1 -or [string]::IsNullOrWhiteSpace($candidates[0].Name)) {
+        throw "Expected exactly one single-GPU GH200 type; found $($candidates.Count)."
     }
-    return $matches[0]
+    return $candidates[0]
 }
 
 function Get-ExactlyOneNamed {

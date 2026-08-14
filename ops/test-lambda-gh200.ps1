@@ -99,6 +99,36 @@ Test-Case 'Retry-After controls bounded API retry delay' {
     Assert-True (@($sleeps | Where-Object { $_ -ge 3.0 }).Count -eq 1) 'Retry-After delay was not honored.'
 }
 
+Test-Case 'Single-GPU GH200 type is selected' {
+    $instanceTypes = [pscustomobject]@{
+        gh200 = [pscustomobject]@{
+            instance_type = [pscustomobject]@{
+                name = 'gpu_1x_gh200'
+                price_cents_per_hour = 199
+                gpu_description = 'NVIDIA GH200'
+                description = 'Grace Hopper'
+                specs = [pscustomobject]@{ gpus = 1 }
+            }
+            regions_with_capacity_available = @([pscustomobject]@{ name = 'us-east-3' })
+        }
+        irrelevant = [pscustomobject]@{
+            instance_type = [pscustomobject]@{
+                name = 'gpu_1x_a100'
+                price_cents_per_hour = 129
+                gpu_description = 'NVIDIA A100'
+                description = 'Ampere'
+                specs = [pscustomobject]@{ gpus = 1 }
+            }
+            regions_with_capacity_available = @([pscustomobject]@{ name = 'us-east-3' })
+        }
+    }
+    $candidate = Find-Gh200InstanceType $instanceTypes
+    Assert-True (@($candidate).Count -eq 1) 'Expected exactly one GH200 candidate.'
+    Assert-True ($candidate.Name -eq 'gpu_1x_gh200') 'GH200 candidate name is incorrect.'
+    Assert-True ($candidate.PriceCentsPerHour -eq 199) 'GH200 candidate price is incorrect.'
+    Assert-True ([bool]$candidate.Available) 'GH200 candidate should be available in us-east-3.'
+}
+
 Test-Case 'Multiple matching instances are refused' {
     $instance = [pscustomobject]@{
         id = 'instance-1'
