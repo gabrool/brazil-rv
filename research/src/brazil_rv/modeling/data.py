@@ -571,9 +571,6 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 inputs["peer_state"] = _build_peer_state(
                     arrays, dates, equity_cutoffs, active
                 )
-        padded = ~common["sample_valid_mask"]
-        for value in inputs.values():
-            value[padded] = 0
         return {**inputs, **common}
 
 
