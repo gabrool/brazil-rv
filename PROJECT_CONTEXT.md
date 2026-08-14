@@ -54,6 +54,8 @@ Embargo dates are not model-selection data. Training, early stopping, routing se
 
 The incumbent is a width-64, full-receptive-field, SwiGLU causal TCN with `context_pooled` fusion, all 32 slow fields, selected sector/subsector peer features, soft Spearman at temperature 0.50, SAM-AdamW at rho 0.125, at most 20 epochs, five-epoch early stopping, and seed choices 11, 29, or 47.
 
+Production training compiles the model and soft-Spearman objective while validation remains eager against the same current parameters. The temporary GH200 benchmark supports the `default` and `max-autotune-no-cudagraphs` compiler modes.
+
 The canonical context policy is direct:
 
 - `WIN$` is masked.

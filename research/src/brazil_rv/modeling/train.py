@@ -247,7 +247,7 @@ def _run_neural(
     scheduler, steps_per_epoch, warmup_steps = build_scheduler(
         optimizer, train_rows.height, MAX_EPOCHS
     )
-    compiled = compile_model(model)
+    compiled_model = compile_model(model)
     compiled_objective = compile_training_objective(args.objective, args.temperature)
     manifest = {
         "status": "running",
@@ -287,7 +287,7 @@ def _run_neural(
         sampler.set_epoch(epoch)
         training_started = time.perf_counter()
         training = train_one_epoch(
-            compiled,
+            compiled_model,
             train_loader,
             optimizer,
             scheduler,
@@ -301,7 +301,7 @@ def _run_neural(
         training_seconds = time.perf_counter() - training_started
         collection_started = time.perf_counter()
         observations, validation_objective_loss = collect_validation_observations(
-            compiled, validation_loader, args.objective, args.temperature
+            model, validation_loader, args.objective, args.temperature
         )
         validation_collection_seconds = time.perf_counter() - collection_started
         metric_started = time.perf_counter()

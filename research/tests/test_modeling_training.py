@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import warnings
 from copy import deepcopy
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -9,6 +11,7 @@ import torch
 from torch import nn
 from torch._inductor.exc import InductorError
 
+from brazil_rv.modeling import benchmark_runtime, train as train_module
 from brazil_rv.modeling.benchmark_runtime import parse_args as parse_benchmark_args
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
@@ -21,15 +24,18 @@ from brazil_rv.modeling.contract import (
     architecture_for_model,
 )
 from brazil_rv.modeling.engine import (
+    EvaluationObservations,
     _filter_evaluation_rows,
     checkpoint_payload,
     collect_validation_observations,
+    compile_model,
     compile_training_objective,
     eager_training_objective,
     objective_loss,
     rank_huber_loss,
     run_effective_batch_update,
     soft_spearman_loss,
+    train_one_epoch,
 )
 from brazil_rv.modeling.evaluate import load_current_neural_run
 from brazil_rv.modeling.metrics import create_metric_table, primary_validation_score
@@ -56,6 +62,23 @@ class TinyRanker(nn.Module):
         return self.linear(dropped) * equity_mask[..., None]
 
 
+class TinyModeRanker(nn.Module):
+    model_name = "mlp"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.linear = nn.Linear(2, 3, bias=False)
+
+    def forward(
+        self, features: torch.Tensor, equity_mask: torch.Tensor
+    ) -> torch.Tensor:
+        return self.linear(features) * equity_mask[..., None]
+
+    def cuda(self, device: object = None) -> TinyModeRanker:
+        del device
+        return self
+
+
 def _microbatch(seed: int) -> dict[str, torch.Tensor]:
     generator = torch.Generator().manual_seed(seed)
     return {
@@ -73,6 +96,19 @@ def _microbatch(seed: int) -> dict[str, torch.Tensor]:
         ),
         "label_mask": torch.ones(1, 4, 3, dtype=torch.bool),
     }
+
+
+def _validation_observations() -> EvaluationObservations:
+    shape = (2, 4, 3)
+    return EvaluationObservations(
+        sample_id=np.array([0, 1]),
+        predictions=np.zeros(shape, dtype=np.float32),
+        targets=np.zeros(shape, dtype=np.float32),
+        raw_returns=np.zeros(shape, dtype=np.float32),
+        label_mask=np.ones(shape, dtype=bool),
+        date_idx=np.array([0, 0]),
+        decision_idx=np.array([0, 1]),
+    )
 
 
 def test_objectives_match_current_group_aggregation() -> None:
@@ -235,6 +271,295 @@ def test_compiled_soft_spearman_matches_eager_sam_update() -> None:
     )
     assert compiled_result["loss_count"] == eager_result["loss_count"]
     assert compiled_result["backward_passes"] == eager_result["backward_passes"]
+
+
+def test_compiled_training_updates_eager_validation_and_restores_training_mode() -> (
+    None
+):
+    runtime = _compiled_runtime("aot_eager")
+    torch.manual_seed(53)
+    model = TinyModeRanker()
+    compiled_model = compile_model(model, runtime)
+    compiled_objective = compile_training_objective("soft_spearman", 0.50, runtime)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.05)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+    training_batches = [_microbatch(5), _microbatch(6)]
+    evaluation_batch = {
+        name: torch.cat([batch[name] for batch in training_batches])
+        for name in ("tabular_features", "equity_mask", "targets", "label_mask")
+    }
+    evaluation_batch.update(
+        {
+            "sample_valid_mask": torch.ones(2, dtype=torch.bool),
+            "sample_id": torch.tensor([1, 0]),
+            "raw_returns": torch.zeros_like(evaluation_batch["targets"]),
+            "date_idx": torch.tensor([0, 0]),
+            "decision_idx": torch.tensor([1, 0]),
+        }
+    )
+    model.eval()
+    with torch.inference_mode():
+        before_update = model(
+            evaluation_batch["tabular_features"],
+            evaluation_batch["equity_mask"],
+        )[[1, 0]].numpy()
+    originals = [parameter.detach().clone() for parameter in model.parameters()]
+    train_one_epoch(
+        compiled_model,
+        training_batches,
+        optimizer,
+        scheduler,
+        runtime,
+        "sam_adamw",
+        "soft_spearman",
+        0.50,
+        0.125,
+        compiled_objective,
+    )
+    assert any(
+        not torch.equal(parameter, original)
+        for parameter, original in zip(model.parameters(), originals, strict=True)
+    )
+    observations, _ = collect_validation_observations(
+        model, [evaluation_batch], "soft_spearman", 0.50
+    )
+    with torch.inference_mode():
+        current_predictions = model(
+            evaluation_batch["tabular_features"],
+            evaluation_batch["equity_mask"],
+        )[[1, 0]].numpy()
+    np.testing.assert_allclose(observations.predictions, current_predictions)
+    assert not np.allclose(observations.predictions, before_update)
+    assert not model.training
+    train_one_epoch(
+        compiled_model,
+        training_batches,
+        optimizer,
+        scheduler,
+        runtime,
+        "sam_adamw",
+        "soft_spearman",
+        0.50,
+        0.125,
+        compiled_objective,
+    )
+    assert model.training
+
+
+def test_production_routes_compiled_training_and_eager_validation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    model = TinyModeRanker()
+    compiled_model = object()
+    compiled_objective = object()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+    training_models: list[object] = []
+    validation_models: list[object] = []
+    validation_parameters: list[torch.Tensor] = []
+    checkpoint_models: list[object] = []
+
+    class Sampler:
+        def set_epoch(self, epoch: int) -> None:
+            assert epoch == 1
+
+    def fake_compile(current: nn.Module) -> object:
+        assert current is model
+        return compiled_model
+
+    def fake_train(current: object, *_: object) -> dict[str, object]:
+        training_models.append(current)
+        with torch.no_grad():
+            for parameter in model.parameters():
+                parameter.add_(1.0)
+        return {
+            "objective_loss": 0.1,
+            "optimizer_steps": 1,
+            "backward_passes": 2,
+            "mean_gradient_norm": 0.2,
+        }
+
+    def fake_validation(
+        current: nn.Module, *_: object
+    ) -> tuple[EvaluationObservations, float]:
+        validation_models.append(current)
+        validation_parameters.append(next(current.parameters()).detach().clone())
+        return _validation_observations(), 0.1
+
+    def fake_checkpoint(
+        current: nn.Module, *_: object, **__: object
+    ) -> dict[str, object]:
+        checkpoint_models.append(current)
+        return {}
+
+    class OutputFrame:
+        def write_parquet(self, _: Path) -> None:
+            return None
+
+    monkeypatch.setattr(train_module, "MAX_EPOCHS", 1)
+    monkeypatch.setattr(
+        train_module,
+        "create_training_loaders",
+        lambda *_: ([object()], [object()], Sampler()),
+    )
+    monkeypatch.setattr(train_module, "build_neural_model", lambda *_: model)
+    monkeypatch.setattr(
+        train_module, "build_optimizer", lambda _: (optimizer, object())
+    )
+    monkeypatch.setattr(train_module, "build_scheduler", lambda *_: (scheduler, 1, 0))
+    monkeypatch.setattr(train_module, "compile_model", fake_compile)
+    monkeypatch.setattr(
+        train_module, "compile_training_objective", lambda *_: compiled_objective
+    )
+    monkeypatch.setattr(train_module, "train_one_epoch", fake_train)
+    monkeypatch.setattr(
+        train_module, "collect_validation_observations", fake_validation
+    )
+    monkeypatch.setattr(train_module, "validation_primary_metric", lambda _: 0.25)
+    monkeypatch.setattr(train_module, "checkpoint_payload", fake_checkpoint)
+    monkeypatch.setattr(
+        train_module,
+        "summarize_evaluation_observations",
+        lambda *_: ({}, [{"metric": 0.25}]),
+    )
+    monkeypatch.setattr(train_module, "_atomic_json", lambda *_: None)
+    monkeypatch.setattr(train_module, "_atomic_torch_save", lambda *_: None)
+    monkeypatch.setattr(train_module, "_write_history", lambda *_: None)
+    monkeypatch.setattr(train_module.pl, "DataFrame", lambda *_: OutputFrame())
+    rows = SimpleNamespace(height=512)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    original_parameter = next(model.parameters()).detach().clone()
+    train_module._run_neural(
+        train_module.parse_args([]),
+        tmp_path,
+        rows,
+        rows,
+        run_dir,
+    )
+    assert training_models == [compiled_model]
+    assert validation_models == [model]
+    torch.testing.assert_close(validation_parameters[0], original_parameter + 1.0)
+    assert checkpoint_models == [model]
+
+
+def test_benchmark_routes_compiled_updates_and_eager_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = TinyModeRanker()
+    compiled_model = object()
+    compiled_objective = object()
+    update_models: list[object] = []
+    validation_models: list[object] = []
+
+    class Sampler:
+        def set_epoch(self, epoch: int) -> None:
+            assert epoch == 1
+
+    def fake_update(current: object, *_: object) -> float:
+        update_models.append(current)
+        return 1.0
+
+    def fake_validation(
+        current: object, _: object
+    ) -> tuple[EvaluationObservations, float, float, float, float]:
+        validation_models.append(current)
+        return _validation_observations(), 0.25, 3.0, 2.0, 1.0
+
+    rows = SimpleNamespace(height=512)
+    monkeypatch.setattr(benchmark_runtime, "set_seeds", lambda _: None)
+    monkeypatch.setattr(benchmark_runtime, "resolve_feature_store", lambda: Path("."))
+    monkeypatch.setattr(benchmark_runtime, "load_sample_index", lambda _: object())
+    monkeypatch.setattr(benchmark_runtime, "select_sample_split", lambda *_: rows)
+    monkeypatch.setattr(
+        benchmark_runtime,
+        "create_training_loaders",
+        lambda *_: ([object()], object(), Sampler()),
+    )
+    monkeypatch.setattr(benchmark_runtime, "build_neural_model", lambda *_: model)
+    monkeypatch.setattr(
+        benchmark_runtime, "build_optimizer", lambda _: (object(), object())
+    )
+    monkeypatch.setattr(
+        benchmark_runtime, "build_scheduler", lambda *_: (object(), 1, 0)
+    )
+    monkeypatch.setattr(benchmark_runtime, "compile_model", lambda *_: compiled_model)
+    monkeypatch.setattr(
+        benchmark_runtime,
+        "compile_training_objective",
+        lambda *_: compiled_objective,
+    )
+    monkeypatch.setattr(
+        benchmark_runtime,
+        "_compiled_soft_spearman_parity",
+        lambda _: {
+            "maximum_absolute_loss_difference": 0.0,
+            "maximum_absolute_gradient_difference": 0.0,
+            "absolute_tolerance": benchmark_runtime.PARITY_ABSOLUTE_TOLERANCE,
+        },
+    )
+    monkeypatch.setattr(benchmark_runtime, "_timed_update", fake_update)
+    monkeypatch.setattr(benchmark_runtime, "_timed_validation", fake_validation)
+    monkeypatch.setattr(
+        benchmark_runtime.torch.cuda, "reset_peak_memory_stats", lambda: None
+    )
+    monkeypatch.setattr(benchmark_runtime.torch.cuda, "max_memory_allocated", lambda: 0)
+    monkeypatch.setattr(benchmark_runtime.torch.cuda, "max_memory_reserved", lambda: 0)
+    result = benchmark_runtime.run_benchmark(parse_benchmark_args([]))
+    assert update_models == [compiled_model] * (
+        1 + benchmark_runtime.STEADY_UPDATE_COUNT
+    )
+    assert validation_models == [model, model]
+    assert result["validation_observations_exact_match"] is True
+    assert result["validation_primary_metric_exact_match"] is True
+
+
+def test_benchmark_parity_detaches_before_scalar_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    generator_type = torch.Generator
+    randn = torch.randn
+    rand = torch.rand
+    monkeypatch.setattr(
+        benchmark_runtime.torch,
+        "Generator",
+        lambda **_: generator_type(),
+    )
+
+    def cpu_randn(*shape: object, **keywords: object) -> torch.Tensor:
+        keywords.pop("device", None)
+        return randn(*shape, **keywords)
+
+    def cpu_rand(*shape: object, **keywords: object) -> torch.Tensor:
+        keywords.pop("device", None)
+        return rand(*shape, **keywords)
+
+    monkeypatch.setattr(benchmark_runtime.torch, "randn", cpu_randn)
+    monkeypatch.setattr(benchmark_runtime.torch, "rand", cpu_rand)
+    monkeypatch.setattr(benchmark_runtime.torch.cuda, "synchronize", lambda: None)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        parity = benchmark_runtime._compiled_soft_spearman_parity(
+            eager_training_objective("soft_spearman", 0.50)
+        )
+    assert parity["maximum_absolute_loss_difference"] == 0.0
+    assert parity["maximum_absolute_gradient_difference"] == 0.0
+    assert not any(
+        "requires_grad" in str(warning.message) and "scalar" in str(warning.message)
+        for warning in caught
+    )
+
+
+def test_benchmark_cli_accepts_only_retained_compile_modes() -> None:
+    assert benchmark_runtime.COMPILE_MODES == (
+        "default",
+        "max-autotune-no-cudagraphs",
+    )
+    for mode in benchmark_runtime.COMPILE_MODES:
+        assert parse_benchmark_args(["--compile-mode", mode]).compile_mode == mode
+    for mode in ("reduce" + "-overhead", "max" + "-autotune"):
+        with pytest.raises(SystemExit):
+            parse_benchmark_args(["--compile-mode", mode])
 
 
 @pytest.mark.parametrize(
