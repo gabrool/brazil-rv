@@ -245,6 +245,75 @@ def test_opening_context_completeness_uses_only_causal_prefix() -> None:
         np.testing.assert_array_equal(result[name], unchanged[name])
 
 
+def test_global_completeness_uses_model_window_and_fixed_preopen_prefix() -> None:
+    observed = np.zeros((1, 2, 500), dtype=bool)
+    observed[0, 0, 10] = True
+    observed[0, 1, 120] = True
+    arguments = (
+        np.array([0]),
+        np.array([450]),
+    )
+    result = causal_observation_completeness(
+        observed,
+        *arguments,
+        preopen_cutoff=330,
+        current_window_length=345,
+    )
+    np.testing.assert_array_equal(result["observed_bars"], [[0, 1]])
+    np.testing.assert_allclose(result["observed_fraction"], [[0.0, 1 / 345]])
+    assert np.isnan(result["minutes_since_most_recent_observed_bar"][0, 0])
+    assert result["minutes_since_most_recent_observed_bar"][0, 1] == 329
+    np.testing.assert_allclose(
+        result["preopen_observed_fraction"], [[1 / 330, 1 / 330]]
+    )
+
+    before_window = observed.copy()
+    before_window[0, 0, 50] = True
+    before_window[0, 1, 100] = True
+    before_result = causal_observation_completeness(
+        before_window,
+        *arguments,
+        preopen_cutoff=330,
+        current_window_length=345,
+    )
+    for name in (
+        "observed_bars",
+        "observed_fraction",
+        "minutes_since_most_recent_observed_bar",
+    ):
+        np.testing.assert_allclose(result[name], before_result[name], equal_nan=True)
+    assert not np.array_equal(
+        result["preopen_observed_fraction"],
+        before_result["preopen_observed_fraction"],
+    )
+
+    inside_window = observed.copy()
+    inside_window[0, 0, 449] = True
+    inside_result = causal_observation_completeness(
+        inside_window,
+        *arguments,
+        preopen_cutoff=330,
+        current_window_length=345,
+    )
+    np.testing.assert_array_equal(inside_result["observed_bars"], [[1, 1]])
+    assert inside_result["minutes_since_most_recent_observed_bar"][0, 0] == 0
+    np.testing.assert_array_equal(
+        result["preopen_observed_fraction"],
+        inside_result["preopen_observed_fraction"],
+    )
+
+    after_cutoff = observed.copy()
+    after_cutoff[:, :, 450:] = True
+    after_result = causal_observation_completeness(
+        after_cutoff,
+        *arguments,
+        preopen_cutoff=330,
+        current_window_length=345,
+    )
+    for name in result:
+        np.testing.assert_array_equal(result[name], after_result[name])
+
+
 def test_attribution_inference_is_validation_only(monkeypatch, tmp_path) -> None:
     inputs = _inputs()
     observed_split: list[str] = []

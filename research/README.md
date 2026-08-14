@@ -5,6 +5,9 @@ The research package builds the canonical feature store, trains full-universe ne
 From the repository root:
 
 ```powershell
+# Install the local feature-store/source preprocessing environment
+uv sync --project research --no-default-groups --group preprocessing
+
 # Full-universe incumbent TCN
 uv run --project research python -m brazil_rv.modeling.train
 

@@ -20,6 +20,8 @@ The current repository supports:
 - Environment manager: `uv`
 - Research project: `research/`
 
+The default project dependencies are the current modeling runtime. Local feature-store construction and source normalization use the explicit `preprocessing` group; tests and lint use `dev`, which includes preprocessing dependencies. Interactive notebook packages are not part of the current environment contract.
+
 Raw data under `quant-data/b3/raw/**`, canonical source archives, and `Trading/**` are immutable. Derived stores belong under `quant-data/b3/interim/**` or `quant-data/b3/processed/**`. Resolve canonical pointer files at runtime rather than hard-coding timestamped output directories.
 
 Equities are keyed by permanent B3 security identity and bounded source-assignment dates. Tickers are dated attributes. Monthly point-in-time membership is the eligibility contract; current constituents and survivors must never be substituted historically.
@@ -69,6 +71,9 @@ Default routing is `slow=late_only, macro=late_only`. Direct slow or macro alter
 From the repository root:
 
 ```powershell
+# Local feature-store and source preprocessing environment
+uv sync --project research --no-default-groups --group preprocessing
+
 # Full-universe incumbent
 uv run --project research python -m brazil_rv.modeling.train
 
@@ -106,7 +111,7 @@ Current checkpoints use one schema with strict PyTorch state-dict loading. Uniqu
 
 `ops/lambda-gh200.ps1` is the single notification/launch watcher. Launch requires explicit billing acknowledgement, refuses ambiguous matching instances, uses the explicit Brazil-RV SSH key and per-instance known-hosts file, transfers a verified Git bundle and bootstrap script, and leaves the instance running on success or failure.
 
-The remote bootstrap verifies delivery, the filesystem mount, AArch64/GH200 visibility, the frozen dependency install, package import, CLI help, and Python compilation. It does not run the research test suite, compile a model, perform forward/backward/SAM work, start training, or terminate the instance.
+The remote bootstrap verifies delivery, fast-forwards a clean nondivergent checkout from the uploaded bundle, verifies the filesystem mount and AArch64/GH200 visibility, installs only the frozen default modeling runtime with `--no-default-groups`, and checks package import, CLI help, and Python compilation. It does not install development, notebook, or preprocessing-only dependencies; run the research test suite; compile a model; perform forward/backward/SAM work; start training; or terminate the instance.
 
 ## Limitations
 
