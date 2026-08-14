@@ -38,6 +38,44 @@ Test-Case 'Secrets are redacted from text' {
     Assert-True ($safe -eq 'request failed with <redacted>') 'Secret was not redacted.'
 }
 
+Test-Case 'Current-user DPAPI round trip succeeds' {
+    $text = 'brazil-rv-lambda-dpapi-regression'
+    $bytes = [Text.Encoding]::UTF8.GetBytes($text)
+    $unprotected = $null
+    try {
+        $protected = [System.Security.Cryptography.ProtectedData]::Protect(
+            $bytes,
+            $null,
+            [System.Security.Cryptography.DataProtectionScope]::CurrentUser
+        )
+        $unprotected = [System.Security.Cryptography.ProtectedData]::Unprotect(
+            $protected,
+            $null,
+            [System.Security.Cryptography.DataProtectionScope]::CurrentUser
+        )
+        $decoded = [Text.Encoding]::UTF8.GetString($unprotected)
+        Assert-True ($decoded -ceq $text) 'DPAPI round trip changed the synthetic test string.'
+    }
+    finally {
+        [Array]::Clear($bytes, 0, $bytes.Length)
+        if ($null -ne $unprotected) { [Array]::Clear($unprotected, 0, $unprotected.Length) }
+    }
+}
+
+Test-Case 'Watcher uses fully qualified DPAPI types' {
+    $watcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'lambda-gh200.ps1'))
+    Assert-True ($watcher -notmatch '\[Security\.Cryptography\.') 'Abbreviated cryptography type remains.'
+    Assert-True (
+        [regex]::Matches($watcher, '\[System\.Security\.Cryptography\.ProtectedData\]').Count -eq 2
+    ) 'Expected exactly two fully qualified ProtectedData references.'
+    Assert-True (
+        [regex]::Matches(
+            $watcher,
+            '\[System\.Security\.Cryptography\.DataProtectionScope\]::CurrentUser'
+        ).Count -eq 2
+    ) 'Expected exactly two fully qualified current-user DataProtectionScope references.'
+}
+
 Test-Case 'Retry-After controls bounded API retry delay' {
     $state = [pscustomobject]@{ Count = 0 }
     $sleeps = New-Object 'System.Collections.Generic.List[double]'
