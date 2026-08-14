@@ -349,6 +349,11 @@ def _accumulate_gradients(
     return total
 
 
+def _require_finite_loss(loss: torch.Tensor, location: str) -> None:
+    if not bool(torch.isfinite(loss)):
+        raise FloatingPointError(f"{location} accumulated loss is non-finite")
+
+
 def _gradient_norm(parameters: Iterable[nn.Parameter], maximum: float) -> torch.Tensor:
     try:
         return torch.nn.utils.clip_grad_norm_(
@@ -404,6 +409,7 @@ def _run_sam_update(
     optimizer.zero_grad(set_to_none=True)
     try:
         first_loss = _accumulate_gradients(model, batches, loss_function, count)
+        _require_finite_loss(first_loss, "SAM pass 1")
         first_norm = _gradient_norm(parameters, float("inf"))
         if observer:
             observer("first_gradients", model)
@@ -417,7 +423,8 @@ def _run_sam_update(
         optimizer.zero_grad(set_to_none=True)
         _restore_rng(start_rng, device)
         try:
-            _accumulate_gradients(model, batches, loss_function, count)
+            second_loss = _accumulate_gradients(model, batches, loss_function, count)
+            _require_finite_loss(second_loss, "SAM pass 2")
         finally:
             with torch.no_grad():
                 for parameter, original in zip(parameters, originals, strict=True):
@@ -482,7 +489,12 @@ def run_effective_batch_update(
             sam_observer,
         )
     optimizer.zero_grad(set_to_none=True)
-    total = _accumulate_gradients(model, batches, loss_function, count)
+    try:
+        total = _accumulate_gradients(model, batches, loss_function, count)
+        _require_finite_loss(total, "Ordinary update")
+    except BaseException:
+        optimizer.zero_grad(set_to_none=True)
+        raise
     norm = _optimizer_update(model, optimizer, scheduler)
     return {
         "loss_sum": total,

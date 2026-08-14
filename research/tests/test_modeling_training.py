@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 from torch import nn
+from torch._inductor.exc import InductorError
 
 from brazil_rv.modeling.benchmark_runtime import parse_args as parse_benchmark_args
 from brazil_rv.modeling.contract import (
@@ -22,6 +25,7 @@ from brazil_rv.modeling.engine import (
     checkpoint_payload,
     collect_validation_observations,
     compile_training_objective,
+    eager_training_objective,
     objective_loss,
     rank_huber_loss,
     run_effective_batch_update,
@@ -72,27 +76,240 @@ def _microbatch(seed: int) -> dict[str, torch.Tensor]:
 
 
 def test_objectives_match_current_group_aggregation() -> None:
-    predictions = torch.tensor(
-        [[[-1.0, -0.5, 0.0], [0.0, 0.5, 1.0], [1.0, 0.0, -1.0]]],
-        requires_grad=True,
-    )
-    targets = predictions.detach() / 2
+    predictions = torch.tensor([[[-1.0, -0.5, 0.0], [0.0, 0.5, 1.0], [1.0, 0.0, -1.0]]])
+    targets = predictions / 2
     mask = torch.ones_like(predictions, dtype=torch.bool)
     assert torch.isfinite(soft_spearman_loss(predictions, targets, mask, 0.50))
     difference = predictions - targets
     expected = (0.5 * difference.square()).mean()
-    eager = objective_loss(predictions, targets, mask, "rank_huber", None)
-    compiled = compile_training_objective(
-        "rank_huber", None, RuntimeSettings(num_workers=0, compile_backend="eager")
-    )(predictions, targets, mask)
     torch.testing.assert_close(rank_huber_loss(predictions, targets, mask), expected)
-    torch.testing.assert_close(eager, expected)
-    torch.testing.assert_close(compiled, expected)
-    eager.backward(retain_graph=True)
-    eager_gradient = predictions.grad.detach().clone()
-    predictions.grad = None
-    compiled.backward()
-    torch.testing.assert_close(predictions.grad, eager_gradient)
+    torch.testing.assert_close(
+        objective_loss(predictions, targets, mask, "rank_huber", None), expected
+    )
+
+
+def _compiled_runtime(backend: str) -> RuntimeSettings:
+    return RuntimeSettings(
+        microbatch_size=1,
+        accumulation_steps=2,
+        evaluation_batch_size=2,
+        num_workers=0,
+        compile_backend=backend,
+    )
+
+
+def _soft_spearman_inputs() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    predictions = torch.tensor(
+        [
+            [
+                [-1.0, 0.0, 0.5],
+                [-1.0, 1.0, 0.0],
+                [0.0, 2.0, -0.5],
+                [1.0, 3.0, -0.5],
+                [2.0, 4.0, 1.0],
+            ],
+            [
+                [2.0, -1.0, 0.0],
+                [1.0, -1.0, 1.0],
+                [0.0, 0.0, 1.0],
+                [-1.0, 1.0, 2.0],
+                [-2.0, 2.0, 3.0],
+            ],
+        ],
+        dtype=torch.float32,
+    )
+    targets = torch.tensor(
+        [
+            [
+                [-2.0, 4.0, 0.0],
+                [-1.0, 3.0, 1.0],
+                [0.0, 2.0, 2.0],
+                [1.0, 1.0, 3.0],
+                [2.0, 0.0, 4.0],
+            ],
+            [
+                [2.0, 0.0, 4.0],
+                [1.0, 1.0, 3.0],
+                [0.0, 2.0, 2.0],
+                [-1.0, 3.0, 1.0],
+                [-2.0, 4.0, 0.0],
+            ],
+        ],
+        dtype=torch.float32,
+    )
+    mask = torch.ones_like(predictions, dtype=torch.bool)
+    mask[0, 1, 1] = False
+    mask[0, 4, 2] = False
+    mask[1, 0, 0] = False
+    mask[1, 3, 2] = False
+    return predictions, targets, mask
+
+
+def _assert_compiled_soft_spearman_parity(backend: str) -> None:
+    predictions, targets, mask = _soft_spearman_inputs()
+    eager_predictions = predictions.clone().requires_grad_(True)
+    compiled_predictions = predictions.clone().requires_grad_(True)
+    eager = eager_training_objective("soft_spearman", 0.50)
+    compiled = compile_training_objective(
+        "soft_spearman", 0.50, _compiled_runtime(backend)
+    )
+    eager_loss = eager(eager_predictions, targets, mask)
+    compiled_loss = compiled(compiled_predictions, targets, mask)
+    eager_loss.backward()
+    compiled_loss.backward()
+    assert torch.isfinite(eager_loss)
+    assert torch.isfinite(compiled_loss)
+    assert torch.isfinite(eager_predictions.grad).all()
+    assert torch.isfinite(compiled_predictions.grad).all()
+    torch.testing.assert_close(compiled_loss, eager_loss)
+    torch.testing.assert_close(compiled_predictions.grad, eager_predictions.grad)
+
+
+def test_compiled_soft_spearman_matches_eager_loss_and_gradients() -> None:
+    _assert_compiled_soft_spearman_parity("aot_eager")
+
+
+@pytest.mark.skipif(
+    "inductor" not in torch._dynamo.list_backends(),
+    reason="TorchInductor is unavailable",
+)
+def test_inductor_default_soft_spearman_matches_eager_loss_and_gradients() -> None:
+    try:
+        _assert_compiled_soft_spearman_parity("inductor")
+    except InductorError as error:
+        if "InvalidCxxCompiler" not in str(error):
+            raise
+        pytest.skip(f"TorchInductor compiler is unavailable: {error}")
+
+
+def test_compiled_soft_spearman_matches_eager_sam_update() -> None:
+    runtime = _compiled_runtime("aot_eager")
+    torch.manual_seed(41)
+    eager_model = TinyRanker()
+    compiled_model = deepcopy(eager_model)
+    eager_optimizer = torch.optim.AdamW(eager_model.parameters(), lr=1e-3)
+    compiled_optimizer = torch.optim.AdamW(compiled_model.parameters(), lr=1e-3)
+    eager_objective = eager_training_objective("soft_spearman", 0.50)
+    compiled_objective = compile_training_objective("soft_spearman", 0.50, runtime)
+    warm_predictions = torch.zeros(1, 4, 3, requires_grad=True)
+    compiled_objective(
+        warm_predictions,
+        _microbatch(1)["targets"],
+        _microbatch(1)["label_mask"],
+    ).backward()
+    batches = [_microbatch(1), _microbatch(2)]
+    rng_state = torch.get_rng_state()
+    torch.set_rng_state(rng_state)
+    eager_result = run_effective_batch_update(
+        eager_model,
+        batches,
+        eager_optimizer,
+        None,
+        runtime,
+        "sam_adamw",
+        "soft_spearman",
+        0.50,
+        0.125,
+        training_objective=eager_objective,
+    )
+    torch.set_rng_state(rng_state)
+    compiled_result = run_effective_batch_update(
+        compiled_model,
+        batches,
+        compiled_optimizer,
+        None,
+        runtime,
+        "sam_adamw",
+        "soft_spearman",
+        0.50,
+        0.125,
+        training_objective=compiled_objective,
+    )
+    for eager_parameter, compiled_parameter in zip(
+        eager_model.parameters(), compiled_model.parameters(), strict=True
+    ):
+        torch.testing.assert_close(compiled_parameter, eager_parameter)
+    torch.testing.assert_close(compiled_result["loss_sum"], eager_result["loss_sum"])
+    torch.testing.assert_close(
+        compiled_result["gradient_norm"], eager_result["gradient_norm"]
+    )
+    assert compiled_result["loss_count"] == eager_result["loss_count"]
+    assert compiled_result["backward_passes"] == eager_result["backward_passes"]
+
+
+@pytest.mark.parametrize(
+    ("optimizer_variant", "fail_after", "rho", "message"),
+    (
+        ("adamw", 0, None, "Ordinary update"),
+        ("sam_adamw", 0, 0.125, "SAM pass 1"),
+        ("sam_adamw", 2, 0.125, "SAM pass 2"),
+    ),
+)
+def test_nonfinite_accumulated_loss_is_rejected_per_effective_pass(
+    optimizer_variant: str,
+    fail_after: int,
+    rho: float | None,
+    message: str,
+) -> None:
+    model = TinyRanker()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    originals = [parameter.detach().clone() for parameter in model.parameters()]
+    calls = 0
+
+    def detached_nonfinite_loss(
+        predictions: torch.Tensor,
+        targets: torch.Tensor,
+        label_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        nonlocal calls
+        del targets, label_mask
+        calls += 1
+        finite = predictions.square().sum()
+        if calls > fail_after:
+            return finite + predictions.new_tensor(float("inf"))
+        return finite
+
+    with pytest.raises(
+        FloatingPointError, match=f"{message} accumulated loss is non-finite"
+    ):
+        run_effective_batch_update(
+            model,
+            [_microbatch(1), _microbatch(2)],
+            optimizer,
+            None,
+            _compiled_runtime("eager"),
+            optimizer_variant,
+            "rank_huber",
+            None,
+            rho,
+            training_objective=detached_nonfinite_loss,
+        )
+    for parameter, original in zip(model.parameters(), originals, strict=True):
+        torch.testing.assert_close(parameter, original, atol=0, rtol=0)
+        assert parameter.grad is None
+
+
+def test_finite_loss_check_preserves_ordinary_update() -> None:
+    torch.manual_seed(43)
+    model = TinyRanker()
+    originals = [parameter.detach().clone() for parameter in model.parameters()]
+    result = run_effective_batch_update(
+        model,
+        [_microbatch(1), _microbatch(2)],
+        torch.optim.AdamW(model.parameters(), lr=1e-3),
+        None,
+        _compiled_runtime("eager"),
+        "adamw",
+        "soft_spearman",
+        0.50,
+        None,
+    )
+    assert torch.isfinite(result["loss_sum"])
+    assert torch.isfinite(result["gradient_norm"])
+    assert any(
+        not torch.equal(parameter, original)
+        for parameter, original in zip(model.parameters(), originals, strict=True)
+    )
 
 
 def test_sam_restores_exactly_before_second_gradient_update_and_replays_rng() -> None:
