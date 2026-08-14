@@ -1,32 +1,42 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from pathlib import Path
 
 import numpy as np
 import polars as pl
 import pytest
+import torch
 
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
+    BASELINE_TCN_SETTINGS,
     EFFECTIVE_BATCH_SIZE,
     EQUITY_ABSOLUTE_START_PATCH,
     EQUITY_COUNT,
     GLOBAL_CONTEXT_COUNT,
+    HORIZON_COUNT,
     LOCAL_CONTEXT_COUNT,
     PATCH_INPUT_WIDTH,
     RuntimeSettings,
     SLOW_FEATURE_COUNT,
     TABULAR_FEATURE_COUNT,
+    TCNArchitecture,
+    architecture_for_model,
 )
 from brazil_rv.modeling.data import (
     DateStratifiedMicrobatchSampler,
     DecisionGroupedBatchSampler,
+    VectorizedFeatureDataset,
     _build_patch_batch,
     _build_peer_state,
     _validate_sample_index,
     build_tabular_batch,
     select_sample_split,
+    tensorize_vectorized_batch,
 )
+from brazil_rv.modeling.engine import collect_validation_observations, objective_loss
+from brazil_rv.modeling.model import build_neural_model
 
 
 def _arrays() -> dict[str, np.ndarray]:
@@ -38,6 +48,10 @@ def _arrays() -> dict[str, np.ndarray]:
     equity_features[..., 5] = 1
     context_features[..., 5] = 1
     global_features[..., 5] = 1
+    targets = np.broadcast_to(
+        np.linspace(-0.02, 0.02, EQUITY_COUNT, dtype=np.float32)[None, :, None, None],
+        (1, EQUITY_COUNT, 55, HORIZON_COUNT),
+    ).copy()
     return {
         "equity_features.npy": equity_features,
         "equity_slow.npy": np.ones(
@@ -59,6 +73,9 @@ def _arrays() -> dict[str, np.ndarray]:
             (1, EQUITY_COUNT, 405, 6), dtype=np.float32
         ),
         "equity_peer_valid.npy": np.zeros((1, EQUITY_COUNT, 405, 4), dtype=bool),
+        "targets.npy": targets,
+        "label_mask.npy": np.ones_like(targets, dtype=bool),
+        "raw_returns.npy": targets / 10,
     }
 
 
@@ -210,6 +227,66 @@ def test_padding_is_explicit_and_does_not_create_real_rows() -> None:
     assert requests[0].valid_count == 4
     assert requests[1].indices == (0, 0, 0, 0)
     assert requests[1].valid_count == 1
+
+
+def test_padded_tcn_batch_reuses_safe_inputs_and_is_excluded_from_validation() -> None:
+    rows = pl.DataFrame(
+        {
+            "sample_id": [2, 0, 1],
+            "date_idx": [0, 0, 0],
+            "decision_idx": [0, 2, 1],
+            "equity_cutoff_index": [15, 25, 20],
+            "context_cutoff_index": [75, 85, 80],
+        }
+    )
+    architecture = architecture_for_model("tcn", BASELINE_TCN_SETTINGS)
+    assert isinstance(architecture, TCNArchitecture)
+    dataset = VectorizedFeatureDataset(
+        Path("."), rows, "tcn", "enabled", architecture, "selected"
+    )
+    dataset._arrays = _arrays()
+    request = next(iter(DecisionGroupedBatchSampler(rows, 4)))
+    assert request.indices == (0, 2, 1, 1)
+    assert request.valid_count == rows.height
+    numpy_batch = dataset[request]
+    padded = slice(request.valid_count, None)
+    repeated = slice(request.valid_count - 1, request.valid_count)
+    for name in (
+        "patches",
+        "history_patch_mask",
+        "instrument_mask",
+        "slow_features",
+        "state_position",
+        "peer_state",
+    ):
+        np.testing.assert_array_equal(
+            numpy_batch[name][padded], numpy_batch[name][repeated]
+        )
+    assert (numpy_batch["state_position"][padded] > 0).all()
+    assert not numpy_batch["sample_valid_mask"][padded].any()
+    assert not numpy_batch["label_mask"][padded].any()
+    assert not numpy_batch["targets"][padded].any()
+    assert not numpy_batch["raw_returns"][padded].any()
+    for name in ("sample_id", "date_idx", "decision_idx"):
+        np.testing.assert_array_equal(numpy_batch[name][padded], [-1])
+
+    batch = tensorize_vectorized_batch(numpy_batch)
+    assert int((batch["state_position"] - 1).min()) >= 0
+    model = build_neural_model("tcn", architecture, "selected").eval()
+    observations, loss = collect_validation_observations(
+        model, [batch], "soft_spearman", 0.50
+    )
+    assert observations.predictions.shape[0] == rows.height
+    assert -1 not in observations.sample_id
+    np.testing.assert_array_equal(observations.sample_id, [0, 1, 2])
+    expected_loss = objective_loss(
+        torch.from_numpy(observations.predictions),
+        torch.from_numpy(observations.targets),
+        torch.from_numpy(observations.label_mask),
+        "soft_spearman",
+        0.50,
+    )
+    assert np.isclose(loss, float(expected_loss))
 
 
 def test_train_validation_test_boundaries_are_disjoint() -> None:
