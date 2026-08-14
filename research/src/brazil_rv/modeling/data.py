@@ -627,17 +627,21 @@ class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
                 yield BatchRequest(values, len(values))
 
 
-class SequentialPaddedBatchSampler(Sampler[BatchRequest]):
-    def __init__(self, row_count: int, batch_size: int) -> None:
-        self.row_count = row_count
+class DecisionGroupedBatchSampler(Sampler[BatchRequest]):
+    def __init__(self, sample_index: pl.DataFrame, batch_size: int) -> None:
         self.batch_size = batch_size
+        order = np.arange(sample_index.height)
+        sample_ids = sample_index.get_column("sample_id").to_numpy()
+        decisions = sample_index.get_column("decision_idx").to_numpy()
+        order = order[np.argsort(sample_ids[order], kind="stable")]
+        self.positions = order[np.argsort(decisions[order], kind="stable")]
 
     def __len__(self) -> int:
-        return math.ceil(self.row_count / self.batch_size)
+        return math.ceil(self.positions.size / self.batch_size)
 
     def __iter__(self) -> Iterator[BatchRequest]:
-        for start in range(0, self.row_count, self.batch_size):
-            values = list(range(start, min(start + self.batch_size, self.row_count)))
+        for start in range(0, self.positions.size, self.batch_size):
+            values = self.positions[start : start + self.batch_size].tolist()
             valid_count = len(values)
             values.extend([values[-1]] * (self.batch_size - valid_count))
             yield BatchRequest(tuple(values), valid_count)
@@ -718,9 +722,7 @@ def create_training_loaders(
             tcn_architecture,
             peer_features,
         ),
-        SequentialPaddedBatchSampler(
-            validation_rows.height, runtime.evaluation_batch_size
-        ),
+        DecisionGroupedBatchSampler(validation_rows, runtime.evaluation_batch_size),
         runtime,
         seed,
     )
@@ -741,7 +743,7 @@ def create_evaluation_loader(
         VectorizedFeatureDataset(
             store, rows, model_name, global_context, tcn_architecture, peer_features
         ),
-        SequentialPaddedBatchSampler(rows.height, runtime.evaluation_batch_size),
+        DecisionGroupedBatchSampler(rows, runtime.evaluation_batch_size),
         runtime,
         seed,
     )

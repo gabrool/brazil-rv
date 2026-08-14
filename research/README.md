@@ -24,6 +24,6 @@ uv run --project research python -m brazil_rv.modeling.analyze_stock_time_attrib
   --output-dir <output-directory>
 ```
 
-The incumbent is the width-64 full-receptive-field SwiGLU TCN with selected peers, canonical context masking, late-only routing, soft Spearman at temperature 0.50, and SAM-AdamW at rho 0.125. Training and selection never access the held-out split.
+The incumbent is the width-64 full-receptive-field SwiGLU TCN with selected peers, canonical context masking, late-only routing, soft Spearman at temperature 0.50, and SAM-AdamW at rho 0.125. Training-time validation retains canonical best-epoch observations and writes the complete report once; standalone evaluation remains complete. Training and selection never access the held-out split.
 
 See the repository-root [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for the durable current contract.

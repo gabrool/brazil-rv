@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from torch import nn
 
+from brazil_rv.modeling.benchmark_runtime import parse_args as parse_benchmark_args
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
     BASELINE_TCN_SETTINGS,
@@ -19,13 +20,15 @@ from brazil_rv.modeling.contract import (
 from brazil_rv.modeling.engine import (
     _filter_evaluation_rows,
     checkpoint_payload,
+    collect_validation_observations,
+    compile_training_objective,
     objective_loss,
     rank_huber_loss,
     run_effective_batch_update,
     soft_spearman_loss,
 )
 from brazil_rv.modeling.evaluate import load_current_neural_run
-from brazil_rv.modeling.metrics import create_metric_table
+from brazil_rv.modeling.metrics import create_metric_table, primary_validation_score
 from brazil_rv.modeling.model import build_neural_model
 from brazil_rv.modeling.train import parse_args
 
@@ -37,11 +40,16 @@ class TinyRanker(nn.Module):
         super().__init__()
         self.dropout = nn.Dropout(0.2)
         self.linear = nn.Linear(2, 3, bias=False)
+        self.dropout_outputs: list[torch.Tensor] = []
+        self.inference_flags: list[bool] = []
 
     def forward(
         self, features: torch.Tensor, equity_mask: torch.Tensor
     ) -> torch.Tensor:
-        return self.linear(self.dropout(features)) * equity_mask[..., None]
+        dropped = self.dropout(features)
+        self.dropout_outputs.append(dropped.detach().clone())
+        self.inference_flags.append(torch.is_inference_mode_enabled())
+        return self.linear(dropped) * equity_mask[..., None]
 
 
 def _microbatch(seed: int) -> dict[str, torch.Tensor]:
@@ -64,16 +72,27 @@ def _microbatch(seed: int) -> dict[str, torch.Tensor]:
 
 
 def test_objectives_match_current_group_aggregation() -> None:
-    predictions = torch.tensor([[[-1.0, -0.5, 0.0], [0.0, 0.5, 1.0], [1.0, 0.0, -1.0]]])
-    targets = predictions / 2
+    predictions = torch.tensor(
+        [[[-1.0, -0.5, 0.0], [0.0, 0.5, 1.0], [1.0, 0.0, -1.0]]],
+        requires_grad=True,
+    )
+    targets = predictions.detach() / 2
     mask = torch.ones_like(predictions, dtype=torch.bool)
     assert torch.isfinite(soft_spearman_loss(predictions, targets, mask, 0.50))
     difference = predictions - targets
     expected = (0.5 * difference.square()).mean()
+    eager = objective_loss(predictions, targets, mask, "rank_huber", None)
+    compiled = compile_training_objective(
+        "rank_huber", None, RuntimeSettings(num_workers=0, compile_backend="eager")
+    )(predictions, targets, mask)
     torch.testing.assert_close(rank_huber_loss(predictions, targets, mask), expected)
-    torch.testing.assert_close(
-        objective_loss(predictions, targets, mask, "rank_huber", None), expected
-    )
+    torch.testing.assert_close(eager, expected)
+    torch.testing.assert_close(compiled, expected)
+    eager.backward(retain_graph=True)
+    eager_gradient = predictions.grad.detach().clone()
+    predictions.grad = None
+    compiled.backward()
+    torch.testing.assert_close(predictions.grad, eager_gradient)
 
 
 def test_sam_restores_exactly_before_second_gradient_update_and_replays_rng() -> None:
@@ -105,7 +124,15 @@ def test_sam_restores_exactly_before_second_gradient_update_and_replays_rng() ->
         0.125,
         sam_observer=observer,
     )
-    assert result["rng_replay_exact"] is True
+    assert set(result) == {
+        "loss_sum",
+        "loss_count",
+        "gradient_norm",
+        "backward_passes",
+    }
+    assert len(model.dropout_outputs) == 4
+    torch.testing.assert_close(model.dropout_outputs[0], model.dropout_outputs[2])
+    torch.testing.assert_close(model.dropout_outputs[1], model.dropout_outputs[3])
     assert any(
         not torch.equal(observed["perturbed_parameters"][name], original[name])
         for name in original
@@ -122,10 +149,13 @@ def test_sam_restores_exactly_before_second_gradient_update_and_replays_rng() ->
 
 def test_metric_ordering_preserves_turnover_and_daily_weighting() -> None:
     rng = np.random.default_rng(3)
-    predictions = rng.normal(size=(4, 30, 3)).astype(np.float32)
-    targets = rng.normal(size=(4, 30, 3)).astype(np.float32)
-    returns = rng.normal(scale=0.01, size=(4, 30, 3)).astype(np.float32)
-    mask = np.ones((4, 30, 3), dtype=bool)
+    predictions = np.round(rng.normal(size=(4, 35, 3)), 1).astype(np.float32)
+    targets = np.round(rng.normal(size=(4, 35, 3)), 1).astype(np.float32)
+    returns = rng.normal(scale=0.01, size=(4, 35, 3)).astype(np.float32)
+    mask = np.ones((4, 35, 3), dtype=bool)
+    mask[0, :6, 0] = False
+    mask[1, :5, 1] = False
+    mask[2, :3, 2] = False
     dates = np.array([2, 1, 2, 1])
     decisions = np.array([1, 1, 0, 0])
     first, daily_first = create_metric_table(
@@ -141,6 +171,13 @@ def test_metric_ordering_preserves_turnover_and_daily_weighting() -> None:
         decisions[order],
     )
     assert np.isclose(first["primary_score"], second["primary_score"], atol=1e-15)
+    assert (
+        abs(
+            primary_validation_score(predictions, targets, mask, dates)
+            - float(first["primary_score"])
+        )
+        <= 1e-12
+    )
     assert np.isclose(
         first["mean_valid_sample_spearman_ic"],
         second["mean_valid_sample_spearman_ic"],
@@ -158,17 +195,26 @@ def test_metric_ordering_preserves_turnover_and_daily_weighting() -> None:
 def test_evaluation_padding_filters_only_real_rows() -> None:
     predictions = torch.arange(4 * 2 * 3, dtype=torch.float32).reshape(4, 2, 3)
     batch = {
+        "tabular_features": torch.ones(4, 2, 2),
+        "equity_mask": torch.ones(4, 2, dtype=torch.bool),
         "sample_valid_mask": torch.tensor([True, True, False, False]),
-        "sample_id": torch.tensor([4, 5, -1, -1]),
+        "sample_id": torch.tensor([5, 4, -1, -1]),
         "targets": torch.zeros(4, 2, 3),
         "raw_returns": torch.zeros(4, 2, 3),
         "label_mask": torch.ones(4, 2, 3, dtype=torch.bool),
         "date_idx": torch.tensor([1, 1, -1, -1]),
-        "decision_idx": torch.tensor([0, 1, -1, -1]),
+        "decision_idx": torch.tensor([1, 0, -1, -1]),
     }
     filtered = _filter_evaluation_rows(predictions, batch)
     assert filtered["predictions"].shape[0] == 2
-    np.testing.assert_array_equal(filtered["sample_id"], [4, 5])
+    np.testing.assert_array_equal(filtered["sample_id"], [5, 4])
+    model = TinyRanker()
+    observations, loss = collect_validation_observations(
+        model, [batch], "rank_huber", None
+    )
+    np.testing.assert_array_equal(observations.sample_id, [4, 5])
+    assert model.inference_flags == [True]
+    assert np.isfinite(loss)
 
 
 def test_current_checkpoint_round_trip_uses_one_schema(tmp_path: Path) -> None:
@@ -223,6 +269,7 @@ def test_direct_cli_defaults_to_full_incumbent_and_removed_surfaces_are_rejected
         0.50,
         0.125,
     )
+    assert parse_benchmark_args([]).microbatch_size == 64
 
 
 def test_each_retained_neural_family_has_a_finite_forward_pass() -> None:

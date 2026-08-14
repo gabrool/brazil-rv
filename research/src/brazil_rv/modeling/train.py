@@ -50,13 +50,17 @@ from .data import (
     select_sample_split,
 )
 from .engine import (
+    EvaluationObservations,
     checkpoint_payload,
+    collect_validation_observations,
     compile_model,
-    evaluate_model,
+    compile_training_objective,
     experiment_decimal,
     objective_metadata,
     sam_metadata,
+    summarize_evaluation_observations,
     train_one_epoch,
+    validation_primary_metric,
 )
 from .model import build_neural_model, count_trainable_parameters
 from .optim import build_optimizer, build_scheduler
@@ -244,6 +248,7 @@ def _run_neural(
         optimizer, train_rows.height, MAX_EPOCHS
     )
     compiled = compile_model(model)
+    compiled_objective = compile_training_objective(args.objective, args.temperature)
     manifest = {
         "status": "running",
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -273,10 +278,14 @@ def _run_neural(
     history: list[dict[str, object]] = []
     best_score = -float("inf")
     best_epoch = 0
+    best_observations: EvaluationObservations | None = None
+    best_objective_loss = float("nan")
     stale_epochs = 0
     run_started = time.perf_counter()
     for epoch in range(1, MAX_EPOCHS + 1):
+        epoch_started = time.perf_counter()
         sampler.set_epoch(epoch)
+        training_started = time.perf_counter()
         training = train_one_epoch(
             compiled,
             train_loader,
@@ -287,25 +296,36 @@ def _run_neural(
             args.objective,
             args.temperature,
             args.sam_rho,
+            compiled_objective,
         )
-        validation, daily = evaluate_model(
+        training_seconds = time.perf_counter() - training_started
+        collection_started = time.perf_counter()
+        observations, validation_objective_loss = collect_validation_observations(
             compiled, validation_loader, args.objective, args.temperature
         )
+        validation_collection_seconds = time.perf_counter() - collection_started
+        metric_started = time.perf_counter()
+        score = validation_primary_metric(observations)
+        validation_primary_metric_seconds = time.perf_counter() - metric_started
         row = {
             "epoch": epoch,
             "train_objective_loss": training["objective_loss"],
-            "validation_objective_loss": validation["objective_loss"],
-            "validation_primary_ic": validation["primary_score"],
+            "validation_objective_loss": validation_objective_loss,
+            "validation_primary_ic": score,
             "optimizer_steps": training["optimizer_steps"],
-            "epoch_seconds": training["epoch_seconds"],
+            "training_seconds": training_seconds,
+            "validation_collection_seconds": validation_collection_seconds,
+            "validation_primary_metric_seconds": validation_primary_metric_seconds,
+            "epoch_seconds": time.perf_counter() - epoch_started,
         }
         history.append(row)
         _write_history(run_dir / "history.csv", history)
-        score = float(validation["primary_score"])
         if not np.isfinite(score):
             raise FloatingPointError("Validation primary IC is non-finite")
         if score > best_score + MIN_IC_IMPROVEMENT:
             best_score, best_epoch, stale_epochs = score, epoch, 0
+            best_observations = observations
+            best_objective_loss = validation_objective_loss
             _atomic_torch_save(
                 run_dir / "best_checkpoint.pt",
                 checkpoint_payload(
@@ -327,14 +347,22 @@ def _run_neural(
                     args.peer_features,
                 ),
             )
-            _atomic_json(run_dir / "validation_metrics.json", validation)
-            pl.DataFrame(daily).write_parquet(
-                run_dir / "validation_daily_metrics.parquet"
-            )
         else:
             stale_epochs += 1
             if stale_epochs >= EARLY_STOP_PATIENCE:
                 break
+    if best_observations is None:
+        raise RuntimeError("Training completed without a best validation epoch")
+    reporting_started = time.perf_counter()
+    validation, daily = summarize_evaluation_observations(
+        best_observations,
+        args.objective,
+        args.temperature,
+        best_objective_loss,
+    )
+    _atomic_json(run_dir / "validation_metrics.json", validation)
+    pl.DataFrame(daily).write_parquet(run_dir / "validation_daily_metrics.parquet")
+    final_validation_reporting_seconds = time.perf_counter() - reporting_started
     completed = {
         **manifest,
         "status": "completed",
@@ -343,6 +371,7 @@ def _run_neural(
         "best_validation_score": best_score,
         "epochs_completed": len(history),
         "total_run_seconds": time.perf_counter() - run_started,
+        "final_validation_reporting_seconds": final_validation_reporting_seconds,
     }
     _atomic_json(run_dir / "run_manifest.json", completed)
 
