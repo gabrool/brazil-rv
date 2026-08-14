@@ -101,7 +101,7 @@ Launch prints the instance ID, IP, exact SSH command, and persistent bootstrap l
 
 ## Evaluation and attribution
 
-Hard Spearman is the primary validation and checkpoint-selection metric. It is averaged across decisions within each date and horizon, then equally across horizons. Top/bottom returns and turnover use raw returns.
+Hard Spearman is the primary validation and checkpoint-selection metric. It is averaged across decisions within each date and horizon, then equally across horizons. Training-time validation uses decision-grouped batches, restores canonical sample order, and computes only objective loss plus this selection metric each epoch; the complete validation report is built once from the retained best-epoch observations. Standalone evaluation still builds the complete report normally. Top/bottom returns and turnover use raw returns.
 
 Attribution performs validation inference once per current run or reads an explicitly requested simple prediction cache. It reports exact additive stock IC contributions, cross-sectionally normalized time-series rank skill, 5-minute and canonical 30-minute bins, horizon attribution, five-day moving-block confidence intervals, training-fitted overnight regimes, and causal opening-context completeness. Outputs are plain CSV, Parquet, and JSON.
 

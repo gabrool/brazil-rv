@@ -30,14 +30,13 @@ def _correlation(left: NDArray[np.floating], right: NDArray[np.floating]) -> flo
     return float(np.sum(left_centered * right_centered) / denominator)
 
 
-def sample_level_ic(
+def sample_level_spearman_ic(
     predictions: NDArray[np.float32],
     targets: NDArray[np.float32],
     label_mask: NDArray[np.bool_],
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+) -> NDArray[np.float64]:
     sample_count, _, horizon_count = predictions.shape
     spearman = np.full((sample_count, horizon_count), np.nan, dtype=np.float64)
-    pearson = np.full_like(spearman, np.nan)
     for sample in range(sample_count):
         for horizon in range(horizon_count):
             valid = label_mask[sample, :, horizon]
@@ -45,9 +44,26 @@ def sample_level_ic(
                 continue
             predicted = predictions[sample, valid, horizon]
             actual = targets[sample, valid, horizon]
-            pearson[sample, horizon] = _correlation(predicted, actual)
             spearman[sample, horizon] = _correlation(
                 average_ranks(predicted), average_ranks(actual)
+            )
+    return spearman
+
+
+def sample_level_ic(
+    predictions: NDArray[np.float32],
+    targets: NDArray[np.float32],
+    label_mask: NDArray[np.bool_],
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    spearman = sample_level_spearman_ic(predictions, targets, label_mask)
+    pearson = np.full_like(spearman, np.nan)
+    for sample in range(predictions.shape[0]):
+        for horizon in range(predictions.shape[2]):
+            valid = label_mask[sample, :, horizon]
+            if int(valid.sum()) < MIN_IC_EQUITIES:
+                continue
+            pearson[sample, horizon] = _correlation(
+                predictions[sample, valid, horizon], targets[sample, valid, horizon]
             )
     return spearman, pearson
 
@@ -60,6 +76,34 @@ def _mean(values: NDArray[np.float64]) -> float:
 def _standard_deviation(values: NDArray[np.float64]) -> float:
     finite = values[np.isfinite(values)]
     return float(np.std(finite, ddof=1)) if finite.size > 1 else float("nan")
+
+
+def _primary_score(spearman: NDArray[np.float64], date_idx: NDArray[np.int64]) -> float:
+    unique_dates = np.unique(date_idx)
+    horizon_means = [
+        _mean(
+            np.asarray(
+                [
+                    _mean(spearman[date_idx == date_value, horizon])
+                    for date_value in unique_dates
+                ],
+                dtype=np.float64,
+            )
+        )
+        for horizon in range(spearman.shape[1])
+    ]
+    return float(np.mean(horizon_means))
+
+
+def primary_validation_score(
+    predictions: NDArray[np.float32],
+    targets: NDArray[np.float32],
+    label_mask: NDArray[np.bool_],
+    date_idx: NDArray[np.int64],
+) -> float:
+    return _primary_score(
+        sample_level_spearman_ic(predictions, targets, label_mask), date_idx
+    )
 
 
 def ranking_diagnostics(
@@ -211,7 +255,7 @@ def create_metric_table(
                 ),
             }
         )
-    primary_score = float(np.mean([row["mean_daily_spearman_ic"] for row in horizons]))
+    primary_score = _primary_score(spearman, date_idx)
     return (
         {
             "primary_score": primary_score,

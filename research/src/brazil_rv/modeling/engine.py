@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -26,7 +25,9 @@ from .contract import (
     context_routing_metadata,
     peer_feature_metadata,
 )
-from .metrics import create_metric_table
+from .metrics import create_metric_table, primary_validation_score
+
+TrainingObjective = Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
 
 
 @dataclass(frozen=True)
@@ -97,7 +98,6 @@ def _soft_spearman_loss_sum(
     label_mask: torch.Tensor,
     temperature: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    validate_neural_objective("soft_spearman", temperature)
     with torch.autocast(device_type=predictions.device.type, enabled=False):
         scores = predictions.float().transpose(1, 2)
         target_ranks = targets.float().transpose(1, 2)
@@ -143,6 +143,7 @@ def soft_spearman_loss(
     label_mask: torch.Tensor,
     temperature: float,
 ) -> torch.Tensor:
+    validate_neural_objective("soft_spearman", temperature)
     total, count = _soft_spearman_loss_sum(
         predictions, targets, label_mask, temperature
     )
@@ -166,7 +167,7 @@ def _rank_huber_loss_sum(
     horizon_counts = valid_horizons.sum(1)
     valid_samples = horizon_counts > 0
     sample_loss = (horizon_loss * valid_horizons).sum(1) / horizon_counts.clamp_min(1)
-    return sample_loss[valid_samples].sum(), valid_samples.sum()
+    return (sample_loss * valid_samples).sum(), valid_samples.sum()
 
 
 def rank_huber_loss(
@@ -201,6 +202,48 @@ def objective_loss(
         predictions, targets, label_mask, objective, temperature
     )
     return total / count.clamp_min(1)
+
+
+def eager_training_objective(
+    objective: str, temperature: float | None
+) -> TrainingObjective:
+    objective, temperature = validate_neural_objective(objective, temperature)
+    if objective == "soft_spearman":
+        assert temperature is not None
+
+        def loss(
+            predictions: torch.Tensor,
+            targets: torch.Tensor,
+            label_mask: torch.Tensor,
+        ) -> torch.Tensor:
+            return _soft_spearman_loss_sum(
+                predictions, targets, label_mask, temperature
+            )[0]
+
+        return loss
+
+    def loss(
+        predictions: torch.Tensor,
+        targets: torch.Tensor,
+        label_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        return _rank_huber_loss_sum(predictions, targets, label_mask)[0]
+
+    return loss
+
+
+def compile_training_objective(
+    objective: str,
+    temperature: float | None,
+    runtime: RuntimeSettings = GH200_RUNTIME,
+) -> TrainingObjective:
+    return torch.compile(
+        eager_training_objective(objective, temperature),
+        backend=runtime.compile_backend,
+        mode=runtime.compile_mode,
+        fullgraph=runtime.compile_fullgraph,
+        dynamic=runtime.compile_dynamic,
+    )
 
 
 def _model_transfer_keys(batch: dict[str, torch.Tensor]) -> tuple[str, ...]:
@@ -252,42 +295,67 @@ def _autocast(device: torch.device):
     )
 
 
-def _loss_count(effective_batch: list[dict[str, torch.Tensor]], objective: str) -> int:
-    if objective == "soft_spearman":
-        return sum(
-            int((batch["label_mask"].sum(1) >= 2).sum()) for batch in effective_batch
-        )
-    return sum(
-        int(batch["label_mask"].any(dim=(1, 2)).sum()) for batch in effective_batch
+def _concatenate_batches(values: list[torch.Tensor]) -> torch.Tensor:
+    first = values[0]
+    output = torch.empty(
+        (sum(value.shape[0] for value in values), *first.shape[1:]),
+        dtype=first.dtype,
+        pin_memory=first.is_pinned(),
     )
+    return torch.cat(values, out=output)
+
+
+def _combine_effective_batch(
+    batches: list[dict[str, torch.Tensor]],
+) -> dict[str, torch.Tensor]:
+    return {
+        key: _concatenate_batches([batch[key] for batch in batches])
+        for key in _model_transfer_keys(batches[0])
+    }
+
+
+def _loss_count(label_mask: torch.Tensor, objective: str) -> int:
+    if objective == "soft_spearman":
+        return int((label_mask.sum(1) >= 2).sum())
+    return int(label_mask.any(dim=(1, 2)).sum())
+
+
+def _split_microbatches(
+    batch: dict[str, torch.Tensor], microbatch_size: int
+) -> list[dict[str, torch.Tensor]]:
+    batch_size = next(iter(batch.values())).shape[0]
+    return [
+        {
+            name: values[start : start + microbatch_size]
+            for name, values in batch.items()
+        }
+        for start in range(0, batch_size, microbatch_size)
+    ]
 
 
 def _accumulate_gradients(
     model: nn.Module,
     batches: list[dict[str, torch.Tensor]],
-    objective: str,
-    temperature: float | None,
+    loss_function: TrainingObjective,
     count: int,
 ) -> torch.Tensor:
     total = next(model.parameters()).new_zeros((), dtype=torch.float32)
     for batch in batches:
         with _autocast(next(model.parameters()).device):
             predictions = _predict(model, batch)
-        loss_sum, _ = _objective_loss_sum(
-            predictions, batch["targets"], batch["label_mask"], objective, temperature
-        )
-        if not torch.isfinite(loss_sum):
-            raise FloatingPointError("Training loss is non-finite")
+        loss_sum = loss_function(predictions, batch["targets"], batch["label_mask"])
         total += loss_sum.detach()
         (loss_sum / count).backward()
-    gradients = [
-        parameter.grad for parameter in model.parameters() if parameter.grad is not None
-    ]
-    if not gradients or not all(
-        bool(torch.isfinite(value).all()) for value in gradients
-    ):
-        raise FloatingPointError("Training gradients are non-finite")
     return total
+
+
+def _gradient_norm(parameters: Iterable[nn.Parameter], maximum: float) -> torch.Tensor:
+    try:
+        return torch.nn.utils.clip_grad_norm_(
+            tuple(parameters), maximum, error_if_nonfinite=True
+        ).detach()
+    except RuntimeError as error:
+        raise FloatingPointError("Training gradients are non-finite") from error
 
 
 def _optimizer_update(
@@ -296,17 +364,11 @@ def _optimizer_update(
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
 ) -> torch.Tensor:
     try:
-        norm = torch.nn.utils.clip_grad_norm_(model.parameters(), GRADIENT_CLIP)
-        if not torch.isfinite(norm):
-            raise FloatingPointError("Gradient norm is non-finite")
+        norm = _gradient_norm(model.parameters(), GRADIENT_CLIP)
         optimizer.step()
-        if not all(
-            bool(torch.isfinite(parameter).all()) for parameter in model.parameters()
-        ):
-            raise FloatingPointError("Optimizer produced non-finite parameters")
         if scheduler is not None:
             scheduler.step()
-        return norm.detach()
+        return norm
     finally:
         optimizer.zero_grad(set_to_none=True)
 
@@ -330,29 +392,19 @@ def _run_sam_update(
     batches: list[dict[str, torch.Tensor]],
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
-    objective: str,
-    temperature: float | None,
+    loss_function: TrainingObjective,
     rho: float,
     count: int,
     observer: Callable[[str, nn.Module], None] | None = None,
-) -> dict[str, float | int | bool]:
+) -> dict[str, object]:
     parameters = tuple(model.parameters())
     originals = [parameter.detach().clone() for parameter in parameters]
     device = parameters[0].device
     start_rng = _rng_state(device)
     optimizer.zero_grad(set_to_none=True)
     try:
-        first_loss = _accumulate_gradients(
-            model, batches, objective, temperature, count
-        )
-        first_end_rng = _rng_state(device)
-        first_norm = torch.sqrt(
-            sum(
-                parameter.grad.detach().float().square().sum()
-                for parameter in parameters
-                if parameter.grad is not None
-            )
-        )
+        first_loss = _accumulate_gradients(model, batches, loss_function, count)
+        first_norm = _gradient_norm(parameters, float("inf"))
         if observer:
             observer("first_gradients", model)
         scale = rho / (first_norm + SAM_NORM_EPS)
@@ -365,44 +417,21 @@ def _run_sam_update(
         optimizer.zero_grad(set_to_none=True)
         _restore_rng(start_rng, device)
         try:
-            _accumulate_gradients(model, batches, objective, temperature, count)
-            second_end_rng = _rng_state(device)
-            second_norm = torch.sqrt(
-                sum(
-                    parameter.grad.detach().float().square().sum()
-                    for parameter in parameters
-                    if parameter.grad is not None
-                )
-            )
+            _accumulate_gradients(model, batches, loss_function, count)
         finally:
             with torch.no_grad():
                 for parameter, original in zip(parameters, originals, strict=True):
                     parameter.copy_(original)
-        if not all(
-            torch.equal(parameter, original)
-            for parameter, original in zip(parameters, originals, strict=True)
-        ):
-            raise RuntimeError("SAM parameter restoration was not exact")
-        if not torch.equal(first_end_rng[0], second_end_rng[0]) or (
-            first_end_rng[1] is not None
-            and not torch.equal(first_end_rng[1], second_end_rng[1])
-        ):
-            raise RuntimeError("SAM RNG replay diverged")
         if observer:
             observer("second_gradients", model)
         clipped = _optimizer_update(model, optimizer, scheduler)
         if observer:
             observer("updated_parameters", model)
         return {
-            "loss_sum": float(first_loss),
+            "loss_sum": first_loss,
             "loss_count": count,
-            "gradient_norm": float(clipped),
-            "first_pass_gradient_norm": float(first_norm),
-            "second_pass_gradient_norm": float(second_norm),
-            "perturbation_norm": rho,
+            "gradient_norm": clipped,
             "backward_passes": 2 * len(batches),
-            "rng_replay_exact": True,
-            "all_finite": True,
         }
     except BaseException:
         with torch.no_grad():
@@ -423,17 +452,23 @@ def run_effective_batch_update(
     temperature: float | None,
     sam_rho: float | None,
     *,
+    training_objective: TrainingObjective | None = None,
     sam_observer: Callable[[str, nn.Module], None] | None = None,
 ) -> dict[str, object]:
     if len(effective_batch) != runtime.accumulation_steps:
         raise ValueError(f"Expected {runtime.accumulation_steps} microbatches")
     objective_metadata(objective, temperature)
     sam_metadata(optimizer_variant, sam_rho)
-    device = next(model.parameters()).device
-    batches = [_to_device(batch, device) for batch in effective_batch]
-    count = _loss_count(batches, objective)
+    cpu_batch = _combine_effective_batch(effective_batch)
+    count = _loss_count(cpu_batch["label_mask"], objective)
     if not count:
         raise ValueError("Effective batch has no valid objective group")
+    device = next(model.parameters()).device
+    batch = _to_device(cpu_batch, device)
+    batches = _split_microbatches(batch, runtime.microbatch_size)
+    loss_function = training_objective or eager_training_objective(
+        objective, temperature
+    )
     if optimizer_variant == "sam_adamw":
         assert sam_rho is not None
         return _run_sam_update(
@@ -441,21 +476,19 @@ def run_effective_batch_update(
             batches,
             optimizer,
             scheduler,
-            objective,
-            temperature,
+            loss_function,
             sam_rho,
             count,
             sam_observer,
         )
     optimizer.zero_grad(set_to_none=True)
-    total = _accumulate_gradients(model, batches, objective, temperature, count)
+    total = _accumulate_gradients(model, batches, loss_function, count)
     norm = _optimizer_update(model, optimizer, scheduler)
     return {
-        "loss_sum": float(total),
+        "loss_sum": total,
         "loss_count": count,
-        "gradient_norm": float(norm),
+        "gradient_norm": norm,
         "backward_passes": len(batches),
-        "all_finite": True,
     }
 
 
@@ -469,9 +502,9 @@ def train_one_epoch(
     objective: str,
     temperature: float | None,
     sam_rho: float | None,
+    training_objective: TrainingObjective | None = None,
 ) -> dict[str, object]:
     model.train()
-    started = time.perf_counter()
     batches: list[dict[str, torch.Tensor]] = []
     updates: list[dict[str, object]] = []
     for batch in loader:
@@ -488,22 +521,25 @@ def train_one_epoch(
                     objective,
                     temperature,
                     sam_rho,
+                    training_objective=training_objective,
                 )
             )
             batches = []
     if batches:
         raise ValueError("Training epoch ended with an incomplete effective batch")
-    loss_sum = sum(float(update["loss_sum"]) for update in updates)
     loss_count = sum(int(update["loss_count"]) for update in updates)
+    loss_sum = torch.stack([update["loss_sum"] for update in updates]).sum()
+    mean_gradient_norm = torch.stack(
+        [update["gradient_norm"] for update in updates]
+    ).mean()
+    objective_loss, mean_gradient_norm_value = (
+        torch.stack((loss_sum / loss_count, mean_gradient_norm)).detach().cpu().tolist()
+    )
     return {
-        "objective_loss": loss_sum / loss_count,
+        "objective_loss": objective_loss,
         "optimizer_steps": len(updates),
         "backward_passes": sum(int(update["backward_passes"]) for update in updates),
-        "mean_gradient_norm": float(
-            np.mean([update["gradient_norm"] for update in updates])
-        ),
-        "epoch_seconds": time.perf_counter() - started,
-        "all_finite": True,
+        "mean_gradient_norm": mean_gradient_norm_value,
     }
 
 
@@ -527,12 +563,12 @@ def _filter_evaluation_rows(
     }
 
 
-def collect_evaluation_observations(
+def collect_validation_observations(
     model: nn.Module,
     loader: Iterable[dict[str, torch.Tensor]],
     objective: str,
     temperature: float | None,
-) -> tuple[EvaluationObservations, dict[str, object], list[dict[str, object]]]:
+) -> tuple[EvaluationObservations, float]:
     objective_metadata(objective, temperature)
     device = next(model.parameters()).device
     model.eval()
@@ -548,54 +584,82 @@ def collect_evaluation_observations(
             "decision_idx",
         )
     }
-    total_loss = 0.0
+    loss_sums: list[torch.Tensor] = []
     total_count = 0
-    with torch.no_grad():
+    with torch.inference_mode():
         for cpu_batch in loader:
-            batch = _to_device(cpu_batch, device)
             valid_count = int(cpu_batch["sample_valid_mask"].sum())
+            total_count += _loss_count(cpu_batch["label_mask"][:valid_count], objective)
+            batch = _to_device(cpu_batch, device)
             with _autocast(device):
                 predictions = _predict(model, batch)
-            loss_sum, count = _objective_loss_sum(
+            loss_sum, _ = _objective_loss_sum(
                 predictions[:valid_count],
                 batch["targets"][:valid_count],
                 batch["label_mask"][:valid_count],
                 objective,
                 temperature,
             )
-            total_loss += float(loss_sum)
-            total_count += int(count)
+            loss_sums.append(loss_sum.detach())
             for name, values in _filter_evaluation_rows(predictions, cpu_batch).items():
                 collected[name].append(values)
-    arrays = {name: np.concatenate(parts) for name, parts in collected.items()}
-    summary, daily = create_metric_table(
-        arrays["predictions"],
-        arrays["targets"],
-        arrays["raw_returns"],
-        arrays["label_mask"],
-        arrays["date_idx"],
-        arrays["decision_idx"],
-    )
     if not total_count:
         raise ValueError("Evaluation has no valid objective groups")
-    summary["objective"] = objective_metadata(objective, temperature)
-    summary["objective_loss"] = total_loss / total_count
+    arrays = {name: np.concatenate(parts) for name, parts in collected.items()}
+    order = np.argsort(arrays["sample_id"], kind="stable")
     observations = EvaluationObservations(
-        **{name: arrays[name] for name in EvaluationObservations.__dataclass_fields__}
+        **{
+            name: arrays[name][order]
+            for name in EvaluationObservations.__dataclass_fields__
+        }
     )
-    return observations, summary, daily
+    objective_loss_value = (
+        float(torch.stack(loss_sums).sum().detach().cpu()) / total_count
+    )
+    return observations, objective_loss_value
 
 
-def evaluate_model(
+def validation_primary_metric(observations: EvaluationObservations) -> float:
+    return primary_validation_score(
+        observations.predictions,
+        observations.targets,
+        observations.label_mask,
+        observations.date_idx,
+    )
+
+
+def summarize_evaluation_observations(
+    observations: EvaluationObservations,
+    objective: str,
+    temperature: float | None,
+    objective_loss_value: float,
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    summary, daily = create_metric_table(
+        observations.predictions,
+        observations.targets,
+        observations.raw_returns,
+        observations.label_mask,
+        observations.date_idx,
+        observations.decision_idx,
+    )
+    summary["objective"] = objective_metadata(objective, temperature)
+    summary["objective_loss"] = objective_loss_value
+    return summary, daily
+
+
+def collect_evaluation_observations(
     model: nn.Module,
     loader: Iterable[dict[str, torch.Tensor]],
     objective: str,
     temperature: float | None,
-) -> tuple[dict[str, object], list[dict[str, object]]]:
-    _, summary, daily = collect_evaluation_observations(
+) -> tuple[EvaluationObservations, dict[str, object], list[dict[str, object]]]:
+    observations, objective_loss_value = collect_validation_observations(
         model, loader, objective, temperature
     )
-    return summary, daily
+    summary, daily = summarize_evaluation_observations(
+        observations, objective, temperature, objective_loss_value
+    )
+    return observations, summary, daily
 
 
 def checkpoint_payload(

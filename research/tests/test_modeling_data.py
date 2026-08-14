@@ -20,7 +20,7 @@ from brazil_rv.modeling.contract import (
 )
 from brazil_rv.modeling.data import (
     DateStratifiedMicrobatchSampler,
-    SequentialPaddedBatchSampler,
+    DecisionGroupedBatchSampler,
     _build_patch_batch,
     _build_peer_state,
     _validate_sample_index,
@@ -204,9 +204,12 @@ def test_date_stratified_sampler_uses_full_grid_distinct_dates_and_decision_orde
 
 
 def test_padding_is_explicit_and_does_not_create_real_rows() -> None:
-    request = list(SequentialPaddedBatchSampler(5, 4))[-1]
-    assert request.valid_count == 1
-    assert request.indices == (4, 4, 4, 4)
+    rows = pl.DataFrame({"sample_id": [4, 2, 3, 1, 0], "decision_idx": [1, 0, 1, 0, 1]})
+    requests = list(DecisionGroupedBatchSampler(rows, 4))
+    assert requests[0].indices == (3, 1, 4, 2)
+    assert requests[0].valid_count == 4
+    assert requests[1].indices == (0, 0, 0, 0)
+    assert requests[1].valid_count == 1
 
 
 def test_train_validation_test_boundaries_are_disjoint() -> None:
