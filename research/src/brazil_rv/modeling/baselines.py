@@ -190,6 +190,25 @@ class SharedCausalTCN(nn.Module):
                 self.routing.apply(self._initialize_module)
                 self.routing.zero_final_projections()
 
+        self.scale_logits: nn.Parameter | None = None
+        if architecture.readout == "shared_multiscale":
+            self.scale_logits = nn.Parameter(torch.zeros(architecture.residual_blocks))
+        elif architecture.readout == "horizon_multiscale":
+            self.scale_logits = nn.Parameter(
+                torch.zeros(architecture.output_horizons, architecture.residual_blocks)
+            )
+        self.score_mlp: nn.Sequential | None = None
+        if architecture.readout == "final_score_mlp":
+            with torch.random.fork_rng(devices=[]):
+                self.score_mlp = nn.Sequential(
+                    nn.Linear(architecture.output_horizons, 2, bias=True),
+                    nn.SiLU(),
+                    nn.Linear(2, architecture.output_horizons, bias=True),
+                )
+                self.score_mlp.apply(self._initialize_module)
+                nn.init.zeros_(self.score_mlp[-1].weight)
+                nn.init.zeros_(self.score_mlp[-1].bias)
+
     @staticmethod
     def _initialize_module(module: nn.Module) -> None:
         if isinstance(module, (nn.Linear, nn.Conv1d)):
@@ -382,6 +401,32 @@ class SharedCausalTCN(nn.Module):
             history_patch_mask.shape[2],
         )
 
+    def _gather_hidden_states(
+        self,
+        hidden: torch.Tensor,
+        batch_size: int,
+        instrument_count: int,
+        state_position: torch.Tensor,
+    ) -> torch.Tensor:
+        architecture = self.architecture
+        sequence_length = hidden.shape[-1]
+        streams = hidden.reshape(
+            batch_size, instrument_count, architecture.width, sequence_length
+        ).permute(0, 1, 3, 2)
+        gather_positions = state_position[:, None].expand(-1, instrument_count)
+        if instrument_count == self.instrument_count:
+            global_slots = (
+                torch.arange(instrument_count, device=hidden.device)
+                >= self.equity_count + LOCAL_CONTEXT_COUNT
+            )
+            gather_positions = torch.where(
+                global_slots[None], STATE_TOKEN_SLOT, gather_positions
+            )
+        gather_index = (gather_positions - 1)[..., None, None].expand(
+            -1, -1, 1, architecture.width
+        )
+        return streams.gather(2, gather_index).squeeze(2)
+
     def _instrument_states(
         self,
         patches: torch.Tensor,
@@ -389,7 +434,9 @@ class SharedCausalTCN(nn.Module):
         instrument_mask: torch.Tensor,
         slow_features: torch.Tensor,
         state_position: torch.Tensor,
-    ) -> torch.Tensor:
+        *,
+        collect_taps: bool = False,
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, ...]]:
         architecture = self.architecture
         batch_size = patches.shape[0]
         instrument_count = (
@@ -453,6 +500,7 @@ class SharedCausalTCN(nn.Module):
             architecture.width,
             masked.shape[2],
         )
+        taps: list[torch.Tensor] = []
         for block_index, block in enumerate(self.blocks):
             hidden = block(hidden)
             if self.routing is not None and (
@@ -467,26 +515,168 @@ class SharedCausalTCN(nn.Module):
                     state_position,
                     slow_condition,
                 )
-        hidden = hidden.reshape(
-            batch_size,
-            instrument_count,
-            architecture.width,
-            masked.shape[2],
-        ).permute(0, 1, 3, 2)
-        gather_positions = state_position[:, None].expand(-1, instrument_count)
-        if instrument_count == self.instrument_count:
-            global_slots = (
-                torch.arange(instrument_count, device=patches.device)
-                >= self.equity_count + LOCAL_CONTEXT_COUNT
-            )
-            gather_positions = torch.where(
-                global_slots[None], STATE_TOKEN_SLOT, gather_positions
-            )
-        gather_index = (gather_positions - 1)[..., None, None].expand(
-            -1, -1, 1, architecture.width
+            if collect_taps:
+                taps.append(
+                    self._gather_hidden_states(
+                        hidden, batch_size, instrument_count, state_position
+                    )[:, : self.equity_count]
+                )
+        raw_state = self._gather_hidden_states(
+            hidden, batch_size, instrument_count, state_position
         )
-        state = hidden.gather(2, gather_index).squeeze(2)
-        return self.state_norm(state + self.slow_projection(slow_features))
+        states = self.state_norm(raw_state + self.slow_projection(slow_features))
+        return states, tuple(taps)
+
+    def _add_peer(
+        self, equity_states: torch.Tensor, peer_state: torch.Tensor | None
+    ) -> torch.Tensor:
+        if self.peer_adapter is None:
+            if peer_state is not None:
+                raise ValueError("Peer state is forbidden when peer features are none")
+            return equity_states
+        if peer_state is None:
+            raise ValueError("Peer state is required for peer-enabled TCN")
+        if peer_state.shape != (
+            equity_states.shape[0],
+            self.equity_count,
+            PEER_STATE_WIDTH,
+        ):
+            raise ValueError("Peer state has the wrong shape")
+        peer = self.peer_adapter(peer_state)
+        return (
+            equity_states + peer[:, :, None, :]
+            if equity_states.ndim == 4
+            else equity_states + peer
+        )
+
+    def _fuse_equity(
+        self,
+        equity_states: torch.Tensor,
+        context_states: torch.Tensor,
+        equity_mask: torch.Tensor,
+        context_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        fusion_mode = self.architecture.fusion_mode
+        if fusion_mode == "none":
+            return equity_states
+        shared_parts: list[torch.Tensor] = []
+        if fusion_mode in ("context_only", "context_pooled"):
+            shared_parts.append(
+                (
+                    context_states * context_mask[..., None].to(context_states.dtype)
+                ).reshape(
+                    context_states.shape[0],
+                    CONTEXT_COUNT * self.architecture.width,
+                )
+            )
+        if fusion_mode in ("pooled_market", "context_pooled"):
+            weight = equity_mask[..., None].to(equity_states.dtype)
+            count = weight.sum(dim=1).clamp_min(1.0)
+            mean = (equity_states * weight).sum(dim=1) / count
+            second_moment = (equity_states.square() * weight).sum(dim=1) / count
+            dispersion = torch.sqrt(
+                torch.clamp(second_moment - mean.square(), min=1e-6)
+            )
+            shared_parts.extend((mean, dispersion))
+        shared = torch.cat(shared_parts, dim=-1)
+        shared = shared[:, None].expand(-1, self.equity_count, -1)
+        fusion_input = torch.cat((equity_states, shared), dim=-1)
+        fused = self.fusion_output(F.gelu(self.fusion_input(fusion_input)))
+        fused = self.dropout(F.gelu(fused))
+        gate = torch.sigmoid(
+            self.fusion_gate(torch.cat((equity_states, fused), dim=-1))
+        )
+        return self.fusion_norm(equity_states + gate * fused)
+
+    def _fuse_horizons(
+        self,
+        equity_states: torch.Tensor,
+        context_states: torch.Tensor,
+        equity_mask: torch.Tensor,
+        context_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        batch_size, _, horizon_count, width = equity_states.shape
+        flattened = equity_states.permute(0, 2, 1, 3).reshape(
+            batch_size * horizon_count, self.equity_count, width
+        )
+        repeated_context = (
+            context_states[:, None]
+            .expand(-1, horizon_count, -1, -1)
+            .reshape(batch_size * horizon_count, context_states.shape[1], width)
+        )
+        repeated_equity_mask = (
+            equity_mask[:, None]
+            .expand(-1, horizon_count, -1)
+            .reshape(batch_size * horizon_count, self.equity_count)
+        )
+        repeated_context_mask = (
+            context_mask[:, None]
+            .expand(-1, horizon_count, -1)
+            .reshape(batch_size * horizon_count, context_mask.shape[1])
+        )
+        fused = self._fuse_equity(
+            flattened,
+            repeated_context,
+            repeated_equity_mask,
+            repeated_context_mask,
+        )
+        return fused.reshape(
+            batch_size, horizon_count, self.equity_count, width
+        ).permute(0, 2, 1, 3)
+
+    def scale_weights(self) -> torch.Tensor | None:
+        return (
+            None
+            if self.scale_logits is None
+            else torch.softmax(self.scale_logits, dim=-1)
+        )
+
+    def _readout(
+        self,
+        states: torch.Tensor,
+        taps: tuple[torch.Tensor, ...],
+        instrument_mask: torch.Tensor,
+        slow_features: torch.Tensor,
+        peer_state: torch.Tensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        equity_mask = instrument_mask[:, : self.equity_count]
+        context_states = states[:, self.equity_count :]
+        context_mask = instrument_mask[:, self.equity_count :]
+        readout = self.architecture.readout
+        if readout in ("final", "final_score_mlp"):
+            equity_states = self._add_peer(states[:, : self.equity_count], peer_state)
+            equity_states = self._fuse_equity(
+                equity_states, context_states, equity_mask, context_mask
+            )
+            predictions = self.prediction_head(equity_states)
+            if self.score_mlp is not None:
+                predictions = predictions + self.score_mlp(predictions)
+        else:
+            if len(taps) != self.architecture.residual_blocks:
+                raise AssertionError("Multiscale readout requires every TCN tap")
+            tap_tensor = torch.stack(taps, dim=2)
+            weights = self.scale_weights()
+            assert weights is not None
+            slow = self.slow_projection(slow_features[:, : self.equity_count])
+            if readout == "shared_multiscale":
+                mixed = (tap_tensor * weights[None, None, :, None]).sum(dim=2)
+                equity_states = self.state_norm(mixed + slow)
+                equity_states = self._add_peer(equity_states, peer_state)
+                equity_states = self._fuse_equity(
+                    equity_states, context_states, equity_mask, context_mask
+                )
+                predictions = self.prediction_head(equity_states)
+            else:
+                mixed = torch.einsum("hk,bekw->behw", weights, tap_tensor)
+                equity_states = self.state_norm(mixed + slow[:, :, None, :])
+                equity_states = self._add_peer(equity_states, peer_state)
+                equity_states = self._fuse_horizons(
+                    equity_states, context_states, equity_mask, context_mask
+                )
+                predictions = (
+                    equity_states * self.prediction_head.weight[None, None, :, :]
+                ).sum(dim=-1) + self.prediction_head.bias
+        return predictions * equity_mask[..., None].to(predictions.dtype), equity_states
 
     def forward(
         self,
@@ -497,58 +687,53 @@ class SharedCausalTCN(nn.Module):
         state_position: torch.Tensor,
         peer_state: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        states = self._instrument_states(
+        collect_taps = self.architecture.readout in (
+            "shared_multiscale",
+            "horizon_multiscale",
+        )
+        states, taps = self._instrument_states(
             patches,
             history_patch_mask,
             instrument_mask,
             slow_features,
             state_position,
+            collect_taps=collect_taps,
         )
-        equity_states = states[:, : self.equity_count]
-        equity_mask = instrument_mask[:, : self.equity_count]
-        if self.peer_adapter is None:
-            if peer_state is not None:
-                raise ValueError("Peer state is forbidden when peer features are none")
-        else:
-            if peer_state is None:
-                raise ValueError("Peer state is required for peer-enabled TCN")
-            if peer_state.shape != (
-                equity_states.shape[0],
-                self.equity_count,
-                PEER_STATE_WIDTH,
-            ):
-                raise ValueError("Peer state has the wrong shape")
-            equity_states = equity_states + self.peer_adapter(peer_state)
-        fusion_mode = self.architecture.fusion_mode
-        if fusion_mode != "none":
-            shared_parts: list[torch.Tensor] = []
-            if fusion_mode in ("context_only", "context_pooled"):
-                shared_parts.append(
-                    (
-                        states[:, self.equity_count :]
-                        * instrument_mask[:, self.equity_count :, None].to(states.dtype)
-                    ).reshape(states.shape[0], CONTEXT_COUNT * self.architecture.width)
-                )
-            if fusion_mode in ("pooled_market", "context_pooled"):
-                weight = equity_mask[..., None].to(states.dtype)
-                count = weight.sum(dim=1).clamp_min(1.0)
-                mean = (equity_states * weight).sum(dim=1) / count
-                second_moment = (equity_states.square() * weight).sum(dim=1) / count
-                dispersion = torch.sqrt(
-                    torch.clamp(second_moment - mean.square(), min=1e-6)
-                )
-                shared_parts.extend((mean, dispersion))
-            shared = torch.cat(shared_parts, dim=-1)
-            shared = shared[:, None].expand(-1, self.equity_count, -1)
-            fusion_input = torch.cat((equity_states, shared), dim=-1)
-            fused = self.fusion_output(F.gelu(self.fusion_input(fusion_input)))
-            fused = self.dropout(F.gelu(fused))
-            gate = torch.sigmoid(
-                self.fusion_gate(torch.cat((equity_states, fused), dim=-1))
-            )
-            equity_states = self.fusion_norm(equity_states + gate * fused)
-        predictions = self.prediction_head(equity_states)
-        return predictions * equity_mask[..., None].to(predictions.dtype)
+        predictions, _ = self._readout(
+            states, taps, instrument_mask, slow_features, peer_state
+        )
+        return predictions
+
+    def extract_diagnostics(
+        self,
+        patches: torch.Tensor,
+        history_patch_mask: torch.Tensor,
+        instrument_mask: torch.Tensor,
+        slow_features: torch.Tensor,
+        state_position: torch.Tensor,
+        peer_state: torch.Tensor | None = None,
+    ) -> dict[str, torch.Tensor]:
+        if torch.compiler.is_compiling():
+            raise RuntimeError("Diagnostic extraction is eager-only")
+        states, taps = self._instrument_states(
+            patches,
+            history_patch_mask,
+            instrument_mask,
+            slow_features,
+            state_position,
+            collect_taps=True,
+        )
+        predictions, representation = self._readout(
+            states, taps, instrument_mask, slow_features, peer_state
+        )
+        result = {
+            f"block_{index}": tap.detach() for index, tap in enumerate(taps, start=1)
+        }
+        result["final_pre_head"] = representation.detach()
+        result["predictions"] = predictions.detach()
+        if self.architecture.fusion_mode in ("context_only", "context_pooled"):
+            result["context_states"] = states[:, self.equity_count :].detach()
+        return result
 
 
 class _MLPResidualBlock(nn.Module):

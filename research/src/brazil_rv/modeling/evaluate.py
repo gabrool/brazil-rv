@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -63,6 +64,11 @@ def load_current_neural_run(
     settings_value = checkpoint["tcn_settings"]
     settings = TCNSettings(**settings_value) if settings_value is not None else None
     architecture = architecture_for_model(model_name, settings)
+    checkpoint["tcn_settings"] = None if settings is None else asdict(settings)
+    checkpoint["architecture"] = asdict(architecture)
+    checkpoint.setdefault("training_horizon", "all")
+    checkpoint.setdefault("selection_horizon", checkpoint["training_horizon"])
+    checkpoint.setdefault("context_family_ablation", "none")
     peer_value = checkpoint["peer_features"]
     if not isinstance(peer_value, dict) or peer_value.get("mode") not in (
         "none",
@@ -114,6 +120,7 @@ def collect_neural_evaluation(
         int(checkpoint["seed"]),
         architecture if isinstance(architecture, TCNArchitecture) else None,
         str(peer["mode"]),
+        str(checkpoint["context_family_ablation"]),
     )
     observations, summary, daily = collect_evaluation_observations(
         model,
