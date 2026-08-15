@@ -208,7 +208,7 @@ PEER_STATE_ORDER = (
 
 EFFECTIVE_BATCH_SIZE = 512
 MAX_EPOCHS = 20
-EARLY_STOP_PATIENCE = 5
+EARLY_STOP_PATIENCE = 3
 MIN_IC_IMPROVEMENT = 1e-4
 GRADIENT_CLIP = 1.0
 HUBER_DELTA = 1.0
@@ -228,8 +228,9 @@ MLP_SWIGLU_WIDTH = 512
 
 @dataclass(frozen=True)
 class RuntimeSettings:
-    microbatch_size: int = 64
-    accumulation_steps: int = 8
+    effective_batch_size: int = EFFECTIVE_BATCH_SIZE
+    loader_batch_size: int = 256
+    microbatch_size: int = 256
     evaluation_batch_size: int = 256
     num_workers: int = 8
     prefetch_factor: int = 4
@@ -237,6 +238,35 @@ class RuntimeSettings:
     compile_mode: str = "default"
     compile_fullgraph: bool = True
     compile_dynamic: bool = False
+
+    def __post_init__(self) -> None:
+        sizes = (
+            self.effective_batch_size,
+            self.loader_batch_size,
+            self.microbatch_size,
+        )
+        if any(size <= 0 for size in sizes):
+            raise ValueError("Batch sizes must be positive")
+        if self.effective_batch_size % self.loader_batch_size:
+            raise ValueError(
+                "Effective batch size must be divisible by loader batch size"
+            )
+        if self.effective_batch_size % self.microbatch_size:
+            raise ValueError(
+                "Effective batch size must be divisible by microbatch size"
+            )
+        if self.loader_batch_size < self.microbatch_size:
+            raise ValueError("Loader batch size must be at least the microbatch size")
+        if self.loader_batch_size % self.microbatch_size:
+            raise ValueError("Loader batch size must be divisible by microbatch size")
+
+    @property
+    def loader_batches_per_effective_batch(self) -> int:
+        return self.effective_batch_size // self.loader_batch_size
+
+    @property
+    def microbatches_per_effective_batch(self) -> int:
+        return self.effective_batch_size // self.microbatch_size
 
 
 GH200_RUNTIME = RuntimeSettings()

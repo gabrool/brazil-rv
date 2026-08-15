@@ -20,7 +20,6 @@ from .contract import (
     CONTEXT_COUNT,
     CONTEXT_GENERIC_DYNAMIC_COUNT,
     DECISION_GLOBAL_INDICES,
-    EFFECTIVE_BATCH_SIZE,
     EQUITY_ABSOLUTE_START_PATCH,
     EQUITY_COUNT,
     EXPECTED_DECISIONS_PER_DATE,
@@ -574,7 +573,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         return {**inputs, **common}
 
 
-class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
+class DateStratifiedBatchSampler(Sampler[BatchRequest]):
     def __init__(
         self, sample_index: pl.DataFrame, runtime: RuntimeSettings, seed: int
     ) -> None:
@@ -590,25 +589,27 @@ class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
         self.positions_by_date = {
             date: np.asarray(values) for date, values in positions.items()
         }
-        if len(self.dates) < EFFECTIVE_BATCH_SIZE:
+        if len(self.dates) < runtime.effective_batch_size:
             raise ValueError(
-                f"Training requires at least {EFFECTIVE_BATCH_SIZE} distinct dates"
+                f"Training requires at least {runtime.effective_batch_size} distinct dates"
             )
         self.epoch_sample_count = (
-            math.ceil(self.sample_count / EFFECTIVE_BATCH_SIZE) * EFFECTIVE_BATCH_SIZE
+            math.ceil(self.sample_count / runtime.effective_batch_size)
+            * runtime.effective_batch_size
         )
 
     def set_epoch(self, epoch: int) -> None:
         self.epoch = epoch
 
     def __len__(self) -> int:
-        return self.epoch_sample_count // self.runtime.microbatch_size
+        return self.epoch_sample_count // self.runtime.loader_batch_size
 
     def __iter__(self) -> Iterator[BatchRequest]:
         generator = np.random.default_rng(self.seed + self.epoch)
-        for _ in range(self.epoch_sample_count // EFFECTIVE_BATCH_SIZE):
+        effective_batch_size = self.runtime.effective_batch_size
+        for _ in range(self.epoch_sample_count // effective_batch_size):
             chosen = generator.choice(
-                len(self.dates), EFFECTIVE_BATCH_SIZE, replace=False
+                len(self.dates), effective_batch_size, replace=False
             )
             indices = [
                 int(
@@ -619,8 +620,8 @@ class DateStratifiedMicrobatchSampler(Sampler[BatchRequest]):
                 for date in chosen
             ]
             indices.sort(key=lambda position: int(self.decision_indices[position]))
-            for start in range(0, EFFECTIVE_BATCH_SIZE, self.runtime.microbatch_size):
-                values = tuple(indices[start : start + self.runtime.microbatch_size])
+            for start in range(0, effective_batch_size, self.runtime.loader_batch_size):
+                values = tuple(indices[start : start + self.runtime.loader_batch_size])
                 yield BatchRequest(values, len(values))
 
 
@@ -694,9 +695,9 @@ def create_training_loaders(
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
-    DateStratifiedMicrobatchSampler,
+    DateStratifiedBatchSampler,
 ]:
-    sampler = DateStratifiedMicrobatchSampler(train_rows, runtime, seed)
+    sampler = DateStratifiedBatchSampler(train_rows, runtime, seed)
     train = _create_loader(
         VectorizedFeatureDataset(
             store,

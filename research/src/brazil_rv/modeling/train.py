@@ -270,6 +270,24 @@ def _run_neural(
         "training": {
             "maximum_epochs": MAX_EPOCHS,
             "early_stop_patience": EARLY_STOP_PATIENCE,
+            "effective_batch_size": GH200_RUNTIME.effective_batch_size,
+            "loader_batch_size": GH200_RUNTIME.loader_batch_size,
+            "microbatch_size": GH200_RUNTIME.microbatch_size,
+            "loader_batches_per_effective_batch": (
+                GH200_RUNTIME.loader_batches_per_effective_batch
+            ),
+            "microbatches_per_effective_batch": (
+                GH200_RUNTIME.microbatches_per_effective_batch
+            ),
+            "evaluation_batch_size": GH200_RUNTIME.evaluation_batch_size,
+            "num_workers": GH200_RUNTIME.num_workers,
+            "prefetch_factor": GH200_RUNTIME.prefetch_factor,
+            "pin_memory": True,
+            "persistent_workers": GH200_RUNTIME.num_workers > 0,
+            "compile_backend": GH200_RUNTIME.compile_backend,
+            "compile_mode": GH200_RUNTIME.compile_mode,
+            "compile_fullgraph": GH200_RUNTIME.compile_fullgraph,
+            "compile_dynamic": GH200_RUNTIME.compile_dynamic,
             "steps_per_epoch": steps_per_epoch,
             "warmup_steps": warmup_steps,
         },

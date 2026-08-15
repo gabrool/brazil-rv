@@ -1,6 +1,6 @@
 # Brazil-RV Project Context
 
-Last verified: 2026-08-13.
+Last verified: 2026-08-14.
 
 ## Purpose
 
@@ -52,9 +52,9 @@ Embargo dates are not model-selection data. Training, early stopping, routing se
 
 ## Current model and input policy
 
-The incumbent is a width-64, full-receptive-field, SwiGLU causal TCN with `context_pooled` fusion, all 32 slow fields, selected sector/subsector peer features, soft Spearman at temperature 0.50, SAM-AdamW at rho 0.125, at most 20 epochs, five-epoch early stopping, and seed choices 11, 29, or 47.
+The incumbent is a width-64, full-receptive-field, SwiGLU causal TCN with `context_pooled` fusion, all 32 slow fields, selected sector/subsector peer features, soft Spearman at temperature 0.50, SAM-AdamW at rho 0.125, at most 20 epochs, three-epoch early stopping, and seed choices 11, 29, or 47.
 
-Production training compiles the model and soft-Spearman objective while validation remains eager against the same current parameters. The temporary GH200 benchmark supports the `default` and `max-autotune-no-cudagraphs` compiler modes.
+Production GH200 training uses effective batches of 512 as two ordered 256-sample loader/GPU microbatches. It compiles the model and soft-Spearman objective with the Inductor `default` mode, full graphs, and static shapes, while validation remains eager against the same current parameters.
 
 The canonical context policy is direct:
 

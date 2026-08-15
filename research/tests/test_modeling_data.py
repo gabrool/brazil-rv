@@ -14,6 +14,7 @@ from brazil_rv.modeling.contract import (
     EFFECTIVE_BATCH_SIZE,
     EQUITY_ABSOLUTE_START_PATCH,
     EQUITY_COUNT,
+    GH200_RUNTIME,
     GLOBAL_CONTEXT_COUNT,
     HORIZON_COUNT,
     LOCAL_CONTEXT_COUNT,
@@ -25,7 +26,7 @@ from brazil_rv.modeling.contract import (
     architecture_for_model,
 )
 from brazil_rv.modeling.data import (
-    DateStratifiedMicrobatchSampler,
+    DateStratifiedBatchSampler,
     DecisionGroupedBatchSampler,
     VectorizedFeatureDataset,
     _build_patch_batch,
@@ -197,27 +198,86 @@ def test_sample_index_enforces_complete_causal_decision_grid() -> None:
         _validate_sample_index(corrupt)
 
 
-def test_date_stratified_sampler_uses_full_grid_distinct_dates_and_decision_order() -> (
-    None
-):
+def test_gh200_runtime_contract_and_derived_batch_counts() -> None:
+    runtime = GH200_RUNTIME
+    assert runtime.effective_batch_size == EFFECTIVE_BATCH_SIZE == 512
+    assert runtime.loader_batch_size == 256
+    assert runtime.microbatch_size == 256
+    assert runtime.loader_batches_per_effective_batch == 2
+    assert runtime.microbatches_per_effective_batch == 2
+    assert runtime.evaluation_batch_size == 256
+    assert (runtime.num_workers, runtime.prefetch_factor) == (8, 4)
+    assert runtime.compile_backend == "inductor"
+    assert runtime.compile_mode == "default"
+    assert runtime.compile_fullgraph is True
+    assert runtime.compile_dynamic is False
+
+
+@pytest.mark.parametrize(
+    ("settings", "message"),
+    (
+        ({"effective_batch_size": 0}, "positive"),
+        (
+            {"effective_batch_size": 6, "loader_batch_size": 4, "microbatch_size": 2},
+            "divisible by loader",
+        ),
+        (
+            {"effective_batch_size": 12, "loader_batch_size": 6, "microbatch_size": 5},
+            "divisible by microbatch",
+        ),
+        (
+            {"effective_batch_size": 4, "loader_batch_size": 1, "microbatch_size": 2},
+            "at least",
+        ),
+        (
+            {"effective_batch_size": 12, "loader_batch_size": 6, "microbatch_size": 4},
+            "Loader batch size must be divisible",
+        ),
+    ),
+)
+def test_runtime_rejects_invalid_batch_sizes(
+    settings: dict[str, int], message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        RuntimeSettings(**settings)
+
+
+def test_date_stratified_sampler_preserves_effective_sequence_and_reseeding() -> None:
     rows = _sample_index(EFFECTIVE_BATCH_SIZE)
-    runtime = RuntimeSettings(
-        microbatch_size=64,
-        accumulation_steps=8,
-        evaluation_batch_size=32,
-        num_workers=0,
-    )
-    sampler = DateStratifiedMicrobatchSampler(rows, runtime, seed=29)
-    requests = [next(iter(sampler))]
-    # Reiterate once and inspect the complete first effective batch.
+    runtime = RuntimeSettings(num_workers=0)
+    sampler = DateStratifiedBatchSampler(rows, runtime, seed=29)
     iterator = iter(sampler)
-    requests = [next(iterator) for _ in range(runtime.accumulation_steps)]
+    requests = [
+        next(iterator) for _ in range(runtime.loader_batches_per_effective_batch)
+    ]
+    assert [len(request.indices) for request in requests] == [256, 256]
     positions = [position for request in requests for position in request.indices]
     selected = rows[positions]
     assert selected.get_column("trade_date").n_unique() == EFFECTIVE_BATCH_SIZE
     decisions = selected.get_column("decision_idx").to_list()
     assert decisions == sorted(decisions)
     assert min(decisions) >= 0 and max(decisions) < 55
+
+    legacy_runtime = RuntimeSettings(loader_batch_size=64, microbatch_size=64)
+    legacy = DateStratifiedBatchSampler(rows, legacy_runtime, seed=29)
+    legacy_iterator = iter(legacy)
+    legacy_positions = [
+        position
+        for _ in range(legacy_runtime.loader_batches_per_effective_batch)
+        for position in next(legacy_iterator).indices
+    ]
+    assert positions == legacy_positions
+    repeated = DateStratifiedBatchSampler(rows, runtime, seed=29)
+    repeated_iterator = iter(repeated)
+    assert requests == [
+        next(repeated_iterator)
+        for _ in range(runtime.loader_batches_per_effective_batch)
+    ]
+    sampler.set_epoch(1)
+    epoch_two = iter(sampler)
+    assert requests != [
+        next(epoch_two) for _ in range(runtime.loader_batches_per_effective_batch)
+    ]
 
 
 def test_padding_is_explicit_and_does_not_create_real_rows() -> None:
