@@ -474,10 +474,14 @@ def test_stage_resume_skips_only_valid_completed_step(tmp_path: Path) -> None:
         nonlocal called
         called = True
 
-    stage.step("audit", config, (artifact,), action, lambda: True)
+    stage.step("audit", config, (artifact,), action, lambda: None)
     assert not called
+
+    def invalid() -> None:
+        raise ValueError("artifact validation failed")
+
     with pytest.raises(ValueError, match="artifact validation"):
-        stage.step("audit", config, (artifact,), action, lambda: False)
+        stage.step("audit", config, (artifact,), action, invalid)
 
 
 def test_consolidation_emits_three_seed_and_control_summaries(
@@ -531,10 +535,19 @@ def test_consolidation_emits_three_seed_and_control_summaries(
     gradient_dir = tmp_path / "audits" / "gradient"
     context_dir = tmp_path / "audits" / "context"
     frozen_dir = tmp_path / "audits" / "frozen_block"
-    for directory in (gradient_dir, context_dir, frozen_dir):
+    oof_dir = tmp_path / "audits" / "oof"
+    target_dir = tmp_path / "audits" / "target_basis"
+    for directory in (gradient_dir, context_dir, frozen_dir, oof_dir, target_dir):
         directory.mkdir(parents=True)
     (gradient_dir / "horizon_gradient_summary.json").write_text(
-        json.dumps({"single_horizon_controls": None}), encoding="utf-8"
+        json.dumps(
+            {
+                "sample_count": 20,
+                "by_group_and_horizon_pair": [{"fraction_negative": 0.25}],
+                "single_horizon_controls": None,
+            }
+        ),
+        encoding="utf-8",
     )
     (context_dir / "context_family_summary.json").write_text(
         json.dumps({"inference": {}}), encoding="utf-8"
@@ -552,6 +565,36 @@ def test_consolidation_emits_three_seed_and_control_summaries(
                     "60": False,
                     "120": False,
                 },
+                "concatenated_beats_final_post_fusion_by_horizon": {
+                    "30": False,
+                    "60": False,
+                    "120": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (oof_dir / "oof_residual_probe_summary.json").write_text(
+        json.dumps(
+            {
+                "results": [
+                    {
+                        "probe": "slow",
+                        "horizon_minutes": 30,
+                        "delta_from_base": 0.001,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (target_dir / "target_basis_summary.json").write_text(
+        json.dumps(
+            {
+                "pooled_target_correlation": np.eye(3).tolist(),
+                "eigenvalues": [1.5, 1.0, 0.5],
+                "variance_shares": [0.5, 1 / 3, 1 / 6],
+                "fixed_basis_variance": [1.0, 0.5, 0.25],
             }
         ),
         encoding="utf-8",
@@ -574,6 +617,7 @@ def test_consolidation_emits_three_seed_and_control_summaries(
 
     monkeypatch.setattr(stage_module, "load_current_neural_run", fake_load)
     stage_module._consolidate(tmp_path, run_dirs)
+    stage_module.validate_consolidated(tmp_path, tuple(ARM_BY_NAME))
     comparison = pl.read_csv(tmp_path / "multiscale_comparison.csv")
     assert (
         comparison.filter(
@@ -585,5 +629,31 @@ def test_consolidation_emits_three_seed_and_control_summaries(
     gates = pl.read_csv(tmp_path / "multiscale_gate_weights.csv")
     assert gates.filter(pl.col("seed") == 0).height == 18
     summary = json.loads((tmp_path / "stage_summary.json").read_text(encoding="utf-8"))
-    assert "hypothesis_evidence" in summary
+    assert set(summary["hypotheses"]) == {
+        "representation_information_loss",
+        "shared_scale_aggregation",
+        "horizon_scale_specialization",
+        "trained_multiscale_result",
+        "score_capacity_control",
+        "horizon_conflict",
+        "context_source_information",
+        "target_structure",
+    }
     assert summary["promotion"] == "none"
+    context = pl.read_csv(context_dir / "context_training_ablations.csv")
+    assert context.height == 12
+
+    comparison_path = tmp_path / "multiscale_comparison.csv"
+    original_comparisons = pl.read_csv(comparison_path)
+    pl.concat((original_comparisons, original_comparisons.head(1))).write_csv(
+        comparison_path
+    )
+    with pytest.raises(ValueError, match="comparison row count"):
+        stage_module.validate_consolidated(tmp_path, tuple(ARM_BY_NAME))
+
+    original_comparisons.write_csv(comparison_path)
+    gates.filter(pl.col("arm") != "shared_multiscale_seed29").write_csv(
+        tmp_path / "multiscale_gate_weights.csv"
+    )
+    with pytest.raises(ValueError, match="gate runs"):
+        stage_module.validate_consolidated(tmp_path, tuple(ARM_BY_NAME))

@@ -20,12 +20,14 @@ from brazil_rv.modeling.contract import (
     LOCAL_CONTEXT_COUNT,
     PATCH_INPUT_WIDTH,
     RuntimeSettings,
+    context_family_slots,
     SLOW_FEATURE_COUNT,
     TABULAR_FEATURE_COUNT,
     TCNArchitecture,
     architecture_for_model,
 )
 from brazil_rv.modeling.data import (
+    BatchRequest,
     DateStratifiedBatchSampler,
     DecisionGroupedBatchSampler,
     VectorizedFeatureDataset,
@@ -111,6 +113,44 @@ def test_current_full_universe_batch_shapes_masks_and_context_policy() -> None:
         globals_, [False, False, True, True, False, False, False, False]
     )
     assert not batch["slow_features"][0, :EQUITY_COUNT, 20].any()  # beta_to_WIN
+
+
+@pytest.mark.parametrize("family", ("wdo", "br_rates", "us_rates"))
+def test_dataset_training_ablation_disables_family_before_model_input(
+    family: str,
+) -> None:
+    rows = pl.DataFrame(
+        {
+            "sample_id": [0],
+            "date_idx": [0],
+            "decision_idx": [0],
+            "equity_cutoff_index": [15],
+            "context_cutoff_index": [75],
+        }
+    )
+    architecture = architecture_for_model("tcn", BASELINE_TCN_SETTINGS)
+    assert isinstance(architecture, TCNArchitecture)
+    dataset = VectorizedFeatureDataset(
+        Path("."),
+        rows,
+        "tcn",
+        "enabled",
+        architecture,
+        "selected",
+        family,
+    )
+    dataset._arrays = _arrays()
+    batch = dataset[BatchRequest((0,), 1)]
+    slots = tuple(EQUITY_COUNT + slot for slot in context_family_slots(family))
+    for name in (
+        "patches",
+        "history_patch_mask",
+        "instrument_mask",
+        "slow_features",
+    ):
+        assert not batch[name][:, slots].any()
+    assert batch["instrument_mask"][:, :EQUITY_COUNT].all()
+    assert batch["peer_state"].shape[-1] == 6
 
 
 def test_entry_and_future_bars_never_enter_patch_batch() -> None:

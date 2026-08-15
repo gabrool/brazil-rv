@@ -371,6 +371,8 @@ def test_production_routes_compiled_training_and_eager_validation(
     checkpoint_models: list[object] = []
     manifests: list[dict[str, object]] = []
 
+    checkpoint_metadata: dict[str, object] = {}
+
     class Sampler:
         def set_epoch(self, epoch: int) -> None:
             assert epoch == 1
@@ -399,9 +401,10 @@ def test_production_routes_compiled_training_and_eager_validation(
         return _validation_observations(), 0.1
 
     def fake_checkpoint(
-        current: nn.Module, *_: object, **__: object
+        current: nn.Module, *_: object, **metadata: object
     ) -> dict[str, object]:
         checkpoint_models.append(current)
+        checkpoint_metadata.update(metadata)
         return {}
 
     def fake_atomic_json(_: Path, value: dict[str, object]) -> None:
@@ -412,6 +415,25 @@ def test_production_routes_compiled_training_and_eager_validation(
             return None
 
     monkeypatch.setattr(train_module, "MAX_EPOCHS", 1)
+    store_identity = {
+        "path": str(tmp_path.resolve()),
+        "contract_version": "test",
+        "metadata_sha256": "abc",
+    }
+    monkeypatch.setattr(
+        train_module, "feature_store_identity", lambda _: store_identity
+    )
+    monkeypatch.setattr(
+        train_module,
+        "sample_window_metadata",
+        lambda _, name: {
+            "name": name,
+            "start": "2022-01-01",
+            "end": "2022-01-02",
+            "date_count": 2,
+            "sample_count": 512,
+        },
+    )
     monkeypatch.setattr(
         train_module,
         "create_training_loaders",
@@ -462,8 +484,24 @@ def test_production_routes_compiled_training_and_eager_validation(
     assert completed["split"] == {
         "training": "train",
         "selection": "validation",
+        "fit_window": {
+            "name": "train",
+            "start": "2022-01-01",
+            "end": "2022-01-02",
+            "date_count": 2,
+            "sample_count": 512,
+        },
+        "selection_window": {
+            "name": "validation",
+            "start": "2022-01-01",
+            "end": "2022-01-02",
+            "date_count": 2,
+            "sample_count": 512,
+        },
         "test_accessed": False,
     }
+    assert completed["feature_store_identity"] == store_identity
+    assert checkpoint_metadata["feature_store_metadata"] == store_identity
     training = completed["training"]
     assert isinstance(training, dict)
     assert training["early_stop_patience"] == EARLY_STOP_PATIENCE == 3
@@ -481,6 +519,8 @@ def test_production_routes_compiled_training_and_eager_validation(
     assert training["compile_mode"] == "default"
     assert training["compile_fullgraph"] is True
     assert training["compile_dynamic"] is False
+
+    assert training["allow_date_replacement"] is False
 
 
 @pytest.mark.parametrize(
