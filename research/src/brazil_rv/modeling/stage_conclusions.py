@@ -34,6 +34,52 @@ def _comparison_evidence(row: dict[str, object]) -> dict[str, object]:
     }
 
 
+def build_context_training_summary(
+    rows: list[dict[str, object]],
+) -> dict[str, object]:
+    order = {minutes: index for index, minutes in enumerate((*HORIZONS, 0))}
+    result: dict[str, object] = {}
+    for family in ("wdo", "br_rates", "us_rates"):
+        selected = sorted(
+            (row for row in rows if row["context_family"] == family),
+            key=lambda row: order[int(row["horizon_minutes"])],
+        )
+        result[family] = {
+            "worst_horizon_delta": min(
+                float(row["delta_ic"])
+                for row in selected
+                if int(row["horizon_minutes"]) in HORIZONS
+            ),
+            "results": selected,
+        }
+    return result
+
+
+def stage_summary_markdown(summary: dict[str, Any]) -> str:
+    hypotheses = summary["hypotheses"]
+    trained = hypotheses["trained_multiscale_result"]
+    lines = [
+        "# Horizon multiscale stage summary",
+        "",
+        f"- Training runs: {summary['training_run_count']}",
+        "- Held-out test accessed: no",
+        f"- Representation: {summary['bottleneck_interpretation']}",
+        f"- Trained multiscale supported: {trained['supported']}; "
+        f"aggregate delta {float(trained['delta_ic']):.6f}.",
+        f"- Shared aggregation delta (seed 29): "
+        f"{float(hypotheses['shared_scale_aggregation']['delta_ic']):.6f}.",
+        f"- Horizon specialization over shared (seed 29): "
+        f"{float(hypotheses['horizon_scale_specialization']['delta_ic']):.6f}.",
+        f"- Score capacity is a competing explanation: "
+        f"{hypotheses['score_capacity_control']['competing_explanation']}.",
+        "- Gradient conflict, single-horizon controls, context sources, and target "
+        "structure remain separate hypotheses; see the artifact paths in "
+        "stage_summary.json.",
+        "- Architecture promotion: none.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def build_hypothesis_summary(
     comparisons: list[dict[str, object]],
     frozen_summary: dict[str, Any],
@@ -100,7 +146,13 @@ def build_hypothesis_summary(
     }
     gradient_rows = gradient_summary["by_group_and_horizon_pair"]
     negative_gradient_cells = sum(
-        float(row["fraction_negative"]) > 0.0 for row in gradient_rows
+        row.get("fraction_negative") is not None
+        and float(row["fraction_negative"]) > 0.0
+        for row in gradient_rows
+    )
+    undefined_gradient_cells = sum(
+        row.get("valid_samples") == 0 or row.get("fraction_negative") is None
+        for row in gradient_rows
     )
     context_aggregate = {
         str(row["context_family"]): _comparison_evidence(row)
@@ -198,6 +250,7 @@ def build_hypothesis_summary(
             "gradient_sample_count": gradient_summary["sample_count"],
             "gradient_cells_with_any_negative_cosines": negative_gradient_cells,
             "single_horizon_deltas": single_deltas,
+            "gradient_cells_without_defined_cosines": undefined_gradient_cells,
             "single_horizon_improvements": [
                 horizon for horizon, delta in single_deltas.items() if delta > 0.0
             ],

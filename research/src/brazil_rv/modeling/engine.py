@@ -29,6 +29,7 @@ from .contract import (
     validate_training_horizon,
 )
 from .metrics import create_metric_table, primary_validation_score
+from .provenance import model_metadata
 
 TrainingObjective = Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
 
@@ -717,10 +718,7 @@ def checkpoint_payload(
     training_horizon: str = "all",
     context_family_ablation: str = "none",
     *,
-    feature_store_metadata: dict[str, object] | None = None,
-    fit_window: dict[str, object] | None = None,
-    selection_window: dict[str, object] | None = None,
-    parameter_count: int | None = None,
+    run_provenance: dict[str, object] | None = None,
 ) -> dict[str, object]:
     if getattr(model, "model_name", None) != model_name:
         raise ValueError("Checkpoint model name does not match the model")
@@ -749,13 +747,34 @@ def checkpoint_payload(
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict(),
     }
-    optional = {
-        "feature_store_identity": feature_store_metadata,
-        "fit_window": fit_window,
-        "selection_window": selection_window,
-        "parameter_count": parameter_count,
-    }
-    payload.update(
-        {name: value for name, value in optional.items() if value is not None}
-    )
+    if run_provenance is not None:
+        model_provenance = run_provenance.get("model")
+        if not isinstance(model_provenance, dict):
+            raise ValueError("Run provenance has invalid model metadata")
+        canonical_model = model_metadata(
+            model_name, architecture, tcn_settings, peer_features
+        )
+        bindings = {
+            name: canonical_model[name]
+            for name in ("model_name", "architecture", "tcn_settings", "peer_features")
+        }
+        for name, expected in bindings.items():
+            if model_provenance.get(name) != expected:
+                raise ValueError(f"Run provenance {name} differs from checkpoint")
+        if (
+            Path(str(run_provenance.get("feature_store"))).resolve()
+            != feature_store.resolve()
+        ):
+            raise ValueError("Run provenance feature store differs from checkpoint")
+        payload.update(
+            {
+                **bindings,
+                "repository_commit": run_provenance["repository_commit"],
+                "run_provenance": run_provenance,
+                "feature_store_identity": run_provenance["feature_store_identity"],
+                "fit_window": run_provenance["fit_window"],
+                "selection_window": run_provenance["selection_window"],
+                "parameter_count": run_provenance["parameter_count"],
+            }
+        )
     return payload

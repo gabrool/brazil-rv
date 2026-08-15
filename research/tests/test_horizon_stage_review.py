@@ -37,7 +37,6 @@ from brazil_rv.modeling.stage_validation import (
     validate_oof_plan,
     validate_split_contract,
 )
-from brazil_rv.modeling.train import _model_metadata
 from brazil_rv.preprocessing.contract import CONTRACT_VERSION
 
 
@@ -351,7 +350,8 @@ def test_incomplete_training_directory_is_archived_before_retry(
     monkeypatch.setattr(
         "brazil_rv.modeling.run_horizon_multiscale_stage._run_neural", fake_run
     )
-    archived = _run_arm(
+    archive_events: list[dict[str, object]] = []
+    result = _run_arm(
         run_dir,
         Arm("retry"),
         tmp_path,
@@ -359,11 +359,17 @@ def test_incomplete_training_directory_is_archived_before_retry(
         rows,
         fit_name="B0",
         selection_name="B1",
-        expected={},
+        expected={"test": True},
+        step_identity="training_retry",
+        record_archive=archive_events.append,
     )
+    assert result is None
+    assert len(archive_events) == 1
+    archived = Path(str(archive_events[0]["path"]))
     assert archived is not None and ".incomplete." in archived.name
     assert (archived / "partial.txt").read_text(encoding="utf-8") == "preserve"
     assert (run_dir / "new.txt").read_text(encoding="utf-8") == "retry"
+    assert read_json_object(run_dir / "run_manifest.json")["status"] == "running"
 
 
 def test_corrupt_and_incomplete_artifact_schemas_are_rejected(tmp_path: Path) -> None:
@@ -426,11 +432,13 @@ def _completed_run(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
     arm = Arm("control", training_horizon="60", context_ablation="wdo")
     expected = _expected_run_config(
         arm,
+        store,
         fit_rows,
         selection_rows,
         "B0",
         "B1",
         True,
+        repository_commit_value="test-commit",
     )
     settings = BASELINE_TCN_SETTINGS
     architecture = architecture_for_model("tcn", settings)
@@ -457,16 +465,15 @@ def _completed_run(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
         "selected",
         "60",
         "wdo",
-        feature_store_metadata=feature_store_identity(store),
-        fit_window=expected["fit_window"],
-        selection_window=expected["selection_window"],
-        parameter_count=expected["parameter_count"],
+        run_provenance=expected,
     )
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     torch.save(checkpoint, run_dir / "best_checkpoint.pt")
     manifest = {
         "status": "completed",
+        "repository_commit": expected["repository_commit"],
+        "run_provenance": expected,
         "feature_store": str(store),
         "feature_store_identity": feature_store_identity(store),
         "split": {
@@ -481,13 +488,14 @@ def _completed_run(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
         "training_horizon": "60",
         "selection_horizon": "60",
         "context_family_ablation": "wdo",
-        "model": _model_metadata("tcn", architecture, settings, "selected"),
+        "model": expected["model"],
         "parameter_count": expected["parameter_count"],
         "objective": expected["objective"],
-        "optimizer": "sam_adamw",
+        "optimizer": expected["optimizer"],
         "sam": expected["sam"],
-        "training": {"allow_date_replacement": True},
+        "training": expected["training"],
         "best_epoch": 1,
+        "best_validation_score": 0.1,
         "epochs_completed": 1,
         "total_run_seconds": 3.0,
     }
@@ -602,3 +610,221 @@ def test_context_ablation_comparison_is_paired_and_deterministic(
     for left, right in zip(first, second, strict=True):
         assert left == right
         assert np.isclose(float(left["delta_ic"]), 0.01)
+
+
+def _write_json(path: Path, value: object) -> None:
+    path.write_text(json.dumps(value), encoding="utf-8")
+
+
+def test_completed_run_rejects_wrong_repository_commit(tmp_path: Path) -> None:
+    run_dir, store, expected = _completed_run(tmp_path)
+    path = run_dir / "run_manifest.json"
+    manifest = read_json_object(path)
+    manifest["repository_commit"] = "wrong-commit"
+    _write_json(path, manifest)
+    with pytest.raises(ValueError, match="repository commit differs"):
+        validate_completed_run(run_dir, store, expected)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("effective_batch_size", "early_stop_patience", "warmup_steps"),
+)
+def test_completed_run_rejects_changed_training_contract(
+    tmp_path: Path, field: str
+) -> None:
+    run_dir, store, expected = _completed_run(tmp_path)
+    path = run_dir / "run_manifest.json"
+    manifest = read_json_object(path)
+    manifest["run_provenance"]["training"][field] += 1
+    manifest["training"][field] += 1
+    _write_json(path, manifest)
+    with pytest.raises(ValueError, match="run provenance differs"):
+        validate_completed_run(run_dir, store, expected)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    (
+        ("epoch", 2, "checkpoint best epoch differs"),
+        ("validation_score", 0.2, "checkpoint validation score differs"),
+    ),
+)
+def test_completed_run_rejects_checkpoint_result_mismatch(
+    tmp_path: Path, field: str, value: float, message: str
+) -> None:
+    run_dir, store, expected = _completed_run(tmp_path)
+    path = run_dir / "best_checkpoint.pt"
+    checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+    checkpoint[field] = value
+    torch.save(checkpoint, path)
+    with pytest.raises(ValueError, match=message):
+        validate_completed_run(run_dir, store, expected)
+
+
+def test_completed_run_rejects_history_best_score_mismatch(tmp_path: Path) -> None:
+    run_dir, store, expected = _completed_run(tmp_path)
+    path = run_dir / "history.csv"
+    history = pl.read_csv(path).with_columns(pl.lit(0.2).alias("validation_primary_ic"))
+    history.write_csv(path)
+    with pytest.raises(ValueError, match="history best validation score differs"):
+        validate_completed_run(run_dir, store, expected)
+
+
+def test_completed_run_rejects_metrics_that_disagree_with_daily(
+    tmp_path: Path,
+) -> None:
+    run_dir, store, expected = _completed_run(tmp_path)
+    path = run_dir / "validation_metrics.json"
+    metrics = read_json_object(path)
+    metrics["horizons"][0]["mean_daily_spearman_ic"] = 0.2
+    _write_json(path, metrics)
+    with pytest.raises(ValueError, match="validation horizon IC 30 differs"):
+        validate_completed_run(run_dir, store, expected)
+
+
+@pytest.mark.parametrize("mutation", ("duplicate", "missing"))
+def test_completed_run_rejects_duplicate_or_missing_daily_keys(
+    tmp_path: Path, mutation: str
+) -> None:
+    run_dir, store, expected = _completed_run(tmp_path)
+    path = run_dir / "validation_daily_metrics.parquet"
+    daily = pl.read_parquet(path)
+    if mutation == "duplicate":
+        daily = pl.concat((daily.slice(0, daily.height - 1), daily.head(1)))
+        message = "duplicate keys"
+    else:
+        daily = daily.slice(0, daily.height - 1)
+        message = "validation daily rows differs"
+    daily.write_parquet(path)
+    with pytest.raises(ValueError, match=message):
+        validate_completed_run(run_dir, store, expected)
+
+
+def test_completed_run_rejects_same_config_cross_artifact_result_mismatch(
+    tmp_path: Path,
+) -> None:
+    run_dir, store, expected = _completed_run(tmp_path)
+    manifest_path = run_dir / "run_manifest.json"
+    manifest = read_json_object(manifest_path)
+    manifest["best_validation_score"] = 0.2
+    _write_json(manifest_path, manifest)
+    checkpoint_path = run_dir / "best_checkpoint.pt"
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    checkpoint["validation_score"] = 0.2
+    torch.save(checkpoint, checkpoint_path)
+    history_path = run_dir / "history.csv"
+    pl.read_csv(history_path).with_columns(
+        pl.lit(0.2).alias("validation_primary_ic")
+    ).write_csv(history_path)
+    with pytest.raises(ValueError, match="selected validation score differs"):
+        validate_completed_run(run_dir, store, expected)
+
+
+def _retry_rows() -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "trade_date": [date(2024, 1, 2)],
+            "sample_id": [0],
+            "date_idx": [0],
+            "decision_idx": [0],
+        }
+    )
+
+
+def test_archive_record_is_persisted_before_retry_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write_json(run_dir / "run_manifest.json", {"status": "failed"})
+    stage = object.__new__(Stage)
+    stage.manifest_path = tmp_path / "stage_manifest.json"
+    stage.manifest = {"archived_incomplete_runs": []}
+
+    def fail_retry(*_: object, **__: object) -> None:
+        persisted = read_json_object(stage.manifest_path)["archived_incomplete_runs"]
+        assert len(persisted) == 1
+        assert Path(str(persisted[0]["path"])).exists()
+        raise RuntimeError("retry failed")
+
+    monkeypatch.setattr(
+        "brazil_rv.modeling.run_horizon_multiscale_stage._run_neural", fail_retry
+    )
+    with pytest.raises(RuntimeError, match="retry failed"):
+        _run_arm(
+            run_dir,
+            Arm("retry"),
+            tmp_path,
+            _retry_rows(),
+            _retry_rows(),
+            expected={"test": True},
+            step_identity="train_retry",
+            record_archive=stage.record_incomplete_archive,
+        )
+    persisted = read_json_object(stage.manifest_path)["archived_incomplete_runs"]
+    assert persisted[0]["prior_status"] == "failed"
+
+
+def test_repeated_failed_retries_append_archive_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write_json(run_dir / "run_manifest.json", {"status": "running"})
+    stage = object.__new__(Stage)
+    stage.manifest_path = tmp_path / "stage_manifest.json"
+    stage.manifest = {"archived_incomplete_runs": []}
+
+    def fail_retry(*_: object, **__: object) -> None:
+        raise RuntimeError("retry failed")
+
+    monkeypatch.setattr(
+        "brazil_rv.modeling.run_horizon_multiscale_stage._run_neural", fail_retry
+    )
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="retry failed"):
+            _run_arm(
+                run_dir,
+                Arm("retry"),
+                tmp_path,
+                _retry_rows(),
+                _retry_rows(),
+                expected={"test": True},
+                step_identity="train_retry",
+                record_archive=stage.record_incomplete_archive,
+            )
+    persisted = read_json_object(stage.manifest_path)["archived_incomplete_runs"]
+    assert len(persisted) == 2
+    assert len({row["path"] for row in persisted}) == 2
+    assert all(row["prior_status"] == "running" for row in persisted)
+
+
+@pytest.mark.parametrize(
+    ("manifest", "message"),
+    (
+        (None, "no manifest"),
+        ("{", "Invalid JSON"),
+        ({"status": "mystery"}, "Ambiguous run status"),
+    ),
+)
+def test_ambiguous_or_corrupt_run_directories_are_refused(
+    tmp_path: Path, manifest: object, message: str
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    if isinstance(manifest, dict):
+        _write_json(run_dir / "run_manifest.json", manifest)
+    elif isinstance(manifest, str):
+        (run_dir / "run_manifest.json").write_text(manifest, encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        _run_arm(
+            run_dir,
+            Arm("retry"),
+            tmp_path,
+            _retry_rows(),
+            _retry_rows(),
+            expected={"test": True},
+            step_identity="train_retry",
+            record_archive=lambda _: None,
+        )

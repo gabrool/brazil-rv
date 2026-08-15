@@ -5,9 +5,8 @@ import hashlib
 import json
 import logging
 import os
-import subprocess
 import time
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -46,9 +45,14 @@ from .horizon_diagnostics import (
     atomic_parquet,
     run_target_basis_audit,
 )
-from .stage_conclusions import build_hypothesis_summary
+from .stage_conclusions import (
+    build_context_training_summary,
+    build_hypothesis_summary,
+    stage_summary_markdown,
+)
 from .metrics import moving_block_bootstrap
 from .model import build_neural_model, count_trainable_parameters
+from .provenance import build_run_provenance, repository_commit
 from .stage_conflict_oof import run_gradient_audit, run_oof_residual_probes
 from .stage_representation_probes import (
     run_context_inference_probes,
@@ -119,15 +123,6 @@ def parse_args(arguments: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(arguments)
 
 
-def _git_commit() -> str:
-    return subprocess.run(
-        ("git", "rev-parse", "HEAD"),
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-
-
 def _fingerprint(value: object) -> str:
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(payload.encode()).hexdigest()
@@ -144,7 +139,7 @@ class Stage:
         self.output_dir = output_dir.resolve()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.manifest_path = self.output_dir / "stage_manifest.json"
-        self.commit = _git_commit()
+        self.commit = repository_commit()
         self.store_identity = feature_store_identity(store)
         self.logger = logging.getLogger(f"horizon-stage-{id(self)}")
         self.logger.setLevel(logging.INFO)
@@ -166,6 +161,10 @@ class Stage:
                 raise ValueError(
                     "Existing stage state has incompatible commit or feature store"
                 )
+            archives = self.manifest.setdefault("archived_incomplete_runs", [])
+            if not isinstance(archives, list):
+                raise ValueError("Stage archive history must be a list")
+
         else:
             self.manifest = {
                 "schema": STAGE_SCHEMA,
@@ -182,11 +181,19 @@ class Stage:
                 "bootstrap_seed": BOOTSTRAP_SEED,
                 "command": REMOTE_COMMAND,
                 "steps": {},
+                "archived_incomplete_runs": [],
             }
             self.write_manifest()
 
     def write_manifest(self) -> None:
         atomic_json(self.manifest_path, self.manifest)
+
+    def record_incomplete_archive(self, event: dict[str, object]) -> None:
+        history = self.manifest.setdefault("archived_incomplete_runs", [])
+        if not isinstance(history, list):
+            raise ValueError("Stage archive history must be a list")
+        history.append(event)
+        self.write_manifest()
 
     def step(
         self,
@@ -270,11 +277,14 @@ def _training_args(arm: Arm) -> argparse.Namespace:
 
 def _expected_run_config(
     arm: Arm,
+    store: Path,
     fit_rows: pl.DataFrame,
     selection_rows: pl.DataFrame,
     fit_name: str,
     selection_name: str,
     allow_date_replacement: bool = False,
+    *,
+    repository_commit_value: str | None = None,
 ) -> dict[str, object]:
     args = _training_args(arm)
     settings = replace(BASELINE_TCN_SETTINGS, readout=arm.readout)
@@ -283,23 +293,28 @@ def _expected_run_config(
         parameter_count = count_trainable_parameters(
             build_neural_model("tcn", architecture, args.peer_features)
         )
-    return {
-        "seed": arm.seed,
-        "global_context": args.global_context,
-        "training_horizon": arm.training_horizon,
-        "selection_horizon": arm.training_horizon,
-        "context_family_ablation": arm.context_ablation,
-        "tcn_settings": asdict(settings),
-        "architecture": asdict(architecture),
-        "peer_features": args.peer_features,
-        "objective": objective_metadata(args.objective, args.temperature),
-        "optimizer": args.optimizer,
-        "sam": sam_metadata(args.optimizer, args.sam_rho),
-        "fit_window": sample_window_metadata(fit_rows, fit_name),
-        "selection_window": sample_window_metadata(selection_rows, selection_name),
-        "allow_date_replacement": allow_date_replacement,
-        "parameter_count": parameter_count,
-    }
+    return build_run_provenance(
+        repository_commit_value=repository_commit_value or repository_commit(),
+        feature_store=store,
+        feature_store_metadata=feature_store_identity(store),
+        model_name="tcn",
+        architecture=architecture,
+        settings=settings,
+        peer_features=args.peer_features,
+        global_context=args.global_context,
+        objective=objective_metadata(args.objective, args.temperature),
+        optimizer=args.optimizer,
+        sam=sam_metadata(args.optimizer, args.sam_rho),
+        seed=arm.seed,
+        training_horizon=arm.training_horizon,
+        selection_horizon=arm.training_horizon,
+        context_family_ablation=arm.context_ablation,
+        fit_window=sample_window_metadata(fit_rows, fit_name),
+        selection_window=sample_window_metadata(selection_rows, selection_name),
+        allow_date_replacement=allow_date_replacement,
+        parameter_count=parameter_count,
+        training_sample_count=fit_rows.height,
+    )
 
 
 def _run_arm(
@@ -313,28 +328,59 @@ def _run_arm(
     selection_name: str = "validation",
     allow_date_replacement: bool = False,
     expected: dict[str, object] | None = None,
-) -> Path | None:
+    step_identity: str,
+    record_archive: Callable[[dict[str, object]], None],
+) -> None:
     assert_analysis_rows(fit_rows)
     assert_analysis_rows(
         selection_rows, allow_validation=selection_name == "validation"
     )
     expected = expected or _expected_run_config(
-        arm, fit_rows, selection_rows, fit_name, selection_name, allow_date_replacement
+        arm,
+        store,
+        fit_rows,
+        selection_rows,
+        fit_name,
+        selection_name,
+        allow_date_replacement,
     )
     if output_dir.exists():
         manifest_path = output_dir / "run_manifest.json"
-        if (
-            manifest_path.exists()
-            and read_json_object(manifest_path).get("status") == "completed"
-        ):
+        if not manifest_path.exists():
+            raise ValueError(f"Ambiguous run directory has no manifest: {output_dir}")
+        prior = read_json_object(manifest_path)
+        prior_status = prior.get("status")
+        if prior_status == "completed":
             validate_completed_run(output_dir, store, expected)
-            return None
-        moved = output_dir.with_name(
-            f"{output_dir.name}.incomplete."
-            f"{datetime.now(timezone.utc):%Y%m%dT%H%M%S%fZ}"
+            return
+        if prior_status not in ("running", "failed"):
+            raise ValueError(f"Ambiguous run status for {output_dir}: {prior_status!r}")
+        archived_at = datetime.now(timezone.utc)
+        archive_name = f"{output_dir.name}.incomplete.{archived_at:%Y%m%dT%H%M%S%fZ}"
+        archived = output_dir.with_name(archive_name)
+        collision = 1
+        while archived.exists():
+            archived = output_dir.with_name(f"{archive_name}.{collision}")
+            collision += 1
+        output_dir.rename(archived)
+        record_archive(
+            {
+                "path": str(archived),
+                "timestamp": archived_at.isoformat(),
+                "prior_status": prior_status,
+                "arm": arm.name,
+                "step": step_identity,
+            }
         )
-        output_dir.rename(moved)
     output_dir.mkdir(parents=True)
+    atomic_json(
+        output_dir / "run_manifest.json",
+        {
+            "status": "running",
+            "run_provenance": expected,
+            "stage_placeholder": True,
+        },
+    )
     _run_neural(
         _training_args(arm),
         store,
@@ -345,7 +391,6 @@ def _run_arm(
         selection_name=selection_name,
         allow_date_replacement=allow_date_replacement,
     )
-    return moved if "moved" in locals() else None
 
 
 def _preflight(
@@ -692,7 +737,6 @@ def _consolidate(output_dir: Path, run_dirs: dict[str, Path]) -> None:
     gradient_summary["single_horizon_controls"] = single_rows
     atomic_json(gradient_summary_path, gradient_summary)
     context_rows: list[dict[str, object]] = []
-    context_training: dict[str, object] = {}
     for family in ("wdo", "br_rates", "us_rates"):
         arm_record = next(
             value for value in records if value["arm"] == f"without_{family}"
@@ -729,11 +773,8 @@ def _consolidate(output_dir: Path, run_dirs: dict[str, Path]) -> None:
             for result in results
         ]
         context_rows.extend(family_rows)
-        context_training[family] = {
-            "worst_horizon_delta": worst_horizon,
-            "results": family_rows,
-        }
     context_dir = output_dir / "audits" / "context"
+    context_training = build_context_training_summary(context_rows)
     atomic_csv(
         pl.DataFrame(context_rows),
         context_dir / "context_training_ablations.csv",
@@ -770,7 +811,6 @@ def _consolidate(output_dir: Path, run_dirs: dict[str, Path]) -> None:
         for row in comparisons
         if row["comparison"] == "horizon_multiscale_vs_final_three_seed"
     ]
-    trained = evidence["hypotheses"]["trained_multiscale_result"]
     summary = {
         "training_run_count": TRAINING_RUN_COUNT,
         "test_accessed": False,
@@ -781,26 +821,7 @@ def _consolidate(output_dir: Path, run_dirs: dict[str, Path]) -> None:
         "promotion": "none",
     }
     atomic_json(output_dir / "stage_summary.json", summary)
-    hypotheses = summary["hypotheses"]
-    lines = [
-        "# Horizon multiscale stage summary",
-        "",
-        f"- Training runs: {TRAINING_RUN_COUNT}",
-        "- Held-out test accessed: no",
-        f"- Representation: {summary['bottleneck_interpretation']}",
-        f"- Trained multiscale supported: {trained['supported']}; "
-        f"aggregate delta {float(trained['delta_ic']):.6f}.",
-        f"- Shared aggregation delta (seed 29): "
-        f"{float(hypotheses['shared_scale_aggregation']['delta_ic']):.6f}.",
-        f"- Horizon specialization over shared (seed 29): "
-        f"{float(hypotheses['horizon_scale_specialization']['delta_ic']):.6f}.",
-        f"- Score capacity is a competing explanation: "
-        f"{hypotheses['score_capacity_control']['competing_explanation']}.",
-        "- Gradient conflict, single-horizon controls, context sources, and target "
-        "structure remain separate hypotheses; see the artifact paths in stage_summary.json.",
-        "- Architecture promotion: none.",
-    ]
-    _atomic_text(output_dir / "stage_summary.md", "\n".join(lines) + "\n")
+    _atomic_text(output_dir / "stage_summary.md", stage_summary_markdown(summary))
 
 
 def run_stage(output_dir: Path) -> Path:
@@ -843,16 +864,18 @@ def run_stage(output_dir: Path) -> Path:
         arm = ARM_BY_NAME[name]
         expected = _expected_run_config(
             arm,
+            store,
             fit_rows,
             selection_rows,
             fit_name,
             selection_name,
             allow_date_replacement,
+            repository_commit_value=stage.commit,
         )
         step_name = f"train_{name}"
 
         def run_arm() -> None:
-            archived = _run_arm(
+            _run_arm(
                 run_dirs[name],
                 arm,
                 store,
@@ -862,21 +885,13 @@ def run_stage(output_dir: Path) -> Path:
                 selection_name=selection_name,
                 allow_date_replacement=allow_date_replacement,
                 expected=expected,
+                step_identity=step_name,
+                record_archive=stage.record_incomplete_archive,
             )
-            if archived is not None:
-                stage.manifest["steps"][step_name]["archived_incomplete_run"] = str(
-                    archived
-                )
-                stage.write_manifest()
 
         stage.step(
             step_name,
-            {
-                **asdict(arm),
-                "fit_window": expected["fit_window"],
-                "selection_window": expected["selection_window"],
-                "allow_date_replacement": allow_date_replacement,
-            },
+            expected,
             _run_artifacts(run_dirs[name]),
             run_arm,
             lambda: validate_completed_run(run_dirs[name], store, expected),

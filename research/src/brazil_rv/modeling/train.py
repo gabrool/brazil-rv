@@ -7,7 +7,6 @@ import os
 import random
 import time
 from collections.abc import Sequence
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -38,13 +37,10 @@ from .contract import (
     TCN_RECEPTIVE_FIELDS,
     TCN_WIDTHS,
     TRAINING_HORIZONS,
-    NeuralArchitecture,
     TCNArchitecture,
     TCNSettings,
     architecture_for_model,
-    context_routing_metadata,
     model_consumes_context,
-    peer_feature_metadata,
 )
 from .data import (
     create_training_loaders,
@@ -69,6 +65,7 @@ from .engine import (
 )
 from .model import build_neural_model, count_trainable_parameters
 from .optim import build_optimizer, build_scheduler
+from .provenance import build_run_provenance, repository_commit
 
 
 def validate_cli_args(
@@ -166,24 +163,6 @@ def _tcn_settings_from_args(args: argparse.Namespace) -> TCNSettings | None:
         args.macro_temporal_routing,
         args.tcn_readout,
     )
-
-
-def _model_metadata(
-    model_name: str,
-    architecture: NeuralArchitecture,
-    settings: TCNSettings | None,
-    peer_features: str = "none",
-) -> dict[str, object]:
-    return {
-        "model_name": model_name,
-        "architecture": asdict(architecture),
-        "tcn_settings": None if settings is None else asdict(settings),
-        "context_routing": context_routing_metadata(architecture)
-        if isinstance(architecture, TCNArchitecture)
-        else None,
-        "peer_features": peer_feature_metadata(model_name, architecture, peer_features),
-        "readout": settings.readout if settings is not None else None,
-    }
 
 
 def _run_directory_name(args: argparse.Namespace, created_at: datetime) -> str:
@@ -285,12 +264,47 @@ def _run_neural(
     scheduler, steps_per_epoch, warmup_steps = build_scheduler(
         optimizer, train_rows.height, MAX_EPOCHS
     )
+    objective = objective_metadata(args.objective, args.temperature)
+    sam = sam_metadata(args.optimizer, args.sam_rho)
+    run_provenance = build_run_provenance(
+        repository_commit_value=repository_commit(),
+        feature_store=store,
+        feature_store_metadata=store_identity,
+        model_name=args.model,
+        architecture=architecture,
+        settings=settings,
+        peer_features=args.peer_features,
+        global_context=args.global_context,
+        objective=objective,
+        optimizer=args.optimizer,
+        sam=sam,
+        seed=args.seed,
+        training_horizon=args.training_horizon,
+        selection_horizon=args.training_horizon,
+        context_family_ablation=args.context_family_ablation,
+        fit_window=fit_window,
+        selection_window=selection_window,
+        allow_date_replacement=allow_date_replacement,
+        parameter_count=parameter_count,
+        training_sample_count=train_rows.height,
+        maximum_epochs=MAX_EPOCHS,
+        early_stop_patience=EARLY_STOP_PATIENCE,
+        runtime=GH200_RUNTIME,
+    )
+    recorded_training = run_provenance["training"]
+    if not isinstance(recorded_training, dict) or (
+        recorded_training["steps_per_epoch"],
+        recorded_training["warmup_steps"],
+    ) != (steps_per_epoch, warmup_steps):
+        raise RuntimeError("Scheduler and recorded training contract differ")
     compiled_model = compile_model(model)
     compiled_objective = compile_training_objective(args.objective, args.temperature)
     manifest = {
         "status": "running",
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "feature_store": str(store),
+        "repository_commit": run_provenance["repository_commit"],
+        "run_provenance": run_provenance,
+        "feature_store": run_provenance["feature_store"],
         "feature_store_identity": store_identity,
         "split": {
             "training": fit_name,
@@ -304,38 +318,12 @@ def _run_neural(
         "training_horizon": args.training_horizon,
         "selection_horizon": args.training_horizon,
         "context_family_ablation": args.context_family_ablation,
-        "model": _model_metadata(
-            args.model, architecture, settings, args.peer_features
-        ),
+        "model": run_provenance["model"],
         "parameter_count": parameter_count,
-        "objective": objective_metadata(args.objective, args.temperature),
+        "objective": objective,
         "optimizer": args.optimizer,
-        "sam": sam_metadata(args.optimizer, args.sam_rho),
-        "training": {
-            "allow_date_replacement": allow_date_replacement,
-            "maximum_epochs": MAX_EPOCHS,
-            "early_stop_patience": EARLY_STOP_PATIENCE,
-            "effective_batch_size": GH200_RUNTIME.effective_batch_size,
-            "loader_batch_size": GH200_RUNTIME.loader_batch_size,
-            "microbatch_size": GH200_RUNTIME.microbatch_size,
-            "loader_batches_per_effective_batch": (
-                GH200_RUNTIME.loader_batches_per_effective_batch
-            ),
-            "microbatches_per_effective_batch": (
-                GH200_RUNTIME.microbatches_per_effective_batch
-            ),
-            "evaluation_batch_size": GH200_RUNTIME.evaluation_batch_size,
-            "num_workers": GH200_RUNTIME.num_workers,
-            "prefetch_factor": GH200_RUNTIME.prefetch_factor,
-            "pin_memory": True,
-            "persistent_workers": GH200_RUNTIME.num_workers > 0,
-            "compile_backend": GH200_RUNTIME.compile_backend,
-            "compile_mode": GH200_RUNTIME.compile_mode,
-            "compile_fullgraph": GH200_RUNTIME.compile_fullgraph,
-            "compile_dynamic": GH200_RUNTIME.compile_dynamic,
-            "steps_per_epoch": steps_per_epoch,
-            "warmup_steps": warmup_steps,
-        },
+        "sam": sam,
+        "training": recorded_training,
     }
     _atomic_json(run_dir / "run_manifest.json", manifest)
     history: list[dict[str, object]] = []
@@ -419,10 +407,7 @@ def _run_neural(
                     args.peer_features,
                     args.training_horizon,
                     args.context_family_ablation,
-                    feature_store_metadata=store_identity,
-                    fit_window=fit_window,
-                    selection_window=selection_window,
-                    parameter_count=parameter_count,
+                    run_provenance=run_provenance,
                 ),
             )
         else:

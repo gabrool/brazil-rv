@@ -97,13 +97,22 @@ def feature_store_identity(store: Path) -> dict[str, object]:
     }
 
 
+def int64_identity_sha256(values: np.ndarray) -> str:
+    canonical = np.asarray(values, dtype="<i8")
+    return hashlib.sha256(canonical.tobytes(order="C")).hexdigest()
+
+
 def sample_window_metadata(rows: pl.DataFrame, name: str) -> dict[str, object]:
+    date_indices = rows.get_column("date_idx").unique().sort().cast(pl.Int64).to_numpy()
+    sample_ids = rows.get_column("sample_id").sort().cast(pl.Int64).to_numpy()
     return {
         "name": name,
         "start": str(rows.get_column("trade_date").min()),
         "end": str(rows.get_column("trade_date").max()),
         "date_count": rows.get_column("trade_date").n_unique(),
         "sample_count": rows.height,
+        "date_identity_sha256": int64_identity_sha256(date_indices),
+        "sample_identity_sha256": int64_identity_sha256(sample_ids),
     }
 
 

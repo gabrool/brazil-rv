@@ -415,6 +415,7 @@ def test_production_routes_compiled_training_and_eager_validation(
             return None
 
     monkeypatch.setattr(train_module, "MAX_EPOCHS", 1)
+    monkeypatch.setattr(train_module, "repository_commit", lambda: "test-commit")
     store_identity = {
         "path": str(tmp_path.resolve()),
         "contract_version": "test",
@@ -432,6 +433,8 @@ def test_production_routes_compiled_training_and_eager_validation(
             "end": "2022-01-02",
             "date_count": 2,
             "sample_count": 512,
+            "date_identity_sha256": "date-hash",
+            "sample_identity_sha256": "sample-hash",
         },
     )
     monkeypatch.setattr(
@@ -443,7 +446,7 @@ def test_production_routes_compiled_training_and_eager_validation(
     monkeypatch.setattr(
         train_module, "build_optimizer", lambda _: (optimizer, object())
     )
-    monkeypatch.setattr(train_module, "build_scheduler", lambda *_: (scheduler, 1, 0))
+    monkeypatch.setattr(train_module, "build_scheduler", lambda *_: (scheduler, 1, 1))
     monkeypatch.setattr(train_module, "compile_model", fake_compile)
     monkeypatch.setattr(
         train_module, "compile_training_objective", lambda *_: compiled_objective
@@ -490,6 +493,8 @@ def test_production_routes_compiled_training_and_eager_validation(
             "end": "2022-01-02",
             "date_count": 2,
             "sample_count": 512,
+            "date_identity_sha256": "date-hash",
+            "sample_identity_sha256": "sample-hash",
         },
         "selection_window": {
             "name": "validation",
@@ -497,13 +502,17 @@ def test_production_routes_compiled_training_and_eager_validation(
             "end": "2022-01-02",
             "date_count": 2,
             "sample_count": 512,
+            "date_identity_sha256": "date-hash",
+            "sample_identity_sha256": "sample-hash",
         },
         "test_accessed": False,
     }
     assert completed["feature_store_identity"] == store_identity
-    assert checkpoint_metadata["feature_store_metadata"] == store_identity
+    assert completed["repository_commit"] == "test-commit"
+    assert checkpoint_metadata["run_provenance"] == completed["run_provenance"]
     training = completed["training"]
     assert isinstance(training, dict)
+    assert completed["run_provenance"]["training"] == training
     assert training["early_stop_patience"] == EARLY_STOP_PATIENCE == 3
     assert training["effective_batch_size"] == 512
     assert training["loader_batch_size"] == 256
