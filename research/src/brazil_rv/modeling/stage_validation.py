@@ -206,7 +206,7 @@ def _require_correlation_matrix(value: object, name: str) -> np.ndarray:
         raise ValueError(f"{name} must be symmetric")
     if not np.allclose(np.diag(matrix), 1.0, rtol=0.0, atol=1e-12):
         raise ValueError(f"{name} must have a unit diagonal")
-    if (matrix < -1.0).any() or (matrix > 1.0).any():
+    if (matrix < -1.0 - 1e-12).any() or (matrix > 1.0 + 1e-12).any():
         raise ValueError(f"{name} contains an invalid correlation")
     return matrix
 

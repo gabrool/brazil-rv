@@ -14,6 +14,7 @@ from brazil_rv.modeling.stage_conclusions import build_hypothesis_summary
 from brazil_rv.modeling.stage_validation import (
     GRADIENT_GROUPS,
     HORIZON_PAIRS,
+    _require_correlation_matrix,
     TARGET_HORIZON_PAIRS,
     read_json_object,
     validate_gradient_audit,
@@ -295,3 +296,26 @@ def test_target_basis_corruptions_are_rejected(tmp_path: Path, mutation: str) ->
         _write_json(summary_path, summary)
     with pytest.raises(ValueError):
         validate_target_basis(tmp_path)
+
+
+def test_correlation_matrix_accepts_tiny_upper_bound_roundoff() -> None:
+    matrix = np.eye(3)
+    matrix[0, 0] = 1.0000000000000002
+    np.testing.assert_array_equal(
+        _require_correlation_matrix(matrix, "correlation"), matrix
+    )
+
+
+def test_correlation_matrix_accepts_tiny_lower_bound_roundoff() -> None:
+    matrix = np.eye(3)
+    matrix[0, 1] = matrix[1, 0] = -1.0000000000000002
+    np.testing.assert_array_equal(
+        _require_correlation_matrix(matrix, "correlation"), matrix
+    )
+
+
+def test_correlation_matrix_rejects_material_bound_violation() -> None:
+    matrix = np.eye(3)
+    matrix[0, 1] = matrix[1, 0] = 1.000000001
+    with pytest.raises(ValueError, match="invalid correlation"):
+        _require_correlation_matrix(matrix, "correlation")
