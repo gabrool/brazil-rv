@@ -295,25 +295,6 @@ def _autocast(device: torch.device):
     )
 
 
-def _concatenate_batches(values: list[torch.Tensor]) -> torch.Tensor:
-    first = values[0]
-    output = torch.empty(
-        (sum(value.shape[0] for value in values), *first.shape[1:]),
-        dtype=first.dtype,
-        pin_memory=first.is_pinned(),
-    )
-    return torch.cat(values, out=output)
-
-
-def _combine_effective_batch(
-    batches: list[dict[str, torch.Tensor]],
-) -> dict[str, torch.Tensor]:
-    return {
-        key: _concatenate_batches([batch[key] for batch in batches])
-        for key in _model_transfer_keys(batches[0])
-    }
-
-
 def _loss_count(label_mask: torch.Tensor, objective: str) -> int:
     if objective == "soft_spearman":
         return int((label_mask.sum(1) >= 2).sum())
@@ -347,11 +328,6 @@ def _accumulate_gradients(
         total += loss_sum.detach()
         (loss_sum / count).backward()
     return total
-
-
-def _require_finite_loss(loss: torch.Tensor, location: str) -> None:
-    if not bool(torch.isfinite(loss)):
-        raise FloatingPointError(f"{location} accumulated loss is non-finite")
 
 
 def _gradient_norm(parameters: Iterable[nn.Parameter], maximum: float) -> torch.Tensor:
@@ -409,7 +385,6 @@ def _run_sam_update(
     optimizer.zero_grad(set_to_none=True)
     try:
         first_loss = _accumulate_gradients(model, batches, loss_function, count)
-        _require_finite_loss(first_loss, "SAM pass 1")
         first_norm = _gradient_norm(parameters, float("inf"))
         if observer:
             observer("first_gradients", model)
@@ -423,8 +398,7 @@ def _run_sam_update(
         optimizer.zero_grad(set_to_none=True)
         _restore_rng(start_rng, device)
         try:
-            second_loss = _accumulate_gradients(model, batches, loss_function, count)
-            _require_finite_loss(second_loss, "SAM pass 2")
+            _accumulate_gradients(model, batches, loss_function, count)
         finally:
             with torch.no_grad():
                 for parameter, original in zip(parameters, originals, strict=True):
@@ -462,17 +436,30 @@ def run_effective_batch_update(
     training_objective: TrainingObjective | None = None,
     sam_observer: Callable[[str, nn.Module], None] | None = None,
 ) -> dict[str, object]:
-    if len(effective_batch) != runtime.accumulation_steps:
-        raise ValueError(f"Expected {runtime.accumulation_steps} microbatches")
+    if len(effective_batch) != runtime.loader_batches_per_effective_batch:
+        raise ValueError(
+            f"Expected {runtime.loader_batches_per_effective_batch} loader batches"
+        )
     objective_metadata(objective, temperature)
     sam_metadata(optimizer_variant, sam_rho)
-    cpu_batch = _combine_effective_batch(effective_batch)
-    count = _loss_count(cpu_batch["label_mask"], objective)
+    if any(
+        batch["label_mask"].shape[0] != runtime.loader_batch_size
+        for batch in effective_batch
+    ):
+        raise ValueError(f"Expected loader batches of size {runtime.loader_batch_size}")
+    count = sum(
+        _loss_count(batch["label_mask"], objective) for batch in effective_batch
+    )
     if not count:
         raise ValueError("Effective batch has no valid objective group")
     device = next(model.parameters()).device
-    batch = _to_device(cpu_batch, device)
-    batches = _split_microbatches(batch, runtime.microbatch_size)
+    batches = [
+        microbatch
+        for cpu_batch in effective_batch
+        for microbatch in _split_microbatches(
+            _to_device(cpu_batch, device), runtime.microbatch_size
+        )
+    ]
     loss_function = training_objective or eager_training_objective(
         objective, temperature
     )
@@ -491,7 +478,6 @@ def run_effective_batch_update(
     optimizer.zero_grad(set_to_none=True)
     try:
         total = _accumulate_gradients(model, batches, loss_function, count)
-        _require_finite_loss(total, "Ordinary update")
     except BaseException:
         optimizer.zero_grad(set_to_none=True)
         raise
@@ -521,7 +507,7 @@ def train_one_epoch(
     updates: list[dict[str, object]] = []
     for batch in loader:
         batches.append(batch)
-        if len(batches) == runtime.accumulation_steps:
+        if len(batches) == runtime.loader_batches_per_effective_batch:
             updates.append(
                 run_effective_batch_update(
                     model,
@@ -547,6 +533,8 @@ def train_one_epoch(
     objective_loss, mean_gradient_norm_value = (
         torch.stack((loss_sum / loss_count, mean_gradient_norm)).detach().cpu().tolist()
     )
+    if not np.isfinite(objective_loss) or not np.isfinite(mean_gradient_norm_value):
+        raise FloatingPointError("Epoch training statistics are non-finite")
     return {
         "objective_loss": objective_loss,
         "optimizer_steps": len(updates),
@@ -555,23 +543,20 @@ def train_one_epoch(
     }
 
 
-def _filter_evaluation_rows(
-    predictions: torch.Tensor, cpu_batch: dict[str, torch.Tensor]
+def _filter_evaluation_metadata(
+    cpu_batch: dict[str, torch.Tensor],
 ) -> dict[str, np.ndarray]:
     valid = cpu_batch["sample_valid_mask"].numpy().astype(bool, copy=False)
     return {
-        "predictions": predictions[: int(valid.sum())].float().cpu().numpy(),
-        **{
-            name: cpu_batch[name].numpy()[valid]
-            for name in (
-                "sample_id",
-                "targets",
-                "raw_returns",
-                "label_mask",
-                "date_idx",
-                "decision_idx",
-            )
-        },
+        name: cpu_batch[name].numpy()[valid]
+        for name in (
+            "sample_id",
+            "targets",
+            "raw_returns",
+            "label_mask",
+            "date_idx",
+            "decision_idx",
+        )
     }
 
 
@@ -588,7 +573,6 @@ def collect_validation_observations(
         name: []
         for name in (
             "sample_id",
-            "predictions",
             "targets",
             "raw_returns",
             "label_mask",
@@ -596,6 +580,7 @@ def collect_validation_observations(
             "decision_idx",
         )
     }
+    prediction_parts: list[torch.Tensor] = []
     loss_sums: list[torch.Tensor] = []
     total_count = 0
     with torch.inference_mode():
@@ -613,11 +598,15 @@ def collect_validation_observations(
                 temperature,
             )
             loss_sums.append(loss_sum.detach())
-            for name, values in _filter_evaluation_rows(predictions, cpu_batch).items():
+            prediction_parts.append(predictions[:valid_count].float())
+            for name, values in _filter_evaluation_metadata(cpu_batch).items():
                 collected[name].append(values)
     if not total_count:
         raise ValueError("Evaluation has no valid objective groups")
-    arrays = {name: np.concatenate(parts) for name, parts in collected.items()}
+    arrays = {
+        "predictions": torch.cat(prediction_parts).cpu().numpy(),
+        **{name: np.concatenate(parts) for name, parts in collected.items()},
+    }
     order = np.argsort(arrays["sample_id"], kind="stable")
     observations = EvaluationObservations(
         **{

@@ -30,24 +30,75 @@ def _correlation(left: NDArray[np.floating], right: NDArray[np.floating]) -> flo
     return float(np.sum(left_centered * right_centered) / denominator)
 
 
+def _rowwise_average_ranks(
+    values: NDArray[np.float64], mask: NDArray[np.bool_]
+) -> NDArray[np.float64]:
+    value_order = np.argsort(values, axis=1, kind="stable")
+    sorted_valid = np.take_along_axis(mask, value_order, axis=1)
+    valid_order = np.argsort(~sorted_valid, axis=1, kind="stable")
+    order = np.take_along_axis(value_order, valid_order, axis=1)
+    sorted_values = np.take_along_axis(values, order, axis=1)
+    sorted_valid = np.take_along_axis(mask, order, axis=1)
+
+    columns = np.arange(values.shape[1])
+    group_starts = sorted_valid.copy()
+    group_starts[:, 1:] &= sorted_values[:, 1:] != sorted_values[:, :-1]
+    starts = np.maximum.accumulate(np.where(group_starts, columns, -1), axis=1)
+    group_ends = sorted_valid.copy()
+    group_ends[:, :-1] &= (~sorted_valid[:, 1:]) | (
+        sorted_values[:, :-1] != sorted_values[:, 1:]
+    )
+    ends = np.minimum.accumulate(
+        np.where(group_ends, columns, values.shape[1])[:, ::-1], axis=1
+    )[:, ::-1]
+    sorted_ranks = np.where(sorted_valid, 0.5 * (starts + ends), 0.0)
+    ranks = np.empty_like(sorted_ranks)
+    np.put_along_axis(ranks, order, sorted_ranks, axis=1)
+    return ranks
+
+
+def _rowwise_correlation(
+    left: NDArray[np.float64],
+    right: NDArray[np.float64],
+    mask: NDArray[np.bool_],
+) -> NDArray[np.float64]:
+    counts = mask.sum(axis=1)
+    safe_counts = np.maximum(counts, 1)
+    left_mean = np.where(mask, left, 0.0).sum(axis=1) / safe_counts
+    right_mean = np.where(mask, right, 0.0).sum(axis=1) / safe_counts
+    left_centered = np.where(mask, left - left_mean[:, None], 0.0)
+    right_centered = np.where(mask, right - right_mean[:, None], 0.0)
+    covariance = (left_centered * right_centered).sum(axis=1)
+    denominator = np.sqrt(
+        (left_centered**2).sum(axis=1) * (right_centered**2).sum(axis=1)
+    )
+    result = np.full(left.shape[0], np.nan, dtype=np.float64)
+    valid = (counts >= MIN_IC_EQUITIES) & (denominator != 0.0)
+    result[valid] = covariance[valid] / denominator[valid]
+    return result
+
+
+def _metric_rows(
+    values: NDArray[np.float32], label_mask: NDArray[np.bool_]
+) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
+    rows = values.transpose(0, 2, 1).reshape(-1, values.shape[1]).astype(np.float64)
+    mask = label_mask.transpose(0, 2, 1).reshape(-1, values.shape[1])
+    return rows, mask
+
+
 def sample_level_spearman_ic(
     predictions: NDArray[np.float32],
     targets: NDArray[np.float32],
     label_mask: NDArray[np.bool_],
 ) -> NDArray[np.float64]:
-    sample_count, _, horizon_count = predictions.shape
-    spearman = np.full((sample_count, horizon_count), np.nan, dtype=np.float64)
-    for sample in range(sample_count):
-        for horizon in range(horizon_count):
-            valid = label_mask[sample, :, horizon]
-            if int(valid.sum()) < MIN_IC_EQUITIES:
-                continue
-            predicted = predictions[sample, valid, horizon]
-            actual = targets[sample, valid, horizon]
-            spearman[sample, horizon] = _correlation(
-                average_ranks(predicted), average_ranks(actual)
-            )
-    return spearman
+    predicted, mask = _metric_rows(predictions, label_mask)
+    actual, _ = _metric_rows(targets, label_mask)
+    spearman = _rowwise_correlation(
+        _rowwise_average_ranks(predicted, mask),
+        _rowwise_average_ranks(actual, mask),
+        mask,
+    )
+    return spearman.reshape(predictions.shape[0], predictions.shape[2])
 
 
 def sample_level_ic(
@@ -56,16 +107,10 @@ def sample_level_ic(
     label_mask: NDArray[np.bool_],
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     spearman = sample_level_spearman_ic(predictions, targets, label_mask)
-    pearson = np.full_like(spearman, np.nan)
-    for sample in range(predictions.shape[0]):
-        for horizon in range(predictions.shape[2]):
-            valid = label_mask[sample, :, horizon]
-            if int(valid.sum()) < MIN_IC_EQUITIES:
-                continue
-            pearson[sample, horizon] = _correlation(
-                predictions[sample, valid, horizon], targets[sample, valid, horizon]
-            )
-    return spearman, pearson
+    predicted, mask = _metric_rows(predictions, label_mask)
+    actual, _ = _metric_rows(targets, label_mask)
+    pearson = _rowwise_correlation(predicted, actual, mask)
+    return spearman, pearson.reshape(predictions.shape[0], predictions.shape[2])
 
 
 def _mean(values: NDArray[np.float64]) -> float:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,11 +10,12 @@ import torch
 from torch import nn
 from torch._inductor.exc import InductorError
 
-from brazil_rv.modeling import benchmark_runtime, train as train_module
-from brazil_rv.modeling.benchmark_runtime import parse_args as parse_benchmark_args
+from brazil_rv.modeling import engine as engine_module, train as train_module
 from brazil_rv.modeling.contract import (
     ABSOLUTE_PATCH_COUNT,
     BASELINE_TCN_SETTINGS,
+    EARLY_STOP_PATIENCE,
+    MIN_IC_EQUITIES,
     EQUITY_COUNT,
     PATCH_INPUT_WIDTH,
     RuntimeSettings,
@@ -25,7 +25,7 @@ from brazil_rv.modeling.contract import (
 )
 from brazil_rv.modeling.engine import (
     EvaluationObservations,
-    _filter_evaluation_rows,
+    _filter_evaluation_metadata,
     checkpoint_payload,
     collect_validation_observations,
     compile_model,
@@ -38,7 +38,12 @@ from brazil_rv.modeling.engine import (
     train_one_epoch,
 )
 from brazil_rv.modeling.evaluate import load_current_neural_run
-from brazil_rv.modeling.metrics import create_metric_table, primary_validation_score
+from brazil_rv.modeling.metrics import (
+    average_ranks,
+    create_metric_table,
+    primary_validation_score,
+    sample_level_ic,
+)
 from brazil_rv.modeling.model import build_neural_model
 from brazil_rv.modeling.train import parse_args
 
@@ -98,6 +103,11 @@ def _microbatch(seed: int) -> dict[str, torch.Tensor]:
     }
 
 
+def _loader_batch(*seeds: int) -> dict[str, torch.Tensor]:
+    batches = [_microbatch(seed) for seed in seeds]
+    return {name: torch.cat([batch[name] for batch in batches]) for name in batches[0]}
+
+
 def _validation_observations() -> EvaluationObservations:
     shape = (2, 4, 3)
     return EvaluationObservations(
@@ -126,8 +136,9 @@ def test_objectives_match_current_group_aggregation() -> None:
 
 def _compiled_runtime(backend: str) -> RuntimeSettings:
     return RuntimeSettings(
+        effective_batch_size=2,
+        loader_batch_size=1,
         microbatch_size=1,
-        accumulation_steps=2,
         evaluation_batch_size=2,
         num_workers=0,
         compile_backend=backend,
@@ -358,6 +369,7 @@ def test_production_routes_compiled_training_and_eager_validation(
     validation_models: list[object] = []
     validation_parameters: list[torch.Tensor] = []
     checkpoint_models: list[object] = []
+    manifests: list[dict[str, object]] = []
 
     class Sampler:
         def set_epoch(self, epoch: int) -> None:
@@ -392,6 +404,9 @@ def test_production_routes_compiled_training_and_eager_validation(
         checkpoint_models.append(current)
         return {}
 
+    def fake_atomic_json(_: Path, value: dict[str, object]) -> None:
+        manifests.append(deepcopy(value))
+
     class OutputFrame:
         def write_parquet(self, _: Path) -> None:
             return None
@@ -422,7 +437,7 @@ def test_production_routes_compiled_training_and_eager_validation(
         "summarize_evaluation_observations",
         lambda *_: ({}, [{"metric": 0.25}]),
     )
-    monkeypatch.setattr(train_module, "_atomic_json", lambda *_: None)
+    monkeypatch.setattr(train_module, "_atomic_json", fake_atomic_json)
     monkeypatch.setattr(train_module, "_atomic_torch_save", lambda *_: None)
     monkeypatch.setattr(train_module, "_write_history", lambda *_: None)
     monkeypatch.setattr(train_module.pl, "DataFrame", lambda *_: OutputFrame())
@@ -442,146 +457,51 @@ def test_production_routes_compiled_training_and_eager_validation(
     torch.testing.assert_close(validation_parameters[0], original_parameter + 1.0)
     assert checkpoint_models == [model]
 
-
-def test_benchmark_routes_compiled_updates_and_eager_validation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    model = TinyModeRanker()
-    compiled_model = object()
-    compiled_objective = object()
-    update_models: list[object] = []
-    validation_models: list[object] = []
-
-    class Sampler:
-        def set_epoch(self, epoch: int) -> None:
-            assert epoch == 1
-
-    def fake_update(current: object, *_: object) -> float:
-        update_models.append(current)
-        return 1.0
-
-    def fake_validation(
-        current: object, _: object
-    ) -> tuple[EvaluationObservations, float, float, float, float]:
-        validation_models.append(current)
-        return _validation_observations(), 0.25, 3.0, 2.0, 1.0
-
-    rows = SimpleNamespace(height=512)
-    monkeypatch.setattr(benchmark_runtime, "set_seeds", lambda _: None)
-    monkeypatch.setattr(benchmark_runtime, "resolve_feature_store", lambda: Path("."))
-    monkeypatch.setattr(benchmark_runtime, "load_sample_index", lambda _: object())
-    monkeypatch.setattr(benchmark_runtime, "select_sample_split", lambda *_: rows)
-    monkeypatch.setattr(
-        benchmark_runtime,
-        "create_training_loaders",
-        lambda *_: ([object()], object(), Sampler()),
-    )
-    monkeypatch.setattr(benchmark_runtime, "build_neural_model", lambda *_: model)
-    monkeypatch.setattr(
-        benchmark_runtime, "build_optimizer", lambda _: (object(), object())
-    )
-    monkeypatch.setattr(
-        benchmark_runtime, "build_scheduler", lambda *_: (object(), 1, 0)
-    )
-    monkeypatch.setattr(benchmark_runtime, "compile_model", lambda *_: compiled_model)
-    monkeypatch.setattr(
-        benchmark_runtime,
-        "compile_training_objective",
-        lambda *_: compiled_objective,
-    )
-    monkeypatch.setattr(
-        benchmark_runtime,
-        "_compiled_soft_spearman_parity",
-        lambda _: {
-            "maximum_absolute_loss_difference": 0.0,
-            "maximum_absolute_gradient_difference": 0.0,
-            "absolute_tolerance": benchmark_runtime.PARITY_ABSOLUTE_TOLERANCE,
-        },
-    )
-    monkeypatch.setattr(benchmark_runtime, "_timed_update", fake_update)
-    monkeypatch.setattr(benchmark_runtime, "_timed_validation", fake_validation)
-    monkeypatch.setattr(
-        benchmark_runtime.torch.cuda, "reset_peak_memory_stats", lambda: None
-    )
-    monkeypatch.setattr(benchmark_runtime.torch.cuda, "max_memory_allocated", lambda: 0)
-    monkeypatch.setattr(benchmark_runtime.torch.cuda, "max_memory_reserved", lambda: 0)
-    result = benchmark_runtime.run_benchmark(parse_benchmark_args([]))
-    assert update_models == [compiled_model] * (
-        1 + benchmark_runtime.STEADY_UPDATE_COUNT
-    )
-    assert validation_models == [model, model]
-    assert result["validation_observations_exact_match"] is True
-    assert result["validation_primary_metric_exact_match"] is True
-
-
-def test_benchmark_parity_detaches_before_scalar_conversion(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    generator_type = torch.Generator
-    randn = torch.randn
-    rand = torch.rand
-    monkeypatch.setattr(
-        benchmark_runtime.torch,
-        "Generator",
-        lambda **_: generator_type(),
-    )
-
-    def cpu_randn(*shape: object, **keywords: object) -> torch.Tensor:
-        keywords.pop("device", None)
-        return randn(*shape, **keywords)
-
-    def cpu_rand(*shape: object, **keywords: object) -> torch.Tensor:
-        keywords.pop("device", None)
-        return rand(*shape, **keywords)
-
-    monkeypatch.setattr(benchmark_runtime.torch, "randn", cpu_randn)
-    monkeypatch.setattr(benchmark_runtime.torch, "rand", cpu_rand)
-    monkeypatch.setattr(benchmark_runtime.torch.cuda, "synchronize", lambda: None)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        parity = benchmark_runtime._compiled_soft_spearman_parity(
-            eager_training_objective("soft_spearman", 0.50)
-        )
-    assert parity["maximum_absolute_loss_difference"] == 0.0
-    assert parity["maximum_absolute_gradient_difference"] == 0.0
-    assert not any(
-        "requires_grad" in str(warning.message) and "scalar" in str(warning.message)
-        for warning in caught
-    )
-
-
-def test_benchmark_cli_accepts_only_retained_compile_modes() -> None:
-    assert benchmark_runtime.COMPILE_MODES == (
-        "default",
-        "max-autotune-no-cudagraphs",
-    )
-    for mode in benchmark_runtime.COMPILE_MODES:
-        assert parse_benchmark_args(["--compile-mode", mode]).compile_mode == mode
-    for mode in ("reduce" + "-overhead", "max" + "-autotune"):
-        with pytest.raises(SystemExit):
-            parse_benchmark_args(["--compile-mode", mode])
+    completed = manifests[-1]
+    assert completed["status"] == "completed"
+    assert completed["split"] == {
+        "training": "train",
+        "selection": "validation",
+        "test_accessed": False,
+    }
+    training = completed["training"]
+    assert isinstance(training, dict)
+    assert training["early_stop_patience"] == EARLY_STOP_PATIENCE == 3
+    assert training["effective_batch_size"] == 512
+    assert training["loader_batch_size"] == 256
+    assert training["microbatch_size"] == 256
+    assert training["loader_batches_per_effective_batch"] == 2
+    assert training["microbatches_per_effective_batch"] == 2
+    assert training["evaluation_batch_size"] == 256
+    assert training["num_workers"] == 8
+    assert training["prefetch_factor"] == 4
+    assert training["pin_memory"] is True
+    assert training["persistent_workers"] is True
+    assert training["compile_backend"] == "inductor"
+    assert training["compile_mode"] == "default"
+    assert training["compile_fullgraph"] is True
+    assert training["compile_dynamic"] is False
 
 
 @pytest.mark.parametrize(
-    ("optimizer_variant", "fail_after", "rho", "message"),
+    ("optimizer_variant", "fail_after", "rho"),
     (
-        ("adamw", 0, None, "Ordinary update"),
-        ("sam_adamw", 0, 0.125, "SAM pass 1"),
-        ("sam_adamw", 2, 0.125, "SAM pass 2"),
+        ("adamw", 0, None),
+        ("sam_adamw", 0, 0.125),
+        ("sam_adamw", 2, 0.125),
     ),
 )
-def test_nonfinite_accumulated_loss_is_rejected_per_effective_pass(
+def test_nonfinite_gradients_are_rejected_per_effective_pass(
     optimizer_variant: str,
     fail_after: int,
     rho: float | None,
-    message: str,
 ) -> None:
     model = TinyRanker()
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     originals = [parameter.detach().clone() for parameter in model.parameters()]
     calls = 0
 
-    def detached_nonfinite_loss(
+    def nonfinite_gradient_loss(
         predictions: torch.Tensor,
         targets: torch.Tensor,
         label_mask: torch.Tensor,
@@ -591,12 +511,10 @@ def test_nonfinite_accumulated_loss_is_rejected_per_effective_pass(
         calls += 1
         finite = predictions.square().sum()
         if calls > fail_after:
-            return finite + predictions.new_tensor(float("inf"))
+            return finite * predictions.new_tensor(float("nan"))
         return finite
 
-    with pytest.raises(
-        FloatingPointError, match=f"{message} accumulated loss is non-finite"
-    ):
+    with pytest.raises(FloatingPointError, match="Training gradients are non-finite"):
         run_effective_batch_update(
             model,
             [_microbatch(1), _microbatch(2)],
@@ -607,14 +525,118 @@ def test_nonfinite_accumulated_loss_is_rejected_per_effective_pass(
             "rank_huber",
             None,
             rho,
-            training_objective=detached_nonfinite_loss,
+            training_objective=nonfinite_gradient_loss,
         )
     for parameter, original in zip(model.parameters(), originals, strict=True):
         torch.testing.assert_close(parameter, original, atol=0, rtol=0)
         assert parameter.grad is None
 
 
-def test_finite_loss_check_preserves_ordinary_update() -> None:
+def test_epoch_rejects_nonfinite_reported_objective() -> None:
+    model = TinyRanker()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+
+    def detached_nonfinite_loss(
+        predictions: torch.Tensor,
+        targets: torch.Tensor,
+        label_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        del targets, label_mask
+        return predictions.square().sum() + predictions.new_tensor(float("inf"))
+
+    with pytest.raises(FloatingPointError, match="Epoch training statistics"):
+        train_one_epoch(
+            model,
+            [_microbatch(1), _microbatch(2)],
+            optimizer,
+            scheduler,
+            _compiled_runtime("eager"),
+            "adamw",
+            "rank_huber",
+            None,
+            None,
+            detached_nonfinite_loss,
+        )
+
+
+def test_loader_batches_transfer_directly_and_match_reference_update(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    torch.manual_seed(43)
+    model = TinyModeRanker()
+    reference_model = deepcopy(model)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    reference_optimizer = torch.optim.AdamW(reference_model.parameters(), lr=1e-3)
+    runtime = RuntimeSettings(
+        effective_batch_size=4,
+        loader_batch_size=2,
+        microbatch_size=1,
+        num_workers=0,
+    )
+    loader_batches = [_loader_batch(1, 2), _loader_batch(3, 4)]
+    transferred: list[dict[str, torch.Tensor]] = []
+    original_transfer = engine_module._to_device
+
+    def track_transfer(
+        batch: dict[str, torch.Tensor], device: torch.device
+    ) -> dict[str, torch.Tensor]:
+        transferred.append(batch)
+        return original_transfer(batch, device)
+
+    class StepCounter:
+        steps = 0
+
+        def step(self) -> None:
+            self.steps += 1
+
+    scheduler = StepCounter()
+    monkeypatch.setattr(engine_module, "_to_device", track_transfer)
+    loss_function = eager_training_objective("soft_spearman", 0.50)
+    result = run_effective_batch_update(
+        model,
+        loader_batches,
+        optimizer,
+        scheduler,
+        runtime,
+        "adamw",
+        "soft_spearman",
+        0.50,
+        None,
+        training_objective=loss_function,
+    )
+
+    reference_optimizer.zero_grad(set_to_none=True)
+    reference_total = torch.zeros((), dtype=torch.float32)
+    for batch in [_microbatch(seed) for seed in (1, 2, 3, 4)]:
+        predictions = reference_model(batch["tabular_features"], batch["equity_mask"])
+        loss_sum = loss_function(predictions, batch["targets"], batch["label_mask"])
+        reference_total += loss_sum.detach()
+        (loss_sum / 12).backward()
+    reference_norm = torch.nn.utils.clip_grad_norm_(
+        tuple(reference_model.parameters()), 1.0, error_if_nonfinite=True
+    )
+    reference_optimizer.step()
+
+    assert len(transferred) == len(loader_batches)
+    assert all(
+        actual is expected for actual, expected in zip(transferred, loader_batches)
+    )
+    assert not hasattr(engine_module, "_concatenate_batches")
+    assert not hasattr(engine_module, "_combine_effective_batch")
+    assert result["loss_count"] == 12
+    assert result["backward_passes"] == 4
+    assert scheduler.steps == 1
+    assert all(float(state["step"]) == 1.0 for state in optimizer.state.values())
+    torch.testing.assert_close(result["loss_sum"], reference_total)
+    torch.testing.assert_close(result["gradient_norm"], reference_norm)
+    for parameter, reference_parameter in zip(
+        model.parameters(), reference_model.parameters(), strict=True
+    ):
+        torch.testing.assert_close(parameter, reference_parameter)
+
+
+def test_finite_gradients_preserve_ordinary_update() -> None:
     torch.manual_seed(43)
     model = TinyRanker()
     originals = [parameter.detach().clone() for parameter in model.parameters()]
@@ -642,7 +664,7 @@ def test_sam_restores_exactly_before_second_gradient_update_and_replays_rng() ->
     model = TinyRanker()
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     runtime = RuntimeSettings(
-        microbatch_size=1, accumulation_steps=2, evaluation_batch_size=2, num_workers=0
+        effective_batch_size=2, loader_batch_size=1, microbatch_size=1, num_workers=0
     )
     original = {
         name: value.detach().clone() for name, value in model.named_parameters()
@@ -686,6 +708,85 @@ def test_sam_restores_exactly_before_second_gradient_update_and_replays_rng() ->
     assert any(
         not torch.equal(value, original[name])
         for name, value in model.named_parameters()
+    )
+
+
+def _scalar_correlation(left: np.ndarray, right: np.ndarray) -> float:
+    left = left.astype(np.float64)
+    right = right.astype(np.float64)
+    left -= left.mean()
+    right -= right.mean()
+    denominator = np.sqrt(np.sum(left**2) * np.sum(right**2))
+    return float(np.sum(left * right) / denominator) if denominator else float("nan")
+
+
+def _scalar_sample_level_ic(
+    predictions: np.ndarray,
+    targets: np.ndarray,
+    label_mask: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    shape = (predictions.shape[0], predictions.shape[2])
+    spearman = np.full(shape, np.nan, dtype=np.float64)
+    pearson = np.full(shape, np.nan, dtype=np.float64)
+    for sample in range(predictions.shape[0]):
+        for horizon in range(predictions.shape[2]):
+            valid = label_mask[sample, :, horizon]
+            if int(valid.sum()) < MIN_IC_EQUITIES:
+                continue
+            predicted = predictions[sample, valid, horizon]
+            actual = targets[sample, valid, horizon]
+            spearman[sample, horizon] = _scalar_correlation(
+                average_ranks(predicted), average_ranks(actual)
+            )
+            pearson[sample, horizon] = _scalar_correlation(predicted, actual)
+    return spearman, pearson
+
+
+def _finite_mean(values: np.ndarray) -> float:
+    finite = values[np.isfinite(values)]
+    return float(finite.mean()) if finite.size else float("nan")
+
+
+def test_vectorized_sample_metrics_match_scalar_reference() -> None:
+    rng = np.random.default_rng(7)
+    predictions = np.round(rng.normal(size=(5, 35, 3)), 1).astype(np.float32)
+    targets = np.round(rng.normal(size=(5, 35, 3)), 1).astype(np.float32)
+    mask = rng.random((5, 35, 3)) > 0.15
+    mask[0, :, 0] = False
+    mask[0, :MIN_IC_EQUITIES, 0] = True
+    mask[0, :, 1] = False
+    mask[0, : MIN_IC_EQUITIES - 1, 1] = True
+    mask[1, :, :2] = True
+    predictions[1, :, 0] = 2.0
+    targets[1, :, 1] = -1.0
+    mask[4] = False
+    predictions[~mask] = np.nan
+    targets[~mask] = np.inf
+
+    expected_spearman, expected_pearson = _scalar_sample_level_ic(
+        predictions, targets, mask
+    )
+    spearman, pearson = sample_level_ic(predictions, targets, mask)
+    np.testing.assert_array_equal(np.isnan(spearman), np.isnan(expected_spearman))
+    np.testing.assert_array_equal(np.isnan(pearson), np.isnan(expected_pearson))
+    np.testing.assert_allclose(spearman, expected_spearman, rtol=1e-14, atol=1e-15)
+    np.testing.assert_allclose(pearson, expected_pearson, rtol=1e-14, atol=1e-15)
+
+    dates = np.array([2, 1, 2, 1, 3])
+    expected_horizons = []
+    for horizon in range(spearman.shape[1]):
+        daily = np.asarray(
+            [
+                _finite_mean(expected_spearman[dates == date_value, horizon])
+                for date_value in np.unique(dates)
+            ]
+        )
+        expected_horizons.append(_finite_mean(daily))
+    assert np.isclose(
+        primary_validation_score(predictions, targets, mask, dates),
+        np.mean(expected_horizons),
+        rtol=1e-14,
+        atol=1e-15,
     )
 
 
@@ -734,8 +835,7 @@ def test_metric_ordering_preserves_turnover_and_daily_weighting() -> None:
                 assert left[key] == right[key]
 
 
-def test_evaluation_padding_filters_only_real_rows() -> None:
-    predictions = torch.arange(4 * 2 * 3, dtype=torch.float32).reshape(4, 2, 3)
+def test_evaluation_padding_filters_only_real_rows_across_batches() -> None:
     batch = {
         "tabular_features": torch.ones(4, 2, 2),
         "equity_mask": torch.ones(4, 2, dtype=torch.bool),
@@ -747,16 +847,30 @@ def test_evaluation_padding_filters_only_real_rows() -> None:
         "date_idx": torch.tensor([1, 1, -1, -1]),
         "decision_idx": torch.tensor([1, 0, -1, -1]),
     }
-    filtered = _filter_evaluation_rows(predictions, batch)
-    assert filtered["predictions"].shape[0] == 2
+    filtered = _filter_evaluation_metadata(batch)
     np.testing.assert_array_equal(filtered["sample_id"], [5, 4])
+    second_batch = {name: values.clone() for name, values in batch.items()}
+    second_batch["sample_id"] = torch.tensor([3, 2, -1, -1])
+    second_batch["targets"][:2] = 1.0
+    second_batch["raw_returns"][:2] = 0.1
+    second_batch["date_idx"] = torch.tensor([0, 0, -1, -1])
+    second_batch["decision_idx"] = torch.tensor([1, 0, -1, -1])
     model = TinyRanker()
     observations, loss = collect_validation_observations(
-        model, [batch], "rank_huber", None
+        model, [batch, second_batch], "rank_huber", None
     )
-    np.testing.assert_array_equal(observations.sample_id, [4, 5])
-    assert model.inference_flags == [True]
-    assert np.isfinite(loss)
+    np.testing.assert_array_equal(observations.sample_id, [2, 3, 4, 5])
+    np.testing.assert_array_equal(observations.targets[:2], 1.0)
+    assert observations.predictions.shape[0] == 4
+    assert model.inference_flags == [True, True]
+    expected_loss = objective_loss(
+        torch.from_numpy(observations.predictions),
+        torch.from_numpy(observations.targets),
+        torch.from_numpy(observations.label_mask),
+        "rank_huber",
+        None,
+    )
+    assert np.isclose(loss, float(expected_loss))
 
 
 def test_current_checkpoint_round_trip_uses_one_schema(tmp_path: Path) -> None:
@@ -811,7 +925,6 @@ def test_direct_cli_defaults_to_full_incumbent_and_removed_surfaces_are_rejected
         0.50,
         0.125,
     )
-    assert parse_benchmark_args([]).microbatch_size == 64
 
 
 def test_each_retained_neural_family_has_a_finite_forward_pass() -> None:
