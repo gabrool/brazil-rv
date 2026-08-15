@@ -18,6 +18,7 @@ import torch
 from .contract import (
     ALLOWED_SEEDS,
     BASELINE_TCN_SETTINGS,
+    CONTEXT_FAMILY_ABLATIONS,
     CONTEXT_ROUTING_MODES,
     EARLY_STOP_PATIENCE,
     GLOBAL_CONTEXT_SETTINGS,
@@ -33,8 +34,10 @@ from .contract import (
     SOFT_RANK_TEMPERATURES,
     TCN_BLOCK_VARIANTS,
     TCN_FUSIONS,
+    TCN_READOUTS,
     TCN_RECEPTIVE_FIELDS,
     TCN_WIDTHS,
+    TRAINING_HORIZONS,
     NeuralArchitecture,
     TCNArchitecture,
     TCNSettings,
@@ -79,6 +82,8 @@ def validate_cli_args(
         args.sam_rho = 0.125 if args.sam_rho is None else args.sam_rho
     elif args.sam_rho is not None:
         parser.error("AdamW does not accept --sam-rho")
+    if args.model != "tcn" and args.tcn_readout != "final":
+        parser.error("TCN readouts are supported only for TCN")
     args.peer_features = (
         ("selected" if args.model == "tcn" else "none")
         if args.peer_features is None
@@ -92,6 +97,8 @@ def validate_cli_args(
         args.global_context = args.global_context or "enabled"
     elif args.global_context is not None:
         parser.error("Context-free models do not accept --global-context")
+    if not consumes_context and args.context_family_ablation != "none":
+        parser.error("Context ablation requires context inputs")
     return args
 
 
@@ -129,6 +136,15 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--macro-temporal-routing", choices=CONTEXT_ROUTING_MODES, default="late_only"
     )
+    parser.add_argument(
+        "--tcn-readout", choices=TCN_READOUTS, default=BASELINE_TCN_SETTINGS.readout
+    )
+    parser.add_argument("--training-horizon", choices=TRAINING_HORIZONS, default="all")
+    parser.add_argument(
+        "--context-family-ablation",
+        choices=CONTEXT_FAMILY_ABLATIONS,
+        default="none",
+    )
     parser.add_argument("--global-context", choices=GLOBAL_CONTEXT_SETTINGS)
     parser.add_argument("--peer-features", choices=PEER_FEATURE_MODES)
     parser.add_argument("--seed", type=int, choices=ALLOWED_SEEDS, default=29)
@@ -146,6 +162,7 @@ def _tcn_settings_from_args(args: argparse.Namespace) -> TCNSettings | None:
         args.tcn_block,
         args.slow_routing,
         args.macro_temporal_routing,
+        args.tcn_readout,
     )
 
 
@@ -163,12 +180,17 @@ def _model_metadata(
         if isinstance(architecture, TCNArchitecture)
         else None,
         "peer_features": peer_feature_metadata(model_name, architecture, peer_features),
+        "readout": settings.readout if settings is not None else None,
     }
 
 
 def _run_directory_name(args: argparse.Namespace, created_at: datetime) -> str:
     if args.model == "tcn":
-        model = f"tcn_{args.tcn_fusion}_w{args.tcn_width}_rf{args.tcn_receptive_field}_b{args.tcn_block}"
+        model = (
+            f"tcn_{args.tcn_fusion}_w{args.tcn_width}"
+            f"_rf{args.tcn_receptive_field}_b{args.tcn_block}"
+            f"_readout-{args.tcn_readout}"
+        )
         if (
             args.slow_routing != "late_only"
             or args.macro_temporal_routing != "late_only"
@@ -185,6 +207,10 @@ def _run_directory_name(args: argparse.Namespace, created_at: datetime) -> str:
         model += f"_global-{args.global_context}"
     if args.peer_features != "none":
         model += f"_peer-{args.peer_features}"
+    if args.training_horizon != "all":
+        model += f"_horizon-{args.training_horizon}"
+    if args.context_family_ablation != "none":
+        model += f"_without-{args.context_family_ablation}"
     return f"{model}_seed{args.seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
 
 
@@ -222,6 +248,10 @@ def _run_neural(
     train_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
     run_dir: Path,
+    *,
+    fit_name: str = "train",
+    selection_name: str = "validation",
+    allow_date_replacement: bool = False,
 ) -> None:
     torch.set_float32_matmul_precision("high")
     settings = _tcn_settings_from_args(args)
@@ -236,6 +266,8 @@ def _run_neural(
         args.seed,
         architecture if isinstance(architecture, TCNArchitecture) else None,
         args.peer_features,
+        args.context_family_ablation,
+        allow_date_replacement,
     )
     train_loader, validation_loader, sampler = loaders
     model = build_neural_model(
@@ -254,12 +286,15 @@ def _run_neural(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "feature_store": str(store),
         "split": {
-            "training": "train",
-            "selection": "validation",
+            "training": fit_name,
+            "selection": selection_name,
             "test_accessed": False,
         },
         "seed": args.seed,
         "global_context": args.global_context,
+        "training_horizon": args.training_horizon,
+        "selection_horizon": args.training_horizon,
+        "context_family_ablation": args.context_family_ablation,
         "model": _model_metadata(
             args.model, architecture, settings, args.peer_features
         ),
@@ -315,15 +350,24 @@ def _run_neural(
             args.temperature,
             args.sam_rho,
             compiled_objective,
+            args.training_horizon,
         )
         training_seconds = time.perf_counter() - training_started
         collection_started = time.perf_counter()
         observations, validation_objective_loss = collect_validation_observations(
-            model, validation_loader, args.objective, args.temperature
+            model,
+            validation_loader,
+            args.objective,
+            args.temperature,
+            args.training_horizon,
         )
         validation_collection_seconds = time.perf_counter() - collection_started
         metric_started = time.perf_counter()
-        score = validation_primary_metric(observations)
+        score = (
+            validation_primary_metric(observations)
+            if args.training_horizon == "all"
+            else validation_primary_metric(observations, args.training_horizon)
+        )
         validation_primary_metric_seconds = time.perf_counter() - metric_started
         row = {
             "epoch": epoch,
@@ -363,6 +407,8 @@ def _run_neural(
                     store,
                     args.global_context,
                     args.peer_features,
+                    args.training_horizon,
+                    args.context_family_ablation,
                 ),
             )
         else:

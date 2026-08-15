@@ -156,6 +156,14 @@ TCN_KERNEL_SIZE = 3
 TCN_FUSIONS = ("none", "context_only", "pooled_market", "context_pooled")
 TCN_WIDTHS = (64, 128, 192, 256)
 TCN_BLOCK_VARIANTS = ("gelu", "silu", "swiglu")
+TCN_READOUTS = (
+    "final",
+    "shared_multiscale",
+    "horizon_multiscale",
+    "final_score_mlp",
+)
+TRAINING_HORIZONS = ("all", "30", "60", "120")
+CONTEXT_FAMILY_ABLATIONS = ("none", "wdo", "br_rates", "us_rates")
 TCN_RECEPTIVE_FIELDS: Mapping[str, tuple[int, ...]] = MappingProxyType(
     {
         "short": (1, 1, 1, 1, 1, 2),
@@ -300,6 +308,7 @@ class TCNSettings:
     block: str = "swiglu"
     slow_routing: str = "late_only"
     macro_temporal_routing: str = "late_only"
+    readout: str = "final"
 
 
 BASELINE_TCN_SETTINGS = TCNSettings()
@@ -331,6 +340,7 @@ class TCNArchitecture:
     slow_routing: str
     macro_temporal_routing: str
     context_routing_rank: int
+    readout: str
 
 
 @dataclass(frozen=True)
@@ -451,6 +461,8 @@ def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
         or settings.macro_temporal_routing not in CONTEXT_ROUTING_MODES
     ):
         raise ValueError(f"Invalid context routing: {settings}")
+    if settings.readout not in TCN_READOUTS:
+        raise ValueError(f"Invalid TCN readout: {settings.readout}")
     if (
         settings.slow_routing != "late_only"
         or settings.macro_temporal_routing != "late_only"
@@ -504,7 +516,49 @@ def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
         settings.slow_routing,
         settings.macro_temporal_routing,
         min(32, settings.width),
+        settings.readout,
     )
+
+
+def tcn_tap_receptive_field_minutes(
+    architecture: TCNArchitecture,
+) -> tuple[int, ...]:
+    cumulative = 0
+    values: list[int] = []
+    for dilation in architecture.dilations:
+        cumulative += dilation
+        patches = 1 + (architecture.kernel_size - 1) * cumulative
+        values.append(patches * PATCH_MINUTES)
+    return tuple(values)
+
+
+def validate_training_horizon(value: str) -> str:
+    if value not in TRAINING_HORIZONS:
+        raise ValueError(f"Invalid training horizon: {value}")
+    return value
+
+
+def training_horizon_index(value: str) -> int | None:
+    value = validate_training_horizon(value)
+    return None if value == "all" else HORIZONS.index(int(value))
+
+
+def validate_context_family_ablation(value: str) -> str:
+    if value not in CONTEXT_FAMILY_ABLATIONS:
+        raise ValueError(f"Invalid context-family ablation: {value}")
+    return value
+
+
+def context_family_slots(value: str) -> tuple[int, ...]:
+    value = validate_context_family_ablation(value)
+    symbols = {
+        "none": (),
+        "wdo": ("WDO$",),
+        "br_rates": ("DI1F27", "DI1F28", "DI1F29", "DI1F31", "DI1$N"),
+        "us_rates": ("ZT.v.0", "ZN.v.0"),
+    }[value]
+    ordered = (*LOCAL_CONTEXT_SYMBOLS, *GLOBAL_CONTEXT_SYMBOLS)
+    return tuple(ordered.index(symbol) for symbol in symbols)
 
 
 def routing_enabled(architecture: TCNArchitecture) -> bool:

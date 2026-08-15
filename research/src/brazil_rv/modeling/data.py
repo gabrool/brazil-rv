@@ -44,6 +44,8 @@ from .contract import (
     TRAIN_START,
     VALIDATION_END,
     VALIDATION_START,
+    context_family_slots,
+    validate_context_family_ablation,
     validate_peer_feature_mode,
 )
 
@@ -207,6 +209,8 @@ def _context_readiness(
     date_idx: np.ndarray,
     decision_idx: np.ndarray,
     global_context: str,
+    context_family_ablation: str = "none",
+    allow_date_replacement: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     if global_context not in GLOBAL_CONTEXT_SETTINGS:
         raise ValueError(f"Invalid global context: {global_context}")
@@ -225,6 +229,11 @@ def _context_readiness(
     global_ready &= keep
     if global_context == "masked":
         global_ready[:] = False
+    for slot in context_family_slots(context_family_ablation):
+        if slot < LOCAL_CONTEXT_COUNT:
+            local_ready[:, slot] = False
+        else:
+            global_ready[:, slot - LOCAL_CONTEXT_COUNT] = False
     return local_ready, global_ready
 
 
@@ -236,6 +245,7 @@ def _build_patch_batch(
     context_cutoffs: np.ndarray,
     active: np.ndarray,
     global_context: str | None,
+    context_family_ablation: str = "none",
 ) -> dict[str, np.ndarray]:
     needs_context = global_context is not None
     batch_size = date_idx.size
@@ -243,7 +253,11 @@ def _build_patch_batch(
     local_ready = global_ready = None
     if needs_context:
         local_ready, global_ready = _context_readiness(
-            arrays, date_idx, decision_idx, global_context
+            arrays,
+            date_idx,
+            decision_idx,
+            global_context,
+            context_family_ablation,
         )
     patches = np.zeros(
         (batch_size, instrument_count, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH),
@@ -352,10 +366,11 @@ def build_tabular_batch(
     context_cutoffs: np.ndarray,
     active: np.ndarray,
     global_context: str,
+    context_family_ablation: str = "none",
 ) -> dict[str, np.ndarray]:
     batch_size = date_idx.size
     local_ready, global_ready = _context_readiness(
-        arrays, date_idx, decision_idx, global_context
+        arrays, date_idx, decision_idx, global_context, context_family_ablation
     )
     global_cutoffs = np.asarray(DECISION_GLOBAL_INDICES)[decision_idx]
     global_grid = np.asarray(arrays["global_features.npy"][date_idx], dtype=np.float32)
@@ -482,6 +497,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         global_context: str | None,
         tcn_architecture: TCNArchitecture | None = None,
         peer_features: str = "none",
+        context_family_ablation: str = "none",
     ) -> None:
         if model_name not in NEURAL_MODELS:
             raise ValueError(f"Neural dataset required, found {model_name}")
@@ -503,6 +519,11 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         self.needs_context = needs_context
         self.global_context = global_context
         self.peer_features = validate_peer_feature_mode(model_name, peer_features)
+        self.context_family_ablation = validate_context_family_ablation(
+            context_family_ablation
+        )
+        if not needs_context and self.context_family_ablation != "none":
+            raise ValueError("Context ablation requires context inputs")
         self.rows = {
             name: sample_index.get_column(name).to_numpy()
             for name in (
@@ -555,6 +576,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 context_cutoffs,
                 active,
                 self.global_context,
+                self.context_family_ablation,
             )
         else:
             inputs = _build_patch_batch(
@@ -565,6 +587,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 context_cutoffs,
                 active,
                 self.global_context,
+                self.context_family_ablation,
             )
             if self.peer_features == "selected":
                 inputs["peer_state"] = _build_peer_state(
@@ -575,7 +598,11 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
 
 class DateStratifiedBatchSampler(Sampler[BatchRequest]):
     def __init__(
-        self, sample_index: pl.DataFrame, runtime: RuntimeSettings, seed: int
+        self,
+        sample_index: pl.DataFrame,
+        runtime: RuntimeSettings,
+        seed: int,
+        allow_date_replacement: bool = False,
     ) -> None:
         self.runtime = runtime
         self.seed = seed
@@ -589,10 +616,14 @@ class DateStratifiedBatchSampler(Sampler[BatchRequest]):
         self.positions_by_date = {
             date: np.asarray(values) for date, values in positions.items()
         }
-        if len(self.dates) < runtime.effective_batch_size:
+        if (
+            len(self.dates) < runtime.effective_batch_size
+            and not allow_date_replacement
+        ):
             raise ValueError(
                 f"Training requires at least {runtime.effective_batch_size} distinct dates"
             )
+        self.replace_dates = len(self.dates) < runtime.effective_batch_size
         self.epoch_sample_count = (
             math.ceil(self.sample_count / runtime.effective_batch_size)
             * runtime.effective_batch_size
@@ -609,7 +640,9 @@ class DateStratifiedBatchSampler(Sampler[BatchRequest]):
         effective_batch_size = self.runtime.effective_batch_size
         for _ in range(self.epoch_sample_count // effective_batch_size):
             chosen = generator.choice(
-                len(self.dates), effective_batch_size, replace=False
+                len(self.dates),
+                effective_batch_size,
+                replace=self.replace_dates,
             )
             indices = [
                 int(
@@ -623,6 +656,26 @@ class DateStratifiedBatchSampler(Sampler[BatchRequest]):
             for start in range(0, effective_batch_size, self.runtime.loader_batch_size):
                 values = tuple(indices[start : start + self.runtime.loader_batch_size])
                 yield BatchRequest(values, len(values))
+
+
+class SingleDecisionBatchSampler(Sampler[BatchRequest]):
+    def __init__(self, sample_index: pl.DataFrame, batch_size: int) -> None:
+        self.batch_size = batch_size
+        decisions = sample_index.get_column("decision_idx").to_numpy()
+        self.groups = tuple(
+            np.flatnonzero(decisions == decision) for decision in np.unique(decisions)
+        )
+
+    def __len__(self) -> int:
+        return sum(math.ceil(group.size / self.batch_size) for group in self.groups)
+
+    def __iter__(self) -> Iterator[BatchRequest]:
+        for group in self.groups:
+            for start in range(0, group.size, self.batch_size):
+                values = group[start : start + self.batch_size].tolist()
+                valid_count = len(values)
+                values.extend([values[-1]] * (self.batch_size - valid_count))
+                yield BatchRequest(tuple(values), valid_count)
 
 
 class DecisionGroupedBatchSampler(Sampler[BatchRequest]):
@@ -692,12 +745,16 @@ def create_training_loaders(
     seed: int,
     tcn_architecture: TCNArchitecture | None = None,
     peer_features: str = "none",
+    context_family_ablation: str = "none",
+    allow_date_replacement: bool = False,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
     DateStratifiedBatchSampler,
 ]:
-    sampler = DateStratifiedBatchSampler(train_rows, runtime, seed)
+    sampler = DateStratifiedBatchSampler(
+        train_rows, runtime, seed, allow_date_replacement
+    )
     train = _create_loader(
         VectorizedFeatureDataset(
             store,
@@ -706,6 +763,7 @@ def create_training_loaders(
             global_context,
             tcn_architecture,
             peer_features,
+            context_family_ablation,
         ),
         sampler,
         runtime,
@@ -719,6 +777,7 @@ def create_training_loaders(
             global_context,
             tcn_architecture,
             peer_features,
+            context_family_ablation,
         ),
         DecisionGroupedBatchSampler(validation_rows, runtime.evaluation_batch_size),
         runtime,
@@ -736,12 +795,50 @@ def create_evaluation_loader(
     seed: int,
     tcn_architecture: TCNArchitecture | None = None,
     peer_features: str = "none",
+    context_family_ablation: str = "none",
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
         VectorizedFeatureDataset(
-            store, rows, model_name, global_context, tcn_architecture, peer_features
+            store,
+            rows,
+            model_name,
+            global_context,
+            tcn_architecture,
+            peer_features,
+            context_family_ablation,
         ),
         DecisionGroupedBatchSampler(rows, runtime.evaluation_batch_size),
+        runtime,
+        seed,
+    )
+
+
+def create_analysis_loader(
+    store: Path,
+    rows: pl.DataFrame,
+    model_name: str,
+    global_context: str | None,
+    runtime: RuntimeSettings,
+    seed: int,
+    tcn_architecture: TCNArchitecture | None = None,
+    peer_features: str = "none",
+    context_family_ablation: str = "none",
+    batch_size: int | None = None,
+) -> DataLoader[dict[str, torch.Tensor]]:
+    size = rows.height if batch_size is None else batch_size
+    if size <= 0:
+        raise ValueError("Analysis batch size must be positive")
+    return _create_loader(
+        VectorizedFeatureDataset(
+            store,
+            rows,
+            model_name,
+            global_context,
+            tcn_architecture,
+            peer_features,
+            context_family_ablation,
+        ),
+        SingleDecisionBatchSampler(rows, size),
         runtime,
         seed,
     )

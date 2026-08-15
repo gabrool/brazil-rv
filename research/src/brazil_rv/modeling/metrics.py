@@ -309,3 +309,35 @@ def create_metric_table(
         },
         daily_rows,
     )
+
+
+def moving_block_bootstrap(
+    daily_values: NDArray[np.floating],
+    *,
+    replications: int = 10_000,
+    block_length: int = 5,
+    seed: int = 20260815,
+) -> dict[str, NDArray[np.float64]]:
+    values = np.asarray(daily_values, dtype=np.float64)
+    if values.ndim == 1:
+        values = values[:, None]
+    if values.ndim != 2 or values.shape[0] < block_length or replications <= 0:
+        raise ValueError("Moving-block bootstrap dimensions are invalid")
+    date_count = values.shape[0]
+    block_count = math.ceil(date_count / block_length)
+    generator = np.random.default_rng(seed)
+    starts = generator.integers(
+        0,
+        date_count - block_length + 1,
+        size=(replications, block_count),
+    )
+    indices = (starts[..., None] + np.arange(block_length, dtype=np.int64)).reshape(
+        replications, -1
+    )[:, :date_count]
+    sampled = values[indices]
+    replicated = np.nanmean(sampled, axis=1)
+    return {
+        "estimate": np.nanmean(values, axis=0),
+        "lower_95": np.nanquantile(replicated, 0.025, axis=0),
+        "upper_95": np.nanquantile(replicated, 0.975, axis=0),
+    }

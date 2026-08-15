@@ -24,6 +24,9 @@ from .contract import (
     TCNSettings,
     context_routing_metadata,
     peer_feature_metadata,
+    training_horizon_index,
+    validate_context_family_ablation,
+    validate_training_horizon,
 )
 from .metrics import create_metric_table, primary_validation_score
 
@@ -90,6 +93,17 @@ def sam_metadata(optimizer_variant: str, rho: float | None) -> dict[str, object]
         "same_batch_replay": True,
         "same_rng_replay": True,
     }
+
+
+def select_training_label_mask(
+    label_mask: torch.Tensor, training_horizon: str = "all"
+) -> torch.Tensor:
+    index = training_horizon_index(training_horizon)
+    if index is None:
+        return label_mask
+    selected = torch.zeros_like(label_mask)
+    selected[..., index] = label_mask[..., index]
+    return selected
 
 
 def _soft_spearman_loss_sum(
@@ -501,11 +515,20 @@ def train_one_epoch(
     temperature: float | None,
     sam_rho: float | None,
     training_objective: TrainingObjective | None = None,
+    training_horizon: str = "all",
 ) -> dict[str, object]:
     model.train()
+    validate_training_horizon(training_horizon)
     batches: list[dict[str, torch.Tensor]] = []
     updates: list[dict[str, object]] = []
     for batch in loader:
+        if training_horizon != "all":
+            batch = {
+                **batch,
+                "label_mask": select_training_label_mask(
+                    batch["label_mask"], training_horizon
+                ),
+            }
         batches.append(batch)
         if len(batches) == runtime.loader_batches_per_effective_batch:
             updates.append(
@@ -565,8 +588,10 @@ def collect_validation_observations(
     loader: Iterable[dict[str, torch.Tensor]],
     objective: str,
     temperature: float | None,
+    training_horizon: str = "all",
 ) -> tuple[EvaluationObservations, float]:
     objective_metadata(objective, temperature)
+    validate_training_horizon(training_horizon)
     device = next(model.parameters()).device
     model.eval()
     collected = {
@@ -586,14 +611,19 @@ def collect_validation_observations(
     with torch.inference_mode():
         for cpu_batch in loader:
             valid_count = int(cpu_batch["sample_valid_mask"].sum())
-            total_count += _loss_count(cpu_batch["label_mask"][:valid_count], objective)
+            objective_mask = select_training_label_mask(
+                cpu_batch["label_mask"][:valid_count], training_horizon
+            )
+            total_count += _loss_count(objective_mask, objective)
             batch = _to_device(cpu_batch, device)
             with _autocast(device):
                 predictions = _predict(model, batch)
             loss_sum, _ = _objective_loss_sum(
                 predictions[:valid_count],
                 batch["targets"][:valid_count],
-                batch["label_mask"][:valid_count],
+                select_training_label_mask(
+                    batch["label_mask"][:valid_count], training_horizon
+                ),
                 objective,
                 temperature,
             )
@@ -620,11 +650,15 @@ def collect_validation_observations(
     return observations, objective_loss_value
 
 
-def validation_primary_metric(observations: EvaluationObservations) -> float:
+def validation_primary_metric(
+    observations: EvaluationObservations, training_horizon: str = "all"
+) -> float:
+    index = training_horizon_index(training_horizon)
+    horizon = slice(None) if index is None else slice(index, index + 1)
     return primary_validation_score(
-        observations.predictions,
-        observations.targets,
-        observations.label_mask,
+        observations.predictions[..., horizon],
+        observations.targets[..., horizon],
+        observations.label_mask[..., horizon],
         observations.date_idx,
     )
 
@@ -680,9 +714,13 @@ def checkpoint_payload(
     feature_store: Path,
     global_context: str | None,
     peer_features: str,
+    training_horizon: str = "all",
+    context_family_ablation: str = "none",
 ) -> dict[str, object]:
     if getattr(model, "model_name", None) != model_name:
         raise ValueError("Checkpoint model name does not match the model")
+    validate_training_horizon(training_horizon)
+    validate_context_family_ablation(context_family_ablation)
     return {
         "model_name": model_name,
         "architecture": asdict(architecture),
@@ -699,6 +737,9 @@ def checkpoint_payload(
         "validation_score": validation_score,
         "feature_store": str(feature_store),
         "global_context": global_context,
+        "training_horizon": training_horizon,
+        "selection_horizon": training_horizon,
+        "context_family_ablation": context_family_ablation,
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict(),

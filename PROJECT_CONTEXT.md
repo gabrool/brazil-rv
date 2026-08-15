@@ -1,6 +1,6 @@
 # Brazil-RV Project Context
 
-Last verified: 2026-08-14.
+Last verified: 2026-08-15.
 
 ## Purpose
 
@@ -48,7 +48,7 @@ The local contexts are `WIN$`, `WDO$`, `DI1F27`, `DI1F28`, `DI1F29`, `DI1F31`, a
 - Validation: 2024-07-08 through 2025-06-30
 - Held-out test: 2025-07-07 through 2026-07-17
 
-Embargo dates are not model-selection data. Training, early stopping, routing selection, opening thresholds, and other model choices use training and validation only. Test data is opened only by an explicit standalone evaluation with `--split test`. Attribution is validation-only and has no split option.
+Embargo dates are not model-selection data. Training, early stopping, routing selection, opening thresholds, and other model choices use training and validation only. Test data is opened only by an explicit standalone evaluation with `--split test`. Attribution is validation-only and has no split option. The horizon-multiscale stage runner has no split option and never reads or evaluates the test period.
 
 ## Current model and input policy
 
@@ -67,6 +67,8 @@ The canonical context policy is direct:
 Selected peer state contains six fields: selected-peer 15/60-minute return differences, selected-peer 15/60-minute ranks, and two validity flags.
 
 Default routing is `slow=late_only, macro=late_only`. Direct slow or macro alternatives are `late_only`, `early_concat`, `film`, and `early_concat_film`. Isolated slow FiLM remains available and is neutral at initialization because its final heads are zero-initialized. Transformer, TCN, and MLP are current neural families.
+
+The default TCN readout remains `final`, which uses only the final causal block state and strict-loads pre-readout checkpoints. Opt-in readouts are `shared_multiscale` (one global six-tap mixture), `horizon_multiscale` (one six-tap mixture per horizon), and `final_score_mlp` (a zero-initialized residual 3-to-2-to-3 score control). Training-only diagnostic controls are `--training-horizon {all,30,60,120}` and `--context-family-ablation {none,wdo,br_rates,us_rates}`; both default to the incumbent behavior.
 
 ## Commands
 
@@ -92,6 +94,10 @@ uv run --project research python -m brazil_rv.modeling.analyze_stock_time_attrib
   --output-dir <output-directory> `
   --cache-dir <optional-cache-directory>
 
+# Resumable train/validation-only multiscale and diagnostic stage
+uv run --project research python -m brazil_rv.modeling.run_horizon_multiscale_stage `
+  --output-dir <persistent-stage-directory>
+
 # Lambda availability, launch, local safety tests, and credential deletion
 .\ops\lambda-gh200.ps1 -Mode Notify -Notify
 .\ops\lambda-gh200.ps1 -Mode Launch -IUnderstandBilling
@@ -106,6 +112,8 @@ Launch prints the instance ID, IP, exact SSH command, and persistent bootstrap l
 Hard Spearman is the primary validation and checkpoint-selection metric. It is averaged across decisions within each date and horizon, then equally across horizons. Training-time validation uses decision-grouped batches, restores canonical sample order, and computes only objective loss plus this selection metric each epoch; the complete validation report is built once from the retained best-epoch observations. Standalone evaluation still builds the complete report normally. Top/bottom returns and turnover use raw returns.
 
 Attribution performs validation inference once per current run or reads an explicitly requested simple prediction cache. It reports exact additive stock IC contributions, cross-sectionally normalized time-series rank skill, 5-minute and canonical 30-minute bins, horizon attribution, five-day moving-block confidence intervals, training-fitted overnight regimes, and causal opening-context completeness. Outputs are plain CSV, Parquet, and JSON.
+
+The horizon-multiscale stage writes atomic resumable state plus run, probe, covariance, gradient, paired-bootstrap, gate-weight, and consolidated summary artifacts under its explicit output directory. Frozen and OOF probe fitting is train-only; ordinary trained-arm comparison uses canonical validation; the runner never evaluates held-out test data.
 
 Current checkpoints use one schema with strict PyTorch state-dict loading. Unique run directories prevent collisions, and checkpoints are published atomically. Historical run formats are intentionally unsupported.
 
