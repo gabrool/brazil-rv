@@ -95,22 +95,6 @@ def assert_analysis_rows(rows: pl.DataFrame, *, allow_validation: bool = False) 
         raise ValueError(f"Analysis window ends after {boundary}: {maximum}")
 
 
-def feature_store_identity(store: Path) -> dict[str, object]:
-    manifest_path = store / "manifest.json"
-    schema_path = store / "feature_schema.json"
-    digest = hashlib.sha256()
-    for path in (manifest_path, schema_path, store / "sample_index.parquet"):
-        with path.open("rb") as source:
-            while chunk := source.read(1024 * 1024):
-                digest.update(chunk)
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    return {
-        "path": str(store.resolve()),
-        "contract_version": schema["contract_version"],
-        "metadata_sha256": digest.hexdigest(),
-    }
-
-
 @dataclass
 class RidgeSufficientStatistics:
     feature_dim: int

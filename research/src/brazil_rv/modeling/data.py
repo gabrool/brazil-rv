@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import random
 from collections.abc import Iterator
@@ -78,6 +80,31 @@ def resolve_feature_store(pointer: Path = FEATURE_STORE_POINTER) -> Path:
     if not store.is_dir():
         raise FileNotFoundError(store)
     return store
+
+
+def feature_store_identity(store: Path) -> dict[str, object]:
+    schema_path = store / "feature_schema.json"
+    digest = hashlib.sha256()
+    for path in (store / "manifest.json", schema_path, store / "sample_index.parquet"):
+        with path.open("rb") as source:
+            while chunk := source.read(1024 * 1024):
+                digest.update(chunk)
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    return {
+        "path": str(store.resolve()),
+        "contract_version": schema["contract_version"],
+        "metadata_sha256": digest.hexdigest(),
+    }
+
+
+def sample_window_metadata(rows: pl.DataFrame, name: str) -> dict[str, object]:
+    return {
+        "name": name,
+        "start": str(rows.get_column("trade_date").min()),
+        "end": str(rows.get_column("trade_date").max()),
+        "date_count": rows.get_column("trade_date").n_unique(),
+        "sample_count": rows.height,
+    }
 
 
 def _validate_sample_index(sample_index: pl.DataFrame) -> None:

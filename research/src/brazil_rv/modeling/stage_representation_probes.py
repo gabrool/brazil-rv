@@ -377,6 +377,11 @@ def run_frozen_block_probes(
             )
             for horizon in range(len(HORIZONS))
         ),
+        "concatenated_beats_final_post_fusion_by_horizon": {
+            str(minutes): scores["concatenated"].horizon_score(horizon)
+            > scores["final_post_fusion"].horizon_score(horizon)
+            for horizon, minutes in enumerate(HORIZONS)
+        },
         "earlier_tap_beats_final_post_fusion_by_horizon": {
             str(minutes): max(
                 scores[f"block_{index}"].horizon_score(horizon) for index in range(1, 6)

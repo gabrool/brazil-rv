@@ -48,8 +48,10 @@ from .contract import (
 )
 from .data import (
     create_training_loaders,
+    feature_store_identity,
     load_sample_index,
     resolve_feature_store,
+    sample_window_metadata,
     select_sample_split,
 )
 from .engine import (
@@ -256,6 +258,9 @@ def _run_neural(
     torch.set_float32_matmul_precision("high")
     settings = _tcn_settings_from_args(args)
     architecture = architecture_for_model(args.model, settings)
+    store_identity = feature_store_identity(store)
+    fit_window = sample_window_metadata(train_rows, fit_name)
+    selection_window = sample_window_metadata(validation_rows, selection_name)
     loaders = create_training_loaders(
         store,
         train_rows,
@@ -275,6 +280,7 @@ def _run_neural(
         architecture if isinstance(architecture, TCNArchitecture) else None,
         args.peer_features,
     ).cuda()
+    parameter_count = count_trainable_parameters(model)
     optimizer, _ = build_optimizer(model)
     scheduler, steps_per_epoch, warmup_steps = build_scheduler(
         optimizer, train_rows.height, MAX_EPOCHS
@@ -285,9 +291,12 @@ def _run_neural(
         "status": "running",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "feature_store": str(store),
+        "feature_store_identity": store_identity,
         "split": {
             "training": fit_name,
             "selection": selection_name,
+            "fit_window": fit_window,
+            "selection_window": selection_window,
             "test_accessed": False,
         },
         "seed": args.seed,
@@ -298,11 +307,12 @@ def _run_neural(
         "model": _model_metadata(
             args.model, architecture, settings, args.peer_features
         ),
-        "parameter_count": count_trainable_parameters(model),
+        "parameter_count": parameter_count,
         "objective": objective_metadata(args.objective, args.temperature),
         "optimizer": args.optimizer,
         "sam": sam_metadata(args.optimizer, args.sam_rho),
         "training": {
+            "allow_date_replacement": allow_date_replacement,
             "maximum_epochs": MAX_EPOCHS,
             "early_stop_patience": EARLY_STOP_PATIENCE,
             "effective_batch_size": GH200_RUNTIME.effective_batch_size,
@@ -409,6 +419,10 @@ def _run_neural(
                     args.peer_features,
                     args.training_horizon,
                     args.context_family_ablation,
+                    feature_store_metadata=store_identity,
+                    fit_window=fit_window,
+                    selection_window=selection_window,
+                    parameter_count=parameter_count,
                 ),
             )
         else:

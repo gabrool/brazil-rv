@@ -716,12 +716,17 @@ def checkpoint_payload(
     peer_features: str,
     training_horizon: str = "all",
     context_family_ablation: str = "none",
+    *,
+    feature_store_metadata: dict[str, object] | None = None,
+    fit_window: dict[str, object] | None = None,
+    selection_window: dict[str, object] | None = None,
+    parameter_count: int | None = None,
 ) -> dict[str, object]:
     if getattr(model, "model_name", None) != model_name:
         raise ValueError("Checkpoint model name does not match the model")
     validate_training_horizon(training_horizon)
     validate_context_family_ablation(context_family_ablation)
-    return {
+    payload = {
         "model_name": model_name,
         "architecture": asdict(architecture),
         "tcn_settings": None if tcn_settings is None else asdict(tcn_settings),
@@ -744,3 +749,13 @@ def checkpoint_payload(
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict(),
     }
+    optional = {
+        "feature_store_identity": feature_store_metadata,
+        "fit_window": fit_window,
+        "selection_window": selection_window,
+        "parameter_count": parameter_count,
+    }
+    payload.update(
+        {name: value for name, value in optional.items() if value is not None}
+    )
+    return payload

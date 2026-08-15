@@ -28,7 +28,14 @@ from .contract import (
     architecture_for_model,
     tcn_tap_receptive_field_minutes,
 )
-from .data import load_sample_index, resolve_feature_store, select_sample_split
+from .data import (
+    feature_store_identity,
+    load_sample_index,
+    resolve_feature_store,
+    sample_window_metadata,
+    select_sample_split,
+)
+from .engine import objective_metadata, sam_metadata
 from .evaluate import load_current_neural_run
 from .horizon_diagnostics import (
     BOOTSTRAP_SEED,
@@ -37,15 +44,28 @@ from .horizon_diagnostics import (
     atomic_csv,
     atomic_json,
     atomic_parquet,
-    feature_store_identity,
     run_target_basis_audit,
 )
+from .stage_conclusions import build_hypothesis_summary
 from .metrics import moving_block_bootstrap
 from .model import build_neural_model, count_trainable_parameters
 from .stage_conflict_oof import run_gradient_audit, run_oof_residual_probes
 from .stage_representation_probes import (
     run_context_inference_probes,
     run_frozen_block_probes,
+)
+from .stage_validation import (
+    read_json_object,
+    validate_completed_run,
+    validate_consolidated,
+    validate_context_inference,
+    validate_frozen_probes,
+    validate_gradient_audit,
+    validate_oof_plan,
+    validate_oof_residual,
+    validate_preflight,
+    validate_split_contract,
+    validate_target_basis,
 )
 from .train import _run_neural, parse_args as parse_training_args
 
@@ -174,7 +194,7 @@ class Stage:
         config: dict[str, object],
         artifacts: tuple[Path, ...],
         action: Callable[[], None],
-        validator: Callable[[], bool] | None = None,
+        validator: Callable[[], None] | None = None,
     ) -> None:
         fingerprint = _fingerprint(
             {
@@ -192,8 +212,8 @@ class Stage:
                 raise ValueError(
                     f"Completed step {name} is missing artifacts: {missing}"
                 )
-            if validator is not None and not validator():
-                raise ValueError(f"Completed step {name} failed artifact validation")
+            if validator is not None:
+                validator()
             self.logger.info("reuse completed step %s", name)
             return
         self.logger.info("start step %s", name)
@@ -211,8 +231,8 @@ class Stage:
             missing = [str(path) for path in artifacts if not path.exists()]
             if missing:
                 raise RuntimeError(f"Step {name} did not produce {missing}")
-            if validator is not None and not validator():
-                raise RuntimeError(f"Step {name} failed artifact validation")
+            if validator is not None:
+                validator()
         except BaseException as error:
             self.manifest["steps"][name].update(
                 {
@@ -248,24 +268,38 @@ def _training_args(arm: Arm) -> argparse.Namespace:
     return parse_training_args(arguments)
 
 
-def _validate_completed_run(run_dir: Path, arm: Arm, store: Path) -> bool:
-    manifest_path = run_dir / "run_manifest.json"
-    if not manifest_path.exists():
-        return False
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    model = manifest.get("model", {})
-    settings = model.get("tcn_settings", {}) if isinstance(model, dict) else {}
-    return (
-        manifest.get("status") == "completed"
-        and Path(str(manifest.get("feature_store"))).resolve() == store.resolve()
-        and manifest.get("seed") == arm.seed
-        and settings.get("readout") == arm.readout
-        and manifest.get("training_horizon", "all") == arm.training_horizon
-        and manifest.get("context_family_ablation", "none") == arm.context_ablation
-        and (run_dir / "best_checkpoint.pt").exists()
-        and (run_dir / "validation_metrics.json").exists()
-        and (run_dir / "validation_daily_metrics.parquet").exists()
-    )
+def _expected_run_config(
+    arm: Arm,
+    fit_rows: pl.DataFrame,
+    selection_rows: pl.DataFrame,
+    fit_name: str,
+    selection_name: str,
+    allow_date_replacement: bool = False,
+) -> dict[str, object]:
+    args = _training_args(arm)
+    settings = replace(BASELINE_TCN_SETTINGS, readout=arm.readout)
+    architecture = architecture_for_model("tcn", settings)
+    with torch.random.fork_rng(devices=[]):
+        parameter_count = count_trainable_parameters(
+            build_neural_model("tcn", architecture, args.peer_features)
+        )
+    return {
+        "seed": arm.seed,
+        "global_context": args.global_context,
+        "training_horizon": arm.training_horizon,
+        "selection_horizon": arm.training_horizon,
+        "context_family_ablation": arm.context_ablation,
+        "tcn_settings": asdict(settings),
+        "architecture": asdict(architecture),
+        "peer_features": args.peer_features,
+        "objective": objective_metadata(args.objective, args.temperature),
+        "optimizer": args.optimizer,
+        "sam": sam_metadata(args.optimizer, args.sam_rho),
+        "fit_window": sample_window_metadata(fit_rows, fit_name),
+        "selection_window": sample_window_metadata(selection_rows, selection_name),
+        "allow_date_replacement": allow_date_replacement,
+        "parameter_count": parameter_count,
+    }
 
 
 def _run_arm(
@@ -278,14 +312,23 @@ def _run_arm(
     fit_name: str = "train",
     selection_name: str = "validation",
     allow_date_replacement: bool = False,
-) -> None:
+    expected: dict[str, object] | None = None,
+) -> Path | None:
     assert_analysis_rows(fit_rows)
     assert_analysis_rows(
         selection_rows, allow_validation=selection_name == "validation"
     )
+    expected = expected or _expected_run_config(
+        arm, fit_rows, selection_rows, fit_name, selection_name, allow_date_replacement
+    )
     if output_dir.exists():
-        if _validate_completed_run(output_dir, arm, store):
-            return
+        manifest_path = output_dir / "run_manifest.json"
+        if (
+            manifest_path.exists()
+            and read_json_object(manifest_path).get("status") == "completed"
+        ):
+            validate_completed_run(output_dir, store, expected)
+            return None
         moved = output_dir.with_name(
             f"{output_dir.name}.incomplete."
             f"{datetime.now(timezone.utc):%Y%m%dT%H%M%S%fZ}"
@@ -302,6 +345,7 @@ def _run_arm(
         selection_name=selection_name,
         allow_date_replacement=allow_date_replacement,
     )
+    return moved if "moved" in locals() else None
 
 
 def _preflight(
@@ -309,10 +353,8 @@ def _preflight(
 ) -> None:
     assert_analysis_rows(train_rows)
     assert_analysis_rows(validation_rows, allow_validation=True)
-    if train_rows.get_column("trade_date").min() != TRAIN_START:
-        raise ValueError("Training start differs from the canonical contract")
-    if validation_rows.get_column("trade_date").min() != VALIDATION_START:
-        raise ValueError("Validation start differs from the canonical contract")
+    train_contract = validate_split_contract(train_rows, "train")
+    validation_contract = validate_split_contract(validation_rows, "validation")
     torch.manual_seed(29)
     counts: dict[str, int] = {}
     state_keys: dict[str, list[str]] = {}
@@ -340,6 +382,7 @@ def _preflight(
             architecture_for_model("tcn", BASELINE_TCN_SETTINGS)
         ),
         "readout_modes": TCN_READOUTS,
+        "split_contract": {"train": train_contract, "validation": validation_contract},
     }
     atomic_json(path, summary)
 
@@ -350,6 +393,7 @@ def _run_artifacts(run_dir: Path) -> tuple[Path, ...]:
         run_dir / "best_checkpoint.pt",
         run_dir / "validation_metrics.json",
         run_dir / "validation_daily_metrics.parquet",
+        run_dir / "history.csv",
     )
 
 
@@ -647,16 +691,48 @@ def _consolidate(output_dir: Path, run_dirs: dict[str, Path]) -> None:
     gradient_summary = json.loads(gradient_summary_path.read_text(encoding="utf-8"))
     gradient_summary["single_horizon_controls"] = single_rows
     atomic_json(gradient_summary_path, gradient_summary)
-    context_rows = []
+    context_rows: list[dict[str, object]] = []
+    context_training: dict[str, object] = {}
     for family in ("wdo", "br_rates", "us_rates"):
-        row = next(value for value in records if value["arm"] == f"without_{family}")
-        context_rows.append(
-            {
-                **row,
-                "paired_control_ic": control["validation_ic"],
-                "delta_from_control": (row["validation_ic"] - control["validation_ic"]),
-            }
+        arm_record = next(
+            value for value in records if value["arm"] == f"without_{family}"
         )
+        results, _ = _comparison(
+            f"without_{family}_vs_final_seed29",
+            run_dirs[f"without_{family}"],
+            run_dirs["final_seed29"],
+            29,
+        )
+        worst_horizon = min(
+            float(row["delta_ic"])
+            for row in results
+            if int(row["horizon_minutes"]) in HORIZONS
+        )
+        family_rows = [
+            {
+                "context_family": family,
+                "arm": arm_record["arm"],
+                "seed": arm_record["seed"],
+                "horizon_minutes": result["horizon_minutes"],
+                "control_ic": result["control_ic"],
+                "candidate_ic": result["candidate_ic"],
+                "delta_ic": result["delta_ic"],
+                "delta_lower_95": result["delta_lower_95"],
+                "delta_upper_95": result["delta_upper_95"],
+                "worst_horizon_delta": worst_horizon,
+                "best_epoch": arm_record["best_epoch"],
+                "epochs_completed": arm_record["epochs_completed"],
+                "parameter_count": arm_record["parameter_count"],
+                "training_duration_seconds": arm_record["training_duration_seconds"],
+                "run_dir": arm_record["run_dir"],
+            }
+            for result in results
+        ]
+        context_rows.extend(family_rows)
+        context_training[family] = {
+            "worst_horizon_delta": worst_horizon,
+            "results": family_rows,
+        }
     context_dir = output_dir / "audits" / "context"
     atomic_csv(
         pl.DataFrame(context_rows),
@@ -664,87 +740,65 @@ def _consolidate(output_dir: Path, run_dirs: dict[str, Path]) -> None:
     )
     context_summary_path = context_dir / "context_family_summary.json"
     context_summary = json.loads(context_summary_path.read_text(encoding="utf-8"))
-    context_summary["training_ablations"] = context_rows
+    context_summary["retraining_ablation"] = {
+        "interpretation": "Retraining ablation measures replaceable usefulness.",
+        "families": context_training,
+    }
     atomic_json(context_summary_path, context_summary)
+
+    frozen_summary = read_json_object(
+        output_dir / "audits" / "frozen_block" / "frozen_block_probe_summary.json"
+    )
+    oof_summary = read_json_object(
+        output_dir / "audits" / "oof" / "oof_residual_probe_summary.json"
+    )
+    target_summary = read_json_object(
+        output_dir / "audits" / "target_basis" / "target_basis_summary.json"
+    )
+    evidence = build_hypothesis_summary(
+        comparisons,
+        frozen_summary,
+        gradient_summary,
+        single_rows,
+        context_summary,
+        context_rows,
+        oof_summary,
+        target_summary,
+    )
     three_seed_rows = [
         row
         for row in comparisons
         if row["comparison"] == "horizon_multiscale_vs_final_three_seed"
     ]
-    worst = min(
-        float(row["delta_ic"]) for row in three_seed_rows if row["horizon_minutes"] != 0
-    )
-
-    def aggregate_delta(name: str) -> float:
-        return float(
-            next(
-                row["delta_ic"]
-                for row in comparisons
-                if row["comparison"] == name and row["horizon_minutes"] == 0
-            )
-        )
-
-    shared_delta = aggregate_delta("shared_multiscale_vs_final_seed29")
-    specialized_delta = aggregate_delta("horizon_multiscale_vs_shared_seed29")
-    score_delta = aggregate_delta("final_score_mlp_vs_final_seed29")
-    three_seed_aggregate = next(
-        row for row in three_seed_rows if row["horizon_minutes"] == 0
-    )
-    frozen_summary = json.loads(
-        (
-            output_dir / "audits" / "frozen_block" / "frozen_block_probe_summary.json"
-        ).read_text(encoding="utf-8")
-    )
-    consistent_gain = (
-        float(three_seed_aggregate["delta_lower_95"]) > 0.0 and worst > 0.0
-    )
-    hypothesis_evidence = {
-        "shared_scale_aggregation_delta_seed29": shared_delta,
-        "horizon_specialization_over_shared_delta_seed29": specialized_delta,
-        "score_capacity_control_delta_seed29": score_delta,
-        "score_vs_horizon_gain_difference_seed29": (
-            score_delta - aggregate_delta("horizon_multiscale_vs_final_seed29")
-        ),
-        "single_horizon_deltas": {
-            str(row["training_horizon"]): row["delta_from_control"]
-            for row in single_rows
-        },
-        "probe_best_tap_by_horizon": frozen_summary["best_tap_by_horizon"],
-        "probe_information_loss_by_horizon": frozen_summary[
-            "earlier_tap_beats_final_post_fusion_by_horizon"
-        ],
-        "consistent_three_seed_gain": consistent_gain,
-    }
+    trained = evidence["hypotheses"]["trained_multiscale_result"]
     summary = {
         "training_run_count": TRAINING_RUN_COUNT,
         "test_accessed": False,
         "bootstrap": {"block_days": 5, "seed": BOOTSTRAP_SEED},
         "three_seed_horizon_multiscale": three_seed_rows,
-        "worst_horizon_delta": worst,
-        "hypothesis_evidence": hypothesis_evidence,
-        "conclusion": (
-            "The paired three-seed result is consistent across horizons and its "
-            "aggregate interval excludes zero."
-            if consistent_gain
-            else "No consistent paired three-seed gain was established; the "
-            "final-state bottleneck hypothesis is not supported strongly enough."
-        ),
+        "context_training_ablations": context_training,
+        **evidence,
         "promotion": "none",
     }
     atomic_json(output_dir / "stage_summary.json", summary)
+    hypotheses = summary["hypotheses"]
     lines = [
         "# Horizon multiscale stage summary",
         "",
         f"- Training runs: {TRAINING_RUN_COUNT}",
         "- Held-out test accessed: no",
-        f"- Shared aggregation delta (seed 29): {shared_delta:.6f}",
-        f"- Horizon specialization over shared (seed 29): {specialized_delta:.6f}",
-        f"- Score-capacity control delta (seed 29): {score_delta:.6f}",
-        f"- Worst-horizon paired delta: {worst:.6f}",
-        f"- Conclusion: {summary['conclusion']}",
+        f"- Representation: {summary['bottleneck_interpretation']}",
+        f"- Trained multiscale supported: {trained['supported']}; "
+        f"aggregate delta {float(trained['delta_ic']):.6f}.",
+        f"- Shared aggregation delta (seed 29): "
+        f"{float(hypotheses['shared_scale_aggregation']['delta_ic']):.6f}.",
+        f"- Horizon specialization over shared (seed 29): "
+        f"{float(hypotheses['horizon_scale_specialization']['delta_ic']):.6f}.",
+        f"- Score capacity is a competing explanation: "
+        f"{hypotheses['score_capacity_control']['competing_explanation']}.",
+        "- Gradient conflict, single-horizon controls, context sources, and target "
+        "structure remain separate hypotheses; see the artifact paths in stage_summary.json.",
         "- Architecture promotion: none.",
-        "",
-        "See the CSV, Parquet, and JSON artifacts for the paired and diagnostic evidence.",
     ]
     _atomic_text(output_dir / "stage_summary.md", "\n".join(lines) + "\n")
 
@@ -761,6 +815,7 @@ def run_stage(output_dir: Path) -> Path:
         {"schema": STAGE_SCHEMA},
         (preflight,),
         lambda: _preflight(store, train_rows, validation_rows, preflight),
+        lambda: validate_preflight(preflight, store, train_rows, validation_rows),
     )
     target_dir = stage.output_dir / "audits" / "target_basis"
     stage.step(
@@ -773,6 +828,7 @@ def run_stage(output_dir: Path) -> Path:
             target_dir / "target_basis_by_decision.csv",
         ),
         lambda: run_target_basis_audit(store, train_rows, target_dir),
+        lambda: validate_target_basis(target_dir),
     )
     run_dirs = {arm.name: stage.output_dir / "runs" / arm.name for arm in ARMS}
 
@@ -785,19 +841,18 @@ def run_stage(output_dir: Path) -> Path:
         allow_date_replacement: bool = False,
     ) -> None:
         arm = ARM_BY_NAME[name]
-        stage.step(
-            f"train_{name}",
-            {
-                **asdict(arm),
-                "fit_name": fit_name,
-                "selection_name": selection_name,
-                "fit_start": str(fit_rows.get_column("trade_date").min()),
-                "fit_end": str(fit_rows.get_column("trade_date").max()),
-                "selection_start": str(selection_rows.get_column("trade_date").min()),
-                "selection_end": str(selection_rows.get_column("trade_date").max()),
-            },
-            _run_artifacts(run_dirs[name]),
-            lambda: _run_arm(
+        expected = _expected_run_config(
+            arm,
+            fit_rows,
+            selection_rows,
+            fit_name,
+            selection_name,
+            allow_date_replacement,
+        )
+        step_name = f"train_{name}"
+
+        def run_arm() -> None:
+            archived = _run_arm(
                 run_dirs[name],
                 arm,
                 store,
@@ -806,8 +861,25 @@ def run_stage(output_dir: Path) -> Path:
                 fit_name=fit_name,
                 selection_name=selection_name,
                 allow_date_replacement=allow_date_replacement,
-            ),
-            lambda: _validate_completed_run(run_dirs[name], arm, store),
+                expected=expected,
+            )
+            if archived is not None:
+                stage.manifest["steps"][step_name]["archived_incomplete_run"] = str(
+                    archived
+                )
+                stage.write_manifest()
+
+        stage.step(
+            step_name,
+            {
+                **asdict(arm),
+                "fit_window": expected["fit_window"],
+                "selection_window": expected["selection_window"],
+                "allow_date_replacement": allow_date_replacement,
+            },
+            _run_artifacts(run_dirs[name]),
+            run_arm,
+            lambda: validate_completed_run(run_dirs[name], store, expected),
         )
 
     training_step("final_seed29")
@@ -826,6 +898,7 @@ def run_stage(output_dir: Path) -> Path:
             validation_rows,
             frozen_dir,
         ),
+        lambda: validate_frozen_probes(frozen_dir),
     )
     context_dir = stage.output_dir / "audits" / "context"
     stage.step(
@@ -839,6 +912,7 @@ def run_stage(output_dir: Path) -> Path:
         lambda: run_context_inference_probes(
             run_dirs["final_seed29"], store, validation_rows, context_dir
         ),
+        lambda: validate_context_inference(context_dir),
     )
     gradient_dir = stage.output_dir / "audits" / "gradient"
     stage.step(
@@ -851,6 +925,7 @@ def run_stage(output_dir: Path) -> Path:
         lambda: run_gradient_audit(
             run_dirs["final_seed29"], store, train_rows, gradient_dir
         ),
+        lambda: validate_gradient_audit(gradient_dir),
     )
     for name in (
         "shared_multiscale_seed29",
@@ -878,6 +953,7 @@ def run_stage(output_dir: Path) -> Path:
             oof_dir.mkdir(parents=True, exist_ok=True),
             atomic_json(oof_dir / "oof_plan.json", plan),
         ),
+        lambda: validate_oof_plan(oof_dir / "oof_plan.json", plan),
     )
     training_step(
         "oof_fold_1",
@@ -910,6 +986,7 @@ def run_stage(output_dir: Path) -> Path:
             windows["B3"],
             oof_dir,
         ),
+        lambda: validate_oof_residual(oof_dir),
     )
     consolidated = (
         stage.output_dir / "run_matrix.csv",
@@ -926,6 +1003,7 @@ def run_stage(output_dir: Path) -> Path:
         {"training_runs": TRAINING_RUN_COUNT},
         consolidated,
         lambda: _consolidate(stage.output_dir, run_dirs),
+        lambda: validate_consolidated(stage.output_dir, tuple(ARM_BY_NAME)),
     )
     stage.manifest["status"] = "completed"
     stage.manifest["completed_at"] = datetime.now(timezone.utc).isoformat()
