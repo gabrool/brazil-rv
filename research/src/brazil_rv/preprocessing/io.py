@@ -184,7 +184,10 @@ def load_market_dates_and_security_dates(
         if not dates_by_security.get(security_id)
     ]
     if missing:
-        raise ValueError(f"Accepted securities without exact COTAHIST dates: {missing}")
+        raise ValueError(
+            "Accepted securities without exact COTAHIST dates in requested "
+            f"interval [{research_start}, {research_end}]: {missing}"
+        )
     return market_dates, dates_by_security
 
 

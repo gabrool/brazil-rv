@@ -40,6 +40,7 @@ from .io import resolve_pointer
 from .preprocessing_audit_di import (
     DIInputs,
     load_equity_causal_state,
+    prepare_equity_causal_scope,
     run_di_audit,
 )
 from .preprocessing_audit_features import (
@@ -529,6 +530,7 @@ def run_audit(args: argparse.Namespace) -> Path:
     equity_index = pl.read_parquet(store / "equity_index.parquet")
     dates = AuditDates.from_frame(date_index)
     arrays = AuditArrays(store, dates)
+    equity_scope = prepare_equity_causal_scope(inputs, dates, equity_index, arrays)
     global_mapping_changed = _global_mapping_changes(store, dates)
 
     def write(partial: Path) -> None:
@@ -538,7 +540,7 @@ def run_audit(args: argparse.Namespace) -> Path:
             equity_index,
             global_mapping_changed=global_mapping_changed,
         )
-        equity_state = load_equity_causal_state(inputs, dates, equity_index)
+        equity_state = load_equity_causal_state(inputs, dates, equity_scope)
         target, target_coverage, target_security = run_target_audit(
             arrays, dates, equity_index, causal_sigma=equity_state.sigma
         )

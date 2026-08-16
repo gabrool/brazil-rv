@@ -20,6 +20,7 @@ from .analyze_preprocessing import (
     fit_di_curve,
     maturity_hull_intersection,
     spearman_correlation,
+    validate_audit_indices,
 )
 from .contract import (
     BETA_CLIP,
@@ -77,6 +78,13 @@ class EquityCausalState:
     change: NDArray[np.float64]
     change_valid: NDArray[np.bool_]
     source_files: tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class EquityCausalScope:
+    output_security_ids: tuple[str, ...]
+    in_scope_assignments: pl.DataFrame
+    accepted_dates: dict[str, frozenset[date]]
 
 
 @dataclass(frozen=True)
@@ -608,23 +616,71 @@ def _causal_sigma(
     return sigma
 
 
-def load_equity_causal_state(
+def prepare_equity_causal_scope(
     inputs: DIInputs,
     dates: AuditDates,
     equity_index: pl.DataFrame,
-) -> EquityCausalState:
-    """Rebuild only causal daily state from accepted raw identity segments."""
-    assignments = load_assignments(inputs.assignments_dir)
-    security_ids = tuple(
+    arrays: AuditArrays,
+) -> EquityCausalScope:
+    """Validate the permitted identity scope without opening raw MT5 sources."""
+    audit_start = dates.trade_dates[0]
+    audit_end = dates.trade_dates[int(dates.validation[-1])]
+    output_security_ids = tuple(
         equity_index.sort("equity_slot").get_column("security_id").to_list()
+    )
+    assignments = load_assignments(inputs.assignments_dir)
+    in_scope_assignments = assignments.filter(
+        pl.col("first_overlap_date") <= audit_end,
+        pl.col("last_overlap_date") >= audit_start,
+    )
+    in_scope_ids = frozenset(in_scope_assignments.get_column("security_id"))
+
+    allowed_indices = np.concatenate((dates.train, dates.validation))
+    validate_audit_indices(allowed_indices, dates.trade_dates, allow_validation=True)
+    membership = arrays.array("equity_membership.npy")
+    readiness = arrays.array("equity_data_ready.npy")
+    active = np.asarray(
+        membership[allowed_indices] & readiness[allowed_indices], dtype=bool
+    ).any(axis=0)
+    excluded_active = [
+        output_security_ids[int(slot)]
+        for slot in np.flatnonzero(active)
+        if output_security_ids[int(slot)] not in in_scope_ids
+    ]
+    if excluded_active:
+        raise ValueError(
+            "Train/validation feature-store membership/readiness uses securities "
+            f"outside the permitted identity reconstruction: {excluded_active}"
+        )
+
+    requested_ids = tuple(
+        security_id
+        for security_id in output_security_ids
+        if security_id in in_scope_ids
     )
     _, accepted_dates = load_market_dates_and_security_dates(
         cotahist_files(inputs.cotahist_dir),
-        security_ids,
-        dates.trade_dates[0],
-        dates.trade_dates[int(dates.validation[-1])],
+        requested_ids,
+        audit_start,
+        audit_end,
     )
-    validate_source_date_isolation(assignments, accepted_dates)
+    validate_source_date_isolation(in_scope_assignments, accepted_dates)
+    return EquityCausalScope(
+        output_security_ids,
+        in_scope_assignments,
+        accepted_dates,
+    )
+
+
+def load_equity_causal_state(
+    inputs: DIInputs,
+    dates: AuditDates,
+    scope: EquityCausalScope,
+) -> EquityCausalState:
+    """Rebuild only causal daily state from accepted raw identity segments."""
+    assignments = scope.in_scope_assignments
+    security_ids = scope.output_security_ids
+    accepted_dates = scope.accepted_dates
     audit_dates = dates.trade_dates[: int(dates.validation[-1]) + 1]
     slot_lookup = {security_id: slot for slot, security_id in enumerate(security_ids)}
     sigma = np.zeros((len(audit_dates), len(security_ids)), dtype=np.float64)
@@ -640,8 +696,12 @@ def load_equity_causal_state(
             pl.scan_parquet(source_path)
             .select(SOURCE_COLUMNS)
             .filter(
-                pl.col("ts_exchange").dt.date()
-                <= dates.trade_dates[int(dates.validation[-1])]
+                pl.col("ts_exchange")
+                .dt.date()
+                .is_between(
+                    dates.trade_dates[0],
+                    dates.trade_dates[int(dates.validation[-1])],
+                )
             )
             .collect()
         )
@@ -1025,7 +1085,8 @@ def run_di_audit(
         grids, dates
     )
     if equity_state is None:
-        equity_state = load_equity_causal_state(inputs, dates, equity_index)
+        scope = prepare_equity_causal_scope(inputs, dates, equity_index, arrays)
+        equity_state = load_equity_causal_state(inputs, dates, scope)
     betas, beta_ready = causal_factor_betas(
         equity_state.change,
         equity_state.change_valid,

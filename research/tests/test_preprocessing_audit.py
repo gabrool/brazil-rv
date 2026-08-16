@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from argparse import Namespace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -39,6 +40,42 @@ class FakeArrays:
 
     def array(self, filename: str, **_: object) -> np.ndarray:
         return self.values[filename]
+
+
+class GuardedArray:
+    def __init__(self, values: np.ndarray, forbidden_date_indices: set[int]):
+        self.values = values
+        self.forbidden_date_indices = forbidden_date_indices
+        self.read_date_indices: list[int] = []
+
+    def __getitem__(self, key: object) -> np.ndarray:
+        date_key = key[0] if isinstance(key, tuple) else key
+        indices = np.atleast_1d(np.arange(self.values.shape[0])[date_key])
+        selected = [int(index) for index in indices]
+        if self.forbidden_date_indices.intersection(selected):
+            raise AssertionError(f"Forbidden date positions indexed: {selected}")
+        self.read_date_indices.extend(selected)
+        return self.values[key]
+
+
+class GuardedAuditArrays:
+    def __init__(
+        self,
+        values: dict[str, np.ndarray],
+        *,
+        forbidden_date_indices: set[int],
+    ):
+        self.arrays = {
+            name: GuardedArray(value, forbidden_date_indices)
+            for name, value in values.items()
+        }
+        self.opened: list[str] = []
+
+    def array(self, filename: str, **_: object) -> GuardedArray:
+        if filename not in self.arrays:
+            raise AssertionError(f"Unexpected array opened: {filename}")
+        self.opened.append(filename)
+        return self.arrays[filename]
 
 
 def test_distribution_excludes_padding_and_counts_clips_and_zeros() -> None:
@@ -126,6 +163,237 @@ def test_validation_target_is_rejected_before_array_open(tmp_path: Path) -> None
     arrays = AuditArrays(tmp_path, dates)
     with pytest.raises(ValueError, match="prohibited split"):
         arrays.target_slice("targets.npy", dates.validation)
+
+
+def _identity_audit_dates() -> AuditDates:
+    return AuditDates(
+        (date(2024, 1, 2), date(2024, 7, 8), date(2025, 7, 7)),
+        np.asarray([0], dtype=np.int64),
+        np.asarray([1], dtype=np.int64),
+    )
+
+
+def _identity_assignments(
+    in_scope_source: Path, test_only_source: Path
+) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "security_id": ["IN", "POST"],
+            "isin": ["IN", "POST"],
+            "latest_ticker": ["IN3", "POST3"],
+            "xp_symbol": ["IN3", "POST3"],
+            "source_file": [str(in_scope_source), str(test_only_source)],
+            "source_assignment_type": ["EXACT", "EXACT"],
+            "first_overlap_date": [date(2024, 1, 2), date(2025, 7, 7)],
+            "last_overlap_date": [date(2024, 7, 8), date(2026, 7, 17)],
+            "manual_decision": ["ACCEPTED", "ACCEPTED"],
+            "normalization_rule": [
+                "FILTER_TO_COTAHIST_SECURITY_DATES",
+                "FILTER_TO_COTAHIST_SECURITY_DATES",
+            ],
+        },
+        schema_overrides={
+            "first_overlap_date": pl.Date,
+            "last_overlap_date": pl.Date,
+        },
+    )
+
+
+def _identity_equity_index() -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "equity_slot": [0, 1],
+            "security_id": ["IN", "POST"],
+            "latest_ticker": ["IN3", "POST3"],
+        }
+    )
+
+
+def _identity_arrays(*, post_active_in_validation: bool) -> GuardedAuditArrays:
+    membership = np.zeros((3, 2), dtype=bool)
+    readiness = np.zeros_like(membership)
+    membership[:2, 0] = True
+    readiness[:2, 0] = True
+    membership[2, 1] = True
+    readiness[2, 1] = True
+    if post_active_in_validation:
+        membership[1, 1] = True
+        readiness[1, 1] = True
+    return GuardedAuditArrays(
+        {
+            "equity_membership.npy": membership,
+            "equity_data_ready.npy": readiness,
+        },
+        forbidden_date_indices={2},
+    )
+
+
+def _identity_inputs(tmp_path: Path) -> di_audit.DIInputs:
+    return di_audit.DIInputs(
+        context_dir=tmp_path,
+        catalogue_path=tmp_path / "catalogue.parquet",
+        assignments_dir=tmp_path,
+        cotahist_dir=tmp_path,
+    )
+
+
+def test_post_validation_identity_is_excluded_without_source_or_test_access(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dates = _identity_audit_dates()
+    in_scope_source = tmp_path / "in.parquet"
+    test_only_source = tmp_path / "must_not_open.parquet"
+    pl.DataFrame(
+        {
+            "ts_exchange": [datetime(2024, 1, 2, 10, 0, tzinfo=timezone.utc)],
+            "open": [10.0],
+            "high": [10.0],
+            "low": [10.0],
+            "close": [10.0],
+            "real_volume": [100.0],
+            "symbol": ["IN3"],
+        }
+    ).write_parquet(in_scope_source)
+    assignments = _identity_assignments(in_scope_source, test_only_source)
+    arrays = _identity_arrays(post_active_in_validation=False)
+    monkeypatch.setattr(di_audit, "load_assignments", lambda _: assignments)
+    monkeypatch.setattr(
+        di_audit, "cotahist_files", lambda _: [tmp_path / "cotahist.parquet"]
+    )
+
+    def permitted_cotahist(
+        _: list[Path],
+        security_ids: tuple[str, ...],
+        research_start: date,
+        research_end: date,
+    ) -> tuple[tuple[date, ...], dict[str, frozenset[date]]]:
+        assert security_ids == ("IN",)
+        assert research_start == dates.trade_dates[0]
+        assert research_end == dates.trade_dates[1]
+        return dates.trade_dates[:2], {"IN": frozenset({dates.trade_dates[0]})}
+
+    monkeypatch.setattr(
+        di_audit,
+        "load_market_dates_and_security_dates",
+        permitted_cotahist,
+    )
+    scope = di_audit.prepare_equity_causal_scope(
+        _identity_inputs(tmp_path), dates, _identity_equity_index(), arrays
+    )
+    assert scope.in_scope_assignments.get_column("security_id").to_list() == ["IN"]
+
+    state = di_audit.load_equity_causal_state(_identity_inputs(tmp_path), dates, scope)
+    assert state.sigma.shape == (2, 2)
+    np.testing.assert_array_equal(state.sigma[:, 1], 0.0)
+    np.testing.assert_array_equal(state.change[:, 1], 0.0)
+    assert not state.change_valid[:, 1].any()
+    assert state.source_files == (in_scope_source,)
+    assert not test_only_source.exists()
+    assert arrays.opened == [
+        "equity_membership.npy",
+        "equity_data_ready.npy",
+    ]
+    for guarded in arrays.arrays.values():
+        assert set(guarded.read_date_indices) == {0, 1}
+
+
+def test_train_validation_masks_cannot_use_excluded_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assignments = _identity_assignments(
+        tmp_path / "in.parquet", tmp_path / "post.parquet"
+    )
+    monkeypatch.setattr(di_audit, "load_assignments", lambda _: assignments)
+    arrays = _identity_arrays(post_active_in_validation=True)
+    with pytest.raises(
+        ValueError,
+        match="Train/validation feature-store membership/readiness.*POST",
+    ):
+        di_audit.prepare_equity_causal_scope(
+            _identity_inputs(tmp_path),
+            _identity_audit_dates(),
+            _identity_equity_index(),
+            arrays,
+        )
+    assert arrays.opened == [
+        "equity_membership.npy",
+        "equity_data_ready.npy",
+    ]
+
+
+def test_in_scope_missing_cotahist_security_reports_requested_interval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cotahist = tmp_path / "cotahist.parquet"
+    pl.DataFrame(
+        {
+            "trade_date": [date(2024, 1, 2)],
+            "security_id": ["OTHER"],
+        },
+        schema_overrides={"trade_date": pl.Date},
+    ).write_parquet(cotahist)
+    assignments = _identity_assignments(
+        tmp_path / "in.parquet", tmp_path / "post.parquet"
+    )
+    monkeypatch.setattr(di_audit, "load_assignments", lambda _: assignments)
+    monkeypatch.setattr(di_audit, "cotahist_files", lambda _: [cotahist])
+    with pytest.raises(
+        ValueError,
+        match=r"requested interval \[2024-01-02, 2024-07-08\].*IN",
+    ) as error:
+        di_audit.prepare_equity_causal_scope(
+            _identity_inputs(tmp_path),
+            _identity_audit_dates(),
+            _identity_equity_index(),
+            _identity_arrays(post_active_in_validation=False),
+        )
+    assert "POST" not in str(error.value)
+
+
+def test_identity_feasibility_runs_before_normalization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = tmp_path / "store"
+    store.mkdir()
+    (store / "manifest.json").write_text("{}", encoding="utf-8")
+    pl.DataFrame(
+        {
+            "date_idx": [0, 1],
+            "trade_date": [date(2024, 6, 28), date(2024, 7, 8)],
+        },
+        schema_overrides={"trade_date": pl.Date},
+    ).write_parquet(store / "date_index.parquet")
+    pl.DataFrame(
+        {
+            "equity_slot": [0],
+            "security_id": ["IN"],
+            "latest_ticker": ["IN3"],
+        }
+    ).write_parquet(store / "equity_index.parquet")
+    monkeypatch.setattr(
+        audit_cli,
+        "_resolve_inputs",
+        lambda *_: _identity_inputs(tmp_path),
+    )
+    calls: list[str] = []
+
+    def fail_identity(*_: object) -> None:
+        calls.append("identity")
+        raise ValueError("identity feasibility failure")
+
+    def reject_normalization(*_: object, **__: object) -> None:
+        calls.append("normalization")
+        raise AssertionError("Normalization ran before identity feasibility")
+
+    monkeypatch.setattr(audit_cli, "prepare_equity_causal_scope", fail_identity)
+    monkeypatch.setattr(audit_cli, "run_normalization_audit", reject_normalization)
+    with pytest.raises(ValueError, match="identity feasibility failure"):
+        audit_cli.run_audit(Namespace(feature_store=store))
+    assert calls == ["identity"]
 
 
 def test_target_ties_coverage_and_reconstruction_parity(
