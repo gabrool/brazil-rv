@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -8,6 +8,7 @@ import polars as pl
 import pytest
 
 from brazil_rv.preprocessing import preprocessing_audit as audit_cli
+from brazil_rv.preprocessing import preprocessing_audit_di as di_audit
 from brazil_rv.preprocessing import preprocessing_audit_features as feature_audit
 from brazil_rv.preprocessing import preprocessing_audit_target as target_audit
 from brazil_rv.preprocessing.analyze_preprocessing import (
@@ -298,6 +299,19 @@ def test_di_curve_recovers_level_and_tilt() -> None:
     assert fit.level == pytest.approx(2.5)
     assert fit.tilt == pytest.approx(-1.2)
     assert fit.residual_rmse == pytest.approx(0.0, abs=1e-12)
+    assert not hasattr(fit, "condition_number")
+
+
+def test_raw_maturity_design_conditioning_responds_to_tight_spacing() -> None:
+    ready = np.ones(4, dtype=bool)
+    changes = np.asarray([1.0, 2.0, 3.0, 4.0])
+    well_spaced = fit_di_curve(changes, np.asarray([1.0, 2.0, 4.0, 7.0]), ready)
+    tightly_spaced = fit_di_curve(changes, np.asarray([2.0, 2.01, 2.02, 2.03]), ready)
+    assert well_spaced is not None and tightly_spaced is not None
+    assert (
+        tightly_spaced.raw_maturity_design_condition_number
+        > well_spaced.raw_maturity_design_condition_number
+    )
 
 
 def test_di_curve_handles_one_missing_and_rejects_fewer_than_three() -> None:
@@ -344,6 +358,208 @@ def test_factor_beta_uses_only_prior_sessions_and_minimum_pairs() -> None:
     assert not ready[19].any()
     assert ready[20].all()
     np.testing.assert_array_equal(baseline[20], changed[20])
+
+
+def test_di_availability_establishes_computability_not_empirical_quality() -> None:
+    assessment = di_audit.di_computability_assessment(
+        0.99, {"level": 0.90, "tilt": 0.90}
+    )
+    assert assessment["causal_level_tilt_candidate_computable"]
+    assert assessment["causal_stock_specific_exposures_computable"]
+    assert assessment["conclusion"] == (
+        "The existing archive is sufficient to construct a causal level/tilt "
+        "candidate and stock-specific exposures."
+    )
+    assert "adequate" not in str(assessment["conclusion"])
+    assert "superior" not in str(assessment["conclusion"])
+
+
+def _contract_beta_row(
+    factor: str, contract: str, correlation: float
+) -> dict[str, object]:
+    return {
+        "row_type": "existing_contract_beta_correlation",
+        "factor": factor,
+        "contract_symbol": contract,
+        "paired_count": 100,
+        "spearman_correlation": correlation,
+    }
+
+
+def test_one_strong_contract_pair_cannot_establish_two_factor_alignment() -> None:
+    result = di_audit.bivariate_contract_beta_alignment(
+        [_contract_beta_row("level", "DI1F27", 0.95)]
+    )
+    assert result["level"]["meets_threshold"]
+    assert not result["tilt"]["meets_threshold"]
+    assert not result["both_factors_individually_meet_threshold"]
+
+
+def test_level_and_tilt_must_independently_meet_alignment_threshold() -> None:
+    rows = [
+        _contract_beta_row("level", "DI1F27", 0.95),
+        _contract_beta_row("tilt", "DI1F31", -0.79),
+    ]
+    assert not di_audit.bivariate_contract_beta_alignment(rows)[
+        "both_factors_individually_meet_threshold"
+    ]
+    rows[1] = _contract_beta_row("tilt", "DI1F31", -0.81)
+    result = di_audit.bivariate_contract_beta_alignment(rows)
+    assert result["both_factors_individually_meet_threshold"]
+    assert result["level"]["contract_symbol"] == "DI1F27"
+    assert result["tilt"]["contract_symbol"] == "DI1F31"
+
+
+def _extra_di_dates() -> AuditDates:
+    return AuditDates(
+        (date(2024, 6, 28), date(2024, 7, 8)),
+        np.asarray([0], dtype=np.int64),
+        np.asarray([1], dtype=np.int64),
+    )
+
+
+def _write_extra_di(path: Path, symbol: str, timestamps: list[datetime]) -> None:
+    pl.DataFrame(
+        {
+            "symbol": [symbol] * len(timestamps),
+            "ts_exchange": timestamps,
+            "close": [10.0] * len(timestamps),
+        }
+    ).write_parquet(path)
+
+
+def test_extra_di_missing_expiry_or_period_coverage_is_not_broadly_available(
+    tmp_path: Path,
+) -> None:
+    context = tmp_path / "context"
+    context.mkdir()
+    _write_extra_di(
+        context / "f30.parquet",
+        "DI1F30",
+        [datetime(2024, 6, 28, 10, 14, tzinfo=timezone.utc)],
+    )
+    _write_extra_di(
+        context / "f32.parquet",
+        "DI1F32",
+        [datetime(2025, 1, 2, 10, 14, tzinfo=timezone.utc)],
+    )
+    catalogue = tmp_path / "catalogue.parquet"
+    pl.DataFrame(
+        {
+            "name": ["DI1F32"],
+            "expiration_time": [datetime(2027, 1, 2, tzinfo=timezone.utc).timestamp()],
+        }
+    ).write_parquet(catalogue)
+
+    _, summaries, _ = di_audit.audit_extra_fixed_contracts(
+        context, catalogue, _extra_di_dates()
+    )
+    by_symbol = {row["symbol"]: row for row in summaries}
+    assert by_symbol["DI1F30"]["candidate_status"] == "discovered_but_unusable"
+    assert "missing_catalogue_expiry" in by_symbol["DI1F30"]["audit_issues"]
+    assert by_symbol["DI1F32"]["candidate_status"] == "discovered_but_unusable"
+    assert "no_usable_audited_period_rows" in by_symbol["DI1F32"]["audit_issues"]
+
+
+def test_valid_extra_di_has_bounded_raw_coverage_but_is_not_store_ready(
+    tmp_path: Path,
+) -> None:
+    context = tmp_path / "context"
+    context.mkdir()
+    timestamps = [
+        datetime(
+            trade_date.year, trade_date.month, trade_date.day, 9, tzinfo=timezone.utc
+        )
+        + timedelta(minutes=cutoff - 1)
+        for trade_date in _extra_di_dates().trade_dates
+        for cutoff in di_audit.DECISION_CONTEXT_INDICES
+    ]
+    _write_extra_di(context / "f30.parquet", "DI1F30", timestamps)
+    catalogue = tmp_path / "catalogue.parquet"
+    pl.DataFrame(
+        {
+            "name": ["DI1F30"],
+            "expiration_time": [datetime(2027, 1, 2, tzinfo=timezone.utc).timestamp()],
+        }
+    ).write_parquet(catalogue)
+
+    rows, summaries, _ = di_audit.audit_extra_fixed_contracts(
+        context, catalogue, _extra_di_dates()
+    )
+    assert summaries[0]["candidate_status"] == "broadly_covered_raw_candidate"
+    assert not summaries[0]["feature_store_integrated"]
+    for scope in ("training", "validation"):
+        row = next(item for item in rows if item["scope_kind"] == scope)
+        assert 0.0 <= float(row["raw_row_coverage_fraction"]) <= 1.0
+        assert row["observed_fraction_at_decisions"] == pytest.approx(1.0)
+        assert row["feature_store_slot"] is None
+        assert row["feature_ready_date_count"] is None
+        assert not row["feature_store_integrated"]
+
+
+def test_normalization_decision_rows_cover_entity_applicable_dynamic_channels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dynamic_width = len(DYNAMIC_CHANNELS)
+    equity = np.zeros((1, 1, 285, dynamic_width), dtype=np.float32)
+    local = np.zeros((1, 7, 345, dynamic_width), dtype=np.float32)
+    global_features = np.zeros((1, 8, 615, dynamic_width), dtype=np.float32)
+    for values in (equity, local, global_features):
+        values[..., 5] = 1.0
+    arrays = FakeArrays(
+        {
+            "equity_features.npy": equity,
+            "equity_membership.npy": np.ones((1, 1), dtype=bool),
+            "equity_data_ready.npy": np.ones((1, 1), dtype=bool),
+            "context_features.npy": local,
+            "context_data_ready.npy": np.ones((1, 7), dtype=bool),
+            "global_features.npy": global_features,
+        }
+    )
+
+    def all_valid_sample(
+        _: FakeArrays,
+        keys: feature_audit.SampleKeys,
+        *,
+        entity_kind: str,
+        mapping_changed: np.ndarray | None = None,
+    ) -> feature_audit.FeatureSample:
+        del mapping_changed
+        slow_names = GLOBAL_SLOW_CHANNELS if entity_kind == "global" else SLOW_CHANNELS
+        width = dynamic_width + len(slow_names)
+        return feature_audit.FeatureSample(
+            np.ones((len(keys), width), dtype=np.float64),
+            np.ones((len(keys), width), dtype=bool),
+            tuple((*DYNAMIC_CHANNELS, *slow_names)),
+            tuple((*(["dynamic"] * dynamic_width), *(["slow"] * len(slow_names)))),
+            keys.date_idx,
+            keys.entity_idx,
+            keys.decision_idx,
+            keys.full_row_count,
+        )
+
+    monkeypatch.setattr(feature_audit, "extract_feature_sample", all_valid_sample)
+    dates = AuditDates(
+        (date(2024, 6, 28),),
+        np.asarray([0], dtype=np.int64),
+        np.empty(0, dtype=np.int64),
+    )
+    equity_index = pl.DataFrame(
+        {"equity_slot": [0], "security_id": ["S0"], "latest_ticker": ["T0"]}
+    )
+    rows, _ = feature_audit.run_normalization_audit(arrays, dates, equity_index)
+    decision_features = {
+        entity: {
+            row["feature"]
+            for row in rows
+            if row["entity_kind"] == entity and row["scope_kind"] == "decision_overall"
+        }
+        for entity in ("equity", "local", "global")
+    }
+    assert set(DYNAMIC_CHANNELS[14:26]) <= decision_features["equity"]
+    for entity in ("local", "global"):
+        assert set(DYNAMIC_CHANNELS[14:16]) <= decision_features[entity]
+        assert set(DYNAMIC_CHANNELS[16:26]).isdisjoint(decision_features[entity])
 
 
 def test_stratified_sampling_is_deterministic() -> None:

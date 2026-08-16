@@ -10,7 +10,8 @@ from numpy.typing import NDArray
 from .analyze_preprocessing import (
     AUDIT_SEED,
     BASE_CHANNELS,
-    DERIVED_CHANNELS,
+    CONTEXT_DECISION_DYNAMIC_CHANNELS,
+    EQUITY_DECISION_DYNAMIC_CHANNELS,
     PAIR_THRESHOLD,
     PCA_FAMILIES,
     VOLUME_STATE_CHANNELS,
@@ -544,10 +545,15 @@ def run_normalization_audit(
             entity_kind=entity,
             mapping_changed=(global_mapping_changed if entity == "global" else None),
         )
+        decision_channels = (
+            EQUITY_DECISION_DYNAMIC_CHANNELS
+            if entity == "equity"
+            else CONTEXT_DECISION_DYNAMIC_CHANNELS
+        )
         for row in range(len(keys)):
             year = dates.trade_dates[int(keys.date_idx[row])].year
             label = labels[int(keys.entity_idx[row])]
-            for channel in DERIVED_CHANNELS:
+            for channel in decision_channels:
                 if not sample.valid[row, channel]:
                     continue
                 bounds = DYNAMIC_BOUNDS[channel]

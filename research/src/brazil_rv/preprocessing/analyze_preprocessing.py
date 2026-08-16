@@ -21,6 +21,7 @@ from brazil_rv.modeling.contract import (
 
 from .contract import (
     BETA_MIN_PAIRED_SESSIONS,
+    DYNAMIC_CHANNEL_COUNT,
     PRICE_VOL_REFERENCE,
 )
 from .transforms import causal_exposure_betas, centered_midranks
@@ -63,7 +64,8 @@ TARGET_ARRAYS = frozenset(
 )
 
 BASE_CHANNELS = (0, 1, 2, 3, 4)
-DERIVED_CHANNELS = tuple(range(6, 14))
+EQUITY_DECISION_DYNAMIC_CHANNELS = tuple(range(6, DYNAMIC_CHANNEL_COUNT))
+CONTEXT_DECISION_DYNAMIC_CHANNELS = tuple(range(6, 16))
 VOLATILITY_STATE_CHANNELS = (0, 5, 9, 10, 11)
 VOLUME_STATE_CHANNELS = (6, 12, 13, 14)
 
@@ -631,7 +633,9 @@ class DICurveFit:
     contract_count: int
     level: float
     tilt: float
-    condition_number: float
+    raw_maturity_design_condition_number: float
+    maturity_span_years: float
+    minimum_distinct_maturity_separation_years: float
     residual_rmse: float
     explained_variance_fraction: float
     curvature: float | None
@@ -658,6 +662,9 @@ def fit_di_curve(
         return None
     z = (x - x.mean()) / scale
     design = np.column_stack((np.ones(z.size), z))
+    raw_design = np.column_stack((np.ones(x.size), x))
+    distinct_maturities = np.unique(x)
+    minimum_separation = float(np.diff(distinct_maturities).min())
     coefficients, *_ = np.linalg.lstsq(design, y, rcond=None)
     residual = y - design @ coefficients
     sse = float(residual @ residual)
@@ -682,15 +689,17 @@ def fit_di_curve(
             curvature_rmse = float(np.sqrt(sse_three / y.size))
             incremental = (sse - sse_three) / sse if sse > 0.0 else 0.0
     return DICurveFit(
-        int(mask.sum()),
-        float(coefficients[0]),
-        float(coefficients[1]),
-        float(np.linalg.cond(design)),
-        float(np.sqrt(sse / y.size)),
-        float(explained),
-        curvature,
-        curvature_rmse,
-        incremental,
+        contract_count=int(mask.sum()),
+        level=float(coefficients[0]),
+        tilt=float(coefficients[1]),
+        raw_maturity_design_condition_number=float(np.linalg.cond(raw_design)),
+        maturity_span_years=float(x.max() - x.min()),
+        minimum_distinct_maturity_separation_years=minimum_separation,
+        residual_rmse=float(np.sqrt(sse / y.size)),
+        explained_variance_fraction=float(explained),
+        curvature=curvature,
+        curvature_residual_rmse=curvature_rmse,
+        curvature_incremental_residual_reduction=incremental,
     )
 
 
