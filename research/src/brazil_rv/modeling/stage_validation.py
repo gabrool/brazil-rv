@@ -1675,14 +1675,15 @@ def validate_consolidated(output_dir: Path, arm_names: tuple[str, ...]) -> None:
         entropy_values = group["entropy"].unique()
         if entropy_values.len() != 1:
             raise ValueError(f"Gate entropy is inconsistent for {key}")
-        weights = group.sort("block")["weight"].to_numpy()
-        positive_weights = weights[weights > 0.0]
-        _require_close(
-            f"gate entropy {key}",
-            entropy_values[0],
-            -(positive_weights * np.log(positive_weights)).sum(),
-            tolerance=FLOAT32_DIAGNOSTIC_TOLERANCE,
-        )
+        if key[0] != "horizon_multiscale_three_seed":
+            weights = group.sort("block")["weight"].to_numpy()
+            positive_weights = weights[weights > 0.0]
+            _require_close(
+                f"gate entropy {key}",
+                entropy_values[0],
+                -(positive_weights * np.log(positive_weights)).sum(),
+                tolerance=FLOAT32_DIAGNOSTIC_TOLERANCE,
+            )
     summary_arm = "horizon_multiscale_three_seed"
     individual_gates = gates.filter(pl.col("arm") != summary_arm)
     summary_gates = gates.filter(pl.col("arm") == summary_arm)
