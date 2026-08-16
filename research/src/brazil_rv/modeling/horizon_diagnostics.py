@@ -574,7 +574,7 @@ def residual_source_designs(
     )
     channels = tuple(DYNAMIC_CHANNELS.index(name) for name in factor_names)
     beta_symbols = ("WDO$", "DI1F27", "DI1F28", "DI1F29", "DI1F31")
-    beta_names = tuple(f"beta_to_{symbol}" for symbol in beta_symbols)
+    beta_names = tuple(f"beta_to_{symbol.rstrip('$')}" for symbol in beta_symbols)
     beta_indices = tuple(EQUITY_SLOW_CHANNELS.index(name) for name in beta_names)
     local_slots = (1, 2, 3, 4, 5)
     interactions: list[torch.Tensor] = []

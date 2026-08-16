@@ -39,6 +39,7 @@ from brazil_rv.modeling.horizon_diagnostics import (
     gradient_cosine,
     mask_context_family_batch,
     permute_context_family_batch,
+    residual_source_designs,
 )
 from brazil_rv.modeling.metrics import moving_block_bootstrap
 from brazil_rv.modeling.model import build_neural_model, count_trainable_parameters
@@ -51,6 +52,7 @@ from brazil_rv.modeling.run_horizon_multiscale_stage import (
     parse_args as parse_stage_args,
 )
 from brazil_rv.modeling.train import _run_directory_name, parse_args
+from brazil_rv.preprocessing.contract import EQUITY_SLOW_CHANNELS
 
 
 EQUITIES = 4
@@ -291,6 +293,39 @@ def _analysis_batch() -> dict[str, torch.Tensor]:
         "decision_idx": torch.full((batch_size,), 18),
         "sample_valid_mask": torch.ones(batch_size, dtype=torch.bool),
     }
+
+
+def test_residual_source_designs_uses_canonical_wdo_beta_channel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from brazil_rv.modeling import horizon_diagnostics
+
+    monkeypatch.setattr(horizon_diagnostics, "EQUITY_COUNT", EQUITIES)
+    beta_names = (
+        "beta_to_WDO",
+        "beta_to_DI1F27",
+        "beta_to_DI1F28",
+        "beta_to_DI1F29",
+        "beta_to_DI1F31",
+    )
+    beta_indices = tuple(EQUITY_SLOW_CHANNELS.index(name) for name in beta_names)
+    assert tuple(EQUITY_SLOW_CHANNELS[index] for index in beta_indices) == beta_names
+
+    designs = residual_source_designs(_analysis_batch())
+
+    assert set(designs) == {
+        "slow",
+        "selected_peer",
+        "macro_interaction",
+        "combined",
+    }
+    assert designs["macro_interaction"].shape == (4, EQUITIES, 77)
+    assert designs["combined"].shape == (
+        4,
+        EQUITIES,
+        SLOW_FEATURE_COUNT + PEER_STATE_WIDTH + 77,
+    )
+    assert all(torch.isfinite(design).all() for design in designs.values())
 
 
 @pytest.mark.parametrize("family", ("wdo", "br_rates", "us_rates"))
@@ -600,20 +635,29 @@ def test_consolidation_emits_three_seed_and_control_summaries(
         encoding="utf-8",
     )
 
+    horizon_weights = {
+        "horizon_multiscale_seed11": (0.75, 0.05, 0.05, 0.05, 0.05, 0.05),
+        "horizon_multiscale_seed29": (0.05, 0.60, 0.10, 0.10, 0.10, 0.05),
+        "horizon_multiscale_seed47": (0.05, 0.10, 0.45, 0.15, 0.15, 0.10),
+    }
+
     class FakeModel:
-        def __init__(self, readout: str) -> None:
+        def __init__(self, arm: str) -> None:
+            readout = ARM_BY_NAME[arm].readout
             self.architecture = architecture_for_model(
                 "tcn", replace(BASELINE_TCN_SETTINGS, readout=readout)
             )
             self.readout = readout
+            self.arm = arm
 
         def scale_weights(self) -> torch.Tensor:
             if self.readout == "shared_multiscale":
                 return torch.full((6,), 1 / 6)
-            return torch.full((3, 6), 1 / 6)
+            weights = torch.tensor(horizon_weights[self.arm])
+            return weights.repeat(3, 1)
 
     def fake_load(run_dir: Path):
-        return FakeModel(ARM_BY_NAME[run_dir.name].readout), {}, tmp_path
+        return FakeModel(run_dir.name), {}, tmp_path
 
     monkeypatch.setattr(stage_module, "load_current_neural_run", fake_load)
     stage_module._consolidate(tmp_path, run_dirs)
@@ -628,6 +672,47 @@ def test_consolidation_emits_three_seed_and_control_summaries(
     )
     gates = pl.read_csv(tmp_path / "multiscale_gate_weights.csv")
     assert gates.filter(pl.col("seed") == 0).height == 18
+    horizon_gates = gates.filter(pl.col("horizon_minutes") == HORIZONS[0])
+    constituent_gates = horizon_gates.filter(
+        pl.col("arm").str.starts_with("horizon_multiscale_seed")
+    )
+    summary_gates = horizon_gates.filter(
+        pl.col("arm") == "horizon_multiscale_three_seed"
+    )
+    mean_constituent_entropy = constituent_gates["entropy"].mean()
+    mean_weights = (
+        constituent_gates.group_by("block")
+        .agg(pl.col("weight").mean())
+        .sort("block")["weight"]
+        .to_numpy()
+    )
+    entropy_of_mean_weights = -(mean_weights * np.log(mean_weights)).sum()
+    assert abs(entropy_of_mean_weights - mean_constituent_entropy) > 1e-3
+    assert summary_gates["entropy"].n_unique() == 1
+    assert np.isclose(summary_gates["entropy"][0], mean_constituent_entropy)
+
+    gate_path = tmp_path / "multiscale_gate_weights.csv"
+    gates.with_columns(
+        pl.when(pl.col("arm") == "horizon_multiscale_three_seed")
+        .then(pl.col("entropy") + 0.01)
+        .otherwise(pl.col("entropy"))
+        .alias("entropy")
+    ).write_csv(gate_path)
+    with pytest.raises(ValueError, match="three-seed gate .* entropy differs"):
+        stage_module.validate_consolidated(tmp_path, tuple(ARM_BY_NAME))
+
+    gates.with_columns(
+        pl.when(
+            (pl.col("arm") == "horizon_multiscale_seed11")
+            & (pl.col("horizon_minutes") == HORIZONS[0])
+        )
+        .then(pl.col("entropy") + 0.01)
+        .otherwise(pl.col("entropy"))
+        .alias("entropy")
+    ).write_csv(gate_path)
+    with pytest.raises(ValueError, match="gate entropy"):
+        stage_module.validate_consolidated(tmp_path, tuple(ARM_BY_NAME))
+    gates.write_csv(gate_path)
     summary = json.loads((tmp_path / "stage_summary.json").read_text(encoding="utf-8"))
     assert set(summary["hypotheses"]) == {
         "representation_information_loss",
@@ -652,8 +737,6 @@ def test_consolidation_emits_three_seed_and_control_summaries(
         stage_module.validate_consolidated(tmp_path, tuple(ARM_BY_NAME))
 
     original_comparisons.write_csv(comparison_path)
-    gates.filter(pl.col("arm") != "shared_multiscale_seed29").write_csv(
-        tmp_path / "multiscale_gate_weights.csv"
-    )
+    gates.filter(pl.col("arm") != "shared_multiscale_seed29").write_csv(gate_path)
     with pytest.raises(ValueError, match="gate runs"):
         stage_module.validate_consolidated(tmp_path, tuple(ARM_BY_NAME))
