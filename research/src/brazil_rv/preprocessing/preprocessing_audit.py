@@ -428,9 +428,9 @@ def build_summary(
         for row in pairs[:10]
     ]
     experiments: list[str] = []
-    if di["defensibility"]["two_factor_level_tilt_changes"]:
+    if di["computability"]["causal_level_tilt_candidate_computable"]:
         experiments.append(
-            "Chronological ablation of raw DI contract channels versus the audited two-factor level/tilt representation."
+            "Chronological ablation of raw DI contract channels versus the candidate level/tilt representation."
         )
     overall_normalization = [
         row
@@ -466,7 +466,10 @@ def build_summary(
         "largest_train_validation_shifts_by_entity": shifts_by_entity,
         "predominant_shift_components": predominant_shift_components,
         "di_verdict": di["verdict"],
-        "di_defensibility": di["defensibility"],
+        "di_computability": di["computability"],
+        "di_fit_quality_diagnostics": di["fit_quality_diagnostics"],
+        "di_empirical_usefulness": di["empirical_usefulness"],
+        "di_bivariate_contract_beta_alignment": di["bivariate_contract_beta_alignment"],
         "ranked_preprocessing_experiments": experiments,
         "interpretation": {
             "normalization_unit_std_not_assumed_optimal": True,
