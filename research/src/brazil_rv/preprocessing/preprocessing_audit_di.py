@@ -1,0 +1,828 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+from numpy.typing import NDArray
+
+from brazil_rv.modeling.contract import TRAIN_END
+
+from .analyze_preprocessing import (
+    PERSISTENCE_LEVELS,
+    AuditArrays,
+    AuditDates,
+    DistributionAccumulator,
+    beta_readiness,
+    causal_factor_betas,
+    fit_di_curve,
+    maturity_hull_intersection,
+    spearman_correlation,
+)
+from .contract import (
+    BETA_CLIP,
+    CONTEXT_SESSION_MINUTES,
+    CONTEXT_SESSION_START_MINUTE,
+    DECISION_CONTEXT_INDICES,
+    DECISION_EQUITY_INDICES,
+    EQUITY_SESSION_MINUTES,
+    EQUITY_SESSION_START_MINUTE,
+    FIXED_RATE_CONTEXT_SYMBOLS,
+    PRICE_VOL_FLOOR,
+    VOL_EWMA_ALPHA,
+    VOL_WARMUP_VALID_DAYS,
+)
+from .io import (
+    SOURCE_COLUMNS,
+    cotahist_files,
+    dense_grid,
+    discover_context_files,
+    load_assignments,
+    load_context_expiries,
+    load_market_dates_and_security_dates,
+    prepare_session_bars,
+    validate_physical_source_identity,
+    validate_source_date_isolation,
+)
+from .transforms import _daily_summaries, _daily_variance
+
+
+@dataclass(frozen=True)
+class DIInputs:
+    context_dir: Path
+    catalogue_path: Path
+    assignments_dir: Path
+    cotahist_dir: Path
+
+
+@dataclass(frozen=True)
+class EquityCausalState:
+    sigma: NDArray[np.float64]
+    change: NDArray[np.float64]
+    change_valid: NDArray[np.bool_]
+    source_files: tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class RateGrids:
+    close: NDArray[np.float64]
+    observed: NDArray[np.bool_]
+    expiries: tuple[date, ...]
+    source_rows: tuple[dict[str, object], ...]
+    files: tuple[Path, ...]
+    extra_fixed_contracts: tuple[str, ...]
+
+
+def _discover_extra_fixed_contracts(context_dir: Path) -> tuple[str, ...]:
+    found: set[str] = set()
+    for path in sorted(context_dir.glob("*.parquet")):
+        schema = pl.read_parquet_schema(path)
+        if "symbol" not in schema:
+            continue
+        frame = pl.read_parquet(path, columns=["symbol"], n_rows=1)
+        if frame.is_empty():
+            continue
+        symbol = str(frame.item())
+        if symbol.startswith("DI1F") and symbol[4:].isdigit():
+            found.add(symbol)
+    return tuple(sorted(found - set(FIXED_RATE_CONTEXT_SYMBOLS)))
+
+
+def load_rate_grids(inputs: DIInputs, dates: AuditDates) -> RateGrids:
+    files_by_symbol = discover_context_files(inputs.context_dir)
+    expiries_by_symbol = load_context_expiries(inputs.catalogue_path)
+    date_lookup = {value: index for index, value in enumerate(dates.trade_dates)}
+    close = np.zeros(
+        (
+            len(dates.trade_dates),
+            len(FIXED_RATE_CONTEXT_SYMBOLS),
+            CONTEXT_SESSION_MINUTES,
+        ),
+        dtype=np.float64,
+    )
+    observed = np.zeros(close.shape, dtype=bool)
+    source_rows: list[dict[str, object]] = []
+    files: list[Path] = []
+    for slot, symbol in enumerate(FIXED_RATE_CONTEXT_SYMBOLS):
+        path = files_by_symbol[symbol]
+        files.append(path)
+        scan = (
+            pl.scan_parquet(path)
+            .select("ts_exchange", "close")
+            .with_columns(
+                pl.col("ts_exchange").dt.date().alias("trade_date"),
+                (
+                    pl.col("ts_exchange").dt.hour() * 60
+                    + pl.col("ts_exchange").dt.minute()
+                    - CONTEXT_SESSION_START_MINUTE
+                )
+                .cast(pl.Int16)
+                .alias("minute_idx"),
+            )
+            .filter(
+                pl.col("trade_date").is_between(
+                    dates.trade_dates[0], dates.trade_dates[int(dates.validation[-1])]
+                ),
+                pl.col("minute_idx").is_between(0, CONTEXT_SESSION_MINUTES - 1),
+                pl.col("close").is_finite(),
+            )
+            .sort("ts_exchange")
+            .collect()
+        )
+        if scan.is_empty():
+            raise ValueError(f"No audit-permitted raw DI rows for {symbol}")
+        minimum = float(scan.get_column("close").min())
+        maximum = float(scan.get_column("close").max())
+        if minimum < 1.0 or maximum > 50.0:
+            raise ValueError(f"{symbol} is not in annual percentage-rate units")
+        duplicate = scan.select("trade_date", "minute_idx").is_duplicated()
+        if duplicate.any():
+            raise ValueError(f"Duplicate DI minute in {path}")
+        for row in scan.select("trade_date", "minute_idx", "close").iter_rows(
+            named=True
+        ):
+            date_idx = date_lookup.get(row["trade_date"])
+            if date_idx is None:
+                continue
+            minute = int(row["minute_idx"])
+            close[date_idx, slot, minute] = float(row["close"])
+            observed[date_idx, slot, minute] = True
+        source_rows.append(
+            {
+                "symbol": symbol,
+                "raw_m1_row_count": scan.height,
+                "raw_row_scope": "research_start_through_validation_end",
+                "first_timestamp": str(scan.get_column("ts_exchange").min()),
+                "last_timestamp": str(scan.get_column("ts_exchange").max()),
+                "source_path": str(path),
+                "source_size_bytes": path.stat().st_size,
+                "source_mtime_ns": path.stat().st_mtime_ns,
+                "quote_semantics": "annual_percentage_rate",
+                "five_minute_change_unit": "basis_points",
+                "observed_rate_minimum": minimum,
+                "observed_rate_maximum": maximum,
+            }
+        )
+    return RateGrids(
+        close,
+        observed,
+        tuple(expiries_by_symbol[symbol] for symbol in FIXED_RATE_CONTEXT_SYMBOLS),
+        tuple(source_rows),
+        tuple(files),
+        _discover_extra_fixed_contracts(inputs.context_dir),
+    )
+
+
+def _maturity_years(trade_date: date, expiries: tuple[date, ...]) -> np.ndarray:
+    return np.asarray(
+        [max((expiry - trade_date).days, 0) / 365.25 for expiry in expiries],
+        dtype=np.float64,
+    )
+
+
+def _scope(date_value: date) -> tuple[str, str]:
+    if date_value <= TRAIN_END:
+        return "training_year", str(date_value.year)
+    return "validation", "validation"
+
+
+def _aggregate_factor_rows(
+    rows: list[dict[str, object]], model: str
+) -> list[dict[str, object]]:
+    output: list[dict[str, object]] = []
+    scopes: list[tuple[str, str, list[dict[str, object]]]] = [
+        ("overall", "train_validation", rows)
+    ]
+    values = sorted({(str(row["scope_kind"]), str(row["scope_value"])) for row in rows})
+    scopes.extend(
+        (
+            kind,
+            value,
+            [
+                row
+                for row in rows
+                if row["scope_kind"] == kind and row["scope_value"] == value
+            ],
+        )
+        for kind, value in values
+    )
+    for scope_kind, scope_value, selected in scopes:
+        eligible = len(selected)
+        fits = [row for row in selected if row["fit_available"]]
+        four = [row for row in selected if int(row["contract_count"]) == 4]
+        three_or_more = [row for row in selected if int(row["contract_count"]) >= 3]
+        curvature = [row for row in fits if row["curvature"] is not None]
+
+        def summary(field: str, statistic: str) -> float | None:
+            array = np.asarray(
+                [float(row[field]) for row in fits if row[field] is not None],
+                dtype=np.float64,
+            )
+            if not array.size:
+                return None
+            return {
+                "mean": float(array.mean()),
+                "std": float(array.std()),
+                "median": float(np.median(array)),
+                "p95": float(np.quantile(array, 0.95)),
+                "p99": float(np.quantile(array, 0.99)),
+            }[statistic]
+
+        output.append(
+            {
+                "model": model,
+                "scope_kind": scope_kind,
+                "scope_value": scope_value,
+                "eligible_decision_count": eligible,
+                "fit_count": len(fits),
+                "fit_availability_fraction": len(fits) / eligible if eligible else None,
+                "four_ready_fraction": len(four) / eligible if eligible else None,
+                "at_least_three_ready_fraction": len(three_or_more) / eligible
+                if eligible
+                else None,
+                "fewer_than_three_fraction": 1.0 - len(three_or_more) / eligible
+                if eligible
+                else None,
+                "condition_number_median": summary("condition_number", "median"),
+                "condition_number_p99": summary("condition_number", "p99"),
+                "residual_rmse_mean": summary("residual_rmse", "mean"),
+                "residual_rmse_p95": summary("residual_rmse", "p95"),
+                "explained_variance_mean": summary("explained_variance", "mean"),
+                "explained_variance_p05": (
+                    float(
+                        np.quantile(
+                            [float(row["explained_variance"]) for row in fits], 0.05
+                        )
+                    )
+                    if fits
+                    else None
+                ),
+                "level_mean": summary("level", "mean"),
+                "level_std": summary("level", "std"),
+                "tilt_mean": summary("tilt", "mean"),
+                "tilt_std": summary("tilt", "std"),
+                "curvature_fit_count": len(curvature),
+                "curvature_fit_fraction": len(curvature) / eligible
+                if eligible
+                else None,
+                "curvature_incremental_residual_reduction_mean": (
+                    float(
+                        np.mean(
+                            [
+                                float(row["curvature_incremental_reduction"])
+                                for row in curvature
+                            ]
+                        )
+                    )
+                    if curvature
+                    else None
+                ),
+            }
+        )
+    return output
+
+
+def _daily_rate_factors(
+    grids: RateGrids, dates: AuditDates
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    date_count = int(dates.validation[-1]) + 1
+    closes = np.zeros((date_count, len(FIXED_RATE_CONTEXT_SYMBOLS)), dtype=np.float64)
+    close_valid = np.zeros_like(closes, dtype=bool)
+    for date_idx in range(date_count):
+        for slot in range(len(FIXED_RATE_CONTEXT_SYMBOLS)):
+            positions = np.flatnonzero(grids.observed[date_idx, slot])
+            if positions.size:
+                closes[date_idx, slot] = grids.close[date_idx, slot, positions[-1]]
+                close_valid[date_idx, slot] = True
+    changes = np.zeros_like(closes)
+    change_valid = np.zeros_like(close_valid)
+    prior = np.zeros(closes.shape[1], dtype=np.float64)
+    has_prior = np.zeros(closes.shape[1], dtype=bool)
+    for date_idx in range(date_count):
+        current = close_valid[date_idx]
+        paired = current & has_prior
+        changes[date_idx, paired] = 100.0 * (closes[date_idx, paired] - prior[paired])
+        change_valid[date_idx, paired] = True
+        prior[current] = closes[date_idx, current]
+        has_prior[current] = True
+    factors = np.zeros((date_count, 2), dtype=np.float64)
+    valid = np.zeros_like(factors, dtype=bool)
+    for date_idx, trade_date in enumerate(dates.trade_dates[:date_count]):
+        fit = fit_di_curve(
+            changes[date_idx],
+            _maturity_years(trade_date, grids.expiries),
+            change_valid[date_idx],
+        )
+        if fit is not None:
+            factors[date_idx] = (fit.level, fit.tilt)
+            valid[date_idx] = True
+    return factors, valid, change_valid
+
+
+def _causal_sigma(
+    raw_grid: NDArray[np.float64],
+    observed: NDArray[np.bool_],
+    valid_day: NDArray[np.bool_],
+) -> NDArray[np.float64]:
+    sigma = np.zeros(valid_day.size, dtype=np.float64)
+    warmup: list[float] = []
+    ewma_variance: float | None = None
+    for date_idx in range(valid_day.size):
+        if ewma_variance is not None and valid_day[date_idx]:
+            sigma[date_idx] = np.sqrt(max(ewma_variance, PRICE_VOL_FLOOR**2))
+        variance = _daily_variance(
+            raw_grid[date_idx, :, 3], observed[date_idx], is_rate=False
+        )
+        if not valid_day[date_idx] or variance is None:
+            continue
+        if ewma_variance is None:
+            warmup.append(variance)
+            if len(warmup) == VOL_WARMUP_VALID_DAYS:
+                ewma_variance = float(np.median(warmup))
+        else:
+            ewma_variance = (
+                1.0 - VOL_EWMA_ALPHA
+            ) * ewma_variance + VOL_EWMA_ALPHA * variance
+    return sigma
+
+
+def load_equity_causal_state(
+    inputs: DIInputs,
+    dates: AuditDates,
+    equity_index: pl.DataFrame,
+) -> EquityCausalState:
+    """Rebuild only causal daily state from accepted raw identity segments."""
+    assignments = load_assignments(inputs.assignments_dir)
+    security_ids = tuple(
+        equity_index.sort("equity_slot").get_column("security_id").to_list()
+    )
+    _, accepted_dates = load_market_dates_and_security_dates(
+        cotahist_files(inputs.cotahist_dir),
+        security_ids,
+        dates.trade_dates[0],
+        dates.trade_dates[int(dates.validation[-1])],
+    )
+    validate_source_date_isolation(assignments, accepted_dates)
+    audit_dates = dates.trade_dates[: int(dates.validation[-1]) + 1]
+    slot_lookup = {security_id: slot for slot, security_id in enumerate(security_ids)}
+    sigma = np.zeros((len(audit_dates), len(security_ids)), dtype=np.float64)
+    changes = np.zeros((len(audit_dates), len(security_ids)), dtype=np.float64)
+    valid = np.zeros_like(changes, dtype=bool)
+    source_files: list[Path] = []
+    for group in assignments.partition_by("source_file", maintain_order=True):
+        source_path = Path(str(group.item(0, "source_file")))
+        if not source_path.is_absolute():
+            source_path = inputs.assignments_dir / source_path
+        source_files.append(source_path)
+        source = (
+            pl.scan_parquet(source_path)
+            .select(SOURCE_COLUMNS)
+            .filter(
+                pl.col("ts_exchange").dt.date()
+                <= dates.trade_dates[int(dates.validation[-1])]
+            )
+            .collect()
+        )
+        validate_physical_source_identity(group, source, source_path)
+        group_security_ids = tuple(group.get_column("security_id").to_list())
+        allowed_dates = frozenset().union(
+            *(accepted_dates[security_id] for security_id in group_security_ids)
+        )
+        session_bars = prepare_session_bars(
+            source,
+            source_path,
+            allowed_dates,
+            audit_dates,
+            EQUITY_SESSION_START_MINUTE,
+            EQUITY_SESSION_MINUTES,
+        )
+        for assignment in group.iter_rows(named=True):
+            security_id = assignment["security_id"]
+            bars = session_bars.filter(
+                pl.col("trade_date").is_in(tuple(accepted_dates[security_id]))
+            )
+            if bars.is_empty():
+                raise ValueError(
+                    f"Accepted assignment produced no audit bars: {security_id}"
+                )
+            raw_grid, observed = dense_grid(
+                bars, len(audit_dates), EQUITY_SESSION_MINUTES
+            )
+            identity_day = np.fromiter(
+                (
+                    assignment["first_overlap_date"]
+                    <= trade_date
+                    <= assignment["last_overlap_date"]
+                    for trade_date in audit_dates
+                ),
+                dtype=bool,
+                count=len(audit_dates),
+            )
+            daily = _daily_summaries(
+                raw_grid,
+                observed,
+                identity_day,
+                is_rate=False,
+                early_open_cutoff=DECISION_EQUITY_INDICES[0],
+            )
+            slot = slot_lookup[security_id]
+            sigma[:, slot] = _causal_sigma(raw_grid, observed, identity_day)
+            changes[:, slot] = daily["change"]
+            valid[:, slot] = daily["change_valid"]
+    return EquityCausalState(sigma, changes, valid, tuple(source_files))
+
+
+def _coverage_rows(
+    grids: RateGrids,
+    arrays: AuditArrays,
+    dates: AuditDates,
+) -> list[dict[str, object]]:
+    context_ready = arrays.array("context_data_ready.npy")
+    fixed_slots = [
+        LOCAL_CONTEXT_SYMBOLS.index(symbol) for symbol in FIXED_RATE_CONTEXT_SYMBOLS
+    ]
+    source_by_symbol = {str(row["symbol"]): row for row in grids.source_rows}
+    rows: list[dict[str, object]] = []
+    for slot, (symbol, expiry) in enumerate(
+        zip(FIXED_RATE_CONTEXT_SYMBOLS, grids.expiries, strict=True)
+    ):
+        scopes: list[tuple[str, str, np.ndarray]] = [
+            (
+                "overall",
+                "train_validation",
+                np.concatenate((dates.train, dates.validation)),
+            ),
+            ("validation", "validation", dates.validation),
+        ]
+        for year in sorted(
+            {dates.trade_dates[int(index)].year for index in dates.train}
+        ):
+            indices = np.asarray(
+                [
+                    index
+                    for index in dates.train
+                    if dates.trade_dates[int(index)].year == year
+                ],
+                dtype=np.int64,
+            )
+            scopes.append(("training_year", str(year), indices))
+        for scope_kind, scope_value, indices in scopes:
+            decision_observed = []
+            for date_idx in indices:
+                for cutoff in DECISION_CONTEXT_INDICES:
+                    decision_observed.append(
+                        bool(grids.observed[int(date_idx), slot, cutoff - 1])
+                    )
+            maturity = [
+                max((expiry - dates.trade_dates[int(index)]).days, 0) / 365.25
+                for index in indices
+            ]
+            source = source_by_symbol[symbol] if scope_kind == "overall" else {}
+            rows.append(
+                {
+                    "symbol": symbol,
+                    "feature_store_slot": fixed_slots[slot],
+                    "scope_kind": scope_kind,
+                    "scope_value": scope_value,
+                    **source,
+                    "expiry_date": expiry,
+                    "date_count": int(indices.size),
+                    "feature_ready_date_count": int(
+                        np.asarray(
+                            context_ready[indices, fixed_slots[slot]], dtype=bool
+                        ).sum()
+                    ),
+                    "observed_decision_count": int(sum(decision_observed)),
+                    "possible_decision_count": len(decision_observed),
+                    "observed_fraction_at_decisions": (
+                        float(np.mean(decision_observed)) if decision_observed else None
+                    ),
+                    "missing_fraction_at_decisions": (
+                        1.0 - float(np.mean(decision_observed))
+                        if decision_observed
+                        else None
+                    ),
+                    "minimum_time_to_expiry_years": min(maturity) if maturity else None,
+                    "maximum_time_to_expiry_years": max(maturity) if maturity else None,
+                }
+            )
+    return rows
+
+
+def run_di_audit(
+    arrays: AuditArrays,
+    dates: AuditDates,
+    equity_index: pl.DataFrame,
+    inputs: DIInputs,
+    *,
+    equity_state: EquityCausalState | None = None,
+) -> tuple[
+    list[dict[str, object]],
+    list[dict[str, object]],
+    list[dict[str, object]],
+    dict[str, object],
+    dict[str, object],
+]:
+    grids = load_rate_grids(inputs, dates)
+    coverage_rows = _coverage_rows(grids, arrays, dates)
+    context_ready = arrays.array("context_data_ready.npy")
+    fixed_slots = np.asarray(
+        [LOCAL_CONTEXT_SYMBOLS.index(symbol) for symbol in FIXED_RATE_CONTEXT_SYMBOLS],
+        dtype=np.int64,
+    )
+    audit_dates = np.concatenate((dates.train, dates.validation))
+    factor_rows: list[dict[str, object]] = []
+    sensitivity_rows: list[dict[str, object]] = []
+    maturity_rows: list[np.ndarray] = []
+    maturity_ready: list[np.ndarray] = []
+    for date_idx in audit_dates:
+        index = int(date_idx)
+        trade_date = dates.trade_dates[index]
+        scope_kind, scope_value = _scope(trade_date)
+        maturity = _maturity_years(trade_date, grids.expiries)
+        for decision_idx, cutoff in enumerate(DECISION_CONTEXT_INDICES):
+            end = cutoff - 1
+            start = cutoff - 6
+            endpoint = grids.observed[index, :, end] & grids.observed[index, :, start]
+            feature_ready = np.asarray(context_ready[index, fixed_slots], dtype=bool)
+            ready = endpoint & feature_ready
+            changes = 100.0 * (
+                grids.close[index, :, end] - grids.close[index, :, start]
+            )
+            fit = fit_di_curve(changes, maturity, ready)
+            row: dict[str, object] = {
+                "scope_kind": scope_kind,
+                "scope_value": scope_value,
+                "date_idx": index,
+                "trade_date": trade_date,
+                "decision_idx": decision_idx,
+                "cutoff_minute_idx": end,
+                "ready_contracts": list(np.asarray(FIXED_RATE_CONTEXT_SYMBOLS)[ready]),
+                "maturity_years": maturity.tolist(),
+                "contract_count": int(ready.sum()),
+                "fit_available": fit is not None,
+                "level": None,
+                "tilt": None,
+                "condition_number": None,
+                "residual_rmse": None,
+                "explained_variance": None,
+                "curvature": None,
+                "curvature_incremental_reduction": None,
+            }
+            if fit is not None:
+                row.update(
+                    {
+                        "level": fit.level,
+                        "tilt": fit.tilt,
+                        "condition_number": fit.condition_number,
+                        "residual_rmse": fit.residual_rmse,
+                        "explained_variance": fit.explained_variance_fraction,
+                        "curvature": fit.curvature,
+                        "curvature_incremental_reduction": fit.curvature_incremental_residual_reduction,
+                    }
+                )
+            factor_rows.append(row)
+            no_f28 = ready.copy()
+            no_f28[FIXED_RATE_CONTEXT_SYMBOLS.index("DI1F28")] = False
+            sensitivity = fit_di_curve(changes, maturity, no_f28)
+            sensitivity_rows.append(
+                {
+                    **{
+                        key: row[key]
+                        for key in (
+                            "scope_kind",
+                            "scope_value",
+                            "date_idx",
+                            "trade_date",
+                            "decision_idx",
+                            "cutoff_minute_idx",
+                            "ready_contracts",
+                            "maturity_years",
+                        )
+                    },
+                    "contract_count": int(no_f28.sum()),
+                    "fit_available": sensitivity is not None,
+                    "level": None if sensitivity is None else sensitivity.level,
+                    "tilt": None if sensitivity is None else sensitivity.tilt,
+                    "condition_number": None
+                    if sensitivity is None
+                    else sensitivity.condition_number,
+                    "residual_rmse": None
+                    if sensitivity is None
+                    else sensitivity.residual_rmse,
+                    "explained_variance": None
+                    if sensitivity is None
+                    else sensitivity.explained_variance_fraction,
+                    "curvature": None,
+                    "curvature_incremental_reduction": None,
+                }
+            )
+            maturity_rows.append(maturity)
+            maturity_ready.append(ready)
+    fit_summary = _aggregate_factor_rows(factor_rows, "level_tilt")
+    fit_summary.extend(
+        _aggregate_factor_rows(sensitivity_rows, "level_tilt_without_DI1F28")
+    )
+    fit_output = [dict(row_type="summary", **row) for row in fit_summary]
+    fit_output.extend(
+        dict(row_type="decision", model="level_tilt", **row) for row in factor_rows
+    )
+    fit_output.extend(
+        dict(row_type="decision", model="level_tilt_without_DI1F28", **row)
+        for row in sensitivity_rows
+    )
+    hull = maturity_hull_intersection(
+        np.asarray(maturity_rows), np.asarray(maturity_ready)
+    )
+
+    daily_factors, daily_factor_valid, daily_contract_valid = _daily_rate_factors(
+        grids, dates
+    )
+    if equity_state is None:
+        equity_state = load_equity_causal_state(inputs, dates, equity_index)
+    betas, beta_ready = causal_factor_betas(
+        equity_state.change,
+        equity_state.change_valid,
+        daily_factors,
+        daily_factor_valid,
+    )
+    membership = arrays.array("equity_membership.npy")
+    existing_beta_ready = beta_readiness(
+        equity_state.change_valid, daily_contract_valid
+    )
+    equity_ready = arrays.array("equity_data_ready.npy")
+    slow = arrays.array("equity_slow.npy")
+    beta_rows: list[dict[str, object]] = []
+    all_allowed = np.concatenate((dates.train, dates.validation))
+    active_allowed = np.asarray(
+        membership[all_allowed] & equity_ready[all_allowed], dtype=bool
+    )
+    total_active = int(active_allowed.sum())
+    for factor_idx, factor_name in enumerate(("level", "tilt")):
+        scopes: list[tuple[str, str, np.ndarray]] = [
+            ("overall", "train_validation", all_allowed),
+            ("validation", "validation", dates.validation),
+        ]
+        for year in sorted(
+            {dates.trade_dates[int(index)].year for index in dates.train}
+        ):
+            scopes.append(
+                (
+                    "training_year",
+                    str(year),
+                    np.asarray(
+                        [
+                            index
+                            for index in dates.train
+                            if dates.trade_dates[int(index)].year == year
+                        ],
+                        dtype=np.int64,
+                    ),
+                )
+            )
+        for scope_kind, scope_value, indices in scopes:
+            active = np.asarray(membership[indices] & equity_ready[indices], dtype=bool)
+            use = active & beta_ready[indices, :, factor_idx]
+            values = betas[indices, :, factor_idx][use]
+            stats = DistributionAccumulator(
+                f"di_beta:{factor_name}:{scope_kind}:{scope_value}",
+                -BETA_CLIP,
+                BETA_CLIP,
+            )
+            stats.update(values, possible_count=int(active.sum()))
+            beta_rows.append(
+                {
+                    "row_type": "factor_beta_distribution",
+                    "factor": factor_name,
+                    "scope_kind": scope_kind,
+                    "scope_value": scope_value,
+                    **stats.row(),
+                }
+            )
+        ready_fraction = np.divide(
+            (beta_ready[all_allowed, :, factor_idx] & active_allowed).sum(axis=0),
+            active_allowed.sum(axis=0),
+            out=np.zeros(active_allowed.shape[1], dtype=np.float64),
+            where=active_allowed.sum(axis=0) > 0,
+        )
+        for threshold in PERSISTENCE_LEVELS:
+            beta_rows.append(
+                {
+                    "row_type": "persistent_readiness",
+                    "factor": factor_name,
+                    "scope_kind": "overall",
+                    "scope_value": "train_validation",
+                    "readiness_threshold": threshold,
+                    "equity_fraction_meeting_threshold": float(
+                        np.mean(ready_fraction >= threshold)
+                    ),
+                }
+            )
+        factor_values = betas[all_allowed, :, factor_idx]
+        for offset, symbol in enumerate(FIXED_RATE_CONTEXT_SYMBOLS):
+            existing = np.asarray(slow[all_allowed, :, 22 + offset], dtype=np.float64)
+            use = (
+                active_allowed
+                & beta_ready[all_allowed, :, factor_idx]
+                & existing_beta_ready[all_allowed, :, offset]
+            )
+            beta_rows.append(
+                {
+                    "row_type": "existing_contract_beta_correlation",
+                    "factor": factor_name,
+                    "scope_kind": "overall",
+                    "scope_value": "train_validation",
+                    "contract_symbol": symbol,
+                    "paired_count": int(use.sum()),
+                    "spearman_correlation": spearman_correlation(
+                        factor_values[use], existing[use]
+                    ),
+                }
+            )
+    overall_fit = next(
+        row
+        for row in fit_summary
+        if row["model"] == "level_tilt" and row["scope_kind"] == "overall"
+    )
+    overall_beta = next(
+        row
+        for row in beta_rows
+        if row["row_type"] == "factor_beta_distribution"
+        and row["factor"] == "level"
+        and row["scope_kind"] == "overall"
+    )
+    fit_fraction = float(overall_fit["fit_availability_fraction"] or 0.0)
+    beta_fraction = float(overall_beta["observed_fraction"] or 0.0)
+    if fit_fraction >= 0.95 and beta_fraction >= 0.80:
+        verdict = "Existing data support a two-factor level/tilt representation and causal stock-specific exposures."
+    elif fit_fraction > 0.0 and beta_fraction > 0.0:
+        verdict = "Existing data support only a weaker/partial version, with the limitation quantified."
+    else:
+        verdict = "Existing data are insufficient."
+    correlations = [
+        abs(float(row["spearman_correlation"]))
+        for row in beta_rows
+        if row["row_type"] == "existing_contract_beta_correlation"
+        and row["spearman_correlation"] is not None
+    ]
+    feasibility: dict[str, object] = {
+        "verdict": verdict,
+        "audit_interval_end": str(dates.trade_dates[int(dates.validation[-1])]),
+        "held_out_test_accessed": False,
+        "baseline_contracts": list(FIXED_RATE_CONTEXT_SYMBOLS),
+        "additional_fixed_contracts_found": list(grids.extra_fixed_contracts),
+        "maturity_hull": hull,
+        "fit_availability_fraction": fit_fraction,
+        "factor_beta_readiness_fraction": beta_fraction,
+        "defensibility": {
+            "two_factor_level_tilt_changes": fit_fraction >= 0.95,
+            "curvature": "diagnostic_only_when_all_four_contracts_are_ready",
+            "constant_maturity_interpolation_over_full_audited_sample": hull[
+                "constant_maturity_without_extrapolation_full_interval"
+            ],
+            "recomputed_factor_betas": beta_fraction >= 0.80,
+            "approximate_rotation_of_existing_contract_betas": bool(
+                correlations and max(correlations) >= 0.80
+            ),
+            "exact_historical_rolled_curve_or_tradable_contract_reconstruction": False,
+            "adding_more_maturities_without_new_collection": bool(
+                grids.extra_fixed_contracts
+            ),
+        },
+        "limitations": [
+            "Raw row counts and timestamps are restricted through validation end to preserve the held-out split.",
+            "Continuous DI1 series are not used as exact maturity points.",
+            "Curvature is never proposed as a production feature.",
+        ],
+    }
+    access = {
+        "rate_source_files": [str(path) for path in grids.files],
+        "rate_source_identities": [
+            {
+                "path": str(path),
+                "size_bytes": path.stat().st_size,
+                "mtime_ns": path.stat().st_mtime_ns,
+            }
+            for path in grids.files
+        ],
+        "equity_source_files": [str(path) for path in equity_state.source_files],
+        "equity_source_identities": [
+            {
+                "path": str(path),
+                "size_bytes": path.stat().st_size,
+                "mtime_ns": path.stat().st_mtime_ns,
+            }
+            for path in equity_state.source_files
+        ],
+        "factor_decision_count": len(factor_rows),
+        "equity_daily_change_valid_count": int(equity_state.change_valid.sum()),
+        "factor_daily_valid_count": int(daily_factor_valid[:, 0].sum()),
+        "active_equity_date_count": total_active,
+    }
+    return coverage_rows, fit_output, beta_rows, feasibility, access
+
+
+# Imported late to keep the contract list above visually focused.
+from .contract import LOCAL_CONTEXT_SYMBOLS  # noqa: E402
