@@ -404,8 +404,18 @@ def _portable_human_prior_context(
     reference = base / "reference"
     parent = base / "current_parent"
     parent.mkdir()
-    shutil.copy2(reference / "date_index.parquet", parent / "date_index.parquet")
-    shutil.copy2(reference / "equity_index.parquet", parent / "equity_index.parquet")
+    pl.DataFrame(
+        {
+            "date_idx": pl.Series(range(len(trade_dates)), dtype=pl.Int32),
+            "trade_date": pl.Series(trade_dates, dtype=pl.Date),
+        }
+    ).write_parquet(parent / "date_index.parquet", compression="uncompressed")
+    pl.DataFrame(
+        {
+            "equity_slot": pl.Series(range(len(security_ids)), dtype=pl.Int16),
+            "security_id": security_ids,
+        }
+    ).write_parquet(parent / "equity_index.parquet", compression="uncompressed")
     np.save(parent / "equity_features.npy", np.zeros((2, 1), dtype=np.float32))
     np.save(parent / "targets.npy", np.zeros((2, 1), dtype=np.float32))
 
@@ -479,6 +489,17 @@ def test_portable_human_prior_replay_accepts_missing_predecessor(
     assert artifact.reference_feature_store == case.obsolete.resolve()
     assert not artifact.reference_feature_store.exists()
     assert tuple(artifact.security_metadata["security_id"]) == case.security_ids
+    lineage_hashes = case.context.manifest["canonical_inputs"]["human_priors"][
+        "referenced_feature_store"
+    ]["artifact_sha256"]
+    for filename in ("date_index.parquet", "equity_index.parquet"):
+        assert _sha256(case.parent / filename) != lineage_hashes[filename]
+    assert {path.resolve() for path in hashed}.isdisjoint(
+        {
+            (case.parent / "date_index.parquet").resolve(),
+            (case.parent / "equity_index.parquet").resolve(),
+        }
+    )
     assert {path.name for path in hashed}.isdisjoint(
         {"equity_features.npy", "targets.npy"}
     )
@@ -544,4 +565,11 @@ def test_portable_human_prior_replay_rejects_corruption(
         entry["resolved_path"] = r"C:\unsupported\human_priors"
 
     with pytest.raises((ValueError, FileNotFoundError)):
-        variants._load_human_prior_artifact(case.context)
+        load_human_priors(
+            case.pointer,
+            case.sidecar,
+            case.trade_dates,
+            case.security_ids,
+            frozen_manifest_entry=entry,
+            current_parent_store=case.parent,
+        )

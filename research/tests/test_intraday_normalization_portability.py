@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -50,7 +51,7 @@ def test_workspace_path_rebases_supported_windows_forms(
     assert resolve_feature_store(pointer) == target.resolve()
 
 
-def test_workspace_path_preserves_native_paths_and_rejects_ambiguity(
+def test_workspace_path_preserves_native_paths_and_missing_recorded_paths(
     tmp_path: Path,
 ) -> None:
     root = tmp_path / "workspace"
@@ -69,19 +70,68 @@ def test_workspace_path_preserves_native_paths_and_rejects_ambiguity(
         )
         == missing.resolve()
     )
-    with pytest.raises((ValueError, FileNotFoundError)):
-        modeling_contract.workspace_path(
-            r"C:\unsupported\quant-data\artifact",
-            project_root=root,
-        )
+    with pytest.raises(ValueError):
+        modeling_contract.workspace_path("", project_root=root)
+
+
+def test_workspace_path_rejects_existing_and_missing_relative_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    Path("existing-relative").mkdir()
+
+    with pytest.raises(ValueError):
+        modeling_contract.workspace_path("existing-relative", project_root=tmp_path)
     with pytest.raises(ValueError):
         modeling_contract.workspace_path(
-            r"C:\quant-data\..\outside",
+            "missing-relative",
+            must_exist=False,
+            project_root=tmp_path,
+        )
+
+
+def test_workspace_path_rejects_existing_traversal_destination() -> None:
+    assert (modeling_contract.PROJECT_ROOT / "quant").is_dir()
+    with pytest.raises(ValueError):
+        modeling_contract.workspace_path(
+            r"C:\Brazil-RV\quant-data\..\quant",
+            must_exist=False,
+        )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="non-Windows path classification")
+def test_workspace_path_rejects_existing_windows_traversal_and_unsupported_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "workspace"
+    (root / "outside").mkdir(parents=True)
+    monkeypatch.chdir(tmp_path)
+    traversal = Path(r"C:\quant-data\..\outside")
+    unsupported = Path(r"D:\unsupported\artifact")
+    traversal.mkdir()
+    unsupported.mkdir()
+
+    with pytest.raises(ValueError):
+        modeling_contract.workspace_path(
+            str(traversal),
             must_exist=False,
             project_root=root,
         )
     with pytest.raises(ValueError):
-        modeling_contract.workspace_path("", project_root=root)
+        modeling_contract.workspace_path(str(unsupported), project_root=root)
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or not Path(r"C:\quant-data").is_dir(),
+    reason="requires the native Windows C:\\quant-data root",
+)
+def test_workspace_path_preserves_existing_native_windows_data_root() -> None:
+    assert (
+        modeling_contract.workspace_path(r"C:\quant-data")
+        == Path(r"C:\quant-data").resolve()
+    )
 
 
 def _write_portable_source_context(

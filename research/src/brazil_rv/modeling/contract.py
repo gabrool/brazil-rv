@@ -4,7 +4,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import MappingProxyType
 
 
@@ -34,27 +34,46 @@ def workspace_path(
     raw = os.fspath(value)
     if not raw.strip():
         raise ValueError("Workspace path is empty")
-    path = Path(raw).expanduser()
-    if path.exists():
-        return path.resolve()
 
+    native = Path(raw)
     normalized = raw.replace("\\", "/")
     lowered = normalized.casefold()
     relative: str | None = None
+    recorded_root: str | None = None
     for prefix in ("c:/brazil-rv/quant-data", "c:/quant-data"):
         if lowered == prefix or lowered.startswith(prefix + "/"):
+            recorded_root = normalized[: len(prefix)]
             relative = normalized[len(prefix) :].lstrip("/")
             break
+
     if relative is not None:
-        root = (PROJECT_ROOT if project_root is None else project_root).resolve()
-        data_root = (root / "quant-data").resolve()
-        path = (data_root / relative).resolve()
+        depth = 0
+        for part in relative.split("/"):
+            if part in ("", "."):
+                continue
+            if part == "..":
+                if depth == 0:
+                    raise ValueError(f"Workspace path escapes quant-data: {value}")
+                depth -= 1
+            else:
+                depth += 1
+
+        if os.name == "nt" and native.is_absolute() and native.exists():
+            assert recorded_root is not None
+            data_root = Path(recorded_root).resolve()
+            path = native.resolve()
+        else:
+            root = (PROJECT_ROOT if project_root is None else project_root).resolve()
+            data_root = (root / "quant-data").resolve()
+            path = (data_root / relative).resolve()
         if not path.is_relative_to(data_root):
             raise ValueError(f"Workspace path escapes quant-data: {value}")
-    elif not path.is_absolute():
-        raise ValueError(f"Unsupported workspace path: {value}")
+    elif native.is_absolute():
+        path = native.resolve()
+    elif PureWindowsPath(raw).is_absolute():
+        raise ValueError(f"Unsupported Windows workspace path: {value}")
     else:
-        path = path.resolve()
+        raise ValueError(f"Workspace path must be absolute: {value}")
 
     if must_exist and not path.exists():
         raise FileNotFoundError(path)

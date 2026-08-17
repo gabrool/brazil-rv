@@ -279,11 +279,6 @@ def load_human_priors(
         _require(
             axis_store.is_dir(), "Current canonical V4 parent store is unavailable"
         )
-        for filename in ("date_index.parquet", "equity_index.parquet"):
-            _require(
-                sha256_file(axis_store / filename) == reference_hashes[filename],
-                f"Human-priors {filename} lineage differs from canonical V4",
-            )
         date_axis_error = (
             "Human-priors date axis does not match the current canonical V4 parent"
         )
