@@ -32,6 +32,7 @@ from .contract import (
 )
 from .data import select_sample_split
 from .evaluate import collect_neural_evaluation
+from .feature_variant import load_variant_manifest, variant_parent
 from .metrics import average_ranks, ranking_diagnostics
 
 BOOTSTRAP_BLOCK_TRADING_DAYS = 5
@@ -787,6 +788,8 @@ def load_attribution_inputs(
         store = Path(str(checkpoint["feature_store"]))
     dates = values["date_idx"].astype(np.int64)
     decisions = values["decision_idx"].astype(np.int64)
+    variant = load_variant_manifest(store)
+    metadata_store = store if variant is None else variant_parent(store, variant)
     return AttributionInputs(
         run_dir.name,
         values["predictions"],
@@ -795,8 +798,8 @@ def load_attribution_inputs(
         values["label_mask"].astype(bool),
         dates,
         decisions,
-        _security_ids(store),
-        _opening_diagnostics(store, dates, decisions),
+        _security_ids(metadata_store),
+        _opening_diagnostics(metadata_store, dates, decisions),
     )
 
 

@@ -14,6 +14,13 @@ import polars as pl
 import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
+from .feature_variant import (
+    load_variant_manifest,
+    open_variant_arrays,
+    validate_variant_binding,
+    variant_parent,
+)
+
 from .contract import (
     ABSOLUTE_PATCH_COUNT,
     CANONICAL_DROPPED_LOCAL_SLOTS,
@@ -83,6 +90,21 @@ def resolve_feature_store(pointer: Path = FEATURE_STORE_POINTER) -> Path:
 
 
 def feature_store_identity(store: Path) -> dict[str, object]:
+    variant = load_variant_manifest(store)
+    if variant is not None:
+        parent = variant_parent(store, variant)
+        parent_identity = feature_store_identity(parent)
+        validate_variant_binding(
+            store, variant, parent_identity, verify_overlay_hashes=False
+        )
+        digest = hashlib.sha256()
+        digest.update((store / "intraday_normalization_variant.json").read_bytes())
+        digest.update(str(parent_identity["metadata_sha256"]).encode("ascii"))
+        return {
+            "path": str(store.resolve()),
+            "contract_version": parent_identity["contract_version"],
+            "metadata_sha256": digest.hexdigest(),
+        }
     schema_path = store / "feature_schema.json"
     digest = hashlib.sha256()
     for path in (store / "manifest.json", schema_path, store / "sample_index.parquet"):
@@ -136,6 +158,9 @@ def _validate_sample_index(sample_index: pl.DataFrame) -> None:
 
 
 def load_sample_index(store: Path) -> pl.DataFrame:
+    variant = load_variant_manifest(store)
+    if variant is not None:
+        store = variant_parent(store, variant)
     rows = pl.read_parquet(store / "sample_index.parquet").sort("sample_id")
     _validate_sample_index(rows)
     return rows
@@ -560,6 +585,20 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         )
         if not needs_context and self.context_family_ablation != "none":
             raise ValueError("Context ablation requires context inputs")
+        self.variant_manifest = load_variant_manifest(store)
+        self.parent_store = store
+        if self.variant_manifest is not None:
+            self.parent_store = variant_parent(store, self.variant_manifest)
+            validate_variant_binding(
+                store,
+                self.variant_manifest,
+                feature_store_identity(self.parent_store),
+                verify_overlay_hashes=False,
+            )
+            if sample_index.get_column("date_idx").max() >= int(
+                self.variant_manifest["allowed_date_count"]
+            ):
+                raise ValueError("Feature variant cannot serve held-out test rows")
         self.rows = {
             name: sample_index.get_column(name).to_numpy()
             for name in (
@@ -591,10 +630,17 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 )
             if self.peer_features == "selected":
                 filenames = (*filenames, *PEER_ARRAY_FILES)
-            self._arrays = {
-                name: np.load(self.store / name, mmap_mode="r", allow_pickle=False)
-                for name in filenames
-            }
+            if self.variant_manifest is None:
+                self._arrays = {
+                    name: np.load(
+                        self.parent_store / name, mmap_mode="r", allow_pickle=False
+                    )
+                    for name in filenames
+                }
+            else:
+                self._arrays = open_variant_arrays(
+                    self.store, self.parent_store, self.variant_manifest, filenames
+                )
         return self._arrays
 
     def __getitem__(self, request: BatchRequest) -> dict[str, np.ndarray]:

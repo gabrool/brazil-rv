@@ -1,6 +1,6 @@
 # Brazil-RV Project Context
 
-Last verified: 2026-08-15.
+Last verified: 2026-08-17.
 
 ## Purpose
 
@@ -98,6 +98,10 @@ uv run --project research python -m brazil_rv.modeling.analyze_stock_time_attrib
 uv run --project research python -m brazil_rv.modeling.run_horizon_multiscale_stage `
   --output-dir <persistent-stage-directory>
 
+# Resumable validation-only equity intraday-normalization stage; resume with the identical command
+uv run --project research python -m brazil_rv.modeling.run_intraday_normalization_stage `
+  --output-dir <persistent-stage-directory>
+
 # Lambda availability, launch, local safety tests, and credential deletion
 .\ops\lambda-gh200.ps1 -Mode Notify -Notify
 .\ops\lambda-gh200.ps1 -Mode Launch -IUnderstandBilling
@@ -116,6 +120,52 @@ Attribution performs validation inference once per current run or reads an expli
 The horizon-multiscale stage writes atomic resumable state plus run, probe, covariance, gradient, paired-bootstrap, gate-weight, and consolidated summary artifacts under its explicit output directory. Every resumable step strictly validates its complete artifact schema and provenance before reuse, including immutable feature-store identity, canonical fit/selection windows, material training settings, parameter counts, and strict checkpoint reconstruction. Frozen and OOF probe fitting is train-only; ordinary trained-arm comparison and paired context-retraining ablations use canonical validation; diagnostic evidence, trained evidence, controls, and negative-transfer outcomes remain separate hypotheses in the final conclusion. The runner never evaluates held-out test data.
 
 Current checkpoints use one schema with strict PyTorch state-dict loading. Unique run directories prevent collisions, and checkpoints are published atomically. Historical run formats are intentionally unsupported.
+
+## Research-only equity intraday seasonal normalization
+
+The first intraday-normalization experiment is implemented as a validation-only, unpromoted research stage. It has exactly three matched arms and seeds 11, 29, and 47:
+
+| Arm | Seasonal variance strength |
+|---|---:|
+| `legacy_daily_vol` | `gamma=0.0` |
+| `equity_tod_half` | `gamma=0.5` |
+| `equity_tod_full` | `gamma=1.0` |
+
+All nine runs use the incumbent TCN, readout, objective, SAM-AdamW settings, batching, compilation, early stopping, split boundaries, and checkpoint selection. Implementation alone promotes no arm and does not change the incumbent or production configuration.
+
+The shared profile is a deterministic 30-minute equity-wide relative-variance curve estimated from unclipped legacy-normalized close moves. Each date emits its profile before that date updates state. A daily bin contributes one variance estimate only when it has valid observed, point-in-time-member, data-ready observations; the shrinkage count is the number of historical valid session-bin estimates, not minute rows. The 20-session-equivalent prior is centered on one, the valid-count-weighted bin mean is normalized to one, and relative variance has the recorded `[0.25,4.0]` safety guard. Dates through training end update the expanding state; validation uses one profile frozen after 2024-06-28 and cannot update it. Targets, labels, predictions, validation statistics, and test observations never fit the profile.
+
+The candidate denominator for a one-minute move is `sigma_daily * q_bin ** (gamma/2)`. Multi-minute returns integrate `sum(q_bin ** gamma)` over the exact scheduled return interval. Realized-volatility channels are rebuilt from corrected valid one-minute paths. One close-move profile serves open, high, low, and close so bar geometry is not distorted.
+
+Affected equity dynamic channels are OHLC moves, return since open, 15/30/60-minute returns, 15/30/60-minute realized-volatility ratios, market return medians and dispersions, and the 30-minute realized-volatility rank. Selected-sector/subsector and same-issuer peer differences are rebuilt. Sign breadth and return ranks stay parent-bound because a positive common date/minute scale leaves them invariant. Volume, observation/availability, calendar, slow state, human priors, membership/readiness, local/global context, WDO, DI, betas, targets, raw returns, label/horizon masks, and target medians remain exactly parent-bound.
+
+Candidates are immutable overlays bound to the complete canonical V4 artifact hashes, accepted raw-source hashes, profile hash/configuration, repository commit, gamma, splits, and freeze date. They contain only development dates through validation end; the modeling loader rejects a test-date request. The canonical feature-store pointer and V4 store are never mutated. The two overlays occupy exactly 5,951,291,200 bytes (5.54 GiB) before filesystem allocation overhead.
+
+Diagnostics are exact rather than sampled. They report train and frozen-profile validation distributions by arm, relevant channel, 30-minute bin, training year, and security; return windows also use decision-time bins. Each group includes counts, mean, standard deviation, signed log-standard deviation, median/MAD, p01/p05/p95/p99, zeros, clipping, coverage, applied seasonal variance/multiplier, effective profile days, and shrinkage. Summary effects include max/min standard-deviation and variance ratios, weighted log-standard-deviation RMSE, weighted bin CV, maximum absolute log standard deviation, out-of-band fraction, fixed opening-bin 0 versus midday-bin 4, year ratio, clipping/coverage deltas, and security p10/median/p90 dispersion and extremes. The primary endpoint is validation weighted log-standard-deviation RMSE for `close_move_normalized`.
+
+The stage writes:
+
+```text
+<output-dir>/
+  stage_manifest.json, launcher.log, preflight.json
+  profiles/
+  feature_variants/equity_tod_half/, feature_variants/equity_tod_full/
+  diagnostics/
+  runs/<arm>_seed<seed>/
+  validation_attribution/, validation_prediction_cache/
+  comparisons/
+  stage_summary.json, stage_summary.md
+```
+
+Every completed step has a semantic validator. A completed artifact with corrupt or mismatched provenance fails closed. Explicit `running` or `failed` artifacts are collision-safely timestamp-archived, with append-only archive history persisted before retry. No launcher PID is treated as authoritative. Reuse and resume use the identical command:
+
+```bash
+cd /home/ubuntu/Brazil-RV/quant/b3-quant/research && \
+uv run --frozen --no-default-groups python -m brazil_rv.modeling.run_intraday_normalization_stage \
+  --output-dir /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/intraday_normalization_v1
+```
+
+The paired comparison retains existing validation economics, five-minute and 30-minute attribution, and the established five-trading-day moving-block bootstrap with 10,000 replications. It reports matched candidate-minus-legacy deltas for aggregate, each horizon, worst horizon, and every major 30-minute bin. The final interpretation keeps heteroskedasticity reduction separate from IC improvement and explicitly records half-versus-full behavior, without automatic promotion.
 
 ## Operations
 
