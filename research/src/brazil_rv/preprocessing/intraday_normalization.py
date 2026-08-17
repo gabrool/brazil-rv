@@ -582,9 +582,7 @@ def dynamic_validity_from_observed(
     return validity
 
 
-def load_source_context(parent: Path) -> EquitySourceContext:
-    parent = parent.resolve()
-    manifest = json.loads((parent / "manifest.json").read_text(encoding="utf-8"))
+def _development_date_index(parent: Path) -> pl.DataFrame:
     date_index = (
         pl.scan_parquet(parent / "date_index.parquet")
         .filter(pl.col("trade_date") <= VALIDATION_END)
@@ -599,6 +597,15 @@ def load_source_context(parent: Path) -> EquitySourceContext:
         date_index["date_idx"].to_numpy(), np.arange(allowed_date_count)
     ):
         raise ValueError("Development date indices are not contiguous from zero")
+    return date_index
+
+
+def load_source_context(parent: Path) -> EquitySourceContext:
+    parent = parent.resolve()
+    manifest = json.loads((parent / "manifest.json").read_text(encoding="utf-8"))
+    date_index = _development_date_index(parent)
+    market_dates = tuple(date_index.get_column("trade_date").to_list())
+    allowed_date_count = len(market_dates)
     canonical = manifest["canonical_inputs"]
     assignments_dir = workspace_path(
         canonical["accepted_xp_assignments"]["resolved_path"]
@@ -725,24 +732,26 @@ def parent_identity(context: EquitySourceContext) -> dict[str, object]:
     )
 
 
-def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, object]:
-    date_count = context.allowed_date_count
+def development_parent_artifact_hashes(
+    parent: Path,
+    manifest: dict[str, object],
+    *,
+    expected_date_count: int | None = None,
+) -> dict[str, object]:
+    parent = parent.resolve()
+    date_index = _development_date_index(parent)
+    date_count = date_index.height
+    if expected_date_count is not None and date_count != expected_date_count:
+        raise ValueError("Development date count differs from the source context")
     array_specs = output_array_specs(date_count)
-    if set(context.manifest["outputs"]) != set(array_specs):
+    if set(manifest["outputs"]) != set(array_specs):
         raise ValueError("Parent output inventory differs from the V4 contract")
     artifacts: dict[str, object] = {
-        filename: _development_array_identity(
-            context.parent / filename, spec.dtype, spec.shape
-        )
+        filename: _development_array_identity(parent / filename, spec.dtype, spec.shape)
         for filename, spec in sorted(array_specs.items())
     }
-    date_index = (
-        pl.scan_parquet(context.parent / "date_index.parquet")
-        .filter(pl.col("trade_date") <= VALIDATION_END)
-        .collect()
-    )
     sample_index = (
-        pl.scan_parquet(context.parent / "sample_index.parquet")
+        pl.scan_parquet(parent / "sample_index.parquet")
         .filter(pl.col("trade_date") <= VALIDATION_END)
         .collect()
     )
@@ -764,18 +773,16 @@ def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, object]:
         artifacts[filename] = {
             "scope": "complete_non_date_axis",
             **canonical_frame_identity(
-                pl.read_parquet(context.parent / filename), sort_by=sort_by
+                pl.read_parquet(parent / filename), sort_by=sort_by
             ),
         }
-    schema = json.loads(
-        (context.parent / "feature_schema.json").read_text(encoding="utf-8")
-    )
+    schema = json.loads((parent / "feature_schema.json").read_text(encoding="utf-8"))
     artifacts["feature_schema.json"] = {
         "scope": "complete_non_observation_metadata",
         **canonical_json_identity(schema),
     }
     manifest_contract = {
-        key: context.manifest[key]
+        key: manifest[key]
         for key in (
             "contract_version",
             "build_git_commit",
@@ -797,6 +804,24 @@ def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, object]:
         },
         "artifacts": artifacts,
     }
+
+
+def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, object]:
+    return development_parent_artifact_hashes(
+        context.parent,
+        context.manifest,
+        expected_date_count=context.allowed_date_count,
+    )
+
+
+def development_parent_identity_from_store(parent: Path) -> dict[str, object]:
+    parent = parent.resolve()
+    manifest = json.loads((parent / "manifest.json").read_text(encoding="utf-8"))
+    return development_parent_identity(
+        parent,
+        str(manifest["contract_version"]),
+        development_parent_artifact_hashes(parent, manifest),
+    )
 
 
 def equity_source_hashes(context: EquitySourceContext) -> dict[str, object]:

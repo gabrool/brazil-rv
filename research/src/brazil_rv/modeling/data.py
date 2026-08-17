@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import random
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
@@ -14,6 +15,10 @@ import numpy as np
 import polars as pl
 import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
+
+from brazil_rv.preprocessing.intraday_normalization import (
+    development_parent_identity_from_store,
+)
 
 from .feature_variant import (
     feature_variant_identity,
@@ -111,6 +116,74 @@ def feature_store_identity(store: Path) -> dict[str, object]:
     if variant is not None:
         return feature_variant_identity(store, variant)
     return _legacy_feature_store_identity(store)
+
+
+FeatureStoreIdentityCache = dict[tuple[str, str], dict[str, object]]
+_IDENTITY_KEYS = frozenset(("path", "contract_version", "metadata_sha256"))
+_DEVELOPMENT_SCOPE_KEYS = frozenset(
+    ("kind", "end_date", "date_count", "date_array_scope")
+)
+
+
+def _validate_recorded_feature_store_identity(
+    identity: object,
+) -> tuple[dict[str, object], bool]:
+    if not isinstance(identity, dict):
+        raise ValueError("Checkpoint feature-store identity must be a dictionary")
+    development = "hash_scope" in identity
+    expected_keys = _IDENTITY_KEYS | ({"hash_scope"} if development else set())
+    if set(identity) != expected_keys:
+        raise ValueError("Checkpoint feature-store identity has invalid fields")
+    if not isinstance(identity["path"], str) or not identity["path"]:
+        raise ValueError("Checkpoint feature-store identity has an invalid path")
+    if (
+        not isinstance(identity["contract_version"], str)
+        or not identity["contract_version"]
+    ):
+        raise ValueError("Checkpoint feature-store identity has an invalid contract")
+    digest = identity["metadata_sha256"]
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise ValueError("Checkpoint feature-store identity has an invalid digest")
+    if development:
+        scope = identity["hash_scope"]
+        if not isinstance(scope, dict) or set(scope) != _DEVELOPMENT_SCOPE_KEYS:
+            raise ValueError("Checkpoint feature-store identity has an invalid scope")
+        if (
+            scope["kind"] != "development_only"
+            or scope["end_date"] != str(VALIDATION_END)
+            or type(scope["date_count"]) is not int
+            or scope["date_count"] <= 0
+            or scope["date_array_scope"] != "prefix_only"
+        ):
+            raise ValueError("Checkpoint feature-store identity has an invalid scope")
+    return identity, development
+
+
+def validate_feature_store_identity(
+    store: Path,
+    recorded_identity: object,
+    *,
+    identity_cache: FeatureStoreIdentityCache | None = None,
+) -> dict[str, object]:
+    recorded, development = _validate_recorded_feature_store_identity(recorded_identity)
+    store = store.resolve()
+    cache_key = (str(store), "development" if development else "full")
+    actual = None if identity_cache is None else identity_cache.get(cache_key)
+    if actual is None:
+        variant = load_variant_manifest(store)
+        if development and variant is None:
+            actual = development_parent_identity_from_store(store)
+        elif development:
+            actual = feature_variant_identity(store, variant)
+        else:
+            actual = feature_store_identity(store)
+    if actual != recorded:
+        raise ValueError(
+            "Checkpoint feature-store identity differs from the resolved store"
+        )
+    if identity_cache is not None:
+        identity_cache[cache_key] = actual
+    return actual
 
 
 def int64_identity_sha256(values: np.ndarray) -> str:

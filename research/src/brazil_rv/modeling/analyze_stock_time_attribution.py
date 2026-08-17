@@ -30,8 +30,11 @@ from .contract import (
     TRAIN_END,
     TRAIN_START,
 )
-from .data import select_sample_split
-from .evaluate import collect_neural_evaluation
+from .data import FeatureStoreIdentityCache, select_sample_split
+from .evaluate import (
+    collect_neural_evaluation,
+    resolve_checkpoint_feature_store,
+)
 from .feature_variant import load_variant_manifest, variant_parent
 from .metrics import average_ranks, ranking_diagnostics
 
@@ -763,13 +766,20 @@ def _opening_diagnostics(
 
 
 def load_attribution_inputs(
-    run_dir: Path, cache_dir: Path | None = None
+    run_dir: Path,
+    cache_dir: Path | None = None,
+    *,
+    identity_cache: FeatureStoreIdentityCache | None = None,
 ) -> AttributionInputs:
     cached = (
         _load_cached(_cache_path(cache_dir, run_dir)) if cache_dir is not None else None
     )
     if cached is None:
-        observations, _, _, _, store = collect_neural_evaluation(run_dir, "validation")
+        observations, _, _, _, store = collect_neural_evaluation(
+            run_dir,
+            "validation",
+            identity_cache=identity_cache,
+        )
         values = {
             "predictions": observations.predictions,
             "targets": observations.targets,
@@ -785,7 +795,10 @@ def load_attribution_inputs(
         checkpoint = torch.load(
             run_dir / "best_checkpoint.pt", map_location="cpu", weights_only=False
         )
-        store = Path(str(checkpoint["feature_store"]))
+        store = resolve_checkpoint_feature_store(
+            checkpoint,
+            identity_cache=identity_cache,
+        )
     dates = values["date_idx"].astype(np.int64)
     decisions = values["decision_idx"].astype(np.int64)
     variant = load_variant_manifest(store)
@@ -807,8 +820,14 @@ def analyze_runs(
     run_dirs: list[Path], output_dir: Path, cache_dir: Path | None = None
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=False)
+    identity_cache: FeatureStoreIdentityCache = {}
     inputs = [
-        load_attribution_inputs(run_dir.resolve(), cache_dir) for run_dir in run_dirs
+        load_attribution_inputs(
+            run_dir.resolve(),
+            cache_dir,
+            identity_cache=identity_cache,
+        )
+        for run_dir in run_dirs
     ]
     outputs = {
         "stock_attribution": pl.concat([stock_attribution(value) for value in inputs]),

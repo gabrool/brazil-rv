@@ -318,7 +318,8 @@ def test_attribution_inference_is_validation_only(monkeypatch, tmp_path) -> None
     inputs = _inputs()
     observed_split: list[str] = []
 
-    def collect(run_dir, split):
+    def collect(run_dir, split, *, identity_cache=None):
+        assert identity_cache is None
         observed_split.append(split)
         observations = SimpleNamespace(
             predictions=inputs.predictions,

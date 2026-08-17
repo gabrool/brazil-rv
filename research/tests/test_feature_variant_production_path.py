@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from dataclasses import asdict
 from datetime import date
 from pathlib import Path
@@ -12,12 +13,15 @@ import polars as pl
 import pytest
 import torch
 
+import brazil_rv.modeling.analyze_stock_time_attribution as attribution
 import brazil_rv.modeling.data as modeling_data
 import brazil_rv.modeling.feature_variant as feature_variant
+import brazil_rv.preprocessing.intraday_normalization as normalization
 import brazil_rv.preprocessing.intraday_normalization_variants as variants
 from brazil_rv.modeling.contract import (
     BASELINE_TCN_SETTINGS,
     EQUITY_COUNT,
+    HORIZON_COUNT,
     RuntimeSettings,
     TEST_START,
     TCNArchitecture,
@@ -35,7 +39,10 @@ from brazil_rv.modeling.data import (
     create_training_loaders,
     feature_store_identity,
 )
-from brazil_rv.modeling.evaluate import load_current_neural_run
+from brazil_rv.modeling.evaluate import (
+    load_current_neural_run,
+    resolve_checkpoint_feature_store,
+)
 from brazil_rv.modeling.model import build_neural_model
 from brazil_rv.modeling.run_intraday_normalization_stage import (
     _expected_run_provenance,
@@ -281,6 +288,50 @@ def _legacy_identity(store: Path) -> dict[str, object]:
     }
 
 
+_ABSENT_IDENTITY = object()
+
+
+def _write_run_checkpoint(
+    run_dir: Path,
+    store: Path,
+    identity: object = _ABSENT_IDENTITY,
+) -> tuple[dict[str, object], TCNArchitecture]:
+    architecture = architecture_for_model("tcn", BASELINE_TCN_SETTINGS)
+    assert isinstance(architecture, TCNArchitecture)
+    model = build_neural_model("tcn", architecture)
+    checkpoint: dict[str, object] = {
+        "model_name": "tcn",
+        "architecture": asdict(architecture),
+        "tcn_settings": asdict(BASELINE_TCN_SETTINGS),
+        "peer_features": {"mode": "none"},
+        "optimizer_variant": "adamw",
+        "objective": {"name": "soft_spearman", "temperature": 0.5},
+        "sam": {"enabled": False},
+        "seed": 11,
+        "epoch": 1,
+        "validation_score": 0.1,
+        "feature_store": str(store),
+        "global_context": "enabled",
+        "model_state_dict": model.state_dict(),
+    }
+    if identity is not _ABSENT_IDENTITY:
+        checkpoint["feature_store_identity"] = identity
+    run_dir.mkdir()
+    torch.save(checkpoint, run_dir / "best_checkpoint.pt")
+    return checkpoint, architecture
+
+
+def _write_validation_cache(cache_dir: Path, run_dir: Path) -> None:
+    values = {
+        name: np.zeros((1, EQUITY_COUNT, HORIZON_COUNT), dtype=np.float32)
+        for name in ("predictions", "targets", "raw_returns")
+    }
+    values["label_mask"] = np.ones((1, EQUITY_COUNT, HORIZON_COUNT), dtype=bool)
+    values["date_idx"] = np.array([1], dtype=np.int64)
+    values["decision_idx"] = np.array([0], dtype=np.int64)
+    attribution._write_cache(attribution._cache_path(cache_dir, run_dir), values)
+
+
 def test_candidate_identity_dataset_and_all_production_loaders(
     candidate_store: SimpleNamespace,
 ) -> None:
@@ -510,3 +561,328 @@ def test_completed_run_evaluation_resolves_the_recorded_candidate_identity(
     torch.save(checkpoint, checkpoint_path)
     with pytest.raises(ValueError, match="differs from the resolved store"):
         load_current_neural_run(run_dir)
+
+
+def test_completed_run_evaluation_accepts_normalization_legacy_control(
+    candidate_store: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = candidate_store.parent
+    identity = _stage_store_identity(store, candidate_store.context)
+    architecture = architecture_for_model("tcn", BASELINE_TCN_SETTINGS)
+    assert isinstance(architecture, TCNArchitecture)
+    model = build_neural_model("tcn", architecture)
+    checkpoint = {
+        "model_name": "tcn",
+        "architecture": asdict(architecture),
+        "tcn_settings": asdict(BASELINE_TCN_SETTINGS),
+        "peer_features": {"mode": "none"},
+        "optimizer_variant": "adamw",
+        "objective": {"name": "soft_spearman", "temperature": 0.5},
+        "sam": {"enabled": False},
+        "seed": 11,
+        "epoch": 1,
+        "validation_score": 0.1,
+        "feature_store": str(store),
+        "feature_store_identity": identity,
+        "global_context": "enabled",
+        "model_state_dict": model.state_dict(),
+    }
+    run_dir = store.parent / "legacy_control_run"
+    run_dir.mkdir()
+    torch.save(checkpoint, run_dir / "best_checkpoint.pt")
+
+    _, loaded, resolved_store = load_current_neural_run(run_dir)
+    assert loaded["feature_store_identity"] == identity
+    assert loaded["feature_store_identity"] == _stage_store_identity(
+        store, candidate_store.context
+    )
+    assert resolved_store.resolve() == store.resolve()
+    rows = _loader_rows(1, VALIDATION_END, 55)
+    runtime = RuntimeSettings(
+        effective_batch_size=1,
+        loader_batch_size=1,
+        microbatch_size=1,
+        evaluation_batch_size=1,
+        num_workers=0,
+    )
+    loader = create_evaluation_loader(
+        resolved_store,
+        rows,
+        "tcn",
+        "enabled",
+        runtime,
+        11,
+        architecture,
+    )
+    assert next(iter(loader))["sample_valid_mask"].all()
+
+    monkeypatch.setattr(
+        attribution,
+        "learn_overnight_thresholds",
+        lambda _values: (0.0, 0.0),
+    )
+    cache_dir = store.parent / "legacy_control_cache"
+    _write_validation_cache(cache_dir, run_dir)
+    inputs = attribution.load_attribution_inputs(run_dir.resolve(), cache_dir)
+    assert inputs.run_name == run_dir.name
+    assert inputs.predictions.shape == (1, EQUITY_COUNT, HORIZON_COUNT)
+
+
+def test_completed_run_accepts_ordinary_full_legacy_identity(
+    candidate_store: SimpleNamespace,
+) -> None:
+    identity = feature_store_identity(candidate_store.parent)
+    assert identity == _legacy_identity(candidate_store.parent)
+    run_dir = candidate_store.parent.parent / "full_legacy_run"
+    _write_run_checkpoint(run_dir, candidate_store.parent, identity)
+
+    _, loaded, store = load_current_neural_run(run_dir)
+
+    assert loaded["feature_store_identity"] == identity
+    assert store == candidate_store.parent.resolve()
+
+
+def test_historical_checkpoint_without_identity_remains_loadable(
+    candidate_store: SimpleNamespace,
+) -> None:
+    run_dir = candidate_store.parent.parent / "historical_run"
+    _write_run_checkpoint(run_dir, candidate_store.parent)
+
+    _, loaded, store = load_current_neural_run(run_dir)
+
+    assert "feature_store_identity" not in loaded
+    assert store == candidate_store.parent.resolve()
+
+
+def test_development_identity_ignores_held_out_feature_and_target_tail(
+    candidate_store: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    identity = _stage_store_identity(candidate_store.parent, candidate_store.context)
+    run_dir = candidate_store.parent.parent / "heldout_tail_run"
+    _write_run_checkpoint(run_dir, candidate_store.parent, identity)
+    for filename in ("equity_features.npy", "targets.npy"):
+        values = np.load(
+            candidate_store.parent / filename,
+            mmap_mode="r+",
+            allow_pickle=False,
+        )
+        values[2].flat[0] = 123.0
+        values.flush()
+
+    original_load = normalization.np.load
+
+    class PrefixOnlyArray:
+        def __init__(self, values: np.ndarray) -> None:
+            self.values = values
+            self.dtype = values.dtype
+            self.shape = values.shape
+
+        def __getitem__(self, key: object) -> object:
+            date_key = key[0] if isinstance(key, tuple) else key
+            if not isinstance(date_key, slice) or (
+                date_key.stop is None or date_key.stop > 2
+            ):
+                pytest.fail("development identity accessed the held-out array tail")
+            return self.values[key]
+
+    def guarded_load(path: Path, *args: object, **kwargs: object) -> object:
+        values = original_load(path, *args, **kwargs)
+        if Path(path).parent.resolve() == candidate_store.parent.resolve() and Path(
+            path
+        ).name in output_array_specs(3):
+            return PrefixOnlyArray(values)
+        return values
+
+    monkeypatch.setattr(normalization.np, "load", guarded_load)
+    _, loaded, store = load_current_neural_run(run_dir)
+    monkeypatch.setattr(normalization.np, "load", original_load)
+
+    assert loaded["feature_store_identity"] == identity
+    assert store == candidate_store.parent.resolve()
+    rows = _loader_rows(1, VALIDATION_END, 55)
+    runtime = RuntimeSettings(
+        effective_batch_size=1,
+        loader_batch_size=1,
+        microbatch_size=1,
+        evaluation_batch_size=1,
+        num_workers=0,
+    )
+    loader = create_evaluation_loader(
+        store,
+        rows,
+        "tcn",
+        "enabled",
+        runtime,
+        11,
+        architecture_for_model("tcn", BASELINE_TCN_SETTINGS),
+    )
+    assert next(iter(loader))["sample_valid_mask"].all()
+
+
+@pytest.mark.parametrize("filename", ("equity_features.npy", "targets.npy"))
+def test_development_identity_rejects_prefix_mutation(
+    candidate_store: SimpleNamespace,
+    filename: str,
+) -> None:
+    identity = _stage_store_identity(candidate_store.parent, candidate_store.context)
+    run_dir = candidate_store.parent.parent / f"{Path(filename).stem}_prefix_run"
+    _write_run_checkpoint(run_dir, candidate_store.parent, identity)
+    values = np.load(
+        candidate_store.parent / filename,
+        mmap_mode="r+",
+        allow_pickle=False,
+    )
+    values[0].flat[0] = 123.0
+    values.flush()
+
+    with pytest.raises(ValueError, match="differs from the resolved store"):
+        load_current_neural_run(run_dir)
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    (
+        "digest",
+        "path",
+        "contract",
+        "date_count",
+        "end_date",
+        "array_scope",
+        "missing_field",
+        "extra_field",
+        "malformed",
+        "candidate_on_parent",
+        "full_on_candidate",
+    ),
+)
+def test_checkpoint_identity_resolver_rejects_corruption_and_cross_type_binding(
+    candidate_store: SimpleNamespace,
+    corruption: str,
+) -> None:
+    store = candidate_store.parent
+    identity: object = json.loads(
+        json.dumps(_stage_store_identity(store, candidate_store.context))
+    )
+    assert isinstance(identity, dict)
+    if corruption == "digest":
+        identity["metadata_sha256"] = "0" * 64
+    elif corruption == "path":
+        identity["path"] = str(candidate_store.candidate.resolve())
+    elif corruption == "contract":
+        identity["contract_version"] = "wrong"
+    elif corruption == "date_count":
+        identity["hash_scope"]["date_count"] += 1
+    elif corruption == "end_date":
+        identity["hash_scope"]["end_date"] = str(TRAIN_END)
+    elif corruption == "array_scope":
+        identity["hash_scope"]["date_array_scope"] = "complete"
+    elif corruption == "missing_field":
+        identity.pop("metadata_sha256")
+    elif corruption == "extra_field":
+        identity["unexpected"] = True
+    elif corruption == "malformed":
+        identity = "not-an-identity"
+    elif corruption == "candidate_on_parent":
+        identity = feature_store_identity(candidate_store.candidate)
+    elif corruption == "full_on_candidate":
+        store = candidate_store.candidate
+        identity = {
+            **_legacy_identity(candidate_store.parent),
+            "path": str(store.resolve()),
+        }
+
+    with pytest.raises(ValueError):
+        resolve_checkpoint_feature_store(
+            {
+                "feature_store": str(store),
+                "feature_store_identity": identity,
+            }
+        )
+
+
+def test_invocation_cache_hashes_one_legacy_control_once(
+    candidate_store: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+    original = normalization._development_array_identity
+
+    def counted(*args: object, **kwargs: object) -> dict[str, object]:
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    identity = _stage_store_identity(candidate_store.parent, candidate_store.context)
+    monkeypatch.setattr(normalization, "_development_array_identity", counted)
+    first_run = candidate_store.parent.parent / "cached_seed_11"
+    second_run = candidate_store.parent.parent / "cached_seed_22"
+    _write_run_checkpoint(first_run, candidate_store.parent, identity)
+    _write_run_checkpoint(second_run, candidate_store.parent, identity)
+    identity_cache: modeling_data.FeatureStoreIdentityCache = {}
+
+    load_current_neural_run(first_run, identity_cache=identity_cache)
+    first_count = calls
+    load_current_neural_run(second_run, identity_cache=identity_cache)
+
+    assert first_count == len(output_array_specs(2))
+    assert calls == first_count
+    assert len(identity_cache) == 1
+
+
+def test_three_arm_cached_attribution_uses_the_shared_identity_resolver(
+    candidate_store: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        attribution,
+        "learn_overnight_thresholds",
+        lambda _values: (0.0, 0.0),
+    )
+    full = candidate_store.parent.parent / "candidate_full"
+    shutil.copytree(candidate_store.candidate, full)
+    full_manifest = json.loads(
+        (full / variants.VARIANT_MANIFEST).read_text(encoding="utf-8")
+    )
+    full_manifest["arm"] = "equity_tod_full"
+    full_manifest["gamma"] = 1.0
+    _write_json(full / variants.VARIANT_MANIFEST, full_manifest)
+
+    arms = (
+        (
+            "legacy_control",
+            candidate_store.parent,
+            _stage_store_identity(candidate_store.parent, candidate_store.context),
+        ),
+        (
+            "equity_tod_half",
+            candidate_store.candidate,
+            feature_store_identity(candidate_store.candidate),
+        ),
+        ("equity_tod_full", full, feature_store_identity(full)),
+    )
+    cache_dir = candidate_store.parent.parent / "attribution_cache"
+    identity_cache: modeling_data.FeatureStoreIdentityCache = {}
+    loaded = []
+    for name, store, identity in arms:
+        run_dir = candidate_store.parent.parent / f"attribution_{name}"
+        _write_run_checkpoint(run_dir, store, identity)
+        _write_validation_cache(cache_dir, run_dir)
+        load_current_neural_run(run_dir, identity_cache=identity_cache)
+        loaded.append(
+            attribution.load_attribution_inputs(
+                run_dir.resolve(),
+                cache_dir,
+                identity_cache=identity_cache,
+            )
+        )
+
+    assert [value.run_name for value in loaded] == [
+        f"attribution_{name}" for name, _, _ in arms
+    ]
+    assert all(len(value.security_ids) == EQUITY_COUNT for value in loaded)
+    assert all(
+        value.predictions.shape == (1, EQUITY_COUNT, HORIZON_COUNT) for value in loaded
+    )
+    assert len(identity_cache) == 3

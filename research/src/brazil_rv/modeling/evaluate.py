@@ -17,10 +17,11 @@ from .contract import (
     architecture_for_model,
 )
 from .data import (
+    FeatureStoreIdentityCache,
     create_evaluation_loader,
-    feature_store_identity,
     load_sample_index,
     select_sample_split,
+    validate_feature_store_identity,
 )
 from .engine import EvaluationObservations, collect_evaluation_observations
 from .model import build_neural_model
@@ -55,8 +56,28 @@ def _atomic_json(path: Path, value: dict[str, object]) -> None:
     os.replace(temporary, path)
 
 
+def resolve_checkpoint_feature_store(
+    checkpoint: dict[str, object],
+    *,
+    identity_cache: FeatureStoreIdentityCache | None = None,
+) -> Path:
+    store = Path(str(checkpoint["feature_store"])).resolve()
+    if not store.is_dir():
+        raise FileNotFoundError(store)
+    recorded_identity = checkpoint.get("feature_store_identity")
+    if recorded_identity is not None:
+        validate_feature_store_identity(
+            store,
+            recorded_identity,
+            identity_cache=identity_cache,
+        )
+    return store
+
+
 def load_current_neural_run(
     run_dir: Path,
+    *,
+    identity_cache: FeatureStoreIdentityCache | None = None,
 ) -> tuple[torch.nn.Module, dict[str, object], Path]:
     torch.set_float32_matmul_precision("high")
     checkpoint = torch.load(
@@ -87,22 +108,18 @@ def load_current_neural_run(
         peer_features,
     )
     model.load_state_dict(checkpoint["model_state_dict"], strict=True)
-    store = Path(str(checkpoint["feature_store"]))
-    if not store.is_dir():
-        raise FileNotFoundError(store)
-    recorded_identity = checkpoint.get("feature_store_identity")
-    if recorded_identity is not None and recorded_identity != feature_store_identity(
-        store
-    ):
-        raise ValueError(
-            "Checkpoint feature-store identity differs from the resolved store"
-        )
+    store = resolve_checkpoint_feature_store(
+        checkpoint,
+        identity_cache=identity_cache,
+    )
     return model, checkpoint, store
 
 
 def collect_neural_evaluation(
     run_dir: Path,
     split: str,
+    *,
+    identity_cache: FeatureStoreIdentityCache | None = None,
 ) -> tuple[
     EvaluationObservations,
     dict[str, object],
@@ -110,7 +127,9 @@ def collect_neural_evaluation(
     dict[str, object],
     Path,
 ]:
-    model, checkpoint, store = load_current_neural_run(run_dir)
+    model, checkpoint, store = load_current_neural_run(
+        run_dir, identity_cache=identity_cache
+    )
     model = model.cuda()
     rows = select_sample_split(load_sample_index(store), split)
     settings_value = checkpoint["tcn_settings"]
