@@ -16,6 +16,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
 from .feature_variant import (
+    feature_variant_identity,
     load_variant_manifest,
     open_variant_arrays,
     validate_variant_binding,
@@ -90,22 +91,7 @@ def resolve_feature_store(pointer: Path = FEATURE_STORE_POINTER) -> Path:
     return store
 
 
-def feature_store_identity(store: Path) -> dict[str, object]:
-    variant = load_variant_manifest(store)
-    if variant is not None:
-        parent = variant_parent(store, variant)
-        parent_identity = feature_store_identity(parent)
-        validate_variant_binding(
-            store, variant, parent_identity, verify_overlay_hashes=False
-        )
-        digest = hashlib.sha256()
-        digest.update((store / "intraday_normalization_variant.json").read_bytes())
-        digest.update(str(parent_identity["metadata_sha256"]).encode("ascii"))
-        return {
-            "path": str(store.resolve()),
-            "contract_version": parent_identity["contract_version"],
-            "metadata_sha256": digest.hexdigest(),
-        }
+def _legacy_feature_store_identity(store: Path) -> dict[str, object]:
     schema_path = store / "feature_schema.json"
     digest = hashlib.sha256()
     for path in (store / "manifest.json", schema_path, store / "sample_index.parquet"):
@@ -118,6 +104,13 @@ def feature_store_identity(store: Path) -> dict[str, object]:
         "contract_version": schema["contract_version"],
         "metadata_sha256": digest.hexdigest(),
     }
+
+
+def feature_store_identity(store: Path) -> dict[str, object]:
+    variant = load_variant_manifest(store)
+    if variant is not None:
+        return feature_variant_identity(store, variant)
+    return _legacy_feature_store_identity(store)
 
 
 def int64_identity_sha256(values: np.ndarray) -> str:
@@ -593,11 +586,9 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         self.variant_manifest = load_variant_manifest(store)
         self.parent_store = store
         if self.variant_manifest is not None:
-            self.parent_store = variant_parent(store, self.variant_manifest)
-            validate_variant_binding(
+            self.parent_store, _ = validate_variant_binding(
                 store,
                 self.variant_manifest,
-                feature_store_identity(self.parent_store),
                 verify_overlay_hashes=False,
             )
             if sample_index.get_column("date_idx").max() >= int(

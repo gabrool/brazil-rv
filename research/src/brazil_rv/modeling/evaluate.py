@@ -16,7 +16,12 @@ from .contract import (
     TCNSettings,
     architecture_for_model,
 )
-from .data import create_evaluation_loader, load_sample_index, select_sample_split
+from .data import (
+    create_evaluation_loader,
+    feature_store_identity,
+    load_sample_index,
+    select_sample_split,
+)
 from .engine import EvaluationObservations, collect_evaluation_observations
 from .model import build_neural_model
 
@@ -85,6 +90,13 @@ def load_current_neural_run(
     store = Path(str(checkpoint["feature_store"]))
     if not store.is_dir():
         raise FileNotFoundError(store)
+    recorded_identity = checkpoint.get("feature_store_identity")
+    if recorded_identity is not None and recorded_identity != feature_store_identity(
+        store
+    ):
+        raise ValueError(
+            "Checkpoint feature-store identity differs from the resolved store"
+        )
     return model, checkpoint, store
 
 

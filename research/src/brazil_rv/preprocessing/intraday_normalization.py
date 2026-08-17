@@ -167,7 +167,7 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _canonical_frame_identity(
+def canonical_frame_identity(
     frame: pl.DataFrame, *, sort_by: tuple[str, ...]
 ) -> dict[str, object]:
     ordered = frame.sort(list(sort_by), maintain_order=True) if sort_by else frame
@@ -186,7 +186,7 @@ def _canonical_frame_identity(
     return {**metadata, "sha256": digest.hexdigest()}
 
 
-def _canonical_json_identity(value: object) -> dict[str, object]:
+def canonical_json_identity(value: object) -> dict[str, object]:
     payload = json.dumps(
         value,
         sort_keys=True,
@@ -704,17 +704,25 @@ def iter_reconstructed_equities(
             )
 
 
-def parent_identity(context: EquitySourceContext) -> dict[str, object]:
-    artifacts = parent_artifact_hashes(context)
+def development_parent_identity(
+    parent: Path, contract_version: str, artifacts: dict[str, object]
+) -> dict[str, object]:
     digest = hashlib.sha256(
         json.dumps(artifacts, sort_keys=True, separators=(",", ":")).encode("utf-8")
     )
     return {
-        "path": str(context.parent),
-        "contract_version": context.manifest["contract_version"],
+        "path": str(parent),
+        "contract_version": contract_version,
         "metadata_sha256": digest.hexdigest(),
         "hash_scope": artifacts["hash_scope"],
     }
+
+
+def parent_identity(context: EquitySourceContext) -> dict[str, object]:
+    artifacts = parent_artifact_hashes(context)
+    return development_parent_identity(
+        context.parent, context.manifest["contract_version"], artifacts
+    )
 
 
 def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, object]:
@@ -741,12 +749,12 @@ def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, object]:
     artifacts["date_index.parquet"] = {
         "scope": "rows_through_validation_end",
         "end_date": str(VALIDATION_END),
-        **_canonical_frame_identity(date_index, sort_by=("date_idx",)),
+        **canonical_frame_identity(date_index, sort_by=("date_idx",)),
     }
     artifacts["sample_index.parquet"] = {
         "scope": "rows_through_validation_end",
         "end_date": str(VALIDATION_END),
-        **_canonical_frame_identity(sample_index, sort_by=("sample_id",)),
+        **canonical_frame_identity(sample_index, sort_by=("sample_id",)),
     }
     for filename, sort_by in (
         ("equity_index.parquet", ("equity_slot",)),
@@ -755,7 +763,7 @@ def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, object]:
     ):
         artifacts[filename] = {
             "scope": "complete_non_date_axis",
-            **_canonical_frame_identity(
+            **canonical_frame_identity(
                 pl.read_parquet(context.parent / filename), sort_by=sort_by
             ),
         }
@@ -764,7 +772,7 @@ def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, object]:
     )
     artifacts["feature_schema.json"] = {
         "scope": "complete_non_observation_metadata",
-        **_canonical_json_identity(schema),
+        **canonical_json_identity(schema),
     }
     manifest_contract = {
         key: context.manifest[key]
@@ -777,7 +785,7 @@ def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, object]:
     }
     artifacts["manifest_contract"] = {
         "scope": "stage_relevant_non_observation_metadata",
-        **_canonical_json_identity(manifest_contract),
+        **canonical_json_identity(manifest_contract),
     }
     return {
         "schema": DEVELOPMENT_IDENTITY_SCHEMA,
@@ -805,7 +813,7 @@ def equity_source_hashes(context: EquitySourceContext) -> dict[str, object]:
             "start_date": str(first_date),
             "end_date": str(VALIDATION_END),
             "source_columns": list(SOURCE_COLUMNS),
-            **_canonical_frame_identity(frame, sort_by=SOURCE_COLUMNS),
+            **canonical_frame_identity(frame, sort_by=SOURCE_COLUMNS),
         }
     return {
         "schema": DEVELOPMENT_IDENTITY_SCHEMA,

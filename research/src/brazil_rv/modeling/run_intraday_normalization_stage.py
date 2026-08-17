@@ -106,15 +106,7 @@ def _stage_store_identity(store: Path, context) -> dict[str, object]:
         raise ValueError("Normalization stage store is neither parent nor candidate")
     if manifest.get("canonical_parent_feature_store") != development_parent:
         raise ValueError("Candidate is not bound to the development parent identity")
-    digest = hashlib.sha256()
-    digest.update((store / "intraday_normalization_variant.json").read_bytes())
-    digest.update(str(development_parent["metadata_sha256"]).encode("ascii"))
-    return {
-        "path": str(store),
-        "contract_version": development_parent["contract_version"],
-        "metadata_sha256": digest.hexdigest(),
-        "hash_scope": development_parent["hash_scope"],
-    }
+    return feature_store_identity(store)
 
 
 class Stage:
