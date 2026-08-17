@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import polars as pl
 import pytest
+
+import brazil_rv.modeling.contract as modeling_contract
+import brazil_rv.preprocessing.human_prior_input as human_prior_input
+import brazil_rv.preprocessing.intraday_normalization_variants as variants
 
 from brazil_rv.preprocessing.human_prior_input import (
     load_human_priors,
@@ -383,3 +389,159 @@ def test_reference_membership_or_readiness_mismatch_fails_before_use(
     artifact = load_human_priors(pointer, sidecar, trade_dates, security_ids)
     with pytest.raises(ValueError, match="membership lineage"):
         validate_human_prior_reference_inputs(artifact, ~membership, readiness)
+
+
+def _portable_human_prior_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> SimpleNamespace:
+    root = tmp_path / "workspace"
+    data_root = root / "quant-data"
+    relative_base = Path("portable") / tmp_path.name
+    base = data_root / relative_base
+    base.mkdir(parents=True)
+    pointer, sidecar, trade_dates, security_ids, _, _ = _write_sidecar(base)
+    reference = base / "reference"
+    parent = base / "current_parent"
+    parent.mkdir()
+    shutil.copy2(reference / "date_index.parquet", parent / "date_index.parquet")
+    shutil.copy2(reference / "equity_index.parquet", parent / "equity_index.parquet")
+    np.save(parent / "equity_features.npy", np.zeros((2, 1), dtype=np.float32))
+    np.save(parent / "targets.npy", np.zeros((2, 1), dtype=np.float32))
+
+    def windows_path(path: Path, *, workspace_prefix: bool = False) -> str:
+        relative = str(path.relative_to(data_root)).replace("/", "\\")
+        prefix = "C:\\Brazil-RV\\quant-data" if workspace_prefix else "C:\\quant-data"
+        return f"{prefix}\\{relative}"
+
+    obsolete = data_root / relative_base / "obsolete_feature_store"
+    human_manifest_path = sidecar / "manifest.json"
+    human_manifest = json.loads(human_manifest_path.read_text(encoding="utf-8"))
+    human_manifest["canonical_inputs"]["feature_store"]["resolved_path"] = windows_path(
+        obsolete
+    )
+    human_manifest_path.write_text(json.dumps(human_manifest), encoding="utf-8")
+    pointer.write_text(windows_path(sidecar), encoding="utf-8")
+    audit = json.loads((sidecar / "metadata_audit.json").read_text(encoding="utf-8"))
+    scope = audit["scope"]
+    frozen_entry = {
+        "pointer": windows_path(pointer, workspace_prefix=True),
+        "pointer_sha256": _sha256(pointer),
+        "resolved_path": windows_path(sidecar, workspace_prefix=True),
+        "schema_version": human_manifest["schema_version"],
+        "build_mode": human_manifest["build_mode"],
+        "canonical_pointer_published": True,
+        "classification_snapshot_date": scope["classification_snapshot_date"],
+        "classification_is_point_in_time": False,
+        "historical_classification_caveat": scope["historical_classification_caveat"],
+        "output_sha256": human_manifest["output_sha256"],
+        "referenced_feature_store": {
+            "resolved_path": windows_path(obsolete),
+            "artifact_sha256": human_manifest["canonical_inputs"]["feature_store"][
+                "artifact_sha256"
+            ],
+        },
+    }
+    context = SimpleNamespace(
+        parent=parent,
+        manifest={"canonical_inputs": {"human_priors": frozen_entry}},
+    )
+    shutil.rmtree(reference)
+    monkeypatch.setattr(modeling_contract, "PROJECT_ROOT", root)
+    return SimpleNamespace(
+        root=root,
+        context=context,
+        pointer=pointer,
+        sidecar=sidecar,
+        parent=parent,
+        obsolete=obsolete,
+        trade_dates=trade_dates,
+        security_ids=security_ids,
+    )
+
+
+def test_portable_human_prior_replay_accepts_missing_predecessor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case = _portable_human_prior_context(tmp_path, monkeypatch)
+    hashed: list[Path] = []
+    original_sha256 = human_prior_input.sha256_file
+
+    def tracked_sha256(path: Path) -> str:
+        hashed.append(Path(path))
+        return original_sha256(path)
+
+    monkeypatch.setattr(human_prior_input, "sha256_file", tracked_sha256)
+    artifact = variants._load_human_prior_artifact(case.context)
+
+    assert artifact.directory == case.sidecar.resolve()
+    assert artifact.reference_feature_store == case.obsolete.resolve()
+    assert not artifact.reference_feature_store.exists()
+    assert tuple(artifact.security_metadata["security_id"]) == case.security_ids
+    assert {path.name for path in hashed}.isdisjoint(
+        {"equity_features.npy", "targets.npy"}
+    )
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    (
+        "pointer",
+        "output_hash",
+        "lineage",
+        "frozen_lineage",
+        "date_axis",
+        "security_axis",
+        "pointer_hash",
+        "unsupported_path",
+    ),
+)
+def test_portable_human_prior_replay_rejects_corruption(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    corruption: str,
+) -> None:
+    case = _portable_human_prior_context(tmp_path, monkeypatch)
+    entry = case.context.manifest["canonical_inputs"]["human_priors"]
+    if corruption == "pointer":
+        case.pointer.write_text(
+            r"C:\unsupported\human_priors",
+            encoding="utf-8",
+        )
+    elif corruption == "output_hash":
+        with (case.sidecar / "metadata_audit.json").open("a", encoding="utf-8") as file:
+            file.write(" ")
+    elif corruption == "lineage":
+        path = case.sidecar / "manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest["canonical_inputs"]["feature_store"]["artifact_sha256"][
+            "date_index.parquet"
+        ] = "1" * 64
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+    elif corruption == "frozen_lineage":
+        entry["referenced_feature_store"]["artifact_sha256"]["date_index.parquet"] = (
+            "1" * 64
+        )
+    elif corruption == "date_axis":
+        pl.DataFrame(
+            {
+                "date_idx": pl.Series([0], dtype=pl.Int32),
+                "trade_date": [date(2024, 1, 3)],
+            }
+        ).write_parquet(case.parent / "date_index.parquet")
+    elif corruption == "security_axis":
+        equities = pl.read_parquet(case.parent / "equity_index.parquet")
+        equities.with_columns(
+            pl.when(pl.col("equity_slot") == 0)
+            .then(pl.lit("WRONG"))
+            .otherwise(pl.col("security_id"))
+            .alias("security_id")
+        ).write_parquet(case.parent / "equity_index.parquet")
+    elif corruption == "pointer_hash":
+        entry["pointer_sha256"] = "1" * 64
+    else:
+        entry["resolved_path"] = r"C:\unsupported\human_priors"
+
+    with pytest.raises((ValueError, FileNotFoundError)):
+        variants._load_human_prior_artifact(case.context)

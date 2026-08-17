@@ -52,6 +52,7 @@ from .contract import (
     VALIDATION_END,
     VALIDATION_START,
     architecture_for_model,
+    workspace_path,
 )
 from .data import (
     feature_store_identity,
@@ -719,7 +720,7 @@ def _validate_root_summary(
 
 
 def run_stage(output_dir: Path) -> Path:
-    parent = Path(FEATURE_STORE_POINTER.read_text(encoding="utf-8").strip()).resolve()
+    parent = workspace_path(FEATURE_STORE_POINTER.read_text(encoding="utf-8").strip())
     if not parent.is_dir():
         raise FileNotFoundError(parent)
     context = load_source_context(parent)

@@ -18,11 +18,11 @@ import polars as pl
 from numpy.typing import NDArray
 
 from brazil_rv.modeling.contract import (
-    PROJECT_ROOT,
     TRAIN_END,
     TRAIN_START,
     VALIDATION_END,
     VALIDATION_START,
+    workspace_path,
 )
 
 from .contract import (
@@ -252,20 +252,6 @@ def atomic_directory(output_dir: Path, writer: Callable[[Path], None]) -> Path:
         shutil.rmtree(partial, ignore_errors=True)
         raise
     return output_dir
-
-
-def workspace_path(value: str | Path) -> Path:
-    path = Path(value)
-    if path.exists():
-        return path.resolve()
-    normalized = str(value).replace("\\", "/")
-    marker = "/quant-data/"
-    position = normalized.lower().find(marker)
-    if position >= 0:
-        rebased = PROJECT_ROOT / normalized[position + 1 :]
-        if rebased.exists():
-            return rebased.resolve()
-    raise FileNotFoundError(path)
 
 
 def _bounded_unit_mean(

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+import polars as pl
 from numpy.lib.format import open_memmap
 
 from brazil_rv.modeling.contract import (
@@ -14,6 +15,7 @@ from brazil_rv.modeling.contract import (
     TRAIN_START,
     VALIDATION_END,
     VALIDATION_START,
+    workspace_path,
 )
 
 from .contract import EXPECTED_EQUITIES
@@ -37,7 +39,6 @@ from .intraday_normalization import (
     repository_commit,
     sha256_file,
     validate_equity_tod_profile,
-    workspace_path,
     write_canonical_json,
 )
 from .peer_features import build_peer_features
@@ -64,12 +65,17 @@ def _load_human_prior_artifact(context):
     entry = context.manifest["canonical_inputs"]["human_priors"]
     pointer = workspace_path(entry["pointer"])
     directory = workspace_path(entry["resolved_path"])
-    security_ids = tuple(context.assignments.get_column("security_id").to_list())
+    dates = pl.read_parquet(context.parent / "date_index.parquet").sort("date_idx")
+    equities = pl.read_parquet(context.parent / "equity_index.parquet").sort(
+        "equity_slot"
+    )
     return load_human_priors(
         pointer,
         directory,
-        context.market_dates,
-        security_ids,
+        tuple(dates.get_column("trade_date")),
+        tuple(equities.get_column("security_id")),
+        frozen_manifest_entry=entry,
+        current_parent_store=context.parent,
     )
 
 

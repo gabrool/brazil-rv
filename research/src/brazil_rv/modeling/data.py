@@ -63,6 +63,7 @@ from .contract import (
     context_family_slots,
     validate_context_family_ablation,
     validate_peer_feature_mode,
+    workspace_path,
 )
 
 FEATURE_ARRAY_FILES = (
@@ -90,7 +91,7 @@ class BatchRequest:
 
 
 def resolve_feature_store(pointer: Path = FEATURE_STORE_POINTER) -> Path:
-    store = Path(pointer.read_text(encoding="utf-8").strip())
+    store = workspace_path(pointer.read_text(encoding="utf-8").strip())
     if not store.is_dir():
         raise FileNotFoundError(store)
     return store

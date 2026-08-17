@@ -23,6 +23,44 @@ def resolve_project_root() -> Path:
 
 
 PROJECT_ROOT = resolve_project_root()
+
+
+def workspace_path(
+    value: str | Path,
+    *,
+    must_exist: bool = True,
+    project_root: Path | None = None,
+) -> Path:
+    raw = os.fspath(value)
+    if not raw.strip():
+        raise ValueError("Workspace path is empty")
+    path = Path(raw).expanduser()
+    if path.exists():
+        return path.resolve()
+
+    normalized = raw.replace("\\", "/")
+    lowered = normalized.casefold()
+    relative: str | None = None
+    for prefix in ("c:/brazil-rv/quant-data", "c:/quant-data"):
+        if lowered == prefix or lowered.startswith(prefix + "/"):
+            relative = normalized[len(prefix) :].lstrip("/")
+            break
+    if relative is not None:
+        root = (PROJECT_ROOT if project_root is None else project_root).resolve()
+        data_root = (root / "quant-data").resolve()
+        path = (data_root / relative).resolve()
+        if not path.is_relative_to(data_root):
+            raise ValueError(f"Workspace path escapes quant-data: {value}")
+    elif not path.is_absolute():
+        raise ValueError(f"Unsupported workspace path: {value}")
+    else:
+        path = path.resolve()
+
+    if must_exist and not path.exists():
+        raise FileNotFoundError(path)
+    return path
+
+
 FEATURE_STORE_POINTER = (
     PROJECT_ROOT
     / "quant-data"

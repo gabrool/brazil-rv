@@ -10,6 +10,8 @@ import numpy as np
 import polars as pl
 from numpy.typing import NDArray
 
+from brazil_rv.modeling.contract import workspace_path
+
 from .contract import EXPECTED_EQUITIES, MIN_ACTIVE_EQUITIES
 
 HUMAN_PRIOR_SCHEMA = "B3_HUMAN_PRIORS_V4"
@@ -81,20 +83,63 @@ def _require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def _valid_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _portable_manifest_entry(entry: object) -> dict[str, object]:
+    _require(isinstance(entry, dict), "Invalid frozen human-prior manifest entry")
+    value = dict(entry)
+    _require(
+        isinstance(value.get("pointer"), str)
+        and isinstance(value.get("resolved_path"), str),
+        "Invalid frozen human-prior paths",
+    )
+    value["pointer"] = str(workspace_path(value["pointer"]))
+    value["resolved_path"] = str(workspace_path(value["resolved_path"]))
+    reference = value.get("referenced_feature_store")
+    _require(
+        isinstance(reference, dict) and isinstance(reference.get("resolved_path"), str),
+        "Invalid frozen human-prior reference lineage",
+    )
+    reference = dict(reference)
+    reference["resolved_path"] = str(
+        workspace_path(reference["resolved_path"], must_exist=False)
+    )
+    value["referenced_feature_store"] = reference
+    return value
+
+
 def load_human_priors(
     pointer: Path,
     resolved_dir: Path,
     market_dates: Sequence[object],
     security_ids: Sequence[str],
+    *,
+    frozen_manifest_entry: dict[str, object] | None = None,
+    current_parent_store: Path | None = None,
 ) -> HumanPriorArtifact:
     """Validate and load the canonical human-priors sidecar fail-closed."""
+    _require(
+        (frozen_manifest_entry is None) == (current_parent_store is None),
+        "Frozen human-prior lineage and current parent must be supplied together",
+    )
+    pointer = workspace_path(pointer)
+    resolved_dir = workspace_path(resolved_dir)
+    _require(resolved_dir.is_dir(), "Human-priors artifact directory is unavailable")
     pointer_bytes = pointer.read_bytes()
     pointer_sha256 = hashlib.sha256(pointer_bytes).hexdigest()
-    pointer_target = Path(pointer_bytes.decode("utf-8").strip())
-    if not pointer_target.is_dir():
-        raise FileNotFoundError(f"Human-priors pointer resolves to {pointer_target}")
+    pointer_target = workspace_path(pointer_bytes.decode("utf-8").strip())
     _require(
-        pointer_target.resolve() == resolved_dir.resolve(),
+        pointer_target.is_dir(),
+        f"Human-priors pointer resolves to {pointer_target}",
+    )
+    _require(
+        pointer_target == resolved_dir,
         "Human-priors pointer changed after canonical input resolution",
     )
     manifest_path = resolved_dir / "manifest.json"
@@ -168,8 +213,16 @@ def load_human_priors(
 
     canonical_inputs = manifest.get("canonical_inputs", {})
     reference = canonical_inputs.get("feature_store", {})
-    reference_store = Path(str(reference.get("resolved_path", "")))
-    _require(reference_store.is_dir(), "Referenced feature store is unavailable")
+    _require(
+        isinstance(reference, dict)
+        and isinstance(reference.get("resolved_path"), str)
+        and bool(reference["resolved_path"]),
+        "Human-priors lineage omits the referenced feature-store path",
+    )
+    reference_store = workspace_path(
+        reference["resolved_path"],
+        must_exist=frozen_manifest_entry is None,
+    )
     reference_hashes = reference.get("artifact_sha256")
     required_reference = {
         "manifest.json",
@@ -183,33 +236,77 @@ def load_human_priors(
         and required_reference <= set(reference_hashes),
         "Human-priors lineage omits required feature-store hashes",
     )
-    for filename, expected_hash in reference_hashes.items():
-        path = reference_store / filename
+    _require(
+        all(
+            isinstance(filename, str) and _valid_sha256(expected_hash)
+            for filename, expected_hash in reference_hashes.items()
+        ),
+        "Human-priors lineage contains an invalid feature-store hash",
+    )
+
+    if frozen_manifest_entry is None:
+        for filename, expected_hash in reference_hashes.items():
+            path = reference_store / filename
+            _require(
+                path.is_file(),
+                f"Referenced feature-store input is missing: {filename}",
+            )
+            _require(
+                sha256_file(path) == expected_hash,
+                f"Referenced input hash mismatch: {filename}",
+            )
+        axis_store = reference_store
+        date_axis_error = "Human-priors referenced date axis does not match the build"
+        equity_axis_error = (
+            "Human-priors referenced equity axis does not match the build"
+        )
+    else:
+        frozen_reference = frozen_manifest_entry.get("referenced_feature_store")
         _require(
-            path.is_file(), f"Referenced feature-store input is missing: {filename}"
+            isinstance(frozen_reference, dict)
+            and set(frozen_reference) == {"resolved_path", "artifact_sha256"}
+            and isinstance(frozen_reference.get("resolved_path"), str),
+            "Current canonical V4 human-prior lineage is malformed",
         )
         _require(
-            sha256_file(path) == expected_hash,
-            f"Referenced input hash mismatch: {filename}",
+            workspace_path(frozen_reference["resolved_path"], must_exist=False)
+            == reference_store
+            and frozen_reference["artifact_sha256"] == reference_hashes,
+            "Human-priors referenced feature-store lineage differs from canonical V4",
+        )
+        assert current_parent_store is not None
+        axis_store = workspace_path(current_parent_store)
+        _require(
+            axis_store.is_dir(), "Current canonical V4 parent store is unavailable"
+        )
+        for filename in ("date_index.parquet", "equity_index.parquet"):
+            _require(
+                sha256_file(axis_store / filename) == reference_hashes[filename],
+                f"Human-priors {filename} lineage differs from canonical V4",
+            )
+        date_axis_error = (
+            "Human-priors date axis does not match the current canonical V4 parent"
+        )
+        equity_axis_error = (
+            "Human-priors equity axis does not match the current canonical V4 parent"
         )
 
-    reference_dates = pl.read_parquet(reference_store / "date_index.parquet").sort(
+    reference_dates = pl.read_parquet(axis_store / "date_index.parquet").sort(
         "date_idx"
     )
     _require(
         reference_dates["date_idx"].to_list() == list(range(len(market_dates)))
         and tuple(reference_dates["trade_date"]) == tuple(market_dates),
-        "Human-priors referenced date axis does not match the build",
+        date_axis_error,
     )
-    reference_equities = pl.read_parquet(reference_store / "equity_index.parquet").sort(
+    reference_equities = pl.read_parquet(axis_store / "equity_index.parquet").sort(
         "equity_slot"
     )
     _require(
         reference_equities["equity_slot"].to_list() == list(range(len(security_ids)))
         and tuple(reference_equities["security_id"]) == tuple(security_ids),
-        "Human-priors referenced equity axis does not match the build",
+        equity_axis_error,
     )
-
     security_metadata = pl.read_parquet(
         resolved_dir / "security_metadata.parquet"
     ).sort("equity_slot")
@@ -350,7 +447,7 @@ def load_human_priors(
         ngrd3.height == 1, "Expected NGRD3 as the unique unresolved classification"
     )
 
-    return HumanPriorArtifact(
+    artifact = HumanPriorArtifact(
         pointer=pointer,
         directory=resolved_dir,
         pointer_sha256=pointer_sha256,
@@ -368,6 +465,14 @@ def load_human_priors(
         issuer_ids=issuer_ids,
         ngrd3_slot=int(ngrd3.item(0, "equity_slot")),
     )
+
+    if frozen_manifest_entry is not None:
+        _require(
+            _portable_manifest_entry(artifact.manifest_entry())
+            == _portable_manifest_entry(frozen_manifest_entry),
+            "Human-priors artifact provenance differs from canonical V4",
+        )
+    return artifact
 
 
 def validate_human_prior_reference_inputs(
