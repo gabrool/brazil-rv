@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import math
 import os
@@ -35,6 +36,7 @@ from .contract import (
     REALIZED_VOL_LOG_FLOOR,
     REALIZED_VOL_MIN_FRACTION,
     RETURN_WINDOWS,
+    output_array_specs,
 )
 from .io import (
     SOURCE_COLUMNS,
@@ -55,6 +57,8 @@ PROFILE_BIN_MINUTES = 30
 PROFILE_BIN_COUNT = math.ceil(EQUITY_SESSION_MINUTES / PROFILE_BIN_MINUTES)
 VISIBLE_EQUITY_MINUTES = max(DECISION_EQUITY_INDICES)
 DECISION_FEATURE_MINUTES = tuple(value - 1 for value in DECISION_EQUITY_INDICES)
+DEVELOPMENT_IDENTITY_SCHEMA = "INTRADAY_NORMALIZATION_DEVELOPMENT_INPUTS_V1"
+PROFILE_NUMERICAL_ATOL = 1e-12
 
 ARMS = {
     "legacy_daily_vol": 0.0,
@@ -62,9 +66,10 @@ ARMS = {
     "equity_tod_full": 1.0,
 }
 
-# Return breadth/ranks remain parent-bound because the seasonal factor is positive
-# and common to every equity at a date/minute. The realized-volatility rank is
-# rebuilt because missing paths can produce different effective corrected windows.
+# Return breadth remains parent-bound because the seasonal factor is positive and
+# common to every equity at a date/minute. Return ranks are rebuilt because the
+# fixed clipping bound can create or remove ties after seasonal rescaling. The
+# realized-volatility rank is rebuilt because missing paths can change windows.
 AFFECTED_DYNAMIC_CHANNELS = (
     0,
     1,
@@ -81,6 +86,8 @@ AFFECTED_DYNAMIC_CHANNELS = (
     17,
     20,
     21,
+    22,
+    23,
     25,
 )
 AFFECTED_PEER_CHANNELS = (0, 1, 4, 5)
@@ -158,6 +165,59 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _canonical_frame_identity(
+    frame: pl.DataFrame, *, sort_by: tuple[str, ...]
+) -> dict[str, object]:
+    ordered = frame.sort(list(sort_by), maintain_order=True) if sort_by else frame
+    metadata = {
+        "columns": ordered.columns,
+        "dtypes": [str(value) for value in ordered.dtypes],
+        "row_count": ordered.height,
+    }
+    buffer = io.BytesIO()
+    ordered.write_ipc(buffer, compression="uncompressed")
+    digest = hashlib.sha256()
+    digest.update(
+        json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    )
+    digest.update(buffer.getvalue())
+    return {**metadata, "sha256": digest.hexdigest()}
+
+
+def _canonical_json_identity(value: object) -> dict[str, object]:
+    payload = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return {"sha256": hashlib.sha256(payload).hexdigest()}
+
+
+def _development_array_identity(
+    path: Path, expected_dtype: np.dtype, expected_shape: tuple[int, ...]
+) -> dict[str, object]:
+    values = np.load(path, mmap_mode="r", allow_pickle=False)
+    if values.dtype != expected_dtype or values.shape[1:] != expected_shape[1:]:
+        raise ValueError(f"Parent array contract mismatch: {path.name}")
+    if values.shape[0] < expected_shape[0]:
+        raise ValueError(f"Parent array is shorter than validation end: {path.name}")
+    metadata = {
+        "scope": "date_prefix",
+        "end_date": str(VALIDATION_END),
+        "filename": path.name,
+        "dtype": expected_dtype.name,
+        "development_shape": list(expected_shape),
+    }
+    digest = hashlib.sha256(
+        json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    )
+    for start in range(0, expected_shape[0], 8):
+        stop = min(start + 8, expected_shape[0])
+        digest.update(np.ascontiguousarray(values[start:stop]).tobytes(order="C"))
+    return {**metadata, "sha256": digest.hexdigest()}
 
 
 def repository_commit() -> str:
@@ -525,11 +585,20 @@ def dynamic_validity_from_observed(
 def load_source_context(parent: Path) -> EquitySourceContext:
     parent = parent.resolve()
     manifest = json.loads((parent / "manifest.json").read_text(encoding="utf-8"))
-    date_index = pl.read_parquet(parent / "date_index.parquet").sort("date_idx")
+    date_index = (
+        pl.scan_parquet(parent / "date_index.parquet")
+        .filter(pl.col("trade_date") <= VALIDATION_END)
+        .collect()
+        .sort("date_idx")
+    )
     market_dates = tuple(date_index.get_column("trade_date").to_list())
-    allowed_date_count = sum(value <= VALIDATION_END for value in market_dates)
-    if not allowed_date_count or market_dates[allowed_date_count - 1] != VALIDATION_END:
+    allowed_date_count = len(market_dates)
+    if not allowed_date_count or market_dates[-1] != VALIDATION_END:
         raise ValueError("Parent date axis does not end validation exactly")
+    if not np.array_equal(
+        date_index["date_idx"].to_numpy(), np.arange(allowed_date_count)
+    ):
+        raise ValueError("Development date indices are not contiguous from zero")
     canonical = manifest["canonical_inputs"]
     assignments_dir = workspace_path(
         canonical["accepted_xp_assignments"]["resolved_path"]
@@ -545,7 +614,7 @@ def load_source_context(parent: Path) -> EquitySourceContext:
         research_start,
         VALIDATION_END,
     )
-    if reconstructed_dates != market_dates[:allowed_date_count]:
+    if reconstructed_dates != market_dates:
         raise ValueError("Parent date axis differs from canonical COTAHIST")
     validate_source_date_isolation(assignments, accepted_dates)
     equity_index = pl.read_parquet(parent / "equity_index.parquet").sort("equity_slot")
@@ -636,39 +705,117 @@ def iter_reconstructed_equities(
 
 
 def parent_identity(context: EquitySourceContext) -> dict[str, object]:
-    digest = hashlib.sha256()
-    for filename in ("manifest.json", "feature_schema.json", "sample_index.parquet"):
-        with (context.parent / filename).open("rb") as source:
-            for block in iter(lambda: source.read(1024 * 1024), b""):
-                digest.update(block)
+    artifacts = parent_artifact_hashes(context)
+    digest = hashlib.sha256(
+        json.dumps(artifacts, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    )
     return {
         "path": str(context.parent),
         "contract_version": context.manifest["contract_version"],
         "metadata_sha256": digest.hexdigest(),
+        "hash_scope": artifacts["hash_scope"],
     }
 
 
-def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, str]:
-    filenames = sorted(
-        {
-            *context.manifest["outputs"],
-            "manifest.json",
-            "feature_schema.json",
-            "date_index.parquet",
-            "equity_index.parquet",
-            "sample_index.parquet",
-            "peer_feature_build_audit.json",
-        }
+def parent_artifact_hashes(context: EquitySourceContext) -> dict[str, object]:
+    date_count = context.allowed_date_count
+    array_specs = output_array_specs(date_count)
+    if set(context.manifest["outputs"]) != set(array_specs):
+        raise ValueError("Parent output inventory differs from the V4 contract")
+    artifacts: dict[str, object] = {
+        filename: _development_array_identity(
+            context.parent / filename, spec.dtype, spec.shape
+        )
+        for filename, spec in sorted(array_specs.items())
+    }
+    date_index = (
+        pl.scan_parquet(context.parent / "date_index.parquet")
+        .filter(pl.col("trade_date") <= VALIDATION_END)
+        .collect()
     )
-    return {filename: sha256_file(context.parent / filename) for filename in filenames}
+    sample_index = (
+        pl.scan_parquet(context.parent / "sample_index.parquet")
+        .filter(pl.col("trade_date") <= VALIDATION_END)
+        .collect()
+    )
+    artifacts["date_index.parquet"] = {
+        "scope": "rows_through_validation_end",
+        "end_date": str(VALIDATION_END),
+        **_canonical_frame_identity(date_index, sort_by=("date_idx",)),
+    }
+    artifacts["sample_index.parquet"] = {
+        "scope": "rows_through_validation_end",
+        "end_date": str(VALIDATION_END),
+        **_canonical_frame_identity(sample_index, sort_by=("sample_id",)),
+    }
+    for filename, sort_by in (
+        ("equity_index.parquet", ("equity_slot",)),
+        ("context_index.parquet", ("context_slot",)),
+        ("global_context_index.parquet", ("global_slot",)),
+    ):
+        artifacts[filename] = {
+            "scope": "complete_non_date_axis",
+            **_canonical_frame_identity(
+                pl.read_parquet(context.parent / filename), sort_by=sort_by
+            ),
+        }
+    schema = json.loads(
+        (context.parent / "feature_schema.json").read_text(encoding="utf-8")
+    )
+    artifacts["feature_schema.json"] = {
+        "scope": "complete_non_observation_metadata",
+        **_canonical_json_identity(schema),
+    }
+    manifest_contract = {
+        key: context.manifest[key]
+        for key in (
+            "contract_version",
+            "build_git_commit",
+            "canonical_inputs",
+            "constants",
+        )
+    }
+    artifacts["manifest_contract"] = {
+        "scope": "stage_relevant_non_observation_metadata",
+        **_canonical_json_identity(manifest_contract),
+    }
+    return {
+        "schema": DEVELOPMENT_IDENTITY_SCHEMA,
+        "hash_scope": {
+            "kind": "development_only",
+            "end_date": str(VALIDATION_END),
+            "date_count": date_count,
+            "date_array_scope": "prefix_only",
+        },
+        "artifacts": artifacts,
+    }
 
 
-def equity_source_hashes(context: EquitySourceContext) -> dict[str, str]:
+def equity_source_hashes(context: EquitySourceContext) -> dict[str, object]:
     paths = sorted(
         {workspace_path(value) for value in context.assignments["source_file"]},
         key=str,
     )
-    return {str(path): sha256_file(path) for path in paths}
+    first_date = context.market_dates[0]
+    sources: dict[str, object] = {}
+    for path in paths:
+        frame = _load_source_through_validation(path, first_date)
+        sources[str(path)] = {
+            "scope": "canonical_source_rows_through_validation_end",
+            "start_date": str(first_date),
+            "end_date": str(VALIDATION_END),
+            "source_columns": list(SOURCE_COLUMNS),
+            **_canonical_frame_identity(frame, sort_by=SOURCE_COLUMNS),
+        }
+    return {
+        "schema": DEVELOPMENT_IDENTITY_SCHEMA,
+        "hash_scope": {
+            "kind": "canonical_rows_only",
+            "start_date": str(first_date),
+            "end_date": str(VALIDATION_END),
+        },
+        "sources": sources,
+    }
 
 
 def build_equity_tod_profile(
@@ -791,6 +938,11 @@ def build_equity_tod_profile(
             "test_accessed": False,
             "date_count": context.allowed_date_count,
             "bin_count": PROFILE_BIN_COUNT,
+            "hash_scope": {
+                "kind": "development_only",
+                "end_date": str(VALIDATION_END),
+                "date_count": context.allowed_date_count,
+            },
             "artifacts": {
                 q_path.name: sha256_file(q_path),
                 csv_path.name: sha256_file(csv_path),
@@ -801,8 +953,10 @@ def build_equity_tod_profile(
     return atomic_directory(output_dir, write)
 
 
-def load_equity_tod_profile(
+def validate_equity_tod_profile(
     profile_dir: Path,
+    *,
+    expected_context: EquitySourceContext | None = None,
 ) -> tuple[dict[str, object], NDArray[np.float64]]:
     manifest_path = profile_dir / "equity_tod_profile.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -813,13 +967,229 @@ def load_equity_tod_profile(
         raise ValueError("Invalid equity time-of-day profile manifest")
     q_path = profile_dir / "equity_tod_profile.npy"
     csv_path = profile_dir / "equity_tod_profile.csv"
+    if set(manifest.get("artifacts", {})) != {q_path.name, csv_path.name}:
+        raise ValueError("Profile artifact inventory is invalid")
     for path in (q_path, csv_path):
         if sha256_file(path) != manifest["artifacts"][path.name]:
             raise ValueError(f"Profile artifact hash mismatch: {path}")
+    expected_config = asdict(ProfileConfig())
+    expected_contract = {
+        "repository_commit": repository_commit(),
+        "configuration": expected_config,
+        "training_window": [str(TRAIN_START), str(TRAIN_END)],
+        "validation_window": [str(VALIDATION_START), str(VALIDATION_END)],
+        "training_profile_freeze_date": str(TRAIN_END),
+        "profile_input": "unclipped_legacy_normalized_equity_close_moves",
+        "historical_count_unit": "valid_session_bin_estimates",
+        "current_date_update_rule": "emit_then_update",
+        "validation_update_rule": "frozen_training_end_profile",
+        "bin_count": PROFILE_BIN_COUNT,
+    }
+    for key, expected in expected_contract.items():
+        if manifest.get(key) != expected:
+            raise ValueError(f"Profile contract mismatch: {key}")
+    date_count = int(manifest.get("date_count", -1))
+    if manifest.get("hash_scope") != {
+        "kind": "development_only",
+        "end_date": str(VALIDATION_END),
+        "date_count": date_count,
+    }:
+        raise ValueError("Profile development hash scope is invalid")
     q = np.load(q_path, mmap_mode="r", allow_pickle=False)
-    expected_shape = (int(manifest["date_count"]), int(manifest["bin_count"]))
+    expected_shape = (date_count, PROFILE_BIN_COUNT)
     if q.shape != expected_shape or q.dtype != np.dtype(np.float64):
         raise ValueError("Seasonal profile array has the wrong shape or dtype")
-    if not np.isfinite(q).all() or np.any(q <= 0.0):
+    lower = expected_config["relative_variance_lower_bound"]
+    upper = expected_config["relative_variance_upper_bound"]
+    if (
+        not np.isfinite(q).all()
+        or np.any(q <= 0.0)
+        or np.any(q < lower)
+        or np.any(q > upper)
+    ):
         raise ValueError("Seasonal profile contains an invalid value")
+
+    frame = pl.read_csv(csv_path, try_parse_dates=True)
+    expected_columns = (
+        "date_idx",
+        "trade_date",
+        "split",
+        "bin_idx",
+        "session_minute_start",
+        "session_minute_end_exclusive",
+        "relative_variance",
+        "standard_deviation_multiplier",
+        "effective_historical_profile_days",
+        "shrinkage_weight",
+        "historical_observation_count",
+        "current_daily_variance_estimate",
+        "current_daily_observation_count",
+    )
+    if tuple(frame.columns) != expected_columns:
+        raise ValueError("Profile CSV schema is invalid")
+    if frame.height != date_count * PROFILE_BIN_COUNT:
+        raise ValueError("Profile CSV does not contain the exact date/bin lattice")
+    if frame.select("date_idx", "bin_idx").n_unique() != frame.height:
+        raise ValueError("Profile CSV contains duplicate date/bin keys")
+    frame = frame.sort("date_idx", "bin_idx")
+    expected_dates = np.repeat(np.arange(date_count), PROFILE_BIN_COUNT)
+    expected_bins = np.tile(np.arange(PROFILE_BIN_COUNT), date_count)
+    if not np.array_equal(frame["date_idx"].to_numpy(), expected_dates) or not (
+        np.array_equal(frame["bin_idx"].to_numpy(), expected_bins)
+    ):
+        raise ValueError("Profile CSV date/bin keys are not contiguous")
+    starts = expected_bins * PROFILE_BIN_MINUTES
+    ends = np.minimum(starts + PROFILE_BIN_MINUTES, EQUITY_SESSION_MINUTES)
+    if not np.array_equal(frame["session_minute_start"].to_numpy(), starts) or not (
+        np.array_equal(frame["session_minute_end_exclusive"].to_numpy(), ends)
+    ):
+        raise ValueError("Profile CSV bin boundaries are invalid")
+
+    date_rows = frame.filter(pl.col("bin_idx") == 0).sort("date_idx")
+    trade_dates = tuple(date_rows["trade_date"].to_list())
+    if (
+        len(set(trade_dates)) != date_count
+        or trade_dates != tuple(sorted(trade_dates))
+        or trade_dates[-1] != VALIDATION_END
+    ):
+        raise ValueError("Profile CSV trade-date axis is invalid")
+    if expected_context is not None:
+        if trade_dates != expected_context.market_dates:
+            raise ValueError(
+                "Profile trade dates differ from the parent development axis"
+            )
+        if date_count != expected_context.allowed_date_count:
+            raise ValueError("Profile date count differs from the parent")
+        if manifest.get("parent_feature_store") != parent_identity(expected_context):
+            raise ValueError("Profile parent identity mismatch")
+        if manifest.get("parent_artifact_sha256") != parent_artifact_hashes(
+            expected_context
+        ):
+            raise ValueError("Profile parent artifact identity mismatch")
+        if manifest.get("equity_source_sha256") != equity_source_hashes(
+            expected_context
+        ):
+            raise ValueError("Profile source identity mismatch")
+    expected_split = np.asarray(
+        [
+            "train"
+            if TRAIN_START <= value <= TRAIN_END
+            else (
+                "validation"
+                if VALIDATION_START <= value <= VALIDATION_END
+                else "warmup_or_embargo"
+            )
+            for value in trade_dates
+        ]
+    )
+    if not np.array_equal(date_rows["split"].to_numpy(), expected_split):
+        raise ValueError("Profile CSV split mapping is invalid")
+    per_date_contract = frame.group_by("date_idx").agg(
+        pl.col("trade_date").n_unique().alias("trade_dates"),
+        pl.col("split").n_unique().alias("splits"),
+    )
+    if (per_date_contract["trade_dates"] != 1).any() or (
+        per_date_contract["splits"] != 1
+    ).any():
+        raise ValueError("Profile CSV date metadata varies within a date")
+
+    csv_q = frame["relative_variance"].to_numpy().reshape(expected_shape)
+    if not np.array_equal(csv_q, np.asarray(q)):
+        raise ValueError("Profile CSV relative variance differs from the NPY")
+    multiplier = (
+        frame["standard_deviation_multiplier"].to_numpy().reshape(expected_shape)
+    )
+    if not np.allclose(
+        multiplier, np.sqrt(csv_q), rtol=0.0, atol=PROFILE_NUMERICAL_ATOL
+    ):
+        raise ValueError("Profile CSV multiplier does not reconstruct")
+    profile_days = (
+        frame["effective_historical_profile_days"].to_numpy().reshape(expected_shape)
+    )
+    observations = (
+        frame["historical_observation_count"].to_numpy().reshape(expected_shape)
+    )
+    daily_count = (
+        frame["current_daily_observation_count"].to_numpy().reshape(expected_shape)
+    )
+    daily_variance = (
+        frame["current_daily_variance_estimate"].to_numpy().reshape(expected_shape)
+    )
+    if (
+        np.any(profile_days < 0)
+        or np.any(observations < 0)
+        or np.any(daily_count < 0)
+        or not np.isfinite(daily_variance).all()
+        or np.any(daily_variance < 0.0)
+    ):
+        raise ValueError("Profile sufficient statistics are invalid")
+    expected_shrinkage = profile_days / (
+        profile_days + expected_config["prior_session_equivalents"]
+    )
+    shrinkage = frame["shrinkage_weight"].to_numpy().reshape(expected_shape)
+    if not np.allclose(
+        shrinkage, expected_shrinkage, rtol=0.0, atol=PROFILE_NUMERICAL_ATOL
+    ):
+        raise ValueError("Profile shrinkage does not reconstruct")
+
+    reconstructed = estimate_causal_profile(
+        daily_variance,
+        daily_count.astype(np.int64),
+        trade_dates,
+        ProfileConfig(),
+    )
+    if not np.allclose(
+        reconstructed.relative_variance,
+        q,
+        rtol=0.0,
+        atol=PROFILE_NUMERICAL_ATOL,
+    ):
+        raise ValueError("Profile does not reconstruct from emitted statistics")
+    for name, actual, expected in (
+        (
+            "historical profile days",
+            profile_days,
+            reconstructed.historical_profile_days,
+        ),
+        (
+            "historical observations",
+            observations,
+            reconstructed.historical_observation_count,
+        ),
+    ):
+        if not np.array_equal(actual, expected):
+            raise ValueError(f"Profile {name} do not reconstruct")
+    positive = observations > 0
+    for date_idx in range(date_count):
+        usable = positive[date_idx]
+        if usable.any() and not np.isclose(
+            np.average(csv_q[date_idx, usable], weights=observations[date_idx, usable]),
+            1.0,
+            rtol=0.0,
+            atol=PROFILE_NUMERICAL_ATOL,
+        ):
+            raise ValueError("Profile curve is not weighted-unit-normalized")
+    after_train = np.asarray([value > TRAIN_END for value in trade_dates])
+    if after_train.any() and not np.array_equal(
+        np.asarray(q)[after_train],
+        np.broadcast_to(
+            np.asarray(q)[after_train][0], np.asarray(q)[after_train].shape
+        ),
+    ):
+        raise ValueError("Profile is not frozen after training end")
+    perturbed_variance = daily_variance.copy()
+    perturbed_count = daily_count.astype(np.int64, copy=True)
+    perturbed_variance[after_train] = np.arange(1, PROFILE_BIN_COUNT + 1)
+    perturbed_count[after_train] = 100
+    perturbed = estimate_causal_profile(
+        perturbed_variance, perturbed_count, trade_dates, ProfileConfig()
+    )
+    if not np.array_equal(perturbed.relative_variance, reconstructed.relative_variance):
+        raise ValueError("Validation observations can alter the frozen profile")
     return manifest, q
+
+
+def load_equity_tod_profile(
+    profile_dir: Path,
+) -> tuple[dict[str, object], NDArray[np.float64]]:
+    return validate_equity_tod_profile(profile_dir)

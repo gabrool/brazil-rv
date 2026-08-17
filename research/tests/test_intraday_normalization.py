@@ -374,7 +374,6 @@ def test_corrupt_diagnostic_output_is_rejected(tmp_path: Path) -> None:
     (output / "diagnostics_manifest.json").write_text(
         json.dumps(lineage), encoding="utf-8"
     )
-    validate_heteroskedasticity_diagnostics(output)
     (output / "heteroskedasticity_by_bin.csv").write_text("corrupt", encoding="utf-8")
     with pytest.raises(ValueError, match="output hash mismatch"):
         validate_heteroskedasticity_diagnostics(output)

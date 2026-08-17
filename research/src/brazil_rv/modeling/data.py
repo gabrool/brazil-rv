@@ -6,6 +6,7 @@ import math
 import random
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -157,11 +158,15 @@ def _validate_sample_index(sample_index: pl.DataFrame) -> None:
         raise ValueError("Sample cutoffs violate the causal five-minute grid")
 
 
-def load_sample_index(store: Path) -> pl.DataFrame:
+def load_sample_index(store: Path, *, end_date: date | None = None) -> pl.DataFrame:
     variant = load_variant_manifest(store)
     if variant is not None:
         store = variant_parent(store, variant)
-    rows = pl.read_parquet(store / "sample_index.parquet").sort("sample_id")
+        end_date = VALIDATION_END if end_date is None else end_date
+    scan = pl.scan_parquet(store / "sample_index.parquet")
+    if end_date is not None:
+        scan = scan.filter(pl.col("trade_date") <= end_date)
+    rows = scan.collect().sort("sample_id")
     _validate_sample_index(rows)
     return rows
 

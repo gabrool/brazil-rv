@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Iterable
+from itertools import product
 from pathlib import Path
 
 import numpy as np
@@ -55,6 +56,8 @@ CHANNELS = {
     17: "market_median_return_60m",
     20: "market_dispersion_return_15m",
     21: "market_dispersion_return_60m",
+    22: "market_rank_return_15m",
+    23: "market_rank_return_60m",
     25: "market_rank_realized_volatility_30m",
 }
 RETURN_CHANNEL_WINDOWS = {7: 15, 8: 30, 9: 60}
@@ -103,7 +106,7 @@ def _finite_statistics(
 def _clip_bounds(channel: int) -> tuple[float | None, float | None]:
     if channel in REALIZED_VOL_CHANNEL_WINDOWS:
         return -REALIZED_VOL_LOG_CLIP, REALIZED_VOL_LOG_CLIP
-    if channel == 25:
+    if channel in (22, 23, 25):
         return None, None
     return -PRICE_FEATURE_CLIP, PRICE_FEATURE_CLIP
 
@@ -149,6 +152,11 @@ def _channel_valid(
         source = _window_valid(observed, RETURN_CHANNEL_WINDOWS[source_channel])
         enough = (source & active_minutes).sum(axis=1) >= MIN_ACTIVE_EQUITIES
         return active_minutes & enough[:, None, :]
+    if channel in (22, 23):
+        window = 15 if channel == 22 else 60
+        source = _window_valid(observed, window) & active_minutes
+        enough = source.sum(axis=1) >= MIN_ACTIVE_EQUITIES
+        return source & enough[:, None, :]
     if channel == 25:
         source = _realized_vol_valid(observed, 30) & active_minutes
         enough = source.sum(axis=1) >= MIN_ACTIVE_EQUITIES
@@ -202,10 +210,11 @@ def _append_group(
     channel: int,
     *,
     include_empty: bool = False,
+    minimum_valid_count: int = 2,
 ) -> None:
     selected, possible = _selected_values(values, valid, active, minutes)
-    if selected.size < 2 or possible == 0:
-        if include_empty and possible > 0:
+    if selected.size < minimum_valid_count or possible == 0:
+        if include_empty:
             rows.append(
                 {
                     **prefix,
@@ -223,7 +232,9 @@ def _append_group(
                     "zero_fraction": None,
                     "lower_clipping_fraction": None,
                     "upper_clipping_fraction": None,
-                    "observed_fraction": float(selected.size / possible),
+                    "observed_fraction": None
+                    if possible == 0
+                    else float(selected.size / possible),
                 }
             )
         return
@@ -293,6 +304,7 @@ def _effect_size_rows(
             & (pl.col("split") == split)
             & (pl.col("channel") == channel)
             & (pl.col("bin_idx") == -1)
+            & pl.col("standard_deviation").is_not_null()
         ).sort("standard_deviation")
         security_std = security["standard_deviation"].to_numpy()
         security_quantiles = np.quantile(security_std, (0.1, 0.5, 0.9))
@@ -308,6 +320,7 @@ def _effect_size_rows(
         rows.append(
             {
                 "arm": arm,
+                "gamma": ARMS[arm],
                 "split": split,
                 "channel": channel,
                 "max_to_min_bin_std_ratio": float(std.max() / std.min()),
@@ -356,14 +369,35 @@ def _cross_security_rows(by_security: pl.DataFrame) -> list[dict[str, object]]:
     for (arm, split, channel, bin_idx), group in by_security.group_by(
         "arm", "split", "channel", "bin_idx", maintain_order=True
     ):
+        group = group.filter(pl.col("standard_deviation").is_not_null()).sort(
+            "standard_deviation"
+        )
         if group.height < 10:
+            rows.append(
+                {
+                    "arm": arm,
+                    "gamma": ARMS[arm],
+                    "split": split,
+                    "channel": channel,
+                    "bin_idx": bin_idx,
+                    "security_count": group.height,
+                    "security_std_p10": None,
+                    "security_std_median": None,
+                    "security_std_p90": None,
+                    "security_std_p90_minus_p10": None,
+                    "most_under_dispersed_security": None,
+                    "most_under_dispersed_std": None,
+                    "most_over_dispersed_security": None,
+                    "most_over_dispersed_std": None,
+                }
+            )
             continue
-        group = group.sort("standard_deviation")
         values = group["standard_deviation"].to_numpy()
         quantiles = np.quantile(values, (0.1, 0.5, 0.9))
         rows.append(
             {
                 "arm": arm,
+                "gamma": ARMS[arm],
                 "split": split,
                 "channel": channel,
                 "bin_idx": bin_idx,
@@ -379,6 +413,60 @@ def _cross_security_rows(by_security: pl.DataFrame) -> list[dict[str, object]]:
             }
         )
     return rows
+
+
+def _diagnostic_summary(
+    outputs: dict[str, pl.DataFrame], profile_manifest_sha256: str
+) -> dict[str, object]:
+    primary = (
+        outputs["heteroskedasticity_effect_sizes.csv"]
+        .filter(
+            (pl.col("split") == "validation")
+            & (pl.col("channel") == "close_move_normalized")
+        )
+        .sort("gamma")
+    )
+    return {
+        "schema": DIAGNOSTIC_SCHEMA,
+        "test_accessed": False,
+        "exact_statistics": True,
+        "sampling": None,
+        "arms": ARMS,
+        "channels": {str(channel): name for channel, name in CHANNELS.items()},
+        "profile_manifest_sha256": profile_manifest_sha256,
+        "opening_bin": OPENING_BIN,
+        "opening_bin_definition": "session minutes 0 through 29",
+        "midday_bin": MIDDAY_BIN,
+        "midday_bin_definition": "session minutes 120 through 149",
+        "primary_endpoint": (
+            "validation weighted_log_std_rmse for close_move_normalized"
+        ),
+        "primary_results": primary.select(
+            "arm",
+            "weighted_log_std_rmse",
+            "max_to_min_bin_std_ratio",
+            "opening_to_midday_std_ratio",
+        ).to_dicts(),
+        "row_counts": {filename: frame.height for filename, frame in outputs.items()},
+    }
+
+
+def _diagnostic_markdown(summary: dict[str, object]) -> str:
+    lines = [
+        "# Equity intraday heteroskedasticity diagnostics",
+        "",
+        "The primary endpoint is validation weighted log-standard-deviation RMSE for the normalized close move.",
+        "",
+        "| Arm | weighted log-std RMSE | max/min bin std | opening/midday std |",
+        "|---|---:|---:|---:|",
+    ]
+    for row in summary["primary_results"]:
+        lines.append(
+            f"| {row['arm']} | {row['weighted_log_std_rmse']:.6f} | "
+            f"{row['max_to_min_bin_std_ratio']:.6f} | "
+            f"{row['opening_to_midday_std_ratio']:.6f} |"
+        )
+    return "\n".join(lines) + "\n"
 
 
 def run_heteroskedasticity_diagnostics(
@@ -519,6 +607,7 @@ def run_heteroskedasticity_diagnostics(
                         year_active,
                         visible_minutes,
                         channel,
+                        include_empty=True,
                     )
                     for bin_idx, start in enumerate(
                         range(0, VISIBLE_EQUITY_MINUTES, PROFILE_BIN_MINUTES)
@@ -545,13 +634,13 @@ def run_heteroskedasticity_diagnostics(
                             year_active,
                             minutes,
                             channel,
+                            include_empty=True,
                         )
 
                 for equity_slot, security_id in enumerate(security_ids):
                     security_values = values[:, equity_slot : equity_slot + 1]
                     security_valid = valid[:, equity_slot : equity_slot + 1]
                     security_active = active[:, equity_slot : equity_slot + 1]
-                    before = len(by_security)
                     _append_group(
                         by_security,
                         {
@@ -569,9 +658,8 @@ def run_heteroskedasticity_diagnostics(
                         security_active,
                         visible_minutes,
                         channel,
+                        include_empty=True,
                     )
-                    if len(by_security) == before:
-                        continue
                     for bin_idx, start in enumerate(
                         range(0, VISIBLE_EQUITY_MINUTES, PROFILE_BIN_MINUTES)
                     ):
@@ -581,16 +669,8 @@ def run_heteroskedasticity_diagnostics(
                                 VISIBLE_EQUITY_MINUTES,
                             )
                         ]
-                        selected, possible = _selected_values(
-                            security_values,
-                            security_valid,
-                            security_active,
-                            minutes,
-                        )
-                        if selected.size < 100 or possible == 0:
-                            continue
-                        lower, upper = _clip_bounds(channel)
-                        by_security.append(
+                        _append_group(
+                            by_security,
                             {
                                 "arm": arm,
                                 "gamma": gamma,
@@ -600,13 +680,14 @@ def run_heteroskedasticity_diagnostics(
                                 "security_id": security_id,
                                 "equity_slot": equity_slot,
                                 "bin_idx": bin_idx,
-                                **_finite_statistics(
-                                    selected,
-                                    possible_count=possible,
-                                    lower_clip=lower,
-                                    upper_clip=upper,
-                                ),
-                            }
+                            },
+                            security_values,
+                            security_valid,
+                            security_active,
+                            minutes,
+                            channel,
+                            include_empty=True,
+                            minimum_valid_count=100,
                         )
 
     output_dir.mkdir(parents=True, exist_ok=False)
@@ -627,50 +708,11 @@ def run_heteroskedasticity_diagnostics(
     }
     for filename, frame in outputs.items():
         frame.write_csv(output_dir / filename)
-    primary = summary_frame.filter(
-        (pl.col("split") == "validation")
-        & (pl.col("channel") == "close_move_normalized")
-    ).sort("gamma")
-    summary = {
-        "schema": DIAGNOSTIC_SCHEMA,
-        "test_accessed": False,
-        "exact_statistics": True,
-        "sampling": None,
-        "arms": ARMS,
-        "channels": CHANNELS,
-        "profile_manifest_sha256": sha256_file(profile_dir / "equity_tod_profile.json"),
-        "opening_bin": OPENING_BIN,
-        "opening_bin_definition": "session minutes 0 through 29",
-        "midday_bin": MIDDAY_BIN,
-        "midday_bin_definition": "session minutes 120 through 149",
-        "primary_endpoint": (
-            "validation weighted_log_std_rmse for close_move_normalized"
-        ),
-        "primary_results": primary.select(
-            "arm",
-            "weighted_log_std_rmse",
-            "max_to_min_bin_std_ratio",
-            "opening_to_midday_std_ratio",
-        ).to_dicts(),
-        "row_counts": {filename: frame.height for filename, frame in outputs.items()},
-    }
+    profile_hash = sha256_file(profile_dir / "equity_tod_profile.json")
+    summary = _diagnostic_summary(outputs, profile_hash)
     write_canonical_json(output_dir / "heteroskedasticity_summary.json", summary)
-    markdown = [
-        "# Equity intraday heteroskedasticity diagnostics",
-        "",
-        "The primary endpoint is validation weighted log-standard-deviation RMSE for the normalized close move.",
-        "",
-        "| Arm | weighted log-std RMSE | max/min bin std | opening/midday std |",
-        "|---|---:|---:|---:|",
-    ]
-    for row in summary["primary_results"]:
-        markdown.append(
-            f"| {row['arm']} | {row['weighted_log_std_rmse']:.6f} | "
-            f"{row['max_to_min_bin_std_ratio']:.6f} | "
-            f"{row['opening_to_midday_std_ratio']:.6f} |"
-        )
-    (output_dir / "heteroskedasticity_summary.md").write_text(
-        "\n".join(markdown) + "\n", encoding="utf-8"
+    (output_dir / "heteroskedasticity_summary.md").write_bytes(
+        _diagnostic_markdown(summary).encode("utf-8")
     )
     output_names = (
         *outputs,
@@ -705,15 +747,63 @@ def _finite_columns(frame: pl.DataFrame, excluded: Iterable[str]) -> None:
             raise ValueError(f"Non-finite diagnostic column: {name}")
 
 
+def _assert_diagnostic_frame(
+    actual: pl.DataFrame,
+    expected: pl.DataFrame,
+    sort_by: tuple[str, ...],
+    label: str,
+) -> None:
+    if actual.columns != expected.columns or actual.height != expected.height:
+        raise ValueError(f"{label} schema or row count does not reconstruct")
+    actual = actual.sort(list(sort_by))
+    expected = expected.sort(list(sort_by))
+    for name in actual.columns:
+        actual_null = actual[name].is_null().to_numpy()
+        expected_null = expected[name].is_null().to_numpy()
+        if not np.array_equal(actual_null, expected_null):
+            raise ValueError(f"{label} null policy differs: {name}")
+        left = actual[name].drop_nulls()
+        right = expected[name].drop_nulls()
+        if actual.schema[name].is_numeric() and expected.schema[name].is_numeric():
+            if actual.schema[name].is_float() or expected.schema[name].is_float():
+                equal = np.allclose(
+                    left.to_numpy(),
+                    right.to_numpy(),
+                    rtol=1e-10,
+                    atol=1e-12,
+                )
+            else:
+                equal = np.array_equal(left.to_numpy(), right.to_numpy())
+        else:
+            equal = left.to_list() == right.to_list()
+        if not equal:
+            raise ValueError(f"{label} does not reconstruct: {name}")
+
+
+def _require_nested_close(actual: object, expected: object, label: str) -> None:
+    if isinstance(expected, dict):
+        if not isinstance(actual, dict) or set(actual) != set(expected):
+            raise ValueError(f"{label} keys do not reconstruct")
+        for key, value in expected.items():
+            _require_nested_close(actual[key], value, f"{label}/{key}")
+        return
+    if isinstance(expected, list):
+        if not isinstance(actual, list) or len(actual) != len(expected):
+            raise ValueError(f"{label} list does not reconstruct")
+        for index, value in enumerate(expected):
+            _require_nested_close(actual[index], value, f"{label}/{index}")
+        return
+    if isinstance(expected, (int, float)) and not isinstance(expected, bool):
+        if not isinstance(actual, (int, float)) or not np.isclose(
+            actual, expected, rtol=1e-10, atol=1e-12
+        ):
+            raise ValueError(f"{label} value does not reconstruct")
+        return
+    if actual != expected:
+        raise ValueError(f"{label} value does not reconstruct")
+
+
 def validate_heteroskedasticity_diagnostics(output_dir: Path) -> None:
-    summary = json.loads(
-        (output_dir / "heteroskedasticity_summary.json").read_text(encoding="utf-8")
-    )
-    if (
-        summary.get("schema") != DIAGNOSTIC_SCHEMA
-        or summary.get("test_accessed") is not False
-    ):
-        raise ValueError("Invalid heteroskedasticity summary contract")
     lineage = json.loads(
         (output_dir / "diagnostics_manifest.json").read_text(encoding="utf-8")
     )
@@ -730,27 +820,237 @@ def validate_heteroskedasticity_diagnostics(output_dir: Path) -> None:
         raise ValueError("Heteroskedasticity profile hash mismatch")
     if set(lineage["stores"]) != set(ARMS):
         raise ValueError("Heteroskedasticity store lineage is incomplete")
+    detail_names = (
+        "heteroskedasticity_by_bin.csv",
+        "heteroskedasticity_by_year.csv",
+        "heteroskedasticity_by_security.csv",
+        "return_windows_by_decision_bin.csv",
+    )
+    derived_names = (
+        "heteroskedasticity_effect_sizes.csv",
+        "cross_security_dispersion.csv",
+    )
+    output_names = (
+        *detail_names,
+        *derived_names,
+        "heteroskedasticity_summary.json",
+        "heteroskedasticity_summary.md",
+    )
+    if set(lineage.get("output_sha256", {})) != set(output_names):
+        raise ValueError("Heteroskedasticity output inventory is invalid")
     for name, expected_hash in lineage["output_sha256"].items():
         if sha256_file(output_dir / name) != expected_hash:
             raise ValueError(f"Heteroskedasticity output hash mismatch: {name}")
-    required = {
-        "heteroskedasticity_by_bin.csv": (len(ARMS) * 2 * len(CHANNELS), None),
-        "heteroskedasticity_by_year.csv": (1, None),
-        "heteroskedasticity_by_security.csv": (1, None),
-        "return_windows_by_decision_bin.csv": (1, None),
-        "heteroskedasticity_effect_sizes.csv": (
-            len(ARMS) * 2 * len(CHANNELS),
-            None,
-        ),
-        "cross_security_dispersion.csv": (len(ARMS) * 2 * len(CHANNELS), None),
+
+    frames = {
+        name: pl.read_csv(output_dir / name) for name in (*detail_names, *derived_names)
     }
-    for filename, (minimum, _) in required.items():
-        frame = pl.read_csv(output_dir / filename)
-        if frame.height < minimum or frame.height != summary["row_counts"][filename]:
-            raise ValueError(f"Diagnostic row-count mismatch: {filename}")
-        if set(frame["arm"]) != set(ARMS):
-            raise ValueError(f"Diagnostic arm mismatch: {filename}")
+    profile_path = Path(profile["path"])
+    _, _ = load_equity_tod_profile(profile_path)
+    profile_frame = pl.read_csv(
+        profile_path / "equity_tod_profile.csv", try_parse_dates=True
+    )
+    date_rows = profile_frame.filter(pl.col("bin_idx") == 0).sort("date_idx")
+    split_dates = {
+        "train": date_rows.filter(
+            pl.col("trade_date").is_between(TRAIN_START, TRAIN_END)
+        )["date_idx"].to_numpy(),
+        "validation": date_rows.filter(
+            pl.col("trade_date").is_between(VALIDATION_START, VALIDATION_END)
+        )["date_idx"].to_numpy(),
+    }
+    split_years = {
+        split: tuple(
+            sorted(
+                set(
+                    date_rows.filter(pl.col("date_idx").is_in(indices.tolist()))[
+                        "trade_date"
+                    ].dt.year()
+                )
+            )
+        )
+        for split, indices in split_dates.items()
+    }
+    legacy_store = Path(lineage["stores"]["legacy_daily_vol"])
+    security_ids = tuple(
+        pl.read_parquet(legacy_store / "equity_index.parquet")
+        .sort("equity_slot")["security_id"]
+        .to_list()
+    )
+    splits = ("train", "validation")
+    bins = tuple(range(math.ceil(VISIBLE_EQUITY_MINUTES / PROFILE_BIN_MINUTES)))
+    all_bins = (-1, *bins)
+    channel_names = tuple(CHANNELS.values())
+    return_names = tuple(CHANNELS[channel] for channel in RETURN_CHANNEL_WINDOWS)
+
+    expected_lattices = {
+        "heteroskedasticity_by_bin.csv": (
+            ("arm", "split", "channel", "bin_idx"),
+            set(product(ARMS, splits, channel_names, bins)),
+        ),
+        "heteroskedasticity_by_year.csv": (
+            ("arm", "split", "year", "channel", "bin_idx"),
+            {
+                (arm, split, year, channel, bin_idx)
+                for arm in ARMS
+                for split in splits
+                for year in split_years[split]
+                for channel in channel_names
+                for bin_idx in all_bins
+            },
+        ),
+        "heteroskedasticity_by_security.csv": (
+            ("arm", "split", "channel", "security_id", "bin_idx"),
+            set(product(ARMS, splits, channel_names, security_ids, all_bins)),
+        ),
+        "return_windows_by_decision_bin.csv": (
+            ("arm", "split", "channel", "bin_idx"),
+            set(product(ARMS, splits, return_names, bins)),
+        ),
+        "heteroskedasticity_effect_sizes.csv": (
+            ("arm", "split", "channel"),
+            set(product(ARMS, splits, channel_names)),
+        ),
+        "cross_security_dispersion.csv": (
+            ("arm", "split", "channel", "bin_idx"),
+            set(product(ARMS, splits, channel_names, all_bins)),
+        ),
+    }
+    for filename, frame in frames.items():
+        key_columns, expected = expected_lattices[filename]
+        keys = list(frame.select(key_columns).iter_rows())
+        if len(keys) != len(set(keys)) or set(keys) != expected:
+            raise ValueError(f"Diagnostic lattice mismatch: {filename}")
+        if frame["arm"].unique(maintain_order=True).to_list() != list(ARMS):
+            raise ValueError(f"Diagnostic arm order mismatch: {filename}")
+        if "gamma" in frame.columns:
+            for row in frame.select("arm", "gamma").unique().iter_rows(named=True):
+                if row["gamma"] != ARMS[row["arm"]]:
+                    raise ValueError(f"Diagnostic gamma mismatch: {filename}")
         _finite_columns(frame, ("security_id", "channel", "arm", "split"))
-    primary = summary["primary_results"]
-    if [row["arm"] for row in primary] != list(ARMS):
-        raise ValueError("Primary diagnostic results have the wrong arm order")
+
+    distribution_columns = (
+        "mean",
+        "standard_deviation",
+        "signed_log_standard_deviation",
+        "median",
+        "mad",
+        "p01",
+        "p05",
+        "p95",
+        "p99",
+        "zero_fraction",
+        "lower_clipping_fraction",
+        "upper_clipping_fraction",
+    )
+    for filename in detail_names:
+        frame = frames[filename]
+        for row in frame.iter_rows(named=True):
+            valid = int(row["valid_count"])
+            possible = int(row["possible_count"])
+            if valid < 0 or possible < 0 or valid > possible:
+                raise ValueError(f"Invalid diagnostic counts: {filename}")
+            expected_fraction = None if possible == 0 else valid / possible
+            actual_fraction = row["observed_fraction"]
+            if expected_fraction is None:
+                if actual_fraction is not None:
+                    raise ValueError(f"Invalid zero-possible coverage: {filename}")
+            elif actual_fraction is None or not np.isclose(
+                actual_fraction, expected_fraction, rtol=0.0, atol=1e-12
+            ):
+                raise ValueError(
+                    f"Diagnostic coverage does not reconstruct: {filename}"
+                )
+            minimum = (
+                100
+                if filename == "heteroskedasticity_by_security.csv"
+                and int(row["bin_idx"]) >= 0
+                else 2
+            )
+            insufficient = possible == 0 or valid < minimum
+            nulls = [row[name] is None for name in distribution_columns]
+            if insufficient:
+                if not all(nulls):
+                    raise ValueError(
+                        f"Insufficient diagnostic group is non-null: {filename}"
+                    )
+                continue
+            if any(nulls) or row["standard_deviation"] <= 0.0:
+                raise ValueError(f"Sufficient diagnostic group is invalid: {filename}")
+            if not np.isclose(
+                row["signed_log_standard_deviation"],
+                math.log(row["standard_deviation"]),
+                rtol=0.0,
+                atol=1e-12,
+            ):
+                raise ValueError(
+                    f"Diagnostic signed log-std is inconsistent: {filename}"
+                )
+            if not (
+                row["p01"] <= row["p05"] <= row["median"] <= row["p95"] <= row["p99"]
+            ):
+                raise ValueError(f"Diagnostic quantiles are inconsistent: {filename}")
+            for name in (
+                "zero_fraction",
+                "lower_clipping_fraction",
+                "upper_clipping_fraction",
+            ):
+                if not 0.0 <= row[name] <= 1.0:
+                    raise ValueError(
+                        f"Diagnostic fraction is outside [0,1]: {filename}/{name}"
+                    )
+
+    for filename in (
+        "heteroskedasticity_by_bin.csv",
+        "return_windows_by_decision_bin.csv",
+    ):
+        for row in frames[filename].iter_rows(named=True):
+            expected = _profile_aggregate(
+                profile_frame,
+                split_dates[row["split"]],
+                int(row["bin_idx"]),
+                ARMS[row["arm"]],
+            )
+            for name, value in expected.items():
+                if not np.isclose(row[name], value, rtol=1e-12, atol=1e-12):
+                    raise ValueError(
+                        f"Diagnostic profile aggregate mismatch: {filename}/{name}"
+                    )
+
+    expected_effects = pl.DataFrame(
+        _effect_size_rows(
+            frames["heteroskedasticity_by_bin.csv"],
+            frames["heteroskedasticity_by_year.csv"],
+            frames["heteroskedasticity_by_security.csv"],
+        )
+    )
+    expected_cross = pl.DataFrame(
+        _cross_security_rows(frames["heteroskedasticity_by_security.csv"])
+    )
+    _assert_diagnostic_frame(
+        frames["heteroskedasticity_effect_sizes.csv"],
+        expected_effects,
+        ("arm", "split", "channel"),
+        "heteroskedasticity effect sizes",
+    )
+    _assert_diagnostic_frame(
+        frames["cross_security_dispersion.csv"],
+        expected_cross,
+        ("arm", "split", "channel", "bin_idx"),
+        "cross-security dispersion",
+    )
+    reconstructed_outputs = {
+        **{name: frames[name] for name in detail_names},
+        "heteroskedasticity_effect_sizes.csv": expected_effects,
+        "cross_security_dispersion.csv": expected_cross,
+    }
+    expected_summary = _diagnostic_summary(
+        reconstructed_outputs, profile["manifest_sha256"]
+    )
+    summary = json.loads(
+        (output_dir / "heteroskedasticity_summary.json").read_text(encoding="utf-8")
+    )
+    _require_nested_close(summary, expected_summary, "heteroskedasticity summary")
+    expected_markdown = _diagnostic_markdown(expected_summary).encode("utf-8")
+    if (output_dir / "heteroskedasticity_summary.md").read_bytes() != expected_markdown:
+        raise ValueError("Heteroskedasticity Markdown does not reconstruct")

@@ -9,6 +9,13 @@ from pathlib import Path
 import numpy as np
 from numpy.lib.format import open_memmap
 
+from brazil_rv.modeling.contract import (
+    TRAIN_END,
+    TRAIN_START,
+    VALIDATION_END,
+    VALIDATION_START,
+)
+
 from .contract import EXPECTED_EQUITIES
 from .human_prior_input import load_human_priors
 from .intraday_normalization import (
@@ -29,6 +36,7 @@ from .intraday_normalization import (
     parent_identity,
     repository_commit,
     sha256_file,
+    validate_equity_tod_profile,
     workspace_path,
     write_canonical_json,
 )
@@ -140,6 +148,7 @@ def _populate_raw_channels(
             candidate, candidate_valid = build_seasonal_dynamic_features(
                 equity.raw_grid,
                 equity.observed,
+                equity.data_ready,
                 equity.sigma,
                 relative_variance,
                 gamma,
@@ -394,8 +403,13 @@ def build_intraday_normalization_variants(
 
 
 def validate_intraday_normalization_variant(
-    variant: Path, *, verify_parent_hashes: bool = True
+    variant: Path,
+    expected_arm: str,
+    *,
+    verify_parent_hashes: bool = True,
 ) -> dict[str, object]:
+    if expected_arm not in tuple(ARMS)[1:]:
+        raise ValueError(f"Unsupported candidate arm: {expected_arm}")
     manifest_path = variant / VARIANT_MANIFEST
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema") != VARIANT_SCHEMA:
@@ -403,43 +417,118 @@ def validate_intraday_normalization_variant(
     if manifest.get("repository_commit") != repository_commit():
         raise ValueError("Normalization variant repository commit mismatch")
     if (
+        manifest.get("arm") != expected_arm
+        or manifest.get("gamma") != ARMS[expected_arm]
+    ):
+        raise ValueError("Normalization variant arm/gamma mismatch")
+    if (
         manifest.get("test_accessed") is not False
         or manifest.get("test_rows_present") is not False
     ):
         raise ValueError("Normalization variant is not development-only")
+    expected_files = {VARIANT_MANIFEST, DYNAMIC_OVERLAY_FILE, PEER_OVERLAY_FILE}
+    if {path.name for path in variant.iterdir()} != expected_files:
+        raise ValueError("Normalization variant file inventory is invalid")
     parent = workspace_path(manifest["canonical_parent_feature_store"]["path"])
     context = load_source_context(parent)
-    if manifest["canonical_parent_feature_store"] != parent_identity(context):
+    expected_parent = parent_identity(context)
+    if manifest.get("canonical_parent_feature_store") != expected_parent:
         raise ValueError("Normalization variant parent identity mismatch")
-    if verify_parent_hashes and manifest[
+    if verify_parent_hashes and manifest.get(
         "parent_artifact_sha256"
-    ] != parent_artifact_hashes(context):
+    ) != parent_artifact_hashes(context):
         raise ValueError("Normalization variant parent hashes mismatch")
+    if manifest.get("contract_version") != context.manifest["contract_version"]:
+        raise ValueError("Normalization variant contract version mismatch")
+    if manifest.get("split_boundaries") != {
+        "training": [str(TRAIN_START), str(TRAIN_END)],
+        "validation": [str(VALIDATION_START), str(VALIDATION_END)],
+    }:
+        raise ValueError("Normalization variant split boundaries mismatch")
+    if manifest.get("allowed_date_count") != context.allowed_date_count or manifest.get(
+        "allowed_date_end"
+    ) != str(VALIDATION_END):
+        raise ValueError("Normalization variant development date boundary mismatch")
     profile = manifest["profile"]
     profile_dir = Path(profile["path"])
     profile_manifest_path = profile_dir / "equity_tod_profile.json"
     if sha256_file(profile_manifest_path) != profile["manifest_sha256"]:
         raise ValueError("Normalization profile manifest hash mismatch")
-    profile_manifest, _ = load_equity_tod_profile(profile_dir)
+    profile_manifest, _ = validate_equity_tod_profile(
+        profile_dir, expected_context=context
+    )
     if profile_manifest["artifacts"] != profile["artifact_sha256"]:
         raise ValueError("Normalization profile artifact identity mismatch")
-    if manifest["profile_estimator_configuration"] != profile_manifest["configuration"]:
+    if (
+        manifest.get("profile_estimator_configuration")
+        != profile_manifest["configuration"]
+    ):
         raise ValueError("Normalization estimator configuration mismatch")
     if (
-        manifest["profile_freeze_date"]
+        manifest.get("profile_freeze_date")
         != profile_manifest["training_profile_freeze_date"]
     ):
         raise ValueError("Normalization profile freeze date mismatch")
-    for key in ("dynamic_overlay", "peer_overlay"):
-        entry = manifest[key]
-        path = variant / entry["file"]
+    if manifest.get("validation_update_rule") != "frozen_training_end_profile":
+        raise ValueError("Normalization validation profile rule mismatch")
+    expected_dynamic = {
+        "file": DYNAMIC_OVERLAY_FILE,
+        "shape": [
+            context.allowed_date_count,
+            EXPECTED_EQUITIES,
+            VISIBLE_EQUITY_MINUTES,
+            len(AFFECTED_DYNAMIC_CHANNELS),
+        ],
+        "dtype": "float32",
+        "channels": list(AFFECTED_DYNAMIC_CHANNELS),
+    }
+    expected_peer = {
+        "file": PEER_OVERLAY_FILE,
+        "shape": [
+            context.allowed_date_count,
+            EXPECTED_EQUITIES,
+            len(DECISION_FEATURE_MINUTES),
+            len(AFFECTED_PEER_CHANNELS),
+        ],
+        "dtype": "float32",
+        "minutes": list(DECISION_FEATURE_MINUTES),
+        "channels": list(AFFECTED_PEER_CHANNELS),
+    }
+    for key, expected in (
+        ("dynamic_overlay", expected_dynamic),
+        ("peer_overlay", expected_peer),
+    ):
+        entry = manifest.get(key)
+        if not isinstance(entry, dict) or any(
+            entry.get(name) != value for name, value in expected.items()
+        ):
+            raise ValueError(f"Normalization overlay metadata mismatch: {key}")
+        if set(entry) != {*expected, "sha256"}:
+            raise ValueError(f"Normalization overlay metadata has extra fields: {key}")
+        path = variant / str(entry["file"])
         if sha256_file(path) != entry["sha256"]:
             raise ValueError(f"Normalization overlay hash mismatch: {path.name}")
         values = np.load(path, mmap_mode="r", allow_pickle=False)
-        if list(values.shape) != entry["shape"] or values.dtype != np.dtype(
-            entry["dtype"]
-        ):
+        if list(values.shape) != expected["shape"] or values.dtype != np.float32:
             raise ValueError(f"Normalization overlay contract mismatch: {path.name}")
         if not np.isfinite(values).all():
             raise ValueError(f"Normalization overlay is non-finite: {path.name}")
+    if manifest.get("affected_arrays") != {
+        "equity_features.npy": list(AFFECTED_DYNAMIC_CHANNELS),
+        "equity_peer_features.npy": list(AFFECTED_PEER_CHANNELS),
+    }:
+        raise ValueError("Normalization affected-array contract mismatch")
+    expected_parent_bound = sorted(
+        filename
+        for filename in context.manifest["outputs"]
+        if filename not in {"equity_features.npy", "equity_peer_features.npy"}
+    )
+    if manifest.get("parent_bound_arrays") != expected_parent_bound:
+        raise ValueError("Normalization parent-bound array contract mismatch")
+    if manifest.get("parent_bound_dynamic_channels") != list(
+        INVARIANT_DYNAMIC_CHANNELS
+    ):
+        raise ValueError("Normalization parent-bound dynamic channels mismatch")
+    if manifest.get("parent_bound_peer_channels") != [2, 3]:
+        raise ValueError("Normalization parent-bound peer channels mismatch")
     return manifest

@@ -1109,8 +1109,14 @@ def validate_completed_run(
     run_dir: Path,
     store: Path,
     expected: dict[str, Any],
+    *,
+    feature_store_metadata: dict[str, object] | None = None,
 ) -> None:
-    store_identity = feature_store_identity(store)
+    store_identity = (
+        feature_store_identity(store)
+        if feature_store_metadata is None
+        else feature_store_metadata
+    )
     _require_equal(
         "expected feature-store identity",
         expected["feature_store_identity"],

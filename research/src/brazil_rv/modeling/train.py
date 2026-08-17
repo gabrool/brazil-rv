@@ -233,11 +233,16 @@ def _run_neural(
     fit_name: str = "train",
     selection_name: str = "validation",
     allow_date_replacement: bool = False,
+    feature_store_metadata: dict[str, object] | None = None,
 ) -> None:
     torch.set_float32_matmul_precision("high")
     settings = _tcn_settings_from_args(args)
     architecture = architecture_for_model(args.model, settings)
-    store_identity = feature_store_identity(store)
+    store_identity = (
+        feature_store_identity(store)
+        if feature_store_metadata is None
+        else feature_store_metadata
+    )
     fit_window = sample_window_metadata(train_rows, fit_name)
     selection_window = sample_window_metadata(validation_rows, selection_name)
     loaders = create_training_loaders(
