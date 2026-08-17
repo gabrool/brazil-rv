@@ -90,7 +90,11 @@ def test_real_populate_raw_channels_passes_and_respects_data_ready(
         )
     np.save(parent / "equity_data_ready.npy", parent_ready, allow_pickle=False)
     np.save(parent / "equity_features.npy", parent_dynamic, allow_pickle=False)
-    context = SimpleNamespace(parent=parent, allowed_date_count=date_count)
+    context = SimpleNamespace(
+        parent=parent,
+        allowed_date_count=date_count,
+        development_inactive_slots=frozenset(),
+    )
     overlays = {
         arm: np.zeros(
             (
@@ -216,9 +220,13 @@ def test_raw_source_identity_hashes_only_canonical_development_rows(
             }
         ).select(SOURCE_COLUMNS).write_parquet(path)
 
+    market_dates = (date(2025, 6, 29), date(2025, 6, 30))
     context = SimpleNamespace(
-        assignments=pl.DataFrame({"source_file": [str(path)]}),
-        market_dates=(date(2025, 6, 29), date(2025, 6, 30)),
+        assignments=pl.DataFrame(
+            {"security_id": ["security"], "source_file": [str(path)]}
+        ),
+        accepted_dates={"security": frozenset(market_dates)},
+        market_dates=market_dates,
     )
     monkeypatch.setattr(
         normalization,

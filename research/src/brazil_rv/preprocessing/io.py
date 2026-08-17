@@ -161,6 +161,8 @@ def load_market_dates_and_security_dates(
     security_ids: tuple[str, ...],
     research_start: date,
     research_end: date,
+    *,
+    allow_empty_security_dates: bool = False,
 ) -> tuple[tuple[date, ...], dict[str, frozenset[date]]]:
     daily = (
         pl.scan_parquet(files)
@@ -183,12 +185,15 @@ def load_market_dates_and_security_dates(
         for security_id in security_ids
         if not dates_by_security.get(security_id)
     ]
-    if missing:
+    if missing and not allow_empty_security_dates:
         raise ValueError(
             "Accepted securities without exact COTAHIST dates in requested "
             f"interval [{research_start}, {research_end}]: {missing}"
         )
-    return market_dates, dates_by_security
+    return market_dates, {
+        security_id: dates_by_security.get(security_id, frozenset())
+        for security_id in security_ids
+    }
 
 
 def expand_membership(

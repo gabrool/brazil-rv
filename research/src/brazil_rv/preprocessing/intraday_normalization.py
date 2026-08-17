@@ -143,6 +143,7 @@ class EquitySourceContext:
     market_dates: tuple[date, ...]
     accepted_dates: dict[str, frozenset[date]]
     slot_by_security: dict[str, int]
+    development_inactive_slots: frozenset[int]
     allowed_date_count: int
 
 
@@ -586,6 +587,38 @@ def _development_date_index(parent: Path) -> pl.DataFrame:
     return date_index
 
 
+def _validate_development_inactive_parent(
+    parent: Path,
+    allowed_date_count: int,
+    security_ids: tuple[str, ...],
+    inactive_slots: frozenset[int],
+) -> None:
+    if not inactive_slots:
+        return
+    membership = np.load(
+        parent / "equity_membership.npy", mmap_mode="r", allow_pickle=False
+    )
+    readiness = np.load(
+        parent / "equity_data_ready.npy", mmap_mode="r", allow_pickle=False
+    )
+    dynamic = np.load(parent / "equity_features.npy", mmap_mode="r", allow_pickle=False)
+    for slot in inactive_slots:
+        security_id = security_ids[slot]
+        if np.asarray(membership[:allowed_date_count, slot]).any():
+            raise ValueError(
+                f"Development-inactive security has parent membership: {security_id}"
+            )
+        if np.asarray(readiness[:allowed_date_count, slot]).any():
+            raise ValueError(
+                f"Development-inactive security has parent readiness: {security_id}"
+            )
+        values = np.asarray(dynamic[:allowed_date_count, slot])
+        if (values[..., AFFECTED_DYNAMIC_CHANNELS] != 0.0).any():
+            raise ValueError(
+                f"Development-inactive security has nonzero parent features: {security_id}"
+            )
+
+
 def load_source_context(parent: Path) -> EquitySourceContext:
     parent = parent.resolve()
     manifest = json.loads((parent / "manifest.json").read_text(encoding="utf-8"))
@@ -606,6 +639,7 @@ def load_source_context(parent: Path) -> EquitySourceContext:
         security_ids,
         research_start,
         VALIDATION_END,
+        allow_empty_security_dates=True,
     )
     if reconstructed_dates != market_dates:
         raise ValueError("Parent date axis differs from canonical COTAHIST")
@@ -613,6 +647,14 @@ def load_source_context(parent: Path) -> EquitySourceContext:
     equity_index = pl.read_parquet(parent / "equity_index.parquet").sort("equity_slot")
     if tuple(equity_index["security_id"]) != security_ids:
         raise ValueError("Assignment order differs from the parent equity axis")
+    inactive_slots = frozenset(
+        slot
+        for slot, security_id in enumerate(security_ids)
+        if not accepted_dates[security_id]
+    )
+    _validate_development_inactive_parent(
+        parent, allowed_date_count, security_ids, inactive_slots
+    )
     return EquitySourceContext(
         parent,
         manifest,
@@ -620,6 +662,7 @@ def load_source_context(parent: Path) -> EquitySourceContext:
         market_dates,
         accepted_dates,
         {security_id: slot for slot, security_id in enumerate(security_ids)},
+        inactive_slots,
         allowed_date_count,
     )
 
@@ -639,12 +682,19 @@ def iter_reconstructed_equities(
     market_dates = context.market_dates[: context.allowed_date_count]
     all_dates = frozenset(market_dates)
     for group in context.assignments.partition_by("source_file", maintain_order=True):
+        group_ids = tuple(group.get_column("security_id").to_list())
+        active_ids = tuple(
+            security_id
+            for security_id in group_ids
+            if context.accepted_dates[security_id]
+        )
+        if not active_ids:
+            continue
         source_path = workspace_path(group.item(0, "source_file"))
         source = _load_source_through_validation(source_path, market_dates[0])
         validate_physical_source_identity(group, source, source_path)
-        group_ids = tuple(group.get_column("security_id").to_list())
         allowed_dates = frozenset().union(
-            *(context.accepted_dates[security_id] for security_id in group_ids)
+            *(context.accepted_dates[security_id] for security_id in active_ids)
         )
         if not allowed_dates <= all_dates:
             raise ValueError("Accepted equity dates enter the held-out period")
@@ -658,8 +708,11 @@ def iter_reconstructed_equities(
         )
         for assignment in group.iter_rows(named=True):
             security_id = str(assignment["security_id"])
+            accepted_dates = context.accepted_dates[security_id]
+            if not accepted_dates:
+                continue
             bars = session_bars.filter(
-                pl.col("trade_date").is_in(tuple(context.accepted_dates[security_id]))
+                pl.col("trade_date").is_in(tuple(accepted_dates))
             )
             if bars.is_empty():
                 raise ValueError(f"No accepted bars for {security_id}")
@@ -812,7 +865,14 @@ def development_parent_identity_from_store(parent: Path) -> dict[str, object]:
 
 def equity_source_hashes(context: EquitySourceContext) -> dict[str, object]:
     paths = sorted(
-        {workspace_path(value) for value in context.assignments["source_file"]},
+        {
+            workspace_path(group.item(0, "source_file"))
+            for group in context.assignments.partition_by("source_file")
+            if any(
+                context.accepted_dates[security_id]
+                for security_id in group.get_column("security_id")
+            )
+        },
         key=str,
     )
     first_date = context.market_dates[0]
@@ -858,6 +918,7 @@ def build_equity_tod_profile(
     total_sq = np.zeros_like(total)
     count = np.zeros(total.shape, dtype=np.int64)
     seen = np.zeros(EXPECTED_EQUITIES, dtype=bool)
+    seen[list(context.development_inactive_slots)] = True
     for equity in iter_reconstructed_equities(context):
         if seen[equity.slot]:
             raise ValueError(f"Equity slot {equity.slot} was assigned twice")

@@ -61,7 +61,8 @@ def test_profile_to_real_overlay_validator_loader_and_model_batch(
 ) -> None:
     date_count = 2
     parent_date_count = 3
-    equity_count = 2
+    equity_count = 3
+    active_equity_count = 2
     parent = tmp_path / "parent"
     profile_dir = tmp_path / "profile"
     output = tmp_path / "variants"
@@ -82,14 +83,15 @@ def test_profile_to_real_overlay_validator_loader_and_model_batch(
     (profile_dir / "equity_tod_profile.csv").write_text("fixture\n", encoding="utf-8")
 
     ready = np.zeros((parent_date_count, equity_count), dtype=bool)
-    ready[1] = True
-    membership = np.ones_like(ready)
+    ready[1, :active_equity_count] = True
+    membership = np.zeros_like(ready)
+    membership[:, :active_equity_count] = True
     parent_dynamic = np.zeros(
         (parent_date_count, equity_count, EQUITY_SESSION_MINUTES, 26),
         dtype=np.float32,
     )
     equities: list[ReconstructedEquity] = []
-    for slot in range(equity_count):
+    for slot in range(active_equity_count):
         raw, observed = _raw_path(
             np.full(
                 (date_count, EQUITY_SESSION_MINUTES),
@@ -133,7 +135,7 @@ def test_profile_to_real_overlay_validator_loader_and_model_batch(
         selected_group_id=np.zeros((date_count, equity_count), dtype=np.int64),
         sector_group_id=np.zeros(equity_count, dtype=np.int64),
         subsector_group_id=np.zeros(equity_count, dtype=np.int64),
-        issuer_ids=("issuer", "issuer"),
+        issuer_ids=tuple("issuer" for _ in range(equity_count)),
     )
     parent_peer = np.zeros(
         (parent_date_count, equity_count, EQUITY_SESSION_MINUTES, 6), dtype=np.float32
@@ -190,6 +192,7 @@ def test_profile_to_real_overlay_validator_loader_and_model_batch(
         parent=parent,
         allowed_date_count=date_count,
         market_dates=dates,
+        development_inactive_slots=frozenset({2}),
         manifest={"contract_version": "fixture", "outputs": outputs},
     )
     parent_identity = {
@@ -245,6 +248,12 @@ def test_profile_to_real_overlay_validator_loader_and_model_batch(
 
     for arm in ("equity_tod_half", "equity_tod_full"):
         manifest = variants.validate_intraday_normalization_variant(built[arm], arm)
+        assert not np.load(
+            built[arm] / variants.DYNAMIC_OVERLAY_FILE, allow_pickle=False
+        )[:, 2].any()
+        assert not np.load(built[arm] / variants.PEER_OVERLAY_FILE, allow_pickle=False)[
+            :, 2
+        ].any()
         assert {22, 23} <= set(manifest["dynamic_overlay"]["channels"])
         assert {18, 19} <= set(manifest["parent_bound_dynamic_channels"])
         arrays = open_variant_arrays(

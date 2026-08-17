@@ -134,6 +134,7 @@ def _populate_raw_channels(
         AFFECTED_DYNAMIC_CHANNELS.index(value) for value in raw_channels
     )
     seen = np.zeros(EXPECTED_EQUITIES, dtype=bool)
+    seen[list(context.development_inactive_slots)] = True
     for equity in iter_reconstructed_equities(context):
         if seen[equity.slot]:
             raise ValueError(f"Equity slot {equity.slot} was reconstructed twice")
