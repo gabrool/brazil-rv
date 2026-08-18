@@ -1425,3 +1425,26 @@ def test_preprocessing_paths_follow_brazil_rv_root(tmp_path: Path) -> None:
     lines = result.stdout.strip().splitlines()
     assert Path(lines[0]).resolve() == project.resolve()
     assert Path(lines[1]).resolve() == target.resolve()
+
+
+def test_global_source_audit_resolves_recorded_workspace_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_source = tmp_path / "source.dbn.zst"
+    raw_source.write_bytes(b"immutable source")
+    normalized_source = tmp_path / "normalized"
+    normalized_source.mkdir()
+    recorded = r"C:\Brazil-RV\quant-data\b3\raw\databento\global_context\source.dbn.zst"
+    resolved: list[str] = []
+    monkeypatch.setattr(
+        audit_module,
+        "workspace_path",
+        lambda value: resolved.append(value) or raw_source,
+    )
+    monkeypatch.setattr(audit_module, "GLOBAL_CONTEXT_SYMBOLS", ())
+    manifest = {
+        "source_hashes": {recorded: audit_module._sha256(raw_source)},
+        "normalized_hashes": {},
+    }
+    assert audit_module._audit_global_source(normalized_source, manifest) == []

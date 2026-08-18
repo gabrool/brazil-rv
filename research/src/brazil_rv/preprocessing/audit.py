@@ -20,6 +20,7 @@ from ..modeling.contract import (
     TRAIN_START,
     VALIDATION_END,
     VALIDATION_START,
+    workspace_path,
 )
 
 from .contract import (
@@ -799,7 +800,7 @@ def _audit_global_source(
     source_dir: Path, source_manifest: dict[str, object]
 ) -> list[dict[str, object]]:
     for path_text, expected in source_manifest["source_hashes"].items():
-        path = Path(path_text)
+        path = workspace_path(path_text)
         if not path.is_file() or _sha256(path) != expected:
             raise ValueError(f"Global source hash mismatch: {path}")
     for relative, expected in source_manifest["normalized_hashes"].items():
