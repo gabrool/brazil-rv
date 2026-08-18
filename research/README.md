@@ -13,27 +13,29 @@ uv sync --project research --no-default-groups --group preprocessing
 # Build, audit, and atomically promote the peer-free causal-TOD feature store
 uv run --project research python -m brazil_rv.preprocessing.build
 
-# One current TCN run
+# One current hybrid-loss TCN run, using a campaign-built target-scale sidecar
 uv run --project research python -m brazil_rv.modeling.train `
-  --seed 29 `
-  --recency-policy uniform
+  --seed 11 `
+  --recency-policy uniform `
+  --target-scale-dir <target-scale-directory>
 
-# Resumable 21-run validation-only campaign
-uv run --project research python -m brazil_rv.modeling.run_core_campaign
+# Resumable two-run hybrid-loss and residual-attention campaign
+uv run --project research --no-default-groups --group preprocessing python -m `
+  brazil_rv.modeling.run_loss_attention_campaign `
+  --source-campaign-dir <completed-PIT-clean-campaign-directory> `
+  --output-dir <new-campaign-directory>
 
-# Standalone evaluation; test access must be explicit
+# Standalone development evaluation
 uv run --project research python -m brazil_rv.modeling.evaluate `
   --run-dir <run-directory>
-uv run --project research python -m brazil_rv.modeling.evaluate `
-  --run-dir <run-directory> `
-  --split test
 ```
 
 The fixed recipe is a width-64, full-receptive-field SwiGLU causal TCN with
 final-state readout, the masked context policy, context-plus-pooled fusion, all
-three horizons, soft Spearman at temperature 0.50, and SAM-AdamW at rho 0.125.
-The campaign temporarily exposes recency policy and one final-state
-cross-equity-attention candidate; losing branches are removed after selection.
+three horizons, and SAM-AdamW at rho 0.125. The current objective adds a
+gap-weighted pairwise term at weight 0.25 to soft Spearman. The attention arm
+attends only to cross-sectionally residualized equity states; the original state
+and macro/context-plus-pooled fusion remain on their existing residual routes.
 
 See the repository-root [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for the
 durable accepted contract.

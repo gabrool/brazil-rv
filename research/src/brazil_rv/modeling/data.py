@@ -29,6 +29,7 @@ from .contract import (
     GH200_RUNTIME,
     GLOBAL_CONTEXT_COUNT,
     GLOBAL_WINDOW_MINUTES,
+    HORIZONS,
     HORIZON_COUNT,
     LOCAL_CONTEXT_COUNT,
     PATCH_INPUT_WIDTH,
@@ -56,12 +57,15 @@ FEATURE_ARRAY_FILES = (
     "context_slow.npy",
     "context_data_ready.npy",
     "targets.npy",
+    "cross_section_median.npy",
     "global_features.npy",
     "global_slow.npy",
     "global_data_ready.npy",
     "label_mask.npy",
     "raw_returns.npy",
 )
+TARGET_SCALE_SCHEMA = "PIT_CLEAN_TARGET_SCALE"
+TARGET_SCALE_FILE = "target_scale.npy"
 
 
 @dataclass(frozen=True)
@@ -88,6 +92,35 @@ def feature_store_identity(store: Path) -> dict[str, object]:
         "path": str(store.resolve()),
         "contract_version": schema["contract_version"],
         "metadata_sha256": digest.hexdigest(),
+    }
+
+
+def target_scale_identity(
+    directory: Path, source_feature_store: dict[str, object]
+) -> dict[str, object]:
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    scale_path = directory / TARGET_SCALE_FILE
+    digest = hashlib.sha256()
+    with scale_path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+    if (
+        manifest.get("schema") != TARGET_SCALE_SCHEMA
+        or manifest.get("source_feature_store") != source_feature_store
+        or manifest.get("through") != VALIDATION_END.isoformat()
+        or manifest.get("test_accessed") is not False
+        or manifest.get("target_scale_sha256") != digest.hexdigest()
+    ):
+        raise ValueError("Target-scale sidecar does not match its recorded contract")
+    scale = np.load(scale_path, mmap_mode="r", allow_pickle=False)
+    if list(scale.shape) != manifest.get("shape") or scale.dtype != np.float64:
+        raise ValueError("Target-scale array does not match its manifest")
+    return {
+        "path": str(directory.resolve()),
+        "schema": TARGET_SCALE_SCHEMA,
+        "target_scale_sha256": manifest["target_scale_sha256"],
+        "through": manifest["through"],
+        "source_feature_store": source_feature_store,
     }
 
 
@@ -233,6 +266,7 @@ def _common_batch(
     targets = np.zeros((batch_size, EQUITY_COUNT, HORIZON_COUNT), dtype=np.float32)
     label_mask = np.zeros_like(targets, dtype=bool)
     raw_returns = np.zeros_like(targets)
+    medians = np.zeros((batch_size, HORIZON_COUNT), dtype=np.float32)
     for decision in np.unique(decisions):
         group = np.flatnonzero(decisions == decision)
         targets[group] = arrays["targets.npy"][dates[group], :, int(decision), :]
@@ -240,6 +274,22 @@ def _common_batch(
         raw_returns[group] = arrays["raw_returns.npy"][
             dates[group], :, int(decision), :
         ]
+        medians[group] = arrays["cross_section_median.npy"][
+            dates[group], int(decision), :
+        ]
+    scale = np.asarray(arrays[TARGET_SCALE_FILE][dates], dtype=np.float64)
+    denominator = (
+        scale[:, :, None]
+        * np.sqrt(np.asarray(HORIZONS, dtype=np.float64))[None, None, :]
+    )
+    continuous_targets = np.zeros_like(raw_returns, dtype=np.float64)
+    np.divide(
+        raw_returns.astype(np.float64) - medians[:, None, :],
+        denominator,
+        out=continuous_targets,
+        where=label_mask,
+    )
+    continuous_targets = continuous_targets.astype(np.float32)
     training_weight = (
         np.ones(batch_size, dtype=np.float32)
         if date_weights is None
@@ -249,6 +299,7 @@ def _common_batch(
     targets[padded] = 0
     label_mask[padded] = False
     raw_returns[padded] = 0
+    continuous_targets[padded] = 0
     training_weight[padded] = 0
     sample_id[padded] = date_idx[padded] = decision_idx[padded] = -1
     return (
@@ -256,6 +307,7 @@ def _common_batch(
             "targets": targets,
             "label_mask": label_mask,
             "raw_returns": raw_returns,
+            "continuous_targets": continuous_targets,
             "training_weight": training_weight,
             "sample_valid_mask": sample_valid_mask,
             "sample_id": sample_id,
@@ -396,10 +448,12 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
     def __init__(
         self,
         store: Path,
+        target_scale_dir: Path,
         sample_index: pl.DataFrame,
         date_weights: np.ndarray | None = None,
     ) -> None:
         self.store = store
+        self.target_scale_dir = target_scale_dir
         self.date_weights = date_weights
         self.rows = {
             name: sample_index.get_column(name).to_numpy()
@@ -427,6 +481,11 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 name: np.load(self.store / name, mmap_mode="r", allow_pickle=False)
                 for name in FEATURE_ARRAY_FILES
             }
+            self._arrays[TARGET_SCALE_FILE] = np.load(
+                self.target_scale_dir / TARGET_SCALE_FILE,
+                mmap_mode="r",
+                allow_pickle=False,
+            )
         return self._arrays
 
     def __getitem__(self, request: BatchRequest) -> dict[str, np.ndarray]:
@@ -560,6 +619,7 @@ def _create_loader(
 
 def create_training_loaders(
     store: Path,
+    target_scale_dir: Path,
     train_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
     date_weights: np.ndarray,
@@ -572,13 +632,13 @@ def create_training_loaders(
 ]:
     sampler = DateStratifiedBatchSampler(train_rows, runtime, seed)
     train = _create_loader(
-        VectorizedFeatureDataset(store, train_rows, date_weights),
+        VectorizedFeatureDataset(store, target_scale_dir, train_rows, date_weights),
         sampler,
         runtime,
         seed,
     )
     validation = _create_loader(
-        VectorizedFeatureDataset(store, validation_rows),
+        VectorizedFeatureDataset(store, target_scale_dir, validation_rows),
         DecisionGroupedBatchSampler(validation_rows, runtime.evaluation_batch_size),
         runtime,
         seed,
@@ -588,12 +648,13 @@ def create_training_loaders(
 
 def create_evaluation_loader(
     store: Path,
+    target_scale_dir: Path,
     rows: pl.DataFrame,
     runtime: RuntimeSettings = GH200_RUNTIME,
     seed: int = 29,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
-        VectorizedFeatureDataset(store, rows),
+        VectorizedFeatureDataset(store, target_scale_dir, rows),
         DecisionGroupedBatchSampler(rows, runtime.evaluation_batch_size),
         runtime,
         seed,

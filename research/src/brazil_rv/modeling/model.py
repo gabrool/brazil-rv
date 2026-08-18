@@ -127,16 +127,26 @@ class SharedCausalTCN(nn.Module):
         raw = self._gather_hidden_states(hidden, batch_size, state_position)
         return self.state_norm(raw + self.slow_projection(slow_features))
 
+    @staticmethod
+    def _specific_attention_states(
+        normalized: torch.Tensor, equity_mask: torch.Tensor
+    ) -> torch.Tensor:
+        weight = equity_mask[..., None].to(normalized.dtype)
+        count = weight.sum(dim=1, keepdim=True).clamp_min(1.0)
+        common = (normalized * weight).sum(dim=1, keepdim=True) / count
+        return (normalized - common) * weight
+
     def _attend_equities(
         self, states: torch.Tensor, equity_mask: torch.Tensor
     ) -> torch.Tensor:
         if not self.cross_equity_attention:
             return states
         normalized = self.attention_norm(states)
+        specific = self._specific_attention_states(normalized, equity_mask)
         attended, _ = self.equity_attention(
-            normalized,
-            normalized,
-            normalized,
+            specific,
+            specific,
+            specific,
             key_padding_mask=~equity_mask,
             need_weights=False,
         )

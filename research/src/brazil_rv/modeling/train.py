@@ -32,6 +32,7 @@ from .data import (
     resolve_feature_store,
     sample_window_metadata,
     select_sample_split,
+    target_scale_identity,
 )
 from .engine import (
     EvaluationObservations,
@@ -55,6 +56,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, choices=ALLOWED_SEEDS, default=29)
     parser.add_argument("--recency-policy", choices=RECENCY_POLICIES, default="uniform")
     parser.add_argument("--cross-equity-attention", action="store_true")
+    parser.add_argument("--target-scale-dir", required=True, type=Path)
     parser.add_argument("--output-base", type=Path, default=RUN_OUTPUT_BASE)
     return parser.parse_args(arguments)
 
@@ -103,6 +105,7 @@ def _write_observations(path: Path, observations: EvaluationObservations) -> Non
 def run_training(
     *,
     store: Path,
+    target_scale_dir: Path,
     seed: int,
     recency_policy: str,
     cross_equity_attention: bool,
@@ -119,8 +122,11 @@ def run_training(
     train_rows, date_weights, recency = prepare_training_rows(
         raw_train_rows, recency_policy
     )
+    store_identity = feature_store_identity(store)
+    scale_identity = target_scale_identity(target_scale_dir, store_identity)
     train_loader, validation_loader, sampler = create_training_loaders(
         store,
+        target_scale_dir,
         train_rows,
         validation_rows,
         date_weights,
@@ -133,11 +139,12 @@ def run_training(
     scheduler, steps_per_epoch, warmup_steps = build_scheduler(
         optimizer, train_rows.height, MAX_EPOCHS
     )
-    store_identity = feature_store_identity(store)
     run_provenance = build_run_provenance(
         repository_commit_value=repository_commit(),
         feature_store=store,
         feature_store_metadata=store_identity,
+        target_scale_dir=target_scale_dir,
+        target_scale_metadata=scale_identity,
         cross_equity_attention=cross_equity_attention,
         seed=seed,
         recency=recency,
@@ -160,6 +167,8 @@ def run_training(
         "run_provenance": run_provenance,
         "feature_store": str(store.resolve()),
         "feature_store_identity": store_identity,
+        "target_scale": str(target_scale_dir.resolve()),
+        "target_scale_identity": scale_identity,
         "split": {
             "training": "train",
             "selection": "validation",
@@ -236,6 +245,8 @@ def run_training(
                     epoch=epoch,
                     validation_score=score,
                     feature_store=store,
+                    target_scale_dir=target_scale_dir,
+                    target_scale_identity=scale_identity,
                     run_provenance=run_provenance,
                 ),
             )
@@ -273,6 +284,7 @@ def _run(args: argparse.Namespace) -> Path:
     )
     return run_training(
         store=resolve_feature_store(),
+        target_scale_dir=args.target_scale_dir,
         seed=args.seed,
         recency_policy=args.recency_policy,
         cross_equity_attention=args.cross_equity_attention,

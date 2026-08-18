@@ -14,6 +14,7 @@ from .data import (
     create_evaluation_loader,
     load_sample_index,
     select_sample_split,
+    target_scale_identity,
     validate_feature_store_identity,
 )
 from .engine import EvaluationObservations, collect_evaluation_observations
@@ -29,6 +30,8 @@ REQUIRED_CHECKPOINT_KEYS = {
     "feature_store",
     "feature_store_identity",
     "model_state_dict",
+    "target_scale",
+    "target_scale_identity",
 }
 
 
@@ -49,7 +52,7 @@ def load_current_run(
     run_dir: Path,
     *,
     identity_cache: FeatureStoreIdentityCache | None = None,
-) -> tuple[torch.nn.Module, dict[str, object], Path]:
+) -> tuple[torch.nn.Module, dict[str, object], Path, Path]:
     torch.set_float32_matmul_precision("high")
     checkpoint = torch.load(
         run_dir / "best_checkpoint.pt", map_location="cpu", weights_only=False
@@ -65,11 +68,17 @@ def load_current_run(
         checkpoint["feature_store_identity"],
         identity_cache=identity_cache,
     )
+    target_scale_dir = Path(str(checkpoint["target_scale"])).resolve()
+    scale_identity = target_scale_identity(
+        target_scale_dir, checkpoint["feature_store_identity"]
+    )
+    if scale_identity != checkpoint["target_scale_identity"]:
+        raise ValueError("Checkpoint target-scale sidecar identity differs")
     model = build_model(
         cross_equity_attention=bool(checkpoint["cross_equity_attention"])
     )
     model.load_state_dict(checkpoint["model_state_dict"], strict=True)
-    return model, checkpoint, store
+    return model, checkpoint, store, target_scale_dir
 
 
 def collect_run_evaluation(
@@ -84,10 +93,18 @@ def collect_run_evaluation(
     dict[str, object],
     Path,
 ]:
-    model, checkpoint, store = load_current_run(run_dir, identity_cache=identity_cache)
+    if split == "test":
+        raise ValueError(
+            "The development-only continuous-target sidecar cannot access test rows"
+        )
+    model, checkpoint, store, target_scale_dir = load_current_run(
+        run_dir, identity_cache=identity_cache
+    )
     model = model.cuda()
     rows = select_sample_split(load_sample_index(store), split)
-    loader = create_evaluation_loader(store, rows, seed=int(checkpoint["seed"]))
+    loader = create_evaluation_loader(
+        store, target_scale_dir, rows, seed=int(checkpoint["seed"])
+    )
     observations, summary, daily = collect_evaluation_observations(model, loader)
     return observations, summary, daily, checkpoint, store
 

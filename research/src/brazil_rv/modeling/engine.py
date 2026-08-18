@@ -9,6 +9,8 @@ import torch
 from torch import nn
 
 from .contract import (
+    HYBRID_GAP_CLIP,
+    HYBRID_GAP_WEIGHT,
     GH200_RUNTIME,
     GRADIENT_CLIP,
     SAM_NORM_EPS,
@@ -23,7 +25,7 @@ from .metrics import create_metric_table, primary_validation_score
 from .provenance import model_metadata
 
 TrainingObjective = Callable[
-    [torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
+    [torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
 ]
 
 
@@ -51,7 +53,13 @@ def compile_model(
 
 
 def objective_metadata() -> dict[str, object]:
-    return {"name": "soft_spearman", "temperature": SOFT_RANK_TEMPERATURE}
+    return {
+        "name": "soft_spearman_plus_gap_pairwise",
+        "soft_spearman_temperature": SOFT_RANK_TEMPERATURE,
+        "gap_pairwise_temperature": SOFT_RANK_TEMPERATURE,
+        "gap_weight": HYBRID_GAP_WEIGHT,
+        "gap_clip": HYBRID_GAP_CLIP,
+    }
 
 
 def sam_metadata() -> dict[str, object]:
@@ -106,6 +114,76 @@ def _soft_spearman_loss_sum(
         return losses.sum(), group_weight.sum()
 
 
+def _gap_weighted_pairwise_loss_sum(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    continuous_targets: torch.Tensor,
+    label_mask: torch.Tensor,
+    sample_weight: torch.Tensor,
+) -> torch.Tensor:
+    with torch.autocast(device_type=predictions.device.type, enabled=False):
+        scores = predictions.float().transpose(1, 2)
+        target_ranks = targets.float().transpose(1, 2)
+        continuous = continuous_targets.float().transpose(1, 2)
+        mask = label_mask.bool().transpose(1, 2)
+        counts = mask.sum(-1)
+        safe_counts = counts.clamp_min(1)
+        centered = (
+            scores - (scores * mask).sum(-1).div(safe_counts).unsqueeze(-1)
+        ) * mask
+        variance = centered.square().sum(-1) / safe_counts
+        standardized = centered / torch.sqrt(
+            variance.unsqueeze(-1) + SOFT_RANK_STANDARDIZATION_EPS
+        )
+        equity_count = scores.shape[-1]
+        upper_triangle = torch.triu(
+            torch.ones(
+                equity_count,
+                equity_count,
+                dtype=torch.bool,
+                device=scores.device,
+            ),
+            diagonal=1,
+        ).reshape(1, 1, equity_count, equity_count)
+        pair_mask = mask.unsqueeze(-1) & mask.unsqueeze(-2) & upper_triangle
+        target_difference = target_ranks.unsqueeze(-1) - target_ranks.unsqueeze(-2)
+        direction = target_difference.sign()
+        gap = (
+            (continuous.unsqueeze(-1) - continuous.unsqueeze(-2))
+            .abs()
+            .clamp_max(HYBRID_GAP_CLIP)
+        )
+        pair_weight = gap * pair_mask * direction.ne(0)
+        score_difference = (
+            standardized.unsqueeze(-1) - standardized.unsqueeze(-2)
+        ) / SOFT_RANK_TEMPERATURE
+        pair_loss = torch.nn.functional.softplus(-direction * score_difference)
+        weight_sum = pair_weight.sum(dim=(-1, -2))
+        group_loss = (pair_loss * pair_weight).sum(dim=(-1, -2)) / weight_sum.clamp_min(
+            SOFT_SPEARMAN_CORRELATION_EPS
+        )
+        group_weight = (counts >= 2).to(
+            torch.float32
+        ) * sample_weight.float().unsqueeze(-1)
+        return (group_loss * group_weight).sum()
+
+
+def _hybrid_loss_sum(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    continuous_targets: torch.Tensor,
+    label_mask: torch.Tensor,
+    sample_weight: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    soft_sum, count = _soft_spearman_loss_sum(
+        predictions, targets, label_mask, sample_weight
+    )
+    gap_sum = _gap_weighted_pairwise_loss_sum(
+        predictions, targets, continuous_targets, label_mask, sample_weight
+    )
+    return soft_sum + HYBRID_GAP_WEIGHT * gap_sum, count
+
+
 def soft_spearman_loss(
     predictions: torch.Tensor,
     targets: torch.Tensor,
@@ -125,21 +203,27 @@ def soft_spearman_loss(
 def objective_loss(
     predictions: torch.Tensor,
     targets: torch.Tensor,
+    continuous_targets: torch.Tensor,
     label_mask: torch.Tensor,
 ) -> torch.Tensor:
-    return soft_spearman_loss(predictions, targets, label_mask)
+    weights = torch.ones(predictions.shape[0], device=predictions.device)
+    total, count = _hybrid_loss_sum(
+        predictions, targets, continuous_targets, label_mask, weights
+    )
+    return total / count.clamp_min(1)
 
 
 def eager_training_objective() -> TrainingObjective:
     def loss(
         predictions: torch.Tensor,
         targets: torch.Tensor,
+        continuous_targets: torch.Tensor,
         label_mask: torch.Tensor,
         sample_weight: torch.Tensor,
     ) -> torch.Tensor:
-        return _soft_spearman_loss_sum(predictions, targets, label_mask, sample_weight)[
-            0
-        ]
+        return _hybrid_loss_sum(
+            predictions, targets, continuous_targets, label_mask, sample_weight
+        )[0]
 
     return loss
 
@@ -164,6 +248,7 @@ def _model_transfer_keys() -> tuple[str, ...]:
         "slow_features",
         "state_position",
         "targets",
+        "continuous_targets",
         "label_mask",
         "training_weight",
     )
@@ -225,6 +310,7 @@ def _accumulate_gradients(
         loss_sum = loss_function(
             predictions,
             batch["targets"],
+            batch["continuous_targets"],
             batch["label_mask"],
             batch["training_weight"],
         )
@@ -440,9 +526,10 @@ def collect_validation_observations(
             batch = _to_device(cpu_batch, device)
             with _autocast(device):
                 predictions = _predict(model, batch)
-            loss_sum, _ = _soft_spearman_loss_sum(
+            loss_sum, _ = _hybrid_loss_sum(
                 predictions[:valid_count],
                 batch["targets"][:valid_count],
+                batch["continuous_targets"][:valid_count],
                 batch["label_mask"][:valid_count],
                 batch["training_weight"][:valid_count],
             )
@@ -512,11 +599,15 @@ def checkpoint_payload(
     epoch: int,
     validation_score: float,
     feature_store: Path,
+    target_scale_dir: Path,
+    target_scale_identity: dict[str, object],
     run_provenance: dict[str, object],
 ) -> dict[str, object]:
     metadata = model_metadata(cross_equity_attention)
     if run_provenance.get("model") != metadata:
         raise ValueError("Run provenance differs from checkpoint model")
+    if run_provenance.get("target_scale_identity") != target_scale_identity:
+        raise ValueError("Run provenance differs from checkpoint target scale")
     return {
         "model": metadata,
         "architecture": asdict(TCN_ARCHITECTURE),
@@ -529,6 +620,8 @@ def checkpoint_payload(
         "validation_score": validation_score,
         "feature_store": str(feature_store.resolve()),
         "feature_store_identity": run_provenance["feature_store_identity"],
+        "target_scale": str(target_scale_dir.resolve()),
+        "target_scale_identity": target_scale_identity,
         "repository_commit": run_provenance["repository_commit"],
         "run_provenance": run_provenance,
         "model_state_dict": model.state_dict(),

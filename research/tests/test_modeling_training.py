@@ -7,28 +7,23 @@ import pytest
 import torch
 from torch import nn
 
-from brazil_rv.modeling.contract import (
-    ALLOWED_SEEDS,
-    RECENCY_POLICIES,
-    RuntimeSettings,
-)
+from brazil_rv.modeling.contract import RuntimeSettings
 from brazil_rv.modeling.engine import (
+    _gap_weighted_pairwise_loss_sum,
+    _hybrid_loss_sum,
     _soft_spearman_loss_sum,
     checkpoint_payload,
     compile_training_objective,
+    objective_metadata,
     run_effective_batch_update,
     soft_spearman_loss,
 )
 from brazil_rv.modeling.model import SharedCausalTCN
 from brazil_rv.modeling.provenance import model_metadata
-from brazil_rv.modeling.run_core_campaign import (
+from brazil_rv.modeling.run_loss_attention_campaign import (
     RunSpec,
-    CAMPAIGN_SCHEMA,
-    _completed_attempt,
-    _control_reuse_manifest,
-    _reused_control_runs,
+    _matching_completed_attempt,
     expand_campaign_specs,
-    select_recency_parent,
 )
 from brazil_rv.modeling.train import parse_args
 
@@ -51,7 +46,7 @@ def _rank_case() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     return predictions, targets, torch.ones_like(targets, dtype=torch.bool)
 
 
-def test_uniform_loss_is_numerically_equivalent() -> None:
+def test_uniform_soft_loss_is_numerically_equivalent() -> None:
     predictions, targets, mask = _rank_case()
     ones = torch.ones(predictions.shape[0])
     expected = soft_spearman_loss(predictions, targets, mask)
@@ -59,7 +54,7 @@ def test_uniform_loss_is_numerically_equivalent() -> None:
     torch.testing.assert_close(total / count, expected)
 
 
-def test_weighted_loss_uses_weighted_valid_group_denominator() -> None:
+def test_weighted_soft_loss_uses_weighted_valid_group_denominator() -> None:
     predictions, targets, mask = _rank_case()
     weights = torch.tensor([0.25, 2.0])
     total, count = _soft_spearman_loss_sum(predictions, targets, mask, weights)
@@ -76,6 +71,32 @@ def test_weighted_loss_uses_weighted_valid_group_denominator() -> None:
         weights[0] * sample_losses[0] + weights[1] * sample_losses[1]
     ) / weights.sum()
     torch.testing.assert_close(total / count, expected)
+
+
+def test_gap_loss_prioritizes_large_continuous_return_gaps() -> None:
+    targets = torch.tensor([[[-0.75], [0.0], [0.75]]])
+    continuous = torch.tensor([[[-0.05], [0.0], [1.0]]])
+    mask = torch.ones_like(targets, dtype=torch.bool)
+    near_swap = torch.tensor([[[0.1], [0.0], [1.0]]])
+    far_errors = torch.tensor([[[1.0], [0.1], [0.0]]])
+    weights = torch.ones(1)
+    near = _gap_weighted_pairwise_loss_sum(
+        near_swap, targets, continuous, mask, weights
+    )
+    far = _gap_weighted_pairwise_loss_sum(
+        far_errors, targets, continuous, mask, weights
+    )
+    assert far > near
+
+
+def test_hybrid_loss_retains_soft_spearman_component() -> None:
+    predictions, targets, mask = _rank_case()
+    continuous = targets * 0.5
+    weights = torch.ones(predictions.shape[0])
+    hybrid, count = _hybrid_loss_sum(predictions, targets, continuous, mask, weights)
+    soft, soft_count = _soft_spearman_loss_sum(predictions, targets, mask, weights)
+    assert count == soft_count
+    assert hybrid > soft
 
 
 class TinyRanker(nn.Module):
@@ -96,7 +117,7 @@ class TinyRanker(nn.Module):
         return torch.stack((score, score.square()), dim=-1)
 
 
-def test_compiled_weighted_objective_has_finite_two_pass_sam_gradients() -> None:
+def test_compiled_hybrid_objective_has_finite_two_pass_sam_gradients() -> None:
     runtime = RuntimeSettings(
         effective_batch_size=2,
         loader_batch_size=2,
@@ -107,8 +128,7 @@ def test_compiled_weighted_objective_has_finite_two_pass_sam_gradients() -> None
     )
     model = TinyRanker()
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
-    predictions, targets, mask = _rank_case()
-    del predictions
+    _, targets, mask = _rank_case()
     patches = torch.zeros(2, 4, 1, 1)
     patches[:, :, 0, 0] = torch.tensor([[0.1, 0.2, 0.4, 0.3], [0.4, 0.1, 0.2, 0.3]])
     batch = {
@@ -118,6 +138,7 @@ def test_compiled_weighted_objective_has_finite_two_pass_sam_gradients() -> None
         "slow_features": torch.zeros(2, 4, 1),
         "state_position": torch.ones(2, dtype=torch.long),
         "targets": targets,
+        "continuous_targets": targets * 0.5,
         "label_mask": mask,
         "training_weight": torch.tensor([0.5, 1.5]),
     }
@@ -140,6 +161,19 @@ def test_attention_is_zero_initialized_parent_equivalent() -> None:
     torch.testing.assert_close(model._attend_equities(states, mask), states)
 
 
+def test_attention_relationship_states_remove_active_common_state() -> None:
+    states = torch.randn(2, 6, 64)
+    mask = torch.tensor(
+        [[True, True, False, True, False, True], [True, False, True, True, True, False]]
+    )
+    specific = SharedCausalTCN._specific_attention_states(states, mask)
+    weight = mask[..., None].to(states.dtype)
+    torch.testing.assert_close(
+        (specific * weight).sum(1), torch.zeros(2, 64), atol=1e-6, rtol=0.0
+    )
+    assert torch.count_nonzero(specific[~mask]) == 0
+
+
 def test_attention_is_permutation_equivariant_and_inactive_safe() -> None:
     model = SharedCausalTCN(cross_equity_attention=True, equity_count=6).eval()
     nn.init.normal_(model.equity_attention.out_proj.weight)
@@ -158,151 +192,60 @@ def test_attention_is_permutation_equivariant_and_inactive_safe() -> None:
     assert torch.count_nonzero(isolated[~mask]) == 0
 
 
-def test_training_cli_exposes_only_campaign_switches() -> None:
-    actions = {name for name, _ in parse_args([])._get_kwargs()}
+def test_training_cli_exposes_only_current_switches() -> None:
+    actions = {
+        name for name, _ in parse_args(["--target-scale-dir", "scale"])._get_kwargs()
+    }
     assert actions == {
         "seed",
         "recency_policy",
         "cross_equity_attention",
+        "target_scale_dir",
         "output_base",
     }
 
 
-def test_campaign_expands_exactly_twenty_one_ordered_specs() -> None:
+def test_campaign_expands_exactly_two_ordered_specs() -> None:
     specs = expand_campaign_specs()
-    assert len(specs) == 21
-    assert [spec.seed for spec in specs[:3]] == list(ALLOWED_SEEDS)
-    assert {spec.recency_policy for spec in specs[6:18]} == set(RECENCY_POLICIES[1:])
-    assert all(spec.recency_policy == "selected_parent" for spec in specs[18:])
+    assert [spec.arm for spec in specs] == [
+        "hybrid_base",
+        "hybrid_residual_attention",
+    ]
+    assert [spec.cross_equity_attention for spec in specs] == [False, True]
 
 
-def _completed_run(path: Path, seed: int, score: float, policy: str) -> Path:
-    path.mkdir(parents=True)
-    (path / "run_manifest.json").write_text(
-        json.dumps(
-            {
-                "status": "completed",
-                "seed": seed,
-                "recency_policy": policy,
-                "cross_equity_attention": False,
-                "feature_store": str(path.parent.parent.parent / "store"),
-                "repository_commit": "test",
-                "split": {"test_accessed": False},
-                "best_validation_score": score,
-            }
-        ),
-        encoding="utf-8",
-    )
-    return path
-
-
-def test_recency_selection_requires_mean_and_two_matched_wins(
-    tmp_path: Path,
-) -> None:
-    arms: dict[str, dict[int, Path]] = {}
-    scores = {
-        "uniform": [0.040, 0.041, 0.042],
-        "exp_504": [0.041, 0.042, 0.041],
-        "exp_252": [0.039, 0.045, 0.046],
-        "exp_126": [0.043, 0.039, 0.041],
-        "rolling_504": [0.038, 0.039, 0.050],
-    }
-    for policy, values in scores.items():
-        arms[policy] = {
-            seed: _completed_run(
-                tmp_path / policy / f"seed_{seed}", seed, score, policy
-            )
-            for seed, score in zip(ALLOWED_SEEDS, values, strict=True)
-        }
-    assert select_recency_parent(arms) == "exp_252"
-
-
-def test_resume_accepts_only_a_matching_completed_attempt(
+def test_campaign_resume_requires_an_exact_completed_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(
+        "brazil_rv.modeling.run_loss_attention_campaign.repository_commit",
+        lambda: "sha",
+    )
     store = tmp_path / "store"
     store.mkdir()
     arm = tmp_path / "arm"
     attempt = arm / "attempt_01"
     attempt.mkdir(parents=True)
-    spec = RunSpec("training", "tod_uniform", 11, "full_tod", "uniform", False)
-    monkeypatch.setattr(
-        "brazil_rv.modeling.run_core_campaign.repository_commit", lambda: "sha"
-    )
-    (attempt / "run_manifest.json").write_text(
-        json.dumps(
-            {
-                "status": "completed",
-                "seed": 11,
-                "recency_policy": "uniform",
-                "cross_equity_attention": False,
-                "feature_store": str(store),
-                "repository_commit": "sha",
-                "split": {"test_accessed": False},
-            }
-        ),
-        encoding="utf-8",
-    )
-    assert _completed_attempt(arm, spec, store) == attempt
-
-
-def test_control_reuse_preserves_original_sha_and_validates_runs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    store = tmp_path / "store"
-    store.mkdir()
-    identity = {
-        "path": str(store.resolve()),
-        "contract_version": "test",
-        "metadata_sha256": "test",
+    scale_identity = {"target_scale_sha256": "scale"}
+    manifest_path = attempt / "run_manifest.json"
+    manifest = {
+        "status": "completed",
+        "repository_commit": "sha",
+        "seed": 11,
+        "recency_policy": "uniform",
+        "cross_equity_attention": False,
+        "objective": objective_metadata(),
+        "target_scale_identity": scale_identity,
+        "feature_store": str(store),
+        "split": {"test_accessed": False},
     }
-    monkeypatch.setattr(
-        "brazil_rv.modeling.run_core_campaign.feature_store_identity",
-        lambda _: identity,
-    )
-    source = tmp_path / "source_campaign"
-    source.mkdir()
-    (source / "campaign_manifest.json").write_text(
-        json.dumps(
-            {
-                "schema": CAMPAIGN_SCHEMA,
-                "repository_sha": "source-sha",
-                "test_accessed": False,
-                "control_store": identity,
-            }
-        ),
-        encoding="utf-8",
-    )
-    expected: dict[int, Path] = {}
-    for seed in ALLOWED_SEEDS:
-        attempt = source / "runs" / "legacy_uniform" / f"seed_{seed}" / "attempt_01"
-        attempt.mkdir(parents=True)
-        (attempt / "run_manifest.json").write_text(
-            json.dumps(
-                {
-                    "status": "completed",
-                    "seed": seed,
-                    "recency_policy": "uniform",
-                    "cross_equity_attention": False,
-                    "feature_store": str(store.resolve()),
-                    "repository_commit": "source-sha",
-                    "split": {"test_accessed": False},
-                }
-            ),
-            encoding="utf-8",
-        )
-        expected[seed] = attempt.resolve()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    spec = RunSpec("hybrid_base", False)
+    assert _matching_completed_attempt(arm, spec, store, scale_identity) == attempt
 
-    reuse = _control_reuse_manifest(source, store)
-    assert reuse["source_repository_sha"] == "source-sha"
-    assert _reused_control_runs(reuse, store) == expected
-
-    tampered = expected[11] / "run_manifest.json"
-    payload = json.loads(tampered.read_text(encoding="utf-8"))
-    payload["split"]["test_accessed"] = True
-    tampered.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(ValueError, match="no longer matches"):
-        _reused_control_runs(reuse, store)
+    manifest["split"]["test_accessed"] = True
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    assert _matching_completed_attempt(arm, spec, store, scale_identity) is None
 
 
 def test_checkpoint_model_metadata_is_json_canonical(tmp_path: Path) -> None:
@@ -311,9 +254,11 @@ def test_checkpoint_model_metadata_is_json_canonical(tmp_path: Path) -> None:
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
     metadata = model_metadata(False)
     assert isinstance(metadata["architecture"]["dilations"], list)
+    scale_identity = {"path": str(tmp_path / "target_scale")}
     provenance = {
         "model": metadata,
         "feature_store_identity": {"path": str(tmp_path)},
+        "target_scale_identity": scale_identity,
         "repository_commit": "sha",
     }
     payload = checkpoint_payload(
@@ -326,6 +271,8 @@ def test_checkpoint_model_metadata_is_json_canonical(tmp_path: Path) -> None:
         epoch=1,
         validation_score=0.01,
         feature_store=tmp_path,
+        target_scale_dir=tmp_path / "target_scale",
+        target_scale_identity=scale_identity,
         run_provenance=provenance,
     )
     assert payload["model"] == provenance["model"]
