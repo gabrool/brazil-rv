@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, time
-from pathlib import Path
-
 import numpy as np
+
+from ..modeling.contract import PROJECT_ROOT
 
 CONTRACT_VERSION = "M1_FEATURES_PIT_CAUSAL_TOD"
 LOCAL_CONTEXT_AVAILABILITY_RULE = (
@@ -16,7 +16,6 @@ SAMPLE_ELIGIBILITY_RULE = (
     "local and global context readiness never gate samples."
 )
 
-PROJECT_ROOT = Path(r"C:\Brazil-RV")
 UNIVERSE_POINTER = (
     PROJECT_ROOT / "quant-data/b3/interim/universe/pit_v1_canonical_path.txt"
 )

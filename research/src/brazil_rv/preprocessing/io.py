@@ -10,6 +10,7 @@ import polars as pl
 from numpy.lib.format import open_memmap
 from numpy.typing import NDArray
 
+from ..modeling.contract import workspace_path
 from .contract import (
     ASSIGNMENTS_POINTER,
     CATALOGUE_PATH,
@@ -73,7 +74,7 @@ class CanonicalInputs:
 
 
 def resolve_pointer(pointer: Path) -> Path:
-    resolved = Path(pointer.read_text(encoding="utf-8").strip())
+    resolved = workspace_path(pointer.read_text(encoding="utf-8").strip())
     if not resolved.is_dir():
         raise FileNotFoundError(f"Canonical pointer {pointer} resolves to {resolved}")
     return resolved
@@ -117,6 +118,10 @@ def load_assignments(assignments_dir: Path) -> pl.DataFrame:
         .with_columns(
             pl.col("first_overlap_date").str.to_date(strict=True),
             pl.col("last_overlap_date").str.to_date(strict=True),
+            pl.col("source_file").map_elements(
+                lambda value: str(workspace_path(value, must_exist=False)),
+                return_dtype=pl.String,
+            ),
         )
         .sort("security_id")
     )

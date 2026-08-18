@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -1390,3 +1393,35 @@ def test_pointer_interruption_after_replacement_preserves_committed_publication(
     assert unrelated_audit.is_dir()
     assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
     assert not tuple(pointer.parent.glob(f"{pointer.name}.*.tmp"))
+
+
+def test_preprocessing_paths_follow_brazil_rv_root(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    (project / "quant" / "b3-quant" / "research").mkdir(parents=True)
+    target = project / "quant-data" / "b3" / "interim" / "synthetic"
+    target.mkdir(parents=True)
+    pointer = tmp_path / "pointer.txt"
+    pointer.write_text(r"C:\quant-data\b3\interim\synthetic", encoding="utf-8")
+    environment = {
+        **os.environ,
+        "BRAZIL_RV_ROOT": str(project),
+        "TEST_POINTER": str(pointer),
+    }
+    code = (
+        "import os;"
+        "from pathlib import Path;"
+        "from brazil_rv.preprocessing.contract import PROJECT_ROOT;"
+        "from brazil_rv.preprocessing.io import resolve_pointer;"
+        "print(PROJECT_ROOT);"
+        "print(resolve_pointer(Path(os.environ['TEST_POINTER'])))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    lines = result.stdout.strip().splitlines()
+    assert Path(lines[0]).resolve() == project.resolve()
+    assert Path(lines[1]).resolve() == target.resolve()
