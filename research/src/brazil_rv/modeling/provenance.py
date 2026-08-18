@@ -36,6 +36,7 @@ def repository_commit() -> str:
         check=True,
         capture_output=True,
         text=True,
+        cwd=Path(__file__).resolve().parents[4],
     ).stdout.strip()
 
 

@@ -19,7 +19,7 @@ from brazil_rv.modeling.engine import (
     soft_spearman_loss,
 )
 from brazil_rv.modeling.model import SharedCausalTCN
-from brazil_rv.modeling.provenance import model_metadata
+from brazil_rv.modeling.provenance import model_metadata, repository_commit
 from brazil_rv.modeling.run_loss_attention_campaign import (
     RunSpec,
     _matching_completed_attempt,
@@ -203,6 +203,14 @@ def test_training_cli_exposes_only_current_switches() -> None:
         "target_scale_dir",
         "output_base",
     }
+
+
+def test_repository_commit_is_independent_of_process_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = repository_commit()
+    monkeypatch.chdir(tmp_path)
+    assert repository_commit() == expected
 
 
 def test_campaign_expands_exactly_two_ordered_specs() -> None:
