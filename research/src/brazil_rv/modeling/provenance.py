@@ -38,7 +38,7 @@ def repository_commit() -> str:
 
 
 def model_metadata(cross_equity_attention: bool) -> dict[str, object]:
-    return {
+    metadata = {
         "model_name": "tcn",
         "architecture": asdict(TCN_ARCHITECTURE),
         "cross_equity_attention": cross_equity_attention,
@@ -54,6 +54,7 @@ def model_metadata(cross_equity_attention: bool) -> dict[str, object]:
             else None
         ),
     }
+    return json.loads(json.dumps(metadata))
 
 
 def training_contract(

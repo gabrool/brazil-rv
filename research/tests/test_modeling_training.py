@@ -14,11 +14,13 @@ from brazil_rv.modeling.contract import (
 )
 from brazil_rv.modeling.engine import (
     _soft_spearman_loss_sum,
+    checkpoint_payload,
     compile_training_objective,
     run_effective_batch_update,
     soft_spearman_loss,
 )
 from brazil_rv.modeling.model import SharedCausalTCN
+from brazil_rv.modeling.provenance import model_metadata
 from brazil_rv.modeling.run_core_campaign import (
     RunSpec,
     _completed_attempt,
@@ -239,3 +241,29 @@ def test_resume_accepts_only_a_matching_completed_attempt(
         encoding="utf-8",
     )
     assert _completed_attempt(arm, spec, store) == attempt
+
+
+def test_checkpoint_model_metadata_is_json_canonical(tmp_path: Path) -> None:
+    model = SharedCausalTCN()
+    optimizer = torch.optim.AdamW(model.parameters())
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
+    metadata = model_metadata(False)
+    assert isinstance(metadata["architecture"]["dilations"], list)
+    provenance = {
+        "model": metadata,
+        "feature_store_identity": {"path": str(tmp_path)},
+        "repository_commit": "sha",
+    }
+    payload = checkpoint_payload(
+        model,
+        optimizer,
+        scheduler,
+        cross_equity_attention=False,
+        recency_policy="uniform",
+        seed=11,
+        epoch=1,
+        validation_score=0.01,
+        feature_store=tmp_path,
+        run_provenance=provenance,
+    )
+    assert payload["model"] == provenance["model"]
