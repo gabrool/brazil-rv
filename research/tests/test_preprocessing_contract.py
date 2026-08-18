@@ -1270,7 +1270,7 @@ def test_feature_build_failure_before_rename_cleans_only_its_partial(
     assert unrelated.is_dir()
 
 
-def test_feature_audit_failure_cleans_outputs_and_keeps_pointer(
+def test_feature_audit_failure_preserves_store_and_keeps_pointer(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1306,7 +1306,8 @@ def test_feature_audit_failure_cleans_outputs_and_keeps_pointer(
 
     assert pointer.read_text(encoding="utf-8") == str(previous)
     assert previous.is_dir()
-    assert not final.exists()
+    assert final.is_dir()
+    assert (final / "artifact").read_text(encoding="utf-8") == "complete"
     assert not tuple(final.parent.glob(f"{final.name}.*.partial"))
     assert tuple(audit_base.iterdir()) == (unrelated_audit,)
 
@@ -1436,6 +1437,9 @@ def test_global_source_audit_resolves_recorded_workspace_paths(
     normalized_source = tmp_path / "normalized"
     normalized_source.mkdir()
     recorded = r"C:\Brazil-RV\quant-data\b3\raw\databento\global_context\source.dbn.zst"
+    normalized_partition = normalized_source / "bars" / "slot=00" / "part.parquet"
+    normalized_partition.parent.mkdir(parents=True)
+    normalized_partition.write_bytes(b"normalized partition")
     resolved: list[str] = []
     monkeypatch.setattr(
         audit_module,
@@ -1443,8 +1447,21 @@ def test_global_source_audit_resolves_recorded_workspace_paths(
         lambda value: resolved.append(value) or raw_source,
     )
     monkeypatch.setattr(audit_module, "GLOBAL_CONTEXT_SYMBOLS", ())
+    monkeypatch.setattr(
+        audit_module.pl,
+        "read_parquet",
+        lambda _: pl.DataFrame({"continuous_symbol": ["ES.v.0"]}),
+    )
+    monkeypatch.setattr(
+        audit_module,
+        "validate_normalized_bars",
+        lambda *_args, **_kwargs: None,
+    )
     manifest = {
         "source_hashes": {recorded: audit_module._sha256(raw_source)},
-        "normalized_hashes": {},
+        "normalized_hashes": {
+            r"bars\slot=00\part.parquet": audit_module._sha256(normalized_partition)
+        },
     }
     assert audit_module._audit_global_source(normalized_source, manifest) == []
+    assert resolved == [recorded]

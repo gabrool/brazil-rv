@@ -88,7 +88,9 @@ def _atomic_json(path: Path, value: dict[str, object]) -> None:
     os.replace(temporary, path)
 
 
-def _initial_manifest(campaign_dir: Path) -> dict[str, object]:
+def _initial_manifest(
+    reuse_controls_from: Path | None,
+) -> dict[str, object]:
     control_store = resolve_feature_store()
     return {
         "schema": CAMPAIGN_SCHEMA,
@@ -97,6 +99,11 @@ def _initial_manifest(campaign_dir: Path) -> dict[str, object]:
         "repository_sha": repository_commit(),
         "test_accessed": False,
         "control_store": feature_store_identity(control_store),
+        "control_reuse": (
+            None
+            if reuse_controls_from is None
+            else _control_reuse_manifest(reuse_controls_from, control_store)
+        ),
         "full_tod_store": None,
         "normalization_contract": {
             "profile_input": (
@@ -127,7 +134,9 @@ def _initial_manifest(campaign_dir: Path) -> dict[str, object]:
     }
 
 
-def _load_or_create_manifest(campaign_dir: Path) -> dict[str, object]:
+def _load_or_create_manifest(
+    campaign_dir: Path, reuse_controls_from: Path | None
+) -> dict[str, object]:
     campaign_dir.mkdir(parents=True, exist_ok=True)
     path = campaign_dir / "campaign_manifest.json"
     if path.exists():
@@ -138,8 +147,16 @@ def _load_or_create_manifest(campaign_dir: Path) -> dict[str, object]:
             or manifest.get("test_accessed") is not False
         ):
             raise ValueError("Existing campaign manifest does not match this campaign")
+        if reuse_controls_from is not None:
+            reuse = manifest.get("control_reuse")
+            if (
+                not isinstance(reuse, dict)
+                or Path(str(reuse.get("source_campaign_dir"))).resolve()
+                != reuse_controls_from.resolve()
+            ):
+                raise ValueError("Control-reuse campaign does not match the manifest")
         return manifest
-    manifest = _initial_manifest(campaign_dir)
+    manifest = _initial_manifest(reuse_controls_from)
     _atomic_json(path, manifest)
     return manifest
 
@@ -153,7 +170,9 @@ def _store_from_identity(identity: object) -> Path:
     return path
 
 
-def _completed_attempt(arm_dir: Path, spec: RunSpec, store: Path) -> Path | None:
+def _matching_completed_attempt(
+    arm_dir: Path, spec: RunSpec, store: Path, commit: str
+) -> Path | None:
     for attempt in sorted(arm_dir.glob("attempt_*"), reverse=True):
         path = attempt / "run_manifest.json"
         if not path.is_file():
@@ -165,11 +184,74 @@ def _completed_attempt(arm_dir: Path, spec: RunSpec, store: Path) -> Path | None
             and manifest.get("recency_policy") == spec.recency_policy
             and manifest.get("cross_equity_attention") == spec.cross_equity_attention
             and Path(str(manifest.get("feature_store"))).resolve() == store.resolve()
-            and manifest.get("repository_commit") == repository_commit()
+            and manifest.get("repository_commit") == commit
             and manifest.get("split", {}).get("test_accessed") is False
         ):
             return attempt
     return None
+
+
+def _completed_attempt(arm_dir: Path, spec: RunSpec, store: Path) -> Path | None:
+    return _matching_completed_attempt(arm_dir, spec, store, repository_commit())
+
+
+def _control_reuse_manifest(campaign_dir: Path, store: Path) -> dict[str, object]:
+    source_dir = campaign_dir.resolve()
+    source_manifest = json.loads(
+        (source_dir / "campaign_manifest.json").read_text(encoding="utf-8")
+    )
+    if (
+        source_manifest.get("schema") != CAMPAIGN_SCHEMA
+        or source_manifest.get("test_accessed") is not False
+        or source_manifest.get("control_store") != feature_store_identity(store)
+    ):
+        raise ValueError("Reused control campaign does not match the control contract")
+    source_commit = source_manifest.get("repository_sha")
+    if not isinstance(source_commit, str):
+        raise ValueError("Reused control campaign has no repository SHA")
+    runs: dict[str, str] = {}
+    for seed in ALLOWED_SEEDS:
+        spec = RunSpec(
+            "pit_clean_control", "legacy_uniform", seed, "control", "uniform", False
+        )
+        attempt = _matching_completed_attempt(
+            source_dir / "runs" / "legacy_uniform" / f"seed_{seed}",
+            spec,
+            store,
+            source_commit,
+        )
+        if attempt is None:
+            raise ValueError(
+                f"Reused control seed {seed} is not a matching completed run"
+            )
+        runs[str(seed)] = str(attempt.resolve())
+    return {
+        "source_campaign_dir": str(source_dir),
+        "source_repository_sha": source_commit,
+        "runs": runs,
+    }
+
+
+def _reused_control_runs(value: object, store: Path) -> dict[int, Path]:
+    if not isinstance(value, dict) or not isinstance(value.get("runs"), dict):
+        raise ValueError("Control-reuse provenance is missing")
+    commit = value.get("source_repository_sha")
+    if not isinstance(commit, str):
+        raise ValueError("Control-reuse repository SHA is missing")
+    runs: dict[int, Path] = {}
+    recorded = value["runs"]
+    for seed in ALLOWED_SEEDS:
+        path_text = recorded.get(str(seed))
+        if not isinstance(path_text, str):
+            raise ValueError(f"Reused control seed {seed} path is missing")
+        attempt = Path(path_text).resolve()
+        spec = RunSpec(
+            "pit_clean_control", "legacy_uniform", seed, "control", "uniform", False
+        )
+        if _matching_completed_attempt(attempt.parent, spec, store, commit) != attempt:
+            raise ValueError(f"Reused control seed {seed} no longer matches")
+        runs[seed] = attempt
+    return runs
 
 
 def _run_spec(campaign_dir: Path, spec: RunSpec, store: Path) -> Path:
@@ -385,6 +467,7 @@ def _write_report(
     report = {
         "schema": CAMPAIGN_SCHEMA,
         "repository_sha": manifest["repository_sha"],
+        "control_reuse": manifest.get("control_reuse"),
         "control_store": manifest["control_store"],
         "full_tod_store": manifest["full_tod_store"],
         "test_accessed": False,
@@ -419,13 +502,21 @@ def _write_report(
     (campaign_dir / "campaign_report.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-def run_campaign(campaign_dir: Path = CAMPAIGN_DIR) -> Path:
-    manifest = _load_or_create_manifest(campaign_dir)
+def run_campaign(
+    campaign_dir: Path = CAMPAIGN_DIR,
+    reuse_controls_from: Path | None = None,
+) -> Path:
+    manifest = _load_or_create_manifest(campaign_dir, reuse_controls_from)
     control_store = _store_from_identity(manifest["control_store"])
     arms: dict[str, dict[int, Path]] = {}
-    arms["legacy_uniform"] = _run_arm(
-        campaign_dir, "legacy_uniform", control_store, "uniform"
-    )
+    if manifest["control_reuse"] is None:
+        arms["legacy_uniform"] = _run_arm(
+            campaign_dir, "legacy_uniform", control_store, "uniform"
+        )
+    else:
+        arms["legacy_uniform"] = _reused_control_runs(
+            manifest["control_reuse"], control_store
+        )
 
     if manifest["full_tod_store"] is None:
         current = resolve_feature_store()
@@ -494,6 +585,7 @@ def run_campaign(campaign_dir: Path = CAMPAIGN_DIR) -> Path:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the 21-run PIT-clean campaign")
     parser.add_argument("--campaign-dir", type=Path, default=CAMPAIGN_DIR)
+    parser.add_argument("--reuse-controls-from", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -504,7 +596,7 @@ def main() -> None:
         specs = [asdict(spec) for spec in expand_campaign_specs()]
         print(json.dumps({"run_count": len(specs), "specifications": specs}, indent=2))
         return
-    print(run_campaign(args.campaign_dir))
+    print(run_campaign(args.campaign_dir, args.reuse_controls_from))
 
 
 if __name__ == "__main__":

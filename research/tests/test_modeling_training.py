@@ -23,7 +23,10 @@ from brazil_rv.modeling.model import SharedCausalTCN
 from brazil_rv.modeling.provenance import model_metadata
 from brazil_rv.modeling.run_core_campaign import (
     RunSpec,
+    CAMPAIGN_SCHEMA,
     _completed_attempt,
+    _control_reuse_manifest,
+    _reused_control_runs,
     expand_campaign_specs,
     select_recency_parent,
 )
@@ -241,6 +244,65 @@ def test_resume_accepts_only_a_matching_completed_attempt(
         encoding="utf-8",
     )
     assert _completed_attempt(arm, spec, store) == attempt
+
+
+def test_control_reuse_preserves_original_sha_and_validates_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = tmp_path / "store"
+    store.mkdir()
+    identity = {
+        "path": str(store.resolve()),
+        "contract_version": "test",
+        "metadata_sha256": "test",
+    }
+    monkeypatch.setattr(
+        "brazil_rv.modeling.run_core_campaign.feature_store_identity",
+        lambda _: identity,
+    )
+    source = tmp_path / "source_campaign"
+    source.mkdir()
+    (source / "campaign_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema": CAMPAIGN_SCHEMA,
+                "repository_sha": "source-sha",
+                "test_accessed": False,
+                "control_store": identity,
+            }
+        ),
+        encoding="utf-8",
+    )
+    expected: dict[int, Path] = {}
+    for seed in ALLOWED_SEEDS:
+        attempt = source / "runs" / "legacy_uniform" / f"seed_{seed}" / "attempt_01"
+        attempt.mkdir(parents=True)
+        (attempt / "run_manifest.json").write_text(
+            json.dumps(
+                {
+                    "status": "completed",
+                    "seed": seed,
+                    "recency_policy": "uniform",
+                    "cross_equity_attention": False,
+                    "feature_store": str(store.resolve()),
+                    "repository_commit": "source-sha",
+                    "split": {"test_accessed": False},
+                }
+            ),
+            encoding="utf-8",
+        )
+        expected[seed] = attempt.resolve()
+
+    reuse = _control_reuse_manifest(source, store)
+    assert reuse["source_repository_sha"] == "source-sha"
+    assert _reused_control_runs(reuse, store) == expected
+
+    tampered = expected[11] / "run_manifest.json"
+    payload = json.loads(tampered.read_text(encoding="utf-8"))
+    payload["split"]["test_accessed"] = True
+    tampered.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="no longer matches"):
+        _reused_control_runs(reuse, store)
 
 
 def test_checkpoint_model_metadata_is_json_canonical(tmp_path: Path) -> None:

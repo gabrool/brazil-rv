@@ -804,7 +804,7 @@ def _audit_global_source(
         if not path.is_file() or _sha256(path) != expected:
             raise ValueError(f"Global source hash mismatch: {path}")
     for relative, expected in source_manifest["normalized_hashes"].items():
-        path = source_dir / relative
+        path = source_dir / str(relative).replace("\\", "/")
         if not path.is_file() or _sha256(path) != expected:
             raise ValueError(f"Normalized global store hash mismatch: {path}")
         partition = pl.read_parquet(path)
@@ -1090,7 +1090,7 @@ def _generate_feature_audit(
     ):
         raise ValueError("Global coverage keys are not unique")
     global_metadata = manifest["global_context"]
-    source_dir = Path(global_metadata["normalized_source_path"])
+    source_dir = workspace_path(global_metadata["normalized_source_path"])
     source_manifest = json.loads(
         (source_dir / "manifest.json").read_text(encoding="utf-8")
     )

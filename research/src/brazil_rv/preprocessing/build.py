@@ -705,6 +705,8 @@ def build_feature_store(*, created_at: datetime | None = None) -> tuple[Path, Pa
         promotion_started = True
         _promote(output_dir)
     except BaseException:
+        if renamed and audit_dir is None:
+            raise
         if not promotion_started or not _canonical_pointer_targets(output_dir):
             _remove_build_directories(
                 audit_dir,
