@@ -3,19 +3,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 import polars as pl
 import torch
 
-from .contract import (
-    GH200_RUNTIME,
-    TCNArchitecture,
-    TCNSettings,
-    architecture_for_model,
-)
 from .data import (
     FeatureStoreIdentityCache,
     create_evaluation_loader,
@@ -24,21 +17,17 @@ from .data import (
     validate_feature_store_identity,
 )
 from .engine import EvaluationObservations, collect_evaluation_observations
-from .model import build_neural_model
+from .model import build_model
 
 REQUIRED_CHECKPOINT_KEYS = {
-    "model_name",
-    "architecture",
-    "tcn_settings",
-    "peer_features",
-    "optimizer_variant",
-    "objective",
-    "sam",
+    "model",
+    "cross_equity_attention",
+    "recency_policy",
     "seed",
     "epoch",
     "validation_score",
     "feature_store",
-    "global_context",
+    "feature_store_identity",
     "model_state_dict",
 }
 
@@ -56,25 +45,7 @@ def _atomic_json(path: Path, value: dict[str, object]) -> None:
     os.replace(temporary, path)
 
 
-def resolve_checkpoint_feature_store(
-    checkpoint: dict[str, object],
-    *,
-    identity_cache: FeatureStoreIdentityCache | None = None,
-) -> Path:
-    store = Path(str(checkpoint["feature_store"])).resolve()
-    if not store.is_dir():
-        raise FileNotFoundError(store)
-    recorded_identity = checkpoint.get("feature_store_identity")
-    if recorded_identity is not None:
-        validate_feature_store_identity(
-            store,
-            recorded_identity,
-            identity_cache=identity_cache,
-        )
-    return store
-
-
-def load_current_neural_run(
+def load_current_run(
     run_dir: Path,
     *,
     identity_cache: FeatureStoreIdentityCache | None = None,
@@ -85,37 +56,23 @@ def load_current_neural_run(
     )
     missing = REQUIRED_CHECKPOINT_KEYS - set(checkpoint)
     if missing:
-        raise ValueError(f"Checkpoint is missing required keys: {sorted(missing)}")
-    model_name = str(checkpoint["model_name"])
-    settings_value = checkpoint["tcn_settings"]
-    settings = TCNSettings(**settings_value) if settings_value is not None else None
-    architecture = architecture_for_model(model_name, settings)
-    checkpoint["tcn_settings"] = None if settings is None else asdict(settings)
-    checkpoint["architecture"] = asdict(architecture)
-    checkpoint.setdefault("training_horizon", "all")
-    checkpoint.setdefault("selection_horizon", checkpoint["training_horizon"])
-    checkpoint.setdefault("context_family_ablation", "none")
-    peer_value = checkpoint["peer_features"]
-    if not isinstance(peer_value, dict) or peer_value.get("mode") not in (
-        "none",
-        "selected",
-    ):
-        raise ValueError("Checkpoint has invalid current peer metadata")
-    peer_features = str(peer_value["mode"])
-    model = build_neural_model(
-        model_name,
-        architecture if isinstance(architecture, TCNArchitecture) else None,
-        peer_features,
-    )
-    model.load_state_dict(checkpoint["model_state_dict"], strict=True)
-    store = resolve_checkpoint_feature_store(
-        checkpoint,
+        raise ValueError(f"Checkpoint is missing current keys: {sorted(missing)}")
+    store = Path(str(checkpoint["feature_store"])).resolve()
+    if not store.is_dir():
+        raise FileNotFoundError(store)
+    validate_feature_store_identity(
+        store,
+        checkpoint["feature_store_identity"],
         identity_cache=identity_cache,
     )
+    model = build_model(
+        cross_equity_attention=bool(checkpoint["cross_equity_attention"])
+    )
+    model.load_state_dict(checkpoint["model_state_dict"], strict=True)
     return model, checkpoint, store
 
 
-def collect_neural_evaluation(
+def collect_run_evaluation(
     run_dir: Path,
     split: str,
     *,
@@ -127,38 +84,11 @@ def collect_neural_evaluation(
     dict[str, object],
     Path,
 ]:
-    model, checkpoint, store = load_current_neural_run(
-        run_dir, identity_cache=identity_cache
-    )
+    model, checkpoint, store = load_current_run(run_dir, identity_cache=identity_cache)
     model = model.cuda()
     rows = select_sample_split(load_sample_index(store), split)
-    settings_value = checkpoint["tcn_settings"]
-    settings = TCNSettings(**settings_value) if settings_value is not None else None
-    architecture = architecture_for_model(str(checkpoint["model_name"]), settings)
-    objective = checkpoint["objective"]
-    if not isinstance(objective, dict) or objective.get("name") not in (
-        "soft_spearman",
-        "rank_huber",
-    ):
-        raise ValueError("Checkpoint has invalid objective metadata")
-    peer = checkpoint["peer_features"]
-    loader = create_evaluation_loader(
-        store,
-        rows,
-        str(checkpoint["model_name"]),
-        checkpoint["global_context"],
-        GH200_RUNTIME,
-        int(checkpoint["seed"]),
-        architecture if isinstance(architecture, TCNArchitecture) else None,
-        str(peer["mode"]),
-        str(checkpoint["context_family_ablation"]),
-    )
-    observations, summary, daily = collect_evaluation_observations(
-        model,
-        loader,
-        str(objective["name"]),
-        objective.get("temperature"),
-    )
+    loader = create_evaluation_loader(store, rows, seed=int(checkpoint["seed"]))
+    observations, summary, daily = collect_evaluation_observations(model, loader)
     return observations, summary, daily, checkpoint, store
 
 
@@ -170,7 +100,7 @@ def evaluate_run(run_dir: Path, split: str) -> Path:
         run_dir / f"evaluation_{split}_{datetime.now(timezone.utc):%Y%m%dT%H%M%S%fZ}"
     )
     output.mkdir(exist_ok=False)
-    observations, summary, daily, _, _ = collect_neural_evaluation(run_dir, split)
+    observations, summary, daily, _, _ = collect_run_evaluation(run_dir, split)
     pl.DataFrame(
         {
             "sample_id": observations.sample_id,

@@ -4,7 +4,6 @@ import hashlib
 import json
 import math
 import random
-import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
@@ -16,53 +15,35 @@ import polars as pl
 import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
-from brazil_rv.preprocessing.intraday_normalization import (
-    development_parent_identity_from_store,
-)
-
-from .feature_variant import (
-    feature_variant_identity,
-    load_variant_manifest,
-    open_variant_arrays,
-    validate_variant_binding,
-    variant_parent,
-)
-
 from .contract import (
     ABSOLUTE_PATCH_COUNT,
     CANONICAL_DROPPED_LOCAL_SLOTS,
     CANONICAL_NEUTRALIZED_EQUITY_SLOW_INDICES,
     CANONICAL_RETAINED_GLOBAL_SLOTS,
     CONTEXT_COUNT,
-    CONTEXT_GENERIC_DYNAMIC_COUNT,
     DECISION_GLOBAL_INDICES,
     EQUITY_ABSOLUTE_START_PATCH,
     EQUITY_COUNT,
     EXPECTED_DECISIONS_PER_DATE,
     FEATURE_STORE_POINTER,
+    GH200_RUNTIME,
     GLOBAL_CONTEXT_COUNT,
-    GLOBAL_CONTEXT_SETTINGS,
     GLOBAL_WINDOW_MINUTES,
     HORIZON_COUNT,
     LOCAL_CONTEXT_COUNT,
-    NEURAL_MODELS,
     PATCH_INPUT_WIDTH,
     PATCH_MINUTES,
-    PEER_STATE_WIDTH,
+    RECENCY_HALF_LIVES,
+    RECENCY_POLICIES,
+    ROLLING_WINDOW_DATES,
     RuntimeSettings,
     SLOW_FEATURE_COUNT,
-    TABULAR_FEATURE_COUNT,
-    TABULAR_OFFSETS,
-    TCNArchitecture,
     TEST_END,
     TEST_START,
     TRAIN_END,
     TRAIN_START,
     VALIDATION_END,
     VALIDATION_START,
-    context_family_slots,
-    validate_context_family_ablation,
-    validate_peer_feature_mode,
     workspace_path,
 )
 
@@ -81,7 +62,6 @@ FEATURE_ARRAY_FILES = (
     "label_mask.npy",
     "raw_returns.npy",
 )
-PEER_ARRAY_FILES = ("equity_peer_features.npy", "equity_peer_valid.npy")
 
 
 @dataclass(frozen=True)
@@ -97,14 +77,13 @@ def resolve_feature_store(pointer: Path = FEATURE_STORE_POINTER) -> Path:
     return store
 
 
-def _legacy_feature_store_identity(store: Path) -> dict[str, object]:
-    schema_path = store / "feature_schema.json"
+def feature_store_identity(store: Path) -> dict[str, object]:
     digest = hashlib.sha256()
-    for path in (store / "manifest.json", schema_path, store / "sample_index.parquet"):
-        with path.open("rb") as source:
+    for name in ("manifest.json", "feature_schema.json", "sample_index.parquet"):
+        with (store / name).open("rb") as source:
             while chunk := source.read(1024 * 1024):
                 digest.update(chunk)
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    schema = json.loads((store / "feature_schema.json").read_text(encoding="utf-8"))
     return {
         "path": str(store.resolve()),
         "contract_version": schema["contract_version"],
@@ -112,52 +91,7 @@ def _legacy_feature_store_identity(store: Path) -> dict[str, object]:
     }
 
 
-def feature_store_identity(store: Path) -> dict[str, object]:
-    variant = load_variant_manifest(store)
-    if variant is not None:
-        return feature_variant_identity(store, variant)
-    return _legacy_feature_store_identity(store)
-
-
-FeatureStoreIdentityCache = dict[tuple[str, str], dict[str, object]]
-_IDENTITY_KEYS = frozenset(("path", "contract_version", "metadata_sha256"))
-_DEVELOPMENT_SCOPE_KEYS = frozenset(
-    ("kind", "end_date", "date_count", "date_array_scope")
-)
-
-
-def _validate_recorded_feature_store_identity(
-    identity: object,
-) -> tuple[dict[str, object], bool]:
-    if not isinstance(identity, dict):
-        raise ValueError("Checkpoint feature-store identity must be a dictionary")
-    development = "hash_scope" in identity
-    expected_keys = _IDENTITY_KEYS | ({"hash_scope"} if development else set())
-    if set(identity) != expected_keys:
-        raise ValueError("Checkpoint feature-store identity has invalid fields")
-    if not isinstance(identity["path"], str) or not identity["path"]:
-        raise ValueError("Checkpoint feature-store identity has an invalid path")
-    if (
-        not isinstance(identity["contract_version"], str)
-        or not identity["contract_version"]
-    ):
-        raise ValueError("Checkpoint feature-store identity has an invalid contract")
-    digest = identity["metadata_sha256"]
-    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
-        raise ValueError("Checkpoint feature-store identity has an invalid digest")
-    if development:
-        scope = identity["hash_scope"]
-        if not isinstance(scope, dict) or set(scope) != _DEVELOPMENT_SCOPE_KEYS:
-            raise ValueError("Checkpoint feature-store identity has an invalid scope")
-        if (
-            scope["kind"] != "development_only"
-            or scope["end_date"] != str(VALIDATION_END)
-            or type(scope["date_count"]) is not int
-            or scope["date_count"] <= 0
-            or scope["date_array_scope"] != "prefix_only"
-        ):
-            raise ValueError("Checkpoint feature-store identity has an invalid scope")
-    return identity, development
+FeatureStoreIdentityCache = dict[str, dict[str, object]]
 
 
 def validate_feature_store_identity(
@@ -166,24 +100,16 @@ def validate_feature_store_identity(
     *,
     identity_cache: FeatureStoreIdentityCache | None = None,
 ) -> dict[str, object]:
-    recorded, development = _validate_recorded_feature_store_identity(recorded_identity)
-    store = store.resolve()
-    cache_key = (str(store), "development" if development else "full")
-    actual = None if identity_cache is None else identity_cache.get(cache_key)
+    if not isinstance(recorded_identity, dict):
+        raise ValueError("Checkpoint feature-store identity must be a dictionary")
+    key = str(store.resolve())
+    actual = None if identity_cache is None else identity_cache.get(key)
     if actual is None:
-        variant = load_variant_manifest(store)
-        if development and variant is None:
-            actual = development_parent_identity_from_store(store)
-        elif development:
-            actual = feature_variant_identity(store, variant)
-        else:
-            actual = feature_store_identity(store)
-    if actual != recorded:
-        raise ValueError(
-            "Checkpoint feature-store identity differs from the resolved store"
-        )
+        actual = feature_store_identity(store)
+    if actual != recorded_identity:
+        raise ValueError("Checkpoint feature store differs from the resolved store")
     if identity_cache is not None:
-        identity_cache[cache_key] = actual
+        identity_cache[key] = actual
     return actual
 
 
@@ -212,9 +138,7 @@ def _validate_sample_index(sample_index: pl.DataFrame) -> None:
         raise ValueError("sample_id must be sorted, unique, and contiguous")
     expected = list(range(EXPECTED_DECISIONS_PER_DATE))
     per_date = sample_index.group_by("trade_date").agg(pl.col("decision_idx").sort())
-    if any(
-        values.to_list() != expected for values in per_date.get_column("decision_idx")
-    ):
+    if any(values.to_list() != expected for values in per_date["decision_idx"]):
         raise ValueError("Each eligible date must contain decisions 0..54 exactly once")
     decision = pl.col("decision_idx").cast(pl.Int16)
     invalid = sample_index.filter(
@@ -225,17 +149,13 @@ def _validate_sample_index(sample_index: pl.DataFrame) -> None:
         raise ValueError("Sample cutoffs violate the causal five-minute grid")
 
 
-def load_sample_index(store: Path, *, end_date: date | None = None) -> pl.DataFrame:
-    variant = load_variant_manifest(store)
-    if variant is not None:
-        store = variant_parent(store, variant)
-        end_date = VALIDATION_END if end_date is None else end_date
-    scan = pl.scan_parquet(store / "sample_index.parquet")
-    if end_date is not None:
-        scan = scan.filter(pl.col("trade_date") <= end_date)
-    rows = scan.collect().sort("sample_id")
-    _validate_sample_index(rows)
-    return rows
+def load_sample_index(store: Path, *, through: date | None = None) -> pl.DataFrame:
+    rows = pl.scan_parquet(store / "sample_index.parquet")
+    if through is not None:
+        rows = rows.filter(pl.col("trade_date") <= through)
+    collected = rows.collect().sort("sample_id")
+    _validate_sample_index(collected)
+    return collected
 
 
 def select_sample_split(sample_index: pl.DataFrame, split: str) -> pl.DataFrame:
@@ -253,100 +173,108 @@ def select_sample_split(sample_index: pl.DataFrame, split: str) -> pl.DataFrame:
         raise ValueError(f"Unknown split: {split}") from error
 
 
+def prepare_training_rows(
+    rows: pl.DataFrame, policy: str
+) -> tuple[pl.DataFrame, np.ndarray, dict[str, object]]:
+    if policy not in RECENCY_POLICIES:
+        raise ValueError(f"Unknown recency policy: {policy}")
+    unique_dates = rows.select("date_idx", "trade_date").unique().sort("date_idx")
+    if policy == "rolling_504":
+        retained = unique_dates.tail(ROLLING_WINDOW_DATES)
+        rows = rows.join(retained.select("date_idx"), on="date_idx", how="semi")
+        unique_dates = retained
+    raw = np.ones(unique_dates.height, dtype=np.float64)
+    half_life = RECENCY_HALF_LIVES.get(policy)
+    if half_life is not None:
+        ages = np.arange(unique_dates.height - 1, -1, -1, dtype=np.float64)
+        raw = np.power(2.0, -ages / half_life)
+        raw /= raw.mean()
+    max_date_idx = int(unique_dates["date_idx"].max())
+    by_date = np.zeros(max_date_idx + 1, dtype=np.float32)
+    by_date[unique_dates["date_idx"].to_numpy()] = raw.astype(np.float32)
+    metadata = {
+        "policy": policy,
+        "half_life_sessions": half_life,
+        "rolling_window_sessions": (
+            ROLLING_WINDOW_DATES if policy == "rolling_504" else None
+        ),
+        "date_count": unique_dates.height,
+        "first_date": str(unique_dates["trade_date"].min()),
+        "last_date": str(unique_dates["trade_date"].max()),
+        "weight_mean": float(raw.mean()),
+        "weight_minimum": float(raw.min()),
+        "weight_maximum": float(raw.max()),
+    }
+    return rows, by_date, metadata
+
+
 def _common_batch(
     arrays: dict[str, np.ndarray],
     rows: dict[str, np.ndarray],
     positions: np.ndarray,
     valid_count: int,
+    date_weights: np.ndarray | None,
 ) -> tuple[
     dict[str, np.ndarray], np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
 ]:
-    source_dates = rows["date_idx"][positions].astype(np.int64, copy=False)
-    source_decisions = rows["decision_idx"][positions].astype(np.int64, copy=False)
+    dates = rows["date_idx"][positions].astype(np.int64, copy=False)
+    decisions = rows["decision_idx"][positions].astype(np.int64, copy=False)
     sample_id = rows["sample_id"][positions].astype(np.int64, copy=True)
-    date_idx = source_dates.copy()
-    decision_idx = source_decisions.copy()
+    date_idx = dates.copy()
+    decision_idx = decisions.copy()
     equity_cutoffs = rows["equity_cutoff_index"][positions]
     context_cutoffs = rows["context_cutoff_index"][positions]
     batch_size = positions.size
     sample_valid_mask = np.arange(batch_size) < valid_count
     active = np.asarray(
-        arrays["equity_membership.npy"][source_dates]
-        & arrays["equity_data_ready.npy"][source_dates],
+        arrays["equity_membership.npy"][dates] & arrays["equity_data_ready.npy"][dates],
         dtype=bool,
     )
     targets = np.zeros((batch_size, EQUITY_COUNT, HORIZON_COUNT), dtype=np.float32)
     label_mask = np.zeros_like(targets, dtype=bool)
     raw_returns = np.zeros_like(targets)
-    for decision in np.unique(source_decisions):
-        group = np.flatnonzero(source_decisions == decision)
-        targets[group] = arrays["targets.npy"][source_dates[group], :, int(decision), :]
-        label_mask[group] = arrays["label_mask.npy"][
-            source_dates[group], :, int(decision), :
-        ]
+    for decision in np.unique(decisions):
+        group = np.flatnonzero(decisions == decision)
+        targets[group] = arrays["targets.npy"][dates[group], :, int(decision), :]
+        label_mask[group] = arrays["label_mask.npy"][dates[group], :, int(decision), :]
         raw_returns[group] = arrays["raw_returns.npy"][
-            source_dates[group], :, int(decision), :
+            dates[group], :, int(decision), :
         ]
+    training_weight = (
+        np.ones(batch_size, dtype=np.float32)
+        if date_weights is None
+        else date_weights[dates].astype(np.float32, copy=True)
+    )
     padded = ~sample_valid_mask
     targets[padded] = 0
     label_mask[padded] = False
     raw_returns[padded] = 0
+    training_weight[padded] = 0
     sample_id[padded] = date_idx[padded] = decision_idx[padded] = -1
-    common = {
-        "targets": targets,
-        "label_mask": label_mask,
-        "raw_returns": raw_returns,
-        "sample_valid_mask": sample_valid_mask,
-        "sample_id": sample_id,
-        "date_idx": date_idx,
-        "decision_idx": decision_idx,
-    }
     return (
-        common,
+        {
+            "targets": targets,
+            "label_mask": label_mask,
+            "raw_returns": raw_returns,
+            "training_weight": training_weight,
+            "sample_valid_mask": sample_valid_mask,
+            "sample_id": sample_id,
+            "date_idx": date_idx,
+            "decision_idx": decision_idx,
+        },
         active,
         equity_cutoffs,
         context_cutoffs,
-        source_dates,
-        source_decisions,
+        dates,
+        decisions,
     )
-
-
-def _build_peer_state(
-    arrays: dict[str, np.ndarray],
-    date_idx: np.ndarray,
-    equity_cutoffs: np.ndarray,
-    active: np.ndarray,
-) -> np.ndarray:
-    state = np.zeros((date_idx.size, EQUITY_COUNT, PEER_STATE_WIDTH), dtype=np.float32)
-    for cutoff in np.unique(equity_cutoffs):
-        group = np.flatnonzero(equity_cutoffs == cutoff)
-        minute = int(cutoff) - 1
-        numeric = np.asarray(
-            arrays["equity_peer_features.npy"][date_idx[group], :, minute, :4],
-            dtype=np.float32,
-        )
-        valid = np.asarray(
-            arrays["equity_peer_valid.npy"][date_idx[group], :, minute, :2], dtype=bool
-        )
-        state[group, :, :4] = np.where(
-            np.tile(valid, 2),
-            numeric,
-            0.0,
-        )
-        state[group, :, 4:] = valid
-    return state * active[..., None]
 
 
 def _context_readiness(
     arrays: dict[str, np.ndarray],
     date_idx: np.ndarray,
     decision_idx: np.ndarray,
-    global_context: str,
-    context_family_ablation: str = "none",
-    allow_date_replacement: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
-    if global_context not in GLOBAL_CONTEXT_SETTINGS:
-        raise ValueError(f"Invalid global context: {global_context}")
     local_ready = np.asarray(
         arrays["context_data_ready.npy"][date_idx], dtype=bool
     ).copy()
@@ -360,13 +288,6 @@ def _context_readiness(
     keep = np.zeros(GLOBAL_CONTEXT_COUNT, dtype=bool)
     keep[list(CANONICAL_RETAINED_GLOBAL_SLOTS)] = True
     global_ready &= keep
-    if global_context == "masked":
-        global_ready[:] = False
-    for slot in context_family_slots(context_family_ablation):
-        if slot < LOCAL_CONTEXT_COUNT:
-            local_ready[:, slot] = False
-        else:
-            global_ready[:, slot - LOCAL_CONTEXT_COUNT] = False
     return local_ready, global_ready
 
 
@@ -377,32 +298,26 @@ def _build_patch_batch(
     decision_idx: np.ndarray,
     context_cutoffs: np.ndarray,
     active: np.ndarray,
-    global_context: str | None,
-    context_family_ablation: str = "none",
 ) -> dict[str, np.ndarray]:
-    needs_context = global_context is not None
     batch_size = date_idx.size
-    instrument_count = EQUITY_COUNT + (CONTEXT_COUNT if needs_context else 0)
-    local_ready = global_ready = None
-    if needs_context:
-        local_ready, global_ready = _context_readiness(
-            arrays,
-            date_idx,
-            decision_idx,
-            global_context,
-            context_family_ablation,
-        )
+    local_ready, global_ready = _context_readiness(arrays, date_idx, decision_idx)
     patches = np.zeros(
-        (batch_size, instrument_count, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH),
+        (
+            batch_size,
+            EQUITY_COUNT + CONTEXT_COUNT,
+            ABSOLUTE_PATCH_COUNT,
+            PATCH_INPUT_WIDTH,
+        ),
         dtype=np.float32,
     )
     history_mask = np.zeros(
-        (batch_size, instrument_count, ABSOLUTE_PATCH_COUNT), dtype=bool
+        (batch_size, EQUITY_COUNT + CONTEXT_COUNT, ABSOLUTE_PATCH_COUNT), dtype=bool
     )
-    instrument_mask = np.zeros((batch_size, instrument_count), dtype=bool)
+    instrument_mask = np.zeros((batch_size, EQUITY_COUNT + CONTEXT_COUNT), dtype=bool)
     instrument_mask[:, :EQUITY_COUNT] = active
     slow = np.zeros(
-        (batch_size, instrument_count, SLOW_FEATURE_COUNT), dtype=np.float32
+        (batch_size, EQUITY_COUNT + CONTEXT_COUNT, SLOW_FEATURE_COUNT),
+        dtype=np.float32,
     )
     equity_slow = np.asarray(
         arrays["equity_slow.npy"][date_idx], dtype=np.float32
@@ -421,67 +336,53 @@ def _build_patch_batch(
         prefix = np.asarray(
             arrays["equity_features.npy"][date_idx[group], :, : int(cutoff), :],
             dtype=np.float32,
-        )
-        prefix = prefix.reshape(
-            group.size, EQUITY_COUNT, equity_patches, PATCH_INPUT_WIDTH
-        )
+        ).reshape(group.size, EQUITY_COUNT, equity_patches, PATCH_INPUT_WIDTH)
         patches[group, :EQUITY_COUNT, EQUITY_ABSOLUTE_START_PATCH:state] = (
             prefix * active[group, :, None, None]
         )
         history_mask[group, :EQUITY_COUNT, EQUITY_ABSOLUTE_START_PATCH:state] = active[
             group, :, None
         ]
-        if needs_context:
-            assert local_ready is not None
-            ready = local_ready[group]
-            local = np.asarray(
-                arrays["context_features.npy"][date_idx[group], :, :context_cutoff, :],
-                dtype=np.float32,
-            )
-            local = local.reshape(
-                group.size, LOCAL_CONTEXT_COUNT, state, PATCH_INPUT_WIDTH
-            )
-            start = EQUITY_COUNT
-            patches[group, start : start + LOCAL_CONTEXT_COUNT, :state] = (
-                local * ready[..., None, None]
-            )
-            history_mask[group, start : start + LOCAL_CONTEXT_COUNT, :state] = ready[
-                ..., None
-            ]
-    if needs_context:
-        assert local_ready is not None and global_ready is not None
-        global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
-        instrument_mask[:, EQUITY_COUNT:global_start] = local_ready
-        slow[:, EQUITY_COUNT:global_start] = (
-            np.asarray(arrays["context_slow.npy"][date_idx], dtype=np.float32)
-            * local_ready[..., None]
+        ready = local_ready[group]
+        local = np.asarray(
+            arrays["context_features.npy"][date_idx[group], :, :context_cutoff, :],
+            dtype=np.float32,
+        ).reshape(group.size, LOCAL_CONTEXT_COUNT, state, PATCH_INPUT_WIDTH)
+        start = EQUITY_COUNT
+        patches[group, start : start + LOCAL_CONTEXT_COUNT, :state] = (
+            local * ready[..., None, None]
         )
-        cutoffs = np.asarray(DECISION_GLOBAL_INDICES)[decision_idx]
-        minutes = (
-            cutoffs[:, None]
-            - GLOBAL_WINDOW_MINUTES
-            + np.arange(GLOBAL_WINDOW_MINUTES)[None, :]
-        )
-        global_grid = np.asarray(
-            arrays["global_features.npy"][date_idx], dtype=np.float32
-        )
-        global_values = global_grid[
-            np.arange(batch_size)[:, None, None],
-            np.arange(GLOBAL_CONTEXT_COUNT)[None, :, None],
-            minutes[:, None, :],
-        ].reshape(
-            batch_size, GLOBAL_CONTEXT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH
-        )
-        patches[:, global_start:] = global_values * global_ready[..., None, None]
-        history_mask[:, global_start:] = global_ready[..., None]
-        instrument_mask[:, global_start:] = global_ready
-        global_slow = np.asarray(arrays["global_slow.npy"][date_idx], dtype=np.float32)
-        decision_slow = global_slow[
-            np.arange(batch_size)[:, None],
-            np.arange(GLOBAL_CONTEXT_COUNT)[None, :],
-            decision_idx[:, None],
+        history_mask[group, start : start + LOCAL_CONTEXT_COUNT, :state] = ready[
+            ..., None
         ]
-        slow[:, global_start:] = decision_slow * global_ready[..., None]
+    global_start = EQUITY_COUNT + LOCAL_CONTEXT_COUNT
+    instrument_mask[:, EQUITY_COUNT:global_start] = local_ready
+    slow[:, EQUITY_COUNT:global_start] = (
+        np.asarray(arrays["context_slow.npy"][date_idx], dtype=np.float32)
+        * local_ready[..., None]
+    )
+    cutoffs = np.asarray(DECISION_GLOBAL_INDICES)[decision_idx]
+    minutes = (
+        cutoffs[:, None]
+        - GLOBAL_WINDOW_MINUTES
+        + np.arange(GLOBAL_WINDOW_MINUTES)[None, :]
+    )
+    global_grid = np.asarray(arrays["global_features.npy"][date_idx], dtype=np.float32)
+    global_values = global_grid[
+        np.arange(batch_size)[:, None, None],
+        np.arange(GLOBAL_CONTEXT_COUNT)[None, :, None],
+        minutes[:, None, :],
+    ].reshape(batch_size, GLOBAL_CONTEXT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH)
+    patches[:, global_start:] = global_values * global_ready[..., None, None]
+    history_mask[:, global_start:] = global_ready[..., None]
+    instrument_mask[:, global_start:] = global_ready
+    global_slow = np.asarray(arrays["global_slow.npy"][date_idx], dtype=np.float32)
+    decision_slow = global_slow[
+        np.arange(batch_size)[:, None],
+        np.arange(GLOBAL_CONTEXT_COUNT)[None, :],
+        decision_idx[:, None],
+    ]
+    slow[:, global_start:] = decision_slow * global_ready[..., None]
     return {
         "patches": patches,
         "history_patch_mask": history_mask,
@@ -491,184 +392,15 @@ def _build_patch_batch(
     }
 
 
-def build_tabular_batch(
-    arrays: dict[str, np.ndarray],
-    date_idx: np.ndarray,
-    decision_idx: np.ndarray,
-    equity_cutoffs: np.ndarray,
-    context_cutoffs: np.ndarray,
-    active: np.ndarray,
-    global_context: str,
-    context_family_ablation: str = "none",
-) -> dict[str, np.ndarray]:
-    batch_size = date_idx.size
-    local_ready, global_ready = _context_readiness(
-        arrays, date_idx, decision_idx, global_context, context_family_ablation
-    )
-    global_cutoffs = np.asarray(DECISION_GLOBAL_INDICES)[decision_idx]
-    global_grid = np.asarray(arrays["global_features.npy"][date_idx], dtype=np.float32)
-    output = np.zeros(
-        (batch_size, EQUITY_COUNT, TABULAR_FEATURE_COUNT), dtype=np.float32
-    )
-    cursor = 0
-    equity_slow = np.asarray(
-        arrays["equity_slow.npy"][date_idx], dtype=np.float32
-    ).copy()
-    equity_slow[..., CANONICAL_NEUTRALIZED_EQUITY_SLOW_INDICES] = 0.0
-    output[:, :, :SLOW_FEATURE_COUNT] = equity_slow * active[..., None]
-    cursor += SLOW_FEATURE_COUNT
-    equity_validity: list[np.ndarray] = []
-    for offset in TABULAR_OFFSETS:
-        block = np.zeros(
-            (batch_size, EQUITY_COUNT, PATCH_INPUT_WIDTH // PATCH_MINUTES),
-            dtype=np.float32,
-        )
-        valid = np.zeros((batch_size, EQUITY_COUNT), dtype=bool)
-        for cutoff in np.unique(equity_cutoffs):
-            group = np.flatnonzero(equity_cutoffs == cutoff)
-            minute = int(cutoff) - 1 - offset
-            if minute >= 0:
-                values = np.asarray(
-                    arrays["equity_features.npy"][date_idx[group], :, minute, :],
-                    dtype=np.float32,
-                )
-                group_valid = (values[..., 5] > 0.5) & active[group]
-                block[group] = values * group_valid[..., None]
-                valid[group] = group_valid
-        output[:, :, cursor : cursor + block.shape[-1]] = block
-        cursor += block.shape[-1]
-        equity_validity.append(valid)
-    context_validity: list[np.ndarray] = []
-    for slot in range(LOCAL_CONTEXT_COUNT):
-        for offset in TABULAR_OFFSETS:
-            block = np.zeros(
-                (batch_size, CONTEXT_GENERIC_DYNAMIC_COUNT), dtype=np.float32
-            )
-            valid = np.zeros(batch_size, dtype=bool)
-            for cutoff in np.unique(context_cutoffs):
-                group = np.flatnonzero(context_cutoffs == cutoff)
-                minute = int(cutoff) - 1 - offset
-                if minute >= 0:
-                    values = np.asarray(
-                        arrays["context_features.npy"][
-                            date_idx[group], slot, minute, :
-                        ],
-                        dtype=np.float32,
-                    )
-                    group_valid = (values[:, 5] > 0.5) & local_ready[group, slot]
-                    block[group] = (
-                        values[:, :CONTEXT_GENERIC_DYNAMIC_COUNT] * group_valid[:, None]
-                    )
-                    valid[group] = group_valid
-            output[:, :, cursor : cursor + CONTEXT_GENERIC_DYNAMIC_COUNT] = block[
-                :, None
-            ]
-            cursor += CONTEXT_GENERIC_DYNAMIC_COUNT
-            context_validity.append(valid)
-    global_minutes = global_cutoffs[:, None] - 1 - np.asarray(TABULAR_OFFSETS)[None, :]
-    global_values = global_grid[
-        np.arange(batch_size)[:, None, None],
-        np.arange(GLOBAL_CONTEXT_COUNT)[None, :, None],
-        global_minutes[:, None, :],
-    ]
-    global_validity = (global_values[..., 5] > 0.5) & global_ready[..., None]
-    block = (
-        global_values[..., :CONTEXT_GENERIC_DYNAMIC_COUNT] * global_validity[..., None]
-    ).reshape(batch_size, -1)
-    output[:, :, cursor : cursor + block.shape[-1]] = block[:, None]
-    cursor += block.shape[-1]
-    local_slow = (
-        np.asarray(arrays["context_slow.npy"][date_idx], dtype=np.float32)
-        * local_ready[..., None]
-    ).reshape(batch_size, -1)
-    output[:, :, cursor : cursor + local_slow.shape[-1]] = local_slow[:, None]
-    cursor += local_slow.shape[-1]
-    global_slow = np.asarray(arrays["global_slow.npy"][date_idx], dtype=np.float32)
-    decision_slow = global_slow[
-        np.arange(batch_size)[:, None],
-        np.arange(GLOBAL_CONTEXT_COUNT)[None, :],
-        decision_idx[:, None],
-    ]
-    decision_slow = (decision_slow * global_ready[..., None]).reshape(batch_size, -1)
-    output[:, :, cursor : cursor + decision_slow.shape[-1]] = decision_slow[:, None]
-    cursor += decision_slow.shape[-1]
-    position = decision_idx.astype(np.float32) / (EXPECTED_DECISIONS_PER_DATE - 1)
-    output[:, :, cursor] = np.sin(2 * np.pi * position)[:, None]
-    output[:, :, cursor + 1] = np.cos(2 * np.pi * position)[:, None]
-    cursor += 2
-    for valid in equity_validity:
-        output[:, :, cursor] = valid
-        cursor += 1
-    for valid in context_validity:
-        output[:, :, cursor] = valid[:, None]
-        cursor += 1
-    for valid in global_validity.reshape(batch_size, -1).T:
-        output[:, :, cursor] = valid[:, None]
-        cursor += 1
-    for ready in local_ready.T:
-        output[:, :, cursor] = ready[:, None]
-        cursor += 1
-    for ready in global_ready.T:
-        output[:, :, cursor] = ready[:, None]
-        cursor += 1
-    if cursor != TABULAR_FEATURE_COUNT:
-        raise RuntimeError(
-            f"Tabular construction ended at {cursor}, expected {TABULAR_FEATURE_COUNT}"
-        )
-    return {
-        "tabular_features": output * active[..., None],
-        "equity_mask": active.copy(),
-    }
-
-
 class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
     def __init__(
         self,
         store: Path,
         sample_index: pl.DataFrame,
-        model_name: str,
-        global_context: str | None,
-        tcn_architecture: TCNArchitecture | None = None,
-        peer_features: str = "none",
-        context_family_ablation: str = "none",
+        date_weights: np.ndarray | None = None,
     ) -> None:
-        if model_name not in NEURAL_MODELS:
-            raise ValueError(f"Neural dataset required, found {model_name}")
-        if model_name == "tcn":
-            if tcn_architecture is None:
-                raise ValueError("TCN architecture is required")
-            needs_context = tcn_architecture.fusion_mode in (
-                "context_only",
-                "context_pooled",
-            )
-        else:
-            if tcn_architecture is not None:
-                raise ValueError("TCN architecture is only valid for TCN")
-            needs_context = model_name in ("context_only", "context_pooled", "mlp")
-        if needs_context != (global_context is not None):
-            raise ValueError("Global-context setting does not match model inputs")
         self.store = store
-        self.model_name = model_name
-        self.needs_context = needs_context
-        self.global_context = global_context
-        self.peer_features = validate_peer_feature_mode(model_name, peer_features)
-        self.context_family_ablation = validate_context_family_ablation(
-            context_family_ablation
-        )
-        if not needs_context and self.context_family_ablation != "none":
-            raise ValueError("Context ablation requires context inputs")
-        self.variant_manifest = load_variant_manifest(store)
-        self.parent_store = store
-        if self.variant_manifest is not None:
-            self.parent_store, _ = validate_variant_binding(
-                store,
-                self.variant_manifest,
-                verify_overlay_hashes=False,
-            )
-            if sample_index.get_column("date_idx").max() >= int(
-                self.variant_manifest["allowed_date_count"]
-            ):
-                raise ValueError("Feature variant cannot serve held-out test rows")
+        self.date_weights = date_weights
         self.rows = {
             name: sample_index.get_column(name).to_numpy()
             for name in (
@@ -691,90 +423,51 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
 
     def _open_arrays(self) -> dict[str, np.ndarray]:
         if self._arrays is None:
-            filenames = FEATURE_ARRAY_FILES
-            if self.model_name != "mlp" and not self.needs_context:
-                filenames = tuple(
-                    name
-                    for name in filenames
-                    if not name.startswith(("context_", "global_"))
-                )
-            if self.peer_features == "selected":
-                filenames = (*filenames, *PEER_ARRAY_FILES)
-            if self.variant_manifest is None:
-                self._arrays = {
-                    name: np.load(
-                        self.parent_store / name, mmap_mode="r", allow_pickle=False
-                    )
-                    for name in filenames
-                }
-            else:
-                self._arrays = open_variant_arrays(
-                    self.store, self.parent_store, self.variant_manifest, filenames
-                )
+            self._arrays = {
+                name: np.load(self.store / name, mmap_mode="r", allow_pickle=False)
+                for name in FEATURE_ARRAY_FILES
+            }
         return self._arrays
 
     def __getitem__(self, request: BatchRequest) -> dict[str, np.ndarray]:
         arrays = self._open_arrays()
         positions = np.asarray(request.indices, dtype=np.int64)
         common, active, equity_cutoffs, context_cutoffs, dates, decisions = (
-            _common_batch(arrays, self.rows, positions, request.valid_count)
+            _common_batch(
+                arrays,
+                self.rows,
+                positions,
+                request.valid_count,
+                self.date_weights,
+            )
         )
-        if self.model_name == "mlp":
-            inputs = build_tabular_batch(
-                arrays,
-                dates,
-                decisions,
-                equity_cutoffs,
-                context_cutoffs,
-                active,
-                self.global_context,
-                self.context_family_ablation,
-            )
-        else:
-            inputs = _build_patch_batch(
-                arrays,
-                dates,
-                equity_cutoffs,
-                decisions,
-                context_cutoffs,
-                active,
-                self.global_context,
-                self.context_family_ablation,
-            )
-            if self.peer_features == "selected":
-                inputs["peer_state"] = _build_peer_state(
-                    arrays, dates, equity_cutoffs, active
-                )
+        inputs = _build_patch_batch(
+            arrays,
+            dates,
+            equity_cutoffs,
+            decisions,
+            context_cutoffs,
+            active,
+        )
         return {**inputs, **common}
 
 
 class DateStratifiedBatchSampler(Sampler[BatchRequest]):
     def __init__(
-        self,
-        sample_index: pl.DataFrame,
-        runtime: RuntimeSettings,
-        seed: int,
-        allow_date_replacement: bool = False,
+        self, sample_index: pl.DataFrame, runtime: RuntimeSettings, seed: int
     ) -> None:
         self.runtime = runtime
         self.seed = seed
         self.epoch = 0
         self.sample_count = sample_index.height
-        self.decision_indices = sample_index.get_column("decision_idx").to_numpy()
+        self.decision_indices = sample_index["decision_idx"].to_numpy()
         positions: dict[object, list[int]] = {}
-        for position, trade_date in enumerate(sample_index.get_column("trade_date")):
+        for position, trade_date in enumerate(sample_index["trade_date"]):
             positions.setdefault(trade_date, []).append(position)
         self.dates = tuple(positions)
         self.positions_by_date = {
-            date: np.asarray(values) for date, values in positions.items()
+            value: np.asarray(items) for value, items in positions.items()
         }
-        if (
-            len(self.dates) < runtime.effective_batch_size
-            and not allow_date_replacement
-        ):
-            raise ValueError(
-                f"Training requires at least {runtime.effective_batch_size} distinct dates"
-            )
         self.replace_dates = len(self.dates) < runtime.effective_batch_size
         self.epoch_sample_count = (
             math.ceil(self.sample_count / runtime.effective_batch_size)
@@ -789,12 +482,10 @@ class DateStratifiedBatchSampler(Sampler[BatchRequest]):
 
     def __iter__(self) -> Iterator[BatchRequest]:
         generator = np.random.default_rng(self.seed + self.epoch)
-        effective_batch_size = self.runtime.effective_batch_size
-        for _ in range(self.epoch_sample_count // effective_batch_size):
+        effective = self.runtime.effective_batch_size
+        for _ in range(self.epoch_sample_count // effective):
             chosen = generator.choice(
-                len(self.dates),
-                effective_batch_size,
-                replace=self.replace_dates,
+                len(self.dates), effective, replace=self.replace_dates
             )
             indices = [
                 int(
@@ -805,37 +496,17 @@ class DateStratifiedBatchSampler(Sampler[BatchRequest]):
                 for date in chosen
             ]
             indices.sort(key=lambda position: int(self.decision_indices[position]))
-            for start in range(0, effective_batch_size, self.runtime.loader_batch_size):
+            for start in range(0, effective, self.runtime.loader_batch_size):
                 values = tuple(indices[start : start + self.runtime.loader_batch_size])
                 yield BatchRequest(values, len(values))
-
-
-class SingleDecisionBatchSampler(Sampler[BatchRequest]):
-    def __init__(self, sample_index: pl.DataFrame, batch_size: int) -> None:
-        self.batch_size = batch_size
-        decisions = sample_index.get_column("decision_idx").to_numpy()
-        self.groups = tuple(
-            np.flatnonzero(decisions == decision) for decision in np.unique(decisions)
-        )
-
-    def __len__(self) -> int:
-        return sum(math.ceil(group.size / self.batch_size) for group in self.groups)
-
-    def __iter__(self) -> Iterator[BatchRequest]:
-        for group in self.groups:
-            for start in range(0, group.size, self.batch_size):
-                values = group[start : start + self.batch_size].tolist()
-                valid_count = len(values)
-                values.extend([values[-1]] * (self.batch_size - valid_count))
-                yield BatchRequest(tuple(values), valid_count)
 
 
 class DecisionGroupedBatchSampler(Sampler[BatchRequest]):
     def __init__(self, sample_index: pl.DataFrame, batch_size: int) -> None:
         self.batch_size = batch_size
         order = np.arange(sample_index.height)
-        sample_ids = sample_index.get_column("sample_id").to_numpy()
-        decisions = sample_index.get_column("decision_idx").to_numpy()
+        sample_ids = sample_index["sample_id"].to_numpy()
+        decisions = sample_index["decision_idx"].to_numpy()
         order = order[np.argsort(sample_ids[order], kind="stable")]
         self.positions = order[np.argsort(decisions[order], kind="stable")]
 
@@ -891,46 +562,23 @@ def create_training_loaders(
     store: Path,
     train_rows: pl.DataFrame,
     validation_rows: pl.DataFrame,
-    model_name: str,
-    global_context: str | None,
-    runtime: RuntimeSettings,
-    seed: int,
-    tcn_architecture: TCNArchitecture | None = None,
-    peer_features: str = "none",
-    context_family_ablation: str = "none",
-    allow_date_replacement: bool = False,
+    date_weights: np.ndarray,
+    runtime: RuntimeSettings = GH200_RUNTIME,
+    seed: int = 29,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
     DateStratifiedBatchSampler,
 ]:
-    sampler = DateStratifiedBatchSampler(
-        train_rows, runtime, seed, allow_date_replacement
-    )
+    sampler = DateStratifiedBatchSampler(train_rows, runtime, seed)
     train = _create_loader(
-        VectorizedFeatureDataset(
-            store,
-            train_rows,
-            model_name,
-            global_context,
-            tcn_architecture,
-            peer_features,
-            context_family_ablation,
-        ),
+        VectorizedFeatureDataset(store, train_rows, date_weights),
         sampler,
         runtime,
         seed,
     )
     validation = _create_loader(
-        VectorizedFeatureDataset(
-            store,
-            validation_rows,
-            model_name,
-            global_context,
-            tcn_architecture,
-            peer_features,
-            context_family_ablation,
-        ),
+        VectorizedFeatureDataset(store, validation_rows),
         DecisionGroupedBatchSampler(validation_rows, runtime.evaluation_batch_size),
         runtime,
         seed,
@@ -941,56 +589,12 @@ def create_training_loaders(
 def create_evaluation_loader(
     store: Path,
     rows: pl.DataFrame,
-    model_name: str,
-    global_context: str | None,
-    runtime: RuntimeSettings,
-    seed: int,
-    tcn_architecture: TCNArchitecture | None = None,
-    peer_features: str = "none",
-    context_family_ablation: str = "none",
+    runtime: RuntimeSettings = GH200_RUNTIME,
+    seed: int = 29,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
-        VectorizedFeatureDataset(
-            store,
-            rows,
-            model_name,
-            global_context,
-            tcn_architecture,
-            peer_features,
-            context_family_ablation,
-        ),
+        VectorizedFeatureDataset(store, rows),
         DecisionGroupedBatchSampler(rows, runtime.evaluation_batch_size),
-        runtime,
-        seed,
-    )
-
-
-def create_analysis_loader(
-    store: Path,
-    rows: pl.DataFrame,
-    model_name: str,
-    global_context: str | None,
-    runtime: RuntimeSettings,
-    seed: int,
-    tcn_architecture: TCNArchitecture | None = None,
-    peer_features: str = "none",
-    context_family_ablation: str = "none",
-    batch_size: int | None = None,
-) -> DataLoader[dict[str, torch.Tensor]]:
-    size = rows.height if batch_size is None else batch_size
-    if size <= 0:
-        raise ValueError("Analysis batch size must be positive")
-    return _create_loader(
-        VectorizedFeatureDataset(
-            store,
-            rows,
-            model_name,
-            global_context,
-            tcn_architecture,
-            peer_features,
-            context_family_ablation,
-        ),
-        SingleDecisionBatchSampler(rows, size),
         runtime,
         seed,
     )

@@ -34,7 +34,6 @@ def workspace_path(
     raw = os.fspath(value)
     if not raw.strip():
         raise ValueError("Workspace path is empty")
-
     native = Path(raw)
     normalized = raw.replace("\\", "/")
     lowered = normalized.casefold()
@@ -45,7 +44,6 @@ def workspace_path(
             recorded_root = normalized[: len(prefix)]
             relative = normalized[len(prefix) :].lstrip("/")
             break
-
     if relative is not None:
         depth = 0
         for part in relative.split("/"):
@@ -57,7 +55,6 @@ def workspace_path(
                 depth -= 1
             else:
                 depth += 1
-
         if os.name == "nt" and native.is_absolute() and native.exists():
             assert recorded_root is not None
             data_root = Path(recorded_root).resolve()
@@ -74,7 +71,6 @@ def workspace_path(
         raise ValueError(f"Unsupported Windows workspace path: {value}")
     else:
         raise ValueError(f"Workspace path must be absolute: {value}")
-
     if must_exist and not path.exists():
         raise FileNotFoundError(path)
     return path
@@ -117,28 +113,9 @@ HORIZON_COUNT = 3
 DYNAMIC_CHANNEL_COUNT = 26
 SLOW_FEATURE_COUNT = 32
 CONTEXT_GENERIC_DYNAMIC_COUNT = 16
-LOCAL_CONTEXT_SYMBOLS = (
-    "WIN$",
-    "WDO$",
-    "DI1F27",
-    "DI1F28",
-    "DI1F29",
-    "DI1F31",
-    "DI1$N",
-)
-GLOBAL_CONTEXT_SYMBOLS = (
-    "ES.v.0",
-    "NQ.v.0",
-    "ZT.v.0",
-    "ZN.v.0",
-    "CL.v.0",
-    "HG.v.0",
-    "6E.v.0",
-    "6M.v.0",
-)
 HORIZONS = (30, 60, 120)
 
-# The completed context screen is the current feature policy.
+# This is the accepted context screen, not an experiment switch.
 CANONICAL_DROPPED_LOCAL_SLOTS = (0,)  # WIN$
 CANONICAL_RETAINED_GLOBAL_SLOTS = (2, 3)  # ZT, ZN
 CANONICAL_NEUTRALIZED_EQUITY_SLOW_INDICES = (20,)  # beta_to_WIN
@@ -147,137 +124,37 @@ PATCH_MINUTES = 5
 PATCH_INPUT_WIDTH = PATCH_MINUTES * DYNAMIC_CHANNEL_COUNT
 ABSOLUTE_PATCH_COUNT = 69
 STATE_TOKEN_SLOT = 69
-TEMPORAL_TOKEN_COUNT = 70
 EQUITY_ABSOLUTE_START_PATCH = 12
 GLOBAL_WINDOW_MINUTES = ABSOLUTE_PATCH_COUNT * PATCH_MINUTES
 DECISION_GLOBAL_INDICES = tuple(345 + PATCH_MINUTES * index for index in range(55))
-TABULAR_OFFSETS = (0, 15, 30, 60, 120)
-TABULAR_FEATURE_COUNT = (
-    SLOW_FEATURE_COUNT
-    + DYNAMIC_CHANNEL_COUNT * len(TABULAR_OFFSETS)
-    + CONTEXT_GENERIC_DYNAMIC_COUNT * CONTEXT_COUNT * len(TABULAR_OFFSETS)
-    + SLOW_FEATURE_COUNT * CONTEXT_COUNT
-    + 2
-    + (1 + CONTEXT_COUNT) * len(TABULAR_OFFSETS)
-    + LOCAL_CONTEXT_COUNT
-    + GLOBAL_CONTEXT_COUNT
-)
 
-FAMILY_EQUITY = 0
-FAMILY_EQUITY_FUTURE = 1
-FAMILY_FX_FUTURE = 2
-FAMILY_RATE_FUTURE = 3
-FAMILY_EQUITY_INDEX = 4
-FAMILY_RATE_TREASURY = 5
-FAMILY_ENERGY = 6
-FAMILY_INDUSTRIAL_METAL = 7
-FAMILY_MAJOR_FX = 8
-FAMILY_EMERGING_FX = 9
-FAMILY_COUNT = 10
-INSTRUMENT_FAMILY_IDS = (
-    (FAMILY_EQUITY,) * EQUITY_COUNT
-    + (FAMILY_EQUITY_FUTURE, FAMILY_FX_FUTURE)
-    + (FAMILY_RATE_FUTURE,) * 5
-    + (FAMILY_EQUITY_INDEX,) * 2
-    + (FAMILY_RATE_TREASURY,) * 2
-    + (FAMILY_ENERGY, FAMILY_INDUSTRIAL_METAL, FAMILY_MAJOR_FX, FAMILY_EMERGING_FX)
-)
-
-TRANSFORMER_MODELS = (
-    "temporal_only",
-    "context_only",
-    "pooled_market",
-    "context_pooled",
-)
-NEURAL_MODELS = (*TRANSFORMER_MODELS, "tcn", "mlp")
-GLOBAL_CONTEXT_SETTINGS = ("enabled", "masked")
-OPTIMIZER_VARIANTS = ("adamw", "sam_adamw")
-NEURAL_OBJECTIVES = ("soft_spearman", "rank_huber")
-ALLOWED_SEEDS = (11, 29, 47)
-SOFT_RANK_TEMPERATURES = (0.05, 0.10, 0.20, 0.50)
-SAM_RHOS = (0.025, 0.050, 0.075, 0.100, 0.125)
-SOFT_RANK_STANDARDIZATION_EPS = 1e-6
-SOFT_SPEARMAN_CORRELATION_EPS = 1e-8
-SAM_NORM_EPS = 1e-12
-
-RMS_NORM_EPS = 1e-6
-QK_NORM_EPS = 1e-6
-ROPE_BASE = 10_000.0
-INPUT_DROPOUT = 0.05
-RESIDUAL_DROPOUT = 0.10
-ATTENTION_DROPOUT = 0.0
-TARGETED_FUSION_GATE_BIAS = -2.0
-POOLED_INDUCING_TOKEN_COUNT = 4
-
+TCN_WIDTH = 64
 TCN_KERNEL_SIZE = 3
-TCN_FUSIONS = ("none", "context_only", "pooled_market", "context_pooled")
-TCN_WIDTHS = (64, 128, 192, 256)
-TCN_BLOCK_VARIANTS = ("gelu", "silu", "swiglu")
-TCN_READOUTS = (
-    "final",
-    "shared_multiscale",
-    "horizon_multiscale",
-    "final_score_mlp",
-)
-TRAINING_HORIZONS = ("all", "30", "60", "120")
-CONTEXT_FAMILY_ABLATIONS = ("none", "wdo", "br_rates", "us_rates")
-TCN_RECEPTIVE_FIELDS: Mapping[str, tuple[int, ...]] = MappingProxyType(
-    {
-        "short": (1, 1, 1, 1, 1, 2),
-        "medium": (1, 2, 2, 2, 4, 4),
-        "long": (1, 2, 4, 4, 4, 8),
-        "full": (1, 2, 4, 8, 16, 32),
-        "matched_full": (1, 2, 4, 8, 8, 12),
-    }
-)
-TCN_SWIGLU_HIDDEN_WIDTHS: Mapping[int, int] = MappingProxyType(
-    {64: 24, 128: 40, 192: 64, 256: 88}
-)
-CONTEXT_ROUTING_MODES = ("late_only", "early_concat", "film", "early_concat_film")
-CONTEXT_ROUTING_MACRO_SYMBOLS = (
-    "WDO$",
-    "DI1F27",
-    "DI1F28",
-    "DI1F29",
-    "DI1F31",
-    "DI1$N",
-    "ZT.v.0",
-    "ZN.v.0",
-)
-CONTEXT_ROUTING_LOCAL_SOURCE_COUNT = 6
-CONTEXT_ROUTING_GLOBAL_SOURCE_COUNT = 2
-CONTEXT_ROUTING_SOURCE_COUNT = 8
-CONTEXT_ROUTING_PATCH_SOURCE_WIDTH = PATCH_MINUTES * CONTEXT_GENERIC_DYNAMIC_COUNT
-CONTEXT_ROUTING_MACRO_EARLY_SOURCE_WIDTH = CONTEXT_ROUTING_PATCH_SOURCE_WIDTH + 1
-CONTEXT_ROUTING_EXCLUDED_GLOBAL_SLOW_CHANNEL = (
-    "previous_b3_close_to_decision_return_normalized"
-)
-CONTEXT_ROUTING_GLOBAL_SLOW_WIDTH = SLOW_FEATURE_COUNT - 1
-CONTEXT_ROUTING_MACRO_SLOW_INPUT_WIDTH = (
-    CONTEXT_ROUTING_LOCAL_SOURCE_COUNT * SLOW_FEATURE_COUNT
-    + CONTEXT_ROUTING_GLOBAL_SOURCE_COUNT * CONTEXT_ROUTING_GLOBAL_SLOW_WIDTH
-    + CONTEXT_ROUTING_SOURCE_COUNT
-)
+TCN_DILATIONS = (1, 2, 4, 8, 16, 32)
+TCN_SWIGLU_HIDDEN_WIDTH = 24
+TCN_FUSION_WIDTH = 2 * TCN_WIDTH
+TCN_ATTENTION_HEADS = 4
+RESIDUAL_DROPOUT = 0.10
+TARGETED_FUSION_GATE_BIAS = -2.0
 
-# Only the selected sector/subsector representation is a current model input.
-PEER_FEATURE_MODES = ("none", "selected")
-PEER_STATE_WIDTH = 6
-PEER_STATE_ORDER = (
-    "return_vs_selected_peer_median_15m",
-    "return_vs_selected_peer_median_60m",
-    "selected_peer_return_rank_15m",
-    "selected_peer_return_rank_60m",
-    "selected_peer_15m_valid",
-    "selected_peer_60m_valid",
+ALLOWED_SEEDS = (11, 29, 47)
+RECENCY_POLICIES = ("uniform", "exp_504", "exp_252", "exp_126", "rolling_504")
+RECENCY_HALF_LIVES: Mapping[str, int] = MappingProxyType(
+    {"exp_504": 504, "exp_252": 252, "exp_126": 126}
 )
+ROLLING_WINDOW_DATES = 504
 
 EFFECTIVE_BATCH_SIZE = 512
 MAX_EPOCHS = 20
 EARLY_STOP_PATIENCE = 3
 MIN_IC_IMPROVEMENT = 1e-4
 GRADIENT_CLIP = 1.0
-HUBER_DELTA = 1.0
 MIN_IC_EQUITIES = 30
+SOFT_RANK_TEMPERATURE = 0.50
+SOFT_RANK_STANDARDIZATION_EPS = 1e-6
+SOFT_SPEARMAN_CORRELATION_EPS = 1e-8
+SAM_RHO = 0.125
+SAM_NORM_EPS = 1e-12
 
 ADAMW_LR = 3e-4
 ADAMW_BETAS = (0.9, 0.95)
@@ -285,10 +162,6 @@ ADAMW_EPS = 1e-8
 ADAMW_WEIGHT_DECAY = 0.01
 WARMUP_FRACTION = 0.05
 FINAL_LR_FACTOR = 0.1
-
-MLP_WIDTH = 256
-MLP_DEPTH = 3
-MLP_SWIGLU_WIDTH = 512
 
 
 @dataclass(frozen=True)
@@ -305,340 +178,33 @@ class RuntimeSettings:
     compile_dynamic: bool = False
 
     def __post_init__(self) -> None:
-        sizes = (
-            self.effective_batch_size,
-            self.loader_batch_size,
-            self.microbatch_size,
-        )
-        if any(size <= 0 for size in sizes):
-            raise ValueError("Batch sizes must be positive")
         if self.effective_batch_size % self.loader_batch_size:
-            raise ValueError(
-                "Effective batch size must be divisible by loader batch size"
-            )
-        if self.effective_batch_size % self.microbatch_size:
-            raise ValueError(
-                "Effective batch size must be divisible by microbatch size"
-            )
-        if self.loader_batch_size < self.microbatch_size:
-            raise ValueError("Loader batch size must be at least the microbatch size")
+            raise ValueError("Effective batch must divide into loader batches")
         if self.loader_batch_size % self.microbatch_size:
-            raise ValueError("Loader batch size must be divisible by microbatch size")
+            raise ValueError("Loader batch must divide into microbatches")
 
     @property
     def loader_batches_per_effective_batch(self) -> int:
         return self.effective_batch_size // self.loader_batch_size
-
-    @property
-    def microbatches_per_effective_batch(self) -> int:
-        return self.effective_batch_size // self.microbatch_size
 
 
 GH200_RUNTIME = RuntimeSettings()
 
 
 @dataclass(frozen=True)
-class TransformerArchitecture:
-    family: str
-    d_model: int
-    attention_heads: int
-    head_dim: int
-    temporal_depth: int
-    swiglu_width: int
-    rms_norm_eps: float
-    qk_norm_eps: float
-    rope_base: float
-    input_dropout: float
-    residual_dropout: float
-    attention_dropout: float
-    context_memory_tokens: int
-    pooled_memory_tokens: int
-    fusion_blocks: int
-    output_horizons: int
-
-
-@dataclass(frozen=True)
-class TCNSettings:
-    fusion: str = "context_pooled"
-    width: int = 64
-    receptive_field: str = "full"
-    block: str = "swiglu"
-    slow_routing: str = "late_only"
-    macro_temporal_routing: str = "late_only"
-    readout: str = "final"
-
-
-BASELINE_TCN_SETTINGS = TCNSettings()
-
-
-@dataclass(frozen=True)
 class TCNArchitecture:
-    family: str
-    fusion_mode: str
-    receptive_field: str
-    block: str
-    patch_input_width: int
-    width: int
-    swiglu_hidden_width: int | None
-    residual_blocks: int
-    kernel_size: int
-    dilations: tuple[int, ...]
-    slow_width: int
-    fusion_states: int
-    theoretical_receptive_field_patches: int
-    theoretical_receptive_field_minutes: int
-    maximum_effective_equity_receptive_field_patches: int
-    maximum_effective_equity_receptive_field_minutes: int
-    maximum_effective_context_receptive_field_patches: int | None
-    maximum_effective_context_receptive_field_minutes: int | None
-    fusion_width: int
-    dropout: float
-    output_horizons: int
-    slow_routing: str
-    macro_temporal_routing: str
-    context_routing_rank: int
-    readout: str
+    family: str = "tcn"
+    patch_input_width: int = PATCH_INPUT_WIDTH
+    width: int = TCN_WIDTH
+    swiglu_hidden_width: int = TCN_SWIGLU_HIDDEN_WIDTH
+    residual_blocks: int = len(TCN_DILATIONS)
+    kernel_size: int = TCN_KERNEL_SIZE
+    dilations: tuple[int, ...] = TCN_DILATIONS
+    slow_width: int = SLOW_FEATURE_COUNT
+    fusion_states: int = CONTEXT_COUNT + 3
+    fusion_width: int = TCN_FUSION_WIDTH
+    dropout: float = RESIDUAL_DROPOUT
+    output_horizons: int = HORIZON_COUNT
 
 
-@dataclass(frozen=True)
-class MLPArchitecture:
-    family: str
-    input_width: int
-    hidden_width: int
-    residual_blocks: int
-    swiglu_width: int
-    norm_eps: float
-    dropout: float
-    output_horizons: int
-
-
-NeuralArchitecture = TransformerArchitecture | TCNArchitecture | MLPArchitecture
-
-_SHARED_TRANSFORMER = {
-    "family": "transformer",
-    "d_model": 256,
-    "attention_heads": 8,
-    "head_dim": 32,
-    "temporal_depth": 2,
-    "swiglu_width": 704,
-    "rms_norm_eps": RMS_NORM_EPS,
-    "qk_norm_eps": QK_NORM_EPS,
-    "rope_base": ROPE_BASE,
-    "input_dropout": INPUT_DROPOUT,
-    "residual_dropout": RESIDUAL_DROPOUT,
-    "attention_dropout": ATTENTION_DROPOUT,
-    "output_horizons": HORIZON_COUNT,
-}
-NEURAL_ARCHITECTURES: Mapping[str, TransformerArchitecture | MLPArchitecture] = (
-    MappingProxyType(
-        {
-            "temporal_only": TransformerArchitecture(
-                **_SHARED_TRANSFORMER,
-                context_memory_tokens=0,
-                pooled_memory_tokens=0,
-                fusion_blocks=0,
-            ),
-            "context_only": TransformerArchitecture(
-                **_SHARED_TRANSFORMER,
-                context_memory_tokens=CONTEXT_COUNT,
-                pooled_memory_tokens=0,
-                fusion_blocks=1,
-            ),
-            "pooled_market": TransformerArchitecture(
-                **_SHARED_TRANSFORMER,
-                context_memory_tokens=0,
-                pooled_memory_tokens=2 + POOLED_INDUCING_TOKEN_COUNT,
-                fusion_blocks=1,
-            ),
-            "context_pooled": TransformerArchitecture(
-                **_SHARED_TRANSFORMER,
-                context_memory_tokens=CONTEXT_COUNT,
-                pooled_memory_tokens=2 + POOLED_INDUCING_TOKEN_COUNT,
-                fusion_blocks=1,
-            ),
-            "mlp": MLPArchitecture(
-                "mlp",
-                TABULAR_FEATURE_COUNT,
-                MLP_WIDTH,
-                MLP_DEPTH,
-                MLP_SWIGLU_WIDTH,
-                RMS_NORM_EPS,
-                RESIDUAL_DROPOUT,
-                HORIZON_COUNT,
-            ),
-        }
-    )
-)
-
-
-def architecture_for_model(
-    model_name: str, tcn_settings: TCNSettings | None = None
-) -> NeuralArchitecture:
-    if model_name == "tcn":
-        if tcn_settings is None:
-            raise ValueError("TCN settings are required")
-        return resolve_tcn_architecture(tcn_settings)
-    if tcn_settings is not None:
-        raise ValueError(f"TCN settings are forbidden for {model_name}")
-    try:
-        return NEURAL_ARCHITECTURES[model_name]
-    except KeyError as error:
-        raise ValueError(f"Unknown neural model: {model_name}") from error
-
-
-def model_consumes_context(
-    model_name: str, tcn_settings: TCNSettings | None = None
-) -> bool:
-    if model_name == "tcn":
-        if tcn_settings is None:
-            raise ValueError("TCN settings are required")
-        return tcn_settings.fusion in ("context_only", "context_pooled")
-    if tcn_settings is not None:
-        raise ValueError(f"TCN settings are forbidden for {model_name}")
-    return model_name in ("context_only", "context_pooled", "mlp")
-
-
-def validate_peer_feature_mode(model_name: str, mode: str) -> str:
-    if mode not in PEER_FEATURE_MODES:
-        raise ValueError(f"Invalid peer-feature mode: {mode}")
-    if mode != "none" and model_name != "tcn":
-        raise ValueError("Peer features are supported only for TCN")
-    return mode
-
-
-def resolve_tcn_architecture(settings: TCNSettings) -> TCNArchitecture:
-    if (
-        settings.fusion not in TCN_FUSIONS
-        or settings.width not in TCN_WIDTHS
-        or settings.block not in TCN_BLOCK_VARIANTS
-    ):
-        raise ValueError(f"Invalid TCN settings: {settings}")
-    if (
-        settings.slow_routing not in CONTEXT_ROUTING_MODES
-        or settings.macro_temporal_routing not in CONTEXT_ROUTING_MODES
-    ):
-        raise ValueError(f"Invalid context routing: {settings}")
-    if settings.readout not in TCN_READOUTS:
-        raise ValueError(f"Invalid TCN readout: {settings.readout}")
-    if (
-        settings.slow_routing != "late_only"
-        or settings.macro_temporal_routing != "late_only"
-    ) and settings.fusion != "context_pooled":
-        raise ValueError("Early or FiLM routing requires context_pooled fusion")
-    try:
-        dilations = TCN_RECEPTIVE_FIELDS[settings.receptive_field]
-    except KeyError as error:
-        raise ValueError(
-            f"Invalid TCN receptive field: {settings.receptive_field}"
-        ) from error
-    fusion_states = {
-        "none": 0,
-        "context_only": 1 + CONTEXT_COUNT,
-        "pooled_market": 3,
-        "context_pooled": 3 + CONTEXT_COUNT,
-    }[settings.fusion]
-    theoretical = 1 + (TCN_KERNEL_SIZE - 1) * sum(dilations)
-    equity_patches = min(
-        theoretical, ABSOLUTE_PATCH_COUNT - EQUITY_ABSOLUTE_START_PATCH
-    )
-    context_patches = (
-        min(theoretical, ABSOLUTE_PATCH_COUNT)
-        if settings.fusion in ("context_only", "context_pooled")
-        else None
-    )
-    return TCNArchitecture(
-        "tcn",
-        settings.fusion,
-        settings.receptive_field,
-        settings.block,
-        PATCH_INPUT_WIDTH,
-        settings.width,
-        TCN_SWIGLU_HIDDEN_WIDTHS[settings.width]
-        if settings.block == "swiglu"
-        else None,
-        len(dilations),
-        TCN_KERNEL_SIZE,
-        dilations,
-        SLOW_FEATURE_COUNT,
-        fusion_states,
-        theoretical,
-        theoretical * PATCH_MINUTES,
-        equity_patches,
-        equity_patches * PATCH_MINUTES,
-        context_patches,
-        None if context_patches is None else context_patches * PATCH_MINUTES,
-        2 * settings.width,
-        RESIDUAL_DROPOUT,
-        HORIZON_COUNT,
-        settings.slow_routing,
-        settings.macro_temporal_routing,
-        min(32, settings.width),
-        settings.readout,
-    )
-
-
-def tcn_tap_receptive_field_minutes(
-    architecture: TCNArchitecture,
-) -> tuple[int, ...]:
-    cumulative = 0
-    values: list[int] = []
-    for dilation in architecture.dilations:
-        cumulative += dilation
-        patches = 1 + (architecture.kernel_size - 1) * cumulative
-        values.append(patches * PATCH_MINUTES)
-    return tuple(values)
-
-
-def validate_training_horizon(value: str) -> str:
-    if value not in TRAINING_HORIZONS:
-        raise ValueError(f"Invalid training horizon: {value}")
-    return value
-
-
-def training_horizon_index(value: str) -> int | None:
-    value = validate_training_horizon(value)
-    return None if value == "all" else HORIZONS.index(int(value))
-
-
-def validate_context_family_ablation(value: str) -> str:
-    if value not in CONTEXT_FAMILY_ABLATIONS:
-        raise ValueError(f"Invalid context-family ablation: {value}")
-    return value
-
-
-def context_family_slots(value: str) -> tuple[int, ...]:
-    value = validate_context_family_ablation(value)
-    symbols = {
-        "none": (),
-        "wdo": ("WDO$",),
-        "br_rates": ("DI1F27", "DI1F28", "DI1F29", "DI1F31", "DI1$N"),
-        "us_rates": ("ZT.v.0", "ZN.v.0"),
-    }[value]
-    ordered = (*LOCAL_CONTEXT_SYMBOLS, *GLOBAL_CONTEXT_SYMBOLS)
-    return tuple(ordered.index(symbol) for symbol in symbols)
-
-
-def routing_enabled(architecture: TCNArchitecture) -> bool:
-    return (
-        architecture.slow_routing != "late_only"
-        or architecture.macro_temporal_routing != "late_only"
-    )
-
-
-def context_routing_metadata(architecture: TCNArchitecture) -> dict[str, object]:
-    return {
-        "slow_routing": architecture.slow_routing,
-        "macro_temporal_routing": architecture.macro_temporal_routing,
-        "ordered_sources": list(CONTEXT_ROUTING_MACRO_SYMBOLS),
-    }
-
-
-def peer_feature_metadata(
-    model_name: str, architecture: NeuralArchitecture | None, mode: str
-) -> dict[str, object]:
-    mode = validate_peer_feature_mode(model_name, mode)
-    return {
-        "mode": mode,
-        "state_order": list(PEER_STATE_ORDER),
-        "state_width": PEER_STATE_WIDTH,
-    }
+TCN_ARCHITECTURE = TCNArchitecture()

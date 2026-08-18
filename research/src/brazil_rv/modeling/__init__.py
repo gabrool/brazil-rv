@@ -1,5 +1,5 @@
-"""Brazil RV model families."""
+"""Current Brazil-RV research model."""
 
-from .model import TargetedCrossAssetTransformer, build_neural_model
+from .model import SharedCausalTCN, build_model
 
-__all__ = ["TargetedCrossAssetTransformer", "build_neural_model"]
+__all__ = ["SharedCausalTCN", "build_model"]

@@ -11,36 +11,29 @@ from torch import nn
 from .contract import (
     GH200_RUNTIME,
     GRADIENT_CLIP,
-    HUBER_DELTA,
-    NEURAL_OBJECTIVES,
     SAM_NORM_EPS,
-    SAM_RHOS,
+    SAM_RHO,
     SOFT_RANK_STANDARDIZATION_EPS,
-    SOFT_RANK_TEMPERATURES,
+    SOFT_RANK_TEMPERATURE,
     SOFT_SPEARMAN_CORRELATION_EPS,
-    NeuralArchitecture,
+    TCN_ARCHITECTURE,
     RuntimeSettings,
-    TCNArchitecture,
-    TCNSettings,
-    context_routing_metadata,
-    peer_feature_metadata,
-    training_horizon_index,
-    validate_context_family_ablation,
-    validate_training_horizon,
 )
 from .metrics import create_metric_table, primary_validation_score
 from .provenance import model_metadata
 
-TrainingObjective = Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
+TrainingObjective = Callable[
+    [torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
+]
 
 
 @dataclass(frozen=True)
 class EvaluationObservations:
-    sample_id: np.ndarray
     predictions: np.ndarray
     targets: np.ndarray
     raw_returns: np.ndarray
     label_mask: np.ndarray
+    sample_id: np.ndarray
     date_idx: np.ndarray
     decision_idx: np.ndarray
 
@@ -57,61 +50,19 @@ def compile_model(
     )
 
 
-def experiment_decimal(value: float, minimum_fraction_digits: int) -> str:
-    whole, fraction = f"{value:.10f}".rstrip("0").split(".")
-    return f"{whole}p{fraction.ljust(minimum_fraction_digits, '0')}"
+def objective_metadata() -> dict[str, object]:
+    return {"name": "soft_spearman", "temperature": SOFT_RANK_TEMPERATURE}
 
 
-def validate_neural_objective(
-    objective: str, temperature: float | None
-) -> tuple[str, float | None]:
-    if objective not in NEURAL_OBJECTIVES:
-        raise ValueError(f"Unknown objective: {objective}")
-    if objective == "soft_spearman":
-        if temperature not in SOFT_RANK_TEMPERATURES:
-            raise ValueError(f"Temperature must be one of {SOFT_RANK_TEMPERATURES}")
-    elif temperature is not None:
-        raise ValueError("rank_huber does not accept a temperature")
-    return objective, temperature
-
-
-def objective_metadata(objective: str, temperature: float | None) -> dict[str, object]:
-    objective, temperature = validate_neural_objective(objective, temperature)
-    return {"name": objective, "temperature": temperature}
-
-
-def sam_metadata(optimizer_variant: str, rho: float | None) -> dict[str, object] | None:
-    if optimizer_variant == "adamw":
-        if rho is not None:
-            raise ValueError("AdamW does not accept SAM rho")
-        return None
-    if optimizer_variant != "sam_adamw" or rho not in SAM_RHOS:
-        raise ValueError(f"SAM rho must be one of {SAM_RHOS}")
-    return {
-        "rho": rho,
-        "norm": "l2",
-        "adaptive": False,
-        "same_batch_replay": True,
-        "same_rng_replay": True,
-    }
-
-
-def select_training_label_mask(
-    label_mask: torch.Tensor, training_horizon: str = "all"
-) -> torch.Tensor:
-    index = training_horizon_index(training_horizon)
-    if index is None:
-        return label_mask
-    selected = torch.zeros_like(label_mask)
-    selected[..., index] = label_mask[..., index]
-    return selected
+def sam_metadata() -> dict[str, object]:
+    return {"rho": SAM_RHO, "base_optimizer": "adamw"}
 
 
 def _soft_spearman_loss_sum(
     predictions: torch.Tensor,
     targets: torch.Tensor,
     label_mask: torch.Tensor,
-    temperature: float,
+    sample_weight: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     with torch.autocast(device_type=predictions.device.type, enabled=False):
         scores = predictions.float().transpose(1, 2)
@@ -134,7 +85,7 @@ def _soft_spearman_loss_sum(
         pair_mask = mask.unsqueeze(-1) & mask.unsqueeze(-2) & not_self
         pairwise = (
             standardized.unsqueeze(-1) - standardized.unsqueeze(-2)
-        ) / temperature
+        ) / SOFT_RANK_TEMPERATURE
         soft_ranks = (1 + (torch.sigmoid(pairwise) * pair_mask).sum(-1)) * mask
         soft_centered = (
             soft_ranks - soft_ranks.sum(-1).div(safe_counts).unsqueeze(-1)
@@ -148,112 +99,56 @@ def _soft_spearman_loss_sum(
             .clamp_min(SOFT_SPEARMAN_CORRELATION_EPS)
             .sqrt()
         )
-        losses = (1 - covariance / denominator) * valid_groups
-        return losses.sum(), valid_groups.sum()
+        group_weight = valid_groups.to(torch.float32) * sample_weight.float().unsqueeze(
+            -1
+        )
+        losses = (1 - covariance / denominator) * group_weight
+        return losses.sum(), group_weight.sum()
 
 
 def soft_spearman_loss(
     predictions: torch.Tensor,
     targets: torch.Tensor,
     label_mask: torch.Tensor,
-    temperature: float,
+    sample_weight: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    validate_neural_objective("soft_spearman", temperature)
+    if sample_weight is None:
+        sample_weight = torch.ones(
+            predictions.shape[0], device=predictions.device, dtype=torch.float32
+        )
     total, count = _soft_spearman_loss_sum(
-        predictions, targets, label_mask, temperature
+        predictions, targets, label_mask, sample_weight
     )
     return total / count.clamp_min(1)
-
-
-def _rank_huber_loss_sum(
-    predictions: torch.Tensor, targets: torch.Tensor, label_mask: torch.Tensor
-) -> tuple[torch.Tensor, torch.Tensor]:
-    difference = predictions.float() - targets.float()
-    absolute = difference.abs()
-    values = torch.where(
-        absolute <= HUBER_DELTA,
-        0.5 * difference.square(),
-        HUBER_DELTA * (absolute - 0.5 * HUBER_DELTA),
-    )
-    mask = label_mask.bool()
-    counts = mask.sum(1)
-    valid_horizons = counts > 0
-    horizon_loss = (values * mask).sum(1) / counts.clamp_min(1)
-    horizon_counts = valid_horizons.sum(1)
-    valid_samples = horizon_counts > 0
-    sample_loss = (horizon_loss * valid_horizons).sum(1) / horizon_counts.clamp_min(1)
-    return (sample_loss * valid_samples).sum(), valid_samples.sum()
-
-
-def rank_huber_loss(
-    predictions: torch.Tensor, targets: torch.Tensor, label_mask: torch.Tensor
-) -> torch.Tensor:
-    total, count = _rank_huber_loss_sum(predictions, targets, label_mask)
-    return total / count.clamp_min(1)
-
-
-def _objective_loss_sum(
-    predictions: torch.Tensor,
-    targets: torch.Tensor,
-    label_mask: torch.Tensor,
-    objective: str,
-    temperature: float | None,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    objective, temperature = validate_neural_objective(objective, temperature)
-    if objective == "soft_spearman":
-        assert temperature is not None
-        return _soft_spearman_loss_sum(predictions, targets, label_mask, temperature)
-    return _rank_huber_loss_sum(predictions, targets, label_mask)
 
 
 def objective_loss(
     predictions: torch.Tensor,
     targets: torch.Tensor,
     label_mask: torch.Tensor,
-    objective: str,
-    temperature: float | None,
 ) -> torch.Tensor:
-    total, count = _objective_loss_sum(
-        predictions, targets, label_mask, objective, temperature
-    )
-    return total / count.clamp_min(1)
+    return soft_spearman_loss(predictions, targets, label_mask)
 
 
-def eager_training_objective(
-    objective: str, temperature: float | None
-) -> TrainingObjective:
-    objective, temperature = validate_neural_objective(objective, temperature)
-    if objective == "soft_spearman":
-        assert temperature is not None
-
-        def loss(
-            predictions: torch.Tensor,
-            targets: torch.Tensor,
-            label_mask: torch.Tensor,
-        ) -> torch.Tensor:
-            return _soft_spearman_loss_sum(
-                predictions, targets, label_mask, temperature
-            )[0]
-
-        return loss
-
+def eager_training_objective() -> TrainingObjective:
     def loss(
         predictions: torch.Tensor,
         targets: torch.Tensor,
         label_mask: torch.Tensor,
+        sample_weight: torch.Tensor,
     ) -> torch.Tensor:
-        return _rank_huber_loss_sum(predictions, targets, label_mask)[0]
+        return _soft_spearman_loss_sum(predictions, targets, label_mask, sample_weight)[
+            0
+        ]
 
     return loss
 
 
 def compile_training_objective(
-    objective: str,
-    temperature: float | None,
     runtime: RuntimeSettings = GH200_RUNTIME,
 ) -> TrainingObjective:
     return torch.compile(
-        eager_training_objective(objective, temperature),
+        eager_training_objective(),
         backend=runtime.compile_backend,
         mode=runtime.compile_mode,
         fullgraph=runtime.compile_fullgraph,
@@ -261,20 +156,17 @@ def compile_training_objective(
     )
 
 
-def _model_transfer_keys(batch: dict[str, torch.Tensor]) -> tuple[str, ...]:
-    if "tabular_features" in batch:
-        keys = ("tabular_features", "equity_mask")
-    else:
-        keys = (
-            "patches",
-            "history_patch_mask",
-            "instrument_mask",
-            "slow_features",
-            "state_position",
-        )
-    if "peer_state" in batch:
-        keys = (*keys, "peer_state")
-    return (*keys, "targets", "label_mask")
+def _model_transfer_keys() -> tuple[str, ...]:
+    return (
+        "patches",
+        "history_patch_mask",
+        "instrument_mask",
+        "slow_features",
+        "state_position",
+        "targets",
+        "label_mask",
+        "training_weight",
+    )
 
 
 def _to_device(
@@ -282,26 +174,18 @@ def _to_device(
 ) -> dict[str, torch.Tensor]:
     return {
         key: batch[key].to(device, non_blocking=device.type == "cuda")
-        for key in _model_transfer_keys(batch)
+        for key in _model_transfer_keys()
     }
 
 
 def _predict(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-    if "tabular_features" in batch:
-        return model(batch["tabular_features"], batch["equity_mask"])
-    arguments = [
-        batch[name]
-        for name in (
-            "patches",
-            "history_patch_mask",
-            "instrument_mask",
-            "slow_features",
-            "state_position",
-        )
-    ]
-    if "peer_state" in batch:
-        arguments.append(batch["peer_state"])
-    return model(*arguments)
+    return model(
+        batch["patches"],
+        batch["history_patch_mask"],
+        batch["instrument_mask"],
+        batch["slow_features"],
+        batch["state_position"],
+    )
 
 
 def _autocast(device: torch.device):
@@ -310,10 +194,9 @@ def _autocast(device: torch.device):
     )
 
 
-def _loss_count(label_mask: torch.Tensor, objective: str) -> int:
-    if objective == "soft_spearman":
-        return int((label_mask.sum(1) >= 2).sum())
-    return int(label_mask.any(dim=(1, 2)).sum())
+def _loss_count(label_mask: torch.Tensor, sample_weight: torch.Tensor) -> float:
+    valid = (label_mask.sum(1) >= 2).to(torch.float32)
+    return float((valid * sample_weight.float().unsqueeze(-1)).sum())
 
 
 def _split_microbatches(
@@ -333,13 +216,18 @@ def _accumulate_gradients(
     model: nn.Module,
     batches: list[dict[str, torch.Tensor]],
     loss_function: TrainingObjective,
-    count: int,
+    count: float,
 ) -> torch.Tensor:
     total = next(model.parameters()).new_zeros((), dtype=torch.float32)
     for batch in batches:
         with _autocast(next(model.parameters()).device):
             predictions = _predict(model, batch)
-        loss_sum = loss_function(predictions, batch["targets"], batch["label_mask"])
+        loss_sum = loss_function(
+            predictions,
+            batch["targets"],
+            batch["label_mask"],
+            batch["training_weight"],
+        )
         total += loss_sum.detach()
         (loss_sum / count).backward()
     return total
@@ -370,9 +258,10 @@ def _optimizer_update(
 
 
 def _rng_state(device: torch.device) -> tuple[torch.Tensor, torch.Tensor | None]:
-    return torch.get_rng_state(), torch.cuda.get_rng_state(
-        device
-    ) if device.type == "cuda" else None
+    return (
+        torch.get_rng_state(),
+        torch.cuda.get_rng_state(device) if device.type == "cuda" else None,
+    )
 
 
 def _restore_rng(
@@ -389,9 +278,7 @@ def _run_sam_update(
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
     loss_function: TrainingObjective,
-    rho: float,
-    count: int,
-    observer: Callable[[str, nn.Module], None] | None = None,
+    count: float,
 ) -> dict[str, object]:
     parameters = tuple(model.parameters())
     originals = [parameter.detach().clone() for parameter in parameters]
@@ -401,15 +288,11 @@ def _run_sam_update(
     try:
         first_loss = _accumulate_gradients(model, batches, loss_function, count)
         first_norm = _gradient_norm(parameters, float("inf"))
-        if observer:
-            observer("first_gradients", model)
-        scale = rho / (first_norm + SAM_NORM_EPS)
+        scale = SAM_RHO / (first_norm + SAM_NORM_EPS)
         with torch.no_grad():
             for parameter in parameters:
                 if parameter.grad is not None:
                     parameter.add_(parameter.grad.detach().float() * scale)
-        if observer:
-            observer("perturbed_parameters", model)
         optimizer.zero_grad(set_to_none=True)
         _restore_rng(start_rng, device)
         try:
@@ -418,11 +301,7 @@ def _run_sam_update(
             with torch.no_grad():
                 for parameter, original in zip(parameters, originals, strict=True):
                     parameter.copy_(original)
-        if observer:
-            observer("second_gradients", model)
         clipped = _optimizer_update(model, optimizer, scheduler)
-        if observer:
-            observer("updated_parameters", model)
         return {
             "loss_sum": first_loss,
             "loss_count": count,
@@ -442,30 +321,17 @@ def run_effective_batch_update(
     effective_batch: list[dict[str, torch.Tensor]],
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
-    runtime: RuntimeSettings,
-    optimizer_variant: str,
-    objective: str,
-    temperature: float | None,
-    sam_rho: float | None,
+    runtime: RuntimeSettings = GH200_RUNTIME,
     *,
     training_objective: TrainingObjective | None = None,
-    sam_observer: Callable[[str, nn.Module], None] | None = None,
 ) -> dict[str, object]:
     if len(effective_batch) != runtime.loader_batches_per_effective_batch:
-        raise ValueError(
-            f"Expected {runtime.loader_batches_per_effective_batch} loader batches"
-        )
-    objective_metadata(objective, temperature)
-    sam_metadata(optimizer_variant, sam_rho)
-    if any(
-        batch["label_mask"].shape[0] != runtime.loader_batch_size
-        for batch in effective_batch
-    ):
-        raise ValueError(f"Expected loader batches of size {runtime.loader_batch_size}")
+        raise ValueError("Effective batch has the wrong loader-batch count")
     count = sum(
-        _loss_count(batch["label_mask"], objective) for batch in effective_batch
+        _loss_count(batch["label_mask"], batch["training_weight"])
+        for batch in effective_batch
     )
-    if not count:
+    if count <= 0:
         raise ValueError("Effective batch has no valid objective group")
     device = next(model.parameters()).device
     batches = [
@@ -475,34 +341,14 @@ def run_effective_batch_update(
             _to_device(cpu_batch, device), runtime.microbatch_size
         )
     ]
-    loss_function = training_objective or eager_training_objective(
-        objective, temperature
+    return _run_sam_update(
+        model,
+        batches,
+        optimizer,
+        scheduler,
+        training_objective or eager_training_objective(),
+        count,
     )
-    if optimizer_variant == "sam_adamw":
-        assert sam_rho is not None
-        return _run_sam_update(
-            model,
-            batches,
-            optimizer,
-            scheduler,
-            loss_function,
-            sam_rho,
-            count,
-            sam_observer,
-        )
-    optimizer.zero_grad(set_to_none=True)
-    try:
-        total = _accumulate_gradients(model, batches, loss_function, count)
-    except BaseException:
-        optimizer.zero_grad(set_to_none=True)
-        raise
-    norm = _optimizer_update(model, optimizer, scheduler)
-    return {
-        "loss_sum": total,
-        "loss_count": count,
-        "gradient_norm": norm,
-        "backward_passes": len(batches),
-    }
 
 
 def train_one_epoch(
@@ -510,26 +356,13 @@ def train_one_epoch(
     loader: Iterable[dict[str, torch.Tensor]],
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler,
-    runtime: RuntimeSettings,
-    optimizer_variant: str,
-    objective: str,
-    temperature: float | None,
-    sam_rho: float | None,
+    runtime: RuntimeSettings = GH200_RUNTIME,
     training_objective: TrainingObjective | None = None,
-    training_horizon: str = "all",
 ) -> dict[str, object]:
     model.train()
-    validate_training_horizon(training_horizon)
     batches: list[dict[str, torch.Tensor]] = []
     updates: list[dict[str, object]] = []
     for batch in loader:
-        if training_horizon != "all":
-            batch = {
-                **batch,
-                "label_mask": select_training_label_mask(
-                    batch["label_mask"], training_horizon
-                ),
-            }
         batches.append(batch)
         if len(batches) == runtime.loader_batches_per_effective_batch:
             updates.append(
@@ -539,31 +372,25 @@ def train_one_epoch(
                     optimizer,
                     scheduler,
                     runtime,
-                    optimizer_variant,
-                    objective,
-                    temperature,
-                    sam_rho,
                     training_objective=training_objective,
                 )
             )
             batches = []
     if batches:
         raise ValueError("Training epoch ended with an incomplete effective batch")
-    loss_count = sum(int(update["loss_count"]) for update in updates)
+    loss_count = sum(float(update["loss_count"]) for update in updates)
     loss_sum = torch.stack([update["loss_sum"] for update in updates]).sum()
-    mean_gradient_norm = torch.stack(
-        [update["gradient_norm"] for update in updates]
-    ).mean()
-    objective_loss, mean_gradient_norm_value = (
-        torch.stack((loss_sum / loss_count, mean_gradient_norm)).detach().cpu().tolist()
+    gradient_norm = torch.stack([update["gradient_norm"] for update in updates]).mean()
+    objective_value, norm_value = (
+        torch.stack((loss_sum / loss_count, gradient_norm)).detach().cpu().tolist()
     )
-    if not np.isfinite(objective_loss) or not np.isfinite(mean_gradient_norm_value):
+    if not np.isfinite(objective_value) or not np.isfinite(norm_value):
         raise FloatingPointError("Epoch training statistics are non-finite")
     return {
-        "objective_loss": objective_loss,
+        "objective_loss": objective_value,
         "optimizer_steps": len(updates),
         "backward_passes": sum(int(update["backward_passes"]) for update in updates),
-        "mean_gradient_norm": mean_gradient_norm_value,
+        "mean_gradient_norm": norm_value,
     }
 
 
@@ -587,12 +414,7 @@ def _filter_evaluation_metadata(
 def collect_validation_observations(
     model: nn.Module,
     loader: Iterable[dict[str, torch.Tensor]],
-    objective: str,
-    temperature: float | None,
-    training_horizon: str = "all",
 ) -> tuple[EvaluationObservations, float]:
-    objective_metadata(objective, temperature)
-    validate_training_horizon(training_horizon)
     device = next(model.parameters()).device
     model.eval()
     collected = {
@@ -608,31 +430,27 @@ def collect_validation_observations(
     }
     prediction_parts: list[torch.Tensor] = []
     loss_sums: list[torch.Tensor] = []
-    total_count = 0
+    total_count = 0.0
     with torch.inference_mode():
         for cpu_batch in loader:
             valid_count = int(cpu_batch["sample_valid_mask"].sum())
-            objective_mask = select_training_label_mask(
-                cpu_batch["label_mask"][:valid_count], training_horizon
-            )
-            total_count += _loss_count(objective_mask, objective)
+            mask = cpu_batch["label_mask"][:valid_count]
+            weights = torch.ones(valid_count)
+            total_count += _loss_count(mask, weights)
             batch = _to_device(cpu_batch, device)
             with _autocast(device):
                 predictions = _predict(model, batch)
-            loss_sum, _ = _objective_loss_sum(
+            loss_sum, _ = _soft_spearman_loss_sum(
                 predictions[:valid_count],
                 batch["targets"][:valid_count],
-                select_training_label_mask(
-                    batch["label_mask"][:valid_count], training_horizon
-                ),
-                objective,
-                temperature,
+                batch["label_mask"][:valid_count],
+                batch["training_weight"][:valid_count],
             )
             loss_sums.append(loss_sum.detach())
             prediction_parts.append(predictions[:valid_count].float())
             for name, values in _filter_evaluation_metadata(cpu_batch).items():
                 collected[name].append(values)
-    if not total_count:
+    if total_count <= 0:
         raise ValueError("Evaluation has no valid objective groups")
     arrays = {
         "predictions": torch.cat(prediction_parts).cpu().numpy(),
@@ -645,29 +463,20 @@ def collect_validation_observations(
             for name in EvaluationObservations.__dataclass_fields__
         }
     )
-    objective_loss_value = (
-        float(torch.stack(loss_sums).sum().detach().cpu()) / total_count
-    )
-    return observations, objective_loss_value
+    return observations, float(torch.stack(loss_sums).sum().cpu()) / total_count
 
 
-def validation_primary_metric(
-    observations: EvaluationObservations, training_horizon: str = "all"
-) -> float:
-    index = training_horizon_index(training_horizon)
-    horizon = slice(None) if index is None else slice(index, index + 1)
+def validation_primary_metric(observations: EvaluationObservations) -> float:
     return primary_validation_score(
-        observations.predictions[..., horizon],
-        observations.targets[..., horizon],
-        observations.label_mask[..., horizon],
+        observations.predictions,
+        observations.targets,
+        observations.label_mask,
         observations.date_idx,
     )
 
 
 def summarize_evaluation_observations(
     observations: EvaluationObservations,
-    objective: str,
-    temperature: float | None,
     objective_loss_value: float,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     summary, daily = create_metric_table(
@@ -678,7 +487,7 @@ def summarize_evaluation_observations(
         observations.date_idx,
         observations.decision_idx,
     )
-    summary["objective"] = objective_metadata(objective, temperature)
+    summary["objective"] = objective_metadata()
     summary["objective_loss"] = objective_loss_value
     return summary, daily
 
@@ -686,15 +495,9 @@ def summarize_evaluation_observations(
 def collect_evaluation_observations(
     model: nn.Module,
     loader: Iterable[dict[str, torch.Tensor]],
-    objective: str,
-    temperature: float | None,
 ) -> tuple[EvaluationObservations, dict[str, object], list[dict[str, object]]]:
-    observations, objective_loss_value = collect_validation_observations(
-        model, loader, objective, temperature
-    )
-    summary, daily = summarize_evaluation_observations(
-        observations, objective, temperature, objective_loss_value
-    )
+    observations, loss = collect_validation_observations(model, loader)
+    summary, daily = summarize_evaluation_observations(observations, loss)
     return observations, summary, daily
 
 
@@ -702,79 +505,33 @@ def checkpoint_payload(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler,
-    model_name: str,
-    architecture: NeuralArchitecture,
-    tcn_settings: TCNSettings | None,
-    optimizer_variant: str,
-    objective: str,
-    temperature: float | None,
-    sam_rho: float | None,
+    *,
+    cross_equity_attention: bool,
+    recency_policy: str,
     seed: int,
     epoch: int,
     validation_score: float,
     feature_store: Path,
-    global_context: str | None,
-    peer_features: str,
-    training_horizon: str = "all",
-    context_family_ablation: str = "none",
-    *,
-    run_provenance: dict[str, object] | None = None,
+    run_provenance: dict[str, object],
 ) -> dict[str, object]:
-    if getattr(model, "model_name", None) != model_name:
-        raise ValueError("Checkpoint model name does not match the model")
-    validate_training_horizon(training_horizon)
-    validate_context_family_ablation(context_family_ablation)
-    payload = {
-        "model_name": model_name,
-        "architecture": asdict(architecture),
-        "tcn_settings": None if tcn_settings is None else asdict(tcn_settings),
-        "peer_features": peer_feature_metadata(model_name, architecture, peer_features),
-        "context_routing": context_routing_metadata(architecture)
-        if isinstance(architecture, TCNArchitecture)
-        else None,
-        "optimizer_variant": optimizer_variant,
-        "objective": objective_metadata(objective, temperature),
-        "sam": sam_metadata(optimizer_variant, sam_rho),
+    metadata = model_metadata(cross_equity_attention)
+    if run_provenance.get("model") != metadata:
+        raise ValueError("Run provenance differs from checkpoint model")
+    return {
+        "model": metadata,
+        "architecture": asdict(TCN_ARCHITECTURE),
+        "cross_equity_attention": cross_equity_attention,
+        "recency_policy": recency_policy,
+        "objective": objective_metadata(),
+        "sam": sam_metadata(),
         "seed": seed,
         "epoch": epoch,
         "validation_score": validation_score,
-        "feature_store": str(feature_store),
-        "global_context": global_context,
-        "training_horizon": training_horizon,
-        "selection_horizon": training_horizon,
-        "context_family_ablation": context_family_ablation,
+        "feature_store": str(feature_store.resolve()),
+        "feature_store_identity": run_provenance["feature_store_identity"],
+        "repository_commit": run_provenance["repository_commit"],
+        "run_provenance": run_provenance,
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict(),
     }
-    if run_provenance is not None:
-        model_provenance = run_provenance.get("model")
-        if not isinstance(model_provenance, dict):
-            raise ValueError("Run provenance has invalid model metadata")
-        canonical_model = model_metadata(
-            model_name, architecture, tcn_settings, peer_features
-        )
-        bindings = {
-            name: canonical_model[name]
-            for name in ("model_name", "architecture", "tcn_settings", "peer_features")
-        }
-        for name, expected in bindings.items():
-            if model_provenance.get(name) != expected:
-                raise ValueError(f"Run provenance {name} differs from checkpoint")
-        if (
-            Path(str(run_provenance.get("feature_store"))).resolve()
-            != feature_store.resolve()
-        ):
-            raise ValueError("Run provenance feature store differs from checkpoint")
-        payload.update(
-            {
-                **bindings,
-                "repository_commit": run_provenance["repository_commit"],
-                "run_provenance": run_provenance,
-                "feature_store_identity": run_provenance["feature_store_identity"],
-                "fit_window": run_provenance["fit_window"],
-                "selection_window": run_provenance["selection_window"],
-                "parameter_count": run_provenance["parameter_count"],
-            }
-        )
-    return payload

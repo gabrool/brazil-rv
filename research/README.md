@@ -1,29 +1,39 @@
 # Brazil-RV research
 
-The research package builds the canonical feature store, trains full-universe neural models, evaluates current runs, and produces validation-only stock/time attribution.
+The current research path builds one PIT-clean causal feature store and trains one
+fixed full-universe TCN. The held-out test split is never loaded during training
+or campaign selection.
 
 From the repository root:
 
 ```powershell
-# Install the local feature-store/source preprocessing environment
+# Install runtime plus preprocessing dependencies
 uv sync --project research --no-default-groups --group preprocessing
 
-# Full-universe incumbent TCN
-uv run --project research python -m brazil_rv.modeling.train
+# Build, audit, and atomically promote the peer-free causal-TOD feature store
+uv run --project research python -m brazil_rv.preprocessing.build
 
-# Isolated slow-state FiLM
-uv run --project research python -m brazil_rv.modeling.train --slow-routing film --seed 29
+# One current TCN run
+uv run --project research python -m brazil_rv.modeling.train `
+  --seed 29 `
+  --recency-policy uniform
 
-# Validation evaluation or explicit held-out evaluation
-uv run --project research python -m brazil_rv.modeling.evaluate --run-dir <run-directory>
-uv run --project research python -m brazil_rv.modeling.evaluate --run-dir <run-directory> --split test
+# Resumable 21-run validation-only campaign
+uv run --project research python -m brazil_rv.modeling.run_core_campaign
 
-# Validation-only attribution
-uv run --project research python -m brazil_rv.modeling.analyze_stock_time_attribution `
+# Standalone evaluation; test access must be explicit
+uv run --project research python -m brazil_rv.modeling.evaluate `
+  --run-dir <run-directory>
+uv run --project research python -m brazil_rv.modeling.evaluate `
   --run-dir <run-directory> `
-  --output-dir <output-directory>
+  --split test
 ```
 
-The incumbent is the width-64 full-receptive-field SwiGLU TCN with selected peers, canonical context masking, late-only routing, soft Spearman at temperature 0.50, and SAM-AdamW at rho 0.125. Training-time validation retains canonical best-epoch observations and writes the complete report once; standalone evaluation remains complete. Training and selection never access the held-out split.
+The fixed recipe is a width-64, full-receptive-field SwiGLU causal TCN with
+final-state readout, the masked context policy, context-plus-pooled fusion, all
+three horizons, soft Spearman at temperature 0.50, and SAM-AdamW at rho 0.125.
+The campaign temporarily exposes recency policy and one final-state
+cross-equity-attention candidate; losing branches are removed after selection.
 
-See the repository-root [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for the durable current contract.
+See the repository-root [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for the
+durable accepted contract.
