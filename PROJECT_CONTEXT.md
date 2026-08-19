@@ -16,6 +16,11 @@ gap-pairwise loss, continuous-target sidecar, and residual equity-attention bran
 are absent from the current tree; their commits, manifests, and immutable artifacts
 remain the historical reproduction contract.
 
+The historical parent was reproduced on 2026-08-19 at commit `4067962` with
+matched seeds 11/29/47. Best-IC deltas versus the immutable records were
+`+0.0000053`, `-0.0000065`, and `+0.0000009`; every best epoch and stop epoch
+matched. The internal folds then froze `final_ema_0995` as the trajectory rule.
+
 Read [RESEARCH_HANDOFF.md](RESEARCH_HANDOFF.md) for architecture and campaign
 history, exact results, artifact identities, and interpretations.
 
@@ -92,6 +97,8 @@ internal folds. Campaign drivers cannot request validation or test rows.
 - One fixed 20-epoch trajectory; no training-time early stopping.
 - Raw checkpoint and raw/EMA validation predictions every epoch.
 - EMA decays 0.98, 0.99, and 0.995.
+- Frozen rule: final epoch EMA-0.995. Do not reselect epoch or EMA decay on the
+  official validation split.
 - Last-3/last-5 weight averages and raw-score prediction averages are constructed
   without retraining.
 - Patience-3 and retrospective best epoch are diagnostic only.
@@ -101,6 +108,17 @@ Hard Spearman is the primary selection metric. It is averaged across decisions
 within each date and horizon, then equally across dates and horizons. Seed
 ensembles uniformly average tie-aware within-sample/horizon ranks and never fit
 ensemble weights.
+
+The completed internal campaign at
+`trajectory_discovery_e22dd67_20260819T134332Z` selected final EMA-0.995 with
+fold-A/fold-B ensemble ICs `0.045309`/`0.050625` and mean `0.047967`, versus
+final-raw `0.043416`/`0.049602` and mean `0.046509`. Paired EMA-minus-raw deltas
+were positive on both folds (`+0.001892`, `+0.001024`) and at every horizon, but
+their block-bootstrap intervals mostly included zero and time-of-day deltas were
+mixed. Treat the rule as a deterministic variance-reduction choice, not a claim of
+uniform statistical dominance. Patience-3 and retrospective-best scored higher
+internally but remain diagnostic-only because they select epochs from the screening
+windows.
 
 ## Current source-tree status
 

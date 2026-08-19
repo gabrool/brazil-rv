@@ -349,6 +349,67 @@ results above remain authoritative records, not executable compatibility paths.
 - The official validation split is reserved for sparse stage-winner checks; the
   held-out test remains accessible only through the standalone frozen-rule evaluator.
 
+## Completed restoration and trajectory screen (2026-08-19)
+
+The peer-free incumbent was retrained from historical commit
+`4067962f6bb6748a530814d10e20dfc865a385c7` before the new recipe was used. The
+matched reproduction is stored at:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/parent_reproduction_4067962_e22dd67_20260819T131142Z
+
+| Seed | Immutable IC | Reproduced IC | Delta | Best / stopped epoch |
+|---:|---:|---:|---:|---:|
+| 11 | 0.041972266 | 0.041977574 | +0.000005309 | 12 / 15 |
+| 29 | 0.040481999 | 0.040475500 | -0.000006499 | 14 / 17 |
+| 47 | 0.038463105 | 0.038464003 | +0.000000898 | 7 / 10 |
+
+All best and stopped epochs matched. Every run used soft Spearman, uniform dates,
+the full causal-TOD store hash
+`c90103b0f99e0017dc1303284a1ab61eca99106094227f5823ba718756d28a6b`, and
+recorded `test_accessed=false`.
+
+The fixed-trajectory discovery campaign from commit
+`e22dd671305f30069ff2da4aafc50c1eb521cb51` is stored at:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/trajectory_discovery_e22dd67_20260819T134332Z
+
+It contains six completed runs, 120 epoch checkpoints, and 126 prediction files.
+Fold A fit 512 dates through 2023-08-31 and selected on the next 102 dates through
+2024-01-31. Fold B fit 614 dates through 2024-01-31 and selected on the final 102
+training dates through 2024-06-28. These remain screening folds because the stored
+causal TOD profile adapted inside the historical training dates.
+
+| Rule | Fold A ensemble IC | Fold B ensemble IC | Mean |
+|---|---:|---:|---:|
+| Final raw | 0.043416 | 0.049602 | 0.046509 |
+| Final EMA-0.98 | 0.043522 | 0.049681 | 0.046601 |
+| Final EMA-0.99 | 0.043826 | 0.049905 | 0.046866 |
+| **Final EMA-0.995** | **0.045309** | **0.050625** | **0.047967** |
+| Last-3 weight average | 0.043438 | 0.049902 | 0.046670 |
+| Last-5 weight average | 0.043628 | 0.050146 | 0.046887 |
+| Tail-3 prediction average | 0.043458 | 0.049932 | 0.046695 |
+| Tail-5 prediction average | 0.043661 | 0.050187 | 0.046924 |
+| Patience-3 raw (diagnostic) | 0.049576 | 0.054145 | 0.051860 |
+| Retrospective best raw (diagnostic) | 0.049382 | 0.054145 | 0.051763 |
+
+The deterministic frozen rule is `final_ema_0995`. Patience-3 and retrospective
+best are not eligible because they choose an epoch from each selection window and
+would reintroduce validation-driven epoch selection on the official split.
+
+The strict paired analyzer compared the selected rule with final raw. Fold-A and
+fold-B deltas were `+0.001892` and `+0.001024`. Moving-block 95% intervals were
+`[-0.000126, 0.003693]` / `[-0.000016, 0.003627]` at block lengths 5/10 for fold A
+and `[-0.000087, 0.001816]` / `[-0.000078, 0.001568]` for fold B. Horizon deltas
+were positive at 30/60/120 minutes: `+0.000719/+0.001487/+0.003471` in fold A and
+`+0.000659/+0.000888/+0.001525` in fold B. Time-of-day deltas were mixed: 8 of 55
+were negative in fold A (range `-0.001888` to `+0.006399`) and 17 of 55 in fold B
+(range `-0.001263` to `+0.003981`).
+
+EMA-0.995 seed-prediction correlations ranged 0.909-0.914 in fold A and
+0.928-0.932 in fold B. Uniform rank ensembling gained `+0.001048` and `+0.000981`
+versus the mean member, respectively; no ensemble weights were learned. Official
+validation was not accessed by this campaign, and the held-out test remains sealed.
+
 ## Code map
 
 - `research/src/brazil_rv/preprocessing/build.py`: self-contained full-TOD store.
@@ -374,11 +435,13 @@ results above remain authoritative records, not executable compatibility paths.
 
 ## Operational handoff
 
-The final two-run campaign used Lambda instance
-`1408116f8e794a4baa1962d512e80d6c` at `192.222.50.69`. After the campaign completed,
-the host stopped answering SSH during this documentation pass. Do not assume it is
-still running or terminated; check Lambda state before launching or billing another
-instance. Persistent results belong on the `brazil-rv-east3` NFS filesystem.
+The 2026-08-19 parent reproduction and trajectory screen used Lambda instance
+`de1f90e39e204d1aa10f6a00677ad0f4` at `192.222.59.14`. After the NFS artifacts
+and lockbox flags passed audit, termination was accepted and a subsequent provider
+query no longer listed the instance. Persistent results remain on the
+`brazil-rv-east3` NFS filesystem. The older final two-run campaign used instance
+`1408116f8e794a4baa1962d512e80d6c`; its host state is historical and must not be
+inferred from this record.
 
 Do not evaluate the held-out test split, overwrite raw data, mutate immutable
 feature stores, or update a canonical pointer until the corresponding audit passes.
