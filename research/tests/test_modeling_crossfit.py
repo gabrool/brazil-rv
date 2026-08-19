@@ -4,9 +4,7 @@ import numpy as np
 
 from brazil_rv.modeling.crossfit import (
     CANDIDATE_RULES,
-    CENTERED_WEIGHT_RULE,
     TrajectoryMember,
-    centered_epoch_window,
     crossfit_fold,
 )
 from brazil_rv.modeling.engine import EvaluationObservations
@@ -47,17 +45,14 @@ def test_patience_checkpoint_is_selected_on_opposite_date_parity() -> None:
             if not rule.startswith("patience")
         },
         epoch_predictions={"raw": raw_epochs, "ema_0995": ema_epochs},
-        parity_predictions={CENTERED_WEIGHT_RULE: {"odd": odd_good, "even": even_good}},
     )
 
     report = crossfit_fold([member])
 
     raw = report["rules"]["patience3_raw"]
     ema = report["rules"]["patience3_ema_0995"]
-    centered = report["rules"][CENTERED_WEIGHT_RULE]
     assert raw["ensemble_crossfit_ic"] == -1.0
     assert ema["ensemble_crossfit_ic"] == 1.0
-    assert centered["ensemble_crossfit_ic"] == -1.0
     directions = report["rule_selection_crossfit"]["directions"]
     assert (
         directions[0]["rules"]["patience3_raw"]["member_patience_replay"]["seed_11"][
@@ -71,12 +66,3 @@ def test_patience_checkpoint_is_selected_on_opposite_date_parity() -> None:
         ]
         == 2
     )
-    assert directions[0]["rules"][CENTERED_WEIGHT_RULE]["member_patience_replay"][
-        "seed_11"
-    ]["averaged_epochs"] == [1, 2, 3, 4, 5]
-
-
-def test_centered_epoch_window_is_five_checkpoints_and_shifts_at_boundaries() -> None:
-    assert centered_epoch_window(1) == (1, 2, 3, 4, 5)
-    assert centered_epoch_window(8) == (6, 7, 8, 9, 10)
-    assert centered_epoch_window(20) == (16, 17, 18, 19, 20)
