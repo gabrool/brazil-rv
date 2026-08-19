@@ -19,7 +19,9 @@ remain the historical reproduction contract.
 The historical parent was reproduced on 2026-08-19 at commit `4067962` with
 matched seeds 11/29/47. Best-IC deltas versus the immutable records were
 `+0.0000053`, `-0.0000065`, and `+0.0000009`; every best epoch and stop epoch
-matched. The internal folds then froze `final_ema_0995` as the trajectory rule.
+matched. A bidirectional odd/even-date cross-fit of the internal selection windows
+subsequently froze raw Patience-3 as the trajectory rule, with its uncertainty and
+Fold-B non-confirmation retained in the research record.
 
 Read [RESEARCH_HANDOFF.md](RESEARCH_HANDOFF.md) for architecture and campaign
 history, exact results, artifact identities, and interpretations.
@@ -97,11 +99,12 @@ internal folds. Campaign drivers cannot request validation or test rows.
 - One fixed 20-epoch trajectory; no training-time early stopping.
 - Raw checkpoint and raw/EMA validation predictions every epoch.
 - EMA decays 0.98, 0.99, and 0.995.
-- Frozen rule: final epoch EMA-0.995. Do not reselect epoch or EMA decay on the
-  official validation split.
+- Frozen rule: raw Patience-3 with minimum IC improvement `0.0001`, patience three,
+  maximum 20 epochs, and restoration of the best raw checkpoint. This entire rule
+  is fixed before the sparse official-validation stage; do not retune it there.
 - Last-3/last-5 weight averages and raw-score prediction averages are constructed
   without retraining.
-- Patience-3 and retrospective best epoch are diagnostic only.
+- Retrospective best epoch remains diagnostic only.
 - No peer/classification inputs and no cross-equity attention.
 
 Hard Spearman is the primary selection metric. It is averaged across decisions
@@ -110,24 +113,37 @@ ensembles uniformly average tie-aware within-sample/horizon ranks and never fit
 ensemble weights.
 
 The completed internal campaign at
-`trajectory_discovery_e22dd67_20260819T134332Z` selected final EMA-0.995 with
-fold-A/fold-B ensemble ICs `0.045309`/`0.050625` and mean `0.047967`, versus
-final-raw `0.043416`/`0.049602` and mean `0.046509`. Paired EMA-minus-raw deltas
-were positive on both folds (`+0.001892`, `+0.001024`) and at every horizon, but
-their block-bootstrap intervals mostly included zero and time-of-day deltas were
-mixed. Treat the rule as a deterministic variance-reduction choice, not a claim of
-uniform statistical dominance. Patience-3 and retrospective-best scored higher
-internally but remain diagnostic-only because they select epochs from the screening
-windows.
+`trajectory_discovery_e22dd67_20260819T134332Z` initially selected final EMA-0.995
+from fixed rules, with fold-A/fold-B ensemble ICs `0.045309`/`0.050625` and mean
+`0.047967`, versus final-raw `0.043416`/`0.049602` and mean `0.046509`. Paired
+EMA-minus-raw deltas were positive on both folds (`+0.001892`, `+0.001024`) and at
+every horizon, but their block-bootstrap intervals mostly included zero and
+time-of-day deltas were mixed. Treat the rule as a deterministic variance-reduction
+choice, not a claim of uniform statistical dominance.
+
+The same-window Patience-3 IC `0.051860` was selection-biased. The corrective
+artifact `trajectory_crossfit_3054228_20260819T161200Z` selected checkpoints on
+one odd/even date parity and reported them only on the other, in both directions.
+Raw Patience-3 scored `0.048416`/`0.050673` and mean `0.049545`, versus final
+EMA-0.995 mean `0.047967`. Its paired advantage was `+0.003108` on Fold A but only
+`+0.000048` on Fold B, with both block-bootstrap intervals including zero. EMA-0.995
+Patience scored `0.048518`; last-10 raw weight averaging scored `0.048060`, while
+last-7 scored `0.047352`. The outer rule replay chose raw Patience in three of four
+directions and EMA Patience once, with mean out-of-half IC `0.048897`. Raw
+Patience-3 is frozen as the numerical winner, but it is not treated as established
+dominance over final EMA-0.995.
 
 ## Current source-tree status
 
 `modeling.train` is the canonical soft-Spearman trajectory entry point.
 `modeling.run_discovery_campaign` runs exactly the two internal folds and seeds
-11/29/47, then freezes one deterministic trajectory rule using their mean
-three-seed ensemble IC. `modeling.analyze` strictly aligns observations and reports
-member/ensemble IC, seed diversity, ensemble gains, paired date deltas, moving
-block intervals at lengths 5 and 10, and horizon/time-of-day guardrails.
+11/29/47 and records the fixed-rule baseline table. `modeling.crossfit` selects
+validation-adaptive checkpoints on one odd/even date parity and reports only on the
+other, replays rule selection in both directions, and can materialize last-7/last-10
+weight-average predictions without mutating source runs. Its frozen selection file
+is the authority for the next official-window run. `modeling.analyze` strictly
+aligns observations and reports member/ensemble IC, seed diversity, paired date
+deltas, moving-block intervals, and horizon/time-of-day guardrails.
 
 `modeling.evaluate` restores held-out evaluation without exposing it to campaign
 drivers. It accepts only a completed official-window run with an internal-fold

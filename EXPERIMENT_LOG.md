@@ -143,9 +143,9 @@ Each cell is the three-seed, uniformly rank-averaged ensemble IC.
 | `patience3_raw` | **0.049575896** | **0.054144782** | **0.051860339** |
 | `retrospective_best_epoch_raw` | 0.049381828 | 0.054144782 | 0.051763305 |
 
-The initial implementation classified both `patience3_raw` and `retrospective_best_epoch_raw` as diagnostic and therefore selected `final_ema_0995` from the remaining rules. That classification was too conservative for Patience-3. The request explicitly called for testing Patience-3 versus fixed 20 epochs and reserved diagnostic-only status for retrospective best epoch. Patience-3 is a fully specified, reproducible rule once patience and minimum improvement are frozen.
+Initial interpretation, later superseded: the implementation classified both `patience3_raw` and `retrospective_best_epoch_raw` as diagnostic and selected `final_ema_0995` from the fixed rules. I incorrectly described this as unfairly excluding Patience-3 and treated its same-window IC as trustworthy evidence that it led.
 
-Correct interpretation: Patience-3 was not rejected by the evidence. It is the leading numerical candidate, beating `final_ema_0995` by 0.003893338 mean IC and winning on both folds. It should be restored to selection eligibility and subjected to the same paired bootstrap and guardrail analysis before any official-validation stage run. Only the retrospective 20-epoch oracle must remain diagnostic-only.
+Correction: Patience-3 is a fully specified deployable algorithm, but its checkpoint is selected on each 102-date window. Reporting IC on that same window gives it almost the same winner's-curse bias as retrospective best epoch. Its apparent +0.003893338 advantage over `final_ema_0995` was therefore not an apples-to-apples estimate of deployed value. Experiment 6 supplies the required out-of-half estimate.
 
 Immutable artifact:
 
@@ -157,9 +157,9 @@ Purpose: pick one rule from the internal folds without learning ensemble weights
 
 ### Implemented selection rule
 
-For each candidate, calculate the three-seed ensemble IC separately on folds A and B, average those two values, choose the largest mean, and break an exact tie lexically by rule name. Under the initial, overly restrictive eligibility set, this selected `final_ema_0995` with mean IC 0.047967001.
+For each fixed candidate, calculate the three-seed ensemble IC separately on folds A and B, average those two values, choose the largest mean, and break an exact tie lexically by rule name. This selected `final_ema_0995` with mean IC 0.047967001.
 
-Status: provisional and scientifically superseded by the Patience-3 interpretation above. No official-validation or held-out-test decision should rely on `final_ema_0995` as the winner until Patience-3 is made eligible and receives equivalent diagnostics.
+Status at this point: provisional pending an out-of-half comparison with validation-adaptive rules. Resolved by Experiment 6.
 
 ## Experiment 5 — Measurement and guardrails for provisional EMA-0.995 winner
 
@@ -193,12 +193,98 @@ Time-of-day effects were mixed: 8 of 55 decision slots were negative on Fold A a
 
 Pairwise seed correlations were 0.9085-0.9140 on Fold A and 0.9283-0.9321 on Fold B. The ensemble gain versus the mean member was +0.00104825 on Fold A and +0.00098071 on Fold B.
 
-Conclusion: EMA-0.995 consistently improved the final raw checkpoint, especially at 120 minutes, but both moving-block intervals touched or crossed zero and TOD effects were not uniformly positive. These results do not answer whether EMA-0.995 is preferable to Patience-3 because Patience-3 was mistakenly excluded from this paired analysis.
+Conclusion: EMA-0.995 consistently improved the final raw checkpoint, especially at 120 minutes, but both moving-block intervals touched or crossed zero and TOD effects were not uniformly positive. The same-fold Patience estimate was selection-biased, so this experiment did not compare their deployed values; Experiment 6 does.
 
-## Open decision before the next stage
+## Experiment 6 — Odd/even cross-fit of checkpoint and rule selection
 
-1. Make `patience3_raw` eligible while keeping `retrospective_best_epoch_raw` diagnostic-only.
-2. Run the existing analyzer on Patience-3 versus the fixed parent using the already-saved predictions; no retraining is required.
-3. If its paired bootstrap, horizon, TOD, and diversity diagnostics are acceptable, freeze the entire Patience-3 rule: monitor, minimum improvement 0.0001, patience 3, raw-state selection, and tie behavior.
-4. Use official validation sparingly for the resulting stage winner. Do not use the held-out test until the final recipe is locked.
+Purpose: remove the winner's-curse bias from validation-adaptive checkpoint rules, add the missing EMA-0.995 Patience candidate, and test longer raw weight-average windows without retraining.
+
+### Bias diagnosis
+
+The original `patience3_raw` IC was calculated on the same 102-date window used to select its checkpoint. Its mean IC of 0.051860 was nearly identical to the retrospective-best oracle's 0.051763, including the same Fold-B ensemble result. It was therefore not a valid deployed-value comparison with fixed rules such as final EMA-0.995.
+
+### Settings
+
+- Analyzer commit: `30542282c29ad23943de1dc8ad9765a0eb88f9e2`
+- Source campaign: `trajectory_discovery_e22dd67_20260819T134332Z`
+- Retraining: none
+- Each fold's 102 chronologically sorted selection dates was divided into 51 odd-position and 51 even-position dates.
+- Direction 1 selected on odd dates and reported only on even dates; Direction 2 selected on even dates and reported only on odd dates.
+- Patience was replayed independently for every seed using only the selecting parity. The selected checkpoint's predictions were placed only into the opposite parity before constructing the three-seed rank ensemble.
+- `patience3_raw` monitored raw IC and restored the best raw checkpoint after three epochs without improvement greater than 0.0001.
+- `patience3_ema_0995` monitored EMA-0.995 IC and restored the best EMA-0.995 checkpoint under the same patience rule.
+- Fixed rules used the same state on both parities and received no per-fold checkpoint choice.
+- Rule-level replay selected the highest selection-half ensemble IC and reported that selected rule only on the opposite half, in both directions.
+- Prediction aggregation remained uniform, tie-aware rank averaging within sample and horizon. No ensemble weights were learned.
+- Paired deltas used per-date candidate-minus-final-EMA-0.995 IC with moving-block bootstrap lengths 5 and 10 and 10,000 replications.
+- Official validation and held-out test access: none.
+
+The last-7 and last-10 candidates arithmetic-averaged raw checkpoint weights from epochs 14-20 and 11-20, respectively, with float64 accumulation. Their validation predictions required two post-hoc evaluation passes per run but no optimization steps. They were written to a new extension artifact; the source campaign remained immutable.
+
+An initial extension attempt used seed-only filenames, which collided between folds. The process was stopped before accepting a report, the new invalid artifact was permanently deleted, and a regression test was added. The successful run keys every extension by fold and seed.
+
+### Cross-fitted candidate results
+
+| Rule | Fold A | Fold B | Mean |
+|---|---:|---:|---:|
+| `patience3_raw` | **0.048416261** | 0.050673275 | **0.049544768** |
+| `patience3_ema_0995` | 0.047120095 | 0.049916235 | 0.048518165 |
+| `last10_weight_average` | 0.045318709 | **0.050801712** | 0.048060210 |
+| `final_ema_0995` | 0.045308520 | 0.050625481 | 0.047967001 |
+| `last7_weight_average` | 0.044347388 | 0.050356302 | 0.047351845 |
+| `tail5_prediction_average` | 0.043660588 | 0.050187198 | 0.046923893 |
+| `last5_weight_average` | 0.043628097 | 0.050146187 | 0.046887142 |
+| `final_ema_099` | 0.043825966 | 0.049905499 | 0.046865732 |
+| `tail3_prediction_average` | 0.043457892 | 0.049932086 | 0.046694989 |
+| `last3_weight_average` | 0.043437668 | 0.049902230 | 0.046669949 |
+| `final_ema_098` | 0.043521575 | 0.049681043 | 0.046601309 |
+| `final_raw` | 0.043416330 | 0.049601613 | 0.046508972 |
+
+Cross-fitting reduced raw Patience's apparent advantage over final EMA-0.995 from 0.003893338 to 0.001577767 mean IC. EMA Patience did not improve on raw Patience. Last-10 was effectively tied with final EMA-0.995, while last-7 was worse; the apparent monotonic benefit of longer averaging windows did not continue cleanly beyond five.
+
+### Patience replay epochs
+
+Epoch triplets are seeds 11/29/47 in order, shown as best checkpoint / stopping epoch.
+
+| Fold and selecting parity | Raw Patience | EMA-0.995 Patience |
+|---|---|---|
+| A odd | 8/11, 5/8, 5/8 | 11/14, 10/13, 11/14 |
+| A even | 10/13, 5/8, 9/12 | 14/17, 13/16, 14/17 |
+| B odd | 4/7, 6/9, 4/7 | 8/11, 8/11, 8/11 |
+| B even | 7/10, 9/12, 8/11 | 15/18, 12/15, 18/20 |
+
+### Raw Patience versus final EMA-0.995
+
+| Fold | Cross-fitted IC delta | Block-5 95% interval | Block-10 95% interval |
+|---|---:|---:|---:|
+| A | +0.003107741 | [-0.005447569, 0.011401605] | [-0.005303876, 0.011083898] |
+| B | +0.000047794 | [-0.004546764, 0.003404376] | [-0.004811228, 0.002349003] |
+
+| Fold | 30m delta | 60m delta | 120m delta |
+|---|---:|---:|---:|
+| A | -0.001166307 | +0.002453159 | +0.008036371 |
+| B | -0.000247896 | -0.000978029 | +0.001369305 |
+
+TOD effects were mixed: 25 of 55 slots were negative on Fold A, ranging from -0.014302 to +0.021623; 29 of 55 were negative on Fold B, ranging from -0.011852 to +0.013599. The result is driven most coherently by the 120-minute horizon and does not show uniform horizon or TOD dominance.
+
+### Cross-fitted rule-selection replay
+
+| Fold and direction | Rule selected on first half | Opposite-half IC |
+|---|---|---:|
+| A odd to even | `patience3_raw` | 0.056957688 |
+| A even to odd | `patience3_raw` | 0.039874834 |
+| B odd to even | `patience3_raw` | 0.055943832 |
+| B even to odd | `patience3_ema_0995` | 0.042812317 |
+
+The combined out-of-half rule-selector IC was 0.048416261 on Fold A and 0.049378075 on Fold B, mean 0.048897168. Raw Patience was selected in three of four directions; EMA Patience was selected once.
+
+### Decision
+
+Freeze `patience3_raw`, the highest per-rule cross-fitted candidate: raw IC monitor, minimum improvement 0.0001, patience 3, maximum 20 epochs, restore best raw checkpoint. Retrospective best epoch remains diagnostic-only. This is a numerical selection, not evidence of established dominance: Fold B provided essentially no paired advantage over final EMA-0.995 and every paired block interval included zero.
+
+The sparse official-validation stage may apply this already-frozen stopping algorithm but must not retune its patience, threshold, epoch, state type, or EMA decay. The held-out test remains sealed.
+
+Immutable artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/trajectory_crossfit_3054228_20260819T161200Z`
 

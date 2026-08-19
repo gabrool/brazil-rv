@@ -47,7 +47,9 @@ def _rank_case() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 def test_soft_spearman_is_the_sole_objective() -> None:
     predictions, targets, mask = _rank_case()
     total, count = _soft_spearman_loss_sum(predictions, targets, mask)
-    torch.testing.assert_close(total / count, soft_spearman_loss(predictions, targets, mask))
+    torch.testing.assert_close(
+        total / count, soft_spearman_loss(predictions, targets, mask)
+    )
     assert objective_metadata() == {"name": "soft_spearman", "temperature": 0.5}
 
 
@@ -82,9 +84,7 @@ def test_compiled_soft_objective_has_finite_two_pass_sam_gradients() -> None:
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
     _, targets, mask = _rank_case()
     patches = torch.zeros(2, 4, 1, 1)
-    patches[:, :, 0, 0] = torch.tensor(
-        [[0.1, 0.2, 0.4, 0.3], [0.4, 0.1, 0.2, 0.3]]
-    )
+    patches[:, :, 0, 0] = torch.tensor([[0.1, 0.2, 0.4, 0.3], [0.4, 0.1, 0.2, 0.3]])
     batch = {
         "patches": patches,
         "history_patch_mask": torch.ones(2, 4, 1, dtype=torch.bool),
@@ -135,14 +135,12 @@ def test_ema_and_weight_averages_are_exact() -> None:
     torch.testing.assert_close(averaged["weight"], torch.full((2,), 2.0))
 
 
-def test_early_stop_and_best_epoch_are_diagnostics_only() -> None:
+def test_patience_replay_and_retrospective_best_epoch() -> None:
     scores = [0.01, 0.02, 0.019, 0.018, 0.017] + [0.0] * (MAX_EPOCHS - 5)
-    diagnostic = simulate_patience3(scores)
-    assert diagnostic == {
+    assert simulate_patience3(scores) == {
         "selected_epoch": 2,
         "selected_score": 0.02,
         "stopped_epoch": 5,
-        "selection_eligible": False,
     }
     assert retrospective_best_epoch(scores) == 2
 

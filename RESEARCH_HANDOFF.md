@@ -389,12 +389,25 @@ causal TOD profile adapted inside the historical training dates.
 | Last-5 weight average | 0.043628 | 0.050146 | 0.046887 |
 | Tail-3 prediction average | 0.043458 | 0.049932 | 0.046695 |
 | Tail-5 prediction average | 0.043661 | 0.050187 | 0.046924 |
-| Patience-3 raw (diagnostic) | 0.049576 | 0.054145 | 0.051860 |
+| Patience-3 raw (same-window, selection-biased) | 0.049576 | 0.054145 | 0.051860 |
 | Retrospective best raw (diagnostic) | 0.049382 | 0.054145 | 0.051763 |
 
-The deterministic frozen rule is `final_ema_0995`. Patience-3 and retrospective
-best are not eligible because they choose an epoch from each selection window and
-would reintroduce validation-driven epoch selection on the official split.
+The same-window Patience result above is not a deployed-value estimate: each seed's
+checkpoint was selected and reported on the same 102-date window.
+
+The corrective artifact is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/trajectory_crossfit_3054228_20260819T161200Z
+
+It selected on odd dates and reported on even dates, then reversed the roles. Raw
+Patience scored `0.048416`/`0.050673`, mean `0.049545`, versus final EMA-0.995 mean
+`0.047967`. EMA-0.995 Patience scored `0.048518`; last-10 and last-7 raw weight
+averaging scored `0.048060` and `0.047352`. The outer rule replay chose raw Patience
+in three of four directions and EMA Patience once, with mean out-of-half IC
+`0.048897`. Raw Patience-3 is frozen: minimum improvement `0.0001`, patience three,
+maximum 20 epochs, restore best raw checkpoint. Its Fold-B paired advantage over
+final EMA-0.995 was effectively zero and all paired block intervals included zero,
+so this is a numerical freeze rather than established dominance.
 
 The strict paired analyzer compared the selected rule with final raw. Fold-A and
 fold-B deltas were `+0.001892` and `+0.001024`. Moving-block 95% intervals were
@@ -423,11 +436,13 @@ validation was not accessed by this campaign, and the held-out test remains seal
 - `research/src/brazil_rv/modeling/engine.py`: compiled soft-Spearman/SAM training
   and eager validation.
 - `research/src/brazil_rv/modeling/trajectory.py`: EMA, tail averaging, checkpoint,
-  diagnostic early-stop, and frozen-rule helpers.
+  frozen raw-Patience, and frozen-rule helpers.
 - `research/src/brazil_rv/modeling/train.py`: one fixed 20-epoch trajectory with
   raw and EMA artifacts at every epoch.
 - `research/src/brazil_rv/modeling/analyze.py`: strict alignment, uniform rank
-  ensembles, paired bootstraps, guardrails, and trajectory-rule selection.
+  ensembles, paired bootstraps, guardrails, and fixed-rule baseline selection.
+- `research/src/brazil_rv/modeling/crossfit.py`: bidirectional odd/even checkpoint
+  and rule selection plus immutable last-7/last-10 prediction extensions.
 - `research/src/brazil_rv/modeling/run_discovery_campaign.py`: exact two-fold,
   three-seed internal screen; it cannot access official validation or test.
 - `research/src/brazil_rv/modeling/evaluate.py`: standalone validation/test

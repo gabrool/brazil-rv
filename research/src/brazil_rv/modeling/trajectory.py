@@ -10,8 +10,8 @@ import torch
 from torch import nn
 
 from .contract import (
-    DIAGNOSTIC_EARLY_STOP_PATIENCE,
-    DIAGNOSTIC_MIN_IC_IMPROVEMENT,
+    EARLY_STOP_PATIENCE,
+    MIN_IC_IMPROVEMENT,
     MAX_EPOCHS,
 )
 from .engine import state_dict_to_cpu
@@ -31,10 +31,8 @@ ELIGIBLE_RULES = (
     "tail3_prediction_average",
     "tail5_prediction_average",
 )
-DIAGNOSTIC_RULES = (
-    "diagnostic_patience3_raw",
-    "diagnostic_best_epoch_raw",
-)
+FROZEN_RULES = (*ELIGIBLE_RULES, "patience3_raw")
+DIAGNOSTIC_RULES = ("diagnostic_best_epoch_raw",)
 
 
 class ModelEMA:
@@ -61,9 +59,7 @@ class ModelEMA:
 
 
 @contextmanager
-def temporarily_load_state(
-    model: nn.Module, state_dict: Mapping[str, torch.Tensor]
-):
+def temporarily_load_state(model: nn.Module, state_dict: Mapping[str, torch.Tensor]):
     original = {
         name: value.detach().clone() for name, value in model.state_dict().items()
     }
@@ -122,12 +118,12 @@ def _tail_epochs(length: int) -> range:
     return range(MAX_EPOCHS - length + 1, MAX_EPOCHS + 1)
 
 
-def _diagnostic_epoch(run_dir: Path, rule: str) -> int:
+def _selected_epoch(run_dir: Path, rule: str) -> int:
     diagnostics = json.loads(
         (run_dir / "trajectory_diagnostics.json").read_text(encoding="utf-8")
     )
     key = {
-        "diagnostic_patience3_raw": "patience3",
+        "patience3_raw": "patience3",
         "diagnostic_best_epoch_raw": "retrospective_best_epoch",
     }[rule]
     value = diagnostics[key]
@@ -137,8 +133,11 @@ def _diagnostic_epoch(run_dir: Path, rule: str) -> int:
 def model_state_dicts_for_rule(
     run_dir: Path, rule: str
 ) -> tuple[dict[str, torch.Tensor], ...]:
-    if rule not in ELIGIBLE_RULES:
+    if rule not in FROZEN_RULES:
         raise ValueError(f"Rule is not eligible for frozen evaluation: {rule}")
+    if rule == "patience3_raw":
+        selected = load_checkpoint(run_dir, _selected_epoch(run_dir, rule))
+        return (selected["model_state_dict"],)
     final = load_checkpoint(run_dir, MAX_EPOCHS)
     if rule == "final_raw":
         return (final["model_state_dict"],)
@@ -160,8 +159,8 @@ def model_state_dicts_for_rule(
 
 
 def predictions_for_rule(run_dir: Path, rule: str) -> np.ndarray:
-    if rule in DIAGNOSTIC_RULES:
-        epoch = _diagnostic_epoch(run_dir, rule)
+    if rule == "patience3_raw" or rule in DIAGNOSTIC_RULES:
+        epoch = _selected_epoch(run_dir, rule)
         with np.load(prediction_path(run_dir, epoch), allow_pickle=False) as values:
             return values["raw"].copy()
     if rule not in ELIGIBLE_RULES:
@@ -187,20 +186,19 @@ def simulate_patience3(scores: Sequence[float]) -> dict[str, float | int]:
     stale = 0
     stopped_epoch = MAX_EPOCHS
     for epoch, score in enumerate(scores, start=1):
-        if score > best_score + DIAGNOSTIC_MIN_IC_IMPROVEMENT:
+        if score > best_score + MIN_IC_IMPROVEMENT:
             best_score = float(score)
             best_epoch = epoch
             stale = 0
         else:
             stale += 1
-            if stale >= DIAGNOSTIC_EARLY_STOP_PATIENCE:
+            if stale >= EARLY_STOP_PATIENCE:
                 stopped_epoch = epoch
                 break
     return {
         "selected_epoch": best_epoch,
         "selected_score": best_score,
         "stopped_epoch": stopped_epoch,
-        "selection_eligible": False,
     }
 
 
@@ -215,6 +213,6 @@ def load_frozen_selection(path: Path) -> dict[str, object]:
     if selection.get("schema") != "TRAJECTORY_SELECTION":
         raise ValueError("Selection file has an unknown schema")
     rule = selection.get("selected_rule")
-    if rule not in ELIGIBLE_RULES:
+    if rule not in FROZEN_RULES:
         raise ValueError("Selection file does not contain an eligible rule")
     return selection
