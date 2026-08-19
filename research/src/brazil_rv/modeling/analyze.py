@@ -154,25 +154,20 @@ def _bootstrap(values: np.ndarray, *, seed_offset: int = 0) -> dict[str, object]
     return result
 
 
-def compare_ensembles(
-    candidate_runs: Sequence[Path],
-    parent_runs: Sequence[Path],
+def compare_observation_ensembles(
+    candidate_members: Mapping[str, EvaluationObservations],
+    parent_members: Mapping[str, EvaluationObservations],
     *,
     candidate_rule: str,
     parent_rule: str,
     output_dir: Path,
+    comparison_metadata: Mapping[str, object] | None = None,
 ) -> Path:
+    if set(candidate_members) != set(parent_members):
+        raise ValueError("Candidate and parent ensemble members differ")
     if output_dir.exists():
         raise FileExistsError(output_dir)
     output_dir.mkdir(parents=True)
-    candidate_members = {
-        _member_name(run): load_run_observations(run, candidate_rule)
-        for run in candidate_runs
-    }
-    parent_members = {
-        _member_name(run): load_run_observations(run, parent_rule)
-        for run in parent_runs
-    }
     all_members = align_observations(
         {
             **{f"candidate_{name}": value for name, value in candidate_members.items()},
@@ -221,7 +216,9 @@ def compare_ensembles(
             {
                 "horizon_minutes": minutes,
                 "candidate_minus_parent_ic": finite_mean(horizon_delta[:, index]),
-                "bootstrap": _bootstrap(horizon_delta[:, index], seed_offset=index * 100),
+                "bootstrap": _bootstrap(
+                    horizon_delta[:, index], seed_offset=index * 100
+                ),
             }
         )
     pl.DataFrame(
@@ -254,7 +251,9 @@ def compare_ensembles(
                 "decision_idx": int(decision),
                 "decision_time": f"{minute // 60:02d}:{minute % 60:02d}",
                 "candidate_minus_parent_ic": finite_mean(by_date),
-                "bootstrap": _bootstrap(by_date, seed_offset=1000 + int(decision) * 100),
+                "bootstrap": _bootstrap(
+                    by_date, seed_offset=1000 + int(decision) * 100
+                ),
             }
         )
     pl.DataFrame(
@@ -273,6 +272,7 @@ def compare_ensembles(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "candidate_rule": candidate_rule,
         "parent_rule": parent_rule,
+        "comparison_metadata": dict(comparison_metadata or {}),
         "candidate": candidate_summary,
         "parent": parent_summary,
         "candidate_minus_parent_primary_ic": (
@@ -292,6 +292,31 @@ def compare_ensembles(
     }
     _atomic_json(output_dir / "analysis.json", report)
     return output_dir
+
+
+def compare_ensembles(
+    candidate_runs: Sequence[Path],
+    parent_runs: Sequence[Path],
+    *,
+    candidate_rule: str,
+    parent_rule: str,
+    output_dir: Path,
+) -> Path:
+    candidate_members = {
+        _member_name(run): load_run_observations(run, candidate_rule)
+        for run in candidate_runs
+    }
+    parent_members = {
+        _member_name(run): load_run_observations(run, parent_rule)
+        for run in parent_runs
+    }
+    return compare_observation_ensembles(
+        candidate_members,
+        parent_members,
+        candidate_rule=candidate_rule,
+        parent_rule=parent_rule,
+        output_dir=output_dir,
+    )
 
 
 def select_trajectory_rule(
@@ -339,7 +364,9 @@ def select_trajectory_rule(
 
 
 def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Analyze aligned trajectory predictions")
+    parser = argparse.ArgumentParser(
+        description="Analyze aligned trajectory predictions"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     compare = subparsers.add_parser("compare")
     compare.add_argument("--candidate-run", action="append", type=Path, required=True)

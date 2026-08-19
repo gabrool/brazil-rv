@@ -23,6 +23,7 @@ from .contract import (
     WARMUP_FRACTION,
     RuntimeSettings,
 )
+from .model import PARENT_MODEL_VARIANT, model_variant_metadata
 from .optim import scheduler_step_contract
 
 RUN_PROVENANCE_SCHEMA = "PIT_CLEAN_TCN_TRAJECTORY"
@@ -38,12 +39,13 @@ def repository_commit() -> str:
     ).stdout.strip()
 
 
-def model_metadata() -> dict[str, object]:
+def model_metadata(variant: str = PARENT_MODEL_VARIANT) -> dict[str, object]:
     return json.loads(
         json.dumps(
             {
                 "model_name": "tcn",
                 "architecture": asdict(TCN_ARCHITECTURE),
+                "variant": model_variant_metadata(variant),
                 "cross_equity_attention": False,
             }
         )
@@ -104,6 +106,7 @@ def build_run_provenance(
     parameter_count: int,
     training_sample_count: int,
     date_replacement: bool,
+    model_variant: str = PARENT_MODEL_VARIANT,
     runtime: RuntimeSettings = GH200_RUNTIME,
 ) -> dict[str, object]:
     provenance = {
@@ -111,7 +114,7 @@ def build_run_provenance(
         "repository_commit": repository_commit_value,
         "feature_store": str(feature_store.resolve()),
         "feature_store_identity": feature_store_metadata,
-        "model": model_metadata(),
+        "model": model_metadata(model_variant),
         "seed": seed,
         "fit_window": fit_window,
         "selection_window": selection_window,

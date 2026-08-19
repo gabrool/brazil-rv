@@ -45,7 +45,12 @@ from .engine import (
     train_one_epoch,
     validation_primary_metric,
 )
-from .model import build_model, count_trainable_parameters
+from .model import (
+    MODEL_VARIANTS,
+    PARENT_MODEL_VARIANT,
+    build_model,
+    count_trainable_parameters,
+)
 from .optim import build_optimizer, build_scheduler
 from .provenance import build_run_provenance, repository_commit
 from .trajectory import (
@@ -64,6 +69,9 @@ from .trajectory import (
 def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train one fixed PIT-clean trajectory")
     parser.add_argument("--seed", type=int, choices=ALLOWED_SEEDS, default=29)
+    parser.add_argument(
+        "--variant", choices=MODEL_VARIANTS, default=PARENT_MODEL_VARIANT
+    )
     parser.add_argument(
         "--selection-window",
         choices=("fold_a", "fold_b", "official"),
@@ -124,7 +132,9 @@ def _selection_metadata(path: Path | None, window: str) -> dict[str, object] | N
     if path is None:
         return None
     if window != "official":
-        raise ValueError("A frozen selection rule may be applied only to an official run")
+        raise ValueError(
+            "A frozen selection rule may be applied only to an official run"
+        )
     selection = load_frozen_selection(path)
     return {
         "selected_rule": selection["selected_rule"],
@@ -184,6 +194,7 @@ def run_training(
     selection_window: str,
     run_dir: Path,
     selection_rule_file: Path | None = None,
+    variant: str = PARENT_MODEL_VARIANT,
 ) -> Path:
     if run_dir.exists():
         raise FileExistsError(run_dir)
@@ -205,7 +216,7 @@ def run_training(
         GH200_RUNTIME,
         seed,
     )
-    model = build_model().cuda()
+    model = build_model(variant).cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
     parameter_count = count_trainable_parameters(model)
     optimizer, _ = build_optimizer(model)
@@ -225,6 +236,7 @@ def run_training(
         parameter_count=parameter_count,
         training_sample_count=train_rows.height,
         date_replacement=sampler.replace_dates,
+        model_variant=variant,
     )
     recorded_training = run_provenance["training"]
     if (
@@ -297,9 +309,7 @@ def run_training(
             raw_prediction_tail = raw_prediction_tail[-5:]
             raw_scores.append(scores["raw"])
             _atomic_npz(
-                run_dir
-                / "validation_predictions"
-                / f"epoch_{epoch:02d}.npz",
+                run_dir / "validation_predictions" / f"epoch_{epoch:02d}.npz",
                 predictions,
             )
             _atomic_torch_save(
@@ -420,7 +430,7 @@ def run_training(
 def _run(args: argparse.Namespace) -> Path:
     created_at = datetime.now(timezone.utc)
     name = (
-        f"tcn_{args.selection_window}_seed{args.seed}_"
+        f"tcn_{args.variant}_{args.selection_window}_seed{args.seed}_"
         f"{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     return run_training(
@@ -429,6 +439,7 @@ def _run(args: argparse.Namespace) -> Path:
         selection_window=args.selection_window,
         selection_rule_file=args.selection_rule_file,
         run_dir=args.output_base / name,
+        variant=args.variant,
     )
 
 
