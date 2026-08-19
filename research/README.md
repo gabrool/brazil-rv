@@ -1,44 +1,42 @@
 # Brazil-RV research
 
-The current source tree builds one PIT-clean causal feature store and contains the
-exact hybrid-loss/residual-attention research snapshot evaluated on 2026-08-18.
-Neither candidate was promoted: the accepted incumbent remains the peer-free,
-full-TOD, no-attention TCN trained with soft Spearman. The held-out test split was
-not loaded during training or campaign selection.
+The current source tree implements the accepted peer-free, full-TOD TCN with soft
+Spearman as its sole objective. Rejected hybrid-loss, continuous-target sidecar,
+recency-weight, and residual-attention code is intentionally absent. Their recorded
+commits and immutable artifacts preserve historical reproduction.
 
 From the repository root:
 
-```powershell
-# Install runtime plus preprocessing dependencies
-uv sync --project research --no-default-groups --group preprocessing
+    # Install the locked research and test environment
+    uv sync --project research --group dev
 
-# Build, audit, and atomically promote the peer-free causal-TOD feature store
-uv run --project research python -m brazil_rv.preprocessing.build
+    # Build and audit the peer-free causal-TOD feature store
+    uv run --project research python -m brazil_rv.preprocessing.build
 
-# One unpromoted hybrid-loss research run, using a campaign-built target-scale sidecar
-uv run --project research python -m brazil_rv.modeling.train `
-  --seed 11 `
-  --recency-policy uniform `
-  --target-scale-dir <target-scale-directory>
+    # Run the two non-overlapping internal folds at seeds 11, 29, and 47
+    uv run --project research python -m brazil_rv.modeling.run_discovery_campaign --output-dir <new-campaign-directory>
 
-# Resumable two-run hybrid-loss and residual-attention campaign
-uv run --project research --no-default-groups --group preprocessing python -m `
-  brazil_rv.modeling.run_loss_attention_campaign `
-  --source-campaign-dir <completed-PIT-clean-campaign-directory> `
-  --output-dir <new-campaign-directory>
+    # Compare a candidate ensemble against its matched parent
+    uv run --project research python -m brazil_rv.modeling.analyze compare --candidate-run <run> --parent-run <run> --candidate-rule <rule> --parent-rule <rule> --output-dir <analysis-directory>
 
-# Standalone development evaluation
-uv run --project research python -m brazil_rv.modeling.evaluate `
-  --run-dir <run-directory>
-```
+    # Confirm the internally frozen rule on the consumed official validation split
+    uv run --project research python -m brazil_rv.modeling.train --selection-window official --selection-rule-file <trajectory-selection.json> --seed 11
 
-The accepted recipe is a width-64, full-receptive-field SwiGLU causal TCN with
-final-state readout, the masked context policy, context-plus-pooled fusion, all
-three horizons, soft Spearman at temperature 0.50, and SAM-AdamW at rho 0.125.
-The checked-in experimental objective adds a gap-weighted pairwise term at weight
-0.25; it reduced seed-11 IC from 0.041972 to 0.037294. Residualized equity attention
-then reduced it to 0.034091. Do not treat either branch as the incumbent.
+    # Open the held-out lockbox only for a completed official run with a frozen rule
+    uv run --project research python -m brazil_rv.modeling.evaluate --run-dir <official-run-directory> --split test
 
-See the repository-root [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for the
-durable accepted contract and [RESEARCH_HANDOFF.md](../RESEARCH_HANDOFF.md) for
-the exact experiment history and artifact identities.
+Every run follows one fixed 20-epoch SAM trajectory. It records raw weights and
+raw/EMA validation predictions at every epoch, with EMA decays 0.98, 0.99, and
+0.995. It also evaluates last-3/last-5 weight averages and raw-score prediction
+averages without retraining. Patience-3 and retrospective best epoch are diagnostic
+only.
+
+`modeling.run_discovery_campaign` cannot request official validation or test rows.
+It freezes one rule from the mean two-fold three-seed rank-ensemble IC. The
+standalone analyzer strictly aligns identities, targets, and masks; uniformly
+rank-averages members; and reports paired moving-block intervals plus horizon and
+time-of-day guardrails. It never learns ensemble weights.
+
+See [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for the durable contract and
+[RESEARCH_HANDOFF.md](../RESEARCH_HANDOFF.md) for the historical result and
+artifact record.
