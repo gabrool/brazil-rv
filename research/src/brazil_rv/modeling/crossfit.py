@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -48,11 +48,12 @@ EXTENDED_WEIGHT_RULES = (
     "last10_weight_average",
 )
 FIXED_RULES = (*ELIGIBLE_RULES, *EXTENDED_WEIGHT_RULES)
+CENTERED_WEIGHT_RULE = "patience3_center5_weight_average"
 ADAPTIVE_RULE_KEYS = {
     "patience3_raw": "raw",
     "patience3_ema_0995": "ema_0995",
 }
-CANDIDATE_RULES = (*FIXED_RULES, *ADAPTIVE_RULE_KEYS)
+CANDIDATE_RULES = (*FIXED_RULES, *ADAPTIVE_RULE_KEYS, CENTERED_WEIGHT_RULE)
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,9 @@ class TrajectoryMember:
     reference: EvaluationObservations
     fixed_predictions: Mapping[str, np.ndarray]
     epoch_predictions: Mapping[str, Sequence[np.ndarray]]
+    parity_predictions: Mapping[str, Mapping[str, np.ndarray]] = field(
+        default_factory=dict
+    )
 
 
 def _atomic_json(path: Path, value: Mapping[str, object]) -> None:
@@ -120,6 +124,12 @@ def load_trajectory_member(run_dir: Path, extension_dir: Path) -> TrajectoryMemb
     with np.load(extension_path, allow_pickle=False) as values:
         for rule in EXTENDED_WEIGHT_RULES:
             fixed[rule] = values[rule][order].copy()
+        parity_predictions = {
+            CENTERED_WEIGHT_RULE: {
+                parity: values[f"{CENTERED_WEIGHT_RULE}_select_{parity}"][order].copy()
+                for parity in ("odd", "even")
+            }
+        }
     epochs = {key: [] for key in ADAPTIVE_RULE_KEYS.values()}
     for epoch in range(1, MAX_EPOCHS + 1):
         with np.load(
@@ -133,7 +143,15 @@ def load_trajectory_member(run_dir: Path, extension_dir: Path) -> TrajectoryMemb
         reference=reference,
         fixed_predictions=fixed,
         epoch_predictions=epochs,
+        parity_predictions=parity_predictions,
     )
+
+
+def centered_epoch_window(best_epoch: int) -> tuple[int, ...]:
+    if not 1 <= best_epoch <= MAX_EPOCHS:
+        raise ValueError(f"Epoch is outside the trajectory: {best_epoch}")
+    start = min(max(best_epoch - 2, 1), MAX_EPOCHS - 4)
+    return tuple(range(start, start + 5))
 
 
 def _score(
@@ -268,20 +286,30 @@ def crossfit_fold(members: Sequence[TrajectoryMember]) -> dict[str, object]:
                 if rule in FIXED_RULES:
                     predictions = member.fixed_predictions[rule]
                 else:
-                    key = ADAPTIVE_RULE_KEYS[rule]
+                    key = (
+                        "raw"
+                        if rule == CENTERED_WEIGHT_RULE
+                        else ADAPTIVE_RULE_KEYS[rule]
+                    )
                     scores = [
                         _score(member.reference, predictions, selection_mask)
                         for predictions in member.epoch_predictions[key]
                     ]
                     replay = simulate_patience3(scores)
-                    predictions = member.epoch_predictions[key][
-                        int(replay["selected_epoch"]) - 1
-                    ]
+                    selected_epoch = int(replay["selected_epoch"])
+                    if rule == CENTERED_WEIGHT_RULE:
+                        predictions = member.parity_predictions[rule][selection_parity]
+                    else:
+                        predictions = member.epoch_predictions[key][selected_epoch - 1]
                     member_replays[member.name] = {
-                        "selected_epoch": int(replay["selected_epoch"]),
+                        "selected_epoch": selected_epoch,
                         "stopped_epoch": int(replay["stopped_epoch"]),
                         "selection_half_ic": float(replay["selected_score"]),
                     }
+                    if rule == CENTERED_WEIGHT_RULE:
+                        member_replays[member.name]["averaged_epochs"] = list(
+                            centered_epoch_window(selected_epoch)
+                        )
                 selected_predictions[member.name] = predictions
                 crossfit_member_predictions[rule][member.name][evaluation_mask] = (
                     predictions[evaluation_mask]
@@ -373,13 +401,17 @@ def _materialize_extended_weight_predictions(
         loader = create_evaluation_loader(
             store, selection_rows, seed=int(manifest["seed"])
         )
-        reference, _ = _load_reference(run_dir)
+        reference, order = _load_reference(run_dir)
         model = build_model().cuda()
         predictions = {}
         scores = {}
+        raw_states = {
+            epoch: load_checkpoint(run_dir, epoch)["model_state_dict"]
+            for epoch in range(1, MAX_EPOCHS + 1)
+        }
         for length in (7, 10):
             states = [
-                load_checkpoint(run_dir, epoch)["model_state_dict"]
+                raw_states[epoch]
                 for epoch in range(MAX_EPOCHS - length + 1, MAX_EPOCHS + 1)
             ]
             model.load_state_dict(average_state_dicts(states), strict=True)
@@ -393,6 +425,40 @@ def _materialize_extended_weight_predictions(
                 observations.label_mask,
                 observations.date_idx,
             )
+        raw_epoch_predictions = []
+        for epoch in range(1, MAX_EPOCHS + 1):
+            with np.load(
+                run_dir / "validation_predictions" / f"epoch_{epoch:02d}.npz",
+                allow_pickle=False,
+            ) as values:
+                raw_epoch_predictions.append(values["raw"][order].copy())
+        patience_replays = {}
+        window_cache = {}
+        for parity, dates in _date_parities(reference.date_idx).items():
+            selection_mask = np.isin(reference.date_idx, dates)
+            replay = simulate_patience3(
+                [
+                    _score(reference, epoch_predictions, selection_mask)
+                    for epoch_predictions in raw_epoch_predictions
+                ]
+            )
+            selected_epoch = int(replay["selected_epoch"])
+            window = centered_epoch_window(selected_epoch)
+            if window not in window_cache:
+                model.load_state_dict(
+                    average_state_dicts([raw_states[epoch] for epoch in window]),
+                    strict=True,
+                )
+                observations, _ = collect_validation_observations(model, loader)
+                assert_observations_aligned(reference, observations)
+                window_cache[window] = observations.predictions
+            key = f"{CENTERED_WEIGHT_RULE}_select_{parity}"
+            predictions[key] = window_cache[window]
+            patience_replays[parity] = {
+                "selected_epoch": selected_epoch,
+                "stopped_epoch": int(replay["stopped_epoch"]),
+                "averaged_epochs": list(window),
+            }
         output = _extension_path(extension_dir, run_dir)
         _atomic_npz(output, predictions)
         manifest_rows.append(
@@ -402,6 +468,7 @@ def _materialize_extended_weight_predictions(
                 "fold": fold,
                 "output": str(output.resolve()),
                 "scores": scores,
+                "centered_patience_replays": patience_replays,
             }
         )
         del model
@@ -413,7 +480,7 @@ def _materialize_extended_weight_predictions(
             "created_at": datetime.now(timezone.utc).isoformat(),
             "repository_commit": repository_commit(),
             "source_artifacts_mutated": False,
-            "rules": list(EXTENDED_WEIGHT_RULES),
+            "rules": [*EXTENDED_WEIGHT_RULES, CENTERED_WEIGHT_RULE],
             "runs": manifest_rows,
         },
     )
