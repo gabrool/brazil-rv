@@ -240,7 +240,13 @@ An initial extension attempt used seed-only filenames, which collided between fo
 | `final_ema_098` | 0.043521575 | 0.049681043 | 0.046601309 |
 | `final_raw` | 0.043416330 | 0.049601613 | 0.046508972 |
 
-Cross-fitting reduced raw Patience's apparent advantage over final EMA-0.995 from 0.003893338 to 0.001577767 mean IC. EMA Patience did not improve on raw Patience. Last-10 was effectively tied with final EMA-0.995, while last-7 was worse; the apparent monotonic benefit of longer averaging windows did not continue cleanly beyond five.
+Cross-fitting reduced raw Patience's apparent advantage over final EMA-0.995 from 0.003893338 to 0.001577767 mean IC. EMA Patience did not improve on raw Patience. Last-10 was effectively tied with final EMA-0.995. Within the raw weight-average family, however, longer windows improved monotonically at every tested length.
+
+The exact raw weight-average sequence was strictly monotone over every tested
+window: last-3 `0.046669949`, last-5
+`0.046887142`, last-7 `0.047351845`, and last-10 `0.048060210`. Comparing last-7
+with final EMA-0.995 was informative for rule selection but was the wrong
+comparator for the averaging-window trend. The trend had not saturated at last-10.
 
 ### Patience replay epochs
 
@@ -267,6 +273,17 @@ Epoch triplets are seeds 11/29/47 in order, shown as best checkpoint / stopping 
 
 TOD effects were mixed: 25 of 55 slots were negative on Fold A, ranging from -0.014302 to +0.021623; 29 of 55 were negative on Fold B, ranging from -0.011852 to +0.013599. The result is driven most coherently by the 120-minute horizon and does not show uniform horizon or TOD dominance.
 
+The fold result is best read as fold-dependent post-peak decline, not as
+"Patience works on A but not B." On Fold A final raw ended at `0.043416330`
+versus cross-fitted Patience `0.048416261`, so Patience recovered about
+`0.0050`; on Fold B final raw `0.049601613` was already near Patience
+`0.050673275`, leaving only about `0.0011` to recover. Relative to final EMA-0.995,
+both folds concentrated the Patience gain at 120 minutes (`+0.008036371` and
+`+0.001369305`) while 30-minute deltas were slightly negative. With only two
+folds, the record cannot distinguish regime distance from the 512-versus-614-date
+fit windows. That uncertainty is a reason to freeze the simple winner and stop
+probing checkpoint selection.
+
 ### Cross-fitted rule-selection replay
 
 | Fold and direction | Rule selected on first half | Opposite-half IC |
@@ -287,4 +304,73 @@ The sparse official-validation stage may apply this already-frozen stopping algo
 Immutable artifact:
 
 `/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/trajectory_crossfit_3054228_20260819T161200Z`
+
+## Experiment 7 — Patience-centered five-checkpoint weight averaging
+
+Purpose: test the mechanistic combination missing from Experiment 6—use raw
+Patience to locate the early peak, then reduce checkpoint variance by averaging
+weights around that peak—without retraining or consuming another data split.
+
+### Settings
+
+- Evaluator commit: `381dcb7491b26f1e34d4ecdef75d0e5e291b5441`
+- Source campaign: `trajectory_discovery_e22dd67_20260819T134332Z`
+- Retraining and optimizer steps: none
+- One predeclared candidate only; no window sweep
+- For every fold, selecting parity, and seed, replay raw Patience-3 using only the
+  51 selecting dates.
+- Arithmetic-average five raw checkpoint state dictionaries centered on the
+  selected best epoch: `[best-2, best-1, best, best+1, best+2]`. A boundary case
+  shifts the five-wide window inside epochs 1-20; no observed replay required a
+  boundary shift.
+- Accumulate floating weights in float64 and cast back to their original dtype;
+  copy non-floating state from the latest checkpoint in the window.
+- Evaluate the averaged state once per unique window, but report its predictions
+  only on the opposite parity. Repeat in both directions.
+- Construct the three-seed ensemble by uniform tie-aware rank averaging within
+  sample and horizon. Learn no ensemble weights.
+- Official validation and held-out test access: none.
+- Source artifacts remained immutable. The centered predictions and replay
+  windows were written to a new extension artifact.
+
+### Results
+
+| Rule | Fold A | Fold B | Mean |
+|---|---:|---:|---:|
+| `patience3_raw` | **0.048416261** | **0.050673275** | **0.049544768** |
+| `patience3_center5_weight_average` | 0.046655118 | 0.050385365 | 0.048520241 |
+| `final_ema_0995` | 0.045308520 | 0.050625481 | 0.047967001 |
+
+Centered-minus-raw-Patience was `-0.001761143` on Fold A and `-0.000287910`
+on Fold B, mean `-0.001024527`. It was lower in every out-of-half direction:
+
+| Fold and direction | Centered IC | Raw-Patience IC | Delta |
+|---|---:|---:|---:|
+| A odd to even | 0.054607525 | 0.056957688 | -0.002350163 |
+| A even to odd | 0.038702710 | 0.039874834 | -0.001172124 |
+| B odd to even | 0.055891940 | 0.055943832 | -0.000051892 |
+| B even to odd | 0.044878789 | 0.045402718 | -0.000523929 |
+
+Against final EMA-0.995, centered averaging gained `+0.001346598` on Fold A
+but lost `-0.000240117` on Fold B. The block-5 intervals were
+`[-0.006870319, 0.009388453]` and `[-0.005029775, 0.003178609]`; block-10
+intervals were `[-0.006861055, 0.009247092]` and
+`[-0.005313988, 0.002133605]`. Horizon deltas versus EMA-0.995 were
+`-0.002189669/+0.000703642/+0.005525820` on Fold A and
+`-0.000598913/-0.001190991/+0.001069554` on Fold B for 30/60/120 minutes.
+The same 120-minute concentration remained, but smoothing diluted the raw
+Patience result rather than improving it.
+
+### Decision
+
+Reject the centered five-checkpoint average and keep `patience3_raw` frozen.
+The centered rule lost on both folds and all four honest evaluation halves, so no
+additional window or centering sweep is justified. This closes the checkpoint-rule
+line of investigation.
+
+The rejected evaluator was removed from current HEAD under the project's
+deletion-first rule. Historical reproduction uses evaluator commit `381dcb7` and
+the immutable artifact below, not compatibility code:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/trajectory_centered_crossfit_381dcb7_20260819T170100Z`
 

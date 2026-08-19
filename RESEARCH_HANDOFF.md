@@ -343,6 +343,8 @@ results above remain authoritative records, not executable compatibility paths.
   raw, EMA, weight-average, and prediction-average candidates.
 - Rejected hybrid loss, continuous-target sidecar, residual attention, recency
   weighting, and their campaign driver have been deleted from current code.
+- The rejected Patience-centered checkpoint-average evaluator is likewise absent;
+  its recorded commit and immutable artifact preserve exact reproduction.
 - Exact historical reproduction still uses the recorded commit
   `4067962f6bb6748a530814d10e20dfc865a385c7`, immutable store identity, and run
   manifest.
@@ -402,12 +404,36 @@ The corrective artifact is:
 It selected on odd dates and reported on even dates, then reversed the roles. Raw
 Patience scored `0.048416`/`0.050673`, mean `0.049545`, versus final EMA-0.995 mean
 `0.047967`. EMA-0.995 Patience scored `0.048518`; last-10 and last-7 raw weight
-averaging scored `0.048060` and `0.047352`. The outer rule replay chose raw Patience
-in three of four directions and EMA Patience once, with mean out-of-half IC
+averaging scored `0.048060` and `0.047352`. The raw weight-average sequence was
+strictly monotone across last-3/5/7/10 (`0.046670`, `0.046887`, `0.047352`,
+`0.048060`) and had not saturated at the longest tested tail. The outer rule
+replay chose raw Patience in three of four directions and EMA Patience once, with
+mean out-of-half IC
 `0.048897`. Raw Patience-3 is frozen: minimum improvement `0.0001`, patience three,
 maximum 20 epochs, restore best raw checkpoint. Its Fold-B paired advantage over
 final EMA-0.995 was effectively zero and all paired block intervals included zero,
 so this is a numerical freeze rather than established dominance.
+
+The fold contrast reflects different post-peak declines: Fold A final raw fell
+about `0.0050` below cross-fitted Patience, while Fold B final raw was only about
+`0.0011` lower. Both folds placed the coherent benefit at 120 minutes and were
+slightly negative at 30 minutes. With two folds this cannot be attributed to
+regime distance versus fit-window length, so checkpoint selection was frozen
+rather than probed further.
+
+One predeclared no-retraining refinement then averaged five raw checkpoints around
+each parity-selected Patience peak. It scored `0.046655`/`0.050385`, mean
+`0.048520`, versus raw Patience mean `0.049545`; centered-minus-raw-Patience was
+`-0.001761` on Fold A and `-0.000288` on Fold B and was negative in all four
+out-of-half directions. The centered rule was rejected and no window sweep was
+run. Official validation and test were not accessed. Historical reproduction is:
+
+    evaluator commit 381dcb7491b26f1e34d4ecdef75d0e5e291b5441
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/trajectory_centered_crossfit_381dcb7_20260819T170100Z
+
+The evaluator was removed from current HEAD under the deletion-first rule. Raw
+Patience-3 remains the frozen trajectory rule, and the checkpoint-rule line is
+closed.
 
 The strict paired analyzer compared the selected rule with final raw. Fold-A and
 fold-B deltas were `+0.001892` and `+0.001024`. Moving-block 95% intervals were

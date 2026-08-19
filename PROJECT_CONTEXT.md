@@ -22,6 +22,9 @@ matched seeds 11/29/47. Best-IC deltas versus the immutable records were
 matched. A bidirectional odd/even-date cross-fit of the internal selection windows
 subsequently froze raw Patience-3 as the trajectory rule, with its uncertainty and
 Fold-B non-confirmation retained in the research record.
+A no-retraining follow-up averaged five raw checkpoints around the parity-selected
+Patience peak. It lost to raw Patience on both folds and was rejected; raw
+Patience-3 remains frozen and checkpoint-rule investigation is closed.
 
 Read [RESEARCH_HANDOFF.md](RESEARCH_HANDOFF.md) for architecture and campaign
 history, exact results, artifact identities, and interpretations.
@@ -132,6 +135,15 @@ last-7 scored `0.047352`. The outer rule replay chose raw Patience in three of f
 directions and EMA Patience once, with mean out-of-half IC `0.048897`. Raw
 Patience-3 is frozen as the numerical winner, but it is not treated as established
 dominance over final EMA-0.995.
+
+The one-candidate centered-average follow-up at evaluator commit `381dcb7`
+scored `0.046655`/`0.050385`, mean `0.048520`, versus raw Patience mean
+`0.049545`. Centered-minus-raw-Patience was `-0.001761` on Fold A and
+`-0.000288` on Fold B and was negative in all four out-of-half directions. The
+candidate was rejected without another sweep. Its code was removed from current
+HEAD; exact reproduction uses the recorded evaluator commit and immutable
+`trajectory_centered_crossfit_381dcb7_20260819T170100Z` artifact. Neither
+official validation nor test was accessed.
 
 ## Current source-tree status
 
