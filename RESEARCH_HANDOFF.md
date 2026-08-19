@@ -333,42 +333,44 @@ Use the accepted soft-Spearman incumbent as the parent for new experiments, not
 the rejected hybrid objective. Start with one matched seed; promote to seeds
 11/29/47 only after a meaningful improvement.
 
-## Current HEAD caveat
+## Current HEAD status
 
-The current source tree is a research snapshot, not a promoted hybrid recipe:
+The current source tree is the restored peer-free soft-Spearman parent plus the
+internal-fold trajectory measurement layer. Historical hybrid and attention
+results above remain authoritative records, not executable compatibility paths.
 
-- `run_loss_attention_campaign.py`, the target-scale sidecar, the hybrid objective,
-  and the optional residual-attention implementation remain present so the exact
-  completed experiments are visible in Git history and code.
-- The generic `modeling.train` entry point at this snapshot uses the hybrid loss
-  and requires a target-scale sidecar. **Do not call it the incumbent.**
-- The accepted incumbent is the existing full-TOD soft-Spearman no-attention run
-  recorded above. An exact rerun can be reconstructed from its recorded commit
+- `modeling.train` runs a fixed 20-epoch soft-Spearman SAM trajectory and records
+  raw, EMA, weight-average, and prediction-average candidates.
+- Rejected hybrid loss, continuous-target sidecar, residual attention, recency
+  weighting, and their campaign driver have been deleted from current code.
+- Exact historical reproduction still uses the recorded commit
   `4067962f6bb6748a530814d10e20dfc865a385c7`, immutable store identity, and run
   manifest.
-- The original cleanup plan called for deleting losing experiment branches after
-  selection. A future maintenance change may restore soft Spearman as the sole
-  canonical training path and delete the rejected hybrid/attention driver; do not
-  do that before preserving these result contracts.
+- The official validation split is reserved for sparse stage-winner checks; the
+  held-out test remains accessible only through the standalone frozen-rule evaluator.
 
 ## Code map
 
 - `research/src/brazil_rv/preprocessing/build.py`: self-contained full-TOD store.
 - `research/src/brazil_rv/preprocessing/intraday_normalization.py`: causal TOD
   profile and equity dynamic correction.
-- `research/src/brazil_rv/preprocessing/target_scale.py`: temporary exact
-  development target-scale sidecar used by the rejected hybrid experiment.
-- `research/src/brazil_rv/modeling/data.py`: current schema-only loader, masking,
-  patches, recency weights, and target batching.
+- `research/src/brazil_rv/modeling/data.py`: sidecar-free loader, masking, patches,
+  and the two expanding internal screening folds.
 - `research/src/brazil_rv/modeling/layers.py`: causal residual TCN block.
-- `research/src/brazil_rv/modeling/model.py`: shared TCN, optional residualized
-  equity attention, and fixed context-plus-pooled fusion.
-- `research/src/brazil_rv/modeling/engine.py`: compiled loss/SAM training and eager
-  validation.
-- `research/src/brazil_rv/modeling/train.py`: one-run interface for the current
-  research snapshot.
-- `research/src/brazil_rv/modeling/run_loss_attention_campaign.py`: exact resumable
-  two-run campaign used for the final table.
+- `research/src/brazil_rv/modeling/model.py`: peer-free shared TCN and fixed
+  context-plus-pooled fusion.
+- `research/src/brazil_rv/modeling/engine.py`: compiled soft-Spearman/SAM training
+  and eager validation.
+- `research/src/brazil_rv/modeling/trajectory.py`: EMA, tail averaging, checkpoint,
+  diagnostic early-stop, and frozen-rule helpers.
+- `research/src/brazil_rv/modeling/train.py`: one fixed 20-epoch trajectory with
+  raw and EMA artifacts at every epoch.
+- `research/src/brazil_rv/modeling/analyze.py`: strict alignment, uniform rank
+  ensembles, paired bootstraps, guardrails, and trajectory-rule selection.
+- `research/src/brazil_rv/modeling/run_discovery_campaign.py`: exact two-fold,
+  three-seed internal screen; it cannot access official validation or test.
+- `research/src/brazil_rv/modeling/evaluate.py`: standalone validation/test
+  evaluation for official runs carrying an internally frozen rule.
 
 ## Operational handoff
 

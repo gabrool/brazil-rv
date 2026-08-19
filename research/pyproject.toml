@@ -1,7 +1,7 @@
 [project]
 name = "brazil-rv"
 version = "0.1.0"
-description = "Add your description here"
+description = "Point-in-time Brazilian mid-frequency quantitative research"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

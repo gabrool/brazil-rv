@@ -1,24 +1,12 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import date, timedelta
 
 import numpy as np
 import polars as pl
-import pytest
 
-from brazil_rv.modeling.contract import (
-    EFFECTIVE_BATCH_SIZE,
-    RECENCY_HALF_LIVES,
-    ROLLING_WINDOW_DATES,
-    VALIDATION_END,
-    RuntimeSettings,
-)
-from brazil_rv.modeling.data import (
-    DateStratifiedBatchSampler,
-    prepare_training_rows,
-)
+from brazil_rv.modeling.contract import EFFECTIVE_BATCH_SIZE, RuntimeSettings
+from brazil_rv.modeling.data import DateStratifiedBatchSampler, discovery_folds
 
 
 def _rows(date_count: int = 716) -> pl.DataFrame:
@@ -33,33 +21,21 @@ def _rows(date_count: int = 716) -> pl.DataFrame:
     )
 
 
-def test_uniform_policy_is_exactly_unit_weighted() -> None:
-    rows, weights, metadata = prepare_training_rows(_rows(), "uniform")
-    assert rows.height == 716
-    np.testing.assert_array_equal(weights, np.ones(716, dtype=np.float32))
-    assert metadata["weight_mean"] == 1.0
+def test_discovery_folds_have_exact_expanding_windows() -> None:
+    fold_a, fold_b = discovery_folds(_rows())
+    assert (fold_a.name, fold_b.name) == ("fold_a", "fold_b")
+    assert fold_a.fit_rows["date_idx"].n_unique() == 512
+    assert fold_a.selection_rows["date_idx"].n_unique() == 102
+    assert fold_b.fit_rows["date_idx"].n_unique() == 614
+    assert fold_b.selection_rows["date_idx"].n_unique() == 102
+    assert set(fold_a.selection_rows["date_idx"]).isdisjoint(
+        set(fold_b.selection_rows["date_idx"])
+    )
+    assert fold_a.selection_rows["date_idx"].min() == 512
+    assert fold_b.selection_rows["date_idx"].min() == 614
 
 
-def test_exponential_half_lives_and_mean_one_normalization() -> None:
-    for policy, half_life in RECENCY_HALF_LIVES.items():
-        rows, weights, metadata = prepare_training_rows(_rows(), policy)
-        used = weights[rows["date_idx"].unique().sort().to_numpy()]
-        assert np.isclose(used.mean(), 1.0)
-        assert np.isclose(used[-1] / used[-1 - half_life], 2.0, rtol=1e-6)
-        assert metadata["half_life_sessions"] == half_life
-
-
-def test_rolling_policy_retains_exact_latest_window() -> None:
-    rows, weights, metadata = prepare_training_rows(_rows(), "rolling_504")
-    assert rows.height == ROLLING_WINDOW_DATES
-    assert rows["date_idx"].min() == 716 - ROLLING_WINDOW_DATES
-    assert rows["date_idx"].max() == 715
-    assert np.all(weights[: 716 - ROLLING_WINDOW_DATES] == 0)
-    assert np.all(weights[716 - ROLLING_WINDOW_DATES :] == 1)
-    assert metadata["rolling_window_sessions"] == ROLLING_WINDOW_DATES
-
-
-def test_date_replacement_is_used_only_for_undersized_date_sets() -> None:
+def test_both_fold_training_windows_sample_512_distinct_dates() -> None:
     runtime = RuntimeSettings(
         effective_batch_size=EFFECTIVE_BATCH_SIZE,
         loader_batch_size=256,
@@ -67,10 +43,14 @@ def test_date_replacement_is_used_only_for_undersized_date_sets() -> None:
         evaluation_batch_size=256,
         num_workers=0,
     )
-    assert not DateStratifiedBatchSampler(_rows(716), runtime, 11).replace_dates
-    assert DateStratifiedBatchSampler(
-        _rows(ROLLING_WINDOW_DATES), runtime, 11
-    ).replace_dates
+    for fold in discovery_folds(_rows()):
+        sampler = DateStratifiedBatchSampler(fold.fit_rows, runtime, 11)
+        assert not sampler.replace_dates
+        first_two_loader_batches = list(sampler)[:2]
+        positions = (
+            first_two_loader_batches[0].indices + first_two_loader_batches[1].indices
+        )
+        assert len(positions) == len(set(positions)) == 512
 
 
 def test_date_sampling_is_epoch_deterministic() -> None:
@@ -86,40 +66,6 @@ def test_date_sampling_is_epoch_deterministic() -> None:
     left.set_epoch(3)
     right.set_epoch(3)
     assert list(left) == list(right)
-
-
-def test_target_scale_identity_requires_development_only_source_binding(
-    tmp_path,
-) -> None:
-    from brazil_rv.modeling.data import (
-        TARGET_SCALE_FILE,
-        TARGET_SCALE_SCHEMA,
-        target_scale_identity,
-    )
-
-    scale_dir = tmp_path / "target_scale"
-    scale_dir.mkdir()
-    scale_path = scale_dir / TARGET_SCALE_FILE
-    np.save(scale_path, np.ones((2, 3), dtype=np.float64))
-    source = {"path": "feature-store", "manifest_sha256": "feature-hash"}
-    manifest = {
-        "schema": TARGET_SCALE_SCHEMA,
-        "source_feature_store": source,
-        "through": VALIDATION_END.isoformat(),
-        "test_accessed": False,
-        "shape": [2, 3],
-        "target_scale_sha256": hashlib.sha256(scale_path.read_bytes()).hexdigest(),
-    }
-    manifest_path = scale_dir / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    assert target_scale_identity(scale_dir, source)["through"] == (
-        VALIDATION_END.isoformat()
-    )
-
-    manifest["test_accessed"] = True
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    with pytest.raises(ValueError, match="recorded contract"):
-        target_scale_identity(scale_dir, source)
 
 
 def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
@@ -149,7 +95,6 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
         "context_slow.npy": (1, LOCAL_CONTEXT_COUNT, SLOW_FEATURE_COUNT),
         "context_data_ready.npy": (1, LOCAL_CONTEXT_COUNT),
         "targets.npy": (1, 158, 55, HORIZON_COUNT),
-        "cross_section_median.npy": (1, 55, HORIZON_COUNT),
         "global_features.npy": (1, GLOBAL_CONTEXT_COUNT, 615, 26),
         "global_slow.npy": (1, GLOBAL_CONTEXT_COUNT, 55, SLOW_FEATURE_COUNT),
         "global_data_ready.npy": (1, GLOBAL_CONTEXT_COUNT, 55),
@@ -169,13 +114,8 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
         if name == "targets.npy":
             rank = np.linspace(-1, 1, 158, dtype=np.float32)
             values[:] = rank[None, :, None, None]
-        if name == "cross_section_median.npy":
-            values.fill(0.0)
         np.save(tmp_path / name, values, allow_pickle=False)
 
-    scale_dir = tmp_path / "target_scale"
-    scale_dir.mkdir()
-    np.save(scale_dir / "target_scale.npy", np.ones((1, 158), dtype=np.float64))
     rows = pl.DataFrame(
         {
             "sample_id": [0],
@@ -186,14 +126,10 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
             "context_cutoff_index": [75],
         }
     )
-    dataset = VectorizedFeatureDataset(
-        tmp_path, scale_dir, rows, np.ones(1, dtype=np.float32)
-    )
+    dataset = VectorizedFeatureDataset(tmp_path, rows)
     batch = tensorize_vectorized_batch(dataset[BatchRequest((0,), 1)])
-    np.testing.assert_allclose(
-        batch["continuous_targets"][0, 0].numpy(),
-        1.0 / np.sqrt(np.asarray((30, 60, 120))),
-    )
+    assert "continuous_targets" not in batch
+    assert "training_weight" not in batch
     model = build_model()
     predictions = model(
         batch["patches"],
@@ -204,7 +140,7 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
     )
     assert predictions.shape == (1, 158, HORIZON_COUNT)
     loss = soft_spearman_loss(
-        predictions, batch["targets"], batch["label_mask"], batch["training_weight"]
+        predictions, batch["targets"], batch["label_mask"]
     )
     loss.backward()
     assert torch.isfinite(loss)

@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-08-18.
+Last verified: 2026-08-19.
 
 ## Purpose and current research state
 
@@ -11,13 +11,13 @@ axis.
 
 The accepted incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
-exact validation result verified on 2026-08-18 is seed-11 IC **0.041972**. The
-gap-pairwise hybrid loss and residual-state cross-equity attention in current HEAD
-are completed, rejected research candidates rather than promoted defaults.
+recorded exact validation result is seed-11 IC **0.041972**. The rejected
+gap-pairwise loss, continuous-target sidecar, and residual equity-attention branch
+are absent from the current tree; their commits, manifests, and immutable artifacts
+remain the historical reproduction contract.
 
-Read [RESEARCH_HANDOFF.md](RESEARCH_HANDOFF.md) for the exact architecture,
-campaign chronology, results, NFS artifact identities, interpretations, current
-HEAD caveat, and next recommended experiments.
+Read [RESEARCH_HANDOFF.md](RESEARCH_HANDOFF.md) for architecture and campaign
+history, exact results, artifact identities, and interpretations.
 
 ## Source and write boundaries
 
@@ -59,18 +59,26 @@ Core causal rules:
   information available at their historical timestamp.
 - Training, validation, and test identities are immutable and audited.
 
-## Splits and test policy
+## Splits, discovery folds, and test policy
 
 - Training: 2021-08-16 through 2024-06-28, 716 dates.
 - Validation: 2024-07-08 through 2025-06-30, 244 dates.
 - Held-out test: 2025-07-07 through 2026-07-17, 259 dates.
+- Fold A: first 512 training dates fit, next 102 select.
+- Fold B: first 614 training dates fit, final 102 select.
 
-Embargo dates are not selection data. Training, early stopping, and experiment
-selection use training and validation only. Test data may be opened only through
-an explicit standalone held-out evaluation. The 2026-08-18 campaigns all record
-`test_accessed=false`.
+The two internal selection periods do not overlap. Both fit windows preserve an
+effective batch of 512 distinct dates. Stored features are causal, but the TOD
+profile adapted inside the historical training dates, so these are screening
+folds rather than exact replicas of the officially frozen preprocessing regime.
 
-## Accepted model contract
+The official validation split has already been consumed and is reserved for
+sparse confirmation of stage winners. Embargo dates are not selection data. The
+held-out test is the final lockbox and may be opened only through the explicit
+standalone evaluator for an official-window run carrying a rule frozen on the
+internal folds. Campaign drivers cannot request validation or test rows.
+
+## Accepted model and trajectory contract
 
 - One shared per-instrument width-64 causal TCN.
 - Five-minute patches, 69 patches, kernel 3, dilations `(1, 2, 4, 8, 16, 32)`.
@@ -79,37 +87,48 @@ an explicit standalone held-out evaluation. The 2026-08-18 campaigns all record
 - Fixed context-plus-masked-equity-mean/dispersion gated fusion.
 - `WIN$` and equity `beta_to_WIN` masked; WDO, five DI contexts, ZT, and ZN active.
 - All three horizons trained jointly.
-- Accepted objective: soft Spearman, temperature 0.50.
+- Sole objective: soft Spearman, temperature 0.50.
 - Uniform training dates; SAM-AdamW rho 0.125; effective batch 512.
-- Maximum 20 epochs and three-epoch early stopping.
-- No peer/classification inputs and no cross-equity attention in the incumbent.
+- One fixed 20-epoch trajectory; no training-time early stopping.
+- Raw checkpoint and raw/EMA validation predictions every epoch.
+- EMA decays 0.98, 0.99, and 0.995.
+- Last-3/last-5 weight averages and raw-score prediction averages are constructed
+  without retraining.
+- Patience-3 and retrospective best epoch are diagnostic only.
+- No peer/classification inputs and no cross-equity attention.
 
 Hard Spearman is the primary selection metric. It is averaged across decisions
-within each date and horizon, then equally across validation dates and horizons.
+within each date and horizon, then equally across dates and horizons. Seed
+ensembles uniformly average tie-aware within-sample/horizon ranks and never fit
+ensemble weights.
 
 ## Current source-tree status
 
-The repository deliberately retains the exact rejected hybrid-loss and
-residual-attention experiment implementation at the 2026-08-18 snapshot. Therefore
-the generic training entry point currently describes that research candidate and
-is not the accepted incumbent command. See `RESEARCH_HANDOFF.md` before running or
-removing it. Historical runs remain reproducible through recorded commits and
-immutable manifests; current checkpoint loading is strict.
+`modeling.train` is the canonical soft-Spearman trajectory entry point.
+`modeling.run_discovery_campaign` runs exactly the two internal folds and seeds
+11/29/47, then freezes one deterministic trajectory rule using their mean
+three-seed ensemble IC. `modeling.analyze` strictly aligns observations and reports
+member/ensemble IC, seed diversity, ensemble gains, paired date deltas, moving
+block intervals at lengths 5 and 10, and horizon/time-of-day guardrails.
+
+`modeling.evaluate` restores held-out evaluation without exposing it to campaign
+drivers. It accepts only a completed official-window run with an internal-fold
+selection file recorded in its manifest.
 
 The old human-prior/peer, alternate model-family, routing, multiscale, attribution,
-probe, overlay, and V-numbered experiment systems were deleted. Do not recreate
-compatibility shims for them.
+probe, overlay, V-numbered, recency-weight, hybrid-loss, target-sidecar, and
+residual-attention experiment systems are not compatibility APIs. Historical
+reproduction uses their recorded commits and immutable artifacts.
 
 ## Environment and operations
 
 From the repository root:
 
-```powershell
-uv sync --project research --no-default-groups --group preprocessing
-uv run --project research python -m brazil_rv.preprocessing.build
-uv run --project research python -m pytest research/tests/test_modeling_training.py `
-  research/tests/test_modeling_data.py research/tests/test_intraday_normalization.py
-```
+    uv sync --project research --group dev
+    uv run --project research python -m brazil_rv.preprocessing.build
+    uv run --project research python -m brazil_rv.modeling.run_discovery_campaign --output-dir <new-campaign-directory>
+    uv run --project research python -m brazil_rv.modeling.train --selection-window official --selection-rule-file <trajectory-selection.json> --seed 11
+    uv run --project research python -m brazil_rv.modeling.evaluate --run-dir <completed-official-run-directory> --split test
 
 `ops/lambda-gh200.ps1` is the only Lambda watcher/launcher. Launch requires
 explicit billing acknowledgement, transfers a verified Git bundle, and leaves the

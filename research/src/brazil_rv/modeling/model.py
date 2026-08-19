@@ -11,7 +11,6 @@ from .contract import (
     STATE_TOKEN_SLOT,
     TARGETED_FUSION_GATE_BIAS,
     TCN_ARCHITECTURE,
-    TCN_ATTENTION_HEADS,
     TCNArchitecture,
 )
 from .layers import CausalTCNResidualBlock, MuonLinear
@@ -23,7 +22,6 @@ class SharedCausalTCN(nn.Module):
     def __init__(
         self,
         *,
-        cross_equity_attention: bool = False,
         architecture: TCNArchitecture = TCN_ARCHITECTURE,
         equity_count: int = EQUITY_COUNT,
     ) -> None:
@@ -49,16 +47,6 @@ class SharedCausalTCN(nn.Module):
         )
         self.slow_projection = nn.Linear(architecture.slow_width, width, bias=False)
         self.state_norm = nn.LayerNorm(width)
-        self.cross_equity_attention = cross_equity_attention
-        if cross_equity_attention:
-            self.attention_norm = nn.LayerNorm(width)
-            self.equity_attention = nn.MultiheadAttention(
-                width,
-                TCN_ATTENTION_HEADS,
-                dropout=0.0,
-                bias=False,
-                batch_first=True,
-            )
         self.fusion_input = nn.Linear(
             architecture.fusion_states * width,
             architecture.fusion_width,
@@ -72,8 +60,6 @@ class SharedCausalTCN(nn.Module):
         self.apply(self._initialize_module)
         nn.init.zeros_(self.fusion_gate.weight)
         nn.init.constant_(self.fusion_gate.bias, TARGETED_FUSION_GATE_BIAS)
-        if cross_equity_attention:
-            nn.init.zeros_(self.equity_attention.out_proj.weight)
 
     @staticmethod
     def _initialize_module(module: nn.Module) -> None:
@@ -127,32 +113,6 @@ class SharedCausalTCN(nn.Module):
         raw = self._gather_hidden_states(hidden, batch_size, state_position)
         return self.state_norm(raw + self.slow_projection(slow_features))
 
-    @staticmethod
-    def _specific_attention_states(
-        normalized: torch.Tensor, equity_mask: torch.Tensor
-    ) -> torch.Tensor:
-        weight = equity_mask[..., None].to(normalized.dtype)
-        count = weight.sum(dim=1, keepdim=True).clamp_min(1.0)
-        common = (normalized * weight).sum(dim=1, keepdim=True) / count
-        return (normalized - common) * weight
-
-    def _attend_equities(
-        self, states: torch.Tensor, equity_mask: torch.Tensor
-    ) -> torch.Tensor:
-        if not self.cross_equity_attention:
-            return states
-        normalized = self.attention_norm(states)
-        specific = self._specific_attention_states(normalized, equity_mask)
-        attended, _ = self.equity_attention(
-            specific,
-            specific,
-            specific,
-            key_padding_mask=~equity_mask,
-            need_weights=False,
-        )
-        output = states + self.dropout(attended)
-        return output * equity_mask[..., None].to(output.dtype)
-
     def _fuse(
         self,
         equity_states: torch.Tensor,
@@ -190,9 +150,7 @@ class SharedCausalTCN(nn.Module):
             patches, history_patch_mask, slow_features, state_position
         )
         equity_mask = instrument_mask[:, : self.equity_count]
-        equity_states = self._attend_equities(
-            states[:, : self.equity_count], equity_mask
-        )
+        equity_states = states[:, : self.equity_count]
         fused = self._fuse(
             equity_states,
             states[:, self.equity_count :],
@@ -203,8 +161,8 @@ class SharedCausalTCN(nn.Module):
         return predictions * equity_mask[..., None].to(predictions.dtype)
 
 
-def build_model(*, cross_equity_attention: bool = False) -> SharedCausalTCN:
-    return SharedCausalTCN(cross_equity_attention=cross_equity_attention)
+def build_model() -> SharedCausalTCN:
+    return SharedCausalTCN()
 
 
 def count_trainable_parameters(model: nn.Module) -> int:

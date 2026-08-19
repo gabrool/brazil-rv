@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -19,15 +20,6 @@ def average_ranks(values: NDArray[np.floating]) -> NDArray[np.float64]:
         ranks[order[start:end]] = 0.5 * (start + end - 1)
         start = end
     return ranks
-
-
-def _correlation(left: NDArray[np.floating], right: NDArray[np.floating]) -> float:
-    left_centered = left.astype(np.float64) - float(np.mean(left))
-    right_centered = right.astype(np.float64) - float(np.mean(right))
-    denominator = math.sqrt(float(np.sum(left_centered**2) * np.sum(right_centered**2)))
-    if denominator == 0.0:
-        return float("nan")
-    return float(np.sum(left_centered * right_centered) / denominator)
 
 
 def _rowwise_average_ranks(
@@ -86,6 +78,26 @@ def _metric_rows(
     return rows, mask
 
 
+def rank_average_predictions(
+    members: Sequence[NDArray[np.float32]],
+    label_mask: NDArray[np.bool_],
+) -> NDArray[np.float32]:
+    if not members:
+        raise ValueError("At least one ensemble member is required")
+    if any(member.shape != label_mask.shape for member in members):
+        raise ValueError("Ensemble prediction shapes differ from the label mask")
+    ranked = []
+    for member in members:
+        rows, mask = _metric_rows(member, label_mask)
+        ranked.append(_rowwise_average_ranks(rows, mask))
+    averaged = np.mean(np.stack(ranked), axis=0)
+    result = averaged.reshape(
+        label_mask.shape[0], label_mask.shape[2], label_mask.shape[1]
+    ).transpose(0, 2, 1)
+    result[~label_mask] = 0.0
+    return result.astype(np.float32)
+
+
 def sample_level_spearman_ic(
     predictions: NDArray[np.float32],
     targets: NDArray[np.float32],
@@ -113,7 +125,7 @@ def sample_level_ic(
     return spearman, pearson.reshape(predictions.shape[0], predictions.shape[2])
 
 
-def _mean(values: NDArray[np.float64]) -> float:
+def finite_mean(values: NDArray[np.float64]) -> float:
     finite = values[np.isfinite(values)]
     return float(np.mean(finite)) if finite.size else float("nan")
 
@@ -123,21 +135,39 @@ def _standard_deviation(values: NDArray[np.float64]) -> float:
     return float(np.std(finite, ddof=1)) if finite.size > 1 else float("nan")
 
 
-def _primary_score(spearman: NDArray[np.float64], date_idx: NDArray[np.int64]) -> float:
-    unique_dates = np.unique(date_idx)
-    horizon_means = [
-        _mean(
-            np.asarray(
-                [
-                    _mean(spearman[date_idx == date_value, horizon])
-                    for date_value in unique_dates
-                ],
-                dtype=np.float64,
-            )
-        )
-        for horizon in range(spearman.shape[1])
-    ]
-    return float(np.mean(horizon_means))
+def daily_horizon_ic(
+    sample_ic: NDArray[np.float64],
+    date_idx: NDArray[np.int64],
+) -> tuple[NDArray[np.int64], NDArray[np.float64]]:
+    dates = np.unique(date_idx)
+    values = np.asarray(
+        [
+            [
+                finite_mean(sample_ic[date_idx == date_value, horizon])
+                for horizon in range(sample_ic.shape[1])
+            ]
+            for date_value in dates
+        ],
+        dtype=np.float64,
+    )
+    return dates, values
+
+
+def primary_score_from_sample_ic(
+    sample_ic: NDArray[np.float64], date_idx: NDArray[np.int64]
+) -> float:
+    _, daily = daily_horizon_ic(sample_ic, date_idx)
+    return finite_mean(np.nanmean(daily, axis=0))
+
+
+def per_date_primary_ic(
+    sample_ic: NDArray[np.float64], date_idx: NDArray[np.int64]
+) -> tuple[NDArray[np.int64], NDArray[np.float64]]:
+    dates = np.unique(date_idx)
+    return dates, np.asarray(
+        [finite_mean(sample_ic[date_idx == value].ravel()) for value in dates],
+        dtype=np.float64,
+    )
 
 
 def primary_validation_score(
@@ -146,7 +176,7 @@ def primary_validation_score(
     label_mask: NDArray[np.bool_],
     date_idx: NDArray[np.int64],
 ) -> float:
-    return _primary_score(
+    return primary_score_from_sample_ic(
         sample_level_spearman_ic(predictions, targets, label_mask), date_idx
     )
 
@@ -224,23 +254,14 @@ def create_metric_table(
                 {
                     "date_idx": int(date_value),
                     "horizon_minutes": horizon_minutes,
-                    "spearman_ic": _mean(spearman[on_date, horizon_index]),
-                    "rank_target_pearson_ic": _mean(pearson[on_date, horizon_index]),
-                    "top_return": _mean(
-                        diagnostics["top_return"][on_date, horizon_index]
+                    "spearman_ic": finite_mean(spearman[on_date, horizon_index]),
+                    "rank_target_pearson_ic": finite_mean(
+                        pearson[on_date, horizon_index]
                     ),
-                    "bottom_return": _mean(
-                        diagnostics["bottom_return"][on_date, horizon_index]
-                    ),
-                    "top_minus_bottom": _mean(
-                        diagnostics["top_minus_bottom"][on_date, horizon_index]
-                    ),
-                    "long_only_top": _mean(
-                        diagnostics["long_only_top"][on_date, horizon_index]
-                    ),
-                    "one_way_turnover": _mean(
-                        diagnostics["one_way_turnover"][on_date, horizon_index]
-                    ),
+                    **{
+                        name: finite_mean(values[on_date, horizon_index])
+                        for name, values in diagnostics.items()
+                    },
                 }
             )
 
@@ -255,7 +276,7 @@ def create_metric_table(
         daily_pearson = np.asarray(
             [row["rank_target_pearson_ic"] for row in horizon_rows], dtype=np.float64
         )
-        mean_spearman = _mean(daily_spearman)
+        mean_spearman = finite_mean(daily_spearman)
         standard_deviation = _standard_deviation(daily_spearman)
         horizons.append(
             {
@@ -267,44 +288,21 @@ def create_metric_table(
                     if np.isfinite(standard_deviation) and standard_deviation > 0.0
                     else float("nan")
                 ),
-                "mean_daily_rank_target_pearson_ic": _mean(daily_pearson),
-                "mean_top_return": _mean(
-                    np.asarray(
-                        [row["top_return"] for row in horizon_rows],
-                        dtype=np.float64,
+                "mean_daily_rank_target_pearson_ic": finite_mean(daily_pearson),
+                **{
+                    f"mean_{name}": finite_mean(
+                        np.asarray(
+                            [row[name] for row in horizon_rows], dtype=np.float64
+                        )
                     )
-                ),
-                "mean_bottom_return": _mean(
-                    np.asarray(
-                        [row["bottom_return"] for row in horizon_rows],
-                        dtype=np.float64,
-                    )
-                ),
-                "mean_top_minus_bottom": _mean(
-                    np.asarray(
-                        [row["top_minus_bottom"] for row in horizon_rows],
-                        dtype=np.float64,
-                    )
-                ),
-                "mean_long_only_top": _mean(
-                    np.asarray(
-                        [row["long_only_top"] for row in horizon_rows],
-                        dtype=np.float64,
-                    )
-                ),
-                "mean_one_way_turnover": _mean(
-                    np.asarray(
-                        [row["one_way_turnover"] for row in horizon_rows],
-                        dtype=np.float64,
-                    )
-                ),
+                    for name in diagnostics
+                },
             }
         )
-    primary_score = _primary_score(spearman, date_idx)
     return (
         {
-            "primary_score": primary_score,
-            "mean_valid_sample_spearman_ic": _mean(spearman.ravel()),
+            "primary_score": primary_score_from_sample_ic(spearman, date_idx),
+            "mean_valid_sample_spearman_ic": finite_mean(spearman.ravel()),
             "horizons": horizons,
         },
         daily_rows,
@@ -334,8 +332,7 @@ def moving_block_bootstrap(
     indices = (starts[..., None] + np.arange(block_length, dtype=np.int64)).reshape(
         replications, -1
     )[:, :date_count]
-    sampled = values[indices]
-    replicated = np.nanmean(sampled, axis=1)
+    replicated = np.nanmean(values[indices], axis=1)
     return {
         "estimate": np.nanmean(values, axis=0),
         "lower_95": np.nanquantile(replicated, 0.025, axis=0),
