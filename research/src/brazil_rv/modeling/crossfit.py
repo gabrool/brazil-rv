@@ -34,6 +34,7 @@ from .metrics import (
     sample_level_spearman_ic,
 )
 from .model import build_model
+from .provenance import repository_commit
 from .trajectory import (
     ELIGIBLE_RULES,
     average_state_dicts,
@@ -106,7 +107,7 @@ def _member_name_and_fold(run_dir: Path) -> tuple[str, str]:
 
 
 def _extension_path(extension_dir: Path, run_dir: Path) -> Path:
-    return extension_dir / f"{run_dir.name}.npz"
+    return extension_dir / f"{run_dir.parent.name}_{run_dir.name}.npz"
 
 
 def load_trajectory_member(run_dir: Path, extension_dir: Path) -> TrajectoryMember:
@@ -410,6 +411,7 @@ def _materialize_extended_weight_predictions(
         {
             "schema": "TRAJECTORY_WEIGHT_AVERAGE_EXTENSION",
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "repository_commit": repository_commit(),
             "source_artifacts_mutated": False,
             "rules": list(EXTENDED_WEIGHT_RULES),
             "runs": manifest_rows,
@@ -456,6 +458,7 @@ def run_crossfit_analysis(
     report = {
         "schema": "TRAJECTORY_ODD_EVEN_CROSSFIT",
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "repository_commit": repository_commit(),
         "selected_rule": selected_rule,
         "selection_criterion": (
             "maximum mean of fold-A/fold-B bidirectional odd/even cross-fitted "
