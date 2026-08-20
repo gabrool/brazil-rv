@@ -25,7 +25,6 @@ from .contract import (
     VALIDATION_END,
 )
 from .data import (
-    auxiliary_target_identity,
     create_training_loaders,
     feature_store_identity,
     load_sample_index,
@@ -46,7 +45,7 @@ from .engine import (
     train_one_epoch,
     validation_primary_metric,
 )
-from .model import build_auxiliary_model, build_model, count_trainable_parameters
+from .model import build_model, count_trainable_parameters
 from .optim import build_optimizer, build_scheduler
 from .provenance import build_run_provenance, repository_commit
 from .trajectory import (
@@ -125,9 +124,7 @@ def _selection_metadata(path: Path | None, window: str) -> dict[str, object] | N
     if path is None:
         return None
     if window != "official":
-        raise ValueError(
-            "A frozen selection rule may be applied only to an official run"
-        )
+        raise ValueError("A frozen selection rule may be applied only to an official run")
     selection = load_frozen_selection(path)
     return {
         "selected_rule": selection["selected_rule"],
@@ -187,14 +184,7 @@ def run_training(
     selection_window: str,
     run_dir: Path,
     selection_rule_file: Path | None = None,
-    auxiliary_variant: str | None = None,
-    auxiliary_target_dir: Path | None = None,
-    auxiliary_identity_value: Mapping[str, object] | None = None,
 ) -> Path:
-    if (auxiliary_variant is None) != (auxiliary_target_dir is None):
-        raise ValueError(
-            "Auxiliary variant and target sidecar must be provided together"
-        )
     if run_dir.exists():
         raise FileExistsError(run_dir)
     run_dir.mkdir(parents=True)
@@ -208,34 +198,14 @@ def run_training(
     )
     frozen_selection = _selection_metadata(selection_rule_file, selection_window)
     store_identity = feature_store_identity(store)
-    auxiliary_identity = None
-    if auxiliary_target_dir is not None:
-        auxiliary_identity = (
-            dict(auxiliary_identity_value)
-            if auxiliary_identity_value is not None
-            else auxiliary_target_identity(auxiliary_target_dir, store_identity)
-        )
-        if (
-            Path(str(auxiliary_identity.get("path"))).resolve()
-            != auxiliary_target_dir.resolve()
-            or auxiliary_identity.get("source_feature_store") != store_identity
-        ):
-            raise ValueError(
-                "Provided auxiliary-target identity does not match the run"
-            )
     train_loader, validation_loader, sampler = create_training_loaders(
         store,
         train_rows,
         validation_rows,
         GH200_RUNTIME,
         seed,
-        auxiliary_target_dir=auxiliary_target_dir,
     )
-    model = (
-        build_model()
-        if auxiliary_variant is None
-        else build_auxiliary_model(auxiliary_variant)
-    ).cuda()
+    model = build_model().cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
     parameter_count = count_trainable_parameters(model)
     optimizer, _ = build_optimizer(model)
@@ -255,9 +225,6 @@ def run_training(
         parameter_count=parameter_count,
         training_sample_count=train_rows.height,
         date_replacement=sampler.replace_dates,
-        auxiliary_variant=auxiliary_variant,
-        auxiliary_target_identity=auxiliary_identity,
-        objective=objective_metadata(auxiliary_variant),
     )
     recorded_training = run_provenance["training"]
     if (
@@ -283,12 +250,7 @@ def run_training(
         "seed": seed,
         "model": run_provenance["model"],
         "parameter_count": parameter_count,
-        "objective": objective_metadata(auxiliary_variant),
-        **(
-            {"auxiliary_target_identity": auxiliary_identity}
-            if auxiliary_identity is not None
-            else {}
-        ),
+        "objective": objective_metadata(),
         "optimizer": "sam_adamw",
         "sam": sam_metadata(),
         "training": recorded_training,
@@ -296,7 +258,7 @@ def run_training(
     }
     _atomic_json(run_dir / "run_manifest.json", manifest)
     compiled_model = compile_model(model)
-    compiled_objective = compile_training_objective(auxiliary_variant=auxiliary_variant)
+    compiled_objective = compile_training_objective()
     history: list[dict[str, object]] = []
     raw_scores: list[float] = []
     raw_prediction_tail: list[np.ndarray] = []
@@ -320,7 +282,6 @@ def run_training(
                 GH200_RUNTIME,
                 compiled_objective,
                 after_update=update_emas,
-                auxiliary_variant=auxiliary_variant,
             )
             training_seconds = time.perf_counter() - training_started
             validation_started = time.perf_counter()
@@ -336,7 +297,9 @@ def run_training(
             raw_prediction_tail = raw_prediction_tail[-5:]
             raw_scores.append(scores["raw"])
             _atomic_npz(
-                run_dir / "validation_predictions" / f"epoch_{epoch:02d}.npz",
+                run_dir
+                / "validation_predictions"
+                / f"epoch_{epoch:02d}.npz",
                 predictions,
             )
             _atomic_torch_save(
@@ -349,8 +312,6 @@ def run_training(
                     validation_scores=scores,
                     feature_store=store,
                     run_provenance=run_provenance,
-                    auxiliary_variant=auxiliary_variant,
-                    auxiliary_target_identity=auxiliary_identity,
                 ),
             )
             row = {
@@ -458,7 +419,10 @@ def run_training(
 
 def _run(args: argparse.Namespace) -> Path:
     created_at = datetime.now(timezone.utc)
-    name = f"tcn_{args.selection_window}_seed{args.seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
+    name = (
+        f"tcn_{args.selection_window}_seed{args.seed}_"
+        f"{created_at:%Y%m%dT%H%M%S%fZ}"
+    )
     return run_training(
         store=resolve_feature_store(),
         seed=args.seed,

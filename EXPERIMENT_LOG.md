@@ -645,3 +645,209 @@ current HEAD; reproduction uses the commits and immutable artifact:
 
 The completed manifest records 120 checkpoints, exact commit `b8d955a`,
 `official_validation_accessed=false`, and `test_accessed=false`.
+
+## Experiment 11 — Phase B immutable auxiliary-target sidecar
+
+Purpose: implement and audit the target-decomposition contract before any GPU
+training. This sidecar was separate from the canonical feature store and was
+never required by ordinary parent training or evaluation.
+
+### Contract
+
+- Implementation commits: `a04d63e` with the validation-truncation correction in
+  `15471e8`.
+- Causal beta: stored pre-neutralization `beta_to_WIN`, emitted before the daily
+  beta update.
+- Market component: the exact future WIN return from decision-bar open to the
+  same close endpoint used by the equity label.
+- Endpoint rule: both exact WIN endpoints must be observed; stale prices are not
+  accepted.
+- Residual: `equity_return - beta_to_WIN * WIN_return`, cross-sectionally
+  median-centered, divided by the existing causal volatility scale times the
+  square root of the horizon, then cross-sectional tie-aware midranked.
+- Sign target: whether the equity return is above the contemporaneous
+  cross-sectional median.
+- Magnitude target: absolute median-centered return divided by the existing
+  causal volatility scale times the square root of the horizon.
+- Ordinary feature/label arrays were not mutated. The official model head and
+  main soft-Spearman target were unchanged.
+
+### Training-scope audit
+
+The audit used only the 716 training dates, 2021-08-16 through 2024-06-28.
+
+| Horizon | Main labels | Beta coverage | Exact WIN endpoint | Matched residual | Residual/main rank corr. | Mean absolute rank shift | Factor/main RMS | Positive sign rate | Mean magnitude |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 30m | 4,916,832 | 0.998564 | 0.999974 | 0.998538 | 0.960993 | 0.093272 | 0.567132 | 0.483645 | 0.503436 |
+| 60m | 4,921,547 | 0.998564 | 0.999974 | 0.998538 | 0.960573 | 0.093347 | 0.573532 | 0.489913 | 0.480353 |
+| 120m | 4,935,876 | 0.998567 | 0.999948 | 0.998515 | 0.959743 | 0.094033 | 0.581310 | 0.493688 | 0.448421 |
+
+Mutation tests passed for post-exit invariance, exact-exit sensitivity, missing
+endpoint masking, and beta emit-before-update. The audit SHA-256 is
+`a2f1ef5cbc6fd3c293d6da8e2ded6f873bc9183fe3ba353a8a6d3d55766fb6c5`.
+The immutable sidecar is:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/auxiliary_targets/phase_b_aux_15471e8_20260820T141500Z`
+
+Its manifest records `official_validation_evaluated=false` and
+`test_accessed=false`.
+
+## Experiment 12 — Phase B auxiliary-target trajectories
+
+Purpose: test residual-rank, sign, magnitude, and combined auxiliary supervision
+both as standalone models and as diversity members.
+
+### Settings
+
+- Runnable campaign commit: `6b7b121adf465327dd17ca87c436fe9033fa7686`.
+- Discovery folds: Fold A fit first 512 training dates and selected on the next
+  102; Fold B fit first 614 and selected on the final 102. The selection periods
+  do not overlap.
+- Seeds: 11, 29, and 47.
+- Training: one fixed 20-epoch SAM trajectory per fold/seed/candidate with the
+  canonical optimizer, schedule, sampler, and parent RNG initialization.
+- Matrix: four candidates times two folds times three seeds, 24 trajectories and
+  480 raw checkpoint files.
+- Main loss: canonical soft Spearman, unchanged.
+- Single auxiliary: total weight 0.5. Residual used soft Spearman; sign used
+  binary cross-entropy with logits; magnitude used smooth L1.
+- Combined bundle: equal mean of the three auxiliary losses with the same fixed
+  total weight 0.5, not three separately weighted losses.
+- Auxiliary heads: zero-initialized weights and biases; construction preserved
+  the parent RNG stream and base-module initialization.
+- Primary readout: separately replayed odd/even cross-fitted Raw Patience-3.
+- Free secondary readout: fixed final-epoch EMA-0.995.
+- Ensembles: uniform within-sample/horizon tie-aware ranks. No weights were
+  learned. Each candidate was measured standalone, parent-3 plus candidate-3,
+  and parent-3 plus Phase-A multi-depth-3 plus candidate-3.
+- Inference: paired per-date candidate-minus-parent IC with 10,000-replicate
+  moving-block bootstrap at lengths 5 and 10, plus horizon and TOD guardrails.
+- Official validation and held-out test: not accessed.
+
+### Standalone results
+
+| Candidate | Raw Patience Fold A | Raw Patience Fold B | Primary mean | EMA Fold A | EMA Fold B | EMA mean |
+|---|---:|---:|---:|---:|---:|---:|
+| Residual rank | +0.000418 | -0.001669 | -0.000625 | +0.001439 | +0.000988 | +0.001214 |
+| Sign | -0.000936 | -0.000028 | -0.000482 | -0.000143 | +0.000201 | +0.000029 |
+| Magnitude | -0.003143 | -0.002054 | -0.002599 | -0.003219 | +0.000101 | -0.001559 |
+| Combined bundle | -0.000641 | -0.000061 | -0.000351 | +0.001055 | +0.001382 | +0.001218 |
+
+Residual-rank Fold B was negative with block-5 95% interval
+`[-0.002757, -0.000101]` and block-10 interval
+`[-0.002260, -0.000286]`. Magnitude Fold A was also negative with intervals
+`[-0.005935, -0.000331]` and `[-0.005508, -0.000627]`. Sign and combined were
+null. No primary candidate improved both folds, so the EMA-positive residual and
+combined patterns were retained only as the predeclared secondary readout and
+could not change selection.
+
+### Diversity results
+
+| Candidate members | Raw parent+candidate mean delta | Raw full-stack mean delta | EMA parent+candidate mean delta | EMA full-stack mean delta |
+|---|---:|---:|---:|---:|
+| Residual rank | -0.000082 | +0.000620 | +0.000892 | +0.002108 |
+| Sign | -0.000193 | +0.000557 | +0.000029 | +0.001569 |
+| Magnitude | -0.000415 | +0.000452 | +0.000288 | +0.001811 |
+| Combined bundle | -0.000029 | +0.000695 | +0.000849 | +0.002046 |
+
+The pre-existing Phase-A parent+multi-depth baseline was `+0.000761` on the raw
+primary readout. No Phase B full stack exceeded it and added value on both folds;
+therefore no Phase B member was retained. Magnitude generated the most diversity
+but lost too much standalone quality. The conditional common-component head and
+recombination diagnostic were correctly skipped because residual rank did not win
+the primary discovery screen.
+
+The completed campaign is:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_b_6b7b121_20260820T145500Z`
+
+All 24 trajectories and 52 analysis reports completed. The campaign manifest and
+selection file record `official_validation_accessed=false` and
+`test_accessed=false`.
+
+## Experiment 13 — Three-epoch recency fine-tuning
+
+Purpose: test one, two, and three recent-window epochs and the 50/50 full-history
+plus fine-tuned rank ensemble from one trajectory per seed/fold/direction.
+
+### Settings
+
+- Source: the unchanged full-history parent. No auxiliary model qualified on both
+  folds.
+- Recent window: most recent 120 dates of each fit window.
+- Learning rate: `0.00003`, one tenth of the parent rate.
+- Epochs: three, saving after epochs 1, 2, and 3.
+- Honest evaluation: select the source Raw Patience-3 checkpoint on one date
+  parity, fine-tune it, and evaluate on the opposite parity; run both directions.
+- Matrix: two folds times three seeds times two directions times three epochs,
+  36 checkpoints.
+- Comparisons: fine-tuned model alone and a fixed 50/50 rank ensemble with its
+  full-history source.
+- Official validation and held-out test: not accessed.
+
+| Epoch | Fine-only Fold A / Fold B / mean | 50/50 Fold A / Fold B / mean |
+|---:|---|---|
+| 1 | -0.001260 / +0.001500 / +0.000120 | -0.000543 / +0.000882 / +0.000169 |
+| 2 | -0.002511 / +0.002299 / -0.000106 | -0.001030 / +0.001544 / +0.000257 |
+| 3 | -0.002737 / +0.002844 / +0.000053 | -0.000930 / +0.001843 / +0.000457 |
+
+Every rule showed the same Fold-A-down/Fold-B-up split. For the nominal best,
+the epoch-3 50/50 ensemble, Fold A's block-10 interval was
+`[-0.001686, -0.000320]` while Fold B's was `[+0.000412, +0.003094]`.
+The predeclared both-fold guardrail therefore selected `full_history`; no recency
+checkpoint or ensemble was retained. The completed recency manifest and analysis
+live inside the Experiment 12 campaign directory and record
+`official_validation_accessed=false` and `test_accessed=false`.
+
+## Experiment 14 — Sparse official confirmation of the final stage recipe
+
+Purpose: after Phase B concluded, spend one official-validation read on the only
+remaining stage-level recipe: the three parent members plus the three Phase-A
+multi-depth diversity members. No Phase B member or recency model qualified.
+
+### Settings
+
+- Multi-depth implementation: immutable commit `732b1b0`.
+- Frozen selection rule: Raw Patience-3 from
+  `trajectory_crossfit_3054228_20260819T161200Z/trajectory_selection.json`.
+- Multi-depth training: all 716 training dates, seeds 11/29/47, fixed 20-epoch
+  trajectories, 60 checkpoints total.
+- Parent comparator: the three matched official parent-reproduction runs from
+  Experiment 1.
+- Candidate: uniform rank average of parent-3 plus multi-depth-3. Comparator:
+  uniform rank average of parent-3. No learned weights.
+- Manual validation-only analyzer commit: `e33a122`; it exposed no test selector,
+  required exactly the three allowed seeds and 244 validation dates, and verified
+  completed manifests, feature-store identity, frozen rule, and test-clean flags.
+
+### Result
+
+| Recipe | Official validation IC |
+|---|---:|
+| Parent three-seed ensemble | 0.041639843 |
+| Parent-3 + multi-depth-3 | 0.040495819 |
+| Candidate minus parent | -0.001144024 |
+
+The paired block-5 95% interval was `[-0.002990, +0.000614]`; block-10 was
+`[-0.003185, +0.000623]`. Horizon deltas were
+`-0.000135/-0.001324/-0.001974` at 30/60/120 minutes. TOD deltas ranged
+`[-0.006786, +0.002753]`. The six-member ensemble gained more over its mean member
+than the parent ensemble (`+0.002075` versus `+0.001334`), but the multi-depth
+members were only `0.036006-0.037464` IC versus parent members
+`0.038464-0.041978`; diversity could not compensate for lower quality.
+
+### Final Phase B decision
+
+Reject the Phase-A six-member recipe on official validation. Retain the
+three-seed parent with Raw Patience-3 as the sole canonical recipe. Do not open the
+held-out test for this rejected stage. Official validation is consumed/closed
+again; `test_accessed=false` throughout.
+
+Official training and comparison artifacts are:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_official_732b1b0_20260820T201500Z`
+
+Deletion-first cleanup removed the rejected Phase B sidecar/training/recency
+plumbing, auxiliary heads, one-use official-confirmation driver, and specific
+tests from current HEAD. Exact reproduction remains in commits
+`a04d63e`, `15471e8`, `6b7b121`, `e33a122`, and the immutable NFS artifacts.

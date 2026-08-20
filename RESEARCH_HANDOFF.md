@@ -603,3 +603,98 @@ The paid instance for these follow-ups was
 the instance entered `terminating`, and a subsequent provider inventory query
 confirmed that the exact ID was absent. Persistent experiment artifacts remain
 on the attached NFS volume.
+
+## Completed Phase B target decomposition and adaptation (2026-08-20)
+
+Phase B is complete and produced no recipe change. The three-seed parent with
+Raw Patience-3 remains canonical; official validation is closed again and the
+held-out test is untouched.
+
+### Auxiliary-target audit
+
+Commits `a04d63e`/`15471e8` built an immutable sidecar from causal
+pre-neutralization `beta_to_WIN`, exact decision-open-to-label-close WIN returns,
+explicit observed endpoint masks, and no stale prices. Residual returns were
+`r_i - beta_i r_WIN`, then median-centered, normalized by the existing causal
+volatility scale and horizon, and cross-sectionally midranked. Sign was relative
+to the cross-sectional median; magnitude was absolute normalized return.
+
+Across the 716 training dates, beta coverage was 0.998564-0.998567, exact WIN
+endpoint coverage was 0.999948-0.999974, residual/main rank correlation was
+0.959743-0.960993, and mean absolute rank shift was 0.093272-0.094033. Mutation
+tests passed for future invariance, exact-exit sensitivity, endpoint masking, and
+beta emit-before-update. Audit hash:
+
+    a2f1ef5cbc6fd3c293d6da8e2ded6f873bc9183fe3ba353a8a6d3d55766fb6c5
+
+Sidecar:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/auxiliary_targets/phase_b_aux_15471e8_20260820T141500Z
+
+### Main auxiliary campaign
+
+Commit `6b7b121` ran residual-rank, sign, magnitude, and combined supervision on
+Fold A/Fold B, seeds 11/29/47, fixed 20-epoch SAM trajectories: 24 trajectories
+and 480 checkpoints. The main target/head stayed canonical. Single auxiliary
+losses had weight 0.5; combined used the equal mean of all three with the same
+fixed total weight. Raw odd/even cross-fitted Patience-3 was primary and final
+EMA-0.995 was the free secondary readout.
+
+| Candidate | Primary Fold A / Fold B / mean | EMA Fold A / Fold B / mean |
+|---|---|---|
+| Residual rank | +.000418 / -.001669 / -.000625 | +.001439 / +.000988 / +.001214 |
+| Sign | -.000936 / -.000028 / -.000482 | -.000143 / +.000201 / +.000029 |
+| Magnitude | -.003143 / -.002054 / -.002599 | -.003219 / +.000101 / -.001559 |
+| Combined | -.000641 / -.000061 / -.000351 | +.001055 / +.001382 / +.001218 |
+
+No primary candidate improved both folds. Residual Fold B and magnitude Fold A
+had block-5/10 intervals excluding zero on the negative side. The EMA residual
+and combined effects were secondary-only and did not override the primary rule.
+No candidate improved the parent+Phase-A stack on both folds; the conditional
+common-component head was skipped because residual rank did not win.
+
+Campaign:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_b_6b7b121_20260820T145500Z
+
+### Recency fine-tuning
+
+Because no auxiliary qualified, recency started from the parent. Each fold/seed
+and odd/even direction used the latest 120 fit dates, learning rate `3e-5`, and
+one three-epoch trajectory. This produced 36 checkpoints and honestly compared
+epochs 1/2/3 plus fixed 50/50 full-history/fine-tuned rank ensembles out of half.
+The nominal best was the epoch-3 50/50 ensemble: Fold A `-0.000930`, Fold B
+`+0.001843`, mean `+0.000457`. Fold A's block-10 interval was wholly negative
+while Fold B's was wholly positive. The both-fold guardrail selected
+`full_history`; no recency state was retained.
+
+### Sparse official confirmation
+
+After Phase B, the sole stage finalist remained Phase-A parent-3 plus
+multi-depth-3. Three full-history multi-depth trajectories were run from commit
+`732b1b0` with the frozen Raw Patience-3 rule, then the validation-only analyzer
+from `e33a122` compared their uniform six-member rank pool with the matched
+parent-3 reproduction.
+
+| Recipe | Official validation IC |
+|---|---:|
+| Parent-3 | 0.041639843 |
+| Parent-3 + multi-depth-3 | 0.040495819 |
+| Delta | -0.001144024 |
+
+Block-5 95% was `[-0.002990, +0.000614]`; block-10 was
+`[-0.003185, +0.000623]`. All 30/60/120-minute deltas were negative. Reject the
+six-member recipe; diversity did not compensate for weaker multi-depth members.
+Do not evaluate this rejected stage on held-out test.
+
+Official artifacts:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_official_732b1b0_20260820T201500Z
+
+The sidecar, discovery campaign, recency manifest, official runs, and confirmation
+all preserve exact results. Deletion-first cleanup restored canonical source and
+tests byte-for-byte to pre-Phase-B commit `2c4897c`; rejected auxiliary, recency,
+and one-use confirmation code is reproduced through commits `a04d63e`,
+`15471e8`, `6b7b121`, and `e33a122`, not compatibility branches. The main Linux
+suite passed 191/191 on the exact Phase B implementation; local Windows passed
+190 with only the policy-blocked compile test deselected.

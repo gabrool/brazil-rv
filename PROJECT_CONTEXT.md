@@ -262,3 +262,47 @@ experiments. The rejected corrected-adapter code was deleted from current HEAD.
 The canonical analyzer now permits candidate and parent ensembles with different
 member counts while preserving strict observation alignment and uniform ranks.
 Neither follow-up accessed official validation or the held-out test.
+
+## Phase B target-decomposition decision (2026-08-20)
+
+An immutable auxiliary-target sidecar was audited before training. It used stored
+causal pre-neutralization `beta_to_WIN`, exact WIN decision-open-to-label-close
+returns with observed endpoint masks, and no stale prices. Residual returns were
+factor-neutralized, median-centered, normalized with the existing causal
+volatility contract, and cross-sectionally midranked. Beta and exact WIN endpoint
+coverage both exceeded 0.9985 across all horizons; mutation-based causality tests
+passed. The immutable sidecar is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/auxiliary_targets/phase_b_aux_15471e8_20260820T141500Z
+
+Residual-rank, sign, magnitude, and combined auxiliary supervision were screened
+on both internal folds with seeds 11/29/47 and 20-epoch trajectories. Primary
+mean candidate-minus-parent IC was `-0.000625`, `-0.000482`, `-0.002599`, and
+`-0.000351`, respectively. No primary candidate improved both folds, and no
+Phase B member improved the existing Phase-A diversity stack on both folds. The
+EMA-positive residual/combined secondary readouts did not override the frozen
+Raw Patience-3 primary. Therefore the conditional common-component head was not
+run. The completed 480-checkpoint campaign is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_b_6b7b121_20260820T145500Z
+
+The parent then received one three-epoch, latest-120-date, learning-rate-divided-
+by-ten recency trajectory per fold/seed/direction. The best average candidate was
+the epoch-3 50/50 full/fine rank ensemble at `+0.000457`, but it was
+`-0.000930` on Fold A and `+0.001843` on Fold B. The both-fold guardrail retained
+full history.
+
+After Phase B, the only stage finalist was the prior parent-3 plus Phase-A
+multi-depth-3 diversity pool. Its one sparse official-validation confirmation
+scored `0.040495819` versus parent-3 `0.041639843`, delta `-0.001144024`;
+30/60/120-minute deltas were all negative. Reject the six-member pool. The sole
+canonical recipe remains the three-seed parent with Raw Patience-3. Official
+validation is closed again, and the held-out test has never been accessed.
+Official artifacts are:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_official_732b1b0_20260820T201500Z
+
+Rejected Phase B sidecar/training/recency plumbing and the one-use confirmation
+driver were deleted from current HEAD. Reproduction is through commits
+`a04d63e`, `15471e8`, `6b7b121`, `e33a122`, and immutable artifacts, not
+compatibility code.
