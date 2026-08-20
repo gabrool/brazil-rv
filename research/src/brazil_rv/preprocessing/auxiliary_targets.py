@@ -322,7 +322,11 @@ def build_auxiliary_target_sidecar(store: Path, output_dir: Path) -> Path:
     assignments = load_assignments(assignments_dir)
     security_ids = tuple(assignments.get_column("security_id").to_list())
     market_dates, assignment_dates = load_market_dates_and_security_dates(
-        cotahist_files(cotahist_dir), security_ids, research_start, through
+        cotahist_files(cotahist_dir),
+        security_ids,
+        research_start,
+        through,
+        allow_empty_security_dates=True,
     )
     validate_source_date_isolation(assignments, assignment_dates)
     date_index = (
