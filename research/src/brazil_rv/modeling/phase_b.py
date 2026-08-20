@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing as mp
 import os
 from collections.abc import Mapping
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +29,7 @@ from .trajectory import predictions_for_rule, simulate_patience3
 DISCOVERY_FOLDS = ("fold_a", "fold_b")
 PHASE_B_READOUTS = ("patience3_raw", "final_ema_0995")
 PHASE_A_DIVERSITY_VARIANT = "multi_depth_stats"
+MAX_PARALLEL_PROCESSES = 2
 
 
 def _atomic_json(path: Path, value: Mapping[str, object]) -> None:
@@ -49,6 +52,28 @@ def _phase_a_run(phase_a_campaign: Path, fold: str, seed: int) -> Path:
 
 def _candidate_run(output_dir: Path, variant: str, fold: str, seed: int) -> Path:
     return output_dir / "runs" / variant / fold / f"seed_{seed}"
+
+
+def _run_candidate_job(
+    store: Path,
+    auxiliary_target_dir: Path,
+    output_dir: Path,
+    sidecar_identity: dict[str, object],
+    variant: str,
+    fold: str,
+    seed: int,
+) -> str:
+    run_dir = _candidate_run(output_dir, variant, fold, seed)
+    run_training(
+        store=store,
+        seed=seed,
+        selection_window=fold,
+        run_dir=run_dir,
+        auxiliary_variant=variant,
+        auxiliary_target_dir=auxiliary_target_dir,
+        auxiliary_identity_value=sidecar_identity,
+    )
+    return str(run_dir)
 
 
 def _validate_source_campaigns(
@@ -492,8 +517,12 @@ def run_phase_b_campaign(
     parent_campaign: Path,
     phase_a_campaign: Path,
     output_dir: Path,
+    *,
+    parallel_processes: int = 1,
 ) -> Path:
     commit = repository_commit()
+    if not 1 <= parallel_processes <= MAX_PARALLEL_PROCESSES:
+        raise ValueError("Phase B supports one or two isolated trajectory processes")
     store_identity = feature_store_identity(store)
     sidecar_identity = auxiliary_target_identity(auxiliary_target_dir, store_identity)
     _validate_source_campaigns(
@@ -518,6 +547,7 @@ def run_phase_b_campaign(
         "readouts": list(PHASE_B_READOUTS),
         "ensemble_weights_learned": False,
         "official_validation_accessed": False,
+        "parallel_processes": parallel_processes,
         "test_accessed": False,
     }
     created_at = datetime.now(timezone.utc).isoformat()
@@ -531,6 +561,7 @@ def run_phase_b_campaign(
         {**immutable, "status": "running", "created_at": created_at},
     )
 
+    pending = []
     for variant in PHASE_B_AUXILIARY_VARIANTS:
         for fold in DISCOVERY_FOLDS:
             for seed in ALLOWED_SEEDS:
@@ -548,15 +579,28 @@ def run_phase_b_campaign(
                     ):
                         raise ValueError(f"Existing Phase B run differs: {run_dir}")
                 else:
-                    run_training(
-                        store=store,
-                        seed=seed,
-                        selection_window=fold,
-                        run_dir=run_dir,
-                        auxiliary_variant=variant,
-                        auxiliary_target_dir=auxiliary_target_dir,
-                        auxiliary_identity_value=sidecar_identity,
+                    pending.append(
+                        (
+                            store,
+                            auxiliary_target_dir,
+                            output_dir,
+                            dict(sidecar_identity),
+                            variant,
+                            fold,
+                            seed,
+                        )
                     )
+    if parallel_processes == 1:
+        for job in pending:
+            print(_run_candidate_job(*job), flush=True)
+    else:
+        with ProcessPoolExecutor(
+            max_workers=parallel_processes,
+            mp_context=mp.get_context("spawn"),
+        ) as executor:
+            futures = [executor.submit(_run_candidate_job, *job) for job in pending]
+            for future in as_completed(futures):
+                print(future.result(), flush=True)
 
     phase_a_baseline = _analyze_phase_a_baseline(
         output_dir, parent_campaign, phase_a_campaign
@@ -592,6 +636,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--parent-campaign", required=True, type=Path)
     parser.add_argument("--phase-a-campaign", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--parallel-processes", type=int, default=1)
     return parser.parse_args()
 
 
@@ -604,6 +649,7 @@ def main() -> None:
             args.parent_campaign,
             args.phase_a_campaign,
             args.output_dir,
+            parallel_processes=args.parallel_processes,
         )
     )
 
