@@ -221,3 +221,44 @@ Its manifest records `official_validation_accessed=false` and
 removed from current HEAD. Reproduction is through commit `732b1b0` and the
 immutable artifacts, not compatibility branches. The general strict
 observation-level measurement layer remains canonical.
+
+## Phase A autopsy and diversity follow-up (2026-08-20)
+
+Checkpoint autopsy disproved the hypothesis that the historical decision-time and
+learned-set paths were dead. Decision-time final-projection norms reached
+`0.319-0.355`; learned-set final-projection norms reached `0.490-1.107`, and its
+standard-initialized `phi` weights moved materially. Learned set already entered
+the incumbent nonlinear shared fusion with only its final projection zeroed.
+Their prediction ranks nevertheless remained above 0.9991 correlated with the
+matched parent, so both were active but rank-ineffective.
+
+A no-training uniform-rank reanalysis pooled the three parent members with the
+three decorrelated multi-depth members. Under cross-fitted raw Patience-3 it added
+`+0.001237` on Fold A and `+0.000284` on Fold B, mean `+0.000761`. The same
+six-member pool added mean `+0.001651` under final EMA-0.995. Adding the three
+temporal-statistics members diluted both readouts. All block-bootstrap intervals
+included zero, so parent+multi-depth is retained only as the one Phase A
+diversity-ensemble candidate eligible for sparse official-validation confirmation;
+it is not yet a canonical lockbox recipe and no ensemble weights may be learned.
+The immutable reanalysis is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_autopsy_d237998_20260820T111500Z
+
+The remaining decision-time routing objection was then tested directly. A
+standard-initialized width-16 decision embedding fed a zero-only final projection
+into the existing shared nonlinear fusion, and candidate construction preserved
+the parent's RNG stream exactly. A 10-step soft-Spearman assertion confirmed that
+both the final projection and upstream embedding moved. Across two folds and
+three seeds, cross-fitted Patience candidate-minus-parent IC was
+`-0.000001`/`-0.000009`, mean `-0.000005`; EMA-0.995 mean delta was
+`-0.000001`. Final adapter norms ranged `0.299-0.992`. This is a conclusive active
+null, so decision-time embedding is closed and must not consume official
+validation. Exact reproduction uses commits `9828f72`/`b8d955a` and:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/decision_time_fusion_b8d955a_20260820T113924Z
+
+Raw Patience-3 on the parent architecture remains the canonical base for future
+experiments. The rejected corrected-adapter code was deleted from current HEAD.
+The canonical analyzer now permits candidate and parent ensembles with different
+member counts while preserving strict observation alignment and uniform ranks.
+Neither follow-up accessed official validation or the held-out test.

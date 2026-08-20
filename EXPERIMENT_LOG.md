@@ -519,3 +519,129 @@ a fresh isolated `uv` environment. The deletion-first model/training files were
 therefore also byte-compared with the previously tested parent and matched exactly;
 the retained analyzer matched the 192-test-passing campaign commit exactly. Re-run
 the full suite after the machine policy is cleared.
+
+## Experiment 9 — Phase A adapter autopsy and diversity ensembles
+
+Purpose: test the claim that the near-zero decision-time and learned-set results
+came from dead zero-start paths, and test whether the decorrelated multi-depth
+members add value when uniformly pooled with the parent. This used only saved
+checkpoints and predictions; there was no training.
+
+### Settings
+
+- Source parent: `trajectory_discovery_e22dd67_20260819T134332Z`
+- Source Phase A campaign: `phase_a_732b1b0_20260819T180348Z`
+- Folds and seeds: Fold A/Fold B and seeds 11/29/47
+- Primary readout: separately replayed odd/even cross-fitted `patience3_raw`
+- Secondary readout: fixed final-epoch EMA-0.995
+- Candidate ensembles: uniform within-sample/horizon tie-aware rank average of
+  parent-3 plus multi-depth-3 (six members), and parent-3 plus multi-depth-3 plus
+  temporal-stats-3 (nine members)
+- Parent comparator: the original parent three-member rank ensemble
+- Learned ensemble weights: none
+- Paired inference: candidate-minus-parent daily IC, 10,000-replicate moving-block
+  bootstrap at block lengths 5 and 10, with horizon and TOD guardrails
+- Official validation and held-out test access: none
+
+### Adapter autopsy
+
+The proposed double-zero dead-lock did not occur. In the historical code, learned
+set `phi` was standard-initialized and only its final projection was zeroed; its
+pooled value already entered the existing nonlinear shared fusion. Both candidate
+paths learned substantially:
+
+| Path | Epoch-20 final-projection L2 range | Epoch-1-to-20 delta-norm range | Prediction Spearman vs matched parent |
+|---|---:|---:|---:|
+| Decision-time state adapter | 0.319-0.355 | 0.314-0.356 | 0.999134-0.999440 |
+| Learned-set final projection | 0.490-1.107 | 0.487-1.105 | 0.999626-0.999890 |
+
+Learned-set `phi` weights also moved materially. Raw-prediction RMSE relative to
+the parent prediction standard deviation was about 3.6%-7.6% for decision time
+and 2.1%-4.1% for learned set. The paths were active, but their rank-relevant
+effects were tiny.
+
+### Diversity-ensemble results
+
+| Readout and ensemble | Fold A delta | Block-5 95% | Block-10 95% | Fold B delta | Block-5 95% | Block-10 95% | Mean delta |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Patience: parent + multi-depth | +0.001236751 | [-0.000263872, 0.003034151] | [-0.000389246, 0.003377175] | +0.000284322 | [-0.001438356, 0.001526562] | [-0.001402278, 0.001524120] | +0.000760536 |
+| Patience: parent + multi-depth + temporal | +0.000942357 | [-0.000448536, 0.002593614] | [-0.000558944, 0.002855912] | +0.000229962 | [-0.001370314, 0.001442489] | [-0.001310741, 0.001471717] | +0.000586159 |
+| EMA: parent + multi-depth | +0.002562444 | [-0.000611509, 0.005889654] | [-0.001062603, 0.006706125] | +0.000738824 | [-0.002360407, 0.002914785] | [-0.002325517, 0.002708976] | +0.001650634 |
+| EMA: parent + multi-depth + temporal | +0.002398249 | [-0.000493044, 0.005519021] | [-0.000928059, 0.006254678] | +0.000134722 | [-0.002977608, 0.002310791] | [-0.003016961, 0.002328570] | +0.001266486 |
+
+The six-member Patience ensemble scored `0.049653012`/`0.050957597` versus
+parent `0.048416261`/`0.050673275` on Fold A/Fold B. Adding temporal statistics
+diluted the gain under both readouts. All intervals included zero, but the
+six-member direction was positive on both folds and both predeclared readouts.
+
+### Decision
+
+Keep parent+multi-depth as the sole Phase A diversity-ensemble candidate for the
+next sparse official-validation confirmation. Do not add temporal statistics and
+do not claim statistical establishment from two folds. Raw Patience-3 on the
+parent architecture remains the canonical trajectory parent for subsequent
+representation experiments; the diversity ensemble is a secondary recipe, not a
+replacement training objective or checkpoint rule.
+
+Immutable output:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_autopsy_d237998_20260820T111500Z`
+
+## Experiment 10 — Corrected decision-time shared-fusion rerun
+
+Purpose: isolate the remaining plausible routing criticism by replacing the
+historical uniform state shift with a nonlinear shared-fusion decision context,
+while removing the accidental RNG-stream shift caused by candidate construction.
+
+### Settings
+
+- Runnable experiment commits: `9828f7219efbda1cb3d9aef89217423bd7e65feb`
+  and checkpoint-provenance fix `b8d955a71a0c6a20be0861d4a6bfd2330d1da65b`
+- Parent campaign: `trajectory_discovery_e22dd67_20260819T134332Z`
+- Candidate input: sine/cosine decision phase
+- Candidate path: standard-initialized `2 -> 16 -> 16` GELU embedding; zero-only
+  final `16 -> 128` projection added to the shared mean/dispersion context before
+  the incumbent nonlinear fusion
+- Parent start: exact shared-module weights and exact epoch-zero predictions
+- RNG control: adapter construction inside `torch.random.fork_rng`, verified to
+  leave the post-construction RNG state identical to the parent
+- Gradient smoke: after 10 soft-Spearman optimization steps, both the final
+  projection and upstream embedding changed; the full research suite passed
+  188/188 on the exact experiment commit
+- Training: Fold A/Fold B, seeds 11/29/47, fixed 20-epoch SAM trajectories;
+  120 checkpoints total. The three seeds ran in isolated processes within each
+  fold; each retained independent sampler and PyTorch RNG state.
+- Reporting: frozen odd/even cross-fitted raw Patience-3 primary and final
+  EMA-0.995 secondary, paired to the matched parent with the canonical analyzer
+- Official validation and held-out test access: none
+
+### Results
+
+| Readout | Fold A delta | Block-5 95% | Block-10 95% | Fold B delta | Block-5 95% | Block-10 95% | Mean delta |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `patience3_raw` | -0.000001432 | [-0.000022193, 0.000017576] | [-0.000025859, 0.000018291] | -0.000008622 | [-0.000029098, 0.000016326] | [-0.000028747, 0.000018578] | -0.000005027 |
+| `final_ema_0995` | -0.000000824 | [-0.000031588, 0.000022928] | [-0.000030386, 0.000020209] | -0.000000765 | [-0.000046207, 0.000039875] | [-0.000043633, 0.000031953] | -0.000000795 |
+
+Patience candidate ICs were `0.048414829`/`0.050664653` versus parent
+`0.048416261`/`0.050673275`. Primary 30/60/120-minute deltas were
+`+0.000016572/+0.000005019/-0.000025886` on Fold A and
+`-0.000014128/-0.000007322/-0.000004417` on Fold B. TOD ranges were
+`[-0.000169979, +0.000182903]` and `[-0.000214485, +0.000189598]`.
+
+The corrected path was unquestionably active. Epoch-20 final-projection norms
+ranged `0.299-0.992`; upstream embedding weights also moved materially on every
+fold/seed. Nevertheless, both readouts reproduced the parent to numerical-noise
+scale on both folds.
+
+### Decision
+
+Reject decision-time embedding conclusively. The original and corrected routes
+both produce null results, while checkpoint norms and the 10-step assertion rule
+out dead gradients. Do not spend official validation on it. The rejected adapter,
+variant plumbing, campaign driver, and candidate-specific tests were removed from
+current HEAD; reproduction uses the commits and immutable artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/decision_time_fusion_b8d955a_20260820T113924Z`
+
+The completed manifest records 120 checkpoints, exact commit `b8d955a`,
+`official_validation_accessed=false`, and `test_accessed=false`.

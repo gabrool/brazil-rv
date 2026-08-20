@@ -539,3 +539,65 @@ check, every deletion-first model/training/test file byte-matched the previously
 tested parent and the retained analyzer byte-matched commit `732b1b0`. Re-run
 `uv run --project research pytest` after the Windows policy is cleared; do not
 represent the post-reset attempt as a passing suite.
+
+## Phase A autopsy, diversity ensemble, and decision-time closure (2026-08-20)
+
+A checkpoint autopsy showed that the near-zero decision-time and learned-set
+scores were not dead-adapter artifacts. Across Fold A/Fold B and seeds 11/29/47,
+the historical decision-time projection ended at L2 `0.319-0.355`; the learned-set
+final projection ended at `0.490-1.107`, and both learned-set `phi` layers moved.
+Candidate/parent prediction Spearman remained `0.999134-0.999440` for decision
+time and `0.999626-0.999890` for learned set. Learned set had already used
+standard `phi` initialization, zero-only final projection, and the incumbent
+nonlinear shared fusion. Both paths were active but contributed almost no new
+cross-sectional ordering.
+
+Saved predictions then supported two no-training diversity ensembles:
+
+| Uniform rank ensemble | Patience Fold A / Fold B / mean delta | EMA Fold A / Fold B / mean delta |
+|---|---|---|
+| Parent-3 + multi-depth-3 | +.001237 / +.000284 / +.000761 | +.002562 / +.000739 / +.001651 |
+| Parent-3 + multi-depth-3 + temporal-3 | +.000942 / +.000230 / +.000586 | +.002398 / +.000135 / +.001266 |
+
+Every direction was positive, but every fold-level block interval included zero.
+Adding temporal members diluted the six-member pool. Retain parent+multi-depth as
+the sole Phase A diversity candidate for sparse official-validation confirmation;
+do not learn weights, do not add temporal members, and do not treat it as proven
+until that confirmation. Raw Patience-3 on the parent remains the base for new
+representation experiments. The immutable reanalysis is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_autopsy_d237998_20260820T111500Z
+
+The remaining decision-time routing objection received one corrected rerun. The
+candidate used a standard-initialized `2 -> 16 -> 16` GELU decision embedding and
+a zero-only `16 -> 128` projection into shared mean/dispersion context before the
+existing nonlinear fusion. Adapter construction preserved the parent's RNG state;
+exact parent weights and predictions matched at epoch zero. A 10-step rank-loss
+test confirmed both the projection and upstream embedding changed. The exact
+experiment commit passed all 188 research tests on the GH200.
+
+| Readout | Fold A delta | Fold B delta | Mean |
+|---|---:|---:|---:|
+| Cross-fitted raw Patience-3 | -0.000001432 | -0.000008622 | -0.000005027 |
+| Final EMA-0.995 | -0.000000824 | -0.000000765 | -0.000000795 |
+
+All bootstrap intervals included zero; horizon/TOD deltas were at noise scale.
+The final projection reached L2 `0.299-0.992` and both embedding layers moved in
+every run. Decision time is therefore an active, route-corrected null and the line
+is closed without official-validation access. The campaign contains six completed
+20-epoch trajectories and 120 checkpoints:
+
+    implementation 9828f7219efbda1cb3d9aef89217423bd7e65feb
+    provenance fix b8d955a71a0c6a20be0861d4a6bfd2330d1da65b
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/decision_time_fusion_b8d955a_20260820T113924Z
+
+Its manifest is `status=completed`, records the exact final commit, and has
+`official_validation_accessed=false` and `test_accessed=false`. Deletion-first
+cleanup removed the rejected adapter, variant plumbing, driver, and specific
+tests; exact reproduction uses the commits and immutable artifact. The generic
+analyzer now supports candidate and parent ensembles with different member counts
+without weakening strict alignment or uniform-rank requirements.
+
+The paid instance for these follow-ups was
+`d09de0143ed64f2f929f117e1b68727d` in `us-east-3`. Termination and provider
+absence must be recorded only after they are verified.
