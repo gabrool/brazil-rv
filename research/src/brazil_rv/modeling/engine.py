@@ -16,15 +16,12 @@ from .contract import (
     SOFT_RANK_STANDARDIZATION_EPS,
     SOFT_RANK_TEMPERATURE,
     SOFT_SPEARMAN_CORRELATION_EPS,
-    TCN_ARCHITECTURE,
     RuntimeSettings,
 )
 from .metrics import create_metric_table, primary_validation_score
 from .provenance import model_metadata
 
-TrainingObjective = Callable[
-    [torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
-]
+TrainingObjective = Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
 UpdateCallback = Callable[[], None]
 
 
@@ -145,6 +142,8 @@ def _model_transfer_keys() -> tuple[str, ...]:
         "instrument_mask",
         "slow_features",
         "state_position",
+        "market_state",
+        "tilt_exposure",
         "targets",
         "label_mask",
     )
@@ -156,16 +155,24 @@ def _to_device(
     return {
         key: batch[key].to(device, non_blocking=device.type == "cuda")
         for key in _model_transfer_keys()
+        if key in batch
     }
 
 
 def _predict(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-    return model(
+    inputs = (
         batch["patches"],
         batch["history_patch_mask"],
         batch["instrument_mask"],
         batch["slow_features"],
         batch["state_position"],
+    )
+    if "market_state" not in batch:
+        return model(*inputs)
+    return model(
+        *inputs,
+        batch["market_state"],
+        batch["tilt_exposure"],
     )
 
 
@@ -515,12 +522,12 @@ def checkpoint_payload(
     feature_store: Path,
     run_provenance: dict[str, object],
 ) -> dict[str, object]:
-    metadata = model_metadata()
+    metadata = model_metadata(str(getattr(model, "variant")))
     if run_provenance.get("model") != metadata:
         raise ValueError("Run provenance differs from checkpoint model")
     return {
         "model": metadata,
-        "architecture": asdict(TCN_ARCHITECTURE),
+        "architecture": asdict(getattr(model, "architecture")),
         "objective": objective_metadata(),
         "sam": sam_metadata(),
         "seed": seed,
@@ -532,7 +539,6 @@ def checkpoint_payload(
         "run_provenance": run_provenance,
         "model_state_dict": state_dict_to_cpu(model.state_dict()),
         "ema_state_dicts": {
-            name: state_dict_to_cpu(state)
-            for name, state in ema_state_dicts.items()
+            name: state_dict_to_cpu(state) for name, state in ema_state_dicts.items()
         },
     }

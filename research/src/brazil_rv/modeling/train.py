@@ -17,6 +17,7 @@ import polars as pl
 import torch
 
 from .contract import (
+    ADAMW_WEIGHT_DECAY,
     ALLOWED_SEEDS,
     EMA_DECAYS,
     GH200_RUNTIME,
@@ -26,6 +27,7 @@ from .contract import (
 )
 from .data import (
     create_training_loaders,
+    di_tilt_sidecar_identity,
     feature_store_identity,
     load_sample_index,
     resolve_feature_store,
@@ -45,7 +47,14 @@ from .engine import (
     train_one_epoch,
     validation_primary_metric,
 )
-from .model import build_model, count_trainable_parameters
+from .model import (
+    CAPACITY_96_VARIANT,
+    DI_TILT_EXPOSURE_VARIANT,
+    MODEL_VARIANTS,
+    PARENT_MODEL_VARIANT,
+    build_model,
+    count_trainable_parameters,
+)
 from .optim import build_optimizer, build_scheduler
 from .provenance import build_run_provenance, repository_commit
 from .trajectory import (
@@ -65,11 +74,15 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train one fixed PIT-clean trajectory")
     parser.add_argument("--seed", type=int, choices=ALLOWED_SEEDS, default=29)
     parser.add_argument(
+        "--variant", choices=MODEL_VARIANTS, default=PARENT_MODEL_VARIANT
+    )
+    parser.add_argument(
         "--selection-window",
         choices=("fold_a", "fold_b", "official"),
         default="fold_a",
     )
     parser.add_argument("--selection-rule-file", type=Path)
+    parser.add_argument("--tilt-sidecar", type=Path)
     parser.add_argument("--output-base", type=Path, default=RUN_OUTPUT_BASE)
     return parser.parse_args(arguments)
 
@@ -184,6 +197,8 @@ def run_training(
     selection_window: str,
     run_dir: Path,
     selection_rule_file: Path | None = None,
+    variant: str = PARENT_MODEL_VARIANT,
+    tilt_sidecar: Path | None = None,
 ) -> Path:
     if run_dir.exists():
         raise FileExistsError(run_dir)
@@ -198,17 +213,26 @@ def run_training(
     )
     frozen_selection = _selection_metadata(selection_rule_file, selection_window)
     store_identity = feature_store_identity(store)
+    if (variant == DI_TILT_EXPOSURE_VARIANT) != (tilt_sidecar is not None):
+        raise ValueError("Only the DI tilt variant accepts and requires its sidecar")
+    tilt_manifest = (
+        None
+        if tilt_sidecar is None
+        else di_tilt_sidecar_identity(tilt_sidecar, store_identity)
+    )
     train_loader, validation_loader, sampler = create_training_loaders(
         store,
         train_rows,
         validation_rows,
         GH200_RUNTIME,
         seed,
+        tilt_sidecar,
     )
-    model = build_model().cuda()
+    model = build_model(variant).cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
     parameter_count = count_trainable_parameters(model)
-    optimizer, _ = build_optimizer(model)
+    weight_decay = 0.02 if variant == CAPACITY_96_VARIANT else ADAMW_WEIGHT_DECAY
+    optimizer, _ = build_optimizer(model, weight_decay)
     scheduler, steps_per_epoch, warmup_steps = build_scheduler(
         optimizer, train_rows.height, MAX_EPOCHS
     )
@@ -225,6 +249,8 @@ def run_training(
         parameter_count=parameter_count,
         training_sample_count=train_rows.height,
         date_replacement=sampler.replace_dates,
+        model_variant=variant,
+        weight_decay=weight_decay,
     )
     recorded_training = run_provenance["training"]
     if (
@@ -239,6 +265,12 @@ def run_training(
         "run_provenance": run_provenance,
         "feature_store": str(store.resolve()),
         "feature_store_identity": store_identity,
+        "auxiliary_inputs": None
+        if tilt_manifest is None
+        else {
+            "di_tilt_sidecar": str(tilt_sidecar.resolve()),
+            "di_tilt_manifest": tilt_manifest,
+        },
         "split": {
             "training": selection_window,
             "selection": selection_window,
@@ -420,7 +452,7 @@ def run_training(
 def _run(args: argparse.Namespace) -> Path:
     created_at = datetime.now(timezone.utc)
     name = (
-        f"tcn_{args.selection_window}_seed{args.seed}_"
+        f"tcn_{args.variant}_{args.selection_window}_seed{args.seed}_"
         f"{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     return run_training(
@@ -428,6 +460,8 @@ def _run(args: argparse.Namespace) -> Path:
         seed=args.seed,
         selection_window=args.selection_window,
         selection_rule_file=args.selection_rule_file,
+        variant=args.variant,
+        tilt_sidecar=args.tilt_sidecar,
         run_dir=args.output_base / name,
     )
 

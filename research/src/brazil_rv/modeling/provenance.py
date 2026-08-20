@@ -19,9 +19,13 @@ from .contract import (
     MAX_EPOCHS,
     SAM_RHO,
     SOFT_RANK_TEMPERATURE,
-    TCN_ARCHITECTURE,
     WARMUP_FRACTION,
     RuntimeSettings,
+)
+from .model import (
+    PARENT_MODEL_VARIANT,
+    architecture_for_variant,
+    model_variant_metadata,
 )
 from .optim import scheduler_step_contract
 
@@ -38,12 +42,13 @@ def repository_commit() -> str:
     ).stdout.strip()
 
 
-def model_metadata() -> dict[str, object]:
+def model_metadata(variant: str = PARENT_MODEL_VARIANT) -> dict[str, object]:
     return json.loads(
         json.dumps(
             {
                 "model_name": "tcn",
-                "architecture": asdict(TCN_ARCHITECTURE),
+                "architecture": asdict(architecture_for_variant(variant)),
+                "variant": model_variant_metadata(variant),
                 "cross_equity_attention": False,
             }
         )
@@ -55,6 +60,7 @@ def training_contract(
     date_replacement: bool,
     *,
     runtime: RuntimeSettings = GH200_RUNTIME,
+    weight_decay: float = ADAMW_WEIGHT_DECAY,
 ) -> dict[str, object]:
     steps_per_epoch, warmup_steps = scheduler_step_contract(
         training_sample_count,
@@ -82,7 +88,7 @@ def training_contract(
         "learning_rate": ADAMW_LR,
         "adamw_betas": list(ADAMW_BETAS),
         "adamw_epsilon": ADAMW_EPS,
-        "adamw_weight_decay": ADAMW_WEIGHT_DECAY,
+        "adamw_weight_decay": weight_decay,
         "gradient_clip": GRADIENT_CLIP,
         "objective": {
             "name": "soft_spearman",
@@ -104,6 +110,8 @@ def build_run_provenance(
     parameter_count: int,
     training_sample_count: int,
     date_replacement: bool,
+    model_variant: str = PARENT_MODEL_VARIANT,
+    weight_decay: float = ADAMW_WEIGHT_DECAY,
     runtime: RuntimeSettings = GH200_RUNTIME,
 ) -> dict[str, object]:
     provenance = {
@@ -111,7 +119,7 @@ def build_run_provenance(
         "repository_commit": repository_commit_value,
         "feature_store": str(feature_store.resolve()),
         "feature_store_identity": feature_store_metadata,
-        "model": model_metadata(),
+        "model": model_metadata(model_variant),
         "seed": seed,
         "fit_window": fit_window,
         "selection_window": selection_window,
@@ -122,6 +130,7 @@ def build_run_provenance(
             training_sample_count,
             date_replacement,
             runtime=runtime,
+            weight_decay=weight_decay,
         ),
     }
     return json.loads(json.dumps(provenance))

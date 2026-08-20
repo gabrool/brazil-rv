@@ -63,6 +63,13 @@ FEATURE_ARRAY_FILES = (
     "raw_returns.npy",
 )
 FEATURE_STORE_CONTRACT = "M1_FEATURES_PIT_CAUSAL_TOD"
+DI_TILT_SIDECAR_SCHEMA = "DI_TILT_EXPOSURE_SIDECAR_V1"
+MARKET_STATE_SPECS = (
+    (0, 8),  # ES return_30m_normalized
+    (0, 11),  # ES realized_vol_30m_log_ratio
+    (5, 8),  # HG return_30m_normalized
+    (7, 8),  # 6M return_30m_normalized
+)
 SCREENING_FOLD_NOTE = (
     "Causal stored features are reused, but the time-of-day profile adapted inside "
     "these historical training dates. These are screening folds, not exact replicas "
@@ -109,6 +116,35 @@ def feature_store_identity(store: Path) -> dict[str, object]:
 
 
 FeatureStoreIdentityCache = dict[str, dict[str, object]]
+
+
+def di_tilt_sidecar_identity(
+    sidecar: Path, source_feature_store: dict[str, object]
+) -> dict[str, object]:
+    manifest_path = sidecar / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("schema") != DI_TILT_SIDECAR_SCHEMA:
+        raise ValueError("Unexpected DI tilt sidecar schema")
+    if manifest.get("source_feature_store") != source_feature_store:
+        raise ValueError("DI tilt sidecar feature store differs from training store")
+    if manifest.get("test_accessed") is not False:
+        raise ValueError("DI tilt sidecar must not access the held-out test")
+    hashes = manifest.get("files_sha256")
+    if not isinstance(hashes, dict):
+        raise ValueError("DI tilt sidecar has no immutable file hashes")
+    for name in ("tilt_exposure.npy", "tilt_ready.npy"):
+        path = sidecar / name
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        digest = hashlib.sha256()
+        with path.open("rb") as source:
+            while chunk := source.read(1024 * 1024):
+                digest.update(chunk)
+        if hashes.get(name) != digest.hexdigest():
+            raise ValueError(
+                f"DI tilt sidecar file differs from recorded contract: {name}"
+            )
+    return manifest
 
 
 def validate_feature_store_identity(
@@ -267,9 +303,7 @@ def _common_batch(
     for decision in np.unique(decisions):
         group = np.flatnonzero(decisions == decision)
         targets[group] = arrays["targets.npy"][dates[group], :, int(decision), :]
-        label_mask[group] = arrays["label_mask.npy"][
-            dates[group], :, int(decision), :
-        ]
+        label_mask[group] = arrays["label_mask.npy"][dates[group], :, int(decision), :]
         raw_returns[group] = arrays["raw_returns.npy"][
             dates[group], :, int(decision), :
         ]
@@ -300,7 +334,7 @@ def _context_readiness(
     arrays: dict[str, np.ndarray],
     date_idx: np.ndarray,
     decision_idx: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     local_ready = np.asarray(
         arrays["context_data_ready.npy"][date_idx], dtype=bool
     ).copy()
@@ -314,7 +348,7 @@ def _context_readiness(
     keep = np.zeros(GLOBAL_CONTEXT_COUNT, dtype=bool)
     keep[list(CANONICAL_RETAINED_GLOBAL_SLOTS)] = True
     global_ready &= keep
-    return local_ready, global_ready
+    return local_ready, global_ready, all_global
 
 
 def _build_patch_batch(
@@ -326,7 +360,9 @@ def _build_patch_batch(
     active: np.ndarray,
 ) -> dict[str, np.ndarray]:
     batch_size = date_idx.size
-    local_ready, global_ready = _context_readiness(arrays, date_idx, decision_idx)
+    local_ready, global_ready, all_global_ready = _context_readiness(
+        arrays, date_idx, decision_idx
+    )
     patches = np.zeros(
         (
             batch_size,
@@ -409,18 +445,32 @@ def _build_patch_batch(
         decision_idx[:, None],
     ]
     slow[:, global_start:] = decision_slow * global_ready[..., None]
+    market_state = np.zeros((batch_size, len(MARKET_STATE_SPECS)), dtype=np.float32)
+    endpoints = np.asarray(DECISION_GLOBAL_INDICES, dtype=np.int64)[decision_idx] - 1
+    batch_positions = np.arange(batch_size)
+    for output_idx, (slot, channel) in enumerate(MARKET_STATE_SPECS):
+        ready = all_global_ready[batch_positions, slot, decision_idx]
+        values = global_grid[batch_positions, slot, endpoints, channel]
+        market_state[:, output_idx] = np.where(ready, values, 0.0)
     return {
         "patches": patches,
         "history_patch_mask": history_mask,
         "instrument_mask": instrument_mask,
         "slow_features": slow,
         "state_position": state_position,
+        "market_state": market_state,
     }
 
 
 class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
-    def __init__(self, store: Path, sample_index: pl.DataFrame) -> None:
+    def __init__(
+        self,
+        store: Path,
+        sample_index: pl.DataFrame,
+        tilt_sidecar: Path | None = None,
+    ) -> None:
         self.store = store
+        self.tilt_sidecar = tilt_sidecar
         self.rows = {
             name: sample_index.get_column(name).to_numpy()
             for name in (
@@ -432,6 +482,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             )
         }
         self._arrays: dict[str, np.ndarray] | None = None
+        self._tilt_arrays: tuple[np.ndarray, np.ndarray] | None = None
 
     def __len__(self) -> int:
         return len(self.rows["sample_id"])
@@ -439,6 +490,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         state["_arrays"] = None
+        state["_tilt_arrays"] = None
         return state
 
     def _open_arrays(self) -> dict[str, np.ndarray]:
@@ -448,6 +500,24 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 for name in FEATURE_ARRAY_FILES
             }
         return self._arrays
+
+    def _open_tilt_arrays(self) -> tuple[np.ndarray, np.ndarray] | None:
+        if self.tilt_sidecar is None:
+            return None
+        if self._tilt_arrays is None:
+            self._tilt_arrays = (
+                np.load(
+                    self.tilt_sidecar / "tilt_exposure.npy",
+                    mmap_mode="r",
+                    allow_pickle=False,
+                ),
+                np.load(
+                    self.tilt_sidecar / "tilt_ready.npy",
+                    mmap_mode="r",
+                    allow_pickle=False,
+                ),
+            )
+        return self._tilt_arrays
 
     def __getitem__(self, request: BatchRequest) -> dict[str, np.ndarray]:
         arrays = self._open_arrays()
@@ -463,7 +533,15 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             context_cutoffs,
             active,
         )
-        return {**inputs, **common}
+        tilt = self._open_tilt_arrays()
+        if tilt is None:
+            tilt_exposure = np.zeros(active.shape, dtype=np.float32)
+        else:
+            exposure, ready = tilt
+            tilt_exposure = np.asarray(exposure[dates], dtype=np.float32) * np.asarray(
+                ready[dates] & active, dtype=np.float32
+            )
+        return {**inputs, **common, "tilt_exposure": tilt_exposure}
 
 
 class DateStratifiedBatchSampler(Sampler[BatchRequest]):
@@ -578,6 +656,7 @@ def create_training_loaders(
     validation_rows: pl.DataFrame,
     runtime: RuntimeSettings = GH200_RUNTIME,
     seed: int = 29,
+    tilt_sidecar: Path | None = None,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
@@ -585,10 +664,13 @@ def create_training_loaders(
 ]:
     sampler = DateStratifiedBatchSampler(train_rows, runtime, seed)
     train = _create_loader(
-        VectorizedFeatureDataset(store, train_rows), sampler, runtime, seed
+        VectorizedFeatureDataset(store, train_rows, tilt_sidecar),
+        sampler,
+        runtime,
+        seed,
     )
     validation = _create_loader(
-        VectorizedFeatureDataset(store, validation_rows),
+        VectorizedFeatureDataset(store, validation_rows, tilt_sidecar),
         DecisionGroupedBatchSampler(validation_rows, runtime.evaluation_batch_size),
         runtime,
         seed,
@@ -601,9 +683,10 @@ def create_evaluation_loader(
     rows: pl.DataFrame,
     runtime: RuntimeSettings = GH200_RUNTIME,
     seed: int = 29,
+    tilt_sidecar: Path | None = None,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
-        VectorizedFeatureDataset(store, rows),
+        VectorizedFeatureDataset(store, rows, tilt_sidecar),
         DecisionGroupedBatchSampler(rows, runtime.evaluation_batch_size),
         runtime,
         seed,

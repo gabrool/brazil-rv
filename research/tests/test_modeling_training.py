@@ -149,8 +149,10 @@ def test_training_cli_exposes_only_current_controls() -> None:
     actions = {name for name, _ in parse_args([])._get_kwargs()}
     assert actions == {
         "seed",
+        "variant",
         "selection_window",
         "selection_rule_file",
+        "tilt_sidecar",
         "output_base",
     }
 
