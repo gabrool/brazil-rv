@@ -3,11 +3,13 @@ from __future__ import annotations
 import torch
 
 from brazil_rv.modeling.contract import CONTEXT_COUNT, TCNArchitecture
-from brazil_rv.modeling.engine import soft_spearman_loss
+from brazil_rv.modeling.engine import checkpoint_payload, soft_spearman_loss
 from brazil_rv.modeling.model import (
     DECISION_TIME_FUSION_VARIANT,
+    model_variant_metadata,
     SharedCausalTCN,
 )
+from brazil_rv.modeling.provenance import model_metadata
 
 
 def _architecture() -> TCNArchitecture:
@@ -92,3 +94,28 @@ def test_decision_time_fusion_path_wakes_within_ten_rank_steps() -> None:
         model.decision_time_embedding[0].weight,
         embedding_at_start,
     )
+
+
+def test_decision_time_checkpoint_records_matching_variant(tmp_path) -> None:
+    model = SharedCausalTCN(
+        architecture=_architecture(),
+        equity_count=4,
+        variant=DECISION_TIME_FUSION_VARIANT,
+    )
+    metadata = model_metadata()
+    metadata["variant"] = model_variant_metadata(DECISION_TIME_FUSION_VARIANT)
+    provenance = {
+        "model": metadata,
+        "feature_store_identity": {"path": str(tmp_path)},
+        "repository_commit": "sha",
+    }
+    payload = checkpoint_payload(
+        model,
+        {"ema_098": model.state_dict()},
+        seed=11,
+        epoch=1,
+        validation_scores={"raw": 0.0},
+        feature_store=tmp_path,
+        run_provenance=provenance,
+    )
+    assert payload["model"]["variant"]["name"] == DECISION_TIME_FUSION_VARIANT
