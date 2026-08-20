@@ -851,3 +851,9 @@ Deletion-first cleanup removed the rejected Phase B sidecar/training/recency
 plumbing, auxiliary heads, one-use official-confirmation driver, and specific
 tests from current HEAD. Exact reproduction remains in commits
 `a04d63e`, `15471e8`, `6b7b121`, `e33a122`, and the immutable NFS artifacts.
+
+The paid GH200 instance was `5e9201fcd5b6436cbdd3be9fe9ee4524` in
+`us-east-3`. After all artifacts, tests, commits, and GitHub updates were complete,
+Lambda accepted termination and reported `terminating`; a subsequent provider
+inventory poll returned zero matches for the exact ID. Persistent results remain
+on the attached `brazil-rv-east3` NFS filesystem.

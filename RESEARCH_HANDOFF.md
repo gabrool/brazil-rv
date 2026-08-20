@@ -698,3 +698,10 @@ and one-use confirmation code is reproduced through commits `a04d63e`,
 `15471e8`, `6b7b121`, and `e33a122`, not compatibility branches. The main Linux
 suite passed 191/191 on the exact Phase B implementation; local Windows passed
 190 with only the policy-blocked compile test deselected.
+
+The paid Phase B instance was `5e9201fcd5b6436cbdd3be9fe9ee4524` in
+`us-east-3`. Termination was requested only after results, cleanup, the 209-test
+suite, commit `23efd41`, and its GitHub push completed. Lambda first returned
+`terminating`; the subsequent provider inventory contained zero matches for the
+exact instance ID. Persistent sidecar, campaign, recency, and official-confirmation
+artifacts remain on the `brazil-rv-east3` NFS filesystem.
