@@ -486,3 +486,56 @@ inferred from this record.
 
 Do not evaluate the held-out test split, overwrite raw data, mutate immutable
 feature stores, or update a canonical pointer until the corresponding audit passes.
+
+## Completed Phase A representation campaign (2026-08-20)
+
+Campaign commit `732b1b0e7dd870d9ea210c7b2eb750a624f12fb7` tested six
+zero-start residual candidates on the two internal folds. Each candidate completed
+both folds, seeds 11/29/47, and 20 epochs: 120 checkpoints per candidate and 720
+total. Primary reporting used separately replayed odd/even cross-fitted raw
+Patience-3 for candidate and parent; final EMA-0.995 was the free secondary
+readout. Prediction ensembles were uniform rank averages and learned no weights.
+
+| Candidate | Patience Fold A / Fold B / mean delta | EMA-0.995 Fold A / Fold B / mean delta |
+|---|---|---|
+| Decision time | -.000017 / -.000002 / -.000010 | -.000180 / -.000088 / -.000134 |
+| Temporal stats | +.000098 / -.000307 / -.000104 | +.001688 / -.001669 / +.000009 |
+| Multi-depth stats | +.000532 / -.000827 / -.000148 | +.001408 / -.003358 / -.000975 |
+| Cross-sectional max/min | -.000498 / +.000101 / -.000198 | +.001691 / -.000146 / +.000772 |
+| Learned set pool | -.000009 / -.000003 / -.000006 | +.000002 / +.000009 / +.000005 |
+| Conditional bucket means | -.000363 / -.000035 / -.000199 | +.001752 / -.000902 / +.000425 |
+
+All six primary means were non-positive. The two significant-looking Fold-A EMA
+effects for max/min and conditional buckets reversed on Fold B. Horizon and TOD
+guardrails were mixed, and no candidate warranted official-validation access.
+Reject all six standalone candidates; raw Patience-3 remains the parent.
+
+The completed campaign is stored at:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_732b1b0_20260819T180348Z
+
+The manifest is `status=completed`, references the causal feature-store hash
+`c90103b0f99e0017dc1303284a1ab61eca99106094227f5823ba718756d28a6b`, and records
+`official_validation_accessed=false` and `test_accessed=false`.
+
+Deletion-first cleanup removed the six candidate implementations, generic variant
+plumbing, `modeling.phase_a`, and candidate tests from current HEAD. The experiment
+commit and immutable artifact preserve exact reproduction. The strict analyzer's
+observation-level comparison entry point was retained because it is generally
+useful for future cross-fitted campaigns.
+
+The Phase A instance was `df8326b7265845bf8285546d9018ed86` in `us-east-3`.
+After results and repository state were safely recorded, termination was accepted;
+a subsequent provider query reported the exact instance ID absent. Persistent
+campaign results remain on the `brazil-rv-east3` NFS filesystem.
+
+Final verification passed Ruff and full Python syntax compilation. Before the
+building reset, commit `732b1b0` passed all 192 research tests and compiled BF16
+real-store smoke checks for all six candidates on the GH200. The post-reset local
+full-suite rerun did not collect tests because Windows Application Control blocked
+`torch.dll` with `WinError 4551`, including from a fresh isolated `uv` environment.
+This is an environment-policy failure, not a test assertion. As a compensating
+check, every deletion-first model/training/test file byte-matched the previously
+tested parent and the retained analyzer byte-matched commit `732b1b0`. Re-run
+`uv run --project research pytest` after the Windows policy is cleared; do not
+represent the post-reset attempt as a passing suite.

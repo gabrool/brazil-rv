@@ -1,6 +1,6 @@
 # Brazil-RV experiment log
 
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 
 This is the chronological research record for the current experimentation program. Future sessions should append new experiments and preserve prior entries, including negative results. Every entry should identify the code commit, data source, split access, complete selection rule, seeds, artifact location, and result.
 
@@ -374,3 +374,148 @@ the immutable artifact below, not compatibility code:
 
 `/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/trajectory_centered_crossfit_381dcb7_20260819T170100Z`
 
+
+## Experiment 8 — Phase A representation screens
+
+Purpose: test the six cheapest representation improvements from the research memo
+on top of the frozen raw Patience-3 parent, with final EMA-0.995 retained as a
+free secondary readout from the same trajectories.
+
+### Settings
+
+- Implementation and campaign commit: `732b1b0e7dd870d9ea210c7b2eb750a624f12fb7`
+- Parent campaign: `trajectory_discovery_e22dd67_20260819T134332Z`
+- Feature store and hash: unchanged from the common contract above
+- Folds: the same 512+102 and 614+102 internal discovery folds
+- Seeds: 11, 29, and 47
+- Training: one fixed 20-epoch soft-Spearman SAM trajectory per fold and seed
+- Primary readout: honest odd/even cross-fitted `patience3_raw`, selecting the
+  stopping checkpoint on one parity and reporting it only on the other, in both
+  directions
+- Secondary readout: fixed final-epoch EMA-0.995 from the same trajectory
+- Ensemble: uniform tie-aware rank averaging; no learned validation weights
+- Paired unit: candidate-minus-parent IC by date after averaging decisions and
+  horizons; 10,000-replicate moving-block bootstraps at block lengths 5 and 10
+- Guardrails: 30/60/120-minute and all 55 decision-time deltas
+- Parent pairing: exact member names, seeds, folds, observations, targets, and masks
+- Stage-one compute gate: seed 29 on both folds; stop only when raw Patience delta
+  was at most -0.003 on both folds and EMA delta was at most -0.002 on both folds
+- All six candidates passed that deliberately broad harm gate, so the final count
+  was 720 checkpoints: 6 candidates x 2 folds x 3 seeds x 20 epochs
+- Official validation access: none
+- Held-out test access: none
+
+The candidates were implemented as follows. Every injection projection was
+zero-initialized after parent construction, preserving the parent's shared-module
+initialization and exact epoch-zero function.
+
+- `decision_time`: sine/cosine decision-phase coordinates projected residually
+  into each normalized equity state.
+- `temporal_stats`: masked causal mean and standard deviation of the final TCN
+  block, projected into the final state as
+  `final_state + zero_projection(causal_mean, causal_std)`.
+- `multi_depth_stats`: masked causal mean/std pools from blocks 2, 4, and 6,
+  projected residually into the final state.
+- `cross_section_max_min`: active-equity max/min states projected into the existing
+  cross-sectional mean/dispersion pool.
+- `learned_set_pool`: shared `phi` with width 16, active masked mean, and a
+  zero-started projection into the existing pool.
+- `conditional_bucket_means`: active-equity means in three fixed standardized
+  buckets each for causal `beta_to_WDO` and cross-sectional realized-volatility
+  rank, injected through a zero-started projection. No threshold was fit on a
+  validation period.
+
+### Primary `patience3_raw` results
+
+All values below are candidate minus the matched trajectory parent. No primary
+mean was positive.
+
+| Candidate | Fold A delta | Block-5 95% | Block-10 95% | Fold B delta | Block-5 95% | Block-10 95% | Mean delta |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Decision time | -0.000017458 | [-0.000066579, 0.000023393] | [-0.000066067, 0.000025086] | -0.000001586 | [-0.000025538, 0.000027084] | [-0.000024347, 0.000027698] | -0.000009522 |
+| Temporal stats | +0.000098414 | [-0.001185126, 0.001529769] | [-0.001161095, 0.001660097] | -0.000307062 | [-0.001929435, 0.001120799] | [-0.001757769, 0.001142709] | -0.000104324 |
+| Multi-depth stats | +0.000531513 | [-0.002742947, 0.004481381] | [-0.002839944, 0.005219267] | -0.000827167 | [-0.004261297, 0.001741108] | [-0.004201801, 0.001764999] | -0.000147827 |
+| Cross-sectional max/min | -0.000497629 | [-0.002067675, 0.001231708] | [-0.002084246, 0.001227718] | +0.000101368 | [-0.000375884, 0.000442713] | [-0.000363012, 0.000369244] | -0.000198130 |
+| Learned set pool | -0.000009072 | [-0.000028979, 0.000004408] | [-0.000030251, 0.000003328] | -0.000003349 | [-0.000024022, 0.000017019] | [-0.000022071, 0.000016529] | -0.000006211 |
+| Conditional bucket means | -0.000362585 | [-0.001668679, 0.000988903] | [-0.001659114, 0.000904938] | -0.000035139 | [-0.000473808, 0.000372378] | [-0.000486874, 0.000328671] | -0.000198862 |
+
+The candidate ensemble ICs for Fold A/Fold B were `0.048399/0.050672`,
+`0.048515/0.050366`, `0.048948/0.049846`, `0.047919/0.050775`,
+`0.048407/0.050670`, and `0.048054/0.050638` in table order. The matched
+parent ICs were always `0.048416/0.050673`.
+
+### Secondary final EMA-0.995 results
+
+| Candidate | Fold A delta | Block-5 95% | Block-10 95% | Fold B delta | Block-5 95% | Block-10 95% | Mean delta |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Decision time | -0.000179524 | [-0.000323778, -0.000025011] | [-0.000317016, -0.000013000] | -0.000088033 | [-0.000224618, 0.000051428] | [-0.000195851, 0.000052946] | -0.000133778 |
+| Temporal stats | +0.001687701 | [-0.000821536, 0.004584018] | [-0.001136599, 0.005219924] | -0.001668903 | [-0.005149351, 0.000887101] | [-0.005186566, 0.001220284] | +0.000009399 |
+| Multi-depth stats | +0.001407586 | [-0.004976762, 0.008640091] | [-0.005871645, 0.010369604] | -0.003357589 | [-0.009829727, 0.001296815] | [-0.009856910, 0.000986787] | -0.000975001 |
+| Cross-sectional max/min | +0.001690664 | [0.000124882, 0.003093798] | [0.000165529, 0.003024779] | -0.000146385 | [-0.001771570, 0.000834316] | [-0.001649641, 0.000614895] | +0.000772140 |
+| Learned set pool | +0.000001792 | [-0.000033089, 0.000027919] | [-0.000033031, 0.000023055] | +0.000009126 | [-0.000047985, 0.000060654] | [-0.000046444, 0.000059766] | +0.000005459 |
+| Conditional bucket means | +0.001751860 | [0.000644237, 0.002792420] | [0.000648120, 0.002778574] | -0.000902497 | [-0.002484332, 0.000426722] | [-0.002191569, 0.000385227] | +0.000424682 |
+
+The two apparently significant Fold-A EMA gains for max/min and conditional
+buckets both reversed on Fold B. EMA was a free secondary readout, not the frozen
+selection criterion; neither fold-dependent pattern justifies changing the recipe.
+
+### Primary horizon and time-of-day guardrails
+
+| Candidate | Fold A 30m / 60m / 120m | Fold B 30m / 60m / 120m | Fold A TOD range | Fold B TOD range |
+|---|---|---|---|---|
+| Decision time | +0.000008 / -0.000010 / -0.000051 | +0.000007 / +0.000031 / -0.000043 | [-0.000258, 0.000235] | [-0.000144, 0.000179] |
+| Temporal stats | +0.000253 / +0.000036 / +0.000007 | +0.000116 / -0.000360 / -0.000678 | [-0.005854, 0.004085] | [-0.008505, 0.006066] |
+| Multi-depth stats | +0.001275 / +0.000840 / -0.000520 | -0.000016 / -0.000926 / -0.001540 | [-0.010400, 0.009149] | [-0.012621, 0.007158] |
+| Cross-sectional max/min | +0.000173 / -0.000476 / -0.001190 | +0.000102 / +0.000064 / +0.000139 | [-0.004606, 0.002280] | [-0.001083, 0.001213] |
+| Learned set pool | -0.000008 / -0.000001 / -0.000017 | +0.000001 / -0.000018 / +0.000006 | [-0.000185, 0.000165] | [-0.000142, 0.000171] |
+| Conditional bucket means | +0.000142 / -0.000327 / -0.000903 | -0.000021 / -0.000130 / +0.000046 | [-0.003131, 0.002451] | [-0.001303, 0.001073] |
+
+No rejected candidate showed a coherent positive horizon or time-of-day profile.
+
+### Primary ensemble diagnostics
+
+Member triplets are seed 11/29/47. Correlation is the mean of the three pairwise
+prediction Spearman values. Gains are ensemble minus mean member / best member.
+
+| Candidate | Fold A member ICs | Fold B member ICs | Mean correlation A / B | Gain A vs mean / best | Gain B vs mean / best |
+|---|---|---|---|---|---|
+| Decision time | .048470 / .047536 / .045711 | .050001 / .050433 / .048800 | .9212 / .9368 | +.001160 / -.000071 | +.000927 / +.000239 |
+| Temporal stats | .048091 / .047469 / .046312 | .048410 / .049084 / .051471 | .9151 / .9425 | +.001224 / +.000424 | +.000711 / -.001105 |
+| Multi-depth stats | .046954 / .046720 / .047574 | .048171 / .049436 / .047840 | .8644 / .8988 | +.001865 / +.001374 | +.001364 / +.000410 |
+| Cross-sectional max/min | .048966 / .046652 / .045421 | .050162 / .050652 / .049113 | .9344 / .9421 | +.000906 / -.001047 | +.000799 / +.000122 |
+| Learned set pool | .048516 / .047533 / .045689 | .050036 / .050411 / .048829 | .9214 / .9368 | +.001161 / -.000109 | +.000911 / +.000259 |
+| Conditional bucket means | .049334 / .046391 / .045859 | .050020 / .050383 / .048951 | .9398 / .9389 | +.000859 / -.001280 | +.000854 / +.000255 |
+
+Multi-depth pooling did create the intended extra seed diversity, but its primary
+IC still fell on average. More identical seeds are not the remedy for any of these
+representation changes.
+
+### Decision
+
+Reject all six candidates as standalone changes. Raw Patience-3 remains the
+canonical parent. Do not spend the repeatedly consumed official validation split
+on any of these non-winners, and keep the held-out test sealed.
+
+The rejected variant branches, variant plumbing, campaign driver, and their tests
+were removed from current HEAD under the deletion-first rule. Exact reproduction
+uses implementation commit `732b1b0` and the completed immutable campaign:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_732b1b0_20260819T180348Z`
+
+The manifest records `status=completed`, all six three-seed completions,
+`official_validation_accessed=false`, and `test_accessed=false`. The generic strict
+observation-level analyzer remains in current source for future experiments.
+
+The campaign ran on Lambda instance `df8326b7265845bf8285546d9018ed86` in
+`us-east-3`. After artifact and documentation checks, termination was accepted and
+a subsequent provider query reported the exact ID absent.
+
+Final source verification: Ruff and full Python syntax compilation passed. Before
+the building reset, implementation commit `732b1b0` passed all 192 research tests
+and every candidate passed compiled BF16 real-store forward/backward smoke checks
+on the GH200. After the reset, the local full-suite rerun could not collect because
+Windows Application Control blocked `torch.dll` with `WinError 4551`, including in
+a fresh isolated `uv` environment. The deletion-first model/training files were
+therefore also byte-compared with the previously tested parent and matched exactly;
+the retained analyzer matched the 192-test-passing campaign commit exactly. Re-run
+the full suite after the machine policy is cleared.

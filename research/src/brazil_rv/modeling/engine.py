@@ -22,7 +22,9 @@ from .contract import (
 from .metrics import create_metric_table, primary_validation_score
 from .provenance import model_metadata
 
-TrainingObjective = Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
+TrainingObjective = Callable[
+    [torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
+]
 UpdateCallback = Callable[[], None]
 
 
@@ -513,7 +515,7 @@ def checkpoint_payload(
     feature_store: Path,
     run_provenance: dict[str, object],
 ) -> dict[str, object]:
-    metadata = model_metadata(str(getattr(model, "variant")))
+    metadata = model_metadata()
     if run_provenance.get("model") != metadata:
         raise ValueError("Run provenance differs from checkpoint model")
     return {
@@ -530,6 +532,7 @@ def checkpoint_payload(
         "run_provenance": run_provenance,
         "model_state_dict": state_dict_to_cpu(model.state_dict()),
         "ema_state_dicts": {
-            name: state_dict_to_cpu(state) for name, state in ema_state_dicts.items()
+            name: state_dict_to_cpu(state)
+            for name, state in ema_state_dicts.items()
         },
     }

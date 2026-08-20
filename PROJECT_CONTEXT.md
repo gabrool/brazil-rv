@@ -190,3 +190,34 @@ unapproved technical indicators are not model features.
 
 When statements conflict, prefer immutable sources and canonical pointers, then
 executable code and tests, then this document, then the detailed handoff.
+
+## Phase A representation decision (2026-08-20)
+
+Six zero-start residual representation candidates were screened on the two
+internal discovery folds with seeds 11/29/47 and the frozen odd/even cross-fitted
+raw Patience-3 readout. Final EMA-0.995 was recorded from the same trajectories as
+a secondary readout. The campaign produced 720 checkpoints from commit `732b1b0`.
+
+| Candidate | Primary mean candidate-minus-parent IC | EMA-0.995 secondary mean delta |
+|---|---:|---:|
+| Decision-time embedding | -0.000009522 | -0.000133778 |
+| Temporal mean/std adapter | -0.000104324 | +0.000009399 |
+| Block-2/4/6 multi-depth stats | -0.000147827 | -0.000975001 |
+| Cross-sectional max/min | -0.000198130 | +0.000772140 |
+| Learned set pool, width 16 | -0.000006211 | +0.000005459 |
+| Conditional beta/volatility bucket means | -0.000198862 | +0.000424682 |
+
+Every primary mean was non-positive. The secondary max/min and conditional-bucket
+gains were confined to Fold A and reversed on Fold B. No candidate had a coherent
+positive horizon/TOD profile, so none qualified for sparse official validation.
+Raw Patience-3 remains the canonical parent and the held-out test remains sealed.
+
+The completed immutable campaign is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_732b1b0_20260819T180348Z
+
+Its manifest records `official_validation_accessed=false` and
+`test_accessed=false`. Rejected candidate code and its campaign driver were
+removed from current HEAD. Reproduction is through commit `732b1b0` and the
+immutable artifacts, not compatibility branches. The general strict
+observation-level measurement layer remains canonical.

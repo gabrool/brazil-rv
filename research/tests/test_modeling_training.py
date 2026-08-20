@@ -118,7 +118,6 @@ def test_model_has_no_residual_attention_branch() -> None:
     model = SharedCausalTCN()
     assert not any("attention" in name for name, _ in model.named_parameters())
     assert model_metadata()["cross_equity_attention"] is False
-    assert model_metadata()["variant"]["name"] == "parent"
 
 
 def test_ema_and_weight_averages_are_exact() -> None:
@@ -150,7 +149,6 @@ def test_training_cli_exposes_only_current_controls() -> None:
     actions = {name for name, _ in parse_args([])._get_kwargs()}
     assert actions == {
         "seed",
-        "variant",
         "selection_window",
         "selection_rule_file",
         "output_base",

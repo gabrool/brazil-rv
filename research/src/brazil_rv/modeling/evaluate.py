@@ -72,7 +72,9 @@ def load_current_run(
     if manifest.get("split", {}).get("training") != "official":
         raise ValueError("Only an official-window run can be evaluated externally")
     frozen = manifest.get("frozen_selection")
-    if not isinstance(frozen, dict) or not isinstance(frozen.get("selected_rule"), str):
+    if not isinstance(frozen, dict) or not isinstance(
+        frozen.get("selected_rule"), str
+    ):
         raise ValueError("Run does not contain an internally frozen selection rule")
     store = Path(str(manifest["feature_store"])).resolve()
     if not store.is_dir():
@@ -106,8 +108,7 @@ def collect_run_evaluation(
     )
     rows = select_sample_split(load_sample_index(store), split)
     loader = create_evaluation_loader(store, rows, seed=int(manifest["seed"]))
-    variant = str(manifest["model"]["variant"]["name"])
-    model = build_model(variant).cuda()
+    model = build_model().cuda()
     reference: EvaluationObservations | None = None
     predictions = []
     losses = []
@@ -123,9 +124,9 @@ def collect_run_evaluation(
     assert reference is not None
     combined = replace(
         reference,
-        predictions=np.mean(np.stack(predictions), axis=0, dtype=np.float64).astype(
-            np.float32
-        ),
+        predictions=np.mean(
+            np.stack(predictions), axis=0, dtype=np.float64
+        ).astype(np.float32),
     )
     summary, daily = summarize_evaluation_observations(
         combined, losses[0] if len(losses) == 1 else None
