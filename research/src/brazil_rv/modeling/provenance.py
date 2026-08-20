@@ -11,18 +11,19 @@ from .contract import (
     ADAMW_LR,
     ADAMW_WEIGHT_DECAY,
     EARLY_STOP_PATIENCE,
-    MIN_IC_IMPROVEMENT,
     EMA_DECAYS,
     FINAL_LR_FACTOR,
     GH200_RUNTIME,
     GRADIENT_CLIP,
     MAX_EPOCHS,
+    MIN_IC_IMPROVEMENT,
     SAM_RHO,
     SOFT_RANK_TEMPERATURE,
     TCN_ARCHITECTURE,
     WARMUP_FRACTION,
     RuntimeSettings,
 )
+from .model import auxiliary_model_metadata
 from .optim import scheduler_step_contract
 
 RUN_PROVENANCE_SCHEMA = "PIT_CLEAN_TCN_TRAJECTORY"
@@ -38,8 +39,8 @@ def repository_commit() -> str:
     ).stdout.strip()
 
 
-def model_metadata() -> dict[str, object]:
-    return json.loads(
+def model_metadata(auxiliary_variant: str | None = None) -> dict[str, object]:
+    metadata = json.loads(
         json.dumps(
             {
                 "model_name": "tcn",
@@ -48,6 +49,9 @@ def model_metadata() -> dict[str, object]:
             }
         )
     )
+    if auxiliary_variant is not None:
+        metadata["auxiliary"] = auxiliary_model_metadata(auxiliary_variant)
+    return metadata
 
 
 def training_contract(
@@ -55,6 +59,7 @@ def training_contract(
     date_replacement: bool,
     *,
     runtime: RuntimeSettings = GH200_RUNTIME,
+    objective: dict[str, object] | None = None,
 ) -> dict[str, object]:
     steps_per_epoch, warmup_steps = scheduler_step_contract(
         training_sample_count,
@@ -84,10 +89,8 @@ def training_contract(
         "adamw_epsilon": ADAMW_EPS,
         "adamw_weight_decay": ADAMW_WEIGHT_DECAY,
         "gradient_clip": GRADIENT_CLIP,
-        "objective": {
-            "name": "soft_spearman",
-            "temperature": SOFT_RANK_TEMPERATURE,
-        },
+        "objective": objective
+        or {"name": "soft_spearman", "temperature": SOFT_RANK_TEMPERATURE},
         "sam": {"rho": SAM_RHO, "base_optimizer": "adamw"},
     }
 
@@ -105,13 +108,16 @@ def build_run_provenance(
     training_sample_count: int,
     date_replacement: bool,
     runtime: RuntimeSettings = GH200_RUNTIME,
+    auxiliary_variant: str | None = None,
+    auxiliary_target_identity: dict[str, object] | None = None,
+    objective: dict[str, object] | None = None,
 ) -> dict[str, object]:
     provenance = {
         "schema": RUN_PROVENANCE_SCHEMA,
         "repository_commit": repository_commit_value,
         "feature_store": str(feature_store.resolve()),
         "feature_store_identity": feature_store_metadata,
-        "model": model_metadata(),
+        "model": model_metadata(auxiliary_variant),
         "seed": seed,
         "fit_window": fit_window,
         "selection_window": selection_window,
@@ -122,6 +128,12 @@ def build_run_provenance(
             training_sample_count,
             date_replacement,
             runtime=runtime,
+            objective=objective,
+        ),
+        **(
+            {"auxiliary_target_identity": auxiliary_target_identity}
+            if auxiliary_target_identity is not None
+            else {}
         ),
     }
     return json.loads(json.dumps(provenance))

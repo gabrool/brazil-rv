@@ -78,6 +78,7 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
         SLOW_FEATURE_COUNT,
     )
     from brazil_rv.modeling.data import (
+        AUXILIARY_TARGET_FILES,
         BatchRequest,
         FEATURE_ARRAY_FILES,
         VectorizedFeatureDataset,
@@ -130,6 +131,23 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
     batch = tensorize_vectorized_batch(dataset[BatchRequest((0,), 1)])
     assert "continuous_targets" not in batch
     assert "training_weight" not in batch
+    assert not set(AUXILIARY_TARGET_FILES) & set(batch)
+
+    sidecar = tmp_path / "sidecar"
+    sidecar.mkdir()
+    auxiliary_boolean = {"residual_mask.npy", "sign_targets.npy"}
+    for name in AUXILIARY_TARGET_FILES:
+        values = np.ones(
+            (1, 158, 55, HORIZON_COUNT),
+            dtype=bool if name in auxiliary_boolean else np.float32,
+        )
+        np.save(sidecar / name, values, allow_pickle=False)
+    auxiliary_batch = tensorize_vectorized_batch(
+        VectorizedFeatureDataset(tmp_path, rows, sidecar)[BatchRequest((0,), 1)]
+    )
+    assert {name.removesuffix(".npy") for name in AUXILIARY_TARGET_FILES} <= set(
+        auxiliary_batch
+    )
     model = build_model()
     predictions = model(
         batch["patches"],
@@ -139,9 +157,7 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
         batch["state_position"],
     )
     assert predictions.shape == (1, 158, HORIZON_COUNT)
-    loss = soft_spearman_loss(
-        predictions, batch["targets"], batch["label_mask"]
-    )
+    loss = soft_spearman_loss(predictions, batch["targets"], batch["label_mask"])
     loss.backward()
     assert torch.isfinite(loss)
     assert all(

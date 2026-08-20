@@ -63,6 +63,21 @@ FEATURE_ARRAY_FILES = (
     "raw_returns.npy",
 )
 FEATURE_STORE_CONTRACT = "M1_FEATURES_PIT_CAUSAL_TOD"
+AUXILIARY_TARGET_SCHEMA = "PHASE_B_AUXILIARY_TARGETS"
+AUXILIARY_TARGET_FILES = (
+    "residual_targets.npy",
+    "residual_mask.npy",
+    "sign_targets.npy",
+    "magnitude_targets.npy",
+)
+AUXILIARY_IDENTITY_FILES = (
+    "target_scale.npy",
+    "beta_to_win.npy",
+    "beta_ready.npy",
+    "win_returns.npy",
+    "win_endpoint_mask.npy",
+    *AUXILIARY_TARGET_FILES,
+)
 SCREENING_FOLD_NOTE = (
     "Causal stored features are reused, but the time-of-day profile adapted inside "
     "these historical training dates. These are screening folds, not exact replicas "
@@ -105,6 +120,44 @@ def feature_store_identity(store: Path) -> dict[str, object]:
         "path": str(store.resolve()),
         "contract_version": schema["contract_version"],
         "metadata_sha256": digest.hexdigest(),
+    }
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def auxiliary_target_identity(
+    directory: Path, source_feature_store: dict[str, object]
+) -> dict[str, object]:
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    recorded_hashes = manifest.get("array_sha256")
+    if not isinstance(recorded_hashes, dict):
+        raise ValueError("Auxiliary-target manifest has no array hashes")
+    actual_hashes = {
+        name: _file_sha256(directory / name) for name in AUXILIARY_IDENTITY_FILES
+    }
+    audit_hash = _file_sha256(directory / "audit.json")
+    if (
+        manifest.get("schema") != AUXILIARY_TARGET_SCHEMA
+        or manifest.get("source_feature_store") != source_feature_store
+        or manifest.get("through") != VALIDATION_END.isoformat()
+        or manifest.get("test_accessed") is not False
+        or recorded_hashes != actual_hashes
+        or manifest.get("audit_file_sha256") != audit_hash
+    ):
+        raise ValueError("Auxiliary-target sidecar differs from its recorded contract")
+    return {
+        "path": str(directory.resolve()),
+        "schema": AUXILIARY_TARGET_SCHEMA,
+        "through": manifest["through"],
+        "array_sha256": actual_hashes,
+        "audit_file_sha256": audit_hash,
+        "source_feature_store": source_feature_store,
     }
 
 
@@ -267,16 +320,28 @@ def _common_batch(
     for decision in np.unique(decisions):
         group = np.flatnonzero(decisions == decision)
         targets[group] = arrays["targets.npy"][dates[group], :, int(decision), :]
-        label_mask[group] = arrays["label_mask.npy"][
-            dates[group], :, int(decision), :
-        ]
+        label_mask[group] = arrays["label_mask.npy"][dates[group], :, int(decision), :]
         raw_returns[group] = arrays["raw_returns.npy"][
             dates[group], :, int(decision), :
         ]
+    auxiliary: dict[str, np.ndarray] = {}
+    if AUXILIARY_TARGET_FILES[0] in arrays:
+        for filename in AUXILIARY_TARGET_FILES:
+            name = filename.removesuffix(".npy")
+            source = arrays[filename]
+            values = np.zeros(
+                (batch_size, EQUITY_COUNT, HORIZON_COUNT), dtype=source.dtype
+            )
+            for decision in np.unique(decisions):
+                group = np.flatnonzero(decisions == decision)
+                values[group] = source[dates[group], :, int(decision), :]
+            auxiliary[name] = values
     padded = ~sample_valid_mask
     targets[padded] = 0
     label_mask[padded] = False
     raw_returns[padded] = 0
+    for values in auxiliary.values():
+        values[padded] = 0
     sample_id[padded] = date_idx[padded] = decision_idx[padded] = -1
     return (
         {
@@ -287,6 +352,7 @@ def _common_batch(
             "sample_id": sample_id,
             "date_idx": date_idx,
             "decision_idx": decision_idx,
+            **auxiliary,
         },
         active,
         equity_cutoffs,
@@ -419,8 +485,14 @@ def _build_patch_batch(
 
 
 class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
-    def __init__(self, store: Path, sample_index: pl.DataFrame) -> None:
+    def __init__(
+        self,
+        store: Path,
+        sample_index: pl.DataFrame,
+        auxiliary_target_dir: Path | None = None,
+    ) -> None:
         self.store = store
+        self.auxiliary_target_dir = auxiliary_target_dir
         self.rows = {
             name: sample_index.get_column(name).to_numpy()
             for name in (
@@ -447,6 +519,17 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 name: np.load(self.store / name, mmap_mode="r", allow_pickle=False)
                 for name in FEATURE_ARRAY_FILES
             }
+            if self.auxiliary_target_dir is not None:
+                self._arrays.update(
+                    {
+                        name: np.load(
+                            self.auxiliary_target_dir / name,
+                            mmap_mode="r",
+                            allow_pickle=False,
+                        )
+                        for name in AUXILIARY_TARGET_FILES
+                    }
+                )
         return self._arrays
 
     def __getitem__(self, request: BatchRequest) -> dict[str, np.ndarray]:
@@ -578,6 +661,8 @@ def create_training_loaders(
     validation_rows: pl.DataFrame,
     runtime: RuntimeSettings = GH200_RUNTIME,
     seed: int = 29,
+    *,
+    auxiliary_target_dir: Path | None = None,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
@@ -585,7 +670,10 @@ def create_training_loaders(
 ]:
     sampler = DateStratifiedBatchSampler(train_rows, runtime, seed)
     train = _create_loader(
-        VectorizedFeatureDataset(store, train_rows), sampler, runtime, seed
+        VectorizedFeatureDataset(store, train_rows, auxiliary_target_dir),
+        sampler,
+        runtime,
+        seed,
     )
     validation = _create_loader(
         VectorizedFeatureDataset(store, validation_rows),

@@ -16,6 +16,44 @@ from .contract import (
 from .layers import CausalTCNResidualBlock, MuonLinear
 
 
+PHASE_B_AUXILIARY_VARIANTS = (
+    "residual_rank",
+    "sign",
+    "magnitude",
+    "combined",
+)
+_AUXILIARY_HEADS = {
+    "residual_rank": ("residual",),
+    "sign": ("sign",),
+    "magnitude": ("magnitude",),
+    "combined": ("residual", "sign", "magnitude"),
+}
+
+
+def auxiliary_head_names(variant: str) -> tuple[str, ...]:
+    try:
+        return _AUXILIARY_HEADS[variant]
+    except KeyError as error:
+        raise ValueError(f"Unknown Phase B auxiliary variant: {variant}") from error
+
+
+def auxiliary_prediction_slices(variant: str) -> dict[str, slice]:
+    width = TCN_ARCHITECTURE.output_horizons
+    return {
+        name: slice(width * (index + 1), width * (index + 2))
+        for index, name in enumerate(auxiliary_head_names(variant))
+    }
+
+
+def auxiliary_model_metadata(variant: str) -> dict[str, object]:
+    return {
+        "name": variant,
+        "heads": list(auxiliary_head_names(variant)),
+        "head_initialization": "zero_weight_and_bias",
+        "parent_rng_preserved": True,
+    }
+
+
 class SharedCausalTCN(nn.Module):
     model_name = "tcn"
 
@@ -138,6 +176,26 @@ class SharedCausalTCN(nn.Module):
         )
         return self.fusion_norm(equity_states + gate * fused)
 
+    def _fused_equity_states(
+        self,
+        patches: torch.Tensor,
+        history_patch_mask: torch.Tensor,
+        instrument_mask: torch.Tensor,
+        slow_features: torch.Tensor,
+        state_position: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        states = self._instrument_states(
+            patches, history_patch_mask, slow_features, state_position
+        )
+        equity_mask = instrument_mask[:, : self.equity_count]
+        fused = self._fuse(
+            states[:, : self.equity_count],
+            states[:, self.equity_count :],
+            equity_mask,
+            instrument_mask[:, self.equity_count :],
+        )
+        return fused, equity_mask
+
     def forward(
         self,
         patches: torch.Tensor,
@@ -146,23 +204,68 @@ class SharedCausalTCN(nn.Module):
         slow_features: torch.Tensor,
         state_position: torch.Tensor,
     ) -> torch.Tensor:
-        states = self._instrument_states(
-            patches, history_patch_mask, slow_features, state_position
-        )
-        equity_mask = instrument_mask[:, : self.equity_count]
-        equity_states = states[:, : self.equity_count]
-        fused = self._fuse(
-            equity_states,
-            states[:, self.equity_count :],
-            equity_mask,
-            instrument_mask[:, self.equity_count :],
+        fused, equity_mask = self._fused_equity_states(
+            patches,
+            history_patch_mask,
+            instrument_mask,
+            slow_features,
+            state_position,
         )
         predictions = self.prediction_head(fused)
         return predictions * equity_mask[..., None].to(predictions.dtype)
 
 
+class AuxiliaryCausalTCN(SharedCausalTCN):
+    def __init__(self, variant: str) -> None:
+        super().__init__()
+        self.auxiliary_variant = variant
+        with torch.random.fork_rng(devices=[]):
+            self.auxiliary_heads = nn.ModuleDict(
+                {
+                    name: nn.Linear(
+                        self.architecture.width,
+                        self.architecture.output_horizons,
+                        bias=True,
+                    )
+                    for name in auxiliary_head_names(variant)
+                }
+            )
+        for head in self.auxiliary_heads.values():
+            nn.init.zeros_(head.weight)
+            nn.init.zeros_(head.bias)
+
+    def forward(
+        self,
+        patches: torch.Tensor,
+        history_patch_mask: torch.Tensor,
+        instrument_mask: torch.Tensor,
+        slow_features: torch.Tensor,
+        state_position: torch.Tensor,
+    ) -> torch.Tensor:
+        fused, equity_mask = self._fused_equity_states(
+            patches,
+            history_patch_mask,
+            instrument_mask,
+            slow_features,
+            state_position,
+        )
+        outputs = [
+            self.prediction_head(fused),
+            *(
+                self.auxiliary_heads[name](fused)
+                for name in auxiliary_head_names(self.auxiliary_variant)
+            ),
+        ]
+        predictions = torch.cat(outputs, dim=-1)
+        return predictions * equity_mask[..., None].to(predictions.dtype)
+
+
 def build_model() -> SharedCausalTCN:
     return SharedCausalTCN()
+
+
+def build_auxiliary_model(variant: str) -> AuxiliaryCausalTCN:
+    return AuxiliaryCausalTCN(variant)
 
 
 def count_trainable_parameters(model: nn.Module) -> int:
