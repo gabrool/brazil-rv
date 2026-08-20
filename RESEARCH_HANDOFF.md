@@ -599,5 +599,7 @@ analyzer now supports candidate and parent ensembles with different member count
 without weakening strict alignment or uniform-rank requirements.
 
 The paid instance for these follow-ups was
-`d09de0143ed64f2f929f117e1b68727d` in `us-east-3`. Termination and provider
-absence must be recorded only after they are verified.
+`d09de0143ed64f2f929f117e1b68727d` in `us-east-3`. Lambda accepted termination,
+the instance entered `terminating`, and a subsequent provider inventory query
+confirmed that the exact ID was absent. Persistent experiment artifacts remain
+on the attached NFS volume.
