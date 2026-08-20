@@ -119,7 +119,10 @@ FeatureStoreIdentityCache = dict[str, dict[str, object]]
 
 
 def di_tilt_sidecar_identity(
-    sidecar: Path, source_feature_store: dict[str, object]
+    sidecar: Path,
+    source_feature_store: dict[str, object],
+    *,
+    require_residual: bool = False,
 ) -> dict[str, object]:
     manifest_path = sidecar / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -132,7 +135,10 @@ def di_tilt_sidecar_identity(
     hashes = manifest.get("files_sha256")
     if not isinstance(hashes, dict):
         raise ValueError("DI tilt sidecar has no immutable file hashes")
-    for name in ("tilt_exposure.npy", "tilt_ready.npy"):
+    required = ["tilt_exposure.npy", "tilt_ready.npy", "audit.json"]
+    if require_residual:
+        required.extend(("residual_targets.npy", "residual_mask.npy"))
+    for name in required:
         path = sidecar / name
         if not path.is_file():
             raise FileNotFoundError(path)
@@ -483,6 +489,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         }
         self._arrays: dict[str, np.ndarray] | None = None
         self._tilt_arrays: tuple[np.ndarray, np.ndarray] | None = None
+        self._residual_arrays: tuple[np.ndarray, np.ndarray] | None = None
 
     def __len__(self) -> int:
         return len(self.rows["sample_id"])
@@ -491,6 +498,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         state = self.__dict__.copy()
         state["_arrays"] = None
         state["_tilt_arrays"] = None
+        state["_residual_arrays"] = None
         return state
 
     def _open_arrays(self) -> dict[str, np.ndarray]:
@@ -519,6 +527,26 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             )
         return self._tilt_arrays
 
+    def _open_residual_arrays(self) -> tuple[np.ndarray, np.ndarray] | None:
+        if self.tilt_sidecar is None:
+            return None
+        if not (self.tilt_sidecar / "residual_targets.npy").is_file():
+            return None
+        if self._residual_arrays is None:
+            self._residual_arrays = (
+                np.load(
+                    self.tilt_sidecar / "residual_targets.npy",
+                    mmap_mode="r",
+                    allow_pickle=False,
+                ),
+                np.load(
+                    self.tilt_sidecar / "residual_mask.npy",
+                    mmap_mode="r",
+                    allow_pickle=False,
+                ),
+            )
+        return self._residual_arrays
+
     def __getitem__(self, request: BatchRequest) -> dict[str, np.ndarray]:
         arrays = self._open_arrays()
         positions = np.asarray(request.indices, dtype=np.int64)
@@ -541,7 +569,21 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             tilt_exposure = np.asarray(exposure[dates], dtype=np.float32) * np.asarray(
                 ready[dates] & active, dtype=np.float32
             )
-        return {**inputs, **common, "tilt_exposure": tilt_exposure}
+        output = {**inputs, **common, "tilt_exposure": tilt_exposure}
+        residual = self._open_residual_arrays()
+        if residual is not None:
+            source_targets, source_mask = residual
+            targets = np.zeros_like(common["targets"])
+            mask = np.zeros_like(common["label_mask"])
+            for decision in np.unique(decisions):
+                group = np.flatnonzero(decisions == decision)
+                targets[group] = source_targets[dates[group], :, int(decision), :]
+                mask[group] = source_mask[dates[group], :, int(decision), :]
+            padded = np.arange(dates.size) >= request.valid_count
+            targets[padded] = 0.0
+            mask[padded] = False
+            output.update(residual_targets=targets, residual_mask=mask)
+        return output
 
 
 class DateStratifiedBatchSampler(Sampler[BatchRequest]):

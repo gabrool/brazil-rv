@@ -52,6 +52,7 @@ from .model import (
     DI_TILT_EXPOSURE_VARIANT,
     MODEL_VARIANTS,
     PARENT_MODEL_VARIANT,
+    RESIDUAL_AUXILIARY_VARIANT,
     build_model,
     count_trainable_parameters,
 )
@@ -137,7 +138,9 @@ def _selection_metadata(path: Path | None, window: str) -> dict[str, object] | N
     if path is None:
         return None
     if window != "official":
-        raise ValueError("A frozen selection rule may be applied only to an official run")
+        raise ValueError(
+            "A frozen selection rule may be applied only to an official run"
+        )
     selection = load_frozen_selection(path)
     return {
         "selected_rule": selection["selected_rule"],
@@ -213,13 +216,22 @@ def run_training(
     )
     frozen_selection = _selection_metadata(selection_rule_file, selection_window)
     store_identity = feature_store_identity(store)
-    if (variant == DI_TILT_EXPOSURE_VARIANT) != (tilt_sidecar is not None):
-        raise ValueError("Only the DI tilt variant accepts and requires its sidecar")
+    sidecar_variants = {DI_TILT_EXPOSURE_VARIANT, RESIDUAL_AUXILIARY_VARIANT}
+    if (variant in sidecar_variants) != (tilt_sidecar is not None):
+        raise ValueError(
+            "Only DI tilt and residual auxiliary variants require a sidecar"
+        )
+    residual_auxiliary = variant == RESIDUAL_AUXILIARY_VARIANT
     tilt_manifest = (
         None
         if tilt_sidecar is None
-        else di_tilt_sidecar_identity(tilt_sidecar, store_identity)
+        else di_tilt_sidecar_identity(
+            tilt_sidecar,
+            store_identity,
+            require_residual=residual_auxiliary,
+        )
     )
+    objective = objective_metadata(residual_auxiliary)
     train_loader, validation_loader, sampler = create_training_loaders(
         store,
         train_rows,
@@ -251,6 +263,7 @@ def run_training(
         date_replacement=sampler.replace_dates,
         model_variant=variant,
         weight_decay=weight_decay,
+        objective=objective,
     )
     recorded_training = run_provenance["training"]
     if (
@@ -268,8 +281,8 @@ def run_training(
         "auxiliary_inputs": None
         if tilt_manifest is None
         else {
-            "di_tilt_sidecar": str(tilt_sidecar.resolve()),
-            "di_tilt_manifest": tilt_manifest,
+            "next_stage_sidecar": str(tilt_sidecar.resolve()),
+            "next_stage_sidecar_manifest": tilt_manifest,
         },
         "split": {
             "training": selection_window,
@@ -282,7 +295,7 @@ def run_training(
         "seed": seed,
         "model": run_provenance["model"],
         "parameter_count": parameter_count,
-        "objective": objective_metadata(),
+        "objective": objective,
         "optimizer": "sam_adamw",
         "sam": sam_metadata(),
         "training": recorded_training,
@@ -290,7 +303,9 @@ def run_training(
     }
     _atomic_json(run_dir / "run_manifest.json", manifest)
     compiled_model = compile_model(model)
-    compiled_objective = compile_training_objective()
+    compiled_objective = compile_training_objective(
+        residual_auxiliary=residual_auxiliary
+    )
     history: list[dict[str, object]] = []
     raw_scores: list[float] = []
     raw_prediction_tail: list[np.ndarray] = []
@@ -314,6 +329,7 @@ def run_training(
                 GH200_RUNTIME,
                 compiled_objective,
                 after_update=update_emas,
+                residual_auxiliary=residual_auxiliary,
             )
             training_seconds = time.perf_counter() - training_started
             validation_started = time.perf_counter()
@@ -329,9 +345,7 @@ def run_training(
             raw_prediction_tail = raw_prediction_tail[-5:]
             raw_scores.append(scores["raw"])
             _atomic_npz(
-                run_dir
-                / "validation_predictions"
-                / f"epoch_{epoch:02d}.npz",
+                run_dir / "validation_predictions" / f"epoch_{epoch:02d}.npz",
                 predictions,
             )
             _atomic_torch_save(

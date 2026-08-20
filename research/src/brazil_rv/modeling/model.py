@@ -25,6 +25,7 @@ SET_POOL_FACTOR_MIXER_VARIANT = "set_pool_factor_mixer_k4"
 DI_TILT_EXPOSURE_VARIANT = "di_tilt_exposure"
 CAPACITY_96_VARIANT = "capacity_96"
 COMPETITIVE_FEATURE_GATE_VARIANT = "competitive_feature_gate"
+RESIDUAL_AUXILIARY_VARIANT = "residual_auxiliary"
 MODEL_VARIANTS = (
     PARENT_MODEL_VARIANT,
     COMPRESSED_GLOBAL_RISK_VARIANT,
@@ -34,6 +35,7 @@ MODEL_VARIANTS = (
     DI_TILT_EXPOSURE_VARIANT,
     CAPACITY_96_VARIANT,
     COMPETITIVE_FEATURE_GATE_VARIANT,
+    RESIDUAL_AUXILIARY_VARIANT,
 )
 MARKET_STATE_WIDTH = 4
 SET_POOL_WIDTH = 16
@@ -93,7 +95,15 @@ def model_variant_metadata(variant: str) -> dict[str, object]:
             temperature=FEATURE_GATE_TEMPERATURE,
             gate="softmax_competitive_multiplicative_dynamic_feature_gate",
         )
+    elif variant == RESIDUAL_AUXILIARY_VARIANT:
+        details.update(
+            auxiliary_target="win_wdo_di_level_residual_rank",
+            auxiliary_weight=0.5,
+            main_head_unchanged=True,
+            head_initialization="zero_weight_and_bias",
+        )
     return details
+
 
 class SharedCausalTCN(nn.Module):
     model_name = "tcn"
@@ -145,9 +155,7 @@ class SharedCausalTCN(nn.Module):
         parent_modules = frozenset(self._modules)
         self._add_variant_modules(width, parent_modules)
 
-    def _add_variant_modules(
-        self, width: int, parent_modules: frozenset[str]
-    ) -> None:
+    def _add_variant_modules(self, width: int, parent_modules: frozenset[str]) -> None:
         if self.variant in (PARENT_MODEL_VARIANT, CAPACITY_96_VARIANT):
             return
         final_projections: list[nn.Linear] = []
@@ -192,6 +200,11 @@ class SharedCausalTCN(nn.Module):
                     16, self.architecture.patch_input_width // 5, bias=False
                 )
                 final_projections.append(self.feature_gate_output)
+            elif self.variant == RESIDUAL_AUXILIARY_VARIANT:
+                self.residual_auxiliary_head = nn.Linear(
+                    width, self.architecture.output_horizons, bias=True
+                )
+                final_projections.append(self.residual_auxiliary_head)
             else:
                 raise AssertionError(self.variant)
             for name, module in self.named_children():
@@ -210,9 +223,7 @@ class SharedCausalTCN(nn.Module):
             nn.init.ones_(module.weight)
             nn.init.zeros_(module.bias)
 
-    def _stream_states(
-        self, hidden: torch.Tensor, batch_size: int
-    ) -> torch.Tensor:
+    def _stream_states(self, hidden: torch.Tensor, batch_size: int) -> torch.Tensor:
         return hidden.reshape(
             batch_size,
             self.instrument_count,
@@ -283,7 +294,8 @@ class SharedCausalTCN(nn.Module):
             SET_POOL_FACTOR_MIXER_VARIANT,
         ):
             smoothed = self.state_norm(
-                self._masked_temporal_mean(hidden, history_patch_mask, batch_size) + slow
+                self._masked_temporal_mean(hidden, history_patch_mask, batch_size)
+                + slow
             )
             return states, smoothed
         return states, None
@@ -390,6 +402,10 @@ class SharedCausalTCN(nn.Module):
             market_state,
         )
         predictions = self.prediction_head(fused)
+        if self.variant == RESIDUAL_AUXILIARY_VARIANT:
+            predictions = torch.cat(
+                (predictions, self.residual_auxiliary_head(fused)), dim=-1
+            )
         return predictions * equity_mask[..., None].to(predictions.dtype)
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 
 from brazil_rv.modeling.contract import CONTEXT_COUNT, TCNArchitecture
-from brazil_rv.modeling.engine import soft_spearman_loss
+from brazil_rv.modeling.engine import eager_training_objective, soft_spearman_loss
 from brazil_rv.modeling.model import (
     CAPACITY_96_VARIANT,
     COMPRESSED_GLOBAL_RISK_VARIANT,
@@ -13,6 +13,7 @@ from brazil_rv.modeling.model import (
     FACTOR_MIXER_K8_VARIANT,
     MODEL_VARIANTS,
     PARENT_MODEL_VARIANT,
+    RESIDUAL_AUXILIARY_VARIANT,
     SET_POOL_FACTOR_MIXER_VARIANT,
     SharedCausalTCN,
 )
@@ -21,7 +22,8 @@ from brazil_rv.modeling.phase_c import c2_extensions_allowed, parse_args
 ZERO_START_VARIANTS = tuple(
     variant
     for variant in MODEL_VARIANTS
-    if variant not in (PARENT_MODEL_VARIANT, CAPACITY_96_VARIANT)
+    if variant
+    not in (PARENT_MODEL_VARIANT, CAPACITY_96_VARIANT, RESIDUAL_AUXILIARY_VARIANT)
 )
 
 
@@ -127,6 +129,42 @@ def test_phase_c_adapters_receive_gradients_and_wake_up() -> None:
             not torch.equal(before, after)
             for before, after in zip(initial, upstream, strict=True)
         )
+
+
+def test_residual_auxiliary_starts_as_parent_and_receives_gradient() -> None:
+    architecture = _architecture()
+    inputs = _inputs()
+    torch.manual_seed(23)
+    parent = SharedCausalTCN(
+        architecture=architecture, equity_count=4, variant=PARENT_MODEL_VARIANT
+    ).eval()
+    expected = parent(**inputs)
+    parent_state = parent.state_dict()
+
+    torch.manual_seed(23)
+    candidate = SharedCausalTCN(
+        architecture=architecture,
+        equity_count=4,
+        variant=RESIDUAL_AUXILIARY_VARIANT,
+    ).train()
+    for name, value in parent_state.items():
+        torch.testing.assert_close(candidate.state_dict()[name], value, rtol=0, atol=0)
+    predictions = candidate(**inputs)
+    torch.testing.assert_close(predictions[..., :3], expected, rtol=0, atol=0)
+    torch.testing.assert_close(
+        predictions[..., 3:], torch.zeros_like(predictions[..., 3:]), rtol=0, atol=0
+    )
+
+    rank = torch.linspace(-1.0, 1.0, 4)[None, :, None]
+    targets = rank.expand(2, -1, 3).clone()
+    mask = inputs["instrument_mask"][:, :4, None].expand(-1, -1, 3)
+    loss = eager_training_objective(residual_auxiliary=True)(
+        predictions, targets, mask, -targets, mask
+    )
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert candidate.residual_auxiliary_head.weight.grad is not None
+    assert torch.count_nonzero(candidate.residual_auxiliary_head.weight.grad) > 0
 
 
 def _c2_summary(mean: float, fold_a: float, fold_b: float):

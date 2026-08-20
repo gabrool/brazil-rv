@@ -61,6 +61,7 @@ def training_contract(
     *,
     runtime: RuntimeSettings = GH200_RUNTIME,
     weight_decay: float = ADAMW_WEIGHT_DECAY,
+    objective: dict[str, object] | None = None,
 ) -> dict[str, object]:
     steps_per_epoch, warmup_steps = scheduler_step_contract(
         training_sample_count,
@@ -90,7 +91,8 @@ def training_contract(
         "adamw_epsilon": ADAMW_EPS,
         "adamw_weight_decay": weight_decay,
         "gradient_clip": GRADIENT_CLIP,
-        "objective": {
+        "objective": objective
+        or {
             "name": "soft_spearman",
             "temperature": SOFT_RANK_TEMPERATURE,
         },
@@ -112,6 +114,7 @@ def build_run_provenance(
     date_replacement: bool,
     model_variant: str = PARENT_MODEL_VARIANT,
     weight_decay: float = ADAMW_WEIGHT_DECAY,
+    objective: dict[str, object] | None = None,
     runtime: RuntimeSettings = GH200_RUNTIME,
 ) -> dict[str, object]:
     provenance = {
@@ -131,6 +134,7 @@ def build_run_provenance(
             date_replacement,
             runtime=runtime,
             weight_decay=weight_decay,
+            objective=objective,
         ),
     }
     return json.loads(json.dumps(provenance))

@@ -26,6 +26,7 @@ from .model import (
     DI_TILT_EXPOSURE_VARIANT,
     FACTOR_MIXER_K4_VARIANT,
     FACTOR_MIXER_K8_VARIANT,
+    RESIDUAL_AUXILIARY_VARIANT,
     SET_POOL_FACTOR_MIXER_VARIANT,
 )
 from .next_stage_diagnostics import crossfit_patience_observations
@@ -326,7 +327,11 @@ def _run_candidate(
         selection_window=fold,
         run_dir=run_dir,
         variant=variant,
-        tilt_sidecar=(tilt_sidecar if variant == DI_TILT_EXPOSURE_VARIANT else None),
+        tilt_sidecar=(
+            tilt_sidecar
+            if variant in (DI_TILT_EXPOSURE_VARIANT, RESIDUAL_AUXILIARY_VARIANT)
+            else None
+        ),
     )
 
 
@@ -370,6 +375,12 @@ def run_phase_c_campaign(
     identity = feature_store_identity(store)
     _validate_parent_campaign(parent_campaign, store=store, identity=identity)
     sidecar_manifest = di_tilt_sidecar_identity(tilt_sidecar, identity)
+    sidecar_audit = json.loads(
+        (tilt_sidecar / "audit.json").read_text(encoding="utf-8")
+    )
+    d2_training_gate_passed = bool(sidecar_audit["training_gate"]["passed"])
+    if d2_training_gate_passed:
+        di_tilt_sidecar_identity(tilt_sidecar, identity, require_residual=True)
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = output_dir / "campaign_manifest.json"
     immutable = {
@@ -378,8 +389,10 @@ def run_phase_c_campaign(
         "feature_store": str(store.resolve()),
         "feature_store_identity": identity,
         "trajectory_parent": str(parent_campaign.resolve()),
-        "di_tilt_sidecar": str(tilt_sidecar.resolve()),
-        "di_tilt_sidecar_manifest": sidecar_manifest,
+        "next_stage_sidecar": str(tilt_sidecar.resolve()),
+        "next_stage_sidecar_manifest": sidecar_manifest,
+        "d2_training_gate_passed": d2_training_gate_passed,
+        "d2_selected_variant": sidecar_audit["selected_lowest_correlation_variant"],
         "initial_variants": list(INITIAL_VARIANTS),
         "c2_extension_variants": list(C2_EXTENSION_VARIANTS),
         "null_only_variants": list(NULL_ONLY_VARIANTS),
@@ -446,6 +459,8 @@ def run_phase_c_campaign(
         )
         return summary
 
+    if d2_training_gate_passed:
+        run(RESIDUAL_AUXILIARY_VARIANT)
     initial = {variant: run(variant) for variant in INITIAL_VARIANTS}
     if c2_extensions_allowed(initial[FACTOR_MIXER_K4_VARIANT]):
         for variant in C2_EXTENSION_VARIANTS:

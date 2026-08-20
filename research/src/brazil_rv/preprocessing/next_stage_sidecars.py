@@ -231,7 +231,7 @@ def _di_level_future(
         out=np.zeros_like(values[0]),
         where=count > 0,
     )
-    return level.astype(np.float32), count >= 3
+    return level.astype(np.float32), count > 0
 
 
 def _validate_target_parity(
@@ -297,8 +297,7 @@ def _residual_variant(
         }
         for horizon in HORIZONS
     }
-    training = frozenset(int(value) for value in dates.train)
-    for date_idx in range(len(dates.trade_dates)):
+    for date_idx in dates.train:
         for decision_idx in range(raw.shape[2]):
             for horizon_idx, horizon in enumerate(HORIZONS):
                 valid = np.asarray(
@@ -329,8 +328,6 @@ def _residual_variant(
                         centered_midranks(residual)
                     )
                     residual_mask[date_idx, matched, decision_idx, horizon_idx] = True
-                if date_idx not in training:
-                    continue
                 row = metrics[horizon]
                 row["main"] += int(valid.sum())
                 row["beta"] += int(beta_ready.sum())
@@ -455,13 +452,14 @@ def build_next_stage_sidecars(store: Path, output_dir: Path) -> Path:
     scope = prepare_equity_causal_scope(inputs, dates, equity_index, arrays)
     equity = load_equity_causal_state(inputs, dates, scope)
     date_count = int(dates.validation[-1]) + 1
-    _validate_target_parity(store, equity.sigma, date_count)
+    training_date_count = int(dates.train[-1]) + 1
+    _validate_target_parity(store, equity.sigma, training_date_count)
     equity_ready = np.asarray(
         arrays.array("equity_data_ready.npy")[:date_count], dtype=bool
     )
 
     context_index = pl.read_parquet(store / "context_index.parquet")
-    trade_dates = dates.trade_dates[:date_count]
+    trade_dates = dates.trade_dates[:training_date_count]
     win_future, win_endpoint, win_change, win_valid = _nonrate_context(
         context_index, "WIN$", trade_dates
     )
@@ -480,8 +478,15 @@ def build_next_stage_sidecars(store: Path, output_dir: Path) -> Path:
     beta_di = np.asarray(
         slow[:date_count, :, BETA_TO_DI1F28_SLOW_INDEX], dtype=np.float32
     )
-    ready_win = paired_beta_readiness(equity.change_valid, win_valid) & equity_ready
-    ready_wdo = paired_beta_readiness(equity.change_valid, wdo_valid) & equity_ready
+    training_equity_ready = equity_ready[:training_date_count]
+    ready_win = (
+        paired_beta_readiness(equity.change_valid[:training_date_count], win_valid)
+        & training_equity_ready
+    )
+    ready_wdo = (
+        paired_beta_readiness(equity.change_valid[:training_date_count], wdo_valid)
+        & training_equity_ready
+    )
 
     rate_grids = load_rate_grids(inputs, dates)
     rate_factors, rate_factor_valid, contract_change_valid = _daily_rate_factors(
@@ -501,9 +506,12 @@ def build_next_stage_sidecars(store: Path, output_dir: Path) -> Path:
     )
 
     short_beta, short_ready = causal_unclipped_beta(
-        equity.change, equity.change_valid, win_change, win_valid
+        equity.change[:training_date_count],
+        equity.change_valid[:training_date_count],
+        win_change,
+        win_valid,
     )
-    short_ready &= equity_ready
+    short_ready &= training_equity_ready
     component_sets = {
         "short_unclipped_win": ((short_beta, short_ready, win_future, win_endpoint),),
         "win_wdo": (
@@ -572,7 +580,11 @@ def build_next_stage_sidecars(store: Path, output_dir: Path) -> Path:
                 ),
             },
             "di_tilt": {
-                "training_ready_fraction": float(tilt_ready[dates.train].mean()),
+                "training_ready_fraction": float(
+                    tilt_ready[dates.train].sum()
+                    / training_equity_ready[dates.train].sum()
+                ),
+                "coverage_denominator": "active training equity-date cells",
                 "source": "causal beta to fitted DI tilt factor",
             },
             "mutation_causality_checks": _mutation_checks(),
@@ -595,12 +607,13 @@ def build_next_stage_sidecars(store: Path, output_dir: Path) -> Path:
                 "20 prior paired sessions; emit before current update"
             ),
             "d2_contract": {
+                "target_through": TRAIN_END.isoformat(),
                 "short_win_half_life_days": SHORT_WIN_HALF_LIFE_DAYS,
                 "short_win_clip": None,
                 "short_win_variance_floor": None,
                 "di_level_future": (
-                    "mean basis-point open[T]-to-close[T+h-1] change over at "
-                    "least three endpoint-ready fixed DI contracts"
+                    "mean basis-point open[T]-to-close[T+h-1] change over all "
+                    "endpoint-ready fixed DI contracts; at least one required"
                 ),
                 "selected_variant": selected,
                 "training_gate_passed": training_gate_passed,
