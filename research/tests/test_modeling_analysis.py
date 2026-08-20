@@ -6,7 +6,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from brazil_rv.modeling.analyze import align_observations, compare_ensembles
+from brazil_rv.modeling.analyze import (
+    align_observations,
+    compare_ensembles,
+    compare_observation_ensembles,
+)
 from brazil_rv.modeling.engine import EvaluationObservations
 from brazil_rv.modeling.metrics import rank_average_predictions
 
@@ -127,3 +131,23 @@ def test_comparison_reports_member_ensemble_bootstrap_and_guardrails(
     assert len(report["horizon_guardrails"]) == 3
     assert len(report["time_of_day_guardrails"]) == 1
     assert (output / "daily_delta.parquet").is_file()
+
+
+def test_comparison_allows_different_candidate_and_parent_member_counts(
+    tmp_path: Path,
+) -> None:
+    predictions = np.broadcast_to(
+        np.linspace(-1.0, 1.0, 32, dtype=np.float32)[None, :, None],
+        (10, 32, 3),
+    ).copy()
+    observations = _observations(predictions)
+    output = compare_observation_ensembles(
+        {"parent_11": observations, "variant_11": observations},
+        {"parent_11": observations},
+        candidate_rule="uniform_parent_plus_variant",
+        parent_rule="parent_only",
+        output_dir=tmp_path / "analysis",
+    )
+    report = json.loads((output / "analysis.json").read_text(encoding="utf-8"))
+    assert len(report["candidate"]["member_ic"]) == 2
+    assert len(report["parent"]["member_ic"]) == 1

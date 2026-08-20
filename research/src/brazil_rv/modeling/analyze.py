@@ -163,8 +163,6 @@ def compare_observation_ensembles(
     output_dir: Path,
     comparison_metadata: Mapping[str, object] | None = None,
 ) -> Path:
-    if set(candidate_members) != set(parent_members):
-        raise ValueError("Candidate and parent ensemble members differ")
     if output_dir.exists():
         raise FileExistsError(output_dir)
     output_dir.mkdir(parents=True)

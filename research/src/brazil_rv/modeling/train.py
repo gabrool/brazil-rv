@@ -45,7 +45,12 @@ from .engine import (
     train_one_epoch,
     validation_primary_metric,
 )
-from .model import build_model, count_trainable_parameters
+from .model import (
+    PARENT_MODEL_VARIANT,
+    build_model,
+    count_trainable_parameters,
+    model_variant_metadata,
+)
 from .optim import build_optimizer, build_scheduler
 from .provenance import build_run_provenance, repository_commit
 from .trajectory import (
@@ -184,6 +189,7 @@ def run_training(
     selection_window: str,
     run_dir: Path,
     selection_rule_file: Path | None = None,
+    variant: str = PARENT_MODEL_VARIANT,
 ) -> Path:
     if run_dir.exists():
         raise FileExistsError(run_dir)
@@ -205,7 +211,7 @@ def run_training(
         GH200_RUNTIME,
         seed,
     )
-    model = build_model().cuda()
+    model = build_model(variant).cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
     parameter_count = count_trainable_parameters(model)
     optimizer, _ = build_optimizer(model)
@@ -227,6 +233,8 @@ def run_training(
         date_replacement=sampler.replace_dates,
     )
     recorded_training = run_provenance["training"]
+    if variant != PARENT_MODEL_VARIANT:
+        run_provenance["model"]["variant"] = model_variant_metadata(variant)
     if (
         recorded_training["steps_per_epoch"],
         recorded_training["warmup_steps"],
