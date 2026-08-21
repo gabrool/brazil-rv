@@ -335,7 +335,8 @@ def main() -> int:
     audit_json = args.out / "parse_audit.json"
     with audit_csv.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(asdict(audits[0]).keys()))
-        writer.writeheader(); writer.writerows(asdict(item) for item in audits)
+        writer.writeheader()
+        writer.writerows(asdict(item) for item in audits)
     audit_json.write_text(json.dumps({
         "script_version": SCRIPT_VERSION,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),

@@ -1334,3 +1334,59 @@ complete, cleanup commit `7a6590e` passed verification, and GitHub `main` was
 updated. Lambda reported `terminating`; two subsequent provider inventory checks
 confirmed zero matches for the exact ID. The artifact remains on persistent
 `brazil-rv-east3` NFS.
+
+## Experiment 26 -- Storage, repository, and challenger-contract cleanup
+
+Purpose: make the research environment lean without losing the canonical inputs,
+auditable results, or the fixed files needed for the standing challenger.
+
+### Lambda storage
+
+A complete object inventory attributed 125.789 GiB of the 148.513-GiB filesystem
+to model runs. The deletion plan was generated from the live object listing and
+bound to an uploaded SHA-256 manifest before execution. It removed exactly 5,928
+objects / 129.699 GiB and left 18.815 GiB.
+
+Protected invariants after deletion:
+
+- canonical causal-TOD feature store: 27/27 objects present;
+- obsolete human-prior V4 feature store: zero objects;
+- canonical parent discovery predictions: 120 epoch files and six references
+  present; zero redundant raw checkpoints;
+- residual challenger discovery payloads: six epoch-20 files and six references,
+  with no other binary states;
+- residual challenger official payloads: three epoch-20 files and three
+  references, with no other binary states;
+- raw/interim data: untouched; and
+- active paid Lambda instances: zero.
+
+The cleanup is permanent at the object-store layer. Historical rejected
+trajectories retain their commits, manifests, metrics, and analysis outputs, but
+deleted checkpoints and redundant predictions would require a rerun to recreate.
+
+Artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_retention/storage_cleanup_20260821`
+
+Delete-list SHA-256:
+`b45f591cd4c77640ce2c924506f3040b1cdefe6b65679de7bae618217dd75f7b`.
+
+### Designated challenger
+
+The EMA-member stack from Experiment 25 is now the designated challenger:
+parent-3 honest cross-fitted Raw Patience-3 plus Experiment-18 residual-auxiliary-3
+fixed final EMA-0.995, uniform tie-aware rank average, seeds 11/29/47, and no
+learned weights. Every residual training/model/target/optimizer hyperparameter is
+frozen to the `3b60ac9` run manifests; no tuning is permitted.
+
+All future discovery-fold screens must report:
+
+1. candidate minus canonical parent; and
+2. candidate minus designated challenger, informational only.
+
+Retention remains exclusively a function of the canonical-parent comparison.
+Selecting because a candidate "beats either" comparator is prohibited. The
+challenger gets its official comparison only inside the next official read already
+earned by a future stage winner, so it cannot itself increase validation spending.
+No official-validation predictions or held-out-test data were opened in this
+cleanup.

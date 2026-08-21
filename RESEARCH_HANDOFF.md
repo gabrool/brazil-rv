@@ -811,3 +811,32 @@ pre-experiment commit `68c6301` exactly and pass the 209-test suite plus Ruff.
 The paid analysis instance `3985e78591e349549f7c99971c86fa9e` was terminated
 after cleanup commit `7a6590e` reached GitHub. Two provider inventory checks
 confirmed the exact ID was absent; the immutable NFS artifact persists.
+
+## Designated challenger and cleanup state (2026-08-21)
+
+The EMA-member stack is retained as a standing challenger, not as the canonical
+recipe. It is the uniform rank average of three honest odd/even cross-fitted
+parent Raw-Patience members and three Experiment-18 stronger-residual members at
+fixed final EMA-0.995, seeds 11/29/47. The residual target is the audited
+WIN+WDO+ready-DI-level residual rank; auxiliary soft-Spearman weight is 0.5 and all
+other hyperparameters are frozen to the `3b60ac9` manifests.
+
+Future fold screens use
+`modeling.designated_challenger.compare_discovery_screen`. It emits candidate
+deltas against both canonical parent and challenger, but its machine-readable
+selection contract keeps retention keyed only to the canonical parent and forbids "beats either" selection. The challenger receives an official comparison only as
+part of the next official read independently justified for a future stage winner.
+Its saved official final-EMA payloads remain reserved; the test lockbox is sealed.
+
+Lambda storage was compacted from 148.513 GiB to 18.815 GiB by deleting 5,928
+exactly enumerated objects (129.699 GiB). Raw/interim data, the canonical causal-TOD
+store, all parent epoch predictions needed for cross-fit Patience, and the exact
+discovery/official challenger payloads were verified after deletion. Closed
+campaigns retain lightweight manifests, metrics, and analyses; deleted training
+intermediates require rerunning their recorded commits. The immutable cleanup
+manifest and exact delete list are at:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_retention/storage_cleanup_20260821
+
+No paid Lambda instance was active. Provider byte accounting lagged immediately
+after deletion, but the complete object listing measured 20,202,855,773 bytes.

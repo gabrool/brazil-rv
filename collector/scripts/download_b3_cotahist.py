@@ -148,7 +148,8 @@ def main() -> int:
     (args.out / "download_manifest.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     with (args.out / "download_manifest.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(asdict(results[0]).keys()))
-        writer.writeheader(); writer.writerows(asdict(result) for result in results)
+        writer.writeheader()
+        writer.writerows(asdict(result) for result in results)
 
     failed = [result for result in results if result.status not in {"downloaded", "existing_valid"}]
     if failed:

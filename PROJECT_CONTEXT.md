@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-08-19.
+Last verified: 2026-08-21.
 
 ## Purpose and current research state
 
@@ -306,3 +306,66 @@ Rejected Phase B sidecar/training/recency plumbing and the one-use confirmation
 driver were deleted from current HEAD. Reproduction is through commits
 `a04d63e`, `15471e8`, `6b7b121`, `e33a122`, and immutable artifacts, not
 compatibility code.
+
+
+## Designated challenger and comparator policy (2026-08-21)
+
+The standing designated challenger is fixed as the uniform six-member rank
+ensemble of:
+
+- the three canonical parent members at seeds 11/29/47, with Raw Patience-3
+  selected bidirectionally on the opposite odd/even discovery-date parity; and
+- the three Experiment-18 residual-auxiliary members at the same seeds, read at
+  fixed final EMA-0.995.
+
+The auxiliary configuration is frozen to commit `3b60ac9` and its immutable run
+manifests: WIN + WDO + ready-DI-level residual rank, soft-Spearman auxiliary
+weight 0.5, separate zero-weight/zero-bias auxiliary head, parent initialization
+and RNG stream preserved, width 64, 20 epochs, SAM rho 0.125, learning rate
+0.0003, and EMA decay 0.995. All six predictions are tie-aware ranked within each
+sample/horizon and averaged uniformly; weights are never learned.
+
+This is not a second retention baseline. Every future discovery-fold candidate
+must report paired deltas against both the canonical parent and this challenger,
+but candidate retention remains keyed exclusively to the canonical parent. "Beats either" selection is prohibited. The challenger column is informational
+evidence accumulated passively. The canonical entry point for future fold screens
+is `modeling.designated_challenger.compare_discovery_screen`, whose summary
+records this selection contract.
+
+The challenger receives one official-validation comparison only when bundled into
+the next official read already justified for a future stage winner. It does not
+independently authorize an official read. The saved official residual final
+EMA-0.995 payloads remain unopened for that purpose. The held-out test remains
+sealed.
+
+## Persistent Lambda retention cleanup (2026-08-21)
+
+The `brazil-rv-east3` object store was reduced from 159,464,940,112 bytes
+(148.513 GiB) to 20,202,855,773 bytes (18.815 GiB). The exact manifest deleted
+5,928 objects totaling 139,262,802,568 bytes (129.699 GiB):
+
+- an obsolete noncanonical human-prior V4 feature store;
+- 120 unreferenced historical model-run prefixes;
+- raw checkpoints, tail states, and redundant per-epoch predictions from closed
+  campaigns; and
+- all Phase-C/official binary intermediates except the designated challenger's
+  required final EMA-0.995 predictions and observation references.
+
+Raw and interim data were untouched. The canonical causal-TOD feature store and
+pointer remain complete. The parent retains all 120 per-epoch discovery prediction
+files and six references needed to reconstruct honest Patience cross-fits. The
+challenger retains six discovery and three official residual epoch-20 prediction
+files with their matching references. Manifests, histories, metrics, analyses,
+and every run prefix named in the durable research record remain.
+
+The immutable cleanup record is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_retention/storage_cleanup_20260821
+
+Its delete-list SHA-256 is
+`b45f591cd4c77640ce2c924506f3040b1cdefe6b65679de7bae618217dd75f7b`.
+Deleted binary intermediates are not recoverable in place; exact reruns use their
+recorded commits, retained manifests/results, and canonical derived data. Lambda's
+provider accounting endpoint still reported the pre-cleanup byte count immediately
+after deletion, while a complete object-store listing returned the verified
+post-cleanup total. No paid instance was active.

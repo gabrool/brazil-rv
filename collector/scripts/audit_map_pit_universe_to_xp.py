@@ -117,7 +117,7 @@ def main() -> int:
     union = load_required(args.universe_dir / "universe_union.parquet")
     master = load_required(args.universe_dir / "security_master.parquet")
     ticker_history = load_required(args.universe_dir / "ticker_history.parquet")
-    changes = load_required(args.universe_dir / "universe_changes.parquet")
+    load_required(args.universe_dir / "universe_changes.parquet")
     summary = load_required(args.universe_dir / "universe_summary.parquet")
     catalogue = load_required(args.xp_catalogue)
 
