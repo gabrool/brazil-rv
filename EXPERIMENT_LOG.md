@@ -1272,3 +1272,56 @@ and Ruff, and GitHub `main` was updated. Lambda accepted termination, reported
 `terminating`, and the exact ID was then absent in two consecutive provider
 inventory checks. Persistent experiment artifacts remain on the
 `brazil-rv-east3` NFS filesystem.
+
+## Experiment 25 — EMA residual-member stack rule reanalysis
+
+Purpose: act once on the replicated interaction between auxiliary regularization
+and the fixed checkpoint rule by isolating the saved residual members' readout.
+
+### Settings
+
+- Training: none. All predictions came from Experiment 18's six discovery
+  trajectories.
+- Candidate: parent-3 cross-fitted Raw Patience-3 plus residual-3 fixed final
+  EMA-0.995.
+- Comparator: the identical parent-3 Patience members plus residual-3 cross-fitted
+  Raw Patience-3 members.
+- Patience construction: select each member's raw epoch on one odd/even date
+  parity and report only on the other, in both directions.
+- Ensemble: uniform tie-aware within-sample/horizon rank average; no learned
+  weights.
+- Predeclared gate: candidate-minus-comparator IC at least `+0.001` on each fold
+  individually. Only a passing gate could open the saved official predictions.
+- Inference: paired daily delta with 10,000-replicate block-5/10 bootstrap plus
+  horizon and TOD guardrails.
+
+| Fold | EMA-member stack IC | Patience-member stack IC | Delta |
+|---|---:|---:|---:|
+| A | 0.049103342 | 0.048750860 | +0.000352482 |
+| B | 0.053006013 | 0.050705923 | +0.002300089 |
+| Mean | 0.051054677 | 0.049728392 | +0.001326286 |
+
+Fold A's block-5/10 intervals were `[-0.002179, +0.002805]` and
+`[-0.002249, +0.002854]`. Its 30/60/120-minute deltas were
+`+0.001770 / +0.000576 / -0.001288`. Fold B was convincingly positive:
+block-5 `[+0.001152, +0.003937]`, block-10 `[+0.001553, +0.003871]`, with
+positive deltas at all three horizons.
+
+Decision: the exact gate failed because Fold A gained only `+0.000352`, below
+`+0.001`, despite the positive two-fold mean. The driver therefore never opened
+the official artifacts. Its manifest records `official_validation_accessed=false`
+and `test_accessed=false`. This resolves the repeated EMA signature honestly:
+the effect is real in Fold B but not robust enough across both discovery periods
+to support another consumed-validation read. The model-side program is closed.
+
+Artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/ema_residual_stack_84ae363_20260821T114900Z`
+
+### Deletion-first cleanup
+
+The one-use analyzer and its specific tests were removed after the gate failed.
+Exact reproduction uses implementation commit `84ae363` and the immutable artifact,
+not compatibility code on current HEAD. Canonical source/tests returned exactly to
+pre-experiment commit `68c6301`; 185 research tests, 24 collector invariants, and
+Ruff passed.

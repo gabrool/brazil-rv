@@ -779,3 +779,31 @@ The paid next-stage instance was `c6e81d007b354af98eaeec598902543c` in
 pushed, then two provider inventory checks confirmed zero matches for the exact
 ID. Persistent sidecar, discovery, and official-confirmation artifacts remain on
 `brazil-rv-east3` NFS.
+
+## Final EMA residual-stack reanalysis (2026-08-21)
+
+The replicated positive EMA-0.995 secondary readouts triggered one final
+zero-training, predeclared comparison. On each discovery fold, the candidate kept
+the same three cross-fitted parent Patience members and changed only the three
+residual members from cross-fitted Raw Patience-3 to fixed final EMA-0.995. The
+gate required at least `+0.001` candidate-minus-comparator IC on each fold before
+any additional official access.
+
+Fold A gained `+0.000352` (`0.049103` versus `0.048751`) and failed the gate;
+its 120-minute delta was `-0.001288` and both block intervals crossed zero. Fold B
+gained `+0.002300` (`0.053006` versus `0.050706`) with both intervals wholly
+positive. The mean gain was `+0.001326`, but mean performance could not override
+the both-fold contract.
+
+No official-validation or held-out-test artifact was opened. The immutable result
+is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/ema_residual_stack_84ae363_20260821T114900Z
+
+This closes the model-side program: EMA is genuinely helpful for the residual
+stack in one discovery period, but the effect did not replicate strongly enough
+under the same guardrail used throughout the program.
+
+Deletion-first cleanup removed the one-use analyzer and tests. Reproduction uses
+commit `84ae363` and the immutable artifact; current canonical source/tests match
+pre-experiment commit `68c6301` exactly and pass the 209-test suite plus Ruff.
