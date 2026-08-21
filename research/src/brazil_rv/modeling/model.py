@@ -69,12 +69,11 @@ class SharedCausalTCN(nn.Module):
             rng_state = torch.get_rng_state()
             try:
                 self.sidecar_adapter = nn.Linear(
-                    2 * sidecar_feature_count, width, bias=True
+                    2 * sidecar_feature_count, width, bias=False
                 )
             finally:
                 torch.set_rng_state(rng_state)
             nn.init.zeros_(self.sidecar_adapter.weight)
-            nn.init.zeros_(self.sidecar_adapter.bias)
 
     @staticmethod
     def _initialize_module(module: nn.Module) -> None:

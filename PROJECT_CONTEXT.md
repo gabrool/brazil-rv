@@ -75,11 +75,14 @@ date/equity axis hashes. Daily arrays have shape `[date, 158, feature]`; intrada
 arrays add the canonical 55-decision axis. Every feature has an explicit mask,
 invalid values are exactly zero, and source-specific availability is materialized
 as an exact no-fill join before training. The loader additionally gates values and
-masks by point-in-time equity membership. A single per-equity linear residual
-injects concatenated values and masks into the incumbent state; its weight and
-bias are zero-initialized, and candidate construction restores the parent's RNG
+masks by point-in-time equity membership. A single per-equity bias-free linear
+residual injects concatenated values and masks into the incumbent state; its
+weight is zero-initialized, and candidate construction restores the parent's RNG
 state after adding it. Thus every external-data candidate begins as the exact
-parent without changing base weights or dropout randomness.
+parent without changing base weights or dropout randomness. An equity with no
+valid external observation has an all-zero input and therefore receives exactly
+zero direct adapter residual throughout training; learned mask weights still
+represent observedness where data is present.
 
 ## Splits, discovery folds, and test policy
 

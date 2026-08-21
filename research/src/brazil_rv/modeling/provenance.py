@@ -54,6 +54,8 @@ def model_metadata(
             "input_width": 2 * sidecar_feature_count,
             "input": "values_concatenated_with_explicit_masks",
             "injection": "equity_state_linear_residual",
+            "bias": False,
+            "all_missing_input_injection": "identically_zero",
             "zero_initialized": True,
         }
     return json.loads(json.dumps(model))

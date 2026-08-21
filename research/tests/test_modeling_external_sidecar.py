@@ -252,6 +252,47 @@ def test_zero_start_sidecar_is_exact_parent_and_adapter_gradient_wakes() -> None
     assert candidate.sidecar_adapter.weight.grad.norm() > 0
 
 
+def test_sidecar_adapter_never_changes_an_all_missing_equity() -> None:
+    torch.manual_seed(41)
+    parent = SharedCausalTCN(architecture=_tiny_architecture(), equity_count=4)
+    torch.manual_seed(41)
+    candidate = SharedCausalTCN(
+        architecture=_tiny_architecture(),
+        equity_count=4,
+        sidecar_feature_count=2,
+    )
+    assert candidate.sidecar_adapter is not None
+    assert candidate.sidecar_adapter.bias is None
+    with torch.no_grad():
+        candidate.sidecar_adapter.weight.fill_(0.25)
+
+    equity_states = torch.randn(1, 4, _tiny_architecture().width)
+    sidecar = torch.tensor(
+        [
+            [
+                [0.0, 0.0, 0.0, 0.0],
+                [1.0, -0.5, 1.0, 1.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 1.0],
+            ]
+        ]
+    )
+    injected = candidate._inject_sidecar(equity_states, sidecar)
+    torch.testing.assert_close(injected[:, 0], equity_states[:, 0], rtol=0, atol=0)
+    torch.testing.assert_close(injected[:, 2], equity_states[:, 2], rtol=0, atol=0)
+    assert not torch.equal(injected[:, 1], equity_states[:, 1])
+    assert not torch.equal(injected[:, 3], equity_states[:, 3])
+
+    torch.manual_seed(9)
+    inputs = _model_inputs(4)
+    all_missing = torch.zeros(1, 4, 4)
+    parent.eval()
+    candidate.eval()
+    torch.testing.assert_close(
+        candidate(*inputs, all_missing), parent(*inputs), rtol=0, atol=0
+    )
+
+
 def test_sidecar_identity_is_recorded_in_provenance_and_checkpoint(
     tmp_path: Path,
 ) -> None:
@@ -283,8 +324,12 @@ def test_sidecar_identity_is_recorded_in_provenance_and_checkpoint(
         runtime=runtime,
     )
     assert provenance["external_sidecar"] == sidecar_identity
-    assert provenance["model"]["external_sidecar_adapter"]["input_width"] == 4
+    adapter = provenance["model"]["external_sidecar_adapter"]
+    assert adapter["input_width"] == 4
+    assert adapter["bias"] is False
+    assert adapter["all_missing_input_injection"] == "identically_zero"
     state = model.state_dict()
+    assert "sidecar_adapter.bias" not in state
     payload = checkpoint_payload(
         model,
         {"ema_098": state, "ema_099": state, "ema_0995": state},

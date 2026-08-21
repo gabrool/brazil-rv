@@ -1411,10 +1411,12 @@ existed.
 - One fixed 20-epoch SAM trajectory per fold/seed, with the incumbent architecture,
   optimizer, batches, objective, and data order unchanged. Raw and EMA-0.98/0.99/
   0.995 states and validation predictions are saved every epoch.
-- Values and explicit masks enter through one per-equity linear state residual.
-  Its weight and bias are zero; constructing it restores the parent's RNG state,
+- Values and explicit masks enter through one per-equity bias-free linear state
+  residual. Its weight is zero; constructing it restores the parent's RNG state,
   so every candidate begins as the exact parent and does not shift base weights or
-  dropout randomness.
+  dropout randomness. An all-missing equity has an all-zero adapter input and an
+  identically zero direct residual throughout training. Mask-column weights retain
+  a learnable observedness path where the source is present.
 - Primary readout: Raw Patience-3 selected on one odd/even date parity and reported
   only on the other, in both directions. The checkpoint rule is not reselected for
   any dataset.
@@ -1444,6 +1446,10 @@ inaccessible throughout these ten screens.
    A bulletin dated D is end-of-day data available at the next B3 open. Complete
    tables permit observed zero; missing/incomplete bulletins stay masked. Historical
    rates, fees, new-loan flow, and utilization are unavailable and are not tested.
+   The retrievable BDI archive begins on 2022-03-21 (first usable sidecar date
+   2022-03-22); 157 earlier requested sessions are explicit unmigrated endpoint
+   failures, so Fold-A fit contains a real coverage-regime change rather than an
+   invented zero history.
 2. **SHFE ferrous/pulp.** Ten prior-only robust features from rebar, HRC, and pulp:
    same-contract 1/5-session returns, product curves, and HRC-minus-rebar spread.
    The contract is chosen with prior-session open interest. Exact Shanghai
@@ -1457,11 +1463,13 @@ inaccessible throughout these ten screens.
    become usable next session. Per-series OI, covered/uncovered quantity, and IV
    are not inferred when their historical source payload is absent.
 4. **CVM RAD events.** Five decision-level states: ITR/DFP, material-fact,
-   market-communication, and shareholder/corporate-action events within five
-   sessions, plus bounded log trading-minute age since the latest event. Exact RAD
-   receipt time activates at the first canonical decision strictly after receipt.
-   Historical FCA plus exact same-date COTAHIST maps issuer/share classes; pending
-   events and duplicated price-drift features are excluded.
+   market-communication, and IPE shareholder-notice events within five sessions,
+   plus bounded log trading-minute age since the latest event. The shareholder-
+   notice field is only a corporate-action proxy; the stopped optional expansion
+   means provent and OPA categories are not claimed. Exact RAD receipt time activates
+   at the first canonical decision strictly after receipt. Historical FCA plus exact
+   same-date COTAHIST maps issuer/share classes; pending events and duplicated
+   price-drift features are excluded.
 5. **B3 odd-lot activity.** Eight next-session features: fixed transforms of odd-
    lot volume/trade shares, exact lag-5 changes, prior-20 median/MAD surprises,
    regular-versus-odd average trade value, and close ratio. Regular and odd COTAHIST
@@ -1471,9 +1479,11 @@ inaccessible throughout these ten screens.
    SMLL: current weight, preview delta/add/delete/pressure, pre-effective ramp, and
    post-effective reversal. Historical official attachments activate at their
    exact archived HTTP timestamp; preview weights become current only at the
-   effective-session open. Permanent identity and prior ADV/close inputs are
-   causal. MSCI is excluded because no clean free historical archive/license was
-   found.
+   effective-session open. The recovered archive contains 13 releases and 291 state
+   dates beginning 2023-05-02; dates before that remain masked and are not called a
+   complete 2021--2024 rebalance history. Permanent identity and prior ADV/close
+   inputs are causal. MSCI is excluded because no clean free historical archive/
+   license was found.
 7. **CCEE PLD power state.** Eleven fixed, prior-only level/spread/range/change/
    surprise/floor/cap features plus five audited power-role masks. The complete D
    price curve is published D-1 at 20:00 and is usable from D open. ONS load/EAR
@@ -1519,3 +1529,23 @@ finite valid values, exactly-zero invalid values, permanent `security_id`, and
 explicit masks. Daily arrays are `[date, 158, feature]`; intraday arrays are
 `[date, 158, 55, feature]`. Sidecar and campaign manifests record source and array
 hashes. No candidate may access official validation or test.
+
+### Pre-score adapter correction
+
+The first paid-instance preflight at repository commit `c7dbff6` was stopped
+before any fold/seed trajectory completed and before any discovery analysis or
+score existed. Its program root was
+`external_data_c7dbff6_20260821T154100Z`. A live checkpoint-norm audit confirmed
+that the external path woke, but also exposed a missing-row confound in the
+preflight implementation: the zero-started linear projection had a trainable
+bias, so after the first update an equity with `[values=0, masks=0]` received the
+learned bias. This affected most cells for sparse sources such as SHFE, PLD, and
+ADRs and tested generic residual capacity in addition to the source.
+
+The preflight was rejected without interpretation. The corrected preregistered
+adapter is bias-free, making the direct residual identically zero for every
+all-missing equity while preserving learned mask effects for observed rows. New
+tests require exact parent initialization/RNG, nonzero observed-feature gradient
+flow, no bias checkpoint key, and exact missing-row nullity after assigning
+nonzero adapter weights. No partial checkpoint or prediction from the rejected
+preflight may enter the ten candidate screens.
