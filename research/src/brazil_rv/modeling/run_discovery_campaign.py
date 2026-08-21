@@ -8,12 +8,17 @@ from pathlib import Path
 
 from .analyze import select_trajectory_rule
 from .contract import ALLOWED_SEEDS
-from .data import feature_store_identity, resolve_feature_store
+from .data import feature_store_identity, load_external_sidecar, resolve_feature_store
 from .engine import objective_metadata
 from .provenance import repository_commit
 from .train import run_training
 
 DISCOVERY_FOLDS = ("fold_a", "fold_b")
+EXTERNAL_DATA_READOUT_CONTRACT = {
+    "primary": "bidirectional_odd_even_crossfit_patience3_raw",
+    "secondary": "final_ema_0995",
+    "trajectory_rule_reselection": False,
+}
 
 
 def _atomic_json(path: Path, value: dict[str, object]) -> None:
@@ -29,6 +34,7 @@ def _completed_run_matches(
     fold: str,
     seed: int,
     commit: str,
+    external_sidecar: dict[str, object] | None,
 ) -> bool:
     manifest_path = run_dir / "run_manifest.json"
     if not manifest_path.is_file():
@@ -42,12 +48,20 @@ def _completed_run_matches(
         and manifest.get("split", {}).get("training") == fold
         and manifest.get("split", {}).get("test_accessed") is False
         and manifest.get("objective") == objective_metadata()
+        and manifest.get("external_sidecar") == external_sidecar
     )
 
 
-def run_campaign(store: Path, output_dir: Path) -> Path:
+def run_campaign(
+    store: Path,
+    output_dir: Path,
+    *,
+    sidecar_dir: Path | None = None,
+) -> Path:
     commit = repository_commit()
     identity = feature_store_identity(store)
+    sidecar = None if sidecar_dir is None else load_external_sidecar(sidecar_dir, store)
+    sidecar_identity = None if sidecar is None else sidecar.identity
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = output_dir / "campaign_manifest.json"
     manifest = {
@@ -57,12 +71,15 @@ def run_campaign(store: Path, output_dir: Path) -> Path:
         "repository_commit": commit,
         "feature_store": str(store.resolve()),
         "feature_store_identity": identity,
+        "external_sidecar": sidecar_identity,
         "folds": list(DISCOVERY_FOLDS),
         "seeds": list(ALLOWED_SEEDS),
         "objective": objective_metadata(),
         "official_validation_accessed": False,
         "test_accessed": False,
     }
+    if sidecar is not None:
+        manifest["external_data_readout_contract"] = EXTERNAL_DATA_READOUT_CONTRACT
     if manifest_path.exists():
         existing = json.loads(manifest_path.read_text(encoding="utf-8"))
         immutable = {
@@ -72,6 +89,8 @@ def run_campaign(store: Path, output_dir: Path) -> Path:
                 "repository_commit",
                 "feature_store",
                 "feature_store_identity",
+                "external_sidecar",
+                *(("external_data_readout_contract",) if sidecar is not None else ()),
                 "folds",
                 "seeds",
                 "objective",
@@ -94,6 +113,7 @@ def run_campaign(store: Path, output_dir: Path) -> Path:
                     fold=fold,
                     seed=seed,
                     commit=commit,
+                    external_sidecar=sidecar_identity,
                 ):
                     raise ValueError(f"Existing run does not match campaign: {run_dir}")
             else:
@@ -102,10 +122,13 @@ def run_campaign(store: Path, output_dir: Path) -> Path:
                     seed=seed,
                     selection_window=fold,
                     run_dir=run_dir,
+                    sidecar_dir=sidecar_dir,
                 )
             fold_runs[fold].append(run_dir)
-    selection = select_trajectory_rule(
-        fold_runs, output_dir / "trajectory_selection.json"
+    selection = (
+        None
+        if sidecar is not None
+        else select_trajectory_rule(fold_runs, output_dir / "trajectory_selection.json")
     )
     _atomic_json(
         manifest_path,
@@ -113,7 +136,9 @@ def run_campaign(store: Path, output_dir: Path) -> Path:
             **manifest,
             "status": "completed",
             "completed_at": datetime.now(timezone.utc).isoformat(),
-            "trajectory_selection": str(selection.resolve()),
+            "trajectory_selection": (
+                None if selection is None else str(selection.resolve())
+            ),
         },
     )
     return output_dir
@@ -124,12 +149,19 @@ def parse_args() -> argparse.Namespace:
         description="Run the two-fold, three-seed trajectory screen"
     )
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--sidecar-dir", type=Path)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    print(run_campaign(resolve_feature_store(), args.output_dir))
+    print(
+        run_campaign(
+            resolve_feature_store(),
+            args.output_dir,
+            sidecar_dir=args.sidecar_dir,
+        )
+    )
 
 
 if __name__ == "__main__":

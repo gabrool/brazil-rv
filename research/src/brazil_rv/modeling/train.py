@@ -27,6 +27,7 @@ from .contract import (
 from .data import (
     create_training_loaders,
     feature_store_identity,
+    load_external_sidecar,
     load_sample_index,
     resolve_feature_store,
     sample_window_metadata,
@@ -70,6 +71,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
         default="fold_a",
     )
     parser.add_argument("--selection-rule-file", type=Path)
+    parser.add_argument("--sidecar-dir", type=Path)
     parser.add_argument("--output-base", type=Path, default=RUN_OUTPUT_BASE)
     return parser.parse_args(arguments)
 
@@ -124,7 +126,9 @@ def _selection_metadata(path: Path | None, window: str) -> dict[str, object] | N
     if path is None:
         return None
     if window != "official":
-        raise ValueError("A frozen selection rule may be applied only to an official run")
+        raise ValueError(
+            "A frozen selection rule may be applied only to an official run"
+        )
     selection = load_frozen_selection(path)
     return {
         "selected_rule": selection["selected_rule"],
@@ -184,7 +188,9 @@ def run_training(
     selection_window: str,
     run_dir: Path,
     selection_rule_file: Path | None = None,
+    sidecar_dir: Path | None = None,
 ) -> Path:
+    sidecar = None if sidecar_dir is None else load_external_sidecar(sidecar_dir, store)
     if run_dir.exists():
         raise FileExistsError(run_dir)
     run_dir.mkdir(parents=True)
@@ -204,8 +210,9 @@ def run_training(
         validation_rows,
         GH200_RUNTIME,
         seed,
+        sidecar,
     )
-    model = build_model().cuda()
+    model = build_model(None if sidecar is None else sidecar.feature_count).cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
     parameter_count = count_trainable_parameters(model)
     optimizer, _ = build_optimizer(model)
@@ -225,6 +232,7 @@ def run_training(
         parameter_count=parameter_count,
         training_sample_count=train_rows.height,
         date_replacement=sampler.replace_dates,
+        external_sidecar=None if sidecar is None else sidecar.identity,
     )
     recorded_training = run_provenance["training"]
     if (
@@ -239,6 +247,7 @@ def run_training(
         "run_provenance": run_provenance,
         "feature_store": str(store.resolve()),
         "feature_store_identity": store_identity,
+        "external_sidecar": None if sidecar is None else sidecar.identity,
         "split": {
             "training": selection_window,
             "selection": selection_window,
@@ -297,9 +306,7 @@ def run_training(
             raw_prediction_tail = raw_prediction_tail[-5:]
             raw_scores.append(scores["raw"])
             _atomic_npz(
-                run_dir
-                / "validation_predictions"
-                / f"epoch_{epoch:02d}.npz",
+                run_dir / "validation_predictions" / f"epoch_{epoch:02d}.npz",
                 predictions,
             )
             _atomic_torch_save(
@@ -419,15 +426,13 @@ def run_training(
 
 def _run(args: argparse.Namespace) -> Path:
     created_at = datetime.now(timezone.utc)
-    name = (
-        f"tcn_{args.selection_window}_seed{args.seed}_"
-        f"{created_at:%Y%m%dT%H%M%S%fZ}"
-    )
+    name = f"tcn_{args.selection_window}_seed{args.seed}_{created_at:%Y%m%dT%H%M%S%fZ}"
     return run_training(
         store=resolve_feature_store(),
         seed=args.seed,
         selection_window=args.selection_window,
         selection_rule_file=args.selection_rule_file,
+        sidecar_dir=args.sidecar_dir,
         run_dir=args.output_base / name,
     )
 

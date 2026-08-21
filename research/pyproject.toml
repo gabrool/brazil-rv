@@ -17,7 +17,9 @@ build-backend = "uv_build"
 [dependency-groups]
 preprocessing = [
     "databento==0.81.0",
+    "fastexcel>=0.17.2",
     "pyarrow>=25.0.0",
+    "pypdf>=6.1.0",
 ]
 dev = [
     { include-group = "preprocessing" },

@@ -9,9 +9,9 @@ import brazil_rv.modeling.analyze as analyze_module
 import brazil_rv.modeling.designated_challenger as challenger_module
 from brazil_rv.modeling.designated_challenger import (
     DESIGNATED_CHALLENGER_NAME,
-    _crossfit_parent_observations,
     challenger_contract,
     compare_discovery_screen,
+    crossfit_patience3_observations,
 )
 from brazil_rv.modeling.engine import EvaluationObservations
 
@@ -75,7 +75,7 @@ def test_parent_patience_predictions_are_crossfit_out_of_half(tmp_path: Path) ->
     run = tmp_path / "run"
     _write_trajectory(run, raw_epochs)
 
-    observations, directions = _crossfit_parent_observations(run)
+    observations, directions = crossfit_patience3_observations(run)
 
     np.testing.assert_array_equal(observations.predictions, -target)
     assert [row["selected_epoch"] for row in directions] == [1, 2]

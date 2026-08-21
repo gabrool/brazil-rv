@@ -69,6 +69,18 @@ Core causal rules:
   information available at their historical timestamp.
 - Training, validation, and test identities are immutable and audited.
 
+External data experiments use the immutable `PIT_EXTERNAL_FEATURE_SIDECAR`
+contract. A sidecar is bound to the exact canonical feature-store identity and
+date/equity axis hashes. Daily arrays have shape `[date, 158, feature]`; intraday
+arrays add the canonical 55-decision axis. Every feature has an explicit mask,
+invalid values are exactly zero, and source-specific availability is materialized
+as an exact no-fill join before training. The loader additionally gates values and
+masks by point-in-time equity membership. A single per-equity linear residual
+injects concatenated values and masks into the incumbent state; its weight and
+bias are zero-initialized, and candidate construction restores the parent's RNG
+state after adding it. Thus every external-data candidate begins as the exact
+parent without changing base weights or dropout randomness.
+
 ## Splits, discovery folds, and test policy
 
 - Training: 2021-08-16 through 2024-06-28, 716 dates.
@@ -149,13 +161,26 @@ official validation nor test was accessed.
 
 `modeling.train` is the canonical soft-Spearman trajectory entry point.
 `modeling.run_discovery_campaign` runs exactly the two internal folds and seeds
-11/29/47 and records the fixed-rule baseline table. `modeling.crossfit` selects
+11/29/47. Sidecar campaigns do not select a fresh checkpoint rule: they record
+the frozen bidirectional odd/even Raw Patience-3 primary and final EMA-0.995
+secondary readouts. `modeling.crossfit` selects
 validation-adaptive checkpoints on one odd/even date parity and reports only on the
 other, replays rule selection in both directions, and can materialize last-7/last-10
 weight-average predictions without mutating source runs. Its frozen selection file
 is the authority for the next official-window run. `modeling.analyze` strictly
 aligns observations and reports member/ensemble IC, seed diversity, paired date
 deltas, moving-block intervals, and horizon/time-of-day guardrails.
+
+`modeling.external_data_screen` applies that frozen readout contract to one
+completed sidecar campaign. It reports candidate deltas against both the canonical
+parent and the standing designated challenger, plus a predeclared uniform
+parent-plus-candidate diversity readout. The standalone candidate and that fixed
+six-member diversity recipe are separate predeclared retention paths, and both
+are keyed only to their canonical-parent deltas. The challenger and EMA columns
+are informational and cannot create a "beats either" selection rule.
+Either primary path requires at least `+0.001` mean fold IC gain and non-negative
+gain on both folds. The diversity path additionally requires the standalone
+candidate to lose no more than `0.001` on either fold.
 
 `modeling.evaluate` restores held-out evaluation without exposing it to campaign
 drivers. It accepts only a completed official-window run with an internal-fold

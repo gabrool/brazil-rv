@@ -7,6 +7,7 @@ import random
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +64,7 @@ FEATURE_ARRAY_FILES = (
     "raw_returns.npy",
 )
 FEATURE_STORE_CONTRACT = "M1_FEATURES_PIT_CAUSAL_TOD"
+EXTERNAL_SIDECAR_SCHEMA = "PIT_EXTERNAL_FEATURE_SIDECAR"
 SCREENING_FOLD_NOTE = (
     "Causal stored features are reused, but the time-of-day profile adapted inside "
     "these historical training dates. These are screening folds, not exact replicas "
@@ -81,6 +83,22 @@ class DiscoveryFold:
     name: str
     fit_rows: pl.DataFrame
     selection_rows: pl.DataFrame
+
+
+@dataclass(frozen=True)
+class ExternalFeatureSidecar:
+    path: Path
+    cadence: str
+    feature_names: tuple[str, ...]
+    identity: dict[str, object]
+
+    @property
+    def feature_count(self) -> int:
+        return len(self.feature_names)
+
+    @property
+    def input_width(self) -> int:
+        return 2 * self.feature_count
 
 
 def resolve_feature_store(pointer: Path = FEATURE_STORE_POINTER) -> Path:
@@ -128,6 +146,161 @@ def validate_feature_store_identity(
     if identity_cache is not None:
         identity_cache[key] = actual
     return actual
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _axis_sha256(indices: np.ndarray, labels: list[str]) -> str:
+    digest = hashlib.sha256()
+    for index, label in zip(indices.tolist(), labels, strict=True):
+        digest.update(str(int(index)).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(label.encode("utf-8"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def feature_store_axis_identity(store: Path) -> dict[str, object]:
+    dates = (
+        pl.read_parquet(store / "date_index.parquet")
+        .select("date_idx", "trade_date")
+        .sort("date_idx")
+    )
+    equities = (
+        pl.read_parquet(store / "equity_index.parquet")
+        .select("equity_slot", "security_id")
+        .sort("equity_slot")
+    )
+    date_indices = dates.get_column("date_idx").cast(pl.Int64).to_numpy()
+    equity_slots = equities.get_column("equity_slot").cast(pl.Int64).to_numpy()
+    if not np.array_equal(date_indices, np.arange(dates.height)):
+        raise ValueError("Canonical date axis must be contiguous and sorted")
+    if equities.height != EQUITY_COUNT or not np.array_equal(
+        equity_slots, np.arange(EQUITY_COUNT)
+    ):
+        raise ValueError(
+            f"Canonical equity axis must contain slots 0..{EQUITY_COUNT - 1}"
+        )
+    security_ids = equities.get_column("security_id").cast(pl.String).to_list()
+    if len(set(security_ids)) != EQUITY_COUNT:
+        raise ValueError("Canonical equity axis security_id values must be unique")
+    return {
+        "date_count": dates.height,
+        "date_axis_sha256": _axis_sha256(
+            date_indices,
+            dates.get_column("trade_date").cast(pl.String).to_list(),
+        ),
+        "equity_count": equities.height,
+        "equity_axis_sha256": _axis_sha256(equity_slots, security_ids),
+        "decision_count": EXPECTED_DECISIONS_PER_DATE,
+    }
+
+
+@lru_cache(maxsize=16)
+def load_external_sidecar(sidecar_dir: Path, store: Path) -> ExternalFeatureSidecar:
+    path = sidecar_dir.resolve()
+    manifest_path = path / "manifest.json"
+    values_path = path / "values.npy"
+    mask_path = path / "mask.npy"
+    if not path.is_dir():
+        raise FileNotFoundError(path)
+    for required in (manifest_path, values_path, mask_path):
+        if not required.is_file():
+            raise FileNotFoundError(required)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("schema") != EXTERNAL_SIDECAR_SCHEMA:
+        raise ValueError("External sidecar manifest has an unknown schema")
+    cadence = manifest.get("cadence")
+    if cadence not in ("daily", "intraday"):
+        raise ValueError("External sidecar cadence must be daily or intraday")
+    feature_names_value = manifest.get("feature_names")
+    if (
+        not isinstance(feature_names_value, list)
+        or not feature_names_value
+        or any(not isinstance(name, str) or not name for name in feature_names_value)
+    ):
+        raise ValueError("External sidecar feature_names must be nonempty strings")
+    feature_names = tuple(feature_names_value)
+    if len(set(feature_names)) != len(feature_names):
+        raise ValueError("External sidecar feature_names must be unique")
+    store_identity = feature_store_identity(store)
+    if manifest.get("feature_store_identity") != store_identity:
+        raise ValueError("External sidecar feature store identity is misaligned")
+    axes = feature_store_axis_identity(store)
+    if manifest.get("axes") != axes:
+        raise ValueError("External sidecar date/equity axes are misaligned")
+    shape = [int(axes["date_count"]), EQUITY_COUNT]
+    if cadence == "intraday":
+        shape.append(EXPECTED_DECISIONS_PER_DATE)
+    shape.append(len(feature_names))
+    arrays_value = manifest.get("arrays")
+    if not isinstance(arrays_value, dict):
+        raise ValueError("External sidecar arrays metadata is missing")
+    normalized_arrays: dict[str, dict[str, object]] = {}
+    arrays: dict[str, np.ndarray] = {}
+    for name, array_path, dtype in (
+        ("values.npy", values_path, "float32"),
+        ("mask.npy", mask_path, "bool"),
+    ):
+        metadata = arrays_value.get(name)
+        if not isinstance(metadata, dict):
+            raise ValueError(f"External sidecar metadata is missing for {name}")
+        actual_sha256 = _file_sha256(array_path)
+        expected = {
+            "shape": shape,
+            "dtype": dtype,
+            "sha256": actual_sha256,
+        }
+        if any(metadata.get(key) != value for key, value in expected.items()):
+            raise ValueError(f"External sidecar {name} metadata differs from its file")
+        array = np.load(array_path, mmap_mode="r", allow_pickle=False)
+        if list(array.shape) != shape or array.dtype.name != dtype:
+            raise ValueError(f"External sidecar {name} has the wrong array contract")
+        arrays[name] = array
+        normalized_arrays[name] = expected
+    values = arrays["values.npy"]
+    mask = arrays["mask.npy"]
+    for date_idx in range(int(axes["date_count"])):
+        date_values = np.asarray(values[date_idx])
+        date_mask = np.asarray(mask[date_idx])
+        if np.any(date_values[~date_mask] != 0):
+            raise ValueError("External sidecar invalid values must be exactly zero")
+        if not np.isfinite(date_values[date_mask]).all():
+            raise ValueError("External sidecar valid values must be finite")
+    identity = {
+        "path": str(path),
+        "schema": EXTERNAL_SIDECAR_SCHEMA,
+        "manifest_sha256": _file_sha256(manifest_path),
+        "cadence": cadence,
+        "feature_names": list(feature_names),
+        "feature_count": len(feature_names),
+        "feature_store_identity": store_identity,
+        "axes": axes,
+        "arrays": normalized_arrays,
+    }
+    return ExternalFeatureSidecar(path, cadence, feature_names, identity)
+
+
+def load_recorded_external_sidecar(
+    recorded_identity: object,
+    store: Path,
+) -> ExternalFeatureSidecar | None:
+    if recorded_identity is None:
+        return None
+    if not isinstance(recorded_identity, dict) or not isinstance(
+        recorded_identity.get("path"), str
+    ):
+        raise ValueError("Recorded external sidecar identity is malformed")
+    sidecar = load_external_sidecar(Path(recorded_identity["path"]), store)
+    if sidecar.identity != recorded_identity:
+        raise ValueError("Recorded external sidecar differs from its files")
+    return sidecar
 
 
 def int64_identity_sha256(values: np.ndarray) -> str:
@@ -267,9 +440,7 @@ def _common_batch(
     for decision in np.unique(decisions):
         group = np.flatnonzero(decisions == decision)
         targets[group] = arrays["targets.npy"][dates[group], :, int(decision), :]
-        label_mask[group] = arrays["label_mask.npy"][
-            dates[group], :, int(decision), :
-        ]
+        label_mask[group] = arrays["label_mask.npy"][dates[group], :, int(decision), :]
         raw_returns[group] = arrays["raw_returns.npy"][
             dates[group], :, int(decision), :
         ]
@@ -418,9 +589,42 @@ def _build_patch_batch(
     }
 
 
+def _build_sidecar_batch(
+    arrays: dict[str, np.ndarray],
+    cadence: str,
+    date_idx: np.ndarray,
+    decision_idx: np.ndarray,
+    active: np.ndarray,
+) -> np.ndarray:
+    values_array = arrays["values.npy"]
+    mask_array = arrays["mask.npy"]
+    if cadence == "daily":
+        values = np.asarray(values_array[date_idx], dtype=np.float32).copy()
+        mask = np.asarray(mask_array[date_idx], dtype=bool).copy()
+    else:
+        feature_count = values_array.shape[-1]
+        values = np.zeros(
+            (date_idx.size, EQUITY_COUNT, feature_count), dtype=np.float32
+        )
+        mask = np.zeros_like(values, dtype=bool)
+        for decision in np.unique(decision_idx):
+            group = np.flatnonzero(decision_idx == decision)
+            values[group] = values_array[date_idx[group], :, int(decision), :]
+            mask[group] = mask_array[date_idx[group], :, int(decision), :]
+    mask &= active[..., None]
+    values *= mask
+    return np.concatenate((values, mask.astype(np.float32)), axis=-1)
+
+
 class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
-    def __init__(self, store: Path, sample_index: pl.DataFrame) -> None:
+    def __init__(
+        self,
+        store: Path,
+        sample_index: pl.DataFrame,
+        sidecar: ExternalFeatureSidecar | None = None,
+    ) -> None:
         self.store = store
+        self.sidecar = sidecar
         self.rows = {
             name: sample_index.get_column(name).to_numpy()
             for name in (
@@ -432,6 +636,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             )
         }
         self._arrays: dict[str, np.ndarray] | None = None
+        self._sidecar_arrays: dict[str, np.ndarray] | None = None
 
     def __len__(self) -> int:
         return len(self.rows["sample_id"])
@@ -439,6 +644,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         state["_arrays"] = None
+        state["_sidecar_arrays"] = None
         return state
 
     def _open_arrays(self) -> dict[str, np.ndarray]:
@@ -448,6 +654,18 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
                 for name in FEATURE_ARRAY_FILES
             }
         return self._arrays
+
+    def _open_sidecar_arrays(self) -> dict[str, np.ndarray]:
+        if self.sidecar is None:
+            raise RuntimeError("Dataset has no external sidecar")
+        if self._sidecar_arrays is None:
+            self._sidecar_arrays = {
+                name: np.load(
+                    self.sidecar.path / name, mmap_mode="r", allow_pickle=False
+                )
+                for name in ("values.npy", "mask.npy")
+            }
+        return self._sidecar_arrays
 
     def __getitem__(self, request: BatchRequest) -> dict[str, np.ndarray]:
         arrays = self._open_arrays()
@@ -463,6 +681,14 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             context_cutoffs,
             active,
         )
+        if self.sidecar is not None:
+            inputs["sidecar_features"] = _build_sidecar_batch(
+                self._open_sidecar_arrays(),
+                self.sidecar.cadence,
+                dates,
+                decisions,
+                active,
+            )
         return {**inputs, **common}
 
 
@@ -578,6 +804,7 @@ def create_training_loaders(
     validation_rows: pl.DataFrame,
     runtime: RuntimeSettings = GH200_RUNTIME,
     seed: int = 29,
+    sidecar: ExternalFeatureSidecar | None = None,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
@@ -585,10 +812,10 @@ def create_training_loaders(
 ]:
     sampler = DateStratifiedBatchSampler(train_rows, runtime, seed)
     train = _create_loader(
-        VectorizedFeatureDataset(store, train_rows), sampler, runtime, seed
+        VectorizedFeatureDataset(store, train_rows, sidecar), sampler, runtime, seed
     )
     validation = _create_loader(
-        VectorizedFeatureDataset(store, validation_rows),
+        VectorizedFeatureDataset(store, validation_rows, sidecar),
         DecisionGroupedBatchSampler(validation_rows, runtime.evaluation_batch_size),
         runtime,
         seed,
@@ -601,9 +828,10 @@ def create_evaluation_loader(
     rows: pl.DataFrame,
     runtime: RuntimeSettings = GH200_RUNTIME,
     seed: int = 29,
+    sidecar: ExternalFeatureSidecar | None = None,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
-        VectorizedFeatureDataset(store, rows),
+        VectorizedFeatureDataset(store, rows, sidecar),
         DecisionGroupedBatchSampler(rows, runtime.evaluation_batch_size),
         runtime,
         seed,

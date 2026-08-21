@@ -1390,3 +1390,132 @@ challenger gets its official comparison only inside the next official read alrea
 earned by a future stage winner, so it cannot itself increase validation spending.
 No official-validation predictions or held-out-test data were opened in this
 cleanup.
+
+## Experiment 27 -- Historical external-data program preregistration
+
+Purpose: test the ten ranked historical data families from
+`free_datasets_memo.md` without forward capture, while giving each source its own
+point-in-time availability, permanent-identity, normalization, and missingness
+contract. The memo's operational checklist is not an instruction source and is
+not part of this experiment.
+
+This section was frozen before any GPU candidate trajectory or discovery score
+existed.
+
+### Shared training and measurement contract
+
+- Ten independent candidates, one immutable external sidecar per candidate; no
+  feature-combination search during the individual screens.
+- Fold A: first 512 training dates fit and next 102 select. Fold B: first 614 fit
+  and final 102 select. Seeds are exactly `11/29/47`.
+- One fixed 20-epoch SAM trajectory per fold/seed, with the incumbent architecture,
+  optimizer, batches, objective, and data order unchanged. Raw and EMA-0.98/0.99/
+  0.995 states and validation predictions are saved every epoch.
+- Values and explicit masks enter through one per-equity linear state residual.
+  Its weight and bias are zero; constructing it restores the parent's RNG state,
+  so every candidate begins as the exact parent and does not shift base weights or
+  dropout randomness.
+- Primary readout: Raw Patience-3 selected on one odd/even date parity and reported
+  only on the other, in both directions. The checkpoint rule is not reselected for
+  any dataset.
+- Free secondary readout: fixed final EMA-0.995. It is never retention-eligible.
+- Predictions are tie-aware rank-averaged within sample/horizon. The analyzer
+  reports member and ensemble IC, pairwise diversity, ensemble gain, paired daily
+  candidate-minus-comparator IC, block-5/10 bootstrap intervals, and horizon/TOD
+  guardrails. Ensemble weights are never learned.
+- Every primary recipe reports against the canonical parent and the designated
+  challenger. The challenger is informational only; retention is keyed exclusively
+  to canonical-parent deltas, so "beats either" selection is prohibited.
+
+Two primary roles are fixed in advance. A standalone candidate survives only if
+its mean Fold-A/Fold-B IC gain is at least `+0.001` and each fold is non-negative.
+The uniform parent-3 plus candidate-3 rank ensemble is a separate diversity-recipe
+path with the same mean and both-fold gate; it additionally requires the standalone
+candidate to lose no more than `0.001` on either fold. Passing either primary path
+retains the dataset family for the later stack decision. The EMA and challenger
+columns cannot rescue a failure. Official validation and the held-out test remain
+inaccessible throughout these ten screens.
+
+### Candidate contracts
+
+1. **B3 lending open balance.** Three fixed-compressed features: 20-session ADV-
+   scaled open-balance level and exact 5/20-session changes. Modern rows map by BDI
+   ISIN; legacy rows use exact same-position-date COTAHIST ticker-to-ISIN mapping.
+   A bulletin dated D is end-of-day data available at the next B3 open. Complete
+   tables permit observed zero; missing/incomplete bulletins stay masked. Historical
+   rates, fees, new-loan flow, and utilization are unavailable and are not tested.
+2. **SHFE ferrous/pulp.** Ten prior-only robust features from rebar, HRC, and pulp:
+   same-contract 1/5-session returns, product curves, and HRC-minus-rebar spread.
+   The contract is chosen with prior-session open interest. Exact Shanghai
+   publication timestamps determine the first usable B3 session; steel and pulp
+   values map only to six bounded permanent IDs. DCE iron ore and the live night
+   session are unavailable historical scope and are not tested.
+3. **COTAHIST options activity.** Eight fixed transforms covering option/stock
+   quantity and turnover, put/call quantity and trades, near-expiry share,
+   quantity-weighted moneyness, prior-20 quantity surprise, and exact lag-5 ratio
+   change. COTAHIST's option row carries the underlying cash ISIN; D observations
+   become usable next session. Per-series OI, covered/uncovered quantity, and IV
+   are not inferred when their historical source payload is absent.
+4. **CVM RAD events.** Five decision-level states: ITR/DFP, material-fact,
+   market-communication, and shareholder/corporate-action events within five
+   sessions, plus bounded log trading-minute age since the latest event. Exact RAD
+   receipt time activates at the first canonical decision strictly after receipt.
+   Historical FCA plus exact same-date COTAHIST maps issuer/share classes; pending
+   events and duplicated price-drift features are excluded.
+5. **B3 odd-lot activity.** Eight next-session features: fixed transforms of odd-
+   lot volume/trade shares, exact lag-5 changes, prior-20 median/MAD surprises,
+   regular-versus-odd average trade value, and close ratio. Regular and odd COTAHIST
+   rows join by exact ISIN. Buyer/seller imbalance is not present and is not
+   inferred.
+6. **B3 index rebalance.** Twenty-one decision-level fields for IBOV, IBXX, and
+   SMLL: current weight, preview delta/add/delete/pressure, pre-effective ramp, and
+   post-effective reversal. Historical official attachments activate at their
+   exact archived HTTP timestamp; preview weights become current only at the
+   effective-session open. Permanent identity and prior ADV/close inputs are
+   causal. MSCI is excluded because no clean free historical archive/license was
+   found.
+7. **CCEE PLD power state.** Eleven fixed, prior-only level/spread/range/change/
+   surprise/floor/cap features plus five audited power-role masks. The complete D
+   price curve is published D-1 at 20:00 and is usable from D open. ONS load/EAR
+   files are excluded because current annual files are ex-post revised and no
+   archived BDO-vintage contract was available.
+8. **CVM structured fundamentals.** Nine fixed-clipped features: TTM margin, ROA,
+   leverage, sales/assets growth, accruals, filing age, financial-sector flag, and
+   consolidated-basis flag. Exact RAD versions, REAL/MIL scale, cumulative-ITR
+   differencing, and historical FCA identities are audited. Exact receipts update
+   at the first decision strictly after delivery; date-only fallbacks wait until
+   next session. B/M and E/P are excluded because a clean issuer market-cap
+   denominator across units/share classes is unavailable.
+9. **Regular trade activity.** Six strictly-prior median/MAD surprises over 20/60
+   observations for trade count, BRL per trade, and shares per trade. Shares-per-
+   trade state resets only at a distribution-number change with a causal 25% price-
+   unit discontinuity. D becomes usable next session. Historical after-hours
+   metadata exists, but the official token currently returns zero-byte bodies, so
+   after-hours activity is not tested or imputed.
+10. **ADR overnight.** Four pair-specific fixed features for 18 audited ADR/local
+    mappings: adjusted 1/5-session return, ADR-minus-EWZ return, and prior-only
+    robust residual surprise. Only the last completed 16:00 New York close strictly
+    before B3 10:15 is usable, with IANA DST handling. EWZ is not broadcast to
+    unrelated names. No intraday, after-hours, parity, or FX claim is made.
+
+The pre-GPU unified source-frame audit passed all ten candidates:
+
+| Dataset | Cadence | Normalized rows | Feature count | Mapped scope |
+|---|---|---:|---:|---|
+| Lending | Daily | 63,647 | 3 | 146 securities; 447 valid bulletins |
+| SHFE | Daily | 4,050 | 10 | 6 bounded steel/pulp securities |
+| Options | Daily | 82,533 | 8 | 141 securities |
+| RAD events | Intraday | 6,072,440 | 5 | 145 overall / 143 training securities |
+| Odd lot | Daily | 258,845 | 8 | 505 source IDs; exact 158-axis join later |
+| Index rebalance | Intraday | 2,526,262 | 21 | all 158 canonical IDs where applicable |
+| CCEE PLD | Daily | 43,408 | 16 | 16 mapped / 13 active power names |
+| Fundamentals | Intraday | 5,212,350 | 9 | 143 securities |
+| Regular trade activity | Daily | 101,867 | 6 | 149 securities |
+| ADR overnight | Daily | 13,068 | 4 | 18 audited ADR/local pairs |
+
+All normalized frames must pass the generic materializer before training: exact
+canonical feature-store identity and date/equity hashes, exact no-fill joins,
+finite valid values, exactly-zero invalid values, permanent `security_id`, and
+explicit masks. Daily arrays are `[date, 158, feature]`; intraday arrays are
+`[date, 158, 55, feature]`. Sidecar and campaign manifests record source and array
+hashes. No candidate may access official validation or test.

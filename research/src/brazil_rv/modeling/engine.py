@@ -22,9 +22,7 @@ from .contract import (
 from .metrics import create_metric_table, primary_validation_score
 from .provenance import model_metadata
 
-TrainingObjective = Callable[
-    [torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
-]
+TrainingObjective = Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
 UpdateCallback = Callable[[], None]
 
 
@@ -138,8 +136,8 @@ def compile_training_objective(
     )
 
 
-def _model_transfer_keys() -> tuple[str, ...]:
-    return (
+def _model_transfer_keys(batch: Mapping[str, torch.Tensor]) -> tuple[str, ...]:
+    keys = (
         "patches",
         "history_patch_mask",
         "instrument_mask",
@@ -148,6 +146,9 @@ def _model_transfer_keys() -> tuple[str, ...]:
         "targets",
         "label_mask",
     )
+    if "sidecar_features" in batch:
+        return (*keys, "sidecar_features")
+    return keys
 
 
 def _to_device(
@@ -155,18 +156,21 @@ def _to_device(
 ) -> dict[str, torch.Tensor]:
     return {
         key: batch[key].to(device, non_blocking=device.type == "cuda")
-        for key in _model_transfer_keys()
+        for key in _model_transfer_keys(batch)
     }
 
 
 def _predict(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-    return model(
+    inputs = (
         batch["patches"],
         batch["history_patch_mask"],
         batch["instrument_mask"],
         batch["slow_features"],
         batch["state_position"],
     )
+    if "sidecar_features" in batch:
+        return model(*inputs, batch["sidecar_features"])
+    return model(*inputs)
 
 
 def _autocast(device: torch.device):
@@ -515,10 +519,10 @@ def checkpoint_payload(
     feature_store: Path,
     run_provenance: dict[str, object],
 ) -> dict[str, object]:
-    metadata = model_metadata()
+    metadata = model_metadata(getattr(model, "sidecar_feature_count", None))
     if run_provenance.get("model") != metadata:
         raise ValueError("Run provenance differs from checkpoint model")
-    return {
+    payload = {
         "model": metadata,
         "architecture": asdict(TCN_ARCHITECTURE),
         "objective": objective_metadata(),
@@ -532,7 +536,9 @@ def checkpoint_payload(
         "run_provenance": run_provenance,
         "model_state_dict": state_dict_to_cpu(model.state_dict()),
         "ema_state_dicts": {
-            name: state_dict_to_cpu(state)
-            for name, state in ema_state_dicts.items()
+            name: state_dict_to_cpu(state) for name, state in ema_state_dicts.items()
         },
     }
+    if "external_sidecar" in run_provenance:
+        payload["external_sidecar"] = run_provenance["external_sidecar"]
+    return payload

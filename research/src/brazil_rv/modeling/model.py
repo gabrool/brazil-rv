@@ -24,11 +24,15 @@ class SharedCausalTCN(nn.Module):
         *,
         architecture: TCNArchitecture = TCN_ARCHITECTURE,
         equity_count: int = EQUITY_COUNT,
+        sidecar_feature_count: int | None = None,
     ) -> None:
         super().__init__()
+        if sidecar_feature_count is not None and sidecar_feature_count <= 0:
+            raise ValueError("sidecar_feature_count must be positive")
         self.architecture = architecture
         self.equity_count = equity_count
         self.instrument_count = equity_count + CONTEXT_COUNT
+        self.sidecar_feature_count = sidecar_feature_count
         width = architecture.width
         self.input_projection = nn.Linear(
             architecture.patch_input_width, width, bias=False
@@ -60,6 +64,17 @@ class SharedCausalTCN(nn.Module):
         self.apply(self._initialize_module)
         nn.init.zeros_(self.fusion_gate.weight)
         nn.init.constant_(self.fusion_gate.bias, TARGETED_FUSION_GATE_BIAS)
+        self.sidecar_adapter: nn.Linear | None = None
+        if sidecar_feature_count is not None:
+            rng_state = torch.get_rng_state()
+            try:
+                self.sidecar_adapter = nn.Linear(
+                    2 * sidecar_feature_count, width, bias=True
+                )
+            finally:
+                torch.set_rng_state(rng_state)
+            nn.init.zeros_(self.sidecar_adapter.weight)
+            nn.init.zeros_(self.sidecar_adapter.bias)
 
     @staticmethod
     def _initialize_module(module: nn.Module) -> None:
@@ -138,6 +153,21 @@ class SharedCausalTCN(nn.Module):
         )
         return self.fusion_norm(equity_states + gate * fused)
 
+    def _inject_sidecar(
+        self,
+        equity_states: torch.Tensor,
+        sidecar_features: torch.Tensor | None,
+    ) -> torch.Tensor:
+        if self.sidecar_adapter is None:
+            if sidecar_features is not None:
+                raise ValueError("Parent model received unexpected sidecar features")
+            return equity_states
+        if sidecar_features is None:
+            raise ValueError("Sidecar model requires sidecar features")
+        if sidecar_features.shape[:2] != equity_states.shape[:2]:
+            raise ValueError("Sidecar batch/equity axes are misaligned")
+        return equity_states + self.sidecar_adapter(sidecar_features)
+
     def forward(
         self,
         patches: torch.Tensor,
@@ -145,12 +175,15 @@ class SharedCausalTCN(nn.Module):
         instrument_mask: torch.Tensor,
         slow_features: torch.Tensor,
         state_position: torch.Tensor,
+        sidecar_features: torch.Tensor | None = None,
     ) -> torch.Tensor:
         states = self._instrument_states(
             patches, history_patch_mask, slow_features, state_position
         )
         equity_mask = instrument_mask[:, : self.equity_count]
-        equity_states = states[:, : self.equity_count]
+        equity_states = self._inject_sidecar(
+            states[:, : self.equity_count], sidecar_features
+        )
         fused = self._fuse(
             equity_states,
             states[:, self.equity_count :],
@@ -161,8 +194,8 @@ class SharedCausalTCN(nn.Module):
         return predictions * equity_mask[..., None].to(predictions.dtype)
 
 
-def build_model() -> SharedCausalTCN:
-    return SharedCausalTCN()
+def build_model(sidecar_feature_count: int | None = None) -> SharedCausalTCN:
+    return SharedCausalTCN(sidecar_feature_count=sidecar_feature_count)
 
 
 def count_trainable_parameters(model: nn.Module) -> int:

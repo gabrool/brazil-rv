@@ -15,6 +15,7 @@ from .data import (
     FeatureStoreIdentityCache,
     create_evaluation_loader,
     load_sample_index,
+    load_recorded_external_sidecar,
     select_sample_split,
     validate_feature_store_identity,
 )
@@ -72,9 +73,7 @@ def load_current_run(
     if manifest.get("split", {}).get("training") != "official":
         raise ValueError("Only an official-window run can be evaluated externally")
     frozen = manifest.get("frozen_selection")
-    if not isinstance(frozen, dict) or not isinstance(
-        frozen.get("selected_rule"), str
-    ):
+    if not isinstance(frozen, dict) or not isinstance(frozen.get("selected_rule"), str):
         raise ValueError("Run does not contain an internally frozen selection rule")
     store = Path(str(manifest["feature_store"])).resolve()
     if not store.is_dir():
@@ -84,6 +83,7 @@ def load_current_run(
         manifest["feature_store_identity"],
         identity_cache=identity_cache,
     )
+    load_recorded_external_sidecar(manifest.get("external_sidecar"), store)
     rule = str(frozen["selected_rule"])
     states = model_state_dicts_for_rule(run_dir, rule)
     return states, manifest, store, rule
@@ -107,8 +107,14 @@ def collect_run_evaluation(
         run_dir, identity_cache=identity_cache
     )
     rows = select_sample_split(load_sample_index(store), split)
-    loader = create_evaluation_loader(store, rows, seed=int(manifest["seed"]))
-    model = build_model().cuda()
+    sidecar = load_recorded_external_sidecar(manifest.get("external_sidecar"), store)
+    loader = create_evaluation_loader(
+        store,
+        rows,
+        seed=int(manifest["seed"]),
+        sidecar=sidecar,
+    )
+    model = build_model(None if sidecar is None else sidecar.feature_count).cuda()
     reference: EvaluationObservations | None = None
     predictions = []
     losses = []
@@ -124,9 +130,9 @@ def collect_run_evaluation(
     assert reference is not None
     combined = replace(
         reference,
-        predictions=np.mean(
-            np.stack(predictions), axis=0, dtype=np.float64
-        ).astype(np.float32),
+        predictions=np.mean(np.stack(predictions), axis=0, dtype=np.float64).astype(
+            np.float32
+        ),
     )
     summary, daily = summarize_evaluation_observations(
         combined, losses[0] if len(losses) == 1 else None

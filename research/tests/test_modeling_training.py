@@ -151,6 +151,7 @@ def test_training_cli_exposes_only_current_controls() -> None:
         "seed",
         "selection_window",
         "selection_rule_file",
+        "sidecar_dir",
         "output_base",
     }
 

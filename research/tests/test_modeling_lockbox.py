@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 
 from brazil_rv.modeling.evaluate import load_current_run
-from brazil_rv.modeling.run_discovery_campaign import DISCOVERY_FOLDS, run_campaign
+from brazil_rv.modeling.run_discovery_campaign import (
+    DISCOVERY_FOLDS,
+    EXTERNAL_DATA_READOUT_CONTRACT,
+    run_campaign,
+)
 
 
 def _manifest(path: Path, *, window: str, frozen: bool) -> None:
@@ -30,7 +34,13 @@ def test_discovery_campaign_has_no_split_or_test_control() -> None:
     assert tuple(inspect.signature(run_campaign).parameters) == (
         "store",
         "output_dir",
+        "sidecar_dir",
     )
+    assert EXTERNAL_DATA_READOUT_CONTRACT == {
+        "primary": "bidirectional_odd_even_crossfit_patience3_raw",
+        "secondary": "final_ema_0995",
+        "trajectory_rule_reselection": False,
+    }
 
 
 def test_external_evaluation_rejects_discovery_runs(tmp_path: Path) -> None:

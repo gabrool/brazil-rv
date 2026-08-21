@@ -38,16 +38,25 @@ def repository_commit() -> str:
     ).stdout.strip()
 
 
-def model_metadata() -> dict[str, object]:
-    return json.loads(
-        json.dumps(
-            {
-                "model_name": "tcn",
-                "architecture": asdict(TCN_ARCHITECTURE),
-                "cross_equity_attention": False,
-            }
-        )
-    )
+def model_metadata(
+    sidecar_feature_count: int | None = None,
+) -> dict[str, object]:
+    if sidecar_feature_count is not None and sidecar_feature_count <= 0:
+        raise ValueError("sidecar_feature_count must be positive")
+    model = {
+        "model_name": "tcn",
+        "architecture": asdict(TCN_ARCHITECTURE),
+        "cross_equity_attention": False,
+    }
+    if sidecar_feature_count is not None:
+        model["external_sidecar_adapter"] = {
+            "feature_count": sidecar_feature_count,
+            "input_width": 2 * sidecar_feature_count,
+            "input": "values_concatenated_with_explicit_masks",
+            "injection": "equity_state_linear_residual",
+            "zero_initialized": True,
+        }
+    return json.loads(json.dumps(model))
 
 
 def training_contract(
@@ -104,14 +113,21 @@ def build_run_provenance(
     parameter_count: int,
     training_sample_count: int,
     date_replacement: bool,
+    external_sidecar: dict[str, object] | None = None,
     runtime: RuntimeSettings = GH200_RUNTIME,
 ) -> dict[str, object]:
+    sidecar_feature_count: int | None = None
+    if external_sidecar is not None:
+        recorded_count = external_sidecar.get("feature_count")
+        if not isinstance(recorded_count, int) or recorded_count <= 0:
+            raise ValueError("External sidecar provenance has no feature count")
+        sidecar_feature_count = recorded_count
     provenance = {
         "schema": RUN_PROVENANCE_SCHEMA,
         "repository_commit": repository_commit_value,
         "feature_store": str(feature_store.resolve()),
         "feature_store_identity": feature_store_metadata,
-        "model": model_metadata(),
+        "model": model_metadata(sidecar_feature_count),
         "seed": seed,
         "fit_window": fit_window,
         "selection_window": selection_window,
@@ -124,4 +140,6 @@ def build_run_provenance(
             runtime=runtime,
         ),
     }
+    if external_sidecar is not None:
+        provenance["external_sidecar"] = external_sidecar
     return json.loads(json.dumps(provenance))

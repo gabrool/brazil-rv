@@ -16,6 +16,7 @@ from .contract import HORIZONS, MAX_EPOCHS, VALIDATION_END
 from .data import (
     create_evaluation_loader,
     load_sample_index,
+    load_recorded_external_sidecar,
     select_training_window,
     validate_feature_store_identity,
 )
@@ -370,11 +371,17 @@ def _materialize_extended_weight_predictions(
         )
         sample_index = load_sample_index(store, through=VALIDATION_END)
         _, selection_rows, _ = select_training_window(sample_index, fold)
+        sidecar = load_recorded_external_sidecar(
+            manifest.get("external_sidecar"), store
+        )
         loader = create_evaluation_loader(
-            store, selection_rows, seed=int(manifest["seed"])
+            store,
+            selection_rows,
+            seed=int(manifest["seed"]),
+            sidecar=sidecar,
         )
         reference, _ = _load_reference(run_dir)
-        model = build_model().cuda()
+        model = build_model(None if sidecar is None else sidecar.feature_count).cuda()
         predictions = {}
         scores = {}
         for length in (7, 10):

@@ -120,7 +120,7 @@ def _validate_run(
         raise ValueError(f"Residual run hyperparameters differ: {run_dir}")
 
 
-def _crossfit_parent_observations(
+def crossfit_patience3_observations(
     run_dir: Path,
 ) -> tuple[EvaluationObservations, list[dict[str, object]]]:
     reference = load_run_observations(run_dir, "final_raw")
@@ -174,7 +174,7 @@ def load_designated_challenger_members(
     for seed in ALLOWED_SEEDS:
         parent_run = run_root / PARENT_DISCOVERY_ARTIFACT / fold / f"seed_{seed}"
         _validate_run(parent_run, fold=fold, seed=seed, residual=False)
-        parent, _ = _crossfit_parent_observations(parent_run)
+        parent, _ = crossfit_patience3_observations(parent_run)
         residual_run = (
             run_root
             / RESIDUAL_DISCOVERY_ARTIFACT
