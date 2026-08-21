@@ -807,3 +807,7 @@ under the same guardrail used throughout the program.
 Deletion-first cleanup removed the one-use analyzer and tests. Reproduction uses
 commit `84ae363` and the immutable artifact; current canonical source/tests match
 pre-experiment commit `68c6301` exactly and pass the 209-test suite plus Ruff.
+
+The paid analysis instance `3985e78591e349549f7c99971c86fa9e` was terminated
+after cleanup commit `7a6590e` reached GitHub. Two provider inventory checks
+confirmed the exact ID was absent; the immutable NFS artifact persists.

@@ -1325,3 +1325,12 @@ Exact reproduction uses implementation commit `84ae363` and the immutable artifa
 not compatibility code on current HEAD. Canonical source/tests returned exactly to
 pre-experiment commit `68c6301`; 185 research tests, 24 collector invariants, and
 Ruff passed.
+
+### Paid-instance termination
+
+The paid GH200 instance was `3985e78591e349549f7c99971c86fa9e` in
+`us-east-3`. Termination was requested only after the immutable manifest was
+complete, cleanup commit `7a6590e` passed verification, and GitHub `main` was
+updated. Lambda reported `terminating`; two subsequent provider inventory checks
+confirmed zero matches for the exact ID. The artifact remains on persistent
+`brazil-rv-east3` NFS.
