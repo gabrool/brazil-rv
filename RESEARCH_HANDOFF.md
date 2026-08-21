@@ -773,3 +773,9 @@ variant, campaign, and confirmation code remains reproducible through commits
 `c0d0598`, `3b60ac9`, and `921dd3a` plus the immutable artifacts, not through
 compatibility code on current HEAD. The cleaned suite passed 185 research tests
 and 24 collector invariants (209 total), and Ruff passed.
+
+The paid next-stage instance was `c6e81d007b354af98eaeec598902543c` in
+`us-east-3`. Lambda accepted termination after cleanup commit `09c0d12` was
+pushed, then two provider inventory checks confirmed zero matches for the exact
+ID. Persistent sidecar, discovery, and official-confirmation artifacts remain on
+`brazil-rv-east3` NFS.

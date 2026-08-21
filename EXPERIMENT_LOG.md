@@ -1262,3 +1262,13 @@ Canonical `research/src` and `research/tests` are byte-for-byte identical to
 accepted pre-experiment commit `a91c068`; exact reproduction uses commits
 `c0d0598`, `3b60ac9`, and `921dd3a` and the immutable artifacts above. The
 cleaned code passed 185 research tests plus 24 collector invariants, and Ruff.
+
+### Paid-instance termination
+
+The paid GH200 instance was `c6e81d007b354af98eaeec598902543c` in
+`us-east-3`. Termination was requested only after both campaign manifests were
+complete, all results were recorded, cleanup commit `09c0d12` passed 209 tests
+and Ruff, and GitHub `main` was updated. Lambda accepted termination, reported
+`terminating`, and the exact ID was then absent in two consecutive provider
+inventory checks. Persistent experiment artifacts remain on the
+`brazil-rv-east3` NFS filesystem.
