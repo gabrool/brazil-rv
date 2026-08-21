@@ -857,3 +857,408 @@ The paid GH200 instance was `5e9201fcd5b6436cbdd3be9fe9ee4524` in
 Lambda accepted termination and reported `terminating`; a subsequent provider
 inventory poll returned zero matches for the exact ID. Persistent results remain
 on the attached `brazil-rv-east3` NFS filesystem.
+
+
+## Experiment 15 — Official-validation staleness profile
+
+Purpose: determine whether the gap between the stronger internal discovery folds and
+the canonical parent's `0.041640` official-validation IC is consistent with
+post-training staleness.
+
+### Settings
+
+- Source: the three stored parent-reproduction validation observation files; no
+  model training or new prediction generation.
+- Scope: all 244 already-consumed official-validation dates.
+- Statistic: daily primary IC from the uniform three-seed rank ensemble, quarterly
+  means, H1-2025 minus H2-2024, and a linear IC slope on calendar days since the
+  2024-06-28 training end.
+- Inference: 10,000-replicate moving-block bootstrap at block lengths 5 and 10.
+- Selection: diagnostic for retraining cadence only. It was not available to the
+  Stage 2 architecture campaign.
+- Held-out test: not accessed.
+
+### Result
+
+| Period | Mean daily IC |
+|---|---:|
+| 2024 Q3 | 0.040053 |
+| 2024 Q4 | 0.045006 |
+| 2025 Q1 | 0.045948 |
+| 2025 Q2 | 0.035552 |
+
+H1-2025 minus H2-2024 was `-0.001779`, with block-5 interval
+`[-0.021436, +0.018751]` and block-10 interval
+`[-0.022423, +0.018695]`. The fitted slope was slightly positive,
+`+0.000131` IC per 100 calendar days. The late Q2 weakness is real in the point
+estimate, but neither the half-year comparison nor the slope supports a systematic
+staleness claim. Do not change retraining cadence from this diagnostic; interpret
+the official stage winner against the observed quarterly variability.
+
+Artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_c0d0598_20260820T225000Z/d1_staleness`
+
+## Experiment 16 — Stronger residual-target gate and corrected immutable sidecar
+
+Purpose: determine whether target decomposition becomes meaningfully different
+after less-shrunk and multi-factor residualization, before spending GPU time.
+
+### Settings
+
+- Short WIN beta: five-session EWMA half-life, no clipping, no variance floor.
+- Two-factor target: stored causal pre-neutralization WIN and WDO betas times exact
+  future WIN/WDO returns.
+- Three-factor target: WIN + WDO plus the ready-contract mean exact DI basis-point
+  level change against the stored causal `beta_to_DI1F28`.
+- Exact endpoint rule: decision-bar open to the equity label's matching close;
+  both endpoints observed, no stale prices.
+- Residual transformation: subtract factor component, cross-sectionally
+  median-center, apply the existing causal volatility/horizon normalization, then
+  tie-aware midrank.
+- Audit scope: the 716 training dates only. Residual arrays are zero/masked on
+  every non-training date; causal C3 tilt exposures alone extend through validation.
+- Gate: train exactly one candidate only if the lowest residual/main rank
+  correlation is at most `0.90`.
+- Held-out test and official-validation targets: not accessed.
+
+### Audit result
+
+| Residualization | Aggregate rank corr. | 30m / 60m / 120m matched coverage | Factor/main RMS, 30m / 60m / 120m |
+|---|---:|---|---|
+| Short unclipped WIN | 0.938757 | 0.9985 / 0.9985 / 0.9985 | 0.611 / 0.618 / 0.625 |
+| WIN + WDO | 0.912874 | 0.9981 / 0.9980 / 0.9979 | 0.858 / 0.869 / 0.884 |
+| WIN + WDO + DI level | 0.861604 | 0.8491 / 0.8462 / 0.7807 | 1.124 / 1.138 / 1.151 |
+
+The three-factor target passed the gate and was selected for exactly one
+three-seed candidate. Its horizon correlations were
+`0.864586 / 0.860850 / 0.859186`, and mean absolute rank shifts were
+`0.18797 / 0.19064 / 0.19129`. All mutation tests passed: post-exit changes were
+invariant, missing exact exits masked the factor, and the short beta emitted
+before the current update.
+
+The first immutable artifact, built under `c0d0598`, incorrectly required three
+simultaneous fixed-DI endpoints and was rejected before training. It remains
+immutable for forensic reproducibility. Commit `3b60ac9` corrected the contract
+to the mean over all endpoint-ready fixed contracts with at least one required,
+and also sealed all residual targets at the training boundary.
+
+Corrected artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/auxiliary_targets/next_stage_3b60ac9_20260820T233000Z`
+
+The same sidecar records C3's causal DI-tilt exposure at `99.8555%` readiness
+among active training equity-date cells.
+
+## Experiment 17 — Patience plus EMA rank blend
+
+Purpose: test whether the complementary horizon/trajectory profiles of Raw
+Patience-3 and EMA-0.995 improve the canonical parent without retraining.
+
+### Settings
+
+- Source: saved per-epoch predictions in
+  `trajectory_discovery_e22dd67_20260819T134332Z`.
+- Per fold/parity/seed: select Raw Patience-3 on one date parity; rank-average its
+  out-of-half predictions 50/50 with either final EMA-0.995 or EMA-0.995 at the
+  selected epoch; repeat both directions.
+- Ensemble: uniform rank average of the three seed members.
+- Inference: paired daily delta with 10,000-replicate block-5/10 bootstrap.
+- Retention: strictly positive primary delta on both discovery folds.
+- Official validation and held-out test: not accessed.
+
+| Blend | Fold A delta | Fold B delta | Mean | Retained |
+|---|---:|---:|---:|---|
+| Raw Patience + final EMA-0.995 | -0.000123 | +0.001292 | +0.000585 | No |
+| Raw Patience + selected-epoch EMA-0.995 | -0.002978 | -0.000598 | -0.001788 | No |
+
+The final-EMA blend was mildly additive only on Fold B; its intervals included
+zero on both folds. The selected-epoch EMA variant was significantly harmful on
+Fold A. Reject both and retain Raw Patience-3 unchanged.
+
+Artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_c0d0598_20260820T225000Z/r1_rank_blend`
+
+
+## Experiment 18 — Gated three-factor residual auxiliary
+
+Purpose: train the one auxiliary candidate authorized by Experiment 16's
+predeclared correlation gate.
+
+### Settings
+
+- Target: the selected WIN + WDO + ready-DI-level residual rank from the immutable
+  `3b60ac9` sidecar.
+- Main objective and official head: canonical soft Spearman, unchanged.
+- Auxiliary objective: residual-rank soft Spearman at fixed weight `0.5` through a
+  separate zero-initialized head.
+- Initialization: parent modules and RNG stream matched exactly; only the final
+  auxiliary head was zero-initialized.
+- Matrix: folds A/B × seeds 11/29/47, one fixed 20-epoch SAM trajectory each,
+  120 raw checkpoint files.
+- Primary: odd/even cross-fitted Raw Patience-3. Secondary: fixed final
+  EMA-0.995.
+- Inference: paired daily deltas with 10,000-replicate block-5/10 bootstrap plus
+  horizon and TOD guardrails.
+- Official validation and held-out test: not accessed.
+
+| Readout | Fold A delta | Fold B delta | Mean | Positive both folds |
+|---|---:|---:|---:|---|
+| Raw Patience-3 | +0.000286 | -0.000452 | -0.000083 | No |
+| Final EMA-0.995 | +0.001731 | +0.001879 | +0.001805 | Yes |
+
+For the primary readout, Fold A's block-5/10 intervals were
+`[-0.001055, +0.001882]` and `[-0.001083, +0.001861]`; Fold B's were
+`[-0.001532, +0.001311]` and `[-0.001133, +0.001168]`. The stronger
+residualization therefore remained null under the frozen primary rule. The
+secondary EMA pattern is directionally coherent with Experiment 12's residual
+readout, but its fold intervals also cross zero and it cannot change selection.
+
+Decision: do not retain this as a standalone candidate. Because the D2 gate opened,
+the attached plan predeclared it as a Stage 3 diversity member regardless of its
+standalone result; that stack inclusion remains fixed and does not authorize an
+EMA reselection.
+
+Analysis artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_3b60ac9_20260820T233000Z/phase_c/analysis/residual_auxiliary`
+
+
+## Experiment 19 — C1 compressed global-risk state
+
+Purpose: test whether compressed causal summaries from global instruments add value
+after full masked ES/NQ/CL/HG streams failed.
+
+### Settings
+
+- Inputs: causal ES 30-minute normalized return, ES 30-minute realized-volatility
+  log ratio, HG 30-minute normalized return, and 6M 30-minute normalized return.
+- Route: standard-initialized width-16 encoder into a zero-initialized projection
+  added to the existing shared fusion hidden state.
+- Parent preservation: exact at initialization, including parent module values and
+  RNG stream.
+- Matrix/readouts/inference: the standing six-trajectory discovery protocol,
+  cross-fitted Raw Patience-3 primary, final EMA-0.995 secondary, paired
+  block-5/10 bootstrap, horizon/TOD guardrails.
+- Additional guardrail: low-versus-high daily ES volatility, split at each fold's
+  median causal ES volatility state.
+- Official validation and held-out test: not accessed.
+
+| Readout | Fold A delta | Fold B delta | Mean | Positive both folds |
+|---|---:|---:|---:|---|
+| Raw Patience-3 | -0.000029 | +0.000001 | -0.000014 | No |
+| Final EMA-0.995 | -0.000090 | +0.000148 | +0.000029 | No |
+
+The primary high-ES-vol deltas were `-0.000081` on Fold A and `-0.000008` on
+Fold B; the adapter did not earn its keep in the regime where the mechanism
+predicted its benefit.
+
+Checkpoint autopsy rules out a dead path. Epoch-20 final adapter norms were
+`1.338–1.528` across all six runs, and the standard-initialized upstream encoder
+weights and biases also moved. The unusually small prediction deltas are therefore
+a genuine functional null after training, not a zero-init lock.
+
+Decision: reject C1 and do not spend official validation on it.
+
+Analysis artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_3b60ac9_20260820T233000Z/phase_c/analysis/compressed_global_risk`
+
+
+## Experiment 20 — C2 low-rank factor mixer, K=4
+
+Purpose: test cross-equity interaction through a crosstalk-safe low-rank mixer.
+
+### Settings
+
+- Four learned factor queries attend over masked equity states.
+- Source state: masked causal temporal mean plus the existing slow projection.
+- Per-equity loadings: softmax loadings computed from each equity's own smoothed
+  state.
+- Route: zero-initialized final projection adds the mixed factor state to the fast
+  final equity state; the fast state is otherwise untouched.
+- Matrix/readouts/inference: the standing six-trajectory protocol with cross-fitted
+  Raw Patience-3 primary and final EMA-0.995 secondary.
+- Extension gate: K=8 and set-pool×mixer require primary mean at least `+0.001`
+  and neither fold negative.
+- Official validation and held-out test: not accessed.
+
+| Readout | Fold A delta | Fold B delta | Mean | Positive both folds |
+|---|---:|---:|---:|---|
+| Raw Patience-3 | -0.000095 | -0.003950 | -0.002022 | No |
+| Final EMA-0.995 | -0.000072 | -0.000545 | -0.000308 | No |
+
+The primary Fold B result was significantly negative: block-5 interval
+`[-0.005820, -0.001470]` and block-10 interval
+`[-0.005381, -0.001585]`. Fold A was null. The fixed EMA readout softened the
+damage but was also negative on both folds.
+
+Decision: reject K=4. The extension gate failed by a wide margin, so K=8 and the
+set-pool×mixer stack were correctly skipped with zero additional training.
+
+Analysis artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_3b60ac9_20260820T233000Z/phase_c/analysis/factor_mixer_k4`
+
+
+## Experiment 21 — C3 causal DI-curve tilt exposure
+
+Purpose: test whether the contemporaneous cross-equity residual-loading structure
+contains signal that the existing sequence representation does not expose directly.
+
+### Settings
+
+- Feature: causal projection of each equity's available short beta vector onto the
+  contemporaneous fixed-DI level direction from the immutable `3b60ac9` sidecar.
+- Availability: `99.8555%` among active training equity-date cells; unavailable
+  cells were masked rather than imputed.
+- Route: the scalar, equity-varying exposure enters the existing slow-state fusion
+  through a zero-initialized final projection.
+- Matrix/readouts/inference: the standing six-trajectory protocol with cross-fitted
+  Raw Patience-3 primary, final EMA-0.995 secondary, paired block-5/10 bootstrap,
+  and horizon/TOD guardrails.
+- Official validation and held-out test: not accessed.
+
+| Readout | Fold A delta | Fold B delta | Mean | Positive both folds |
+|---|---:|---:|---:|---|
+| Raw Patience-3 | -0.000005 | +0.000002 | -0.000001 | No |
+| Final EMA-0.995 | -0.000032 | -0.000025 | -0.000028 | No |
+
+The primary block-5/10 intervals were `[-0.000029, +0.000020]` and
+`[-0.000029, +0.000021]` on Fold A, and `[-0.000018, +0.000026]` and
+`[-0.000017, +0.000027]` on Fold B. These are numerical nulls, not evidence of
+a dead adapter: final projection norms were `0.593–0.707` across all six runs.
+
+Decision: reject C3. With C1–C3 all null, the plan's predeclared gate opens the
+width/regularization controls C4 and C5; it does not reopen any feature extension.
+
+Analysis artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_3b60ac9_20260820T233000Z/phase_c/analysis/di_tilt_exposure`
+
+## Experiment 22 — C4 width/regularization capacity screen
+
+Purpose: test the last cheap capacity axis after all three initial Phase C
+representations failed the retention rule.
+
+### Settings
+
+- Architecture: width `96` and fusion width `192`, versus the parent's `128` and
+  `256`; all other architecture and training choices frozen.
+- Regularization: AdamW weight decay `0.02`, exactly twice the parent setting.
+- Scope: one predeclared candidate, no width or decay sweep.
+- Matrix/readouts/inference: the standing six-trajectory protocol with cross-fitted
+  Raw Patience-3 primary, final EMA-0.995 secondary, paired block-5/10 bootstrap,
+  and horizon/TOD guardrails.
+- Official validation and held-out test: not accessed.
+
+| Readout | Fold A delta | Fold B delta | Mean | Positive both folds |
+|---|---:|---:|---:|---|
+| Raw Patience-3 | +0.000751 | -0.002182 | -0.000716 | No |
+| Final EMA-0.995 | -0.009056 | -0.007347 | -0.008201 | No |
+
+The primary Fold A block-5/10 intervals were `[-0.001181, +0.002560]` and
+`[-0.000885, +0.002599]`; Fold B's were `[-0.003839, +0.000364]` and
+`[-0.003276, +0.000357]`. The fold reversal was most pronounced at 120 minutes:
+`-0.000116` on Fold A versus `-0.004031` on Fold B. The fixed EMA readout was
+uniformly harmful and cannot rescue the candidate.
+
+Decision: reject C4. The one-candidate screen supplies no reason to sweep width or
+regularization.
+
+Analysis artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_3b60ac9_20260820T233000Z/phase_c/analysis/capacity_96`
+
+## Experiment 23 — C5 competitive market-state feature gate
+
+Purpose: test the final predeclared architecture candidate, a MASTER-style
+competitive multiplicative gate conditioned on compressed causal market state.
+
+### Settings
+
+- Conditioning state: the same four causal compressed global-risk inputs audited
+  in C1.
+- Gate: standard-initialized width-16 encoder followed by a zero-initialized output
+  projection; softmax competition over feature channels at fixed temperature `2`.
+- Route: multiplicative dynamic gating of input features, with exact parent output
+  at initialization.
+- Matrix/readouts/inference: the standing six-trajectory protocol with cross-fitted
+  Raw Patience-3 primary, final EMA-0.995 secondary, paired block-5/10 bootstrap,
+  and horizon/TOD guardrails.
+- Official validation and held-out test: not accessed.
+
+| Readout | Fold A delta | Fold B delta | Mean | Positive both folds |
+|---|---:|---:|---:|---|
+| Raw Patience-3 | +0.000024 | -0.000134 | -0.000055 | No |
+| Final EMA-0.995 | +0.000283 | +0.000274 | +0.000279 | Yes |
+
+The primary Fold A block-5/10 intervals were `[-0.000255, +0.000221]` and
+`[-0.000288, +0.000230]`; Fold B's were `[-0.000892, +0.000741]` and
+`[-0.000691, +0.000775]`. Every secondary interval also crossed zero. The EMA
+pattern is directionally coherent but secondary-only and too small to override the
+frozen rule. Final output-projection norms were `0.798–0.968`, and the upstream
+encoder also moved in every run, ruling out a dead path.
+
+Decision: reject C5. No Phase C candidate survived the both-fold primary rule.
+The completed discovery campaign contains 36 trajectories and 720 raw epoch
+checkpoints; its manifest is complete and records no official-validation or test
+access.
+
+Campaign artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_3b60ac9_20260820T233000Z/phase_c`
+
+## Experiment 24 — Sparse official confirmation of the next-stage stack
+
+Purpose: spend the plan's single official-validation read on the fixed stack that
+survived the prior gates.
+
+### Settings
+
+- Stack composition fixed before access: canonical parent seeds 11/29/47 plus
+  full-history stronger-residual-auxiliary seeds 11/29/47. No Phase C candidate
+  qualified, and R1 was null.
+- Candidate training: official 716-date fit window, one fixed 20-epoch SAM
+  trajectory per residual member, 60 raw checkpoints total.
+- Selection: frozen Raw Patience-3 from the immutable selection-rule artifact.
+- Ensemble: uniform within-sample/horizon tie-aware rank average of all six members;
+  no learned weights.
+- Comparison: matched parent-3 reproduction on the 244-date consumed official
+  validation split, paired daily delta with 10,000-replicate block-5/10 bootstrap.
+- Held-out test: not accessed; the driver exposes no test control.
+
+| Recipe | Official validation IC |
+|---|---:|
+| Canonical parent-3 | 0.041639843 |
+| Parent-3 + stronger-residual-3 | 0.042142944 |
+| Candidate minus parent | +0.000503100 |
+
+The paired block-5 interval was `[-0.000390, +0.001351]`; block-10 was
+`[-0.000437, +0.001336]`. Horizon deltas were positive but small:
+`+0.000608 / +0.000549 / +0.000353` at 30/60/120 minutes. The six-member
+ensemble gained `+0.001371` over its mean member but remained `-0.000192` below
+its best member. Parent/residual cross-family prediction correlations ranged from
+`0.8737` to `0.9529`, providing real diversity but not enough evidence of a
+repeatable recipe gain.
+
+D1 found no material H1-2025 deterioration relative to H2-2024, so there is no
+staleness result that changes the static interpretation or justifies a
+walk-forward exception.
+
+Decision: reject the stack as an accepted recipe change. It did not clear either
+paired interval, so `held_out_test_read_justified=false`; the single held-out test
+remains sealed. Raw Patience-3 parent-3 remains canonical.
+
+Official artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_official_921dd3a_20260821T085500Z`
+
+### Deletion-first cleanup
+
+After the null official result, all next-stage-only source and tests were removed.
+Canonical `research/src` and `research/tests` are byte-for-byte identical to
+accepted pre-experiment commit `a91c068`; exact reproduction uses commits
+`c0d0598`, `3b60ac9`, and `921dd3a` and the immutable artifacts above. The
+cleaned code passed 185 research tests plus 24 collector invariants, and Ruff.

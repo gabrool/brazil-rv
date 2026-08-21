@@ -705,3 +705,71 @@ suite, commit `23efd41`, and its GitHub push completed. Lambda first returned
 `terminating`; the subsequent provider inventory contained zero matches for the
 exact instance ID. Persistent sidecar, campaign, recency, and official-confirmation
 artifacts remain on the `brazil-rv-east3` NFS filesystem.
+
+
+## Completed post-Phase-B gated screens and Phase C (2026-08-21)
+
+The attached next-stage plan is complete. It produced no accepted recipe change:
+the canonical model remains the three-seed parent with Raw Patience-3, official
+validation is closed again, and the held-out test is untouched.
+
+Commits `c0d0598`, `3b60ac9`, and `921dd3a` preserve the exact diagnostic,
+sidecar, Phase C, and sparse-confirmation implementations. The corrected immutable
+sidecar is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/auxiliary_targets/next_stage_3b60ac9_20260820T233000Z
+
+D1 found quarterly parent ICs of `0.040053`, `0.045006`, `0.045948`, and
+`0.035552` from Q3-2024 through Q2-2025. H1-2025 minus H2-2024 was `-0.001779`,
+with block-5/10 intervals `[-0.021437, +0.018751]` and
+`[-0.022423, +0.018695]`; the fitted slope was slightly positive. There is no
+statistically useful official-year staleness signal.
+
+D2's stronger WIN+WDO+ready-DI-level residual passed the audit gate at residual/main
+rank correlation `0.861604`. The one authorized candidate was null under primary
+Raw Patience-3 (`+0.000286 / -0.000452` on Folds A/B), although its fixed EMA
+secondary was positive on both folds. R1's no-training Patience plus final-EMA
+rank blend was also rejected (`-0.000123 / +0.001292`).
+
+The Phase C discovery campaign ran exactly the gated sequence below. Every
+candidate used folds A/B, seeds 11/29/47, fixed 20-epoch SAM trajectories,
+cross-fitted Raw Patience-3 primary, final EMA-0.995 secondary, and paired
+block-5/10 inference. It completed 36 trajectories and 720 raw checkpoints with
+no official-validation or test access.
+
+| Candidate | Primary Fold A / Fold B / mean | EMA Fold A / Fold B / mean | Decision |
+|---|---|---|---|
+| Stronger residual auxiliary | +.000286 / -.000452 / -.000083 | +.001731 / +.001879 / +.001805 | Null primary; Stage 3 diversity member by prior gate |
+| Compressed global risk | -.000029 / +.000001 / -.000014 | -.000090 / +.000148 / +.000029 | Reject |
+| Factor mixer K=4 | -.000095 / -.003950 / -.002022 | -.000072 / -.000545 / -.000308 | Reject; skip K=8/set-pool extensions |
+| DI tilt exposure | -.000005 / +.000002 / -.000001 | -.000032 / -.000025 / -.000028 | Reject; live-path autopsy passed |
+| Width 96, 2x weight decay | +.000751 / -.002182 / -.000716 | -.009056 / -.007347 / -.008201 | Reject |
+| Competitive feature gate | +.000024 / -.000134 / -.000055 | +.000283 / +.000274 / +.000279 | Reject primary; live-path autopsy passed |
+
+Campaign:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_3b60ac9_20260820T233000Z/phase_c
+
+Stage 3 therefore stacked only parent-3 plus three full-history stronger-residual
+members, with the composition frozen before the one official read. The six-member
+uniform rank ensemble scored `0.042142944` versus parent-3 `0.041639843`, a
+`+0.000503100` point estimate. Block-5 was `[-0.000390, +0.001351]`; block-10
+was `[-0.000437, +0.001336]`. All horizon deltas were positive, but the stack
+cleared neither interval. It was rejected, and the manifest records
+`held_out_test_read_justified=false` and `test_accessed=false`.
+
+Official artifact:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_official_921dd3a_20260821T085500Z
+
+The practical research conclusion is that the current causal feature set is
+plateaued near the established recent-regime IC. The next high-value investment
+belongs in new data and deployment adaptivity rather than another architecture
+rewiring of the same inputs.
+
+Deletion-first cleanup restored `research/src` and `research/tests` byte-for-byte
+to accepted pre-experiment commit `a91c068`. Rejected diagnostic, sidecar,
+variant, campaign, and confirmation code remains reproducible through commits
+`c0d0598`, `3b60ac9`, and `921dd3a` plus the immutable artifacts, not through
+compatibility code on current HEAD. The cleaned suite passed 185 research tests
+and 24 collector invariants (209 total), and Ruff passed.

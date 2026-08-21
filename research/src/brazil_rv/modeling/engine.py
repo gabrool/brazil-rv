@@ -11,20 +11,21 @@ from torch import nn
 from .contract import (
     GH200_RUNTIME,
     GRADIENT_CLIP,
-    HORIZON_COUNT,
     SAM_NORM_EPS,
     SAM_RHO,
     SOFT_RANK_STANDARDIZATION_EPS,
     SOFT_RANK_TEMPERATURE,
     SOFT_SPEARMAN_CORRELATION_EPS,
+    TCN_ARCHITECTURE,
     RuntimeSettings,
 )
 from .metrics import create_metric_table, primary_validation_score
 from .provenance import model_metadata
 
-TrainingObjective = Callable[..., torch.Tensor]
+TrainingObjective = Callable[
+    [torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
+]
 UpdateCallback = Callable[[], None]
-AUXILIARY_LOSS_WEIGHT = 0.5
 
 
 @dataclass(frozen=True)
@@ -50,18 +51,10 @@ def compile_model(
     )
 
 
-def objective_metadata(residual_auxiliary: bool = False) -> dict[str, object]:
-    main = {
+def objective_metadata() -> dict[str, object]:
+    return {
         "name": "soft_spearman",
         "temperature": SOFT_RANK_TEMPERATURE,
-    }
-    if not residual_auxiliary:
-        return main
-    return {
-        "name": "main_soft_spearman_with_residual_rank_auxiliary",
-        "main": main,
-        "auxiliary_weight": AUXILIARY_LOSS_WEIGHT,
-        "auxiliary_loss": "soft_spearman",
     }
 
 
@@ -122,26 +115,7 @@ def soft_spearman_loss(
     return total / count.clamp_min(1)
 
 
-def eager_training_objective(residual_auxiliary: bool = False) -> TrainingObjective:
-    if residual_auxiliary:
-
-        def residual_loss(
-            outputs: torch.Tensor,
-            targets: torch.Tensor,
-            label_mask: torch.Tensor,
-            residual_targets: torch.Tensor,
-            residual_mask: torch.Tensor,
-        ) -> torch.Tensor:
-            main = _soft_spearman_loss_sum(
-                outputs[..., :HORIZON_COUNT], targets, label_mask
-            )[0]
-            auxiliary = _soft_spearman_loss_sum(
-                outputs[..., HORIZON_COUNT:], residual_targets, residual_mask
-            )[0]
-            return main + AUXILIARY_LOSS_WEIGHT * auxiliary
-
-        return residual_loss
-
+def eager_training_objective() -> TrainingObjective:
     def loss(
         predictions: torch.Tensor,
         targets: torch.Tensor,
@@ -154,10 +128,9 @@ def eager_training_objective(residual_auxiliary: bool = False) -> TrainingObject
 
 def compile_training_objective(
     runtime: RuntimeSettings = GH200_RUNTIME,
-    residual_auxiliary: bool = False,
 ) -> TrainingObjective:
     return torch.compile(
-        eager_training_objective(residual_auxiliary),
+        eager_training_objective(),
         backend=runtime.compile_backend,
         mode=runtime.compile_mode,
         fullgraph=runtime.compile_fullgraph,
@@ -165,54 +138,35 @@ def compile_training_objective(
     )
 
 
-def _model_transfer_keys(residual_auxiliary: bool = False) -> tuple[str, ...]:
-    keys = (
+def _model_transfer_keys() -> tuple[str, ...]:
+    return (
         "patches",
         "history_patch_mask",
         "instrument_mask",
         "slow_features",
         "state_position",
-        "market_state",
-        "tilt_exposure",
         "targets",
         "label_mask",
     )
-    if not residual_auxiliary:
-        return keys
-    return (*keys, "residual_targets", "residual_mask")
 
 
 def _to_device(
-    batch: dict[str, torch.Tensor],
-    device: torch.device,
-    residual_auxiliary: bool = False,
+    batch: dict[str, torch.Tensor], device: torch.device
 ) -> dict[str, torch.Tensor]:
     return {
         key: batch[key].to(device, non_blocking=device.type == "cuda")
-        for key in _model_transfer_keys(residual_auxiliary)
-        if key in batch
+        for key in _model_transfer_keys()
     }
 
 
-def _predict_training(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-    inputs = (
+def _predict(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+    return model(
         batch["patches"],
         batch["history_patch_mask"],
         batch["instrument_mask"],
         batch["slow_features"],
         batch["state_position"],
     )
-    if "market_state" not in batch:
-        return model(*inputs)
-    return model(
-        *inputs,
-        batch["market_state"],
-        batch["tilt_exposure"],
-    )
-
-
-def _predict(model: nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-    return _predict_training(model, batch)[..., :HORIZON_COUNT]
 
 
 def _autocast(device: torch.device):
@@ -243,26 +197,16 @@ def _accumulate_gradients(
     batches: list[dict[str, torch.Tensor]],
     loss_function: TrainingObjective,
     count: float,
-    residual_auxiliary: bool,
 ) -> torch.Tensor:
     total = next(model.parameters()).new_zeros((), dtype=torch.float32)
     for batch in batches:
         with _autocast(next(model.parameters()).device):
-            predictions = _predict_training(model, batch)
-        if residual_auxiliary:
-            loss_sum = loss_function(
-                predictions,
-                batch["targets"],
-                batch["label_mask"],
-                batch["residual_targets"],
-                batch["residual_mask"],
-            )
-        else:
-            loss_sum = loss_function(
-                predictions,
-                batch["targets"],
-                batch["label_mask"],
-            )
+            predictions = _predict(model, batch)
+        loss_sum = loss_function(
+            predictions,
+            batch["targets"],
+            batch["label_mask"],
+        )
         total += loss_sum.detach()
         (loss_sum / count).backward()
     return total
@@ -318,7 +262,6 @@ def _run_sam_update(
     loss_function: TrainingObjective,
     count: float,
     after_update: UpdateCallback | None,
-    residual_auxiliary: bool,
 ) -> dict[str, object]:
     parameters = tuple(model.parameters())
     originals = [parameter.detach().clone() for parameter in parameters]
@@ -326,9 +269,7 @@ def _run_sam_update(
     start_rng = _rng_state(device)
     optimizer.zero_grad(set_to_none=True)
     try:
-        first_loss = _accumulate_gradients(
-            model, batches, loss_function, count, residual_auxiliary
-        )
+        first_loss = _accumulate_gradients(model, batches, loss_function, count)
         first_norm = _gradient_norm(parameters, float("inf"))
         scale = SAM_RHO / (first_norm + SAM_NORM_EPS)
         with torch.no_grad():
@@ -338,9 +279,7 @@ def _run_sam_update(
         optimizer.zero_grad(set_to_none=True)
         _restore_rng(start_rng, device)
         try:
-            _accumulate_gradients(
-                model, batches, loss_function, count, residual_auxiliary
-            )
+            _accumulate_gradients(model, batches, loss_function, count)
         finally:
             with torch.no_grad():
                 for parameter, original in zip(parameters, originals, strict=True):
@@ -369,7 +308,6 @@ def run_effective_batch_update(
     *,
     training_objective: TrainingObjective | None = None,
     after_update: UpdateCallback | None = None,
-    residual_auxiliary: bool = False,
 ) -> dict[str, object]:
     if len(effective_batch) != runtime.loader_batches_per_effective_batch:
         raise ValueError("Effective batch has the wrong loader-batch count")
@@ -381,7 +319,7 @@ def run_effective_batch_update(
         microbatch
         for cpu_batch in effective_batch
         for microbatch in _split_microbatches(
-            _to_device(cpu_batch, device, residual_auxiliary), runtime.microbatch_size
+            _to_device(cpu_batch, device), runtime.microbatch_size
         )
     ]
     return _run_sam_update(
@@ -389,10 +327,9 @@ def run_effective_batch_update(
         batches,
         optimizer,
         scheduler,
-        training_objective or eager_training_objective(residual_auxiliary),
+        training_objective or eager_training_objective(),
         count,
         after_update,
-        residual_auxiliary,
     )
 
 
@@ -404,7 +341,6 @@ def train_one_epoch(
     runtime: RuntimeSettings = GH200_RUNTIME,
     training_objective: TrainingObjective | None = None,
     after_update: UpdateCallback | None = None,
-    residual_auxiliary: bool = False,
 ) -> dict[str, object]:
     model.train()
     batches: list[dict[str, torch.Tensor]] = []
@@ -421,7 +357,6 @@ def train_one_epoch(
                     runtime,
                     training_objective=training_objective,
                     after_update=after_update,
-                    residual_auxiliary=residual_auxiliary,
                 )
             )
             batches = []
@@ -580,15 +515,13 @@ def checkpoint_payload(
     feature_store: Path,
     run_provenance: dict[str, object],
 ) -> dict[str, object]:
-    metadata = model_metadata(str(getattr(model, "variant")))
+    metadata = model_metadata()
     if run_provenance.get("model") != metadata:
         raise ValueError("Run provenance differs from checkpoint model")
     return {
         "model": metadata,
-        "architecture": asdict(getattr(model, "architecture")),
-        "objective": objective_metadata(
-            str(getattr(model, "variant")) == "residual_auxiliary"
-        ),
+        "architecture": asdict(TCN_ARCHITECTURE),
+        "objective": objective_metadata(),
         "sam": sam_metadata(),
         "seed": seed,
         "epoch": epoch,
@@ -599,6 +532,7 @@ def checkpoint_payload(
         "run_provenance": run_provenance,
         "model_state_dict": state_dict_to_cpu(model.state_dict()),
         "ema_state_dicts": {
-            name: state_dict_to_cpu(state) for name, state in ema_state_dicts.items()
+            name: state_dict_to_cpu(state)
+            for name, state in ema_state_dicts.items()
         },
     }

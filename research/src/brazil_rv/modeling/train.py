@@ -17,7 +17,6 @@ import polars as pl
 import torch
 
 from .contract import (
-    ADAMW_WEIGHT_DECAY,
     ALLOWED_SEEDS,
     EMA_DECAYS,
     GH200_RUNTIME,
@@ -27,7 +26,6 @@ from .contract import (
 )
 from .data import (
     create_training_loaders,
-    di_tilt_sidecar_identity,
     feature_store_identity,
     load_sample_index,
     resolve_feature_store,
@@ -47,15 +45,7 @@ from .engine import (
     train_one_epoch,
     validation_primary_metric,
 )
-from .model import (
-    CAPACITY_96_VARIANT,
-    DI_TILT_EXPOSURE_VARIANT,
-    MODEL_VARIANTS,
-    PARENT_MODEL_VARIANT,
-    RESIDUAL_AUXILIARY_VARIANT,
-    build_model,
-    count_trainable_parameters,
-)
+from .model import build_model, count_trainable_parameters
 from .optim import build_optimizer, build_scheduler
 from .provenance import build_run_provenance, repository_commit
 from .trajectory import (
@@ -75,15 +65,11 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train one fixed PIT-clean trajectory")
     parser.add_argument("--seed", type=int, choices=ALLOWED_SEEDS, default=29)
     parser.add_argument(
-        "--variant", choices=MODEL_VARIANTS, default=PARENT_MODEL_VARIANT
-    )
-    parser.add_argument(
         "--selection-window",
         choices=("fold_a", "fold_b", "official"),
         default="fold_a",
     )
     parser.add_argument("--selection-rule-file", type=Path)
-    parser.add_argument("--tilt-sidecar", type=Path)
     parser.add_argument("--output-base", type=Path, default=RUN_OUTPUT_BASE)
     return parser.parse_args(arguments)
 
@@ -138,9 +124,7 @@ def _selection_metadata(path: Path | None, window: str) -> dict[str, object] | N
     if path is None:
         return None
     if window != "official":
-        raise ValueError(
-            "A frozen selection rule may be applied only to an official run"
-        )
+        raise ValueError("A frozen selection rule may be applied only to an official run")
     selection = load_frozen_selection(path)
     return {
         "selected_rule": selection["selected_rule"],
@@ -200,8 +184,6 @@ def run_training(
     selection_window: str,
     run_dir: Path,
     selection_rule_file: Path | None = None,
-    variant: str = PARENT_MODEL_VARIANT,
-    tilt_sidecar: Path | None = None,
 ) -> Path:
     if run_dir.exists():
         raise FileExistsError(run_dir)
@@ -216,35 +198,17 @@ def run_training(
     )
     frozen_selection = _selection_metadata(selection_rule_file, selection_window)
     store_identity = feature_store_identity(store)
-    sidecar_variants = {DI_TILT_EXPOSURE_VARIANT, RESIDUAL_AUXILIARY_VARIANT}
-    if (variant in sidecar_variants) != (tilt_sidecar is not None):
-        raise ValueError(
-            "Only DI tilt and residual auxiliary variants require a sidecar"
-        )
-    residual_auxiliary = variant == RESIDUAL_AUXILIARY_VARIANT
-    tilt_manifest = (
-        None
-        if tilt_sidecar is None
-        else di_tilt_sidecar_identity(
-            tilt_sidecar,
-            store_identity,
-            require_residual=residual_auxiliary,
-        )
-    )
-    objective = objective_metadata(residual_auxiliary)
     train_loader, validation_loader, sampler = create_training_loaders(
         store,
         train_rows,
         validation_rows,
         GH200_RUNTIME,
         seed,
-        tilt_sidecar,
     )
-    model = build_model(variant).cuda()
+    model = build_model().cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
     parameter_count = count_trainable_parameters(model)
-    weight_decay = 0.02 if variant == CAPACITY_96_VARIANT else ADAMW_WEIGHT_DECAY
-    optimizer, _ = build_optimizer(model, weight_decay)
+    optimizer, _ = build_optimizer(model)
     scheduler, steps_per_epoch, warmup_steps = build_scheduler(
         optimizer, train_rows.height, MAX_EPOCHS
     )
@@ -261,9 +225,6 @@ def run_training(
         parameter_count=parameter_count,
         training_sample_count=train_rows.height,
         date_replacement=sampler.replace_dates,
-        model_variant=variant,
-        weight_decay=weight_decay,
-        objective=objective,
     )
     recorded_training = run_provenance["training"]
     if (
@@ -278,12 +239,6 @@ def run_training(
         "run_provenance": run_provenance,
         "feature_store": str(store.resolve()),
         "feature_store_identity": store_identity,
-        "auxiliary_inputs": None
-        if tilt_manifest is None
-        else {
-            "next_stage_sidecar": str(tilt_sidecar.resolve()),
-            "next_stage_sidecar_manifest": tilt_manifest,
-        },
         "split": {
             "training": selection_window,
             "selection": selection_window,
@@ -295,7 +250,7 @@ def run_training(
         "seed": seed,
         "model": run_provenance["model"],
         "parameter_count": parameter_count,
-        "objective": objective,
+        "objective": objective_metadata(),
         "optimizer": "sam_adamw",
         "sam": sam_metadata(),
         "training": recorded_training,
@@ -303,9 +258,7 @@ def run_training(
     }
     _atomic_json(run_dir / "run_manifest.json", manifest)
     compiled_model = compile_model(model)
-    compiled_objective = compile_training_objective(
-        residual_auxiliary=residual_auxiliary
-    )
+    compiled_objective = compile_training_objective()
     history: list[dict[str, object]] = []
     raw_scores: list[float] = []
     raw_prediction_tail: list[np.ndarray] = []
@@ -329,7 +282,6 @@ def run_training(
                 GH200_RUNTIME,
                 compiled_objective,
                 after_update=update_emas,
-                residual_auxiliary=residual_auxiliary,
             )
             training_seconds = time.perf_counter() - training_started
             validation_started = time.perf_counter()
@@ -345,7 +297,9 @@ def run_training(
             raw_prediction_tail = raw_prediction_tail[-5:]
             raw_scores.append(scores["raw"])
             _atomic_npz(
-                run_dir / "validation_predictions" / f"epoch_{epoch:02d}.npz",
+                run_dir
+                / "validation_predictions"
+                / f"epoch_{epoch:02d}.npz",
                 predictions,
             )
             _atomic_torch_save(
@@ -466,7 +420,7 @@ def run_training(
 def _run(args: argparse.Namespace) -> Path:
     created_at = datetime.now(timezone.utc)
     name = (
-        f"tcn_{args.variant}_{args.selection_window}_seed{args.seed}_"
+        f"tcn_{args.selection_window}_seed{args.seed}_"
         f"{created_at:%Y%m%dT%H%M%S%fZ}"
     )
     return run_training(
@@ -474,8 +428,6 @@ def _run(args: argparse.Namespace) -> Path:
         seed=args.seed,
         selection_window=args.selection_window,
         selection_rule_file=args.selection_rule_file,
-        variant=args.variant,
-        tilt_sidecar=args.tilt_sidecar,
         run_dir=args.output_base / name,
     )
 
