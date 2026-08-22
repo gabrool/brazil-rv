@@ -440,3 +440,8 @@ sidecar is `kronos_k0_bars_3f93b26_20260822T134400Z` in the same model-runs
 root. Exact settings, leakage caveats, operational corrections, model-scope
 override, metric breakdowns, hashes, and cleanup provenance are in
 `EXPERIMENT_LOG.md` and the run manifests.
+
+Transient base partials, model caches, upstream clones, and MPS state were
+deleted. The retained run and sidecar are read-only. Paid GH200 instance
+`c0aef7522bf64fe0899e8703027668db` was terminated and confirmed absent from
+Lambda's active inventory.

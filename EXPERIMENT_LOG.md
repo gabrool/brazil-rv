@@ -1980,3 +1980,13 @@ in-scope values and exact zero out of scope, and found the expected 2/6/12 rows
 in the fold summary, horizon table, and time-of-day table. The manifest records
 `official_validation_accessed=false`, `test_accessed=false`, and
 `k1_started=false`.
+
+Deletion-first cleanup then removed the unmerged Kronos-base directory, all
+private completed-worker score arrays, the pinned upstream clone, the three
+Kronos HuggingFace cache directories (`502 MiB` total), the CUDA MPS runtime,
+and the local workspace clone. The completed run (`9.0 MiB`) and bar sidecar
+(`199 MiB`) are retained read-only; operational logs remain outside the run.
+The paid Lambda instance `c0aef7522bf64fe0899e8703027668db`
+(`gpu_1x_gh200`, `us-east-3`, IP `192.222.50.94`) accepted termination and was
+confirmed absent from the provider's active-instance inventory at
+`2026-08-22T17:05:28Z`.
