@@ -1773,3 +1773,107 @@ Total cleanup was 1,072 files / 5,808,790,930 bytes. Persistent NFS reported
 `c40d3ea383f84ea89780612a7aaaeeec` in `us-east-3` was terminated only after
 these postchecks. Lambda accepted the exact-ID request as `terminating`; two
 subsequent provider inventory reads returned zero matches for that ID.
+
+## Experiment 38 -- Kronos K0 zero-shot kill-test preregistration
+
+Status at registration: no Kronos inference score, momentum-control score,
+parent same-scope score, or ensemble result exists. This section is frozen before
+any score is computed. The source specification was supplied on 2026-08-22 as
+`k0_killtest_spec.md`, SHA-256
+`396cbc970e9f63ec57f286176122d95902f1ffa17214e24359fe4584dee3b6f5`.
+
+K0 is inference only. There is no training, fine-tuning, gradient update,
+context/DI/slow-feature injection, official-validation access, held-out-test
+access, or K1 run. The user explicitly requires that the K0 decision rules be
+registered but that K1 not be launched from this run.
+
+### Frozen implementation and scope
+
+- Upstream repository: `https://github.com/shiyu-coder/Kronos`, commit
+  `67b630e67f6a18c9e9be918d9b4337c960db1e9a`. Only `model/` may be imported.
+  The fine-tuning, CSV fine-tuning, examples, and WebUI trees are prohibited.
+- Checkpoints are pinned before download: Kronos-small revision
+  `901c26c1332695a2a8f243eb2f37243a37bea320`, Kronos-base revision
+  `2b554741eca47781b64468546e77fef3e85130e6`, and shared tokenizer revision
+  `0e0117387f39004a9016484a186a908917e22426`. Every downloaded file is hashed.
+- The upstream predictor and model internals remain unmodified. Models and
+  tokenizer run in evaluation mode. The upstream fine-token RoPE/cross-attention
+  behavior is accepted as shipped.
+- Only Fold A's 102-date selection window and Fold B's disjoint 102-date
+  selection window are accessed. The fixed decision grid is
+  `{0, 10, 20, 30, 40, 50}` and the horizons are 30/60/120 minutes. Kronos-small
+  runs this full scope. Kronos-base runs the full scope if its 200-context
+  projected time is no more than 24 GPU-hours; otherwise its scope is fixed to
+  `{0, 20, 40}`. This throughput rule is result-independent.
+- Each context contains the last 512 five-minute bars through the bar closing at
+  the decision minute, with no bar beginning at the decision included. Five-minute
+  aggregation, synthetic bars, point-in-time membership, exact security identity,
+  and the `80%` full-context / `95%` last-24 coverage thresholds follow the supplied
+  K0 specification. Groups with fewer than 30 eligible+labeled equities are skipped.
+- The raw XP schema has no financial-volume or minute-VWAP field. The sidecar
+  therefore stores OHLC plus summed `real_volume` and omits `amount`; the shipped
+  predictor deterministically synthesizes amount as volume times mean OHLC. This
+  rule is fixed before inference.
+- Inference settings are `T=0.6`, `top_p=0.9`, `top_k=0`, `sample_count=5`,
+  `pred_len=24`, and `max_context=512`. The horizon score is mean predicted close
+  at index `H/5 - 1`, divided by the last context close, minus one.
+- Momentum control is fixed as `close[T] / close[T-60 minutes] - 1`, using context
+  close indices `-1` and `-13` on the same synthetic-aware K0 bars.
+- The first 100 eligible contexts in chronological date/decision/security order
+  form the bf16-versus-fp32 audit. Identical per-context seeds are used. bf16 is
+  adopted for a model only if every evaluable group's absolute Spearman-IC change
+  is below `0.001`; unsupported or non-finite bf16 falls back to fp32.
+- The first 200 eligible contexts in the same order form the throughput audit.
+  Throughput cannot change the small scope and can change base only through the
+  predeclared 24-hour rule above.
+- Stable per-context seed is the first unsigned 63 bits of SHA-256 over
+  `(model_name, trade_date, decision_idx, security_id)`. The shipped
+  `predict_batch` has one process-global RNG and no per-row generator. To preserve
+  the exact per-context seed without patching upstream internals, K0 calls
+  `predict_batch` with one equity context and five internally batched samples.
+  This deliberately forgoes cross-equity batching. A context rerun resets its
+  seed and must reproduce its score array bit-for-bit.
+- Primary metrics use the existing `sample_level_spearman_ic` and
+  `primary_validation_score` conventions. The three-seed parent is reconstructed
+  from the immutable trajectory artifacts with the frozen bidirectional
+  odd/even Patience-3 epochs and re-ranked on the same K0 mask. Parent correlation,
+  same-scope parent IC, horizon/TOD tables, and uniform parent-plus-Kronos rank
+  ensemble block-5/10 intervals are informational only.
+
+### Preregistered decision rule
+
+Let `IC_best` = the better of the two models' mean-of-folds primary IC.
+
+- **Kill** (family rejected, program over) if `IC_best < 0.015`, OR if
+  `IC_best ≤ momentum-control IC` on the mean of folds. Rationale recorded in
+  advance: fold contamination biases upward, so failing on favorable ground is
+  decisive.
+- **Proceed to K1** (fine-tune-as-encoder program; separate preregistration) if
+  `IC_best ≥ 0.015` AND mean score-parent correlation `< 0.5`. Record explicitly
+  that K0 passing proves nothing (optimistic bias); K1's confirmatory evidence
+  must come from post-2024-06 data (the bundled official read) or forward
+  walk-forward.
+- **Park** (no K1, revisit only with new evidence) if `IC_best ≥ 0.015` but
+  correlation `≥ 0.5` -- a redundant signal at parent-quality-minus is not worth
+  the compute.
+- The informational ensemble delta cannot rescue a kill and cannot trigger K1 by
+  itself.
+
+For this execution, "Proceed to K1" means only that the registered K0 rule labels
+the family eligible for a separately preregistered future experiment. It does not
+authorize K1 work or another model/data read on the paid instance.
+
+### Leakage register
+
+Kronos weights are a non-point-in-time artifact relative to the fold dates:
+pretraining extends through 2024-06 and includes B3 **daily/weekly** bars -- i.e.,
+the daily-scale outcomes of these exact tickers during both fold windows are
+inside the pretrained weights. B3 intraday bars are not in the corpus, so
+memorization of intraday paths is not possible, but daily-scale foreknowledge and
+global cross-market intraday patterns keep the bias direction positive. Hence the
+asymmetric decision rule. Any future confirmatory claim requires post-2024-06
+evaluation windows.
+
+The immutable result entry must record the final artifact path and
+`official_validation_accessed=false`, `test_accessed=false`. Score arrays and
+manifests survive cleanup; K1 is explicitly outside this run.
