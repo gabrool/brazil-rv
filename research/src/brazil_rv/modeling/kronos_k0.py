@@ -95,6 +95,7 @@ FOLD_RANGES = {
     "fold_b": (date(2024, 2, 1), date(2024, 6, 28)),
 }
 GLOBAL_SEED = 20260822
+INFERENCE_WORKERS = 8
 
 
 def _sha256(path: Path) -> str:
@@ -602,7 +603,7 @@ def _snapshot_files(path: Path) -> list[dict[str, object]]:
 
 
 def _load_kronos(
-    model_name: str, kronos_repo: Path
+    model_name: str, kronos_repo: Path, *, collect_metadata: bool = True
 ) -> tuple[object, dict[str, object]]:
     actual_commit = subprocess.run(
         ["git", "-C", str(kronos_repo), "rev-parse", "HEAD"],
@@ -636,24 +637,28 @@ def _load_kronos(
         )
     finally:
         sys.path.pop(0)
-    metadata = {
-        "upstream_repository": UPSTREAM_REPOSITORY,
-        "upstream_commit": actual_commit,
-        "upstream_model_internals_modified": False,
-        "upstream_fine_token_rope_cross_attention": "accepted_as_shipped",
-        "model": {
-            "repository": model_repo,
-            "revision": model_revision,
-            "snapshot": str(model_path),
-            "files": _snapshot_files(model_path),
-        },
-        "tokenizer": {
-            "repository": TOKENIZER_REPOSITORY,
-            "revision": TOKENIZER_REVISION,
-            "snapshot": str(tokenizer_path),
-            "files": _snapshot_files(tokenizer_path),
-        },
-    }
+    metadata = (
+        {
+            "upstream_repository": UPSTREAM_REPOSITORY,
+            "upstream_commit": actual_commit,
+            "upstream_model_internals_modified": False,
+            "upstream_fine_token_rope_cross_attention": "accepted_as_shipped",
+            "model": {
+                "repository": model_repo,
+                "revision": model_revision,
+                "snapshot": str(model_path),
+                "files": _snapshot_files(model_path),
+            },
+            "tokenizer": {
+                "repository": TOKENIZER_REPOSITORY,
+                "revision": TOKENIZER_REVISION,
+                "snapshot": str(tokenizer_path),
+                "files": _snapshot_files(tokenizer_path),
+            },
+        }
+        if collect_metadata
+        else {}
+    )
     return predictor, metadata
 
 
@@ -836,104 +841,311 @@ def _audit_throughput(
     }
 
 
-def _infer_model(
-    predictor: object,
-    model_name: str,
-    sidecar: BarSidecar,
-    sidecar_dir: Path,
-    reference: Mapping[str, np.ndarray],
-    output_dir: Path,
-    *,
-    decisions: Sequence[int],
-    use_bf16: bool,
-) -> dict[str, object]:
+def _open_partial_arrays(
+    output_dir: Path, reference: Mapping[str, np.ndarray]
+) -> tuple[np.memmap, np.memmap]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    score_partial = output_dir / "scores.partial.npy"
-    done_partial = output_dir / "done.partial.npy"
-    final_score = output_dir / "scores.npy"
-    final_done = output_dir / "done.npy"
-    shape = reference["targets"].shape
-    if final_score.exists() and final_done.exists():
-        return {
-            "resumed_completed": True,
-            "scores": _array_metadata(final_score),
-            "done": _array_metadata(final_done),
-        }
-    if score_partial.exists() != done_partial.exists():
+    score_path = output_dir / "scores.partial.npy"
+    done_path = output_dir / "done.partial.npy"
+    if score_path.exists() != done_path.exists():
         raise RuntimeError("Partial Kronos inference files are inconsistent")
-    if not score_partial.exists():
-        scores = open_memmap(score_partial, mode="w+", dtype=np.float32, shape=shape)
+    if not score_path.exists():
+        scores = open_memmap(
+            score_path,
+            mode="w+",
+            dtype=np.float32,
+            shape=reference["targets"].shape,
+        )
         done = open_memmap(
-            done_partial,
+            done_path,
             mode="w+",
             dtype=bool,
             shape=reference["coverage"].shape,
         )
         scores[...] = 0.0
         done[...] = False
-    else:
-        scores = open_memmap(score_partial, mode="r+")
-        done = open_memmap(done_partial, mode="r+")
-        if scores.shape != shape or done.shape != reference["coverage"].shape:
-            raise ValueError("Partial inference arrays have the wrong shape")
+        scores.flush()
+        done.flush()
+        return scores, done
+    scores = open_memmap(score_path, mode="r+")
+    done = open_memmap(done_path, mode="r+")
+    if (
+        scores.shape != reference["targets"].shape
+        or done.shape != reference["coverage"].shape
+    ):
+        raise ValueError("Partial inference arrays have the wrong shape")
+    return scores, done
 
+
+def _close_memmap(array: np.memmap) -> None:
+    array.flush()
+    mapping = getattr(array, "_mmap", None)
+    if mapping is not None:
+        mapping.close()
+
+
+def _infer_worker(
+    *,
+    model_name: str,
+    sidecar_dir: Path,
+    reference_path: Path,
+    kronos_repo: Path,
+    output_dir: Path,
+    baseline_done_path: Path,
+    decisions: Sequence[int],
+    use_bf16: bool,
+    worker_index: int,
+    worker_count: int,
+) -> Path:
+    if not 0 <= worker_index < worker_count:
+        raise ValueError("Worker index is outside the shard count")
+    reference = _load_reference(reference_path)
+    baseline_done = np.load(baseline_done_path, mmap_mode="r", allow_pickle=False)
+    sidecar = BarSidecar(sidecar_dir)
     scope = pl.read_parquet(sidecar_dir / "scope_index.parquet").sort("scope_idx")
     equities = pl.read_parquet(sidecar_dir / "equity_index.parquet").sort("equity_slot")
-    contexts = list(_eligible_contexts(reference, decisions))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    scores, done = _open_partial_arrays(output_dir, reference)
+    contexts = [
+        context
+        for position, context in enumerate(_eligible_contexts(reference, decisions))
+        if position % worker_count == worker_index
+    ]
+    expected_count = sum(
+        not baseline_done[scope_idx, slot] for scope_idx, slot in contexts
+    )
+    if (output_dir / "worker_manifest.json").is_file():
+        manifest = json.loads(
+            (output_dir / "worker_manifest.json").read_text(encoding="utf-8")
+        )
+        if manifest.get("status") == "completed":
+            _close_memmap(scores)
+            _close_memmap(done)
+            return output_dir
+
+    torch.set_float32_matmul_precision("high")
+    torch.use_deterministic_algorithms(True)
+    predictor, _ = _load_kronos(model_name, kronos_repo, collect_metadata=False)
     started = time.perf_counter()
-    completed_before = int(done.sum())
     for number, (scope_idx, slot) in enumerate(contexts, start=1):
-        if done[scope_idx, slot]:
+        if baseline_done[scope_idx, slot] or done[scope_idx, slot]:
             continue
         trade_date, decision, security_id = _context_identity(
             scope, equities, scope_idx, slot
         )
         context = sidecar.context(int(reference["date_idx"][scope_idx]), decision, slot)
         if context is None:
-            raise RuntimeError("Eligible inference context disappeared")
-        seed = stable_context_seed(model_name, trade_date, decision, security_id)
+            raise RuntimeError("Eligible worker context disappeared")
         scores[scope_idx, slot] = _predict_context(
-            predictor, context, seed=seed, use_bf16=use_bf16
+            predictor,
+            context,
+            seed=stable_context_seed(model_name, trade_date, decision, security_id),
+            use_bf16=use_bf16,
         )
         done[scope_idx, slot] = True
         if number % 250 == 0:
             scores.flush()
             done.flush()
-            elapsed = time.perf_counter() - started
             print(
-                f"{model_name}: {number}/{len(contexts)} contexts visited; "
-                f"elapsed={elapsed:.1f}s"
+                f"{model_name} worker {worker_index}: {number}/{len(contexts)} "
+                f"shard contexts visited; elapsed={time.perf_counter() - started:.1f}s"
             )
-    scores.flush()
-    done.flush()
-    elapsed = time.perf_counter() - started
-    mapping = getattr(scores, "_mmap", None)
-    if mapping is not None:
-        mapping.close()
-    mapping = getattr(done, "_mmap", None)
-    if mapping is not None:
-        mapping.close()
-    del scores, done
-    os.replace(score_partial, final_score)
-    os.replace(done_partial, final_done)
+    _close_memmap(scores)
+    _close_memmap(done)
+    final_done = np.load(
+        output_dir / "done.partial.npy", mmap_mode="r", allow_pickle=False
+    )
+    if int(final_done.sum()) != expected_count:
+        raise ValueError("Worker completion count differs from its unfilled shard")
+    _atomic_json(
+        output_dir / "worker_manifest.json",
+        {
+            "schema": "KRONOS_K0_INFERENCE_WORKER",
+            "status": "completed",
+            "model": model_name,
+            "worker_index": worker_index,
+            "worker_count": worker_count,
+            "decisions": list(decisions),
+            "precision": "bf16" if use_bf16 else "fp32",
+            "expected_context_count": expected_count,
+            "elapsed_seconds": time.perf_counter() - started,
+            "scores": _array_metadata(output_dir / "scores.partial.npy"),
+            "done": _array_metadata(output_dir / "done.partial.npy"),
+        },
+    )
+    return output_dir
 
-    final_scores = np.load(final_score, mmap_mode="r", allow_pickle=False)
-    final_flags = np.load(final_done, mmap_mode="r", allow_pickle=False)
+
+def _verify_merged_scores(
+    predictor: object,
+    model_name: str,
+    sidecar: BarSidecar,
+    sidecar_dir: Path,
+    reference: Mapping[str, np.ndarray],
+    scores: np.ndarray,
+    decisions: Sequence[int],
+    *,
+    use_bf16: bool,
+) -> list[dict[str, object]]:
+    scope = pl.read_parquet(sidecar_dir / "scope_index.parquet").sort("scope_idx")
+    equities = pl.read_parquet(sidecar_dir / "equity_index.parquet").sort("equity_slot")
+    eligible = list(_eligible_contexts(reference, decisions))
+    selected = [eligible[0], eligible[len(eligible) // 2], eligible[-1]]
+    rows = []
+    for scope_idx, slot in selected:
+        trade_date, decision, security_id = _context_identity(
+            scope, equities, scope_idx, slot
+        )
+        context = sidecar.context(int(reference["date_idx"][scope_idx]), decision, slot)
+        if context is None:
+            raise RuntimeError("Eligible merged context disappeared")
+        rerun = _predict_context(
+            predictor,
+            context,
+            seed=stable_context_seed(model_name, trade_date, decision, security_id),
+            use_bf16=use_bf16,
+        )
+        if not np.array_equal(scores[scope_idx, slot], rerun):
+            raise ValueError("Merged worker score failed bitwise context rerun")
+        rows.append(
+            {
+                "trade_date": str(trade_date),
+                "decision_idx": decision,
+                "security_id": security_id,
+                "score_sha256": hashlib.sha256(rerun.tobytes()).hexdigest(),
+            }
+        )
+    return rows
+
+
+def _infer_model(
+    predictor: object,
+    model_name: str,
+    sidecar: BarSidecar,
+    sidecar_dir: Path,
+    reference: Mapping[str, np.ndarray],
+    reference_path: Path,
+    kronos_repo: Path,
+    output_dir: Path,
+    *,
+    decisions: Sequence[int],
+    use_bf16: bool,
+    worker_count: int = INFERENCE_WORKERS,
+) -> dict[str, object]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    final_score = output_dir / "scores.npy"
+    final_done = output_dir / "done.npy"
+    if final_score.exists() and final_done.exists():
+        return {
+            "resumed_completed": True,
+            "scores": _array_metadata(final_score),
+            "done": _array_metadata(final_done),
+        }
+    scores, done = _open_partial_arrays(output_dir, reference)
+    completed_before = int(done.sum())
+    _close_memmap(scores)
+    _close_memmap(done)
+
+    worker_root = output_dir / "workers"
+    worker_root.mkdir(exist_ok=True)
+    processes = []
+    logs = []
+    started = time.perf_counter()
+    for worker_index in range(worker_count):
+        worker_dir = worker_root / f"worker_{worker_index:02d}"
+        log_path = worker_root / f"worker_{worker_index:02d}.log"
+        log = log_path.open("a", encoding="utf-8")
+        command = [
+            sys.executable,
+            "-m",
+            "brazil_rv.modeling.kronos_k0",
+            "worker",
+            "--model-name",
+            model_name,
+            "--sidecar-dir",
+            str(sidecar_dir),
+            "--reference-path",
+            str(reference_path),
+            "--kronos-repo",
+            str(kronos_repo),
+            "--output-dir",
+            str(worker_dir),
+            "--baseline-done-path",
+            str(output_dir / "done.partial.npy"),
+            "--decisions",
+            ",".join(map(str, decisions)),
+            "--worker-index",
+            str(worker_index),
+            "--worker-count",
+            str(worker_count),
+        ]
+        if use_bf16:
+            command.append("--use-bf16")
+        processes.append(
+            subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+        )
+        logs.append(log)
+    return_codes = [process.wait() for process in processes]
+    for log in logs:
+        log.close()
+    if any(code != 0 for code in return_codes):
+        raise RuntimeError(f"K0 inference worker failed: return_codes={return_codes}")
+
+    scores = open_memmap(output_dir / "scores.partial.npy", mode="r+")
+    done = open_memmap(output_dir / "done.partial.npy", mode="r+")
     expected = (
         reference["coverage"]
         & np.isin(reference["decision_idx"], np.asarray(decisions))[:, None]
     )
-    if not np.array_equal(final_flags, expected):
-        raise ValueError("Completed inference mask differs from the fixed scope")
-    if np.any(final_scores[~expected] != 0.0):
+    for worker_index in range(worker_count):
+        worker_dir = worker_root / f"worker_{worker_index:02d}"
+        worker_scores = np.load(
+            worker_dir / "scores.partial.npy", mmap_mode="r", allow_pickle=False
+        )
+        worker_done = np.load(
+            worker_dir / "done.partial.npy", mmap_mode="r", allow_pickle=False
+        )
+        if np.any(worker_done & done):
+            raise ValueError("Inference worker outputs overlap")
+        if np.any(worker_done & ~expected):
+            raise ValueError("Inference worker wrote outside the fixed scope")
+        scores[worker_done] = worker_scores[worker_done]
+        done[worker_done] = True
+    scores.flush()
+    done.flush()
+    if not np.array_equal(done, expected):
+        raise ValueError("Merged inference mask differs from the fixed scope")
+    if np.any(scores[~expected] != 0.0):
         raise ValueError("Out-of-scope Kronos scores must be exactly zero")
-    if not np.isfinite(final_scores[expected]).all():
+    if not np.isfinite(scores[expected]).all():
         raise ValueError("Kronos scores contain non-finite values")
+    merged_determinism = _verify_merged_scores(
+        predictor,
+        model_name,
+        sidecar,
+        sidecar_dir,
+        reference,
+        scores,
+        decisions,
+        use_bf16=use_bf16,
+    )
+    _close_memmap(scores)
+    _close_memmap(done)
+    os.replace(output_dir / "scores.partial.npy", final_score)
+    os.replace(output_dir / "done.partial.npy", final_done)
+    for worker_index in range(worker_count):
+        worker_dir = worker_root / f"worker_{worker_index:02d}"
+        (worker_dir / "scores.partial.npy").unlink()
+        (worker_dir / "done.partial.npy").unlink()
+    elapsed = time.perf_counter() - started
     return {
         "resumed_completed": False,
         "elapsed_seconds": elapsed,
-        "completed_before_resume": completed_before,
+        "completed_before_parallel_resume": completed_before,
         "context_count": int(expected.sum()),
+        "worker_count": worker_count,
+        "cuda_mps_pipe_directory": os.environ.get("CUDA_MPS_PIPE_DIRECTORY"),
+        "merged_score_determinism_audit": merged_determinism,
         "scores": _array_metadata(final_score),
         "done": _array_metadata(final_done),
     }
@@ -1335,12 +1547,20 @@ def run_k0(run_dir: Path, sidecar_dir: Path, kronos_repo: Path) -> Path:
         current_commit = _repository_commit()
         previous_commit = str(manifest.get("repository_commit"))
         if previous_commit != current_commit:
+            persisted_scores = 0
+            for done_path in run_dir.glob("*/done.partial.npy"):
+                persisted_scores += int(
+                    np.load(done_path, mmap_mode="r", allow_pickle=False).sum()
+                )
             manifest.setdefault("pre_score_runtime_corrections", []).append(
                 {
                     "from_commit": previous_commit,
                     "to_commit": current_commit,
-                    "reason": "timestamp wrapper now passes pandas Series to shipped .dt accessor",
-                    "score_existed_before_correction": False,
+                    "reason": (
+                        "runtime-only wrapper or orchestration correction recorded "
+                        "in EXPERIMENT_LOG.md"
+                    ),
+                    "persisted_context_scores_before_correction": persisted_scores,
                 }
             )
             manifest["repository_commit"] = current_commit
@@ -1406,6 +1626,8 @@ def run_k0(run_dir: Path, sidecar_dir: Path, kronos_repo: Path) -> Path:
                 ),
                 "per_context_predict_batch_size": 1,
                 "samples_batched_inside_upstream": SAMPLE_COUNT,
+                "inference_workers": INFERENCE_WORKERS,
+                "worker_outputs_disjoint": True,
             },
             "models": {},
             "official_validation_accessed": False,
@@ -1461,6 +1683,8 @@ def run_k0(run_dir: Path, sidecar_dir: Path, kronos_repo: Path) -> Path:
             sidecar,
             sidecar_dir,
             reference,
+            reference_path,
+            kronos_repo,
             model_output,
             decisions=decisions,
             use_bf16=use_bf16,
@@ -1519,6 +1743,17 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     run.add_argument("--run-dir", type=Path, required=True)
     run.add_argument("--sidecar-dir", type=Path, required=True)
     run.add_argument("--kronos-repo", type=Path, required=True)
+    worker = subparsers.add_parser("worker")
+    worker.add_argument("--model-name", choices=tuple(MODEL_REVISIONS), required=True)
+    worker.add_argument("--sidecar-dir", type=Path, required=True)
+    worker.add_argument("--reference-path", type=Path, required=True)
+    worker.add_argument("--kronos-repo", type=Path, required=True)
+    worker.add_argument("--output-dir", type=Path, required=True)
+    worker.add_argument("--baseline-done-path", type=Path, required=True)
+    worker.add_argument("--decisions", required=True)
+    worker.add_argument("--use-bf16", action="store_true")
+    worker.add_argument("--worker-index", type=int, required=True)
+    worker.add_argument("--worker-count", type=int, required=True)
     analyze = subparsers.add_parser("analyze")
     analyze.add_argument("--run-dir", type=Path, required=True)
     return parser.parse_args(arguments)
@@ -1530,6 +1765,21 @@ def main() -> None:
         print(prepare_bar_sidecar(args.output_dir))
     elif args.command == "run":
         print(run_k0(args.run_dir, args.sidecar_dir, args.kronos_repo))
+    elif args.command == "worker":
+        print(
+            _infer_worker(
+                model_name=args.model_name,
+                sidecar_dir=args.sidecar_dir,
+                reference_path=args.reference_path,
+                kronos_repo=args.kronos_repo,
+                output_dir=args.output_dir,
+                baseline_done_path=args.baseline_done_path,
+                decisions=tuple(int(value) for value in args.decisions.split(",")),
+                use_bf16=args.use_bf16,
+                worker_index=args.worker_index,
+                worker_count=args.worker_count,
+            )
+        )
     else:
         print(analyze_run(args.run_dir))
 

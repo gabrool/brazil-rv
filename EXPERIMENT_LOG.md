@@ -1896,3 +1896,17 @@ preflight prediction value was inspected. Future timestamps are now constructed
 as the exact same `last_close_ns + 5-minute * [1..24]` integer nanoseconds before
 conversion to a Series. This is a runtime/logging correction only; it changes no
 timestamp or experimental decision.
+
+The first serial pass then established actual single-context throughput while
+persisting only independently seeded, unanalyzed score rows. No score value or
+metric was inspected. GPU utilization was approximately 45%, so the process was
+stopped on a 250-context flush boundary to introduce execution-only sharding.
+Eight isolated processes now receive disjoint context ordinals. Every worker still
+calls the unchanged upstream `predict_batch` with exactly one equity context and
+five samples, resets the same stable per-context seed, and writes a private array;
+no cross-equity RNG stream is introduced. The coordinator rejects overlaps and
+out-of-scope writes, merges only completed worker masks, and bitwise-reruns the
+first/middle/last merged contexts through the single-process predictor. Existing
+serial scores are retained and included in that audit. Worker count and CUDA MPS
+state are operational metadata only and cannot change scope, precision, sampling,
+metrics, or the registered decision.
