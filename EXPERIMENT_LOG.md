@@ -1877,3 +1877,14 @@ evaluation windows.
 The immutable result entry must record the final artifact path and
 `official_validation_accessed=false`, `test_accessed=false`. Score arrays and
 manifests survive cleanup; K1 is explicitly outside this run.
+
+### Pre-score runtime correction
+
+The first GH200 model call stopped before returning a prediction or producing any
+Kronos, momentum, parent, or ensemble score. Although upstream `predict_batch`
+documents timestamp inputs as `DatetimeIndex or Series`, its shipped
+`calc_time_stamps` implementation calls the pandas `.dt` accessor, which a
+`DatetimeIndex` does not expose. The wrapper now passes identical naive-local
+timestamps as pandas `Series`. No upstream file, model setting, context, mask,
+scope, seed, metric, or decision rule changed. The incomplete run is resumed only
+after this correction is committed and its tests pass.
