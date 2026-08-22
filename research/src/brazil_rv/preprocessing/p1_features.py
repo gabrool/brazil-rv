@@ -850,6 +850,56 @@ def screen_feature_library(store: Path, library_dir: Path, output_dir: Path) -> 
     return output_dir
 
 
+def slice_feature_sidecar(
+    source_dir: Path, feature_names: list[str], output_dir: Path
+) -> Path:
+    """Create one immutable exact-axis subset of a P1 sidecar."""
+    if output_dir.exists():
+        raise FileExistsError(output_dir)
+    manifest = json.loads((source_dir / "manifest.json").read_text(encoding="utf-8"))
+    source_names = list(manifest["feature_names"])
+    if not feature_names or len(set(feature_names)) != len(feature_names):
+        raise ValueError("Sidecar subset feature names must be nonempty and unique")
+    if any(name not in source_names for name in feature_names):
+        raise ValueError("Sidecar subset names are not in the source")
+    indices = [source_names.index(name) for name in feature_names]
+    output_dir.mkdir(parents=True)
+    for filename, dtype in (("values.npy", np.float32), ("mask.npy", np.bool_)):
+        source = np.load(source_dir / filename, mmap_mode="r")
+        output = np.lib.format.open_memmap(
+            output_dir / filename,
+            mode="w+",
+            dtype=dtype,
+            shape=(*source.shape[:-1], len(indices)),
+        )
+        output[...] = source[..., indices]
+        output.flush()
+        del output
+    subset = {
+        **manifest,
+        "candidate_schema": "P1_F4_MINIMAL_SIDECAR_V1",
+        "feature_names": feature_names,
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "provenance": {
+            **manifest["provenance"],
+            "source_sidecar": str(source_dir.resolve()),
+            "subset_method": "predeclared F4 full-minus-zeroed inference attribution",
+        },
+        "arrays": {
+            filename: {
+                "shape": list(np.load(output_dir / filename, mmap_mode="r").shape),
+                "dtype": dtype,
+                "sha256": _sha256(output_dir / filename),
+            }
+            for filename, dtype in (("values.npy", "float32"), ("mask.npy", "bool"))
+        },
+    }
+    (output_dir / "manifest.json").write_text(
+        json.dumps(subset, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return output_dir
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Build and screen the causal P1 feature library"

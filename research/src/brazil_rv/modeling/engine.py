@@ -515,6 +515,60 @@ def collect_equity_input_ablation_predictions(
     }
 
 
+def collect_sidecar_feature_ablation_predictions(
+    model: nn.Module,
+    loader: Iterable[dict[str, torch.Tensor]],
+    *,
+    feature_count: int,
+) -> tuple[EvaluationObservations, dict[str, np.ndarray]]:
+    """Zero each sidecar value and its observedness mask at inference."""
+    if feature_count <= 0:
+        raise ValueError("Sidecar attribution requires a positive feature count")
+    device = next(model.parameters()).device
+    model.eval()
+    metadata = {
+        name: []
+        for name in (
+            "sample_id",
+            "targets",
+            "raw_returns",
+            "label_mask",
+            "date_idx",
+            "decision_idx",
+        )
+    }
+    predictions = {f"feature_{index}": [] for index in range(feature_count)}
+    with torch.inference_mode():
+        for cpu_batch in loader:
+            valid_count = int(cpu_batch["sample_valid_mask"].sum())
+            batch = _to_device(cpu_batch, device)
+            if batch.get("sidecar_features") is None or (
+                batch["sidecar_features"].shape[-1] != 2 * feature_count
+            ):
+                raise ValueError("Sidecar ablation input width differs")
+            for index in range(feature_count):
+                sidecar = batch["sidecar_features"].clone()
+                sidecar[..., index] = 0
+                sidecar[..., feature_count + index] = 0
+                modified = {**batch, "sidecar_features": sidecar}
+                with _autocast(device):
+                    values = _predict(model, modified)
+                predictions[f"feature_{index}"].append(
+                    values[:valid_count].float().cpu().numpy()
+                )
+            for name, values in _filter_evaluation_metadata(cpu_batch).items():
+                metadata[name].append(values)
+    arrays = {name: np.concatenate(parts) for name, parts in metadata.items()}
+    order = np.argsort(arrays["sample_id"], kind="stable")
+    reference = EvaluationObservations(
+        predictions=np.zeros_like(arrays["targets"])[order],
+        **{name: arrays[name][order] for name in metadata},
+    )
+    return reference, {
+        name: np.concatenate(parts)[order] for name, parts in predictions.items()
+    }
+
+
 def assert_observations_aligned(
     reference: EvaluationObservations,
     candidate: EvaluationObservations,
