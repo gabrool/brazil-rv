@@ -185,6 +185,20 @@ Either primary path requires at least `+0.001` mean fold IC gain and non-negativ
 gain on both folds. The diversity path additionally requires the standalone
 candidate to lose no more than `0.001` on either fold.
 
+The completed historical external-data program
+`external_data_7e535ac_20260821T161800Z` tested B3 lending, SHFE ferrous/pulp,
+COTAHIST options activity, CVM RAD events, B3 odd-lot activity, B3 index
+rebalances, CCEE PLD, CVM fundamentals, regular trade activity, and ADR overnight
+under this contract. No standalone or parent-plus-candidate recipe passed the
+frozen gate, so none of these exact feature families is part of the accepted
+recipe. Official validation and test were not accessed. Options activity was
+positive on both folds but its mean gains were only `+0.000257` standalone and
+`+0.000261` in the diversity recipe, below the threshold. Positive fixed-final-
+EMA observations for several candidates remain informational and do not change
+retention or reopen checkpoint selection. Source components that were explicitly
+unavailable and excluded from the screens remain untested rather than rejected;
+`EXPERIMENT_LOG.md` records the exact boundaries and results.
+
 `modeling.evaluate` restores held-out evaluation without exposing it to campaign
 drivers. It accepts only a completed official-window run with an internal-fold
 selection file recorded in its manifest.

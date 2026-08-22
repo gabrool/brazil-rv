@@ -1549,3 +1549,198 @@ tests require exact parent initialization/RNG, nonzero observed-feature gradient
 flow, no bias checkpoint key, and exact missing-row nullity after assigning
 nonzero adapter weights. No partial checkpoint or prediction from the rejected
 preflight may enter the ten candidate screens.
+
+## Experiments 28--37 -- Historical external-data discovery results
+
+The preregistered ten-candidate program completed at repository commit
+`7e535ac6a0b010ef6d9437d688f0ed40f172bdee`. All 60 fixed 20-epoch SAM
+trajectories completed: ten candidates x two discovery folds x three seeds. The
+strict result extractor accepted every campaign and analysis artifact, found no
+contract errors, and verified `official_validation_accessed=false` and
+`test_accessed=false` throughout.
+
+Program artifact:
+
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/external_data_7e535ac_20260821T161800Z`
+
+The strict consolidated JSON/Markdown summaries are frozen under
+`_ops/final_results/` with SHA-256
+`a670a1b3cd23257c8d96551bcfed07261348582f96103500852a59ea7d3e2627`
+and `7a81599b4d528bff51bbd80c8dacc6d160accd9aea048252b75f4d0f18a5220b`.
+
+Canonical feature-store metadata SHA-256:
+`c90103b0f99e0017dc1303284a1ab61eca99106094227f5823ba718756d28a6b`.
+Every run manifest records the bias-free zero-start external adapter; sampled
+epoch-1 checkpoints confirmed a weight-only adapter with no bias key. Full member
+ICs, all Patience replay directions, diversity matrices,
+block-5/10 intervals, EMA/challenger comparisons, horizon/TOD guardrails, source
+coverage, and adapter diagnostics remain in each immutable `analysis/<candidate>`
+directory. The compact table below is the frozen program decision. Deltas are
+candidate minus the canonical Raw-Patience-3 parent unless explicitly marked
+informational.
+
+| Exp. | Dataset | Standalone A | Standalone B | Mean | Parent+candidate A | Parent+candidate B | Mean | EMA standalone mean (info) | Standalone vs challenger mean (info) | Retained |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 28 | B3 lending | +0.000107 | -0.001113 | -0.000503 | +0.000060 | -0.000501 | -0.000220 | +0.000196 | -0.002013 | No |
+| 29 | SHFE ferrous/pulp | +0.000265 | -0.000693 | -0.000214 | +0.000273 | -0.000236 | +0.000018 | +0.000599 | -0.001724 | No |
+| 30 | Options activity | +0.000020 | +0.000494 | +0.000257 | +0.000149 | +0.000372 | +0.000261 | +0.000365 | -0.001253 | No |
+| 31 | CVM RAD events | -0.002418 | +0.001158 | -0.000630 | -0.000977 | +0.000738 | -0.000119 | -0.000212 | -0.002140 | No |
+| 32 | Odd-lot activity | -0.002593 | +0.000407 | -0.001093 | -0.001153 | +0.000250 | -0.000452 | -0.000434 | -0.002603 | No |
+| 33 | Index rebalance | -0.000595 | -0.000131 | -0.000363 | -0.000152 | -0.000009 | -0.000080 | -0.000949 | -0.001873 | No |
+| 34 | CCEE PLD | -0.001113 | +0.000735 | -0.000189 | -0.000185 | +0.000511 | +0.000163 | -0.000206 | -0.001699 | No |
+| 35 | Fundamentals | -0.000695 | +0.001305 | +0.000305 | -0.000101 | +0.000954 | +0.000426 | -0.000448 | -0.001205 | No |
+| 36 | Regular activity | +0.000080 | -0.000691 | -0.000305 | +0.000049 | -0.000260 | -0.000106 | +0.000303 | -0.001815 | No |
+| 37 | ADR overnight | +0.001044 | -0.000757 | +0.000144 | +0.000725 | -0.000111 | +0.000307 | +0.000701 | -0.001366 | No |
+
+No standalone or diversity recipe passed the frozen gate. Therefore no dataset
+family was retained, no official-validation artifact was opened, and the
+designated challenger's bundled official comparison was not triggered. This is a
+recipe-level decision for the exact tested features, availability, adapter, and
+training contract. Unavailable subfeeds explicitly excluded in Experiment 27
+remain untested rather than rejected.
+
+### Experiment 28 -- B3 lending open balance
+
+The standalone Fold-A/Fold-B deltas were `+0.000107` and `-0.001113`, with
+block-10 intervals `[-0.000040, +0.000223]` and
+`[-0.001696, -0.000239]`. The six-member parent-plus-candidate deltas were
+`+0.000060` and `-0.000501`, with block-10 intervals
+`[-0.000019, +0.000124]` and `[-0.000783, -0.000069]`.
+Standalone 30/60/120-minute deltas were
+`+0.000060 / +0.000128 / +0.000134` on Fold A and
+`-0.000796 / -0.000843 / -0.001701` on Fold B. Final EMA-0.995 was
+positive on both folds (`+0.000182 / +0.000210`) but informational. The
+primary paths failed, driven by the negative Fold-B result; the family was
+rejected. Interpret Fold-A fit with the documented March-2022 coverage seam.
+
+Sidecar manifest SHA-256:
+`d543a9bc613d04b27c7765bce57ac6c953b540d9769ba6d22d0abd1afded2a5a`.
+
+### Experiment 29 -- SHFE ferrous and pulp
+
+Standalone deltas were `+0.000265` on Fold A, block-10
+`[-0.000828, +0.002025]`, and `-0.000693` on Fold B, block-10
+`[-0.002030, +0.000502]`. Parent-plus-candidate deltas were
+`+0.000273` and `-0.000236`. Final EMA-0.995 produced a Fold-A gain of
+`+0.002065` but reversed to `-0.000866` on Fold B. The candidate was
+rejected on both primary paths. This result covers only the six mapped
+steel/pulp names and does not test iron ore.
+
+Sidecar manifest SHA-256:
+`97afbd6d25b88de91316960064308de1f3d82bd95bf5cf5b94017c3b2d106b65`.
+
+### Experiment 30 -- COTAHIST options activity
+
+This was the only candidate with positive primary deltas on both folds for both
+roles: standalone `+0.000020 / +0.000494` and parent-plus-candidate
+`+0.000149 / +0.000372`. Their means, `+0.000257` and `+0.000261`, were
+well below the predeclared `+0.001` threshold. Block-10 standalone intervals
+were `[-0.000810, +0.000969]` and `[-0.000765, +0.001488]`.
+The standalone effect increased with horizon on Fold B
+(`+0.000214 / +0.000429 / +0.000839`) but remained informational. The
+family was rejected. This does not reject option OI, IV, or covered/uncovered
+position data, which were not retrievable and were not tested.
+
+Sidecar manifest SHA-256:
+`55e99e9529f6776f6b610f0ce2a482ea94be1cebf6b06dad916ea2117597a6eb`.
+
+### Experiment 31 -- CVM RAD event state
+
+Standalone deltas flipped from `-0.002418` on Fold A, block-10
+`[-0.004804, -0.000288]`, to `+0.001158` on Fold B, block-10
+`[+0.000243, +0.002038]`. The parent-plus-candidate recipe reduced but did
+not remove the reversal: `-0.000977 / +0.000738`. The standalone loss grew
+with horizon on Fold A (`-0.000502 / -0.002207 / -0.004543`) while all
+Fold-B horizons were positive. With only two folds, no regime explanation is
+assigned. Both gates failed and the family was rejected.
+
+Sidecar manifest SHA-256:
+`3ff942984ce6e1b6c2a9e5bff3e9ae95e92422e3f5c3b8954afc13b3fd8a71c3`.
+
+### Experiment 32 -- B3 odd-lot activity
+
+Standalone deltas were `-0.002593` on Fold A, block-10
+`[-0.004542, -0.000630]`, and `+0.000407` on Fold B, block-10
+`[-0.000245, +0.001240]`. Parent-plus-candidate deltas were
+`-0.001153 / +0.000250`; the Fold-A standalone loss also violated the
+diversity path's `-0.001` loss guardrail. Both primary paths failed and the
+family was rejected. Buyer/seller imbalance was absent from COTAHIST and remains
+untested.
+
+Sidecar manifest SHA-256:
+`9a214b4c0b17ab0a42ec4fd191bc41654a3987c9912a32e056dda384bd95f444`.
+
+### Experiment 33 -- B3 index rebalance state
+
+The primary results were near-null and non-positive: standalone
+`-0.000595 / -0.000131` and parent-plus-candidate
+`-0.000152 / -0.000009`. Final EMA-0.995 had a large opposing-fold pattern
+(`-0.004406 / +0.002508`) and could not affect retention. Both paths failed
+and the family was rejected. The result applies only to the sparse 13-release,
+291-state-date archive beginning in May 2023, not to a complete 2021--2024 B3
+or MSCI history.
+
+Sidecar manifest SHA-256:
+`9bc917a89e2d0d6473fcb576e81346c17cb77f7f525b7b613ae6424bec47cf85`.
+
+### Experiment 34 -- CCEE PLD power state
+
+Standalone deltas were `-0.001113` on Fold A and `+0.000735` on Fold B;
+parent-plus-candidate deltas were `-0.000185 / +0.000511`. All three
+standalone horizons were negative on Fold A and positive on Fold B. The
+two-fold means were `-0.000189` standalone and `+0.000163` diversity, so
+both paths failed and the family was rejected. ONS load/EAR vintages were not
+available under a causal historical contract and remain untested.
+
+Sidecar manifest SHA-256:
+`7c4908b2aad10cadf820c9073262fb457a3c4376e4527efb6da60adcb5de17ca`.
+
+### Experiment 35 -- CVM structured fundamentals
+
+Standalone deltas were `-0.000695` on Fold A and `+0.001305` on Fold B;
+parent-plus-candidate deltas were `-0.000101 / +0.000954`. Fold-B gains
+rose with horizon, but the Fold-A sign was not preserved. Means were only
+`+0.000305` and `+0.000426`, and both paths failed. The family was rejected
+for this exact feature set; B/M and E/P were deliberately not constructed and
+remain untested.
+
+Sidecar manifest SHA-256:
+`7e7d9326fbd73789a608d14fdd72eca2bdaec29a6234ca53e6f6d9e25661498e`.
+
+### Experiment 36 -- Regular-session trade activity
+
+Standalone deltas were `+0.000080` on Fold A and `-0.000691` on Fold B;
+parent-plus-candidate deltas were `+0.000049 / -0.000260`. Final EMA-0.995
+was modestly positive on both folds (`+0.000291 / +0.000315`) but was a fixed
+informational readout. Both primary paths failed and the family was rejected.
+Historical after-hours payloads were unavailable and were not tested.
+
+Sidecar manifest SHA-256:
+`fb45132b1fea1a95d7ce5605b319188db0355d85c8e6bb3a5367c72e7cd26bde`.
+
+### Experiment 37 -- ADR overnight
+
+ADR overnight was the strongest primary standalone on Fold A (`+0.001044`,
+block-10 `[-0.000391, +0.002310]`) but reversed on Fold B (`-0.000757`,
+block-10 `[-0.002171, +0.000906]`). Parent-plus-candidate deltas were
+`+0.000725 / -0.000111`. Final EMA-0.995 was positive on both folds
+(`+0.000779 / +0.000622`, mean `+0.000701`) and the EMA stack was also
+positive on both (`+0.000529 / +0.000566`), but neither was retention-eligible.
+Both primary paths failed and the family was rejected. FX/parity and intraday or
+after-hours ADR information were not tested.
+
+Sidecar manifest SHA-256:
+`f2b195a5fef384243daff3635e1fff0d892e21ae4a5b4f542f5dc43eb08adb1f`.
+
+### Program decision
+
+The ten screens produced no canonical-primary stage winner. The nearest robust
+primary was options activity, positive on both folds but only about one quarter
+of the required mean gain. Several sources had an A/B sign reversal, so isolated
+fold or horizon wins are not promoted. Final EMA-0.995 showed positive two-fold
+deltas for lending, options, regular activity, and ADRs; this recurring
+informational pattern may motivate a separately preregistered future question,
+but it does not revise any Experiment-28--37 decision and does not reopen the
+frozen checkpoint rule inside this program. Raw Patience-3 remains the canonical
+recipe, the designated challenger remains informational, and the next official
+read is unspent.
