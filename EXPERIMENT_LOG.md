@@ -1900,7 +1900,8 @@ timestamp or experimental decision.
 The first serial pass then established actual single-context throughput while
 persisting only independently seeded, unanalyzed score rows. No score value or
 metric was inspected. GPU utilization was approximately 45%, so the process was
-stopped on a 250-context flush boundary to introduce execution-only sharding.
+stopped to introduce execution-only sharding; `1,939` completed context rows were
+retained from its memory-mapped partial artifact.
 Eight isolated processes now receive disjoint context ordinals. Every worker still
 calls the unchanged upstream `predict_batch` with exactly one equity context and
 five samples, resets the same stable per-context seed, and writes a private array;
@@ -1927,3 +1928,55 @@ zero contexts merged into the coordinator array, no base metric computed, and no
 base or small score value inspected. Those incomplete base arrays are excluded
 from analysis and deleted. All other fixed settings, masks, comparators, leakage
 register, decision thresholds, and the prohibition on K1 remain unchanged.
+
+### K0 result -- Kronos-small rejected
+
+The completed immutable run is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/kronos_k0_3f93b26_20260822T134800Z
+
+Its immutable bar sidecar is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/kronos_k0_bars_3f93b26_20260822T134400Z
+
+Kronos-small used the full six-decision scope and fp32; bf16 was unsupported by
+the shipped path on this stack. The 200-context serial projection was `9.3201`
+GPU-hours. Eight exact-seed MPS workers completed the fixed `158,205` contexts in
+`9,039.18` seconds after resuming `1,939` serial rows. The coordinator rejected
+overlap and out-of-scope writes and bitwise reproduced the first, middle, and
+last merged contexts. Fold A supplied `79,484` eligible contexts and Fold B
+`78,721`; mean synthetic fractions were `0.004132` and `0.007562`.
+
+| Metric | Fold A | Fold B | Mean of folds |
+|---|---:|---:|---:|
+| Kronos-small primary IC | 0.008843 | 0.018551 | 0.013697 |
+| Matched 60-minute momentum IC | -0.013233 | -0.018841 | -0.016037 |
+| Same-scope parent-3 IC | 0.045239 | 0.047483 | 0.046361 |
+| Kronos-small / parent rank correlation | 0.128711 | 0.138826 | 0.133768 |
+| Parent-3 + Kronos-small IC | 0.044389 | 0.048590 | 0.046489 |
+| Stack delta versus parent | -0.000849 | +0.001106 | +0.000128 |
+
+The informational stack delta was not stable: Fold A block-5 and block-10 95%
+intervals were `[-0.002691, +0.001375]` and
+`[-0.002531, +0.001097]`; Fold B intervals were
+`[-0.000521, +0.003391]` and `[-0.000288, +0.003406]`. All include zero.
+Kronos-small IC was positive at every horizon in both folds, but the entire Fold
+A profile was weak and the mean remained below the registered floor.
+
+The decision is **kill**. Kronos-small's mean-fold IC `0.013697` is below the
+predeclared `0.015` threshold. Its favorable comparison with the negative
+momentum control and its low parent correlation cannot override that independent
+condition; the informational ensemble cannot rescue a kill. Because the fold
+windows are optimistically contaminated by Kronos pretraining, failure on this
+favorable ground rejects the zero-shot Kronos-small family for the current
+program. K1 was not run and is not authorized by this result.
+
+The final score array SHA-256 is
+`d06613122d7fc0b4b05b86dd052ea3847775e6951f5018f3dea3fcafc0f6b739`;
+the completion-mask SHA-256 is
+`0111fa78692e86c4799e8e6a13887a9583ef0dea2b94103735d21ad65c8a4e07`.
+The final artifact audit matched the fixed coverage mask, confirmed finite
+in-scope values and exact zero out of scope, and found the expected 2/6/12 rows
+in the fold summary, horizon table, and time-of-day table. The manifest records
+`official_validation_accessed=false`, `test_accessed=false`, and
+`k1_started=false`.

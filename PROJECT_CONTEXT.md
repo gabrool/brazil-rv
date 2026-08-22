@@ -411,3 +411,32 @@ recorded commits, retained manifests/results, and canonical derived data. Lambda
 provider accounting endpoint still reported the pre-cleanup byte count immediately
 after deletion, while a complete object-store listing returned the verified
 post-cleanup total. No paid instance was active.
+
+## Kronos-small zero-shot K0 decision (2026-08-22)
+
+Kronos-small was evaluated zero-shot on the two 102-date discovery selection
+windows using permanent point-in-time equity identity, the fixed six-decision
+grid, 512 causal five-minute bars, exact per-context sampling seeds, and the
+canonical 30/60/120-minute rank-IC machinery. The user narrowed the experiment
+to Kronos-small before any small score or metric was inspected; an in-progress
+Kronos-base pass was stopped, excluded, and its unmerged partial arrays deleted.
+
+Kronos-small scored `0.008843` on Fold A and `0.018551` on Fold B, for mean IC
+`0.013697`. This is below the preregistered `0.015` kill floor. Its matched
+momentum control was `-0.016037`, parent correlation was only `0.133768`, and an
+informational parent-plus-Kronos rank stack added just `+0.000128` mean IC with
+opposite fold signs and block-bootstrap intervals spanning zero. The zero-shot
+Kronos-small family is therefore rejected for the current program. Do not run
+K1 or use official validation on the basis of K0. The canonical parent remains
+unchanged, and the held-out test remains sealed.
+
+The immutable run and reusable score artifact are:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/kronos_k0_3f93b26_20260822T134800Z
+
+Its manifest records `official_validation_accessed=false`,
+`test_accessed=false`, and `k1_started=false`. The dedicated immutable K0 bar
+sidecar is `kronos_k0_bars_3f93b26_20260822T134400Z` in the same model-runs
+root. Exact settings, leakage caveats, operational corrections, model-scope
+override, metric breakdowns, hashes, and cleanup provenance are in
+`EXPERIMENT_LOG.md` and the run manifests.
