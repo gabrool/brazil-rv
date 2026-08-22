@@ -1910,3 +1910,20 @@ first/middle/last merged contexts through the single-process predictor. Existing
 serial scores are retained and included in that audit. Worker count and CUDA MPS
 state are operational metadata only and cannot change scope, precision, sampling,
 metrics, or the registered decision.
+
+### User-directed model-scope override before analysis
+
+At `2026-08-22T16:56:20Z`, after Kronos-small inference and its bitwise merge
+audit had completed but before any Kronos-small score value or metric was
+inspected, the user narrowed the research question to whether Kronos-small works.
+The user explicitly waived Kronos-base because the paper reports similar results
+for the two sizes. This result-independent instruction supersedes the original
+two-model scope: K0 will analyze Kronos-small only, and `IC_best` in the frozen
+kill/park/eligibility rule is therefore the Kronos-small mean-of-folds IC.
+
+Kronos-base had passed its fp32 and throughput preflights and begun the full
+six-decision pass. It was stopped with `6,751` disjoint worker contexts complete,
+zero contexts merged into the coordinator array, no base metric computed, and no
+base or small score value inspected. Those incomplete base arrays are excluded
+from analysis and deleted. All other fixed settings, masks, comparators, leakage
+register, decision thresholds, and the prohibition on K1 remain unchanged.
