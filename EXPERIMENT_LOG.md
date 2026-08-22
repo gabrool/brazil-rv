@@ -1744,3 +1744,32 @@ but it does not revise any Experiment-28--37 decision and does not reopen the
 frozen checkpoint rule inside this program. Raw Patience-3 remains the canonical
 recipe, the designated challenger remains informational, and the next official
 read is unspent.
+
+### Artifact cleanup and paid-instance termination
+
+Cleanup began only after the strict 10/10 extraction was frozen, GitHub `main`
+contained the results, the program manifest was complete, and no training or
+analysis process remained. The accepted-program checkpoint plan was bound to
+plan ID `dabdea079ff844b699b6809ee4f49993` and inventory SHA-256
+`8d9c50d88f9457718f6cbd0a4aee7ca02d3b86725b552cfc7e672a1721e8f307`.
+It removed exactly 1,022 unselected intermediate `epoch_XX.pt` files totaling
+4,630,878,034 bytes. The postcheck verified all delete targets absent and all
+2,298 retained files against their original SHA-256 hashes. Retained payloads
+include 178 final/Patience-selected checkpoints, all 1,260 per-epoch/tail
+prediction archives, all 60 validation references, and every history, manifest,
+analysis, sidecar, and strict result summary.
+
+The rejected bias-confounded preflight used separate plan ID
+`55ef7ff7745543898c27ba4a12bd51e6` and inventory SHA-256
+`33d174de79cb6211796ef9c84fd962c293189a84bf91199faf4392dc6d3105b9`.
+It removed exactly 24 partial checkpoints, 24 partial prediction archives, and
+two partial validation references totaling 1,177,912,896 bytes. Its abort record,
+program/campaign/run manifests, logs, scheduler records, and histories remain as
+12 hash-verified audit files totaling 74,918 bytes. These removals are permanent;
+the rejected partial binaries were never valid experiment results.
+
+Total cleanup was 1,072 files / 5,808,790,930 bytes. Persistent NFS reported
+76 GiB used after cleanup. Paid GH200 instance
+`c40d3ea383f84ea89780612a7aaaeeec` in `us-east-3` was terminated only after
+these postchecks. Lambda accepted the exact-ID request as `terminating`; two
+subsequent provider inventory reads returned zero matches for that ID.
