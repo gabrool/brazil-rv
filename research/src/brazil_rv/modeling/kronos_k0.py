@@ -1334,6 +1334,18 @@ def run_k0(run_dir: Path, sidecar_dir: Path, kronos_repo: Path) -> Path:
             or manifest.get("status") == "completed"
         ):
             raise ValueError("Run directory is not a resumable K0 run")
+        current_commit = _repository_commit()
+        previous_commit = str(manifest.get("repository_commit"))
+        if previous_commit != current_commit:
+            manifest.setdefault("pre_score_runtime_corrections", []).append(
+                {
+                    "from_commit": previous_commit,
+                    "to_commit": current_commit,
+                    "reason": "timestamp wrapper now passes pandas Series to shipped .dt accessor",
+                    "score_existed_before_correction": False,
+                }
+            )
+            manifest["repository_commit"] = current_commit
         manifest["resume_count"] = int(manifest.get("resume_count", 0)) + 1
     else:
         run_dir.mkdir(parents=True)
