@@ -1888,3 +1888,11 @@ documents timestamp inputs as `DatetimeIndex or Series`, its shipped
 timestamps as pandas `Series`. No upstream file, model setting, context, mask,
 scope, seed, metric, or decision rule changed. The incomplete run is resumed only
 after this correction is committed and its tests pass.
+
+The resumed precision preflight was then stopped before any score array, metric,
+or result was persisted because Pandas/NumPy emitted one deprecation warning per
+context when a `Timedelta` was added to an otherwise correct timestamp. No
+preflight prediction value was inspected. Future timestamps are now constructed
+as the exact same `last_close_ns + 5-minute * [1..24]` integer nanoseconds before
+conversion to a Series. This is a runtime/logging correction only; it changes no
+timestamp or experimental decision.

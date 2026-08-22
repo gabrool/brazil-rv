@@ -670,13 +670,11 @@ def _predict_context(
     torch.cuda.manual_seed_all(seed)
     frame = pd.DataFrame(context.bars, columns=BAR_FIELDS)
     x_timestamp = pd.Series(pd.to_datetime(context.timestamp_ns, unit="ns"))
-    y_timestamp = pd.Series(
-        pd.date_range(
-            x_timestamp.iloc[-1] + pd.Timedelta(minutes=5),
-            periods=PREDICTION_BARS,
-            freq="5min",
-        )
+    five_minutes_ns = 5 * 60 * 1_000_000_000
+    future_timestamp_ns = context.timestamp_ns[-1] + five_minutes_ns * np.arange(
+        1, PREDICTION_BARS + 1, dtype=np.int64
     )
+    y_timestamp = pd.Series(pd.to_datetime(future_timestamp_ns, unit="ns"))
     autocast = (
         torch.autocast(device_type="cuda", dtype=torch.bfloat16)
         if use_bf16
