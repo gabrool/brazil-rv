@@ -1990,3 +1990,107 @@ The paid Lambda instance `c0aef7522bf64fe0899e8703027668db`
 (`gpu_1x_gh200`, `us-east-3`, IP `192.222.50.94`) accepted termination and was
 confirmed absent from the provider's active-instance inventory at
 `2026-08-22T17:05:28Z`.
+
+## Experiment 39 -- P0/P1 feature-program preregistration
+
+Status at registration: no P0 mixed-stack score, channel-attribution score, P1
+feature IC, F3 trajectory, or F4 result has been computed. The research input is
+`research_memo_v2.md` dated 2026-08-22. Per the user's explicit scope, **P0.2
+(the Kronos K0 closure diagnostic) is omitted completely**. It will not be run,
+partially computed, or used to select a P1 feature.
+
+### P0.1 mixed-state stack
+
+Two and only two uniform tie-aware rank ensembles are registered on Fold A and
+Fold B:
+
+1. parent-3 cross-fitted Raw Patience plus final-EMA-0.995 members from residual
+   auxiliary, combined auxiliary, options, lending, regular activity, ADR, and
+   market-gate families (24 members total); and
+2. parent-3 plus residual, options, and ADR EMA members (12 total).
+
+Every family contributes exactly seeds 11/29/47 and receives no fitted weight.
+Both variants report paired block-5/10 deltas versus the canonical parent and the
+designated challenger. Retention remains keyed only to the canonical parent:
+mean Fold-A/B delta at least `+0.001` and each fold non-negative. If both pass,
+the higher mean delta (lexical tie-break) is the discovery finalist. The family
+criterion was itself derived from these folds, so a pass is explicitly discovery
+evidence rather than confirmation and cannot spend official validation alone.
+
+The 2026-08-21 retention cleanup removed the combined-auxiliary and market-gate
+binary predictions, and all parent raw checkpoints needed by P0.3. Missing
+trajectories will be reproduced only at their recorded commits and frozen
+hyperparameters. Parent reproduction must match the retained cross-fit
+predictions/recorded stop epochs before attribution. Combined and market-gate
+reproductions must match their immutable recorded fold/readout summaries before
+entering P0.1. This operational rerun is not a new model search.
+
+### P0.3 channel attribution (F1)
+
+For each of the 26 incumbent dynamic channels and 32 slow fields, the field is
+zeroed only on the 158 equity inputs; local/global context inputs and sequence
+history masks are unchanged. Each seed uses the checkpoint selected on one
+odd/even selection-date parity and reports the ablation only on the opposite
+parity, in both directions. Seeds are uniformly rank-averaged before the IC drop
+is calculated. Report overall and 30/60/120-minute parent-minus-zeroed IC drops
+on both folds with moving-block intervals.
+
+A field is `dead` only when its overall drop is non-positive on both folds and at
+least two of three horizon drops are non-positive on each fold. It is `keep` when
+mean drop is at least `+0.00025` and neither fold is negative; all other fields are
+`suspect`. Only `dead` fields may be removed in F3. This conservative rule favors
+false retention over deleting weak alpha.
+
+### P1 F2 feature screen
+
+The causal library contains 19 candidates: same-30-minute returns lagged 1/5/20
+sessions; 15-minute VWAP reversal and its volume sign-flip interaction; 1/5-day
+signed semivariance and realized skewness; high-attention open-gap fade; late-day
+market momentum times stored pre-neutralization WIN beta; interval, cumulative,
+and first-30-minute relative volume; EDGE spread, intraday Amihud, their reversal
+interactions; and trailing-20-session overnight-minus-intraday return.
+
+Three memo items are deliberately not mislabeled as tests. Current sector labels
+are not substituted for an immutable point-in-time sector history, so
+sector-demeaned reversal is unavailable. The session ends its decision grid at
+14:45, so an after-15:00 signal is structurally unavailable. The incumbent
+already has causal same-minute 20-session robust volume normalization, so P1
+tests only incremental interval/opening variants rather than duplicating it.
+
+All transformations use exact accepted permanent-security dates. History ends
+strictly before the decision, no stale price is an endpoint, prior-session
+normalizers consume only prior observations, and current cross-sectional robust
+scales consume only the contemporaneously available cross-section. EDGE follows
+the estimator authors' published pseudocode.
+
+F2 is frozen to the first 407 training dates (through 2023-03-31), leaving every
+F3 selection date unseen. For each feature, compute IC on two chronological F2
+halves and its maximum absolute within-sample correlation with the 58 incumbent
+equity fields. Eligibility requires the same IC sign in both halves and at least
+`0.001` absolute IC in each. Incremental score is
+`min(abs(half ICs)) * (1 - max_existing_corr^2)`. Greedily take at most eight,
+at most two per family, rejecting a candidate correlated at least `0.85` with an
+already selected feature. F3 runs only if at least six survive.
+
+### P1 F3/F4
+
+F3 trains one bias-free, zero-start sidecar candidate containing the frozen F2
+shortlist while zeroing only F1-dead incumbent fields. It uses seeds 11/29/47,
+the frozen 20-epoch SAM trajectory, and cross-fitted Raw Patience primary. The
+new Fold C fits 407 dates through 2023-03-31 and selects the 105 dates from
+2023-04-03 through 2023-08-31. Its 512-date effective batches necessarily draw
+fit dates with replacement; Fold A/B retain their existing contracts. Both the
+standalone candidate and the uniform parent-3+candidate-3 diversity path are
+reported. Each may pass only with three-fold mean delta at least `+0.001` and
+every fold non-negative; the diversity path also requires standalone loss no
+worse than `-0.001` on every fold. Final EMA and P0 mixed-state additions are
+secondary/informational and cannot retain the candidate.
+
+F4 runs only if a primary F3 path passes. Each selected sidecar feature is then
+zeroed (value and observedness mask) inference-only on the frozen cross-fit
+states. A feature survives when the full-minus-ablated mean is positive and at
+least two folds are non-negative. Exactly one reduced sidecar is retrained across
+the same three folds/seeds. It is promotion-eligible only if it independently
+passes the F3 gate, loses no more than `0.0005` mean IC versus the full F3 recipe,
+and loses no more than `0.001` on any fold. No official validation or held-out
+test access is authorized by this registration.

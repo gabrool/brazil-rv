@@ -9,6 +9,8 @@ import torch
 from torch import nn
 
 from .contract import (
+    DYNAMIC_CHANNEL_COUNT,
+    EQUITY_COUNT,
     GH200_RUNTIME,
     GRADIENT_CLIP,
     SAM_NORM_EPS,
@@ -449,6 +451,68 @@ def collect_validation_observations(
         }
     )
     return observations, float(torch.stack(loss_sums).sum().cpu()) / total_count
+
+
+def collect_equity_input_ablation_predictions(
+    model: nn.Module,
+    loader: Iterable[dict[str, torch.Tensor]],
+    *,
+    dynamic_channel_count: int,
+    slow_field_count: int,
+) -> tuple[EvaluationObservations, dict[str, np.ndarray]]:
+    """Evaluate every one-field equity-input zeroing with one loader traversal."""
+    if dynamic_channel_count != DYNAMIC_CHANNEL_COUNT:
+        raise ValueError("Dynamic ablation count differs from the model contract")
+    device = next(model.parameters()).device
+    model.eval()
+    metadata = {
+        name: []
+        for name in (
+            "sample_id",
+            "targets",
+            "raw_returns",
+            "label_mask",
+            "date_idx",
+            "decision_idx",
+        )
+    }
+    predictions = {
+        **{f"dynamic_{index}": [] for index in range(dynamic_channel_count)},
+        **{f"slow_{index}": [] for index in range(slow_field_count)},
+    }
+    with torch.inference_mode():
+        for cpu_batch in loader:
+            valid_count = int(cpu_batch["sample_valid_mask"].sum())
+            batch = _to_device(cpu_batch, device)
+            for index in range(dynamic_channel_count):
+                patches = batch["patches"].clone()
+                patches[:, :EQUITY_COUNT, :, index::dynamic_channel_count] = 0
+                modified = {**batch, "patches": patches}
+                with _autocast(device):
+                    values = _predict(model, modified)
+                predictions[f"dynamic_{index}"].append(
+                    values[:valid_count].float().cpu().numpy()
+                )
+            for index in range(slow_field_count):
+                slow = batch["slow_features"].clone()
+                slow[:, :EQUITY_COUNT, index] = 0
+                modified = {**batch, "slow_features": slow}
+                with _autocast(device):
+                    values = _predict(model, modified)
+                predictions[f"slow_{index}"].append(
+                    values[:valid_count].float().cpu().numpy()
+                )
+            for name, values in _filter_evaluation_metadata(cpu_batch).items():
+                metadata[name].append(values)
+    arrays = {name: np.concatenate(parts) for name, parts in metadata.items()}
+    order = np.argsort(arrays["sample_id"], kind="stable")
+    reference = EvaluationObservations(
+        predictions=np.zeros_like(arrays["targets"])[order],
+        **{name: arrays[name][order] for name in metadata},
+    )
+    return reference, {
+        name: np.concatenate(parts)[order] for name, parts in predictions.items()
+    }
 
 
 def assert_observations_aligned(

@@ -23,6 +23,7 @@ from .contract import (
     CANONICAL_RETAINED_GLOBAL_SLOTS,
     CONTEXT_COUNT,
     DECISION_GLOBAL_INDICES,
+    DYNAMIC_CHANNEL_COUNT,
     DISCOVERY_FIT_DATE_COUNTS,
     DISCOVERY_SELECTION_DATE_COUNT,
     EQUITY_ABSOLUTE_START_PATCH,
@@ -41,6 +42,9 @@ from .contract import (
     SLOW_FEATURE_COUNT,
     TEST_END,
     TEST_START,
+    THIRD_DISCOVERY_FIT_END,
+    THIRD_DISCOVERY_SELECTION_END,
+    THIRD_DISCOVERY_SELECTION_START,
     TRAIN_END,
     TRAIN_START,
     VALIDATION_END,
@@ -392,6 +396,28 @@ def discovery_folds(training_rows: pl.DataFrame) -> tuple[DiscoveryFold, ...]:
     return tuple(folds)
 
 
+def third_discovery_fold(training_rows: pl.DataFrame) -> DiscoveryFold:
+    """Return the preregistered pre-April-2023 fit / Apr-Aug-2023 screen."""
+    fold = DiscoveryFold(
+        name="fold_c",
+        fit_rows=training_rows.filter(pl.col("trade_date") <= THIRD_DISCOVERY_FIT_END),
+        selection_rows=training_rows.filter(
+            pl.col("trade_date").is_between(
+                THIRD_DISCOVERY_SELECTION_START,
+                THIRD_DISCOVERY_SELECTION_END,
+            )
+        ),
+    )
+    if (
+        fold.fit_rows.get_column("trade_date").n_unique() != 407
+        or fold.selection_rows.get_column("trade_date").n_unique() != 105
+    ):
+        raise ValueError(
+            "Third discovery fold must contain 407 fit and 105 selection dates"
+        )
+    return fold
+
+
 def select_training_window(
     sample_index: pl.DataFrame, window: str
 ) -> tuple[pl.DataFrame, pl.DataFrame, str]:
@@ -406,6 +432,7 @@ def select_training_window(
             ),
         )
     folds = {fold.name: fold for fold in discovery_folds(training_rows)}
+    folds["fold_c"] = third_discovery_fold(training_rows)
     try:
         fold = folds[window]
     except KeyError as error:
@@ -495,6 +522,8 @@ def _build_patch_batch(
     decision_idx: np.ndarray,
     context_cutoffs: np.ndarray,
     active: np.ndarray,
+    zero_dynamic_channels: tuple[int, ...] = (),
+    zero_slow_fields: tuple[int, ...] = (),
 ) -> dict[str, np.ndarray]:
     batch_size = date_idx.size
     local_ready, global_ready = _context_readiness(arrays, date_idx, decision_idx)
@@ -520,6 +549,8 @@ def _build_patch_batch(
         arrays["equity_slow.npy"][date_idx], dtype=np.float32
     ).copy()
     equity_slow[..., CANONICAL_NEUTRALIZED_EQUITY_SLOW_INDICES] = 0.0
+    if zero_slow_fields:
+        equity_slow[..., zero_slow_fields] = 0.0
     slow[:, :EQUITY_COUNT] = equity_slow * active[..., None]
     state_position = np.empty(batch_size, dtype=np.int64)
     for cutoff in np.unique(equity_cutoffs):
@@ -534,6 +565,9 @@ def _build_patch_batch(
             arrays["equity_features.npy"][date_idx[group], :, : int(cutoff), :],
             dtype=np.float32,
         ).reshape(group.size, EQUITY_COUNT, equity_patches, PATCH_INPUT_WIDTH)
+        if zero_dynamic_channels:
+            for channel in zero_dynamic_channels:
+                prefix[..., channel::DYNAMIC_CHANNEL_COUNT] = 0.0
         patches[group, :EQUITY_COUNT, EQUITY_ABSOLUTE_START_PATCH:state] = (
             prefix * active[group, :, None, None]
         )
@@ -622,9 +656,21 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         store: Path,
         sample_index: pl.DataFrame,
         sidecar: ExternalFeatureSidecar | None = None,
+        zero_dynamic_channels: tuple[int, ...] = (),
+        zero_slow_fields: tuple[int, ...] = (),
     ) -> None:
         self.store = store
         self.sidecar = sidecar
+        if len(set(zero_dynamic_channels)) != len(zero_dynamic_channels) or any(
+            not 0 <= value < DYNAMIC_CHANNEL_COUNT for value in zero_dynamic_channels
+        ):
+            raise ValueError("Dynamic ablation indices must be unique values in 0..25")
+        if len(set(zero_slow_fields)) != len(zero_slow_fields) or any(
+            not 0 <= value < SLOW_FEATURE_COUNT for value in zero_slow_fields
+        ):
+            raise ValueError("Slow ablation indices must be unique values in 0..31")
+        self.zero_dynamic_channels = zero_dynamic_channels
+        self.zero_slow_fields = zero_slow_fields
         self.rows = {
             name: sample_index.get_column(name).to_numpy()
             for name in (
@@ -680,6 +726,8 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             decisions,
             context_cutoffs,
             active,
+            self.zero_dynamic_channels,
+            self.zero_slow_fields,
         )
         if self.sidecar is not None:
             inputs["sidecar_features"] = _build_sidecar_batch(
@@ -805,6 +853,8 @@ def create_training_loaders(
     runtime: RuntimeSettings = GH200_RUNTIME,
     seed: int = 29,
     sidecar: ExternalFeatureSidecar | None = None,
+    zero_dynamic_channels: tuple[int, ...] = (),
+    zero_slow_fields: tuple[int, ...] = (),
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
@@ -812,10 +862,25 @@ def create_training_loaders(
 ]:
     sampler = DateStratifiedBatchSampler(train_rows, runtime, seed)
     train = _create_loader(
-        VectorizedFeatureDataset(store, train_rows, sidecar), sampler, runtime, seed
+        VectorizedFeatureDataset(
+            store,
+            train_rows,
+            sidecar,
+            zero_dynamic_channels,
+            zero_slow_fields,
+        ),
+        sampler,
+        runtime,
+        seed,
     )
     validation = _create_loader(
-        VectorizedFeatureDataset(store, validation_rows, sidecar),
+        VectorizedFeatureDataset(
+            store,
+            validation_rows,
+            sidecar,
+            zero_dynamic_channels,
+            zero_slow_fields,
+        ),
         DecisionGroupedBatchSampler(validation_rows, runtime.evaluation_batch_size),
         runtime,
         seed,
@@ -829,9 +894,17 @@ def create_evaluation_loader(
     runtime: RuntimeSettings = GH200_RUNTIME,
     seed: int = 29,
     sidecar: ExternalFeatureSidecar | None = None,
+    zero_dynamic_channels: tuple[int, ...] = (),
+    zero_slow_fields: tuple[int, ...] = (),
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
-        VectorizedFeatureDataset(store, rows, sidecar),
+        VectorizedFeatureDataset(
+            store,
+            rows,
+            sidecar,
+            zero_dynamic_channels,
+            zero_slow_fields,
+        ),
         DecisionGroupedBatchSampler(rows, runtime.evaluation_batch_size),
         runtime,
         seed,

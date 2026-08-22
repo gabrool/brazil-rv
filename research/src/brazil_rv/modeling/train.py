@@ -67,7 +67,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, choices=ALLOWED_SEEDS, default=29)
     parser.add_argument(
         "--selection-window",
-        choices=("fold_a", "fold_b", "official"),
+        choices=("fold_c", "fold_a", "fold_b", "official"),
         default="fold_a",
     )
     parser.add_argument("--selection-rule-file", type=Path)
@@ -189,6 +189,8 @@ def run_training(
     run_dir: Path,
     selection_rule_file: Path | None = None,
     sidecar_dir: Path | None = None,
+    zero_dynamic_channels: tuple[int, ...] = (),
+    zero_slow_fields: tuple[int, ...] = (),
 ) -> Path:
     sidecar = None if sidecar_dir is None else load_external_sidecar(sidecar_dir, store)
     if run_dir.exists():
@@ -211,6 +213,8 @@ def run_training(
         GH200_RUNTIME,
         seed,
         sidecar,
+        zero_dynamic_channels,
+        zero_slow_fields,
     )
     model = build_model(None if sidecar is None else sidecar.feature_count).cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
@@ -233,6 +237,11 @@ def run_training(
         training_sample_count=train_rows.height,
         date_replacement=sampler.replace_dates,
         external_sidecar=None if sidecar is None else sidecar.identity,
+        base_feature_ablation={
+            "scope": "equity_inputs_only",
+            "dynamic_channel_indices": list(zero_dynamic_channels),
+            "slow_field_indices": list(zero_slow_fields),
+        },
     )
     recorded_training = run_provenance["training"]
     if (
@@ -248,6 +257,7 @@ def run_training(
         "feature_store": str(store.resolve()),
         "feature_store_identity": store_identity,
         "external_sidecar": None if sidecar is None else sidecar.identity,
+        "base_feature_ablation": run_provenance["base_feature_ablation"],
         "split": {
             "training": selection_window,
             "selection": selection_window,
