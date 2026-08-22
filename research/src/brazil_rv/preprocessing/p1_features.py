@@ -640,14 +640,10 @@ def _existing_correlations(
     for start in range(0, current.shape[-1], 4):
         right = current[:, :, start : start + 4].astype(np.float64)
         right_mean = np.where(mask[..., None], right, 0.0).sum(axis=1) / safe[:, None]
-        right_centered = np.where(
-            mask[..., None], right - right_mean[:, None, :], 0.0
-        )
+        right_centered = np.where(mask[..., None], right - right_mean[:, None, :], 0.0)
         right_centered[~valid_sample] = 0.0
         numerator = np.sum(left_centered[..., None] * right_centered, axis=(0, 1))
-        denominator = np.sqrt(
-            left_square * np.sum(right_centered**2, axis=(0, 1))
-        )
+        denominator = np.sqrt(left_square * np.sum(right_centered**2, axis=(0, 1)))
         correlations.extend(
             np.divide(
                 numerator,
@@ -733,18 +729,20 @@ def screen_feature_library(store: Path, library_dir: Path, output_dir: Path) -> 
         ]
         finite_corr = [value for value in correlations if np.isfinite(value)]
         max_corr = max(finite_corr, default=0.0)
-        stable = half_ics[0] * half_ics[1] > 0
-        eligible = stable and min(map(abs, half_ics)) >= F2_MIN_HALF_ABS_IC
+        finite_halves = all(np.isfinite(value) for value in half_ics)
+        stable = finite_halves and half_ics[0] * half_ics[1] > 0
+        minimum_half_ic = min(map(abs, half_ics)) if finite_halves else 0.0
+        eligible = stable and minimum_half_ic >= F2_MIN_HALF_ABS_IC
         rows.append(
             {
                 "feature": name,
                 "family": FEATURE_FAMILY[name],
                 "tier": FAMILY_TIER[FEATURE_FAMILY[name]],
-                "half_1_ic": half_ics[0],
-                "half_2_ic": half_ics[1],
-                "fit_mean_ic": float(np.mean(half_ics)),
+                "half_1_ic": half_ics[0] if finite_halves else None,
+                "half_2_ic": half_ics[1] if finite_halves else None,
+                "fit_mean_ic": float(np.mean(half_ics)) if finite_halves else None,
                 "max_abs_correlation_existing": max_corr,
-                "incremental_score": min(map(abs, half_ics)) * (1.0 - max_corr**2),
+                "incremental_score": minimum_half_ic * (1.0 - max_corr**2),
                 "eligible": eligible,
             }
         )
