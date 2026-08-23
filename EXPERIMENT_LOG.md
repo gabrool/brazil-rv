@@ -2434,3 +2434,110 @@ zero planned survivors, zero retained-object size/ETag changes, and exactly two
 expected audit additions. Raw and interim sources, the canonical feature store,
 parent/challenger artifacts, program results, and Experiments 39--40 were outside
 the deletion set. No paid Lambda instance was active.
+
+## Experiment 41 — incumbent feature removal and retrained pruning confirmation (preregistered 2026-08-23)
+
+Status at registration: no Experiment-41 correlation table, ablation score,
+removal set, retrained trajectory, official-validation score, or held-out-test
+score exists. The objective is one decisive KEEP/REMOVE verdict for each of the
+58 incumbent equity inputs (26 dynamic channels and 32 slow fields), followed by
+at most two retrained candidates. No new feature, adapter, store rebuild,
+official-validation access, held-out-test access, or change to the frozen
+official-read lineup is authorized.
+
+### Frozen inputs and Stage-A definitions
+
+The input store is the unchanged canonical PIT-causal store at
+`m1_features_pit_causal_tod_20260818T151728490951Z`. Stage A uses only training
+dates `2021-08-16` through `2024-06-28`, respects the active-equity mask, and
+uses only model-visible intraday minutes 0--284. All Spearman calculations use
+average ranks for ties and require paired observed data.
+
+- Slow/slow correlation is the mean of per-date active-equity cross-sectional
+  correlations.
+- Dynamic/dynamic correlation is computed two ways: the mean per-(date,
+  decision) active-equity cross-sectional correlation and the mean per-equity
+  time-series correlation. The signed value with larger absolute magnitude is
+  retained; exact ties prefer the cross-sectional value.
+- Dynamic/slow correlation is the mean per-(date, decision) active-equity
+  cross-sectional correlation, broadcasting the dated slow value across that
+  date's visible decisions. There is no slow-field time-series alternative.
+
+An undirected edge exists at fixed `abs(rho) >= 0.80`; connected components,
+including singletons, are frozen in a hash-bound Stage-A artifact before the
+first Stage-B evaluation. The six additional semantic tests are fixed by
+incumbent indices: slow beta fields 20--25; dynamic 10--12 plus slow 9--11;
+dynamic 15 plus slow 15--16; slow 26--29; dynamic 16--21; and dynamic 24 plus
+slow 12--14 and 18. Correlation components and semantic sets remain independent
+tests even when they overlap; candidate removals are their union, subject to the
+preview gate.
+
+### Stage-B ablation and assembly contract
+
+Stage B is inference-only. It uses the honestly opposite-parity Raw Patience-3
+parent checkpoints and never changes a weight. A targeted input is set to zero
+only for the 158 equity streams; context/global streams and observation/history
+masks remain untouched. The three seeds are rank-averaged. Reports contain
+parent-minus-ablated IC by Fold C/A/B and horizon, with paired block-10
+intervals. The Experiment-39 P0.3 Fold-A/B single
+ablations are imported unchanged; all 58 Fold-C singles are new.
+
+The group rules are fixed as follows. A set is group-dead when its mean joint
+drop is at most zero and at most one fold is positive. A materially alive set
+(mean joint drop at least `+0.00025`) receives one representative-sufficiency
+test. Its representative maximizes the three-fold single-field drop; exact ties
+prefer the field with fewer missing observations, then the shorter canonical
+feature name as the simpler semantics, then lower global index. A set is
+representative-sufficient when the residual drop after retaining that
+representative is at most `+0.00025`; otherwise every member is KEEP.
+The canonical loader has no per-field missing mask: every active equity receives
+a finite value for all 58 fields, while missing-bar state is carried by the
+dedicated observed/fraction channels. Consequently the missing-fraction
+tie-break is zero for every incumbent field and is still recorded explicitly;
+the name-length and global-index tie-breaks resolve any remaining exact tie.
+Singletons enter R1 only when they satisfy the frozen Experiment-39 P0.3-dead
+rule on both A/B evidence and their new Fold-C single drop is non-positive.
+
+R1 is the union of removals from group-dead sets and eligible singletons. R2 is
+R1 plus non-representatives from representative-sufficient sets. A field may be
+proposed by one overlapping set while another set says KEEP; the proposal still
+enters the preview because the decisive safeguard is the joint preview followed
+by retraining, not an undeclared veto. Each preview must have mean cost at most
+`+0.00025` and every-fold cost at most `+0.0005`. When R1 fails, it is rebuilt
+from empty by adding fields in ascending single-drop order and stops before the
+first failing addition. R2 starts from the final R1 and considers only its extra
+fields in the same order, preserving nesting. This is the fixed interpretation
+of the requested "smallest single-field drop first" greedy walk-back. Final R1,
+R2, their preview metrics, and the full provenance of accepted/rejected
+additions are frozen and hashed before Stage C begins.
+
+### Stage-C decisive retraining and selection
+
+Exactly two candidates are permitted: prune-R1 and prune-R2. Each keeps the
+parent architecture, loss, sampling, SAM optimizer, initialization/RNG, and
+20-epoch training contract unchanged, while zeroing its frozen equity fields in
+the loader from epoch zero. Each runs seeds 11/29/47 on Fold C/A/B: 18 total
+trajectories at hard maximum parallelism two. Bidirectional cross-fitted Raw
+Patience-3 standalone candidate-minus-canonical IC is primary. Final EMA-0.995,
+the uniform parent-plus-pruned rank ensemble, block intervals, horizons, and
+decision-time slices are diagnostic only.
+
+A candidate is non-inferior when its three-fold primary mean is non-negative and
+no fold is below `-0.0005`. It meets the numerical improvement threshold only
+when the mean is at least `+0.0005` and every fold is non-negative; paired
+block-5/10 intervals determine how strongly that improvement is supported and
+must accompany any claim. A non-negative sub-threshold outcome is parity.
+If both are non-inferior, prefer R2 when its mean is within `0.00025` of R1;
+otherwise choose the higher mean. If only one is non-inferior, it wins. The
+winner defines a store-v2 feature specification for the next-generation parent,
+but does not silently replace the canonical recipe. If neither is non-inferior,
+all 58 fields remain and the conclusion is "redundant but load-bearing under
+retraining — do not remove." No third subset or post-score rescue is allowed.
+
+The immutable program must retain the Stage-A matrix/table, complete Stage-B
+set-by-fold/horizon drop matrix and intervals, hashed R1/R2 definitions and
+walk-back trace, all Stage-C histories and analyses, a rule-attributed verdict
+for every field, hashes/manifests, and sealed-data flags. Cleanup is allowed only
+after the final decision is recorded and must be inventory-bound; selected
+checkpoints, all prediction archives, analyses, manifests, and decision
+artifacts are required survivors.

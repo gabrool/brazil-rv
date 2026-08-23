@@ -9,6 +9,8 @@ import torch
 from torch import nn
 
 from .contract import (
+    DYNAMIC_CHANNEL_COUNT,
+    EQUITY_COUNT,
     GH200_RUNTIME,
     GRADIENT_CLIP,
     SAM_NORM_EPS,
@@ -449,6 +451,87 @@ def collect_validation_observations(
         }
     )
     return observations, float(torch.stack(loss_sums).sum().cpu()) / total_count
+
+
+def collect_equity_input_ablation_predictions(
+    model: nn.Module,
+    loader: Iterable[dict[str, torch.Tensor]],
+    ablations: Mapping[str, tuple[tuple[int, ...], tuple[int, ...]]],
+    *,
+    variants_per_forward: int = 8,
+) -> tuple[EvaluationObservations, dict[str, np.ndarray]]:
+    """Evaluate fixed equity-only field groups with batched inference variants."""
+    if not ablations:
+        raise ValueError("At least one equity-input ablation is required")
+    if variants_per_forward < 1:
+        raise ValueError("variants_per_forward must be positive")
+    for name, (dynamic, slow) in ablations.items():
+        if not name:
+            raise ValueError("Ablation names must be nonempty")
+        if len(set(dynamic)) != len(dynamic) or any(
+            not 0 <= index < DYNAMIC_CHANNEL_COUNT for index in dynamic
+        ):
+            raise ValueError(f"Invalid dynamic indices for ablation {name}")
+        if len(set(slow)) != len(slow) or any(not 0 <= index < 32 for index in slow):
+            raise ValueError(f"Invalid slow indices for ablation {name}")
+    device = next(model.parameters()).device
+    model.eval()
+    metadata = {
+        name: []
+        for name in (
+            "sample_id",
+            "targets",
+            "raw_returns",
+            "label_mask",
+            "date_idx",
+            "decision_idx",
+        )
+    }
+    predictions = {name: [] for name in ablations}
+    items = list(ablations.items())
+    width = min(variants_per_forward, len(items))
+    with torch.inference_mode():
+        for cpu_batch in loader:
+            valid_count = int(cpu_batch["sample_valid_mask"].sum())
+            batch = _to_device(cpu_batch, device)
+            batch_size = batch["patches"].shape[0]
+            for start in range(0, len(items), width):
+                chunk = items[start : start + width]
+                padded = [*chunk, *(("", ((), ())) for _ in range(width - len(chunk)))]
+                expanded = {
+                    key: value.repeat((width, *(1 for _ in range(value.ndim - 1))))
+                    for key, value in batch.items()
+                }
+                for variant, (_, (dynamic, slow)) in enumerate(padded):
+                    rows = slice(variant * batch_size, (variant + 1) * batch_size)
+                    for channel in dynamic:
+                        expanded["patches"][
+                            rows,
+                            :EQUITY_COUNT,
+                            :,
+                            channel::DYNAMIC_CHANNEL_COUNT,
+                        ] = 0
+                    if slow:
+                        expanded["slow_features"][rows, :EQUITY_COUNT, slow] = 0
+                with _autocast(device):
+                    values = _predict(model, expanded).reshape(
+                        width, batch_size, EQUITY_COUNT, -1
+                    )
+                for variant, (name, _) in enumerate(chunk):
+                    predictions[name].append(
+                        values[variant, :valid_count].float().cpu().numpy()
+                    )
+            for name, values in _filter_evaluation_metadata(cpu_batch).items():
+                metadata[name].append(values)
+    arrays = {name: np.concatenate(parts) for name, parts in metadata.items()}
+    order = np.argsort(arrays["sample_id"], kind="stable")
+    reference = EvaluationObservations(
+        predictions=np.zeros_like(arrays["targets"])[order],
+        **{name: arrays[name][order] for name in metadata},
+    )
+    return reference, {
+        name: np.concatenate(parts)[order] for name, parts in predictions.items()
+    }
 
 
 def assert_observations_aligned(

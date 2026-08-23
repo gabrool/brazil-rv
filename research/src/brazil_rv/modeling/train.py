@@ -189,6 +189,8 @@ def run_training(
     run_dir: Path,
     selection_rule_file: Path | None = None,
     sidecar_dir: Path | None = None,
+    zero_dynamic_channels: tuple[int, ...] = (),
+    zero_slow_fields: tuple[int, ...] = (),
 ) -> Path:
     sidecar = None if sidecar_dir is None else load_external_sidecar(sidecar_dir, store)
     if run_dir.exists():
@@ -211,6 +213,8 @@ def run_training(
         GH200_RUNTIME,
         seed,
         sidecar,
+        zero_dynamic_channels,
+        zero_slow_fields,
     )
     model = build_model(None if sidecar is None else sidecar.feature_count).cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
@@ -234,6 +238,14 @@ def run_training(
         date_replacement=sampler.replace_dates,
         external_sidecar=None if sidecar is None else sidecar.identity,
     )
+    run_provenance["equity_input_zeroing"] = {
+        "scope": "158_equity_inputs_only",
+        "dynamic_channels": list(zero_dynamic_channels),
+        "slow_fields": list(zero_slow_fields),
+        "context_and_global_inputs_unchanged": True,
+        "history_masks_unchanged": True,
+        "applied_from_epoch_zero": True,
+    }
     recorded_training = run_provenance["training"]
     if (
         recorded_training["steps_per_epoch"],
@@ -248,6 +260,7 @@ def run_training(
         "feature_store": str(store.resolve()),
         "feature_store_identity": store_identity,
         "external_sidecar": None if sidecar is None else sidecar.identity,
+        "equity_input_zeroing": run_provenance["equity_input_zeroing"],
         "split": {
             "training": selection_window,
             "selection": selection_window,

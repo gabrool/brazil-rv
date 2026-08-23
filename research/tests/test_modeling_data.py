@@ -173,3 +173,15 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
         parameter.grad is None or torch.isfinite(parameter.grad).all()
         for parameter in model.parameters()
     )
+
+    zeroed = VectorizedFeatureDataset(
+        tmp_path,
+        rows,
+        zero_dynamic_channels=(0,),
+        zero_slow_fields=(1,),
+    )[BatchRequest((0,), 1)]
+    assert not np.any(zeroed["patches"][:, :158, :, 0::26])
+    assert np.any(zeroed["patches"][:, :158, :, 1::26])
+    assert np.any(zeroed["patches"][:, 158:, :, 0::26])
+    assert not np.any(zeroed["slow_features"][:, :158, 1])
+    assert np.any(zeroed["slow_features"][:, 158:, 1])
