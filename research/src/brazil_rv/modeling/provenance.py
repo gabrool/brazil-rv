@@ -116,7 +116,6 @@ def build_run_provenance(
     training_sample_count: int,
     date_replacement: bool,
     external_sidecar: dict[str, object] | None = None,
-    base_feature_ablation: dict[str, object] | None = None,
     runtime: RuntimeSettings = GH200_RUNTIME,
 ) -> dict[str, object]:
     sidecar_feature_count: int | None = None
@@ -145,9 +144,4 @@ def build_run_provenance(
     }
     if external_sidecar is not None:
         provenance["external_sidecar"] = external_sidecar
-    provenance["base_feature_ablation"] = base_feature_ablation or {
-        "scope": "equity_inputs_only",
-        "dynamic_channel_indices": [],
-        "slow_field_indices": [],
-    }
     return json.loads(json.dumps(provenance))

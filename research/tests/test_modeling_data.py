@@ -6,11 +6,7 @@ import numpy as np
 import polars as pl
 
 from brazil_rv.modeling.contract import EFFECTIVE_BATCH_SIZE, RuntimeSettings
-from brazil_rv.modeling.data import (
-    DateStratifiedBatchSampler,
-    discovery_folds,
-    third_discovery_fold,
-)
+from brazil_rv.modeling.data import DateStratifiedBatchSampler, discovery_folds
 
 
 def _rows(date_count: int = 716) -> pl.DataFrame:
@@ -72,23 +68,6 @@ def test_date_sampling_is_epoch_deterministic() -> None:
     assert list(left) == list(right)
 
 
-def test_third_fold_uses_the_predeclared_calendar_and_replacement() -> None:
-    fit_dates = [date(2021, 8, 16) + timedelta(days=index) for index in range(406)]
-    fit_dates.append(date(2023, 3, 31))
-    selection_dates = [date(2023, 4, 3) + timedelta(days=index) for index in range(104)]
-    selection_dates.append(date(2023, 8, 31))
-    tail_dates = [date(2023, 9, 1) + timedelta(days=index) for index in range(204)]
-    dates = [*fit_dates, *selection_dates, *tail_dates]
-    rows = _rows().with_columns(pl.Series("trade_date", dates, dtype=pl.Date))
-    fold = third_discovery_fold(rows)
-    assert fold.fit_rows["trade_date"].min() == date(2021, 8, 16)
-    assert fold.fit_rows["trade_date"].max() == date(2023, 3, 31)
-    assert fold.selection_rows["trade_date"].min() == date(2023, 4, 3)
-    assert fold.selection_rows["trade_date"].max() == date(2023, 8, 31)
-    runtime = RuntimeSettings(num_workers=0)
-    assert DateStratifiedBatchSampler(fold.fit_rows, runtime, 11).replace_dates
-
-
 def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
     import torch
 
@@ -147,17 +126,8 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
             "context_cutoff_index": [75],
         }
     )
-    dataset = VectorizedFeatureDataset(
-        tmp_path,
-        rows,
-        zero_dynamic_channels=(0,),
-        zero_slow_fields=(1,),
-    )
+    dataset = VectorizedFeatureDataset(tmp_path, rows)
     batch = tensorize_vectorized_batch(dataset[BatchRequest((0,), 1)])
-    assert not batch["patches"][0, :158, :, 0::26].any()
-    assert batch["patches"][0, 158:, :, 0::26].any()
-    assert not batch["slow_features"][0, :158, 1].any()
-    assert batch["slow_features"][0, 158:, 1].any()
     assert "continuous_targets" not in batch
     assert "training_weight" not in batch
     model = build_model()
@@ -169,7 +139,9 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
         batch["state_position"],
     )
     assert predictions.shape == (1, 158, HORIZON_COUNT)
-    loss = soft_spearman_loss(predictions, batch["targets"], batch["label_mask"])
+    loss = soft_spearman_loss(
+        predictions, batch["targets"], batch["label_mask"]
+    )
     loss.backward()
     assert torch.isfinite(loss)
     assert all(

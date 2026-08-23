@@ -445,3 +445,35 @@ Transient base partials, model caches, upstream clones, and MPS state were
 deleted. The retained run and sidecar are read-only. Paid GH200 instance
 `c0aef7522bf64fe0899e8703027668db` was terminated and confirmed absent from
 Lambda's active inventory.
+
+## P0/P1 feature-program decision (2026-08-22/23)
+
+P0.2/Kronos closure was explicitly excluded and never run. P0.1 rejected both
+predeclared mixed-state ensembles: the 24-member all-family stack added
+`-0.001242/+0.001709` on Fold A/B (mean `+0.000233`), while the 12-member
+residual/options/ADR stack added `-0.000272/+0.002278` (mean `+0.001003`). Both
+failed the non-negative-every-fold gate.
+
+Cross-fitted inference attribution classified 12 of 58 incumbent equity fields
+dead, but they were removed only inside the subsequent joint candidate. F2
+selected eight causal features on a disjoint first-407-date window. On Fold
+C/A/B, that bias-free sidecar plus the 12-field ablation added
+`-0.000568/+0.000576/+0.001054` standalone (mean `+0.000354`) and
+`-0.000015/+0.000711/+0.000920` when pooled with parent-3 (mean `+0.000539`).
+Neither path passed the preregistered three-fold gate. Final EMA and the P0
+mixed-state secondary reads were also null-to-negative. F4 therefore recorded
+`not_run` without ablation or retraining.
+
+Reject the P0.1 stacks and the joint P1 feature/pruning recipe. P0.3 and F2 remain
+diagnostic evidence only; do not delete fields from the canonical parent or
+promote individual F2 features based on the joint screen. Raw Patience-3 on the
+unchanged three-seed parent remains canonical, the designated challenger is
+unchanged, official validation was not spent, and the held-out test remains
+sealed. Exact results and source-reproduction validation are under:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/p0_p1_27aa0d0_20260822T194900Z
+
+Experiment implementations are reproducible through commits `5b6b5d4`,
+`1b63661`, `27aa0d0`, and `8f46124`; rejected campaign-only code is absent from
+current HEAD. Full settings, selected features, intervals, operational repair,
+and artifact hashes are recorded in `EXPERIMENT_LOG.md` Experiment 39.

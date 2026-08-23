@@ -2094,3 +2094,118 @@ the same three folds/seeds. It is promotion-eligible only if it independently
 passes the F3 gate, loses no more than `0.0005` mean IC versus the full F3 recipe,
 and loses no more than `0.001` on any fold. No official validation or held-out
 test access is authorized by this registration.
+
+### Source reproduction and operational repair
+
+The missing parent, combined-auxiliary, and market-gate trajectories were
+reproduced at their frozen settings before P0 was scored. The original source
+stage exited cleanly when `combined_fold_b_11` suffered a transient child-process
+failure. No score from the incomplete Fold-B parent was used. A fresh Fold-B
+repair reran all nine family/seed trajectories without reusing partial artifacts;
+Fold A was taken only from the completed original runs and Fold B only from the
+completed repair.
+
+The accepted assembly reproduced every parent cross-fit selected/stopped epoch
+exactly. Parent prediction-rank similarities were `0.999930-0.999952`, maximum
+absolute member IC drift was `0.0000264`, and ensemble IC drift was
+`-0.0000068` on Fold A and `+0.0000029` on Fold B. Reproduced combined and
+market-gate final-EMA metrics differed from their recorded values by at most
+`0.0000274`. These are within the preregistered cross-instance tolerance and the
+assembly was accepted before P0.1/P0.3. P0.2 remained absent. The exact report is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/p0_p1_27aa0d0_20260822T194900Z/validated_sources/validation_report.json
+
+### P0 results
+
+P0.1 rejected both fixed uniform stacks against the canonical parent:
+
+| Variant | Members | Fold A | Fold B | Mean | Gate |
+|---|---:|---:|---:|---:|---|
+| all listed families | 24 | `-0.001242` | `+0.001709` | `+0.000233` | fail |
+| residual + options + ADR | 12 | `-0.000272` | `+0.002278` | `+0.001003` | fail |
+
+Against the informational designated challenger, the same A/B deltas were
+`-0.001929/-0.000624` and `-0.000960/-0.000055`, respectively. The smaller stack
+met the mean threshold only by reversing sign across folds, so it was not
+retained. No weights were learned. The initial summary write encountered only a
+NumPy-boolean JSON serialization error after all immutable analyses had finished;
+commit `8f46124` fixed serialization, and the summary was reconstructed from those
+unchanged analyses without recomputation or selection changes.
+
+P0.3 classified 14 of 58 incumbent equity fields `keep`, 32 `suspect`, and 12
+`dead` under the conservative two-fold/horizon rule. The dead fields were:
+
+- dynamic 11 `realized_vol_30m_log_ratio`;
+- dynamic 20 `market_dispersion_15m`;
+- dynamic 25 `cross_section_volatility_rank_30m`;
+- dynamic 14 `session_range_position`;
+- dynamic 12 `realized_vol_60m_log_ratio`;
+- slow 15/16 `observed_fraction_5d`/`observed_fraction_20d`;
+- slow 27 `weekday_cos` and slow 28 `month_end_proximity`;
+- slow 10 `realized_vol_20d_log_ratio`;
+- slow 13 `median_daily_dollar_volume_20d_log_scale`; and
+- slow 18 `dollar_volume_cross_section_rank`.
+
+Only those fields were zeroed in the P1 candidate. They were not deleted from the
+canonical parent, because the downstream joint candidate did not pass.
+
+### P1 results
+
+F2 selected eight of 19 causal candidates on the first 407 dates:
+
+| Feature | Half-1 IC | Half-2 IC | Max existing correlation | Incremental score |
+|---|---:|---:|---:|---:|
+| `vwap_reversal_15m_cs` | `+0.014392` | `+0.012306` | `0.6861` | `0.006514` |
+| `late_market_momentum_beta` | `-0.013616` | `-0.005298` | `0.0594` | `0.005280` |
+| `overnight_minus_intraday_20d_cs` | `-0.016134` | `-0.005889` | `0.5887` | `0.003848` |
+| `signed_semivariance_1d` | `-0.005317` | `-0.011427` | `0.6551` | `0.003035` |
+| `edge_spread_60m_cs` | `-0.003758` | `-0.007268` | `0.7230` | `0.001793` |
+| `vwap_reversal_volume_flip` | `+0.001791` | `+0.006833` | `0.3185` | `0.001610` |
+| `amihud_30m_cs` | `-0.004782` | `-0.007855` | `0.8150` | `0.001606` |
+| `hks_same_interval_return_lag5` | `+0.001569` | `+0.002473` | `0.0959` | `0.001555` |
+
+F3 then trained the predeclared eight-feature, twelve-field-pruned candidate on
+Fold C/A/B. Cross-fitted Raw Patience produced:
+
+| Primary path | Fold C | Fold A | Fold B | Three-fold mean | Gate |
+|---|---:|---:|---:|---:|---|
+| standalone candidate | `-0.000568` | `+0.000576` | `+0.001054` | `+0.000354` | fail |
+| parent-3 + candidate-3 | `-0.000015` | `+0.000711` | `+0.000920` | `+0.000539` | fail |
+
+The Fold-C block-5/block-10 95% intervals were
+`[-0.003293,+0.001523]`/`[-0.003493,+0.000994]` standalone and
+`[-0.001387,+0.001045]`/`[-0.001486,+0.000779]` for the diversity stack. Fold A
+intervals were `[-0.001465,+0.003064]`/`[-0.001705,+0.003128]` and
+`[-0.000344,+0.001972]`/`[-0.000525,+0.002044]`; Fold B intervals were
+`[-0.000595,+0.002739]`/`[-0.000178,+0.002425]` and
+`[+0.000096,+0.001722]`/`[+0.000298,+0.001580]`. Thus the only locally positive
+interval was Fold B's ensemble, while the unseen Fold C prevented retention and
+the three-fold means remained below `+0.001`.
+
+Final-EMA-0.995 was also negative overall: standalone C/A/B deltas were
+`-0.000026/-0.001814/-0.002199` (mean `-0.001346`), and the parent-plus-candidate
+deltas were `+0.000350/-0.000098/-0.000520` (mean `-0.000089`). Adding the P1
+members to the P0 mixed-state informational comparator reduced IC by `-0.000601`
+on Fold A and `-0.000515` on Fold B. Neither secondary readout altered the
+decision.
+
+Because neither primary path passed, F4 was invoked exactly once and wrote
+`status=not_run`, reason `F3 primary gate did not pass`; no ablation or reduced
+retraining was launched. P0.2 was never run. Official validation and the held-out
+test remained sealed throughout.
+
+### Final decision and artifacts
+
+Reject P0.1 and the joint P1 feature/pruning recipe. Preserve P0.3 and F2 as
+diagnostic evidence, not as permission to modify the canonical recipe. Raw
+Patience-3 on the unchanged parent architecture remains canonical, and the
+designated challenger policy is unchanged. The immutable program root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/p0_p1_27aa0d0_20260822T194900Z
+
+Key summary SHA-256 values are `04d67ff1...293dca0` (P0.1),
+`f920e404...041d280` (P0.3), `b05c8cc5...3294ed` (F2),
+`a0ab1490...8886ee0` (F3), and `3130d4a1...a384b21` (F4). Exact implementation
+history is commits `5b6b5d4`, `1b63661`, `27aa0d0`, and `8f46124`; rejected
+experiment-only plumbing is removed from current HEAD rather than retained as
+compatibility code.
