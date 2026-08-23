@@ -2481,6 +2481,11 @@ masks remain untouched. The three seeds are rank-averaged. Reports contain
 parent-minus-ablated IC by Fold C/A/B and horizon, with paired block-10
 intervals. The Experiment-39 P0.3 Fold-A/B single
 ablations are imported unchanged; all 58 Fold-C singles are new.
+The prior inventory-bound cleanup removed unselected A/B prediction epochs.
+Therefore A/B Patience directions are loaded from Experiment 39's sealed
+`validated_sources/validation_report.json`, whose historical and reproduced
+selected/stopped epochs match exactly; the runner must not recompute selection
+from missing files. Fold C continues to use its retained frozen replay metadata.
 
 The group rules are fixed as follows. A set is group-dead when its mean joint
 drop is at most zero and at most one fold is positive. A materially alive set

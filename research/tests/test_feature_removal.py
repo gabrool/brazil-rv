@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import torch
 
@@ -7,6 +9,7 @@ from brazil_rv.modeling.engine import collect_equity_input_ablation_predictions
 from brazil_rv.modeling.feature_removal import (
     _components,
     _definition,
+    _fold_ab_replays,
     _historical_single_fold,
     _preview_passes,
     _rank_standardize,
@@ -58,6 +61,48 @@ def test_historical_p0_single_is_normalized_without_recomputing() -> None:
     assert normalized["per_horizon_parent_minus_ablated_ic"]["15"] == 0.002
     assert normalized["block10_interval"] == historical["moving_block_bootstrap"]["10"]
     assert normalized["source"] == "imported_unchanged_from_experiment_39_p0_3"
+
+
+def test_fold_ab_replays_use_validated_exact_epochs(tmp_path) -> None:
+    members = {
+        f"seed_{seed}": {
+            "historical_replay_epochs": [[5, 8], [9, 12]],
+            "reproduced_replay_epochs": [[5, 8], [9, 12]],
+        }
+        for seed in (11, 29, 47)
+    }
+    report = tmp_path / "validation_report.json"
+    report.write_text(
+        json.dumps(
+            {
+                "matched_seed_contract": {"replay_epochs_exact": True},
+                "parent": {
+                    "fold_a": {"members": members},
+                    "fold_b": {"members": members},
+                },
+                "official_validation_accessed": False,
+                "test_accessed": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    replays = _fold_ab_replays(report)
+    assert replays["fold_a"]["seed_11"] == [
+        {
+            "selection_parity": "odd",
+            "evaluation_parity": "even",
+            "selected_epoch": 5,
+            "stopped_epoch": 8,
+            "source": "validated_exact_historical_replay",
+        },
+        {
+            "selection_parity": "even",
+            "evaluation_parity": "odd",
+            "selected_epoch": 9,
+            "stopped_epoch": 12,
+            "source": "validated_exact_historical_replay",
+        },
+    ]
 
 
 class _SumModel(torch.nn.Module):

@@ -457,6 +457,56 @@ def _fold_c_replays(report: Path) -> dict[str, list[dict[str, object]]]:
     return replays
 
 
+def _fold_ab_replays(
+    report: Path,
+) -> dict[str, dict[str, list[dict[str, object]]]]:
+    value = _read_json(report)
+    if (
+        value.get("official_validation_accessed") is not False
+        or value.get("test_accessed") is not False
+        or value.get("matched_seed_contract", {}).get("replay_epochs_exact") is not True
+    ):
+        raise ValueError("A/B replay report is not the sealed exact source assembly")
+    parent = value.get("parent")
+    if not isinstance(parent, dict) or set(parent) != {"fold_a", "fold_b"}:
+        raise ValueError("A/B replay report lacks both discovery folds")
+    output: dict[str, dict[str, list[dict[str, object]]]] = {}
+    directions = (("odd", "even"), ("even", "odd"))
+    for fold in ("fold_a", "fold_b"):
+        members = parent[fold].get("members")
+        if not isinstance(members, dict) or set(members) != {
+            f"seed_{seed}" for seed in ALLOWED_SEEDS
+        }:
+            raise ValueError(f"A/B replay report lacks three seeds for {fold}")
+        output[fold] = {}
+        for seed in ALLOWED_SEEDS:
+            member = members[f"seed_{seed}"]
+            epochs = member.get("historical_replay_epochs")
+            reproduced = member.get("reproduced_replay_epochs")
+            if epochs != reproduced or not isinstance(epochs, list) or len(epochs) != 2:
+                raise ValueError(
+                    f"Historical/reproduced replays differ for {fold} seed {seed}"
+                )
+            replays = []
+            for (selection, evaluation), pair in zip(directions, epochs, strict=True):
+                if not isinstance(pair, list) or len(pair) != 2:
+                    raise ValueError(f"Malformed replay pair for {fold} seed {seed}")
+                selected, stopped = (int(value) for value in pair)
+                if not 1 <= selected <= stopped <= 20:
+                    raise ValueError(f"Invalid replay epoch for {fold} seed {seed}")
+                replays.append(
+                    {
+                        "selection_parity": selection,
+                        "evaluation_parity": evaluation,
+                        "selected_epoch": selected,
+                        "stopped_epoch": stopped,
+                        "source": "validated_exact_historical_replay",
+                    }
+                )
+            output[fold][f"seed_{seed}"] = replays
+    return output
+
+
 def _parent_paths(
     *,
     fold: str,
@@ -480,6 +530,7 @@ def evaluate_ablation_sets(
     definitions: Mapping[str, tuple[tuple[int, ...], tuple[int, ...]]],
     parent_reference_campaign: Path,
     parent_checkpoint_campaign: Path,
+    parent_ab_replay_report: Path,
     fold_c_parent: Path,
     fold_c_parent_replay_report: Path,
     folds: Sequence[str] = FOLDS,
@@ -488,6 +539,7 @@ def evaluate_ablation_sets(
         return {}
     sample_index = load_sample_index(store)
     frozen_c = _fold_c_replays(fold_c_parent_replay_report)
+    frozen_ab = _fold_ab_replays(parent_ab_replay_report)
     model = build_model().cuda()
     compiled = compile_model(model)
     results: dict[str, dict[str, object]] = {name: {} for name in definitions}
@@ -509,7 +561,11 @@ def evaluate_ablation_sets(
             )
             parent, directions = crossfit_patience_observations(
                 reference_run,
-                frozen_c[f"seed_{seed}"] if fold == "fold_c" else None,
+                (
+                    frozen_c[f"seed_{seed}"]
+                    if fold == "fold_c"
+                    else frozen_ab[fold][f"seed_{seed}"]
+                ),
             )
             parent_members[f"seed_{seed}"] = parent
             per_ablation = {
@@ -613,6 +669,7 @@ def run_stage_b(
     p0_attribution_report: Path,
     parent_reference_campaign: Path,
     parent_checkpoint_campaign: Path,
+    parent_ab_replay_report: Path,
     fold_c_parent: Path,
     fold_c_parent_replay_report: Path,
     output_dir: Path,
@@ -630,6 +687,7 @@ def run_stage_b(
         definitions=single_definitions,
         parent_reference_campaign=parent_reference_campaign,
         parent_checkpoint_campaign=parent_checkpoint_campaign,
+        parent_ab_replay_report=parent_ab_replay_report,
         fold_c_parent=fold_c_parent,
         fold_c_parent_replay_report=fold_c_parent_replay_report,
         folds=("fold_c",),
@@ -669,6 +727,7 @@ def run_stage_b(
         definitions=group_definitions,
         parent_reference_campaign=parent_reference_campaign,
         parent_checkpoint_campaign=parent_checkpoint_campaign,
+        parent_ab_replay_report=parent_ab_replay_report,
         fold_c_parent=fold_c_parent,
         fold_c_parent_replay_report=fold_c_parent_replay_report,
     )
@@ -708,6 +767,7 @@ def run_stage_b(
         definitions=representative_definitions,
         parent_reference_campaign=parent_reference_campaign,
         parent_checkpoint_campaign=parent_checkpoint_campaign,
+        parent_ab_replay_report=parent_ab_replay_report,
         fold_c_parent=fold_c_parent,
         fold_c_parent_replay_report=fold_c_parent_replay_report,
     )
@@ -775,6 +835,7 @@ def run_stage_b(
                 definitions={name: _definition(sorted(members))},
                 parent_reference_campaign=parent_reference_campaign,
                 parent_checkpoint_campaign=parent_checkpoint_campaign,
+                parent_ab_replay_report=parent_ab_replay_report,
                 fold_c_parent=fold_c_parent,
                 fold_c_parent_replay_report=fold_c_parent_replay_report,
             )[name]
@@ -851,6 +912,8 @@ def run_stage_b(
         "cluster_table_sha256": _sha256(cluster_table),
         "p0_attribution_report": str(p0_attribution_report.resolve()),
         "p0_attribution_sha256": _sha256(p0_attribution_report),
+        "parent_ab_replay_report": str(parent_ab_replay_report.resolve()),
+        "parent_ab_replay_report_sha256": _sha256(parent_ab_replay_report),
         "singles": singles,
         "groups": groups,
         "frozen_sets": str(frozen_path.resolve()),
@@ -914,6 +977,7 @@ def _parent_members(
     parent_reference_campaign: Path,
     fold_c_parent: Path,
     frozen_c: Mapping[str, list[dict[str, object]]],
+    frozen_ab: Mapping[str, Mapping[str, list[dict[str, object]]]],
 ) -> tuple[dict[str, EvaluationObservations], dict[str, object]]:
     members = {}
     replays = {}
@@ -926,7 +990,11 @@ def _parent_members(
         if readout == "patience3_raw":
             observations, replay = crossfit_patience_observations(
                 path,
-                frozen_c[f"seed_{seed}"] if fold == "fold_c" else None,
+                (
+                    frozen_c[f"seed_{seed}"]
+                    if fold == "fold_c"
+                    else frozen_ab[fold][f"seed_{seed}"]
+                ),
             )
         else:
             reference = load_run_observations(path, "final_raw")
@@ -957,6 +1025,7 @@ def run_stage_c(
     store: Path,
     frozen_sets: Path,
     parent_reference_campaign: Path,
+    parent_ab_replay_report: Path,
     fold_c_parent: Path,
     fold_c_parent_replay_report: Path,
     output_dir: Path,
@@ -994,6 +1063,7 @@ def run_stage_c(
         for future in as_completed(futures):
             print(future.result(), flush=True)
     frozen_c = _fold_c_replays(fold_c_parent_replay_report)
+    frozen_ab = _fold_ab_replays(parent_ab_replay_report)
     candidates: dict[str, object] = {}
     for candidate in definitions:
         readouts: dict[str, object] = {}
@@ -1015,6 +1085,7 @@ def run_stage_c(
                     parent_reference_campaign=parent_reference_campaign,
                     fold_c_parent=fold_c_parent,
                     frozen_c=frozen_c,
+                    frozen_ab=frozen_ab,
                 )
                 standalone = compare_observation_ensembles(
                     candidate_members,
@@ -1157,6 +1228,7 @@ def run_program(
     p0_attribution_report: Path,
     parent_reference_campaign: Path,
     parent_checkpoint_campaign: Path,
+    parent_ab_replay_report: Path,
     fold_c_parent: Path,
     fold_c_parent_replay_report: Path,
     output_dir: Path,
@@ -1197,6 +1269,7 @@ def run_program(
             p0_attribution_report=p0_attribution_report,
             parent_reference_campaign=parent_reference_campaign,
             parent_checkpoint_campaign=parent_checkpoint_campaign,
+            parent_ab_replay_report=parent_ab_replay_report,
             fold_c_parent=fold_c_parent,
             fold_c_parent_replay_report=fold_c_parent_replay_report,
             output_dir=output_dir / "stage_b",
@@ -1213,6 +1286,7 @@ def run_program(
             store=store,
             frozen_sets=frozen,
             parent_reference_campaign=parent_reference_campaign,
+            parent_ab_replay_report=parent_ab_replay_report,
             fold_c_parent=fold_c_parent,
             fold_c_parent_replay_report=fold_c_parent_replay_report,
             output_dir=output_dir / "stage_c",
@@ -1253,6 +1327,7 @@ def main() -> None:
         "p0_attribution_report",
         "parent_reference_campaign",
         "parent_checkpoint_campaign",
+        "parent_ab_replay_report",
         "fold_c_parent",
         "fold_c_parent_replay_report",
         "output_dir",
