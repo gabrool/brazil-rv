@@ -6,7 +6,11 @@ import numpy as np
 import polars as pl
 
 from brazil_rv.modeling.contract import EFFECTIVE_BATCH_SIZE, RuntimeSettings
-from brazil_rv.modeling.data import DateStratifiedBatchSampler, discovery_folds
+from brazil_rv.modeling.data import (
+    DateStratifiedBatchSampler,
+    discovery_folds,
+    third_discovery_fold,
+)
 
 
 def _rows(date_count: int = 716) -> pl.DataFrame:
@@ -51,6 +55,29 @@ def test_both_fold_training_windows_sample_512_distinct_dates() -> None:
             first_two_loader_batches[0].indices + first_two_loader_batches[1].indices
         )
         assert len(positions) == len(set(positions)) == 512
+
+
+def test_third_discovery_fold_has_fixed_nonoverlapping_dates() -> None:
+    fit_dates = [date(2022, 1, 1) + timedelta(days=index) for index in range(407)]
+    selection_dates = [date(2023, 4, 3) + timedelta(days=index) for index in range(105)]
+    dates = fit_dates + selection_dates
+    rows = pl.DataFrame(
+        {
+            "sample_id": np.arange(len(dates), dtype=np.int64),
+            "date_idx": np.arange(len(dates), dtype=np.int32),
+            "trade_date": dates,
+            "decision_idx": np.zeros(len(dates), dtype=np.int16),
+        }
+    )
+
+    fold = third_discovery_fold(rows)
+
+    assert fold.name == "fold_c"
+    assert fold.fit_rows["trade_date"].n_unique() == 407
+    assert fold.selection_rows["trade_date"].n_unique() == 105
+    assert fold.fit_rows["trade_date"].max() <= date(2023, 3, 31)
+    assert fold.selection_rows["trade_date"].min() == date(2023, 4, 3)
+    assert fold.selection_rows["trade_date"].max() <= date(2023, 8, 31)
 
 
 def test_date_sampling_is_epoch_deterministic() -> None:
@@ -139,9 +166,7 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
         batch["state_position"],
     )
     assert predictions.shape == (1, 158, HORIZON_COUNT)
-    loss = soft_spearman_loss(
-        predictions, batch["targets"], batch["label_mask"]
-    )
+    loss = soft_spearman_loss(predictions, batch["targets"], batch["label_mask"])
     loss.backward()
     assert torch.isfinite(loss)
     assert all(

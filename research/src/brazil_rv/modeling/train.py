@@ -67,7 +67,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, choices=ALLOWED_SEEDS, default=29)
     parser.add_argument(
         "--selection-window",
-        choices=("fold_a", "fold_b", "official"),
+        choices=("fold_c", "fold_a", "fold_b", "official"),
         default="fold_a",
     )
     parser.add_argument("--selection-rule-file", type=Path)

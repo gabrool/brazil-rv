@@ -41,6 +41,9 @@ from .contract import (
     SLOW_FEATURE_COUNT,
     TEST_END,
     TEST_START,
+    THIRD_DISCOVERY_FIT_END,
+    THIRD_DISCOVERY_SELECTION_END,
+    THIRD_DISCOVERY_SELECTION_START,
     TRAIN_END,
     TRAIN_START,
     VALIDATION_END,
@@ -392,6 +395,28 @@ def discovery_folds(training_rows: pl.DataFrame) -> tuple[DiscoveryFold, ...]:
     return tuple(folds)
 
 
+def third_discovery_fold(training_rows: pl.DataFrame) -> DiscoveryFold:
+    """Return the fixed pre-April-2023 fit / April-August-2023 screen."""
+    fold = DiscoveryFold(
+        name="fold_c",
+        fit_rows=training_rows.filter(pl.col("trade_date") <= THIRD_DISCOVERY_FIT_END),
+        selection_rows=training_rows.filter(
+            pl.col("trade_date").is_between(
+                THIRD_DISCOVERY_SELECTION_START,
+                THIRD_DISCOVERY_SELECTION_END,
+            )
+        ),
+    )
+    if (
+        fold.fit_rows.get_column("trade_date").n_unique() != 407
+        or fold.selection_rows.get_column("trade_date").n_unique() != 105
+    ):
+        raise ValueError(
+            "Third discovery fold must contain 407 fit and 105 selection dates"
+        )
+    return fold
+
+
 def select_training_window(
     sample_index: pl.DataFrame, window: str
 ) -> tuple[pl.DataFrame, pl.DataFrame, str]:
@@ -406,6 +431,7 @@ def select_training_window(
             ),
         )
     folds = {fold.name: fold for fold in discovery_folds(training_rows)}
+    folds["fold_c"] = third_discovery_fold(training_rows)
     try:
         fold = folds[window]
     except KeyError as error:

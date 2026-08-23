@@ -2233,3 +2233,78 @@ Paid Lambda instance `b3eac682796a4e1ea7912422a81f0e85`
 the results commit was pushed. It was confirmed absent from the provider's
 active-instance inventory at `2026-08-23T02:59:07Z` and again at
 `2026-08-23T02:59:27Z`.
+
+## Experiment 40 — final features-only closure and P2 strong-source screens (preregistered 2026-08-23)
+
+Status at registration: no Experiment-40 trajectory, fold score, gate, official
+validation score, or held-out-test score has been computed. The user fixed the
+scope to the final P1 feature-confound screen followed by P2 from
+`research_memo_v2.md`; no later memo stage or bundled official read is authorized
+in this experiment.
+
+### Final P1 feature screen
+
+The primary closure candidate is exactly the frozen eight-feature F2 sidecar from
+Experiment 39, trained with every incumbent parent channel present. There is no
+P0.3 pruning, no feature reselection, and no change to the sidecar adapter. A
+second fixed confirmatory candidate contains only
+`late_market_momentum_beta` and `hks_same_interval_return_lag5`, the two selected
+features whose maximum incumbent correlations were approximately `0.059` and
+`0.096`. It is declared before either closure result and cannot be chosen after
+observing the eight-feature score. These are the feature program's final tests;
+failure closes the program rather than authorizing further feature combinations.
+
+Both candidates use Fold C/A/B and seeds 11/29/47, one 20-epoch SAM trajectory
+per fold/seed, the bias-free zero-start residual sidecar, and bidirectional
+odd/even cross-fitted Raw Patience-3 primary. Final EMA-0.995 remains a free
+secondary read. Each candidate reports standalone and uniform parent-3 plus
+candidate-3 rank ensembles. A path passes only when its three-fold mean delta
+versus the canonical parent is at least `+0.001` and every fold is non-negative;
+the diversity path additionally requires standalone delta no worse than
+`-0.001` on every fold. The designated challenger is informational on Fold A/B
+only and cannot retain a candidate.
+
+### P2 source contracts
+
+Three candidates are screened independently under the identical three-fold
+training/readout/gate contract. No combined P2 bundle is selected from these
+results.
+
+1. **B3 registered lending rates and flows.** Parse exact ISIN rows from the
+   official chapter-05 BDI registered-loans table. The features are taker-fee
+   level, exact five-B3-session fee change, registered share flow divided by
+   trailing-20 observed cash-share volume, and its exact five-session change.
+   Report D first becomes available on the next observed B3 session. A missing
+   accepted ISIN in a complete table is an observed zero registered flow but has
+   no fee. The legacy free BDI archive is retained and audited, but it contains
+   balances rather than the rate table; the exact free rate history begins
+   `2023-07-10` and has a documented source gap from `2023-07-21` through
+   `2023-08-24`. Changes mask across that gap. Zero-byte historical bodies from
+   the nominal legacy CSV endpoint are not treated as data.
+2. **B3 listed-equity option open interest.** Use the final timestamped
+   BVBG.086 Price Report for D and the same-date final BVBG.028 instrument master.
+   Map option instrument ID to the master's explicit underlying instrument ID,
+   then to the same-date cash instrument's exact ISIN and accepted permanent
+   `security_id`; never parse option ticker prefixes. Features cover OI/cash ADV,
+   exact one-session OI change, put/call OI, near-expiry OI share, OI-weighted
+   absolute log moneyness, and prior-only OI surprise. Final report D is first
+   used next B3 session. An active master series absent from the complete final
+   report contributes zero OI. The free Price Report does not expose the separate
+   covered/uncovered split, and historical `DerivativesOpenPositionFile` tokens
+   returned zero-byte bodies on the unrestricted machine, so covered/uncovered
+   and PIN are explicitly not tested or fabricated.
+3. **DCE iron ore.** Use contract-specific daily settlement and OI histories,
+   selecting the return contract only from prior-session OI and never splicing
+   contracts. Features are 1/5-day same-contract settlement returns, one-day OI
+   change, curve slope, and fixed producer/steel exposure masks for six exact
+   accepted B3 ISINs. Continuous `I0` is prohibited. The old official DCE public
+   route returned HTTP 412/timeouts and the current official API requires
+   credentials unavailable in this session, so the frozen free source is the
+   contract-specific Sina mirror, disclosed as unofficial. DCE session D closes
+   around 04:00 Sao Paulo and is used at the first B3 session on or after D; all
+   robust normalization uses prior observations only.
+
+All normalized source frames use explicit value masks, exact-zero invalid values,
+permanent identities, immutable manifests/hashes, and exact assignment to the
+canonical model axes. No official validation or held-out test access is allowed
+during Experiment 40.
