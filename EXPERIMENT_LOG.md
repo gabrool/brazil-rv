@@ -2209,3 +2209,27 @@ Key summary SHA-256 values are `04d67ff1...293dca0` (P0.1),
 history is commits `5b6b5d4`, `1b63661`, `27aa0d0`, and `8f46124`; rejected
 experiment-only plumbing is removed from current HEAD rather than retained as
 compatibility code.
+
+After the summaries and repository commit were secured, an exact hash inventory
+identified only redundant raw checkpoints and per-epoch validation predictions.
+The reviewed plan deleted 1,183 individual `.pt`/`.npz` files totaling
+28,569,479,747 bytes (26.607 GiB). It retained 154 binary artifacts totaling
+3,664,530,222 bytes: every observation reference, epoch 20 raw/EMA container,
+and each checkpoint/prediction epoch selected by an honest opposite-parity
+Patience replay. Sidecars, manifests, histories, diagnostics, analyses, summary
+JSON, source archives, and canonical data were outside the delete set. Hash and
+post-deletion checks passed; the program root is 4.8 GiB after cleanup. The
+immutable audit is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/p0_p1_27aa0d0_20260822T194900Z/_cleanup/20260823T024900Z
+
+The cleanup-plan SHA-256 is
+`9d820e71259c92607ed7c28e969ed8f7e54d0175d40df4c1fc77843af0caacae`;
+the result SHA-256 is
+`da2b91140683cbd179e60ea0ffc94345598b9c3a4c8dcaa59025ad17398d5e1d`.
+
+Paid Lambda instance `b3eac682796a4e1ea7912422a81f0e85`
+(`gpu_1x_gh200`, `us-east-3`, IP `192.222.51.153`) accepted termination after
+the results commit was pushed. It was confirmed absent from the provider's
+active-instance inventory at `2026-08-23T02:59:07Z` and again at
+`2026-08-23T02:59:27Z`.

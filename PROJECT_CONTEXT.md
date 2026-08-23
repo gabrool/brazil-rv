@@ -477,3 +477,11 @@ Experiment implementations are reproducible through commits `5b6b5d4`,
 `1b63661`, `27aa0d0`, and `8f46124`; rejected campaign-only code is absent from
 current HEAD. Full settings, selected features, intervals, operational repair,
 and artifact hashes are recorded in `EXPERIMENT_LOG.md` Experiment 39.
+
+The final retention cleanup removed 26.607 GiB of redundant checkpoints and
+per-epoch predictions while preserving all selected Patience epochs, epoch-20
+EMA states, observation references, sidecars, manifests, analyses, and result
+summaries. Its exact plan and postchecks are under the program root's
+`_cleanup/20260823T024900Z` directory. Paid GH200 instance
+`b3eac682796a4e1ea7912422a81f0e85` was terminated after the results were pushed
+and was confirmed absent from Lambda's inventory twice.
