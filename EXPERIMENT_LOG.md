@@ -2389,3 +2389,48 @@ Lambda accepted termination of exact paid GH200 instance
 `95098103c2da4ffcb8e9d10a4ac7704c` (`gpu_1x_gh200`, `us-east-3`, IP
 `192.222.58.49`). The instance was then absent in two consecutive provider
 inventory reads. No paid Experiment-40 host remains running.
+
+## Storage maintenance — Lambda object-store cleanup round 2 (2026-08-23)
+
+A complete S3-compatible object inventory was taken after Experiment 40. The
+bucket contained 18,970 objects / 109,637,262,343 bytes (102.108 GiB). Inventory
+SHA-256:
+`2a0567a0db123267ad8d42e56b8d10fbb704d8d06b121b1d74019eeb02617d14`.
+
+The plan was derived from the completed Experiment-27 program manifests,
+screen summaries, two-direction Patience-3 replays, and whole-fold trajectory
+diagnostics. It retained the union of final epoch 20, both honest parity-selected
+epochs, and whole-fold Patience-3 for every fold/seed. This produced 178 retained
+prediction epochs across the 60 runs. The already-pruned 178 matching checkpoint
+containers and all 60 validation references were also required to remain.
+
+The exact applied plan removed 6,323 objects / 48,739,734,061 bytes
+(45.392 GiB):
+
+- 1,022 unselected frozen per-epoch predictions / 43,483,279,280 bytes;
+- 60 redundant tail prediction bundles / 2,552,841,960 bytes;
+- 5,211 ephemeral cache objects / 751,448,837 bytes; and
+- 30 rejected-preflight sidecar objects / 1,952,163,984 bytes.
+
+The rejected sidecar tree was deleted only after both old and accepted copies of
+all arrays were streamed and their SHA-256 values matched the common manifest
+hashes. Their manifests were semantically identical after excluding only
+`created_at_utc`. The accepted sidecar tree remains complete.
+
+The cleanup plan ID is `34b332f028db43a1b06465e713deb97c` and its SHA-256 is
+`eda1cb77d361ac0a8fa8b5e00460aff71477812a29e63f9f46ded7535937b64b`.
+The postcheck SHA-256 is
+`cd68b22bc23a891a73eab6c1b75cc61e82e524dae02439153fb37cf965b23ce6`.
+Both immutable records are stored under:
+
+    quant-data/b3/processed/model_runs/_retention/storage_cleanup_20260823_round2
+
+The external-data program shrank from 2,312 objects / 52.032 GiB to 1,230
+objects / 9.158 GiB. The independent post-cleanup inventory contains 12,649
+objects / 60,899,434,233 bytes (56.717 GiB), SHA-256
+`20f8fa4258e914f2a7731bfd0cee42d809fc34488c5f0a2716a28c6e7d9ecce6`.
+Set comparison against the original inventory found zero unexpected removals,
+zero planned survivors, zero retained-object size/ETag changes, and exactly two
+expected audit additions. Raw and interim sources, the canonical feature store,
+parent/challenger artifacts, program results, and Experiments 39--40 were outside
+the deletion set. No paid Lambda instance was active.

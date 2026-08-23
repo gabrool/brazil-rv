@@ -412,6 +412,47 @@ provider accounting endpoint still reported the pre-cleanup byte count immediate
 after deletion, while a complete object-store listing returned the verified
 post-cleanup total. No paid instance was active.
 
+## Persistent Lambda retention cleanup, round 2 (2026-08-23)
+
+After Experiments 27--40, a new complete object-store inventory found
+109,637,262,343 bytes (102.108 GiB) in 18,970 objects. The principal growth was
+the completed Experiment-27 external-data program: its 1,200 per-epoch
+prediction files and 60 redundant tail bundles occupied 49.928 GiB even though
+the selection rule and all ten rejection decisions were frozen.
+
+A manifest-bound cleanup removed exactly 6,323 objects / 48,739,734,061 bytes
+(45.392 GiB): 1,022 unselected external-data prediction epochs, 60 tail bundles,
+5,211 ephemeral model-cache objects, and 30 rejected-preflight sidecar objects.
+Before deleting the sidecar duplicate, both copies of every array were streamed
+and SHA-256 checked against semantically identical manifests; the only manifest
+difference was the creation timestamp. The accepted bias-free sidecar tree was
+retained intact.
+
+The external-data program retains all 178 epochs selected by at least one of
+the two honest parity replays, whole-fold Patience-3, or the final epoch, plus
+all 178 matching raw/EMA checkpoints, 60 observation-alignment references,
+histories, manifests, diagnostics, analyses, and screen summaries. Its footprint
+fell from 52.032 GiB to 9.158 GiB. Raw/interim sources, the canonical feature
+store, canonical parent and challenger artifacts, Experiments 39--40, and every
+other retained object were unchanged.
+
+The fresh post-cleanup inventory contains 12,649 objects / 60,899,434,233 bytes
+(56.717 GiB), including the two new audit records. Its SHA-256 is
+`20f8fa4258e914f2a7731bfd0cee42d809fc34488c5f0a2716a28c6e7d9ecce6`.
+The immutable object-store audit is under:
+
+    quant-data/b3/processed/model_runs/_retention/storage_cleanup_20260823_round2
+
+The applied plan SHA-256 is
+`eda1cb77d361ac0a8fa8b5e00460aff71477812a29e63f9f46ded7535937b64b`;
+the postcheck SHA-256 is
+`cd68b22bc23a891a73eab6c1b75cc61e82e524dae02439153fb37cf965b23ce6`.
+An independent before/after comparison found zero unexpected removals, zero
+planned survivors, zero retained-object metadata changes, and exactly the two
+expected audit additions. Recreating deleted prediction trajectories would
+require an exact rerun from the recorded commit and retained canonical inputs.
+No paid Lambda instance was active.
+
 ## Kronos-small zero-shot K0 decision (2026-08-22)
 
 Kronos-small was evaluated zero-shot on the two 102-date discovery selection
