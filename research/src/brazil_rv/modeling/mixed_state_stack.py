@@ -189,8 +189,9 @@ def run_mixed_state_stack(
         variants[variant] = {
             "folds": {fold: summaries[fold][variant] for fold in FOLDS},
             "mean_candidate_minus_canonical_ic": float(np.mean(deltas)),
-            "canonical_gate_passed": np.mean(deltas) >= GATE_MEAN
-            and all(value >= 0 for value in deltas),
+            "canonical_gate_passed": bool(
+                np.mean(deltas) >= GATE_MEAN and all(value >= 0 for value in deltas)
+            ),
         }
     passed = [
         name for name, value in variants.items() if value["canonical_gate_passed"]
