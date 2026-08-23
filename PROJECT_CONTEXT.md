@@ -533,3 +533,7 @@ epoch-20 raw/EMA states, observation references, sidecars, manifests, histories,
 analyses, and summaries. Its exact hash inventory and passing postchecks are
 under the program root's `_cleanup/20260823T170000Z` directory; the final program
 root is 6.7 GiB.
+
+Paid GH200 instance `95098103c2da4ffcb8e9d10a4ac7704c` was terminated only
+after results, cleanup evidence, and GitHub state were secured, then confirmed
+absent in two consecutive Lambda inventory reads.

@@ -2383,3 +2383,9 @@ program root is 6.7 GiB after cleanup. The immutable plan/result are under
 `7d9ad2a6ad6ee15c007decfbb3e822a3a495143fafb2648a1969f0973daa4af4`
 and `c95e997ee3522fd6d8725c4184f771c8d46b32870cb792192f68056daf888dc4`.
 Postchecks found zero planned files remaining and zero damaged retained files.
+
+After the result commit was pushed and persistent artifacts were rechecked,
+Lambda accepted termination of exact paid GH200 instance
+`95098103c2da4ffcb8e9d10a4ac7704c` (`gpu_1x_gh200`, `us-east-3`, IP
+`192.222.58.49`). The instance was then absent in two consecutive provider
+inventory reads. No paid Experiment-40 host remains running.
