@@ -99,6 +99,21 @@ Test-Case 'Retry-After controls bounded API retry delay' {
     Assert-True (@($sleeps | Where-Object { $_ -ge 3.0 }).Count -eq 1) 'Retry-After delay was not honored.'
 }
 
+Test-Case 'Retry-After reads HttpResponseHeaders without index access' {
+    Add-Type -AssemblyName System.Net.Http
+    $response = New-Object Net.Http.HttpResponseMessage
+    try {
+        [void]$response.Headers.TryAddWithoutValidation('Retry-After', '7')
+        Assert-True (
+            (Get-HeaderValue $response.Headers 'Retry-After') -eq '7'
+        ) 'HttpResponseHeaders Retry-After was not read.'
+        Assert-True (
+            $null -eq (Get-HeaderValue $response.Headers 'Missing')
+        ) 'A missing response header did not remain null.'
+    }
+    finally { $response.Dispose() }
+}
+
 Test-Case 'Single-GPU GH200 type is selected' {
     $instanceTypes = [pscustomobject]@{
         gh200 = [pscustomobject]@{

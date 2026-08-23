@@ -174,6 +174,28 @@ function Get-RetryAfterSeconds {
     return 0.0
 }
 
+function Get-HeaderValue {
+    param(
+        [AllowNull()][object]$Headers,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+    if ($null -eq $Headers) { return $null }
+    if ($null -ne $Headers.PSObject.Methods['TryGetValues']) {
+        $values = $null
+        if ($Headers.TryGetValues($Name, [ref]$values)) {
+            return @($values)[0]
+        }
+        return $null
+    }
+    if ($null -ne $Headers.PSObject.Methods['Get']) {
+        return $Headers.Get($Name)
+    }
+    if ($Headers -is [Collections.IDictionary] -and $Headers.Contains($Name)) {
+        return $Headers[$Name]
+    }
+    return $null
+}
+
 function Invoke-LambdaApi {
     param(
         [Parameter(Mandatory = $true)][ValidateSet('GET', 'POST')][string]$Method,
@@ -224,7 +246,7 @@ function Invoke-LambdaApi {
             }
             elseif ($null -ne $_.Exception.Response) {
                 $status = [int]$_.Exception.Response.StatusCode
-                $retryAfter = $_.Exception.Response.Headers['Retry-After']
+                $retryAfter = Get-HeaderValue $_.Exception.Response.Headers 'Retry-After'
             }
             $retryable = $status -eq 429 -or ($Method -eq 'GET' -and ($status -eq 0 -or $status -ge 500))
             if ($retryable -and $attempt -lt $MaximumAttempts) {
