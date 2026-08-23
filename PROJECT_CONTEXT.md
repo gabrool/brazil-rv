@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-08-21.
+Last verified: 2026-08-23.
 
 ## Purpose and current research state
 
@@ -485,3 +485,51 @@ summaries. Its exact plan and postchecks are under the program root's
 `_cleanup/20260823T024900Z` directory. Paid GH200 instance
 `b3eac682796a4e1ea7912422a81f0e85` was terminated after the results were pushed
 and was confirmed absent from Lambda's inventory twice.
+
+## Final feature closure and P2 strong-source decision (2026-08-23)
+
+Experiment 40 completed the feature program's final features-only test and the
+three independently preregistered P2 screens. The unchanged eight-feature F2
+sidecar, now tested without P0.3 pruning, added only `+0.000179` mean IC
+standalone and `+0.000264` in the fixed parent stack. The fixed
+late-market-momentum/HKS pair added `-0.000474` standalone and `-0.000213` in
+the stack, with a materially negative Fold-B result. The feature program is
+closed: retain neither candidate and do not search further feature subsets from
+these readouts.
+
+B3 lending rates/flows added `-0.000250` standalone and `-0.000051` stacked;
+DCE iron ore added `-0.000499` and `-0.000122`. B3 listed-equity option open
+interest was positive on all three folds but added only `+0.000586` standalone
+and `+0.000400` stacked. None met the frozen `+0.001` mean and non-negative
+every-fold gate, so no P2 source is promoted and no post-readout P2 combination
+is authorized. Raw Patience-3 on the unchanged parent remains canonical, and
+the designated challenger remains informational only.
+
+The previously missing option history was acquired as exact official
+BVBG.086/BVBG.028 final reports: 1,154 complete daily pairs from 2019-11-01
+through 2024-06-28, preserved as an immutable 15 GB raw archive. Exact
+underlying-instrument and dated cash-ISIN mapping yielded a normalized source of
+95,045 rows and 142 permanent IDs. The free historical source does not expose
+covered/uncovered positions, so those fields were not fabricated. DCE remains
+the disclosed contract-specific Sina mirror because the official endpoint was
+not freely accessible.
+
+The completed program, all summaries, sidecars, retained training evidence, and
+source provenance are under:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment40_final_feature_p2_0b6ff68_20260823T075000Z
+
+The program manifest/summary SHA-256 values are
+`495e69adf98b190a697c17d620a4ccb04dc02f4f05c13e4ce039ce0caee871ae`
+and `db7ba8028f6955b2e753a4ed5272b792fd9f72fdc7325e5970a779d77814331c`.
+All 45 trajectories and five three-fold analyses completed at repository commit
+`0b6ff68a64276fff53c770b49b1ab9db64120e4b`; official validation and the held-out
+test remained sealed. Exact fold deltas, uncertainty, availability contracts,
+source hashes, and audit details are in `EXPERIMENT_LOG.md` Experiment 40.
+
+The reviewed retention cleanup removed 36.078 GiB of redundant checkpoints and
+per-epoch predictions while preserving all opposite-parity-selected epochs,
+epoch-20 raw/EMA states, observation references, sidecars, manifests, histories,
+analyses, and summaries. Its exact hash inventory and passing postchecks are
+under the program root's `_cleanup/20260823T170000Z` directory; the final program
+root is 6.7 GiB.

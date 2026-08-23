@@ -2308,3 +2308,78 @@ All normalized source frames use explicit value masks, exact-zero invalid values
 permanent identities, immutable manifests/hashes, and exact assignment to the
 canonical model axes. No official validation or held-out test access is allowed
 during Experiment 40.
+
+### Completed result (2026-08-23)
+
+The program completed all 45 preregistered trajectories: five candidates, three
+chronological folds, seeds 11/29/47, and 20 epochs per fold/seed. The primary
+readout remained bidirectional odd/even cross-fitted Raw Patience-3. The table
+reports candidate-minus-canonical IC in Fold C/A/B order; `stack` is the fixed
+uniform parent-3 plus candidate-3 rank ensemble.
+
+| candidate | standalone C/A/B | standalone mean | stack C/A/B | stack mean | retained |
+| --- | --- | ---: | --- | ---: | --- |
+| full eight features, no pruning | `-0.000028 / +0.000875 / -0.000312` | `+0.000179` | `+0.000174 / +0.000613 / +0.000005` | `+0.000264` | no |
+| fixed late-market/HKS pair | `-0.000016 / +0.000027 / -0.001433` | `-0.000474` | `-0.000010 / +0.000031 / -0.000660` | `-0.000213` | no |
+| B3 lending rates/flows | `+0.000001 / +0.000125 / -0.000876` | `-0.000250` | `+0.000005 / +0.000171 / -0.000331` | `-0.000051` | no |
+| B3 listed-equity option OI | `+0.000156 / +0.000470 / +0.001132` | `+0.000586` | `+0.000080 / +0.000346 / +0.000774` | `+0.000400` | no |
+| DCE iron ore | `-0.000139 / -0.001702 / +0.000344` | `-0.000499` | `+0.000044 / -0.000620 / +0.000211` | `-0.000122` | no |
+
+No path met the frozen mean `>= +0.001` and non-negative-every-fold gate. The
+orthogonal pair was materially negative on Fold B: both its block-5 and block-10
+95% intervals excluded zero. The options-OI candidate was the strongest P2
+result and was positive on all three folds, but its mean was only `+0.000586`;
+all three fold intervals included zero. It is retained as evidence that the
+source was implemented successfully, not as a promoted model input. Final
+EMA-0.995 was also sub-gate: its standalone three-fold means were approximately
+`+0.000480`, `+0.000024`, `+0.000806`, `+0.000757`, and `+0.000145` in table
+order. These secondary observations do not override the primary decision.
+
+The full-eight failure resolves the F3 feature/pruning confound, while the fixed
+near-orthogonal pair's failure closes the feature program: the selected features
+do not provide enough incremental signal beyond the unchanged parent. Reject all
+three P2 candidates under the registered gate. Do not combine the P2 sources or
+use the designated challenger to rescue them after observing these results.
+
+### Source acquisition and immutable artifacts
+
+The missing option source was acquired correctly from an unrestricted Windows
+host. The immutable official BVBG.086/BVBG.028 archive contains 1,154 complete
+daily PR/IN pairs from `2019-11-01` through `2024-06-28` (15 GB); its manifest
+SHA-256 is
+`53ec0cdfba7c0f6eff5a7cbdf2bdfce258e750af8864d28cb737668940bd7d85`.
+Accepted permanent-identity bounds begin `2021-07-19`, so the normalized builder
+used that date through `2024-06-28`, retaining about 20 business days of causal
+warmup before the model window while preserving the earlier raw archive. It
+emitted 735 complete daily pairs, 95,045 rows, and 142 permanent IDs with no
+duplicate keys, future availability, non-finite valid data, or nonzero invalid
+data. Its Parquet SHA-256 is
+`669ecd96c865d48324cf6ac414a68ec6bcccb9a66c0f55dc159e4a92cf28eeb5`.
+The normalized lending and DCE Parquet SHA-256 values are respectively
+`6e2cc7c3ae950b17ce6e9d7f5243272ce947567c92df0d7ad08abf7d5c3b0262`
+and `6cbd6e08e57afcd86f4a2b5ae8dfabe983994f42a32102bd2bc262f60a574940`.
+
+The immutable completed program is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment40_final_feature_p2_0b6ff68_20260823T075000Z
+
+Its `program_manifest.json` SHA-256 is
+`495e69adf98b190a697c17d620a4ccb04dc02f4f05c13e4ce039ce0caee871ae`;
+`program_summary.json` is
+`db7ba8028f6955b2e753a4ed5272b792fd9f72fdc7325e5970a779d77814331c`.
+A recursive audit read 216 JSON artifacts, 55 manifests, all 45 twenty-epoch
+histories, and all five screen summaries with zero contract errors. Every
+repository identity matched commit `0b6ff68a64276fff53c770b49b1ab9db64120e4b`.
+Official validation and the held-out test remained sealed throughout.
+
+A reviewed hash-bound cleanup removed only 1,595 redundant candidate checkpoint
+and per-epoch prediction files (38,738,372,551 bytes, 36.078 GiB). It retained
+all 45 observation references, epoch-20 raw/EMA containers, and every checkpoint
+and prediction selected by either honest parity replay: 295 binary artifacts
+totaling 7,027,551,029 bytes. Sidecars, histories, manifests, diagnostics,
+analyses, summaries, and source archives were outside the deletion set. The
+program root is 6.7 GiB after cleanup. The immutable plan/result are under
+`_cleanup/20260823T170000Z`; their SHA-256 values are
+`7d9ad2a6ad6ee15c007decfbb3e822a3a495143fafb2648a1969f0973daa4af4`
+and `c95e997ee3522fd6d8725c4184f771c8d46b32870cb792192f68056daf888dc4`.
+Postchecks found zero planned files remaining and zero damaged retained files.
