@@ -528,6 +528,9 @@ def run_official_read(*, output_dir: Path, preregistration: Path) -> Path:
     parent_root = RUN_OUTPUT_BASE / PARENT_ARTIFACT
     residual_root = RUN_OUTPUT_BASE / RESIDUAL_ARTIFACT
     feature_root = RUN_OUTPUT_BASE / FEATURE_REMOVAL_ARTIFACT
+    feature_specification = (
+        feature_root / "stage_c" / "store_v2_feature_specification.json"
+    )
     selection_file = RUN_OUTPUT_BASE / SELECTION_ARTIFACT / "trajectory_selection.json"
     staleness_report = RUN_OUTPUT_BASE / STALENESS_ARTIFACT / "d1_staleness" / "staleness_report.json"
     sidecar = RUN_OUTPUT_BASE.parent / "auxiliary_targets" / RESIDUAL_SIDECAR
@@ -543,7 +546,7 @@ def run_official_read(*, output_dir: Path, preregistration: Path) -> Path:
     if any(not path.exists() for path in required):
         missing = [str(path) for path in required if not path.exists()]
         raise FileNotFoundError(f"Official-read preflight inputs missing: {missing}")
-    spec = _read_json(feature_root / "store_v2_feature_specification.json")
+    spec = _read_json(feature_specification)
     removed = tuple(sorted(str(value) for value in spec["removed_fields"]))
     if removed != tuple(sorted(EXPECTED_REMOVED_FIELDS)):
         raise ValueError("Experiment-41 store-v2 removal fields differ")
@@ -604,7 +607,7 @@ def run_official_read(*, output_dir: Path, preregistration: Path) -> Path:
             *parent_predictions,
             *residual_manifests,
             *residual_predictions,
-            feature_root / "store_v2_feature_specification.json",
+            feature_specification,
             selection_file,
             staleness_report,
             sidecar / "manifest.json",
