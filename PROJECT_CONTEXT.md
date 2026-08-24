@@ -698,3 +698,8 @@ its plan and passing postcheck are under the program root's
 `_cleanup/20260824T153000Z` directory. The validation ledger records event 3,
 and every artifact records `test_accessed=false`. The held-out test remains the
 final sealed lockbox.
+
+Paid GH200 instance `c2da7efd0ab645178a847aad8fdf12c8` was terminated only
+after the completed artifacts, cleanup audit, and result commit were secured.
+Two consecutive provider reads confirmed the exact instance absent and the
+Lambda account at zero active instances.

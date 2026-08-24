@@ -862,3 +862,7 @@ decision, deployed recipe, validation-access ledger, and exact source/output
 hash inventories. A reviewed post-decision cleanup removed only the 60
 non-deployed store-v2 checkpoints. This was validation-access event 3; the
 held-out test remains sealed and every manifest records `test_accessed=false`.
+
+Result commit `880a66e` reached GitHub before exact paid GH200 instance
+`c2da7efd0ab645178a847aad8fdf12c8` was terminated. Two consecutive provider
+inventory reads confirmed it absent and the account at zero active instances.

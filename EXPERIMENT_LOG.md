@@ -2917,3 +2917,10 @@ postcheck SHA-256 values are
 and `49fbcb0a93563d9fbbd44b9279327b203df5fd2691306fc577a52a0f41ab6ea8`;
 the retained inventory SHA-256 is
 `12135cbd84c61afe95722c5dab8106d0feb8e6acc7a035e62770b918ad0fee08`.
+
+After result commit `880a66e40b1295cc31ea0b51e392caee5a9eef4c` was pushed and
+the persistent program was rechecked, Lambda accepted termination of exact paid
+GH200 instance `c2da7efd0ab645178a847aad8fdf12c8` (`gpu_1x_gh200`,
+`us-east-3`, IP `192.222.50.160`). The instance was absent from consecutive
+provider inventory reads at `2026-08-24T15:34:25Z` and
+`2026-08-24T15:34:54Z`; the account then had zero active instances.
