@@ -181,7 +181,7 @@ Test-Case 'Transfer hash mismatch is rejected' {
             BundlePath = $bundle
             BootstrapPath = $bootstrap
             BundleSha256 = '0' * 64
-            BootstrapSha256 = (Get-FileHash $bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
+            BootstrapSha256 = Get-Sha256 $bootstrap
         }
         Assert-Throws { Assert-TransferArtifacts $artifacts } 'bundle hash mismatch'
     }

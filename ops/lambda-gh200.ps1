@@ -174,6 +174,19 @@ function Get-RetryAfterSeconds {
     return 0.0
 }
 
+function Get-Sha256 {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $stream = [IO.File]::OpenRead($Path)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try {
+        return [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        $algorithm.Dispose()
+        $stream.Dispose()
+    }
+}
+
 function Get-HeaderValue {
     param(
         [AllowNull()][object]$Headers,
@@ -470,8 +483,8 @@ function New-LaunchArtifacts {
         GitSha = $sha
         BundlePath = $bundle
         BootstrapPath = $bootstrap
-        BundleSha256 = (Get-FileHash $bundle -Algorithm SHA256).Hash.ToLowerInvariant()
-        BootstrapSha256 = (Get-FileHash $bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
+        BundleSha256 = Get-Sha256 $bundle
+        BootstrapSha256 = Get-Sha256 $bootstrap
         GitPath = $git.Source
     }
     Assert-TransferArtifacts $artifacts
@@ -483,10 +496,10 @@ function Assert-TransferArtifacts {
     foreach ($path in @($Artifacts.BundlePath, $Artifacts.BootstrapPath)) {
         if (-not [IO.File]::Exists($path)) { throw "Transfer artifact is missing: $path" }
     }
-    if ((Get-FileHash $Artifacts.BundlePath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Artifacts.BundleSha256) {
+    if ((Get-Sha256 $Artifacts.BundlePath) -ne $Artifacts.BundleSha256) {
         throw 'Git bundle hash mismatch.'
     }
-    if ((Get-FileHash $Artifacts.BootstrapPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Artifacts.BootstrapSha256) {
+    if ((Get-Sha256 $Artifacts.BootstrapPath) -ne $Artifacts.BootstrapSha256) {
         throw 'Bootstrap hash mismatch.'
     }
     if ($null -ne (Get-Value $Artifacts 'GitPath')) {
