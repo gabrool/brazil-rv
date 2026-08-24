@@ -677,3 +677,24 @@ Paid GH200 instance `e2cf2e517d9541ac93cac3906fc5c0e4` was terminated only
 after the results, cleanup evidence, and documentation commit were secured. It
 was absent from two consecutive provider inventory reads, and the Lambda
 account then had zero active instances.
+
+## Official-read deployment decision (2026-08-24)
+
+Experiment 43 consumed the third and sole authorized official-validation read
+for this lineup. Canonical parent-3 Raw Patience-3 scored `0.041639843`. The
+stored residual challenger added `+0.000453978`, and the retrained Experiment-41
+store-v2 mask added `+0.001595530`, but their paired block-10 95% intervals had
+lower bounds of `-0.000684798` and `-0.000294105`. Neither arm passed the frozen
+support rule. Canonical parent-3 therefore remains deployed; no 10-seed
+expansion was run, and neither official retuning nor another read is authorized.
+
+The completed program is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/official_read_c04ea91_20260824T140900Z
+
+All 63 newly generated official prediction archives are retained. The reviewed
+cleanup removed only 60 non-deployed store-v2 checkpoints / 270,571,140 bytes;
+its plan and passing postcheck are under the program root's
+`_cleanup/20260824T153000Z` directory. The validation ledger records event 3,
+and every artifact records `test_accessed=false`. The held-out test remains the
+final sealed lockbox.

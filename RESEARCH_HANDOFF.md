@@ -840,3 +840,25 @@ manifest and exact delete list are at:
 
 No paid Lambda instance was active. Provider byte accounting lagged immediately
 after deletion, but the complete object listing measured 20,202,855,773 bytes.
+
+## Experiment 43 official-read closure (2026-08-24)
+
+The frozen official read compared canonical parent-3 Raw Patience-3 against the
+stored six-member residual challenger and the Experiment-41 store-v2 mask
+retrained on all 716 training dates. Canonical scored `0.041639843`; challenger
+scored `0.042093822` (`+0.000453978`), and store-v2 scored `0.043235373`
+(`+0.001595530`). Their paired block-10 95% intervals versus canonical were
+`[-0.000684798,+0.001534552]` and
+`[-0.000294105,+0.003434960]`. Neither lower bound exceeded zero, so neither arm
+was promoted. Canonical remains deployed and the conditional seven-seed
+expansion was not run.
+
+The immutable result root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/official_read_c04ea91_20260824T140900Z
+
+It retains all 63 official prediction archives, both full analyses, the frozen
+decision, deployed recipe, validation-access ledger, and exact source/output
+hash inventories. A reviewed post-decision cleanup removed only the 60
+non-deployed store-v2 checkpoints. This was validation-access event 3; the
+held-out test remains sealed and every manifest records `test_accessed=false`.

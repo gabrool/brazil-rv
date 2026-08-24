@@ -2873,3 +2873,47 @@ test read, post-score edit, or second official read is permitted. At most two
 processes run concurrently. All prediction archives and deployed selected/final
 checkpoints are retained, results and the validation-access ledger are pushed,
 and the exact paid instance is terminated and verified absent twice.
+
+### Completed result (2026-08-24)
+
+All three preregistered store-v2 official-monitor trajectories completed. The
+canonical parent-3 ensemble scored `0.041639843`. The stored six-member
+challenger scored `0.042093822`, a `+0.000453978` delta, but its paired block-10
+95% interval was `[-0.000684798,+0.001534552]`. The store-v2 ensemble scored
+`0.043235373`, a `+0.001595530` delta, with positive 30/60/120-minute deltas of
+`+0.001408910/+0.001476892/+0.001900788`; its paired block-10 95% interval was
+`[-0.000294105,+0.003434960]`. Both point estimates were positive, but neither
+interval excluded zero. The frozen decision therefore supports no arm,
+canonical parent-3 Raw Patience-3 remains deployed, and the conditional
+seven-seed expansion was correctly not run.
+
+The completed program is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/official_read_c04ea91_20260824T140900Z
+
+The exact preregistration SHA-256 is
+`a30c0bc20565439b7ff3628c2a4576618698e387cf593eadbdc5fed47a6ba938`.
+The challenger analysis, store-v2 analysis, promotion decision, deployed recipe,
+validation-access ledger, and completed program-manifest SHA-256 values are
+`f3442dd80a2da8c9f1989c19f2c4a9c08317f54dde012d11ce71d0636b8c2f29`,
+`53f9082775a90ac5d28b5573b827c518b7e4c409aecbde2273e02c18d9343652`,
+`80ef2a79ba6755983e125946211292dbc4ace0f1f8ac1f126917a9449d9924ea`,
+`b5a4f78b3a054822893e6849c16abc4fc14ca7cf2add421bfdec7f4617be6b6d`,
+`c06f618f16f01269fb8d0334591bb59aa0454df64e64781d2313268bbb9661ce`,
+and `6dbe8314262dd61c0dfda835055282644aed83053149be57398b86673da9ff85`.
+The implementation used preregistration commit `c04ea917` plus pre-score
+operational path repair commit
+`0c05100e9ca527eab3421bba9128d15e6a0fc573`; the repair only resolved the
+immutable Experiment-41 specification at its actual `stage_c` location and
+occurred before any official prediction was opened.
+
+All three 20-epoch histories completed, all 63 official prediction archives
+were retained, every required-output hash passed, and every JSON audit found
+`test_accessed=false`. Because none of the newly trained store-v2 members was
+deployed, the reviewed cleanup removed exactly their 60 checkpoint files /
+270,571,140 bytes while preserving every prediction archive. Cleanup plan and
+postcheck SHA-256 values are
+`f35fd302f27db7e6c88e8cc4801a5794fce051e4163386b7584a0afa7592534f`
+and `49fbcb0a93563d9fbbd44b9279327b203df5fd2691306fc577a52a0f41ab6ea8`;
+the retained inventory SHA-256 is
+`12135cbd84c61afe95722c5dab8106d0feb8e6acc7a035e62770b918ad0fee08`.
