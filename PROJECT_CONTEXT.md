@@ -616,6 +616,18 @@ The final audit passed with official validation and held-out test sealed. Exact
 fold intervals, all 58 rule-attributed verdicts, the operational Stage-C repair,
 and retention-cleanup hashes are recorded in `EXPERIMENT_LOG.md` Experiment 41.
 
+A later explicitly authorized object-store cleanup removed 315 unselected
+per-epoch prediction archives and 18 redundant tail bundles from the completed
+Stage-C repair, totaling 14,309,636,868 bytes (13.327 GiB). The repair retains
+the same frozen union of 45 epoch-20/cross-fit/whole-fold Patience predictions
+and matching checkpoints, all 18 observation references, every history,
+analysis, manifest, summary, verdict, and audit artifact. A fresh full-bucket
+inventory found exactly the 333 planned removals, zero unexpected removals,
+zero retained-object metadata changes, and the two expected immutable audit
+additions. The object store now contains 12,941 objects / 63,474,753,532 bytes
+(59.115 GiB). The exact plan and postcheck are under
+`model_runs/_retention/storage_cleanup_20260824_round3`.
+
 Paid GH200 instance `e975b774f5834e0fa265d11bbbef680f` was terminated only
 after results and audit evidence were pushed, then confirmed absent in two
 consecutive provider inventory reads. No paid Lambda instance remains active.

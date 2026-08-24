@@ -2544,8 +2544,11 @@ set-by-fold/horizon drop matrix and intervals, hashed R1/R2 definitions and
 walk-back trace, all Stage-C histories and analyses, a rule-attributed verdict
 for every field, hashes/manifests, and sealed-data flags. Cleanup is allowed only
 after the final decision is recorded and must be inventory-bound; selected
-checkpoints, all prediction archives, analyses, manifests, and decision
-artifacts are required survivors.
+checkpoints, analyses, manifests, and decision artifacts are required survivors.
+The experiment-closing cleanup initially retains all prediction archives; a
+later explicitly authorized global storage cleanup may reduce them to the exact
+epoch-20/cross-fit/whole-fold Patience union only after an immutable plan and
+full-bucket postcheck are written.
 
 ### Completed result (2026-08-24)
 
@@ -2629,6 +2632,30 @@ and `0f5242e759665f4e2bfe2b0ba3a6c0ec8045a57cd61cfeeb1c6c3d9bb843b8ea`;
 both are under `_cleanup/20260824T030400Z` in the repair root. The canonical
 runner now executes Stage B in an isolated process so compiled inference state
 cannot consume Stage-C worker memory on an exact rerun.
+
+A later explicitly authorized persistent-storage cleanup used a fresh complete
+object inventory and the frozen keep-epoch sets from that first cleanup. It
+removed 315 unselected per-epoch prediction archives plus 18 redundant
+`tail_candidates.npz` bundles, exactly 333 objects / 14,309,636,868 bytes
+(13.327 GiB). It retained the 45 selected/final prediction archives, their 45
+matching checkpoints, all 18 observation-alignment references, all histories,
+24 analyses, manifests, summaries, field verdicts, the store-v2 specification,
+and both sealed-data flags. The Stage-C repair root fell to 2,574,433,193 bytes.
+
+The cleanup plan ID is `2b3dd77f79e34dfa92bd4b015fe73e10`; plan and postcheck
+SHA-256 values are
+`f6c0c1d07088a3829671f43faaf9c06b3b42a9e72eacc0d056b94324a90bc947`
+and `fd6eaa3c2d71dccb37ee2d1aa039c7483133d776c7fdb13f6ab13fae044af88e`.
+Both immutable records are under:
+
+    quant-data/b3/processed/model_runs/_retention/storage_cleanup_20260824_round3
+
+An independent post-cleanup inventory contained 12,941 objects /
+63,474,753,532 bytes (59.115 GiB), SHA-256
+`46a11d4fdfa9c29ad9ca97fa7f78a863cc0b250c2df3cf18f2fa95f3e05145ec`.
+Comparison against the source inventory found exactly the 333 planned
+removals, zero planned survivors, zero unexpected removals, zero retained-object
+metadata changes, and exactly the two expected audit additions.
 
 After result commit `8f7871c77f379efc4fb18df8d9e824d8fc692687` was pushed and
 the persistent artifacts were rechecked, Lambda accepted termination of exact
