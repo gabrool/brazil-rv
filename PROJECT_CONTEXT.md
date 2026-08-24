@@ -631,3 +631,44 @@ additions. The object store now contains 12,941 objects / 63,474,753,532 bytes
 Paid GH200 instance `e975b774f5834e0fa265d11bbbef680f` was terminated only
 after results and audit evidence were pushed, then confirmed absent in two
 consecutive provider inventory reads. No paid Lambda instance remains active.
+
+## R3 and full-options decision (2026-08-24)
+
+Experiment 42 rejected all three attempted advances from the selected
+Experiment-41 prune-R2 specification. Correlation-conditioned Stage B-prime
+froze three further removal candidates: `realized_vol_60m_log_ratio`,
+`realized_vol_20d_log_ratio`, and `vol_of_vol_20d`. Their retrained R3 candidate
+added `+0.000496/-0.001669/-0.000260` Raw Patience-3 IC on Fold A/B/C (mean
+`-0.000478`) and failed non-inferiority. Retain prune-R2's 34 fields as the
+store-v2 specification; do not remove these three fields and do not run R4.
+
+The full 14-field options program added
+`-0.000410/+0.001526/-0.000073` standalone (mean `+0.000348`). The five-field IV
+subset added `-0.001134/-0.002320/-0.000563` (mean `-0.001339`). Neither passed
+the frozen fold/mean/uncertainty gate. Their predeclared mixed states also
+failed, so the options family is parked and no candidate is registered for the
+future official-read cycle. Do not search a third options subset from these
+readouts.
+
+The causal full-options source is now durable: 95,045 rows, 142 permanent IDs,
+2021-07-19 through 2024-06-28, output SHA-256
+`6a0cff033fb48a3b190ba49389e173c385ee1df0211a335e81665e9ec2af5686`.
+The manifest-declared unpublished 2023-12-08 instrument master remains invalid;
+no adjacent-date master was substituted. The completed program is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/r3_options_9a05b1d_20260824T053052Z
+
+Program/R3/options/source-manifest SHA-256 values are
+`888a1cef6c1488365db3870aa434127767c36ee544a82b8deed58dab7382f91d`,
+`a058efc42b66be5117b13c044c774cf531ba57df8294823121bfd3877d6df452`,
+`118746188fe2cc5d61c9f7dfad7a7a68173c433b6ff11979c957907d4cf4dafb`,
+and `d03afc6c75fff445bac4d57df09b72d373f459e1edc08d4e15af679c20711509`.
+All 27 trajectories completed; official validation and held-out test remained
+sealed. Exact gates, fold analyses, source diagnostics, the pre-score
+unpublished-master repair, and cleanup evidence are in `EXPERIMENT_LOG.md`
+Experiment 42.
+
+The reviewed cleanup removed 467 redundant checkpoints / 2,113,294,685 bytes
+while preserving all 540 prediction archives, 73 selected/final checkpoints,
+every analysis, manifest, source artifact, and sealed-data record. Its passing
+postcheck is under the program root's `_cleanup/20260824T121000Z` directory.

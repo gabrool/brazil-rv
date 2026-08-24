@@ -2763,3 +2763,77 @@ accesses official validation/test. It retains all prediction archives,
 selected/final checkpoints, histories, analyses, sidecars, source diagnostics,
 hash manifests, field verdicts, and sealed-data flags until a reviewed
 inventory-bound cleanup is written after the decisions.
+
+### Completed result (2026-08-24)
+
+Stage B-prime proposed seven further removals from the 34 prune-R2 survivors.
+Its frozen walk-back accepted only `realized_vol_60m_log_ratio`,
+`realized_vol_20d_log_ratio`, and `vol_of_vol_20d`. The accepted three-field
+inference ablation passed its preview gate with parent-minus-ablated deltas of
+`-0.000797/-0.001842/+0.000368` on Fold A/B/C (mean `-0.000757`). This was only
+candidate-construction evidence. The single retrained R3 candidate added
+`+0.000496/-0.001669/-0.000260` Raw Patience-3 IC on A/B/C, mean
+`-0.000478`. It failed both non-inferiority and improvement, so R3 is rejected,
+R2 remains the selected 34-field store-v2 specification, and the frozen hard
+stop forbids R4 or a post-score removal edit.
+
+The full 14-field options candidate added
+`-0.000410/+0.001526/-0.000073` standalone on A/B/C, mean `+0.000348`.
+It failed the mean, fold-count, and pooled-uncertainty checks; its pooled
+10-session moving-block 90% interval was `[-0.000684,+0.001367]`. The
+predeclared parent-plus-options mixed state had mean `+0.000994` but failed the
+per-fold floor on Fold A (`-0.000676`) and its pooled interval also included
+zero (`[-0.001501,+0.003399]`).
+
+The five-field IV candidate was materially negative standalone:
+`-0.001134/-0.002320/-0.000563` on A/B/C, mean `-0.001339`, with pooled 90%
+interval `[-0.001953,-0.000696]`. Its mixed state added
+`-0.001200/+0.000215/+0.001763`, mean `+0.000259`, and failed the mean,
+per-fold, and uncertainty gates. Neither options path advanced; the options
+family is parked, no third subset was run, and the future-read preparation
+record is `not_applicable`. Optional F2 trimming was not used.
+
+The causal full-options source contains 95,045 dated security rows for 142
+permanent IDs from 2021-07-19 through 2024-06-28. It used the exact four
+COTAHIST archives, official BVBG instrument masters, the retained option-OI
+source, and fixed DI risk-free inputs. The one manifest-declared unpublished
+instrument-master date, 2023-12-08, remains invalid for activity and IV fields;
+no adjacent-day master or invented identity was substituted. The source output
+SHA-256 is
+`6a0cff033fb48a3b190ba49389e173c385ee1df0211a335e81665e9ec2af5686`.
+
+All 27 twenty-epoch trajectories completed under exact repair commit
+`9a05b1d620d51672956d02765dcebcd65292715a`. The original preregistered root
+failed before any score because the immutable BVBG manifest correctly records
+`IN231208.zip` as not published. The causal pre-score repair was tested with 269
+local and seven instance tests; its audit SHA-256 is
+`9b1f234799b11714c3fa9ed1c63433fceb64a5acd0fc7a1d3b4339b3de10e967`.
+The completed program is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/r3_options_9a05b1d_20260824T053052Z
+
+Program, R3-summary, options-summary, source-manifest, and original artifact-
+inventory SHA-256 values are respectively
+`888a1cef6c1488365db3870aa434127767c36ee544a82b8deed58dab7382f91d`,
+`a058efc42b66be5117b13c044c774cf531ba57df8294823121bfd3877d6df452`,
+`118746188fe2cc5d61c9f7dfad7a7a68173c433b6ff11979c957907d4cf4dafb`,
+`d03afc6c75fff445bac4d57df09b72d373f459e1edc08d4e15af679c20711509`,
+and `852ae14cc959c65c3786ac9fef16462600c5f3407858ba4664653c8a3b7bf210`.
+The final audit checked all 27 histories, 540 checkpoints, all 540 prediction
+archives, exact inputs/decisions/hashes, and sealed flags with zero errors; its
+SHA-256 is
+`752036376719d08faab6bea69003283de40d882391e352223645f955d23f5a8c`.
+
+The reviewed inventory-bound cleanup removed only 467 redundant checkpoint
+containers (2,113,294,685 bytes). It retained every one of the 540 prediction
+archives and the exact union of epoch 20, bidirectional cross-fit Patience
+epochs, and whole-fold Patience epochs: 73 checkpoints. No retained artifact
+changed. Cleanup plan ID is
+`2b03829993933bd421898bc3488f8a051cfd6bee7c3cd9c018834e75817440e8`;
+plan/postcheck SHA-256 values are
+`13e7f8203a47b5c53ddf12dbafd322855ac3abae70be16a54040086e3dc61d7a`
+and `34fd29c1887d066fa247f15737b17256bfb7f6fd30808b8d2a32a3ad2ce4fb68`.
+The post-cleanup inventory has 875 program artifacts / 25,374,165,801 bytes,
+SHA-256
+`dbc5304c79cd27ca7112e6b6b98029311314eb03eda6176a3347f20115e746eb`.
+Official validation and the held-out test remained sealed throughout.
