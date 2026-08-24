@@ -2629,3 +2629,10 @@ and `0f5242e759665f4e2bfe2b0ba3a6c0ec8045a57cd61cfeeb1c6c3d9bb843b8ea`;
 both are under `_cleanup/20260824T030400Z` in the repair root. The canonical
 runner now executes Stage B in an isolated process so compiled inference state
 cannot consume Stage-C worker memory on an exact rerun.
+
+After result commit `8f7871c77f379efc4fb18df8d9e824d8fc692687` was pushed and
+the persistent artifacts were rechecked, Lambda accepted termination of exact
+paid GH200 instance `e975b774f5834e0fa265d11bbbef680f` (`gpu_1x_gh200`,
+`us-east-3`, IP `192.222.50.236`). It was absent from two consecutive provider
+inventory reads at `2026-08-24T03:11:31Z` and `2026-08-24T03:12:02Z`; the
+account then had zero active instances.

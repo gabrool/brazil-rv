@@ -615,3 +615,7 @@ and `08c04de3396fdc31d67b6baeabab1fea80cfd137d55bf2a1aef4ee69d1a34b72`.
 The final audit passed with official validation and held-out test sealed. Exact
 fold intervals, all 58 rule-attributed verdicts, the operational Stage-C repair,
 and retention-cleanup hashes are recorded in `EXPERIMENT_LOG.md` Experiment 41.
+
+Paid GH200 instance `e975b774f5834e0fa265d11bbbef680f` was terminated only
+after results and audit evidence were pushed, then confirmed absent in two
+consecutive provider inventory reads. No paid Lambda instance remains active.
