@@ -1095,6 +1095,8 @@ def _greedy(
         )
         steps = []
         for _ in range(MAX_GREEDY_ADDITIONS):
+            if not candidates:
+                break
             scored = []
             for identity in candidates:
                 candidate_score = float(
@@ -1247,6 +1249,8 @@ def _supplementary_ab(
                 (_score(pool, selection_fold, [*chosen, identity]), identity)
                 for identity in eligible
             ]
+            if not scored:
+                break
             best_score, best_identity = min(
                 scored, key=lambda value: (-value[0], value[1])
             )
@@ -1338,7 +1342,7 @@ def _hygiene(
     return rows
 
 
-def analyze_program(*, program_root: Path, catalogue_path: Path) -> Path:
+def _verified_pool(catalogue_path: Path) -> tuple[MemberPool, list[str]]:
     catalogue = _read_json(catalogue_path)
     freeze_manifest = _read_json(catalogue_path.with_suffix(".manifest.json"))
     if _sha256(catalogue_path) != freeze_manifest["catalogue_sha256"]:
@@ -1354,6 +1358,80 @@ def analyze_program(*, program_root: Path, catalogue_path: Path) -> Path:
         raise ValueError(
             f"Comparator must contain three store-v2 members, found {len(comparator)}"
         )
+    return pool, comparator
+
+
+def _e1_sections(
+    pool: MemberPool,
+    comparator: Sequence[str],
+    archive_primary: Sequence[str],
+) -> dict[str, object]:
+    e1_greedy = _greedy(pool, comparator, archive_primary, "e1_archive_primary")
+    all_primary = set(pool.identities())
+    secondary = [
+        identity
+        for identity in pool.identities(("fold_a", "fold_b"))
+        if identity not in comparator and identity not in all_primary
+    ]
+    supplementary = _supplementary_ab(
+        pool, comparator, [*archive_primary, *secondary]
+    )
+    e1_sets = {
+        "residual_ema3": pool.tagged("residual_ema", FOLDS),
+        "residual_ema3_plus_options_oi": sorted(
+            set(pool.tagged("residual_ema", FOLDS) + pool.tagged("options_oi", FOLDS))
+        ),
+        "best_five_adapter_ema": pool.tagged("best_five_adapter_ema", FOLDS),
+        "parent58_3": pool.tagged("parent58", FOLDS),
+        "full_primary_roster": list(archive_primary),
+    }
+    e1_grid = _fixed_grid(pool, comparator, e1_sets, "e1_fixed")
+    hygiene = _hygiene(pool, comparator, archive_primary)
+    return {
+        "greedy": e1_greedy,
+        "supplementary_ab": supplementary,
+        "fixed_grid": e1_grid,
+        "hygiene": hygiene,
+    }
+
+
+def analyze_e1(*, program_root: Path, catalogue_path: Path) -> Path:
+    pool, comparator = _verified_pool(catalogue_path)
+    archive_primary = [
+        identity
+        for identity in pool.identities()
+        if identity not in comparator
+        and "e2" not in pool.record(identity, "fold_c")["tags"]
+    ]
+    sections = _e1_sections(pool, comparator, archive_primary)
+    gate_rows = [
+        sections["greedy"],
+        *sections["hygiene"],
+        *(row for row in sections["fixed_grid"] if "gate" in row),
+    ]
+    result = {
+        "schema": "EXPERIMENT44_E1_ARCHIVE_ANALYSIS_V1",
+        "created_at": _now(),
+        "catalogue": str(catalogue_path.resolve()),
+        "comparator": comparator,
+        "primary_archive_member_count": len(archive_primary),
+        "diversity": _standalone_and_diversity(
+            pool, [*comparator, *archive_primary]
+        ),
+        "e1": sections,
+        "gate_passer_count": sum(row["gate"]["passed"] for row in gate_rows),
+        "future_read_arm_named": False,
+        "future_read_arm_deferred_until_e2_complete": True,
+        "official_validation_accessed": False,
+        "test_accessed": False,
+    }
+    path = program_root / "analysis" / "experiment44_e1_archive_analysis.json"
+    _atomic_json(path, result)
+    return path
+
+
+def analyze_program(*, program_root: Path, catalogue_path: Path) -> Path:
+    pool, comparator = _verified_pool(catalogue_path)
     primary = [identity for identity in pool.identities() if identity not in comparator]
     archive_primary = [
         identity
@@ -1366,24 +1444,7 @@ def analyze_program(*, program_root: Path, catalogue_path: Path) -> Path:
         if "e2" in pool.record(identity, "fold_c")["tags"]
     ]
     diversity = _standalone_and_diversity(pool, [*comparator, *primary])
-    e1_greedy = _greedy(pool, comparator, archive_primary, "e1_archive_primary")
-    secondary = [
-        identity
-        for identity in pool.identities(("fold_a", "fold_b"))
-        if identity not in comparator and identity not in archive_primary
-    ]
-    supplementary = _supplementary_ab(pool, comparator, [*archive_primary, *secondary])
-    e1_sets = {
-        "residual_ema3": pool.tagged("residual_ema", FOLDS),
-        "residual_ema3_plus_options_oi": sorted(
-            set(pool.tagged("residual_ema", FOLDS) + pool.tagged("options_oi", FOLDS))
-        ),
-        "best_five_adapter_ema": pool.tagged("best_five_adapter_ema", FOLDS),
-        "parent58_3": pool.tagged("parent58", FOLDS),
-        "full_primary_roster": archive_primary,
-    }
-    e1_grid = _fixed_grid(pool, comparator, e1_sets, "e1_fixed")
-    hygiene = _hygiene(pool, comparator, archive_primary)
+    e1 = _e1_sections(pool, comparator, archive_primary)
     e2_greedy = _greedy(pool, comparator, e2_primary, "e2_only")
     full_greedy = _greedy(pool, comparator, primary, "e2_plus_archive")
     e2_sets = {
@@ -1398,11 +1459,11 @@ def analyze_program(*, program_root: Path, catalogue_path: Path) -> Path:
     }
     e2_grid = _fixed_grid(pool, comparator, e2_sets, "e2_fixed")
     gate_rows = [
-        e1_greedy,
+        e1["greedy"],
         e2_greedy,
         full_greedy,
-        *hygiene,
-        *(row for row in e1_grid if "gate" in row),
+        *e1["hygiene"],
+        *(row for row in e1["fixed_grid"] if "gate" in row),
         *(row for row in e2_grid if "gate" in row),
     ]
     passing = [row for row in gate_rows if row["gate"]["passed"]]
@@ -1424,12 +1485,7 @@ def analyze_program(*, program_root: Path, catalogue_path: Path) -> Path:
         "primary_archive_member_count": len(archive_primary),
         "e2_member_count": len(e2_primary),
         "diversity": diversity,
-        "e1": {
-            "greedy": e1_greedy,
-            "supplementary_ab": supplementary,
-            "fixed_grid": e1_grid,
-            "hygiene": hygiene,
-        },
+        "e1": e1,
         "e2": {
             "greedy_e2": e2_greedy,
             "greedy_full": full_greedy,
@@ -1465,6 +1521,9 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     analyze = subparsers.add_parser("analyze")
     analyze.add_argument("--program-root", type=Path, required=True)
     analyze.add_argument("--catalogue", type=Path, required=True)
+    analyze_archive = subparsers.add_parser("analyze-e1")
+    analyze_archive.add_argument("--program-root", type=Path, required=True)
+    analyze_archive.add_argument("--catalogue", type=Path, required=True)
     catalogue = subparsers.add_parser("freeze-catalogue")
     catalogue.add_argument("--provisional", type=Path, required=True)
     catalogue.add_argument("--output", type=Path, required=True)
@@ -1528,6 +1587,12 @@ def main() -> None:
         print(
             materialize_archive_roster(
                 source_map_path=args.source_map, output_dir=args.output_dir
+            )
+        )
+    elif args.command == "analyze-e1":
+        print(
+            analyze_e1(
+                program_root=args.program_root, catalogue_path=args.catalogue
             )
         )
     else:
