@@ -232,8 +232,31 @@ def _components(matrix: np.ndarray) -> list[list[int]]:
     return sorted(grouped.values(), key=lambda values: (values[0], len(values)))
 
 
-def build_stage_a(*, store: Path, output_dir: Path) -> Path:
+def build_stage_a(
+    *,
+    store: Path,
+    output_dir: Path,
+    feature_keys: Sequence[str] | None = None,
+) -> Path:
     output_dir.mkdir(parents=True, exist_ok=False)
+    selected_keys = tuple(FEATURE_BY_KEY if feature_keys is None else feature_keys)
+    if not selected_keys or len(set(selected_keys)) != len(selected_keys):
+        raise ValueError("Stage A feature keys must be nonempty and unique")
+    unknown = sorted(set(selected_keys).difference(FEATURE_BY_KEY))
+    if unknown:
+        raise ValueError(f"Unknown Stage A feature keys: {unknown}")
+    selected_features = tuple(FEATURE_BY_KEY[key] for key in selected_keys)
+    dynamic_indices = tuple(
+        int(row["index"]) for row in selected_features if row["kind"] == "dynamic"
+    )
+    slow_indices = tuple(
+        int(row["index"]) for row in selected_features if row["kind"] == "slow"
+    )
+    ordered_keys = tuple(
+        _feature_key("dynamic", index) for index in dynamic_indices
+    ) + tuple(_feature_key("slow", index) for index in slow_indices)
+    if ordered_keys != selected_keys:
+        raise ValueError("Stage A feature keys must preserve canonical feature order")
     sample_index = load_sample_index(store)
     training = select_sample_split(sample_index, "train")
     date_indices = np.unique(training.get_column("date_idx").to_numpy())
@@ -245,24 +268,34 @@ def build_stage_a(*, store: Path, output_dir: Path) -> Path:
         store / "equity_membership.npy", mmap_mode="r", allow_pickle=False
     )
     ready = np.load(store / "equity_data_ready.npy", mmap_mode="r", allow_pickle=False)
-    dynamic_cross_total = np.zeros((26, 26), dtype=np.float64)
-    dynamic_cross_count = np.zeros((26, 26), dtype=np.int64)
-    slow_total = np.zeros((32, 32), dtype=np.float64)
-    slow_count = np.zeros((32, 32), dtype=np.int64)
-    cross_total = np.zeros((26, 32), dtype=np.float64)
-    cross_count = np.zeros((26, 32), dtype=np.int64)
+    dynamic_count = len(dynamic_indices)
+    slow_count_value = len(slow_indices)
+    dynamic_cross_total = np.zeros(
+        (dynamic_count, dynamic_count), dtype=np.float64
+    )
+    dynamic_cross_count = np.zeros(
+        (dynamic_count, dynamic_count), dtype=np.int64
+    )
+    slow_total = np.zeros((slow_count_value, slow_count_value), dtype=np.float64)
+    slow_count = np.zeros((slow_count_value, slow_count_value), dtype=np.int64)
+    cross_total = np.zeros((dynamic_count, slow_count_value), dtype=np.float64)
+    cross_count = np.zeros((dynamic_count, slow_count_value), dtype=np.int64)
     decision_minutes = np.asarray(DECISION_EQUITY_INDICES) - 1
     active_by_date: dict[int, np.ndarray] = {}
     for position, date_index in enumerate(date_indices):
         active = np.asarray(membership[date_index] & ready[date_index], dtype=bool)
         active_by_date[int(date_index)] = active
         slow_ranked = _rank_standardize(
-            np.asarray(slow[date_index, active], dtype=np.float64)
+            np.asarray(slow[date_index, active], dtype=np.float64)[
+                :, slow_indices
+            ]
         )
         _accumulate(slow_total, slow_count, slow_ranked.T @ slow_ranked)
         for minute in decision_minutes:
             dynamic_ranked = _rank_standardize(
-                np.asarray(dynamic[date_index, active, minute], dtype=np.float64)
+                np.asarray(dynamic[date_index, active, minute], dtype=np.float64)[
+                    :, dynamic_indices
+                ]
             )
             _accumulate(
                 dynamic_cross_total,
@@ -276,8 +309,8 @@ def build_stage_a(*, store: Path, output_dir: Path) -> Path:
             )
         if (position + 1) % 50 == 0:
             print(f"stage_a_cross_section_dates={position + 1}/716", flush=True)
-    temporal_total = np.zeros((26, 26), dtype=np.float64)
-    temporal_count = np.zeros((26, 26), dtype=np.int64)
+    temporal_total = np.zeros((dynamic_count, dynamic_count), dtype=np.float64)
+    temporal_count = np.zeros((dynamic_count, dynamic_count), dtype=np.int64)
     for equity in range(dynamic.shape[1]):
         active_dates = np.asarray(
             [index for index in date_indices if active_by_date[int(index)][equity]],
@@ -286,7 +319,7 @@ def build_stage_a(*, store: Path, output_dir: Path) -> Path:
         values = np.asarray(
             dynamic[active_dates, equity, :VISIBLE_EQUITY_MINUTES],
             dtype=np.float64,
-        ).reshape(-1, 26)
+        )[..., dynamic_indices].reshape(-1, dynamic_count)
         ranked = _rank_standardize(values)
         _accumulate(temporal_total, temporal_count, ranked.T @ ranked)
         if (equity + 1) % 20 == 0:
@@ -298,12 +331,15 @@ def build_stage_a(*, store: Path, output_dir: Path) -> Path:
     dynamic_temporal = _mean_matrix(temporal_total, temporal_count)
     slow_matrix = _mean_matrix(slow_total, slow_count)
     cross_matrix = _mean_matrix(cross_total, cross_count)
-    matrix = np.eye(58, dtype=np.float64)
+    feature_count = len(selected_features)
+    matrix = np.eye(feature_count, dtype=np.float64)
     choose_temporal = np.abs(dynamic_temporal) > np.abs(dynamic_cross)
-    matrix[:26, :26] = np.where(choose_temporal, dynamic_temporal, dynamic_cross)
-    matrix[26:, 26:] = slow_matrix
-    matrix[:26, 26:] = cross_matrix
-    matrix[26:, :26] = cross_matrix.T
+    matrix[:dynamic_count, :dynamic_count] = np.where(
+        choose_temporal, dynamic_temporal, dynamic_cross
+    )
+    matrix[dynamic_count:, dynamic_count:] = slow_matrix
+    matrix[:dynamic_count, dynamic_count:] = cross_matrix
+    matrix[dynamic_count:, :dynamic_count] = cross_matrix.T
     np.fill_diagonal(matrix, 1.0)
     components = _components(matrix)
     clusters = []
@@ -313,20 +349,22 @@ def build_stage_a(*, store: Path, output_dir: Path) -> Path:
         clusters.append(
             {
                 "set_id": f"correlation_cluster_{number:02d}",
-                "members": [str(FEATURES[index]["key"]) for index in indices],
-                "member_names": [str(FEATURES[index]["name"]) for index in indices],
+                "members": [str(selected_features[index]["key"]) for index in indices],
+                "member_names": [
+                    str(selected_features[index]["name"]) for index in indices
+                ],
                 "max_internal_absolute_rho": (
                     0.0 if not off_diagonal.size else float(off_diagonal.max())
                 ),
             }
         )
     pair_rows = []
-    for left in range(58):
-        for right in range(left + 1, 58):
+    for left in range(feature_count):
+        for right in range(left + 1, feature_count):
             pair_rows.append(
                 {
-                    "left": str(FEATURES[left]["key"]),
-                    "right": str(FEATURES[right]["key"]),
+                    "left": str(selected_features[left]["key"]),
+                    "right": str(selected_features[right]["key"]),
                     "rho": float(matrix[left, right]),
                     "absolute_rho": abs(float(matrix[left, right])),
                     "edge": abs(float(matrix[left, right])) >= CORRELATION_THRESHOLD,
@@ -334,7 +372,11 @@ def build_stage_a(*, store: Path, output_dir: Path) -> Path:
             )
     pair_rows.sort(key=lambda row: -float(row["absolute_rho"]))
     cluster_table = {
-        "schema": "FEATURE_REMOVAL_CLUSTER_TABLE_V1",
+        "schema": (
+            "FEATURE_REMOVAL_CLUSTER_TABLE_V1"
+            if feature_count == len(FEATURES)
+            else "FEATURE_REMOVAL_CLUSTER_TABLE_V2"
+        ),
         "created_at": _now(),
         "feature_store_identity": feature_store_identity(store),
         "training_date_count": int(date_indices.size),
@@ -352,11 +394,20 @@ def build_stage_a(*, store: Path, output_dir: Path) -> Path:
             "ties": "average ranks",
             "future_data_used": False,
         },
-        "features": list(FEATURES),
+        "features": list(selected_features),
         "correlation_matrix": matrix.tolist(),
         "pairs": pair_rows,
         "clusters": clusters,
-        "semantic_groups": _semantic_groups(),
+        "semantic_groups": [
+            {**group, "members": members}
+            for group in _semantic_groups()
+            if len(
+                members := [
+                    key for key in group["members"] if key in selected_keys
+                ]
+            )
+            >= 2
+        ],
         "official_validation_accessed": False,
         "test_accessed": False,
     }

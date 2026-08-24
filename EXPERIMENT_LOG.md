@@ -2663,3 +2663,103 @@ paid GH200 instance `e975b774f5834e0fa265d11bbbef680f` (`gpu_1x_gh200`,
 `us-east-3`, IP `192.222.50.236`). It was absent from two consecutive provider
 inventory reads at `2026-08-24T03:11:31Z` and `2026-08-24T03:12:02Z`; the
 account then had zero active instances.
+
+## Experiment 42 — correlation-conditioned R3 and full options program (preregistered 2026-08-24)
+
+Status at registration: no Experiment-42 correlation table, inference-ablation
+score, R3 definition, R3 trajectory, full-options source, option-candidate
+trajectory, fold score, official-validation score, or held-out-test score
+exists. This is one immutable program with two independent decisions. Both use
+the selected Experiment-41 prune-R2 candidate as their sole fold comparator;
+the historical 58-field parent is not a comparator. Official validation and
+the held-out test remain sealed throughout.
+
+### R3 contract
+
+Stage B-prime recomputes the Experiment-41 correlation estimators and the fixed
+`abs(rho) >= 0.80` graph on only the 34 prune-R2 survivors, using all 716
+training dates, active/ready equities, and model-visible minutes. The old
+semantic groups are intersected with the survivors and remnants of at least two
+fields remain tests. Prune-R2's retained bidirectional Raw Patience-3 replay
+epochs are loaded from its hash-bound Stage-C analyses; Stage B-prime zeros the
+24 prune-R2 fields in the evaluation loader before any new inference ablation.
+
+All 34 survivors receive three-fold single-field ablations. A singleton is dead
+only when its overall parent-minus-ablated drop is non-positive on every fold
+and at least two of three horizon drops are non-positive on every fold, exactly
+matching the Experiment-39/41 dead rule. Every new correlation component and
+semantic remnant is jointly ablated. A set is group-dead when its mean joint
+drop is at most zero and at most one fold is positive. A materially alive set
+(mean joint drop at least `+0.00025`) receives one representative-sufficiency
+test. The representative maximizes the three-fold single drop; ties prefer
+lower missing fraction, shorter canonical name, then lower global index. The
+remaining members qualify only when their residual joint drop is at most
+`+0.00025`.
+
+The union of qualified new fields receives one joint preview on prune-R2. It
+passes only when mean cost is at most `+0.00025` and every fold cost is at most
+`+0.0005`. On failure, the set is rebuilt from empty in ascending single-drop
+order and stops before the first failing addition. If no new removal survives,
+R2 is the correlation-conditioned frontier and no R3 trajectory runs. Otherwise
+exactly one prune-R3 candidate runs 20 epochs for seeds 11/29/47 on folds C/A/B
+with at most two processes. R3 replaces R2 only when Raw Patience-3 mean delta
+is non-negative and no fold is below `-0.0005`; a numerical improvement claim
+also requires mean at least `+0.0005` and every fold non-negative. Final
+EMA-0.995 and the uniform prune-R2-Patience plus R3-EMA stack are informational.
+There is no R4, alternate removal set, or post-score edit.
+
+### Full-options source and candidates
+
+The optional F2 trim is not used. This avoids another selection layer and fixes
+the full candidate to all 14 named fields: the unchanged six Experiment-40 OI
+fields; option/cash quantity ratio, put/call quantity ratio, and prior-20 option
+trade-count surprise; and five IV fields (prior-20 ATM-IV robust z, one- and
+five-session ATM-IV changes, OTM-put skew, and ATM-IV minus realized-20 spread).
+Every invalid cell is masked and exactly zero. Every D-dated value is first
+available on the next observed B3 session with no filling.
+
+COTAHIST option rows are joined by exact same-date option ticker to the
+BVBG.028 instrument master. Option type, expiry, and strike must agree, and the
+master's explicit underlying instrument ID must resolve to the same accepted
+cash ISIN recorded by COTAHIST. Ticker prefixes are never used. IV inputs require
+at least 20 contracts, at least three trades, 5--45 calendar days to expiry, and
+positive close premium (otherwise positive average premium). The risk-free rate
+is the same-session final annual-percentage quote of the shortest non-expired
+fixed-maturity DI contract, divided by 100. A qualifying same-strike/expiry
+call-put pair supplies `F = K + exp(rT) * (C-P)` using median premiums per side;
+otherwise the exact cash close is the forward proxy. Discounted-forward
+Black-Scholes is inverted by 64-step bisection on volatility `[0.05, 3.0]`.
+ATM is `abs(log(K/F)) <= 0.10`; OTM put is
+`-0.25 <= log(K/F) <= -0.05`. ATM IV is the median and requires at least two
+solved ATM series; the skew leg is the median solved OTM-put IV. American-style
+contracts are approximated as European and dividends are ignored, both recorded
+as known approximations.
+
+Prior-20 level/surprise fields use only already-emitted observations and robust
+median/MAD scaling clipped to five and divided by five. One- and five-session
+changes require the exact prior B3 session; realized volatility uses the 20
+cash-close returns ending at D and is annualized by `sqrt(252)`. Fixed transforms
+are: log-ratio/tanh scale four for option/cash quantity, scale three for put/call
+quantity, tanh scale `0.25` for IV changes and skew, and tanh scale `0.50` for the
+IV-realized spread.
+
+Exactly two bias-free zero-start sidecar candidates run on the prune-R2 field
+mask: opt-full (all 14) and opt-IV (the five IV fields), each seeds 11/29/47 on
+folds C/A/B for 20 epochs. Standalone bidirectional Raw Patience-3 is primary;
+final EMA-0.995 and the predeclared uniform prune-R2-Patience plus candidate-EMA
+mixed state are secondary. A path passes only when its three-fold mean is at
+least `+0.0005`, at least two folds are strictly positive, no fold is below
+`-0.0005`, and the pooled paired daily delta across the three non-overlapping
+fold windows has a 10-session moving-block 10,000-replication 90% interval that
+excludes zero. If both standalone candidates pass, the higher mean advances. A
+mixed state is eligible only if both standalones fail; if both mixed states pass,
+the higher mixed mean advances. No third subset exists.
+
+A passing fold screen registers, but does not execute, a future official-read
+arm. Its preparation record requires the identical source contract through
+2025-06-30, full-716-date members on the final store-v2 specification, and the
+already frozen read lineup. This program neither acquires post-training data nor
+accesses official validation/test. It retains all prediction archives,
+selected/final checkpoints, histories, analyses, sidecars, source diagnostics,
+hash manifests, field verdicts, and sealed-data flags until a reviewed
+inventory-bound cleanup is written after the decisions.
