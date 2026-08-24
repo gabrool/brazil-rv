@@ -177,7 +177,7 @@ function Get-RetryAfterSeconds {
 function Get-Sha256 {
     param([Parameter(Mandatory = $true)][string]$Path)
     $stream = [IO.File]::OpenRead($Path)
-    $algorithm = [Security.Cryptography.SHA256]::Create()
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
     try {
         return [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
     }
