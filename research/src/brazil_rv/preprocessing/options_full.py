@@ -99,6 +99,16 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _declared_unpublished_in_dates(bvbg_raw_dir: Path) -> set[date]:
+    manifest = json.loads((bvbg_raw_dir / "manifest.json").read_text(encoding="utf-8"))
+    return {
+        date.fromisoformat(str(entry["trade_date"]))
+        for entry in manifest["files"]
+        if str(entry.get("name", "")).startswith("IN")
+        and entry.get("status") == "not_published"
+    }
+
+
 def _integer(raw: bytes) -> int:
     value = raw.decode("ascii", errors="ignore").strip()
     return int(value) if value else 0
@@ -625,12 +635,17 @@ def build_full_options_source(
         market_dates=market_dates,
     )
     jobs = []
-    missing_instrument_days = []
+    declared_unpublished_in_days = _declared_unpublished_in_dates(bvbg_raw_dir)
+    unavailable_instrument_days = []
+    unexpected_missing_instrument_days = []
     missing_rate_days = []
     for source_date, records in sorted(records_by_date.items()):
         in_path = bvbg_raw_dir / f"IN{source_date:%y%m%d}.zip"
         if not in_path.is_file():
-            missing_instrument_days.append(source_date.isoformat())
+            if source_date in declared_unpublished_in_days:
+                unavailable_instrument_days.append(source_date.isoformat())
+            else:
+                unexpected_missing_instrument_days.append(source_date.isoformat())
             continue
         rate = rates.get(source_date)
         if rate is None:
@@ -639,10 +654,11 @@ def build_full_options_source(
         jobs.append(
             (in_path, source_date, records, rate)
         )
-    if missing_instrument_days or missing_rate_days:
+    if unexpected_missing_instrument_days or missing_rate_days:
         raise ValueError(
             "Full options source is incomplete: "
-            f"missing IN={missing_instrument_days[:5]}, DI={missing_rate_days[:5]}"
+            f"missing IN={unexpected_missing_instrument_days[:5]}, "
+            f"DI={missing_rate_days[:5]}"
         )
     parsed = []
     with ProcessPoolExecutor(
@@ -711,6 +727,12 @@ def build_full_options_source(
             "source_archives": archive_audits,
             "bvbg_raw_dir": str(bvbg_raw_dir.resolve()),
             "bvbg_manifest_sha256": _sha256(bvbg_raw_dir / "manifest.json"),
+            "instrument_master_unavailable_days": unavailable_instrument_days,
+            "instrument_master_unavailable_rule": (
+                "When the immutable BVBG manifest records IN as not_published, "
+                "same-day activity/IV fields remain invalid; no adjacent-day "
+                "instrument master is substituted."
+            ),
             "oi_source": str(oi_source.resolve()),
             "oi_source_sha256": _sha256(oi_source),
             "oi_source_manifest_sha256": (

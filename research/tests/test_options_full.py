@@ -5,10 +5,25 @@ from datetime import date
 import pytest
 
 from brazil_rv.preprocessing.options_full import (
+    _declared_unpublished_in_dates,
     _forward_option_price,
     _option_record,
     implied_volatility,
 )
+
+
+def test_declared_unpublished_in_dates_uses_immutable_manifest(tmp_path) -> None:
+    (tmp_path / "manifest.json").write_text(
+        '{"files": ['
+        '{"name": "IN231208.zip", "status": "not_published", '
+        '"trade_date": "2023-12-08"},'
+        '{"name": "PR231208.zip", "status": "resumed_existing", '
+        '"trade_date": "2023-12-08"}'
+        "]}",
+        encoding="utf-8",
+    )
+
+    assert _declared_unpublished_in_dates(tmp_path) == {date(2023, 12, 8)}
 
 
 def _put(line: bytearray, start: int, end: int, value: str) -> None:
