@@ -2844,3 +2844,32 @@ paid GH200 instance `e2cf2e517d9541ac93cac3906fc5c0e4` (`gpu_1x_gh200`,
 `us-east-3`, IP `192.222.50.236`). It was absent from two consecutive provider
 inventory reads at `2026-08-24T12:16:44Z` and `2026-08-24T12:17:04Z`; the
 account then had zero active instances.
+
+## Experiment 43 — official-validation read and conditional 10-seed expansion (preregistered 2026-08-24)
+
+Status at registration: no Experiment-43 trajectory, prediction, analysis,
+promotion decision, supplementary measurement, or deployed declaration exists.
+The exact implementation commit is
+`a441307f23cbc058f17fcbce5f102cb7a84d4c05`. The complete immutable contract is
+`research/preregistrations/experiment43_official_read.md`; this section and that
+file are frozen before training any arm or opening any official-validation
+prediction. This is official-validation access event 3. The held-out test is
+not authorized and remains sealed.
+
+The comparator is the stored Experiment-1 parent-3 Raw Patience-3 ensemble.
+Arm 1 is that parent-3 plus the stored Experiment-24 residual-3 final-EMA-0.995
+members. Arm 2 is the Experiment-41 prune-R2 loader mask retrained on all 716
+training dates at seeds 11/29/47 with matched official-monitor Raw Patience-3.
+Both use uniform tie-aware rank averaging. The only promotion evidence is each
+arm's paired 244-date block-10 95% interval versus canonical: lower bound above
+zero means supported; one supported arm is promoted, two supported arms resolve
+by higher official IC, and no supported arm leaves canonical deployed.
+
+Only a promoted arm opens the fixed seven-seed expansion at seeds
+61/79/97/113/131/149/167. The 10-seed form deploys if its official IC is at
+least the promoted three-seed IC minus `0.0005`; otherwise the three-seed form
+deploys. No options arm, hybrid, extra subset, fold screen, retuning, new data,
+test read, post-score edit, or second official read is permitted. At most two
+processes run concurrently. All prediction archives and deployed selected/final
+checkpoints are retained, results and the validation-access ledger are pushed,
+and the exact paid instance is terminated and verified absent twice.
