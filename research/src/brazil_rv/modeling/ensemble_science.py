@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+
+from .analyze import load_run_observations
 from .contract import ALLOWED_SEEDS, HORIZONS, VALIDATION_END
 from .data import (
     feature_store_identity,
@@ -538,6 +540,142 @@ def materialize_e2_states(*, program_root: Path, design_path: Path) -> Path:
     }
     path = program_root / "e2_member_catalogue.json"
     _atomic_json(path, catalogue)
+    return path
+
+
+def _legacy_observations(path: Path) -> EvaluationObservations:
+    with np.load(path, allow_pickle=False) as values:
+        expected = set(EvaluationObservations.__dataclass_fields__)
+        if set(values.files) != expected:
+            raise ValueError(f"Observation archive has unexpected fields: {path}")
+        return EvaluationObservations(
+            **{name: values[name].copy() for name in expected}
+        )
+
+
+def materialize_archive_roster(*, source_map_path: Path, output_dir: Path) -> Path:
+    if output_dir.exists():
+        raise FileExistsError(output_dir)
+    output_dir.mkdir(parents=True)
+    source_map = _read_json(source_map_path)
+    if source_map.get("scores_computed") is not False:
+        raise ValueError("Archive source map must be frozen before score computation")
+    inventory = []
+    materialized = []
+    references: dict[str, Path] = {}
+    for row in source_map["entries"]:
+        files = [Path(str(value)) for value in row.get("inventory_files", [])]
+        inventory_row = {
+            "label": str(row["label"]),
+            "eligible": bool(row["eligible"]),
+            "reason": row.get("reason"),
+            "files": [
+                {
+                    "path": str(path.resolve()),
+                    "sha256": _sha256(path),
+                    "bytes": path.stat().st_size,
+                }
+                for path in files
+            ],
+        }
+        inventory.append(inventory_row)
+        if not row["eligible"]:
+            continue
+        fold = str(row["fold"])
+        if fold not in FOLDS:
+            raise ValueError(f"Archive roster has unknown fold: {fold}")
+        source_kind = str(row["source_kind"])
+        replay: list[dict[str, object]] = []
+        if source_kind == "run":
+            run_dir = Path(str(row["run_dir"]))
+            state = str(row["state"])
+            if state == "patience3_raw":
+                if "frozen_replays" not in row:
+                    raise ValueError(
+                        "Historical Patience members require frozen replay rows; "
+                        "Stage 0 may not recompute selections"
+                    )
+                observations, replay = crossfit_patience_observations(
+                    run_dir, list(row["frozen_replays"])
+                )
+            elif state == "final_ema_0995":
+                observations = load_run_observations(run_dir, "final_ema_0995")
+            else:
+                raise ValueError(f"Unknown archive member state: {state}")
+            source_identity = {
+                "run_dir": str(run_dir.resolve()),
+                "run_manifest_sha256": _sha256(run_dir / "run_manifest.json"),
+            }
+        elif source_kind == "observations":
+            observations_path = Path(str(row["observations_path"]))
+            observations = _legacy_observations(observations_path)
+            source_identity = {
+                "observations_path": str(observations_path.resolve()),
+                "observations_sha256": _sha256(observations_path),
+            }
+        else:
+            raise ValueError(f"Unknown roster source kind: {source_kind}")
+        if np.unique(observations.date_idx).size != PRIMARY_DATE_COUNTS[fold]:
+            raise ValueError(
+                f"Archive member does not cover the complete {fold} window"
+            )
+        reference_path = output_dir / "references" / f"{fold}.npz"
+        if fold not in references:
+            _write_reference(reference_path, observations)
+            references[fold] = reference_path
+        else:
+            assert_observations_aligned(_load_reference(reference_path), observations)
+        identity = str(row["identity"])
+        prediction_path = (
+            output_dir
+            / "predictions"
+            / fold
+            / f"{hashlib.sha256(identity.encode()).hexdigest()[:16]}.npz"
+        )
+        _write_prediction(prediction_path, observations.predictions)
+        materialized.append(
+            {
+                "identity": identity,
+                "family": str(row["family"]),
+                "seed": row.get("seed"),
+                "state": str(row["state"]),
+                "fold": fold,
+                "prediction": str(prediction_path.resolve()),
+                "prediction_sha256": _sha256(prediction_path),
+                "horizon_coverage": list(row.get("horizon_coverage", range(3))),
+                "tags": list(row["tags"]),
+                "source": source_identity,
+                "frozen_crossfit_replay": replay,
+                "official_validation_accessed": False,
+                "test_accessed": False,
+            }
+        )
+    grouped: dict[str, set[str]] = {}
+    for record in materialized:
+        grouped.setdefault(str(record["identity"]), set()).add(str(record["fold"]))
+    for record in materialized:
+        folds = grouped[str(record["identity"])]
+        record["tier"] = (
+            "primary"
+            if set(FOLDS).issubset(folds)
+            else "secondary"
+            if {"fold_a", "fold_b"}.issubset(folds)
+            else "ineligible"
+        )
+    provisional = {
+        "schema": "EXPERIMENT44_ARCHIVE_PROVISIONAL_ROSTER_V1",
+        "created_at": _now(),
+        "source_map": str(source_map_path.resolve()),
+        "source_map_sha256": _sha256(source_map_path),
+        "references": {fold: str(path.resolve()) for fold, path in references.items()},
+        "members": materialized,
+        "inventory": inventory,
+        "scores_computed": False,
+        "official_validation_accessed": False,
+        "test_accessed": False,
+    }
+    path = output_dir / "archive_roster_provisional.json"
+    _atomic_json(path, provisional)
     return path
 
 
@@ -1261,6 +1399,9 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     a1.add_argument("--source-official-root", type=Path, required=True)
     a1.add_argument("--selection-file", type=Path, required=True)
     a1.add_argument("--parallel-processes", type=int, default=2)
+    archive = subparsers.add_parser("materialize-archive-roster")
+    archive.add_argument("--source-map", type=Path, required=True)
+    archive.add_argument("--output-dir", type=Path, required=True)
     return parser.parse_args(arguments)
 
 
@@ -1301,6 +1442,12 @@ def main() -> None:
                 source_official_root=args.source_official_root,
                 selection_file=args.selection_file,
                 parallel_processes=args.parallel_processes,
+            )
+        )
+    elif args.command == "materialize-archive-roster":
+        print(
+            materialize_archive_roster(
+                source_map_path=args.source_map, output_dir=args.output_dir
             )
         )
     else:
