@@ -672,3 +672,8 @@ The reviewed cleanup removed 467 redundant checkpoints / 2,113,294,685 bytes
 while preserving all 540 prediction archives, 73 selected/final checkpoints,
 every analysis, manifest, source artifact, and sealed-data record. Its passing
 postcheck is under the program root's `_cleanup/20260824T121000Z` directory.
+
+Paid GH200 instance `e2cf2e517d9541ac93cac3906fc5c0e4` was terminated only
+after the results, cleanup evidence, and documentation commit were secured. It
+was absent from two consecutive provider inventory reads, and the Lambda
+account then had zero active instances.

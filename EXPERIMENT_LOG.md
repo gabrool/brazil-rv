@@ -2837,3 +2837,10 @@ The post-cleanup inventory has 875 program artifacts / 25,374,165,801 bytes,
 SHA-256
 `dbc5304c79cd27ca7112e6b6b98029311314eb03eda6176a3347f20115e746eb`.
 Official validation and the held-out test remained sealed throughout.
+
+After result commit `41e54c9654ecb3ab3dd98e83b084763661a8c25c` was pushed and
+the retained artifacts were rechecked, Lambda accepted termination of exact
+paid GH200 instance `e2cf2e517d9541ac93cac3906fc5c0e4` (`gpu_1x_gh200`,
+`us-east-3`, IP `192.222.50.236`). It was absent from two consecutive provider
+inventory reads at `2026-08-24T12:16:44Z` and `2026-08-24T12:17:04Z`; the
+account then had zero active instances.
