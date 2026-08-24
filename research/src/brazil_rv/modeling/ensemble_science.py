@@ -25,12 +25,13 @@ from .data import (
 from .engine import EvaluationObservations, assert_observations_aligned
 from .feature_removal import FEATURES, _definition
 from .metrics import (
-    combine_rank_predictions,
     daily_horizon_ic,
     finite_mean,
     moving_block_bootstrap,
     per_date_primary_ic,
     primary_validation_score,
+    rank_prediction_similarity,
+    rank_transform_predictions,
     sample_level_spearman_ic,
 )
 from .provenance import repository_commit
@@ -101,13 +102,13 @@ def _npz_content_sha256(path: Path) -> str:
 
 
 def _bagged_dates(dates: Sequence[object], seed: int) -> tuple[object, ...]:
-    if not dates:
-        raise ValueError("Cannot bag an empty fit window")
+    if len(dates) < 20:
+        raise ValueError("Date-block bagging requires at least 20 fit dates")
     generator = np.random.default_rng(seed)
     values: list[object] = []
     while len(values) < len(dates):
-        start = int(generator.integers(len(dates)))
-        values.extend(dates[(start + offset) % len(dates)] for offset in range(20))
+        start = int(generator.integers(len(dates) - 20 + 1))
+        values.extend(dates[start : start + 20])
     return tuple(values[: len(dates)])
 
 
@@ -910,6 +911,7 @@ class MemberPool:
             fold = str(record["fold"])
             self.by_identity.setdefault(identity, {})[fold] = record
         self._prediction_cache: dict[tuple[str, str], np.ndarray] = {}
+        self._rank_cache: dict[tuple[str, str], np.ndarray] = {}
 
     def identities(self, required_folds: Sequence[str] = FOLDS) -> list[str]:
         required = set(required_folds)
@@ -937,6 +939,14 @@ class MemberPool:
             self.references[fold], Path(str(self.record(identity, fold)["prediction"]))
         )
 
+    def ranks(self, identity: str, fold: str) -> np.ndarray:
+        key = (identity, fold)
+        if key not in self._rank_cache:
+            self._rank_cache[key] = rank_transform_predictions(
+                self.prediction(identity, fold), self.references[fold].label_mask
+            )
+        return self._rank_cache[key]
+
     def coverage(self, identity: str, fold: str) -> tuple[int, ...]:
         return tuple(
             int(value) for value in self.record(identity, fold)["horizon_coverage"]
@@ -958,13 +968,51 @@ def _combine(
     reduction: str = "mean",
 ) -> EvaluationObservations:
     reference = pool.references[fold]
-    predictions = combine_rank_predictions(
-        [pool.prediction(identity, fold) for identity in identities],
-        reference.label_mask,
-        weights=weights,
-        horizon_coverage=[pool.coverage(identity, fold) for identity in identities],
-        reduction=reduction,
+    if not identities:
+        raise ValueError("Cannot combine an empty member list")
+    member_weights = (
+        np.ones(len(identities), dtype=np.float64)
+        if weights is None
+        else np.asarray(weights, dtype=np.float64)
     )
+    if member_weights.shape != (len(identities),) or np.any(member_weights < 0):
+        raise ValueError("Combination weights are malformed")
+    predictions = np.zeros(reference.targets.shape, dtype=np.float32)
+    for horizon in range(3):
+        eligible = [
+            index
+            for index, identity in enumerate(identities)
+            if horizon in pool.coverage(identity, fold)
+        ]
+        if not eligible:
+            raise ValueError(f"No member covers horizon {horizon}")
+        if reduction == "mean":
+            denominator = float(member_weights[eligible].sum())
+            if denominator <= 0:
+                raise ValueError(f"Horizon {horizon} has zero total weight")
+            for index in eligible:
+                predictions[..., horizon] += pool.ranks(identities[index], fold)[
+                    ..., horizon
+                ] * float(member_weights[index] / denominator)
+        else:
+            values = np.stack(
+                [
+                    pool.ranks(identities[index], fold)[..., horizon]
+                    for index in eligible
+                ]
+            )
+            if reduction == "median":
+                predictions[..., horizon] = np.median(values, axis=0)
+            elif reduction == "trimmed_mean":
+                trim = int(np.floor(0.2 * values.shape[0]))
+                ordered = np.sort(values, axis=0)
+                predictions[..., horizon] = np.mean(
+                    ordered[trim : values.shape[0] - trim] if trim else ordered,
+                    axis=0,
+                )
+            else:
+                raise ValueError(f"Unknown rank reduction: {reduction}")
+    predictions[~reference.label_mask] = 0.0
     return replace(reference, predictions=predictions)
 
 
@@ -1138,9 +1186,9 @@ def _standalone_and_diversity(
                         "left": left,
                         "right": right,
                         "shared_horizon_indices": shared,
-                        "prediction_spearman": primary_validation_score(
-                            pool.prediction(left, fold),
-                            pool.prediction(right, fold),
+                        "prediction_spearman": rank_prediction_similarity(
+                            pool.ranks(left, fold),
+                            pool.ranks(right, fold),
                             mask,
                             reference.date_idx,
                         ),

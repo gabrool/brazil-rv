@@ -98,6 +98,37 @@ def rank_average_predictions(
     return result.astype(np.float32)
 
 
+def rank_transform_predictions(
+    values: NDArray[np.float32], label_mask: NDArray[np.bool_]
+) -> NDArray[np.float32]:
+    if values.shape != label_mask.shape:
+        raise ValueError("Prediction shape differs from the label mask")
+    rows, mask = _metric_rows(values, label_mask)
+    ranked = (
+        _rowwise_average_ranks(rows, mask)
+        .reshape(label_mask.shape[0], label_mask.shape[2], label_mask.shape[1])
+        .transpose(0, 2, 1)
+    )
+    ranked[~label_mask] = 0.0
+    return ranked.astype(np.float32)
+
+
+def rank_prediction_similarity(
+    left_ranks: NDArray[np.float32],
+    right_ranks: NDArray[np.float32],
+    label_mask: NDArray[np.bool_],
+    date_idx: NDArray[np.int64],
+) -> float:
+    if left_ranks.shape != label_mask.shape or right_ranks.shape != label_mask.shape:
+        raise ValueError("Prediction-rank shape differs from the label mask")
+    left, mask = _metric_rows(left_ranks, label_mask)
+    right, _ = _metric_rows(right_ranks, label_mask)
+    sample = _rowwise_correlation(left, right, mask).reshape(
+        label_mask.shape[0], label_mask.shape[2]
+    )
+    return primary_score_from_sample_ic(sample, date_idx)
+
+
 def combine_rank_predictions(
     members: Sequence[NDArray[np.float32]],
     label_mask: NDArray[np.bool_],
@@ -132,13 +163,7 @@ def combine_rank_predictions(
         raise ValueError("Horizon coverage is malformed")
     ranked_members = []
     for member in members:
-        rows, mask = _metric_rows(member, label_mask)
-        ranks = (
-            _rowwise_average_ranks(rows, mask)
-            .reshape(label_mask.shape[0], label_mask.shape[2], label_mask.shape[1])
-            .transpose(0, 2, 1)
-        )
-        ranked_members.append(ranks)
+        ranked_members.append(rank_transform_predictions(member, label_mask))
     ranked = np.stack(ranked_members)
     result = np.zeros(label_mask.shape, dtype=np.float64)
     for horizon in range(label_mask.shape[2]):
