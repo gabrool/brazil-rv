@@ -98,6 +98,76 @@ def rank_average_predictions(
     return result.astype(np.float32)
 
 
+def combine_rank_predictions(
+    members: Sequence[NDArray[np.float32]],
+    label_mask: NDArray[np.bool_],
+    *,
+    weights: Sequence[float] | None = None,
+    horizon_coverage: Sequence[Sequence[int]] | None = None,
+    reduction: str = "mean",
+) -> NDArray[np.float32]:
+    """Combine tie-aware member ranks without estimating weights from outcomes."""
+    if not members:
+        raise ValueError("At least one ensemble member is required")
+    if any(member.shape != label_mask.shape for member in members):
+        raise ValueError("Ensemble prediction shapes differ from the label mask")
+    member_weights = np.ones(len(members), dtype=np.float64)
+    if weights is not None:
+        member_weights = np.asarray(weights, dtype=np.float64)
+        if member_weights.shape != (len(members),) or np.any(member_weights < 0):
+            raise ValueError("Member weights must be finite non-negative values")
+        if not np.isfinite(member_weights).all():
+            raise ValueError("Member weights must be finite non-negative values")
+    coverage = (
+        [tuple(range(label_mask.shape[2])) for _ in members]
+        if horizon_coverage is None
+        else [tuple(value) for value in horizon_coverage]
+    )
+    if len(coverage) != len(members) or any(
+        not value
+        or len(set(value)) != len(value)
+        or any(index not in range(label_mask.shape[2]) for index in value)
+        for value in coverage
+    ):
+        raise ValueError("Horizon coverage is malformed")
+    ranked_members = []
+    for member in members:
+        rows, mask = _metric_rows(member, label_mask)
+        ranks = (
+            _rowwise_average_ranks(rows, mask)
+            .reshape(label_mask.shape[0], label_mask.shape[2], label_mask.shape[1])
+            .transpose(0, 2, 1)
+        )
+        ranked_members.append(ranks)
+    ranked = np.stack(ranked_members)
+    result = np.zeros(label_mask.shape, dtype=np.float64)
+    for horizon in range(label_mask.shape[2]):
+        eligible = np.asarray(
+            [horizon in member_coverage for member_coverage in coverage], dtype=bool
+        )
+        if not eligible.any():
+            raise ValueError(f"No member covers horizon index {horizon}")
+        values = ranked[eligible, ..., horizon]
+        if reduction == "mean":
+            selected_weights = member_weights[eligible]
+            if selected_weights.sum() <= 0:
+                raise ValueError(f"Horizon index {horizon} has zero total weight")
+            result[..., horizon] = np.average(values, axis=0, weights=selected_weights)
+        elif reduction == "median":
+            result[..., horizon] = np.median(values, axis=0)
+        elif reduction == "trimmed_mean":
+            trim = int(math.floor(0.2 * values.shape[0]))
+            ordered = np.sort(values, axis=0)
+            result[..., horizon] = np.mean(
+                ordered[trim : values.shape[0] - trim] if trim else ordered,
+                axis=0,
+            )
+        else:
+            raise ValueError(f"Unknown rank reduction: {reduction}")
+    result[~label_mask] = 0.0
+    return result.astype(np.float32)
+
+
 def sample_level_spearman_ic(
     predictions: NDArray[np.float32],
     targets: NDArray[np.float32],

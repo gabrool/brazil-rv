@@ -191,6 +191,8 @@ def run_training(
     sidecar_dir: Path | None = None,
     zero_dynamic_channels: tuple[int, ...] = (),
     zero_slow_fields: tuple[int, ...] = (),
+    date_multiset: tuple[object, ...] | None = None,
+    training_horizon_indices: tuple[int, ...] | None = None,
 ) -> Path:
     sidecar = None if sidecar_dir is None else load_external_sidecar(sidecar_dir, store)
     if run_dir.exists():
@@ -215,8 +217,18 @@ def run_training(
         sidecar,
         zero_dynamic_channels,
         zero_slow_fields,
+        date_multiset,
+        training_horizon_indices,
     )
-    model = build_model(None if sidecar is None else sidecar.feature_count).cuda()
+    single_horizon_index = (
+        training_horizon_indices[0]
+        if training_horizon_indices is not None and len(training_horizon_indices) == 1
+        else None
+    )
+    model = build_model(
+        None if sidecar is None else sidecar.feature_count,
+        single_horizon_index=single_horizon_index,
+    ).cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
     parameter_count = count_trainable_parameters(model)
     optimizer, _ = build_optimizer(model)
@@ -246,6 +258,24 @@ def run_training(
         "history_masks_unchanged": True,
         "applied_from_epoch_zero": True,
     }
+    serialized_dates = (
+        None if date_multiset is None else [str(value) for value in date_multiset]
+    )
+    run_provenance["training_variation"] = {
+        "date_multiset": serialized_dates,
+        "date_multiset_sha256": (
+            None
+            if serialized_dates is None
+            else hashlib.sha256(
+                ("\n".join(serialized_dates) + "\n").encode("utf-8")
+            ).hexdigest()
+        ),
+        "training_horizon_indices": (
+            None if training_horizon_indices is None else list(training_horizon_indices)
+        ),
+        "single_horizon_head": single_horizon_index,
+        "selection_window_unchanged": True,
+    }
     recorded_training = run_provenance["training"]
     if (
         recorded_training["steps_per_epoch"],
@@ -261,6 +291,7 @@ def run_training(
         "feature_store_identity": store_identity,
         "external_sidecar": None if sidecar is None else sidecar.identity,
         "equity_input_zeroing": run_provenance["equity_input_zeroing"],
+        "training_variation": run_provenance["training_variation"],
         "split": {
             "training": selection_window,
             "selection": selection_window,

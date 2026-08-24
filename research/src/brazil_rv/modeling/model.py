@@ -25,6 +25,7 @@ class SharedCausalTCN(nn.Module):
         architecture: TCNArchitecture = TCN_ARCHITECTURE,
         equity_count: int = EQUITY_COUNT,
         sidecar_feature_count: int | None = None,
+        single_horizon_index: int | None = None,
     ) -> None:
         super().__init__()
         if sidecar_feature_count is not None and sidecar_feature_count <= 0:
@@ -33,6 +34,9 @@ class SharedCausalTCN(nn.Module):
         self.equity_count = equity_count
         self.instrument_count = equity_count + CONTEXT_COUNT
         self.sidecar_feature_count = sidecar_feature_count
+        if single_horizon_index is not None and single_horizon_index not in (0, 1, 2):
+            raise ValueError("single_horizon_index must be 0, 1, or 2")
+        self.single_horizon_index = single_horizon_index
         width = architecture.width
         self.input_projection = nn.Linear(
             architecture.patch_input_width, width, bias=False
@@ -60,7 +64,11 @@ class SharedCausalTCN(nn.Module):
         self.fusion_gate = nn.Linear(2 * width, width, bias=True)
         self.fusion_norm = nn.LayerNorm(width)
         self.dropout = nn.Dropout(architecture.dropout)
-        self.prediction_head = nn.Linear(width, architecture.output_horizons, bias=True)
+        self.prediction_head = nn.Linear(
+            width,
+            1 if single_horizon_index is not None else architecture.output_horizons,
+            bias=True,
+        )
         self.apply(self._initialize_module)
         nn.init.zeros_(self.fusion_gate.weight)
         nn.init.constant_(self.fusion_gate.bias, TARGETED_FUSION_GATE_BIAS)
@@ -190,11 +198,23 @@ class SharedCausalTCN(nn.Module):
             instrument_mask[:, self.equity_count :],
         )
         predictions = self.prediction_head(fused)
+        if self.single_horizon_index is not None:
+            horizon_mask = F.one_hot(
+                torch.tensor(self.single_horizon_index, device=predictions.device),
+                num_classes=self.architecture.output_horizons,
+            ).to(predictions.dtype)
+            predictions = predictions * horizon_mask
         return predictions * equity_mask[..., None].to(predictions.dtype)
 
 
-def build_model(sidecar_feature_count: int | None = None) -> SharedCausalTCN:
-    return SharedCausalTCN(sidecar_feature_count=sidecar_feature_count)
+def build_model(
+    sidecar_feature_count: int | None = None,
+    single_horizon_index: int | None = None,
+) -> SharedCausalTCN:
+    return SharedCausalTCN(
+        sidecar_feature_count=sidecar_feature_count,
+        single_horizon_index=single_horizon_index,
+    )
 
 
 def count_trainable_parameters(model: nn.Module) -> int:

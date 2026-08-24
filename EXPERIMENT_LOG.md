@@ -2924,3 +2924,20 @@ GH200 instance `c2da7efd0ab645178a847aad8fdf12c8` (`gpu_1x_gh200`,
 `us-east-3`, IP `192.222.50.160`). The instance was absent from consecutive
 provider inventory reads at `2026-08-24T15:34:25Z` and
 `2026-08-24T15:34:54Z`; the account then had zero active instances.
+## Experiment 44 — ensemble science E1/E2 (preregistered; running)
+
+The full immutable protocol is
+`research/preregistrations/experiment44_ensemble_science.md`. Before any new
+combination score or trajectory, Experiment 43 Amendment A1 was frozen at
+`research/preregistrations/experiment43_amendment_a1.md`. A1 preserves the
+historical Experiment-43 decision under its original gate, introduces separate
+non-inferiority and superiority tracks, and requires an exact store-v2
+full-window reproduction before store-v2 becomes the standing comparator.
+
+Experiment 44 is one discovery-only session: inventory and hash-freeze the
+retained prediction roster, run the fixed E1 rank-combination rules, manufacture
+exactly 45 E2 store-v2 members, rerun the fixed combination rules, and name at
+most one future official-read arm. Every E1/E2 candidate is complexity-adding
+and must add at least `+0.001` mean IC with no negative held-out fold and paired
+block-5/10 support. Official validation and the held-out test are sealed; no E3,
+HPO, deployment change, or post-score rule expansion is authorized.

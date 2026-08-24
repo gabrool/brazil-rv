@@ -657,6 +657,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         sidecar: ExternalFeatureSidecar | None = None,
         zero_dynamic_channels: tuple[int, ...] = (),
         zero_slow_fields: tuple[int, ...] = (),
+        training_horizon_indices: tuple[int, ...] | None = None,
     ) -> None:
         self.store = store
         self.sidecar = sidecar
@@ -670,6 +671,13 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             raise ValueError("Slow zeroing indices must be unique values in 0..31")
         self.zero_dynamic_channels = zero_dynamic_channels
         self.zero_slow_fields = zero_slow_fields
+        if training_horizon_indices is not None and (
+            not training_horizon_indices
+            or len(set(training_horizon_indices)) != len(training_horizon_indices)
+            or any(value not in (0, 1, 2) for value in training_horizon_indices)
+        ):
+            raise ValueError("Training horizon indices must be unique values in 0..2")
+        self.training_horizon_indices = training_horizon_indices
         self.rows = {
             name: sample_index.get_column(name).to_numpy()
             for name in (
@@ -718,6 +726,11 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         common, active, equity_cutoffs, context_cutoffs, dates, decisions = (
             _common_batch(arrays, self.rows, positions, request.valid_count)
         )
+        if self.training_horizon_indices is not None:
+            keep = np.zeros(3, dtype=bool)
+            keep[list(self.training_horizon_indices)] = True
+            common["label_mask"] = common["label_mask"].copy()
+            common["label_mask"][..., ~keep] = False
         inputs = _build_patch_batch(
             arrays,
             dates,
@@ -741,7 +754,11 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
 
 class DateStratifiedBatchSampler(Sampler[BatchRequest]):
     def __init__(
-        self, sample_index: pl.DataFrame, runtime: RuntimeSettings, seed: int
+        self,
+        sample_index: pl.DataFrame,
+        runtime: RuntimeSettings,
+        seed: int,
+        date_multiset: tuple[object, ...] | None = None,
     ) -> None:
         self.runtime = runtime
         self.seed = seed
@@ -751,7 +768,17 @@ class DateStratifiedBatchSampler(Sampler[BatchRequest]):
         positions: dict[object, list[int]] = {}
         for position, trade_date in enumerate(sample_index["trade_date"]):
             positions.setdefault(trade_date, []).append(position)
-        self.dates = tuple(positions)
+        if date_multiset is None:
+            self.dates = tuple(positions)
+        else:
+            if len(date_multiset) != len(positions):
+                raise ValueError("Date multiset must preserve the fit-window length")
+            missing = set(date_multiset).difference(positions)
+            if missing:
+                raise ValueError(
+                    f"Date multiset contains dates outside fit window: {missing}"
+                )
+            self.dates = date_multiset
         self.positions_by_date = {
             value: np.asarray(items) for value, items in positions.items()
         }
@@ -854,12 +881,16 @@ def create_training_loaders(
     sidecar: ExternalFeatureSidecar | None = None,
     zero_dynamic_channels: tuple[int, ...] = (),
     zero_slow_fields: tuple[int, ...] = (),
+    date_multiset: tuple[object, ...] | None = None,
+    training_horizon_indices: tuple[int, ...] | None = None,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
     DateStratifiedBatchSampler,
 ]:
-    sampler = DateStratifiedBatchSampler(train_rows, runtime, seed)
+    sampler = DateStratifiedBatchSampler(
+        train_rows, runtime, seed, date_multiset=date_multiset
+    )
     train = _create_loader(
         VectorizedFeatureDataset(
             store,
@@ -867,6 +898,7 @@ def create_training_loaders(
             sidecar,
             zero_dynamic_channels,
             zero_slow_fields,
+            training_horizon_indices,
         ),
         sampler,
         runtime,
