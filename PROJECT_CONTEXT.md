@@ -578,3 +578,40 @@ root is 6.7 GiB.
 Paid GH200 instance `95098103c2da4ffcb8e9d10a4ac7704c` was terminated only
 after results, cleanup evidence, and GitHub state were secured, then confirmed
 absent in two consecutive Lambda inventory reads.
+
+## Incumbent feature-removal decision (2026-08-24)
+
+Experiment 41 produced a non-inferior retrained 34-field specification from the
+58 incumbent equity inputs. The selected prune-R2 candidate added
+`+0.000898/-0.000216/+0.002978` Raw Patience-3 IC on Fold C/A/B, mean
+`+0.001220`; every fold stayed above the fixed `-0.0005` floor. Prune-R1 failed
+that floor on Fold A. This is a store-v2 specification for the next rebuilt
+parent, not an in-place mutation of the current canonical store/model, and it
+does not authorize or alter the official-read lineup.
+
+Remove six dynamic fields: `return_60m_normalized`,
+`realized_vol_30m_log_ratio`, `session_range_position`,
+`cross_section_return_rank_15m`, `cross_section_volume_rank`, and
+`cross_section_volatility_rank_30m`. Remove 18 slow fields:
+`overnight_gap_normalized`, `previous_close_to_close_return_normalized`,
+`previous_open_to_close_return_normalized`,
+`median_daily_real_volume_20d_log_scale`,
+`median_daily_dollar_volume_20d_log_scale`,
+`daily_dollar_volume_regime_20d`, `observed_fraction_5d`,
+`observed_fraction_20d`, `dollar_volume_cross_section_rank`, `beta_to_WIN`,
+`beta_to_DI1F27`, `beta_to_DI1F28`, `beta_to_DI1F29`, `beta_to_DI1F31`,
+`weekday_sin`, `weekday_cos`, `month_end_proximity`, and
+`quarter_end_proximity`. Retain the other 34 incumbent inputs; specifically,
+the preview-proposed `volume_surprise`, 15/60-minute market-median returns,
+15-minute market breadth, and 60-minute cross-sectional return rank remain
+KEEP.
+
+The frozen Stage-A/B root is
+`feature_removal_d5b5e1f_20260823T224100Z`; the completed isolated Stage-C root
+is `feature_removal_stage_c_repair_d5b5e1f_20260823T232938Z`.
+Summary/specification SHA-256 values are
+`1070ecfadb99eef42d224b8eacc0ef31fc8e0e08ecc6a7e39aa5153e57fb18b8`
+and `08c04de3396fdc31d67b6baeabab1fea80cfd137d55bf2a1aef4ee69d1a34b72`.
+The final audit passed with official validation and held-out test sealed. Exact
+fold intervals, all 58 rule-attributed verdicts, the operational Stage-C repair,
+and retention-cleanup hashes are recorded in `EXPERIMENT_LOG.md` Experiment 41.

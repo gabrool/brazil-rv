@@ -2546,3 +2546,86 @@ for every field, hashes/manifests, and sealed-data flags. Cleanup is allowed onl
 after the final decision is recorded and must be inventory-bound; selected
 checkpoints, all prediction archives, analyses, manifests, and decision
 artifacts are required survivors.
+
+### Completed result (2026-08-24)
+
+Stage A clustered the 58 incumbent fields under the frozen training-only
+correlation contract. Stage B then froze nested candidates of 16 fields for R1
+and 24 fields for R2. Their inference-only parent-minus-ablated preview means
+were respectively `-0.001899` and `-0.002240`; both passed the fixed preview
+gate on every fold. These favorable inference ablations were treated only as
+candidate-construction evidence, not as the feature-removal decision.
+
+All 18 Stage-C trajectories completed. Prune-R1 produced Raw Patience-3
+candidate-minus-parent deltas of `+0.000741/-0.000812/+0.002965` on Fold C/A/B,
+mean `+0.000965`. It failed non-inferiority because Fold A breached the fixed
+`-0.0005` floor. Prune-R2 produced `+0.000898/-0.000216/+0.002978`, mean
+`+0.001220`, and passed non-inferiority. Its paired block-10 95% intervals were
+`[-0.001939,+0.002712]`, `[-0.001908,+0.000963]`, and
+`[+0.001665,+0.004946]` on C/A/B. It did not meet the separate numerical
+improvement rule because Fold A remained slightly negative. The diagnostic
+parent-plus-prune-R2 stack was positive on all three folds
+(`+0.000794/+0.000273/+0.001959`), while final EMA-0.995 was mixed and
+subordinate to the primary read.
+
+Under the preregistered selection rule, prune-R2 is the winner and defines the
+next store-v2 feature specification. Remove these 24 equity inputs:
+
+- dynamic: `return_60m_normalized`, `realized_vol_30m_log_ratio`,
+  `session_range_position`, `cross_section_return_rank_15m`,
+  `cross_section_volume_rank`, and `cross_section_volatility_rank_30m`;
+- slow return/liquidity/coverage: `overnight_gap_normalized`,
+  `previous_close_to_close_return_normalized`,
+  `previous_open_to_close_return_normalized`,
+  `median_daily_real_volume_20d_log_scale`,
+  `median_daily_dollar_volume_20d_log_scale`,
+  `daily_dollar_volume_regime_20d`, `observed_fraction_5d`,
+  `observed_fraction_20d`, and `dollar_volume_cross_section_rank`;
+- slow betas: `beta_to_WIN`, `beta_to_DI1F27`, `beta_to_DI1F28`,
+  `beta_to_DI1F29`, and `beta_to_DI1F31`; and
+- slow calendar: `weekday_sin`, `weekday_cos`, `month_end_proximity`, and
+  `quarter_end_proximity`.
+
+The other 34 fields remain. In particular, the preview walk-back proposed but
+did not remove `volume_surprise`, `market_median_return_15m`,
+`market_median_return_60m`, `market_breadth_15m`, and
+`cross_section_return_rank_60m`; their verdict is KEEP. The selected
+specification is for a future rebuilt parent and does not silently change the
+current canonical recipe or official-read lineup. Official validation and the
+held-out test remained sealed.
+
+The immutable Stage-A/B source program is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/feature_removal_d5b5e1f_20260823T224100Z
+
+It ran at commit `d5b5e1f5b56fcdb02b6a76ff37363ac841cc4e6e` and froze the
+Stage-A table and Stage-B sets at SHA-256
+`e05ebb1357b45db11f962818d80d50e2f12006335aaf3a7389a30adab38b0ade`
+and `4673a418745847c1a23210f6ed4f5513c19f76ceb7ebd216c9de7ff18e72ca54`.
+After those sets were frozen, the original parent retained 72.5 GiB of compiled
+Stage-B CUDA state and caused the first Stage-C worker launch to fail before a
+trajectory completed. The failed root and partial manifests were preserved.
+Stage C was rerun in a fresh isolated process/root, reusing the exact frozen-set
+hash and none of the partial Stage-C files:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/feature_removal_stage_c_repair_d5b5e1f_20260823T232938Z
+
+The repair summary and store-v2 specification SHA-256 values are
+`1070ecfadb99eef42d224b8eacc0ef31fc8e0e08ecc6a7e39aa5153e57fb18b8`
+and `08c04de3396fdc31d67b6baeabab1fea80cfd137d55bf2a1aef4ee69d1a34b72`.
+The final audit checked all 58 verdicts, 18 twenty-epoch histories, 360 original
+checkpoint containers, all 360 prediction archives, 24 analyses, 67 JSON
+artifacts, exact store/commit/definition hashes, and sealed-data flags with zero
+errors. Its SHA-256 is
+`b423d0f76c7e5f4e7aa88de1f8706ef01e678bd3f87be32828729c5b1443006b`.
+
+A reviewed inventory-bound cleanup deleted only 315 unselected checkpoint
+containers (1,420,508,533 bytes). It retained all 360 prediction archives and
+the union of epoch 20, both cross-fit Patience-selected epochs, and whole-fold
+Patience-selected epochs: 45 checkpoints. Every retained artifact was rehashed
+after deletion. The cleanup plan/result SHA-256 values are
+`0bca5cd90abb99f8294baaf947bd024dc387e2ebff9c4fb157a4b31f5be3c9d6`
+and `0f5242e759665f4e2bfe2b0ba3a6c0ec8045a57cd61cfeeb1c6c3d9bb843b8ea`;
+both are under `_cleanup/20260824T030400Z` in the repair root. The canonical
+runner now executes Stage B in an isolated process so compiled inference state
+cannot consume Stage-C worker memory on an exact rerun.

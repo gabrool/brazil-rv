@@ -926,6 +926,14 @@ def run_stage_b(
     return frozen_path
 
 
+def _run_stage_b_isolated(**kwargs: object) -> Path:
+    """Release compiled Stage-B CUDA state before Stage-C workers start."""
+    with ProcessPoolExecutor(
+        max_workers=1, mp_context=mp.get_context("spawn")
+    ) as executor:
+        return executor.submit(run_stage_b, **kwargs).result()
+
+
 def _run_training_job(
     store: Path,
     run_dir: Path,
@@ -1263,7 +1271,7 @@ def run_program(
         _atomic_json(manifest_path, manifest)
         manifest["stages"]["b"] = {"status": "running"}
         _atomic_json(manifest_path, manifest)
-        frozen = run_stage_b(
+        frozen = _run_stage_b_isolated(
             store=store,
             cluster_table=cluster_table,
             p0_attribution_report=p0_attribution_report,
