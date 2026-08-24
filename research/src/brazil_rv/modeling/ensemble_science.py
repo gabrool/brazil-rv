@@ -359,6 +359,7 @@ def run_amendment_a1(
     *,
     output_dir: Path,
     source_official_root: Path,
+    source_analysis: Path,
     selection_file: Path,
     parallel_processes: int = 2,
 ) -> Path:
@@ -367,6 +368,23 @@ def run_amendment_a1(
     if output_dir.exists():
         raise FileExistsError(output_dir)
     output_dir.mkdir(parents=True)
+    analysis = _read_json(source_analysis)
+    point_delta = float(analysis["candidate_minus_parent_primary_ic"])
+    horizon_deltas = [
+        float(row["candidate_minus_parent_ic"])
+        for row in analysis["horizon_guardrails"]
+    ]
+    interval_lowers = {
+        block: float(analysis["per_date_delta_bootstrap"][block]["lower_95"][0])
+        for block in ("5", "10")
+    }
+    noninferiority_passed = (
+        point_delta >= 0.0
+        and all(value >= 0.0 for value in horizon_deltas)
+        and all(value >= -0.0005 for value in interval_lowers.values())
+    )
+    if not noninferiority_passed:
+        raise ValueError("Store-v2 does not pass the frozen Amendment-A1 gate")
     store = resolve_feature_store()
     jobs = [
         (store, output_dir / "runs" / "store_v2" / f"seed_{seed}", seed, selection_file)
@@ -435,11 +453,23 @@ def run_amendment_a1(
         "amendment": str(AMENDMENT.resolve()),
         "amendment_sha256": _sha256(AMENDMENT.resolve()),
         "source_official_root": str(source_official_root.resolve()),
+        "source_analysis": str(source_analysis.resolve()),
+        "source_analysis_sha256": _sha256(source_analysis),
         "selection_file": str(selection_file.resolve()),
         "selection_file_sha256": _sha256(selection_file),
         "comparisons": comparisons,
         "all_prediction_archives_exact_match": True,
-        "store_v2_comparator_activated": True,
+        "amendment_a1_gate": {
+            "track": "complexity_reducing_noninferiority",
+            "point_delta": point_delta,
+            "horizon_deltas": horizon_deltas,
+            "block5_10_lower_95": interval_lowers,
+            "point_nonnegative": point_delta >= 0.0,
+            "every_horizon_nonnegative": all(value >= 0.0 for value in horizon_deltas),
+            "interval_floor": -0.0005,
+            "passed": noninferiority_passed,
+        },
+        "store_v2_comparator_activated": noninferiority_passed,
         "new_candidate_or_selection": False,
         "official_validation_reaccessed_only_for_exact_reproduction": True,
         "test_accessed": False,
@@ -1445,6 +1475,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     a1 = subparsers.add_parser("amendment-a1")
     a1.add_argument("--output-dir", type=Path, required=True)
     a1.add_argument("--source-official-root", type=Path, required=True)
+    a1.add_argument("--source-analysis", type=Path, required=True)
     a1.add_argument("--selection-file", type=Path, required=True)
     a1.add_argument("--parallel-processes", type=int, default=2)
     archive = subparsers.add_parser("materialize-archive-roster")
@@ -1488,6 +1519,7 @@ def main() -> None:
             run_amendment_a1(
                 output_dir=args.output_dir,
                 source_official_root=args.source_official_root,
+                source_analysis=args.source_analysis,
                 selection_file=args.selection_file,
                 parallel_processes=args.parallel_processes,
             )
