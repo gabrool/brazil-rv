@@ -3266,3 +3266,16 @@ bytes, SHA-256
 `efbe1ab047fe7c2c38e5a035676131038a98af095ea07ee39399190274069d53`.
 Verification V1 did not access model data, official validation, or the held-out
 test, and it did not modify Experiment 45's frozen program.
+
+## Experiment 46 — cross-equity given-graph structure (frozen 2026-08-25)
+
+Status at registration: no Experiment-46 target or retained fold prediction
+has been opened. The full frozen specification is
+`research/preregistrations/experiment46_cross_equity.md`. This discovery-only
+program builds one fixed monthly peer graph, runs the N0 decomposition and
+rotated neutralization screen on retained store-v2 Fold C/A/B comparators,
+screens exactly eight F-peer fields on dates through 2023-03-31, and spends
+nine GPU trajectories only if at least two fields survive. Official validation
+and held-out test remain sealed. Nothing in Experiment 46 changes the deployed
+Experiment-45 store-v2 ten-seed baseline. The active GH200 is retained after
+completion by explicit user instruction.

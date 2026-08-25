@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+import polars as pl
 
 from .analyze import compare_observation_ensembles, load_run_observations
 from .contract import ALLOWED_SEEDS, MAX_EPOCHS
@@ -22,6 +23,7 @@ from .designated_challenger import (
 )
 from .engine import EvaluationObservations, objective_metadata
 from .metrics import primary_validation_score
+from .metrics import moving_block_bootstrap
 from .provenance import repository_commit
 from .train import run_training
 from .trajectory import predictions_for_rule, simulate_patience3
@@ -112,7 +114,13 @@ def crossfit_patience_observations(
 
 
 def _run_job(
-    store: Path, run_dir: Path, seed: int, fold: str, sidecar_dir: Path
+    store: Path,
+    run_dir: Path,
+    seed: int,
+    fold: str,
+    sidecar_dir: Path,
+    zero_dynamic_channels: tuple[int, ...],
+    zero_slow_fields: tuple[int, ...],
 ) -> str:
     run_training(
         store=store,
@@ -120,6 +128,8 @@ def _run_job(
         selection_window=fold,
         run_dir=run_dir,
         sidecar_dir=sidecar_dir,
+        zero_dynamic_channels=zero_dynamic_channels,
+        zero_slow_fields=zero_slow_fields,
     )
     return str(run_dir)
 
@@ -242,6 +252,8 @@ def run_three_fold_sidecar_screen(
     output_dir: Path,
     experiment_role: str,
     parallel_processes: int = 2,
+    zero_dynamic_channels: tuple[int, ...] = (),
+    zero_slow_fields: tuple[int, ...] = (),
 ) -> Path:
     if output_dir.exists():
         raise FileExistsError(output_dir)
@@ -249,6 +261,14 @@ def run_three_fold_sidecar_screen(
         raise ValueError("Candidate name and experiment role must be nonempty")
     if not 1 <= parallel_processes <= MAX_PARALLEL:
         raise ValueError("A screen allows one or two isolated training processes")
+    if len(set(zero_dynamic_channels)) != len(zero_dynamic_channels) or any(
+        not 0 <= value < 26 for value in zero_dynamic_channels
+    ):
+        raise ValueError("Dynamic zeroing indices are invalid")
+    if len(set(zero_slow_fields)) != len(zero_slow_fields) or any(
+        not 0 <= value < 32 for value in zero_slow_fields
+    ):
+        raise ValueError("Slow-field zeroing indices are invalid")
     sidecar = load_external_sidecar(sidecar_dir, store)
     fold_c_report = _read_json(fold_c_parent_replay_report)
     fold_c_parent_replays = fold_c_report.get("comparison_metadata", {}).get(
@@ -280,7 +300,11 @@ def run_three_fold_sidecar_screen(
         },
         "seeds": list(ALLOWED_SEEDS),
         "objective": objective_metadata(),
-        "base_feature_pruning": False,
+        "base_feature_pruning": {
+            "dynamic_channels": list(zero_dynamic_channels),
+            "slow_fields": list(zero_slow_fields),
+            "applied_from_epoch_zero": True,
+        },
         "primary_gate": "mean delta >= +0.001 and every fold delta >= 0",
         "diversity_guardrail": "standalone delta >= -0.001 on every fold",
         "retention_comparator": "canonical_parent_only",
@@ -298,6 +322,8 @@ def run_three_fold_sidecar_screen(
             seed,
             fold,
             sidecar_dir,
+            zero_dynamic_channels,
+            zero_slow_fields,
         )
         for fold in FOLDS
         for seed in ALLOWED_SEEDS
@@ -434,6 +460,37 @@ def run_three_fold_sidecar_screen(
         float(standalone_rows[fold]["delta"]) >= -MAXIMUM_DIVERSITY_MEMBER_FOLD_LOSS
         for fold in FOLDS
     )
+    pooled_daily = np.concatenate(
+        [
+            np.asarray(
+                pl.read_parquet(
+                    output_dir
+                    / "analysis"
+                    / fold
+                    / "primary_standalone"
+                    / "vs_canonical"
+                    / "daily_delta.parquet"
+                )["candidate_minus_parent_ic"]
+            )
+            for fold in FOLDS
+        ]
+    )
+    pooled_intervals = {
+        str(block): {
+            key: np.asarray(value).tolist()
+            for key, value in moving_block_bootstrap(
+                pooled_daily,
+                replications=10_000,
+                block_length=block,
+                seed=46 + block,
+            ).items()
+        }
+        for block in (5, 10)
+    }
+    intervals_support = all(
+        float(pooled_intervals[str(block)]["lower_95"][0]) > 0.0 for block in (5, 10)
+    )
+    standalone_pass = standalone_pass and intervals_support
     summary = {
         "schema": "THREE_FOLD_EXTERNAL_SIDECAR_SCREEN_SUMMARY_V1",
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -447,6 +504,8 @@ def run_three_fold_sidecar_screen(
                     np.mean([standalone_rows[fold]["delta"] for fold in FOLDS])
                 ),
                 "gate_passed": standalone_pass,
+                "pooled_daily_delta_bootstrap": pooled_intervals,
+                "intervals_support_superiority": intervals_support,
             },
             "parent_plus_candidate": {
                 "fold_deltas": {fold: stack_rows[fold]["delta"] for fold in FOLDS},
@@ -464,7 +523,11 @@ def run_three_fold_sidecar_screen(
             "retention_comparator": "canonical_parent_only",
             "designated_challenger_role": "informational_only",
             "beats_either_allowed": False,
-            "base_feature_pruning": False,
+            "base_feature_pruning": {
+                "dynamic_channels": list(zero_dynamic_channels),
+                "slow_fields": list(zero_slow_fields),
+                "applied_from_epoch_zero": True,
+            },
             "official_validation_accessed": False,
             "test_accessed": False,
         },
@@ -501,7 +564,12 @@ def main() -> None:
     parser.add_argument("--candidate-name", required=True)
     parser.add_argument("--experiment-role", required=True)
     parser.add_argument("--parallel-processes", type=int, default=2)
-    print(run_three_fold_sidecar_screen(**vars(parser.parse_args())))
+    parser.add_argument("--zero-dynamic-channels", type=int, nargs="*", default=[])
+    parser.add_argument("--zero-slow-fields", type=int, nargs="*", default=[])
+    values = vars(parser.parse_args())
+    values["zero_dynamic_channels"] = tuple(values["zero_dynamic_channels"])
+    values["zero_slow_fields"] = tuple(values["zero_slow_fields"])
+    print(run_three_fold_sidecar_screen(**values))
 
 
 if __name__ == "__main__":
