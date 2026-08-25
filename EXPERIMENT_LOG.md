@@ -3138,3 +3138,58 @@ The optional D1 closure may query the existing current-broker MT5 terminal
 only, with unlimited max bars, for PETR4/VALE3/BOVA11 M1 from 2018-01-01 and
 record the earliest returned bar. No account creation or further D1 work is
 authorized.
+
+### Verification V1 result (2026-08-25)
+
+Direct egress was confirmed before the ladder: the known-good B3 market-data
+page returned HTTP 200 directly from `104.18.43.121`, with 42,542 legitimate
+HTML bytes and body SHA-256
+`36520c545aae28d557b1497632e6971b91aeafa04d92735a54270984815e3ae5`.
+The legacy `arquivos.b3.com.br/apinegocios/tickercsv/{date}` route returned
+zero-byte HTTP 404 responses for both recent completed sessions, so it was not
+treated as archive evidence.
+
+Official `/bdi` UI inspection exposed the current no-token GET route
+`https://drp.b3.com.br/rapinegocios/tickercsv/{date}`. The live date picker
+spanned `2026-07-15` through `2026-08-25`. Seventeen rate-limited date probes
+stayed inside the frozen 40-request budget. The historical ladder from
+`2026-01-15` through the `2022-06-01` negative control returned HTTP 200 with
+zero bytes, hence EMPTY rather than FULL. Boundary bisection established
+`2026-07-29` as the earliest verified FULL date; `2026-07-27` was EMPTY and
+`2026-07-28` was zero-byte HTTP 404 / DENIED. This is predeclared Outcome B:
+the endpoint is a recent rolling window, not a deep historical archive. D2 is
+therefore not researchable now and is shelved without forward capture under
+the user's direct instruction.
+
+Three downloaded ZIPs were preserved byte-for-byte under the immutable
+`quant-data/b3/raw/b3_negocios/archives` root. Their date / compressed bytes /
+row count / distinct-instrument count / participant-code coverage / SHA-256
+records are:
+
+- `2026-07-29` / `80,559,926` / `9,023,458` / `15,278` /
+  `0.996820731` / `4b7c269ffc2b95eafa191ec57a083c2d7a73e330d683456d7667570e85a7aaef`;
+- `2026-08-04` / `80,901,806` / `8,803,482` / `15,876` /
+  `0.997777357` / `d13d329ae163e23712a73f2805ac998b505d94051af2e0807e4767a260878824`;
+- `2026-08-24` / `90,482,379` / `9,948,893` / `17,468` /
+  `0.997779853` / `e874f8c4fb5750060d497c00b374e6ca6ffa1b292585d1ab1da6e4a4a286adaf`.
+
+All three archives had zero malformed rows, both participant columns, and
+passing PETR4/VALE3 positive-price, positive-quantity, parseable-time, and
+session-range checks. The raw archive manifest SHA-256 after adoption and a
+no-download existing-archive validation was
+`cb45a4cc8403e92fcae1b00dfe4b0e369b3d27fdb13a10719addb0fabbf0b520`.
+
+No recurring capture task is installed. A scheduled task was initially
+registered while following the attached specification, then immediately
+unregistered before any scheduled execution when the user clarified that only
+the history check was wanted. The optional current-XP-terminal D1 probe also
+made no data read: the terminal already had `MaxBars=100000000`, but did not
+expose a Python IPC connection (`-10004`, `No IPC connection`); it was closed
+without changing the account or terminal setting.
+
+The single immutable verification artifact is
+`C:\Brazil-RV\transfer\verification_v1\verification_v1_report.json`, 7,419
+bytes, SHA-256
+`efbe1ab047fe7c2c38e5a035676131038a98af095ea07ee39399190274069d53`.
+Verification V1 did not access model data, official validation, or the held-out
+test, and it did not modify Experiment 45's frozen program.
