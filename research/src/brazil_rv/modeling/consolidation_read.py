@@ -153,8 +153,6 @@ def derive_consensus(analysis: Mapping[str, object]) -> dict[str, object]:
         if not isinstance(path, Mapping):
             raise ValueError(f"Malformed Experiment 44 path: {fold}")
         heldout_members = [str(value) for value in path["heldout_members"]]
-        if len(heldout_members) != len(set(heldout_members)):
-            raise ValueError(f"Experiment 44 path repeats a member: {fold}")
         counts.update(heldout_members)
         for step in path["steps"]:
             gains[str(step["addition"])].append(float(step["marginal_ic"]))

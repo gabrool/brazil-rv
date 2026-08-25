@@ -99,6 +99,32 @@ def test_consensus_withdraws_without_repeated_noncomparator() -> None:
     assert derive_consensus(analysis)["withdrawn"] is True
 
 
+def test_consensus_preserves_repeat_weight_within_one_greedy_path() -> None:
+    repeated = "e2c_horizon_30|seed_47|final_ema_0995"
+    paths = {
+        fold: _path(*COMPARATOR_IDENTITIES, gains={})
+        for fold in ("fold_c", "fold_a", "fold_b")
+    }
+    paths["fold_c"] = {
+        "heldout_members": [*COMPARATOR_IDENTITIES, repeated, repeated],
+        "steps": [
+            {"addition": repeated, "marginal_ic": 0.0002},
+            {"addition": repeated, "marginal_ic": 0.0001},
+        ],
+    }
+    analysis = {
+        "named_read_arm": {"label": "e2_plus_archive", "paths": paths}
+    }
+
+    consensus = derive_consensus(analysis)
+
+    member = consensus["members"][3]
+    assert member["identity"] == repeated
+    assert member["total_repeat_count"] == 2
+    assert member["raw_weight"] == 2
+    assert abs(member["mean_recorded_marginal_gain"] - 0.00015) < 1e-15
+
+
 def test_frozen_gate_boundaries_are_strict_or_inclusive_as_registered() -> None:
     assert sanity_band_passed(ARCHIVED_STORE_V2_IC + 0.0015)
     assert not sanity_band_passed(ARCHIVED_STORE_V2_IC + 0.0015001)
