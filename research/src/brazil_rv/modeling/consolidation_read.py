@@ -4,6 +4,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import multiprocessing as mp
 import os
 import time
@@ -217,7 +218,10 @@ def derive_consensus(analysis: Mapping[str, object]) -> dict[str, object]:
 
 
 def sanity_band_passed(fresh_three_seed_ic: float) -> bool:
-    return abs(fresh_three_seed_ic - ARCHIVED_STORE_V2_IC) <= SANITY_BAND
+    delta = abs(fresh_three_seed_ic - ARCHIVED_STORE_V2_IC)
+    return delta <= SANITY_BAND or math.isclose(
+        delta, SANITY_BAND, rel_tol=0.0, abs_tol=1e-12
+    )
 
 
 def deploy_arm1_ten_seed(fresh_ten_seed_ic: float, fresh_three_seed_ic: float) -> bool:
