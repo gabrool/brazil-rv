@@ -60,14 +60,14 @@ def _load_parent_ensemble(
     fold: str,
     parent_campaign: Path,
     fold_c_parent: Path,
-    fold_c_replays: dict[str, list[dict[str, object]]],
+    fold_replays: dict[str, dict[str, list[dict[str, object]]]],
 ) -> EvaluationObservations:
     members = []
     for seed in ALLOWED_SEEDS:
         run = _parent_run(parent_campaign, fold_c_parent, fold, seed)
         observations, _ = crossfit_patience_observations(
             run,
-            fold_c_replays[f"seed_{seed}"] if fold == "fold_c" else None,
+            fold_replays[fold][f"seed_{seed}"],
         )
         members.append(observations)
     for candidate in members[1:]:
@@ -447,11 +447,10 @@ def run_n0(
         raise FileExistsError(output_dir)
     output_dir.mkdir(parents=True)
     replay_report = json.loads(replay_path.read_text(encoding="utf-8"))
-    replays = replay_report.get("comparison_metadata", {}).get(
-        "parent_patience_replays"
-    )
-    if not isinstance(replays, dict):
-        raise ValueError("Fold-C replay report lacks parent_patience_replays")
+    metadata = replay_report.get("comparison_metadata", {})
+    replays = metadata.get("parent_patience_replays_by_fold")
+    if not isinstance(replays, dict) or set(replays) != set(FOLDS):
+        raise ValueError("Parent replay report lacks all three folds")
     slow = np.load(store / "equity_slow.npy", mmap_mode="r")
     active = np.load(store / "equity_membership.npy", mmap_mode="r") & np.load(
         store / "equity_data_ready.npy", mmap_mode="r"
@@ -472,7 +471,7 @@ def run_n0(
             fold=fold,
             parent_campaign=parent_campaign,
             fold_c_parent=fold_c_parent,
-            fold_c_replays=replays,
+            fold_replays=replays,
         )
         folds[fold] = _fold_analysis(
             observations,

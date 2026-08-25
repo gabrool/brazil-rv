@@ -271,13 +271,18 @@ def run_three_fold_sidecar_screen(
         raise ValueError("Slow-field zeroing indices are invalid")
     sidecar = load_external_sidecar(sidecar_dir, store)
     fold_c_report = _read_json(fold_c_parent_replay_report)
-    fold_c_parent_replays = fold_c_report.get("comparison_metadata", {}).get(
-        "parent_patience_replays"
-    )
-    if not isinstance(fold_c_parent_replays, dict) or set(fold_c_parent_replays) != {
-        f"seed_{seed}" for seed in ALLOWED_SEEDS
-    }:
-        raise ValueError("Fold-C parent replay report lacks the frozen three seeds")
+    replay_metadata = fold_c_report.get("comparison_metadata", {})
+    parent_replays_by_fold = replay_metadata.get("parent_patience_replays_by_fold")
+    if parent_replays_by_fold is None:
+        parent_replays_by_fold = {
+            "fold_c": replay_metadata.get("parent_patience_replays")
+        }
+    expected_seeds = {f"seed_{seed}" for seed in ALLOWED_SEEDS}
+    if set(parent_replays_by_fold) not in ({"fold_c"}, set(FOLDS)) or any(
+        not isinstance(replays, dict) or set(replays) != expected_seeds
+        for replays in parent_replays_by_fold.values()
+    ):
+        raise ValueError("Parent replay report has malformed frozen seed replays")
     commit = repository_commit()
     output_dir.mkdir(parents=True)
     manifest_path = output_dir / "campaign_manifest.json"
@@ -353,7 +358,7 @@ def run_three_fold_sidecar_screen(
         parent_primary, parent_replays = _members(
             parent_paths,
             PRIMARY_RULE,
-            fold_c_parent_replays if fold == "fold_c" else None,
+            parent_replays_by_fold.get(fold),
         )
         standalone = _compare_primary(
             fold=fold,
