@@ -125,3 +125,42 @@ def test_discovery_screen_reports_both_comparators_but_selects_on_parent(
     }
     assert (output / "vs_canonical" / "analysis.json").is_file()
     assert (output / "vs_designated_challenger" / "analysis.json").is_file()
+
+
+def test_discovery_screen_accepts_frozen_parent_distinct_from_legacy_challenger(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(analyze_module, "BOOTSTRAP_REPLICATIONS", 20)
+    target = _observations(np.zeros((10, 32, 3), dtype=np.float32)).targets
+    candidate = _observations(target)
+    parent_predictions = target.copy()
+    parent_predictions[:, [0, 1]] = parent_predictions[:, [1, 0]]
+    parent = _observations(parent_predictions)
+    legacy_predictions = target.copy()
+    legacy_predictions[:, [2, 3]] = legacy_predictions[:, [3, 2]]
+    legacy_parent = _observations(legacy_predictions)
+    monkeypatch.setattr(
+        challenger_module,
+        "load_designated_challenger_members",
+        lambda _fold, run_root: {
+            **{f"parent_seed_{seed}": legacy_parent for seed in (11, 29, 47)},
+            **{f"residual_seed_{seed}": candidate for seed in (11, 29, 47)},
+        },
+    )
+
+    output = compare_discovery_screen(
+        {"candidate": candidate},
+        {f"seed_{seed}": parent for seed in (11, 29, 47)},
+        fold="fold_a",
+        candidate_rule="candidate_rule",
+        parent_rule="patience3_raw",
+        output_dir=tmp_path / "screen",
+        run_root=tmp_path,
+        require_designated_parent_match=False,
+    )
+
+    analysis = json.loads(
+        (output / "vs_canonical" / "analysis.json").read_text(encoding="utf-8")
+    )
+    assert analysis["comparison_metadata"]["designated_parent_match_required"] is False

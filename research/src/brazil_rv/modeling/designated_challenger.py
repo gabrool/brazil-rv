@@ -227,6 +227,7 @@ def compare_discovery_screen(
     parent_rule: str,
     output_dir: Path,
     run_root: Path = RUN_OUTPUT_BASE,
+    require_designated_parent_match: bool = True,
 ) -> Path:
     if output_dir.exists():
         raise FileExistsError(output_dir)
@@ -235,20 +236,25 @@ def compare_discovery_screen(
         f"seed_{seed}": challenger_members[f"parent_seed_{seed}"]
         for seed in ALLOWED_SEEDS
     }
-    if set(parent_members) != set(canonical_parent):
-        raise ValueError("Canonical parent members must be seeds 11, 29, and 47")
-    for name, expected in canonical_parent.items():
-        actual = parent_members[name]
-        assert_observations_aligned(expected, actual)
-        if not np.array_equal(expected.predictions, actual.predictions):
-            raise ValueError(f"Canonical parent predictions differ for {name}")
+    if require_designated_parent_match:
+        if set(parent_members) != set(canonical_parent):
+            raise ValueError("Canonical parent members must be seeds 11, 29, and 47")
+        for name, expected in canonical_parent.items():
+            actual = parent_members[name]
+            assert_observations_aligned(expected, actual)
+            if not np.array_equal(expected.predictions, actual.predictions):
+                raise ValueError(f"Canonical parent predictions differ for {name}")
     canonical_dir = compare_observation_ensembles(
         candidate_members,
         parent_members,
         candidate_rule=candidate_rule,
         parent_rule=parent_rule,
         output_dir=output_dir / "vs_canonical",
-        comparison_metadata={"fold": fold, "retention_comparator": True},
+        comparison_metadata={
+            "fold": fold,
+            "retention_comparator": True,
+            "designated_parent_match_required": require_designated_parent_match,
+        },
     )
     challenger_dir = compare_observation_ensembles(
         candidate_members,

@@ -198,3 +198,18 @@ every tier.
   zero.
 - The active paid GH200 instance is explicitly retained after Experiment 46
   at the user's request.
+
+## Operational repair after frozen F3 training
+
+- All nine F3 trajectories completed under commit
+  `0976c4004194abe5b8a982b4bc6bdbf346cf4926` before the analysis repair.
+  The first post-training comparison stopped before producing a fold verdict
+  because the standing designated-challenger helper asserted that the supplied
+  retention parent must equal the challenger artifact's legacy embedded parent.
+- Experiment 46's frozen retention parent is instead the accepted store-v2
+  parent. The repair therefore leaves every trained prediction, replay, fold,
+  comparator, readout, interval, and gate unchanged; it only permits the
+  supplied hash-verified store-v2 parent to remain the retention comparator
+  while the standing challenger remains informational. An analysis-only resume
+  path verifies all nine completed run manifests and reuses their immutable
+  prediction archives without training another trajectory.

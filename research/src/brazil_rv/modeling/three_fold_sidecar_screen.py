@@ -204,6 +204,7 @@ def _compare_primary(
             parent_rule=PRIMARY_RULE,
             output_dir=output_dir,
             run_root=run_root,
+            require_designated_parent_match=False,
         )
         summary = _read_json(report / "screen_summary.json")
         return {
@@ -254,9 +255,12 @@ def run_three_fold_sidecar_screen(
     parallel_processes: int = 2,
     zero_dynamic_channels: tuple[int, ...] = (),
     zero_slow_fields: tuple[int, ...] = (),
+    analysis_only: bool = False,
 ) -> Path:
-    if output_dir.exists():
+    if output_dir.exists() and not analysis_only:
         raise FileExistsError(output_dir)
+    if not output_dir.is_dir() and analysis_only:
+        raise FileNotFoundError(output_dir)
     if not candidate_name or not experiment_role:
         raise ValueError("Candidate name and experiment role must be nonempty")
     if not 1 <= parallel_processes <= MAX_PARALLEL:
@@ -284,41 +288,53 @@ def run_three_fold_sidecar_screen(
     ):
         raise ValueError("Parent replay report has malformed frozen seed replays")
     commit = repository_commit()
-    output_dir.mkdir(parents=True)
+    output_dir.mkdir(parents=True, exist_ok=analysis_only)
     manifest_path = output_dir / "campaign_manifest.json"
-    manifest = {
-        "schema": "THREE_FOLD_EXTERNAL_SIDECAR_SCREEN_V1",
-        "status": "running",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "candidate_name": candidate_name,
-        "experiment_role": experiment_role,
-        "repository_commit": commit,
-        "feature_store": str(store.resolve()),
-        "feature_store_identity": feature_store_identity(store),
-        "external_sidecar": sidecar.identity,
-        "folds": list(FOLDS),
-        "fold_c": {
-            "fit": "2021-08-16..2023-03-31 (407 dates)",
-            "selection": "2023-04-03..2023-08-31 (105 dates)",
-            "date_sampling": "512 draws with replacement per effective batch",
-            "parent_replay_report": str(fold_c_parent_replay_report.resolve()),
-        },
-        "seeds": list(ALLOWED_SEEDS),
-        "objective": objective_metadata(),
-        "base_feature_pruning": {
-            "dynamic_channels": list(zero_dynamic_channels),
-            "slow_fields": list(zero_slow_fields),
-            "applied_from_epoch_zero": True,
-        },
-        "primary_gate": "mean delta >= +0.001 and every fold delta >= 0",
-        "diversity_guardrail": "standalone delta >= -0.001 on every fold",
-        "retention_comparator": "canonical_parent_only",
-        "designated_challenger_role": "informational_only_on_folds_a_b",
-        "secondary_readout": SECONDARY_RULE,
-        "official_validation_accessed": False,
-        "test_accessed": False,
-    }
-    _atomic_json(manifest_path, manifest)
+    if analysis_only:
+        manifest = _read_json(manifest_path)
+        if (
+            manifest.get("status") != "running"
+            or manifest.get("candidate_name") != candidate_name
+            or manifest.get("experiment_role") != experiment_role
+            or manifest.get("feature_store") != str(store.resolve())
+            or manifest.get("official_validation_accessed") is not False
+            or manifest.get("test_accessed") is not False
+        ):
+            raise ValueError("Existing campaign does not match the analysis-only request")
+    else:
+        manifest = {
+            "schema": "THREE_FOLD_EXTERNAL_SIDECAR_SCREEN_V1",
+            "status": "running",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "candidate_name": candidate_name,
+            "experiment_role": experiment_role,
+            "repository_commit": commit,
+            "feature_store": str(store.resolve()),
+            "feature_store_identity": feature_store_identity(store),
+            "external_sidecar": sidecar.identity,
+            "folds": list(FOLDS),
+            "fold_c": {
+                "fit": "2021-08-16..2023-03-31 (407 dates)",
+                "selection": "2023-04-03..2023-08-31 (105 dates)",
+                "date_sampling": "512 draws with replacement per effective batch",
+                "parent_replay_report": str(fold_c_parent_replay_report.resolve()),
+            },
+            "seeds": list(ALLOWED_SEEDS),
+            "objective": objective_metadata(),
+            "base_feature_pruning": {
+                "dynamic_channels": list(zero_dynamic_channels),
+                "slow_fields": list(zero_slow_fields),
+                "applied_from_epoch_zero": True,
+            },
+            "primary_gate": "mean delta >= +0.001 and every fold delta >= 0",
+            "diversity_guardrail": "standalone delta >= -0.001 on every fold",
+            "retention_comparator": "canonical_parent_only",
+            "designated_challenger_role": "informational_only_on_folds_a_b",
+            "secondary_readout": SECONDARY_RULE,
+            "official_validation_accessed": False,
+            "test_accessed": False,
+        }
+        _atomic_json(manifest_path, manifest)
 
     jobs = [
         (
@@ -333,7 +349,20 @@ def run_three_fold_sidecar_screen(
         for fold in FOLDS
         for seed in ALLOWED_SEEDS
     ]
-    if parallel_processes == 1:
+    if analysis_only:
+        for fold in FOLDS:
+            for seed in ALLOWED_SEEDS:
+                run_manifest = _read_json(
+                    _candidate_run(output_dir, fold, seed) / "run_manifest.json"
+                )
+                if (
+                    run_manifest.get("status") != "completed"
+                    or run_manifest.get("seed") != seed
+                    or run_manifest.get("split", {}).get("training") != fold
+                    or run_manifest.get("split", {}).get("test_accessed") is not False
+                ):
+                    raise ValueError(f"Candidate run is not complete: {fold}/seed_{seed}")
+    elif parallel_processes == 1:
         for job in jobs:
             print(_run_job(*job), flush=True)
     else:
@@ -545,6 +574,8 @@ def run_three_fold_sidecar_screen(
             **manifest,
             "status": "completed",
             "completed_at": datetime.now(timezone.utc).isoformat(),
+            "analysis_repository_commit": commit,
+            "analysis_only_resume": analysis_only,
             "screen_summary": str(summary_path.resolve()),
             "candidate_retained": summary["candidate_retained"],
         },
@@ -571,6 +602,7 @@ def main() -> None:
     parser.add_argument("--parallel-processes", type=int, default=2)
     parser.add_argument("--zero-dynamic-channels", type=int, nargs="*", default=[])
     parser.add_argument("--zero-slow-fields", type=int, nargs="*", default=[])
+    parser.add_argument("--analysis-only", action="store_true")
     values = vars(parser.parse_args())
     values["zero_dynamic_channels"] = tuple(values["zero_dynamic_channels"])
     values["zero_slow_fields"] = tuple(values["zero_slow_fields"])
