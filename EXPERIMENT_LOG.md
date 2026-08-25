@@ -3364,3 +3364,21 @@ root.
 Per the user's explicit override, paid GH200 instance
 `d0ebcd5f7dbb44dc99370080df7b47cc` remains active for the immediately
 following experiment and must not be terminated at Experiment-46 closure.
+
+## Experiment 47 — final bounded HPO + structural sweep (frozen 2026-08-25)
+
+Status at registration: no Experiment-47 trajectory, fold prediction, or
+score exists. The full frozen specification and pre-score implementation
+resolutions are in
+`research/preregistrations/experiment47_hpo_sweep.md`. This discovery-only
+program runs exactly 16 preregistered cells on seed 29 and Folds B/C, then
+conditionally confirms at most three qualifiers on seeds 11/29/47 and Folds
+C/A/B. Stage 2 compares only with the immutable Experiment-41 Stage-C
+store-v2 three-seed comparator. Official validation and the held-out test stay
+sealed; no deployment change or ensemble-pool scoring is permitted.
+
+The attached contract closes HPO and architecture axes permanently for this
+generation after completion. It also ends the standing keep-alive override:
+after results, artifact audit, reviewed checkpoint cleanup, and result push,
+exact paid instance `d0ebcd5f7dbb44dc99370080df7b47cc` must be terminated and
+verified absent twice.

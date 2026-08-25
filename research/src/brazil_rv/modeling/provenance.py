@@ -8,8 +8,6 @@ from pathlib import Path
 from .contract import (
     ADAMW_BETAS,
     ADAMW_EPS,
-    ADAMW_LR,
-    ADAMW_WEIGHT_DECAY,
     EARLY_STOP_PATIENCE,
     MIN_IC_IMPROVEMENT,
     EMA_DECAYS,
@@ -17,11 +15,12 @@ from .contract import (
     GH200_RUNTIME,
     GRADIENT_CLIP,
     MAX_EPOCHS,
-    SAM_RHO,
-    SOFT_RANK_TEMPERATURE,
     TCN_ARCHITECTURE,
     WARMUP_FRACTION,
     RuntimeSettings,
+    TRAINING_SPECIFICATION,
+    TCNArchitecture,
+    TrainingSpecification,
 )
 from .optim import scheduler_step_contract
 
@@ -40,12 +39,14 @@ def repository_commit() -> str:
 
 def model_metadata(
     sidecar_feature_count: int | None = None,
+    *,
+    architecture: TCNArchitecture = TCN_ARCHITECTURE,
 ) -> dict[str, object]:
     if sidecar_feature_count is not None and sidecar_feature_count <= 0:
         raise ValueError("sidecar_feature_count must be positive")
     model = {
         "model_name": "tcn",
-        "architecture": asdict(TCN_ARCHITECTURE),
+        "architecture": asdict(architecture),
         "cross_equity_attention": False,
     }
     if sidecar_feature_count is not None:
@@ -66,6 +67,7 @@ def training_contract(
     date_replacement: bool,
     *,
     runtime: RuntimeSettings = GH200_RUNTIME,
+    specification: TrainingSpecification = TRAINING_SPECIFICATION,
 ) -> dict[str, object]:
     steps_per_epoch, warmup_steps = scheduler_step_contract(
         training_sample_count,
@@ -90,16 +92,17 @@ def training_contract(
         "warmup_steps": warmup_steps,
         "scheduler_warmup_fraction": WARMUP_FRACTION,
         "scheduler_final_lr_factor": FINAL_LR_FACTOR,
-        "learning_rate": ADAMW_LR,
+        "learning_rate": specification.learning_rate,
         "adamw_betas": list(ADAMW_BETAS),
         "adamw_epsilon": ADAMW_EPS,
-        "adamw_weight_decay": ADAMW_WEIGHT_DECAY,
+        "adamw_weight_decay": specification.weight_decay,
         "gradient_clip": GRADIENT_CLIP,
         "objective": {
             "name": "soft_spearman",
-            "temperature": SOFT_RANK_TEMPERATURE,
+            "temperature": specification.soft_rank_temperature,
         },
-        "sam": {"rho": SAM_RHO, "base_optimizer": "adamw"},
+        "sam": {"rho": specification.sam_rho, "base_optimizer": "adamw"},
+        "patch_minutes": specification.patch_minutes,
     }
 
 
@@ -117,6 +120,7 @@ def build_run_provenance(
     date_replacement: bool,
     external_sidecar: dict[str, object] | None = None,
     runtime: RuntimeSettings = GH200_RUNTIME,
+    specification: TrainingSpecification = TRAINING_SPECIFICATION,
 ) -> dict[str, object]:
     sidecar_feature_count: int | None = None
     if external_sidecar is not None:
@@ -129,7 +133,9 @@ def build_run_provenance(
         "repository_commit": repository_commit_value,
         "feature_store": str(feature_store.resolve()),
         "feature_store_identity": feature_store_metadata,
-        "model": model_metadata(sidecar_feature_count),
+        "model": model_metadata(
+            sidecar_feature_count, architecture=specification.architecture
+        ),
         "seed": seed,
         "fit_window": fit_window,
         "selection_window": selection_window,
@@ -140,6 +146,7 @@ def build_run_provenance(
             training_sample_count,
             date_replacement,
             runtime=runtime,
+            specification=specification,
         ),
     }
     if external_sidecar is not None:

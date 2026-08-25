@@ -17,7 +17,6 @@ import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
 from .contract import (
-    ABSOLUTE_PATCH_COUNT,
     CANONICAL_DROPPED_LOCAL_SLOTS,
     CANONICAL_NEUTRALIZED_EQUITY_SLOW_INDICES,
     CANONICAL_RETAINED_GLOBAL_SLOTS,
@@ -26,7 +25,6 @@ from .contract import (
     DYNAMIC_CHANNEL_COUNT,
     DISCOVERY_FIT_DATE_COUNTS,
     DISCOVERY_SELECTION_DATE_COUNT,
-    EQUITY_ABSOLUTE_START_PATCH,
     EQUITY_COUNT,
     EXPECTED_DECISIONS_PER_DATE,
     EXPECTED_SPLIT_DATE_COUNTS,
@@ -36,7 +34,6 @@ from .contract import (
     GLOBAL_WINDOW_MINUTES,
     HORIZON_COUNT,
     LOCAL_CONTEXT_COUNT,
-    PATCH_INPUT_WIDTH,
     PATCH_MINUTES,
     RuntimeSettings,
     SLOW_FEATURE_COUNT,
@@ -524,20 +521,26 @@ def _build_patch_batch(
     active: np.ndarray,
     zero_dynamic_channels: tuple[int, ...] = (),
     zero_slow_fields: tuple[int, ...] = (),
+    patch_minutes: int = PATCH_MINUTES,
 ) -> dict[str, np.ndarray]:
     batch_size = date_idx.size
+    if patch_minutes not in (5, 10):
+        raise ValueError("Patch minutes must be 5 or 10")
+    patch_count = math.ceil(GLOBAL_WINDOW_MINUTES / patch_minutes)
+    patch_width = patch_minutes * DYNAMIC_CHANNEL_COUNT
+    absolute_start_patch = 60 // patch_minutes
     local_ready, global_ready = _context_readiness(arrays, date_idx, decision_idx)
     patches = np.zeros(
         (
             batch_size,
             EQUITY_COUNT + CONTEXT_COUNT,
-            ABSOLUTE_PATCH_COUNT,
-            PATCH_INPUT_WIDTH,
+            patch_count,
+            patch_width,
         ),
         dtype=np.float32,
     )
     history_mask = np.zeros(
-        (batch_size, EQUITY_COUNT + CONTEXT_COUNT, ABSOLUTE_PATCH_COUNT), dtype=bool
+        (batch_size, EQUITY_COUNT + CONTEXT_COUNT, patch_count), dtype=bool
     )
     instrument_mask = np.zeros((batch_size, EQUITY_COUNT + CONTEXT_COUNT), dtype=bool)
     instrument_mask[:, :EQUITY_COUNT] = active
@@ -556,28 +559,36 @@ def _build_patch_batch(
     for cutoff in np.unique(equity_cutoffs):
         group = np.flatnonzero(equity_cutoffs == cutoff)
         context_cutoff = int(context_cutoffs[group[0]])
-        state = context_cutoff // PATCH_MINUTES
-        equity_patches = int(cutoff) // PATCH_MINUTES
-        if EQUITY_ABSOLUTE_START_PATCH + equity_patches != state:
+        context_pad = (-context_cutoff) % patch_minutes
+        equity_pad = (-int(cutoff)) % patch_minutes
+        state = (context_cutoff + context_pad) // patch_minutes
+        equity_patches = (int(cutoff) + equity_pad) // patch_minutes
+        if absolute_start_patch + equity_patches != state:
             raise ValueError("Equity and context patch clocks are misaligned")
         state_position[group] = state
         prefix = np.asarray(
             arrays["equity_features.npy"][date_idx[group], :, : int(cutoff), :],
             dtype=np.float32,
-        ).reshape(group.size, EQUITY_COUNT, equity_patches, PATCH_INPUT_WIDTH)
+        )
+        if equity_pad:
+            prefix = np.pad(prefix, ((0, 0), (0, 0), (equity_pad, 0), (0, 0)))
+        prefix = prefix.reshape(group.size, EQUITY_COUNT, equity_patches, patch_width)
         for channel in zero_dynamic_channels:
             prefix[..., channel::DYNAMIC_CHANNEL_COUNT] = 0.0
-        patches[group, :EQUITY_COUNT, EQUITY_ABSOLUTE_START_PATCH:state] = (
+        patches[group, :EQUITY_COUNT, absolute_start_patch:state] = (
             prefix * active[group, :, None, None]
         )
-        history_mask[group, :EQUITY_COUNT, EQUITY_ABSOLUTE_START_PATCH:state] = active[
+        history_mask[group, :EQUITY_COUNT, absolute_start_patch:state] = active[
             group, :, None
         ]
         ready = local_ready[group]
         local = np.asarray(
             arrays["context_features.npy"][date_idx[group], :, :context_cutoff, :],
             dtype=np.float32,
-        ).reshape(group.size, LOCAL_CONTEXT_COUNT, state, PATCH_INPUT_WIDTH)
+        )
+        if context_pad:
+            local = np.pad(local, ((0, 0), (0, 0), (context_pad, 0), (0, 0)))
+        local = local.reshape(group.size, LOCAL_CONTEXT_COUNT, state, patch_width)
         start = EQUITY_COUNT
         patches[group, start : start + LOCAL_CONTEXT_COUNT, :state] = (
             local * ready[..., None, None]
@@ -602,7 +613,13 @@ def _build_patch_batch(
         np.arange(batch_size)[:, None, None],
         np.arange(GLOBAL_CONTEXT_COUNT)[None, :, None],
         minutes[:, None, :],
-    ].reshape(batch_size, GLOBAL_CONTEXT_COUNT, ABSOLUTE_PATCH_COUNT, PATCH_INPUT_WIDTH)
+    ]
+    global_pad = patch_count * patch_minutes - GLOBAL_WINDOW_MINUTES
+    if global_pad:
+        global_values = np.pad(global_values, ((0, 0), (0, 0), (global_pad, 0), (0, 0)))
+    global_values = global_values.reshape(
+        batch_size, GLOBAL_CONTEXT_COUNT, patch_count, patch_width
+    )
     patches[:, global_start:] = global_values * global_ready[..., None, None]
     history_mask[:, global_start:] = global_ready[..., None]
     instrument_mask[:, global_start:] = global_ready
@@ -658,6 +675,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         zero_dynamic_channels: tuple[int, ...] = (),
         zero_slow_fields: tuple[int, ...] = (),
         training_horizon_indices: tuple[int, ...] | None = None,
+        patch_minutes: int = PATCH_MINUTES,
     ) -> None:
         self.store = store
         self.sidecar = sidecar
@@ -678,6 +696,9 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         ):
             raise ValueError("Training horizon indices must be unique values in 0..2")
         self.training_horizon_indices = training_horizon_indices
+        if patch_minutes not in (5, 10):
+            raise ValueError("Patch minutes must be 5 or 10")
+        self.patch_minutes = patch_minutes
         self.rows = {
             name: sample_index.get_column(name).to_numpy()
             for name in (
@@ -740,6 +761,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             active,
             self.zero_dynamic_channels,
             self.zero_slow_fields,
+            self.patch_minutes,
         )
         if self.sidecar is not None:
             inputs["sidecar_features"] = _build_sidecar_batch(
@@ -883,6 +905,7 @@ def create_training_loaders(
     zero_slow_fields: tuple[int, ...] = (),
     date_multiset: tuple[object, ...] | None = None,
     training_horizon_indices: tuple[int, ...] | None = None,
+    patch_minutes: int = PATCH_MINUTES,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
@@ -899,6 +922,7 @@ def create_training_loaders(
             zero_dynamic_channels,
             zero_slow_fields,
             training_horizon_indices,
+            patch_minutes,
         ),
         sampler,
         runtime,
@@ -911,6 +935,7 @@ def create_training_loaders(
             sidecar,
             zero_dynamic_channels,
             zero_slow_fields,
+            patch_minutes=patch_minutes,
         ),
         DecisionGroupedBatchSampler(validation_rows, runtime.evaluation_batch_size),
         runtime,
@@ -927,6 +952,7 @@ def create_evaluation_loader(
     sidecar: ExternalFeatureSidecar | None = None,
     zero_dynamic_channels: tuple[int, ...] = (),
     zero_slow_fields: tuple[int, ...] = (),
+    patch_minutes: int = PATCH_MINUTES,
 ) -> DataLoader[dict[str, torch.Tensor]]:
     return _create_loader(
         VectorizedFeatureDataset(
@@ -935,6 +961,7 @@ def create_evaluation_loader(
             sidecar,
             zero_dynamic_channels,
             zero_slow_fields,
+            patch_minutes=patch_minutes,
         ),
         DecisionGroupedBatchSampler(rows, runtime.evaluation_batch_size),
         runtime,

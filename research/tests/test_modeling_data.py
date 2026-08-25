@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, timedelta
 
 import numpy as np
@@ -185,3 +186,29 @@ def test_feature_loader_to_tcn_backward_fixture(tmp_path) -> None:
     assert np.any(zeroed["patches"][:, 158:, :, 0::26])
     assert not np.any(zeroed["slow_features"][:, :158, 1])
     assert np.any(zeroed["slow_features"][:, 158:, 1])
+
+    patch10 = VectorizedFeatureDataset(tmp_path, rows, patch_minutes=10)[
+        BatchRequest((0,), 1)
+    ]
+    assert patch10["patches"].shape == (1, 173, 35, 260)
+    assert patch10["history_patch_mask"].shape == (1, 173, 35)
+    assert patch10["state_position"].tolist() == [8]
+    assert not np.any(patch10["patches"][0, 0, 6, : 5 * 26])
+    assert np.all(patch10["patches"][0, 0, 6, 5 * 26 :])
+    assert not np.any(patch10["patches"][0, 167, 0, : 5 * 26])
+    assert np.all(patch10["patches"][0, 167, 0, 5 * 26 :])
+    patch10_tensors = tensorize_vectorized_batch(patch10)
+    patch10_model = build_model(
+        architecture=replace(
+            model.architecture,
+            patch_input_width=10 * 26,
+        )
+    )
+    patch10_predictions = patch10_model(
+        patch10_tensors["patches"],
+        patch10_tensors["history_patch_mask"],
+        patch10_tensors["instrument_mask"],
+        patch10_tensors["slow_features"],
+        patch10_tensors["state_position"],
+    )
+    assert patch10_predictions.shape == (1, 158, HORIZON_COUNT)

@@ -22,7 +22,9 @@ from .contract import (
     GH200_RUNTIME,
     MAX_EPOCHS,
     RUN_OUTPUT_BASE,
+    TRAINING_SPECIFICATION,
     VALIDATION_END,
+    TrainingSpecification,
 )
 from .data import (
     create_training_loaders,
@@ -193,6 +195,7 @@ def run_training(
     zero_slow_fields: tuple[int, ...] = (),
     date_multiset: tuple[object, ...] | None = None,
     training_horizon_indices: tuple[int, ...] | None = None,
+    training_specification: TrainingSpecification = TRAINING_SPECIFICATION,
 ) -> Path:
     sidecar = None if sidecar_dir is None else load_external_sidecar(sidecar_dir, store)
     if run_dir.exists():
@@ -219,6 +222,7 @@ def run_training(
         zero_slow_fields,
         date_multiset,
         training_horizon_indices,
+        training_specification.patch_minutes,
     )
     single_horizon_index = (
         training_horizon_indices[0]
@@ -228,10 +232,15 @@ def run_training(
     model = build_model(
         None if sidecar is None else sidecar.feature_count,
         single_horizon_index=single_horizon_index,
+        architecture=training_specification.architecture,
     ).cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
     parameter_count = count_trainable_parameters(model)
-    optimizer, _ = build_optimizer(model)
+    optimizer, _ = build_optimizer(
+        model,
+        learning_rate=training_specification.learning_rate,
+        weight_decay=training_specification.weight_decay,
+    )
     scheduler, steps_per_epoch, warmup_steps = build_scheduler(
         optimizer, train_rows.height, MAX_EPOCHS
     )
@@ -249,6 +258,7 @@ def run_training(
         training_sample_count=train_rows.height,
         date_replacement=sampler.replace_dates,
         external_sidecar=None if sidecar is None else sidecar.identity,
+        specification=training_specification,
     )
     run_provenance["equity_input_zeroing"] = {
         "scope": "158_equity_inputs_only",
@@ -303,15 +313,17 @@ def run_training(
         "seed": seed,
         "model": run_provenance["model"],
         "parameter_count": parameter_count,
-        "objective": objective_metadata(),
+        "objective": objective_metadata(training_specification.soft_rank_temperature),
         "optimizer": "sam_adamw",
-        "sam": sam_metadata(),
+        "sam": sam_metadata(training_specification.sam_rho),
         "training": recorded_training,
         "frozen_selection": frozen_selection,
     }
     _atomic_json(run_dir / "run_manifest.json", manifest)
     compiled_model = compile_model(model)
-    compiled_objective = compile_training_objective()
+    compiled_objective = compile_training_objective(
+        temperature=training_specification.soft_rank_temperature
+    )
     history: list[dict[str, object]] = []
     raw_scores: list[float] = []
     raw_prediction_tail: list[np.ndarray] = []
@@ -335,6 +347,7 @@ def run_training(
                 GH200_RUNTIME,
                 compiled_objective,
                 after_update=update_emas,
+                sam_rho=training_specification.sam_rho,
             )
             training_seconds = time.perf_counter() - training_started
             validation_started = time.perf_counter()
@@ -363,6 +376,9 @@ def run_training(
                     validation_scores=scores,
                     feature_store=store,
                     run_provenance=run_provenance,
+                    architecture=training_specification.architecture,
+                    objective_temperature=training_specification.soft_rank_temperature,
+                    sam_rho=training_specification.sam_rho,
                 ),
             )
             row = {

@@ -19,6 +19,7 @@ from .contract import (
     SOFT_RANK_TEMPERATURE,
     SOFT_SPEARMAN_CORRELATION_EPS,
     TCN_ARCHITECTURE,
+    TCNArchitecture,
     RuntimeSettings,
 )
 from .metrics import create_metric_table, primary_validation_score
@@ -51,21 +52,24 @@ def compile_model(
     )
 
 
-def objective_metadata() -> dict[str, object]:
+def objective_metadata(
+    temperature: float = SOFT_RANK_TEMPERATURE,
+) -> dict[str, object]:
     return {
         "name": "soft_spearman",
-        "temperature": SOFT_RANK_TEMPERATURE,
+        "temperature": temperature,
     }
 
 
-def sam_metadata() -> dict[str, object]:
-    return {"rho": SAM_RHO, "base_optimizer": "adamw"}
+def sam_metadata(rho: float = SAM_RHO) -> dict[str, object]:
+    return {"rho": rho, "base_optimizer": "adamw"}
 
 
 def _soft_spearman_loss_sum(
     predictions: torch.Tensor,
     targets: torch.Tensor,
     label_mask: torch.Tensor,
+    temperature: float = SOFT_RANK_TEMPERATURE,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     with torch.autocast(device_type=predictions.device.type, enabled=False):
         scores = predictions.float().transpose(1, 2)
@@ -88,7 +92,7 @@ def _soft_spearman_loss_sum(
         pair_mask = mask.unsqueeze(-1) & mask.unsqueeze(-2) & not_self
         pairwise = (
             standardized.unsqueeze(-1) - standardized.unsqueeze(-2)
-        ) / SOFT_RANK_TEMPERATURE
+        ) / temperature
         soft_ranks = (1 + (torch.sigmoid(pairwise) * pair_mask).sum(-1)) * mask
         soft_centered = (
             soft_ranks - soft_ranks.sum(-1).div(safe_counts).unsqueeze(-1)
@@ -110,27 +114,33 @@ def soft_spearman_loss(
     predictions: torch.Tensor,
     targets: torch.Tensor,
     label_mask: torch.Tensor,
+    temperature: float = SOFT_RANK_TEMPERATURE,
 ) -> torch.Tensor:
-    total, count = _soft_spearman_loss_sum(predictions, targets, label_mask)
+    total, count = _soft_spearman_loss_sum(
+        predictions, targets, label_mask, temperature
+    )
     return total / count.clamp_min(1)
 
 
-def eager_training_objective() -> TrainingObjective:
+def eager_training_objective(
+    temperature: float = SOFT_RANK_TEMPERATURE,
+) -> TrainingObjective:
     def loss(
         predictions: torch.Tensor,
         targets: torch.Tensor,
         label_mask: torch.Tensor,
     ) -> torch.Tensor:
-        return _soft_spearman_loss_sum(predictions, targets, label_mask)[0]
+        return _soft_spearman_loss_sum(predictions, targets, label_mask, temperature)[0]
 
     return loss
 
 
 def compile_training_objective(
     runtime: RuntimeSettings = GH200_RUNTIME,
+    temperature: float = SOFT_RANK_TEMPERATURE,
 ) -> TrainingObjective:
     return torch.compile(
-        eager_training_objective(),
+        eager_training_objective(temperature),
         backend=runtime.compile_backend,
         mode=runtime.compile_mode,
         fullgraph=runtime.compile_fullgraph,
@@ -268,6 +278,7 @@ def _run_sam_update(
     loss_function: TrainingObjective,
     count: float,
     after_update: UpdateCallback | None,
+    sam_rho: float,
 ) -> dict[str, object]:
     parameters = tuple(model.parameters())
     originals = [parameter.detach().clone() for parameter in parameters]
@@ -277,7 +288,7 @@ def _run_sam_update(
     try:
         first_loss = _accumulate_gradients(model, batches, loss_function, count)
         first_norm = _gradient_norm(parameters, float("inf"))
-        scale = SAM_RHO / (first_norm + SAM_NORM_EPS)
+        scale = sam_rho / (first_norm + SAM_NORM_EPS)
         with torch.no_grad():
             for parameter in parameters:
                 if parameter.grad is not None:
@@ -314,6 +325,7 @@ def run_effective_batch_update(
     *,
     training_objective: TrainingObjective | None = None,
     after_update: UpdateCallback | None = None,
+    sam_rho: float = SAM_RHO,
 ) -> dict[str, object]:
     if len(effective_batch) != runtime.loader_batches_per_effective_batch:
         raise ValueError("Effective batch has the wrong loader-batch count")
@@ -336,6 +348,7 @@ def run_effective_batch_update(
         training_objective or eager_training_objective(),
         count,
         after_update,
+        sam_rho,
     )
 
 
@@ -347,6 +360,7 @@ def train_one_epoch(
     runtime: RuntimeSettings = GH200_RUNTIME,
     training_objective: TrainingObjective | None = None,
     after_update: UpdateCallback | None = None,
+    sam_rho: float = SAM_RHO,
 ) -> dict[str, object]:
     model.train()
     batches: list[dict[str, torch.Tensor]] = []
@@ -363,6 +377,7 @@ def train_one_epoch(
                     runtime,
                     training_objective=training_objective,
                     after_update=after_update,
+                    sam_rho=sam_rho,
                 )
             )
             batches = []
@@ -601,15 +616,20 @@ def checkpoint_payload(
     validation_scores: Mapping[str, float],
     feature_store: Path,
     run_provenance: dict[str, object],
+    architecture: TCNArchitecture = TCN_ARCHITECTURE,
+    objective_temperature: float = SOFT_RANK_TEMPERATURE,
+    sam_rho: float = SAM_RHO,
 ) -> dict[str, object]:
-    metadata = model_metadata(getattr(model, "sidecar_feature_count", None))
+    metadata = model_metadata(
+        getattr(model, "sidecar_feature_count", None), architecture=architecture
+    )
     if run_provenance.get("model") != metadata:
         raise ValueError("Run provenance differs from checkpoint model")
     payload = {
         "model": metadata,
-        "architecture": asdict(TCN_ARCHITECTURE),
-        "objective": objective_metadata(),
-        "sam": sam_metadata(),
+        "architecture": asdict(architecture),
+        "objective": objective_metadata(objective_temperature),
+        "sam": sam_metadata(sam_rho),
         "seed": seed,
         "epoch": epoch,
         "validation_scores": dict(validation_scores),

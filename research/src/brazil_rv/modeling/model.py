@@ -8,7 +8,6 @@ from .contract import (
     CONTEXT_COUNT,
     EQUITY_COUNT,
     LOCAL_CONTEXT_COUNT,
-    STATE_TOKEN_SLOT,
     TARGETED_FUSION_GATE_BIAS,
     TCN_ARCHITECTURE,
     TCNArchitecture,
@@ -108,7 +107,7 @@ class SharedCausalTCN(nn.Module):
             torch.arange(self.instrument_count, device=hidden.device)
             >= self.equity_count + LOCAL_CONTEXT_COUNT
         )
-        positions = torch.where(global_slots[None], STATE_TOKEN_SLOT, positions)
+        positions = torch.where(global_slots[None], hidden.shape[-1], positions)
         index = (positions - 1)[..., None, None].expand(-1, -1, 1, width)
         return streams.gather(2, index).squeeze(2)
 
@@ -210,8 +209,10 @@ class SharedCausalTCN(nn.Module):
 def build_model(
     sidecar_feature_count: int | None = None,
     single_horizon_index: int | None = None,
+    architecture: TCNArchitecture = TCN_ARCHITECTURE,
 ) -> SharedCausalTCN:
     return SharedCausalTCN(
+        architecture=architecture,
         sidecar_feature_count=sidecar_feature_count,
         single_horizon_index=single_horizon_index,
     )

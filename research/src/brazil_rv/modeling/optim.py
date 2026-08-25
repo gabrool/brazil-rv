@@ -53,14 +53,17 @@ def partition_parameters(model: nn.Module) -> dict[str, list[nn.Parameter]]:
 
 def build_optimizer(
     model: nn.Module,
+    *,
+    learning_rate: float = ADAMW_LR,
+    weight_decay: float = ADAMW_WEIGHT_DECAY,
 ) -> tuple[torch.optim.AdamW, dict[str, list[nn.Parameter]]]:
     groups = partition_parameters(model)
     optimizer = torch.optim.AdamW(
         (
-            {"params": groups["decay"], "weight_decay": ADAMW_WEIGHT_DECAY},
+            {"params": groups["decay"], "weight_decay": weight_decay},
             {"params": groups["no_decay"], "weight_decay": 0.0},
         ),
-        lr=ADAMW_LR,
+        lr=learning_rate,
         betas=ADAMW_BETAS,
         eps=ADAMW_EPS,
         fused=True,

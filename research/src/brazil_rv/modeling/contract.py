@@ -210,3 +210,30 @@ class TCNArchitecture:
 
 
 TCN_ARCHITECTURE = TCNArchitecture()
+
+
+@dataclass(frozen=True)
+class TrainingSpecification:
+    architecture: TCNArchitecture = TCN_ARCHITECTURE
+    patch_minutes: int = PATCH_MINUTES
+    learning_rate: float = ADAMW_LR
+    weight_decay: float = ADAMW_WEIGHT_DECAY
+    soft_rank_temperature: float = SOFT_RANK_TEMPERATURE
+    sam_rho: float = SAM_RHO
+
+    def __post_init__(self) -> None:
+        if self.patch_minutes not in (5, 10):
+            raise ValueError("Patch minutes must be 5 or 10")
+        if self.architecture.patch_input_width != (
+            self.patch_minutes * DYNAMIC_CHANNEL_COUNT
+        ):
+            raise ValueError("Architecture input width differs from patch minutes")
+        if self.architecture.residual_blocks != len(self.architecture.dilations):
+            raise ValueError("Residual-block count differs from dilation count")
+        if self.learning_rate <= 0 or self.weight_decay < 0:
+            raise ValueError("Optimizer settings are invalid")
+        if self.soft_rank_temperature <= 0 or self.sam_rho <= 0:
+            raise ValueError("Objective or SAM settings are invalid")
+
+
+TRAINING_SPECIFICATION = TrainingSpecification()
