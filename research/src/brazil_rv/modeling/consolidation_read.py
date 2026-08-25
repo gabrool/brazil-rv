@@ -277,15 +277,21 @@ def _source_run(record: Mapping[str, object]) -> Path:
 
 def _static_run_contract(manifest: Mapping[str, object]) -> dict[str, object]:
     zeroing = manifest.get("equity_input_zeroing")
-    if not isinstance(zeroing, Mapping):
-        raise ValueError("Source run does not record equity-input zeroing")
+    if zeroing is None:
+        zero_dynamic_channels: list[int] = []
+        zero_slow_fields: list[int] = []
+    elif isinstance(zeroing, Mapping):
+        zero_dynamic_channels = list(zeroing["dynamic_channels"])
+        zero_slow_fields = list(zeroing["slow_fields"])
+    else:
+        raise ValueError("Source run records malformed equity-input zeroing")
     variation = manifest.get("training_variation")
     if not isinstance(variation, Mapping):
         variation = {}
     sidecar = manifest.get("external_sidecar")
     return {
-        "zero_dynamic_channels": list(zeroing["dynamic_channels"]),
-        "zero_slow_fields": list(zeroing["slow_fields"]),
+        "zero_dynamic_channels": zero_dynamic_channels,
+        "zero_slow_fields": zero_slow_fields,
         "external_sidecar": sidecar,
         "training_horizon_indices": variation.get("training_horizon_indices"),
     }

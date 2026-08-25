@@ -3,6 +3,7 @@ from __future__ import annotations
 from brazil_rv.modeling.consolidation_read import (
     ARCHIVED_STORE_V2_IC,
     COMPARATOR_IDENTITIES,
+    _static_run_contract,
     arm2_supported,
     deploy_arm1_ten_seed,
     deployment_choice,
@@ -123,6 +124,16 @@ def test_consensus_preserves_repeat_weight_within_one_greedy_path() -> None:
     assert member["total_repeat_count"] == 2
     assert member["raw_weight"] == 2
     assert abs(member["mean_recorded_marginal_gain"] - 0.00015) < 1e-15
+
+
+def test_legacy_source_without_zeroing_uses_the_original_full_input_set() -> None:
+    contract = _static_run_contract(
+        {"external_sidecar": {"path": "immutable-sidecar"}}
+    )
+
+    assert contract["zero_dynamic_channels"] == []
+    assert contract["zero_slow_fields"] == []
+    assert contract["external_sidecar"] == {"path": "immutable-sidecar"}
 
 
 def test_frozen_gate_boundaries_are_strict_or_inclusive_as_registered() -> None:
