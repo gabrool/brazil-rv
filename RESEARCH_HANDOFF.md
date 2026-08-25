@@ -915,3 +915,34 @@ and `22e44bde683993387e60f7347bc16ea437fc8e426fb8f792be3e693eec0bf37a`.
 The user explicitly requested that paid GH200 instance
 `d0ebcd5f7dbb44dc99370080df7b47cc` stay active for the immediately following
 experiment, overriding the registration's normal terminate-on-closure step.
+
+## Experiment 46 cross-equity closure (2026-08-25)
+
+The fixed monthly peer graph, N0 rotation, eight-field F2 screen, and
+conditional nine-trajectory F3 screen completed without opening official
+validation or the held-out test. N0 did not support neutralization and did not
+trigger T-peer. F2 selected four fields: peer-relative 60-minute and
+prior-session returns, peer-mean 60-minute return, and peer-dispersion
+60-minute return.
+
+F3 failed both registered paths. Standalone Fold C/A/B deltas were
+`+0.000054345/+0.000347304/-0.000881236`, mean `-0.000159862`; pooled block-5
+and block-10 95% intervals both included zero. Parent-plus-candidate mean was
+`-0.000007868`. No official-read arm was registered and deployment remains the
+Experiment-45 measured ten-seed store-v2 ensemble. The nine candidate final
+EMA-0.995 members are retained only as eligible inputs to a future frozen
+ensemble-pool registration.
+
+The result root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/cross_equity_46_affea34_20260825T170000Z
+
+All 552 pre-cleanup artifacts / 9,806,864,144 bytes were hashed and audited;
+the completion audit passed at
+`2f82faef622882768af07aeec9e3e750b195c5f49c5929f9344f5da52ab2b74b`.
+Operational repair `f565933` resumed analysis from the nine immutable
+completed trajectories after decoupling the store-v2 retention parent from an
+obsolete challenger-embedded parent check; it changed no score or rule.
+
+Paid GH200 instance `d0ebcd5f7dbb44dc99370080df7b47cc` must remain active for
+the user's next experiment. Do not terminate it at this closure.

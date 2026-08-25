@@ -780,3 +780,31 @@ and passing retained-output postcheck are under
 Per the user's explicit operational override, paid GH200 instance
 `d0ebcd5f7dbb44dc99370080df7b47cc` remains active for the immediately
 following experiment rather than being terminated at Experiment-45 closure.
+
+## Experiment 46 cross-equity decision (2026-08-25)
+
+The fixed monthly given-graph program completed on discovery folds only. N0
+found improved stability but materially negative rotated IC delta, so no
+neutralization transform was adopted; the T-peer registration condition also
+did not trigger. F2 retained four peer fields: relative 60-minute return,
+relative prior-session return, peer-mean 60-minute return, and peer-dispersion
+60-minute return.
+
+The nine-trajectory F3 candidate failed both frozen paths. Standalone Fold
+C/A/B deltas were `+0.000054345/+0.000347304/-0.000881236`, mean
+`-0.000159862`, and both pooled 95% intervals crossed zero. Parent-plus-candidate
+mean delta was `-0.000007868`. No future official-read arm was registered and
+the deployed Experiment-45 ten-seed store-v2 recipe is unchanged. The nine
+final EMA-0.995 candidate members remain eligible only for a future
+ensemble-pool registration, as preregistered.
+
+The immutable program root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/cross_equity_46_affea34_20260825T170000Z
+
+Its 552-artifact pre-cleanup audit passed at SHA-256
+`2f82faef622882768af07aeec9e3e750b195c5f49c5929f9344f5da52ab2b74b`.
+Every access flag records `official_validation_accessed=false` and
+`test_accessed=false`. Exact graph, N0, F2/F3, operational-repair, and artifact
+hash details are in `EXPERIMENT_LOG.md` Experiment 46. Paid GH200 instance
+`d0ebcd5f7dbb44dc99370080df7b47cc` remains active by explicit user request.

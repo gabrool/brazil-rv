@@ -3279,3 +3279,74 @@ nine GPU trajectories only if at least two fields survive. Official validation
 and held-out test remain sealed. Nothing in Experiment 46 changes the deployed
 Experiment-45 store-v2 ten-seed baseline. The active GH200 is retained after
 completion by explicit user instruction.
+
+### Experiment 46 result (completed 2026-08-25)
+
+Part 0 froze 54 monthly peer-graph snapshots from 2022-02-01 through
+2026-07-01. The cluster sizes ranged from 3 to 51 and adjacent-month adjusted
+Rand index averaged `0.5404`. PETR3/PETR4 were mutual top-one peers in all 54
+snapshots. ELET3/ELET6 were not mutual top-one peers; this was a preregistered
+diagnostic only and did not alter the graph. Monthly-graph and graph-audit
+SHA-256 values are
+`99286f3a1ec1df2955014f82ccdab6e29889d09ca0150c0dfebec767007cac40`
+and `033dfcdaa7f41de3da93875c3ed9ab3cefaa6c312613f562fad4e32cb35cf341`.
+
+N0 rejected every deployment neutralization transform. Its rotated held-out
+mean paired delta was `-0.001826197`, with block-10 95% interval
+`[-0.003539513,-0.000382781]`. Stability improved by `+0.010052757`, with
+interval `[+0.007026385,+0.012897310]`, but the frozen joint IC guardrail
+failed. The held-out rotations chose beta `lambda=0.5` for Folds A/B and
+liquidity `lambda=0.25` for Fold C. The cluster cross-group component had
+positive IC on all three folds, so T-peer's conditional registration did not
+trigger. No deployment transform or future T-peer arm was registered. The N0
+analysis SHA-256 is
+`95627832e0c49df78975c001c5b8db2b995d0ff970998f32679b15669e09a5d9`.
+
+F2 selected exactly `peer_relative_return_60m`,
+`peer_relative_return_1d`, `peer_mean_return_60m`, and
+`peer_dispersion_60m`, permitting the frozen F3 run. The F2 table and selected
+sidecar-manifest SHA-256 values are
+`e9c6c7e440a681497adae94d456cf1bc8674f3ea736dad714104b8169b719a7d`
+and `127630d2df2f1eb125c5e638abfbcfb1521e02ca8f1a6c83f16ce931318ae077`.
+
+All nine F3 trajectories completed. Standalone Raw Patience-3 deltas versus
+the store-v2 parent were Fold C/A/B
+`+0.000054345/+0.000347304/-0.000881236`, mean `-0.000159862`.
+The pooled block-5 and block-10 95% intervals were respectively
+`[-0.000709435,+0.000386293]` and
+`[-0.000717352,+0.000396371]`. The predeclared parent-plus-candidate path had
+Fold C/A/B deltas `+0.000032783/+0.000262657/-0.000319044`, mean
+`-0.000007868`. Both frozen gates failed. F-peer earns no future official-read
+arm and does not change deployment. Per the frozen contract, its nine final
+EMA-0.995 members remain eligible for a future ensemble-pool registration;
+they were not rescored as a pool here.
+
+The first post-training analysis stopped before a Fold-A verdict because the
+standing designated-challenger helper asserted that the supplied retention
+parent must equal the challenger's legacy embedded parent. All nine prediction
+trajectories were already complete and untouched. Operational repair commit
+`f565933cb61eea789254eb900f3d46263ff8dcf3` separated that informational
+challenger identity check from Experiment 46's frozen hash-verified store-v2
+retention parent and added an analysis-only resume. Ruff and nine targeted
+tests passed on Windows and Linux. No trajectory was retrained and no
+prediction, comparator, replay, fold, interval, or gate changed.
+
+The immutable program root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/cross_equity_46_affea34_20260825T170000Z
+
+The completed F3 summary and campaign-manifest SHA-256 values are
+`4d9ac84ffad135038f0b57141df2672e347eb63d37d8cacb31251dabf862f455`
+and `7354e7bffab6ae4e6cadbb698393ad3a239b9b36599930b2460027a16f1f44d0`.
+The independent pre-cleanup audit hashed all 552 artifacts /
+9,806,864,144 bytes, validated all nine 20-epoch histories, 180 prediction
+archives, 180 checkpoints, frozen identities, exact gates, registrations, and
+access flags, and passed with no errors. Inventory and completion-audit
+SHA-256 values are
+`cbf5696f3c2784fa8be032ea0fdec953e4855ec8de274a63d78d1a2b33b784ee`
+and `2f82faef622882768af07aeec9e3e750b195c5f49c5929f9344f5da52ab2b74b`.
+Official validation and the held-out test remained sealed throughout.
+
+Per the user's explicit override, paid GH200 instance
+`d0ebcd5f7dbb44dc99370080df7b47cc` remains active for the immediately
+following experiment and must not be terminated at Experiment-46 closure.
