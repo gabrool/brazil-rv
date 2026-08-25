@@ -3006,3 +3006,10 @@ postcheck SHA-256 values are
 and `45d74a3d9cd9fd02850d20a889c0107ec3c0aa7f54d5974c77447787ecef5ebc`.
 The exact evidence is under the program root's `_cleanup/20260825T045600Z`
 directory.
+
+After result commit `ffbb5b672ebd982ad3ebe748558f81bfb22e00d1` was pushed and
+the retained archives were rechecked, Lambda accepted termination of exact paid
+GH200 instance `74ecb13e8b704ffcad890a5930ee74fd` (`gpu_1x_gh200`,
+`us-east-3`, IP `192.222.50.236`). Consecutive provider inventory reads at
+`2026-08-25T05:16:27Z` and `2026-08-25T05:16:47Z` confirmed the exact instance
+absent and the account at zero active instances.

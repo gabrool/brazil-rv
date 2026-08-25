@@ -734,3 +734,8 @@ The reviewed cleanup removed only 900 redundant E2 checkpoints /
 4,060,129,980 bytes; its passing evidence is under
 `_cleanup/20260825T045600Z`. Exact gate details, roster/design hashes, the A1
 audit, and cleanup hashes are recorded in `EXPERIMENT_LOG.md` Experiment 44.
+
+Paid GH200 instance `74ecb13e8b704ffcad890a5930ee74fd` was terminated only
+after the result commit and retained artifacts were secured. Two consecutive
+provider inventory reads confirmed it absent and the Lambda account at zero
+active instances.
