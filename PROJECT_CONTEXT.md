@@ -739,3 +739,37 @@ Paid GH200 instance `74ecb13e8b704ffcad890a5930ee74fd` was terminated only
 after the result commit and retained artifacts were secured. Two consecutive
 provider inventory reads confirmed it absent and the Lambda account at zero
 active instances.
+
+## Consolidation-read deployment decision (2026-08-25)
+
+Experiment 45 consumed official-validation access event 4 and changed the
+deployed measured recipe from canonical parent-3 to the fresh ten-seed
+store-v2 ensemble. Fresh store-v2 seeds 11/29/47 reproduced the retained
+Experiment-43 comparator within `+0.000004572` (`0.043239945` versus
+`0.043235373`). The ten-seed form scored `0.043718770`, gaining
+`+0.000478826` versus fresh three and passing its frozen deployment rule.
+
+The frozen `e2_plus_archive` consensus scored `0.043916831`, but its paired
+block-10 interval versus the comparator was
+`[-0.000853732, +0.002373780]`. Its lower bound did not exceed zero, so the
+complexity-adding arm was not supported and no hybrid was evaluated. The
+deployed recipe is the uniform tie-aware rank average of store-v2 Raw
+Patience-3 seeds `11/29/47/61/79/97/113/131/149/167`. Its measured selected
+and final checkpoints are retained until a future deployment supersedes them.
+
+The completed program is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/consolidation_read_e2eb713_20260825T105134Z
+
+Its frozen design and completed manifest SHA-256 values are
+`05e0eebfffe95fc870e3e8a1138689aebe5e0595a210333d03a60cd15f1ebe2b`
+and `64a69be9345a0d9cc4a2a506f9f295fd50f9a2bcc210793458adfa9429cda34e`.
+All 298 prediction archives and 18 references are retained. The event-4 ledger
+and every member contract record `test_accessed=false`; the held-out test
+remains sealed. Exact results, analyses, the score-neutral specialist JSON
+repair, and the 730-output completion audit are recorded in
+`EXPERIMENT_LOG.md` Experiment 45.
+
+Per the user's explicit operational override, paid GH200 instance
+`d0ebcd5f7dbb44dc99370080df7b47cc` remains active for the immediately
+following experiment rather than being terminated at Experiment-45 closure.

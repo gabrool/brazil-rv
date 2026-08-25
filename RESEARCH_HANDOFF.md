@@ -866,3 +866,43 @@ held-out test remains sealed and every manifest records `test_accessed=false`.
 Result commit `880a66e` reached GitHub before exact paid GH200 instance
 `c2da7efd0ab645178a847aad8fdf12c8` was terminated. Two consecutive provider
 inventory reads confirmed it absent and the account at zero active instances.
+
+## Experiment 45 consolidation-read closure (2026-08-25)
+
+Official-validation access event 4 completed the deployment decision that
+Experiments 43 and 44 had earned. Fresh store-v2 seeds 11/29/47 scored
+`0.043239945`, reproducing the retained Experiment-43 comparator
+(`0.043235373`) within `+0.000004572` and passing the informational sanity
+band. The exact ten-seed expansion scored `0.043718770`, a
+`+0.000478826` gain over fresh three, and passed the frozen deployment rule.
+
+The blind `e2_plus_archive` consensus realized all frozen members and scored
+`0.043916831`, but its paired block-10 95% interval versus the comparator was
+`[-0.000853732, +0.002373780]`. The superiority gate therefore failed. Arm 2
+was not promoted, no hybrid was evaluated, and the deployed measured recipe is
+the uniform tie-aware rank ensemble of store-v2 Raw Patience-3 seeds
+`11/29/47/61/79/97/113/131/149/167`.
+
+The immutable result root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/consolidation_read_e2eb713_20260825T105134Z
+
+All 18 trajectories, 298 prediction archives, 18 references, paired analyses,
+seed-correlation/gain diagnostics, promotion decision, deployed recipe, and
+event-4 access ledger are retained. The deployed recipe records and preserves
+20 selected/final checkpoints / 90,194,220 bytes. A completion audit rehashed
+730 manifest-bound outputs / 32,334,740,807 bytes and passed at SHA-256
+`52239ea7db0b0051cfdb8c25bb17ff1c64a89560f0a41ff6226dfd928ac618e7`.
+Every access artifact records `test_accessed=false`; the held-out test remains
+sealed.
+
+The two 30-minute specialists required a score-neutral finalization repair:
+their untrained 60/120-minute metric fields were encoded as JSON `null` from
+already-saved predictions after strict JSON rejected NaN. No official source
+was reopened and no frozen score, gate, member, or weight changed. The repair
+audit SHA-256 is
+`28f64727d2d6bb949fe3a0d0bd5b461ec14f9b0c51db7393c5ca7c7bfe864ce4`.
+
+The user explicitly requested that paid GH200 instance
+`d0ebcd5f7dbb44dc99370080df7b47cc` stay active for the immediately following
+experiment, overriding the registration's normal terminate-on-closure step.

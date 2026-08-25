@@ -3052,6 +3052,66 @@ checkpoints remain retained until a future deployment supersedes them. Results,
 hashes, and the validation-access ledger are pushed before the exact paid
 instance is terminated and verified absent twice.
 
+### Experiment 45 result (completed 2026-08-25)
+
+The frozen program completed official-validation access event 4 at exact
+implementation commit `75956f56b38aacfe92c57975fa34552b37a97b3c`. Its
+immutable root and frozen-design SHA-256 are:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/consolidation_read_e2eb713_20260825T105134Z
+    05e0eebfffe95fc870e3e8a1138689aebe5e0595a210333d03a60cd15f1ebe2b
+
+All 18 frozen trajectories completed: the ten Arm-1 store-v2 seeds and the
+eight exact Arm-2 member realizations. The completed artifact retains all 298
+official prediction archives, 18 observation references, all analyses, and
+the 284 pre-cleanup checkpoints. The validation-access ledger is completed for
+event 4 and records `test_accessed=false`; the held-out test was never opened.
+
+The reproduction sanity check passed. Fresh store-v2 seeds 11/29/47 scored
+`0.043239944968` versus the retained Experiment-43 comparator at
+`0.043235373213`, a delta of `+0.000004571755`, well inside the frozen
+`+/-0.0015` band. The ten-seed ensemble scored `0.043718770472`, adding
+`+0.000478825504` versus the fresh three-seed ensemble and satisfying the
+frozen deployment rule (`fresh-three - 0.0005`). Arm 2 scored
+`0.043916831114`, a point delta of `+0.000681457900` versus the comparator,
+but its paired block-10 95% interval was
+`[-0.000853731696, +0.002373780406]`. Because the lower bound did not exceed
+zero, Arm 2 was not supported. The measured ten-seed store-v2 recipe is
+therefore deployed; no hybrid or post-score candidate was evaluated.
+
+The deployment declaration retains the selected and final checkpoints for all
+ten measured deployed members: 20 files / 90,194,220 bytes, with every path,
+size, and SHA-256 recorded. Key completed SHA-256 values are:
+
+- promotion decision: `28f185d32aa9948d8569abaa68255c789bb56d0b0daac284b9f427ac5dd7224b`;
+- deployed recipe: `d4729dc4e614e0edd5118ba5ed5b7bc92f69ca2faceab4a09d0559115e5c4058`;
+- validation-access ledger: `c03e00433c03fcb0ecf9b543e596563e3089fb59f2583103c25b32a6aeebd33f`;
+- completed program manifest: `64a69be9345a0d9cc4a2a506f9f295fd50f9a2bcc210793458adfa9429cda34e`;
+- Arm-1 fresh-3/comparator analysis: `5bf50739d89cacd7f84eddecf2cb20baf417dc48cd0cc9a28ead6595547d2b34`;
+- Arm-1 fresh-10/comparator analysis: `e1ef80298fc2fe00934e5c6271b186cc348ac50875cee0b17ec59e6f36cb73d7`;
+- Arm-1 fresh-10/fresh-3 analysis: `2fcc845da5d48a7900c20c89c1840dd32d0a775ab5d47109851e2ebe4bd98e0f`;
+- Arm-2/comparator analysis: `90de369e1b87a9fb70fac313c9fe972bc39b745b371bb3c8753621adb6b183b7`.
+
+After every frozen score had been produced, the two 30-minute specialist jobs
+hit a JSON-only finalization failure because their deliberately untrained
+60/120-minute metrics were NaN and strict JSON forbids NaN. The operational
+repair used only their already-saved reference and selected prediction
+archives, encoded exactly the eight undefined metrics per run as JSON `null`,
+and completed the member manifests without reopening an official source or
+changing any score, candidate, rule, or weight. Its audit SHA-256 is
+`28f64727d2d6bb949fe3a0d0bd5b461ec14f9b0c51db7393c5ca7c7bfe864ce4`.
+
+The independent completion audit rehashed all 730 manifest-bound outputs /
+32,334,740,807 bytes, validated all 18 member contracts and access flags,
+rechecked the 20 deployed checkpoints, found no temporary or mismatched file,
+and passed with SHA-256
+`52239ea7db0b0051cfdb8c25bb17ff1c64a89560f0a41ff6226dfd928ac618e7`.
+
+The attached registration requested instance termination, but the user
+explicitly superseded that operational step for this run. Exact paid GH200
+instance `d0ebcd5f7dbb44dc99370080df7b47cc` remains active for the immediately
+following experiment; it must not be left idle after that work.
+
 ## Verification V1 — Negócio a Negócio archive depth and participant-code coverage (frozen 2026-08-25)
 
 Status at registration: no endpoint, UI, or archive probe has been made for
