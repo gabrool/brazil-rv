@@ -703,3 +703,34 @@ Paid GH200 instance `c2da7efd0ab645178a847aad8fdf12c8` was terminated only
 after the completed artifacts, cleanup audit, and result commit were secured.
 Two consecutive provider reads confirmed the exact instance absent and the
 Lambda account at zero active instances.
+
+## Ensemble-science decision (2026-08-25)
+
+Experiment 44 completed the frozen archive-only E1 analysis and all 45 E2
+diversity trajectories without opening official validation or the held-out
+test. E1 alone did not pass: its honest greedy mean delta was `+0.000966020`,
+just below the complexity-adding `+0.001` gate. E2-only greedy also failed at
+`+0.000667147`. The predeclared full-pool greedy path passed with Fold C/A/B
+deltas of `+0.001739170/+0.000767959/+0.000721738`, mean `+0.001076289`.
+Exactly one future-read arm, `e2_plus_archive`, is registered. Its exact
+fold-specific member/repeat compositions live in the immutable Experiment-44
+analysis; it is not deployed and does not itself authorize an official read.
+
+Experiment-43 Amendment A1's separate exact reproduction failed because none
+of 60 reproduced epoch prediction archives was byte-identical, despite matching
+static input manifests and only small score differences. The original
+Experiment-43 deployment decision therefore remains unchanged. Experiment 44
+was explicitly independent of that reproduction verdict.
+
+The completed program is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/ensemble_science_8dff0be_20260824T174700Z
+
+The completed analysis SHA-256 is
+`b933e740034cf6499d4569d98ebdb4242c697ee6664c44cafcbc9c606aa913b7`.
+All 945 E2 epoch/tail prediction archives and required analyses/manifests are
+retained.
+The reviewed cleanup removed only 900 redundant E2 checkpoints /
+4,060,129,980 bytes; its passing evidence is under
+`_cleanup/20260825T045600Z`. Exact gate details, roster/design hashes, the A1
+audit, and cleanup hashes are recorded in `EXPERIMENT_LOG.md` Experiment 44.

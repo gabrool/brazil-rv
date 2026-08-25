@@ -2924,7 +2924,8 @@ GH200 instance `c2da7efd0ab645178a847aad8fdf12c8` (`gpu_1x_gh200`,
 `us-east-3`, IP `192.222.50.160`). The instance was absent from consecutive
 provider inventory reads at `2026-08-24T15:34:25Z` and
 `2026-08-24T15:34:54Z`; the account then had zero active instances.
-## Experiment 44 — ensemble science E1/E2 (preregistered; running)
+
+## Experiment 44 — ensemble science E1/E2 (preregistered; completed)
 
 The full immutable protocol is
 `research/preregistrations/experiment44_ensemble_science.md`. Before any new
@@ -2941,3 +2942,67 @@ most one future official-read arm. Every E1/E2 candidate is complexity-adding
 and must add at least `+0.001` mean IC with no negative held-out fold and paired
 block-5/10 support. Official validation and the held-out test are sealed; no E3,
 HPO, deployment change, or post-score rule expansion is authorized.
+
+### Completed result (2026-08-25)
+
+Amendment A1's separate full-window reproduction did not satisfy its exact-
+match condition. The three input manifests matched after excluding provenance,
+runtime, and outcome fields, but none of the 60 epoch prediction archives was
+byte-identical to the Experiment-43 source. The resulting IC differences were
+small, consistent with operational GPU nondeterminism, but the frozen rule was
+exact: A1 failed and the historical Experiment-43 deployment decision remains
+unchanged. The immutable failure-audit SHA-256 is
+`b0ef52109aa3b0e1516a7db0f7ef05bfc9542a844b0328c2fc68792439e66238`.
+The E1/E2 protocol explicitly did not depend on A1, so the discovery program
+continued without changing its comparator or any scored rule.
+
+E1 materialized and hash-verified the frozen archive roster before computing
+scores. None of its 17 fixed-grid cells passed. Its honest greedy path added
+`+0.001544028/+0.000254077/+0.001099957` on held-out Fold C/A/B, mean
+`+0.000966020`, missing the frozen `+0.001` complexity-adding threshold.
+The three predeclared hygiene rules also failed. E1 therefore closed the
+uniform-weighting-only hypothesis without registering an arm.
+
+All 45 frozen E2 trajectories completed: nine date-block bagged members, nine
+feature-subspace members, and 27 horizon specialists, each with Raw Patience-3
+and final EMA-0.995 archives. No one of the 20 E2 fixed-grid cells passed. The
+E2-only honest greedy path added
+`+0.001332262/+0.000535001/+0.000134179` on C/A/B, mean `+0.000667147`, and
+failed. The predeclared full-pool greedy path over E2 plus the primary archive
+roster passed: `+0.001739170/+0.000767959/+0.000721738` on C/A/B, mean
+`+0.001076289`. Every fold was nonnegative, the mean exceeded `+0.001`, and
+the paired block-5/10 intervals were reported as required. Exactly one arm,
+`e2_plus_archive`, is registered for a future official-read preregistration.
+Its fold-specific cross-fit compositions and repeat weights are frozen in the
+analysis. This is not a deployment decision and does not authorize an official
+read by itself.
+
+The completed program is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/ensemble_science_8dff0be_20260824T174700Z
+
+Frozen-design, pre-score source-map, E1-analysis, completed-analysis, E2-
+training-manifest, and E2-member-catalogue SHA-256 values are respectively
+`e0e991079e88f146534a24f3fd94de545f8d773de4547fc49d395d984523d8d9`,
+`6f7f419dbe5c60ea0b55cf358d23195b23b1086c037847ebc49638cd58634c60`,
+`29fcb869475e0c124b38b5a485d0d6b92f2de6cb97619a12120717e204003cd5`,
+`b933e740034cf6499d4569d98ebdb4242c697ee6664c44cafcbc9c606aa913b7`,
+`0a33c92f60d26e402685b62dca6201f722bd8d2f537c8859d5b4f486565098c1`,
+and `538dbd3cea54e066b7d7af59900a847cdd4e465faea97af1ed286afaa71cb157`.
+The audit verified all 90 selected-state E2 catalogue records, their three
+unique observation references, source-run manifests, and hashes. A separate
+complete preservation inventory rehashed all 945 epoch/tail prediction
+archives and all 45 per-run reference archives. Its SHA-256 is
+`b8a8d21600f2655f2869343dfa20564c00b573de43fe70cd50e6b1ea7bdaaa67`.
+Recursive JSON access checks found `official_validation_accessed=false` and
+`test_accessed=false` throughout Experiment 44.
+
+The reviewed inventory-bound cleanup removed exactly the 900 E2 per-epoch
+checkpoint files / 4,060,129,980 bytes after recording every path, size, and
+SHA-256. It preserved and rehashed all 945 prediction archives plus all 45
+per-run references, and left zero E2 checkpoints. Cleanup plan and passing
+postcheck SHA-256 values are
+`e471da7822e7463e2b66001a1e7bb35167e2cc20062011d28a50d19678c4d4cc`
+and `45d74a3d9cd9fd02850d20a889c0107ec3c0aa7f54d5974c77447787ecef5ebc`.
+The exact evidence is under the program root's `_cleanup/20260825T045600Z`
+directory.
