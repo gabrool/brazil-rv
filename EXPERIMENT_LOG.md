@@ -3107,6 +3107,19 @@ rechecked the 20 deployed checkpoints, found no temporary or mismatched file,
 and passed with SHA-256
 `52239ea7db0b0051cfdb8c25bb17ff1c64a89560f0a41ff6226dfd928ac618e7`.
 
+After result commit `d09da270f26303ef16f3cc586b5cdbf0699186e5` reached
+GitHub, the reviewed non-deployed-only cleanup removed exactly 84 checkpoint
+files / 370,484,520 bytes from the eight Arm-2 realization jobs. It retained
+all 298 prediction archives, all 18 references and analyses, and all 200
+checkpoints / 901,942,200 bytes belonging to the ten deployed measured jobs,
+including every one of the 20 required selected/final checkpoints. The exact
+cleanup plan SHA-256 is
+`f7ec92ed63c837b28539c75e48890ee77ec378dcba42de65db6fb0aef06ee19b`.
+The postcheck rehashed all 646 retained manifest-bound outputs /
+31,964,256,287 bytes and passed at SHA-256
+`22e44bde683993387e60f7347bc16ea437fc8e426fb8f792be3e693eec0bf37a`.
+Both artifacts are under `_cleanup/20260825T164320Z` in the program root.
+
 The attached registration requested instance termination, but the user
 explicitly superseded that operational step for this run. Exact paid GH200
 instance `d0ebcd5f7dbb44dc99370080df7b47cc` remains active for the immediately

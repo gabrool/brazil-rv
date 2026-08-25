@@ -770,6 +770,13 @@ remains sealed. Exact results, analyses, the score-neutral specialist JSON
 repair, and the 730-output completion audit are recorded in
 `EXPERIMENT_LOG.md` Experiment 45.
 
+After the deployment declaration was pushed, the reviewed cleanup removed
+only 84 checkpoints / 370,484,520 bytes belonging to the eight non-deployed
+jobs. It retained all 298 prediction archives, all analyses/references, and all
+200 checkpoints belonging to the ten deployed measured jobs. The cleanup plan
+and passing retained-output postcheck are under
+`_cleanup/20260825T164320Z` in the completed program root.
+
 Per the user's explicit operational override, paid GH200 instance
 `d0ebcd5f7dbb44dc99370080df7b47cc` remains active for the immediately
 following experiment rather than being terminated at Experiment-45 closure.

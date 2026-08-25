@@ -903,6 +903,15 @@ was reopened and no frozen score, gate, member, or weight changed. The repair
 audit SHA-256 is
 `28f64727d2d6bb949fe3a0d0bd5b461ec14f9b0c51db7393c5ca7c7bfe864ce4`.
 
+After result commit `d09da27` reached GitHub, a reviewed cleanup removed only
+the 84 checkpoint files / 370,484,520 bytes belonging to the eight
+non-deployed jobs. It retained every prediction/reference/analysis and all 200
+checkpoints / 901,942,200 bytes belonging to the ten deployed measured jobs,
+including the 20 required selected/final checkpoints. Plan and passing
+postcheck SHA-256 values are
+`f7ec92ed63c837b28539c75e48890ee77ec378dcba42de65db6fb0aef06ee19b`
+and `22e44bde683993387e60f7347bc16ea437fc8e426fb8f792be3e693eec0bf37a`.
+
 The user explicitly requested that paid GH200 instance
 `d0ebcd5f7dbb44dc99370080df7b47cc` stay active for the immediately following
 experiment, overriding the registration's normal terminate-on-closure step.
