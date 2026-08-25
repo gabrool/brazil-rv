@@ -3347,6 +3347,20 @@ SHA-256 values are
 and `2f82faef622882768af07aeec9e3e750b195c5f49c5929f9344f5da52ab2b74b`.
 Official validation and the held-out test remained sealed throughout.
 
+After result commit `e325be9` reached GitHub, the reviewed checkpoint cleanup
+removed exactly 156 redundant epoch checkpoints / 705,303,300 bytes. It
+retained all 180 prediction archives and the exact union of epoch 20,
+whole-fold Raw Patience-3, and both honest odd/even cross-fit Raw Patience-3
+epochs for every trajectory: 24 checkpoints / 108,508,200 bytes. Every run
+manifest, history, analysis, graph/sidecar artifact, and final EMA-capable
+epoch-20 state remains. Cleanup-plan, retained-inventory, and passing-postcheck
+SHA-256 values are
+`ada7872e3cf20a4729de37dc6ed03c660e20d800035b026e8fa800aeb1d0bc22`,
+`1eddbf56876fa7d9746d54268bc4d24c656766f409133d917cb3327a532adcc2`,
+and `68ab557488c49895821c62a38045581c5daa4d696b579e64848e30dc42a97427`.
+The immutable evidence is under `_cleanup/20260825T194800Z` in the program
+root.
+
 Per the user's explicit override, paid GH200 instance
 `d0ebcd5f7dbb44dc99370080df7b47cc` remains active for the immediately
 following experiment and must not be terminated at Experiment-46 closure.

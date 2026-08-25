@@ -940,6 +940,10 @@ The result root is:
 All 552 pre-cleanup artifacts / 9,806,864,144 bytes were hashed and audited;
 the completion audit passed at
 `2f82faef622882768af07aeec9e3e750b195c5f49c5929f9344f5da52ab2b74b`.
+The reviewed post-result cleanup removed 156 redundant checkpoints /
+705,303,300 bytes and retained all 180 prediction archives plus the 24 exact
+epoch-20/whole-fold/cross-fit-selected checkpoints. Its postcheck passed at
+`68ab557488c49895821c62a38045581c5daa4d696b579e64848e30dc42a97427`.
 Operational repair `f565933` resumed analysis from the nine immutable
 completed trajectories after decoupling the store-v2 retention parent from an
 obsolete challenger-embedded parent check; it changed no score or rule.

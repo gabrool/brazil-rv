@@ -804,6 +804,10 @@ The immutable program root is:
 
 Its 552-artifact pre-cleanup audit passed at SHA-256
 `2f82faef622882768af07aeec9e3e750b195c5f49c5929f9344f5da52ab2b74b`.
+The reviewed cleanup retained all 180 prediction archives and 24 exact
+selected/final checkpoints while removing 156 redundant checkpoints; its
+passing postcheck SHA-256 is
+`68ab557488c49895821c62a38045581c5daa4d696b579e64848e30dc42a97427`.
 Every access flag records `official_validation_accessed=false` and
 `test_accessed=false`. Exact graph, N0, F2/F3, operational-repair, and artifact
 hash details are in `EXPERIMENT_LOG.md` Experiment 46. Paid GH200 instance
