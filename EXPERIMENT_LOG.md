@@ -3051,3 +3051,90 @@ checkpoints may be removed. The deployed measured members' selected and final
 checkpoints remain retained until a future deployment supersedes them. Results,
 hashes, and the validation-access ledger are pushed before the exact paid
 instance is terminated and verified absent twice.
+
+## Verification V1 — Negócio a Negócio archive depth and participant-code coverage (frozen 2026-08-25)
+
+Status at registration: no endpoint, UI, or archive probe has been made for
+Verification V1. The unrestricted local Windows host is the execution
+environment. This exact frozen specification has SHA-256
+`3fff572e79969cc3d64c9156e6cd1d4f505e3b94e5ff8b612f9ec16b1273c1a3`.
+It has no GPU, model, official-validation, or held-out-test implication and
+does not modify the frozen Experiment-45 program.
+
+### Frozen Verification V1 specification
+
+#### Purpose
+
+Decide, with body-verified evidence, whether B3's free daily trade-by-trade
+file ("Negócio a Negócio", `{date}_NEGOCIOSAVISTA.txt`) is retrievable
+historically — especially back to February 2023, when the
+`CodigoParticipanteComprador`/`CodigoParticipanteVendedor` columns were added.
+This single fact decides whether the D2 broker-flow sidecar is researchable
+now (fold windows are covered from 2023-02 onward) or must wait on forward
+capture. It also formally closes the MT5-L1 question (Appendix).
+
+#### Ground rules
+
+1. HTTP status is never evidence. A 200 with a zero-byte or stub body is EMPTY;
+   a 403/404 from a proxied environment is BLOCKED, not ABSENT. Only a parsed
+   body with plausible content proves existence; only the same negative result
+   from an unrestricted machine and the official UI suggests absence.
+2. Before any probe, fetch a known-good B3 market-data page and confirm direct
+   egress with no proxy interception. If blocked, halt without running the
+   ladder.
+3. Use no more than one request per two seconds, a standard browser User-Agent,
+   two retries on transient errors, approximately 40 requests maximum, and
+   stop early once the depth boundary is established.
+
+#### Outcome classes
+
+- FULL: the ZIP contains the dated `NEGOCIOSAVISTA` text file with a plausible
+  full market day (at least one million rows or at least 30 MB compressed), a
+  parseable header, and both participant-code columns.
+- PARTIAL: a full-day file without the participant columns.
+- EMPTY: HTTP success with a zero-byte, stub, or malformed body.
+- DENIED: 4xx/5xx from the unrestricted machine.
+- BLOCKED: DNS, TLS, proxy-page, or other network-level failure.
+
+#### Procedure
+
+1. Probe `https://arquivos.b3.com.br/apinegocios/tickercsv/{YYYY-MM-DD}` for
+   the two most recent completed B3 sessions. If both are DENIED, perform UI
+   route discovery before concluding anything.
+2. Probe in order 2026-01-15, 2025-06-02, 2024-08-01, 2024-01-15,
+   2023-08-01, 2023-03-01, 2023-02-06, and negative control 2022-06-01.
+   A holiday advances to the next session. Mixed FULL and DENIED results are
+   bisected to the earliest retrievable date with at most 12 extra requests.
+3. If endpoint probes fail, inspect `https://arquivos.b3.com.br/bdi`, record
+   the Negócio a Negócio date-picker range, capture the exact working route,
+   headers, and token flow for the newest and oldest UI-permitted dates, then
+   rerun the ladder on that route.
+4. For every FULL/PARTIAL file, record compressed/uncompressed size, row count,
+   distinct instruments, the full header, and participant-column flag. Check
+   PETR4 or VALE3 for positive price/quantity, session-hour trade times, and,
+   during the code era, greater than 90% nonempty buyer and seller participant
+   codes. Preserve ZIP bytes unmodified with SHA-256 manifests.
+
+#### Predeclared conclusions and outputs
+
+- A: FULL reaches March 2023 or earlier. Declare D2 RESEARCHABLE, record the
+  earliest FULL date, project backfill size from mean compressed size times
+  approximately 870 sessions, and produce only a polite rate-limited,
+  resumable, manifest-hashed backfill plan.
+- B: recent FULL but old DENIED/EMPTY, confirmed by the UI range. D2 is not
+  researchable now and is shelved while capture accrues.
+- C: nothing retrievable anywhere including the UI. Record all probes and
+  distinguish ABSENT from BLOCKED.
+
+For A or B, install a Windows scheduled daily capture job which downloads the
+latest session each evening through the verified route, rejects empty output,
+updates the SHA-256 manifest, and logs failures loudly. The final immutable
+verification artifact records the probe table, working URL patterns, UI range,
+earliest FULL date, negative control, conclusion letter, capture status, and
+every retained SHA-256. Append a dated result summary here. No full backfill is
+authorized.
+
+The optional D1 closure may query the existing current-broker MT5 terminal
+only, with unlimited max bars, for PETR4/VALE3/BOVA11 M1 from 2018-01-01 and
+record the earliest returned bar. No account creation or further D1 work is
+authorized.
