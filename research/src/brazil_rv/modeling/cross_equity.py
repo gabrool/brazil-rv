@@ -461,10 +461,10 @@ def run_n0(
         clusters = _expand_monthly(graph["clusters"], month_dates, slow.shape[0])
     liquidity = _liquidity_terciles(slow, active, month_dates)
     beta_index = EQUITY_SLOW_CHANNELS.index("beta_to_WIN")
-    beta = np.asarray(slow[..., beta_index], dtype=np.float32)
+    beta = np.asarray(slow[..., beta_index], dtype=np.float32).copy()
     beta[~active] = np.nan
     adv_index = EQUITY_SLOW_CHANNELS.index("median_daily_dollar_volume_20d_log_scale")
-    adv = np.asarray(slow[..., adv_index], dtype=np.float32)
+    adv = np.asarray(slow[..., adv_index], dtype=np.float32).copy()
     adv[~active] = np.nan
     folds = {}
     for fold in FOLDS:

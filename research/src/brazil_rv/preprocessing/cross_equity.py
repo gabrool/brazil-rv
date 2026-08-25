@@ -199,7 +199,9 @@ def build_peer_graph(store: Path, output_dir: Path) -> Path:
     audit_rows: list[dict[str, object]] = []
     previous_clusters = None
     ticker = (
-        equities.get_column("ticker").to_list() if "ticker" in equities.columns else []
+        equities.get_column("latest_ticker").to_list()
+        if "latest_ticker" in equities.columns
+        else []
     )
     ticker_to_slot = {str(value): index for index, value in enumerate(ticker)}
     for month, date_index in enumerate(month_starts):
