@@ -3013,3 +3013,41 @@ GH200 instance `74ecb13e8b704ffcad890a5930ee74fd` (`gpu_1x_gh200`,
 `us-east-3`, IP `192.222.50.236`). Consecutive provider inventory reads at
 `2026-08-25T05:16:27Z` and `2026-08-25T05:16:47Z` confirmed the exact instance
 absent and the account at zero active instances.
+
+## Experiment 45 — consolidation read (preregistered 2026-08-25)
+
+Status at registration: no Experiment-45 trajectory, official prediction,
+analysis, promotion decision, or deployment declaration exists. The complete
+immutable contract is
+`research/preregistrations/experiment45_consolidation_read.md`; this summary and
+that file are frozen before training any member or opening any official-
+validation prediction. This is official-validation access event 4. The
+held-out test is not authorized and remains sealed.
+
+The sole comparator for decisions is the retained Experiment-43 store-v2
+three-seed prediction ensemble at official IC `0.043235373`; canonical parent-3
+is reference-only. Arm 1 freshly realizes store-v2 at the exact ten frozen
+seeds under matched official-monitor Raw Patience-3. Its fresh three-seed
+result has an informational `+/-0.0015` reproduction guard: a breach completes
+measurement but halts every deployment declaration. Otherwise ten seeds deploy
+iff their IC is at least fresh-three IC minus `0.0005`; fresh three deploys if
+not.
+
+Arm 2 applies the blind Experiment-44 consensus rule exactly: repeat count at
+least two for non-comparators, the three comparators always present, repeat-
+count weights, the frozen total/gain/lexical cap ordering, weighted tie-aware
+rank averaging, and specialist horizon coverage. Full-window realization is
+capped at 20 new trajectories beyond Arm 1. Raw Patience-3 members use the
+official monitor; final EMA-0.995 members use fixed 20-epoch training with only
+their final read. Arm 2 is supported only when its paired block-10 95% lower
+bound versus the retained comparator is strictly above zero; support
+supersedes Arm 1. No hybrid, new arm, post-score edit, second read, or test read
+is permitted.
+
+At most two training processes run concurrently. Every prediction archive and
+analysis is retained. All evaluated checkpoints remain through the pushed
+deployment declaration, after which only inventory-reviewed non-deployed
+checkpoints may be removed. The deployed measured members' selected and final
+checkpoints remain retained until a future deployment supersedes them. Results,
+hashes, and the validation-access ledger are pushed before the exact paid
+instance is terminated and verified absent twice.
