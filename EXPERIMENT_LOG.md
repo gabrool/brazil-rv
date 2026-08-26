@@ -3432,3 +3432,8 @@ and post-cleanup inventory SHA-256 values are
 and `94187fa46da00001ee72779e2a931c4586b72ab7d97dbeba85cd48c43138087d`.
 The immutable audit evidence is under `_audit/20260826T070331Z` in the program
 root.
+
+Result-log commit `6369688` reached GitHub before shutdown. The exact paid
+GH200 instance `d0ebcd5f7dbb44dc99370080df7b47cc` was then terminated. Provider
+inventory confirmed the ID absent independently at `2026-08-26T07:08:37Z`
+and again at `2026-08-26T07:08:47Z`; no paid instance was left idle.
