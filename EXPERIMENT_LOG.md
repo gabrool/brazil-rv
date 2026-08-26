@@ -3519,3 +3519,10 @@ and `4b43baa7b1760ca22cc10c5f48d084e7d4976154d155d6a714d1539915db38d3`.
 The passing audit evidence is under `_audit/20260826T162730Z` in the program
 root. Every access record remains `official_validation_accessed=false` and
 `test_accessed=false`.
+
+Result/context commit `8fc7cde` reached GitHub before shutdown. The exact paid
+GH200 instance `f766c33a775344d394ec0bdc915fca6d` was then terminated after
+its identity, attached filesystem, and termination action were reverified.
+Provider inventory confirmed the exact ID absent independently at
+`2026-08-26T16:33:18Z` and again at `2026-08-26T16:33:28Z`; the account had
+zero active instances and no paid host was left idle.

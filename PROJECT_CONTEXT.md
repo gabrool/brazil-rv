@@ -811,7 +811,8 @@ passing postcheck SHA-256 is
 Every access flag records `official_validation_accessed=false` and
 `test_accessed=false`. Exact graph, N0, F2/F3, operational-repair, and artifact
 hash details are in `EXPERIMENT_LOG.md` Experiment 46. Paid GH200 instance
-`d0ebcd5f7dbb44dc99370080df7b47cc` remains active by explicit user request.
+`d0ebcd5f7dbb44dc99370080df7b47cc` was retained for Experiment 47 by explicit
+user request and terminated after that program completed.
 
 ## Final HPO and next-generation recipe decision (2026-08-26)
 
@@ -845,3 +846,8 @@ and `4b43baa7b1760ca22cc10c5f48d084e7d4976154d155d6a714d1539915db38d3`.
 The reviewed cleanup retained every prediction/analysis and 47 exact
 epoch-20/honest-selection checkpoints. Full results, hashes, and cleanup
 evidence are recorded in `EXPERIMENT_LOG.md` Experiment 48.
+
+Paid GH200 instance `f766c33a775344d394ec0bdc915fca6d` was terminated only
+after the immutable artifacts, final audit, cleanup evidence, and result commit
+were secured. Two consecutive provider reads confirmed it absent, and the
+Lambda account then had zero active instances.
