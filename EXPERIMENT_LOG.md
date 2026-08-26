@@ -3382,3 +3382,53 @@ generation after completion. It also ends the standing keep-alive override:
 after results, artifact audit, reviewed checkpoint cleanup, and result push,
 exact paid instance `d0ebcd5f7dbb44dc99370080df7b47cc` must be terminated and
 verified absent twice.
+
+### Experiment 47 result (completed 2026-08-26)
+
+All 59 frozen discovery trajectories completed: 32 Stage-1 trajectories and
+the maximum 27 Stage-2 trajectories. Stage 1 advanced exactly `R7` (VAL),
+`R1` (SIMP), and `P2` (SIMP). Their two-fold mean primary deltas were
+`+0.000159592`, `+0.000390868`, and `-0.000229203`, respectively.
+
+In Stage 2, R7 produced Fold A/B/C deltas
+`+0.000434758/+0.000918349/+0.000245795`, mean `+0.000532967`.
+Both pooled supporting intervals had positive lower bounds, but the frozen VAL
+gate still failed because the mean was below `+0.001`. R1 produced Fold A/B/C
+deltas `-0.000442724/+0.001436183/+0.000737590`, mean `+0.000577016`,
+and passed the SIMP gate. P2 produced
+`-0.000922042/-0.000197612/-0.000425118`, mean `-0.000514924`, and
+failed. Therefore R1 is the frozen training-recipe specification for future
+work. No future official-read arm was registered, the ensemble pool was not
+scored, and deployment did not change. HPO and architecture axes are closed
+permanently for this generation.
+
+The immutable program root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/hpo_sweep_47_b637561_20260825T202142Z
+
+Frozen-design, Stage-1 screen, Stage-2 confirmation, result, and completed
+program-manifest SHA-256 values are
+`4ba6919bbe2a27c80e9e3c9d60d9ec73f1bbbc0e005c5ef4ab84a8490b5adc99`,
+`25f19b88a92f7bd922f9011bcb615bc3c4e242578a5be6faf8de3394d0741787`,
+`5d36b859577f58cd7f4b49edbd3996fe5c0c2e59e4bf6e3f048462babb76fafe`,
+`464c2a213a0953f1ec68eb2869825a9418a3458aaa7dd3262bf197b18a844b1a`,
+and `55818633a4559bc5b4584f73dc06deee043be857c7bd559d27608616e63e7a5f`.
+
+The final audit validated all 59 run manifests, 1,180 history epochs, 1,180
+prediction archives, 1,180 pre-cleanup checkpoints, 78 paired-analysis JSONs,
+11 frozen source hashes, all screen/confirmation/result gates, and 288 explicit
+access-ledger flags. It hashed all 2,973 pre-cleanup artifacts / 60,105,765,909
+bytes. Official validation and the held-out test remained sealed throughout.
+Pre-cleanup inventory and final-audit SHA-256 values are
+`50d06b52d874fa9173be37fe2ccbe696a52542261d60e91169b71c6eea59ac6a`
+and `168fc4c7870826a6044de69b841544341d4022b275fff0d45de4d3e8187067ea`.
+
+The reviewed inventory-bound cleanup removed exactly 1,027 redundant epoch
+checkpoints / 4,603,571,101 bytes. It retained every prediction, manifest,
+history, readout, analysis, and the exact union of epoch 20 and candidate/control
+honest odd/even cross-fit selected checkpoints: 153 checkpoints. Cleanup-plan
+and post-cleanup inventory SHA-256 values are
+`e43fa2bb7f826b4bcb1e5dac90b97e0714638b24167039e13301ff1f6c2a56bb`
+and `94187fa46da00001ee72779e2a931c4586b72ab7d97dbeba85cd48c43138087d`.
+The immutable audit evidence is under `_audit/20260826T070331Z` in the program
+root.
