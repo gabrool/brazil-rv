@@ -3460,3 +3460,62 @@ authorized. Exact paid GH200 instance
 `f766c33a775344d394ec0bdc915fca6d` must be terminated only after the complete
 artifact audit, reviewed checkpoint cleanup, result log, commit, and push,
 then verified absent twice.
+
+### Experiment 48 result (completed 2026-08-26)
+
+Part A replicated the early-realization claim on all three discovery folds.
+Fold C/A/B leg-1 versus leg-2 IC was
+`0.039540720/0.021964317`, `0.048528015/0.028513916`, and
+`0.049717261/0.031518314`; the paired differences were
+`+0.017576404/+0.020014099/+0.018198947`. Every block-10 lower 95% bound
+was positive (`+0.013223676/+0.016300907/+0.010434877`), so the frozen
+Part-C gate passed 3/3 folds.
+
+Part B combined R1 depth 4 with temperature 1.00. Its Fold A/B/C deltas versus
+the archived Experiment-47 R1 trajectories were
+`+0.000198613/+0.000944777/+0.000125564`, mean `+0.000422984`.
+The pooled block-5 and block-10 lower 95% bounds were both positive
+(`+0.000104390` and `+0.000109832`). It passed the frozen non-inferiority
+gate, making `R1_T1.0` the next-generation three-head training recipe.
+
+Part C added the fixed equal-weight 15-minute head. Its three-horizon Fold
+A/B/C deltas were `+0.000819706/-0.000864794/-0.000089351`, mean
+`-0.000044813`. Fold B crossed the fixed `-0.0005` floor, so both the primary
+and superiority gates failed. The final next-generation specification is
+therefore `R1_T1.0_three_head_30_60_120`; the dedicated 15-minute model remains
+a registered future option but was not built. The new 15-minute head itself
+measured IC `0.054073317/0.051798396/0.038488832` on Fold A/B/C, versus its
+30-minute head's `0.046053040/0.054633680/0.038939226`.
+
+No pool was scored, no official-validation or held-out-test data was accessed,
+no read was registered, and deployment remained the Experiment-45 ten-seed
+store-v2 recipe. The immutable program root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/nextgen_48_e5c1983_20260826T132551Z
+
+Frozen-design, completed program-manifest, result, Part-A, Part-B, Part-C, and
+15-minute target-sidecar manifest SHA-256 values are
+`def9ff3229e66825df4ef6856130edd2a12f599ed299ef30a9aa5b93de0192bd`,
+`33d5f400d4b775f842bd8237f91ba01bb9570ff39095657ea03603d30239002f`,
+`7d91e63e50c164ede14a75ef02097563a7d1bb58540d6a8bc57a709e43869a0d`,
+`ce0479466decd19e6c345f87c72c913005dbd61c3df3a5b5ed8df78662317855`,
+`04b975228e0a8656e4a005f49d725ce7c3b30d072d8ca28030d6f9c1f1a13c19`,
+`a7aab4061e43c7f7adb9ee9627e455b96073769056599a2deb8527233c5880c8`,
+and `a4cad0382fca44e5b07783f03cefafd2e9378ffd487530655388142002202bb7`.
+
+The final audit verified all 18 run manifests, 360 history epochs, 360
+both-state epoch prediction archives, 360 pre-cleanup checkpoints, 290 frozen
+source hashes, every decision gate, and 124 explicit access flags. It hashed
+873 pre-cleanup artifacts / 21,033,562,827 bytes. The reviewed inventory-bound
+cleanup removed exactly 313 redundant checkpoints / 1,235,370,343 bytes and
+retained every prediction, history, manifest, reference, analysis, plus the
+exact union of epoch 20 and honest odd/even-selected checkpoints: 47
+checkpoints. Pre-inventory, cleanup-plan, post-inventory, and final-audit
+SHA-256 values are
+`0272e2ec37361bdd48b5aafac89429f0a677a1d2eac905fdfbf9234034fdb1ec`,
+`8134ae5ff852d3e2e7a13736300ff490f3017fd3b73233af98bae502ad8b6ab3`,
+`9daf9fa584f05386287a408204f213008277bb28e4af1c3502d8db4ea6d16a87`,
+and `4b43baa7b1760ca22cc10c5f48d084e7d4976154d155d6a714d1539915db38d3`.
+The passing audit evidence is under `_audit/20260826T162730Z` in the program
+root. Every access record remains `official_validation_accessed=false` and
+`test_accessed=false`.

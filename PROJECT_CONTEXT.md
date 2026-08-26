@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-08-23.
+Last verified: 2026-08-26.
 
 ## Purpose and current research state
 
@@ -812,3 +812,36 @@ Every access flag records `official_validation_accessed=false` and
 `test_accessed=false`. Exact graph, N0, F2/F3, operational-repair, and artifact
 hash details are in `EXPERIMENT_LOG.md` Experiment 46. Paid GH200 instance
 `d0ebcd5f7dbb44dc99370080df7b47cc` remains active by explicit user request.
+
+## Final HPO and next-generation recipe decision (2026-08-26)
+
+Experiment 47 closed the bounded HPO and architecture axes. Its simplification
+track adopted R1: four TCN residual blocks with dilations `(1, 4, 16, 32)` on
+the 34-field store-v2 input specification. Experiment 48 then prospectively
+combined R1 with soft-Spearman temperature `1.00`. The combination added
+`+0.000198613/+0.000944777/+0.000125564` on discovery Folds A/B/C, mean
+`+0.000422984`, with positive pooled block-5 and block-10 lower bounds. It
+passed the frozen non-inferiority rule and is the accepted next-generation
+training recipe: `R1_T1.0_three_head_30_60_120`.
+
+The Experiment-48 early/late decomposition strongly replicated early
+30-minute realization on all three folds, so a fixed equal-weight fourth
+15-minute head was tested. Its incumbent three-horizon delta was
+`+0.000819706/-0.000864794/-0.000089351` on Folds A/B/C, mean
+`-0.000044813`; Fold B failed the `-0.0005` floor. Keep the three-head recipe.
+The measured 15-minute head ICs were `0.054073317/0.051798396/0.038488832`
+on A/B/C. A dedicated 15-minute model is only a future registered option and
+was not built. No validation read, held-out test read, read registration,
+pool scoring, or deployment change occurred. The deployed recipe remains the
+Experiment-45 ten-seed store-v2 ensemble.
+
+The immutable Experiment-48 program is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/nextgen_48_e5c1983_20260826T132551Z
+
+Its frozen-design and final-audit SHA-256 values are
+`def9ff3229e66825df4ef6856130edd2a12f599ed299ef30a9aa5b93de0192bd`
+and `4b43baa7b1760ca22cc10c5f48d084e7d4976154d155d6a714d1539915db38d3`.
+The reviewed cleanup retained every prediction/analysis and 47 exact
+epoch-20/honest-selection checkpoints. Full results, hashes, and cleanup
+evidence are recorded in `EXPERIMENT_LOG.md` Experiment 48.
