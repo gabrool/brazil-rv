@@ -3437,3 +3437,26 @@ Result-log commit `6369688` reached GitHub before shutdown. The exact paid
 GH200 instance `d0ebcd5f7dbb44dc99370080df7b47cc` was then terminated. Provider
 inventory confirmed the ID absent independently at `2026-08-26T07:08:37Z`
 and again at `2026-08-26T07:08:47Z`; no paid instance was left idle.
+
+## Experiment 48 — next-generation recipe and 15-minute head (frozen 2026-08-26)
+
+Status at registration: no Experiment-48 target, trajectory, fold prediction,
+or score exists. The full frozen specification is
+`research/preregistrations/experiment48_nextgen.md`. This discovery-only
+program first decomposes the retained Experiment-41 comparator's 30-minute
+signal into exact independently ranked 0→15 and 15→30 minute legs. It then
+runs exactly nine R1-depth-4, temperature-1.00 trajectories on seeds 11/29/47
+and Folds C/A/B. Only if the frozen leg gate passes does it run nine further
+four-head trajectories with a hashed development-only 15-minute target
+sidecar. The incumbent three-horizon metric remains the sole adoption gate;
+the new 15-minute IC is measured separately.
+
+The exact canonical store, Experiment-41 cross-fit archives, Experiment-47 R1
+archives, and causal target-scale source are hash-bound in the runtime frozen
+design before any Experiment-48 score. At most two training processes are
+permitted. No pool scoring, new specialist, weighting search, official
+validation, held-out test, deployment change, or read registration is
+authorized. Exact paid GH200 instance
+`f766c33a775344d394ec0bdc915fca6d` must be terminated only after the complete
+artifact audit, reviewed checkpoint cleanup, result log, commit, and push,
+then verified absent twice.

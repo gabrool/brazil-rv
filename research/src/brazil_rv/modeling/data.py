@@ -66,6 +66,13 @@ FEATURE_ARRAY_FILES = (
 )
 FEATURE_STORE_CONTRACT = "M1_FEATURES_PIT_CAUSAL_TOD"
 EXTERNAL_SIDECAR_SCHEMA = "PIT_EXTERNAL_FEATURE_SIDECAR"
+NEXTGEN_TARGET_SCHEMA = "EXPERIMENT48_15M_LEG_TARGETS_V1"
+NEXTGEN_TARGET_FILES = (
+    "leg_raw_returns.npy",
+    "leg_targets.npy",
+    "leg_label_mask.npy",
+    "leg_cross_section_median.npy",
+)
 SCREENING_FOLD_NOTE = (
     "Causal stored features are reused, but the time-of-day profile adapted inside "
     "these historical training dates. These are screening folds, not exact replicas "
@@ -100,6 +107,13 @@ class ExternalFeatureSidecar:
     @property
     def input_width(self) -> int:
         return 2 * self.feature_count
+
+
+@dataclass(frozen=True)
+class NextgenTargetSidecar:
+    path: Path
+    date_count: int
+    identity: dict[str, object]
 
 
 def resolve_feature_store(pointer: Path = FEATURE_STORE_POINTER) -> Path:
@@ -302,6 +316,68 @@ def load_recorded_external_sidecar(
     if sidecar.identity != recorded_identity:
         raise ValueError("Recorded external sidecar differs from its files")
     return sidecar
+
+
+@lru_cache(maxsize=4)
+def load_nextgen_target_sidecar(sidecar_dir: Path, store: Path) -> NextgenTargetSidecar:
+    path = sidecar_dir.resolve()
+    manifest_path = path / "manifest.json"
+    if not path.is_dir() or not manifest_path.is_file():
+        raise FileNotFoundError(path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    store_identity = feature_store_identity(store)
+    if (
+        manifest.get("schema") != NEXTGEN_TARGET_SCHEMA
+        or manifest.get("source_feature_store") != store_identity
+        or manifest.get("through") != VALIDATION_END.isoformat()
+        or manifest.get("horizon_minutes") != 15
+        or manifest.get("leg_names") != ["0_to_15", "15_to_30"]
+        or manifest.get("official_validation_accessed") is not False
+        or manifest.get("test_accessed") is not False
+    ):
+        raise ValueError("Experiment 48 target sidecar manifest differs")
+    shape = manifest.get("shape")
+    if (
+        not isinstance(shape, list)
+        or len(shape) != 4
+        or shape[1:] != [EQUITY_COUNT, EXPECTED_DECISIONS_PER_DATE, 2]
+    ):
+        raise ValueError("Experiment 48 target sidecar axes differ")
+    hashes = manifest.get("array_sha256")
+    if not isinstance(hashes, dict) or set(hashes) != set(NEXTGEN_TARGET_FILES):
+        raise ValueError("Experiment 48 target sidecar hashes are incomplete")
+    dtypes = {
+        "leg_raw_returns.npy": "float32",
+        "leg_targets.npy": "float32",
+        "leg_label_mask.npy": "bool",
+        "leg_cross_section_median.npy": "float32",
+    }
+    expected_shapes = {name: tuple(shape) for name in NEXTGEN_TARGET_FILES[:3]}
+    expected_shapes["leg_cross_section_median.npy"] = (
+        int(shape[0]),
+        EXPECTED_DECISIONS_PER_DATE,
+        2,
+    )
+    normalized = {}
+    for name in NEXTGEN_TARGET_FILES:
+        array_path = path / name
+        digest = _file_sha256(array_path)
+        array = np.load(array_path, mmap_mode="r", allow_pickle=False)
+        if (
+            hashes.get(name) != digest
+            or array.shape != expected_shapes[name]
+            or array.dtype.name != dtypes[name]
+        ):
+            raise ValueError(f"Experiment 48 target sidecar differs: {name}")
+        normalized[name] = digest
+    identity = {
+        "schema": NEXTGEN_TARGET_SCHEMA,
+        "path": str(path),
+        "manifest_sha256": _file_sha256(manifest_path),
+        "array_sha256": normalized,
+        "through": manifest["through"],
+    }
+    return NextgenTargetSidecar(path, int(shape[0]), identity)
 
 
 def int64_identity_sha256(values: np.ndarray) -> str:
@@ -666,6 +742,43 @@ def _build_sidecar_batch(
     return np.concatenate((values, mask.astype(np.float32)), axis=-1)
 
 
+def _append_nextgen_target(
+    common: dict[str, np.ndarray],
+    arrays: dict[str, np.ndarray],
+    date_idx: np.ndarray,
+    decision_idx: np.ndarray,
+    active: np.ndarray,
+    valid_count: int,
+) -> None:
+    batch_size = date_idx.size
+    targets = np.zeros((batch_size, EQUITY_COUNT, 1), dtype=np.float32)
+    label_mask = np.zeros_like(targets, dtype=bool)
+    raw_returns = np.zeros_like(targets)
+    for decision in np.unique(decision_idx):
+        group = np.flatnonzero(decision_idx == decision)
+        targets[group, :, 0] = arrays["leg_targets.npy"][
+            date_idx[group], :, int(decision), 0
+        ]
+        label_mask[group, :, 0] = arrays["leg_label_mask.npy"][
+            date_idx[group], :, int(decision), 0
+        ]
+        raw_returns[group, :, 0] = arrays["leg_raw_returns.npy"][
+            date_idx[group], :, int(decision), 0
+        ]
+    label_mask &= active[..., None]
+    targets *= label_mask
+    raw_returns *= label_mask
+    if valid_count < batch_size:
+        targets[valid_count:] = 0
+        label_mask[valid_count:] = False
+        raw_returns[valid_count:] = 0
+    common["targets"] = np.concatenate((common["targets"], targets), axis=-1)
+    common["label_mask"] = np.concatenate((common["label_mask"], label_mask), axis=-1)
+    common["raw_returns"] = np.concatenate(
+        (common["raw_returns"], raw_returns), axis=-1
+    )
+
+
 class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
     def __init__(
         self,
@@ -676,9 +789,11 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         zero_slow_fields: tuple[int, ...] = (),
         training_horizon_indices: tuple[int, ...] | None = None,
         patch_minutes: int = PATCH_MINUTES,
+        target_sidecar: NextgenTargetSidecar | None = None,
     ) -> None:
         self.store = store
         self.sidecar = sidecar
+        self.target_sidecar = target_sidecar
         if len(set(zero_dynamic_channels)) != len(zero_dynamic_channels) or any(
             not 0 <= value < DYNAMIC_CHANNEL_COUNT for value in zero_dynamic_channels
         ):
@@ -695,6 +810,10 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             or any(value not in (0, 1, 2) for value in training_horizon_indices)
         ):
             raise ValueError("Training horizon indices must be unique values in 0..2")
+        if target_sidecar is not None and training_horizon_indices is not None:
+            raise ValueError(
+                "The four-head target sidecar cannot be combined with head masking"
+            )
         self.training_horizon_indices = training_horizon_indices
         if patch_minutes not in (5, 10):
             raise ValueError("Patch minutes must be 5 or 10")
@@ -711,6 +830,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         }
         self._arrays: dict[str, np.ndarray] | None = None
         self._sidecar_arrays: dict[str, np.ndarray] | None = None
+        self._target_arrays: dict[str, np.ndarray] | None = None
 
     def __len__(self) -> int:
         return len(self.rows["sample_id"])
@@ -719,6 +839,7 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
         state = self.__dict__.copy()
         state["_arrays"] = None
         state["_sidecar_arrays"] = None
+        state["_target_arrays"] = None
         return state
 
     def _open_arrays(self) -> dict[str, np.ndarray]:
@@ -741,12 +862,43 @@ class VectorizedFeatureDataset(Dataset[dict[str, np.ndarray]]):
             }
         return self._sidecar_arrays
 
+    def _open_target_arrays(self) -> dict[str, np.ndarray]:
+        if self.target_sidecar is None:
+            raise RuntimeError("Dataset has no next-generation target sidecar")
+        if self._target_arrays is None:
+            self._target_arrays = {
+                name: np.load(
+                    self.target_sidecar.path / name,
+                    mmap_mode="r",
+                    allow_pickle=False,
+                )
+                for name in (
+                    "leg_raw_returns.npy",
+                    "leg_targets.npy",
+                    "leg_label_mask.npy",
+                )
+            }
+        return self._target_arrays
+
     def __getitem__(self, request: BatchRequest) -> dict[str, np.ndarray]:
         arrays = self._open_arrays()
         positions = np.asarray(request.indices, dtype=np.int64)
         common, active, equity_cutoffs, context_cutoffs, dates, decisions = (
             _common_batch(arrays, self.rows, positions, request.valid_count)
         )
+        if self.target_sidecar is not None:
+            if dates.size and int(dates.max()) >= self.target_sidecar.date_count:
+                raise ValueError(
+                    "Batch reaches beyond the development-only target sidecar"
+                )
+            _append_nextgen_target(
+                common,
+                self._open_target_arrays(),
+                dates,
+                decisions,
+                active,
+                request.valid_count,
+            )
         if self.training_horizon_indices is not None:
             keep = np.zeros(3, dtype=bool)
             keep[list(self.training_horizon_indices)] = True
@@ -906,6 +1058,7 @@ def create_training_loaders(
     date_multiset: tuple[object, ...] | None = None,
     training_horizon_indices: tuple[int, ...] | None = None,
     patch_minutes: int = PATCH_MINUTES,
+    target_sidecar: NextgenTargetSidecar | None = None,
 ) -> tuple[
     DataLoader[dict[str, torch.Tensor]],
     DataLoader[dict[str, torch.Tensor]],
@@ -923,6 +1076,7 @@ def create_training_loaders(
             zero_slow_fields,
             training_horizon_indices,
             patch_minutes,
+            target_sidecar,
         ),
         sampler,
         runtime,
@@ -936,6 +1090,7 @@ def create_training_loaders(
             zero_dynamic_channels,
             zero_slow_fields,
             patch_minutes=patch_minutes,
+            target_sidecar=target_sidecar,
         ),
         DecisionGroupedBatchSampler(validation_rows, runtime.evaluation_batch_size),
         runtime,

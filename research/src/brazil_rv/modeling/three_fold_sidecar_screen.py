@@ -49,6 +49,7 @@ def _read_json(path: Path) -> dict[str, object]:
 def crossfit_patience_observations(
     run_dir: Path,
     frozen_replays: list[dict[str, object]] | None = None,
+    primary_horizon_count: int | None = None,
 ) -> tuple[EvaluationObservations, list[dict[str, object]]]:
     reference = load_run_observations(run_dir, "final_raw")
     dates = np.unique(reference.date_idx)
@@ -56,6 +57,13 @@ def crossfit_patience_observations(
         raise ValueError("Cross-fit Patience requires at least six selection dates")
     parities = {"odd": dates[0::2], "even": dates[1::2]}
     predictions = np.empty_like(reference.predictions)
+    horizon_count = (
+        reference.predictions.shape[-1]
+        if primary_horizon_count is None
+        else primary_horizon_count
+    )
+    if not 1 <= horizon_count <= reference.predictions.shape[-1]:
+        raise ValueError("Primary horizon count is invalid")
     replay_rows = []
     if frozen_replays is not None:
         if len(frozen_replays) != 2:
@@ -91,9 +99,9 @@ def crossfit_patience_observations(
         evaluation = np.isin(reference.date_idx, parities[evaluation_parity])
         scores = [
             primary_validation_score(
-                values[selection],
-                reference.targets[selection],
-                reference.label_mask[selection],
+                values[selection, ..., :horizon_count],
+                reference.targets[selection, ..., :horizon_count],
+                reference.label_mask[selection, ..., :horizon_count],
                 reference.date_idx[selection],
             )
             for values in epoch_predictions
@@ -300,7 +308,9 @@ def run_three_fold_sidecar_screen(
             or manifest.get("official_validation_accessed") is not False
             or manifest.get("test_accessed") is not False
         ):
-            raise ValueError("Existing campaign does not match the analysis-only request")
+            raise ValueError(
+                "Existing campaign does not match the analysis-only request"
+            )
     else:
         manifest = {
             "schema": "THREE_FOLD_EXTERNAL_SIDECAR_SCREEN_V1",
@@ -361,7 +371,9 @@ def run_three_fold_sidecar_screen(
                     or run_manifest.get("split", {}).get("training") != fold
                     or run_manifest.get("split", {}).get("test_accessed") is not False
                 ):
-                    raise ValueError(f"Candidate run is not complete: {fold}/seed_{seed}")
+                    raise ValueError(
+                        f"Candidate run is not complete: {fold}/seed_{seed}"
+                    )
     elif parallel_processes == 1:
         for job in jobs:
             print(_run_job(*job), flush=True)

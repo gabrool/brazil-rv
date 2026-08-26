@@ -30,6 +30,7 @@ from .data import (
     create_training_loaders,
     feature_store_identity,
     load_external_sidecar,
+    load_nextgen_target_sidecar,
     load_sample_index,
     resolve_feature_store,
     sample_window_metadata,
@@ -196,8 +197,19 @@ def run_training(
     date_multiset: tuple[object, ...] | None = None,
     training_horizon_indices: tuple[int, ...] | None = None,
     training_specification: TrainingSpecification = TRAINING_SPECIFICATION,
+    target_sidecar_dir: Path | None = None,
 ) -> Path:
     sidecar = None if sidecar_dir is None else load_external_sidecar(sidecar_dir, store)
+    target_sidecar = (
+        None
+        if target_sidecar_dir is None
+        else load_nextgen_target_sidecar(target_sidecar_dir, store)
+    )
+    expected_horizons = 4 if target_sidecar is not None else 3
+    if training_specification.architecture.output_horizons != expected_horizons:
+        raise ValueError(
+            "Model output count differs from the requested target-sidecar contract"
+        )
     if run_dir.exists():
         raise FileExistsError(run_dir)
     run_dir.mkdir(parents=True)
@@ -223,6 +235,7 @@ def run_training(
         date_multiset,
         training_horizon_indices,
         training_specification.patch_minutes,
+        target_sidecar,
     )
     single_horizon_index = (
         training_horizon_indices[0]
@@ -286,6 +299,9 @@ def run_training(
         "single_horizon_head": single_horizon_index,
         "selection_window_unchanged": True,
     }
+    run_provenance["target_sidecar"] = (
+        None if target_sidecar is None else target_sidecar.identity
+    )
     recorded_training = run_provenance["training"]
     if (
         recorded_training["steps_per_epoch"],
@@ -300,6 +316,7 @@ def run_training(
         "feature_store": str(store.resolve()),
         "feature_store_identity": store_identity,
         "external_sidecar": None if sidecar is None else sidecar.identity,
+        "target_sidecar": None if target_sidecar is None else target_sidecar.identity,
         "equity_input_zeroing": run_provenance["equity_input_zeroing"],
         "training_variation": run_provenance["training_variation"],
         "split": {

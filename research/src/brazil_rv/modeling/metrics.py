@@ -396,8 +396,12 @@ def create_metric_table(
         )
     return (
         {
-            "primary_score": primary_score_from_sample_ic(spearman, date_idx),
-            "mean_valid_sample_spearman_ic": finite_mean(spearman.ravel()),
+            "primary_score": primary_score_from_sample_ic(
+                spearman[:, : len(HORIZONS)], date_idx
+            ),
+            "mean_valid_sample_spearman_ic": finite_mean(
+                spearman[:, : len(HORIZONS)].ravel()
+            ),
             "horizons": horizons,
         },
         daily_rows,

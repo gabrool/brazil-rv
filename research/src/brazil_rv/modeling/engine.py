@@ -13,6 +13,7 @@ from .contract import (
     EQUITY_COUNT,
     GH200_RUNTIME,
     GRADIENT_CLIP,
+    HORIZONS,
     SAM_NORM_EPS,
     SAM_RHO,
     SOFT_RANK_STANDARDIZATION_EPS,
@@ -566,10 +567,11 @@ def assert_observations_aligned(
 
 
 def validation_primary_metric(observations: EvaluationObservations) -> float:
+    horizon_count = len(HORIZONS)
     return primary_validation_score(
-        observations.predictions,
-        observations.targets,
-        observations.label_mask,
+        observations.predictions[..., :horizon_count],
+        observations.targets[..., :horizon_count],
+        observations.label_mask[..., :horizon_count],
         observations.date_idx,
     )
 
