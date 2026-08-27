@@ -932,3 +932,41 @@ GitHub before shutdown. Exact paid GH200 instance
 `a6c710df4bfa48c9a40f64ee4b7e85c4` was then terminated; provider inventory
 confirmed the exact ID absent twice at `2026-08-27T13:17:35.6228739Z` and
 `2026-08-27T13:17:57.0202321Z`, with zero active instances on both reads.
+
+## Persistent Lambda retention cleanup, round 4 (2026-08-27)
+
+Direct S3-compatible access was used for a reviewed cleanup; no paid Lambda
+instance was launched. After the plan records were present, the bucket held
+19,918 objects / 286,524,998,316 bytes (266.847 GiB). The exact delete list
+removed 3,521 objects / 183,169,695,704 bytes (170.590 GiB), a 63.93% reduction.
+The final bucket, including all six round-4 plan/result records, contains 16,399
+objects / 103,355,305,165 bytes (96.257 GiB).
+
+The deletion scope was limited to unselected `validation_predictions/epoch_*`
+archives and redundant `tail_candidates.npz` bundles in eight closed programs:
+Experiments 42, 43, 44, 45, 46, 47, 48, and 50. It retained 433 exact
+selected/final or honest-selection prediction states across those programs,
+their matching retained checkpoints, every manifest/history/reference/analysis,
+the Experiment-44 frozen 90-member state catalogue, and all non-deployed
+Experiment-45 arm archives. Experiment 45's deployed ten members retain their
+exact selected and final predictions and checkpoints.
+
+Raw data, interim data, the canonical feature store, external sidecars,
+auxiliary targets, and the complete Experiment-51 test-read root were outside
+the deletion scope. Their verified post-cleanup sizes were respectively
+18,224,073,078; 287,164,841; 9,890,909,028; 1,952,163,984; 517,990,485; and
+358,303,408 bytes. The historical unselected per-epoch prediction archives
+removed by this cleanup are not recoverable in place; exact trajectory reruns
+use the recorded commits, manifests, histories, retained selected states, and
+canonical derived data.
+
+The immutable cleanup record is:
+
+    quant-data/b3/processed/model_runs/_retention/storage_cleanup_20260827_round4
+
+Cleanup-plan, exact delete-list, and cleanup-result SHA-256 values are
+`1bd8bb8f99f6821066ad5c03f51ca420d40c9960ee6b2fa3bbb881d3d0d9e7b1`,
+`e262d1fc2430e2d9d0e031a54e21fe40ae2c6ae89be2f5185070db15c8f01f02`,
+and `0b59fa9611a5e098cbd337c63e38ee8cfef941e415dc7f0f258092dca7643eba`.
+Provider inventory at `2026-08-27T14:31:41.9870434Z` showed zero active
+instances.

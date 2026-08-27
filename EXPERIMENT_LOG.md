@@ -3730,3 +3730,52 @@ artifact, log, audit hash, result, and the spent-test policy were secured and
 pushed. Provider inventory confirmed that exact ID absent at
 `2026-08-27T13:17:35.6228739Z` and again at
 `2026-08-27T13:17:57.0202321Z`; both reads showed zero active instances.
+
+## Storage maintenance — Lambda object-store cleanup round 4 (2026-08-27)
+
+The cleanup used the filesystem's direct S3-compatible endpoint, so the GH200
+capacity watcher was stopped before launch and no paid instance was created.
+The reviewed plan was generated at repository commit `0851256`, uploaded before
+deletion, and dry-run against every exact key. Its only deletion scope was
+unselected per-epoch validation predictions and tail-candidate bundles in the
+closed Experiment-42, 43, 44, 45, 46, 47, 48, and 50 program roots.
+
+The plan removed exactly 3,521 objects / 183,169,695,704 bytes. Per root, the
+removed object/byte counts were:
+
+- Experiment 42: 494 / 21,227,317,082;
+- Experiment 43: 57 / 5,801,362,338;
+- Experiment 44: 1,008 / 47,013,357,888;
+- Experiment 45: 190 / 19,337,874,460;
+- Experiment 46: 165 / 7,090,371,894;
+- Experiment 47: 1,086 / 46,790,695,194;
+- Experiment 48: 331 / 16,570,842,388;
+- Experiment 50: 190 / 19,337,874,460.
+
+The retained-state counts for those same roots were 73, 6, 90, 20, 24, 153,
+47, and 20, totaling 433 selected/final or honest-selection prediction
+objects. Every matching retained checkpoint, manifest, history, observation
+reference, analysis, decision, access ledger, and cleanup authority remains.
+Experiment 44's 90 hash-frozen member states remain intact. Experiment 45
+retains the exact deployed ten-member selected/final prediction and checkpoint
+inventory; its non-deployed arm archives were not part of this deletion. The
+complete Experiment-51 test event was explicitly excluded.
+
+The postcheck rebuilt the selection-derived keep sets from each prior cleanup
+authority, found every required retained object, and found zero remaining keys
+eligible under the round-4 plan. Raw/interim, canonical feature-store, external
+sidecar, auxiliary-target, and Experiment-51 sizes remained at
+18,224,073,078 / 287,164,841 / 9,890,909,028 / 1,952,163,984 / 517,990,485 /
+358,303,408 bytes. The final bucket, including the plan and result evidence,
+contains 16,399 objects / 103,355,305,165 bytes.
+
+The immutable record is under
+`model_runs/_retention/storage_cleanup_20260827_round4`. Plan, delete-list, and
+result SHA-256 values are
+`1bd8bb8f99f6821066ad5c03f51ca420d40c9960ee6b2fa3bbb881d3d0d9e7b1`,
+`e262d1fc2430e2d9d0e031a54e21fe40ae2c6ae89be2f5185070db15c8f01f02`,
+and `0b59fa9611a5e098cbd337c63e38ee8cfef941e415dc7f0f258092dca7643eba`.
+The removed unselected archives are not recoverable in place; reproduction uses
+the recorded commits, manifests, histories, retained states, and canonical
+derived data. Provider inventory at `2026-08-27T14:31:41.9870434Z` contained
+zero active instances.
