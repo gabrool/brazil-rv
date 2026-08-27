@@ -4151,3 +4151,24 @@ commit. A direct provider inventory read at `2026-08-27T20:28:00.1318316Z`
 returned exactly one instance, exact ID `e02aac505c884d129c8118577e671ed3`,
 with status `active` at `192.222.51.247`. It remains ready by explicit user
 request; no termination was attempted.
+
+## Learned-policy package Part 1 — code-only implementation (2026-08-27)
+
+Before any real policy trajectory or research score, the execution layer was
+extended with the registered Part-1 mechanisms: a sign-preserving bounded
+neutral/cap projector that never scales gross up; a schema-hashed causal policy
+state built inside the minute scan; volume-weighted entry-price and position-age
+tracking; a zero-initialized shared per-name neural policy; direct net-PnL-above-
+all-cash-CDI optimization with AdamW default and opt-in SAM/checkpointing; and a
+frozen five-block/five-session-purged TRAIN split manifest with exact C/A/B policy
+evaluation slices. Legacy Band/ConcentratedPolicy targets retain their original
+exact-gross path.
+
+This is an implementation registration, not an experiment result. Validation
+used synthetic unit and simulator fixtures only. No canonical prediction,
+feature-store, official-validation, or held-out-test artifact was opened; no OOF
+member was refit or materialized; no real learned policy was trained; no
+Experiment-55 sidecar, score, gate, or trajectory was produced. The OOF archive
+loader remains closed to aggregates until the separately registered constituent-
+fold provenance chain is implemented and manufactured. The held GH200 was not
+used, modified, or terminated for this code-only work.

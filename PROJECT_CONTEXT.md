@@ -1008,7 +1008,10 @@ as recorded liquidity permits. A missing open creates neither a mark nor a fill:
 the holding retains its last observed notional and realizes the cumulative
 return when the next observed open arrives. A transient rank-validity mask that
 cannot support exact signed cap capacity retains the last feasible projected
-target; the hard neutral/gross/cap projection is never relaxed.
+target. Band and concentrated policies retain the hard exact-gross
+neutral/cap projection. A learned policy uses a separate bounded projector that
+is still exactly neutral and capped but never scales exposure up, so gross may
+remain below target or exactly at zero.
 
 A linear close taper targets zero at the final open, and any remaining terminal
 position is force-filled at the recorded spread multiplier and counted,
@@ -1019,10 +1022,17 @@ accrual uses an explicit dated CDI input and one configurable margin formula. No
 canonical daily CDI execution series currently exists, so runs must supply and
 hash-record one.
 
-The baseline policy is the deterministic no-trade-band policy. Neural-policy
-training, OOF refits, cluster penalties, parameter tuning, round lots, impact,
-and live routing are not part of this implementation. No experiment, training,
-official-validation access, or test access was performed while adding it.
+The baseline policy remains the deterministic no-trade-band policy. The
+execution package also contains code-only learned-policy infrastructure: a
+zero-initialized shared per-name neural policy, a hash-frozen strictly causal
+state built inside the minute scan, volume-weighted position cost basis, direct
+AdamW optimization over net PnL above all-cash CDI with optional SAM/replay
+checkpointing, and hashed five-block purged TRAIN split generation. This does
+not establish an accepted policy. No real policy training, OOF refit/materialized
+archive, Experiment-55 trajectory, official-validation access, or additional
+held-out-test access has occurred; the execution archive loader continues to
+reject OOF until the separately registered provenance chain exists. Cluster
+penalties, round lots, impact, and live routing remain outside the contract.
 
 ## First execution reference — Experiment 52 C0 (2026-08-27)
 

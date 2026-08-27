@@ -6,10 +6,21 @@ import torch
 from torch import Tensor, nn
 
 from .config import ExecutionConfig
+from .constraints import project_weights_bounded
+from .features import (
+    DEFAULT_POLICY_HORIZON_NAMES,
+    PolicyState,
+    policy_state_feature_names,
+    policy_state_feature_width,
+    policy_state_schema_sha256,
+)
 
 
 class BandPolicy(nn.Module):
     """Cross-sectional rank policy with refresh-time no-trade bands."""
+
+    projection_mode = "exact"
+    requires_policy_state = False
 
     def __init__(self, config: ExecutionConfig) -> None:
         super().__init__()
@@ -55,6 +66,7 @@ class BandPolicy(nn.Module):
         tradeable_mask: Tensor | None = None,
         cap_weights: Tensor | None = None,
         full_spread: Tensor | None = None,
+        policy_state: PolicyState | None = None,
     ) -> tuple[Tensor, Tensor]:
         """Return the target for one simulator minute.
 
@@ -86,7 +98,7 @@ class BandPolicy(nn.Module):
         if tradeable.shape != shape:
             raise ValueError("Tradeable mask does not align with ranks")
 
-        del cap_weights, full_spread
+        del cap_weights, full_spread, policy_state
         candidate, candidate_valid = self._candidate(ranks, tradeable)
         refreshed_day = refresh_names.any(dim=-1)
         build = refreshed_day & ~initialized.bool() & candidate_valid
@@ -226,7 +238,9 @@ class ConcentratedPolicy(BandPolicy):
         tradeable_mask: Tensor | None = None,
         cap_weights: Tensor | None = None,
         full_spread: Tensor | None = None,
+        policy_state: PolicyState | None = None,
     ) -> tuple[Tensor, Tensor]:
+        del policy_state
         if ranks.ndim != 3:
             raise ValueError("Ranks must be [day, name, horizon]")
         shape = ranks.shape[:2]
@@ -290,3 +304,117 @@ class ConcentratedPolicy(BandPolicy):
         output = torch.where(update, candidate, output)
         output = torch.where(build[:, None], candidate, output)
         return output, initialized.bool() | build
+
+
+class NeuralPolicy(nn.Module):
+    """Shared per-name policy with bounded neutral portfolio output."""
+
+    projection_mode = "bounded"
+    requires_policy_state = True
+
+    def __init__(
+        self,
+        config: ExecutionConfig,
+        *,
+        horizon_count: int | None = None,
+        horizon_names: tuple[str, ...] | None = None,
+        widths: tuple[int, ...] = (64, 64),
+        seed: int = 0,
+    ) -> None:
+        super().__init__()
+        self.config = config
+        self.horizon_count = (
+            len(config.horizon_blend) if horizon_count is None else horizon_count
+        )
+        if self.horizon_count <= 0:
+            raise ValueError("NeuralPolicy requires at least one horizon")
+        if self.horizon_count != len(config.horizon_blend):
+            raise ValueError(
+                "NeuralPolicy horizon count differs from the execution blend"
+            )
+        if horizon_names is None:
+            if self.horizon_count != len(DEFAULT_POLICY_HORIZON_NAMES):
+                raise ValueError("Noncanonical policies require ordered horizon names")
+            horizon_names = DEFAULT_POLICY_HORIZON_NAMES
+        policy_state_feature_names(self.horizon_count, horizon_names)
+        self.horizon_names = horizon_names
+        if not widths or any(width <= 0 for width in widths):
+            raise ValueError("NeuralPolicy widths must be positive")
+        self.widths = widths
+        self.seed = int(seed)
+        input_width = policy_state_feature_width(self.horizon_count)
+        with torch.random.fork_rng(devices=[]):
+            torch.manual_seed(self.seed)
+            layers: list[nn.Module] = [nn.LayerNorm(input_width)]
+            previous = input_width
+            for width in widths:
+                layers.extend((nn.Linear(previous, width), nn.SiLU()))
+                previous = width
+            self.trunk = nn.Sequential(*layers)
+            self.output = nn.Linear(previous, 1, bias=False)
+        nn.init.zeros_(self.output.weight)
+
+    @property
+    def contract_metadata(self) -> dict[str, object]:
+        return {
+            "schema": "BRAZIL_RV_NEURAL_POLICY_V1",
+            "horizon_names": list(self.horizon_names),
+            "policy_state_schema_sha256": policy_state_schema_sha256(
+                self.horizon_names
+            ),
+            "feature_names": list(
+                policy_state_feature_names(self.horizon_count, self.horizon_names)
+            ),
+            "widths": list(self.widths),
+            "seed": self.seed,
+        }
+
+    def step(
+        self,
+        ranks: Tensor,
+        refresh: Tensor,
+        current_weights: Tensor,
+        sigma: Tensor,
+        previous_target: Tensor,
+        initialized: Tensor,
+        tradeable_mask: Tensor | None = None,
+        cap_weights: Tensor | None = None,
+        full_spread: Tensor | None = None,
+        policy_state: PolicyState | None = None,
+    ) -> tuple[Tensor, Tensor]:
+        del current_weights, sigma, previous_target, full_spread
+        if policy_state is None:
+            raise ValueError("NeuralPolicy requires PolicyState")
+        if ranks.ndim != 3 or ranks.shape[-1] != self.horizon_count:
+            raise ValueError("Ranks differ from the configured policy horizons")
+        if tradeable_mask is None or cap_weights is None:
+            raise ValueError("NeuralPolicy requires tradeability and cap weights")
+        if not torch.equal(policy_state.tradeable_mask, tradeable_mask.bool()):
+            raise ValueError("PolicyState tradeability differs from the step mask")
+        if policy_state.cap_weights.shape != cap_weights.shape or not torch.equal(
+            policy_state.cap_weights[tradeable_mask], cap_weights[tradeable_mask]
+        ):
+            raise ValueError("PolicyState caps differ from the step caps")
+        if policy_state.horizon_names != self.horizon_names:
+            raise ValueError("PolicyState ordered horizons differ from the policy")
+        if policy_state.schema_sha256 != policy_state_schema_sha256(self.horizon_names):
+            raise ValueError("PolicyState schema hash differs from the policy")
+        features = policy_state.features()
+        expected = (*ranks.shape[:2], policy_state_feature_width(self.horizon_count))
+        if features.shape != expected:
+            raise ValueError("PolicyState feature axes differ from ranks")
+        raw = self.output(self.trunk(features)).squeeze(-1)
+        target = project_weights_bounded(
+            raw,
+            tradeable_mask,
+            cap_weights,
+            self.config.gross_target,
+        )
+        if refresh.shape == ranks.shape[:1]:
+            refreshed_day = refresh.bool() & tradeable_mask.any(dim=-1)
+        elif refresh.shape == ranks.shape[:2]:
+            refreshed_day = (refresh.bool() & tradeable_mask).any(dim=-1)
+        else:
+            raise ValueError("Refresh must be [day] or [day,name]")
+        active = initialized.bool() | refreshed_day
+        return torch.where(active[:, None], target, torch.zeros_like(target)), active

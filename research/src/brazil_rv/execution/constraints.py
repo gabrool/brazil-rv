@@ -146,3 +146,82 @@ def project_weights(
     )
     projected = long - short
     return flat_candidate.index_copy(0, pending, projected).reshape_as(candidate)
+
+
+def project_weights_bounded(
+    raw: torch.Tensor,
+    valid_mask: torch.Tensor,
+    caps: torch.Tensor | float,
+    gross_target: torch.Tensor | float,
+) -> torch.Tensor:
+    """Map signed scores to a neutral capped book without scaling gross up.
+
+    The projection preserves each nonzero score's sign. It first clips names to
+    their individual caps, scales only the larger signed side to the smaller
+    side, then scales both sides together if gross exceeds ``gross_target``.
+    At the all-zero kink, the forward book remains exactly zero while the
+    backward convention is the neutral tangent projection; this lets a
+    zero-initialized policy learn its first non-cash action.
+    """
+    if not raw.is_floating_point() or raw.ndim == 0:
+        raise ValueError("Raw weights must be a floating tensor with a name axis")
+
+    try:
+        mask = torch.broadcast_to(
+            valid_mask.to(device=raw.device, dtype=torch.bool), raw.shape
+        )
+        cap = torch.broadcast_to(
+            torch.as_tensor(caps, device=raw.device, dtype=raw.dtype), raw.shape
+        )
+        gross = torch.broadcast_to(
+            torch.as_tensor(gross_target, device=raw.device, dtype=raw.dtype),
+            raw.shape[:-1],
+        )
+    except RuntimeError as error:
+        raise ValueError(
+            "Projection inputs do not broadcast to the raw-weight rows"
+        ) from error
+
+    if not torch.isfinite(gross).all() or not (gross >= 0).all():
+        raise ValueError("Gross target must be finite and nonnegative")
+    if not torch.isfinite(torch.where(mask, raw, torch.zeros_like(raw))).all():
+        raise ValueError("Valid raw weights must be finite")
+    valid_caps = torch.where(mask, cap, torch.zeros_like(cap))
+    if not torch.isfinite(valid_caps).all() or not (valid_caps >= 0).all():
+        raise ValueError("Valid per-name caps must be finite and nonnegative")
+
+    candidate = torch.where(
+        mask,
+        torch.maximum(torch.minimum(raw, valid_caps), -valid_caps),
+        torch.zeros_like(raw),
+    )
+    long = candidate.clamp_min(0)
+    short = (-candidate).clamp_min(0)
+    long_sum = long.sum(dim=-1)
+    short_sum = short.sum(dim=-1)
+    balanced_side = torch.minimum(long_sum, short_sum)
+    tiny = torch.finfo(raw.dtype).tiny
+    long_scale = torch.where(long_sum > 0, balanced_side / long_sum.clamp_min(tiny), 1)
+    short_scale = torch.where(
+        short_sum > 0, balanced_side / short_sum.clamp_min(tiny), 1
+    )
+    neutral = long * long_scale.unsqueeze(-1) - short * short_scale.unsqueeze(-1)
+    neutral_gross = neutral.abs().sum(dim=-1)
+    gross_scale = torch.where(
+        neutral_gross > gross,
+        gross / neutral_gross.clamp_min(tiny),
+        1,
+    )
+    projected = neutral * gross_scale.unsqueeze(-1)
+
+    # Projection onto neutrality is a valid subgradient convention at an
+    # entirely zero row. The detach term changes only the backward pass.
+    all_zero = mask.any(dim=-1) & (candidate.abs().sum(dim=-1) == 0)
+    mask_float = mask.to(raw.dtype)
+    count = mask_float.sum(dim=-1, keepdim=True).clamp_min(1)
+    tangent = candidate - (candidate * mask_float).sum(dim=-1, keepdim=True) / count
+    tangent = tangent * mask_float
+    straight_through = tangent - tangent.detach()
+    return projected + torch.where(
+        all_zero.unsqueeze(-1), straight_through, torch.zeros_like(projected)
+    )

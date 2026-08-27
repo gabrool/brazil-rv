@@ -6,6 +6,7 @@ import torch
 
 from .config import ExecutionConfig
 from .constraints import project_weights
+from .features import build_policy_state, update_volume_weighted_cost_basis
 
 
 @dataclass(frozen=True)
@@ -202,7 +203,12 @@ def simulate(
     blend = torch.as_tensor(config.horizon_blend, dtype=dtype, device=device)
     if blend.numel() != ranks.shape[-1]:
         raise ValueError("Horizon blend width differs from prediction heads")
-    required_heads = blend != 0
+    requires_policy_state = bool(getattr(policy, "requires_policy_state", False))
+    required_heads = (
+        torch.ones_like(blend, dtype=torch.bool)
+        if requires_policy_state
+        else blend != 0
+    )
 
     nav = torch.full((days,), config.nav_brl, dtype=dtype, device=device)
     initial_nav = nav.clone()
@@ -215,6 +221,16 @@ def simulate(
         torch.full_like(position, torch.nan),
     )
     last_spread = torch.where(observed[:, 0], spread[:, 0], torch.nan)
+    cost_basis = torch.full_like(position, torch.nan)
+    opened_minute = torch.full((days, names), -1, dtype=torch.int64, device=device)
+    previous_refresh_rank = torch.zeros(
+        (days, names, ranks.shape[-1]), dtype=dtype, device=device
+    )
+    rank_change = torch.zeros_like(previous_refresh_rank)
+    has_previous_refresh = torch.zeros_like(previous_refresh_rank, dtype=torch.bool)
+    last_valid_refresh_minute = torch.full(
+        (days, names), -1, dtype=torch.int64, device=device
+    )
 
     gross_pnl = torch.zeros_like(nav)
     spread_cost = torch.zeros_like(nav)
@@ -252,6 +268,28 @@ def simulate(
             ranks[:, action_minute],
             torch.zeros_like(ranks[:, action_minute]),
         )
+        refresh_now = refresh_mask[:, action_minute].bool()[:, None, None]
+        refreshed_head = refresh_now & minute_rank_valid
+        rank_change = torch.where(
+            refreshed_head & has_previous_refresh,
+            policy_ranks - previous_refresh_rank,
+            torch.where(refreshed_head, torch.zeros_like(rank_change), rank_change),
+        )
+        previous_refresh_rank = torch.where(
+            refreshed_head, policy_ranks, previous_refresh_rank
+        )
+        has_previous_refresh = has_previous_refresh | refreshed_head
+        refreshed_name = refresh_now.squeeze(-1) & name_rank_valid
+        last_valid_refresh_minute = torch.where(
+            refreshed_name,
+            torch.full_like(last_valid_refresh_minute, action_minute),
+            last_valid_refresh_minute,
+        )
+        signal_age = torch.where(
+            last_valid_refresh_minute >= 0,
+            action_minute - last_valid_refresh_minute,
+            torch.zeros_like(last_valid_refresh_minute),
+        ).to(dtype)
         current_weights = position / nav.unsqueeze(-1)
         current_sigma = (sigma if sigma.ndim == 2 else sigma[:, action_minute]).to(
             device=device, dtype=dtype
@@ -265,17 +303,71 @@ def simulate(
             config.adv_cap_fraction * adv,
         )
         cap_weights = cap_notional / nav.unsqueeze(-1)
-        raw_target, initialized = policy.step(
-            policy_ranks,
-            refresh_mask[:, action_minute],
-            current_weights,
-            current_sigma,
-            prior_target,
-            initialized,
-            policy_tradeable,
-            cap_weights,
-            spread[:, action_minute],
-        )
+        policy_state = None
+        if requires_policy_state:
+            action_liquidity = liquidity[:, action_minute]
+            action_capacity = torch.where(
+                policy_tradeable
+                & torch.isfinite(action_liquidity)
+                & (action_liquidity >= 0),
+                config.participation_rate * action_liquidity,
+                torch.zeros_like(position),
+            )
+            position_age = torch.where(
+                opened_minute >= 0,
+                action_minute - opened_minute,
+                torch.zeros_like(opened_minute),
+            ).to(dtype)
+            policy_state = build_policy_state(
+                ranks=policy_ranks,
+                rank_change=rank_change,
+                signal_age_minutes=signal_age,
+                current_weights=current_weights,
+                current_price=last_open,
+                cost_basis_price=cost_basis,
+                minutes_in_position=position_age,
+                lagged_full_spread=torch.where(
+                    torch.isfinite(spread[:, action_minute]),
+                    spread[:, action_minute],
+                    torch.zeros_like(position),
+                ),
+                daily_sigma=current_sigma,
+                adv20_brl=adv,
+                participation_capacity_brl=action_capacity,
+                nav_brl=nav,
+                initial_nav_brl=initial_nav,
+                tradeable_mask=policy_tradeable,
+                cap_weights=cap_weights,
+                gross_target=config.gross_target,
+                margin_fraction_of_gross=config.margin_fraction_of_gross,
+                session_minute=action_minute,
+                session_minutes=minutes,
+                horizon_names=getattr(policy, "horizon_names", None),
+            )
+            raw_target, initialized = policy.step(
+                policy_ranks,
+                refresh_mask[:, action_minute],
+                current_weights,
+                current_sigma,
+                prior_target,
+                initialized,
+                policy_tradeable,
+                cap_weights,
+                spread[:, action_minute],
+                policy_state,
+            )
+        else:
+            raw_target, initialized = policy.step(
+                policy_ranks,
+                refresh_mask[:, action_minute],
+                current_weights,
+                current_sigma,
+                prior_target,
+                initialized,
+                policy_tradeable,
+                cap_weights,
+                spread[:, action_minute],
+            )
         extension_count = getattr(policy, "last_selection_extended_count", None)
         if extension_count is not None:
             if extension_count.shape != (days,):
@@ -296,34 +388,60 @@ def simulate(
         if initialized.shape != (days,):
             raise ValueError("Policy initialized state must contain one value per day")
 
-        active_rows = torch.nonzero(initialized, as_tuple=False).flatten()
-        base_target = torch.zeros_like(raw_target)
-        if active_rows.numel():
-            active_raw = raw_target[active_rows]
-            active_mask = policy_tradeable[active_rows]
-            active_caps = cap_weights[active_rows]
-            side_target = config.gross_target / 2
-            positive_capacity = torch.where(
-                active_mask & (active_raw > 0), active_caps, 0
-            ).sum(dim=-1)
-            negative_capacity = torch.where(
-                active_mask & (active_raw < 0), active_caps, 0
-            ).sum(dim=-1)
-            feasible = (positive_capacity >= side_target) & (
-                negative_capacity >= side_target
+        projection_mode = getattr(policy, "projection_mode", "exact")
+        if projection_mode == "bounded":
+            scale = torch.maximum(
+                raw_target.abs().sum(dim=-1),
+                torch.ones(days, dtype=dtype, device=device),
             )
-            base_target = base_target.index_copy(
-                0, active_rows, prior_target[active_rows]
+            tolerance = 64 * torch.finfo(dtype).eps * scale
+            if (~torch.isfinite(raw_target)).any() or (
+                raw_target.masked_fill(policy_tradeable, 0).abs()
+                > tolerance.unsqueeze(-1)
+            ).any():
+                raise ValueError("Bounded policy emitted invalid or masked weights")
+            if (
+                (raw_target.sum(dim=-1).abs() > tolerance).any()
+                or (raw_target.abs() > cap_weights + tolerance.unsqueeze(-1)).any()
+                or (
+                    raw_target.abs().sum(dim=-1) > config.gross_target + tolerance
+                ).any()
+            ):
+                raise ValueError("Bounded policy target violates neutrality or caps")
+            base_target = torch.where(
+                initialized[:, None], raw_target, torch.zeros_like(raw_target)
             )
-            feasible_rows = active_rows[feasible]
-            if feasible_rows.numel():
-                projected = project_weights(
-                    raw_target[feasible_rows],
-                    policy_tradeable[feasible_rows],
-                    cap_weights[feasible_rows],
-                    config.gross_target,
+        elif projection_mode == "exact":
+            active_rows = torch.nonzero(initialized, as_tuple=False).flatten()
+            base_target = torch.zeros_like(raw_target)
+            if active_rows.numel():
+                active_raw = raw_target[active_rows]
+                active_mask = policy_tradeable[active_rows]
+                active_caps = cap_weights[active_rows]
+                side_target = config.gross_target / 2
+                positive_capacity = torch.where(
+                    active_mask & (active_raw > 0), active_caps, 0
+                ).sum(dim=-1)
+                negative_capacity = torch.where(
+                    active_mask & (active_raw < 0), active_caps, 0
+                ).sum(dim=-1)
+                feasible = (positive_capacity >= side_target) & (
+                    negative_capacity >= side_target
                 )
-                base_target = base_target.index_copy(0, feasible_rows, projected)
+                base_target = base_target.index_copy(
+                    0, active_rows, prior_target[active_rows]
+                )
+                feasible_rows = active_rows[feasible]
+                if feasible_rows.numel():
+                    projected = project_weights(
+                        raw_target[feasible_rows],
+                        policy_tradeable[feasible_rows],
+                        cap_weights[feasible_rows],
+                        config.gross_target,
+                    )
+                    base_target = base_target.index_copy(0, feasible_rows, projected)
+        else:
+            raise ValueError(f"Unknown policy projection mode: {projection_mode}")
         prior_target = base_target
 
         fill_minute = action_minute + 1
@@ -411,6 +529,34 @@ def simulate(
             forced_fill.abs() * terminal_spread * 0.5 * config.force_spread_multiplier
         ).sum(dim=-1)
         total_fill = ordinary_fill + forced_fill
+        basis_price = torch.where(
+            ordinary_fill != 0,
+            next_open,
+            torch.where(
+                torch.isfinite(last_open), last_open, torch.ones_like(last_open)
+            ),
+        )
+        _, cost_basis = update_volume_weighted_cost_basis(
+            old_position,
+            total_fill,
+            basis_price,
+            cost_basis,
+            config.position_tolerance_brl,
+        )
+        new_active_for_age = position.abs() > config.position_tolerance_brl
+        old_active_for_age = old_position.abs() > config.position_tolerance_brl
+        opened_or_crossed = new_active_for_age & (
+            ~old_active_for_age | (torch.sign(old_position) != torch.sign(position))
+        )
+        opened_minute = torch.where(
+            opened_or_crossed,
+            torch.full_like(opened_minute, fill_minute),
+            torch.where(
+                new_active_for_age,
+                opened_minute,
+                torch.full_like(opened_minute, -1),
+            ),
+        )
         regular_spread_by_name = ordinary_fill.abs() * safe_spread * 0.5
         forced_spread_by_name = (
             forced_fill.abs() * terminal_spread * 0.5 * config.force_spread_multiplier

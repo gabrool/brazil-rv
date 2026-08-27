@@ -13,7 +13,8 @@ raw member scores + store-derived causal PIT mask + explicit refresh minutes
                          |
        forward-fill to the 405-minute B3 session grid
                          |
-          BandPolicy -> neutral/capped projection
+    BandPolicy -> exact-gross neutral/capped projection
+ NeuralPolicy -> bounded-gross neutral/capped projection
                          |
       next-open participation-capped fills and carried demand
                          |
@@ -112,11 +113,18 @@ SHA-256, and the report writer emits an atomic JSON file plus a checksum sidecar
   differentiable optimization and performance smoke runs; the standalone report
   records float values only after enforcing its 1e-8 accounting identity.
 
-The implemented policies are `BandPolicy` and the Experiment-53
-`ConcentratedPolicy`. The latter selects rank tails and can extend them in
-deterministic rank order when hard cap capacity binds; projection remains the
-only allocator of feasible weights. Neural-policy training, optimizer
-scaffolding, OOF refits, cluster penalties, parameter tuning, and experiment
-runners are intentionally absent until a registered research question needs
-them. The discovery-fold prediction loader rejects OOF, official-validation,
-and test archives; the held-out test is permanently spent.
+The implemented policies are `BandPolicy`, the Experiment-53
+`ConcentratedPolicy`, and `NeuralPolicy`. Legacy policies retain the original
+exact-gross allocator. The neural policy instead emits a neutral, capped book
+whose gross may stay below target, including exactly zero. Its strictly causal
+state is built inside the minute scan from ranks and rank changes, signal age,
+positions, volume-weighted cost basis, lagged spread/sigma/liquidity, portfolio
+state, and clock state. The small direct trainer optimizes net PnL over the
+same-day all-cash CDI hurdle with AdamW by default; SAM, replay checkpointing,
+caller-monitor patience, and checkpoint save/restore are opt-in hooks.
+
+`purged_training_folds` defines the prospective five-block, five-session-purged
+TRAIN split and hashes every fit/held-out manifest. It does not manufacture OOF
+predictions. The discovery-fold prediction loader therefore continues to reject
+OOF, official-validation, and test archives; the held-out test is permanently
+spent. No real policy training or experiment runner is part of this module.
