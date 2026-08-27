@@ -3941,3 +3941,11 @@ The final audit passed over 182 files / 405,197,467 bytes, including every
 prediction wrapper, causal market/CDI artifact, report and checksum, repair
 inventory, and operational log. C0 does not access official-validation or test
 predictions; both flags are false.
+
+Result/context commit `e4c7736583ce6390eed37b1c953eaf17f52c990e` reached
+GitHub before shutdown. Exact paid GH200 instance
+`356e43e74aa14abd84ad5bca30f70212` was then terminated only after the final
+audit and retained root were secured. Provider inventory confirmed that exact
+ID absent at `2026-08-27T17:10:06.4015869Z` and again at
+`2026-08-27T17:10:24.4091678Z`; the Lambda account contained zero active
+instances on both reads.

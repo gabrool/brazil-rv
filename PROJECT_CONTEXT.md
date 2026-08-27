@@ -1046,3 +1046,10 @@ and `b7591bb6464da90aa3324dced14ebf04e2e29245043b2719b76fb75bbdbd061f`.
 The audit covers all 72 reports plus input hashes, repair provenance, rotation,
 C0 designation, and logs. Official-validation and test predictions were not
 accessed.
+
+Result/context commit `e4c7736583ce6390eed37b1c953eaf17f52c990e` reached
+GitHub before shutdown. Exact paid GH200 instance
+`356e43e74aa14abd84ad5bca30f70212` was terminated after the completed root and
+audit were secured; two provider reads at `2026-08-27T17:10:06.4015869Z` and
+`2026-08-27T17:10:24.4091678Z` confirmed the exact ID absent and zero active
+instances.
