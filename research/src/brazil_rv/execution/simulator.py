@@ -257,13 +257,31 @@ def simulate(
         active_rows = torch.nonzero(initialized, as_tuple=False).flatten()
         base_target = torch.zeros_like(raw_target)
         if active_rows.numel():
-            projected = project_weights(
-                raw_target[active_rows],
-                policy_tradeable[active_rows],
-                cap_weights[active_rows],
-                config.gross_target,
+            active_raw = raw_target[active_rows]
+            active_mask = policy_tradeable[active_rows]
+            active_caps = cap_weights[active_rows]
+            side_target = config.gross_target / 2
+            positive_capacity = torch.where(
+                active_mask & (active_raw > 0), active_caps, 0
+            ).sum(dim=-1)
+            negative_capacity = torch.where(
+                active_mask & (active_raw < 0), active_caps, 0
+            ).sum(dim=-1)
+            feasible = (positive_capacity >= side_target) & (
+                negative_capacity >= side_target
             )
-            base_target = base_target.index_copy(0, active_rows, projected)
+            base_target = base_target.index_copy(
+                0, active_rows, prior_target[active_rows]
+            )
+            feasible_rows = active_rows[feasible]
+            if feasible_rows.numel():
+                projected = project_weights(
+                    raw_target[feasible_rows],
+                    policy_tradeable[feasible_rows],
+                    cap_weights[feasible_rows],
+                    config.gross_target,
+                )
+                base_target = base_target.index_copy(0, feasible_rows, projected)
         prior_target = base_target
 
         fill_minute = action_minute + 1
@@ -330,9 +348,7 @@ def simulate(
                 & (last_spread >= 0)
             )
             if (terminal & ~terminal_pricable).any():
-                raise ValueError(
-                    "Terminal position lacks a prior observed priced fill"
-                )
+                raise ValueError("Terminal position lacks a prior observed priced fill")
             forced_count = terminal.sum(dim=-1)
             forced_fill = torch.where(terminal, -position, 0)
             position = position + forced_fill
@@ -346,10 +362,7 @@ def simulate(
             torch.isfinite(last_spread), last_spread, torch.zeros_like(position)
         )
         forced_spread = (
-            forced_fill.abs()
-            * terminal_spread
-            * 0.5
-            * config.force_spread_multiplier
+            forced_fill.abs() * terminal_spread * 0.5 * config.force_spread_multiplier
         ).sum(dim=-1)
         total_fill = ordinary_fill + forced_fill
         fill_fees = total_fill.abs().sum(dim=-1) * config.fee_bps / 10_000

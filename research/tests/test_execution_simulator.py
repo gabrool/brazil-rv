@@ -207,9 +207,7 @@ def test_terminal_force_ignores_ordinary_liquidity_and_spread_gate() -> None:
 
 
 def test_unobserved_terminal_force_uses_last_observed_open_and_spread() -> None:
-    market, ranks, valid, refresh, sigma = _case(
-        minutes=4, full_spread=(0.01, 0.01)
-    )
+    market, ranks, valid, refresh, sigma = _case(minutes=4, full_spread=(0.01, 0.01))
     market.open_observed[:, -1] = False
     market.open_price[:, -1] = torch.nan
     config = _config(fee_bps=0.0)
@@ -280,6 +278,28 @@ def test_missing_open_carries_without_fill_and_marks_at_next_observation() -> No
     torch.testing.assert_close(
         result.gross_pnl_brl, torch.tensor([100.0], dtype=torch.float64)
     )
+
+
+def test_infeasible_refresh_keeps_last_feasible_projected_target() -> None:
+    market, ranks, valid, refresh, sigma = _case(minutes=4, names=4)
+    refresh[:, 1] = True
+    valid[:, 1, 2:, 0] = False
+    config = _config(name_cap_fraction_of_gross=0.25, fee_bps=0.0)
+
+    result = simulate(
+        market,
+        ranks,
+        valid,
+        refresh,
+        sigma,
+        BandPolicy(config),
+        config,
+        return_path=True,
+    )
+
+    assert result.positions_brl is not None
+    assert result.positions_brl[0, 2].abs().sum() > 0
+    assert torch.equal(result.positions_brl[:, -1], torch.zeros((1, 4)))
 
 
 def test_observed_open_and_valid_rank_values_must_be_finite() -> None:

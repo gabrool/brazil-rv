@@ -688,6 +688,47 @@ def _daily_results(dates: Sequence[date], result: object) -> list[DailyExecution
     ]
 
 
+def _load_existing_report(
+    path: Path,
+    *,
+    config: ExecutionConfig,
+    input_sha256: Mapping[str, str],
+) -> tuple[list[DailyExecutionResult], dict[str, str]]:
+    sidecar = path.with_suffix(path.suffix + ".sha256")
+    digest, name = sidecar.read_text(encoding="utf-8").strip().split("  ")
+    payload = _read_json(path)
+    expected_inputs = dict(sorted(input_sha256.items()))
+    if (
+        name != path.name
+        or digest != _sha256(path)
+        or payload.get("schema") != "B3_EXECUTION_BACKTEST_REPORT_V1"
+        or payload.get("config_sha256") != config.sha256
+        or payload.get("input_sha256") != expected_inputs
+    ):
+        raise ValueError(f"Existing execution report differs: {path}")
+    daily = [
+        DailyExecutionResult(
+            trade_date=date.fromisoformat(str(row["trade_date"])),
+            net_pnl_brl=float(row["net_pnl_brl"]),
+            gross_pnl_brl=float(row["gross_pnl_brl"]),
+            spread_cost_brl=float(row["spread_cost_brl"]),
+            fees_brl=float(row["fees_brl"]),
+            cdi_earned_brl=float(row["cdi_earned_brl"]),
+            turnover_brl=float(row["turnover_brl"]),
+            max_intraday_gross_brl=float(row["max_intraday_gross_brl"]),
+            forced_fill_count=int(row["forced_fill_count"]),
+        )
+        for row in payload.get("daily", [])
+    ]
+    if not daily:
+        raise ValueError(f"Existing execution report has no daily rows: {path}")
+    return daily, {
+        "path": str(path.resolve()),
+        "sha256": digest,
+        "sha256_path": str(sidecar.resolve()),
+    }
+
+
 def _run_one(
     *,
     market: MarketReplay,
@@ -720,6 +761,13 @@ def run_program(*, store: Path, economics_dir: Path, output_dir: Path) -> Path:
     design_path = output_dir / "frozen_design.json"
     manifest = _read_json(manifest_path)
     design = _read_json(design_path)
+    operational_commit = os.environ.get(
+        "EXPERIMENT52_OPERATIONAL_COMMIT", repository_commit()
+    )
+    if len(operational_commit) != 40 or any(
+        value not in "0123456789abcdef" for value in operational_commit
+    ):
+        raise ValueError("Experiment 52 operational commit must be a full Git hash")
     if (
         manifest.get("status") != "frozen"
         or manifest.get("frozen_design", {}).get("sha256") != _sha256(design_path)
@@ -738,7 +786,7 @@ def run_program(*, store: Path, economics_dir: Path, output_dir: Path) -> Path:
         int(value): index for index, value in enumerate(cache_date_idx.tolist())
     }
     reports = output_dir / "reports"
-    reports.mkdir()
+    reports.mkdir(exist_ok=True)
     rows: list[dict[str, object]] = []
     frictionless_assumption = output_dir / "frictionless_assumption.json"
     _atomic_json(
@@ -831,47 +879,60 @@ def run_program(*, store: Path, economics_dir: Path, output_dir: Path) -> Path:
                 band=float(cell["band"]),
                 horizon_blend=tuple(float(value) for value in cell["horizon_blend"]),
             )
-            measured = _run_one(
-                market=MarketReplay(
-                    full_spread=torch.as_tensor(spread_values, dtype=dtype),
-                    **market_kwargs,
-                ),
-                ranks=rank_tensor,
-                rank_valid=valid_tensor,
-                refresh_mask=refresh_tensor,
-                sigma=sigma_tensor,
-                config=config,
-                dates=fold_dates,
-            )
             measured_path = reports / fold / f"{cell['cell_id']}__measured.json"
-            measured_report = write_execution_report(
-                measured_path, config=config, input_sha256=inputs, daily=measured
-            )
-            frictionless_config = replace(config, fee_bps=0.0)
-            frictionless = _run_one(
-                market=MarketReplay(
-                    full_spread=torch.zeros_like(
-                        torch.as_tensor(spread_values, dtype=dtype)
+            if measured_path.exists():
+                measured, measured_report = _load_existing_report(
+                    measured_path, config=config, input_sha256=inputs
+                )
+            else:
+                measured = _run_one(
+                    market=MarketReplay(
+                        full_spread=torch.as_tensor(spread_values, dtype=dtype),
+                        **market_kwargs,
                     ),
-                    **market_kwargs,
-                ),
-                ranks=rank_tensor,
-                rank_valid=valid_tensor,
-                refresh_mask=refresh_tensor,
-                sigma=sigma_tensor,
-                config=frictionless_config,
-                dates=fold_dates,
-            )
+                    ranks=rank_tensor,
+                    rank_valid=valid_tensor,
+                    refresh_mask=refresh_tensor,
+                    sigma=sigma_tensor,
+                    config=config,
+                    dates=fold_dates,
+                )
+                measured_report = write_execution_report(
+                    measured_path, config=config, input_sha256=inputs, daily=measured
+                )
+            frictionless_config = replace(config, fee_bps=0.0)
             frictionless_path = reports / fold / f"{cell['cell_id']}__frictionless.json"
-            frictionless_report = write_execution_report(
-                frictionless_path,
-                config=frictionless_config,
-                input_sha256={
-                    **inputs,
-                    "frictionless_assumption": _sha256(frictionless_assumption),
-                },
-                daily=frictionless,
-            )
+            frictionless_inputs = {
+                **inputs,
+                "frictionless_assumption": _sha256(frictionless_assumption),
+            }
+            if frictionless_path.exists():
+                frictionless, frictionless_report = _load_existing_report(
+                    frictionless_path,
+                    config=frictionless_config,
+                    input_sha256=frictionless_inputs,
+                )
+            else:
+                frictionless = _run_one(
+                    market=MarketReplay(
+                        full_spread=torch.zeros_like(
+                            torch.as_tensor(spread_values, dtype=dtype)
+                        ),
+                        **market_kwargs,
+                    ),
+                    ranks=rank_tensor,
+                    rank_valid=valid_tensor,
+                    refresh_mask=refresh_tensor,
+                    sigma=sigma_tensor,
+                    config=frictionless_config,
+                    dates=fold_dates,
+                )
+                frictionless_report = write_execution_report(
+                    frictionless_path,
+                    config=frictionless_config,
+                    input_sha256=frictionless_inputs,
+                    daily=frictionless,
+                )
             metrics = daily_readout(measured, config.nav_brl)
             frictionless_metrics = daily_readout(frictionless, config.nav_brl)
             rows.append(
@@ -926,7 +987,7 @@ def run_program(*, store: Path, economics_dir: Path, output_dir: Path) -> Path:
         **manifest,
         "status": "completed",
         "completed_at": _now(),
-        "operational_commit": repository_commit(),
+        "operational_commit": operational_commit,
         "market_inputs": _artifact(market_manifest_path),
         "cell_fold_summary": _artifact(summary_path),
         "rotation_table": _artifact(rotation_path),

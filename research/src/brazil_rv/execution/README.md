@@ -83,10 +83,13 @@ SHA-256, and the report writer emits an atomic JSON file plus a checksum sidecar
   target. Unfilled demand is carried. Per-name caps apply to projected targets;
   an exogenous price jump may temporarily move a realized holding beyond its
   target cap, after which it is reduced subject to the same participation limit.
-  This avoids pretending a risk limit can create nonexistent liquidity. Targets
-  taper after hard projection; any terminal residual is flattened at the
-  configured spread multiplier and counted. Terminal liquidation ignores the
-  ordinary participation, liquidity-profile, and spread-universe gates. If the
+  This avoids pretending a risk limit can create nonexistent liquidity. A target
+  retains its last feasible projection when a transient rank-validity mask lacks
+  enough signed cap capacity for exact neutral gross; the hard projection is
+  never relaxed. Targets taper after hard projection; any terminal residual is
+  flattened at the configured spread multiplier and counted. Terminal
+  liquidation ignores the ordinary participation, liquidity-profile, and
+  spread-universe gates. If the
   final minute has no open, it uses that name's last observed session open and
   spread; this explicit end-of-session approximation is counted as a forced
   fill and never changes the observation mask.

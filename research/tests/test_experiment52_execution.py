@@ -6,12 +6,15 @@ import numpy as np
 
 from brazil_rv.execution.experiment52 import (
     FOLDS,
+    _load_existing_report,
     daily_readout,
     execution_cells,
     rotation_designation,
     stored_daily_volatility,
 )
+from brazil_rv.execution.config import ExecutionConfig
 from brazil_rv.execution.report import DailyExecutionResult
+from brazil_rv.execution.report import write_execution_report
 from brazil_rv.preprocessing.contract import (
     EQUITY_SESSION_MINUTES,
     PRICE_VOL_REFERENCE,
@@ -115,3 +118,30 @@ def test_rotation_tie_break_uses_all_heldout_folds() -> None:
     _, designation = rotation_designation(rows)
     assert designation["rotation_win_count"] == 1
     assert designation["c0_cell_id"] == "right"
+
+
+def test_existing_report_resume_requires_exact_hashes(tmp_path) -> None:
+    config = ExecutionConfig()
+    inputs = {"source": "a" * 64}
+    daily = [
+        DailyExecutionResult(
+            trade_date=date(2024, 1, 2),
+            net_pnl_brl=1.0,
+            gross_pnl_brl=2.0,
+            spread_cost_brl=0.5,
+            fees_brl=0.5,
+            cdi_earned_brl=0.0,
+            turnover_brl=10.0,
+            max_intraday_gross_brl=20.0,
+            forced_fill_count=1,
+        )
+    ]
+    path = tmp_path / "report.json"
+    expected = write_execution_report(
+        path, config=config, input_sha256=inputs, daily=daily
+    )
+
+    loaded, artifact = _load_existing_report(path, config=config, input_sha256=inputs)
+
+    assert loaded == daily
+    assert artifact["sha256"] == expected["sha256"]
