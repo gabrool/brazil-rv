@@ -6,6 +6,7 @@ import polars as pl
 from brazil_rv.modeling.experiment49_50 import (
     _combined_book,
     _rank_linear_weights,
+    _run_manifest_test_is_sealed,
     _spread_matrix,
     deploy_next_generation,
     keep_head15,
@@ -139,3 +140,12 @@ def test_frozen_verdict_and_deployment_boundaries_are_inclusive() -> None:
     )
     assert deploy_next_generation(-0.0005)
     assert not deploy_next_generation(-0.0005000001)
+
+
+def test_completed_run_manifest_seals_test_in_provenance() -> None:
+    assert _run_manifest_test_is_sealed(
+        {"status": "completed", "run_provenance": {"test_accessed": False}}
+    )
+    assert not _run_manifest_test_is_sealed(
+        {"status": "completed", "test_accessed": False}
+    )

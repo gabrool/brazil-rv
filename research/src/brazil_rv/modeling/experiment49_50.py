@@ -1186,6 +1186,11 @@ def _root_inventory(root: Path) -> dict[str, object]:
     }
 
 
+def _run_manifest_test_is_sealed(manifest: dict[str, object]) -> bool:
+    provenance = manifest.get("run_provenance")
+    return isinstance(provenance, dict) and provenance.get("test_accessed") is False
+
+
 def run_experiment50(
     *, store: Path, output49: Path, output50: Path, parallel_processes: int = 2
 ) -> Path:
@@ -1398,7 +1403,7 @@ def run_experiment50(
     _atomic_json(output50 / "final_inventory.json", inventory)
     manifests = list((output50 / "runs").rglob("run_manifest.json"))
     if len(manifests) != len(ALL_SEEDS) or any(
-        _read_json(path).get("test_accessed") is not False for path in manifests
+        not _run_manifest_test_is_sealed(_read_json(path)) for path in manifests
     ):
         raise ValueError("Experiment-50 run-manifest audit failed")
     final_audit = {
