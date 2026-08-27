@@ -3987,3 +3987,47 @@ as historical. The requested informational Roll sanity therefore emits per-name
 lagged-Roll values and explicitly unavailable tick ratios without changing the
 schedule or inventing an input. The canonical preregistration is
 `research/preregistrations/experiment53_feasible_region.md`.
+
+Experiment 53 completed from frozen implementation/preregistration commit
+`00cb38a6f414198d87c24553f8eed8af78214093`. All 48 cells ran on discovery
+Folds C/A/B under measured, frictionless, and half-spread contracts: 432
+standard reports and 432 summary rows. The final audit passed with
+`official_validation_accessed=false` and `test_accessed=false`. Amendment
+A53.1 was preserved exactly. Capacity completion was active in 28 of 144
+measured cell-folds, spanning 131,890 refreshes and 417,722 added-name events;
+all per-refresh records were retained. The Roll diagnostic covered 309 dates
+and 158 securities, recorded the causal lagged-Roll distribution, and correctly
+left the quoted-tick ratio unavailable because no permitted historical quoted-
+tick archive exists in the frozen inputs.
+
+The preregistered gross guard left 36 cells eligible and 12 ineligible. All
+eight cells that were net-positive on every measured fold were top-half-ADV
+K=40 cells excluded by that guard, and no cell beat all-cash CDI on every fold.
+The measured-only rotation designated
+`k40__band1p5__c1p0__gross1p0__universe_full` as C1 with three wins. Its mean
+deployed-gross fractions were `0.832879`, `0.826737`, and `0.855144` on A/B/C,
+but its measured Sharpes were `-7.188525`, `-8.505339`, and `-14.026724`.
+Across those folds it produced `R$1,428,362.47` gross PnL, paid
+`R$5,488,091.32` spread and `R$2,149,913.71` fees, earned `R$815,557.00` CDI,
+and finished at `-R$5,394,085.57` net and `-R$6,804,325.37` versus all-cash
+CDI on `R$10,749,568,569.19` turnover. C1 is therefore retained only as the
+feasible hand-policy reference; it is not promoted or deployed, and C0 remains
+the baseline comparator.
+
+The immutable completed root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/execution_feasible_53_00cb38a_20260827T184000Z
+
+Frozen-design, program-manifest, cell-summary, C1-designation,
+selection-extension, result, and log-inclusive final-audit SHA-256 values are
+respectively
+`54344ff68ea55da1a13f6d3cb879a1154edb3eeaafb6839358fd1951ad22aecb`,
+`e80c5cccf8b0e92b202aeff23cc0ec41472e7f588dd6236a6d6838709e510b6a`,
+`eb44cb0b9e650a877ad9b4876e45a9c7f7af1854326dc56f7ef66e21b37158c0`,
+`db61aa52e2b854bf5bc7709d9e3846e531bcd87c301857fe64ab11483fea1d72`,
+`e7bb3369ef52759036c00fbf25defc002a30a68c9eb6e65c24d79c761131bb03`,
+`4c1cb2e73a6608bd4e06ada9213ca744a7acb1da4356b2cb012e4da6509a164b`,
+and `bc5811f118cabae6514e889709a5b801551ebdd91f2b3094183107ad9d43f513`.
+The audit covers 2,606 files / 23,794,843 bytes, including every report,
+readout, analysis, telemetry table, manifest, checksum, and both operational
+logs. No prediction recipe or deployment changed.

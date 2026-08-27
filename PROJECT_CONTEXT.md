@@ -1072,3 +1072,29 @@ Interpretation is constrained in advance: a measured net-positive cell is an
 existence proof and lower bound for learned execution; an all-negative map is a
 verdict only on this hand-policy family and never establishes that the alpha is
 untradeable. Official-validation and held-out-test predictions are excluded.
+
+Experiment 53 completed the frozen 432-report map and designated
+`k40__band1p5__c1p0__gross1p0__universe_full` as C1. It won all three
+measured-only rotations and deployed `82.7%` to `85.5%` of its gross target,
+so it passed the preregistered gross guard. C1 nevertheless lost `R$5.394m`
+net and `R$6.804m` relative to all-cash CDI across the three folds: gross PnL
+of `R$1.428m` did not cover `R$5.488m` of spread cost plus `R$2.150m` of fees
+on `R$10.750bn` turnover. Its fold Sharpes were `-7.188525`, `-8.505339`, and
+`-14.026724` on A/B/C. Eight cells were net-positive on all three measured
+folds, but all were top-half-ADV K=40 cells rejected by the gross-deployment
+guard; no cell beat all-cash CDI on all three folds. Thus C1 is a feasible
+hand-policy reference, not an economically accepted policy, and C0 remains the
+retained baseline comparator. There was no model, deployment, official-
+validation, or test change.
+
+The immutable Experiment-53 root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/execution_feasible_53_00cb38a_20260827T184000Z
+
+The frozen-design and log-inclusive final-audit SHA-256 values are
+`54344ff68ea55da1a13f6d3cb879a1154edb3eeaafb6839358fd1951ad22aecb`
+and `bc5811f118cabae6514e889709a5b801551ebdd91f2b3094183107ad9d43f513`.
+The audit passed over 2,606 files, all 432 reports and summaries, 2,447,280
+selection-extension telemetry rows, analysis tables, manifests, hashes, and
+both operational logs. Official-validation and held-out-test access remained
+false.
