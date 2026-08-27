@@ -1098,3 +1098,10 @@ The audit passed over 2,606 files, all 432 reports and summaries, 2,447,280
 selection-extension telemetry rows, analysis tables, manifests, hashes, and
 both operational logs. Official-validation and held-out-test access remained
 false.
+
+Result/context commit `6862f5c044518f126bec56a1d991112057700a8c`
+reached GitHub before shutdown. Exact paid instance
+`21d5542246d144978478284e10837a22` was then terminated after the immutable
+root and audit were secured. Provider inventory confirmed that exact ID absent
+and zero active instances at `2026-08-27T19:14:50.9818266Z` and again at
+`2026-08-27T19:15:18.8786125Z`.

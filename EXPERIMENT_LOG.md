@@ -4031,3 +4031,11 @@ and `bc5811f118cabae6514e889709a5b801551ebdd91f2b3094183107ad9d43f513`.
 The audit covers 2,606 files / 23,794,843 bytes, including every report,
 readout, analysis, telemetry table, manifest, checksum, and both operational
 logs. No prediction recipe or deployment changed.
+
+Result/context commit `6862f5c044518f126bec56a1d991112057700a8c`
+reached GitHub before shutdown. Exact paid GH200 instance
+`21d5542246d144978478284e10837a22` was terminated only after all required
+artifacts, analyses, hashes, and logs were secured. Provider inventory found
+that exact ID absent and zero active instances at
+`2026-08-27T19:14:50.9818266Z` and again at
+`2026-08-27T19:15:18.8786125Z`.
