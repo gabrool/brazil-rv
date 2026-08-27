@@ -882,3 +882,9 @@ Official validation was accessed exactly once for event 5; the held-out test
 remains sealed. Full economics measurements, artifact hashes, operational
 repair provenance, access ledger, and cleanup evidence are recorded in
 `EXPERIMENT_LOG.md` Experiments 49 and 50.
+
+Result/context commit `1683dfb` reached GitHub before shutdown. Exact paid
+GH200 instance `2407fd931c3f47b7825bf6538617571d` was then terminated after
+all retained evidence was secured. Two provider reads, at
+`2026-08-27T03:54:38Z` and `2026-08-27T03:54:57Z`, confirmed the exact ID
+absent and the account at zero active instances.

@@ -3622,3 +3622,10 @@ deployment decision. Its provenance SHA-256 is
 `c839c226715bb736f5b71d81444fae4cc17c64aa367b3925e03fceae34d22523`.
 The event-5 ledger records `official_validation_accessed=true`; every final
 artifact records `test_accessed=false`, so the held-out test remains sealed.
+
+Result/context commit `1683dfb` reached GitHub before shutdown. The exact paid
+GH200 instance `2407fd931c3f47b7825bf6538617571d` was then terminated only
+after the immutable artifacts, audit, cleanup evidence, checkpoints, logs, and
+result push were secured. Provider inventory confirmed the exact ID absent at
+`2026-08-27T03:54:38Z` and again at `2026-08-27T03:54:57Z`; the account had
+zero active instances and no paid host was left idle.
