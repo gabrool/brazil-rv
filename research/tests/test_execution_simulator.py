@@ -226,17 +226,33 @@ def test_all_cash_cdi_and_margin_line_are_explicit() -> None:
     assert torch.equal(base, torch.zeros(1))
 
 
-def test_missing_open_is_not_stale_filled() -> None:
-    market, ranks, valid, refresh, sigma = _case()
-    market.open_observed[0, 2, 0] = False
+def test_missing_open_carries_without_fill_and_marks_at_next_observation() -> None:
+    market, ranks, valid, refresh, sigma = _case(minutes=4)
+    market.open_observed[0, 2] = False
+    market.open_price[0, 2] = torch.nan
+    market.open_price[0, 3] = torch.tensor([9.0, 11.0])
     config = _config(fee_bps=0.0)
 
-    try:
-        simulate(market, ranks, valid, refresh, sigma, BandPolicy(config), config)
-    except ValueError as error:
-        assert "missing open" in str(error)
-    else:
-        raise AssertionError("A held position crossed an unobserved open")
+    result = simulate(
+        market,
+        ranks,
+        valid,
+        refresh,
+        sigma,
+        BandPolicy(config),
+        config,
+        return_path=True,
+    )
+
+    assert result.positions_brl is not None and result.fills_brl is not None
+    torch.testing.assert_close(
+        result.positions_brl[0, 2],
+        torch.tensor([-500.0, 500.0], dtype=torch.float64),
+    )
+    assert torch.equal(result.fills_brl[0, 2], torch.zeros(2, dtype=torch.float64))
+    torch.testing.assert_close(
+        result.gross_pnl_brl, torch.tensor([100.0], dtype=torch.float64)
+    )
 
 
 def test_observed_open_and_valid_rank_values_must_be_finite() -> None:

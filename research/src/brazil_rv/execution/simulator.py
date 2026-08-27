@@ -165,7 +165,9 @@ def simulate(
     An action formed at minute ``t`` first trades at minute ``t + 1``. Holdings
     are marked open-to-open, then the pending target trades at that next open.
     This is deliberately one minute slower than the alpha label's entry-open
-    convention and never substitutes a stale price for a missing open.
+    convention. A missing open permits neither a fill nor a synthetic mark;
+    an existing holding realizes its cumulative return when the next observed
+    open arrives.
     """
     days, minutes, names = _validate_inputs(
         market, ranks, rank_valid, refresh_mask, sigma
@@ -187,6 +189,11 @@ def simulate(
     position = torch.zeros((days, names), dtype=dtype, device=device)
     prior_target = torch.zeros_like(position)
     initialized = torch.zeros(days, dtype=torch.bool, device=device)
+    last_open = torch.where(
+        observed[:, 0],
+        market.open_price[:, 0],
+        torch.full_like(position, torch.nan),
+    )
 
     gross_pnl = torch.zeros_like(nav)
     spread_cost = torch.zeros_like(nav)
@@ -268,26 +275,23 @@ def simulate(
         interval_interest = interest_base * interval_cdi
 
         held = position.abs() > config.position_tolerance_brl
-        adjacent = observed[:, action_minute] & observed[:, fill_minute]
-        if (held & ~adjacent).any():
-            raise ValueError(
-                "A held position crosses a missing open; stale marking is forbidden"
-            )
-        current_open = torch.where(
-            observed[:, action_minute],
-            market.open_price[:, action_minute],
-            torch.ones_like(position),
-        )
+        if (held & ~torch.isfinite(last_open)).any():
+            raise ValueError("A held position lacks a prior observed open")
+        next_observed = observed[:, fill_minute]
         next_open = torch.where(
-            observed[:, fill_minute],
+            next_observed,
             market.open_price[:, fill_minute],
             torch.ones_like(position),
         )
+        current_open = torch.where(torch.isfinite(last_open), last_open, 1)
         price_return = torch.where(
-            adjacent, next_open / current_open - 1, torch.zeros_like(position)
+            next_observed,
+            next_open / current_open - 1,
+            torch.zeros_like(position),
         )
         interval_pnl = (position * price_return).sum(dim=-1)
         position = position * (1 + price_return)
+        last_open = torch.where(next_observed, next_open, last_open)
         nav = nav + interval_pnl + interval_interest
         gross_pnl = gross_pnl + interval_pnl
         cdi = cdi + interval_interest
