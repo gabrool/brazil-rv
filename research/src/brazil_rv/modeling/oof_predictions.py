@@ -460,14 +460,16 @@ def _run_path(root: Path, fold: str, seed: int) -> Path:
 
 def _execute_jobs(root: Path, design: Mapping[str, object], parallel: int) -> None:
     store = Path(str(design["store"]["path"])).resolve()
+    dates = tuple(
+        load_sample_index(store, through=TRAIN_END)
+        .get_column("trade_date")
+        .unique()
+        .sort()
+        .to_list()
+    )
     folds = load_purged_training_folds(
         root / "purged_folds.json",
-        tuple(
-            load_sample_index(store, through=TRAIN_END)
-            .select("trade_date")
-            .unique()
-            .sort()["trade_date"]
-        ),
+        dates,
     )
     jobs = []
     for fold in folds.folds:

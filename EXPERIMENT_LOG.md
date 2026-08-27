@@ -4214,12 +4214,13 @@ read is allowed. The executable registration is
 
 ### Pre-score OOF freeze repair (2026-08-27)
 
-The first OOF freeze attempt stopped before creating a frozen design, training
-a model, or reading any score because three date-axis constructions called
-Polars `DataFrame.sort()` without its required column argument. The bounded
-operational repair reads the already-selected `trade_date` Series before
-sorting; it changes no date, fold, embargo, seed, recipe, archive, gate, or
-access rule. The incomplete pre-score root is excluded from the experiment and
-the repaired program must freeze into a fresh root. Full Ruff and the 394-test
-suite passed before the repaired freeze; official validation and the spent test
-remain unopened.
+The initial OOF startup attempts stopped before training a model or reading any
+score: the first during freeze before a design was written and the second during
+job construction after a valid design freeze. The date-axis constructions had
+called Polars `DataFrame.sort()` without its required column argument. The
+bounded operational repair reads the already-selected `trade_date` Series
+before sorting; it changes no date, fold, embargo, seed, recipe, archive, gate,
+or access rule. The incomplete pre-score roots are excluded and the repaired
+program must freeze into a fresh root. Full Ruff and the 394-test suite passed
+before the repaired freeze; official validation and the spent test remain
+unopened.
