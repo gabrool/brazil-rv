@@ -3629,3 +3629,39 @@ after the immutable artifacts, audit, cleanup evidence, checkpoints, logs, and
 result push were secured. Provider inventory confirmed the exact ID absent at
 `2026-08-27T03:54:38Z` and again at `2026-08-27T03:54:57Z`; the account had
 zero active instances and no paid host was left idle.
+## Experiment 51 — first and only held-out test read (frozen 2026-08-27)
+
+Status at registration: the held-out test has never been accessed. The full
+immutable specification is
+`research/preregistrations/experiment51_test_read.md`; this registration and
+the implementation are committed before any test-period target or prediction
+is opened. Experiment 51 authorizes the first and only test-access event. On
+completion the test is spent forever; hypotheses from this read require new
+forward data.
+
+The only measured object is the exact Experiment-45 deployed store-v2 recipe:
+ten retained Raw Patience-3 selected checkpoints at seeds
+11/29/47/61/79/97/113/131/149/167, the 34-field input, and uniform
+within-sample/horizon tie-aware rank averaging. The deployed-recipe file is
+bound to SHA-256
+`d4729dc4e614e0edd5118ba5ed5b7bc92f69ca2faceab4a09d0559115e5c4058`;
+all member manifests and the 20-file deployed checkpoint inventory must be
+rehash-verified before test access. There is no comparator, training,
+selection, new weighting, or deployment change.
+
+The only analyses are the preregistered IC, per-horizon IC, staleness,
+period-difficulty, time-of-day, monthly, member, and ensemble diagnostics. The
+daily bootstrap uses exactly 10,000 moving-block replications at block lengths
+5 and 10 with base seed 20260827. The paired staleness statistic is frozen as
+H2 minus H1: test dates 1–129 are paired by ordinal position with dates
+130–258; date 259 remains in all full-period statistics and is excluded only
+from this equal-length paired diagnostic. A negative block-10 interval that
+excludes zero therefore indicates retraining before live use.
+
+Quarterly difficulty uses exactly three label-return summaries, computed the
+same way for test and the already-retained official-validation reference:
+mean population cross-sectional standard deviation over valid
+sample-horizon cells; median sample standard deviation over valid
+equity-horizon groups; and mean valid-equity count over sample-horizon cells.
+No execution statistic—including Sharpe, costs, turnover, or a portfolio
+book—is computed. No analysis may be added after a test number is visible.
