@@ -3863,3 +3863,18 @@ Ruff and compile checks. CPU execution only is permitted. No neural policy,
 trainer, OOF materializer, added cell, post-score parameter change, official or
 test prediction read, live interface, or prediction deployment change is in
 scope.
+
+Pre-score operational repair (2026-08-27): the first production replay stopped
+before writing any measured or frictionless report because a legitimately
+unobserved M1 open interrupted an existing position. The failed immutable root
+is `execution_c0_52_cbc9bd5_20260827T162810Z`; it contains only the frozen
+design, wrapped discovery predictions, causal market inputs, CDI artifact, and
+the zero-score failure log. Official-validation and test access both remained
+false. Repair commit `b466cd639fbc1c5bc7799865c8ae7205cc8ced3e` makes the existing next-open
+contract usable on sparse real M1 paths without creating a bar or a fill: an
+unobserved minute carries the last observed position notional, permits no fill,
+and realizes the cumulative return only when the next observed open arrives.
+Terminal liquidation still requires an observed final open. This is causal,
+changes no frozen cell, source, parameter, readout, or designation rule, and
+passed all 42 focused execution/Experiment-52 tests plus Ruff and compile
+checks before any score existed.
