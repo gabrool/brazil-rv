@@ -3779,3 +3779,43 @@ The removed unselected archives are not recoverable in place; reproduction uses
 the recorded commits, manifests, histories, retained states, and canonical
 derived data. Provider inventory at `2026-08-27T14:31:41.9870434Z` contained
 zero active instances.
+
+## Execution layer implementation (2026-08-27)
+
+The offline execution-backtest layer was implemented from repository base
+commit `2f82d3a8f7b6b9b59a99926a5e04d2f5f981ddb2`. Implementation commit
+`0d933ef83ef31348eac001d20b8ba4151cbbe2ec` contains the execution package,
+tests, module README, and durable project-context contract. It adds an explicit
+score-refresh interface that accepts the current `15,20,...,285` session-minute
+indices without deriving cadence from decision ordinals, and accepts a future
+dense one-minute refresh grid through the same contract. The layer contains
+causal raw-score ranking, discovery-only archive verification, identity-safe M1
+streaming, strictly lagged liquidity and Roll inputs, exact differentiable
+neutral/gross/cap projection, a deterministic no-trade-band policy,
+participation-capped next-open replay, close taper and counted terminal fills,
+CDI/cost accounting, and hash-bound JSON reporting.
+
+The implementation deliberately excludes live/broker interfaces, policy
+training, OOF refits, split generation, tuning, neural scaffolding, cluster
+penalties, impact, and round lots. These are not needed to answer the current
+offline replay question. Aggregate OOF archives are also rejected until a
+canonical materializer can prove constituent-fold exclusion per sample. No
+experiment or training run was performed. No
+production feature store, spread schedule, CDI series, cluster sidecar,
+prediction archive, official-validation data, or held-out-test data was opened;
+all implementation tests used synthetic temporary fixtures. Consequently there
+are no production input hashes to record for this entry. A real execution run
+must hash-record its store, source and execution-wrapper manifests, discovery
+prediction/reference, lagged spread schedule, and explicit dated CDI series
+before replay.
+
+The focused execution suite passed 37 tests, including accounting and golden
+cost arithmetic, causal future-mutation guards, cap/carry/taper/forced-close
+behavior, exact projection and gradcheck, masked-name gradient isolation, CDI,
+band-policy behavior, archive/hash/access rejection, and end-to-end policy
+gradient flow. An additional 21 Experiment-49/50 and modeling data/training
+regression tests passed. Ruff check, Ruff format check, and Python compileall
+also passed on the Windows development host. A float32 synthetic CPU replay of
+250 days × 405 session minutes × 150 names completed in 1.496 seconds and
+finished flat without forced fills on that fixture; this is a smoke measurement,
+not a production-data runtime guarantee.
