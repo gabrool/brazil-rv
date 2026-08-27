@@ -4144,3 +4144,10 @@ The final audit passed over 21 artifacts / 495,173,023 bytes with
 `test_accessed=false`. Per the user's explicit keep-alive override, exact
 instance `e02aac505c884d129c8118577e671ed3` is not terminated after Experiment
 54 and is reserved for the immediately following experiments.
+
+Result/context commit `6eac1962386aede3345d98fcf4a0cfc5886ac6c0`
+reached GitHub, and the instance checkout was fast-forwarded to that exact
+commit. A direct provider inventory read at `2026-08-27T20:28:00.1318316Z`
+returned exactly one instance, exact ID `e02aac505c884d129c8118577e671ed3`,
+with status `active` at `192.222.51.247`. It remains ready by explicit user
+request; no termination was attempted.
