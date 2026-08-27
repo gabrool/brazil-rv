@@ -4039,3 +4039,52 @@ artifacts, analyses, hashes, and logs were secured. Provider inventory found
 that exact ID absent and zero active instances at
 `2026-08-27T19:14:50.9818266Z` and again at
 `2026-08-27T19:15:18.8786125Z`.
+
+## Experiment 54 — conditional edge, latency, and maker feasibility (preregistered 2026-08-27)
+
+Status at registration: no Experiment-54 bucket, forward-edge, fill, frontier,
+positioning, decision, or result number exists, and provider inventory contains
+no paid instance. This is a CPU-only, discovery-only pure-analysis program. It
+must not run the simulator, train a model, alter C0/C1 or the deployed prediction
+recipe, or access official-validation or the permanently spent held-out test.
+
+The immutable inputs are the completed Experiment-53 root and its exact
+Experiment-52 source. The program reuses only the three discovery prediction
+wrappers, causal ADV20/minute-capacity profiles, lagged spreads, daily sigma,
+and CDI. It streams identity-bounded raw M1 only through `TRAIN_END`, requires
+raw open/observed values to reproduce the Experiment-52 cache, and verifies
+observed high/low/close before any outcome analysis.
+
+Fold C alone freezes rank deciles, absolute-rank-change quintiles, and causal
+ADV20/spread/sigma terciles; A/B reuse those numeric edges unchanged. The state
+also includes tail entry, prediction-grid first/middle/final hour, and all-head
+sign agreement. The first refresh is excluded rather than assigned an invented
+rank change. Part A measures signed gross edge at `15/30/60/120` minutes from
+the decision open, next open, and complete 10/30-minute mean-open convergence
+entries. Exact entry observations and exact session-close endpoints are
+required. Conditional tables retain fixed `4.5/7/10`-bps hurdle clearance and
+each event's half-spread/measured/conservative lagged cost clearance.
+
+The taker frontier is an optimistic same-fold state-cell oracle, never an event-
+outcome oracle. It uses next-open cell means, each event's measured taker cost,
+10% causal minute capacity, a 5%-of-gross name cap, R$10m NAV, and gross at most
+2 with no neutrality or persistence constraint. At the 7-bps threshold, the
+maximum over the four registered horizons is compared with 8 NAV bps/day on
+each fold. Below 8 on every fold closes taker actions for learned policy; at
+least two folds at or above 8 keeps them viable with all-cash CDI as hurdle;
+the remaining pattern is inconclusive.
+
+Part B tests tail-only limits at the last observed predecision close and one
+half of the lagged half-spread better, waits `5/15/30` minutes, and fills only
+on a strict low-through/high-through. Filled paths pay 2 bps; unfilled paths
+cross at the exact open after the wait and pay measured taker cost. The maker
+frontier uses positive same-fold conditional composite-net means with the same
+sizing caps. It has no automatic decision rule. Part C reports an analytic
+long-short versus long-only-plus-cash comparison, with drift shown once and
+long-only beta variance reported in bps-squared rather than subtracted using an
+unregistered risk-aversion coefficient.
+
+No bucket, state, horizon, wait, threshold, cost, sizing rule, decision,
+schedule, or interpretation may change after a forward outcome is computed.
+The canonical executable preregistration is
+`research/preregistrations/experiment54_edge_maker.md`.

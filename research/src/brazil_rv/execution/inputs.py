@@ -54,6 +54,8 @@ class DiscoveryEquityGrid:
     security_id: str
     trade_dates: tuple[date, ...]
     open_price: np.ndarray
+    high: np.ndarray
+    low: np.ndarray
     close: np.ndarray
     real_volume: np.ndarray
     observed: np.ndarray
@@ -145,6 +147,8 @@ def iter_discovery_equity_grids(store: Path) -> Iterator[DiscoveryEquityGrid]:
                 security_id=security_id,
                 trade_dates=market_dates,
                 open_price=raw[..., 0],
+                high=raw[..., 1],
+                low=raw[..., 2],
                 close=raw[..., 3],
                 real_volume=raw[..., 4],
                 observed=observed,
