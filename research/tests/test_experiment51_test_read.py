@@ -5,8 +5,10 @@ from datetime import date
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from brazil_rv.modeling.engine import EvaluationObservations
+from brazil_rv.modeling.evaluate import collect_run_evaluation
 from brazil_rv.modeling.experiment51_test_read import (
     _inventory_by_path,
     difficulty_context,
@@ -83,3 +85,8 @@ def test_deployed_inventory_binds_historical_bytes_field(tmp_path: Path) -> None
     result = _inventory_by_path({"retained_checkpoint_inventory": inventory})
 
     assert len(result) == 20
+
+
+def test_generic_evaluator_refuses_a_second_test_read(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="spent by Experiment 51"):
+        collect_run_evaluation(tmp_path, "test")

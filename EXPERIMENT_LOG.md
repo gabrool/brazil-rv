@@ -3665,3 +3665,60 @@ sample-horizon cells; median sample standard deviation over valid
 equity-horizon groups; and mean valid-equity count over sample-horizon cells.
 No execution statistic—including Sharpe, costs, turnover, or a portfolio
 book—is computed. No analysis may be added after a test number is visible.
+
+### Experiment 51 result (completed 2026-08-27)
+
+The first and only held-out test event completed at exact implementation commit
+`6bca6d3e4fa9cbd1123156210561bf9d024438ec`. Before access, frozen-design
+SHA-256
+`0bdf9e1efcf2b4d20cbc952b1d1335d978150faaacc89166eeb832ad865bd1ea`
+rehash-verified the Experiment-45 deployed recipe, all ten source manifests and
+selected checkpoints, all 20 retained selected/final checkpoints, and the
+store-v2 identity. The immutable read root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/test_read_51_67f43b3_20260827T130349Z
+
+The deployed ensemble scored test IC `0.040345936073`, Band A. Block-5 and
+block-10 95% intervals were respectively
+`[0.033209566211, 0.047739292104]` and
+`[0.033313199285, 0.047668906133]`. Per-horizon test ICs were
+`0.040721247903` at 30 minutes, `0.039138347910` at 60 minutes, and
+`0.041178212408` at 120 minutes.
+
+Quarterly IC was `0.044357109` in 2025Q3, `0.029403024` in 2025Q4,
+`0.037295333` in 2026Q1, `0.045224692` in 2026Q2, and `0.064826747` in the
+partial 2026Q3. The daily-IC slope versus days since the 2024-06-28 training
+end was `+0.000026511743` per day. The frozen paired H2-minus-H1 difference
+was `+0.012885851390`; its block-10 interval
+`[-0.007851288044, +0.023472244463]` included zero. The preregistered
+staleness rule therefore does not indicate deterioration or a
+retrain-before-live policy. Difficulty, TOD, monthly, ten member-IC, 45 member-
+correlation, and ensemble-gain tables are retained exactly as preregistered.
+No execution metric was computed and no model, recipe, weighting, or deployment
+state changed.
+
+Two bounded pre-access operational issues were score-neutral. The first SSH
+freeze command stopped before Python because `uv` was not on the non-interactive
+shell path; no output root or ledger existed. The source verifier then correctly
+stopped before root creation because the historical Experiment-45 inventory
+uses field `bytes`, not `size_bytes`. Repair commit `6bca6d3` bound that exact
+historical schema and added a targeted test. Both issues occurred before any
+test access. After scores, only existing logs, the independent completion
+audit, and terminal hash inventories were added; no score, analysis, store
+read, or prediction changed.
+
+The terminal audit passed over 27 artifacts / 358,294,145 bytes, including all
+ten member prediction archives, the ensemble archive, test reference,
+predeclared analyses, preregistration/interpretation text, and launcher,
+bootstrap, freeze, and run logs. Key SHA-256 values are:
+
+- program manifest: `19b87ed6d23a9d38b9defaa923a91e280e7af47d684625ae6c36cbd1a99c3cbf`;
+- artifact inventory: `04a9c367089c6c1c5146cf8464521dc43200f4b26d07220ff3cabe5ef8d61f33`;
+- result: `23fa452636245170659a7889181f1285c3779d47cb3644236f88113359d88fa8`;
+- analysis: `013a490ae8c4a0b860edb1db4b84f4c47322785a9ae26726472bbb1f34a63e16`;
+- test-access ledger: `5ad518caf94f02c4b8b9b02ed5f6afd4a78110002819ca942ab9bdb9d41bf517`;
+- completion audit: `99c06a406fd6cc3eed7f1d6adb76defbb5047f0bad1887b41f2c7a83c36626a8`.
+
+The ledger records `test_accessed=true` and `test_spent_forever=true`. The
+current evaluator rejects any further test request. The held-out period is now
+permanently spent; future hypotheses require new forward data.

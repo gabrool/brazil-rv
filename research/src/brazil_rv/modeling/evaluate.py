@@ -34,7 +34,6 @@ def parse_args(arguments: list[str] | None = None) -> argparse.Namespace:
         description="Evaluate the frozen rule from one completed official run"
     )
     parser.add_argument("--run-dir", required=True, type=Path)
-    parser.add_argument("--split", choices=("validation", "test"), default="validation")
     return parser.parse_args(arguments)
 
 
@@ -102,6 +101,10 @@ def collect_run_evaluation(
     Path,
     str,
 ]:
+    if split != "validation":
+        raise ValueError(
+            "The held-out test was spent by Experiment 51; no further read is authorized"
+        )
     torch.set_float32_matmul_precision("high")
     states, manifest, store, rule = load_current_run(
         run_dir, identity_cache=identity_cache
@@ -171,7 +174,7 @@ def evaluate_run(run_dir: Path, split: str) -> Path:
 
 def main() -> None:
     args = parse_args()
-    print(evaluate_run(args.run_dir, args.split))
+    print(evaluate_run(args.run_dir, "validation"))
 
 
 if __name__ == "__main__":
