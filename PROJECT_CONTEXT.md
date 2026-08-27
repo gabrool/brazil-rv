@@ -970,3 +970,49 @@ Cleanup-plan, exact delete-list, and cleanup-result SHA-256 values are
 and `0b59fa9611a5e098cbd337c63e38ee8cfef941e415dc7f0f258092dca7643eba`.
 Provider inventory at `2026-08-27T14:31:41.9870434Z` showed zero active
 instances.
+
+## Offline execution-backtest contract (2026-08-27)
+
+`research/src/brazil_rv/execution` is the canonical research execution layer.
+It is an offline replay, not a live trading or broker interface. The simulator
+uses the 405-minute equity session but receives score-refresh minute indices
+explicitly. Current `15,20,...,285` five-minute refreshes and a future dense
+one-minute refresh grid therefore share one interface; no code derives cadence
+from `decision_idx * 5`.
+
+Raw prediction scores are ranked only over the causal point-in-time activity mask
+derived from the hash-bound canonical store. Metric-oriented ensemble ranks
+formed with `label_mask` are forbidden for execution because that mask includes
+future label-endpoint observability. The archive loader binds sample/date/decision
+rows and explicit refresh minutes to the canonical sample index, accepts only
+hash-bound discovery-fold inputs through `TRAIN_END`, and requires the completed
+source run's fold plus selection-window sample/date hashes to match the archive.
+Aggregate OOF inputs remain rejected until a canonical materializer binds every
+constituent fold and proves fit-window exclusion per sample. This rejects both
+official/test access and in-sample runs relabeled as OOF, while supporting the
+present 5-minute cutoffs and future one-minute canonical cutoffs without a
+cadence formula. Experiment 51 remains the sole and permanently spent held-out
+test read.
+
+The real-data bridge reuses canonical permanent-security assignments and streams
+exact observed M1 opens, closes, and `real_volume` only through the training end.
+ADV20 and minute-of-day capacity profiles emit before consuming the current
+session. Experiment-49 Roll schedules may be used only one completed quarter
+late; missing estimates use strictly trailing prior-session Roll inputs. The
+same-quarter schedule is not causal for execution decisions.
+
+Actions fill at the next observed minute open. Holdings are marked open-to-open;
+half-spread and per-side fees are charged once on traded notional. Participation
+and projected-target caps constrain convergence; price-move breaches de-risk only
+as recorded liquidity permits. A linear close taper targets zero at the final
+open, and any remaining terminal position is force-filled at the recorded spread
+multiplier and counted, independent of the ordinary participation/profile gate.
+A held position may not cross an unobserved open: missing prices are never
+interpolated or stale-filled. Cash accrual uses an explicit dated CDI input and
+one configurable margin formula. No canonical daily CDI execution series
+currently exists, so runs must supply and hash-record one.
+
+The baseline policy is the deterministic no-trade-band policy. Neural-policy
+training, OOF refits, cluster penalties, parameter tuning, round lots, impact,
+and live routing are not part of this implementation. No experiment, training,
+official-validation access, or test access was performed while adding it.
