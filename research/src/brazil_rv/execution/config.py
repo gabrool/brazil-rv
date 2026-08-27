@@ -24,6 +24,10 @@ class ExecutionConfig:
     causal_lookback_sessions: int = 20
     horizon_blend: tuple[float, ...] = (1 / 3, 1 / 3, 1 / 3)
     band: float = 0.0
+    cost_band_scale: float = 0.0
+    concentration_k: int | None = None
+    top_half_adv: bool = False
+    spread_schedule_multiplier: float = 1.0
     position_tolerance_brl: float = 1e-8
 
     def __post_init__(self) -> None:
@@ -58,6 +62,15 @@ class ExecutionConfig:
             raise ValueError("At least one horizon blend weight must be positive")
         if math.isnan(self.band) or self.band < 0.0:
             raise ValueError("Band must be non-negative")
+        if not math.isfinite(self.cost_band_scale) or self.cost_band_scale < 0.0:
+            raise ValueError("Cost-band scale must be finite and non-negative")
+        if self.concentration_k is not None and self.concentration_k <= 0:
+            raise ValueError("Concentration K must be positive when configured")
+        if (
+            not math.isfinite(self.spread_schedule_multiplier)
+            or self.spread_schedule_multiplier < 0.0
+        ):
+            raise ValueError("Spread-schedule multiplier must be non-negative")
         if (
             not math.isfinite(self.position_tolerance_brl)
             or self.position_tolerance_brl < 0.0

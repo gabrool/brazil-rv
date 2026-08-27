@@ -47,6 +47,10 @@ conservative than the alpha label's entry-open timing.
 | `taper_minutes` | 30 | Linear target taper into the final open |
 | `force_spread_multiplier` | 2x | Half-spread multiplier for terminal residuals |
 | `margin_fraction_of_gross` | 0.5 | Margin line in `max(NAV - fraction*gross, 0)` |
+| `cost_band_scale` | 0 | Per-name full-spread contribution to the band |
+| `concentration_k` | none | Optional equal-weight names selected per side |
+| `top_half_adv` | false | Restrict the date/name mask to the liquid half |
+| `spread_schedule_multiplier` | 1.0 | Hashed spread-cost scenario multiplier |
 
 Every config has a canonical JSON SHA-256. Report inputs must also be named by
 SHA-256, and the report writer emits an atomic JSON file plus a checksum sidecar.
@@ -108,7 +112,10 @@ SHA-256, and the report writer emits an atomic JSON file plus a checksum sidecar
   differentiable optimization and performance smoke runs; the standalone report
   records float values only after enforcing its 1e-8 accounting identity.
 
-The implemented baseline is `BandPolicy`. Neural-policy training, optimizer
+The implemented policies are `BandPolicy` and the Experiment-53
+`ConcentratedPolicy`. The latter selects rank tails and can extend them in
+deterministic rank order when hard cap capacity binds; projection remains the
+only allocator of feasible weights. Neural-policy training, optimizer
 scaffolding, OOF refits, cluster penalties, parameter tuning, and experiment
 runners are intentionally absent until a registered research question needs
 them. The discovery-fold prediction loader rejects OOF, official-validation,

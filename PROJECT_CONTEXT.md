@@ -1053,3 +1053,22 @@ GitHub before shutdown. Exact paid GH200 instance
 audit were secured; two provider reads at `2026-08-27T17:10:06.4015869Z` and
 `2026-08-27T17:10:24.4091678Z` confirmed the exact ID absent and zero active
 instances.
+
+## Experiment 53 feasible-region contract (2026-08-27)
+
+Experiment 53 is the registered discovery-only follow-up to C0. It tests exactly
+48 concentrated equal-blend cells across K `10/20/40`, base band `0.5/1.5`,
+cost scale `0/1`, gross `1.0/2.0`, and full/top-half causal ADV20 universes.
+Measured, frictionless, and half-spread variants are separately config-hashed.
+
+For this experiment only, the name cap is 5% of gross. Rank-tail selection
+extends deterministically when the combined name/ADV caps cannot support a side
+target, and every refresh records the extension count. C1 excludes a cell if
+its mean deployed gross is below 50% of target on any fold, while retaining its
+reports. Among eligible cells, C1 uses C0's measured-only two-fold rotation and
+tie rule. C0 and C1 remain references, not live or deployed policies.
+
+Interpretation is constrained in advance: a measured net-positive cell is an
+existence proof and lower bound for learned execution; an all-negative map is a
+verdict only on this hand-policy family and never establishes that the alpha is
+untradeable. Official-validation and held-out-test predictions are excluded.

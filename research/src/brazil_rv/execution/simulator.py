@@ -37,6 +37,15 @@ class SimulationResult:
     turnover_brl: torch.Tensor
     max_intraday_gross_brl: torch.Tensor
     forced_fill_count: torch.Tensor
+    mean_deployed_gross_brl: torch.Tensor
+    turnover_by_name_brl: torch.Tensor
+    gross_pnl_by_name_brl: torch.Tensor
+    spread_cost_by_name_brl: torch.Tensor
+    fees_by_name_brl: torch.Tensor
+    round_trip_count_by_name: torch.Tensor
+    round_trip_gross_pnl_by_name_brl: torch.Tensor
+    round_trip_cost_by_name_brl: torch.Tensor
+    selection_extended_count: torch.Tensor
     positions_brl: torch.Tensor | None = None
     fills_brl: torch.Tensor | None = None
     carried_demand_brl: torch.Tensor | None = None
@@ -44,9 +53,9 @@ class SimulationResult:
 
 def tradeable_universe(market: MarketReplay, config: ExecutionConfig) -> torch.Tensor:
     """Return the date/name mask without deleting excluded observations."""
-    spread = _date_spread(market)
+    spread = _date_spread(market) * config.spread_schedule_multiplier
     adv = market.adv20_brl
-    return (
+    tradeable = (
         market.active.bool()
         & torch.isfinite(spread)
         & (spread >= 0)
@@ -54,6 +63,16 @@ def tradeable_universe(market: MarketReplay, config: ExecutionConfig) -> torch.T
         & torch.isfinite(adv)
         & (adv >= config.min_adv_brl)
     )
+    if not config.top_half_adv:
+        return tradeable
+    selected = torch.zeros_like(tradeable)
+    for day in range(tradeable.shape[0]):
+        names = torch.nonzero(tradeable[day], as_tuple=False).flatten()
+        keep = (names.numel() + 1) // 2
+        if keep:
+            order = torch.argsort(adv[day, names], descending=True, stable=True)
+            selected[day, names[order[:keep]]] = True
+    return selected
 
 
 def close_taper(fill_minute: int, minute_count: int, taper_minutes: int) -> float:
@@ -175,6 +194,7 @@ def simulate(
     dtype = market.open_price.dtype
     device = market.open_price.device
     spread = _minute_spread(market).to(device=device, dtype=dtype)
+    spread = spread * config.spread_schedule_multiplier
     adv = market.adv20_brl.to(device=device, dtype=dtype)
     liquidity = market.minute_notional20_brl.to(device=device, dtype=dtype)
     observed = market.open_observed.to(device=device, dtype=torch.bool)
@@ -203,6 +223,17 @@ def simulate(
     turnover = torch.zeros_like(nav)
     maximum_gross = torch.zeros_like(nav)
     forced_count = torch.zeros(days, dtype=torch.int64, device=device)
+    gross_by_name = torch.zeros_like(position)
+    spread_by_name = torch.zeros_like(position)
+    fees_by_name = torch.zeros_like(position)
+    turnover_by_name = torch.zeros_like(position)
+    episode_gross = torch.zeros_like(position)
+    episode_cost = torch.zeros_like(position)
+    round_trip_count = torch.zeros((days, names), dtype=torch.int64, device=device)
+    round_trip_gross = torch.zeros_like(position)
+    round_trip_cost = torch.zeros_like(position)
+    deployed_gross_sum = torch.zeros_like(nav)
+    extension_path = torch.zeros((days, minutes), dtype=torch.int64, device=device)
 
     positions = [position]
     fills = [torch.zeros_like(position)]
@@ -229,6 +260,11 @@ def simulate(
             policy_tradeable & (~torch.isfinite(current_sigma) | (current_sigma < 0))
         ).any():
             raise ValueError("Tradeable policy sigma must be finite and non-negative")
+        cap_notional = torch.minimum(
+            config.name_cap_fraction_of_gross * config.gross_target * nav.unsqueeze(-1),
+            config.adv_cap_fraction * adv,
+        )
+        cap_weights = cap_notional / nav.unsqueeze(-1)
         raw_target, initialized = policy.step(
             policy_ranks,
             refresh_mask[:, action_minute],
@@ -237,7 +273,18 @@ def simulate(
             prior_target,
             initialized,
             policy_tradeable,
+            cap_weights,
+            spread[:, action_minute],
         )
+        extension_count = getattr(policy, "last_selection_extended_count", None)
+        if extension_count is not None:
+            if extension_count.shape != (days,):
+                raise ValueError(
+                    "Selection-extension count must have one value per day"
+                )
+            extension_path[:, action_minute] = torch.where(
+                refresh_mask[:, action_minute].bool(), extension_count, 0
+            )
         if (
             raw_target.shape != (days, names)
             or raw_target.device != device
@@ -249,11 +296,6 @@ def simulate(
         if initialized.shape != (days,):
             raise ValueError("Policy initialized state must contain one value per day")
 
-        cap_notional = torch.minimum(
-            config.name_cap_fraction_of_gross * config.gross_target * nav.unsqueeze(-1),
-            config.adv_cap_fraction * adv,
-        )
-        cap_weights = cap_notional / nav.unsqueeze(-1)
         active_rows = torch.nonzero(initialized, as_tuple=False).flatten()
         base_target = torch.zeros_like(raw_target)
         if active_rows.numel():
@@ -308,8 +350,12 @@ def simulate(
             next_open / current_open - 1,
             torch.zeros_like(position),
         )
-        interval_pnl = (position * price_return).sum(dim=-1)
+        interval_name_pnl = position * price_return
+        interval_pnl = interval_name_pnl.sum(dim=-1)
+        gross_by_name = gross_by_name + interval_name_pnl
+        episode_gross = episode_gross + interval_name_pnl
         position = position * (1 + price_return)
+        old_position = position
         last_open = torch.where(next_observed, next_open, last_open)
         last_spread = torch.where(next_observed, spread[:, fill_minute], last_spread)
         nav = nav + interval_pnl + interval_interest
@@ -365,13 +411,49 @@ def simulate(
             forced_fill.abs() * terminal_spread * 0.5 * config.force_spread_multiplier
         ).sum(dim=-1)
         total_fill = ordinary_fill + forced_fill
-        fill_fees = total_fill.abs().sum(dim=-1) * config.fee_bps / 10_000
+        regular_spread_by_name = ordinary_fill.abs() * safe_spread * 0.5
+        forced_spread_by_name = (
+            forced_fill.abs() * terminal_spread * 0.5 * config.force_spread_multiplier
+        )
+        step_spread_by_name = regular_spread_by_name + forced_spread_by_name
+        fill_fees_by_name = total_fill.abs() * config.fee_bps / 10_000
+        fill_fees = fill_fees_by_name.sum(dim=-1)
         step_spread = regular_spread + forced_spread
+        step_cost_by_name = step_spread_by_name + fill_fees_by_name
+        gross_fill = total_fill.abs()
+        turnover_by_name = turnover_by_name + gross_fill
+        spread_by_name = spread_by_name + step_spread_by_name
+        fees_by_name = fees_by_name + fill_fees_by_name
+
+        old_active = old_position.abs() > config.position_tolerance_brl
+        new_active = position.abs() > config.position_tolerance_brl
+        same_side = (
+            old_active & new_active & (torch.sign(old_position) == torch.sign(position))
+        )
+        closes = old_active & ~same_side
+        crossing = closes & new_active
+        close_fraction = torch.where(
+            crossing,
+            old_position.abs() / total_fill.abs().clamp_min(torch.finfo(dtype).tiny),
+            torch.ones_like(position),
+        )
+        closing_cost = torch.where(closes, step_cost_by_name * close_fraction, 0)
+        opening_cost = step_cost_by_name - closing_cost
+        episode_cost = episode_cost + closing_cost
+        round_trip_count = round_trip_count + closes.to(torch.int64)
+        round_trip_gross = round_trip_gross + torch.where(closes, episode_gross, 0)
+        round_trip_cost = round_trip_cost + torch.where(closes, episode_cost, 0)
+        episode_gross = torch.where(
+            closes, torch.zeros_like(episode_gross), episode_gross
+        )
+        episode_cost = torch.where(closes, torch.zeros_like(episode_cost), episode_cost)
+        episode_cost = episode_cost + opening_cost
         nav = nav - step_spread - fill_fees
         spread_cost = spread_cost + step_spread
         fees = fees + fill_fees
         turnover = turnover + total_fill.abs().sum(dim=-1)
         maximum_gross = torch.maximum(maximum_gross, position.abs().sum(dim=-1))
+        deployed_gross_sum = deployed_gross_sum + position.abs().sum(dim=-1)
 
         if return_path:
             positions.append(position)
@@ -385,6 +467,8 @@ def simulate(
         raise ArithmeticError("Execution accounting identity failed")
     if not torch.all(position.abs() <= config.position_tolerance_brl):
         raise ArithmeticError("Execution replay did not finish flat")
+    if (round_trip_count == 0).logical_and(round_trip_cost != 0).any():
+        raise ArithmeticError("Unclosed execution episode retained costs")
     # Canonicalize the reported totals from their separately accumulated
     # components. The scanned NAV is still checked above, while this exact
     # arithmetic order makes every valid replay directly reportable under the
@@ -402,6 +486,15 @@ def simulate(
         turnover_brl=turnover,
         max_intraday_gross_brl=maximum_gross,
         forced_fill_count=forced_count,
+        mean_deployed_gross_brl=deployed_gross_sum / minutes,
+        turnover_by_name_brl=turnover_by_name,
+        gross_pnl_by_name_brl=gross_by_name,
+        spread_cost_by_name_brl=spread_by_name,
+        fees_by_name_brl=fees_by_name,
+        round_trip_count_by_name=round_trip_count,
+        round_trip_gross_pnl_by_name_brl=round_trip_gross,
+        round_trip_cost_by_name_brl=round_trip_cost,
+        selection_extended_count=extension_path,
         positions_brl=torch.stack(positions, dim=1) if return_path else None,
         fills_brl=torch.stack(fills, dim=1) if return_path else None,
         carried_demand_brl=torch.stack(carried, dim=1) if return_path else None,

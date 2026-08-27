@@ -106,6 +106,23 @@ def test_costs_next_open_and_accounting_match_golden_example() -> None:
     torch.testing.assert_close(
         result.turnover_brl, torch.tensor([2_000.0], dtype=torch.float64)
     )
+    torch.testing.assert_close(
+        result.gross_pnl_by_name_brl.sum(dim=-1), result.gross_pnl_brl
+    )
+    torch.testing.assert_close(
+        result.spread_cost_by_name_brl.sum(dim=-1), result.spread_cost_brl
+    )
+    torch.testing.assert_close(result.fees_by_name_brl.sum(dim=-1), result.fees_brl)
+    torch.testing.assert_close(
+        result.turnover_by_name_brl.sum(dim=-1), result.turnover_brl
+    )
+    assert torch.equal(
+        result.round_trip_count_by_name, torch.ones((1, 2), dtype=torch.int64)
+    )
+    torch.testing.assert_close(
+        result.round_trip_cost_by_name_brl.sum(dim=-1),
+        result.spread_cost_brl + result.fees_brl,
+    )
     assert result.forced_fill_count.item() == 0
     assert torch.equal(result.positions_brl[:, -1], torch.zeros((1, 2)))
 
@@ -363,8 +380,10 @@ class ParameterPolicy(nn.Module):
         previous_target: torch.Tensor,
         initialized: torch.Tensor,
         tradeable: torch.Tensor,
+        cap_weights: torch.Tensor,
+        full_spread: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        del ranks, current_weights, sigma
+        del ranks, current_weights, sigma, cap_weights, full_spread
         candidate = self.raw.to(previous_target).expand_as(previous_target)
         build = refresh & ~initialized
         output = torch.where(build[:, None], candidate, previous_target)

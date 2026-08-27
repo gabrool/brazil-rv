@@ -3949,3 +3949,41 @@ audit and retained root were secured. Provider inventory confirmed that exact
 ID absent at `2026-08-27T17:10:06.4015869Z` and again at
 `2026-08-27T17:10:24.4091678Z`; the Lambda account contained zero active
 instances on both reads.
+
+## Experiment 53 — feasible-region map (preregistered 2026-08-27)
+
+Status at registration: no Experiment-53 frozen root, backtest report, cell-
+fold-variant readout, liquidity decomposition, per-trade table, rotation result,
+or C1 designation exists. No paid instance is active. Experiment 53 is CPU-only
+and reuses the exact hash-audited Experiment-52 discovery prediction and market
+inputs; official-validation and held-out-test predictions are outside the input
+contract.
+
+The frozen grid contains exactly 48 concentrated equal-blend cells: K
+`10/20/40`, base band `0.5/1.5`, cost scale `0/1`, gross `1.0/2.0`, and full or
+top-half prior-ADV20 universe. Every cell-fold runs measured, frictionless, and
+half-spread variants, for 432 standard reports. The spread multiplier is part of
+the config hash. Required outputs also include all-cash-CDI excess, liquidity-
+tercile attribution, round-trip economics, and per-refresh selection-extension
+telemetry.
+
+Pre-score Amendment A53.1 is frozen: Experiment 53 alone uses a 5%-of-gross name
+cap; insufficient selected-side name/ADV cap capacity completes deterministically
+with the next-ranked names; every refresh records the extension count; exit
+hysteresis applies to the completed set; and a cell deploying less than 50% of
+its configured gross on any fold is ineligible for C1 but remains fully
+reported. The original 48 cells and every other rule are unchanged.
+
+C1 uses the Experiment-52 measured-only two-fold rotation rule after the
+deployment guard. Any net-positive cell is an existence proof and lower bound
+for a future learned policy. An all-negative map is a verdict on this hand-policy
+family only and may never be described as evidence that the alpha is
+untradeable. C0 and C1 are both retained.
+
+The frozen Experiment-52 contract has no causal historical quoted-tick archive.
+Consistent with the raw-data contract, MT5's historical `spread` field is not
+repurposed as a market spread and the current catalogue snapshot is not treated
+as historical. The requested informational Roll sanity therefore emits per-name
+lagged-Roll values and explicitly unavailable tick ratios without changing the
+schedule or inventing an input. The canonical preregistration is
+`research/preregistrations/experiment53_feasible_region.md`.
