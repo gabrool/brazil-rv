@@ -364,7 +364,7 @@ def freeze_program(
     if output_dir.exists():
         raise FileExistsError(output_dir)
     rows = load_sample_index(store, through=TRAIN_END)
-    dates = tuple(rows.select("trade_date").unique().sort()["trade_date"])
+    dates = tuple(rows.get_column("trade_date").unique().sort().to_list())
     folds = purged_training_folds(dates)
     source54 = _read_json(experiment54_root / "frozen_design.json")
     source54_result = _read_json(experiment54_root / "experiment54_result.json")
@@ -449,7 +449,7 @@ def _validate_design(root: Path) -> dict[str, object]:
     if feature_store_identity(store) != design["store"]["identity"]:
         raise ValueError("OOF feature-store identity differs")
     rows = load_sample_index(store, through=TRAIN_END)
-    dates = tuple(rows.select("trade_date").unique().sort()["trade_date"])
+    dates = tuple(rows.get_column("trade_date").unique().sort().to_list())
     load_purged_training_folds(root / "purged_folds.json", dates)
     return design
 
@@ -819,7 +819,7 @@ def run_to_close_oof_extension(
     }
     _atomic_json(output_dir / "frozen_design.json", extension_design)
     rows = load_sample_index(store, through=TRAIN_END)
-    dates = tuple(rows.select("trade_date").unique().sort()["trade_date"])
+    dates = tuple(rows.get_column("trade_date").unique().sort().to_list())
     folds = load_purged_training_folds(output_dir / "purged_folds.json", dates)
     jobs = []
     for fold in folds.folds:
