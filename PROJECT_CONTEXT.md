@@ -851,3 +851,34 @@ Paid GH200 instance `f766c33a775344d394ec0bdc915fca6d` was terminated only
 after the immutable artifacts, final audit, cleanup evidence, and result commit
 were secured. Two consecutive provider reads confirmed it absent, and the
 Lambda account then had zero active instances.
+
+## Economics robustness and official-read event 5 decision (2026-08-27)
+
+Experiment 49 rejected the shared 15-minute head for the next official read.
+Although midpoint-label retention passed on all discovery folds, executable
+15-minute net return was negative on every fold and the combined 15m/30m book
+improved net Sharpe on zero folds. Keep the accepted next-generation recipe at
+three heads (30/60/120 minutes); the dedicated 15-minute model remains only a
+registered, unbuilt option.
+
+Experiment 50 consumed official-validation access event 5. The ten-seed
+three-head next-generation ensemble scored `0.043588809`, versus
+`0.043718770` for the deployed Experiment-45 store-v2 ten-seed ensemble. Its
+paired block-10 lower 95% bound was `-0.001054764`, failing the frozen
+inclusive `-0.0005` non-inferiority rule. Do not deploy the next-generation
+candidate. The deployed measured recipe remains the Experiment-45 store-v2
+ten-seed uniform tie-aware rank ensemble.
+
+The immutable programs are:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/economics_49_77411e4_20260827T004334Z
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/nextgen_read_50_77411e4_20260827T004334Z
+
+Experiment 50 retains all 210 official prediction archives and the 20 exact
+selected/final candidate checkpoints after reviewed cleanup. Its final audit
+SHA-256 is
+`aca83d6d84c458b7e1db19645bc411942f6e8ef8530e86bda040a62ca2c116fa`.
+Official validation was accessed exactly once for event 5; the held-out test
+remains sealed. Full economics measurements, artifact hashes, operational
+repair provenance, access ledger, and cleanup evidence are recorded in
+`EXPERIMENT_LOG.md` Experiments 49 and 50.

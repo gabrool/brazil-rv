@@ -3551,3 +3551,74 @@ official score is decision-neutral. No second read, pool, alternate arm,
 weighting search, or test access is allowed. After complete artifact audit,
 reviewed checkpoint cleanup, result-log commit, and push, the exact paid instance
 must be terminated and verified absent twice.
+
+### Experiment 49 result (completed 2026-08-27)
+
+The zero-GPU economics audit completed against all 18 frozen discovery
+prediction runs. The 15-minute signal passed the bounce-robustness condition
+on all three folds, but its executable net return was negative on every fold
+and the combined 15m/30m book improved net Sharpe on zero folds. The frozen
+verdict is therefore `DROP`, fixing Experiment 50 to the three-head
+30/60/120-minute realization. The dedicated 15-minute option remains
+registered but unbuilt. Official validation and the held-out test remained
+sealed throughout Experiment 49.
+
+The immutable Experiment-49 program root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/economics_49_77411e4_20260827T004334Z
+
+Frozen-design, result, verdict, completed-manifest, inventory, and final-audit
+SHA-256 values are
+`ad4ee72cdc59dd7b7ea7d89542d7af6c81d89d40f42d258946d92024881e82c3`,
+`d954762eaf578b403531d1d9ee84f0e42b63b994cc8ff8f9324603c158de6e00`,
+`d7603cf1f0ea5a05ef951bfd3ceb15334cb7e79d7d5780984ef6da14959e5221`,
+`1f548748add7cfef44870d52fc75485211d9e7bffca6562560f6148192f2795e`,
+`83f465d7fc7e861ee49712503611c5f12f2f5d0a07de568b659d44923c0dece7`,
+and `9c0a3e2e722598e54a7fdd72b40f49c5691a49da9db1a6b044be0afb921613ec`.
+The passing audit covers 18 source prediction runs, 63 retention rows, 2,528
+spread-schedule rows, 189 spread-tercile rows, nine portfolio summaries, and
+19 inventoried files / 345,089,669 bytes. Pre-score operational repair commit
+`0922a1f` only left post-schedule dates unmaterialized and resumed the exact
+interrupted analysis; it did not alter frozen measurements or gates.
+
+### Experiment 50 result (completed 2026-08-27)
+
+Official-validation access event 5 ran exactly the ten frozen three-head
+next-generation seeds. The candidate uniform ensemble scored
+`0.043588809`; the deployed Experiment-45 store-v2 comparator scored
+`0.043718770`. The candidate-minus-comparator paired block-10 lower 95% bound
+was `-0.001054764`, below the inclusive `-0.0005` non-inferiority floor.
+The frozen decision is `RETAIN_EXPERIMENT45`: the next-generation recipe is
+not deployed, no alternative or hybrid was evaluated, and the standing
+deployment remains the Experiment-45 store-v2 ten-seed ensemble.
+
+The immutable Experiment-50 program root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/nextgen_read_50_77411e4_20260827T004334Z
+
+Conditional-design, result, analysis, deployment-decision, deployed-recipe,
+completed-manifest, access-ledger, final-inventory, and final-audit SHA-256
+values are
+`27dd2a7e8cebbdf40d94308bb6e7251e49fc837d9a67e90413bffd4c455f3b64`,
+`e21571de6bebd04ec8e168036597e077ecc7c4f512002c27cc55328c8a843c28`,
+`b722fc42cd50b063ac7ed6dd257697b4f011162ef7fa2adaedf629dc16e5b4b7`,
+`8189066f5dc6fdf3d7489c20853cf0404b095f1241c5505aea34ec0c041aa3f4`,
+`1555d37882296f6d08e7bb67904bc8f8a2b5c3b64f2b5e5b1bf248f2e33f3ee8`,
+`a7c77d421dbc1eec84c98335241019146210d1d800f6a7087b9ff7ac2c379b9e`,
+`1ceb731411acdca2f2cbfd0e06a420c0eccfaf009c1899f4f4d79dd246f2037a`,
+`c4b837c273c94abab5448f01686f99744b29ea6b986f19bcc9dd6d06dd779d4b`,
+and `aca83d6d84c458b7e1db19645bc411942f6e8ef8530e86bda040a62ca2c116fa`.
+
+The final audit verified all ten completed manifests, 200 history epochs, 210
+official prediction archives, the exact comparator sources, all analyses and
+decision hashes, and `test_accessed=false`. It inventoried 304 files /
+22,028,877,436 bytes. Reviewed cleanup removed 180 redundant candidate
+checkpoints / 710,259,660 bytes and retained every prediction, history,
+manifest, analysis, plus exactly 20 candidate selected/final checkpoints.
+Post-score audit repair commit `1efe9c5` corrected only the terminal location
+of the immutable sealed-test flag (`run_provenance.test_accessed`); it did not
+rerun training, access predictions again, recompute scores, or change the
+deployment decision. Its provenance SHA-256 is
+`c839c226715bb736f5b71d81444fae4cc17c64aa367b3925e03fceae34d22523`.
+The event-5 ledger records `official_validation_accessed=true`; every final
+artifact records `test_accessed=false`, so the held-out test remains sealed.
