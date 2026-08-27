@@ -206,6 +206,33 @@ def test_terminal_force_ignores_ordinary_liquidity_and_spread_gate() -> None:
     )
 
 
+def test_unobserved_terminal_force_uses_last_observed_open_and_spread() -> None:
+    market, ranks, valid, refresh, sigma = _case(
+        minutes=4, full_spread=(0.01, 0.01)
+    )
+    market.open_observed[:, -1] = False
+    market.open_price[:, -1] = torch.nan
+    config = _config(fee_bps=0.0)
+
+    result = simulate(
+        market,
+        ranks,
+        valid,
+        refresh,
+        sigma,
+        BandPolicy(config),
+        config,
+        return_path=True,
+    )
+
+    assert result.positions_brl is not None
+    assert result.forced_fill_count.item() == 2
+    assert torch.equal(result.positions_brl[:, -1], torch.zeros((1, 2)))
+    torch.testing.assert_close(
+        result.spread_cost_brl, torch.tensor([14.975], dtype=torch.float64)
+    )
+
+
 def test_all_cash_cdi_and_margin_line_are_explicit() -> None:
     market, ranks, valid, refresh, sigma = _case(daily_cdi=0.01)
     valid.zero_()

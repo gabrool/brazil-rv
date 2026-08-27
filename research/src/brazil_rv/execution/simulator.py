@@ -194,6 +194,7 @@ def simulate(
         market.open_price[:, 0],
         torch.full_like(position, torch.nan),
     )
+    last_spread = torch.where(observed[:, 0], spread[:, 0], torch.nan)
 
     gross_pnl = torch.zeros_like(nav)
     spread_cost = torch.zeros_like(nav)
@@ -292,6 +293,7 @@ def simulate(
         interval_pnl = (position * price_return).sum(dim=-1)
         position = position * (1 + price_return)
         last_open = torch.where(next_observed, next_open, last_open)
+        last_spread = torch.where(next_observed, spread[:, fill_minute], last_spread)
         nav = nav + interval_pnl + interval_interest
         gross_pnl = gross_pnl + interval_pnl
         cdi = cdi + interval_interest
@@ -323,13 +325,13 @@ def simulate(
         if fill_minute == minutes - 1:
             terminal = position.abs() > config.position_tolerance_brl
             terminal_pricable = (
-                observed[:, fill_minute]
-                & torch.isfinite(minute_spread)
-                & (minute_spread >= 0)
+                torch.isfinite(last_open)
+                & torch.isfinite(last_spread)
+                & (last_spread >= 0)
             )
             if (terminal & ~terminal_pricable).any():
                 raise ValueError(
-                    "Terminal position lacks an observed priced final fill"
+                    "Terminal position lacks a prior observed priced fill"
                 )
             forced_count = terminal.sum(dim=-1)
             forced_fill = torch.where(terminal, -position, 0)
@@ -340,8 +342,14 @@ def simulate(
             torch.isfinite(minute_spread), minute_spread, torch.zeros_like(position)
         )
         regular_spread = (ordinary_fill.abs() * safe_spread * 0.5).sum(dim=-1)
+        terminal_spread = torch.where(
+            torch.isfinite(last_spread), last_spread, torch.zeros_like(position)
+        )
         forced_spread = (
-            forced_fill.abs() * safe_spread * 0.5 * config.force_spread_multiplier
+            forced_fill.abs()
+            * terminal_spread
+            * 0.5
+            * config.force_spread_multiplier
         ).sum(dim=-1)
         total_fill = ordinary_fill + forced_fill
         fill_fees = total_fill.abs().sum(dim=-1) * config.fee_bps / 10_000

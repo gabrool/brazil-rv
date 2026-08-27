@@ -86,14 +86,16 @@ SHA-256, and the report writer emits an atomic JSON file plus a checksum sidecar
   This avoids pretending a risk limit can create nonexistent liquidity. Targets
   taper after hard projection; any terminal residual is flattened at the
   configured spread multiplier and counted. Terminal liquidation ignores the
-  ordinary participation, liquidity-profile, and spread-universe gates, but
-  still requires an observed final open and a finite nonnegative spread.
+  ordinary participation, liquidity-profile, and spread-universe gates. If the
+  final minute has no open, it uses that name's last observed session open and
+  spread; this explicit end-of-session approximation is counted as a forced
+  fill and never changes the observation mask.
 - A missing open permits neither a mark nor a fill. An existing holding keeps its
   last observed notional and realizes the cumulative open-to-open return only
   when a later observed open arrives; the observation mask remains false and no
   synthetic bar is created. This causal state consumes only the last past
-  observation. An unobservable terminal liquidation remains a hard data-quality
-  error.
+  observation. Terminal liquidation fails if the session has no prior observed
+  priced open for an existing holding.
 - Cash receives the supplied per-session CDI return through one explicit margin
   formula. The repository currently has no canonical daily CDI execution series,
   so callers must supply and hash-record one rather than substituting a DI quote.
