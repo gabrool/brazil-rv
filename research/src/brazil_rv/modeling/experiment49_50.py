@@ -467,9 +467,11 @@ def _spread_matrix(
         for row in schedule.iter_rows(named=True)
     }
     security_ids = equity_index.sort("equity_slot")["security_id"].to_list()
-    result = np.zeros((dates.height, len(security_ids)), dtype=np.float64)
+    result = np.full((dates.height, len(security_ids)), np.nan, dtype=np.float64)
     for date_idx, trade_date in dates.select("date_idx", "trade_date").iter_rows():
         quarter = _quarter(trade_date)
+        if (security_ids[0], quarter) not in by_key:
+            continue
         result[int(date_idx)] = [
             by_key[(security_id, quarter)] for security_id in security_ids
         ]
@@ -631,8 +633,8 @@ def run_experiment49(*, store: Path, output49: Path, output50: Path) -> Path:
     manifest = _read_json(manifest_path)
     design = _read_json(output49 / "frozen_design.json")
     if (
-        manifest.get("status") != "frozen"
-        or manifest.get("repository_commit") != repository_commit()
+        manifest.get("status") not in {"frozen", "analysis_running"}
+        or manifest.get("repository_commit") != design.get("repository_commit")
         or _read_json(output50 / "program_manifest.json").get("status")
         != "conditionally_frozen"
     ):
@@ -647,6 +649,7 @@ def run_experiment49(*, store: Path, output49: Path, output50: Path) -> Path:
             **manifest,
             "status": "analysis_running",
             "economics_inputs": economics_identity,
+            "operational_repair_commit": repository_commit(),
         },
     )
     source48 = design["experiment48_sources"]
@@ -1197,7 +1200,7 @@ def run_experiment50(
     design = _read_json(output50 / "conditional_frozen_design.json")
     if (
         manifest.get("status") != "conditionally_frozen"
-        or manifest.get("repository_commit") != repository_commit()
+        or manifest.get("repository_commit") != design.get("repository_commit")
         or result49.get("official_validation_accessed") is not False
         or result49.get("test_accessed") is not False
         or int(result49["verdict"]["head_count_for_experiment50"]) != head_count

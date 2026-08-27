@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import numpy as np
+import polars as pl
 
 from brazil_rv.modeling.experiment49_50 import (
     _combined_book,
     _rank_linear_weights,
+    _spread_matrix,
     deploy_next_generation,
     keep_head15,
 )
@@ -77,6 +79,28 @@ def test_rank_linear_weights_are_dollar_neutral_and_two_times_gross() -> None:
 
     assert np.isclose(weights.sum(), 0.0)
     assert np.isclose(np.abs(weights).sum(), 2.0)
+
+
+def test_spread_matrix_leaves_post_schedule_dates_unmaterialized() -> None:
+    schedule = pl.DataFrame(
+        {
+            "security_id": ["a", "b"],
+            "quarter": ["2025Q2", "2025Q2"],
+            "schedule_full_spread_fraction": [0.001, 0.002],
+        }
+    )
+    dates = pl.DataFrame(
+        {
+            "date_idx": [0, 1],
+            "trade_date": ["2025-06-30", "2025-07-01"],
+        }
+    )
+    equities = pl.DataFrame({"equity_slot": [0, 1], "security_id": ["a", "b"]})
+
+    values = _spread_matrix(schedule, dates, equities)
+
+    assert np.array_equal(values[0], np.asarray([0.001, 0.002]))
+    assert np.isnan(values[1]).all()
 
 
 def test_combined_book_uses_only_prior_days_for_risk_weights() -> None:
