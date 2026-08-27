@@ -67,6 +67,7 @@ FEATURE_ARRAY_FILES = (
 FEATURE_STORE_CONTRACT = "M1_FEATURES_PIT_CAUSAL_TOD"
 EXTERNAL_SIDECAR_SCHEMA = "PIT_EXTERNAL_FEATURE_SIDECAR"
 NEXTGEN_TARGET_SCHEMA = "EXPERIMENT48_15M_LEG_TARGETS_V1"
+TO_CLOSE_TARGET_SCHEMA = "EXPERIMENT55_TO_CLOSE_TARGETS_V1"
 NEXTGEN_TARGET_FILES = (
     "leg_raw_returns.npy",
     "leg_targets.npy",
@@ -326,23 +327,39 @@ def load_nextgen_target_sidecar(sidecar_dir: Path, store: Path) -> NextgenTarget
         raise FileNotFoundError(path)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     store_identity = feature_store_identity(store)
+    schema = manifest.get("schema")
+    if schema == NEXTGEN_TARGET_SCHEMA:
+        through = VALIDATION_END.isoformat()
+        leg_count = 2
+        contract_matches = (
+            manifest.get("horizon_minutes") == 15
+            and manifest.get("leg_names") == ["0_to_15", "15_to_30"]
+        )
+    elif schema == TO_CLOSE_TARGET_SCHEMA:
+        through = TRAIN_END.isoformat()
+        leg_count = 1
+        contract_matches = (
+            manifest.get("leg_names") == ["to_close"]
+            and manifest.get("horizon_minutes_by_decision")
+            == list(range(390, 119, -5))
+        )
+    else:
+        raise ValueError("Target sidecar manifest has an unknown schema")
     if (
-        manifest.get("schema") != NEXTGEN_TARGET_SCHEMA
-        or manifest.get("source_feature_store") != store_identity
-        or manifest.get("through") != VALIDATION_END.isoformat()
-        or manifest.get("horizon_minutes") != 15
-        or manifest.get("leg_names") != ["0_to_15", "15_to_30"]
+        manifest.get("source_feature_store") != store_identity
+        or manifest.get("through") != through
+        or not contract_matches
         or manifest.get("official_validation_accessed") is not False
         or manifest.get("test_accessed") is not False
     ):
-        raise ValueError("Experiment 48 target sidecar manifest differs")
+        raise ValueError("Target sidecar manifest differs from its frozen contract")
     shape = manifest.get("shape")
     if (
         not isinstance(shape, list)
         or len(shape) != 4
-        or shape[1:] != [EQUITY_COUNT, EXPECTED_DECISIONS_PER_DATE, 2]
+        or shape[1:] != [EQUITY_COUNT, EXPECTED_DECISIONS_PER_DATE, leg_count]
     ):
-        raise ValueError("Experiment 48 target sidecar axes differ")
+        raise ValueError("Target sidecar axes differ")
     hashes = manifest.get("array_sha256")
     if not isinstance(hashes, dict) or set(hashes) != set(NEXTGEN_TARGET_FILES):
         raise ValueError("Experiment 48 target sidecar hashes are incomplete")
@@ -356,7 +373,7 @@ def load_nextgen_target_sidecar(sidecar_dir: Path, store: Path) -> NextgenTarget
     expected_shapes["leg_cross_section_median.npy"] = (
         int(shape[0]),
         EXPECTED_DECISIONS_PER_DATE,
-        2,
+        leg_count,
     )
     normalized = {}
     for name in NEXTGEN_TARGET_FILES:
@@ -368,10 +385,10 @@ def load_nextgen_target_sidecar(sidecar_dir: Path, store: Path) -> NextgenTarget
             or array.shape != expected_shapes[name]
             or array.dtype.name != dtypes[name]
         ):
-            raise ValueError(f"Experiment 48 target sidecar differs: {name}")
+            raise ValueError(f"Target sidecar differs: {name}")
         normalized[name] = digest
     identity = {
-        "schema": NEXTGEN_TARGET_SCHEMA,
+        "schema": schema,
         "path": str(path),
         "manifest_sha256": _file_sha256(manifest_path),
         "array_sha256": normalized,

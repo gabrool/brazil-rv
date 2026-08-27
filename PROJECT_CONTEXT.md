@@ -1028,11 +1028,15 @@ zero-initialized shared per-name neural policy, a hash-frozen strictly causal
 state built inside the minute scan, volume-weighted position cost basis, direct
 AdamW optimization over net PnL above all-cash CDI with optional SAM/replay
 checkpointing, and hashed five-block purged TRAIN split generation. This does
-not establish an accepted policy. No real policy training, OOF refit/materialized
-archive, Experiment-55 trajectory, official-validation access, or additional
-held-out-test access has occurred; the execution archive loader continues to
-reject OOF until the separately registered provenance chain exists. Cluster
-penalties, round lots, impact, and live routing remain outside the contract.
+not establish an accepted policy. The OOF manufacture now has a distinct archive
+schema whose loader reconstructs the exact purged folds, verifies all 50 source
+runs and per-sample fit exclusion, and still rejects any unproven aggregate. The
+modeling layer also supports the registered zero-start horizon-conditioned
+to-close readout and its TRAIN-only hashed target sidecar; the three incumbent
+heads and RNG stream are unchanged at initialization. No real policy training,
+official-validation access, or additional held-out-test access is authorized.
+Cluster penalties, round lots, impact, and live routing remain outside the
+contract.
 
 ## First execution reference — Experiment 52 C0 (2026-08-27)
 

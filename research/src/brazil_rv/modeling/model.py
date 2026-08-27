@@ -25,6 +25,7 @@ class SharedCausalTCN(nn.Module):
         equity_count: int = EQUITY_COUNT,
         sidecar_feature_count: int | None = None,
         single_horizon_index: int | None = None,
+        to_close_head: bool = False,
     ) -> None:
         super().__init__()
         if sidecar_feature_count is not None and sidecar_feature_count <= 0:
@@ -33,6 +34,11 @@ class SharedCausalTCN(nn.Module):
         self.equity_count = equity_count
         self.instrument_count = equity_count + CONTEXT_COUNT
         self.sidecar_feature_count = sidecar_feature_count
+        self.to_close_head = bool(to_close_head)
+        if self.to_close_head and architecture.output_horizons != 4:
+            raise ValueError("The horizon-conditioned to-close head requires 4 outputs")
+        if self.to_close_head and single_horizon_index is not None:
+            raise ValueError("The to-close head cannot be combined with head masking")
         if single_horizon_index is not None and single_horizon_index not in (0, 1, 2):
             raise ValueError("single_horizon_index must be 0, 1, or 2")
         self.single_horizon_index = single_horizon_index
@@ -63,11 +69,20 @@ class SharedCausalTCN(nn.Module):
         self.fusion_gate = nn.Linear(2 * width, width, bias=True)
         self.fusion_norm = nn.LayerNorm(width)
         self.dropout = nn.Dropout(architecture.dropout)
+        incumbent_horizons = 3 if self.to_close_head else architecture.output_horizons
         self.prediction_head = nn.Linear(
             width,
-            1 if single_horizon_index is not None else architecture.output_horizons,
+            1 if single_horizon_index is not None else incumbent_horizons,
             bias=True,
         )
+        to_close_readouts: nn.Linear | None = None
+        if self.to_close_head:
+            rng_state = torch.get_rng_state()
+            try:
+                to_close_readouts = nn.Linear(width, 3, bias=True)
+            finally:
+                torch.set_rng_state(rng_state)
+        self.to_close_readouts = None
         self.apply(self._initialize_module)
         nn.init.zeros_(self.fusion_gate.weight)
         nn.init.constant_(self.fusion_gate.bias, TARGETED_FUSION_GATE_BIAS)
@@ -81,6 +96,15 @@ class SharedCausalTCN(nn.Module):
             finally:
                 torch.set_rng_state(rng_state)
             nn.init.zeros_(self.sidecar_adapter.weight)
+        if to_close_readouts is not None:
+            rng_state = torch.get_rng_state()
+            try:
+                self._initialize_module(to_close_readouts)
+            finally:
+                torch.set_rng_state(rng_state)
+            nn.init.zeros_(to_close_readouts.weight)
+            nn.init.zeros_(to_close_readouts.bias)
+            self.to_close_readouts = to_close_readouts
 
     @staticmethod
     def _initialize_module(module: nn.Module) -> None:
@@ -197,6 +221,18 @@ class SharedCausalTCN(nn.Module):
             instrument_mask[:, self.equity_count :],
         )
         predictions = self.prediction_head(fused)
+        if self.to_close_readouts is not None:
+            # Under the five-minute contract state_position is 15 + decision_idx;
+            # the standard equity entry is 5*state_position - 60.
+            remaining = (465 - 5 * state_position).to(fused.dtype)
+            if torch.any((remaining <= 0) | (remaining > 405)):
+                raise ValueError("To-close horizon basis lies outside the session")
+            h = remaining / 405
+            basis = torch.stack((torch.ones_like(h), h, torch.sqrt(h)), dim=-1)
+            to_close = (self.to_close_readouts(fused) * basis[:, None]).sum(
+                dim=-1, keepdim=True
+            )
+            predictions = torch.cat((predictions, to_close), dim=-1)
         if self.single_horizon_index is not None:
             horizon_mask = F.one_hot(
                 torch.tensor(self.single_horizon_index, device=predictions.device),
@@ -210,11 +246,13 @@ def build_model(
     sidecar_feature_count: int | None = None,
     single_horizon_index: int | None = None,
     architecture: TCNArchitecture = TCN_ARCHITECTURE,
+    to_close_head: bool = False,
 ) -> SharedCausalTCN:
     return SharedCausalTCN(
         architecture=architecture,
         sidecar_feature_count=sidecar_feature_count,
         single_horizon_index=single_horizon_index,
+        to_close_head=to_close_head,
     )
 
 

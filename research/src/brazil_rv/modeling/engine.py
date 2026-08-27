@@ -623,7 +623,9 @@ def checkpoint_payload(
     sam_rho: float = SAM_RHO,
 ) -> dict[str, object]:
     metadata = model_metadata(
-        getattr(model, "sidecar_feature_count", None), architecture=architecture
+        getattr(model, "sidecar_feature_count", None),
+        architecture=architecture,
+        to_close_head=bool(getattr(model, "to_close_head", False)),
     )
     if run_provenance.get("model") != metadata:
         raise ValueError("Run provenance differs from checkpoint model")

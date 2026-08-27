@@ -198,6 +198,7 @@ def run_training(
     training_horizon_indices: tuple[int, ...] | None = None,
     training_specification: TrainingSpecification = TRAINING_SPECIFICATION,
     target_sidecar_dir: Path | None = None,
+    to_close_head: bool = False,
 ) -> Path:
     sidecar = None if sidecar_dir is None else load_external_sidecar(sidecar_dir, store)
     target_sidecar = (
@@ -210,6 +211,10 @@ def run_training(
         raise ValueError(
             "Model output count differs from the requested target-sidecar contract"
         )
+    if to_close_head and target_sidecar is None:
+        raise ValueError("The to-close model requires its frozen target sidecar")
+    if to_close_head and training_specification.patch_minutes != 5:
+        raise ValueError("The frozen to-close horizon basis requires five-minute patches")
     if run_dir.exists():
         raise FileExistsError(run_dir)
     run_dir.mkdir(parents=True)
@@ -246,6 +251,7 @@ def run_training(
         None if sidecar is None else sidecar.feature_count,
         single_horizon_index=single_horizon_index,
         architecture=training_specification.architecture,
+        to_close_head=to_close_head,
     ).cuda()
     emas = tuple(ModelEMA(model, decay) for decay in EMA_DECAYS)
     parameter_count = count_trainable_parameters(model)
@@ -272,6 +278,7 @@ def run_training(
         date_replacement=sampler.replace_dates,
         external_sidecar=None if sidecar is None else sidecar.identity,
         specification=training_specification,
+        to_close_head=to_close_head,
     )
     run_provenance["equity_input_zeroing"] = {
         "scope": "158_equity_inputs_only",

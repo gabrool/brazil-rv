@@ -4172,3 +4172,42 @@ Experiment-55 sidecar, score, gate, or trajectory was produced. The OOF archive
 loader remains closed to aggregates until the separately registered constituent-
 fold provenance chain is implemented and manufactured. The held GH200 was not
 used, modified, or terminated for this code-only work.
+
+## Learned-policy OOF manufacture (preregistered 2026-08-27)
+
+Status at registration: no OOF trajectory, held-out prediction, calibration, or
+real policy score exists. The exact five-block/five-session purged TRAIN manifest
+is frozen before training. Five folds times seeds
+`11/29/47/61/79/97/113/131/149/167` use the deployed store-v2 depth-six,
+temperature-0.50 recipe for fixed 20 epochs with no monitor and no held-out
+evaluation during training. Epoch-20 raw is archived and final EMA-0.995 is the
+member. Ten members are causally rank averaged per held-out fold and assembled
+into a 716-date archive whose loader independently verifies every source fold,
+fit exclusion, run/file hash, and exact coverage. A frozen C/A/B calibration
+compares monitor-free OOF EMA ranks with the exact Experiment-41 Patience
+comparator. At most two training processes run. Checkpoints may be removed only
+after archive verification; predictions, references, histories, manifests,
+calibration, and audits remain. The executable registration is
+`research/preregistrations/oof_prediction_manufacture.md`.
+
+## Experiment 55 — horizon-conditioned to-close head (preregistered 2026-08-27)
+
+Status at registration: no to-close target sidecar, trajectory, fold score,
+conditional edge, or gate result exists. After OOF manufacture, a TRAIN-only
+sidecar freezes exact standard-entry-to-final-close labels, median removal,
+causal `sigma*sqrt(H)` scaling, and per-group midranks. The candidate adds three
+zero-initialized full-width readouts combined by `[1,H/405,sqrt(H/405)]`, retaining
+exact three-head and RNG parity at epoch zero. The deployed store-v2 specification
+runs on C/A/B with seeds 11/29/47 and standard four-head-selected cross-fitted
+Patience; final EMA-0.995 is secondary.
+
+The three-head guardrail requires mean delta at least zero and every fold delta
+at least `-0.0005`. To-close IC is reported overall and by morning/middle/late
+third. Economics reuses the exact Experiment-54 buckets, costs, and capacity
+allocator; adoption requires the guardrail plus at least `+2` incremental NAV
+bps/day versus the best existing frontier on at least two folds. Adoption affects
+execution inputs only. If it fires, exactly 50 four-head OOF refits run under the
+already frozen no-monitor protocol; otherwise they are skipped. No retry, new
+bucket, head, state, threshold, cost, weight, official-validation read, or test
+read is allowed. The executable registration is
+`research/preregistrations/experiment55_to_close.md`.

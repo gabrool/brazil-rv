@@ -440,8 +440,8 @@ def build_state_events(
 ) -> tuple[dict[str, np.ndarray], dict[str, int]]:
     ranks = np.asarray(ranks, dtype=np.float64)
     valid = np.asarray(valid, dtype=bool)
-    if ranks.ndim != 4 or ranks.shape != valid.shape or ranks.shape[-1] != 3:
-        raise ValueError("Experiment 54 ranks must be [day,refresh,name,3]")
+    if ranks.ndim != 4 or ranks.shape != valid.shape or ranks.shape[-1] < 1:
+        raise ValueError("State-event ranks must be [day,refresh,name,horizon]")
     days, refreshes, names, _ = ranks.shape
     expected_daily = (days, names)
     expected_minute = (days, EQUITY_SESSION_MINUTES, names)

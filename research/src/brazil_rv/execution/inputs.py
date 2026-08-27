@@ -33,6 +33,7 @@ from ..preprocessing.io import (
 )
 
 EXECUTION_PREDICTION_ARCHIVE_SCHEMA = "B3_EXECUTION_PREDICTION_ARCHIVE_V1"
+OOF_PREDICTION_ARCHIVE_SCHEMA = "B3_EXECUTION_OOF_PREDICTION_ARCHIVE_V1"
 _DISCOVERY_SPLITS = frozenset({"fold_a", "fold_b", "fold_c"})
 
 
@@ -430,6 +431,117 @@ def _source_prediction_manifest_sha256(
     return _sha256(path)
 
 
+def _verify_oof_source_manifest(
+    path: Path,
+    *,
+    store: Path,
+    store_identity: Mapping[str, object],
+    prediction_sha256: str,
+    reference_sha256: str,
+    date_idx: np.ndarray,
+    source_fold_index: np.ndarray,
+) -> str:
+    from .splits import purged_training_folds
+
+    source = json.loads(path.read_text(encoding="utf-8"))
+    dates = (
+        pl.read_parquet(store / "date_index.parquet")
+        .filter(pl.col("trade_date") <= TRAIN_END)
+        .sort("date_idx")
+    )
+    canonical_dates = tuple(dates["trade_date"])
+    folds = purged_training_folds(canonical_dates)
+    if (
+        source.get("schema") != "BRAZIL_RV_OOF_MANUFACTURE_V1"
+        or source.get("status") != "completed"
+        or source.get("feature_store_identity") != store_identity
+        or source.get("purged_folds") != folds.payload()
+        or source.get("prediction_sha256") != prediction_sha256
+        or source.get("reference_sha256") != reference_sha256
+        or source.get("official_validation_accessed") is not False
+        or source.get("test_accessed") is not False
+    ):
+        raise ValueError("OOF source manifest differs from the frozen contract")
+    if (
+        source_fold_index.shape != date_idx.shape
+        or not np.issubdtype(source_fold_index.dtype, np.integer)
+        or np.any((source_fold_index < 0) | (source_fold_index >= len(folds.folds)))
+    ):
+        raise ValueError("OOF source-fold identity is malformed")
+    trade_date_by_idx = dict(dates.select("date_idx", "trade_date").iter_rows())
+    for fold_index, fold in enumerate(folds.folds):
+        emitted = {
+            trade_date_by_idx[int(value)]
+            for value in np.unique(date_idx[source_fold_index == fold_index])
+        }
+        if emitted != set(fold.heldout_dates):
+            raise ValueError("OOF source fold emits a non-held-out date")
+        if emitted.intersection(fold.fit_dates) or emitted.intersection(
+            fold.embargo_dates
+        ):
+            raise ValueError("OOF source fold leaks a fit or embargo date")
+    bindings = source.get("run_bindings")
+    seeds = (11, 29, 47, 61, 79, 97, 113, 131, 149, 167)
+    expected_keys = {
+        f"{fold.name}/seed_{seed}" for fold in folds.folds for seed in seeds
+    }
+    if not isinstance(bindings, dict) or set(bindings) != expected_keys:
+        raise ValueError("OOF source manifest lacks an exact run binding")
+    for fold in folds.folds:
+        for seed in seeds:
+            binding = bindings[f"{fold.name}/seed_{seed}"]
+            if not isinstance(binding, dict):
+                raise ValueError("OOF run binding is malformed")
+            manifest_path = Path(str(binding.get("manifest", "")))
+            if not manifest_path.is_absolute():
+                manifest_path = path.parent / manifest_path
+            if (
+                not manifest_path.is_file()
+                or binding.get("manifest_sha256") != _sha256(manifest_path)
+            ):
+                raise ValueError("OOF run-manifest binding hash differs")
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            prediction_path = Path(str(binding.get("prediction", "")))
+            reference_path = Path(str(binding.get("reference", "")))
+            if not prediction_path.is_absolute():
+                prediction_path = path.parent / prediction_path
+            if not reference_path.is_absolute():
+                reference_path = path.parent / reference_path
+            if (
+                not prediction_path.is_file()
+                or not reference_path.is_file()
+                or binding.get("prediction_sha256") != _sha256(prediction_path)
+                or binding.get("reference_sha256") != _sha256(reference_path)
+                or manifest.get("prediction_sha256") != _sha256(prediction_path)
+                or manifest.get("reference_sha256") != _sha256(reference_path)
+            ):
+                raise ValueError("OOF run archive binding hash differs")
+            training = manifest.get("training")
+            proof = manifest.get("fit_exclusion_proof")
+            if (
+                manifest.get("schema") != "BRAZIL_RV_MONITOR_FREE_OOF_RUN_V1"
+                or manifest.get("status") != "completed"
+                or manifest.get("seed") != seed
+                or manifest.get("source_fold_sha256") != fold.payload()["sha256"]
+                or manifest.get("feature_store_identity") != store_identity
+                or manifest.get("epochs_completed") != 20
+                or manifest.get("monitor") is not None
+                or not isinstance(training, dict)
+                or training.get("heldout_evaluations_during_training") != 0
+                or training.get("final_states")
+                != ["epoch20_raw", "epoch20_ema_0995"]
+                or not isinstance(proof, dict)
+                or proof.get("fit_date_identity_sha256")
+                != fold.payload()["fit_date_identity_sha256"]
+                or proof.get("heldout_date_identity_sha256")
+                != fold.payload()["heldout_date_identity_sha256"]
+                or manifest.get("official_validation_accessed") is not False
+                or manifest.get("test_accessed") is not False
+            ):
+                raise ValueError("OOF source run differs from its fold binding")
+    return _sha256(path)
+
+
 def write_discovery_prediction_manifest(
     path: Path,
     *,
@@ -546,9 +658,18 @@ def load_discovery_prediction_archive(
     """
     store = store.resolve()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("schema") != EXECUTION_PREDICTION_ARCHIVE_SCHEMA:
+    schema = manifest.get("schema")
+    if schema not in (
+        EXECUTION_PREDICTION_ARCHIVE_SCHEMA,
+        OOF_PREDICTION_ARCHIVE_SCHEMA,
+    ):
         raise ValueError("Prediction manifest has an unknown execution schema")
-    _discovery_split(manifest)
+    is_oof = schema == OOF_PREDICTION_ARCHIVE_SCHEMA
+    if is_oof:
+        if manifest.get("split") != "oof_train":
+            raise ValueError("OOF prediction archive split differs")
+    else:
+        _discovery_split(manifest)
     if (
         manifest.get("official_validation_accessed") is not False
         or manifest.get("test_accessed") is not False
@@ -583,10 +704,19 @@ def load_discovery_prediction_archive(
             raise ValueError(f"Prediction archive has no {prediction_key!r} array")
         flat_scores = values[prediction_key].copy()
     with np.load(reference_path, allow_pickle=False) as values:
-        required = ("sample_id", "date_idx", "decision_idx")
+        required = (
+            "sample_id",
+            "date_idx",
+            "decision_idx",
+            *(("source_fold_index",) if is_oof else ()),
+        )
         if any(name not in values for name in required):
             raise ValueError("Prediction reference lacks sample/date/decision identity")
-        sample_id, date_idx, decision_idx = (values[name].copy() for name in required)
+        sample_id, date_idx, decision_idx = (
+            values[name].copy()
+            for name in ("sample_id", "date_idx", "decision_idx")
+        )
+        source_fold_index = values["source_fold_index"].copy() if is_oof else None
     if flat_scores.ndim != 3 or any(
         values.shape != (flat_scores.shape[0],)
         for values in (sample_id, date_idx, decision_idx)
@@ -602,13 +732,25 @@ def load_discovery_prediction_archive(
         raise ValueError("Prediction reference identities must be unique integers")
     if flat_scores.shape[1] != axes["equity_count"]:
         raise ValueError("Prediction name axis differs from the canonical store")
-    actual_source_sha256 = _source_prediction_manifest_sha256(
-        source_path,
-        store_identity,
-        _discovery_split(manifest),
-        sample_id,
-        date_idx,
-    )
+    if is_oof:
+        assert source_fold_index is not None
+        actual_source_sha256 = _verify_oof_source_manifest(
+            source_path,
+            store=store,
+            store_identity=store_identity,
+            prediction_sha256=str(manifest["prediction_sha256"]),
+            reference_sha256=str(manifest["reference_sha256"]),
+            date_idx=date_idx,
+            source_fold_index=source_fold_index,
+        )
+    else:
+        actual_source_sha256 = _source_prediction_manifest_sha256(
+            source_path,
+            store_identity,
+            _discovery_split(manifest),
+            sample_id,
+            date_idx,
+        )
     if actual_source_sha256.casefold() != source_sha256.casefold():
         raise ValueError("Prediction archive source-manifest hash mismatch")
 

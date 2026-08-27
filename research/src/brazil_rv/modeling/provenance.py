@@ -41,14 +41,22 @@ def model_metadata(
     sidecar_feature_count: int | None = None,
     *,
     architecture: TCNArchitecture = TCN_ARCHITECTURE,
+    to_close_head: bool = False,
 ) -> dict[str, object]:
     if sidecar_feature_count is not None and sidecar_feature_count <= 0:
         raise ValueError("sidecar_feature_count must be positive")
-    model = {
+    model: dict[str, object] = {
         "model_name": "tcn",
         "architecture": asdict(architecture),
         "cross_equity_attention": False,
     }
+    if to_close_head:
+        model["to_close_head"] = {
+            "readouts": 3,
+            "basis": ["1", "H/405", "sqrt(H/405)"],
+            "zero_initialized": True,
+            "incumbent_head_count": 3,
+        }
     if sidecar_feature_count is not None:
         model["external_sidecar_adapter"] = {
             "feature_count": sidecar_feature_count,
@@ -119,6 +127,7 @@ def build_run_provenance(
     training_sample_count: int,
     date_replacement: bool,
     external_sidecar: dict[str, object] | None = None,
+    to_close_head: bool = False,
     runtime: RuntimeSettings = GH200_RUNTIME,
     specification: TrainingSpecification = TRAINING_SPECIFICATION,
 ) -> dict[str, object]:
@@ -134,7 +143,9 @@ def build_run_provenance(
         "feature_store": str(feature_store.resolve()),
         "feature_store_identity": feature_store_metadata,
         "model": model_metadata(
-            sidecar_feature_count, architecture=specification.architecture
+            sidecar_feature_count,
+            architecture=specification.architecture,
+            to_close_head=to_close_head,
         ),
         "seed": seed,
         "fit_window": fit_window,
