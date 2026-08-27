@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import date
+from pathlib import Path
 
 import numpy as np
 
 from brazil_rv.modeling.engine import EvaluationObservations
 from brazil_rv.modeling.experiment51_test_read import (
+    _inventory_by_path,
     difficulty_context,
     interpretation_band,
     paired_h2_minus_h1,
@@ -61,3 +64,22 @@ def test_difficulty_context_uses_only_raw_labels_and_masks() -> None:
     assert np.isclose(result[0]["active_universe_size"], 3.0)
     assert np.isclose(result[0]["cross_sectional_dispersion"], np.std(raw[0, :, 0]))
     assert np.isclose(result[0]["per_name_vol_level"], np.std([0.0, 0.1], ddof=1))
+
+
+def test_deployed_inventory_binds_historical_bytes_field(tmp_path: Path) -> None:
+    inventory = []
+    for index in range(20):
+        path = tmp_path / f"checkpoint_{index}.pt"
+        content = str(index).encode()
+        path.write_bytes(content)
+        inventory.append(
+            {
+                "path": str(path),
+                "bytes": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+            }
+        )
+
+    result = _inventory_by_path({"retained_checkpoint_inventory": inventory})
+
+    assert len(result) == 20

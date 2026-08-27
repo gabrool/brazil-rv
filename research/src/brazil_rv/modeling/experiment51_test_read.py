@@ -148,7 +148,7 @@ def _inventory_by_path(deployed: Mapping[str, object]) -> dict[Path, dict]:
     if len(result) != 20 or len(result) != len(inventory):
         raise ValueError("Experiment-45 checkpoint inventory is not the exact 20 files")
     for path, item in result.items():
-        if not path.is_file() or path.stat().st_size != int(item["size_bytes"]):
+        if not path.is_file() or path.stat().st_size != int(item["bytes"]):
             raise ValueError(f"Experiment-45 checkpoint differs: {path}")
         if _sha256(path) != item["sha256"]:
             raise ValueError(f"Experiment-45 checkpoint hash differs: {path}")
