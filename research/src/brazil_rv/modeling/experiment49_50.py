@@ -229,8 +229,8 @@ def _validate_experiment45_manifests(root: Path) -> dict[str, object]:
         if (
             run_manifest.get("status") != "completed"
             or run_manifest.get("seed") != seed
-            or run_manifest.get("split", {}).get("training") != "train"
-            or run_manifest.get("split", {}).get("selection") != "validation"
+            or run_manifest.get("split", {}).get("training") != "official"
+            or run_manifest.get("split", {}).get("selection") != "official"
             or run_manifest.get("split", {}).get("test_accessed") is not False
         ):
             raise ValueError(f"Experiment-45 member differs: seed {seed}")
