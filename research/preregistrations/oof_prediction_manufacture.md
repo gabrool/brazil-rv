@@ -47,4 +47,3 @@ All prediction/reference archives, histories, manifests, calibration, results,
 and audits are retained in an immutable root. Epoch-20 state checkpoints are
 hash-inventoried and removed only after the final archive passes the loader.
 `official_validation_accessed=false` and `test_accessed=false` throughout.
-

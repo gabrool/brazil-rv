@@ -54,4 +54,3 @@ final-EMA rules. Their archive must pass the same per-sample fit-exclusion loade
 Otherwise that branch is skipped. All predictions, analyses, manifests, targets,
 gates, and audits are retained; checkpoints are hash-inventoried and deleted after
 use. `official_validation_accessed=false` and `test_accessed=false` throughout.
-
