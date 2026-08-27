@@ -3722,3 +3722,11 @@ bootstrap, freeze, and run logs. Key SHA-256 values are:
 The ledger records `test_accessed=true` and `test_spent_forever=true`. The
 current evaluator rejects any further test request. The held-out period is now
 permanently spent; future hypotheses require new forward data.
+
+Result/context commit `23a100750397e903aa8ef394af2c12b0906e30fd`
+reached GitHub before shutdown. Exact paid GH200 instance
+`a6c710df4bfa48c9a40f64ee4b7e85c4` was terminated only after every retained
+artifact, log, audit hash, result, and the spent-test policy were secured and
+pushed. Provider inventory confirmed that exact ID absent at
+`2026-08-27T13:17:35.6228739Z` and again at
+`2026-08-27T13:17:57.0202321Z`; both reads showed zero active instances.

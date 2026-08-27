@@ -926,3 +926,9 @@ analyses, preregistration, interpretation statement, and operational logs.
 The ledger records `test_accessed=true` and `test_spent_forever=true`. Current
 code refuses further test evaluation. No second test read is authorized under
 any registration; future validation requires new forward data.
+
+Result/context commit `23a100750397e903aa8ef394af2c12b0906e30fd` reached
+GitHub before shutdown. Exact paid GH200 instance
+`a6c710df4bfa48c9a40f64ee4b7e85c4` was then terminated; provider inventory
+confirmed the exact ID absent twice at `2026-08-27T13:17:35.6228739Z` and
+`2026-08-27T13:17:57.0202321Z`, with zero active instances on both reads.
