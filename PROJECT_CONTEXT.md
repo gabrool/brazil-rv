@@ -1105,3 +1105,47 @@ reached GitHub before shutdown. Exact paid instance
 root and audit were secured. Provider inventory confirmed that exact ID absent
 and zero active instances at `2026-08-27T19:14:50.9818266Z` and again at
 `2026-08-27T19:15:18.8786125Z`.
+
+## Experiment 54 edge and maker feasibility (2026-08-27)
+
+Experiment 54 is the frozen discovery-only conditional-edge analysis over
+Folds C/A/B. It did not run the simulator, train or select a policy, alter C0
+or C1, or access official-validation or held-out-test predictions. Fold C alone
+froze the state bucket edges; A/B reused them unchanged. The retained analysis
+covers 2,219,567 eligible state events, four entry conventions at
+`15/30/60/120` minutes, fixed `4.5/7/10`-bps taker hurdles, six conservative
+maker schedules, and the preregistered positioning comparison.
+
+At the 7-bps threshold, the optimistic same-fold state-cell taker frontier's
+best registered horizon was 120 minutes on every fold and returned
+`9.141462`, `7.944564`, and `10.429961` expected NAV bps/day on A/B/C. Two
+folds cleared the frozen inclusive 8-bps/day gate, so taker actions remain
+VIABLE for a future learned-policy stage and its reward hurdle is all-cash CDI.
+This is a state-cell oracle upper bound, not realized simulator PnL, policy
+acceptance, or deployment authorization.
+
+The strongest maker frontier was the 120-minute, 15-minute-wait,
+half-half-spread-improved limit on Fold A at `3.917194` expected NAV bps/day;
+the matched B/C values were `3.739960` and `3.856317`. Aggregate strict-through
+fill rates rose from roughly `64.3%–66.8%` at 5 minutes to `81.9%–83.7%` at
+30 minutes. Maker results have no automatic gate and require a user decision;
+none reached the 8-bps/day framing. The 120-minute informational construction
+comparison did not establish a uniformly positive long-only-plus-cash or
+long-short tail construction, and it did not change C0/C1.
+
+The immutable root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/execution_edge_maker_54_047e2d2_20260827T201700Z
+
+Frozen-design, result, program-manifest, and log-inclusive final-audit SHA-256
+values are respectively
+`b358144752049d149305f4f7ecfc2021c1d224a176716efc4267b88e166018e7`,
+`f5bcdfbfd654be29e1c9c758ee0276d9eb386eefd1290b5dadb7be5e11939fb1`,
+`129dcfc09273d923948ea2c2dcf8e929885629776b2fc34b53d150ca1764aa86`,
+and `d040f12b0a43356a53c1d03070da5a4d7c9f24f1f8cb4054dd73d3251e37c364`.
+The audit passed over 21 retained artifacts / 495,173,023 bytes, including raw
+OHLC hashes, bucket definitions, 48 latency rows, 276,881 taker conditional
+rows, 36 taker frontiers, 163,440 maker conditional rows, 72 maker frontiers,
+24 positioning rows, decisions, definitions, and both logs. Official-validation
+and test access remained false. At the user's request, the paid GH200 is kept
+active after the completed audit for the immediately following experiments.

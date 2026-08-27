@@ -4088,3 +4088,59 @@ No bucket, state, horizon, wait, threshold, cost, sizing rule, decision,
 schedule, or interpretation may change after a forward outcome is computed.
 The canonical executable preregistration is
 `research/preregistrations/experiment54_edge_maker.md`.
+
+### Experiment 54 completion
+
+Exact frozen pre-score implementation/preregistration commit
+`047e2d2c3989175d46f1decee04247270b449556` reached local `main` and GitHub
+before any forward return or fill was computed. Windows Ruff/compile and 38
+focused tests passed; the exact Linux checkout repeated Ruff, compile, and the
+same 38 tests before freeze. Exact paid GH200 instance
+`e02aac505c884d129c8118577e671ed3` at `192.222.51.247` ran only the registered
+CPU analysis. Frozen-design SHA-256 was
+`b358144752049d149305f4f7ecfc2021c1d224a176716efc4267b88e166018e7`.
+
+The state exclusions retained 757,148, 734,479, and 727,940 eligible events on
+C/A/B respectively; first-refresh and other registered exclusions were
+recorded rather than imputed. Across folds, mean signed decision-open gross
+edge was `0.893317/1.233609/1.602609/2.292508` bps at
+`15/30/60/120` minutes. Moving to the next observed open reduced those means by
+`0.198878/0.225159/0.216071/0.219717` bps. Every registered entry/horizon and
+conditional state table was retained.
+
+At the frozen 7-bps taker hurdle, the best registered horizon was 120 minutes.
+The optimistic same-fold state-cell frontier measured `9.141462` expected NAV
+bps/day on A, `7.944564` on B, and `10.429961` on C. Because A and C cleared
+the inclusive 8-bps/day rule, the exact decision is `VIABLE`: a future learned
+policy may retain taker actions and uses all-cash CDI as its reward hurdle.
+This is explicitly an oracle feasibility bound rather than realized simulator
+PnL, acceptance, deployment, or a C0/C1 replacement.
+
+The best maker frontier was Fold A, 120-minute horizon, 15-minute wait, and the
+half-half-spread-improved limit at `3.917194` expected NAV bps/day. The same
+schedule produced `3.739960` on B and `3.856317` on C. Strict-through fill
+rates ranged `64.3%–66.8%` at 5 minutes, `76.1%–78.2%` at 15 minutes, and
+`81.9%–83.7%` at 30 minutes. No maker schedule reached the 8-bps/day framing;
+the preregistration provides no automatic maker verdict. The Part-C
+construction comparison was retained as information only and authorized no
+policy or deployment change.
+
+The immutable root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/execution_edge_maker_54_047e2d2_20260827T201700Z
+
+It retains raw high/low/close verification, exact frozen buckets, exclusions,
+48 latency rows, 276,881 taker-conditional rows, 36 taker frontiers and daily
+tables, 163,440 maker-conditional rows, 72 maker frontiers and daily tables,
+24 positioning rows, decisions, definitions, manifests, and both operational
+logs. Frozen-design, result, program-manifest, and log-inclusive final-audit
+SHA-256 values are respectively
+`b358144752049d149305f4f7ecfc2021c1d224a176716efc4267b88e166018e7`,
+`f5bcdfbfd654be29e1c9c758ee0276d9eb386eefd1290b5dadb7be5e11939fb1`,
+`129dcfc09273d923948ea2c2dcf8e929885629776b2fc34b53d150ca1764aa86`,
+and `d040f12b0a43356a53c1d03070da5a4d7c9f24f1f8cb4054dd73d3251e37c364`.
+The final audit passed over 21 artifacts / 495,173,023 bytes with
+`simulator_run=false`, `official_validation_accessed=false`, and
+`test_accessed=false`. Per the user's explicit keep-alive override, exact
+instance `e02aac505c884d129c8118577e671ed3` is not terminated after Experiment
+54 and is reserved for the immediately following experiments.
