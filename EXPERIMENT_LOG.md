@@ -3819,3 +3819,47 @@ also passed on the Windows development host. A float32 synthetic CPU replay of
 250 days × 405 session minutes × 150 names completed in 1.496 seconds and
 finished flat without forced fills on that fixture; this is a smoke measurement,
 not a production-data runtime guarantee.
+
+## Experiment 52 — C0 band-policy baseline (preregistered 2026-08-27)
+
+Status at registration: no Experiment-52 market cache, execution report,
+cell-fold readout, frictionless decomposition, rotation table, C0 designation,
+or net-economics number exists. The official-validation and held-out-test
+prediction sets are outside the input contract; the test remains permanently
+spent after Experiment 51.
+
+Experiment 52 is the first end-to-end measurement under the offline execution
+layer. It consumes only the completed Experiment-41 Stage-C store-v2 prune-R2
+seeds 11/29/47 on discovery Folds C/A/B. Each seed uses its already-frozen
+bidirectional opposite-parity Raw Patience-3 states. Per-seed raw predictions
+are tie-aware ranked over the causal store membership-and-readiness mask and
+uniformly averaged, then each fold is bound through the execution discovery
+manifest guard. No label mask participates in execution ranking.
+
+The real M1 bridge, causal liquidity with a 20-session lookback, one-completed-
+quarter-lagged Experiment-49 Roll schedule, prior-session Roll fallback, and a
+hash-pinned BCB SGS series-12 CDI artifact are the only market inputs. Sigma is
+the stored causal `vol_regime` field converted to dimensionless daily-return
+units as `PRICE_VOL_REFERENCE * sqrt(405) * exp(vol_regime)`; the canonical
+stored clipping is retained.
+
+The grid contains exactly 12 cells: bands `0.0/0.5/1.0/2.0` crossed with equal,
+30-minute-only, and `0.5/0.3/0.2` horizon blends. Every other execution setting
+remains at its default. Every measured cell-fold run receives one frictionless
+counterpart with zero fees and zero full spreads. Daily standard deviation uses
+`ddof=1`. Annualized net Sharpe is `sqrt(252) * mean/std`, and daily cost drag is
+spread plus fees divided by date count and initial NAV, expressed in bps.
+
+For each held-out fold, cell ranking uses mean annualized net Sharpe on the other
+two folds. C0 is the cell with the most rotation wins; a tie uses higher mean
+held-out Sharpe across all three folds. An exact residual tie fails closed.
+This is a reference designation with no promotion gate. All 36 measured results
+must be reported even if all are net-negative.
+
+The canonical preregistration is
+`research/preregistrations/experiment52_c0_baseline.md`. The implementation is
+`brazil_rv.execution.experiment52`; its targeted preflight passed 42 tests plus
+Ruff and compile checks. CPU execution only is permitted. No neural policy,
+trainer, OOF materializer, added cell, post-score parameter change, official or
+test prediction read, live interface, or prediction deployment change is in
+scope.
