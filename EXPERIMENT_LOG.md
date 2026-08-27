@@ -3878,3 +3878,16 @@ Terminal liquidation still requires an observed final open. This is causal,
 changes no frozen cell, source, parameter, readout, or designation rule, and
 passed all 42 focused execution/Experiment-52 tests plus Ruff and compile
 checks before any score existed.
+
+The refrozen replay then reached the registered end-of-session flattening step
+without any report having been written and found that some held names lacked an
+open in the exact final M1 slot. Operational repair commit
+`a30685620e92031db05b5493847f59b5c928aada` applies the predeclared forced-close
+rule at each name's last observed session open and spread when the final slot is
+unobserved. It still applies the frozen 2x spread multiplier, ignores the
+ordinary participation cap only for that counted terminal fill, never creates
+an observed bar, and fails if a held name has no prior observed priced open.
+The registered 30-minute taper, 12-cell grid, inputs, metrics, and C0 rule are
+unchanged. The focused suite passed 43 tests plus Ruff and compile checks before
+any measured or frictionless report existed; official-validation and test
+access remained false.
