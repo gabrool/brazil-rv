@@ -1004,15 +1004,45 @@ same-quarter schedule is not causal for execution decisions.
 Actions fill at the next observed minute open. Holdings are marked open-to-open;
 half-spread and per-side fees are charged once on traded notional. Participation
 and projected-target caps constrain convergence; price-move breaches de-risk only
-as recorded liquidity permits. A linear close taper targets zero at the final
-open, and any remaining terminal position is force-filled at the recorded spread
-multiplier and counted, independent of the ordinary participation/profile gate.
-A held position may not cross an unobserved open: missing prices are never
-interpolated or stale-filled. Cash accrual uses an explicit dated CDI input and
-one configurable margin formula. No canonical daily CDI execution series
-currently exists, so runs must supply and hash-record one.
+as recorded liquidity permits. A missing open creates neither a mark nor a fill:
+the holding retains its last observed notional and realizes the cumulative
+return when the next observed open arrives. A transient rank-validity mask that
+cannot support exact signed cap capacity retains the last feasible projected
+target; the hard neutral/gross/cap projection is never relaxed.
+
+A linear close taper targets zero at the final open, and any remaining terminal
+position is force-filled at the recorded spread multiplier and counted,
+independent of the ordinary participation/profile gate. When the exact final M1
+slot is unobserved, this explicit offline approximation uses the name's last
+observed session open and spread without changing the observation mask. Cash
+accrual uses an explicit dated CDI input and one configurable margin formula. No
+canonical daily CDI execution series currently exists, so runs must supply and
+hash-record one.
 
 The baseline policy is the deterministic no-trade-band policy. Neural-policy
 training, OOF refits, cluster penalties, parameter tuning, round lots, impact,
 and live routing are not part of this implementation. No experiment, training,
 official-validation access, or test access was performed while adding it.
+
+## First execution reference — Experiment 52 C0 (2026-08-27)
+
+Experiment 52 ran the frozen 12-cell no-trade-band grid on discovery Folds
+C/A/B with exact measured spreads/fees and matched frictionless counterparts.
+The rotation rule designated `band_2p0__blend_equal` as C0: band `2.0` and
+equal 30/60/120-minute horizon weights. It won all three rotations. All 36
+measured cells were net-negative. Across the three C0 fold windows, gross PnL
+was `R$2.909m`, measured net PnL was `-R$14.910m`, and the frictionless
+counterpart was `+R$3.373m`; spread plus fee drag was `R$18.123m` on
+`R$26.534bn` turnover. C0 is the reference future execution policies must beat,
+not a live policy, promotion, or prediction-recipe change.
+
+The immutable program root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/execution_c0_52_e380cd7_20260827T164738Z
+
+Its frozen-design and final-audit SHA-256 values are
+`5906da60ec6d1179f20ed368f0e519973c173fc968ee7467936d08e8c1687f41`
+and `b7591bb6464da90aa3324dced14ebf04e2e29245043b2719b76fb75bbdbd061f`.
+The audit covers all 72 reports plus input hashes, repair provenance, rotation,
+C0 designation, and logs. Official-validation and test predictions were not
+accessed.

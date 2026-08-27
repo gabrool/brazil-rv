@@ -3891,3 +3891,53 @@ The registered 30-minute taper, 12-cell grid, inputs, metrics, and C0 rule are
 unchanged. The focused suite passed 43 tests plus Ruff and compile checks before
 any measured or frictionless report existed; official-validation and test
 access remained false.
+
+After 44 reports had been written, the replay reached one transient
+rank-validity cross-section whose signed cap capacity could not support the
+exact neutral gross target. The hard projection correctly failed rather than
+relaxing gross or caps. Post-score operational repair commit
+`e36b8bc9fdd95072d0b30ccd45159fbad217015c` retains the last feasible projected
+target only for such an infeasible refresh and adds hash-verified report resume;
+the hard constraints, target grid, and every completed number are unchanged.
+Before resume, all 44 JSON reports and 44 checksum sidecars were inventoried at
+SHA-256 `b67dce2da2823733ee0d0836c292a31954d8d51ac69774066a243571be520df5`.
+The resumed program reloaded those reports only after verifying their config,
+input map, payload, and sidecar hashes. The focused suite passed 45 tests plus
+Ruff, format, and compile checks. The final manifest records the exact
+operational repair commit; official-validation and test access remained false.
+
+Experiment 52 completed with all 36 measured and 36 frictionless cell-fold
+reports. The frozen rotation rule designated `band_2p0__blend_equal` as C0:
+band `2.0` with the equal `(1/3,1/3,1/3)` horizon blend. It won all three
+two-fold rotations. Its measured annualized net Sharpes on Folds C/A/B were
+`-21.085379`, `-12.272587`, and `-14.234936`. All 36 measured cells were
+net-negative; the least-negative cell-fold net PnL was `-R$4,218,309.36` and
+the most negative was `-R$18,474,688.45`.
+
+Across the three C0 fold windows, gross PnL was `R$2,908,868.36`, while spread
+cost was `R$12,816,563.05`, fees were `R$5,306,864.17`, CDI was
+`R$304,193.79`, and measured net PnL was `-R$14,910,365.07` on
+`R$26,534,320,864.54` turnover with 16,052 counted forced fills. The exact
+frictionless counterpart was positive by `R$3,372,629.98` in aggregate; its
+fold Sharpes were `0.157567`, `4.863886`, and `4.965943` on C/A/B. This is the
+registered execution reference, not a deployment or prediction-model change.
+The result plainly attributes the sign reversal to the measured execution-cost
+and turnover structure.
+
+The immutable completed root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/execution_c0_52_e380cd7_20260827T164738Z
+
+Frozen-design, program-manifest, market-input-manifest, cell-summary, rotation,
+C0-designation, and final-audit SHA-256 values are respectively
+`5906da60ec6d1179f20ed368f0e519973c173fc968ee7467936d08e8c1687f41`,
+`cc7d84a0ff52420221f1eb13f574f4857109cb08396e5b28cfb4f547771cd21e`,
+`72acb435973015199eb7fb3b85d41afc75ebc117457fc231a817637e5df14d77`,
+`a05f62d33379616fba1ddcae8aa3020b52a1891023ea5f3ea8911c881d016e6d`,
+`124e619871f848ff582b238a963740cd6058d25ba1a63cff9c94beba7dfa54da`,
+`d18b97df11891b95e5e6b2ae226155e5569bdd6341d618c7bd624655b8e4de5f`,
+and `b7591bb6464da90aa3324dced14ebf04e2e29245043b2719b76fb75bbdbd061f`.
+The final audit passed over 182 files / 405,197,467 bytes, including every
+prediction wrapper, causal market/CDI artifact, report and checksum, repair
+inventory, and operational log. C0 does not access official-validation or test
+predictions; both flags are false.
