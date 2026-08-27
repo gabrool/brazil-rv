@@ -3526,3 +3526,28 @@ its identity, attached filesystem, and termination action were reverified.
 Provider inventory confirmed the exact ID absent independently at
 `2026-08-26T16:33:18Z` and again at `2026-08-26T16:33:28Z`; the account had
 zero active instances and no paid host was left idle.
+
+## Experiments 49 and 50 — economics robustness and read event 5 (frozen 2026-08-26)
+
+Status at registration: no Experiment-49 derived number exists and no
+Experiment-50 trajectory or official prediction has been accessed. The complete
+frozen contracts and pre-score implementation resolutions are in
+`research/preregistrations/experiment49_economics.md` and
+`research/preregistrations/experiment50_nextgen_read.md`.
+
+Experiment 49 is a zero-GPU audit of the archived Experiment-48 four-head and
+store-v2 comparator discovery predictions. It measures quarterly Roll spreads,
+recomputes IC under exactly open-to-open and adjacent-close-midpoint labels,
+localizes IC by spread tercile, and runs the fixed top-80 executable 15m/30m
+books. Its three-part KEEP/DROP rule fixes Experiment 50's head count before any
+official result exists. Price-only Roll estimates may extend through 2025-06-30;
+official model predictions and the held-out test remain sealed.
+
+Experiment 50 is official-validation access event 5. It contains exactly one
+ten-seed R1-depth-4, temperature-1.00 next-generation arm and the immutable
+deployed Experiment-45 ten-seed comparator. Deployment requires the paired
+block-10 lower 95% bound to be at least `-0.0005`, inclusive. The optional 15m
+official score is decision-neutral. No second read, pool, alternate arm,
+weighting search, or test access is allowed. After complete artifact audit,
+reviewed checkpoint cleanup, result-log commit, and push, the exact paid instance
+must be terminated and verified absent twice.
