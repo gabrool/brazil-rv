@@ -808,6 +808,7 @@ def _build_full_market_cache(
     security_ids = tuple(equity["security_id"])
     shape = (requested_idx.size, EQUITY_SESSION_MINUTES, len(security_ids))
     open_price = np.zeros(shape, dtype=np.float32)
+    close_price = np.zeros(shape, dtype=np.float32)
     observed = np.zeros(shape, dtype=bool)
     minute_notional = np.full(shape, np.nan, dtype=np.float32)
     active = np.zeros((requested_idx.size, len(security_ids)), dtype=bool)
@@ -828,6 +829,7 @@ def _build_full_market_cache(
         )
         slot = grid.equity_slot
         open_price[:, :, slot] = grid.open_price[source_position]
+        close_price[:, :, slot] = grid.close[source_position]
         observed[:, :, slot] = grid.observed[source_position]
         minute_notional[:, :, slot] = profile[source_position, :, 0]
         active[:, slot] = grid.active[source_position]
@@ -852,6 +854,7 @@ def _build_full_market_cache(
         for name, values in {
             "date_idx.npy": requested_idx,
             "open_price.npy": open_price,
+            "close_price.npy": close_price,
             "open_observed.npy": observed,
             "active.npy": active,
             "adv20_brl.npy": adv,
@@ -863,7 +866,7 @@ def _build_full_market_cache(
     selected.write_parquet(temporary / "dates.parquet")
     artifacts["dates.parquet"] = _artifact(temporary / "dates.parquet")
     manifest = {
-        "schema": "EXPERIMENT56_TRAIN_MARKET_INPUTS_V1",
+        "schema": "EXPERIMENT56_TRAIN_MARKET_INPUTS_V2",
         "created_at": _now(),
         "store_manifest": design["store"]["manifest"],
         "roll_schedule": roll_record,

@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from datetime import date
+from types import SimpleNamespace
+
 import numpy as np
+import polars as pl
+import pytest
 import torch
 
+from brazil_rv.execution import experiment57
 from brazil_rv.execution.config import ExecutionConfig
 from brazil_rv.execution.experiment57 import (
     RulePathPolicy,
@@ -11,6 +17,44 @@ from brazil_rv.execution.experiment57 import (
     neutrality_free_projection,
 )
 from brazil_rv.execution.simulator import MarketReplay, simulate
+
+
+def test_event_bundle_uses_train_cache_close_prices(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    market = tmp_path / "market_inputs"
+    market.mkdir()
+    pl.DataFrame({"date_idx": [0], "trade_date": [date(2024, 1, 2)]}).write_parquet(
+        market / "dates.parquet"
+    )
+    arrays = {
+        "open_price.npy": np.ones((1, 2, 1), dtype=np.float32),
+        "close_price.npy": np.full((1, 2, 1), 2.0, dtype=np.float32),
+        "open_observed.npy": np.ones((1, 2, 1), dtype=bool),
+        "adv20_brl.npy": np.ones((1, 1), dtype=np.float32),
+        "full_spread.npy": np.ones((1, 1), dtype=np.float32),
+        "sigma_daily.npy": np.ones((1, 1), dtype=np.float32),
+        "minute_notional20_brl.npy": np.ones((1, 2, 1), dtype=np.float32),
+    }
+    monkeypatch.setattr(experiment57, "_load_cache_array", lambda _root, name: arrays[name])
+    events = {"day": np.array([0])}
+    monkeypatch.setattr(experiment57, "build_state_events", lambda **_kwargs: (events, None))
+
+    def edge(*_args, **kwargs):
+        assert np.array_equal(kwargs["close_price"], arrays["close_price.npy"])
+        return np.array([1.0])
+
+    monkeypatch.setattr(experiment57, "forward_edge_bps", edge)
+    monkeypatch.setattr(experiment57, "_to_close_edge_bps", edge)
+    archive = SimpleNamespace(
+        ranks=np.zeros((1, 2, 1, 4)),
+        valid=np.ones((1, 2, 1, 4), dtype=bool),
+        refresh_minutes=np.array([0]),
+    )
+    _, _, dates = experiment57._event_bundle(
+        tmp_path, {"inputs": {"bucket_definitions": {}}}, archive
+    )
+    assert len(dates) == 1
 
 
 def test_cross_fold_conditional_means_exclude_evaluation_day() -> None:
@@ -98,4 +142,3 @@ def test_simulator_accepts_registered_neutrality_free_bounded_book() -> None:
         ),
     )
     assert torch.isfinite(result.net_pnl_brl).all()
-

@@ -4510,3 +4510,17 @@ deployed gross/NAV to graduate; an all-cash float residual can never graduate
 again. If both pass, the neural ladder must strictly beat the teacher's pooled
 excess or the simpler teacher stands. No deployment change, official-validation
 read, or test read is authorized.
+
+The first Stage-0 launch stopped before a conditional-mean table, rule path,
+simulation, threshold selection, or score was written. Its TRAIN market bridge
+contained 716 sessions, while the mistakenly bound Experiment-54 raw close
+array contained the 309-session prior evaluation axis, so the mandatory shape
+check failed before edge construction. The excluded root records that the
+Experiment-54 close artifact was hash- and shape-read; no price value entered a
+calculation. The bounded repair removes that raw evaluation artifact from the
+Stage-0 design and carries the matching causal TRAIN close grid through the
+existing market-cache builder beside its open grid. It changes no sample,
+horizon, edge definition, rule, threshold, execution parameter, or score. A
+regression now requires Stage 0 to consume the cached TRAIN close array. The
+score-free failed root is retained at
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment57_stage0_fa1629e_20260828T211350Z`.

@@ -151,9 +151,6 @@ def freeze_stage0(
                 "experiment54_result": _source_artifact(
                     experiment54_root, "experiment54_result.json"
                 ),
-                "close_price": _source_artifact(
-                    experiment54_root, "raw_ohlc/close_price.npy"
-                ),
                 "experiment52_root": str(experiment52_root.resolve()),
                 "experiment52_result": _source_artifact(
                     experiment52_root, "c0_designation.json"
@@ -218,12 +215,8 @@ def _event_bundle(
         .sort("date_idx")["trade_date"]
     )
     open_price = np.asarray(_load_cache_array(root, "open_price.npy"))
+    close_price = np.asarray(_load_cache_array(root, "close_price.npy"))
     observed = np.asarray(_load_cache_array(root, "open_observed.npy"))
-    close_record = design["inputs"]["close_price"]
-    close_path = Path(str(close_record["path"]))
-    if _sha256(close_path) != close_record["sha256"]:
-        raise ValueError("Experiment 57 close-price source hash differs")
-    close_price = np.asarray(np.load(close_path, mmap_mode="r"))
     if close_price.shape != open_price.shape:
         raise ValueError("Experiment 57 close prices differ from the TRAIN market axis")
     events, _ = build_state_events(
