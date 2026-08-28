@@ -4401,3 +4401,16 @@ with replay length, retaining the old 64-ULP floor. It changes no position,
 fill, cost, PnL component, objective, split, policy parameter, score, or access
 rule. The score-free failed root is retained at
 `/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment56_section_c_0bbf178_20260828T155238Z`.
+
+The next fresh Section-C launch also stopped before its first history,
+checkpoint, selection objective, or evaluation score. The first fit objective
+was finite, but the zero-initialized bounded projection evaluated an unused
+`gross / tiny` branch. In float32 its denominator derivative overflowed; the
+subsequent masked zero times infinity made every policy gradient NaN. The
+bounded pre-score repair replaces only that unused denominator with one when
+gross scaling is inactive. The forward projection is bit-for-bit unchanged:
+when scaling is active it still divides by the same positive neutral gross,
+and when inactive the selected scale remains exactly one. A float32 zero-kink
+gradient regression now protects this contract. No optimizer update, policy
+artifact, or score from the failed launch is retained. Its score-free root is
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment56_section_c_fd1a001_20260828T160308Z`.

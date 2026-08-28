@@ -155,3 +155,16 @@ def test_bounded_projection_masks_output_and_gradient_at_zero_kink() -> None:
     assert torch.equal(result, torch.zeros_like(result))
     assert gradient[mask].abs().sum() > 0
     assert torch.equal(gradient[~mask], torch.zeros(1, dtype=torch.float64))
+
+
+def test_bounded_projection_zero_kink_has_finite_float32_gradient() -> None:
+    raw = torch.zeros(5, dtype=torch.float32, requires_grad=True)
+    mask = torch.tensor([True, True, False, True, True])
+    result = project_weights_bounded(raw, mask, 0.5, 1.0)
+    gradient = torch.autograd.grad(
+        result @ torch.arange(1.0, 6.0, dtype=torch.float32), raw
+    )[0]
+
+    assert torch.isfinite(gradient).all()
+    assert gradient[mask].abs().sum() > 0
+    assert torch.equal(gradient[~mask], torch.zeros(1, dtype=torch.float32))

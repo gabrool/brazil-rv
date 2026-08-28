@@ -207,9 +207,13 @@ def project_weights_bounded(
     )
     neutral = long * long_scale.unsqueeze(-1) - short * short_scale.unsqueeze(-1)
     neutral_gross = neutral.abs().sum(dim=-1)
+    needs_gross_scale = neutral_gross > gross
+    gross_denominator = torch.where(
+        needs_gross_scale, neutral_gross, torch.ones_like(neutral_gross)
+    )
     gross_scale = torch.where(
-        neutral_gross > gross,
-        gross / neutral_gross.clamp_min(tiny),
+        needs_gross_scale,
+        gross / gross_denominator,
         1,
     )
     projected = neutral * gross_scale.unsqueeze(-1)
