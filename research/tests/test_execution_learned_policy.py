@@ -302,6 +302,38 @@ def test_untrained_neural_policy_is_all_cash_and_earns_exact_cdi() -> None:
     )
 
 
+def test_float32_training_ignores_nontradeable_nan_capacity_gradient() -> None:
+    config = _config()
+    base = _batch(edge=True)
+    adv = base.market.adv20_brl.float().clone()
+    adv[:, 0] = torch.nan
+    active = base.market.active.clone()
+    active[:, 0] = False
+    market = replace(
+        base.market,
+        open_price=base.market.open_price.float(),
+        full_spread=base.market.full_spread.float(),
+        adv20_brl=adv,
+        minute_notional20_brl=base.market.minute_notional20_brl.float(),
+        daily_cdi_rate=base.market.daily_cdi_rate.float(),
+        active=active,
+    )
+    batch = PolicyBatch(
+        market,
+        base.ranks.float(),
+        base.rank_valid,
+        base.refresh_mask,
+        base.sigma.float(),
+    )
+    policy = NeuralPolicy(config, seed=29).float()
+    trainer = PolicyTrainer(policy, config, PolicyTrainerConfig(seed=29))
+
+    metrics = trainer.train_step(batch)
+
+    assert math.isfinite(metrics.gradient_norm)
+    assert all(torch.isfinite(value).all() for value in policy.state_dict().values())
+
+
 def test_trainer_learns_planted_edge_and_noise_stays_all_cash() -> None:
     config = _config()
     edge_batch = _batch(edge=True)
