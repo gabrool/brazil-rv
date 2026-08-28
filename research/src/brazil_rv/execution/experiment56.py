@@ -684,7 +684,7 @@ def freeze_section_c(
 ) -> Path:
     section_a, _ = _verified_result(section_a_root.resolve(), "result.json")
     section_b, _ = _verified_result(section_b_root.resolve(), "result.json")
-    _verified_result(experiment52_root.resolve(), "experiment52_result.json")
+    _verified_result(experiment52_root.resolve(), "c0_designation.json")
     _verified_result(experiment53_root.resolve(), "experiment53_result.json")
     if section_a.get("abort") is not False:
         raise RuntimeError("Section A aborts policy training")
@@ -726,7 +726,7 @@ def freeze_section_c(
                 "oof_archive": archive,
                 "experiment52_root": str(experiment52_root.resolve()),
                 "experiment52_result": _artifact(
-                    experiment52_root / "experiment52_result.json"
+                    experiment52_root / "c0_designation.json"
                 ),
                 "experiment53_root": str(experiment53_root.resolve()),
                 "experiment53_result": _artifact(

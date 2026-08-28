@@ -4377,3 +4377,14 @@ its complete artifact inventory. The bounded pre-score repair accepts either
 audit representation only when the exact result-file SHA-256 matches. It
 changes no input, frontier, bucket, cost, allocator, fold, horizon, gate, or
 access rule.
+
+Section B subsequently completed all 50 frozen trajectories and all 1,000
+epochs. Its archive covers exactly 716 TRAIN dates; the fit-exclusion chain,
+loader verification, archive hashes, checkpoint cleanup, and access flags all
+passed. Before Section C was frozen or any policy score existed, its first
+freeze attempt stopped because the source binder requested the nonexistent
+generic name `experiment52_result.json`. Experiment 52's audited canonical
+result is `c0_designation.json`, bound by SHA-256 in its passed final-audit
+inventory. The bounded pre-score repair changes only that source filename; it
+does not change any Section-C input root, split, embargo, lambda, seed,
+objective, execution parameter, score, or access rule.
