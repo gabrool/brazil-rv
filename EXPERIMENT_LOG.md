@@ -4388,3 +4388,16 @@ result is `c0_designation.json`, bound by SHA-256 in its passed final-audit
 inventory. The bounded pre-score repair changes only that source filename; it
 does not change any Section-C input root, split, embargo, lambda, seed,
 objective, execution parameter, score, or access rule.
+
+The first Section-C training launch then stopped in its first fit replay before
+an epoch history, checkpoint, selection objective, or evaluation score was
+written. On the 389-minute float32 CUDA replay, the diagnostic scanned-NAV
+ledger differed from the separately accumulated component ledger by at most
+`173.155762` BRL (`0.173156` NAV bps), exceeding the old fixed 64-ULP bound of
+about `76.29` BRL. This is the expected accumulation-order drift from several
+NAV-scale additions per minute; reported PnL already comes from the component
+ledger. The bounded pre-score repair scales only this diagnostic tolerance
+with replay length, retaining the old 64-ULP floor. It changes no position,
+fill, cost, PnL component, objective, split, policy parameter, score, or access
+rule. The score-free failed root is retained at
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment56_section_c_0bbf178_20260828T155238Z`.

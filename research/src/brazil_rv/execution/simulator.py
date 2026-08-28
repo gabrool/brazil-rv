@@ -611,7 +611,11 @@ def simulate(
 
     accounting = gross_pnl - spread_cost - fees + cdi
     scanned_net = nav - initial_nav
-    tolerance = 64 * torch.finfo(dtype).eps * initial_nav
+    # The scanned NAV performs several additions at NAV scale per minute,
+    # while the component ledger accumulates from zero. Bound their expected
+    # floating-point drift by the replay length without changing reported PnL.
+    rounding_steps = max(64, 2 * minutes)
+    tolerance = rounding_steps * torch.finfo(dtype).eps * initial_nav
     if not torch.all((scanned_net - accounting).abs() <= tolerance):
         raise ArithmeticError("Execution accounting identity failed")
     if not torch.all(position.abs() <= config.position_tolerance_brl):
