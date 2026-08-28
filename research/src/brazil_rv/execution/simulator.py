@@ -50,6 +50,7 @@ class SimulationResult:
     positions_brl: torch.Tensor | None = None
     fills_brl: torch.Tensor | None = None
     carried_demand_brl: torch.Tensor | None = None
+    target_weights: torch.Tensor | None = None
 
 
 def tradeable_universe(market: MarketReplay, config: ExecutionConfig) -> torch.Tensor:
@@ -254,6 +255,7 @@ def simulate(
     positions = [position]
     fills = [torch.zeros_like(position)]
     carried = [torch.zeros_like(position)]
+    targets = [torch.zeros_like(position)]
     interval_cdi = torch.expm1(torch.log1p(market.daily_cdi_rate) / (minutes - 1))
     interval_cdi = interval_cdi.to(device=device, dtype=dtype)
 
@@ -605,6 +607,7 @@ def simulate(
             positions.append(position)
             fills.append(total_fill)
             carried.append(residual)
+            targets.append(base_target)
 
     accounting = gross_pnl - spread_cost - fees + cdi
     scanned_net = nav - initial_nav
@@ -644,4 +647,5 @@ def simulate(
         positions_brl=torch.stack(positions, dim=1) if return_path else None,
         fills_brl=torch.stack(fills, dim=1) if return_path else None,
         carried_demand_brl=torch.stack(carried, dim=1) if return_path else None,
+        target_weights=torch.stack(targets, dim=1) if return_path else None,
     )

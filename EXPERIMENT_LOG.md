@@ -4331,3 +4331,41 @@ manifests, 180 epochs, 180 prediction archives, six analysis tables, the target
 sidecar, checkpoint cleanup, both operational logs, and a complete file hash
 inventory. `official_validation_accessed=false` and `test_accessed=false`;
 the permanently spent held-out test was not read again.
+
+## Experiment 56 — four-head OOF and learned execution policy (preregistered 2026-08-28)
+
+Experiment 56 is registered before any new forward outcome, conditional edge,
+OOF calibration, policy objective, or evaluation score exists. The exact
+contract is `research/preregistrations/experiment56_policy.md`. The program has
+three separately frozen, commit-bound sections.
+
+Section A records the standing research decision that the Experiment-55
+to-close head is adopted as an execution-layer input on its own capability and
+economic evidence. This does not rewrite the historical Experiment-55 result
+and does not change the deployed Experiment-45 prediction recipe. The retained
+Experiment-55 candidate archives will be replayed through the exact
+Experiment-54 state, cost, and capacity contracts. The four-head total frontier
+allows exactly one deterministic best expected-net horizon per name/refresh,
+preventing horizon double counting. Sections B/C abort only if that total is
+below the best threshold-7 three-head frontier on at least two folds.
+
+If the gate proceeds, Section B trains exactly 50 monitor-free four-head OOF
+trajectories: five purged TRAIN folds by the ten frozen seeds, 20 epochs, final
+EMA 0.995, maximum two processes. Section C then trains exactly 18 NeuralPolicy
+runs on OOF ranks: C/A/B by lambdas 0.02/0.10 by seeds 11/29/47. Each evaluation
+window uses only dates ending before a five-session embargo; the last floor-20%
+of those dates selects the checkpoint and all earlier dates fit it. Patience is
+10 under the exact bps objective `mean(net - all-cash CDI) - lambda *
+population_std(net)`, with a 100-epoch operational ceiling. A window's lambda
+is chosen by mean selection objective across all three seeds. Graduation is
+strictly and only positive pooled daily net excess over all-cash CDI after
+averaging the three designated-policy seed replicas by date.
+
+The exact paid GH200 claimed for this program is
+`16d1f1be8d0d4261a5583f27d4cd3ff0` at `192.222.51.247`, attached to
+`brazil-rv-east3`. It was bootstrapped at commit
+`4042723555365c6807c0459b7a146e0c1f0c5fd8`; no training or Experiment-56 score
+has yet run. Official validation and the permanently spent held-out test remain
+inaccessible. After all required roots, results, diagnostics, histories,
+designated checkpoints, logs, and hashes are secured and pushed, only this
+exact instance will be terminated and its absence verified twice.

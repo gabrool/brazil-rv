@@ -85,6 +85,12 @@ def test_costs_next_open_and_accounting_match_golden_example() -> None:
     )
 
     assert result.positions_brl is not None and result.fills_brl is not None
+    assert result.target_weights is not None
+    assert result.target_weights.shape == result.positions_brl.shape
+    torch.testing.assert_close(
+        result.target_weights[0, 1],
+        torch.tensor([-0.5, 0.5], dtype=torch.float64),
+    )
     torch.testing.assert_close(
         result.fills_brl[:, 0], torch.zeros((1, 2), dtype=torch.float64)
     )

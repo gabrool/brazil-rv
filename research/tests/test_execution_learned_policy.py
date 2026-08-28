@@ -479,6 +479,26 @@ def test_training_and_selection_hooks_are_deterministic(tmp_path) -> None:
         semantic_mismatch.load_checkpoint(checkpoint_path)
 
 
+def test_policy_objective_is_exact_bps_mean_minus_population_standard_deviation() -> (
+    None
+):
+    net = torch.tensor([1_100.0, 900.0, 1_300.0], dtype=torch.float64)
+    cdi = torch.tensor([0.0001, 0.0001, 0.0001], dtype=torch.float64)
+
+    objective, excess, standard_deviation = policy_objective(
+        net, cdi, 1_000_000.0, 0.10
+    )
+
+    expected_excess = (net - 100.0) / 100.0
+    expected_net_bps = net / 100.0
+    torch.testing.assert_close(excess, expected_excess)
+    torch.testing.assert_close(standard_deviation, expected_net_bps.std(correction=0))
+    torch.testing.assert_close(
+        objective,
+        expected_excess.mean() - 0.10 * expected_net_bps.std(correction=0),
+    )
+
+
 def test_sam_and_scan_checkpointing_are_available_but_opt_in() -> None:
     config = _config()
     trainer = PolicyTrainer(

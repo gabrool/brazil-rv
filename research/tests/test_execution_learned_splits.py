@@ -11,6 +11,7 @@ from brazil_rv.execution.splits import (
     policy_evaluation_slices,
     purged_training_folds,
 )
+from brazil_rv.execution.experiment56 import policy_splits
 
 
 def _dates() -> tuple[date, ...]:
@@ -107,6 +108,22 @@ def test_policy_slices_reproduce_c_a_b_windows() -> None:
     assert slices[2].dates == training_dates[614:716]
     assert set(slices[0].dates).isdisjoint(slices[1].dates)
     assert set(slices[1].dates).isdisjoint(slices[2].dates)
+
+
+def test_experiment56_policy_splits_are_chronological_and_five_sessions_embargoed() -> (
+    None
+):
+    fit_c = tuple(date(2022, 1, 1) + timedelta(days=index) for index in range(407))
+    select_c = tuple(date(2023, 4, 3) + timedelta(days=index) for index in range(105))
+    remaining = tuple(date(2023, 9, 1) + timedelta(days=index) for index in range(204))
+
+    splits = policy_splits(fit_c + select_c + remaining)
+
+    assert [len(split.selection) for split in splits] == [80, 101, 121]
+    assert [len(split.fit) for split in splits] == [322, 406, 488]
+    for split in splits:
+        assert split.fit[-1] < split.selection[0]
+        assert split.selection[-1] + 6 == split.evaluation[0]
 
 
 def test_split_contract_rejects_unregistered_design_and_malformed_policy_axis() -> None:

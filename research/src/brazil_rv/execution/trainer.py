@@ -53,9 +53,9 @@ class PolicyTrainerConfig:
 
 @dataclass(frozen=True)
 class TrainStepMetrics:
-    objective_brl: float
-    mean_excess_pnl_brl: float
-    daily_net_pnl_variance_brl2: float
+    objective_bps: float
+    mean_excess_pnl_bps: float
+    daily_net_pnl_std_bps: float
     gradient_norm: float
 
 
@@ -65,16 +65,14 @@ def policy_objective(
     nav_brl: float,
     risk_aversion: float,
 ) -> tuple[Tensor, Tensor, Tensor]:
-    """Return objective, daily excess PnL, and population PnL variance.
-
-    ``risk_aversion`` has units BRL^-1 because the objective is intentionally in
-    BRL, matching the registered policy contract.
-    """
+    """Return the registered bps objective, excess PnL, and PnL standard deviation."""
     all_cash_cdi = daily_cdi_rate.to(net_pnl_brl) * nav_brl
-    excess = net_pnl_brl - all_cash_cdi
-    variance = net_pnl_brl.var(correction=0)
-    objective = excess.mean() - risk_aversion * variance
-    return objective, excess, variance
+    scale = 10_000.0 / nav_brl
+    excess_bps = (net_pnl_brl - all_cash_cdi) * scale
+    net_bps = net_pnl_brl * scale
+    standard_deviation_bps = net_bps.std(correction=0)
+    objective_bps = excess_bps.mean() - risk_aversion * standard_deviation_bps
+    return objective_bps, excess_bps, standard_deviation_bps
 
 
 class PolicyTrainer:
@@ -126,7 +124,7 @@ class PolicyTrainer:
         )
 
     def _sam_step(self, batch: PolicyBatch) -> tuple[Tensor, Tensor, Tensor, Tensor]:
-        objective, excess, variance = self._objective(batch)
+        objective, excess, standard_deviation = self._objective(batch)
         (-objective).backward()
         parameters = [
             parameter
@@ -155,15 +153,15 @@ class PolicyTrainer:
                     parameters, perturbations, strict=True
                 ):
                     parameter.sub_(perturbation)
-        return objective, excess, variance, gradient_norm
+        return objective, excess, standard_deviation, gradient_norm
 
     def train_step(self, batch: PolicyBatch) -> TrainStepMetrics:
         self.policy.train()
         self.optimizer.zero_grad(set_to_none=True)
         if self.config.use_sam:
-            objective, excess, variance, preclip_norm = self._sam_step(batch)
+            objective, excess, standard_deviation, preclip_norm = self._sam_step(batch)
         else:
-            objective, excess, variance = self._objective(batch)
+            objective, excess, standard_deviation = self._objective(batch)
             (-objective).backward()
             preclip_norm = clip_grad_norm_(
                 self.policy.parameters(), self.config.gradient_clip_norm
@@ -174,9 +172,9 @@ class PolicyTrainer:
             )
         self.optimizer.step()
         return TrainStepMetrics(
-            objective_brl=float(objective.detach()),
-            mean_excess_pnl_brl=float(excess.detach().mean()),
-            daily_net_pnl_variance_brl2=float(variance.detach()),
+            objective_bps=float(objective.detach()),
+            mean_excess_pnl_bps=float(excess.detach().mean()),
+            daily_net_pnl_std_bps=float(standard_deviation.detach()),
             gradient_norm=float(preclip_norm.detach()),
         )
 
