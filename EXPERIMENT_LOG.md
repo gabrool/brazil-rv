@@ -4239,6 +4239,8 @@ The bounded operational repair maps `date_idx` to `trade_date` explicitly and
 uses those same absolute indices when selecting the frozen C/A/B calibration
 dates. It changes no fold, embargo, seed, recipe, member prediction, rank
 averaging, weight, target, gate, or access rule. The 50 completed trajectories
-are reused without retraining. A focused nonzero-index regression test protects
-the repaired axis contract; official validation and the permanently spent test
-remain unopened.
+are reused without retraining; a changed code commit is accepted only after all
+50 hash-valid source runs from the frozen commit exist. The aggregate source
+manifest, result, and audit record the frozen and operational-repair commits
+separately. A focused nonzero-index regression test protects the repaired axis
+contract; official validation and the permanently spent test remain unopened.

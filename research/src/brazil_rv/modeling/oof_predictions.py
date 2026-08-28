@@ -457,14 +457,26 @@ def _validate_design(root: Path) -> dict[str, object]:
     digest = expected.pop("sha256", None)
     if digest != _canonical_sha256(expected):
         raise ValueError("OOF frozen-design hash differs")
-    if design.get("repository_commit") != repository_commit():
-        raise ValueError("Repository commit differs from the OOF frozen design")
     store = Path(str(design["store"]["path"]))
     if feature_store_identity(store) != design["store"]["identity"]:
         raise ValueError("OOF feature-store identity differs")
     rows = load_sample_index(store, through=TRAIN_END)
     dates = tuple(rows.get_column("trade_date").unique().sort().to_list())
-    load_purged_training_folds(root / "purged_folds.json", dates)
+    folds = load_purged_training_folds(root / "purged_folds.json", dates)
+    if design.get("repository_commit") != repository_commit():
+        for fold in folds.folds:
+            for seed in OOF_SEEDS:
+                manifest_path = _run_path(root, fold.name, seed) / "run_manifest.json"
+                if (
+                    not _run_manifest_valid(
+                        manifest_path, fold, seed, design["store"]["identity"]
+                    )
+                    or _read_json(manifest_path).get("repository_commit")
+                    != design.get("repository_commit")
+                ):
+                    raise ValueError(
+                        "Repository commit differs before all frozen OOF runs completed"
+                    )
     return design
 
 
@@ -539,6 +551,11 @@ def _materialize_from_runs(
                 to_close=to_close,
             ):
                 raise ValueError(f"OOF source run differs: {fold.name}/seed_{seed}")
+            if (
+                not to_close
+                and manifest.get("repository_commit") != design["repository_commit"]
+            ):
+                raise ValueError("OOF source run repository commit differs")
             prediction_path = run / "predictions" / "epoch_20.npz"
             reference_path = run / "heldout_reference.npz"
             if (
@@ -630,6 +647,7 @@ def _materialize_from_runs(
         "status": "completed",
         "created_at": _now(),
         "repository_commit": repository_commit(),
+        "frozen_repository_commit": design["repository_commit"],
         "feature_store_identity": design["store"]["identity"],
         "purged_folds": folds.payload(),
         "run_bindings": run_bindings,
@@ -902,6 +920,8 @@ def run_program(root: Path, parallel: int = MAX_PARALLEL) -> Path:
         "status": "completed",
         "created_at": _now(),
         "frozen_design_sha256": _sha256(root / "frozen_design.json"),
+        "frozen_repository_commit": design["repository_commit"],
+        "operational_repair_commit": repository_commit(),
         "archive": archive,
         "protocol_calibration": calibration,
         "trajectory_count": 50,
@@ -918,6 +938,8 @@ def run_program(root: Path, parallel: int = MAX_PARALLEL) -> Path:
             "result_sha256": _sha256(root / "result.json"),
             "source_manifest_sha256": archive["source_manifest_sha256"],
             "execution_manifest_sha256": archive["execution_manifest_sha256"],
+            "frozen_repository_commit": design["repository_commit"],
+            "operational_repair_commit": repository_commit(),
             "all_50_runs_completed": True,
             "all_716_training_dates_covered_once": True,
             "fit_exclusion_chain_verified": True,
