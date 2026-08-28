@@ -112,9 +112,17 @@ def _verified_result(
     result_path = root / result_name
     audit_path = root / "final_audit.json"
     result, audit = _read_json(result_path), _read_json(audit_path)
+    result_hash = _sha256(result_path)
+    inventory = audit.get("artifacts")
+    inventory_match = isinstance(inventory, list) and any(
+        isinstance(record, dict)
+        and record.get("path") == result_name
+        and record.get("sha256") == result_hash
+        for record in inventory
+    )
     if (
         audit.get("status") != "passed"
-        or audit.get("result_sha256") != _sha256(result_path)
+        or (audit.get("result_sha256") != result_hash and not inventory_match)
         or result.get("official_validation_accessed") is not False
         or result.get("test_accessed") is not False
         or audit.get("official_validation_accessed") is not False

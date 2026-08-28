@@ -4369,3 +4369,11 @@ has yet run. Official validation and the permanently spent held-out test remain
 inaccessible. After all required roots, results, diagnostics, histories,
 designated checkpoints, logs, and hashes are secured and pushed, only this
 exact instance will be terminated and its absence verified twice.
+
+The first Section-A freeze attempt stopped before root creation or outcome
+access because the generic source verifier required a top-level
+`result_sha256`, whereas Experiment 54's passed audit binds that same result in
+its complete artifact inventory. The bounded pre-score repair accepts either
+audit representation only when the exact result-file SHA-256 matches. It
+changes no input, frontier, bucket, cost, allocator, fold, horizon, gate, or
+access rule.
