@@ -4414,3 +4414,17 @@ and when inactive the selected scale remains exactly one. A float32 zero-kink
 gradient regression now protects this contract. No optimizer update, policy
 artifact, or score from the failed launch is retained. Its score-free root is
 `/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment56_section_c_fd1a001_20260828T160308Z`.
+
+The following fresh launch again stopped during the first fit replay, after a
+finite objective but before any history, checkpoint, selection objective,
+evaluation score, or retained optimizer update. Autograd anomaly tracing bound
+the remaining non-finite gradient to the cap-weight expression. The old
+expression formed the name cap as notional proportional to NAV and then
+divided it back by NAV on every minute. Although algebraically constant, that
+float32 backward path accumulated cancellation error through the 389-minute
+replay until its two NAV derivatives became non-finite. The bounded pre-score
+repair computes the same name cap directly in weight space and keeps the ADV
+cap as its unchanged notional-over-NAV ratio before taking the same minimum.
+It changes no cap bound in exact arithmetic and no fill, cost, objective,
+split, policy parameter, score, or access rule. The score-free failed root is retained at
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment56_section_c_37bec49_20260828T161304Z`.

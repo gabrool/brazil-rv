@@ -300,11 +300,14 @@ def simulate(
             policy_tradeable & (~torch.isfinite(current_sigma) | (current_sigma < 0))
         ).any():
             raise ValueError("Tradeable policy sigma must be finite and non-negative")
-        cap_notional = torch.minimum(
-            config.name_cap_fraction_of_gross * config.gross_target * nav.unsqueeze(-1),
-            config.adv_cap_fraction * adv,
+        cap_weights = torch.minimum(
+            torch.as_tensor(
+                config.name_cap_fraction_of_gross * config.gross_target,
+                dtype=dtype,
+                device=device,
+            ),
+            config.adv_cap_fraction * adv / nav.unsqueeze(-1),
         )
-        cap_weights = cap_notional / nav.unsqueeze(-1)
         policy_state = None
         if requires_policy_state:
             action_liquidity = liquidity[:, action_minute]
