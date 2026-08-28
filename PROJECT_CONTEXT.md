@@ -1023,20 +1023,19 @@ canonical daily CDI execution series currently exists, so runs must supply and
 hash-record one.
 
 The baseline policy remains the deterministic no-trade-band policy. The
-execution package also contains code-only learned-policy infrastructure: a
-zero-initialized shared per-name neural policy, a hash-frozen strictly causal
-state built inside the minute scan, volume-weighted position cost basis, direct
-AdamW optimization over net PnL above all-cash CDI with optional SAM/replay
-checkpointing, and hashed five-block purged TRAIN split generation. This does
-not establish an accepted policy. The OOF manufacture now has a distinct archive
-schema whose loader reconstructs the exact purged folds, verifies all 50 source
-runs and per-sample fit exclusion, and still rejects any unproven aggregate. The
-modeling layer also supports the registered zero-start horizon-conditioned
-to-close readout and its TRAIN-only hashed target sidecar; the three incumbent
-heads and RNG stream are unchanged at initialization. No real policy training,
-official-validation access, or additional held-out-test access is authorized.
-Cluster penalties, round lots, impact, and live routing remain outside the
-contract.
+execution package contains a zero-initialized shared per-name neural policy, a
+hash-frozen strictly causal state built inside the minute scan, volume-weighted
+position cost basis, direct AdamW optimization over net PnL above all-cash CDI
+with optional SAM/replay checkpointing, and hashed five-block purged TRAIN split
+generation. The completed learned-policy OOF archive reconstructs those exact
+purged folds, verifies all 50 source runs and every sample's fit exclusion, and
+rejects any unproven aggregate. This manufacture and calibration do not
+establish an accepted policy. The modeling layer also supports the zero-start
+horizon-conditioned to-close readout and its TRAIN-only hashed target sidecar;
+the three incumbent heads and RNG stream are unchanged at initialization.
+Official-validation access and any additional held-out-test access remain
+unauthorized. Cluster penalties, round lots, impact, and live routing remain
+outside the contract.
 
 ## First execution reference — Experiment 52 C0 (2026-08-27)
 
@@ -1163,3 +1162,32 @@ rows, 36 taker frontiers, 163,440 maker conditional rows, 72 maker frontiers,
 24 positioning rows, decisions, definitions, and both logs. Official-validation
 and test access remained false. At the user's request, the paid GH200 is kept
 active after the completed audit for the immediately following experiments.
+
+## Learned-policy OOF and Experiment 55 decision (2026-08-28)
+
+The canonical monitor-free learned-policy OOF archive is complete over the
+exact five purged TRAIN folds and ten frozen seeds. It retains all 50 raw and
+final-EMA member archives, exact 716-date causal rank-average coverage,
+per-sample source-fold proof, loader verification, C/A/B calibration, and
+checkpoint-cleanup provenance. Its immutable root and log-inclusive final-audit
+SHA-256 are:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/learned_policy_oof_53859b8_20260827T220239Z
+    2b023ca3368fd06cc2098298c73704b4571a08516acdb93364280dd3d3525451
+
+Experiment 55 trained only the frozen nine C/A/B-by-seed four-head trajectories.
+The to-close head was economically promising: overall IC was `0.050540`,
+`0.074533`, and `0.066367` on C/A/B, and incremental expected NAV edge versus
+the Experiment-54 frontier was `+10.833850`, `+8.752321`, and `+9.168938`
+bps/day. It is not adopted because its frozen three-head prediction guardrail
+failed: Fold A's IC delta was `-0.001212`, below the `-0.0005` floor. The
+conditional 50-run four-head OOF extension was therefore skipped, and the
+deployed prediction and execution contracts did not change.
+
+The completed Experiment-55 root and log-inclusive final-audit SHA-256 are:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment55_to_close_3b69ba8_20260828T055100Z
+    21dd4f4ab1abb22e1445f2d8d1c5fcb3667952701620e68c6ba63183c4989cbd
+
+Both programs kept official validation sealed and did not read the permanently
+spent held-out test again. The historical test-spent state is unchanged.

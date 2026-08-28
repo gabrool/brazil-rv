@@ -4272,3 +4272,62 @@ score because its separate canonical date-table read had the same omitted lower
 bound. It now uses the identical closed TRAIN interval. This completes the
 date-axis repair consistently across materialization, independent archive
 verification, and the preregistered calibration slice construction.
+
+## Learned-policy OOF manufacture — completed (2026-08-28)
+
+The repaired replay completed without retraining any finished trajectory. All
+50 frozen fold/seed runs completed exactly 20 epochs (1,000 total); raw and
+final-EMA-0.995 archives, histories, references, manifests, exact fit
+exclusions/embargoes, and per-sample source-fold proof were retained. The
+causal rank-average archive covers exactly 716 TRAIN dates (`date_idx 20..735`)
+and 39,380 samples. Independent loader verification passed before calibration
+or checkpoint cleanup. The 50 epoch-20 checkpoints were then removed only
+after their prediction archives were hash verified.
+
+OOF final-EMA rank IC versus the exact Experiment-41 Patience comparator was
+`0.037489` versus `0.036936` on C, `0.042963` versus `0.048181` on A, and
+`0.049915` versus `0.053639` on B. These are calibration readouts, not a new
+deployment decision. The immutable root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/learned_policy_oof_53859b8_20260827T220239Z
+
+Its log-inclusive final-audit SHA-256 is
+`2b023ca3368fd06cc2098298c73704b4571a08516acdb93364280dd3d3525451`.
+The audit covers 211 retained files / 3,259,772,887 bytes, all 50 manifests,
+1,000 epochs, aggregate and source hashes, exact coverage/provenance, loader
+verification, calibration, cleanup inventory, and both operational logs.
+`official_validation_accessed=false` and `test_accessed=false` throughout.
+
+## Experiment 55 — completed, not adopted (2026-08-28)
+
+After the recorded epoch-zero compile failure, the fullgraph-compatible repair
+froze at commit `3b69ba8be11cc0308f96923b337e6382ed4dd1e4` into a fresh root. Exactly
+nine C/A/B-by-seed trajectories completed 20 epochs each (180 total), producing
+180 epoch prediction archives. The TRAIN-only to-close sidecar, zero-impact
+three-head guardrail construction, Experiment-54 economics binding, cleanup,
+access flags, and every retained artifact hash passed independent audit.
+
+The to-close head showed positive capability: overall IC was `0.050540`,
+`0.074533`, and `0.066367` on C/A/B. At the frozen 7-bps threshold, incremental
+expected NAV edge versus the best Experiment-54 three-head frontier was
+`+10.833850`, `+8.752321`, and `+9.168938` bps/day respectively, so all three
+folds passed the economics gate. Adoption nevertheless failed the prior
+prediction guardrail. Three-head IC deltas versus the exact comparator were
+`-0.000270` on C, `-0.001212` on A, and `+0.000409` on B; Fold A breached the
+frozen `-0.0005` floor. Therefore `adopted_for_execution_layer=false`, the
+conditional 50-run four-head OOF extension was correctly skipped, and no
+deployment recipe changed.
+
+The immutable completed root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment55_to_close_3b69ba8_20260828T055100Z
+
+Frozen-design, result, and log-inclusive final-audit SHA-256 values are
+`7f298d2aada74e9d0d8c655d45b732ebbc8c265d9534c45fdf6f5b92c4b96b51`,
+`3101985765fcba52dbc193514ffc8b882b5604c741ec81f065b0292256afac93`,
+and `21dd4f4ab1abb22e1445f2d8d1c5fcb3667952701620e68c6ba63183c4989cbd`.
+The final audit covers 243 retained files / 11,176,806,611 bytes, nine
+manifests, 180 epochs, 180 prediction archives, six analysis tables, the target
+sidecar, checkpoint cleanup, both operational logs, and a complete file hash
+inventory. `official_validation_accessed=false` and `test_accessed=false`;
+the permanently spent held-out test was not read again.
