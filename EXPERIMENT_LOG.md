@@ -4485,3 +4485,28 @@ SHA-256 values are respectively
 and `03c76b9db410fe93149f5b6a7e6b0ab59d96a40cd11d62b2bdebd1e8a0f6c541`.
 The last audit covers 200 source/result/log files totaling 418,331,972 bytes,
 plus its own hash sidecar.
+
+## Experiment 57 — cross-fold teacher replay, imitation, and fine-tuning (preregistered 2026-08-28)
+
+Experiment 57 is frozen before any new conditional mean, realized replay,
+clone, fine-tuning, selection, or held-out evaluation number exists. Its exact
+contract is `research/preregistrations/experiment57_frontier_imitation.md`.
+Stage 0 replaces the same-fold frontier estimate with a realized, full-cost
+cross-fold replay: each C/A/B window receives conditional four-head cell means
+estimated only from the other two windows, one best expected-net horizon per
+event, strict expected-net thresholds 0/4.5/7 bps, a no-double-count horizon
+lock, and matched dollar-neutral and neutrality-free books. The threshold is
+chosen only on the two estimation windows; the held-out rotation supplies the
+headline number.
+
+Stage 1 trains exactly nine unchanged four-head NeuralPolicy replicas to clone
+the selected primary teacher path on chronological fit dates, with the final
+pre-window 20% retained as selection-only. Stage 2 starts from those clones and
+trains exactly nine full-cost policies at lambda 0.02 under the existing
+patience-10/100-epoch contract. Per seed, fine-tuning stands unless its best
+selection objective is strictly below its own clone. Both the teacher and neural
+ladder must have strictly positive pooled daily excess and at least 0.10 mean
+deployed gross/NAV to graduate; an all-cash float residual can never graduate
+again. If both pass, the neural ladder must strictly beat the teacher's pooled
+excess or the simpler teacher stands. No deployment change, official-validation
+read, or test read is authorized.

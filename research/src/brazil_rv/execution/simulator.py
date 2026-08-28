@@ -395,7 +395,7 @@ def simulate(
             raise ValueError("Policy initialized state must contain one value per day")
 
         projection_mode = getattr(policy, "projection_mode", "exact")
-        if projection_mode == "bounded":
+        if projection_mode in {"bounded", "bounded_non_neutral"}:
             scale = torch.maximum(
                 raw_target.abs().sum(dim=-1),
                 torch.ones(days, dtype=dtype, device=device),
@@ -406,8 +406,12 @@ def simulate(
                 > tolerance.unsqueeze(-1)
             ).any():
                 raise ValueError("Bounded policy emitted invalid or masked weights")
+            violates_neutrality = (
+                projection_mode == "bounded"
+                and (raw_target.sum(dim=-1).abs() > tolerance).any()
+            )
             if (
-                (raw_target.sum(dim=-1).abs() > tolerance).any()
+                violates_neutrality
                 or (raw_target.abs() > cap_weights + tolerance.unsqueeze(-1)).any()
                 or (
                     raw_target.abs().sum(dim=-1) > config.gross_target + tolerance
