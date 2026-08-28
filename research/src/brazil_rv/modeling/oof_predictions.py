@@ -27,7 +27,13 @@ from ..execution.splits import (
     policy_evaluation_slices,
     purged_training_folds,
 )
-from .contract import GH200_RUNTIME, MAX_EPOCHS, TRAIN_END, TRAINING_SPECIFICATION
+from .contract import (
+    GH200_RUNTIME,
+    MAX_EPOCHS,
+    TRAIN_END,
+    TRAIN_START,
+    TRAINING_SPECIFICATION,
+)
 from .data import (
     create_training_loaders,
     feature_store_axis_identity,
@@ -714,7 +720,7 @@ def _calibration(
     )
     dates_table = (
         pl.read_parquet(store / "date_index.parquet")
-        .filter(pl.col("trade_date") <= TRAIN_END)
+        .filter(pl.col("trade_date").is_between(TRAIN_START, TRAIN_END))
         .sort("date_idx")
     )
     dates, _, date_lookup = _indexed_trade_dates(dates_table)

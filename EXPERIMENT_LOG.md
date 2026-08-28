@@ -4253,3 +4253,10 @@ dates and rejecting the required 716-date fold contract. The same bounded repair
 now applies the exact closed TRAIN interval in that independent verifier. This
 changes no archive value or research rule; the unverified aggregate candidates
 are deterministically overwritten and reverified from the 50 immutable runs.
+
+That verifier then passed on the next replay. The immediately following
+calibration-slice constructor stopped before loading a comparator or computing a
+score because its separate canonical date-table read had the same omitted lower
+bound. It now uses the identical closed TRAIN interval. This completes the
+date-axis repair consistently across materialization, independent archive
+verification, and the preregistered calibration slice construction.
