@@ -4428,3 +4428,14 @@ cap as its unchanged notional-over-NAV ratio before taking the same minimum.
 It changes no cap bound in exact arithmetic and no fill, cost, objective,
 split, policy parameter, score, or access rule. The score-free failed root is retained at
 `/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment56_section_c_37bec49_20260828T161304Z`.
+
+The first one-step integration replay after that repair remained score-free but
+showed the cap division was the final recipient, not the origin, of the
+non-finite derivative. The zero-initialized projection still evaluated unused
+`balanced_side / tiny` long- and short-side branches. Their float32 derivatives
+could overflow and then reach zero-cap ADV entries, where infinity times a zero
+notional became NaN. The bounded repair uses a denominator of one only on the
+inactive signed side; an active side still divides by its identical positive
+sum, while an inactive side still selects scale one. This is forward-identical
+and changes no projection, cap, execution, objective, split, or access rule.
+No fresh frozen root or policy artifact was created during this diagnostic.

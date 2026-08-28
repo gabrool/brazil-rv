@@ -200,10 +200,15 @@ def project_weights_bounded(
     long_sum = long.sum(dim=-1)
     short_sum = short.sum(dim=-1)
     balanced_side = torch.minimum(long_sum, short_sum)
-    tiny = torch.finfo(raw.dtype).tiny
-    long_scale = torch.where(long_sum > 0, balanced_side / long_sum.clamp_min(tiny), 1)
+    has_long = long_sum > 0
+    has_short = short_sum > 0
+    long_denominator = torch.where(has_long, long_sum, torch.ones_like(long_sum))
+    short_denominator = torch.where(
+        has_short, short_sum, torch.ones_like(short_sum)
+    )
+    long_scale = torch.where(has_long, balanced_side / long_denominator, 1)
     short_scale = torch.where(
-        short_sum > 0, balanced_side / short_sum.clamp_min(tiny), 1
+        has_short, balanced_side / short_denominator, 1
     )
     neutral = long * long_scale.unsqueeze(-1) - short * short_scale.unsqueeze(-1)
     neutral_gross = neutral.abs().sum(dim=-1)
