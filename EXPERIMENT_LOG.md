@@ -4442,3 +4442,46 @@ only on their unselected branches. These changes affect no eligible security,
 projection, position, fill, cost, objective, split, or access rule. A float32
 trainer regression with nontradeable `NaN` capacity protects the exact failure.
 No fresh frozen root or policy artifact was created during these diagnostics.
+
+## Experiment 56 — completed; mechanical graduation is an all-cash result (2026-08-28)
+
+Section A passed its frozen continuation gate. The deterministic four-head
+total frontier produced `26.567279`, `21.652961`, and `20.389667` expected NAV
+bps/day on C/A/B, exceeding the matched three-head frontier by `16.1373`,
+`12.5115`, and `12.4451` bps/day. Section B then completed all 50 frozen
+four-head OOF trajectories and all 1,000 epochs. Its exact exclusions,
+716-date archive/loader proof, calibration, checkpoint cleanup, hashes, and
+access flags passed; its final OOF audit SHA-256 is
+`d2e84d39fe02dbfeca428783ece7529730965bf2e82b01374d59ae0266d293ec`.
+
+After the recorded score-free startup repairs, Section C completed exactly 18
+C/A/B-by-lambda-by-seed NeuralPolicy trajectories. Every run stopped after 13
+epochs under the frozen patience-10 rule. Lambda `0.02` was designated on all
+three windows, and nine designated checkpoints were retained and hash-verified.
+All histories, evaluation dailies, per-trade/liquidity/target-change/time-of-day
+diagnostics, horizon ablations, block-10 intervals, checkpoint inventory, and
+operational logs passed the final inventory audit. Official validation and the
+permanently spent test remained unopened.
+
+The frozen strict-positive graduation comparison returned a pooled mean daily
+net excess over all-cash CDI of only `0.0000120245` bps/day, so the literal
+stored flags are `graduated_as_standing_execution_candidate=true` and
+`paper_preparation_unlocked=true`. This is a mechanical numerical graduation,
+not evidence of a trading policy: every designated evaluation remained exactly
+all cash, with zero turnover, zero round trips, zero deployed gross, zero target
+change, and zero horizon-ablation effect. Fold B's excess estimate was negative,
+and the pooled value is a float32 CDI-accounting residual. No deployed
+prediction or execution recipe changed.
+
+The immutable Section-C root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment56_section_c_b383d30_20260828T164147Z
+
+Frozen-design, result, base-audit, and log-inclusive full-inventory-audit
+SHA-256 values are respectively
+`66ec78c129f4c8dd4f6e80fa8456a204c6ba4b4e3ebfa89359ce3f99c29d1602`,
+`3889faeced6fad0c0a655b731dab4ea2f4de52077b9c38c4e7657deccc049e1c`,
+`a69ebb48fec6c0864692e2010645bc6af9f1546d1ead12d1b5c76cd547030f60`,
+and `03c76b9db410fe93149f5b6a7e6b0ab59d96a40cd11d62b2bdebd1e8a0f6c541`.
+The last audit covers 200 source/result/log files totaling 418,331,972 bytes,
+plus its own hash sidecar.

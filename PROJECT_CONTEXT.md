@@ -1191,3 +1191,36 @@ The completed Experiment-55 root and log-inclusive final-audit SHA-256 are:
 
 Both programs kept official validation sealed and did not read the permanently
 spent held-out test again. The historical test-spent state is unchanged.
+
+## Experiment 56 four-head OOF and NeuralPolicy result (2026-08-28)
+
+Experiment 56 adopted the Experiment-55 to-close head only as an execution-layer
+research input; it did not change the deployed Experiment-45 prediction recipe.
+Section A's deterministic four-head total frontier passed the continuation gate
+on all three discovery folds at `26.567279`, `21.652961`, and `20.389667`
+expected NAV bps/day on C/A/B. Section B completed and audited the exact 50-run,
+1,000-epoch four-head OOF manufacture over 716 TRAIN dates. Its final OOF audit
+SHA-256 is `d2e84d39fe02dbfeca428783ece7529730965bf2e82b01374d59ae0266d293ec`.
+
+Section C completed all 18 preregistered NeuralPolicy trajectories. Each stopped
+after 13 epochs under patience 10; lambda `0.02` was designated on C/A/B, and
+nine checkpoints were retained. The frozen strict-positive rule mechanically
+graduated the result because pooled daily net excess over all-cash CDI was
+`0.0000120245` bps/day. The durable economic interpretation is nevertheless an
+all-cash null: designated evaluations had zero turnover, zero round trips, zero
+deployed gross, and no target or horizon-ablation effect. The positive pooled
+value is float32 CDI-accounting residue rather than learned trading edge. The
+stored graduation and paper-preparation flags remain true under the frozen rule,
+but no deployed prediction or execution recipe changed.
+
+The immutable completed Section-C root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment56_section_c_b383d30_20260828T164147Z
+
+Its frozen-design, result, and log-inclusive full-inventory-audit SHA-256 values
+are `66ec78c129f4c8dd4f6e80fa8456a204c6ba4b4e3ebfa89359ce3f99c29d1602`,
+`3889faeced6fad0c0a655b731dab4ea2f4de52077b9c38c4e7657deccc049e1c`, and
+`03c76b9db410fe93149f5b6a7e6b0ab59d96a40cd11d62b2bdebd1e8a0f6c541`.
+The final audit covers all run artifacts and diagnostics, nine retained
+checkpoint hashes, 200 source/result/log files totaling 418,331,972 bytes, and
+official-validation/test access flags of false.
