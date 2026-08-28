@@ -4244,3 +4244,12 @@ are reused without retraining; a changed code commit is accepted only after all
 manifest, result, and audit record the frozen and operational-repair commits
 separately. A focused nonzero-index regression test protects the repaired axis
 contract; official validation and the permanently spent test remain unopened.
+
+The first repair replay then wrote the aggregate candidates atomically but
+stopped during their independent loader verification, still before calibration
+or any score. The loader bounded the canonical date table above by `TRAIN_END`
+but omitted the frozen `TRAIN_START`, thereby including the store's 20 pre-TRAIN
+dates and rejecting the required 716-date fold contract. The same bounded repair
+now applies the exact closed TRAIN interval in that independent verifier. This
+changes no archive value or research rule; the unverified aggregate candidates
+are deterministically overwritten and reverified from the 50 immutable runs.

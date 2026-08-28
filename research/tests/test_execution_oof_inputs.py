@@ -52,7 +52,7 @@ def _refresh_source(wrapper_path: Path) -> None:
 
 
 def _write_oof_archive(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
-    dates = tuple(date(2021, 1, 1) + timedelta(days=index) for index in range(716))
+    dates = tuple(date(2021, 8, 16) + timedelta(days=index) for index in range(716))
     store = tmp_path / "store"
     store.mkdir()
     (store / "manifest.json").write_text("{}\n", encoding="utf-8")

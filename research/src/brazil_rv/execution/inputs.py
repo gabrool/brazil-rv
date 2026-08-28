@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from ..modeling.contract import TRAIN_END, workspace_path
+from ..modeling.contract import TRAIN_END, TRAIN_START, workspace_path
 from ..modeling.data import (
     feature_store_axis_identity,
     feature_store_identity,
@@ -446,7 +446,7 @@ def _verify_oof_source_manifest(
     source = json.loads(path.read_text(encoding="utf-8"))
     dates = (
         pl.read_parquet(store / "date_index.parquet")
-        .filter(pl.col("trade_date") <= TRAIN_END)
+        .filter(pl.col("trade_date").is_between(TRAIN_START, TRAIN_END))
         .sort("date_idx")
     )
     canonical_dates = tuple(dates["trade_date"])
