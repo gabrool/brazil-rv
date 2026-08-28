@@ -1224,3 +1224,36 @@ are `66ec78c129f4c8dd4f6e80fa8456a204c6ba4b4e3ebfa89359ce3f99c29d1602`,
 The final audit covers all run artifacts and diagnostics, nine retained
 checkpoint hashes, 200 source/result/log files totaling 418,331,972 bytes, and
 official-validation/test access flags of false.
+
+## Experiment 57 cross-fold frontier imitation result (2026-08-28)
+
+Experiment 57 tested whether the four-head oracle frontier survives a realized
+cross-fold execution replay and whether the existing NeuralPolicy can imitate
+and improve it. Stage 0 selected the strict 7-bps threshold on every C/A/B
+rotation, but the realized teacher lost `53.982522` NAV bps/day versus all-cash
+CDI at mean deployed gross/NAV `1.543438`. The teacher therefore failed.
+
+The exact nine 20-epoch imitation clones and nine clone-start lambda-0.02
+fine-tunes still completed under the frozen contract. Fine-tuning was selected
+over its own clone in all nine cells, but the pooled designated evaluation was
+again exactly all cash: zero deployed gross and only `0.0000120245` bps/day of
+float32 CDI-accounting residual. The actual-deployment guard correctly prevents
+graduation. The standing Experiment-57 execution candidate is `none`; no
+prediction, execution, or deployment recipe changed.
+
+The immutable Stage 0/1/2 roots are:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment57_stage0_60c0b66_20260828T212520Z
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment57_stage1_60c0b66_20260828T213216Z
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment57_stage2_60c0b66_20260828T214712Z
+
+Their result SHA-256 values are
+`4047be5d6c08ad957f9348d95b4f4ad87b92360db8fd642dd5d05d9112880c55`,
+`9228c7165bbadd85c91b9919a1130b38fefa3705499222f5cbe1165ccfca3745`,
+and `d7ecc29309bae6a55f926390183d522ced513c5f113f5dec6b2c5e967b345015`;
+the log-inclusive full-inventory-audit SHA-256 values are
+`453ee7b366b574367b9f8c5e54927cef5d640c1a8eefb661e8f185b58d56a3af`,
+`97eafe757b4f02c2548cadcdc6e155d4cfeaba856e799f692475b30623d6b315`,
+and `33e2ce573ebef9f8f6d52f2c6c6d6d820b76f653c63fb26291620619c43460c6`.
+All fresh-root official-validation and permanently spent test access flags are
+false.

@@ -4524,3 +4524,45 @@ horizon, edge definition, rule, threshold, execution parameter, or score. A
 regression now requires Stage 0 to consume the cached TRAIN close array. The
 score-free failed root is retained at
 `/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment57_stage0_fa1629e_20260828T211350Z`.
+
+## Experiment 57 — completed; teacher loses and neural ladder returns all cash (2026-08-28)
+
+The repaired Stage 0 completed the full frozen cross-fold replay and passed its
+log-inclusive inventory audit. The two other folds selected the strict 7-bps
+threshold for each C/A/B evaluation rotation. The realized primary teacher lost
+`53.982522` NAV bps/day relative to all-cash CDI when pooled across the three
+held-out rotations, despite mean deployed gross/NAV of `1.543438`; its frozen
+graduation flag is false. Stage 0 therefore rejects the optimistic same-fold
+frontier as a realized execution policy.
+
+Stage 1 nevertheless completed the contract's exact nine C/A/B-by-seed
+imitation clones and all 180 epochs. All teacher paths, histories, checkpoints,
+selection dailies, and clone-quality reports are retained and hash-verified.
+Clone quality was diagnostic rather than a gate.
+
+Stage 2 completed the exact nine clone-start lambda-0.02 fine-tunes. The frozen
+per-seed ladder designated the fine-tuned checkpoint in all nine cells, with
+130 recorded epoch rows under patience 10. Their pooled evaluation again
+collapsed to all cash: mean deployed gross/NAV was exactly zero and pooled net
+excess was only `0.0000120245` bps/day, the known float32 CDI-accounting
+residual. The repaired graduation rule correctly returns
+`neural_graduated=false`; because the teacher also failed, the standing
+execution candidate is `none`. No deployed recipe changed.
+
+The immutable fresh roots are:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment57_stage0_60c0b66_20260828T212520Z
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment57_stage1_60c0b66_20260828T213216Z
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment57_stage2_60c0b66_20260828T214712Z
+
+Their result SHA-256 values are respectively
+`4047be5d6c08ad957f9348d95b4f4ad87b92360db8fd642dd5d05d9112880c55`,
+`9228c7165bbadd85c91b9919a1130b38fefa3705499222f5cbe1165ccfca3745`,
+and `d7ecc29309bae6a55f926390183d522ced513c5f113f5dec6b2c5e967b345015`.
+Their log-inclusive full-inventory-audit SHA-256 values are respectively
+`453ee7b366b574367b9f8c5e54927cef5d640c1a8eefb661e8f185b58d56a3af`,
+`97eafe757b4f02c2548cadcdc6e155d4cfeaba856e799f692475b30623d6b315`,
+and `33e2ce573ebef9f8f6d52f2c6c6d6d820b76f653c63fb26291620619c43460c6`.
+The audits cover 35, 57, and 91 source/result/log artifacts totaling
+678,451,795, 390,249,906, and 1,603,043 bytes. All fresh-root official-
+validation and test access flags are false.
