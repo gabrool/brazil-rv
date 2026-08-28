@@ -123,3 +123,12 @@ def test_to_close_basis_uses_remaining_session_minutes() -> None:
     torch.testing.assert_close(
         late, torch.full_like(late, 1.0 + late_h + np.sqrt(late_h))
     )
+
+
+def test_to_close_head_has_no_fullgraph_break() -> None:
+    model = SharedCausalTCN(
+        architecture=_architecture(4), equity_count=4, to_close_head=True
+    ).eval()
+    compiled = torch.compile(model, backend="eager", fullgraph=True)
+
+    assert compiled(*_inputs(4, 15)).shape == (1, 4, 4)

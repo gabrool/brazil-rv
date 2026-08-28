@@ -225,8 +225,6 @@ class SharedCausalTCN(nn.Module):
             # Under the five-minute contract state_position is 15 + decision_idx;
             # the standard equity entry is 5*state_position - 60.
             remaining = (465 - 5 * state_position).to(fused.dtype)
-            if torch.any((remaining <= 0) | (remaining > 405)):
-                raise ValueError("To-close horizon basis lies outside the session")
             h = remaining / 405
             basis = torch.stack((torch.ones_like(h), h, torch.sqrt(h)), dim=-1)
             to_close = (self.to_close_readouts(fused) * basis[:, None]).sum(

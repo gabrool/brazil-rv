@@ -4212,6 +4212,18 @@ bucket, head, state, threshold, cost, weight, official-validation read, or test
 read is allowed. The executable registration is
 `research/preregistrations/experiment55_to_close.md`.
 
+### Experiment-55 pre-score compile repair (2026-08-28)
+
+The first Experiment-55 launch stopped all nine scheduled cells at epoch zero,
+before a trajectory, prediction, or score existed. PyTorch full-graph compilation
+correctly rejected a defensive tensor-dependent Python branch in the new
+to-close basis. The branch only rechecked the canonical decision-position range
+already fixed by the dataset contract; removing it leaves the registered
+`[1,H/405,sqrt(H/405)]` arithmetic unchanged. A focused full-graph regression
+test now exercises the four-head forward path. The failed root and operational
+log are retained as provenance, and the repaired program must freeze into a
+fresh commit-bound root before training.
+
 ### Pre-score OOF freeze repair (2026-08-27)
 
 The initial OOF startup attempts stopped before training a model or reading any
