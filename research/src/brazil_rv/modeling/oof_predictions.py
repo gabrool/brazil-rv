@@ -10,7 +10,7 @@ import time
 from collections.abc import Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, replace
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -98,6 +98,20 @@ def _atomic_npz(path: Path, values: Mapping[str, np.ndarray]) -> None:
     with temporary.open("wb") as output:
         np.savez(output, **values)
     os.replace(temporary, path)
+
+
+def _indexed_trade_dates(
+    table: pl.DataFrame,
+) -> tuple[tuple[date, ...], dict[int, date], dict[date, int]]:
+    pairs = [
+        (int(index), value)
+        for index, value in table.select("date_idx", "trade_date").iter_rows()
+    ]
+    return (
+        tuple(value for _, value in pairs),
+        dict(pairs),
+        {value: index for index, value in pairs},
+    )
 
 
 def _write_history(path: Path, rows: list[dict[str, object]]) -> None:
@@ -502,7 +516,7 @@ def _materialize_from_runs(
     store = Path(str(design["store"]["path"])).resolve()
     rows = load_sample_index(store, through=TRAIN_END)
     date_rows = rows.select("date_idx", "trade_date").unique().sort("date_idx")
-    dates = tuple(date_rows["trade_date"])
+    dates, date_by_index, _ = _indexed_trade_dates(date_rows)
     folds = load_purged_training_folds(root / "purged_folds.json", dates)
     heldout_by_date = {
         value: index
@@ -578,7 +592,7 @@ def _materialize_from_runs(
             np.full(reference["sample_id"].shape, fold_index, dtype=np.int8)
         )
         emitted_dates = {
-            dates[int(value)] for value in np.unique(reference["date_idx"])
+            date_by_index[int(value)] for value in np.unique(reference["date_idx"])
         }
         if emitted_dates != set(fold.heldout_dates):
             raise ValueError("OOF emitted dates differ from the held-out fold")
@@ -685,7 +699,7 @@ def _calibration(
         .filter(pl.col("trade_date") <= TRAIN_END)
         .sort("date_idx")
     )
-    dates = tuple(dates_table["trade_date"])
+    dates, _, date_lookup = _indexed_trade_dates(dates_table)
     slices = {item.name: item for item in policy_evaluation_slices(dates, dates)}
     target_array = np.load(store / "targets.npy", mmap_mode="r", allow_pickle=False)
     mask_array = np.load(store / "label_mask.npy", mmap_mode="r", allow_pickle=False)
@@ -699,7 +713,6 @@ def _calibration(
             store,
         )
         expected_dates = set(slices[fold].dates)
-        date_lookup = {value: int(index) for index, value in enumerate(dates)}
         date_indices = np.asarray(sorted(date_lookup[value] for value in expected_dates))
         oof_rows = np.nonzero(np.isin(oof.date_idx, date_indices))[0]
         if not np.array_equal(oof.date_idx[oof_rows], comparator.date_idx):

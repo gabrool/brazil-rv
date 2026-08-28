@@ -20,8 +20,20 @@ from brazil_rv.modeling.data import (
     feature_store_axis_identity,
     feature_store_identity,
 )
+from brazil_rv.modeling.oof_predictions import _indexed_trade_dates
 
 SEEDS = (11, 29, 47, 61, 79, 97, 113, 131, 149, 167)
+
+
+def test_oof_date_axis_preserves_absolute_store_indices() -> None:
+    dates = (date(2021, 8, 16), date(2021, 8, 17))
+    ordered, by_index, by_date = _indexed_trade_dates(
+        pl.DataFrame({"date_idx": [20, 21], "trade_date": dates})
+    )
+
+    assert ordered == dates
+    assert by_index == {20: dates[0], 21: dates[1]}
+    assert by_date == {dates[0]: 20, dates[1]: 21}
 
 
 def _sha256(path: Path) -> str:

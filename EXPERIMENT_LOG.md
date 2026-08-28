@@ -4224,3 +4224,21 @@ or access rule. The incomplete pre-score roots are excluded and the repaired
 program must freeze into a fresh root. Full Ruff and the 394-test suite passed
 before the repaired freeze; official validation and the spent test remain
 unopened.
+
+### Post-training, pre-calibration OOF materialization repair (2026-08-28)
+
+All 50 frozen trajectories completed their exact 20 epochs and wrote their
+hash-bound raw/final-EMA prediction archives before the first materialization
+attempt. That attempt stopped before writing the aggregate archive, calibration,
+research score, cleanup, or Experiment-55 artifact because it treated the
+store's absolute `date_idx` values as zero-based positions in the TRAIN-only
+date tuple. The canonical TRAIN slice has 716 dates indexed `20..735`, so the
+date-coverage assertion failed without consuming a score.
+
+The bounded operational repair maps `date_idx` to `trade_date` explicitly and
+uses those same absolute indices when selecting the frozen C/A/B calibration
+dates. It changes no fold, embargo, seed, recipe, member prediction, rank
+averaging, weight, target, gate, or access rule. The 50 completed trajectories
+are reused without retraining. A focused nonzero-index regression test protects
+the repaired axis contract; official validation and the permanently spent test
+remain unopened.
