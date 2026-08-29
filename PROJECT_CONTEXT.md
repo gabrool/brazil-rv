@@ -1257,3 +1257,35 @@ the log-inclusive full-inventory-audit SHA-256 values are
 and `33e2ce573ebef9f8f6d52f2c6c6d6d820b76f653c63fb26291620619c43460c6`.
 All fresh-root official-validation and permanently spent test access flags are
 false.
+
+## Experiment 58 swing feasibility result (2026-08-29)
+
+Experiment 58 is the canonical TRAIN-only swing screen of the ten-seed
+four-head OOF archive. It establishes a modest predictive floor but rejects the
+registered daily auction construction. The all-TRAIN last-hour four-head mean
+IC at 1/2/3/5/10 sessions is
+`0.016150/0.015986/0.014297/0.022234/0.021047`, with positive block-10 lower
+bounds at every horizon. C/A/B intervals individually cross zero and daily rank
+persistence is only `0.189563`, so the signal is not yet regime-robust or
+slow-moving.
+
+No frozen Part-B cell clears all-cash CDI. At the middle 4-bps cost and 2%
+borrow, the best cell (four-head mean, K=30, band=0.3) returns `-10.086775`
+NAV bps/day with interval `[-18.234071, -1.686089]`; even the best 2-bps-cost
+estimate is negative. Patient entry is also unfavorable. Part 0 confirms that
+the Experiment-57 intraday loss was dominated by spread plus fee drag
+(`52.009366` bps/day) and roughly `6.492246` NAV of daily turnover, not by a
+large negative gross signal.
+
+The immutable root and its frozen-design, repaired-result, and log-inclusive
+full-inventory-audit SHA-256 values are:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment58_swing_7f168eb_20260829T033013Z
+    86b9370b1fc63cb4a05d5291a14b0af86efb218b6aa623989061a7a0e1550626
+    f72a00024d3a55f73654425d7f7b6d285dd0a87004c6877e7d363b9a218fe95e
+    55f0d565d385a2245880d02fc2f95d9da7d4e528eb9f96444492cd1443009eb0
+
+The audit passed over 29 source/result/log artifacts and both access flags are
+false. No model, execution, or deployment recipe changed. Any purpose-built
+daily-native continuation must be separately preregistered; Experiment 58 does
+not start one.

@@ -4599,3 +4599,60 @@ The score-free failed root and hash-bound operational logs are retained at
 `/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment58_swing_56d9e7d_20260829T032705Z`;
 its failure-record SHA-256 is
 `0360f60cd3377695f2f4a6d4f071feb2b727e3521c218abd6003a9f94712cace`.
+
+## Experiment 58 — completed; predictive swing floor, frozen auction grid fails (2026-08-29)
+
+Experiment 58 completed the exact CPU-only 716-TRAIN-date contract. Part 0
+confirms that Experiment 57's teacher loss was cost-and-churn dominated: pooled
+gross PnL was `+1.575952` NAV bps/day, versus `39.024875` spread bps/day and
+`12.984491` fee bps/day, at `64,922.4568` turnover bps of NAV/day. CDI earned
+was `1.014776` bps/day versus `4.563883` bps/day for all cash, yielding the
+retained `-53.982521` bps/day excess result.
+
+Part A finds a modest but statistically supported multi-day signal floor over
+all TRAIN. The last-hour four-head mean IC at D=`1/2/3/5/10` was respectively
+`0.016150/0.015986/0.014297/0.022234/0.021047`; every block-10 lower 95% bound
+was positive. The best individual OOF signal by horizon ranged from `0.014884`
+to `0.023284`, usually the last-hour 120-minute head. Last-hour four-head
+top-minus-bottom decile spreads were `15.0928/6.2837/5.4465/8.8289/8.4589`
+bps per planned holding day; D=1, 5, and 10 had positive lower bounds. Signal
+persistence was only `0.189563`, far below the 20-day-momentum context's
+`0.937370`. The C/A/B window intervals all crossed zero, so the all-TRAIN
+evidence is promising but not regime-robust.
+
+Part B does not translate that floor into positive frozen auction economics.
+No cell had a positive all-TRAIN lower interval at the middle 4-bps cost. The
+best middle-cost cell was four-head mean, K=30, band=0.3, 2% borrow at
+`-10.086775` excess bps/day with block-10 interval
+`[-18.234071, -1.686089]`, annualized net Sharpe `-0.761497`, and estimated
+holding period `1.486899` sessions. Its gross alpha was `+5.853883` bps/day,
+but turnover cost was `10.760653`, borrow was `0.793651`, and the forgone
+all-cash CDI was `4.386355` bps/day. Even the cheapest 2-bps sensitivity's best
+estimate was negative at `-4.706449` bps/day. Part C was also unfavorable:
+mean strict-through fill rates were about `79.9%` for the next-morning window
+and `86.7%` for the full next session, with adverse-selection gaps roughly
+`-19.6` to `-22.5` bps per planned holding day; even its best reported
+limit-then-taker composite was `-1.501466` bps/day.
+
+After scoring, a bounded metadata-only repair replaced nine stale temporary
+daily-market path strings with their atomically renamed final paths. It did not
+rerun the experiment; hashes of every score-bearing NPY/NPZ/Parquet file were
+verified unchanged. The repair record SHA-256 is
+`2cb0b05f76a82ef7e69ef5c0b6e946d737053af9b4d77e3decbaaeaeb418f178`.
+
+The immutable completed root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment58_swing_7f168eb_20260829T033013Z
+
+Frozen-design, repaired-result, base-audit, and log-inclusive full-inventory-
+audit SHA-256 values are respectively
+`86b9370b1fc63cb4a05d5291a14b0af86efb218b6aa623989061a7a0e1550626`,
+`f72a00024d3a55f73654425d7f7b6d285dd0a87004c6877e7d363b9a218fe95e`,
+`31ff8c040e1eeaef9e1d6f4eb24fb5fbc0586c0b3b767ce6951a40f687de5b2c`,
+and `55f0d565d385a2245880d02fc2f95d9da7d4e528eb9f96444492cd1443009eb0`.
+The final audit covers 29 input/result/log artifacts totaling 16,638,067 bytes;
+official-validation and test access flags are false. No model, execution, or
+deployment recipe changed. The current intraday-built signals establish a
+multi-day predictive floor, but the registered daily auction construction is
+not economically feasible; any daily-native successor requires a separate
+preregistration.
