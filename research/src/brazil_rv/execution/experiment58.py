@@ -42,6 +42,7 @@ WAIT_WINDOWS = ("morning_60m", "full_next_session")
 MARGIN_FRACTION = 0.5
 NAV_BRL = 10_000_000.0
 BOOTSTRAP_SEED = 20260858
+PART0_REPORT_IDENTITY_ABS_TOLERANCE_BPS = 1e-6
 
 
 def _create_root(path: Path) -> Path:
@@ -137,6 +138,9 @@ def freeze(
                 "limit_levels": list(LIMIT_LEVELS),
                 "wait_windows": list(WAIT_WINDOWS),
                 "terminal_liquidation": True,
+                "part0_retained_report_identity_abs_tolerance_bps": (
+                    PART0_REPORT_IDENTITY_ABS_TOLERANCE_BPS
+                ),
             },
             "official_validation_accessed": False,
             "test_accessed": False,
@@ -553,10 +557,19 @@ def _part0(root: Path, design: Mapping[str, object]) -> Path:
     actual = float(
         table.filter(pl.col("window") == "pooled").item(0, "net_excess_bps_per_day")
     )
-    if not math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-10):
+    if not _part0_identity_matches(actual, expected):
         raise ValueError("Part 0 attribution does not reproduce the retained result")
     table.write_parquet(path)
     return path
+
+
+def _part0_identity_matches(actual_bps: float, retained_bps: float) -> bool:
+    return math.isclose(
+        actual_bps,
+        retained_bps,
+        rel_tol=0.0,
+        abs_tol=PART0_REPORT_IDENTITY_ABS_TOLERANCE_BPS,
+    )
 
 
 def _part_a(

@@ -4587,3 +4587,15 @@ margin-line CDI formula. Part C supplies only an informational strict-through
 patient-entry bound. A positive result is a floor for a separately
 preregistered daily-native program; a negative result closes swing only for
 the current intraday-built signals.
+
+The first frozen root stopped before writing Part 0, any Part-A IC, any Part-B
+score, or any Part-C readout. The retained Stage-0 result stores its headline
+from float32 daily bps, while Part 0 aggregates the retained BRL columns; those
+two representations differ by only `0.0000007552` bps. The initial `1e-10` bps
+identity tolerance rejected that representation-only difference. The bounded
+repair raises only this retained-report audit tolerance to `1e-6` bps. It
+changes no input, signal, target, rule, grid, cost, score, or access contract.
+The score-free failed root and hash-bound operational logs are retained at
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/experiment58_swing_56d9e7d_20260829T032705Z`;
+its failure-record SHA-256 is
+`0360f60cd3377695f2f4a6d4f071feb2b727e3521c218abd6003a9f94712cace`.

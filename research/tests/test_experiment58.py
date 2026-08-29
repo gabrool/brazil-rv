@@ -7,6 +7,7 @@ from brazil_rv.execution.experiment58 import (
     _cell_weights,
     _daily_targets,
     _midrank_row,
+    _part0_identity_matches,
     _strict_through,
     _tail_weights,
     _turnover_with_terminal_liquidation,
@@ -87,3 +88,10 @@ def test_patient_limits_require_strict_through_price() -> None:
         _strict_through(direction, low, high, limit),
         [True, False, True, False],
     )
+
+
+def test_part0_identity_tolerance_is_only_float_representation_scale() -> None:
+    retained = -53.98252152374261
+
+    assert _part0_identity_matches(-53.9825207685452, retained)
+    assert not _part0_identity_matches(retained + 1.1e-6, retained)
