@@ -3,15 +3,19 @@ from __future__ import annotations
 import numpy as np
 
 from brazil_rv.execution.experiment58 import (
+    SCHEMA,
     TARGET_HORIZONS,
     _cell_weights,
     _daily_targets,
     _midrank_row,
     _part0_identity_matches,
+    _sha256,
     _strict_through,
     _tail_weights,
     _turnover_with_terminal_liquidation,
+    repair_artifact_paths,
 )
+from brazil_rv.execution.experiment56 import _atomic_json, _read_json
 
 
 def test_midrank_is_tie_aware_and_excludes_invalid_names() -> None:
@@ -95,3 +99,48 @@ def test_part0_identity_tolerance_is_only_float_representation_scale() -> None:
 
     assert _part0_identity_matches(-53.9825207685452, retained)
     assert not _part0_identity_matches(retained + 1.1e-6, retained)
+
+
+def test_artifact_path_repair_changes_only_verified_metadata(tmp_path) -> None:
+    market = tmp_path / "daily_market"
+    market.mkdir()
+    values = market / "daily_close.npy"
+    with values.open("wb") as output:
+        np.save(output, np.asarray([[1.0]]), allow_pickle=False)
+    stale = tmp_path / ".daily_market.tmp" / values.name
+    manifest = {
+        "schema": "EXPERIMENT58_DAILY_MARKET_V1",
+        "artifacts": {
+            values.name: {
+                "path": str(stale),
+                "bytes": values.stat().st_size,
+                "sha256": _sha256(values),
+            }
+        },
+        "official_validation_accessed": False,
+        "test_accessed": False,
+    }
+    _atomic_json(market / "manifest.json", manifest)
+    result = {
+        "schema": SCHEMA,
+        "daily_market": manifest,
+        "artifacts": {"daily_market_manifest": {}},
+        "official_validation_accessed": False,
+        "test_accessed": False,
+    }
+    _atomic_json(tmp_path / "result.json", result)
+    _atomic_json(
+        tmp_path / "final_audit.json",
+        {
+            "status": "passed",
+            "result_sha256": _sha256(tmp_path / "result.json"),
+            "official_validation_accessed": False,
+            "test_accessed": False,
+        },
+    )
+
+    repair_artifact_paths(tmp_path)
+
+    repaired = _read_json(tmp_path / "daily_market" / "manifest.json")
+    assert repaired["artifacts"][values.name]["path"] == str(values.resolve())
+    np.testing.assert_array_equal(np.load(values, allow_pickle=False), [[1.0]])

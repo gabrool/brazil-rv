@@ -1175,6 +1175,68 @@ def run(root: Path) -> Path:
     return final
 
 
+def repair_artifact_paths(root: Path) -> Path:
+    root = root.resolve()
+    result, audit_value = _verified_result(root, "result.json")
+    if result.get("schema") != SCHEMA:
+        raise ValueError("Experiment 58 result schema differs")
+    manifest_path = root / "daily_market" / "manifest.json"
+    manifest = _read_json(manifest_path)
+    before_result_sha256 = _sha256(root / "result.json")
+    before_manifest_sha256 = _sha256(manifest_path)
+    score_files = sorted(
+        path for path in root.iterdir() if path.suffix in (".parquet", ".npz", ".npy")
+    )
+    score_hashes = {path.name: _sha256(path) for path in score_files}
+    repaired = 0
+    for name, record in manifest["artifacts"].items():
+        actual = (root / "daily_market" / name).resolve()
+        if not actual.is_file() or _sha256(actual) != record["sha256"]:
+            raise ValueError(f"Daily-market artifact bytes differ: {name}")
+        if Path(str(record["path"])).resolve() != actual:
+            record["path"] = str(actual)
+            repaired += 1
+    if repaired == 0:
+        repair_record = root / "artifact_path_repair.json"
+        if repair_record.exists():
+            return repair_record
+        raise ValueError("Experiment 58 has no stale daily-market paths to repair")
+    _atomic_json(manifest_path, manifest)
+    result["daily_market"] = manifest
+    result["artifacts"]["daily_market_manifest"] = _artifact(manifest_path)
+    _atomic_json(root / "result.json", result)
+    audit_value["result_sha256"] = _sha256(root / "result.json")
+    audit_value["daily_market_artifact_paths_repaired"] = repaired
+    _atomic_json(root / "final_audit.json", audit_value)
+    if score_hashes != {path.name: _sha256(path) for path in score_files}:
+        raise RuntimeError("Artifact-path repair changed a score-bearing file")
+    repair_record = root / "artifact_path_repair.json"
+    _atomic_json(
+        repair_record,
+        {
+            "schema": "EXPERIMENT58_ARTIFACT_PATH_REPAIR_V1",
+            "status": "passed",
+            "repair_scope": "daily-market manifest/result path strings only",
+            "repaired_path_count": repaired,
+            "before_result_sha256": before_result_sha256,
+            "after_result_sha256": _sha256(root / "result.json"),
+            "before_daily_market_manifest_sha256": before_manifest_sha256,
+            "after_daily_market_manifest_sha256": _sha256(manifest_path),
+            "score_file_hashes_unchanged": score_hashes,
+            "official_validation_accessed": False,
+            "test_accessed": False,
+        },
+    )
+    return repair_record
+
+
+def _verify_artifact_record(record: Mapping[str, object]) -> None:
+    path = Path(str(record.get("path", "")))
+    digest = record.get("sha256")
+    if not path.is_file() or not isinstance(digest, str) or _sha256(path) != digest:
+        raise ValueError(f"Experiment 58 artifact record is unresolved: {path}")
+
+
 def audit(root: Path) -> Path:
     root = root.resolve()
     result, _ = _verified_result(root, "result.json")
@@ -1191,6 +1253,10 @@ def audit(root: Path) -> Path:
     )
     if any(not (root / name).is_file() for name in required):
         raise ValueError("Experiment 58 root lacks a required final artifact or log")
+    for record in result["artifacts"].values():
+        _verify_artifact_record(record)
+    for record in result["daily_market"]["artifacts"].values():
+        _verify_artifact_record(record)
     rows = []
     access_files = 0
     for path in sorted(value for value in root.rglob("*") if value.is_file()):
@@ -1244,6 +1310,8 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     run_parser.add_argument("--root", type=Path, required=True)
     audit_parser = commands.add_parser("audit")
     audit_parser.add_argument("--root", type=Path, required=True)
+    repair_parser = commands.add_parser("repair-artifact-paths")
+    repair_parser.add_argument("--root", type=Path, required=True)
     return parser.parse_args(arguments)
 
 
@@ -1258,8 +1326,10 @@ def main(arguments: Sequence[str] | None = None) -> None:
         )
     elif args.command == "run":
         path = run(args.root)
-    else:
+    elif args.command == "audit":
         path = audit(args.root)
+    else:
+        path = repair_artifact_paths(args.root)
     print(path)
 
 
