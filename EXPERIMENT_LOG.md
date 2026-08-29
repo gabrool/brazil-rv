@@ -4566,3 +4566,24 @@ and `33e2ce573ebef9f8f6d52f2c6c6d6d820b76f653c63fb26291620619c43460c6`.
 The audits cover 35, 57, and 91 source/result/log artifacts totaling
 678,451,795, 390,249,906, and 1,603,043 bytes. All fresh-root official-
 validation and test access flags are false.
+
+## Experiment 58 — swing feasibility screen (preregistered 2026-08-28)
+
+Experiment 58 is frozen before any new multi-day IC, swing-economics, or
+patient-entry number exists. Its exact contract is
+`research/preregistrations/experiment58_swing_screen.md`. It is a CPU-only,
+TRAIN-only analysis of the audited ten-seed four-head OOF archive and exact
+daily closes. It adds no training, head, dataset screen, execution layer, or
+deployment change and forbids official-validation and test reads.
+
+Part 0 pulls the Experiment-57 Stage-0 gross/spread/fee/CDI/turnover
+decomposition from retained designated daily reports without replay. Part A
+measures final-refresh and last-hour four-head signals against exact
+1/2/3/5/10-session close targets, with naive daily reversal/momentum context,
+block-10 IC intervals, persistence, C/A/B regimes, and decile-spread economics.
+Part B runs the frozen eight-cell daily auction grid across all declared
+cost/borrow sensitivities, including terminal liquidation and the existing
+margin-line CDI formula. Part C supplies only an informational strict-through
+patient-entry bound. A positive result is a floor for a separately
+preregistered daily-native program; a negative result closes swing only for
+the current intraday-built signals.
