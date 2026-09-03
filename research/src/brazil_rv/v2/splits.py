@@ -246,10 +246,8 @@ def development_folds(calendar_dates: Sequence[date]) -> tuple[DevelopmentFold, 
     for name, (start, end) in _SELECTION_WINDOWS.items():
         selection = tuple(value for value in development if start <= value <= end)
         before = tuple(value for value in development if value < start)
-        if not selection or selection[0] != start or selection[-1] != end:
-            raise ValueError(
-                f"{name} selection boundaries are absent from the calendar"
-            )
+        if dates[0] > start or dates[-1] < end or not selection:
+            raise ValueError(f"{name} selection window is outside the calendar")
         if len(before) <= FIT_EMBARGO_SESSIONS:
             raise ValueError(f"{name} has too few pre-selection sessions")
         fit = before[:-FIT_EMBARGO_SESSIONS]

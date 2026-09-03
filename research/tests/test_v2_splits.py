@@ -39,6 +39,20 @@ def test_development_folds_have_exact_windows_and_75_session_embargo() -> None:
         assert fold.embargo_dates[-1] < fold.selection_dates[0]
 
 
+def test_development_fold_uses_sessions_inside_a_closed_date_boundary() -> None:
+    calendar = tuple(
+        value
+        for value in _weekdays(date(2021, 8, 16), date(2024, 12, 30))
+        if value != date(2023, 12, 29)
+    )
+
+    folds = splits.development_folds(calendar)
+
+    assert folds[0].selection_dates[0] == date(2023, 7, 3)
+    assert folds[0].selection_dates[-1] == date(2023, 12, 28)
+    assert date(2024, 1, 2) not in folds[0].selection_dates
+
+
 def test_block_parity_is_window_local_and_complementary() -> None:
     dates = _weekdays(date(2024, 1, 2), date(2024, 1, 18))
     forward, reverse = splits.block_parity_directions(dates)
