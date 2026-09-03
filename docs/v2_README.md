@@ -244,6 +244,11 @@ An adapter may expose a value on `t` only when its source availability
 timestamp is no later than 15:45 on `t`. Existing v1 D+1 publication rules are
 preserved by the source's `available_date`/timestamp.
 
+For lending balance, the 20-session COTAHIST-volume denominator is valid only
+when the complete trailing window begins on or after that ISIN's first finite
+COTAHIST observation. Missing name-days count as zero only after listing; the
+adapter never manufactures pre-listing volume history.
+
 To add a sidecar group:
 
 1. add its frozen feature tuple to `v2.contract.SIDECAR_FEATURES`;
@@ -432,7 +437,7 @@ no automatic retry. A failed trajectory remains failed for inspection.
 The corporate-action output and store output directories must be new. The
 action file passed to the store builder must sit beside the acquisition
 `manifest.json` that hash-binds it, its acquisition audit, and its security
-master. A complete command shape is:
+master. A representative command shape is:
 
 ```text
 uv run --project research python -m brazil_rv.v2.corporate_actions \

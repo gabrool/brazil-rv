@@ -54,24 +54,22 @@ history, exact results, artifact identities, and interpretations.
 ## V2 daily foundation contract
 
 The additive v2 implementation lives under `brazil_rv.v2`; its detailed
-executable contract is documented in `docs/v2_README.md`. The first full local
-immutable store built from implementation commit
-`e74204d8ceb69497393f530af242479bbe57fcb9` is preserved at:
+executable contract is documented in `docs/v2_README.md`. The canonical local
+immutable store was built from implementation commit
+`f048ea934f782e72f4ca3738b0e53019cbfb6067` at:
 
-    D:\quant-data\b3\processed\v2_daily_store_e74204d_20260903T204100Z
+    D:\quant-data\b3\processed\v2_daily_store_f048ea9_20260903T215233Z
 
-Its manifest SHA-256 is
-`f46206b0695df698a4ca048e1c1a563b55fad067de23880a17de9170c6114177`.
-Its post-build audit and log-inclusive artifact-inventory SHA-256 values are
-`f571eda81b092458ee3ded2073eb65b0ed36ad1efdb2b7bac80d9603d0fca844`
-and `d60dc4f39e15b9fb85eaa77e9dacfaffbae178d9305023af1190af6756ff50e9`.
-The inventory covers 72 files totaling 2,779,260,237 bytes. A subsequent
-source/specification audit found that this root preceded stricter target-value
-capability scrubbing, unresolved-action economics, focal-excluded peer means,
-and exact recoverable sidecar derivations. It and its validation are retained
-as historical engineering evidence but are superseded and must not be used as
-the canonical v2 source. A fresh commit-bound rebuild is required after those
-repairs.
+Its manifest, post-build audit, and log-inclusive artifact-inventory SHA-256
+values are respectively
+`b2a18de90bb57e8c572244293088614be1b5d8b8bad9badfa11e4595418552e5`,
+`de4b0252b87f763d9ebe01370f7770ff5b60d75e6ebc65b2b2b5c21e330cad39`,
+and `57747b9f26cb3c51643cd6b8b720112107ac970e153dc9abfd3942bb7d999413`.
+The inventory covers 77 files totaling 2,790,744,427 bytes, plus itself and its
+SHA sidecar. All 202 unique source files, including 176 declared sources, 18
+raw COTAHIST archives, the parse audit, and seven v1-fast files, hash-verified.
+The earlier `e74204d` store and its validation remain immutable historical
+engineering evidence but are superseded and are not canonical inputs.
 
 The store has 4,102 sessions from 2010-01-04 through 2026-07-17 and 933
 permanent ISIN identities. Its causal point-in-time universe ranges from 101 to
@@ -99,9 +97,21 @@ V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused
 unconditionally by this code version. Target masks and corresponding numeric
 values are clipped at the store capability boundary and again at each exact
-evaluation window. The historical e742 audits decoded features only through
-2024-12-30 and target starts only through 2024-12-12; no 2025/2026 feature or
-target row was decoded and both access flags were false.
+evaluation window. The canonical store audit decoded only the date and ISIN axes,
+reports `sealed_feature_or_target_payload_decoded=false`, and records both access
+flags false. Its development-only sidecar replay passed, including exact lending
+and options inversions; this is distinct from the bounded pipeline validation,
+which deliberately ran with `enabled_sidecars=[]` at:
+
+    D:\quant-data\b3\processed\v2_pipeline_validation_f048ea9_20260903T215944Z
+
+That validation is clean-commit/store bound, completed with
+`pipeline_validation=true`, `research_claim=false`, and both access flags false.
+Its manifest, post-validation audit, and final log-inclusive inventory SHA-256
+values are respectively
+`85cfd310f7a5935853646fa4307e153493d1a26edcb34099a844ede6e1ba36d1`,
+`035036b61e1a87b97b52d2dda185aa8da2e108b6d5d34ef520befe6d675508cd`,
+and `06cb81ece83cc380086f0a8fc681c50d1e99149d8d65e9b1b2d39c52f1142fd1`.
 
 ## V1 intraday feature-store contract
 

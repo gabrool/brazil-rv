@@ -1,6 +1,6 @@
 # Brazil-RV experiment log
 
-Last updated: 2026-08-20
+Last updated: 2026-09-03
 
 This is the chronological research record for the current experimentation program. Future sessions should append new experiments and preserve prior entries, including negative results. Every entry should identify the code commit, data source, split access, complete selection rule, seeds, artifact location, and result.
 
@@ -4751,7 +4751,7 @@ and `48526a9e3146ed6c0b9b5718d3f7dd5ae10367152f96ceca7e321a699ac820cd`.
 Commit `e74204d` repairs only that valid empty-history case without dropping the
 active name or changing targets, scores, pooling, or checkpoint structure.
 
-The fresh completed development-only validation root is:
+The then-completed, now-superseded development-only validation root is:
 
     D:\quant-data\b3\processed\v2_pipeline_validation_e74204d_20260903T205000Z
 
@@ -4796,3 +4796,98 @@ v2 feature or target row was decoded by the audit, trainer, scorer, or evaluator
 No v2 research result, model designation, or deployment change was made. All v2
 implementation, build, and validation work ran locally; no paid Lambda instance
 was claimed.
+
+### V2 source-audit closure and canonical rebuild
+
+A second source/specification audit found material engineering gaps in the
+then-current `e74204d` artifacts. Five bounded commits closed them without
+changing the frozen v2 research design:
+
+- `263a0aab326a4a47499bccc34187014f9381dab1` made target-value sealing
+  capability-safe, carried unresolved actions into realized economics,
+  excluded the focal name from peer means, removed the public untracked-loader
+  bypass, enabled separately authorized evaluation dates while keeping static
+  checkpoint identity strict, and recovered only exactly invertible lending and
+  options sidecars;
+- `cbef7827f93d074f2fc529e4ff482faece1ba3e1` masks cross-session M1-derived
+  features at recorded or unresolved action boundaries while leaving
+  independently valid same-session ratios untouched;
+- `f1e6309fcd6583262c6e28dde6f26fdbeba23f69` accepts the real sparse lending
+  union without bounded schema-inference loss;
+- `a2bb2a5565ccccf650ed10eeb6d42ea0480077ba` requires the complete lending
+  ADV20 denominator window to begin after the ISIN's first finite COTAHIST
+  observation, so only post-listing missing sessions count as zero; and
+- `f048ea934f782e72f4ca3738b0e53019cbfb6067` streams every validated
+  contiguous store-row selection as a slice, avoiding a full advanced-index
+  copy while preserving exact row order and bytes.
+
+Ruff and compilation passed at the final commit. The research suite passed 571
+tests with two expected all-NaN intraday-fixture warnings, and the collector
+suite passed 24 tests.
+
+Three score-free build attempts are retained as excluded operational evidence:
+
+| Attempt root | Stop condition | Failure-record SHA-256 |
+|---|---|---|
+| `D:\quant-data\b3\processed\v2_daily_store_cbef782_20260903T213419Z` | sparse combined-lending Polars schema inference | `4fb314e4d150d41c5f91b8f3d19e1a5b33b3abaab7efb362480d6b5b7936442a` |
+| `D:\quant-data\b3\processed\v2_daily_store_f1e6309_20260903T214050Z` | pre-store audit found a pre-listing lending denominator | `92d9c03b6ceda053fdb1ca8896eb577c2cabc077de20629a5eaa4d4340a63699` |
+| `D:\quant-data\b3\processed\v2_daily_store_a2bb2a5_20260903T214443Z` | atomic staging encountered an advanced-index memory allocation failure | `86e57461efcb907a16579d683400bcbd2d9c5911d0f9987a438ffbffd8536039` |
+
+Each attempt stopped before an immutable store, model, prediction, evaluation,
+or score was produced. Its failure record and operational logs are hash-bound;
+no result-changing retry occurred.
+
+The canonical immutable store is now:
+
+    D:\quant-data\b3\processed\v2_daily_store_f048ea9_20260903T215233Z
+
+It contains 4,102 sessions from 2010-01-04 through 2026-07-17, 933 ISINs,
+53 arrays, and 15 tables. All 176 declared sources, 18 raw COTAHIST archives,
+the parse audit, and seven v1-fast files resolved to 202 unique hash-verified
+files. The exact 4,102-date and 933-ISIN identity hashes are
+`c8a8e994b1cbb4d0923ee028fe2060a2f3cb5a136f2262dc86a243dd57911279`
+and `5c4e69d0e7b00e22060c9c5152ac7e5c5ab6dddd43076687dac23d23fb35a7bb`.
+The store manifest, post-build audit, and final log-inclusive inventory
+SHA-256 values are respectively
+`b2a18de90bb57e8c572244293088614be1b5d8b8bad9badfa11e4595418552e5`,
+`de4b0252b87f763d9ebe01370f7770ff5b60d75e6ebc65b2b2b5c21e330cad39`,
+and `57747b9f26cb3c51643cd6b8b720112107ac970e153dc9abfd3942bb7d999413`.
+That inventory covers 77 files totaling 2,790,744,427 bytes, plus itself and
+its SHA sidecar. The audit passed without decoding a sealed feature or target
+payload and independently reproduced the supported lending and options
+sidecar semantics on development data.
+
+The final development-only integration root is:
+
+    D:\quant-data\b3\processed\v2_pipeline_validation_f048ea9_20260903T215944Z
+
+It is bound to the clean `f048ea9` implementation and the canonical store.
+The bounded runtime used 16 fit sessions, 20 selection sessions, one epoch per
+neural leg, a 20-session lookback, seed 11, and at most 50 GBDT rounds with four
+threads. No optional sidecar was enabled. The completed artifact contains the
+exact 12 baseline cells, two GBDT fold cells with four parity model manifests
+and 20 head files, six one-epoch neural histories/checkpoint pairs, four neural
+score manifests, two neural cross-fit evaluations, and 16 evaluations overall.
+The Stage-P raw checkpoint SHA-256
+`f5e67a046d1130a2818ead8328e41abb89ab14ea3ac4ae125267280952c0bc50`
+is exactly bound by the Stage-F handoff manifest SHA-256
+`c8effbc410930b3e9cbe2cc2eb75fc32695f6ebaaa2bcabbac4c09f14f3f153f`.
+Some conservative unresolved-action smoke paths intentionally produced null
+headline economics when all 19 held intervals were invalid; their IC and full
+diagnostics remain in the manifest. These bounded numbers are integration
+checks, not research claims.
+
+The pipeline manifest, native pre-log inventory, post-validation audit, and
+final log-inclusive inventory SHA-256 values are respectively
+`85cfd310f7a5935853646fa4307e153493d1a26edcb34099a844ede6e1ba36d1`,
+`0cfcf60bfe7b1068d18ce56753258a52b7d58b40709b703502be622c58aeade2`,
+`035036b61e1a87b97b52d2dda185aa8da2e108b6d5d34ef520befe6d675508cd`,
+and `06cb81ece83cc380086f0a8fc681c50d1e99149d8d65e9b1b2d39c52f1142fd1`.
+The final inventory covers 197 files totaling 25,733,360 bytes, plus itself and
+its SHA sidecar. The post-audit rechecked every native row, JSON sidecar,
+result-path hash, Stage-P-to-F binding, actual development input date, and
+recursive access flag. It records `pipeline_validation=true`,
+`research_claim=false`, `official_validation_accessed=false`, and
+`test_accessed=false`. No 2025 or 2026 v2 feature or target payload was decoded,
+no v2 candidate was selected, and no deployment changed. The entire rebuild and
+validation ran locally; no paid Lambda instance was active.
