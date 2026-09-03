@@ -209,6 +209,41 @@ def test_dataset_applies_slow_shift_and_external_sparse_fast_mapping(tmp_path) -
     np.testing.assert_array_equal(batch["v1_equity_slow"][0].numpy(), sample["v1_equity_slow"])
 
 
+def test_finetune_dataset_keeps_first_active_day_with_empty_slow_history(
+    tmp_path: Path,
+) -> None:
+    days, names = 25, 2
+    dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(days)]
+    slow = np.zeros((days, names, 1), dtype=np.float32)
+    slow_valid = np.ones_like(slow, dtype=np.bool_)
+    slow_valid[:20, 1] = False
+    active = np.ones((days, names), dtype=np.bool_)
+    active[:20, 1] = False
+    targets = np.zeros((days, names, 5), dtype=np.float32)
+    target_valid = np.ones_like(targets, dtype=np.bool_)
+    path = write_store(
+        tmp_path / "first_active_day",
+        dates=dates,
+        isins=("BRTESTACNOR1", "BRNEWCOACNOR2"),
+        arrays={
+            "slow_values": slow,
+            "slow_valid": slow_valid,
+            "active": active,
+            "target_primary": targets,
+            "target_valid": target_valid,
+        },
+    )
+
+    sample = V2DailyDataset(
+        path, list(range(20, 25)), stage="finetune", lookback=20
+    )[0]
+
+    assert sample["active_mask"].tolist() == [True, True]
+    assert not sample["slow_history_mask"][1].any()
+    assert not sample["slow_features"][1].any()
+    assert sample["target_mask"][1].tolist() == [True, True, True, False, False]
+
+
 def test_external_fast_ready_is_intersected_with_store_presence(tmp_path) -> None:
     fast = tmp_path / "v1"
     fast.mkdir()

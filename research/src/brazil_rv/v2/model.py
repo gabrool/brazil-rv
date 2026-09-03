@@ -221,7 +221,6 @@ class DailyMultiHorizonModel(nn.Module):
         self,
         slow_features: torch.Tensor,
         slow_history_mask: torch.Tensor,
-        active_mask: torch.Tensor,
         fast_present: torch.Tensor,
         days_since_last_slow_row: torch.Tensor,
     ) -> torch.Tensor:
@@ -257,13 +256,15 @@ class DailyMultiHorizonModel(nn.Module):
         )
         positions = torch.arange(lookback, device=slow_features.device)
         last = torch.where(valid, positions, -1).amax(dim=-1)
-        torch._assert_async(
-            torch.all((last >= 0) | ~active_mask.bool()),
-            "Every active model row needs at least one slow observation",
-        )
+        has_history = last >= 0
         last = last.clamp_min(0)
         index = last[..., None, None].expand(-1, -1, 1, self.config.hidden_width)
-        return sequence.gather(2, index).squeeze(2)
+        state = sequence.gather(2, index).squeeze(2)
+        # A name can enter today's strictly prior-session universe before it
+        # has a rank-normalized row in the t-1 slow window.  The GRU state of
+        # that genuinely empty sequence is its fixed zero initial state.  The
+        # learned absent_state remains reserved for the optional fast stream.
+        return torch.where(has_history[..., None], state, torch.zeros_like(state))
 
     @staticmethod
     def _flags(
@@ -389,7 +390,7 @@ class DailyMultiHorizonModel(nn.Module):
         present = self._flags(slow_features, fast_present, inferred_present)
         days = self._flags(slow_features, days_since_last_slow_row, 0.0)
         slow = self._slow_states(
-            slow_features, slow_history_mask, active_mask, present, days
+            slow_features, slow_history_mask, present, days
         )
         fast = self._fast_states(
             slow,

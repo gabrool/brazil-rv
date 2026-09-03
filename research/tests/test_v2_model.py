@@ -89,6 +89,35 @@ def test_absent_fast_path_ignores_patches_and_receives_gradient() -> None:
     assert torch.isfinite(model.absent_state.grad).all()
 
 
+def test_active_name_with_empty_slow_history_uses_zero_initial_state() -> None:
+    model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32)).eval()
+    slow, history, active = _inputs()
+    history[0, 1] = False
+    changed = slow.clone()
+    changed[0, 1] = 1_000.0
+
+    slow_state = model._slow_states(
+        slow,
+        history,
+        torch.zeros_like(active),
+        torch.ones_like(active, dtype=slow.dtype),
+    )
+
+    first = model(slow, history, active)
+    second = model(changed, history, active)
+
+    assert torch.count_nonzero(slow_state[0, 1]) == 0
+    assert torch.isfinite(first).all()
+    assert torch.equal(first, second)
+    assert torch.count_nonzero(first[0, 1]) > 0
+
+    tracked = slow.clone().requires_grad_()
+    model(tracked, history, active).sum().backward()
+    assert tracked.grad is not None
+    assert torch.isfinite(tracked.grad).all()
+    assert torch.count_nonzero(tracked.grad[0, 1]) == 0
+
+
 def test_fast_encoder_runs_only_present_flattened_rows() -> None:
     model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32)).eval()
     slow, history, active = _inputs()
