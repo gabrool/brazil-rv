@@ -4656,3 +4656,31 @@ deployment recipe changed. The current intraday-built signals establish a
 multi-day predictive floor, but the registered daily auction construction is
 not economically feasible; any daily-native successor requires a separate
 preregistration.
+
+## Persistent Lambda retention cleanup round 5 (2026-09-03)
+
+The Lambda object store was conservatively pruned after a complete bucket
+inventory. Exactly 29 large payload copies in eight score-free failed roots
+were removed, totaling 2,518,100,236 bytes (2.345 GiB). Before deletion, every
+candidate was streamed through SHA-256 and matched byte-for-byte to the
+corresponding artifact in a completed immutable authority root. Small forensic
+records in the failed roots, including frozen designs, manifests, failure
+records, and operational logs, remain intact. No completed root or raw,
+interim, feature, sidecar, or auxiliary artifact was changed.
+
+The bucket moved from 20,484 objects and 127,099,629,508 bytes (118.371 GiB)
+to 20,461 objects and 124,581,553,143 bytes (116.026 GiB), including the six
+new cleanup-audit files. Final verification found zero planned survivors,
+unplanned removals, size changes, unexpected additions outside the audit root,
+or missing authority objects. The audit root is:
+
+    quant-data/b3/processed/model_runs/_retention/storage_cleanup_20260903_round5
+
+Cleanup-plan, delete-list, cleanup-result, and final bucket path-and-size
+inventory SHA-256 values are respectively
+`7499fbfa01d0b4de5fa0068d537a1da15dbf7f5f5aa81878f4175b7f0b0a808e`,
+`d6a1ca2156ac35c9f16a699d9e2962474eaa42450c178aefb2395a5e09e7a065`,
+`ccd1368d2f98a4c77fdc43d193a145680bdf83dd32f27e0bada464ccbc296e89`,
+and `a0fa1167e4d731fdc91870d04b9f800fa6ff717d540baf1c709bf92619994b5df`.
+The deleted failed-root copies are not recoverable at their former keys, but
+their exact bytes remain in the documented completed-root authorities.
