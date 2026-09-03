@@ -132,6 +132,29 @@ def test_raw_lending_formulas_use_source_date_volume_and_d_plus_one() -> None:
     assert causal_result.values[20, 0, 0] == result.values[20, 0, 0]
 
 
+def test_lending_volume_window_does_not_invent_prelisting_zeroes() -> None:
+    days = [date(2024, 1, 1) + timedelta(days=index) for index in range(31)]
+    isin = "BRTESTACNOR1"
+    source = pl.DataFrame(
+        {
+            "source_position_date": [days[19], days[29]],
+            "available_date": [days[20], days[30]],
+            "isin": [isin, isin],
+            "lending_balance_brl": [200.0, 200.0],
+        }
+    )
+    volume = np.full((len(days), 1), np.nan)
+    volume[10:] = 100.0
+    derived = derive_known_archive_features(
+        source, days, [isin], group="lending", daily_volume_brl=volume
+    )
+    result = materialize_known_archive(derived, days, [isin], group="lending")
+    assert not result.valid[20, 0, 0]
+    assert result.values[20, 0, 0] == 0.0
+    assert result.valid[30, 0, 0]
+    assert result.values[30, 0, 0] == pytest.approx(2.0)
+
+
 def test_parser_combines_balance_and_reversible_rate_archives(tmp_path) -> None:
     days = [date(2024, 1, 1) + timedelta(days=index) for index in range(127)]
     isin = "BRTESTACNOR1"

@@ -249,6 +249,12 @@ def _raw_lending_features(
     volume = np.asarray(daily_volume_brl, dtype=np.float64)
     if volume.shape != (len(calendar), len(isins)):
         raise ValueError("daily BRL volume is misaligned with lending axes")
+    volume_observed = np.isfinite(volume)
+    first_observed = np.full(len(isins), len(calendar), dtype=np.int64)
+    observed_names = volume_observed.any(axis=0)
+    first_observed[observed_names] = np.argmax(
+        volume_observed[:, observed_names], axis=0
+    )
     levels: dict[tuple[str, date], tuple[float, bool]] = {}
     rates: dict[tuple[str, date], tuple[float, bool]] = {}
     output_rows: list[dict[str, object]] = []
@@ -281,7 +287,11 @@ def _raw_lending_features(
             day = date_lookup.get(source_date)
             name = isin_lookup.get(isin)
             balance = row.get("lending_balance_brl")
-            valid = day is not None and name is not None and day >= 19
+            valid = (
+                day is not None
+                and name is not None
+                and day - 19 >= first_observed[name]
+            )
             mean_volume = np.nan
             if valid:
                 history = volume[day - 19 : day + 1, name]
