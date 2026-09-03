@@ -173,6 +173,43 @@ def test_store_writer_selects_source_rows_one_array_at_a_time(tmp_path) -> None:
         )
 
 
+def test_store_writer_does_not_copy_a_contiguous_row_selection(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    slow = np.arange(6, dtype=np.float32).reshape(6, 1, 1)
+    original_save = np.save
+    slow_shares_memory: list[bool] = []
+
+    def tracking_save(path, value, *args, **kwargs):
+        if Path(path).name == "slow_values.npy":
+            slow_shares_memory.append(np.shares_memory(value, slow))
+        return original_save(path, value, *args, **kwargs)
+
+    monkeypatch.setattr(np, "save", tracking_save)
+    write_store(
+        tmp_path / "contiguous_rows",
+        dates=[date(2024, 1, 2) + timedelta(days=index) for index in range(4)],
+        isins=["BRTESTACNOR1"],
+        arrays={
+            "slow_values": slow,
+            "slow_valid": np.ones_like(slow, dtype=np.bool_),
+            "active": np.ones((6, 1), dtype=np.bool_),
+        },
+        row_indices=np.arange(2, 6, dtype=np.int64),
+    )
+    assert slow_shares_memory == [True]
+    store, _ = open_store_for_dates(
+        tmp_path / "contiguous_rows", [0, 1, 2, 3], purpose="training"
+    )
+    assert store.read("slow_values", [0, 1, 2, 3]).ravel().tolist() == [
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+    ]
+    store.close()
+
+
 def test_dataset_applies_slow_shift_and_external_sparse_fast_mapping(tmp_path) -> None:
     fast = tmp_path / "v1"
     fast.mkdir()

@@ -149,7 +149,7 @@ def write_store(
         date_axis.size if not source_date_counts else source_date_counts.pop()
     )
     _validate_array_shapes(materialized, source_date_count, len(isin_axis))
-    selected_rows: NDArray[np.int64] | None = None
+    selected_rows: NDArray[np.int64] | slice | None = None
     if row_indices is not None:
         raw_rows = np.asarray(row_indices)
         if (
@@ -168,6 +168,12 @@ def write_store(
         ):
             raise ValueError(
                 "row_indices must be unique, increasing, and inside the source axis"
+            )
+        if selected_rows.size == 1 or np.all(np.diff(selected_rows) == 1):
+            # A first-axis slice is a view; advanced indexing would allocate a
+            # full copy of every selected tensor during the atomic write.
+            selected_rows = slice(
+                int(selected_rows[0]), int(selected_rows[-1]) + 1
             )
     elif source_date_count != date_axis.size:
         raise ValueError("store arrays do not match the output date axis")
