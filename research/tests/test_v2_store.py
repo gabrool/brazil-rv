@@ -376,6 +376,46 @@ def test_authorized_store_never_exposes_whole_or_ungranted_array_rows(
         store.read("active", -1)
 
 
+def test_authorized_store_exposes_only_bounded_runtime_tables(tmp_path) -> None:
+    dates = [date(2024, 12, 30), date(2025, 1, 2)]
+    path = write_store(
+        tmp_path / "table_capability",
+        dates=dates,
+        isins=["BRTESTACNOR1"],
+        arrays={"active": np.ones((2, 1), dtype=np.bool_)},
+        tables={
+            "v1_fast_date_mapping": pl.DataFrame(
+                {
+                    "trade_date": dates,
+                    "v2_date_index": [0, 1],
+                    "v1_date_index": [8, 9],
+                }
+            ),
+            "v1_fast_isin_mapping": pl.DataFrame(
+                {
+                    "isin": ["BRTESTACNOR1"],
+                    "security_id": ["one"],
+                    "v2_isin_index": [0],
+                    "v1_equity_slot": [0],
+                }
+            ),
+            "universe_size": pl.DataFrame(
+                {"trade_date": dates, "member_count": [1, 1]}
+            ),
+        },
+    )
+    store, _ = open_store_for_dates(path, [0], purpose="training")
+    bounded = store.read_table("v1_fast_date_mapping", [0])
+    assert bounded.get_column("trade_date").to_list() == [dates[0]]
+    assert store.read_table("v1_fast_isin_mapping").height == 1
+    with pytest.raises(PermissionError, match="authorized dates"):
+        store.read_table("v1_fast_date_mapping")
+    with pytest.raises(PermissionError, match="sealed store capability"):
+        store.read_table("universe_size", [0])
+    with pytest.raises(PermissionError, match="authorization grant"):
+        store.read_table("v1_fast_date_mapping", [1])
+
+
 def test_causal_history_capability_allows_only_bounded_pre_sample_rows(
     tmp_path,
 ) -> None:
@@ -433,8 +473,13 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
     ]
     dates.append(date(2025, 1, 2))
     days = len(dates)
-    target = np.zeros((days, 1, 5), dtype=np.float32)
+    target = np.full((days, 1, 5), 11.0, dtype=np.float32)
+    raw_target = np.full((days, 1, 5), 22.0, dtype=np.float32)
+    raw_return = np.full((days, 1, 5), 33.0, dtype=np.float32)
     target_valid = np.ones_like(target, dtype=np.bool_)
+    to_close = np.full((days, 1), 44.0, dtype=np.float32)
+    to_close_valid = np.ones_like(to_close, dtype=np.bool_)
+    to_close_valid[-3, 0] = False
     slow = np.zeros((days, 1, 1), dtype=np.float32)
     path = write_store(
         tmp_path / "target_endpoint",
@@ -446,13 +491,46 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
             "active": np.ones((days, 1), dtype=np.bool_),
             "target_primary": target,
             "target_valid": target_valid,
+            "target_raw_midrank": raw_target,
+            "target_raw_valid": target_valid,
+            "target_raw_log_return": raw_return,
+            "target_to_close": to_close,
+            "target_to_close_valid": to_close_valid,
         },
     )
     dataset = V2DailyDataset(
         path, [days - 3, days - 2], stage="evaluation", lookback=20
     )
-    assert dataset[0]["target_mask"].tolist() == [[True, False, False, False, False]]
-    assert dataset[1]["target_mask"].tolist() == [[False] * 5]
+    first = dataset[0]
+    second = dataset[1]
+    assert first["target_mask"].tolist() == [[True, False, False, False, False]]
+    assert first["raw_target_mask"].tolist() == [
+        [True, False, False, False, False]
+    ]
+    assert first["targets"].tolist() == [[11.0, 0.0, 0.0, 0.0, 0.0]]
+    assert first["raw_targets"].tolist() == [[22.0, 0.0, 0.0, 0.0, 0.0]]
+    assert first["raw_log_returns"].tolist() == [
+        [33.0, 0.0, 0.0, 0.0, 0.0]
+    ]
+    assert first["to_close_mask"].tolist() == [False]
+    assert first["to_close_target"].tolist() == [0.0]
+    assert second["target_mask"].tolist() == [[False] * 5]
+    assert second["targets"].tolist() == [[0.0] * 5]
+    assert second["raw_targets"].tolist() == [[0.0] * 5]
+    assert second["raw_log_returns"].tolist() == [[0.0] * 5]
+    assert second["to_close_target"].tolist() == [44.0]
+    direct_targets = dataset.store.read(
+        "target_primary", [days - 3, days - 2]
+    )
+    direct_mask = dataset.store.read("target_valid", [days - 3, days - 2])
+    assert direct_targets[:, 0].tolist() == [
+        [11.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0],
+    ]
+    assert direct_mask[:, 0].tolist() == [
+        [True, False, False, False, False],
+        [False, False, False, False, False],
+    ]
     gappy = V2DailyDataset(
         path, [days - 4, days - 2], stage="evaluation", lookback=20
     )
@@ -568,13 +646,20 @@ def test_store_to_close_uses_exact_m1_final_close_not_cotahist(tmp_path) -> None
     assert not valid[65, 1]
     unavailable = np.load(root / "cash_reinvestment_unavailable_mask.npy")
     unresolved = np.load(root / "unresolved_action.npy")
+    price_unresolved = np.load(root / "price_adjustment_unresolved.npy")
+    price_level_valid = np.load(root / "adjusted_price_level_valid.npy")
     assert unavailable[10, 1]
     assert unresolved[10, 1]
+    assert not price_unresolved[10, 1]
+    assert price_level_valid[64, 1]
     assert unresolved[63, 0]
+    assert price_unresolved[63, 0]
+    assert not price_level_valid[63:, 0].any()
     slow_valid = np.load(root / "slow_valid.npy")
     assert not slow_valid[63, 1, 3]
     assert not slow_valid[63, 0, 0]
     assert slow_valid[64, 0, 0]
+    assert not slow_valid[64, 0, 25]
     target_raw_valid = np.load(root / "target_raw_valid.npy")
     assert not target_raw_valid[5, 1, 4]
     assert not target_raw_valid[62, 0, 0]

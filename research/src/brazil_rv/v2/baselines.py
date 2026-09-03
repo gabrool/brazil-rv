@@ -30,17 +30,27 @@ def _lagged_return(
     close: NDArray[np.floating],
     observed: NDArray[np.bool_],
     active: NDArray[np.bool_],
+    unresolved_action: NDArray[np.bool_],
     *,
     recent_lag: int,
     distant_lag: int,
     sign: float,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
-    if close.ndim != 2 or observed.shape != close.shape or active.shape != close.shape:
-        raise ValueError("close, observed, and active must have shape [date, name]")
+    unresolved = np.asarray(unresolved_action, dtype=np.bool_)
+    if (
+        close.ndim != 2
+        or observed.shape != close.shape
+        or active.shape != close.shape
+        or unresolved.shape != close.shape
+    ):
+        raise ValueError(
+            "close, observed, active, and unresolved_action must have shape [date, name]"
+        )
     if not 0 <= recent_lag < distant_lag:
         raise ValueError("baseline lags must satisfy 0 <= recent < distant")
     values = np.zeros(close.shape, dtype=np.float64)
     mask = np.zeros(close.shape, dtype=bool)
+    cumulative = np.cumsum(unresolved, axis=0, dtype=np.int32)
     for date in range(distant_lag, close.shape[0]):
         recent = date - recent_lag
         distant = date - distant_lag
@@ -51,6 +61,7 @@ def _lagged_return(
             & np.isfinite(close[recent])
             & np.isfinite(close[distant])
             & (close[distant] > 0)
+            & (cumulative[recent] - cumulative[distant] == 0)
         )
         values[date, valid] = sign * (
             close[recent, valid] / close[distant, valid] - 1.0
@@ -74,6 +85,7 @@ def build_baselines(
     close: NDArray[np.floating],
     observed: NDArray[np.bool_],
     active: NDArray[np.bool_],
+    unresolved_action: NDArray[np.bool_],
     *,
     slow_lag: int = 1,
 ) -> dict[str, BaselinePanel]:
@@ -86,10 +98,12 @@ def build_baselines(
     close_values = np.asarray(close, dtype=np.float64)
     observed_mask = np.asarray(observed, dtype=bool)
     active_mask = np.asarray(active, dtype=bool)
+    unresolved = np.asarray(unresolved_action, dtype=np.bool_)
     reversal_5, mask_5 = _lagged_return(
         close_values,
         observed_mask,
         active_mask,
+        unresolved,
         recent_lag=slow_lag,
         distant_lag=5 + slow_lag,
         sign=-1.0,
@@ -98,6 +112,7 @@ def build_baselines(
         close_values,
         observed_mask,
         active_mask,
+        unresolved,
         recent_lag=slow_lag,
         distant_lag=21 + slow_lag,
         sign=-1.0,
@@ -106,6 +121,7 @@ def build_baselines(
         close_values,
         observed_mask,
         active_mask,
+        unresolved,
         recent_lag=21 + slow_lag,
         distant_lag=252 + slow_lag,
         sign=1.0,

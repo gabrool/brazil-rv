@@ -28,6 +28,16 @@ STORE_SCHEMA = "V2_DAILY_STORE_V1"
 _SAFE_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 _WRITE_VERIFICATION = object()
 _MAX_CAUSAL_HISTORY_ROWS = max(*ALLOWED_LOOKBACKS, 253)
+_TARGET_VALUE_MASKS = {
+    "target_primary": "target_valid",
+    "target_normalized_residual": "target_valid",
+    "target_raw_midrank": "target_raw_valid",
+    "target_raw_log_return": "target_raw_valid",
+    "target_to_close": "target_to_close_valid",
+    "target_to_close_normalized_residual": "target_to_close_valid",
+    "target_to_close_raw_log_return": "target_to_close_valid",
+}
+_MULTI_HORIZON_TARGET_MASKS = frozenset(("target_valid", "target_raw_valid"))
 
 
 @dataclass(frozen=True)
@@ -433,14 +443,80 @@ class V2Store:
         except KeyError as error:
             raise KeyError(f"v2 store does not contain {name}") from error
         selector = self._checked_date_selector(date_selector)
-        return np.asarray(array[selector]).copy()
+        result = np.asarray(array[selector]).copy()
+        mask_name = _TARGET_VALUE_MASKS.get(name)
+        if name in _MULTI_HORIZON_TARGET_MASKS:
+            return self._target_mask(name, selector)
+        if mask_name is None:
+            return result
+        if mask_name in _MULTI_HORIZON_TARGET_MASKS:
+            valid = self._target_mask(mask_name, selector)
+        else:
+            valid = np.asarray(self._arrays[mask_name][selector], dtype=np.bool_)
+        if result.shape != valid.shape:
+            raise ValueError(f"{name} and {mask_name} are misaligned")
+        return np.where(valid, result, 0).astype(result.dtype, copy=False)
 
-    def read_table(self, name: str) -> pl.DataFrame:
+    def _target_mask(
+        self, name: str, selector: int | slice | NDArray[np.int64]
+    ) -> NDArray[np.bool_]:
+        """Clip multi-horizon targets to endpoints inside this exact grant."""
+
+        raw = np.asarray(self._arrays[name][selector], dtype=np.bool_).copy()
+        scalar = raw.ndim == 2
+        masks = raw[None, ...] if scalar else raw
+        selected = np.atleast_1d(np.arange(self.dates.size, dtype=np.int64)[selector])
+        if masks.shape[0] != selected.size or masks.shape[-1] != len(HORIZONS):
+            raise ValueError(f"{name} has the wrong target axes")
+        granted = self._authorized_date_indices
+        for row, date_index in enumerate(selected):
+            for horizon_index, horizon in enumerate(HORIZONS):
+                if int(date_index) + horizon not in granted:
+                    masks[row, :, horizon_index] = False
+        return masks[0] if scalar else masks
+
+    def read_table(
+        self,
+        name: str,
+        date_selector: (
+            int
+            | np.integer
+            | slice
+            | range
+            | Sequence[int]
+            | NDArray[np.integer]
+            | None
+        ) = None,
+    ) -> pl.DataFrame:
+        """Read only the two runtime mapping tables within this capability.
+
+        Audit and coverage tables remain immutable artifacts, but are not
+        exposed through a date-bounded training/evaluation store handle.
+        """
+
         try:
             record = self.manifest.get("tables", {})[name]
         except KeyError as error:
             raise KeyError(f"v2 store does not contain table {name}") from error
-        return pl.read_parquet(self.root / record["path"])
+        if name == "v1_fast_isin_mapping":
+            if date_selector is not None:
+                raise ValueError("the static ISIN mapping has no date selector")
+            return pl.read_parquet(self.root / record["path"])
+        if name != "v1_fast_date_mapping":
+            raise PermissionError(
+                "audit tables are not exposed through a sealed store capability"
+            )
+        if date_selector is None:
+            raise PermissionError("the fast date mapping requires authorized dates")
+        indices = np.atleast_1d(self._checked_date_selector(date_selector))
+        allowed = pl.Series(
+            "trade_date",
+            self.dates[indices].astype("datetime64[D]").astype(object).tolist(),
+            dtype=pl.Date,
+        )
+        return pl.read_parquet(self.root / record["path"]).filter(
+            pl.col("trade_date").is_in(allowed.implode())
+        )
 
     def close(self) -> None:
         """Release mmap handles eagerly where NumPy exposes them."""

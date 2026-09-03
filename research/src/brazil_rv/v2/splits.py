@@ -212,28 +212,6 @@ def authorize_dates(
     return AccessLedger(purpose, bool(official), False, token)
 
 
-def load_authorized_array(
-    path: Path,
-    *,
-    dates: Sequence[date],
-    purpose: AccessPurpose,
-    registration_path: Path | None = None,
-    preregistration_root: Path = PREREGISTRATION_ROOT,
-    mmap_mode: str | None = "r",
-) -> tuple[NDArray[np.generic], AccessLedger]:
-    """Memory-map an array only after its date request passes the access gate."""
-    ledger = authorize_dates(
-        dates,
-        purpose=purpose,
-        registration_path=registration_path,
-        preregistration_root=preregistration_root,
-    )
-    return (
-        np.load(path, mmap_mode=mmap_mode, allow_pickle=False),
-        ledger,
-    )
-
-
 def development_folds(calendar_dates: Sequence[date]) -> tuple[DevelopmentFold, ...]:
     dates = _ordered_unique(calendar_dates)
     development = tuple(

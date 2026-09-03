@@ -59,6 +59,7 @@ def _fixture() -> EvaluationInputs:
         raw_target_mask=target_mask.copy(),
         active=np.ones((len(dates), names), dtype=bool),
         total_return_close=np.full((len(dates), names), 100.0),
+        unresolved_action=np.zeros((len(dates), names), dtype=bool),
         cdi_returns=np.zeros(len(dates)),
         source_artifact_hashes={"store_manifest": "a" * 64},
     )
@@ -145,6 +146,7 @@ def test_economics_signal_is_primary_head_rank_average_and_excludes_d10() -> Non
         raw_target_mask=np.zeros_like(cube_mask),
         active=matrix,
         total_return_close=np.ones((1, 4)),
+        unresolved_action=np.zeros((1, 4), dtype=bool),
         cdi_returns=np.zeros(1),
         source_artifact_hashes={"store_manifest": "a" * 64},
     )
@@ -220,9 +222,10 @@ def test_paired_bootstrap_uses_daily_primary_and_headline_deltas() -> None:
 @pytest.mark.parametrize(
     ("field", "message"),
     [
-        ("target_mask", "identical dates, targets, masks, close, and CDI"),
-        ("total_return_close", "identical dates, targets, masks, close, and CDI"),
-        ("cdi_returns", "identical dates, targets, masks, close, and CDI"),
+        ("target_mask", "identical dates, targets, masks, close"),
+        ("total_return_close", "identical dates, targets, masks, close"),
+        ("unresolved_action", "identical dates, targets, masks, close"),
+        ("cdi_returns", "identical dates, targets, masks, close"),
     ],
 )
 def test_paired_comparison_rejects_different_evaluation_population(
@@ -231,7 +234,8 @@ def test_paired_comparison_rejects_different_evaluation_population(
     baseline = evaluate_scores(_fixture(), window_name="F2")
     values = np.asarray(getattr(_fixture(), field)).copy()
     if values.dtype == np.bool_:
-        values[0, 1, 0] = ~values[0, 1, 0]
+        index = (0, 1, 0) if values.ndim == 3 else (0, 1)
+        values[index] = ~values[index]
     else:
         values.flat[0] += 1.0
     candidate = evaluate_scores(
@@ -261,3 +265,27 @@ def test_paired_comparison_rejects_source_or_economics_contract_mismatch() -> No
     changed_contract = replace(baseline, report=changed_report)
     with pytest.raises(ValueError, match="identical economics contract"):
         paired_comparison(changed_contract, baseline)
+
+
+def test_evaluation_hashes_and_reports_unresolved_economic_intervals() -> None:
+    inputs = _fixture()
+    unresolved = np.asarray(inputs.unresolved_action).copy()
+    unresolved[1, 0] = True
+
+    result = evaluate_scores(
+        replace(inputs, unresolved_action=unresolved), window_name="F2"
+    )
+    report = result.report
+    economics = report["economics"]
+    assert isinstance(economics, dict)
+    daily = economics["daily_table"]
+    assert isinstance(daily, list)
+    first_headline = next(
+        row
+        for row in daily
+        if row["cost_bps_per_side"] == 4.0 and row["annual_borrow_rate"] == 0.02
+    )
+    assert first_headline["interval_valid"] is False
+    assert first_headline["unresolved_action_position_count"] == 1
+    assert report["mask_coverage"]["unresolved_action_true"] == 1
+    assert "unresolved_action" in report["input_hashes"]

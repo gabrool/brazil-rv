@@ -3,6 +3,7 @@ from datetime import date, timedelta
 import numpy as np
 
 from brazil_rv.v2.features import (
+    _peer_features,
     build_slow_features,
     deterministic_average_linkage,
     exact_log_return,
@@ -44,6 +45,29 @@ def test_yang_zhang_matches_hand_computed_fixture() -> None:
     )
     assert valid[3, 0]
     assert result[3, 0] == expected
+
+
+def test_yang_zhang_masks_windows_crossing_unresolved_actions() -> None:
+    close = np.arange(100.0, 108.0)[:, None]
+    open_ = close * 0.999
+    high = close * 1.01
+    low = open_ * 0.99
+    unresolved = np.zeros_like(close, dtype=np.bool_)
+    unresolved[3, 0] = True
+
+    values, valid = yang_zhang_volatility(open_, high, low, close, 3, unresolved)
+
+    assert valid[:, 0].tolist() == [
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+        True,
+        True,
+    ]
+    assert np.isnan(values[3:6, 0]).all()
 
 
 def test_slow_features_are_unchanged_by_future_mutation() -> None:
@@ -145,3 +169,85 @@ def test_five_session_range_is_log_window_extrema_not_mean_daily_range() -> None
     )
     assert result.valid[64, 0, 23]
     assert result.values[64, 0, 23] == np.float32(np.log(15.0 / 7.0))
+
+
+def test_unresolved_split_crossing_masks_only_affected_price_features() -> None:
+    days = 270
+    close = 100.0 + np.arange(days, dtype=np.float64)[:, None]
+    high = close * 1.01
+    low = close * 0.99
+    unresolved = np.zeros_like(close, dtype=np.bool_)
+    unresolved[261, 0] = True
+    dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(days)]
+
+    result = build_slow_features(
+        close,
+        high,
+        low,
+        close,
+        close,
+        np.full_like(close, 3_000_000.0),
+        np.full_like(close, 1_000.0),
+        np.ones_like(close, dtype=bool),
+        np.ones_like(close, dtype=bool),
+        dates,
+        cluster_labels=np.zeros_like(close, dtype=np.int16),
+        unresolved_action=unresolved,
+    )
+
+    # Same-session scale-free shape/activity fields do not cross the break.
+    assert result.valid[261, 0, 22]
+    assert result.valid[261, 0, 24]
+    assert result.valid[261, 0, 17]
+    # The current adjusted price and every trailing price/return interval that
+    # crosses the unresolved split disagreement are excluded.
+    assert not result.valid[261, 0, 25]
+    assert not result.valid[269, 0, 25]
+    assert not result.valid[264, 0, 1]
+    assert not result.valid[264, 0, 7]
+    assert not result.valid[264, 0, 14]
+    assert not result.valid[264, 0, 23]
+
+    cash_only = build_slow_features(
+        close,
+        high,
+        low,
+        close,
+        close,
+        np.full_like(close, 3_000_000.0),
+        np.full_like(close, 1_000.0),
+        np.ones_like(close, dtype=bool),
+        np.ones_like(close, dtype=bool),
+        dates,
+        cluster_labels=np.zeros_like(close, dtype=np.int16),
+        unresolved_action=unresolved,
+        price_adjustment_unresolved=np.zeros_like(unresolved),
+    )
+    assert cash_only.valid[269, 0, 25]
+
+
+def test_cluster_peer_features_exclude_focal_and_require_three_valid_peers() -> None:
+    return_5 = np.asarray([[100.0, 1.0, 2.0, 3.0, 4.0]])
+    return_21 = return_5.copy()
+    valid_5 = np.ones_like(return_5, dtype=bool)
+    valid_5[0, 4] = False
+    valid_21 = np.ones_like(return_21, dtype=bool)
+    labels = np.zeros_like(return_5, dtype=np.int16)
+    active = np.ones_like(return_5, dtype=bool)
+
+    values, valid = _peer_features(
+        return_5, valid_5, return_21, valid_21, labels, active
+    )
+
+    assert values[0, 0, 0] == 2.0
+    assert values[0, 0, 2] == 98.0
+    assert values[0, 0, 1] == 2.5
+    assert values[0, 0, 4] == np.std([1.0, 2.0, 3.0, 4.0])
+    assert valid[0, 0].all()
+    assert not valid[0, 4, 0]
+    assert not valid[0, 4, 2]
+
+    valid_5[0, 3] = False
+    _, too_few = _peer_features(return_5, valid_5, return_21, valid_21, labels, active)
+    assert not too_few[0, 0, 0]
+    assert not too_few[0, 0, 2]

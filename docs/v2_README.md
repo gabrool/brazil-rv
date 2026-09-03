@@ -73,7 +73,8 @@ and written to an immutable, hash-recorded cache. The acquisition audit keeps
 `downloaded`, `cache_hit`, `zero_actions`, and `failed` distinct: a successful
 zero-row response is evidence of no provider action, while a missing or failed
 provider response is not. Observed rows inside a failed ticker segment are
-marked `provider_action_failure_mask` and therefore unresolved for targets.
+marked `provider_action_failure_mask` and therefore unresolved for targets,
+price-derived features, and realized portfolio PnL.
 
 The canonical action schema can represent split, reverse split, bonus,
 dividend, JCP, and subscription rights, but the implemented free Yahoo source
@@ -91,8 +92,10 @@ Split candidates are independently flagged when the absolute close-to-close
 log move exceeds 0.35 and the quantity move approximately offsets it. A
 detected/recorded split mismatch, a COTAHIST distribution-number change without
 a recorded action, or a provider-failed segment is unresolved. The relevant
-review tables retain those cases and every target interval crossing one is
-masked.
+review tables retain those cases. Every target or price-derived slow-feature
+interval crossing one is masked, and a held portfolio interval whose exit is
+unresolved is excluded from realized economics without changing its
+previously formed weights.
 
 A recorded cash event can fall on a market session when that exact ISIN did not
 trade. In that case there is no COTAHIST ex-date close at which to apply the
@@ -100,8 +103,9 @@ specified reinvestment. The store never substitutes a stale, later, or
 cross-provider price: it leaves that cash multiplier neutral, records the cell
 in `cash_reinvestment_unavailable_mask` and
 `corporate_action_cash_reinvestment_review.parquet`, and marks it unresolved.
-Trailing total-return feature intervals crossing the unresolved break are also
-invalid; unrelated price-range and activity fields retain their own masks.
+Trailing return, volatility, range, high-watermark, and adjusted-price features
+crossing or landing on the unresolved break are also invalid. Activity-only
+features retain their own independent masks.
 
 Adjustment factors are forward-recursive. A future action never rewrites an
 earlier row. On an effective date, split/bonus factors make the price series
@@ -144,7 +148,7 @@ Core arrays begin with `[date, isin]`:
 | `total_return_close` | — | split- and distribution-adjusted close |
 | `price_adjustment_factor`, `total_return_adjustment_factor` | — | causal cumulative factors |
 | `volume_brl`, `trade_count`, `quantity`, `distribution_number` | — | raw daily activity/action fields |
-| `recorded_action_mask`, `distribution_change_mask`, `provider_action_failure_mask`, `split_disagreement_mask`, `cash_reinvestment_unavailable_mask`, `unresolved_action` | — | action evidence and target/return-feature exclusion state |
+| `recorded_action_mask`, `distribution_change_mask`, `provider_action_failure_mask`, `split_disagreement_mask`, `cash_reinvestment_unavailable_mask`, `price_adjustment_unresolved`, `adjusted_price_level_valid`, `unresolved_action` | — | action evidence, target/return-feature exclusions, and persistent adjusted-price-level trust state |
 | `slow_values`, `slow_valid` | 32 features | rank-Gauss slow library |
 | `intraday_values`, `intraday_valid` | 20 features | rank-Gauss M1 summaries |
 | `sidecar_<group>_values`, `sidecar_<group>_valid` | group features | optional PIT sidecars |
@@ -175,7 +179,7 @@ Each raw value has a validity bit before normalization.
 | Market exposure | 60-session beta and residual volatility against the daily cross-sectional median return |
 | Liquidity | log 20-session mean BRL volume; current-volume z-score; 20-session mean `abs(return)/volume`; trade-count z-score; volume/20-session mean |
 | Price shape | `log(H/L)` for 1 session; `log(max_{u=t-4,...,t} H_u / min_{u=t-4,...,t} L_u)` for the exact 5-session range; `(C-L)/(H-L)`; log adjusted close; log sessions since listing |
-| Given graph | monthly 12-cluster peer mean returns over 5/21; name-minus-peer returns over 5/21; peer 21-session dispersion |
+| Given graph | monthly 12-cluster peer mean returns over 5/21; name-minus-peer returns over 5/21; peer 21-session dispersion; the focal name is excluded and a row requires at least three other valid active peers |
 
 Yang–Zhang uses
 
@@ -216,9 +220,9 @@ broader than what the currently known archives can support exactly:
 
 | Group | Exactly backed by the known archive adapter | Frozen but currently unavailable |
 |---|---|---|
-| `lending` | raw balance divided by the aligned 20-session mean COTAHIST BRL volume; its exact 1- and 5-session changes | loan-rate level and 5-session change; the available transformed fee fields are not relabelled as raw rates |
+| `lending` | raw balance divided by the aligned 20-session mean COTAHIST BRL volume and its exact 1- and 5-session changes; exact inversion of the archive's one-to-one taker-fee transform for the loan-rate level and its exact 5-session change | none |
 | `events` | none | announced-earnings distances, forward distribution flags, standardized unexpected earnings |
-| `options` | none | put/call OI, one-session OI change/volume, relative ATM IV, put skew |
+| `options` | exact inversion of the archive's one-to-one transforms for one-session OI change divided by stock ADV20 and put skew | put/call OI ratio, ATM IV divided by its 20-session median |
 | `oddlot` | raw odd-lot BRL-volume share and exact 5-session change | none |
 | `rebalance` | all 21 Experiment-33 fields: seven release-safe state fields for each of IBOV, IBXX, and SMLL | none |
 | `fundamentals` | `fund_leverage` as leverage, when present | log market cap, book-to-market, gross profitability |
@@ -226,9 +230,9 @@ broader than what the currently known archives can support exactly:
 The seven rebalance suffixes are `current_weight_sqrt`,
 `preview_delta_signed_sqrt`, `preview_add`, `preview_delete`,
 `preview_pressure`, `pre_effective_ramp`, and
-`post_effective_reversal`. Events and the currently wired local options
-archive do not contain the exact frozen fields, so supplying those archives
-still produces honest all-zero values with false masks and zero coverage.
+`post_effective_reversal`. Events and the unrecoverable options fields remain
+honest all-zero values with false masks and zero coverage; no merely similar
+archive quantity is substituted.
 
 An adapter may expose a value on `t` only when its source availability
 timestamp is no later than 15:45 on `t`. Existing v1 D+1 publication rules are
@@ -363,10 +367,23 @@ external fast array. Sample grants add only the frozen 20-, 60-, 120-, or
 exact sample dates. Every array read must stay inside that capability and
 returns copied rows rather than exposing a whole-store mmap.
 
+Multi-horizon target masks are clipped at the store boundary unless each
+label endpoint is inside the exact capability. Their corresponding target
+values are replaced with exact zeros before they reach a dataset, evaluator,
+or artifact hash. Evaluation windows apply the same rule again to their own
+date axis, even when a broader development capability is open. Runtime table
+access is limited to the static ISIN mapping and an authorized-date slice of
+the fast-date mapping; coverage and audit tables remain immutable artifacts
+outside training/evaluation handles.
+
 Loaders and evaluators derive `official_validation_accessed` and
 `test_accessed` from the dates they actually authorize; callers cannot assert
 these flags themselves. Training is never authorized on official validation.
 A registration token cannot open a test date.
+Official-validation scoring keeps checkpoint/store/feature/lookback identity
+strict while binding the separately authorized evaluation date axis and its
+ledger into the score manifest. There is no public untracked-loader escape
+hatch for auditable training artifacts.
 
 Within each selection window, consecutive sessions are grouped into blocks of
 five. Even blocks select the model evaluated on odd blocks, and vice versa.
@@ -388,7 +405,9 @@ side, borrow of 2/4% per year, and CDI on NAV less the margin line. The headline
 is 4 bps and 2% borrow. It reports daily net excess over all-cash CDI,
 annualized net-excess Sharpe, turnover, and implied holding period. A missing
 future exit never changes today's weights; the affected PnL interval is
-explicitly invalid and counted.
+explicitly invalid and counted. The same applies when the exit row carries an
+unresolved corporate action: the decision weight is preserved, but that held
+interval cannot enter headline economics.
 
 Paired comparisons use identical dates and inputs and a deterministic moving
 block bootstrap of daily IC and net-excess deltas, length 20, 10,000 draws.

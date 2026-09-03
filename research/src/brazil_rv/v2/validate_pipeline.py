@@ -394,6 +394,9 @@ def _evaluation_inputs(
     raw_target_mask = _window_target_mask(
         store.read("target_raw_valid", indices), indices
     )
+    targets = np.where(target_mask, targets, 0.0)
+    raw_targets = np.where(raw_target_mask, raw_targets, 0.0)
+    raw_returns = np.where(raw_target_mask, raw_returns, 0.0)
     axes = store.manifest.get("axes")
     if not isinstance(axes, Mapping):
         raise ValueError("store manifest lacks its canonical axes")
@@ -416,6 +419,9 @@ def _evaluation_inputs(
         raw_target_mask=raw_target_mask,
         active=np.asarray(store.read("active", indices), dtype=np.bool_),
         total_return_close=store.read("total_return_close", indices),
+        unresolved_action=np.asarray(
+            store.read("unresolved_action", indices), dtype=np.bool_
+        ),
         cdi_returns=cdi,
         source_artifact_hashes=dict(source_hashes),
     )
@@ -597,7 +603,12 @@ def _run_baselines(
     active = np.asarray(
         store.read("active", baseline_indices), dtype=np.bool_
     )
-    panels = build_baselines(close, observed, active, slow_lag=1)
+    unresolved = np.asarray(
+        store.read("unresolved_action", baseline_indices), dtype=np.bool_
+    )
+    panels = build_baselines(
+        close, observed, active, unresolved, slow_lag=1
+    )
     records: list[dict[str, object]] = []
     for fold, indices in fold_indices.items():
         for name, panel in sorted(panels.items()):

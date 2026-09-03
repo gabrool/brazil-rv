@@ -32,11 +32,17 @@ def _omit_absent_fast(rows):
 
 
 def _scoring_fixture(
-    tmp_path, *, slow_names: tuple[str, str] = ("slow_0", "slow_1")
+    tmp_path,
+    *,
+    slow_names: tuple[str, str] = ("slow_0", "slow_1"),
+    include_official: bool = False,
 ):
     tmp_path.mkdir(parents=True, exist_ok=True)
-    day_count, name_count = 25, 4
-    dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(day_count)]
+    name_count = 4
+    dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(25)]
+    if include_official:
+        dates.extend((date(2025, 1, 2), date(2025, 1, 3), date(2025, 1, 6)))
+    day_count = len(dates)
     generator = np.random.default_rng(17)
     slow = generator.standard_normal((day_count, name_count, 2)).astype(np.float32)
     active = np.ones((day_count, name_count), dtype=np.bool_)
@@ -127,6 +133,8 @@ def test_scoring_is_repeat_bit_identical_and_provenance_bound(tmp_path) -> None:
     assert manifest["checkpoint"]["kind"] == "V2_RAW_PATIENCE"
     assert manifest["checkpoint"]["seed"] == 29
     assert manifest["access_ledger"]["purpose"] == "evaluation"
+    assert manifest["scoring_input"]["dates"]["first_date"] == "2024-01-21"
+    assert len(manifest["scoring_input_sha256"]) == 64
     assert manifest["official_validation_accessed"] is False
     assert manifest["test_accessed"] is False
     assert manifest["store"]["manifest_sha256"] == sha256_file(
@@ -192,6 +200,27 @@ def test_scoring_rejects_hash_mismatch_before_creating_artifact(tmp_path) -> Non
     assert not (tmp_path / "bad_hash").exists()
 
 
+def test_scoring_rejects_non_evaluation_access_ledger(tmp_path) -> None:
+    _, config, checkpoint, _ = _scoring_fixture(tmp_path / "fixture")
+    selected = V2DailyDataset(
+        tmp_path / "fixture" / "store",
+        [20, 21, 22],
+        stage="evaluation",
+        lookback=20,
+        purpose="selection",
+    )
+    output = tmp_path / "selection_scores"
+    with pytest.raises(ValueError, match="evaluation-purpose"):
+        score_checkpoint_artifact(
+            checkpoint=checkpoint,
+            model_config=config,
+            loader=DataLoader(selected, batch_size=2, collate_fn=_omit_absent_fast),
+            output_dir=output,
+            device=torch.device("cpu"),
+        )
+    assert not output.exists()
+
+
 def test_scoring_rejects_swapped_ordered_features_before_output(tmp_path) -> None:
     _, config, checkpoint, _ = _scoring_fixture(tmp_path / "original")
     swapped, _, _, _ = _scoring_fixture(
@@ -255,3 +284,52 @@ def test_scoring_restores_checkpoint_after_initializer_is_deleted(tmp_path) -> N
         device=torch.device("cpu"),
     )
     assert result.scores_path.is_file()
+
+
+def test_registered_official_dates_are_independently_scored_and_recorded(
+    tmp_path,
+) -> None:
+    development, config, checkpoint, _ = _scoring_fixture(
+        tmp_path / "fixture", include_official=True
+    )
+    registration_root = tmp_path / "research" / "preregistrations"
+    registration_root.mkdir(parents=True)
+    registration = registration_root / "official_read.md"
+    registration.write_text("frozen official read\n", encoding="utf-8")
+    official = V2DailyDataset(
+        development.store.root,
+        [25, 26, 27],
+        stage="evaluation",
+        lookback=20,
+        purpose="evaluation",
+        registration_path=registration,
+        preregistration_root=registration_root,
+    )
+
+    result = score_checkpoint_artifact(
+        checkpoint=checkpoint,
+        model_config=config,
+        loader=DataLoader(
+            official,
+            batch_size=2,
+            shuffle=False,
+            collate_fn=_omit_absent_fast,
+        ),
+        output_dir=tmp_path / "official_scores",
+        device=torch.device("cpu"),
+    )
+
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["official_validation_accessed"] is True
+    assert manifest["test_accessed"] is False
+    assert manifest["access_ledger"]["registration"] == {
+        "path": str(registration.resolve()),
+        "sha256": sha256_file(registration),
+    }
+    assert manifest["scoring_input"]["dates"]["first_date"] == "2025-01-02"
+    assert manifest["scoring_input"]["dates"]["last_date"] == "2025-01-06"
+    checkpoint_payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
+    assert (
+        manifest["scoring_input"]["dates"]
+        != checkpoint_payload["input_contract"]["selection"]["dates"]
+    )

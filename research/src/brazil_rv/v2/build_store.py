@@ -573,6 +573,7 @@ def build_daily_store(
     split, cash_distribution, unresolved = align_action_arrays(
         checked_actions, panel.dates, panel.isins
     )
+    price_adjustment_unresolved = unresolved.copy()
     recorded_action = action_presence_array(
         checked_actions, panel.dates, panel.isins
     )
@@ -581,6 +582,7 @@ def build_daily_store(
     )
     distribution_unresolved = distribution_changed & ~recorded_action
     unresolved |= distribution_unresolved
+    price_adjustment_unresolved |= distribution_unresolved
     provider_failed = np.zeros(panel.observed.shape, dtype=np.bool_)
     if action_acquisition_audit is not None:
         provider_failed = provider_failure_mask(
@@ -590,11 +592,13 @@ def build_daily_store(
             panel.observed,
         )
         unresolved |= provider_failed
+        price_adjustment_unresolved |= provider_failed
     split_detected = detect_split_candidates(
         panel.close_brl, panel.quantity, panel.observed
     )
     split_disagreement = split_detected != (split != 1.0)
     unresolved |= split_disagreement
+    price_adjustment_unresolved |= split_disagreement
     cash_reinvestment_unavailable = cash_reinvestment_unavailable_mask(
         panel.close_brl, cash_distribution
     )
@@ -621,6 +625,7 @@ def build_daily_store(
         universe.active,
         panel.dates,
         unresolved_action=unresolved,
+        price_adjustment_unresolved=price_adjustment_unresolved,
     )
     slow_values, slow_valid = rank_gauss_panel(
         slow_raw.values, slow_raw.valid, universe.active
@@ -705,6 +710,10 @@ def build_daily_store(
         "provider_action_failure_mask": provider_failed,
         "split_disagreement_mask": split_disagreement,
         "cash_reinvestment_unavailable_mask": cash_reinvestment_unavailable,
+        "price_adjustment_unresolved": price_adjustment_unresolved,
+        "adjusted_price_level_valid": ~np.maximum.accumulate(
+            price_adjustment_unresolved, axis=0
+        ),
         "unresolved_action": unresolved,
         "slow_values": slow_values,
         "slow_valid": slow_valid,
@@ -1036,7 +1045,11 @@ def _parse_sidecars(
             {column for column in feature_mapping.values() if column is not None}
         )
         derivation_columns = {
-            "lending": ("source_position_date", "lending_balance_brl"),
+            "lending": (
+                "source_position_date",
+                "source_trade_date",
+                "lending_balance_brl",
+            ),
             "oddlot": (
                 "source_trade_date",
                 "regular_volume_brl",

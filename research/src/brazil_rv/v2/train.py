@@ -1323,7 +1323,6 @@ def train_stage(
     learning_rate: float = ADAMW_LR,
     sam_rho: float = SAM_RHO,
     device: torch.device | None = None,
-    allow_untracked_test_loaders: bool = False,
 ) -> StageTrainingResult:
     """Run one frozen P/F/J trajectory and archive raw-Patience plus final EMA."""
 
@@ -1349,15 +1348,11 @@ def train_stage(
         "training": _loader_input_payload(train_loader),
         "selection": _loader_input_payload(selection_loader),
     }
-    if not allow_untracked_test_loaders and any(
-        payload is None for payload in access_ledgers.values()
-    ):
+    if any(payload is None for payload in access_ledgers.values()):
         raise ValueError(
             "production train and selection loaders must expose authorized access ledgers"
         )
-    if not allow_untracked_test_loaders and any(
-        payload is None for payload in input_stores.values()
-    ):
+    if any(payload is None for payload in input_stores.values()):
         raise ValueError(
             "production train and selection loaders must expose canonical model inputs"
         )
@@ -1376,35 +1371,21 @@ def train_stage(
         raise ValueError("v2 training cannot access the sealed test window")
     if official_validation_accessed:
         raise ValueError("v2 training/selection cannot access official validation")
-    if all(payload is not None for payload in input_stores.values()):
-        checkpoint_input_contract = build_checkpoint_input_contract(
-            model_config, train_loader, selection_loader
-        )
-        training_inputs = checkpoint_input_contract["training"]
-        selection_inputs = checkpoint_input_contract["selection"]
-        assert isinstance(training_inputs, Mapping)
-        assert isinstance(selection_inputs, Mapping)
-        _validate_tracked_stage_inputs(
-            stage, fold, model_config, training_inputs, selection_inputs
-        )
-    else:
-        checkpoint_input_contract = {
-            "schema": "BRAZIL_RV_V2_CHECKPOINT_INPUT_V1",
-            "implementation_commit": _repository_commit_if_available(),
-            "model_config": model_config_contract(model_config),
-            "training": None,
-            "selection": None,
-            "untracked_test_loaders": True,
-        }
-        checkpoint_input_contract["sha256"] = _canonical_payload_sha256(
-            checkpoint_input_contract
-        )
+    checkpoint_input_contract = build_checkpoint_input_contract(
+        model_config, train_loader, selection_loader
+    )
+    training_inputs = checkpoint_input_contract["training"]
+    selection_inputs = checkpoint_input_contract["selection"]
+    assert isinstance(training_inputs, Mapping)
+    assert isinstance(selection_inputs, Mapping)
+    _validate_tracked_stage_inputs(
+        stage, fold, model_config, training_inputs, selection_inputs
+    )
     if (pretrain_checkpoint is None) != (expected_pretrain_sha256 is None):
         raise ValueError(
             "stage-P handoff checkpoint and expected SHA-256 must be set together"
         )
-    if not allow_untracked_test_loaders:
-        _require_production_pair_sampler(train_loader)
+    _require_production_pair_sampler(train_loader)
     set_deterministic_seed(seed)
     model = DailyMultiHorizonModel(model_config)
     pretrain_provenance: dict[str, object] | None = None
@@ -1479,7 +1460,7 @@ def train_stage(
             _validate_stage_batch(
                 stage,
                 cpu_batch,
-                expected_pairs=None if allow_untracked_test_loaders else 8,
+                expected_pairs=8,
             )
             batch = _to_device(cpu_batch, device, omit_fast_stream=stage == "P")
 
@@ -1593,7 +1574,6 @@ def train_stage(
             "checkpoint_input_contract": checkpoint_input_contract,
             "access_ledgers": access_ledgers,
             "input_stores": input_stores,
-            "allow_untracked_test_loaders": allow_untracked_test_loaders,
             "optimizer": {
                 "name": "sam_adamw",
                 "learning_rate": learning_rate,

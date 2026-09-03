@@ -1,13 +1,19 @@
 # Brazil-RV project context
 
-Last verified: 2026-08-27.
+Last verified: 2026-09-03.
 
 ## Purpose and current research state
 
-Brazil-RV is an offline research system for predicting 30-, 60-, and 120-minute
-cross-sectional equity ranks from B3 M1 data. A sample is one eligible trading
-date and one of 55 five-minute decisions over a fixed 158-slot point-in-time equity
-axis.
+Brazil-RV now has two additive offline research stacks. The accepted v1 intraday
+system and its deployed research recipe remain unchanged and reproducible. The
+current engineering foundation is v2, a daily system that predicts 1-, 2-, 3-,
+5-, and 10-session cross-sectional total-return residual ranks once per session at
+15:45 for closing-auction entry.
+
+The v2 foundation, store, model, GBDT, baselines, training stages, and evaluation
+harness are implemented and development-tested. No v2 research candidate has
+been selected, no v2 official-validation or test date has been evaluated, and no
+prediction, execution, or deployment recipe has changed.
 
 The accepted incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
@@ -41,9 +47,63 @@ history, exact results, artifact identities, and interpretations.
   available.
 - Equity identity is permanent `security_id`/ISIN plus bounded source-assignment
   dates. Ticker is only a dated attribute.
-- Monthly point-in-time membership is the eligibility contract.
+- Monthly point-in-time membership remains the v1 intraday eligibility
+  contract. V2 uses its separately documented causal daily 20-session
+  activity, liquidity, price, and listing-history rules.
 
-## Current feature-store contract
+## V2 daily foundation contract
+
+The additive v2 implementation lives under `brazil_rv.v2`; its detailed
+executable contract is documented in `docs/v2_README.md`. The first full local
+immutable store built from implementation commit
+`e74204d8ceb69497393f530af242479bbe57fcb9` is preserved at:
+
+    D:\quant-data\b3\processed\v2_daily_store_e74204d_20260903T204100Z
+
+Its manifest SHA-256 is
+`f46206b0695df698a4ca048e1c1a563b55fad067de23880a17de9170c6114177`.
+Its post-build audit and log-inclusive artifact-inventory SHA-256 values are
+`f571eda81b092458ee3ded2073eb65b0ed36ad1efdb2b7bac80d9603d0fca844`
+and `d60dc4f39e15b9fb85eaa77e9dacfaffbae178d9305023af1190af6756ff50e9`.
+The inventory covers 72 files totaling 2,779,260,237 bytes. A subsequent
+source/specification audit found that this root preceded stricter target-value
+capability scrubbing, unresolved-action economics, focal-excluded peer means,
+and exact recoverable sidecar derivations. It and its validation are retained
+as historical engineering evidence but are superseded and must not be used as
+the canonical v2 source. A fresh commit-bound rebuild is required after those
+repairs.
+
+The store has 4,102 sessions from 2010-01-04 through 2026-07-17 and 933
+permanent ISIN identities. Its causal point-in-time universe ranges from 101 to
+243 members per session, with median 141. It contains 32 rank-Gauss daily
+features, 20 rank-Gauss intraday-derived daily features, optional point-in-time
+sidecar groups, five residual and raw multi-session target families, and the
+15:45-to-close auxiliary target. The exact 158-name v1 identity mapping and
+complete 1,248-date M1 calendar overlap were verified. V2 makes exactly one daily
+decision at minute index 345; same-day fast inputs end before that minute, while
+fine-tune slow history ends at t-1.
+
+Corporate actions are deliberately conservative. The free Yahoo source
+guarantees dividends and stock splits but cannot reliably distinguish dividends
+from JCP and does not guarantee separate bonus or subscription-right records. Of
+942 dated ticker-acquisition segments, 410 returned actions, 79 returned a
+confirmed zero-action result, and 453 failed. In addition, 1,536 cash-action rows
+lacked an observed same-ISIN ex-date close for reinvestment. Provider failures,
+action disagreements, and unavailable reinvestment points remain explicitly
+unresolved. The repaired contract masks affected price-derived feature and
+target intervals and excludes a held interval whose exit is unresolved from
+realized economics without changing the decision weights; no stale or
+substituted price is used.
+
+V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
+2025-12-30) requires a hash-bound registration token, and test dates are refused
+unconditionally by this code version. Target masks and corresponding numeric
+values are clipped at the store capability boundary and again at each exact
+evaluation window. The historical e742 audits decoded features only through
+2024-12-30 and target starts only through 2024-12-12; no 2025/2026 feature or
+target row was decoded and both access flags were false.
+
+## V1 intraday feature-store contract
 
 The peer-free store contract is `M1_FEATURES_PIT_CAUSAL_TOD`: 1,248 dates, 1,228
 eligible dates, 55 decisions, 158 equities, 26 dynamic channels, 32 slow channels,
@@ -161,6 +221,16 @@ HEAD; exact reproduction uses the recorded evaluator commit and immutable
 official validation nor test was accessed.
 
 ## Current source-tree status
+
+`brazil_rv.v2` is the canonical additive daily foundation. It contains daily-panel
+and corporate-action construction, causal point-in-time universe and feature
+manufacture, lazy slow-history/fast-stream loading, multi-horizon targets, the
+shared-weight GRU/TCN model, date-pair training with SAM/EMA/Patience, LightGBM
+and naive baselines, sealing-aware scoring/evaluation, named triage/full presets,
+bounded multi-run launch, and the development-only pipeline validator. A
+legitimately active first-day entrant with no prior slow row receives the exact
+zero GRU initial state; it remains active for targets, scoring, and pooled
+statistics. The v1 packages remain unchanged.
 
 `modeling.train` is the canonical soft-Spearman trajectory entry point.
 `modeling.run_discovery_campaign` runs exactly the two internal folds and seeds

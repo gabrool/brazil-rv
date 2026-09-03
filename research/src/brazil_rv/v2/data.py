@@ -341,7 +341,9 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             or ready.dtype != np.bool_
         ):
             raise ValueError("external v1 fast arrays have the wrong contract")
-        date_mapping = self.store.read_table("v1_fast_date_mapping")
+        date_mapping = self.store.read_table(
+            "v1_fast_date_mapping", self.date_indices
+        )
         isin_mapping = self.store.read_table("v1_fast_isin_mapping")
         for target, source in date_mapping.select(
             "v2_date_index", "v1_date_index"
@@ -562,6 +564,23 @@ class V2DailyDataset(Dataset[dict[str, object]]):
                 ):
                     clipped[:, horizon_index] = False
             sample[key] = clipped
+        for value_key, mask_key in (
+            ("targets", "target_mask"),
+            ("raw_targets", "raw_target_mask"),
+            ("raw_log_returns", "raw_target_mask"),
+            ("to_close_target", "to_close_mask"),
+        ):
+            value = sample.get(value_key)
+            if value is None:
+                continue
+            mask = sample.get(mask_key)
+            if not isinstance(value, np.ndarray) or not isinstance(mask, np.ndarray):
+                raise ValueError(f"{value_key} requires its aligned validity mask")
+            if value.shape != mask.shape:
+                raise ValueError(f"{value_key} and {mask_key} are misaligned")
+            sample[value_key] = np.where(mask, value, 0).astype(
+                value.dtype, copy=False
+            )
         return sample
 
 

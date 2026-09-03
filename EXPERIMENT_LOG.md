@@ -4684,3 +4684,115 @@ inventory SHA-256 values are respectively
 and `a0fa1167e4d731fdc91870d04b9f800fa6ff717d540baf1c709bf92619994b5df`.
 The deleted failed-root copies are not recoverable at their former keys, but
 their exact bytes remain in the documented completed-root authorities.
+
+## V2 foundation implementation and development-only validation (2026-09-03)
+
+The additive daily v2 foundation was implemented without changing the v1
+intraday package, the deployed v1 research or execution recipe, or immutable
+artifacts. The initial complete implementation commit was
+`2d9509509b195aa0c5e33e9b915ea65b217407af`. Bounded correctness repairs then
+made missing ex-date reinvestment prices explicitly unresolved
+(`045dc4c5dd976a29ebcb3d3ba0df7a5f35832ae4`), bounded store-construction
+memory (`89048979a312df5c2ecdd0797f0eb97251919016`), honored closed nominal fold
+endpoints (`bfc10d695ddcf8de33263543200b8c9cb1b686ac`), and handled active
+first-day entrants with no prior slow observation by using the exact zero GRU
+initial state (`e74204d8ceb69497393f530af242479bbe57fcb9`).
+
+The initial full local immutable store was:
+
+    D:\quant-data\b3\processed\v2_daily_store_e74204d_20260903T204100Z
+
+It contains 4,102 sessions from 2010-01-04 through 2026-07-17 and 933 ISINs.
+The exact 158-name v1 mapping, v1 calendar overlap, all array/table/source
+hashes, per-feature and sidecar coverage, causal rank-Gauss transforms, target
+replays, entry timing, and sealed access gates passed. Store-manifest,
+post-build-audit, and log-inclusive artifact-inventory SHA-256 values are
+respectively
+`f46206b0695df698a4ca048e1c1a563b55fad067de23880a17de9170c6114177`,
+`f571eda81b092458ee3ded2073eb65b0ed36ad1efdb2b7bac80d9603d0fca844`,
+and `d60dc4f39e15b9fb85eaa77e9dacfaffbae178d9305023af1190af6756ff50e9`.
+The final inventory covers 72 files totaling 2,779,260,237 bytes. A later
+source/specification audit found that this root preceded stricter target-value
+capability scrubbing, unresolved-action economics, focal-excluded peer means,
+and exact recoverable lending/options sidecar derivations. The root and the
+validation below remain immutable historical engineering evidence, but both
+are superseded and must not be used as the canonical v2 source or as current
+validation evidence.
+
+The corporate-action audit retains 10,185 provider action rows and complete
+ISIN-year coverage and review tables. Of 942 acquisition segments, 410 returned
+actions, 79 returned confirmed zero-action responses, and 453 failed. Yahoo's
+free taxonomy does not reliably separate dividends from JCP and does not
+guarantee bonus or subscription-right records. Exactly 1,536 cash-action rows
+lacked an observed same-ISIN ex-date close. Those cases, provider failures,
+distribution disagreements, and split disagreements are unresolved and mask
+affected feature and target intervals instead of using a stale or substituted
+price. The retained M1 adjustment-status audit contains 10,109 rows; its
+2021-07 onward slice classifies 206 rows as raw-unadjusted, 42 as
+price-adjusted, 1,545 as mismatches, and 2,230 as unavailable on the mapped M1
+axis. These are audit classifications, not inferred adjustments.
+
+Ruff and compilation passed. The research suite passed 555 tests with two
+expected warnings, and the collector suite passed 24 tests, for 579 passing
+tests in total.
+
+A first bounded integration attempt at
+
+    D:\quant-data\b3\processed\v2_pipeline_validation_bfc10d6_20260903T202600Z
+
+completed its baseline and GBDT legs but stopped before a neural history,
+checkpoint, optimizer step, or neural score because an assertion incorrectly
+required every active entrant to have a prior slow row. The partial root is
+excluded from the completed validation. Its operational-log, failure-record,
+and inventory SHA-256 values are
+`722d3878c21e9c0068e56f7be63642d6fec9588b658c898dcce02623938a1dfb`,
+`88b27768a7e02170ae100c09e0d99854514095d417bbf4528621a45fff4157a6`,
+and `48526a9e3146ed6c0b9b5718d3f7dd5ae10367152f96ceca7e321a699ac820cd`.
+Commit `e74204d` repairs only that valid empty-history case without dropping the
+active name or changing targets, scores, pooling, or checkpoint structure.
+
+The fresh completed development-only validation root is:
+
+    D:\quant-data\b3\processed\v2_pipeline_validation_e74204d_20260903T205000Z
+
+It ran only bounded integration workloads: at most 16 fit sessions, 20
+selection sessions, slow lookback 20, one epoch per neural leg, seed 11, and at
+most 50 GBDT rounds. The requested date range was 2020-01-30 through
+2024-07-26. Every number below is therefore a wiring check, not a research
+claim. Each table cell is pooled primary IC / headline 4-bps-cost, 2%-borrow
+net excess over all-cash CDI in NAV bps/day.
+
+| Arm | F1 | F2 | F3 |
+|---|---:|---:|---:|
+| Momentum 12-1 | `0.085347 / +24.876855` | `0.058366 / +4.077554` | `0.041531 / -36.509218` |
+| Reversal 21 | `-0.010227 / +6.883263` | `0.047682 / -21.350562` | `0.139340 / +64.000873` |
+| Reversal 5 | `-0.002126 / -18.944204` | `0.014973 / -10.857145` | `0.104678 / +6.454474` |
+| Reversal-5 / momentum blend | `0.059524 / -6.690889` | `0.074650 / -7.431065` | `0.094621 / -11.306379` |
+| GBDT triage | `0.007455 / -39.847524` | `0.034331 / +25.989855` | — |
+| Neural from-scratch smoke | `-0.011038 / -25.127973` | — | — |
+| Neural persistence-0.1 probe | `-0.008541 / -10.844082` | — | — |
+
+The Stage-P smoke wrote checkpoint SHA-256
+`c8e4594a1e81aa3aed51fd2525e2aa88cdfba3ada88bdc9021bb7a779c7981e3`,
+and the Stage-F handoff manifest bound it successfully with SHA-256
+`320c3e2f453454897906ef6c5691c5802ede10349234fcc053ffe968e870faa1`.
+Thus baseline, GBDT, neural train-to-score-to-evaluate, persistence-loss, Stage
+P, and P-to-F checkpoint paths all completed.
+
+The pipeline-validation manifest, original core inventory, copied operational
+log, post-validation audit, and final log-inclusive inventory SHA-256 values are
+respectively
+`d8a267aa54fc89d344b874ad9880bfa664e64f891716f5a8b5e80080b01f269b`,
+`9625464c20fa4b54846be984a524a384ab4160b55c34522661dd62db479946ea`,
+`121a84533bc0971a8130560a9db4f2cefa201aa91d18157830ab4ccddc323fbe`,
+`84f3e31f7ca47c3d5f77deed651d0dbcb86dfd8e29235933d9e6087a4a7ed898`,
+and `1f3017fefba2ade21dde29b9d0ab214595f9735a1955d6dca55f258c37d6ba3c`.
+The last inventory covers 195 files totaling 25,667,412 bytes, plus itself and
+its SHA sidecar.
+
+Both the store and pipeline manifests record
+`official_validation_accessed=false` and `test_accessed=false`. No 2025 or 2026
+v2 feature or target row was decoded by the audit, trainer, scorer, or evaluator.
+No v2 research result, model designation, or deployment change was made. All v2
+implementation, build, and validation work ran locally; no paid Lambda instance
+was claimed.

@@ -38,6 +38,7 @@ def test_daily_weights_match_experiment58_on_fully_observed_fixture() -> None:
         score_mask=score_mask,
         active=active,
         total_return_close=close,
+        unresolved_action=np.zeros_like(active),
         cdi_returns=cdi,
         config=config,
     )
@@ -72,6 +73,7 @@ def test_daily_swing_full_cost_accounting_matches_hand_calculation() -> None:
         score_mask=mask,
         active=mask,
         total_return_close=close,
+        unresolved_action=np.zeros_like(mask),
         cdi_returns=np.asarray([0.0, 0.001]),
         config=config,
     )
@@ -114,6 +116,7 @@ def test_future_close_missingness_does_not_change_decision_weights() -> None:
         score_mask=mask,
         active=mask,
         total_return_close=missing,
+        unresolved_action=np.zeros_like(mask),
         cdi_returns=np.zeros(3),
         config=config,
     )
@@ -143,6 +146,7 @@ def test_same_day_close_outcome_cannot_change_decision_weights() -> None:
         score_mask=mask,
         active=mask,
         total_return_close=changed_close,
+        unresolved_action=np.zeros_like(mask),
         cdi_returns=np.zeros(3),
         config=config,
     )
@@ -163,6 +167,7 @@ def test_sensitivity_grid_contains_the_frozen_six_cells() -> None:
         score_mask=mask,
         active=mask,
         total_return_close=np.full_like(scores, 100.0),
+        unresolved_action=np.zeros_like(mask),
         cdi_returns=np.zeros(3),
     )
 
@@ -174,3 +179,33 @@ def test_sensitivity_grid_contains_the_frozen_six_cells() -> None:
         (7.0, 0.02),
         (7.0, 0.04),
     }
+
+
+def test_unresolved_exit_invalidates_held_interval_without_changing_weights() -> None:
+    dates = tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(3))
+    scores = np.tile(np.asarray([-2.0, -1.0, 1.0, 2.0]), (3, 1))
+    mask = np.ones_like(scores, dtype=bool)
+    close = np.full_like(scores, 100.0)
+    unresolved = np.zeros_like(mask)
+    unresolved[1, 0] = True
+    unresolved[1, 1] = True  # unheld names do not invalidate the interval
+    config = DailySwingConfig(k_per_side=1, rank_band=0.0)
+    expected = build_daily_weights(scores, mask, mask, config)
+
+    result = simulate_daily_swing(
+        dates=dates,
+        scores=scores,
+        score_mask=mask,
+        active=mask,
+        total_return_close=close,
+        unresolved_action=unresolved,
+        cdi_returns=np.zeros(3),
+        config=config,
+    )
+
+    np.testing.assert_array_equal(result.weights, expected[:-1])
+    assert result.interval_valid.tolist() == [False, True]
+    assert result.unresolved_action_position_count.tolist() == [1, 0]
+    assert np.isnan(result.net_excess_all_cash_bps[0])
+    assert np.isfinite(result.net_excess_all_cash_bps[1])
+    assert result.terminal_liquidation_valid is True

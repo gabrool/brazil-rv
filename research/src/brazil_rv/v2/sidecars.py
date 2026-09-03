@@ -19,8 +19,10 @@ ARCHIVE_COLUMN_MAP: dict[str, dict[str, str | None]] = {
         "loan_balance_to_volume_20": "loan_balance_to_volume_20",
         "loan_balance_change_1": "loan_balance_change_1",
         "loan_balance_change_5": "loan_balance_change_5",
-        "loan_rate": None,
-        "loan_rate_change_5": None,
+        # The archived transforms are one-to-one.  They are inverted below
+        # before the canonical v2 fields are rank-normalized.
+        "loan_rate": "lending_taker_fee_level_log_tanh",
+        "loan_rate_change_5": "lending_taker_fee_change_5_tanh",
     },
     "events": {
         "sessions_until_announced_earnings": None,
@@ -32,17 +34,17 @@ ARCHIVE_COLUMN_MAP: dict[str, dict[str, str | None]] = {
     },
     "options": {
         "put_call_oi_ratio": None,
-        "delta_oi_to_volume_1": None,
+        # This is the archived one-session OI change divided by trailing
+        # stock ADV20, behind a reversible signed-log/tanh transform.
+        "delta_oi_to_volume_1": "options_oi_change_to_stock_adv20_tanh",
         "atm_iv_to_median_20": None,
-        "put_skew": None,
+        "put_skew": "options_put_skew_tanh",
     },
     "oddlot": {
         "oddlot_volume_share": "oddlot_volume_share",
         "oddlot_volume_share_change_5": "oddlot_volume_share_change_5",
     },
-    "rebalance": {
-        name: name for name in SIDECAR_FEATURES["rebalance"]
-    },
+    "rebalance": {name: name for name in SIDECAR_FEATURES["rebalance"]},
     "fundamentals": {
         "log_market_cap": None,
         "book_to_market": None,
@@ -170,8 +172,12 @@ def materialize_sidecar(
             continue
         key = (date_index, isin_index)
         previous = chosen.get(key)
-        if previous is not None and _availability_order(previous) == _availability_order(row):
-            raise ValueError("sidecar has ambiguous rows at one availability coordinate")
+        if previous is not None and _availability_order(
+            previous
+        ) == _availability_order(row):
+            raise ValueError(
+                "sidecar has ambiguous rows at one availability coordinate"
+            )
         if previous is None or _availability_order(row) > _availability_order(previous):
             chosen[key] = row
     for (date_index, isin_index), row in chosen.items():
@@ -224,14 +230,19 @@ def _raw_lending_features(
 ) -> pl.DataFrame:
     """Derive exact v2 lending fields from raw, D+1-available quantities."""
 
-    required = {
-        "available_date",
-        "isin",
+    required = {"available_date", "isin"}
+    if not required.issubset(source.columns):
+        return source
+    has_balance = {
         "source_position_date",
         "lending_balance_brl",
-    }
-    if not required.issubset(source.columns):
-        return pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
+    }.issubset(source.columns)
+    has_rate = {
+        "source_trade_date",
+        "lending_taker_fee_level_log_tanh",
+    }.issubset(source.columns)
+    if not has_balance and not has_rate:
+        return source
     calendar = tuple(_as_date(value) for value in dates)
     date_lookup = {value: index for index, value in enumerate(calendar)}
     isin_lookup = {value: index for index, value in enumerate(isins)}
@@ -239,55 +250,145 @@ def _raw_lending_features(
     if volume.shape != (len(calendar), len(isins)):
         raise ValueError("daily BRL volume is misaligned with lending axes")
     levels: dict[tuple[str, date], tuple[float, bool]] = {}
+    rates: dict[tuple[str, date], tuple[float, bool]] = {}
     output_rows: list[dict[str, object]] = []
     for row in source.iter_rows(named=True):
         isin = str(row["isin"])
-        source_date = _as_date(row["source_position_date"])
-        day = date_lookup.get(source_date)
-        name = isin_lookup.get(isin)
-        balance = row["lending_balance_brl"]
-        valid = day is not None and name is not None and day >= 19
-        if valid:
-            history = volume[day - 19 : day + 1, name]
-            # A non-trading name-day is an economic zero in the exact calendar
-            # window.  Negative recorded volume is invalid.
-            valid = bool(np.all(~np.isfinite(history) | (history >= 0.0)))
-            mean_volume = (
-                float(np.mean(np.where(np.isfinite(history), history, 0.0)))
-                if valid
-                else np.nan
+        output = dict(row)
+        if has_balance:
+            output.update(
+                {
+                    "loan_balance_to_volume_20": 0.0,
+                    "loan_balance_to_volume_20_mask": False,
+                    "loan_balance_change_1": 0.0,
+                    "loan_balance_change_1_mask": False,
+                    "loan_balance_change_5": 0.0,
+                    "loan_balance_change_5_mask": False,
+                }
             )
-            valid &= (
-                balance is not None
-                and np.isfinite(float(balance))
-                and float(balance) >= 0.0
-                and np.isfinite(mean_volume)
-                and mean_volume > 0.0
+        if has_rate:
+            output.update(
+                {
+                    "loan_rate": 0.0,
+                    "loan_rate_mask": False,
+                    "loan_rate_change_5": 0.0,
+                    "loan_rate_change_5_mask": False,
+                }
             )
-        level = float(balance) / mean_volume if valid else 0.0
-        levels[(isin, source_date)] = (level, valid)
-        output_rows.append(
-            {
-                "available_date": _as_date(row["available_date"]),
-                "isin": isin,
-                "source_position_date": source_date,
-                "loan_balance_to_volume_20": level,
-                "loan_balance_to_volume_20_mask": valid,
-            }
-        )
+        source_position = row.get("source_position_date")
+        if has_balance and source_position is not None:
+            source_date = _as_date(source_position)
+            day = date_lookup.get(source_date)
+            name = isin_lookup.get(isin)
+            balance = row.get("lending_balance_brl")
+            valid = day is not None and name is not None and day >= 19
+            mean_volume = np.nan
+            if valid:
+                history = volume[day - 19 : day + 1, name]
+                # A non-trading name-day is an economic zero in the exact
+                # calendar window. Negative recorded volume is invalid.
+                valid = bool(np.all(~np.isfinite(history) | (history >= 0.0)))
+                mean_volume = (
+                    float(np.mean(np.where(np.isfinite(history), history, 0.0)))
+                    if valid
+                    else np.nan
+                )
+                valid &= (
+                    balance is not None
+                    and np.isfinite(float(balance))
+                    and float(balance) >= 0.0
+                    and np.isfinite(mean_volume)
+                    and mean_volume > 0.0
+                )
+            level = float(balance) / mean_volume if valid else 0.0
+            levels[(isin, source_date)] = (level, valid)
+            output["loan_balance_to_volume_20"] = level
+            output["loan_balance_to_volume_20_mask"] = valid
+        source_trade = row.get("source_trade_date")
+        transformed = row.get("lending_taker_fee_level_log_tanh")
+        transformed_mask = row.get("lending_taker_fee_level_log_tanh_mask")
+        if has_rate and source_trade is not None:
+            source_date = _as_date(source_trade)
+            valid = (
+                transformed is not None
+                and transformed_mask is not False
+                and np.isfinite(float(transformed))
+                and abs(float(transformed)) < 1.0
+            )
+            rate = (
+                float(np.expm1(2.0 * np.arctanh(float(transformed)))) if valid else 0.0
+            )
+            valid &= np.isfinite(rate) and rate >= 0.0
+            rates[(isin, source_date)] = (rate, valid)
+            output["loan_rate"] = rate if valid else 0.0
+            output["loan_rate_mask"] = valid
+        output_rows.append(output)
     for row in output_rows:
-        day = date_lookup.get(row["source_position_date"])
-        current = levels[(row["isin"], row["source_position_date"])]
-        for lag in (1, 5):
-            prior_date = calendar[day - lag] if day is not None and day >= lag else None
-            prior = levels.get((row["isin"], prior_date), (0.0, False))
+        source_position = row.get("source_position_date")
+        if source_position is not None:
+            source_date = _as_date(source_position)
+            day = date_lookup.get(source_date)
+            current = levels.get((row["isin"], source_date), (0.0, False))
+            for lag in (1, 5):
+                prior_date = (
+                    calendar[day - lag] if day is not None and day >= lag else None
+                )
+                prior = levels.get((row["isin"], prior_date), (0.0, False))
+                valid = current[1] and prior[1]
+                feature = f"loan_balance_change_{lag}"
+                row[feature] = current[0] - prior[0] if valid else 0.0
+                row[f"{feature}_mask"] = valid
+        source_trade = row.get("source_trade_date")
+        if source_trade is not None:
+            source_date = _as_date(source_trade)
+            day = date_lookup.get(source_date)
+            prior_date = calendar[day - 5] if day is not None and day >= 5 else None
+            current = rates.get((row["isin"], source_date), (0.0, False))
+            prior = rates.get((row["isin"], prior_date), (0.0, False))
             valid = current[1] and prior[1]
-            feature = f"loan_balance_change_{lag}"
-            row[feature] = current[0] - prior[0] if valid else 0.0
-            row[f"{feature}_mask"] = valid
-    return pl.DataFrame(output_rows) if output_rows else pl.DataFrame(
-        schema={"available_date": pl.Date, "isin": pl.String}
+            row["loan_rate_change_5"] = current[0] - prior[0] if valid else 0.0
+            row["loan_rate_change_5_mask"] = valid
+    return (
+        pl.DataFrame(output_rows)
+        if output_rows
+        else pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
     )
+
+
+def _raw_options_features(source: pl.DataFrame) -> pl.DataFrame:
+    """Invert archive transforms whose raw v2 quantity is recoverable."""
+
+    output = source
+    transforms = (
+        (
+            "options_oi_change_to_stock_adv20_tanh",
+            "delta_oi_to_volume_1",
+            3.0,
+            True,
+        ),
+        ("options_put_skew_tanh", "put_skew", 0.25, False),
+    )
+    for archived, feature, scale, signed_log in transforms:
+        if archived not in output.columns:
+            continue
+        archived_mask = f"{archived}_mask"
+        values = output.get_column(archived).cast(pl.Float64).fill_null(0.0).to_numpy()
+        valid = np.isfinite(values) & (np.abs(values) < 1.0)
+        if archived_mask in output.columns:
+            valid &= output.get_column(archived_mask).fill_null(False).to_numpy()
+        inverse = np.zeros(len(values), dtype=np.float64)
+        latent = scale * np.arctanh(np.where(valid, values, 0.0))
+        if signed_log:
+            inverse[valid] = np.sign(latent[valid]) * np.expm1(np.abs(latent[valid]))
+        else:
+            inverse[valid] = latent[valid]
+        valid &= np.isfinite(inverse)
+        inverse[~valid] = 0.0
+        output = output.with_columns(
+            pl.Series(feature, inverse),
+            pl.Series(f"{feature}_mask", valid),
+        )
+    return output
 
 
 def _raw_oddlot_features(
@@ -341,12 +442,12 @@ def _raw_oddlot_features(
         current = shares[(row["isin"], row["source_trade_date"])]
         prior = shares.get((row["isin"], prior_date), (0.0, False))
         valid = current[1] and prior[1]
-        row["oddlot_volume_share_change_5"] = (
-            current[0] - prior[0] if valid else 0.0
-        )
+        row["oddlot_volume_share_change_5"] = current[0] - prior[0] if valid else 0.0
         row["oddlot_volume_share_change_5_mask"] = valid
-    return pl.DataFrame(rows) if rows else pl.DataFrame(
-        schema={"available_date": pl.Date, "isin": pl.String}
+    return (
+        pl.DataFrame(rows)
+        if rows
+        else pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
     )
 
 
@@ -366,12 +467,12 @@ def derive_known_archive_features(
         return _raw_lending_features(source, dates, isins, daily_volume_brl)
     if group == "oddlot":
         return _raw_oddlot_features(source, dates)
+    if group == "options":
+        return _raw_options_features(source)
     return source
 
 
-def bind_sidecar_isins(
-    source: pl.DataFrame, assignments: pl.DataFrame
-) -> pl.DataFrame:
+def bind_sidecar_isins(source: pl.DataFrame, assignments: pl.DataFrame) -> pl.DataFrame:
     """Replace a v1 ``security_id`` key with its audited one-to-one ISIN."""
 
     if "isin" in source.columns:
@@ -398,7 +499,9 @@ def available_archive_mapping(
         raise ValueError(f"unknown sidecar group: {group}")
     available = set(columns)
     return {
-        feature: source if source in available else None
+        feature: (
+            feature if feature in available else source if source in available else None
+        )
         for feature, source in ARCHIVE_COLUMN_MAP[group].items()
     }
 
@@ -430,12 +533,16 @@ def materialize_known_archive(
     )
 
 
-def validate_sidecar(result: SidecarResult, active: NDArray[np.bool_] | None = None) -> None:
+def validate_sidecar(
+    result: SidecarResult, active: NDArray[np.bool_] | None = None
+) -> None:
     if result.values.shape != result.valid.shape or result.values.ndim != 3:
         raise ValueError("sidecar arrays must be aligned [date, name, feature]")
     if result.values.shape[2] != len(result.feature_names):
         raise ValueError("sidecar feature axis is misaligned")
-    if not np.isfinite(result.values).all() or np.any(result.values[~result.valid] != 0):
+    if not np.isfinite(result.values).all() or np.any(
+        result.values[~result.valid] != 0
+    ):
         raise ValueError("sidecar values must be finite and invalid cells exactly zero")
     if active is not None:
         membership = np.asarray(active, dtype=np.bool_)

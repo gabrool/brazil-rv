@@ -11,7 +11,7 @@ import pytest
 from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
 from brazil_rv.v2.contract import FINETUNE_START, HORIZONS
 from brazil_rv.v2.score import ScoreArtifact
-from brazil_rv.v2.store import V2Store, write_store
+from brazil_rv.v2.store import V2Store, open_store_for_dates, write_store
 from brazil_rv.v2.train import StageTrainingResult
 from brazil_rv.v2 import validate_pipeline as pipeline
 
@@ -46,6 +46,9 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         arrays={
             "active": np.ones((day_count, name_count), dtype=np.bool_),
             "observed": np.ones((day_count, name_count), dtype=np.bool_),
+            "unresolved_action": np.zeros(
+                (day_count, name_count), dtype=np.bool_
+            ),
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=np.bool_),
             "intraday_values": intraday,
@@ -525,6 +528,38 @@ def test_runtime_caps_and_dataset_refuse_sealed_dates(tmp_path: Path) -> None:
             lookback=20,
             sidecars=(),
         )
+
+
+def test_evaluation_inputs_zero_targets_outside_the_exact_window(
+    tmp_path: Path,
+) -> None:
+    store_root, _, _, _, _ = _development_store(tmp_path)
+    dates = np.load(store_root / "date_index.npy", allow_pickle=False)
+    authorized = np.arange(len(dates) - 3, len(dates), dtype=np.int64)
+    store, _ = open_store_for_dates(
+        store_root,
+        authorized,
+        purpose="evaluation",
+    )
+    indices = authorized[:2]
+    score_shape = (len(indices), len(store.isins), len(HORIZONS))
+    try:
+        inputs = pipeline._evaluation_inputs(
+            store,
+            indices,
+            np.zeros(score_shape, dtype=np.float32),
+            np.ones(score_shape, dtype=np.bool_),
+            np.full(len(dates), 0.0004, dtype=np.float64),
+            {},
+        )
+    finally:
+        store.close()
+
+    assert not inputs.target_mask[-1].any()
+    assert not inputs.raw_target_mask[-1].any()
+    assert np.all(inputs.residual_midrank_targets[~inputs.target_mask] == 0.0)
+    assert np.all(inputs.raw_midrank_targets[~inputs.raw_target_mask] == 0.0)
+    assert np.all(inputs.raw_log_returns[~inputs.raw_target_mask] == 0.0)
 
 
 def test_git_identity_refuses_untracked_files(monkeypatch: pytest.MonkeyPatch) -> None:

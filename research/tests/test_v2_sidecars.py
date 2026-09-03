@@ -13,24 +13,40 @@ from brazil_rv.v2.sidecars import (
 )
 
 
-def test_transformed_lending_proxy_is_not_relabelled_as_exact_rate() -> None:
+def test_reversible_lending_rate_archive_is_inverted() -> None:
+    raw_rate = 0.125
     source = pl.DataFrame(
         {
             "available_date": [date(2024, 1, 2)],
+            "source_trade_date": [date(2024, 1, 1)],
             "isin": ["BRTESTACNOR1"],
-            "lending_taker_fee_level_log_tanh": [0.25],
+            "lending_taker_fee_level_log_tanh": [
+                np.tanh(np.log1p(raw_rate) / 2.0)
+            ],
+            "lending_taker_fee_level_log_tanh_mask": [True],
         }
     )
     mapping = available_archive_mapping("lending", source.columns)
     assert mapping["loan_balance_to_volume_20"] is None
-    result = materialize_known_archive(
-        source, [date(2024, 1, 2)], ["BRTESTACNOR1"], group="lending"
+    assert mapping["loan_rate"] == "lending_taker_fee_level_log_tanh"
+    derived = derive_known_archive_features(
+        source,
+        [date(2024, 1, 1), date(2024, 1, 2)],
+        ["BRTESTACNOR1"],
+        group="lending",
+        daily_volume_brl=np.ones((2, 1)),
     )
-    assert result.valid.sum() == 0
-    assert not result.valid[0, 0, 0]
+    result = materialize_known_archive(
+        derived,
+        [date(2024, 1, 1), date(2024, 1, 2)],
+        ["BRTESTACNOR1"],
+        group="lending",
+    )
+    assert result.values[1, 0, 3] == pytest.approx(raw_rate)
+    assert result.valid[1, 0, 3]
 
 
-def test_unavailable_option_fields_stay_masked_and_leverage_is_exact() -> None:
+def test_reversible_option_fields_are_available_and_leverage_is_exact() -> None:
     options = available_archive_mapping(
         "options",
         [
@@ -40,12 +56,43 @@ def test_unavailable_option_fields_stay_masked_and_leverage_is_exact() -> None:
             "options_put_skew_tanh",
         ],
     )
-    assert all(source is None for source in options.values())
+    assert options == {
+        "put_call_oi_ratio": None,
+        "delta_oi_to_volume_1": "options_oi_change_to_stock_adv20_tanh",
+        "atm_iv_to_median_20": None,
+        "put_skew": "options_put_skew_tanh",
+    }
     fundamentals = available_archive_mapping(
         "fundamentals", ["fund_leverage"]
     )
     assert fundamentals["leverage"] == "fund_leverage"
     assert sum(source is not None for source in fundamentals.values()) == 1
+
+
+def test_reversible_option_transforms_are_inverted() -> None:
+    delta = -0.75
+    skew = 0.12
+    source = pl.DataFrame(
+        {
+            "available_date": [date(2024, 1, 2)],
+            "isin": ["BRTESTACNOR1"],
+            "options_oi_change_to_stock_adv20_tanh": [
+                np.tanh(np.sign(delta) * np.log1p(abs(delta)) / 3.0)
+            ],
+            "options_oi_change_to_stock_adv20_tanh_mask": [True],
+            "options_put_skew_tanh": [np.tanh(skew / 0.25)],
+            "options_put_skew_tanh_mask": [True],
+        }
+    )
+    derived = derive_known_archive_features(
+        source, [date(2024, 1, 2)], ["BRTESTACNOR1"], group="options"
+    )
+    result = materialize_known_archive(
+        derived, [date(2024, 1, 2)], ["BRTESTACNOR1"], group="options"
+    )
+    assert result.values[0, 0, 1] == pytest.approx(delta)
+    assert result.values[0, 0, 3] == pytest.approx(skew)
+    assert result.valid[0, 0].tolist() == [False, True, False, True]
 
 
 def test_raw_lending_formulas_use_source_date_volume_and_d_plus_one() -> None:
@@ -83,6 +130,49 @@ def test_raw_lending_formulas_use_source_date_volume_and_d_plus_one() -> None:
     )
     causal_result = materialize_known_archive(causal, days, [isin], group="lending")
     assert causal_result.values[20, 0, 0] == result.values[20, 0, 0]
+
+
+def test_parser_combines_balance_and_reversible_rate_archives(tmp_path) -> None:
+    days = [date(2024, 1, 1) + timedelta(days=index) for index in range(27)]
+    isin = "BRTESTACNOR1"
+    security_id = "security-one"
+    balance = pl.DataFrame(
+        {
+            "source_position_date": days[19:26],
+            "available_date": days[20:27],
+            "security_id": [security_id] * 7,
+            "lending_balance_brl": [200.0] * 7,
+        }
+    )
+    rates = [0.10, 0.11, 0.12, 0.13, 0.14, 0.25, 0.30]
+    strong = pl.DataFrame(
+        {
+            "source_trade_date": days[19:26],
+            "available_date": days[20:27],
+            "security_id": [security_id] * 7,
+            "lending_taker_fee_level_log_tanh": [
+                np.tanh(np.log1p(value) / 2.0) for value in rates
+            ],
+            "lending_taker_fee_level_log_tanh_mask": [True] * 7,
+            "lending_taker_fee_change_5_tanh": [0.0] * 7,
+            "lending_taker_fee_change_5_tanh_mask": [False] * 5 + [True] * 2,
+        }
+    )
+    balance_path = tmp_path / "balance.parquet"
+    strong_path = tmp_path / "strong.parquet"
+    balance.write_parquet(balance_path)
+    strong.write_parquet(strong_path)
+    result = _parse_sidecars(
+        [f"lending={balance_path}", f"lending={strong_path}"],
+        days,
+        [isin],
+        pl.DataFrame({"security_id": [security_id], "isin": [isin]}),
+        np.full((len(days), 1), 100.0),
+    )["lending"]
+    assert result.values[20, 0, 0] == pytest.approx(2.0)
+    assert result.values[20, 0, 3] == pytest.approx(0.10)
+    assert result.values[25, 0, 4] == pytest.approx(0.15)
+    assert result.valid[25, 0].tolist() == [True, True, True, True, True]
 
 
 def test_raw_oddlot_share_and_exact_session_lag_change() -> None:

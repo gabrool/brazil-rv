@@ -116,30 +116,13 @@ def test_official_window_requires_and_records_registration(tmp_path) -> None:
             )
 
 
-def test_test_dates_are_refused_before_array_access(tmp_path, monkeypatch) -> None:
-    path = tmp_path / "sealed.npy"
-    registration_root = tmp_path / "preregistrations"
-    registration_root.mkdir()
-    registration = registration_root / "token.md"
-    registration.write_text("cannot open the test\n", encoding="utf-8")
-    called = False
-
-    def fail_load(*args: object, **kwargs: object) -> None:
-        nonlocal called
-        called = True
-        raise AssertionError("sealed array was opened")
-
-    monkeypatch.setattr(splits.np, "load", fail_load)
-
+def test_test_dates_are_refused_and_no_whole_array_loader_is_public() -> None:
+    assert not hasattr(splits, "load_authorized_array")
     with pytest.raises(ValueError, match="unconditionally sealed"):
-        splits.load_authorized_array(
-            path,
-            dates=(date(2026, 1, 2),),
+        splits.authorize_dates(
+            (date(2026, 1, 2),),
             purpose="evaluation",
-            registration_path=registration,
-            preregistration_root=registration_root,
         )
-    assert called is False
 
 
 def test_registration_cannot_escape_preregistration_root(tmp_path) -> None:

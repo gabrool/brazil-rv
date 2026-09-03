@@ -8,10 +8,13 @@ import numpy as np
 import pytest
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
 
 from brazil_rv.modeling.engine import soft_spearman_loss
 from brazil_rv.modeling.trajectory import ModelEMA
 from brazil_rv.v2.config import ModelConfig
+from brazil_rv.v2.contract import PRETRAIN_END, STORE_START
+from brazil_rv.v2.data import V2DailyDataset
 from brazil_rv.v2.losses import (
     multi_horizon_loss_components,
     score_persistence_penalty,
@@ -34,6 +37,7 @@ from brazil_rv.v2.train import (
     _require_production_pair_sampler,
     _validate_tracked_stage_inputs,
 )
+from brazil_rv.v2.store import write_store
 
 
 def test_multihead_objective_averages_each_horizon_separately() -> None:
@@ -236,42 +240,82 @@ def test_fullgraph_compile_captures_gru_forward() -> None:
     assert scores.shape == (2, 3, 6)
 
 
+def _tracked_pretrain_loaders(tmp_path):
+    calendar = np.arange(
+        np.datetime64(STORE_START),
+        np.datetime64(PRETRAIN_END) + np.timedelta64(1, "D"),
+        dtype="datetime64[D]",
+    )
+    dates = calendar[np.is_busday(calendar)]
+    fit, _, selection = pretrain_internal_split(np.arange(dates.size))
+    generator = np.random.default_rng(19)
+    name_count = 4
+    slow = generator.standard_normal((dates.size, name_count, 32)).astype(
+        np.float32
+    )
+    targets = generator.standard_normal((dates.size, name_count, 5)).astype(
+        np.float32
+    )
+    store = write_store(
+        tmp_path / "tracked_store",
+        dates=dates,
+        isins=[f"BRTEST{index:02d}NOR1" for index in range(name_count)],
+        arrays={
+            "slow_values": slow,
+            "slow_valid": np.ones_like(slow, dtype=np.bool_),
+            "active": np.ones((dates.size, name_count), dtype=np.bool_),
+            "target_primary": targets,
+            "target_valid": np.ones_like(targets, dtype=np.bool_),
+        },
+        feature_names={
+            "slow": [f"slow_{index}" for index in range(32)],
+            "intraday": [],
+        },
+    )
+    train_dataset = V2DailyDataset(
+        store,
+        fit[-9:],
+        stage="pretrain",
+        lookback=20,
+        purpose="training",
+    )
+    selection_dataset = V2DailyDataset(
+        store,
+        selection[:6],
+        stage="pretrain",
+        lookback=20,
+        purpose="selection",
+    )
+
+    def train_loader():
+        return DataLoader(
+            train_dataset,
+            batch_sampler=DatePairBatchSampler(
+                train_dataset.date_indices,
+                pairs_per_batch=8,
+                seed=19,
+                drop_last=True,
+            ),
+            num_workers=0,
+        )
+
+    selection_loader = DataLoader(
+        selection_dataset,
+        batch_size=len(selection_dataset),
+        shuffle=False,
+        num_workers=0,
+    )
+    return train_loader, selection_loader
+
+
 def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
     config = ModelConfig(
         slow_feature_count=32,
         slow_lookback=20,
         compile_forward=False,
     )
-    generator = torch.Generator().manual_seed(19)
-    batch = {
-        "date_index": torch.tensor([24, 25]),
-        "slow_features": torch.randn(2, 4, 20, 32, generator=generator),
-        "slow_history_mask": torch.ones(2, 4, 20, dtype=torch.bool),
-        "active_mask": torch.ones(2, 4, dtype=torch.bool),
-        "fast_present": torch.zeros(2, 4),
-        "days_since_last_slow_row": torch.zeros(2, 4),
-        "targets": torch.randn(2, 4, 5, generator=generator),
-        "target_mask": torch.ones(2, 4, 5, dtype=torch.bool),
-        "to_close_target": torch.zeros(2, 4),
-        "to_close_mask": torch.zeros(2, 4, dtype=torch.bool),
-        "trade_date": ["2020-01-02", "2020-01-03"],
-    }
-
-    class EpochLoader(list):
-        epochs: list[int]
-
-        def __init__(self, values) -> None:
-            super().__init__(values)
-            self.epochs = []
-
-        def set_epoch(self, epoch: int) -> None:
-            self.epochs.append(epoch)
-
-    train_loader = EpochLoader([batch])
-    selection_batch = {
-        name: (value[:1] if isinstance(value, torch.Tensor) else value[:1])
-        for name, value in batch.items()
-    }
+    train_loader_factory, selection_loader = _tracked_pretrain_loaders(tmp_path)
+    train_loader = train_loader_factory()
     output_dir = tmp_path / "stage_p"
     output_dir.mkdir()
     (output_dir / "launcher.stdout.log").write_text("", encoding="utf-8")
@@ -281,39 +325,39 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
         seed=29,
         fold="pretrain_internal",
         train_loader=train_loader,
-        selection_loader=[selection_batch],
+        selection_loader=selection_loader,
         output_dir=output_dir,
         model_config=config,
         maximum_epochs=1,
         patience=1,
         device=torch.device("cpu"),
-        allow_untracked_test_loaders=True,
     )
     assert result.raw_patience_checkpoint.is_file()
     assert result.final_ema_checkpoint.is_file()
     assert result.history_path.is_file()
     assert result.manifest_path.is_file()
-    assert train_loader.epochs == [0]
+    assert train_loader.batch_sampler.epoch == 0
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["seed"] == 29
     assert manifest["fold"] == "pretrain_internal"
     assert manifest["official_validation_accessed"] is False
     assert manifest["test_accessed"] is False
-    assert manifest["allow_untracked_test_loaders"] is True
+    assert "allow_untracked_test_loaders" not in manifest
+    assert manifest["checkpoint_input_contract"]["training"] is not None
+    assert manifest["checkpoint_input_contract"]["selection"] is not None
 
-    repeat_loader = EpochLoader([batch])
+    repeat_loader = train_loader_factory()
     repeated = train_stage(
         stage="P",
         seed=29,
         fold="pretrain_internal",
         train_loader=repeat_loader,
-        selection_loader=[selection_batch],
+        selection_loader=selection_loader,
         output_dir=tmp_path / "stage_p_repeat",
         model_config=config,
         maximum_epochs=1,
         patience=1,
         device=torch.device("cpu"),
-        allow_untracked_test_loaders=True,
     )
     assert result.history_path.read_bytes() == repeated.history_path.read_bytes()
     first_state = torch.load(

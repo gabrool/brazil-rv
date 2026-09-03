@@ -48,6 +48,7 @@ class EvaluationInputs:
     raw_target_mask: NDArray[np.bool_]
     active: NDArray[np.bool_]
     total_return_close: NDArray[np.floating]
+    unresolved_action: NDArray[np.bool_]
     cdi_returns: NDArray[np.floating]
     horizons: tuple[int, ...] = HORIZONS
     source_artifact_hashes: Mapping[str, str] | None = None
@@ -148,6 +149,8 @@ def _validate(inputs: EvaluationInputs) -> None:
         raise ValueError("active mask shape differs from scores")
     if np.asarray(inputs.total_return_close).shape != matrix_shape:
         raise ValueError("total-return close shape differs from scores")
+    if np.asarray(inputs.unresolved_action).shape != matrix_shape:
+        raise ValueError("unresolved-action mask shape differs from scores")
     if np.asarray(inputs.cdi_returns).shape != (len(dates),):
         raise ValueError("CDI return axis differs from evaluation dates")
     if np.asarray(inputs.score_mask).dtype != np.bool_:
@@ -158,6 +161,8 @@ def _validate(inputs: EvaluationInputs) -> None:
         raise TypeError("raw_target_mask must be a Boolean array")
     if active.dtype != np.bool_:
         raise TypeError("active must be a Boolean array")
+    if np.asarray(inputs.unresolved_action).dtype != np.bool_:
+        raise TypeError("unresolved_action must be a Boolean array")
     if not np.isfinite(np.asarray(inputs.cdi_returns, dtype=np.float64)).all():
         raise ValueError("CDI returns must be finite")
     for horizon_index, horizon in enumerate(HORIZONS):
@@ -347,6 +352,9 @@ def _swing_rows(
                 "missing_exit_position_count": int(
                     result.missing_exit_position_count[index]
                 ),
+                "unresolved_action_position_count": int(
+                    result.unresolved_action_position_count[index]
+                ),
                 "gross_pnl_bps": _finite_or_none(result.gross_pnl_bps[index]),
                 "turnover_fraction_nav": _finite_or_none(
                     result.turnover_fraction_nav[index]
@@ -383,6 +391,7 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         "raw_target_mask": _array_sha256(np.asarray(inputs.raw_target_mask)),
         "active": _array_sha256(np.asarray(inputs.active)),
         "total_return_close": _array_sha256(np.asarray(inputs.total_return_close)),
+        "unresolved_action": _array_sha256(np.asarray(inputs.unresolved_action)),
         "cdi_returns": _array_sha256(np.asarray(inputs.cdi_returns)),
     }
 
@@ -402,6 +411,10 @@ def _economics_contract() -> dict[str, object]:
         "margin_fraction_of_gross": config.margin_fraction_of_gross,
         "annual_sessions": config.annual_sessions,
         "terminal_liquidation": config.terminal_liquidation,
+        "unresolved_action_policy": (
+            "positions are frozen from decision-time scores; a held close-to-close "
+            "interval is invalid ex post when its exit date is unresolved"
+        ),
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
         "annual_borrow_rates": list(ECONOMICS_ANNUAL_BORROW_RATES),
         "headline": {
@@ -445,6 +458,7 @@ def evaluate_scores(
         score_mask=economics_mask,
         active=np.asarray(inputs.active, dtype=bool),
         total_return_close=inputs.total_return_close,
+        unresolved_action=inputs.unresolved_action,
         cdi_returns=inputs.cdi_returns,
         costs_bps=ECONOMICS_COSTS_BPS,
         annual_borrow_rates=ECONOMICS_ANNUAL_BORROW_RATES,
@@ -537,6 +551,9 @@ def evaluate_scores(
             "target_mask_true": int(np.asarray(inputs.target_mask).sum()),
             "raw_target_mask_true": int(np.asarray(inputs.raw_target_mask).sum()),
             "economics_score_mask_true": int(economics_mask.sum()),
+            "unresolved_action_true": int(
+                np.asarray(inputs.unresolved_action, dtype=np.bool_).sum()
+            ),
         },
     }
     return EvaluationResult(
@@ -634,6 +651,7 @@ _PAIRED_INPUT_KEYS = (
     "raw_target_mask",
     "active",
     "total_return_close",
+    "unresolved_action",
     "cdi_returns",
 )
 
@@ -688,7 +706,8 @@ def _validate_paired_identity(
     if mismatched:
         raise ValueError(
             "paired comparison requires identical dates, targets, masks, close, "
-            f"and CDI inputs; mismatched identities: {mismatched}"
+            "unresolved actions, and CDI inputs; mismatched identities: "
+            f"{mismatched}"
         )
     if candidate_report["source_artifact_hashes"] != baseline_report[
         "source_artifact_hashes"

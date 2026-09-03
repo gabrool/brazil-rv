@@ -17,6 +17,8 @@ from .contract import ALLOWED_SEEDS, HORIZONS
 from .data import V2DailyDataset
 from .model import DailyMultiHorizonModel
 from .train import (
+    _canonical_payload_sha256,
+    _input_static_identity,
     _loader_input_payload,
     _repository_commit_if_available,
     _verified_checkpoint_input_contract,
@@ -49,8 +51,8 @@ def _authorized_dataset(
     if ledger is None:
         raise PermissionError("scoring requires a preauthorized dataset access ledger")
     access = ledger.payload()
-    if access.get("purpose") not in {"training", "selection", "evaluation"}:
-        raise ValueError("dataset access purpose is not recognized")
+    if access.get("purpose") != "evaluation":
+        raise ValueError("scoring requires an evaluation-purpose access ledger")
     if access.get("test_accessed"):
         raise PermissionError("the v2 test window is sealed")
     indices = np.asarray(dataset.date_indices, dtype=np.int64)
@@ -196,8 +198,24 @@ def score_checkpoint_artifact(
     if recorded_commit is not None and current_commit != recorded_commit:
         raise ValueError("scoring implementation commit differs from the checkpoint")
     scoring_input = _loader_input_payload(loader)
-    if scoring_input is None or scoring_input != checkpoint_contract.get("selection"):
-        raise ValueError("scoring dataset differs from the checkpoint selection input")
+    checkpoint_selection = checkpoint_contract.get("selection")
+    if not isinstance(scoring_input, Mapping) or not isinstance(
+        checkpoint_selection, Mapping
+    ):
+        raise ValueError("scoring or checkpoint selection provenance is missing")
+    if _input_static_identity(scoring_input) != _input_static_identity(
+        checkpoint_selection
+    ):
+        raise ValueError("scoring dataset differs from the checkpoint input identity")
+    expected_alignment = "through_t" if stage == "P" else "through_t_minus_1"
+    expected_dataset_stage = "pretrain" if stage == "P" else "evaluation"
+    if (
+        dataset.stage != expected_dataset_stage
+        or scoring_input.get("entry_alignment") != expected_alignment
+    ):
+        raise ValueError("scoring dataset has the wrong stage or entry alignment")
+    scoring_input_payload = dict(scoring_input)
+    scoring_input_sha256 = _canonical_payload_sha256(scoring_input_payload)
     set_deterministic_seed(seed)
     restore_config = replace(
         model_config,
@@ -300,6 +318,8 @@ def score_checkpoint_artifact(
             },
             "model_config": config_payload,
             "checkpoint_input_contract_sha256": checkpoint_contract["sha256"],
+            "scoring_input": scoring_input_payload,
+            "scoring_input_sha256": scoring_input_sha256,
             "dataset": {
                 "stage": dataset.stage,
                 "lookback": dataset.lookback,

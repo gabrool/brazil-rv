@@ -24,7 +24,8 @@ def test_rank_gaussianize_is_centered_and_tie_aware() -> None:
 def test_baseline_signs_windows_and_output_contract() -> None:
     close, observed = _prices()
     active = np.ones_like(observed)
-    panels = build_baselines(close, observed, active)
+    unresolved = np.zeros_like(observed)
+    panels = build_baselines(close, observed, active, unresolved)
     assert set(panels) == {
         "reversal_5",
         "reversal_21",
@@ -39,7 +40,9 @@ def test_baseline_signs_windows_and_output_contract() -> None:
     assert not panels["momentum_12_1"].score_mask[252].any()
     assert panels["momentum_12_1"].score_mask[253].all()
     assert (
-        build_baselines(close, observed, active, slow_lag=0)["momentum_12_1"]
+        build_baselines(close, observed, active, unresolved, slow_lag=0)[
+            "momentum_12_1"
+        ]
         .score_mask[252]
         .all()
     )
@@ -48,15 +51,38 @@ def test_baseline_signs_windows_and_output_contract() -> None:
 def test_baselines_are_causal_and_keep_missing_endpoint_masked() -> None:
     close, observed = _prices()
     active = np.ones_like(observed)
-    reference = build_baselines(close, observed, active)
+    unresolved = np.zeros_like(observed)
+    reference = build_baselines(close, observed, active, unresolved)
     changed = close.copy()
     changed[260:] *= 100.0
-    actual = build_baselines(changed, observed, active)
+    actual = build_baselines(changed, observed, active, unresolved)
     for name in reference:
         assert np.array_equal(reference[name].scores[:261], actual[name].scores[:261])
         assert np.array_equal(
             reference[name].score_mask[:261], actual[name].score_mask[:261]
         )
     observed[254, 0] = False
-    missing = build_baselines(close, observed, active)
+    missing = build_baselines(close, observed, active, unresolved)
     assert not missing["reversal_5"].score_mask[260, 0].any()
+
+
+def test_baselines_mask_returns_crossing_unresolved_actions() -> None:
+    close, observed = _prices()
+    active = np.ones_like(observed)
+    unresolved = np.zeros_like(observed)
+    unresolved[254, 0] = True
+
+    panels = build_baselines(close, observed, active, unresolved)
+
+    # Fine/evaluation baselines at t=260 end at t-1=259. The five-session
+    # reversal starts on 254, so the event is not crossed; 21 and 252 are.
+    assert panels["reversal_5"].score_mask[260, 0].all()
+    assert not panels["reversal_21"].score_mask[260, 0].any()
+    assert panels["momentum_12_1"].score_mask[260, 0].all()
+    # An event inside (254, 259] invalidates the five-session return too.
+    unresolved[255, 0] = True
+    crossed = build_baselines(close, observed, active, unresolved)
+    assert not crossed["reversal_5"].score_mask[260, 0].any()
+    unresolved[100, 1] = True
+    crossed = build_baselines(close, observed, active, unresolved)
+    assert not crossed["momentum_12_1"].score_mask[260, 1].any()

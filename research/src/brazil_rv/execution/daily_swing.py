@@ -49,6 +49,7 @@ class DailySwingResult:
     weights: NDArray[np.float64]
     interval_valid: NDArray[np.bool_]
     missing_exit_position_count: NDArray[np.int64]
+    unresolved_action_position_count: NDArray[np.int64]
     gross_pnl_bps: NDArray[np.float64]
     turnover_fraction_nav: NDArray[np.float64]
     turnover_cost_bps: NDArray[np.float64]
@@ -93,6 +94,9 @@ class DailySwingResult:
             "date_count": int(valid.sum()),
             "invalid_interval_count": int((~valid).sum()),
             "missing_exit_position_count": int(self.missing_exit_position_count.sum()),
+            "unresolved_action_position_count": int(
+                self.unresolved_action_position_count.sum()
+            ),
             "mean_net_excess_all_cash_bps": mean(self.net_excess_all_cash_bps),
             "annualized_net_sharpe": sharpe(self.net_pnl_bps),
             "annualized_net_excess_sharpe": sharpe(self.net_excess_all_cash_bps),
@@ -182,6 +186,7 @@ def simulate_daily_swing(
     score_mask: NDArray[np.bool_],
     active: NDArray[np.bool_],
     total_return_close: NDArray[np.floating],
+    unresolved_action: NDArray[np.bool_],
     cdi_returns: NDArray[np.floating],
     config: DailySwingConfig = DailySwingConfig(),
 ) -> DailySwingResult:
@@ -196,13 +201,17 @@ def simulate_daily_swing(
             "daily swing dates must be nonempty, unique, and chronological"
         )
     close = np.asarray(total_return_close, dtype=np.float64)
+    unresolved = np.asarray(unresolved_action, dtype=np.bool_)
     cdi = np.asarray(cdi_returns, dtype=np.float64)
     if (
         close.ndim != 2
         or close.shape[0] != len(date_axis)
+        or unresolved.shape != close.shape
         or cdi.shape != (len(date_axis),)
     ):
-        raise ValueError("daily swing price or CDI axis differs from dates")
+        raise ValueError(
+            "daily swing price, unresolved-action, or CDI axis differs from dates"
+        )
     if not np.isfinite(cdi).all():
         raise ValueError("daily CDI returns must be finite")
     # Freeze positions using only information available at the 15:45 decision.
@@ -222,11 +231,13 @@ def simulate_daily_swing(
         & (close[1:] > 0.0)
     )
     missing = held & ~valid_endpoint
-    interval_valid = ~missing.any(axis=1)
+    unresolved_held = held & unresolved[1:]
+    invalid_held = missing | unresolved_held
+    interval_valid = ~invalid_held.any(axis=1)
     terminal_liquidation_valid = bool(
         not config.terminal_liquidation
         or not len(weights)
-        or not missing[-1].any()
+        or not invalid_held[-1].any()
     )
     returns = np.zeros_like(weights)
     np.divide(
@@ -264,6 +275,7 @@ def simulate_daily_swing(
         weights=weights,
         interval_valid=interval_valid,
         missing_exit_position_count=missing.sum(axis=1).astype(np.int64),
+        unresolved_action_position_count=unresolved_held.sum(axis=1).astype(np.int64),
         gross_pnl_bps=gross,
         turnover_fraction_nav=turnover,
         turnover_cost_bps=turnover_cost,
@@ -284,6 +296,7 @@ def swing_sensitivity_grid(
     score_mask: NDArray[np.bool_],
     active: NDArray[np.bool_],
     total_return_close: NDArray[np.floating],
+    unresolved_action: NDArray[np.bool_],
     cdi_returns: NDArray[np.floating],
     costs_bps: Sequence[float] = (2.0, 4.0, 7.0),
     annual_borrow_rates: Sequence[float] = (0.02, 0.04),
@@ -298,6 +311,7 @@ def swing_sensitivity_grid(
             score_mask=score_mask,
             active=active,
             total_return_close=total_return_close,
+            unresolved_action=unresolved_action,
             cdi_returns=cdi_returns,
             config=replace(
                 base_config,
