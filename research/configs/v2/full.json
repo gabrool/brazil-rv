@@ -1,0 +1,27 @@
+{
+  "schema": "BRAZIL_RV_V2_PROTOCOL_V1",
+  "name": "full",
+  "folds": ["F1", "F2", "F3"],
+  "seeds": [11, 29, 47],
+  "decision_minute_index": 345,
+  "slow_lookback": 60,
+  "horizons_sessions": [1, 2, 3, 5, 10],
+  "training": {
+    "date_pairs_per_batch": 8,
+    "epochs": 20,
+    "patience": 3,
+    "sam_rho": 0.125,
+    "learning_rate": 0.0003,
+    "pretrained_learning_rate_multiplier": 0.3,
+    "weight_decay": 0.01,
+    "ema_decay": 0.995,
+    "lambda_persistence": 0.0,
+    "use_bf16": false
+  },
+  "evaluation": {
+    "paired_bootstrap_replications": 10000,
+    "paired_bootstrap_block_sessions": 20
+  },
+  "max_parallel_trajectories": 6,
+  "official_registration": null
+}
