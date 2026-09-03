@@ -133,22 +133,24 @@ def test_raw_lending_formulas_use_source_date_volume_and_d_plus_one() -> None:
 
 
 def test_parser_combines_balance_and_reversible_rate_archives(tmp_path) -> None:
-    days = [date(2024, 1, 1) + timedelta(days=index) for index in range(27)]
+    days = [date(2024, 1, 1) + timedelta(days=index) for index in range(127)]
     isin = "BRTESTACNOR1"
     security_id = "security-one"
     balance = pl.DataFrame(
         {
-            "source_position_date": days[19:26],
-            "available_date": days[20:27],
-            "security_id": [security_id] * 7,
-            "lending_balance_brl": [200.0] * 7,
+            "source_position_date": days[19:126],
+            "available_date": days[20:127],
+            "security_id": [security_id] * 107,
+            "lending_balance_brl": [200.0] * 107,
         }
     )
     rates = [0.10, 0.11, 0.12, 0.13, 0.14, 0.25, 0.30]
     strong = pl.DataFrame(
         {
-            "source_trade_date": days[19:26],
-            "available_date": days[20:27],
+            # Leave more than Polars' default 100-row inference window before
+            # the first non-null rate value, matching the combined archives.
+            "source_trade_date": days[119:126],
+            "available_date": days[120:127],
             "security_id": [security_id] * 7,
             "lending_taker_fee_level_log_tanh": [
                 np.tanh(np.log1p(value) / 2.0) for value in rates
@@ -169,10 +171,10 @@ def test_parser_combines_balance_and_reversible_rate_archives(tmp_path) -> None:
         pl.DataFrame({"security_id": [security_id], "isin": [isin]}),
         np.full((len(days), 1), 100.0),
     )["lending"]
-    assert result.values[20, 0, 0] == pytest.approx(2.0)
-    assert result.values[20, 0, 3] == pytest.approx(0.10)
-    assert result.values[25, 0, 4] == pytest.approx(0.15)
-    assert result.valid[25, 0].tolist() == [True, True, True, True, True]
+    assert result.values[120, 0, 0] == pytest.approx(2.0)
+    assert result.values[120, 0, 3] == pytest.approx(0.10)
+    assert result.values[125, 0, 4] == pytest.approx(0.15)
+    assert result.valid[125, 0].tolist() == [True, True, True, True, True]
 
 
 def test_raw_oddlot_share_and_exact_session_lag_change() -> None:

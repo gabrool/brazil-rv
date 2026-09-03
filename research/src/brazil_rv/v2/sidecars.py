@@ -349,7 +349,7 @@ def _raw_lending_features(
             row["loan_rate_change_5"] = current[0] - prior[0] if valid else 0.0
             row["loan_rate_change_5_mask"] = valid
     return (
-        pl.DataFrame(output_rows)
+        pl.DataFrame(output_rows, infer_schema_length=None)
         if output_rows
         else pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
     )
