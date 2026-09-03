@@ -507,12 +507,12 @@ def test_store_to_close_uses_exact_m1_final_close_not_cotahist(tmp_path) -> None
     )
     actions = pl.DataFrame(
         {
-            "isin": [names[1]],
-            "ex_date": [dates[10]],
-            "action_type": ["dividend"],
-            "split_factor": [1.0],
-            "cash_distribution_brl": [0.5],
-            "unresolved": [False],
+            "isin": [names[1], names[0]],
+            "ex_date": [dates[10], dates[63]],
+            "action_type": ["dividend", "subscription_rights"],
+            "split_factor": [1.0, 1.0],
+            "cash_distribution_brl": [0.5, 0.0],
+            "unresolved": [False, True],
         },
         schema_overrides={"ex_date": pl.Date},
     )
@@ -535,10 +535,18 @@ def test_store_to_close_uses_exact_m1_final_close_not_cotahist(tmp_path) -> None
     unresolved = np.load(root / "unresolved_action.npy")
     assert unavailable[10, 1]
     assert unresolved[10, 1]
+    assert unresolved[63, 0]
     slow_valid = np.load(root / "slow_valid.npy")
     assert not slow_valid[63, 1, 3]
-    target_valid = np.load(root / "target_raw_valid.npy")
-    assert not target_valid[5, 1, 4]
+    assert not slow_valid[63, 0, 0]
+    assert slow_valid[64, 0, 0]
+    target_raw_valid = np.load(root / "target_raw_valid.npy")
+    assert not target_raw_valid[5, 1, 4]
+    assert not target_raw_valid[62, 0, 0]
+    assert target_raw_valid[63, 0, 0]
+    target_valid = np.load(root / "target_valid.npy")
+    assert not target_valid[62, 0, 0]
+    assert target_valid[63, 0, 0]
     review = pl.read_parquet(
         root / "corporate_action_cash_reinvestment_review.parquet"
     )

@@ -69,6 +69,23 @@ def test_exact_final_m1_close_has_an_independent_observation_mask() -> None:
     assert not result.session_close_valid[24, 1]
 
 
+def test_volume_cleaning_matches_zero_for_unusable_observations() -> None:
+    inputs = list(_minutes())
+    changed = [value.copy() for value in inputs]
+    normalized = [value.copy() for value in inputs]
+    for minute, value in zip((10, 11, 12), (-1.0, np.nan, np.inf), strict=True):
+        changed[4][24, 0, minute] = value
+        normalized[4][24, 0, minute] = 0.0
+    changed[4][24, 0, 13] = 1_000_000.0
+    changed[5][24, 0, 13] = False
+    normalized[4][24, 0, 13] = 0.0
+    normalized[5][24, 0, 13] = False
+    actual = build_intraday_daily_features(*changed)
+    expected = build_intraday_daily_features(*normalized)
+    np.testing.assert_array_equal(actual.values, expected.values)
+    np.testing.assert_array_equal(actual.valid, expected.valid)
+
+
 def test_roll_spread_uses_negative_sample_covariance_and_masks_nonnegative() -> None:
     returns = np.asarray([[[0.01, -0.01, 0.01, -0.01]]])
     valid = np.ones_like(returns, dtype=bool)
@@ -123,3 +140,82 @@ def test_streamed_intraday_carries_exact_observed_final_m1_close(
     assert result.result.session_close_valid[24, 0]
     assert np.isnan(result.result.session_close[23, 0])
     assert not result.result.session_close_valid[23, 0]
+
+
+def test_streamed_intraday_grids_only_the_assignment_date_span(
+    tmp_path, monkeypatch
+) -> None:
+    dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(80)]
+    allowed_dates = dates[27:52]
+    isin = "BRTESTACNOR1"
+    source_path = tmp_path / "source.parquet"
+    source_path.write_bytes(b"immutable-source")
+    assignments = pl.DataFrame({"isin": [isin], "source_file": [str(source_path)]})
+    daily = pl.DataFrame(
+        {"isin": [isin] * len(allowed_dates), "trade_date": allowed_dates}
+    )
+    seen_calendars: list[tuple[date, ...]] = []
+    local_grids: list[tuple[np.ndarray, np.ndarray]] = []
+
+    import brazil_rv.preprocessing.io as io
+
+    monkeypatch.setattr(io, "load_source_file", lambda path: object())
+
+    def prepare(*args):
+        seen_calendars.append(args[3])
+        return object()
+
+    def grid(_bars, date_count, minute_count):
+        values = np.zeros((date_count, minute_count, 5), dtype=np.float64)
+        base = 100.0 + np.arange(minute_count) * 0.01
+        values[..., 0] = base
+        values[..., 1] = base * 1.001
+        values[..., 2] = base * 0.999
+        values[..., 3] = base * 1.0001
+        values[..., 4] = 1.0
+        session_observed = np.asarray(
+            [value in frozenset(allowed_dates) for value in seen_calendars[-1]]
+        )
+        values[~session_observed] = 0.0
+        observed = np.broadcast_to(
+            session_observed[:, None], (date_count, minute_count)
+        ).copy()
+        local_grids.append((values, observed))
+        return values, observed
+
+    monkeypatch.setattr(io, "prepare_session_bars", prepare)
+    monkeypatch.setattr(io, "dense_grid", grid)
+    result = stream_intraday_from_assignments(assignments, daily, dates, [isin])
+    local_grid, local_observed = local_grids[0]
+    full_grid = np.zeros((len(dates), 405, 5), dtype=np.float64)
+    full_observed = np.zeros((len(dates), 405), dtype=bool)
+    full_grid[7:72] = local_grid
+    full_observed[7:72] = local_observed
+    expected = build_intraday_daily_features(
+        full_grid[:, None, :, 0],
+        full_grid[:, None, :, 1],
+        full_grid[:, None, :, 2],
+        full_grid[:, None, :, 3],
+        full_grid[:, None, :, 4],
+        full_observed[:, None, :],
+    )
+    assert seen_calendars == [tuple(dates[7:72])]
+    np.testing.assert_array_equal(result.result.values, expected.values)
+    np.testing.assert_array_equal(result.result.valid, expected.valid)
+    np.testing.assert_equal(result.result.entry_open, expected.entry_open)
+    np.testing.assert_array_equal(
+        result.result.entry_open_valid, expected.entry_open_valid
+    )
+    np.testing.assert_equal(result.result.session_close, expected.session_close)
+    np.testing.assert_array_equal(
+        result.result.session_close_valid, expected.session_close_valid
+    )
+    np.testing.assert_equal(
+        result.result.realized_daily_vol, expected.realized_daily_vol
+    )
+    np.testing.assert_array_equal(result.result.fast_present, expected.fast_present)
+    assert not result.result.fast_present[:27].any()
+    assert result.result.fast_present[27:52].all()
+    assert not result.result.fast_present[52:].any()
+    assert not result.result.entry_open[:27].any()
+    assert not result.result.entry_open[52:].any()

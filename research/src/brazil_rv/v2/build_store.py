@@ -245,6 +245,7 @@ def stream_intraday_from_assignments(
     if not required.issubset(assignments.columns):
         raise ValueError("streaming assignments need ISIN and source_file")
     calendar = tuple(dates)
+    date_lookup = {value: index for index, value in enumerate(calendar)}
     isin_lookup = {value: index for index, value in enumerate(isins)}
     shape = (len(calendar), len(isins))
     feature_values = np.zeros(
@@ -279,6 +280,9 @@ def stream_intraday_from_assignments(
             target = isin_lookup.get(isin)
             if target is None:
                 raise ValueError(f"accepted M1 ISIN absent from daily axis: {isin}")
+            # dense_grid uses zero for an unobserved entry price.  Retain that
+            # masked payload outside the compact working slice as well.
+            entry[:, target] = 0.0
             allowed = dates_by_isin.get(isin, frozenset())
             first = row.get("first_overlap_date")
             last = row.get("last_overlap_date")
@@ -290,16 +294,37 @@ def stream_intraday_from_assignments(
                 allowed = frozenset(value for value in allowed if value >= first)
             if last is not None:
                 allowed = frozenset(value for value in allowed if value <= last)
+            allowed = allowed.intersection(date_lookup)
+            if not allowed:
+                audit_rows.append(
+                    {
+                        "isin": isin,
+                        "security_id": row.get("security_id"),
+                        "source_file": str(source_path),
+                        "source_sha256": source_sha256,
+                        "allowed_date_count": 0,
+                        "observed_session_count": 0,
+                        "exact_session_close_count": 0,
+                        "fast_present_count": 0,
+                    }
+                )
+                continue
+            # Preserve global-calendar semantics for the longest 20-session
+            # reducers and one-session lags while avoiding the years of empty
+            # M1 history outside this accepted identity segment.
+            start = max(date_lookup[min(allowed)] - 20, 0)
+            stop = min(date_lookup[max(allowed)] + 21, len(calendar))
+            local_calendar = calendar[start:stop]
             bars = prepare_session_bars(
                 source,
                 source_path,
                 allowed,
-                calendar,
+                local_calendar,
                 EQUITY_SESSION_START_MINUTE,
                 EQUITY_SESSION_MINUTES,
             )
             grid, observed = dense_grid(
-                bars, len(calendar), EQUITY_SESSION_MINUTES
+                bars, len(local_calendar), EQUITY_SESSION_MINUTES
             )
             native = build_intraday_daily_features(
                 grid[:, None, :, 0],
@@ -309,20 +334,16 @@ def stream_intraday_from_assignments(
                 grid[:, None, :, 4],
                 observed[:, None, :],
             )
-            feature_values[:, target] = native.values[:, 0]
-            feature_valid[:, target] = native.valid[:, 0]
-            entry[:, target] = native.entry_open[:, 0]
-            entry_valid[:, target] = native.entry_open_valid[:, 0]
-            realized[:, target] = native.realized_daily_vol[:, 0]
-            present[:, target] = native.fast_present[:, 0]
+            feature_values[start:stop, target] = native.values[:, 0]
+            feature_valid[start:stop, target] = native.valid[:, 0]
+            entry[start:stop, target] = native.entry_open[:, 0]
+            entry_valid[start:stop, target] = native.entry_open_valid[:, 0]
+            realized[start:stop, target] = native.realized_daily_vol[:, 0]
+            present[start:stop, target] = native.fast_present[:, 0]
+            session_close[start:stop, target] = native.session_close[:, 0]
+            session_close_valid[start:stop, target] = native.session_close_valid[:, 0]
             has_bar = observed.any(axis=1)
             exact_close = observed[:, -1]
-            rows = np.flatnonzero(exact_close)
-            session_close[rows, target] = grid[rows, -1, 3]
-            session_close_valid[rows, target] = (
-                np.isfinite(grid[rows, -1, 3]) & (grid[rows, -1, 3] > 0.0)
-            )
-            session_close[~session_close_valid[:, target], target] = np.nan
             audit_rows.append(
                 {
                     "isin": isin,
@@ -335,6 +356,8 @@ def stream_intraday_from_assignments(
                     "fast_present_count": int(native.fast_present.sum()),
                 }
             )
+            del bars, grid, observed, native
+        del source
     return StreamedIntraday(
         result=IntradayDailyResult(
             values=feature_values,
@@ -1239,6 +1262,12 @@ def main(arguments: Sequence[str] | None = None) -> None:
         raise ValueError(
             "corporate-action security master differs from the COTAHIST foundation"
         )
+    streamed = None
+    minute = load_minute_npz(args.minute_npz) if args.minute_npz else None
+    if minute is None and assignments is not None:
+        streamed = stream_intraday_from_assignments(
+            assignments, foundation, calendar, isins
+        )
     sidecars = _parse_sidecars(
         args.sidecar,
         calendar,
@@ -1246,12 +1275,10 @@ def main(arguments: Sequence[str] | None = None) -> None:
         assignments,
         daily_panel.volume_brl,
     )
-    streamed = None
-    minute = load_minute_npz(args.minute_npz) if args.minute_npz else None
-    if minute is None and assignments is not None:
-        streamed = stream_intraday_from_assignments(
-            assignments, foundation, calendar, isins
-        )
+    # build_daily_store reconstructs the canonical panel from ``daily``.  Drop
+    # the acquisition-only copies before that second materialization so local
+    # validation does not retain two broad daily panels at its memory peak.
+    del daily_panel, foundation, action_master, expected_master
     output = build_daily_store(
         daily,
         actions,

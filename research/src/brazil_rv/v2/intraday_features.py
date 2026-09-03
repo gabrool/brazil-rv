@@ -274,12 +274,12 @@ def build_intraday_daily_features(
     prior_last30_valid[1:] = last30_share_valid[:-1]
     assign(8, prior_last30, prior_last30_valid)
 
-    full_volume = np.where(seen & np.isfinite(volume_), np.maximum(volume_, 0.0), 0.0).sum(axis=2)
-    last_hour_volume = np.where(
-        seen[..., -60:] & np.isfinite(volume_[..., -60:]),
-        np.maximum(volume_[..., -60:], 0.0),
-        0.0,
-    ).sum(axis=2)
+    safe_full_volume = volume_.copy()
+    safe_full_volume[~seen] = 0.0
+    safe_full_volume[~np.isfinite(safe_full_volume)] = 0.0
+    np.maximum(safe_full_volume, 0.0, out=safe_full_volume)
+    full_volume = safe_full_volume.sum(axis=2)
+    last_hour_volume = safe_full_volume[..., -60:].sum(axis=2)
     with np.errstate(divide="ignore", invalid="ignore"):
         last_hour_share = last_hour_volume / full_volume
     full_volume_valid = seen.sum(axis=2) >= int(np.ceil(0.8 * seen.shape[2]))
@@ -294,14 +294,11 @@ def build_intraday_daily_features(
     lag_last_hour_valid[1:] = last_hour_valid[:-1]
     assign(9, lag_last_hour, lag_last_hour_valid)
 
-    safe_full_volume = np.where(seen & np.isfinite(volume_), np.maximum(volume_, 0.0), 0.0)
-    full_vwap = (np.where(seen, close_, 0.0) * safe_full_volume).sum(axis=2) / np.maximum(
-        safe_full_volume.sum(axis=2), 1.0
-    )
+    full_vwap = (np.where(seen, close_, 0.0) * safe_full_volume).sum(
+        axis=2
+    ) / np.maximum(full_volume, 1.0)
     close_vwap, close_vwap_valid = _safe_log_ratio(final_close, full_vwap)
-    close_vwap_valid &= (
-        final_valid & full_volume_valid & (safe_full_volume.sum(axis=2) > 0)
-    )
+    close_vwap_valid &= final_valid & full_volume_valid & (full_volume > 0)
     lag_close_vwap = np.full(shape, np.nan, dtype=np.float64)
     lag_close_vwap_valid = np.zeros(shape, dtype=np.bool_)
     lag_close_vwap[1:] = close_vwap[:-1]
@@ -309,18 +306,16 @@ def build_intraday_daily_features(
     assign(10, lag_close_vwap, lag_close_vwap_valid)
 
     prefix_seen = seen[..., :cutoff]
-    prefix_volume = np.where(
-        prefix_seen & np.isfinite(volume_[..., :cutoff]),
-        np.maximum(volume_[..., :cutoff], 0.0),
-        0.0,
-    )
+    prefix_volume = safe_full_volume[..., :cutoff]
+    prefix_total = prefix_volume.sum(axis=2)
     prefix_vwap = (
         np.where(prefix_seen, close_[..., :cutoff], 0.0) * prefix_volume
-    ).sum(axis=2) / np.maximum(prefix_volume.sum(axis=2), 1.0)
+    ).sum(axis=2) / np.maximum(prefix_total, 1.0)
     vwap_deviation, vwap_valid = _safe_log_ratio(entry, prefix_vwap)
     prefix_valid = prefix_seen.sum(axis=2) >= int(np.ceil(0.8 * cutoff))
-    vwap_valid &= entry_valid & prefix_valid & (prefix_volume.sum(axis=2) > 0)
+    vwap_valid &= entry_valid & prefix_valid & (prefix_total > 0)
     assign(11, vwap_deviation, vwap_valid)
+    del prefix_volume, safe_full_volume
 
     block_returns, block_valid = five_minute_returns(open_, close_, seen, cutoff=cutoff)
     realized, realized_valid = _daily_realized_vol(block_returns, block_valid)
@@ -349,7 +344,6 @@ def build_intraday_daily_features(
     range_valid &= day_range_valid
     assign(18, range_value, range_valid)
 
-    prefix_total = prefix_volume.sum(axis=2)
     relative = np.full(shape, np.nan, dtype=np.float64)
     relative_valid = np.zeros(shape, dtype=np.bool_)
     for day in range(20, shape[0]):
