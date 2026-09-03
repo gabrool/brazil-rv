@@ -7,6 +7,7 @@ from brazil_rv.v2.build_store import stream_intraday_from_assignments
 from brazil_rv.v2.intraday_features import (
     _rolling_roll_spread,
     build_intraday_daily_features,
+    mask_action_boundaries,
 )
 
 
@@ -41,6 +42,26 @@ def test_missing_entry_bar_disables_fast_presence() -> None:
     result = build_intraday_daily_features(*inputs)
     assert not result.entry_open_valid[24, 0]
     assert not result.fast_present[24, 0]
+
+
+def test_action_boundaries_mask_overnight_and_exact_rolling_dependants() -> None:
+    result = build_intraday_daily_features(*_minutes())
+    boundaries = np.zeros(result.values.shape[:2], dtype=np.bool_)
+    boundaries[20, 0] = True
+
+    masked = mask_action_boundaries(result, boundaries)
+
+    assert not masked.valid[20, 0, 0]
+    assert not masked.valid[20, 0, 6]
+    assert not masked.valid[24, 0, 2]
+    assert not masked.valid[24, 0, 3]
+    assert not masked.valid[24, 0, 7]
+    assert not masked.valid[24, 0, 17]
+    assert masked.valid[24, 1, 0]
+    assert masked.valid[24, 0, 1]
+    assert masked.valid[24, 0, 4]
+    assert masked.valid[24, 0, 18]
+    assert np.all(masked.values[~masked.valid] == 0.0)
 
 
 def test_decision_features_exclude_every_entry_and_later_bar_field() -> None:

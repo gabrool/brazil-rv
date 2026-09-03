@@ -148,7 +148,7 @@ Core arrays begin with `[date, isin]`:
 | `total_return_close` | — | split- and distribution-adjusted close |
 | `price_adjustment_factor`, `total_return_adjustment_factor` | — | causal cumulative factors |
 | `volume_brl`, `trade_count`, `quantity`, `distribution_number` | — | raw daily activity/action fields |
-| `recorded_action_mask`, `distribution_change_mask`, `provider_action_failure_mask`, `split_disagreement_mask`, `cash_reinvestment_unavailable_mask`, `price_adjustment_unresolved`, `adjusted_price_level_valid`, `unresolved_action` | — | action evidence, target/return-feature exclusions, and persistent adjusted-price-level trust state |
+| `recorded_action_mask`, `distribution_change_mask`, `provider_action_failure_mask`, `split_disagreement_mask`, `cash_reinvestment_unavailable_mask`, `intraday_action_boundary_mask`, `price_adjustment_unresolved`, `adjusted_price_level_valid`, `unresolved_action` | — | action evidence, target/return-feature exclusions, M1 boundary exclusions, and persistent adjusted-price-level trust state |
 | `slow_values`, `slow_valid` | 32 features | rank-Gauss slow library |
 | `intraday_values`, `intraday_valid` | 20 features | rank-Gauss M1 summaries |
 | `sidecar_<group>_values`, `sidecar_<group>_valid` | group features | optional PIT sidecars |
@@ -206,6 +206,12 @@ use the prior session.
 - realized volatility from 5-minute returns over 1, 5, and 20 sessions;
 - 20-session realized skew, Roll spread, and Corwin–Schultz spread; and
 - volume through 15:45 divided by its 20-session same-time median.
+
+The source M1 archive has raw, adjusted, and indeterminate event histories.
+Every recorded or unresolved corporate-action boundary therefore masks the
+overnight return and its 5/20-session dependants, the overnight-minus-intraday
+features, and the 20-session Corwin-Schultz feature. Same-session scale-free
+ratios and activity features remain independently valid.
 
 The Roll estimator uses sample serial covariance of 5-minute returns and is
 valid only when that covariance is strictly negative; a non-negative estimate

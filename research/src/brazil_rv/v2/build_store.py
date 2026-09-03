@@ -45,7 +45,11 @@ from .data_foundation import (
     verify_v1_mapping,
 )
 from .features import build_slow_features
-from .intraday_features import IntradayDailyResult, build_intraday_daily_features
+from .intraday_features import (
+    IntradayDailyResult,
+    build_intraday_daily_features,
+    mask_action_boundaries,
+)
 from .normalization import rank_gauss_panel
 from .sidecars import (
     SidecarResult,
@@ -603,6 +607,7 @@ def build_daily_store(
         panel.close_brl, cash_distribution
     )
     unresolved |= cash_reinvestment_unavailable
+    intraday_action_boundary = recorded_action | unresolved
     adjusted = adjust_daily_ohlc(
         panel.open_brl,
         panel.high_brl,
@@ -653,6 +658,7 @@ def build_daily_store(
         aligned = _align_intraday_result(
             native, minute_panel.dates, minute_panel.isins, panel.dates, panel.isins
         )
+        aligned = mask_action_boundaries(aligned, intraday_action_boundary)
         intraday_values, intraday_valid = rank_gauss_panel(
             aligned.values, aligned.valid, universe.active
         )
@@ -667,6 +673,7 @@ def build_daily_store(
         aligned = streamed_intraday.result
         if aligned.values.shape[:2] != shape:
             raise ValueError("streamed intraday derivatives are misaligned")
+        aligned = mask_action_boundaries(aligned, intraday_action_boundary)
         intraday_values, intraday_valid = rank_gauss_panel(
             aligned.values, aligned.valid, universe.active
         )
@@ -710,6 +717,7 @@ def build_daily_store(
         "provider_action_failure_mask": provider_failed,
         "split_disagreement_mask": split_disagreement,
         "cash_reinvestment_unavailable_mask": cash_reinvestment_unavailable,
+        "intraday_action_boundary_mask": intraday_action_boundary,
         "price_adjustment_unresolved": price_adjustment_unresolved,
         "adjusted_price_level_valid": ~np.maximum.accumulate(
             price_adjustment_unresolved, axis=0

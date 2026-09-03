@@ -21,6 +21,61 @@ class IntradayDailyResult:
     feature_names: tuple[str, ...] = INTRADAY_DAILY_FEATURES
 
 
+_ACTION_BOUNDARY_WINDOWS = {
+    0: 1,
+    2: 5,
+    3: 20,
+    6: 1,
+    7: 20,
+    17: 20,
+}
+
+
+def mask_action_boundaries(
+    result: IntradayDailyResult,
+    action_boundary: NDArray[np.bool_],
+) -> IntradayDailyResult:
+    """Remove M1 features whose raw-price path crosses an action boundary.
+
+    The M1 archive contains a mixture of raw, adjusted, and indeterminate
+    event histories.  Same-session ratios remain scale-free, but overnight
+    returns and the two-day Corwin-Schultz primitive cannot be reconciled
+    safely at recorded or unresolved action boundaries.  Their trailing
+    dependants are masked for the exact windows that consume those values.
+    """
+
+    boundaries = np.asarray(action_boundary, dtype=np.bool_)
+    if boundaries.shape != result.values.shape[:2]:
+        raise ValueError("action_boundary must align with intraday result axes")
+    values = np.asarray(result.values).copy()
+    valid = np.asarray(result.valid, dtype=np.bool_).copy()
+    cumulative = np.concatenate(
+        (
+            np.zeros((1, boundaries.shape[1]), dtype=np.int32),
+            np.cumsum(boundaries, axis=0, dtype=np.int32),
+        ),
+        axis=0,
+    )
+    for feature_index, window in _ACTION_BOUNDARY_WINDOWS.items():
+        clear = np.zeros(boundaries.shape, dtype=np.bool_)
+        clear[window - 1 :] = cumulative[window:] - cumulative[:-window] == 0
+        valid[..., feature_index] &= clear
+        values[..., feature_index] = np.where(
+            valid[..., feature_index], values[..., feature_index], 0.0
+        )
+    return IntradayDailyResult(
+        values=values,
+        valid=valid,
+        entry_open=result.entry_open,
+        entry_open_valid=result.entry_open_valid,
+        session_close=result.session_close,
+        session_close_valid=result.session_close_valid,
+        realized_daily_vol=result.realized_daily_vol,
+        fast_present=result.fast_present,
+        feature_names=result.feature_names,
+    )
+
+
 def _validate_minutes(
     open_price: NDArray[np.floating],
     high: NDArray[np.floating],
