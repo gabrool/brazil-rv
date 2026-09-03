@@ -5,9 +5,22 @@ import numpy as np
 from brazil_rv.v2.features import (
     build_slow_features,
     deterministic_average_linkage,
+    exact_log_return,
     pairwise_masked_correlation,
     yang_zhang_volatility,
 )
+
+
+def test_exact_return_invalidates_lookbacks_crossing_unresolved_action() -> None:
+    close = np.arange(10.0, 16.0)[:, None]
+    unresolved = np.zeros_like(close, dtype=np.bool_)
+    unresolved[2, 0] = True
+    values, valid = exact_log_return(close, 3, unresolved)
+    # The event is crossed by returns ending at 3 and 4, but is the starting
+    # close (and thus already on both sides of the factor) at the return ending
+    # at 5.
+    assert valid[:, 0].tolist() == [False, False, False, False, False, True]
+    assert np.isnan(values[:5, 0]).all()
 
 
 def test_yang_zhang_matches_hand_computed_fixture() -> None:

@@ -94,6 +94,15 @@ a recorded action, or a provider-failed segment is unresolved. The relevant
 review tables retain those cases and every target interval crossing one is
 masked.
 
+A recorded cash event can fall on a market session when that exact ISIN did not
+trade. In that case there is no COTAHIST ex-date close at which to apply the
+specified reinvestment. The store never substitutes a stale, later, or
+cross-provider price: it leaves that cash multiplier neutral, records the cell
+in `cash_reinvestment_unavailable_mask` and
+`corporate_action_cash_reinvestment_review.parquet`, and marks it unresolved.
+Trailing total-return feature intervals crossing the unresolved break are also
+invalid; unrelated price-range and activity fields retain their own masks.
+
 Adjustment factors are forward-recursive. A future action never rewrites an
 earlier row. On an effective date, split/bonus factors make the price series
 continuous; cash distributions are reinvested at the ex-date close for the
@@ -135,7 +144,7 @@ Core arrays begin with `[date, isin]`:
 | `total_return_close` | — | split- and distribution-adjusted close |
 | `price_adjustment_factor`, `total_return_adjustment_factor` | — | causal cumulative factors |
 | `volume_brl`, `trade_count`, `quantity`, `distribution_number` | — | raw daily activity/action fields |
-| `recorded_action_mask`, `distribution_change_mask`, `provider_action_failure_mask`, `split_disagreement_mask`, `unresolved_action` | — | action evidence and target-exclusion state |
+| `recorded_action_mask`, `distribution_change_mask`, `provider_action_failure_mask`, `split_disagreement_mask`, `cash_reinvestment_unavailable_mask`, `unresolved_action` | — | action evidence and target/return-feature exclusion state |
 | `slow_values`, `slow_valid` | 32 features | rank-Gauss slow library |
 | `intraday_values`, `intraday_valid` | 20 features | rank-Gauss M1 summaries |
 | `sidecar_<group>_values`, `sidecar_<group>_valid` | group features | optional PIT sidecars |

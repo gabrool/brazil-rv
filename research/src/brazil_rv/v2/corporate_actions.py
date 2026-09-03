@@ -542,18 +542,85 @@ def causal_adjustment_factors(
         if date_index:
             price[date_index] = price[date_index - 1]
             distribution[date_index] = distribution[date_index - 1]
-        # ``unresolved`` is a target-eligibility flag, not permission to erase a
-        # recorded action. Unknown actions have the neutral factor/cash value;
-        # known recorded amounts remain the best causal adjustment while their
-        # crossing targets are excluded downstream.
+        # ``unresolved`` is normally a target-eligibility flag, not permission
+        # to erase a recorded action. The sole exception is a cash event for
+        # which this exact ISIN has no positive ex-date close: the specified
+        # reinvestment factor is then unknowable. The caller must flag that
+        # cell unresolved; substituting another session's close would change
+        # the return definition.
         price[date_index] *= split[date_index]
         has_cash = cash[date_index] > 0
         invalid_cash = has_cash & (~np.isfinite(close[date_index]) | (close[date_index] <= 0))
-        if invalid_cash.any():
-            slots = np.flatnonzero(invalid_cash).tolist()
+        unflagged_invalid = invalid_cash & ~bad[date_index]
+        if unflagged_invalid.any():
+            slots = np.flatnonzero(unflagged_invalid).tolist()
             raise ValueError(f"cash distribution has no positive ex-date close at slots {slots}")
+        has_cash &= ~invalid_cash
         distribution[date_index, has_cash] *= 1.0 + cash[date_index, has_cash] / close[date_index, has_cash]
     return price, price * distribution
+
+
+def cash_reinvestment_unavailable_mask(
+    raw_close: NDArray[np.floating],
+    cash_distribution_brl: NDArray[np.floating],
+) -> NDArray[np.bool_]:
+    """Flag cash events lacking the exact positive ex-date close."""
+
+    close = np.asarray(raw_close, dtype=np.float64)
+    cash = np.asarray(cash_distribution_brl, dtype=np.float64)
+    if close.ndim != 2 or cash.shape != close.shape:
+        raise ValueError("cash-reinvestment inputs must align [date, name]")
+    return (cash > 0) & (~np.isfinite(close) | (close <= 0))
+
+
+def cash_reinvestment_review_table(
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+    cash_distribution_brl: NDArray[np.floating],
+    raw_close: NDArray[np.floating],
+    observed: NDArray[np.bool_] | None = None,
+) -> pl.DataFrame:
+    """Retain recorded cash events whose exact reinvestment close is absent."""
+
+    cash = np.asarray(cash_distribution_brl, dtype=np.float64)
+    close = np.asarray(raw_close, dtype=np.float64)
+    seen = (
+        np.isfinite(close)
+        if observed is None
+        else np.asarray(observed, dtype=np.bool_)
+    )
+    unavailable = cash_reinvestment_unavailable_mask(close, cash)
+    if (
+        unavailable.shape != (len(dates), len(isins))
+        or seen.shape != unavailable.shape
+    ):
+        raise ValueError("cash-reinvestment axes are misaligned")
+    rows = [
+        {
+            "trade_date": _as_date(dates[day]),
+            "isin": str(isins[name]),
+            "cash_distribution_brl": float(cash[day, name]),
+            "raw_close_brl": (
+                float(close[day, name]) if np.isfinite(close[day, name]) else None
+            ),
+            "observed": bool(seen[day, name]),
+            "unresolved": True,
+            "status": "unresolved_missing_ex_date_close",
+        }
+        for day, name in np.argwhere(unavailable)
+    ]
+    return pl.DataFrame(
+        rows,
+        schema={
+            "trade_date": pl.Date,
+            "isin": pl.String,
+            "cash_distribution_brl": pl.Float64,
+            "raw_close_brl": pl.Float64,
+            "observed": pl.Boolean,
+            "unresolved": pl.Boolean,
+            "status": pl.String,
+        },
+    )
 
 
 def adjust_daily_ohlc(

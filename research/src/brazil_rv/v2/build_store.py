@@ -27,6 +27,8 @@ from .corporate_actions import (
     adjust_daily_ohlc,
     align_action_arrays,
     audit_m1_adjustment_status,
+    cash_reinvestment_review_table,
+    cash_reinvestment_unavailable_mask,
     detect_distribution_changes,
     detect_split_candidates,
     distribution_review_table,
@@ -570,6 +572,10 @@ def build_daily_store(
     )
     split_disagreement = split_detected != (split != 1.0)
     unresolved |= split_disagreement
+    cash_reinvestment_unavailable = cash_reinvestment_unavailable_mask(
+        panel.close_brl, cash_distribution
+    )
+    unresolved |= cash_reinvestment_unavailable
     adjusted = adjust_daily_ohlc(
         panel.open_brl,
         panel.high_brl,
@@ -591,6 +597,7 @@ def build_daily_store(
         panel.observed,
         universe.active,
         panel.dates,
+        unresolved_action=unresolved,
     )
     slow_values, slow_valid = rank_gauss_panel(
         slow_raw.values, slow_raw.valid, universe.active
@@ -674,6 +681,7 @@ def build_daily_store(
         "distribution_change_mask": distribution_changed,
         "provider_action_failure_mask": provider_failed,
         "split_disagreement_mask": split_disagreement,
+        "cash_reinvestment_unavailable_mask": cash_reinvestment_unavailable,
         "unresolved_action": unresolved,
         "slow_values": slow_values,
         "slow_valid": slow_valid,
@@ -753,6 +761,13 @@ def build_daily_store(
             panel.isins,
             distribution_changed,
             recorded_action,
+        ),
+        "corporate_action_cash_reinvestment_review": cash_reinvestment_review_table(
+            panel.dates,
+            panel.isins,
+            cash_distribution,
+            panel.close_brl,
+            panel.observed,
         ),
         "corporate_action_coverage": action_coverage_table(
             checked_actions,
@@ -841,6 +856,12 @@ def build_daily_store(
         "v1_isin_subset_verified": v1_assignments is not None,
         "v1_calendar_verified": v1_calendar is not None,
         "implementation_git_commit": implementation_commit,
+        "cash_reinvestment_unavailable_count_foundation": int(
+            cash_reinvestment_unavailable.sum()
+        ),
+        "cash_reinvestment_unavailable_count_store_rows": int(
+            cash_reinvestment_unavailable[keep].sum()
+        ),
         "cotahist_provenance": {
             "raw_archives": source_records(cotahist_raw_sources),
             "parse_audit": (

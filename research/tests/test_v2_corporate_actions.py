@@ -10,6 +10,8 @@ from brazil_rv.v2.corporate_actions import (
     acquire_yfinance_actions,
     action_coverage_table,
     audit_m1_adjustment_status,
+    cash_reinvestment_review_table,
+    cash_reinvestment_unavailable_mask,
     causal_adjustment_factors,
     detect_distribution_changes,
     normalize_yfinance_actions,
@@ -31,6 +33,40 @@ def test_forward_adjustment_never_rewrites_history_and_retains_recorded_actions(
     unresolved[2, 0] = True
     flagged, _ = causal_adjustment_factors(close, split, cash, unresolved)
     np.testing.assert_array_equal(flagged[:, 0], price[:, 0])
+
+
+def test_missing_cash_reinvestment_close_requires_explicit_unresolved_flag() -> None:
+    close = np.asarray([[10.0], [np.nan], [12.0]])
+    split = np.ones_like(close)
+    split[1, 0] = 2.0
+    cash = np.asarray([[0.0], [1.0], [0.0]])
+    unavailable = cash_reinvestment_unavailable_mask(close, cash)
+    assert unavailable[:, 0].tolist() == [False, True, False]
+    with np.testing.assert_raises_regex(ValueError, "positive ex-date close"):
+        causal_adjustment_factors(close, split, cash)
+
+    price, total_return = causal_adjustment_factors(
+        close, split, cash, unavailable
+    )
+    np.testing.assert_array_equal(price[:, 0], [1.0, 2.0, 2.0])
+    np.testing.assert_array_equal(total_return[:, 0], [1.0, 2.0, 2.0])
+    review = cash_reinvestment_review_table(
+        [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)],
+        ["BRTESTACNOR1"],
+        cash,
+        close,
+    )
+    assert review.to_dicts() == [
+        {
+            "trade_date": date(2024, 1, 3),
+            "isin": "BRTESTACNOR1",
+            "cash_distribution_brl": 1.0,
+            "raw_close_brl": None,
+            "observed": False,
+            "unresolved": True,
+            "status": "unresolved_missing_ex_date_close",
+        }
+    ]
 
 
 def test_normalize_yfinance_emits_split_and_dividend_rows() -> None:

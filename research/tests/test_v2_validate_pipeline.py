@@ -66,6 +66,7 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         metadata={
             "v1_isin_subset_verified": True,
             "v1_calendar_verified": True,
+            "implementation_git_commit": "1" * 40,
         },
     )
     development_dates = [value for value in dates if value >= FINETUNE_START]
@@ -170,6 +171,28 @@ class _FakeBooster:
     def save_model(self, path: str) -> None:
         Path(path).write_text(
             f"fake-lightgbm head={self.head} seed={self.seed}\n", encoding="ascii"
+        )
+
+
+def test_pipeline_rejects_store_built_by_a_different_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store_root, cdi_path, cdi_sha, reference_path, reference_sha = (
+        _development_store(tmp_path)
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "_git_identity",
+        lambda: {"commit": "2" * 40, "tracked_worktree_clean": True},
+    )
+    with pytest.raises(ValueError, match="store implementation commit differs"):
+        pipeline.run_pipeline_validation(
+            store_root=store_root,
+            cdi_path=cdi_path,
+            cdi_sha256=cdi_sha,
+            experiment52_cdi_path=reference_path,
+            experiment52_cdi_sha256=reference_sha,
+            output_root=tmp_path / "validation",
         )
 
 

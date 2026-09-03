@@ -1301,6 +1301,14 @@ def run_pipeline_validation(
         raise ValueError("validation output and immutable input store must be disjoint")
     code = _git_identity()
     store_manifest, dates = _read_store_header(store_path)
+    store_metadata = store_manifest.get("metadata")
+    if (
+        not isinstance(store_metadata, Mapping)
+        or store_metadata.get("implementation_git_commit") != code["commit"]
+    ):
+        raise ValueError(
+            "v2 store implementation commit differs from the validation code"
+        )
     sidecars = _validate_sidecars(store_manifest, enabled_sidecars)
     fit_indices, selection_indices, fold_payload = _development_indices(
         dates, runtime=runtime

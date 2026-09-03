@@ -27,7 +27,9 @@ def _aligned_daily(*arrays: NDArray[np.generic]) -> tuple[NDArray[np.float64], .
 
 
 def exact_log_return(
-    close: NDArray[np.floating], horizon: int
+    close: NDArray[np.floating],
+    horizon: int,
+    unresolved_action: NDArray[np.bool_] | None = None,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
     values = np.asarray(close, dtype=np.float64)
     if values.ndim != 2 or horizon <= 0:
@@ -43,6 +45,13 @@ def exact_log_return(
         & (values[horizon:] > 0)
         & (values[:-horizon] > 0)
     )
+    if unresolved_action is not None:
+        unresolved = np.asarray(unresolved_action, dtype=np.bool_)
+        if unresolved.shape != values.shape:
+            raise ValueError("unresolved_action must align with close")
+        cumulative = np.cumsum(unresolved, axis=0, dtype=np.int32)
+        # For a return ending at t, exclude events in (t-horizon, t].
+        mask &= cumulative[horizon:] - cumulative[:-horizon] == 0
     output[horizon:] = np.where(mask, candidate, np.nan)
     valid[horizon:] = mask
     return output, valid
@@ -456,6 +465,7 @@ def build_slow_features(
     dates: Sequence[object],
     *,
     cluster_labels: NDArray[np.integer] | None = None,
+    unresolved_action: NDArray[np.bool_] | None = None,
 ) -> SlowFeatureResult:
     """Build the frozen 32-field causal slow library."""
 
@@ -472,6 +482,13 @@ def build_slow_features(
     membership = np.asarray(active, dtype=np.bool_)
     if seen.shape != close.shape or membership.shape != close.shape:
         raise ValueError("observed and active are misaligned")
+    unresolved = (
+        np.zeros(close.shape, dtype=np.bool_)
+        if unresolved_action is None
+        else np.asarray(unresolved_action, dtype=np.bool_)
+    )
+    if unresolved.shape != close.shape:
+        raise ValueError("unresolved_action is misaligned")
     values = np.zeros((*close.shape, len(SLOW_FEATURES)), dtype=np.float32)
     valid = np.zeros(values.shape, dtype=np.bool_)
 
@@ -482,7 +499,7 @@ def build_slow_features(
 
     returns: dict[int, tuple[NDArray[np.float64], NDArray[np.bool_]]] = {}
     for index, horizon in enumerate((1, 5, 21, 63, 126, 252)):
-        returns[horizon] = exact_log_return(tr_close, horizon)
+        returns[horizon] = exact_log_return(tr_close, horizon, unresolved)
         assign(index, *returns[horizon])
     momentum = returns[252][0] - returns[21][0]
     assign(6, momentum, returns[252][1] & returns[21][1])

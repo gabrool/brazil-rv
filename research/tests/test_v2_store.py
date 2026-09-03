@@ -467,6 +467,8 @@ def test_store_to_close_uses_exact_m1_final_close_not_cotahist(tmp_path) -> None
     daily_rows = []
     for day in dates:
         for name_index, isin in enumerate(names):
+            if day == dates[10] and name_index == 1:
+                continue
             daily_rows.append(
                 {
                     "trade_date": day,
@@ -504,14 +506,15 @@ def test_store_to_close_uses_exact_m1_final_close_not_cotahist(tmp_path) -> None
         observed=observed,
     )
     actions = pl.DataFrame(
-        schema={
-            "isin": pl.String,
-            "ex_date": pl.Date,
-            "action_type": pl.String,
-            "split_factor": pl.Float64,
-            "cash_distribution_brl": pl.Float64,
-            "unresolved": pl.Boolean,
-        }
+        {
+            "isin": [names[1]],
+            "ex_date": [dates[10]],
+            "action_type": ["dividend"],
+            "split_factor": [1.0],
+            "cash_distribution_brl": [0.5],
+            "unresolved": [False],
+        },
+        schema_overrides={"ex_date": pl.Date},
     )
     root = build_daily_store(
         pl.DataFrame(daily_rows),
@@ -528,7 +531,36 @@ def test_store_to_close_uses_exact_m1_final_close_not_cotahist(tmp_path) -> None
     assert raw[65, 0] != pytest.approx(np.log(200.0 / minute[65, 0, 345]))
     assert valid[65, 0]
     assert not valid[65, 1]
+    unavailable = np.load(root / "cash_reinvestment_unavailable_mask.npy")
+    unresolved = np.load(root / "unresolved_action.npy")
+    assert unavailable[10, 1]
+    assert unresolved[10, 1]
+    slow_valid = np.load(root / "slow_valid.npy")
+    assert not slow_valid[63, 1, 3]
+    target_valid = np.load(root / "target_raw_valid.npy")
+    assert not target_valid[5, 1, 4]
+    review = pl.read_parquet(
+        root / "corporate_action_cash_reinvestment_review.parquet"
+    )
+    assert review.select("observed", "unresolved").to_dicts() == [
+        {"observed": False, "unresolved": True}
+    ]
+    assert review.select("trade_date", "isin", "cash_distribution_brl").to_dicts() == [
+        {
+            "trade_date": dates[10],
+            "isin": names[1],
+            "cash_distribution_brl": 0.5,
+        }
+    ]
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    assert (
+        manifest["metadata"]["cash_reinvestment_unavailable_count_foundation"]
+        == 1
+    )
+    assert (
+        manifest["metadata"]["cash_reinvestment_unavailable_count_store_rows"]
+        == 1
+    )
     assert tuple(
         manifest["metadata"]["v1_store_v2_zero_slow_fields"]
     ) == V1_STORE_V2_ZERO_SLOW_FIELDS
