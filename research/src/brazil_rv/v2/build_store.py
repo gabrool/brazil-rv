@@ -1242,7 +1242,6 @@ def _parse_sidecars(
             ),
             "events": (
                 "event_itr_dfp_recent_5s",
-                "event_itr_dfp_recent_5s_mask",
             ),
         }.get(group, ())
         value_columns = sorted(

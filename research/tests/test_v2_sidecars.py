@@ -135,6 +135,27 @@ def test_events_sidecar_derives_earnings_age_and_causal_distribution_flags() -> 
     assert not enriched.valid[..., 5].any()
 
 
+def test_event_projection_does_not_duplicate_an_explicit_mask(tmp_path) -> None:
+    days = [date(2024, 1, 2), date(2024, 1, 3)]
+    source = tmp_path / "events.parquet"
+    pl.DataFrame(
+        {
+            "available_date": days,
+            "isin": ["BRTESTACNOR1"] * 2,
+            "event_itr_dfp_recent_5s": [0.0, 1.0],
+            "event_itr_dfp_recent_5s_mask": [True, True],
+        }
+    ).write_parquet(source)
+    parsed = _parse_sidecars(
+        [f"events={source}"],
+        days,
+        ["BRTESTACNOR1"],
+        None,
+    )
+    assert parsed["events"].values.shape == (2, 1, 6)
+    assert parsed["events"].valid[1, 0, 1]
+
+
 def test_raw_lending_formulas_use_source_date_volume_and_d_plus_one() -> None:
     days = [date(2024, 1, 1) + timedelta(days=index) for index in range(27)]
     isin = "BRTESTACNOR1"
