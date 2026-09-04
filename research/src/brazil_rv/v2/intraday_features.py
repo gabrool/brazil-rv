@@ -160,6 +160,8 @@ def replace_daily_close_anchors(
     result: IntradayDailyResult,
     official_close: NDArray[np.floating],
     official_close_observed: NDArray[np.bool_],
+    *,
+    copy_buffers: bool = True,
 ) -> IntradayDailyResult:
     """Replace full-session M1 close anchors with the COTAHIST session close."""
 
@@ -167,9 +169,11 @@ def replace_daily_close_anchors(
     observed = np.asarray(official_close_observed, dtype=np.bool_)
     if official.shape != result.values.shape[:2] or observed.shape != official.shape:
         raise ValueError("official close anchors are misaligned")
-    official_valid = observed & np.isfinite(official) & (official > 0)
-    values = np.asarray(result.values).copy()
-    valid = np.asarray(result.valid, dtype=np.bool_).copy()
+    official_valid = np.isfinite(official)
+    official_valid &= observed
+    official_valid &= official > 0
+    values = result.values.copy() if copy_buffers else result.values
+    valid = result.valid.copy() if copy_buffers else result.valid
     old_close = np.asarray(result.session_close, dtype=np.float64)
     old_valid = np.asarray(result.session_close_valid, dtype=np.bool_)
 
@@ -210,7 +214,10 @@ def replace_daily_close_anchors(
     # The two lagged full-session features can be translated exactly because
     # their original M1 close and current ratio are retained.
     anchor_delta = np.full(official.shape, np.nan, dtype=np.float64)
-    anchor_valid = official_valid & old_valid & np.isfinite(old_close) & (old_close > 0)
+    anchor_valid = np.isfinite(old_close)
+    anchor_valid &= old_valid
+    anchor_valid &= official_valid
+    anchor_valid &= old_close > 0
     anchor_delta[anchor_valid] = np.log(official[anchor_valid] / old_close[anchor_valid])
     for day in range(1, len(official)):
         prior_valid = anchor_valid[day - 1] & day_open_valid[day - 1]

@@ -91,6 +91,28 @@ def test_cotahist_close_replaces_full_session_anchor() -> None:
     assert replaced.values[-1, 0, 0] == np.float32(expected_overnight)
 
 
+def test_cotahist_close_in_place_mode_matches_copy_mode() -> None:
+    copied_input = build_intraday_daily_features(*_minutes())
+    in_place_input = build_intraday_daily_features(*_minutes())
+    official = copied_input.session_close.copy()
+    official[-2, 0] *= 1.02
+    observed = np.ones_like(official, dtype=bool)
+    copied = replace_daily_close_anchors(copied_input, official, observed)
+    in_place_values = in_place_input.values
+    in_place_valid = in_place_input.valid
+    in_place = replace_daily_close_anchors(
+        in_place_input, official, observed, copy_buffers=False
+    )
+    assert in_place.values is in_place_values
+    assert in_place.valid is in_place_valid
+    np.testing.assert_array_equal(in_place.values, copied.values)
+    np.testing.assert_array_equal(in_place.valid, copied.valid)
+    np.testing.assert_array_equal(in_place.session_close, copied.session_close)
+    np.testing.assert_array_equal(
+        in_place.session_close_valid, copied.session_close_valid
+    )
+
+
 def test_decision_features_exclude_every_entry_and_later_bar_field() -> None:
     inputs = _minutes()
     original = build_intraday_daily_features(*inputs)

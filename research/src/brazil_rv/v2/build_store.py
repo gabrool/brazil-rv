@@ -788,7 +788,7 @@ def build_daily_store(
         )
         m1_session_close = aligned.session_close.copy()
         aligned = replace_daily_close_anchors(
-            aligned, panel.close_brl, panel.observed
+            aligned, panel.close_brl, panel.observed, copy_buffers=False
         )
         aligned = mask_action_boundaries(aligned, intraday_action_boundary)
         intraday_values, intraday_valid = rank_gauss_panel(
@@ -805,7 +805,7 @@ def build_daily_store(
             raise ValueError("streamed intraday derivatives are misaligned")
         m1_session_close = aligned.session_close.copy()
         aligned = replace_daily_close_anchors(
-            aligned, panel.close_brl, panel.observed
+            aligned, panel.close_brl, panel.observed, copy_buffers=False
         )
         aligned = mask_action_boundaries(aligned, intraday_action_boundary)
         intraday_values, intraday_valid = rank_gauss_panel(
