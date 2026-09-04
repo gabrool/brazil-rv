@@ -5319,3 +5319,96 @@ paid GH200 instance `9519c52f3a504525976c34710edf2427` was terminated.
 Separate provider inventory reads at 2026-09-04T19:09:48.2998191Z and
 2026-09-04T19:10:09.0341517Z confirmed that exact ID absent and zero remaining
 nonterminal instances.
+
+### Section-C non-finite diagnosis, structural repair, and completed full-F1 neural validation
+
+The exact failed selection batch from the `b61b0d8` continuation was reproduced
+before any fix. The sealed provenance root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/v2_nonfinite_diagnosis_14f6648_20260904T192200Z
+
+It retains the exact 42,848,236-byte batch at SHA-256
+`fcc2b968d0e85138f66a490ad8cfd17523ff7f2ca7c1b1906aafcbb60d483019`
+and the exact 2,940,156-byte post-epoch state at SHA-256
+`4aed87b63eefa78ae81e2a83b27a97407b0e7c83b5ee1fe58e4c1df7d718a49d`.
+All 49 SAM training steps and both losses per step were finite, and every model
+parameter was finite. Per-array checks found finite slow features and mask,
+intraday features and mask, all six sidecar families, v1 fast patches and mask,
+v1 slow features, both flags, active mask, and targets. Invalid cells were
+already zero. No active name had zero valid slow rows and no fast-present name
+had an empty patch set.
+
+The compiled failure contained six non-finite predictions, all on active names,
+including four primary-valid names. Eager forward hooks found no non-finite
+module output. Every separately compiled slow, sparse-fast, tap, block, encoder,
+and tail stage was also finite; only the whole compiled composition failed.
+The pre-fix compiler-stage sweep is SHA-256
+`0876355d21a02f32c3cdd4bb747057071141af7c15336f920e8b5b274200e0ba`.
+On the same batch and state, enabling the documented dynamic-graph CUDA-capture
+safeguard produced finite eager and compiled outputs with maximum absolute
+difference `1.0488555e-05`; that replay is SHA-256
+`f498bb850414f0dbb13b1ce28ff339aacc1ce98076dfdc2443ea00a9fd08c6ca`.
+The failure was therefore whole-graph dynamic CUDA graph stale-buffer
+contamination, not divergent training, bad model parameters, or a NaN-bearing
+input. The diagnosis audit and complete log-inclusive inventory SHA-256 values
+are `52391d502778dd588ccd821cb47e47b845ff39352f5f6e017c766f43ffcf121f`
+and `ba2b0da9bf92514d0e88888c7e0c7f504972b7980f4597b4aee1c849d7ef7c74`.
+
+Commit `bfba0d7b6c6743a6b246ceaff7039917b4ab8f2b` implemented the bounded
+structural repair. Dataset outputs zero every invalid floating cell with its
+mask and reject every non-finite value marked available. Masked model
+reductions use `torch.where`, both SAM loss evaluations are checked before
+backward, external input hashes are recomputed on every resolution, and
+Inductor skips CUDA graph capture for this dynamic sparse-name graph. No
+evaluator-side dropping or score repair was added. Regression tests cover
+NaN-by-contract cells in every array class, an active name with zero lookback,
+a fast-present name with no valid patches, marked-valid non-finite rejection,
+and both non-finite SAM loss phases. Local and Linux Ruff/compile checks and all
+615 tests passed; the only warnings were the two existing all-NaN fixture
+warnings.
+
+The exact post-fix compiled replay root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/v2_nonfinite_postfix_replay_bfba0d7_20260904T194147Z
+
+Both eager and compiled outputs were finite for every active and inactive name.
+Its replay, audit, and log-inclusive inventory SHA-256 values are
+`94d26cd19ec3a6798d255656c23e086f180f879ea84c7dfe721f4109fe794af9`,
+`67ec49a215efdb5dcbb7074a16d1f549fad607dbee1119f9054ffa84998ef7bc`,
+and `6afc2139f332c89b75a3f28d7a82da184ad45aed4856eb0ee4279917c8d4bd11`.
+
+The remaining full-F1 legs then completed without changing the registered
+protocol. The exact root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/v2_pipeline_network_resume_bfba0d7_20260904T194500Z
+
+This run used the complete F1 fit window, seed 11, lookback 60, CUDA, compiled
+execution, two three-epoch from-scratch Stage-F parity fits, two one-epoch
+lambda-0.1 persistence parity fits, one Stage-P epoch, and one Stage-F epoch
+initialized from the exact Stage-P checkpoint. The completed classical legs
+were not repeated. Scratch-F selection values were
+`0.03808258/0.04025806/0.04120493` for even selection and
+`0.06008367/0.05454536/0.05372623` for odd selection. Its block-parity pooled
+primary IC was `0.04577236`; residual Spearman IC for D1/D2/D3/D5/D10 was
+`0.02569576/0.04118709/0.04755169/0.06865491/0.08876351`.
+
+The lambda-0.1 probe's pooled primary IC was `0.03274652`, with residual IC
+`0.02573149/0.03113211/0.03375103/0.04037144/0.09585153`. Mean primary
+prediction persistence increased from `0.96028812` to `0.98053202` at one
+session and from `0.85587469` to `0.89919339` at five sessions. Stage P's
+one-epoch selection value was `0.06927304`; the exact hand-off Stage-F epoch
+was `0.06524824`. These values are integration diagnostics only and do not
+select a research candidate.
+
+The final audit independently verified all six finite histories at exact epoch
+counts, six run manifests, 12 checkpoints, six finite float32 score panels of
+shape 124-by-933-by-5, all score masks, every relocated external file hash, the
+exact P-to-F checkpoint identity, and 42 protected-access flags. The completed
+pipeline manifest SHA-256 is
+`e96e64906bca61cccdce0acc6e84769018b6d877e6c4364cb0c7c5fe6f16e5cb`.
+The log-inclusive completion audit and inventory SHA-256 values are
+`985cdc3a3af81372cbd91550a345cfbbee7b1c3eba1213250a0ca2320c8c8333`
+and `48d553e5ef1dc7848eb5c1404eb27bdf416234c26924d78e6fab33303832ac4d`;
+the latter covers 82 files totaling 31,635,333 bytes. Official validation and
+the permanently spent test were not accessed, Section D was not started, and
+no candidate or deployment changed.

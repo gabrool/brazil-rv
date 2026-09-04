@@ -15,11 +15,10 @@ harness are implemented and unit-tested. The second review pass makes the panel
 definition independent of provider corporate-action coverage: only official
 COTAHIST histories may affect price adjustments, features, masks, and targets;
 provider actions are audit-only. The current v2 store is accepted and
-hash-sealed. Spec-scale baseline and GBDT integration checks are complete, but
-full-F1 neural validation remains incomplete after the first scratch-F leg
-stopped on non-finite selection predictions. No v2 research candidate has been
-selected, no v2 official-validation or test date has been evaluated, and no
-prediction, execution, or deployment recipe has changed.
+hash-sealed. Spec-scale baseline, GBDT, and full-F1 neural integration checks
+are complete after a bounded compiled-inference repair. No v2 research
+candidate has been selected, no v2 official-validation or test date has been
+evaluated, and no prediction, execution, or deployment recipe has changed.
 
 The accepted incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
@@ -148,6 +147,50 @@ Official-validation and test access remained false; Section D remains
 unauthorized and unrun. The former `f048ea9`, `2cb204d`, and related validation
 roots remain immutable historical engineering evidence only and must not be
 used as canonical inputs.
+
+The exact failed selection batch and post-epoch parameters were subsequently
+sealed under
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/v2_nonfinite_diagnosis_14f6648_20260904T192200Z`.
+All 49 training steps, losses, parameters, and saved input arrays were finite;
+invalid input cells were already zero. Six non-finite outputs affected active
+names. Eager inference and every separately compiled model stage remained
+finite, while only the whole compiled composition failed. Replaying the exact
+batch with PyTorch's dynamic-graph CUDA-capture safeguard restored finite
+outputs with a maximum absolute eager difference of `1.0489e-05`. The diagnosis
+therefore identified stale-buffer contamination from whole-graph dynamic CUDA
+graph capture, not training divergence or input contamination. Diagnosis audit
+and inventory SHA-256 values are
+`52391d502778dd588ccd821cb47e47b845ff39352f5f6e017c766f43ffcf121f`
+and `ba2b0da9bf92514d0e88888c7e0c7f504972b7980f4597b4aee1c849d7ef7c74`.
+
+Commit `bfba0d7b6c6743a6b246ceaff7039917b4ab8f2b` makes the data boundary
+structural: every invalid floating input is zeroed under its mask, every
+available value must be finite, masked reductions use `torch.where`, and both
+SAM loss evaluations must be finite. Inductor skips CUDA graph capture for the
+model's dynamic sparse-name graph. Regression coverage includes NaN-by-contract
+cells in every array class, an active name with no valid lookback, a
+fast-present name with no valid patches, marked-valid non-finite rejection, and
+both non-finite SAM loss phases. Local and Linux Ruff/compile checks passed, as
+did all 615 tests. An exact post-fix compiled replay is sealed at
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/v2_nonfinite_postfix_replay_bfba0d7_20260904T194147Z`;
+its audit and inventory SHA-256 values are
+`67ec49a215efdb5dcbb7074a16d1f549fad607dbee1119f9054ffa84998ef7bc`
+and `6afc2139f332c89b75a3f28d7a82da184ad45aed4856eb0ee4279917c8d4bd11`.
+
+The completed network-only integration root is
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/v2_pipeline_network_resume_bfba0d7_20260904T194500Z`.
+It contains both three-epoch scratch-F parities, both one-epoch lambda-0.1
+persistence parities, one Stage-P epoch, and its one-epoch Stage-F checkpoint
+hand-off at full F1 scale, seed 11, lookback 60, CUDA, and compiled execution.
+Scratch F produced pooled primary IC `0.04577236`; lambda 0.1 produced
+`0.03274652` while increasing mean one-session prediction persistence from
+`0.96028812` to `0.98053202` and five-session persistence from `0.85587469`
+to `0.89919339`. These are integration diagnostics, not research results. The
+log-inclusive completion audit and inventory SHA-256 values are
+`985cdc3a3af81372cbd91550a345cfbbee7b1c3eba1213250a0ca2320c8c8333`
+and `48d553e5ef1dc7848eb5c1404eb27bdf416234c26924d78e6fab33303832ac4d`;
+the inventory covers 82 files totaling 31,635,333 bytes. All protected-access
+flags are false. Section D remains unrun and no candidate or deployment changed.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused
