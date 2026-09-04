@@ -419,6 +419,109 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         )
 
 
+def test_network_continuation_verifies_classical_source_and_skips_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        store_root,
+        cdi_path,
+        cdi_sha,
+        experiment52_cdi_path,
+        experiment52_cdi_sha,
+    ) = _development_store(tmp_path)
+    classical = tmp_path / "classical"
+    for index in range(12):
+        write_json_atomic(
+            classical / "baselines" / f"run_{index}" / "evaluation.json",
+            {"official_validation_accessed": False, "test_accessed": False},
+        )
+    for index in range(2):
+        write_json_atomic(
+            classical / "gbdt_triage" / f"run_{index}" / "evaluation.json",
+            {"official_validation_accessed": False, "test_accessed": False},
+        )
+    for index in range(100):
+        model = classical / "gbdt_triage" / "models" / f"head_{index}.txt"
+        model.parent.mkdir(parents=True, exist_ok=True)
+        model.write_text(str(index), encoding="ascii")
+    for index in range(4):
+        write_json_atomic(
+            classical
+            / "gbdt_triage"
+            / "models"
+            / f"parity_{index}"
+            / "model_manifest.json",
+            {"official_validation_accessed": False, "test_accessed": False},
+        )
+    failure_sha = write_json_atomic(
+        classical / "failure_record.json",
+        {
+            "status": "failed_before_neural_training",
+            "official_validation_accessed": False,
+            "test_accessed": False,
+        },
+    )
+    excluded = {"inventory.json", "inventory.json.sha256"}
+    rows = pipeline.inventory(classical, exclude=excluded)
+    inventory_sha = write_json_atomic(
+        classical / "inventory.json",
+        {
+            "status": "failed_after_classical_completion",
+            "official_validation_accessed": False,
+            "test_accessed": False,
+            "excluded_self": sorted(excluded),
+            "files": rows,
+        },
+    )
+    calls: list[dict[str, object]] = []
+
+    def fake_network(**kwargs):
+        calls.append(kwargs)
+        return {"completed": True}
+
+    monkeypatch.setattr(
+        pipeline,
+        "_git_identity",
+        lambda: {"commit": "2" * 40, "tracked_worktree_clean": True},
+    )
+    monkeypatch.setattr(pipeline, "_run_network_smokes", fake_network)
+    monkeypatch.setattr(
+        pipeline,
+        "_run_baselines",
+        lambda **kwargs: pytest.fail("baseline leg must not repeat"),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "_run_gbdt",
+        lambda **kwargs: pytest.fail("GBDT leg must not repeat"),
+    )
+
+    result = pipeline.resume_network_validation(
+        store_root=store_root,
+        store_manifest_sha256=sha256_file(store_root / "manifest.json"),
+        cdi_path=cdi_path,
+        cdi_sha256=cdi_sha,
+        experiment52_cdi_path=experiment52_cdi_path,
+        experiment52_cdi_sha256=experiment52_cdi_sha,
+        completed_classical_root=classical,
+        completed_classical_inventory_sha256=inventory_sha,
+        completed_classical_failure_sha256=failure_sha,
+        output_root=tmp_path / "network-continuation",
+        runtime=pipeline.ValidationRuntime(device="cuda"),
+    )
+
+    assert len(calls) == 1
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["schema"] == pipeline.PIPELINE_NETWORK_RESUME_SCHEMA
+    assert manifest["code"]["commit"] == "2" * 40
+    assert manifest["store_build_commit"] == "1" * 40
+    source = manifest["sources"]["completed_classical_validation"]
+    assert source["inventory_sha256"] == inventory_sha
+    assert source["failure_record_sha256"] == failure_sha
+    assert source["baseline_evaluation_count"] == 12
+    assert source["gbdt_model_count"] == 100
+
+
 def test_development_cdi_requires_exact_experiment52_overlap(tmp_path: Path) -> None:
     (
         store_root,

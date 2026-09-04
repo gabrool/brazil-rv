@@ -35,6 +35,7 @@ from .contract import (
     STORE_START,
 )
 from .data import V2DailyDataset
+from .data_roots import resolve_external_files
 from .evaluate import EvaluationInputs, EvaluationResult, evaluate_scores
 from .gbdt import GBDTConfig, MultiHorizonGBDT, assemble_gbdt_features
 from .score import ScoreArtifact, score_checkpoint_artifact
@@ -50,6 +51,7 @@ from .train import (
 )
 
 PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V1"
+PIPELINE_NETWORK_RESUME_SCHEMA = "BRAZIL_RV_V2_PIPELINE_NETWORK_RESUME_V1"
 PIPELINE_FLAGS: dict[str, bool] = {
     "pipeline_validation": True,
     "research_claim": False,
@@ -75,6 +77,11 @@ _REQUIRED_ARRAYS = frozenset(
         "adjusted_close",
         "target_exclusion_event_mask",
     }
+)
+_V1_FAST_FILES = (
+    "equity_features.npy",
+    "equity_slow.npy",
+    "equity_data_ready.npy",
 )
 
 
@@ -184,6 +191,35 @@ def _read_store_header(root: Path) -> tuple[dict[str, object], NDArray[np.dateti
     ):
         raise ValueError("store does not span the frozen v2 development foundation")
     return manifest, dates
+
+
+def _external_artifact_resolutions(
+    store_manifest: Mapping[str, object],
+) -> list[dict[str, object]]:
+    metadata = store_manifest.get("metadata")
+    if not isinstance(metadata, Mapping):
+        raise ValueError("store manifest metadata is malformed")
+    records = metadata.get("v1_fast_files", [])
+    if not records:
+        return []
+    if not isinstance(records, list) or any(
+        not isinstance(record, Mapping) for record in records
+    ):
+        raise ValueError("external v1 fast artifact records are malformed")
+    _, resolutions = resolve_external_files(records, _V1_FAST_FILES)
+    return [resolution.payload() for resolution in resolutions]
+
+
+def _assert_overrides_outside_store(
+    store_root: Path, resolutions: Sequence[Mapping[str, object]]
+) -> None:
+    for resolution in resolutions:
+        configured = resolution.get("override_file")
+        if configured is None:
+            continue
+        override = Path(str(configured)).resolve(strict=True)
+        if override == store_root or override.is_relative_to(store_root):
+            raise ValueError("data-root override must remain outside the immutable store")
 
 
 def _bounded(
@@ -1300,6 +1336,66 @@ def _verify_inventory_rows(
         raise RuntimeError("pipeline validation inventory changed while sealing")
 
 
+def _verified_classical_source(
+    *,
+    root: Path,
+    expected_inventory_sha256: str,
+    expected_failure_sha256: str,
+) -> dict[str, object]:
+    source = Path(root).resolve(strict=True)
+    inventory_path = source / "inventory.json"
+    failure_path = source / "failure_record.json"
+    if sha256_file(inventory_path).casefold() != expected_inventory_sha256.casefold():
+        raise ValueError("completed classical inventory SHA-256 mismatch")
+    if sha256_file(failure_path).casefold() != expected_failure_sha256.casefold():
+        raise ValueError("completed classical failure-record SHA-256 mismatch")
+    inventory_payload = json.loads(inventory_path.read_text(encoding="utf-8"))
+    failure = json.loads(failure_path.read_text(encoding="utf-8"))
+    if not isinstance(inventory_payload, Mapping) or not isinstance(failure, Mapping):
+        raise ValueError("completed classical audit payload is malformed")
+    for payload in (inventory_payload, failure):
+        if (
+            payload.get("official_validation_accessed") is not False
+            or payload.get("test_accessed") is not False
+        ):
+            raise ValueError("completed classical source records sealed-window access")
+    excluded_raw = inventory_payload.get("excluded_self")
+    rows = inventory_payload.get("files")
+    if (
+        not isinstance(excluded_raw, list)
+        or not all(isinstance(value, str) for value in excluded_raw)
+        or not isinstance(rows, list)
+        or any(not isinstance(row, dict) for row in rows)
+    ):
+        raise ValueError("completed classical inventory is malformed")
+    _verify_inventory_rows(source, rows, excluded=set(excluded_raw))
+    if (source / "network_smokes").exists():
+        raise ValueError("completed classical source unexpectedly contains neural output")
+    baseline_evaluations = list((source / "baselines").rglob("evaluation.json"))
+    gbdt_evaluations = list((source / "gbdt_triage").rglob("evaluation.json"))
+    gbdt_models = list((source / "gbdt_triage").rglob("*.txt"))
+    gbdt_manifests = list((source / "gbdt_triage").rglob("model_manifest.json"))
+    if (
+        len(baseline_evaluations) != 12
+        or len(gbdt_evaluations) != 2
+        or len(gbdt_models) != 100
+        or len(gbdt_manifests) != 4
+    ):
+        raise ValueError("completed classical source has the wrong artifact grid")
+    return {
+        "root": str(source),
+        "inventory": str(inventory_path),
+        "inventory_sha256": expected_inventory_sha256.casefold(),
+        "failure_record": str(failure_path),
+        "failure_record_sha256": expected_failure_sha256.casefold(),
+        "baseline_evaluation_count": len(baseline_evaluations),
+        "gbdt_evaluation_count": len(gbdt_evaluations),
+        "gbdt_model_count": len(gbdt_models),
+        "gbdt_model_manifest_count": len(gbdt_manifests),
+        "neural_artifacts_present": False,
+    }
+
+
 def run_pipeline_validation(
     *,
     store_root: Path,
@@ -1340,6 +1436,8 @@ def run_pipeline_validation(
             "v2 store implementation commit differs from the validation code"
         )
     sidecars = _validate_sidecars(store_manifest, enabled_sidecars)
+    external_resolutions = _external_artifact_resolutions(store_manifest)
+    _assert_overrides_outside_store(store_path, external_resolutions)
     fit_indices, selection_indices, fold_payload = _development_indices(
         dates, runtime=runtime
     )
@@ -1464,6 +1562,7 @@ def run_pipeline_validation(
                         "root": str(store_path),
                         "manifest_sha256": store_manifest_sha,
                         "access_ledger": source_access.payload(),
+                        "external_artifact_resolutions": external_resolutions,
                     },
                     "cdi": cdi_provenance,
                 },
@@ -1491,6 +1590,210 @@ def run_pipeline_validation(
             inventory_path,
             {
                 "schema": f"{PIPELINE_SCHEMA}_INVENTORY",
+                "status": "completed",
+                **PIPELINE_FLAGS,
+                "excluded_self": sorted(excluded),
+                "files": rows,
+            },
+        )
+        _verify_inventory_rows(output, rows, excluded=excluded)
+    finally:
+        store.close()
+    return PipelineValidationResult(
+        root=output,
+        manifest_path=manifest_path,
+        manifest_sha256=manifest_sha,
+        inventory_path=inventory_path,
+        inventory_sha256=inventory_sha,
+    )
+
+
+def resume_network_validation(
+    *,
+    store_root: Path,
+    store_manifest_sha256: str,
+    cdi_path: Path,
+    cdi_sha256: str,
+    experiment52_cdi_path: Path,
+    experiment52_cdi_sha256: str,
+    completed_classical_root: Path,
+    completed_classical_inventory_sha256: str,
+    completed_classical_failure_sha256: str,
+    output_root: Path,
+    runtime: ValidationRuntime = ValidationRuntime(device="cuda"),
+    enabled_sidecars: Sequence[str] = (),
+) -> PipelineValidationResult:
+    """Continue only the F1 neural legs after a sealed classical-only run.
+
+    This path intentionally permits the immutable store's build commit to differ
+    from the current loader commit. It compensates by requiring the exact store,
+    classical inventory, and score-free failure-record hashes and records both
+    commits in the continuation manifest.
+    """
+
+    if (
+        runtime.fine_epochs != 3
+        or runtime.handoff_epochs != 1
+        or runtime.slow_lookback != 60
+        or runtime.max_fit_sessions is not None
+        or runtime.max_selection_sessions is not None
+        or runtime.max_pretrain_fit_sessions is not None
+        or runtime.max_pretrain_selection_sessions is not None
+        or runtime.device != "cuda"
+    ):
+        raise ValueError("network continuation requires the exact full-F1 GPU runtime")
+    store_path = Path(store_root).resolve(strict=True)
+    output = Path(output_root).resolve()
+    classical_path = Path(completed_classical_root).resolve(strict=True)
+    if output.exists():
+        raise FileExistsError(output)
+    if any(
+        output == source
+        or output.is_relative_to(source)
+        or source.is_relative_to(output)
+        for source in (store_path, classical_path)
+    ):
+        raise ValueError("network output must be disjoint from its immutable inputs")
+    code = _git_identity()
+    store_manifest, dates = _read_store_header(store_path)
+    actual_store_manifest_sha = sha256_file(store_path / "manifest.json")
+    if actual_store_manifest_sha.casefold() != store_manifest_sha256.casefold():
+        raise ValueError("sealed store manifest SHA-256 mismatch")
+    store_metadata = store_manifest.get("metadata")
+    if not isinstance(store_metadata, Mapping):
+        raise ValueError("store manifest metadata is malformed")
+    store_build_commit = store_metadata.get("implementation_git_commit")
+    if not isinstance(store_build_commit, str) or len(store_build_commit) != 40:
+        raise ValueError("store manifest lacks its build commit")
+    classical_source = _verified_classical_source(
+        root=classical_path,
+        expected_inventory_sha256=completed_classical_inventory_sha256,
+        expected_failure_sha256=completed_classical_failure_sha256,
+    )
+    sidecars = _validate_sidecars(store_manifest, enabled_sidecars)
+    external_resolutions = _external_artifact_resolutions(store_manifest)
+    _assert_overrides_outside_store(store_path, external_resolutions)
+    fit_indices, selection_indices, fold_payload = _development_indices(
+        dates, runtime=runtime
+    )
+    pretrain_fit, pretrain_embargo, pretrain_selection = _pretrain_indices(
+        dates, runtime
+    )
+    triage = protocol_preset("triage")
+    if triage.seeds != (11,) or "F1" not in fit_indices or "F1" not in selection_indices:
+        raise ValueError("F1 seed protocol differs from the continuation contract")
+    cdi_by_index, cdi_provenance = _load_development_cdi(
+        dates=dates,
+        cdi_path=Path(cdi_path),
+        expected_sha256=cdi_sha256,
+        experiment52_cdi_path=Path(experiment52_cdi_path),
+        experiment52_expected_sha256=experiment52_cdi_sha256,
+    )
+    requested_indices = np.unique(
+        np.concatenate(
+            (
+                pretrain_fit,
+                pretrain_selection,
+                fit_indices["F1"],
+                selection_indices["F1"],
+            )
+        )
+    ).astype(np.int64, copy=False)
+    requested_dates = _dates_for_indices(dates, requested_indices)
+    if any(value >= OFFICIAL_START for value in requested_dates):
+        raise PermissionError("network continuation refuses every 2025/2026 session")
+    history_lookbacks = np.full(
+        len(requested_indices), runtime.slow_lookback, dtype=np.int64
+    )
+    history_end_offsets = np.where(
+        dates[requested_indices] <= np.datetime64(PRETRAIN_END), 0, -1
+    ).astype(np.int64)
+    store, source_access = open_store_for_samples(
+        store_path,
+        requested_indices,
+        purpose="evaluation",
+        history_lookbacks=history_lookbacks,
+        history_end_offsets=history_end_offsets,
+    )
+    source_hashes = {
+        "v2_store_manifest": actual_store_manifest_sha,
+        "cdi_development_extension": str(
+            cdi_provenance["development_extension"]["sha256"]
+        ),
+        "cdi_experiment52_reference": str(
+            cdi_provenance["experiment52_reference"]["sha256"]
+        ),
+        "completed_classical_inventory": completed_classical_inventory_sha256,
+        "completed_classical_failure_record": completed_classical_failure_sha256,
+    }
+    output.mkdir(parents=True, exist_ok=False)
+    try:
+        network = _run_network_smokes(
+            store=store,
+            fit_indices=fit_indices["F1"],
+            selection_indices=selection_indices["F1"],
+            pretrain_fit_indices=pretrain_fit,
+            pretrain_selection_indices=pretrain_selection,
+            cdi_by_index=cdi_by_index,
+            root=output / "network_smokes",
+            source_hashes=source_hashes,
+            runtime=runtime,
+            sidecars=sidecars,
+            seed=11,
+        )
+        protocol_hashes = {
+            name: {
+                "path": str(PROTOCOL_CONFIG_ROOT / f"{name}.json"),
+                "sha256": sha256_file(PROTOCOL_CONFIG_ROOT / f"{name}.json"),
+            }
+            for name in ("triage", "full")
+        }
+        manifest_path = output / "pipeline_network_resume_manifest.json"
+        manifest_sha = write_json_atomic(
+            manifest_path,
+            {
+                "schema": PIPELINE_NETWORK_RESUME_SCHEMA,
+                "status": "completed",
+                **PIPELINE_FLAGS,
+                "scope": (
+                    "development-only F1 neural integration continuation; "
+                    "numbers are not research claims"
+                ),
+                "code": code,
+                "store_build_commit": store_build_commit,
+                "runtime": asdict(runtime),
+                "protocols": protocol_hashes,
+                "enabled_sidecars": list(sidecars),
+                "sources": {
+                    "store": {
+                        "root": str(store_path),
+                        "manifest_sha256": actual_store_manifest_sha,
+                        "access_ledger": source_access.payload(),
+                        "external_artifact_resolutions": external_resolutions,
+                    },
+                    "cdi": cdi_provenance,
+                    "completed_classical_validation": classical_source,
+                },
+                "date_contract": {
+                    "minimum_date": min(requested_dates).isoformat(),
+                    "maximum_date": max(requested_dates).isoformat(),
+                    "official_validation_accessed": False,
+                    "test_accessed": False,
+                    "pretrain_fit_date_indices": pretrain_fit.tolist(),
+                    "pretrain_embargo_date_indices": pretrain_embargo.tolist(),
+                    "pretrain_selection_date_indices": pretrain_selection.tolist(),
+                    "F1": fold_payload["F1"],
+                },
+                "results": {"network_smokes": network},
+            },
+        )
+        excluded = {"inventory.json", "inventory.json.sha256"}
+        rows = inventory(output, exclude=excluded)
+        inventory_path = output / "inventory.json"
+        inventory_sha = write_json_atomic(
+            inventory_path,
+            {
+                "schema": f"{PIPELINE_NETWORK_RESUME_SCHEMA}_INVENTORY",
                 "status": "completed",
                 **PIPELINE_FLAGS,
                 "excluded_self": sorted(excluded),
@@ -1546,6 +1849,17 @@ def _parser() -> argparse.ArgumentParser:
         help="Expected SHA-256 of the Experiment-52 CDI reference.",
     )
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument(
+        "--store-manifest-sha256",
+        help="Exact sealed-store manifest hash required for a network continuation.",
+    )
+    parser.add_argument(
+        "--completed-classical-root",
+        type=Path,
+        help="Sealed partial validation root containing completed classical legs.",
+    )
+    parser.add_argument("--completed-classical-inventory-sha256")
+    parser.add_argument("--completed-classical-failure-sha256")
     parser.add_argument("--sidecar", action="append", default=[])
     parser.add_argument("--fine-epochs", type=int, default=3)
     parser.add_argument("--handoff-epochs", type=int, default=1)
@@ -1586,16 +1900,44 @@ def main(argv: Sequence[str] | None = None) -> int:
         compile_forward=arguments.compile_forward,
         device=arguments.device,
     )
-    result = run_pipeline_validation(
-        store_root=arguments.store_root,
-        cdi_path=arguments.cdi_path,
-        cdi_sha256=arguments.cdi_sha256,
-        experiment52_cdi_path=arguments.experiment52_cdi_path,
-        experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
-        output_root=arguments.output_root,
-        runtime=runtime,
-        enabled_sidecars=arguments.sidecar,
+    continuation = (
+        arguments.store_manifest_sha256,
+        arguments.completed_classical_root,
+        arguments.completed_classical_inventory_sha256,
+        arguments.completed_classical_failure_sha256,
     )
+    if any(value is not None for value in continuation):
+        if any(value is None for value in continuation):
+            raise ValueError("network continuation requires all four source bindings")
+        result = resume_network_validation(
+            store_root=arguments.store_root,
+            store_manifest_sha256=arguments.store_manifest_sha256,
+            cdi_path=arguments.cdi_path,
+            cdi_sha256=arguments.cdi_sha256,
+            experiment52_cdi_path=arguments.experiment52_cdi_path,
+            experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
+            completed_classical_root=arguments.completed_classical_root,
+            completed_classical_inventory_sha256=(
+                arguments.completed_classical_inventory_sha256
+            ),
+            completed_classical_failure_sha256=(
+                arguments.completed_classical_failure_sha256
+            ),
+            output_root=arguments.output_root,
+            runtime=runtime,
+            enabled_sidecars=arguments.sidecar,
+        )
+    else:
+        result = run_pipeline_validation(
+            store_root=arguments.store_root,
+            cdi_path=arguments.cdi_path,
+            cdi_sha256=arguments.cdi_sha256,
+            experiment52_cdi_path=arguments.experiment52_cdi_path,
+            experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
+            output_root=arguments.output_root,
+            runtime=runtime,
+            enabled_sidecars=arguments.sidecar,
+        )
     print(
         json.dumps(
             {

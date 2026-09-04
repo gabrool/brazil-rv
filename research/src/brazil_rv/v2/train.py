@@ -836,6 +836,12 @@ def _loader_input_payload(
                     "v1_calendar_verified",
                 )
             }
+            external_resolutions = [
+                resolution.payload()
+                for resolution in getattr(
+                    candidate, "external_artifact_resolutions", ()
+                )
+            ]
             return {
                 "schema": "BRAZIL_RV_V2_MODEL_INPUT_V1",
                 "store": {
@@ -843,6 +849,7 @@ def _loader_input_payload(
                     "manifest_sha256": sha256_file(store_root / "manifest.json"),
                     "axes": manifest.get("axes"),
                     "fast_identity": fast_identity,
+                    "external_artifact_resolutions": external_resolutions,
                 },
                 "features": {
                     "ordered_slow_and_sidecar_names": slow_names,
@@ -1043,9 +1050,25 @@ def _verified_checkpoint_input_contract(
 
 
 def _input_static_identity(payload: Mapping[str, object]) -> dict[str, object]:
+    store = payload.get("store")
+    if isinstance(store, Mapping):
+        store_identity = dict(store)
+        resolutions = store_identity.get("external_artifact_resolutions")
+        if isinstance(resolutions, list):
+            store_identity["external_artifact_resolutions"] = [
+                {
+                    key: resolution.get(key)
+                    for key in ("recorded_path", "bytes", "sha256")
+                }
+                for resolution in resolutions
+                if isinstance(resolution, Mapping)
+            ]
+    else:
+        store_identity = store
     return {
-        key: payload.get(key)
-        for key in ("store", "features", "lookback_sessions")
+        "store": store_identity,
+        "features": payload.get("features"),
+        "lookback_sessions": payload.get("lookback_sessions"),
     }
 
 

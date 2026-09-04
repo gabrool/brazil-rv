@@ -18,7 +18,8 @@ from .contract import (
     STORE_START,
     V1_STORE_V2_ZERO_SLOW_FIELDS,
 )
-from .store import V2Store, open_store_for_samples, sha256_file
+from .data_roots import ExternalFileResolution, resolve_external_files
+from .store import V2Store, open_store_for_samples
 from .splits import AccessPurpose, PREREGISTRATION_ROOT, authorize_dates
 
 Stage = Literal["pretrain", "finetune", "evaluation", "joint"]
@@ -284,6 +285,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         self._external_fast_features: NDArray[np.generic] | None = None
         self._external_fast_ready: NDArray[np.generic] | None = None
         self._external_fast_slow: NDArray[np.generic] | None = None
+        self.external_artifact_resolutions: tuple[ExternalFileResolution, ...] = ()
         self._fast_date_mapping = np.full(self.store.dates.size, -1, dtype=np.int64)
         self._fast_v2_slots = np.empty(0, dtype=np.int64)
         self._fast_v1_slots = np.empty(0, dtype=np.int64)
@@ -303,34 +305,40 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             "v1_fast_store"
         )
         if configured_fast:
-            self._open_external_fast(Path(configured_fast), verify_fast_hashes)
-
-    def _open_external_fast(self, root: Path, verify_hashes: bool) -> None:
-        path = root.resolve()
-        records = {
-            Path(record["path"]).name: record
-            for record in self.store.manifest.get("metadata", {}).get(
-                "v1_fast_files", []
+            self._open_external_fast(
+                None if fast_store is None else Path(configured_fast),
+                verify_fast_hashes,
             )
-        }
+
+    def _open_external_fast(self, root: Path | None, verify_hashes: bool) -> None:
+        if not verify_hashes:
+            raise ValueError("external v1 fast artifacts must be hash-verified")
+        records = self.store.manifest.get("metadata", {}).get("v1_fast_files", [])
+        if not isinstance(records, list) or any(
+            not isinstance(record, Mapping) for record in records
+        ):
+            raise ValueError("external v1 fast artifact records are malformed")
         required = (
             "equity_features.npy",
             "equity_slow.npy",
             "equity_data_ready.npy",
         )
-        for name in required:
-            item = path / name
-            record = records.get(name)
-            if not item.is_file() or record is None:
-                raise FileNotFoundError(f"unbound external v1 fast file: {item}")
-            if verify_hashes and (
-                item.stat().st_size != int(record["bytes"])
-                or sha256_file(item) != record["sha256"]
-            ):
-                raise ValueError(f"external v1 fast hash mismatch: {name}")
-        features = np.load(path / required[0], mmap_mode="r", allow_pickle=False)
-        slow = np.load(path / required[1], mmap_mode="r", allow_pickle=False)
-        ready = np.load(path / required[2], mmap_mode="r", allow_pickle=False)
+        try:
+            if root is None:
+                paths, resolutions = resolve_external_files(records, required)
+            else:
+                resolved_root = root.resolve(strict=True)
+                paths, resolutions = resolve_external_files(
+                    records, required, local_root=resolved_root
+                )
+        except ValueError as error:
+            if "mismatch" in str(error).casefold():
+                raise ValueError("external v1 fast hash mismatch") from error
+            raise
+        self.external_artifact_resolutions = resolutions
+        features = np.load(paths[required[0]], mmap_mode="r", allow_pickle=False)
+        slow = np.load(paths[required[1]], mmap_mode="r", allow_pickle=False)
+        ready = np.load(paths[required[2]], mmap_mode="r", allow_pickle=False)
         if (
             features.ndim != 4
             or features.shape[2] < DECISION_MINUTE_INDEX

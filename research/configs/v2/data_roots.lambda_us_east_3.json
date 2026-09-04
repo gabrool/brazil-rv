@@ -1,0 +1,6 @@
+{
+  "roots": {
+    "C:\\quant-data": "/lambda/nfs/brazil-rv-east3/quant-data"
+  },
+  "schema": "BRAZIL_RV_DATA_ROOTS_V1"
+}

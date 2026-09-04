@@ -33,11 +33,39 @@ from brazil_rv.v2.train import (
     sam_step,
     stitch_block_parity_predictions,
     train_stage,
+    _input_static_identity,
     _model_input_segments,
     _require_production_pair_sampler,
     _validate_tracked_stage_inputs,
 )
 from brazil_rv.v2.store import write_store
+
+
+def test_external_location_is_not_part_of_model_input_identity() -> None:
+    first = {
+        "store": {
+            "manifest_sha256": "a" * 64,
+            "external_artifact_resolutions": [
+                {
+                    "recorded_path": r"D:\quant-data\sealed.npy",
+                    "resolved_path": r"D:\quant-data\sealed.npy",
+                    "bytes": 123,
+                    "sha256": "b" * 64,
+                    "override_file": None,
+                }
+            ],
+        },
+        "features": {"ordered": ["x"]},
+        "lookback_sessions": 60,
+    }
+    relocated = json.loads(json.dumps(first))
+    resolution = relocated["store"]["external_artifact_resolutions"][0]
+    resolution["resolved_path"] = "/lambda/nfs/quant-data/sealed.npy"
+    resolution["override_file"] = "/run-config/data_roots.json"
+
+    assert _input_static_identity(first) == _input_static_identity(relocated)
+    resolution["sha256"] = "c" * 64
+    assert _input_static_identity(first) != _input_static_identity(relocated)
 
 
 def test_multihead_objective_averages_each_horizon_separately() -> None:
