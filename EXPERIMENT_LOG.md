@@ -5125,3 +5125,34 @@ gate failed first. The later internal-family and target gates were not reached,
 GPU full-F1 validation was not started, Section D was not registered or run,
 and official-validation/test access flags remain false. No paid Lambda instance
 was claimed.
+
+### Section-C name-clustered gate continuation
+
+The external composition contract was refrozen before new real-data output:
+1,000 deterministic 95% name-clustered bootstrap replications per causal
+prior-ADV20 quartile, a minimum of 20 continuation names and 2,000
+family-present name-days in both survival groups, and a one-sided failure only
+when the survivor-minus-delisted lower bound exceeds +5 points. Publication-lag
+mask replay remains the unconditional external leakage guard; internal families
+retain their unconditional five-point cell-level gate and targets retain 10
+points. Commit `923475eff303ab8d154fe28e548933e36c871ea1` froze this rule after
+Ruff, compilation, all 607 tests, and the exact memory guard passed.
+
+The first fresh root under that commit is retained as score-free operational
+evidence:
+
+    D:\quant-data\b3\processed\v2_daily_store_923475e_20260904T164548Z
+
+Every external publication-lag and name-bootstrap computation returned without
+a gate exception. Before any table, store manifest, internal/target gate result,
+or validation score was written, Polars rejected concatenation of the new audit
+column because non-lending `coverage_note` frames inferred `Null` while lending
+inferred `String`. The partial arrays and logs are retained. The failure-record
+and inventory SHA-256 values are
+`8e655fb512036af2ba06291d25999dc01b6704bd52fdc0dd8b56c76dd147a15f` and
+`6e661a5a1346cb3f5525f27ba7776e61e976dcea4e1342776c9add9614ad31fd`;
+the inventory covers 60 files totaling 2,754,189,267 bytes. The bounded repair
+makes the non-lending note an empty String and adds a schema regression test; it
+changes no source, value, mask, stratum, bootstrap, support threshold, gate, or
+score. No result-changing retry, GPU validation, official-validation/test read,
+or Section-D work occurred.

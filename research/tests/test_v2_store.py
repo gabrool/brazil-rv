@@ -145,6 +145,8 @@ def test_external_gate_uses_supported_name_clustered_one_sided_intervals() -> No
     assert binding.get_column("bootstrap_replications").unique().to_list() == [1000]
     assert binding.get_column("supported_continuation_name_count").min() == 20
     assert binding.get_column("family_present_name_days").min() == 2000
+    assert table.schema["coverage_note"] == pl.String
+    assert table.get_column("coverage_note").eq("").all()
 
     delisted_above = valid.copy()
     q2_survivors = (prior_adv == 2.0) & observed

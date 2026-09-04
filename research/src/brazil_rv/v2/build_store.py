@@ -824,7 +824,7 @@ def _external_feature_validity_by_survival_liquidity(
                         "5,212 present name-days across 526 names; lending value "
                         "will be coverage-limited for exactly that segment."
                         if family == "sidecar_lending"
-                        else None
+                        else ""
                     ),
                 }
             )
