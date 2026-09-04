@@ -82,6 +82,22 @@ def test_yang_zhang_masks_windows_crossing_unresolved_actions() -> None:
     assert np.isnan(values[3:6, 0]).all()
 
 
+def test_yang_zhang_accepts_eighty_percent_complete_window() -> None:
+    close = np.arange(100.0, 107.0)[:, None]
+    open_ = close * 0.999
+    high = close * 1.01
+    low = open_ * 0.99
+    high[2, 0] = np.nan
+
+    values, valid = yang_zhang_volatility(open_, high, low, close, 5)
+
+    assert valid[5, 0]
+    assert np.isfinite(values[5, 0])
+    high[3, 0] = np.nan
+    _, invalid = yang_zhang_volatility(open_, high, low, close, 5)
+    assert not invalid[5, 0]
+
+
 def test_slow_features_are_unchanged_by_future_mutation() -> None:
     days, names = 90, 3
     base = 10.0 * np.exp(
@@ -271,6 +287,12 @@ def test_unresolved_split_crossing_masks_only_affected_price_features() -> None:
         unresolved_action=unresolved,
         price_adjustment_unresolved=np.zeros_like(unresolved),
     )
+    # Cash-source uncertainty invalidates total-return features only. Price-
+    # factor features remain usable because no split factor is unresolved.
+    assert not cash_only.valid[264, 0, 1]
+    assert cash_only.valid[264, 0, 7]
+    assert cash_only.valid[264, 0, 23]
+    assert cash_only.valid[269, 0, 14]
     assert cash_only.valid[269, 0, 25]
 
 

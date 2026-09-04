@@ -116,14 +116,30 @@ def yang_zhang_volatility(
         & (close_[1:] > 0)
         & (close_[:-1] > 0)
     )
+    minimum = math.ceil(0.8 * window)
     for end in range(window, shape[0]):
         start = end - window
-        complete = component_valid[start:end].all(axis=0) & interval_clear[end]
+        component_window = component_valid[start:end]
+        complete = (
+            component_window.sum(axis=0) >= minimum
+        ) & interval_clear[end]
         if not complete.any():
             continue
-        sigma_open = np.var(overnight[start:end, complete], axis=0, ddof=1)
-        sigma_close = np.var(intraday[start:end, complete], axis=0, ddof=1)
-        sigma_rs = np.mean(rogers_satchell[start:end, complete], axis=0)
+        usable = component_window[:, complete]
+        sigma_open = np.nanvar(
+            np.where(usable, overnight[start:end, complete], np.nan),
+            axis=0,
+            ddof=1,
+        )
+        sigma_close = np.nanvar(
+            np.where(usable, intraday[start:end, complete], np.nan),
+            axis=0,
+            ddof=1,
+        )
+        sigma_rs = np.nanmean(
+            np.where(usable, rogers_satchell[start:end, complete], np.nan),
+            axis=0,
+        )
         variance = np.maximum(
             sigma_open + k * sigma_close + (1.0 - k) * sigma_rs, 0.0
         )
@@ -563,7 +579,7 @@ def build_slow_features(
     yz: dict[int, tuple[NDArray[np.float64], NDArray[np.bool_]]] = {}
     for index, window in zip((7, 8, 9), (5, 20, 60), strict=True):
         yz[window] = yang_zhang_volatility(
-            open_, high, low, close, window, unresolved
+            open_, high, low, close, window, price_level_break
         )
         assign(index, *yz[window])
     vol_of_vol, vol_of_vol_valid = _rolling_stat(yz[5][0], 60, "std")
@@ -582,7 +598,7 @@ def build_slow_features(
         rolling_high_valid
         & seen
         & (close > 0)
-        & _unresolved_interval_clear(unresolved, 251),
+        & _unresolved_interval_clear(price_level_break, 251),
     )
 
     market = np.full(close.shape[0], np.nan, dtype=np.float64)
@@ -642,7 +658,7 @@ def build_slow_features(
     range_valid = seen & np.isfinite(range_1) & (high > 0) & (low > 0)
     assign(22, range_1, range_valid)
     range_5, range_5_valid = _rolling_high_low_range(
-        high, low, seen, 5, unresolved
+        high, low, seen, 5, price_level_break
     )
     assign(23, range_5, range_5_valid)
     with np.errstate(divide="ignore", invalid="ignore"):
