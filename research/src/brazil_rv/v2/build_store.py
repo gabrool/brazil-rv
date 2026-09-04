@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import re
 import subprocess
+import tempfile
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -53,15 +56,15 @@ from .intraday_features import (
     mask_action_boundaries,
     replace_daily_close_anchors,
 )
-from .normalization import rank_gauss_panel
+from .normalization import rank_gauss_panel_into
 from .sidecars import (
     SidecarResult,
     available_archive_mapping,
     derive_known_archive_features,
     materialize_known_archive,
 )
-from .store import write_store
-from .targets import build_multi_day_targets, build_to_close_target
+from .store import close_memmap, peak_rss_bytes, write_store
+from .targets import build_multi_day_targets_into, build_to_close_target
 from .universe import (
     build_daily_universe,
     session_calendar,
@@ -71,6 +74,74 @@ from .universe import (
 
 EXPECTED_V1_DATES = 1_248
 V1_STORE_START = date(2021, 7, 19)
+
+
+def _workspace_array(
+    directory: Path,
+    name: str,
+    shape: Sequence[int],
+    dtype: np.dtype[np.generic] | type[np.generic],
+    *,
+    fill: float | bool | None = None,
+) -> np.memmap:
+    """Create one disk-backed build output without an in-memory duplicate."""
+
+    output = np.lib.format.open_memmap(
+        directory / f"{name}.npy",
+        mode="w+",
+        dtype=np.dtype(dtype),
+        shape=tuple(int(value) for value in shape),
+    )
+    if fill is not None:
+        for start in range(0, output.shape[0], 64):
+            output[start : start + 64] = fill
+    return output
+
+
+def _copy_workspace_array(
+    directory: Path,
+    name: str,
+    values: NDArray[np.generic],
+    *,
+    dtype: np.dtype[np.generic] | type[np.generic] | None = None,
+) -> np.memmap:
+    """Write one family to disk in bounded date chunks and reopen it read-only."""
+
+    source = np.asarray(values)
+    destination = _workspace_array(
+        directory,
+        name,
+        source.shape,
+        source.dtype if dtype is None else dtype,
+    )
+    for start in range(0, source.shape[0], 64):
+        destination[start : start + 64] = source[start : start + 64]
+    close_memmap(destination)
+    return np.load(directory / f"{name}.npy", mmap_mode="r", allow_pickle=False)
+
+
+def _copy_selected_workspace_array(
+    directory: Path,
+    name: str,
+    values: NDArray[np.generic],
+    rows: NDArray[np.integer],
+    *,
+    dtype: np.dtype[np.generic] | type[np.generic] | None = None,
+) -> np.memmap:
+    """Copy selected increasing date rows without advanced-index panel copies."""
+
+    source = np.asarray(values)
+    selected = np.asarray(rows, dtype=np.int64)
+    destination = _workspace_array(
+        directory,
+        name,
+        (selected.size, *source.shape[1:]),
+        source.dtype if dtype is None else dtype,
+    )
+    for start in range(0, selected.size, 64):
+        destination[start : start + 64] = source[selected[start : start + 64]]
+    close_memmap(destination)
+    return np.load(directory / f"{name}.npy", mmap_mode="r", allow_pickle=False)
 
 
 def _validate_v1_calendar(values: Sequence[date]) -> None:
@@ -126,7 +197,9 @@ def build_v1_fast_mappings(
         raise ValueError("v1 date index has the wrong schema")
     if not {"equity_slot", "security_id"}.issubset(source_equities.columns):
         raise ValueError("v1 equity index has the wrong schema")
-    if source_dates.get_column("date_idx").to_list() != list(range(source_dates.height)):
+    if source_dates.get_column("date_idx").to_list() != list(
+        range(source_dates.height)
+    ):
         raise ValueError("v1 date index is not contiguous")
     if source_equities.get_column("equity_slot").to_list() != list(
         range(source_equities.height)
@@ -164,7 +237,9 @@ def build_v1_fast_mappings(
     for row in source_dates.iter_rows(named=True):
         target = date_lookup.get(row["trade_date"])
         if target is None:
-            raise ValueError(f"v1 fast date absent from daily calendar: {row['trade_date']}")
+            raise ValueError(
+                f"v1 fast date absent from daily calendar: {row['trade_date']}"
+            )
         date_rows.append(
             {
                 "trade_date": row["trade_date"],
@@ -176,7 +251,10 @@ def build_v1_fast_mappings(
     if mapping.get_column("security_id").n_unique() != mapping.height:
         raise ValueError("v1 assignments are not one-to-one")
     bound = source_equities.join(mapping, on="security_id", how="left", validate="1:1")
-    if bound.get_column("isin").null_count() or bound.get_column("isin").n_unique() != bound.height:
+    if (
+        bound.get_column("isin").null_count()
+        or bound.get_column("isin").n_unique() != bound.height
+    ):
         raise ValueError("v1 equity slots do not map one-to-one onto ISIN")
     isin_lookup = {value: index for index, value in enumerate(isins)}
     isin_rows = []
@@ -260,9 +338,7 @@ def stream_intraday_from_assignments(
     date_lookup = {value: index for index, value in enumerate(calendar)}
     isin_lookup = {value: index for index, value in enumerate(isins)}
     shape = (len(calendar), len(isins))
-    feature_values = np.zeros(
-        (*shape, len(INTRADAY_DAILY_FEATURES)), dtype=np.float32
-    )
+    feature_values = np.zeros((*shape, len(INTRADAY_DAILY_FEATURES)), dtype=np.float32)
     feature_valid = np.zeros(feature_values.shape, dtype=np.bool_)
     entry = np.full(shape, np.nan, dtype=np.float64)
     entry_valid = np.zeros(shape, dtype=np.bool_)
@@ -428,7 +504,10 @@ def _target_validity_tables(
     mask = np.asarray(valid, dtype=np.bool_)
     membership = np.asarray(active, dtype=np.bool_)
     seen = np.asarray(observed, dtype=np.bool_)
-    if mask.shape != (*membership.shape, len(HORIZONS)) or seen.shape != membership.shape:
+    if (
+        mask.shape != (*membership.shape, len(HORIZONS))
+        or seen.shape != membership.shape
+    ):
         raise ValueError("target-validity audit axes are misaligned")
     years = dates.astype("datetime64[Y]").astype(np.int64) + 1970
     yearly: list[dict[str, object]] = []
@@ -485,9 +564,7 @@ def _target_validity_tables(
                 }
             )
     for horizon in HORIZONS:
-        if not all(
-            denominators[(label, horizon)] > 0 for label in groups
-        ):
+        if not all(denominators[(label, horizon)] > 0 for label in groups):
             continue
         gap = abs(
             ratios[("delisted_within_panel", horizon)]
@@ -505,9 +582,7 @@ def _feature_validity_by_survival(
     dates: NDArray[np.datetime64],
     active: NDArray[np.bool_],
     observed: NDArray[np.bool_],
-    families: Mapping[
-        str, tuple[NDArray[np.bool_], NDArray[np.bool_]]
-    ],
+    families: Mapping[str, tuple[NDArray[np.bool_], NDArray[np.bool_]]],
 ) -> pl.DataFrame:
     """Gate feature-mask rates against eventual panel survival.
 
@@ -535,7 +610,11 @@ def _feature_validity_by_survival(
     for family, (raw_valid, raw_present) in sorted(families.items()):
         valid = np.asarray(raw_valid, dtype=np.bool_)
         present = np.asarray(raw_present, dtype=np.bool_)
-        if valid.ndim != 3 or valid.shape[:2] != seen.shape or present.shape != seen.shape:
+        if (
+            valid.ndim != 3
+            or valid.shape[:2] != seen.shape
+            or present.shape != seen.shape
+        ):
             raise ValueError(f"feature family {family} is misaligned")
         for label, names in groups.items():
             eligible = membership & seen & present & names[None, :]
@@ -604,9 +683,7 @@ def _fast_sigma_ratio_table(
 
 def _sidecar_coverage_table(
     dates: NDArray[np.datetime64],
-    groups: Mapping[
-        str, tuple[Sequence[str], NDArray[np.bool_], Sequence[str]]
-    ],
+    groups: Mapping[str, tuple[Sequence[str], NDArray[np.bool_], Sequence[str]]],
     active: NDArray[np.bool_],
 ) -> pl.DataFrame:
     rows: list[dict[str, object]] = []
@@ -695,16 +772,18 @@ def _align_intraday_result(
                 continue
             values[target_date, target_isin] = result.values[source_date, source_isin]
             valid[target_date, target_isin] = result.valid[source_date, source_isin]
-            entry[target_date, target_isin] = result.entry_open[source_date, source_isin]
+            entry[target_date, target_isin] = result.entry_open[
+                source_date, source_isin
+            ]
             entry_valid[target_date, target_isin] = result.entry_open_valid[
                 source_date, source_isin
             ]
             session_close[target_date, target_isin] = result.session_close[
                 source_date, source_isin
             ]
-            session_close_valid[target_date, target_isin] = (
-                result.session_close_valid[source_date, source_isin]
-            )
+            session_close_valid[target_date, target_isin] = result.session_close_valid[
+                source_date, source_isin
+            ]
             realized[target_date, target_isin] = result.realized_daily_vol[
                 source_date, source_isin
             ]
@@ -735,6 +814,8 @@ def build_daily_store(
     minute_panel: MinutePanel | None = None,
     streamed_intraday: StreamedIntraday | None = None,
     sidecars: Mapping[str, SidecarResult] | None = None,
+    stream_intraday: bool = False,
+    sidecar_arguments: Sequence[str] = (),
     action_acquisition_audit: pl.DataFrame | None = None,
     v1_assignments: pl.DataFrame | None = None,
     v1_calendar: Sequence[date] | None = None,
@@ -748,8 +829,19 @@ def build_daily_store(
 ) -> Path:
     """Build the immutable aligned daily store from already-acquired sources."""
 
-    if minute_panel is not None and streamed_intraday is not None:
-        raise ValueError("provide either a minute panel or streamed intraday data")
+    if (
+        sum(
+            value is not None and value is not False
+            for value in (minute_panel, streamed_intraday, stream_intraday)
+        )
+        > 1
+    ):
+        raise ValueError("provide exactly one intraday source mode")
+    if sidecars is not None and sidecar_arguments:
+        raise ValueError("provide materialized or streamed sidecars, not both")
+    has_intraday = (
+        minute_panel is not None or streamed_intraday is not None or stream_intraday
+    )
 
     v1_isins: tuple[str, ...] = ()
     if v1_assignments is not None:
@@ -759,18 +851,31 @@ def build_daily_store(
     if not calendar:
         raise ValueError("COTAHIST produced no qualifying sessions")
     panel = panel_from_daily(cash, dates=calendar)
+    keep = np.ones(len(panel.dates), dtype=np.bool_)
+    if store_start is not None:
+        keep &= panel.dates >= np.datetime64(store_start)
+    if not keep.any():
+        raise ValueError("store_start removes the complete calendar")
+    kept_rows = np.flatnonzero(keep)
+    kept_dates = panel.dates[kept_rows]
+    output_parent = Path(output_dir).resolve().parent
+    output_parent.mkdir(parents=True, exist_ok=True)
+    workspace_handle = tempfile.TemporaryDirectory(
+        prefix=f".{Path(output_dir).name}.arrays-", dir=output_parent
+    )
+    workspace = Path(workspace_handle.name)
     if v1_assignments is not None:
         verify_v1_mapping(v1_assignments, panel.isins)
     if v1_calendar is not None:
         if not v1_calendar:
             raise ValueError("v1 calendar cannot be empty")
         matching_slice = tuple(
-            day
-            for day in calendar
-            if v1_calendar[0] <= day <= v1_calendar[-1]
+            day for day in calendar if v1_calendar[0] <= day <= v1_calendar[-1]
         )
         if matching_slice != tuple(v1_calendar):
-            raise ValueError("v1 date axis differs from the matching COTAHIST calendar slice")
+            raise ValueError(
+                "v1 date axis differs from the matching COTAHIST calendar slice"
+            )
 
     checked_actions = validate_action_table(actions)
     provider_split, provider_cash_distribution, _ = align_action_arrays(
@@ -797,12 +902,40 @@ def build_daily_store(
         detected_actions.price_ratio,
         detected_actions.split_event,
     )
+    adjusted_paths: dict[str, Path] = {}
+    for name, values in (
+        ("price_adjustment_factor", adjusted.price_factor),
+        ("adjusted_open", adjusted.adjusted_open),
+        ("adjusted_high", adjusted.adjusted_high),
+        ("adjusted_low", adjusted.adjusted_low),
+        ("adjusted_close", adjusted.adjusted_close),
+    ):
+        materialized = _copy_workspace_array(workspace, name, values)
+        adjusted_paths[name] = workspace / f"{name}.npy"
+        close_memmap(materialized)
+    del adjusted
+    gc.collect()
+    price_adjustment_factor = np.load(
+        adjusted_paths["price_adjustment_factor"], mmap_mode="r", allow_pickle=False
+    )
+    adjusted_open = np.load(
+        adjusted_paths["adjusted_open"], mmap_mode="r", allow_pickle=False
+    )
+    adjusted_high = np.load(
+        adjusted_paths["adjusted_high"], mmap_mode="r", allow_pickle=False
+    )
+    adjusted_low = np.load(
+        adjusted_paths["adjusted_low"], mmap_mode="r", allow_pickle=False
+    )
+    adjusted_close = np.load(
+        adjusted_paths["adjusted_close"], mmap_mode="r", allow_pickle=False
+    )
     universe = build_daily_universe(panel.close_brl, panel.volume_brl, panel.observed)
     slow_raw = build_slow_features(
-        adjusted.adjusted_open,
-        adjusted.adjusted_high,
-        adjusted.adjusted_low,
-        adjusted.adjusted_close,
+        adjusted_open,
+        adjusted_high,
+        adjusted_low,
+        adjusted_close,
         panel.volume_brl,
         panel.trades,
         panel.observed,
@@ -810,13 +943,50 @@ def build_daily_store(
         panel.dates,
         ambiguous_action=detected_actions.ambiguous_event,
     )
-    slow_values, slow_valid = rank_gauss_panel(
-        slow_raw.values, slow_raw.valid, universe.active
+    slow_sigma = _copy_workspace_array(
+        workspace,
+        "slow_sigma",
+        np.where(slow_raw.valid[..., 8], slow_raw.values[..., 8], np.nan),
+        dtype=np.float32,
     )
+    slow_values = _workspace_array(
+        workspace,
+        "slow_values",
+        (kept_rows.size, len(panel.isins), len(SLOW_FEATURES)),
+        np.float32,
+    )
+    slow_valid = _workspace_array(
+        workspace,
+        "slow_valid",
+        slow_values.shape,
+        np.bool_,
+    )
+    rank_gauss_panel_into(
+        slow_raw.values,
+        slow_raw.valid,
+        universe.active,
+        slow_values,
+        slow_valid,
+        source_rows=kept_rows,
+    )
+    del slow_raw
+    gc.collect()
 
     shape = panel.observed.shape
-    intraday_values = np.zeros((*shape, len(INTRADAY_DAILY_FEATURES)), dtype=np.float32)
-    intraday_valid = np.zeros(intraday_values.shape, dtype=np.bool_)
+    intraday_values = _workspace_array(
+        workspace,
+        "intraday_values",
+        (kept_rows.size, len(panel.isins), len(INTRADAY_DAILY_FEATURES)),
+        np.float32,
+        fill=0.0,
+    )
+    intraday_valid = _workspace_array(
+        workspace,
+        "intraday_valid",
+        intraday_values.shape,
+        np.bool_,
+        fill=False,
+    )
     fast_sigma = np.full(shape, np.nan, dtype=np.float64)
     fast_present = np.zeros(shape, dtype=np.bool_)
     entry = np.full(shape, np.nan, dtype=np.float64)
@@ -825,6 +995,14 @@ def build_daily_store(
     m1_session_close = np.full(shape, np.nan, dtype=np.float64)
     m1_session_close_valid = np.zeros(shape, dtype=np.bool_)
     close_anchor_consistent = np.zeros(shape, dtype=np.bool_)
+    intraday_audit: pl.DataFrame | None = None
+    intraday_source_paths: tuple[Path, ...] = ()
+    if stream_intraday:
+        if v1_assignments is None:
+            raise ValueError("streamed intraday construction requires v1 assignments")
+        streamed_intraday = stream_intraday_from_assignments(
+            v1_assignments, cash, calendar, panel.isins
+        )
     if minute_panel is not None:
         native = build_intraday_daily_features(
             minute_panel.open_brl,
@@ -837,14 +1015,20 @@ def build_daily_store(
         aligned = _align_intraday_result(
             native, minute_panel.dates, minute_panel.isins, panel.dates, panel.isins
         )
+        del native
         m1_session_close = aligned.session_close.copy()
         m1_session_close_valid = aligned.session_close_valid.copy()
         aligned = replace_daily_close_anchors(
             aligned, panel.close_brl, panel.observed, copy_buffers=False
         )
         aligned = mask_action_boundaries(aligned, intraday_action_boundary)
-        intraday_values, intraday_valid = rank_gauss_panel(
-            aligned.values, aligned.valid, universe.active
+        rank_gauss_panel_into(
+            aligned.values,
+            aligned.valid,
+            universe.active,
+            intraday_values,
+            intraday_valid,
+            source_rows=kept_rows,
         )
         fast_sigma = np.where(aligned.valid[..., 14], aligned.values[..., 14], np.nan)
         fast_present = aligned.fast_present
@@ -853,6 +1037,8 @@ def build_daily_store(
         realized_daily = aligned.realized_daily_vol
         close_anchor_consistent = aligned.close_anchor_consistent
     elif streamed_intraday is not None:
+        intraday_audit = streamed_intraday.audit
+        intraday_source_paths = streamed_intraday.source_paths
         aligned = streamed_intraday.result
         if aligned.values.shape[:2] != shape:
             raise ValueError("streamed intraday derivatives are misaligned")
@@ -862,8 +1048,13 @@ def build_daily_store(
             aligned, panel.close_brl, panel.observed, copy_buffers=False
         )
         aligned = mask_action_boundaries(aligned, intraday_action_boundary)
-        intraday_values, intraday_valid = rank_gauss_panel(
-            aligned.values, aligned.valid, universe.active
+        rank_gauss_panel_into(
+            aligned.values,
+            aligned.valid,
+            universe.active,
+            intraday_values,
+            intraday_valid,
+            source_rows=kept_rows,
         )
         fast_sigma = np.where(aligned.valid[..., 14], aligned.values[..., 14], np.nan)
         fast_present = aligned.fast_present
@@ -872,25 +1063,76 @@ def build_daily_store(
         realized_daily = aligned.realized_daily_vol
         close_anchor_consistent = aligned.close_anchor_consistent
 
-    slow_sigma = np.where(slow_raw.valid[..., 8], slow_raw.values[..., 8], np.nan)
-    targets = build_multi_day_targets(
-        adjusted.adjusted_close,
+    to_close_arrays: dict[str, NDArray[np.generic]] = {}
+    if has_intraday:
+        to_close = build_to_close_target(
+            entry,
+            np.where(panel.observed, panel.close_brl, np.nan),
+            realized_daily,
+            universe.active,
+            fast_present & entry_valid & close_anchor_consistent,
+        )
+        for name, values in (
+            ("target_to_close", to_close.target),
+            ("target_to_close_valid", to_close.valid),
+            (
+                "target_to_close_normalized_residual",
+                to_close.normalized_residual,
+            ),
+            ("target_to_close_raw_log_return", to_close.raw_log_return),
+            ("m1_cotahist_close_consistent_mask", close_anchor_consistent),
+        ):
+            to_close_arrays[name] = _copy_selected_workspace_array(
+                workspace, f"store_{name}", values, kept_rows
+            )
+        del to_close
+        if "aligned" in locals():
+            del aligned
+        streamed_intraday = None
+        gc.collect()
+
+    target_shape = (kept_rows.size, len(panel.isins), len(HORIZONS))
+    target_primary = _workspace_array(
+        workspace, "target_primary", target_shape, np.float32
+    )
+    target_valid = _workspace_array(workspace, "target_valid", target_shape, np.bool_)
+    target_normalized_residual = _workspace_array(
+        workspace, "target_normalized_residual", target_shape, np.float32
+    )
+    target_raw_midrank = _workspace_array(
+        workspace, "target_raw_midrank", target_shape, np.float32
+    )
+    target_raw_valid = _workspace_array(
+        workspace, "target_raw_valid", target_shape, np.bool_
+    )
+    target_raw_log_return = _workspace_array(
+        workspace, "target_raw_log_return", target_shape, np.float32
+    )
+    build_multi_day_targets_into(
+        adjusted_close,
         universe.active,
         slow_sigma,
         target_exclusion_event,
+        primary=target_primary,
+        primary_valid=target_valid,
+        normalized_residual=target_normalized_residual,
+        raw_midrank=target_raw_midrank,
+        raw_valid=target_raw_valid,
+        raw_log_return=target_raw_log_return,
+        source_rows=kept_rows,
     )
-    arrays: dict[str, NDArray[np.generic]] = {
+    full_store_arrays: dict[str, NDArray[np.generic]] = {
         "active": universe.active,
         "observed": panel.observed,
         "raw_open": panel.open_brl,
         "raw_high": panel.high_brl,
         "raw_low": panel.low_brl,
         "raw_close": panel.close_brl,
-        "adjusted_open": adjusted.adjusted_open,
-        "adjusted_high": adjusted.adjusted_high,
-        "adjusted_low": adjusted.adjusted_low,
-        "adjusted_close": adjusted.adjusted_close,
-        "price_adjustment_factor": adjusted.price_factor,
+        "adjusted_open": adjusted_open,
+        "adjusted_high": adjusted_high,
+        "adjusted_low": adjusted_low,
+        "adjusted_close": adjusted_close,
+        "price_adjustment_factor": price_adjustment_factor,
         "volume_brl": panel.volume_brl,
         "trade_count": panel.trades,
         "quantity": panel.quantity,
@@ -902,71 +1144,131 @@ def build_daily_store(
         "ambiguous_action_mask": detected_actions.ambiguous_event,
         "target_exclusion_event_mask": target_exclusion_event,
         "intraday_action_boundary_mask": intraday_action_boundary,
-        "slow_values": slow_values,
-        "slow_valid": slow_valid,
-        "intraday_values": intraday_values,
-        "intraday_valid": intraday_valid,
-        "fast_present": fast_present,
-        "target_primary": targets.primary,
-        "target_valid": targets.primary_valid,
-        "target_normalized_residual": targets.normalized_residual,
-        "target_raw_midrank": targets.raw_midrank,
-        "target_raw_valid": targets.raw_valid,
-        "target_raw_log_return": targets.raw_log_return,
     }
-    if minute_panel is not None or streamed_intraday is not None:
-        to_close = build_to_close_target(
-            entry,
-            np.where(panel.observed, panel.close_brl, np.nan),
-            realized_daily,
-            universe.active,
-            fast_present & entry_valid & close_anchor_consistent,
+    arrays: dict[str, NDArray[np.generic]] = {
+        name: _copy_selected_workspace_array(
+            workspace, f"store_{name}", values, kept_rows
         )
-        arrays.update(
-            {
-                "target_to_close": to_close.target,
-                "target_to_close_valid": to_close.valid,
-                "target_to_close_normalized_residual": to_close.normalized_residual,
-                "target_to_close_raw_log_return": to_close.raw_log_return,
-                "m1_cotahist_close_consistent_mask": close_anchor_consistent,
-            }
-        )
+        for name, values in full_store_arrays.items()
+    }
+    arrays.update(
+        {
+            "slow_values": slow_values,
+            "slow_valid": slow_valid,
+            "intraday_values": intraday_values,
+            "intraday_valid": intraday_valid,
+            "fast_present": _copy_selected_workspace_array(
+                workspace, "store_fast_present", fast_present, kept_rows
+            ),
+            "target_primary": target_primary,
+            "target_valid": target_valid,
+            "target_normalized_residual": target_normalized_residual,
+            "target_raw_midrank": target_raw_midrank,
+            "target_raw_valid": target_raw_valid,
+            "target_raw_log_return": target_raw_log_return,
+        }
+    )
+    arrays.update(to_close_arrays)
     feature_names: dict[str, Sequence[str]] = {
         "slow": SLOW_FEATURES,
         "intraday": INTRADAY_DAILY_FEATURES,
-        "horizons": tuple(str(value) for value in targets.horizons),
+        "horizons": tuple(str(value) for value in HORIZONS),
     }
     coverage_tables = [
-        _coverage_table(panel.dates, slow_valid, SLOW_FEATURES, family="slow"),
+        _coverage_table(kept_dates, slow_valid, SLOW_FEATURES, family="slow"),
         _coverage_table(
-            panel.dates,
+            kept_dates,
             intraday_valid,
             INTRADAY_DAILY_FEATURES,
             family="intraday",
         ),
     ]
-    prepared_sidecars = dict(sidecars or {})
-    sidecar_masks: dict[
-        str, tuple[Sequence[str], NDArray[np.bool_], Sequence[str]]
-    ] = {}
-    for group, result in sorted(prepared_sidecars.items()):
+
+    def iter_sidecars() -> Iterator[tuple[str, SidecarResult]]:
+        if sidecars:
+            yield from sorted(sidecars.items())
+            return
+        groups = sorted({argument.split("=", 1)[0] for argument in sidecar_arguments})
+        for group in groups:
+            arguments = [
+                argument
+                for argument in sidecar_arguments
+                if argument.split("=", 1)[0] == group
+            ]
+            parsed = _parse_sidecars(
+                arguments,
+                panel.dates,
+                panel.isins,
+                v1_assignments,
+                panel.volume_brl,
+            )
+            yield group, parsed.pop(group)
+
+    sidecar_coverage_frames: list[pl.DataFrame] = []
+    sidecar_survival_frames: list[pl.DataFrame] = []
+    for group, result in iter_sidecars():
         if result.values.shape[:2] != shape:
             raise ValueError(f"sidecar {group} does not match the store axes")
-        values, valid = rank_gauss_panel(result.values, result.valid, universe.active)
+        values = _workspace_array(
+            workspace,
+            f"sidecar_{group}_values",
+            (kept_rows.size, len(panel.isins), len(result.feature_names)),
+            np.float32,
+        )
+        valid = _workspace_array(
+            workspace,
+            f"sidecar_{group}_valid",
+            values.shape,
+            np.bool_,
+        )
+        rank_gauss_panel_into(
+            result.values,
+            result.valid,
+            universe.active,
+            values,
+            valid,
+            source_rows=kept_rows,
+        )
         arrays[f"sidecar_{group}_values"] = values
         arrays[f"sidecar_{group}_valid"] = valid
         feature_names[f"sidecar_{group}"] = result.feature_names
-        sidecar_masks[group] = (
-            result.feature_names,
-            result.valid,
-            result.archive_semantics_available,
+        raw_valid = result.valid[kept_rows]
+        sidecar_coverage_frames.append(
+            _sidecar_coverage_table(
+                kept_dates,
+                {
+                    group: (
+                        result.feature_names,
+                        raw_valid,
+                        result.archive_semantics_available,
+                    )
+                },
+                universe.active[keep],
+            )
         )
+        sidecar_survival_frames.append(
+            _feature_validity_by_survival(
+                kept_dates,
+                universe.active[keep],
+                panel.observed[keep],
+                {
+                    f"sidecar_{group}": (
+                        raw_valid,
+                        raw_valid.any(axis=2),
+                    )
+                },
+            )
+        )
+        del raw_valid, result
+        gc.collect()
 
     tables = {
         "security_master": build_security_master(cash),
         "feature_coverage": pl.concat(coverage_tables),
-        "sidecar_coverage": _sidecar_coverage_table(
-            panel.dates, sidecar_masks, universe.active
+        "sidecar_coverage": (
+            pl.concat(sidecar_coverage_frames)
+            if sidecar_coverage_frames
+            else _sidecar_coverage_table(kept_dates, {}, universe.active[keep])
         ),
         "universe_size": pl.DataFrame(
             {
@@ -1018,9 +1320,7 @@ def build_daily_store(
         "corporate_actions": checked_actions,
     }
     if v1_assignments is not None:
-        v1_isins = tuple(
-            v1_assignments.get_column("isin").cast(pl.String).to_list()
-        )
+        v1_isins = tuple(v1_assignments.get_column("isin").cast(pl.String).to_list())
         tables["v1_pit_active_coverage"] = v1_pit_coverage_table(
             panel.dates,
             panel.isins,
@@ -1035,7 +1335,7 @@ def build_daily_store(
         )
     if action_acquisition_audit is not None:
         tables["corporate_action_acquisition_audit"] = action_acquisition_audit
-    if minute_panel is not None or streamed_intraday is not None:
+    if has_intraday:
         detected_split_factor = np.ones(shape, dtype=np.float64)
         detected_split_factor[detected_actions.split_event] = (
             1.0 / detected_actions.price_ratio[detected_actions.split_event]
@@ -1045,7 +1345,7 @@ def build_daily_store(
             panel.isins,
             m1_session_close,
             panel.close_brl,
-            adjusted.adjusted_close,
+            adjusted_close,
             detected_split_factor,
             np.zeros(shape, dtype=np.float64),
         )
@@ -1060,37 +1360,23 @@ def build_daily_store(
             panel.close_brl,
             panel.observed,
         )
-    if streamed_intraday is not None:
-        tables["m1_source_audit"] = streamed_intraday.audit
-    keep = np.ones(len(panel.dates), dtype=np.bool_)
-    if store_start is not None:
-        keep &= panel.dates >= np.datetime64(store_start)
-    if not keep.any():
-        raise ValueError("store_start removes the complete calendar")
-    kept_dates = panel.dates[keep]
+    if intraday_audit is not None:
+        tables["m1_source_audit"] = intraday_audit
     tables["feature_coverage"] = pl.concat(
         [
             _coverage_table(
                 kept_dates,
-                slow_valid[keep],
+                slow_valid,
                 SLOW_FEATURES,
                 family="slow",
             ),
             _coverage_table(
                 kept_dates,
-                intraday_valid[keep],
+                intraday_valid,
                 INTRADAY_DAILY_FEATURES,
                 family="intraday",
             ),
         ]
-    )
-    tables["sidecar_coverage"] = _sidecar_coverage_table(
-        kept_dates,
-        {
-            group: (names, np.asarray(mask)[keep], available)
-            for group, (names, mask, available) in sidecar_masks.items()
-        },
-        universe.active[keep],
     )
     tables["universe_size"] = tables["universe_size"].filter(
         pl.col("trade_date") >= kept_dates[0].astype(object)
@@ -1100,34 +1386,26 @@ def build_daily_store(
         tables["target_validity_by_survival"],
     ) = _target_validity_tables(
         kept_dates,
-        targets.primary_valid[keep],
+        target_valid,
         universe.active[keep],
         panel.observed[keep],
     )
-    feature_gate_families: dict[
-        str, tuple[NDArray[np.bool_], NDArray[np.bool_]]
-    ] = {
-        "slow": (slow_valid[keep], panel.observed[keep]),
+    feature_gate_families: dict[str, tuple[NDArray[np.bool_], NDArray[np.bool_]]] = {
+        "slow": (slow_valid, panel.observed[keep]),
     }
-    if minute_panel is not None or streamed_intraday is not None:
+    if has_intraday:
         feature_gate_families["intraday"] = (
-            intraday_valid[keep],
+            intraday_valid,
             fast_present[keep],
         )
-    feature_gate_families.update(
-        {
-            f"sidecar_{group}": (
-                np.asarray(mask, dtype=np.bool_)[keep],
-                np.asarray(mask, dtype=np.bool_)[keep].any(axis=2),
-            )
-            for group, (_, mask, _) in sidecar_masks.items()
-        }
-    )
-    tables["feature_validity_by_survival"] = _feature_validity_by_survival(
+    base_feature_survival = _feature_validity_by_survival(
         kept_dates,
         universe.active[keep],
         panel.observed[keep],
         feature_gate_families,
+    )
+    tables["feature_validity_by_survival"] = pl.concat(
+        [base_feature_survival, *sidecar_survival_frames]
     )
     v1_fast_files: list[dict[str, object]] = []
     if v1_fast_store is not None:
@@ -1139,6 +1417,7 @@ def build_daily_store(
         tables["v1_fast_date_mapping"] = date_mapping
         tables["v1_fast_isin_mapping"] = isin_mapping
         v1_fast_files = source_records(fast_paths)
+    build_peak_rss = peak_rss_bytes()
     metadata = {
         "store_start": str(kept_dates[0]),
         "store_end": str(kept_dates[-1]),
@@ -1169,11 +1448,11 @@ def build_daily_store(
                 else None
             ),
         },
+        "build_peak_rss_bytes": build_peak_rss,
+        "build_peak_rss_gib": build_peak_rss / (1024**3),
     }
     if "v1_pit_active_coverage" in tables:
-        active_counts = tables["v1_pit_active_coverage"].get_column(
-            "active_v1_count"
-        )
+        active_counts = tables["v1_pit_active_coverage"].get_column("active_v1_count")
         metadata["v1_pit_active_count"] = {
             "semantics": (
                 "dynamic PIT-active subset of the exact mapped v1 identities; "
@@ -1184,29 +1463,43 @@ def build_daily_store(
             "median": float(active_counts.median()),
             "maximum": int(active_counts.max()),
         }
-    return write_store(
+    result = write_store(
         output_dir,
         dates=kept_dates,
         isins=panel.isins,
         arrays=arrays,
-        row_indices=np.flatnonzero(keep),
         feature_names=feature_names,
         sources=source_records(
             (
                 *source_paths,
-                *(streamed_intraday.source_paths if streamed_intraday else ()),
+                *intraday_source_paths,
             )
         ),
         metadata=metadata,
         tables=tables,
     )
+    for value in arrays.values():
+        close_memmap(value)
+    for value in (
+        price_adjustment_factor,
+        adjusted_open,
+        adjusted_high,
+        adjusted_low,
+        adjusted_close,
+        slow_sigma,
+    ):
+        close_memmap(value)
+    workspace_handle.cleanup()
+    return result
 
 
 def load_minute_npz(path: Path) -> MinutePanel:
     archive = np.load(path, allow_pickle=False)
     required = {"dates", "isins", "open", "high", "low", "close", "volume", "observed"}
     if not required.issubset(archive.files):
-        raise ValueError(f"minute archive keys missing: {sorted(required - set(archive.files))}")
+        raise ValueError(
+            f"minute archive keys missing: {sorted(required - set(archive.files))}"
+        )
     return MinutePanel(
         dates=np.asarray(archive["dates"], dtype="datetime64[D]"),
         isins=tuple(str(value) for value in archive["isins"].tolist()),
@@ -1220,7 +1513,9 @@ def load_minute_npz(path: Path) -> MinutePanel:
 
 
 def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build the immutable Brazil-RV v2 daily store")
+    parser = argparse.ArgumentParser(
+        description="Build the immutable Brazil-RV v2 daily store"
+    )
     parser.add_argument("--cotahist-root", required=True, type=Path)
     parser.add_argument("--cotahist-raw-root", required=True, type=Path)
     parser.add_argument("--cotahist-parse-audit", required=True, type=Path)
@@ -1327,12 +1622,13 @@ def _parse_sidecars(
                 "regular_volume_brl",
                 "odd_lot_volume_brl",
             ),
-            "events": (
-                "event_itr_dfp_recent_5s",
-            ),
+            "events": ("event_itr_dfp_recent_5s",),
         }.get(group, ())
         value_columns = sorted(
-            {*value_columns, *(column for column in derivation_columns if column in schema)}
+            {
+                *value_columns,
+                *(column for column in derivation_columns if column in schema),
+            }
         )
         if not value_columns:
             # The caller still hash-binds the archive and the store reports zero
@@ -1355,9 +1651,7 @@ def _parse_sidecars(
             if column in schema
         ]
         masks = [
-            f"{column}_mask"
-            for column in value_columns
-            if f"{column}_mask" in schema
+            f"{column}_mask" for column in value_columns if f"{column}_mask" in schema
         ]
         projected = ["available_date", identity, *optional, *value_columns, *masks]
         lazy = (
@@ -1370,9 +1664,7 @@ def _parse_sidecars(
             )
         )
         if identity == "isin":
-            lazy = lazy.filter(
-                pl.col("isin").is_in(pl.Series("isin", isins).implode())
-            )
+            lazy = lazy.filter(pl.col("isin").is_in(pl.Series("isin", isins).implode()))
         else:
             if assignment_mapping is None:
                 raise ValueError("security_id sidecars require v1 assignments")
@@ -1425,9 +1717,7 @@ def _parse_sidecars(
         if sources:
             source = pl.concat(sources, how="diagonal_relaxed")
         else:
-            source = pl.DataFrame(
-                schema={"available_date": pl.Date, "isin": pl.String}
-            )
+            source = pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
         identity = "isin" if "isin" in source.columns else "security_id"
         keys = ["available_date", identity]
         for optional in ("decision_idx", "available_timestamp", "delivery_timestamp"):
@@ -1435,8 +1725,7 @@ def _parse_sidecars(
                 keys.append(optional)
         value_columns = [column for column in source.columns if column not in keys]
         source = source.group_by(keys, maintain_order=True).agg(
-            pl.col(column).drop_nulls().last().alias(column)
-            for column in value_columns
+            pl.col(column).drop_nulls().last().alias(column) for column in value_columns
         )
         source = derive_known_archive_features(
             source,
@@ -1529,9 +1818,6 @@ def main(arguments: Sequence[str] | None = None) -> None:
             "canonical COTAHIST foundation must contain exactly years "
             f"{COTAHIST_YEARS}; got {sorted(available_years)}"
         )
-    calendar = session_calendar(foundation)
-    isins = tuple(sorted(foundation.get_column("isin").unique().to_list()))
-    daily_panel = panel_from_daily(foundation, dates=calendar, isins=isins)
     v1_calendar = tuple(
         pl.read_parquet(args.v1_store / "date_index.parquet")
         .sort("date_idx")
@@ -1544,36 +1830,26 @@ def main(arguments: Sequence[str] | None = None) -> None:
     )
     expected_master = build_security_master(foundation)
     master_columns = ["isin", "ticker", "first_date", "last_date"]
-    if not action_master.select(master_columns).sort(master_columns).equals(
-        expected_master.select(master_columns).sort(master_columns)
+    if (
+        not action_master.select(master_columns)
+        .sort(master_columns)
+        .equals(expected_master.select(master_columns).sort(master_columns))
     ):
         raise ValueError(
             "corporate-action security master differs from the COTAHIST foundation"
         )
-    streamed = None
     minute = load_minute_npz(args.minute_npz) if args.minute_npz else None
-    if minute is None and assignments is not None:
-        streamed = stream_intraday_from_assignments(
-            assignments, foundation, calendar, isins
-        )
-    sidecars = _parse_sidecars(
-        args.sidecar,
-        calendar,
-        isins,
-        assignments,
-        daily_panel.volume_brl,
-    )
-    # build_daily_store reconstructs the canonical panel from ``daily``.  Drop
-    # the acquisition-only copies before that second materialization so local
-    # validation does not retain two broad daily panels at its memory peak.
-    del daily_panel, foundation, action_master, expected_master
+    # The builder materializes M1 and sidecar families only when their turn is
+    # reached, then releases each raw family after writing its normalized
+    # memmap. Avoid retaining a second daily panel in this acquisition scope.
+    del foundation, action_master, expected_master
     output = build_daily_store(
         daily,
         actions,
         args.output_dir,
         minute_panel=minute,
-        streamed_intraday=streamed,
-        sidecars=sidecars,
+        stream_intraday=minute is None,
+        sidecar_arguments=args.sidecar,
         action_acquisition_audit=acquisition_audit,
         v1_assignments=assignments,
         v1_calendar=v1_calendar,
@@ -1582,10 +1858,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
             assignment_path,
             *action_sources,
             *((args.minute_npz,) if args.minute_npz else ()),
-            *(
-                Path(value.split("=", 1)[1])
-                for value in args.sidecar
-            ),
+            *(Path(value.split("=", 1)[1]) for value in args.sidecar),
         ),
         implementation_commit=args.implementation_commit,
         cotahist_raw_sources=raw_sources,

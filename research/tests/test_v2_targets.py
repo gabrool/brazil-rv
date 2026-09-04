@@ -1,7 +1,11 @@
 import numpy as np
 
 from brazil_rv.v2.corporate_actions import causal_price_adjustment_factor
-from brazil_rv.v2.targets import build_multi_day_targets, build_to_close_target
+from brazil_rv.v2.targets import (
+    build_multi_day_targets,
+    build_multi_day_targets_into,
+    build_to_close_target,
+)
 
 
 def test_target_masks_exact_path_and_excluded_event_date() -> None:
@@ -42,6 +46,32 @@ def test_raw_target_validity_is_independent_of_missing_sigma() -> None:
     )
     assert result.raw_valid[0, :, 0].all()
     assert not result.primary_valid.any()
+    assert result.raw_log_return.dtype == np.float32
+
+
+def test_target_builder_streams_selected_rows_into_float32_destinations() -> None:
+    close = np.arange(20, dtype=np.float64).reshape(5, 4) + 100.0
+    shape = (2, 4, 2)
+    value_arrays = [np.empty(shape, dtype=np.float32) for _ in range(4)]
+    mask_arrays = [np.empty(shape, dtype=np.bool_) for _ in range(2)]
+    build_multi_day_targets_into(
+        close,
+        np.ones_like(close, dtype=np.bool_),
+        np.full_like(close, 0.02),
+        np.zeros_like(close, dtype=np.bool_),
+        primary=value_arrays[0],
+        primary_valid=mask_arrays[0],
+        normalized_residual=value_arrays[1],
+        raw_midrank=value_arrays[2],
+        raw_valid=mask_arrays[1],
+        raw_log_return=value_arrays[3],
+        source_rows=np.asarray([1, 3]),
+        horizons=(1, 2),
+    )
+    assert mask_arrays[0][0].all()
+    assert not mask_arrays[0][1, :, 1].any()
+    expected = np.log(close[2] / close[1]).astype(np.float32)
+    np.testing.assert_array_equal(value_arrays[3][0, :, 0], expected)
 
 
 def test_to_close_target_is_cross_sectionally_ranked() -> None:

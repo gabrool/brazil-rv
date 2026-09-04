@@ -47,9 +47,7 @@ def test_store_cli_requires_clean_worktree_before_binding_commit(
     monkeypatch.setattr(build_store_module.subprocess, "run", dirty_run)
     with pytest.raises(ValueError, match="clean tracked and untracked worktree"):
         _require_clean_implementation_commit(tmp_path, "a" * 40)
-    assert calls == [
-        ("git", "status", "--porcelain=v1", "--untracked-files=all")
-    ]
+    assert calls == [("git", "status", "--porcelain=v1", "--untracked-files=all")]
 
     responses = iter((SimpleNamespace(stdout=""), SimpleNamespace(stdout="b" * 40)))
     monkeypatch.setattr(
@@ -66,9 +64,7 @@ def test_feature_validity_survivorship_gate_uses_family_population() -> None:
         ["2023-12-27", "2023-12-28", "2023-12-29", "2024-01-02"],
         dtype="datetime64[D]",
     )
-    observed = np.asarray(
-        [[True, True], [True, True], [True, True], [False, True]]
-    )
+    observed = np.asarray([[True, True], [True, True], [True, True], [False, True]])
     active = observed.copy()
     present = observed.copy()
     balanced = np.ones((4, 2, 2), dtype=np.bool_)
@@ -89,6 +85,8 @@ def test_feature_validity_survivorship_gate_uses_family_population() -> None:
             observed,
             {"slow": (skewed, present)},
         )
+
+
 def _base_store(tmp_path, *, external_fast=None, stored_fast_present=None):
     days, names = 25, 3
     dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(days)]
@@ -119,9 +117,7 @@ def _base_store(tmp_path, *, external_fast=None, stored_fast_present=None):
                     "equity_data_ready.npy",
                 )
             ],
-            "v1_store_v2_zero_slow_fields": list(
-                V1_STORE_V2_ZERO_SLOW_FIELDS
-            ),
+            "v1_store_v2_zero_slow_fields": list(V1_STORE_V2_ZERO_SLOW_FIELDS),
         }
         tables = {
             "v1_fast_date_mapping": pl.DataFrame(
@@ -155,9 +151,7 @@ def _base_store(tmp_path, *, external_fast=None, stored_fast_present=None):
 
 def test_store_is_immutable_and_hash_verified(tmp_path) -> None:
     path = _base_store(tmp_path)
-    store, _ = open_store_for_dates(
-        path, list(range(25)), purpose="training"
-    )
+    store, _ = open_store_for_dates(path, list(range(25)), purpose="training")
     assert store.array_shape("slow_values") == (25, 3, 2)
     assert store.array_dtype("slow_values") == np.dtype(np.float32)
     assert store.read("slow_values", 0).shape == (3, 2)
@@ -228,7 +222,7 @@ def test_store_writer_selects_source_rows_one_array_at_a_time(tmp_path) -> None:
         )
 
 
-def test_store_writer_does_not_copy_a_contiguous_row_selection(
+def test_store_writer_streams_a_contiguous_row_selection(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     slow = np.arange(6, dtype=np.float32).reshape(6, 1, 1)
@@ -252,7 +246,9 @@ def test_store_writer_does_not_copy_a_contiguous_row_selection(
         },
         row_indices=np.arange(2, 6, dtype=np.int64),
     )
-    assert slow_shares_memory == [True]
+    # Store arrays are now opened at their final shape and filled in bounded
+    # chunks; np.save is used only for the two small index arrays.
+    assert slow_shares_memory == []
     store, _ = open_store_for_dates(
         tmp_path / "contiguous_rows", [0, 1, 2, 3], purpose="training"
     )
@@ -298,7 +294,9 @@ def test_dataset_applies_slow_shift_and_external_sparse_fast_mapping(tmp_path) -
     assert np.all(patches[1:] == 0.0)
     batch = next(iter(DataLoader(dataset, batch_size=1, shuffle=False)))
     assert tuple(batch["v1_equity_slow"].shape) == (1, 3, 32)
-    np.testing.assert_array_equal(batch["v1_equity_slow"][0].numpy(), sample["v1_equity_slow"])
+    np.testing.assert_array_equal(
+        batch["v1_equity_slow"][0].numpy(), sample["v1_equity_slow"]
+    )
 
 
 def test_finetune_dataset_keeps_first_active_day_with_empty_slow_history(
@@ -326,9 +324,7 @@ def test_finetune_dataset_keeps_first_active_day_with_empty_slow_history(
         },
     )
 
-    sample = V2DailyDataset(
-        path, list(range(20, 25)), stage="finetune", lookback=20
-    )[0]
+    sample = V2DailyDataset(path, list(range(20, 25)), stage="finetune", lookback=20)[0]
 
     assert sample["active_mask"].tolist() == [True, True]
     assert not sample["slow_history_mask"][1].any()
@@ -514,9 +510,7 @@ def test_causal_history_capability_allows_only_bounded_pre_sample_rows(
 ) -> None:
     dates = [
         value.astype(object)
-        for value in np.arange(
-            np.datetime64("2021-07-01"), np.datetime64("2021-08-17")
-        )
+        for value in np.arange(np.datetime64("2021-07-01"), np.datetime64("2021-08-17"))
         if np.is_busday(value)
     ]
     dates.extend((date(2025, 1, 2), date(2026, 1, 2)))
@@ -559,9 +553,7 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
 ) -> None:
     dates = [
         value.astype(object)
-        for value in np.arange(
-            np.datetime64("2024-11-25"), np.datetime64("2024-12-31")
-        )
+        for value in np.arange(np.datetime64("2024-11-25"), np.datetime64("2024-12-31"))
         if np.is_busday(value)
     ]
     dates.append(date(2025, 1, 2))
@@ -597,14 +589,10 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
     first = dataset[0]
     second = dataset[1]
     assert first["target_mask"].tolist() == [[True, False, False, False, False]]
-    assert first["raw_target_mask"].tolist() == [
-        [True, False, False, False, False]
-    ]
+    assert first["raw_target_mask"].tolist() == [[True, False, False, False, False]]
     assert first["targets"].tolist() == [[11.0, 0.0, 0.0, 0.0, 0.0]]
     assert first["raw_targets"].tolist() == [[22.0, 0.0, 0.0, 0.0, 0.0]]
-    assert first["raw_log_returns"].tolist() == [
-        [33.0, 0.0, 0.0, 0.0, 0.0]
-    ]
+    assert first["raw_log_returns"].tolist() == [[33.0, 0.0, 0.0, 0.0, 0.0]]
     assert first["to_close_mask"].tolist() == [False]
     assert first["to_close_target"].tolist() == [0.0]
     assert second["target_mask"].tolist() == [[False] * 5]
@@ -613,9 +601,7 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
     assert second["raw_log_returns"].tolist() == [[0.0] * 5]
     assert second["to_close_mask"].tolist() == [False]
     assert second["to_close_target"].tolist() == [0.0]
-    direct_targets = dataset.store.read(
-        "target_primary", [days - 3, days - 2]
-    )
+    direct_targets = dataset.store.read("target_primary", [days - 3, days - 2])
     direct_mask = dataset.store.read("target_valid", [days - 3, days - 2])
     assert direct_targets[:, 0].tolist() == [
         [11.0, 0.0, 0.0, 0.0, 0.0],
@@ -625,9 +611,7 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
         [True, False, False, False, False],
         [False, False, False, False, False],
     ]
-    gappy = V2DailyDataset(
-        path, [days - 4, days - 2], stage="evaluation", lookback=20
-    )
+    gappy = V2DailyDataset(path, [days - 4, days - 2], stage="evaluation", lookback=20)
     assert gappy[0]["target_mask"].tolist() == [[False] * 5]
     with pytest.raises(PermissionError, match="authorization grant"):
         dataset.store.read("target_primary", days - 1)
@@ -657,8 +641,7 @@ def test_dataset_rejects_dates_outside_its_stage_before_array_open(tmp_path) -> 
 
 def test_v1_calendar_includes_physical_warmup_before_finetune() -> None:
     calendar = [
-        V1_STORE_START + timedelta(days=index)
-        for index in range(EXPECTED_V1_DATES - 1)
+        V1_STORE_START + timedelta(days=index) for index in range(EXPECTED_V1_DATES - 1)
     ]
     calendar.append(ACCUMULATED_TEST_AFTER)
     _validate_v1_calendar(calendar)
@@ -746,6 +729,8 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
         minimum_calendar_names=1,
         store_start=None,
     )
+    build_metadata = json.loads((root / "manifest.json").read_text())["metadata"]
+    assert 0 < build_metadata["build_peak_rss_bytes"] < 8 * 1024**3
     provider_empty_root = build_daily_store(
         pl.DataFrame(daily_rows),
         actions.head(0),
@@ -755,16 +740,14 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
         minimum_calendar_names=1,
         store_start=None,
     )
-    assert {
-        path.name: path.read_bytes() for path in root.glob("*.npy")
-    } == {
-        path.name: path.read_bytes()
-        for path in provider_empty_root.glob("*.npy")
+    assert {path.name: path.read_bytes() for path in root.glob("*.npy")} == {
+        path.name: path.read_bytes() for path in provider_empty_root.glob("*.npy")
     }
     raw = np.load(root / "target_to_close_raw_log_return.npy")
     valid = np.load(root / "target_to_close_valid.npy")
     expected = np.log(cotahist_close / minute[64, 0, 345])
-    assert raw[64, 0] == expected
+    assert raw.dtype == np.float32
+    assert raw[64, 0] == np.float32(expected)
     assert valid[64].all()
     assert np.isnan(raw[65, 0])
     assert not valid[65].any()
@@ -789,6 +772,7 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
     assert manifest["metadata"]["future_total_return_variant"].startswith(
         "registered but not implemented"
     )
-    assert tuple(
-        manifest["metadata"]["v1_store_v2_zero_slow_fields"]
-    ) == V1_STORE_V2_ZERO_SLOW_FIELDS
+    assert (
+        tuple(manifest["metadata"]["v1_store_v2_zero_slow_fields"])
+        == V1_STORE_V2_ZERO_SLOW_FIELDS
+    )

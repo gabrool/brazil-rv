@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -38,6 +39,53 @@ _TARGET_VALUE_MASKS = {
     "target_to_close_raw_log_return": "target_to_close_valid",
 }
 _MULTI_HORIZON_TARGET_MASKS = frozenset(("target_valid", "target_raw_valid"))
+
+
+def peak_rss_bytes() -> int:
+    """Return this process's peak resident set size in bytes."""
+
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        class ProcessMemoryCounters(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        counters = ProcessMemoryCounters()
+        counters.cb = ctypes.sizeof(counters)
+        get_current_process = ctypes.windll.kernel32.GetCurrentProcess
+        get_current_process.argtypes = []
+        get_current_process.restype = wintypes.HANDLE
+        get_process_memory_info = ctypes.windll.psapi.GetProcessMemoryInfo
+        get_process_memory_info.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(ProcessMemoryCounters),
+            wintypes.DWORD,
+        ]
+        get_process_memory_info.restype = wintypes.BOOL
+        if not get_process_memory_info(
+            get_current_process(), ctypes.byref(counters), counters.cb
+        ):
+            raise OSError("GetProcessMemoryInfo failed")
+        return int(counters.PeakWorkingSetSize)
+
+    import resource
+
+    peak = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    return peak if sys.platform == "darwin" else peak * 1024
+
+
 _VERIFIED_HASHES: set[tuple[str, int, int, str]] = set()
 
 
@@ -74,9 +122,9 @@ def _matches_verified_file(path: Path, *, size: int, sha256: str) -> bool:
 
 
 def _json_bytes(value: object) -> bytes:
-    return (
-        json.dumps(value, allow_nan=False, indent=2, sort_keys=True) + "\n"
-    ).encode("utf-8")
+    return (json.dumps(value, allow_nan=False, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
 
 
 def _axis_sha256(values: Sequence[str]) -> str:
@@ -87,9 +135,7 @@ def _axis_sha256(values: Sequence[str]) -> str:
     ).hexdigest()
 
 
-def _validate_axes(
-    dates: NDArray[np.datetime64], isins: tuple[str, ...]
-) -> None:
+def _validate_axes(dates: NDArray[np.datetime64], isins: tuple[str, ...]) -> None:
     if dates.ndim != 1 or dates.size == 0:
         raise ValueError("store needs a nonempty one-dimensional date axis")
     day_values = dates.astype("datetime64[D]").astype(np.int64)
@@ -112,11 +158,16 @@ def _validate_array_shapes(
             )
         if value.dtype == object:
             raise ValueError(f"object array is forbidden: {name}")
-        if name.endswith("_valid") or name.endswith("_mask") or name in {
-            "active",
-            "observed",
-            "fast_present",
-        }:
+        if (
+            name.endswith("_valid")
+            or name.endswith("_mask")
+            or name
+            in {
+                "active",
+                "observed",
+                "fast_present",
+            }
+        ):
             if value.dtype != np.bool_:
                 raise ValueError(f"mask array must have boolean dtype: {name}")
     paired = (
@@ -129,8 +180,267 @@ def _validate_array_shapes(
     for values_name, mask_name in paired:
         if (values_name in arrays) != (mask_name in arrays):
             raise ValueError(f"{values_name} and {mask_name} must be stored together")
-        if values_name in arrays and arrays[values_name].shape != arrays[mask_name].shape:
+        if (
+            values_name in arrays
+            and arrays[values_name].shape != arrays[mask_name].shape
+        ):
             raise ValueError(f"{values_name} and {mask_name} are misaligned")
+
+
+def close_memmap(array: NDArray[np.generic]) -> None:
+    """Flush and close one NumPy memmap without retaining an OS mapping."""
+
+    if isinstance(array, np.memmap):
+        array.flush()
+    mapping = getattr(array, "_mmap", None)
+    if mapping is not None:
+        mapping.close()
+
+
+class StoreStaging:
+    """Build final store arrays directly inside one atomic staging directory."""
+
+    def __init__(
+        self,
+        output_dir: Path,
+        *,
+        dates: Sequence[object],
+        isins: Sequence[str],
+    ) -> None:
+        self.output = Path(output_dir).resolve()
+        if self.output.exists():
+            raise FileExistsError(self.output)
+        self.output.parent.mkdir(parents=True, exist_ok=True)
+        self.dates = np.asarray(dates, dtype="datetime64[D]")
+        self.isins = tuple(str(value) for value in isins)
+        _validate_axes(self.dates, self.isins)
+        self.staging = Path(
+            tempfile.mkdtemp(
+                prefix=f".{self.output.name}.building-", dir=self.output.parent
+            )
+        )
+        np.save(self.staging / "date_index.npy", self.dates, allow_pickle=False)
+        np.save(
+            self.staging / "isin_index.npy",
+            np.asarray(self.isins, dtype=np.str_),
+            allow_pickle=False,
+        )
+        self._arrays: dict[str, tuple[tuple[int, ...], np.dtype[np.generic]]] = {}
+        self._sealed = False
+
+    def __enter__(self) -> StoreStaging:
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        del exc_type, exc, traceback
+        if not self._sealed:
+            shutil.rmtree(self.staging, ignore_errors=True)
+
+    def array_path(self, name: str) -> Path:
+        if not _SAFE_NAME.fullmatch(name):
+            raise ValueError(f"unsafe array name: {name}")
+        return self.staging / f"{name}.npy"
+
+    def create_array(
+        self,
+        name: str,
+        shape: Sequence[int],
+        dtype: np.dtype[np.generic] | type[np.generic],
+        *,
+        fill: float | bool | None = None,
+        chunk_rows: int = 64,
+    ) -> np.memmap:
+        normalized_shape = tuple(int(value) for value in shape)
+        if len(normalized_shape) < 2 or normalized_shape[:2] != (
+            self.dates.size,
+            len(self.isins),
+        ):
+            raise ValueError(
+                "store arrays must begin with the output [date, ISIN] axes"
+            )
+        if name in self._arrays or self.array_path(name).exists():
+            raise ValueError(f"duplicate store array: {name}")
+        normalized_dtype = np.dtype(dtype)
+        output = np.lib.format.open_memmap(
+            self.array_path(name),
+            mode="w+",
+            dtype=normalized_dtype,
+            shape=normalized_shape,
+        )
+        if fill is not None:
+            if chunk_rows <= 0:
+                raise ValueError("chunk_rows must be positive")
+            for start in range(0, normalized_shape[0], chunk_rows):
+                output[start : start + chunk_rows] = fill
+        self._arrays[name] = (normalized_shape, normalized_dtype)
+        return output
+
+    def write_array(
+        self,
+        name: str,
+        values: NDArray[np.generic],
+        *,
+        row_indices: Sequence[int] | NDArray[np.integer] | None = None,
+        dtype: np.dtype[np.generic] | type[np.generic] | None = None,
+        chunk_rows: int = 64,
+    ) -> None:
+        source = np.asarray(values)
+        if source.ndim < 2 or source.shape[1] != len(self.isins):
+            raise ValueError(
+                "store source arrays must begin with the [date, ISIN] axes"
+            )
+        if chunk_rows <= 0:
+            raise ValueError("chunk_rows must be positive")
+        if row_indices is None:
+            if source.shape[0] != self.dates.size:
+                raise ValueError(
+                    "store source array does not match the output date axis"
+                )
+            rows: NDArray[np.int64] | None = None
+        else:
+            raw_rows = np.asarray(row_indices)
+            if (
+                raw_rows.ndim != 1
+                or not np.issubdtype(raw_rows.dtype, np.integer)
+                or np.issubdtype(raw_rows.dtype, np.bool_)
+            ):
+                raise TypeError(
+                    "row_indices must be a one-dimensional integer sequence"
+                )
+            rows = raw_rows.astype(np.int64, copy=False)
+            if (
+                rows.size != self.dates.size
+                or np.any(rows < 0)
+                or np.any(rows >= source.shape[0])
+                or (rows.size > 1 and np.any(np.diff(rows) <= 0))
+            ):
+                raise ValueError(
+                    "row_indices must select one unique increasing source row per output date"
+                )
+        destination = self.create_array(
+            name,
+            (self.dates.size, *source.shape[1:]),
+            source.dtype if dtype is None else dtype,
+        )
+        try:
+            for start in range(0, self.dates.size, chunk_rows):
+                stop = min(start + chunk_rows, self.dates.size)
+                source_rows: slice | NDArray[np.int64] = (
+                    slice(start, stop) if rows is None else rows[start:stop]
+                )
+                destination[start:stop] = source[source_rows]
+        finally:
+            close_memmap(destination)
+
+    def open_array(self, name: str, *, mode: str = "r") -> np.memmap:
+        if name not in self._arrays:
+            raise KeyError(name)
+        return np.load(self.array_path(name), mmap_mode=mode, allow_pickle=False)
+
+    def create_scratch_array(
+        self,
+        name: str,
+        shape: Sequence[int],
+        dtype: np.dtype[np.generic] | type[np.generic],
+    ) -> np.memmap:
+        if not _SAFE_NAME.fullmatch(name):
+            raise ValueError(f"unsafe scratch-array name: {name}")
+        path = self.staging / f".scratch_{name}.npy"
+        if path.exists():
+            raise ValueError(f"duplicate scratch array: {name}")
+        return np.lib.format.open_memmap(
+            path,
+            mode="w+",
+            dtype=np.dtype(dtype),
+            shape=tuple(int(value) for value in shape),
+        )
+
+    def remove_scratch_array(self, name: str) -> None:
+        path = self.staging / f".scratch_{name}.npy"
+        path.unlink()
+
+    def seal(
+        self,
+        *,
+        feature_names: Mapping[str, Sequence[str]] | None = None,
+        sources: Sequence[Mapping[str, object]] = (),
+        metadata: Mapping[str, object] | None = None,
+        tables: Mapping[str, pl.DataFrame] | None = None,
+    ) -> Path:
+        arrays = {name: self.open_array(name) for name in sorted(self._arrays)}
+        try:
+            _validate_array_shapes(arrays, self.dates.size, len(self.isins))
+        finally:
+            for value in arrays.values():
+                close_memmap(value)
+        inventory: dict[str, dict[str, object]] = {}
+        for name, (shape, dtype) in sorted(self._arrays.items()):
+            path = self.array_path(name)
+            inventory[name] = {
+                "path": path.name,
+                "shape": list(shape),
+                "dtype": dtype.str,
+                "bytes": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+        index_inventory = {}
+        for name in ("date_index.npy", "isin_index.npy"):
+            path = self.staging / name
+            index_inventory[name] = {
+                "bytes": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+        table_inventory: dict[str, dict[str, object]] = {}
+        for name, frame in sorted((tables or {}).items()):
+            if not _SAFE_NAME.fullmatch(name):
+                raise ValueError(f"unsafe table name: {name}")
+            path = self.staging / f"{name}.parquet"
+            frame.write_parquet(path)
+            table_inventory[name] = {
+                "path": path.name,
+                "rows": frame.height,
+                "columns": frame.columns,
+                "bytes": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+        manifest: dict[str, Any] = {
+            "schema": STORE_SCHEMA,
+            "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            "axes": {
+                "date_count": int(self.dates.size),
+                "date_start": str(self.dates[0]),
+                "date_end": str(self.dates[-1]),
+                "date_identity_sha256": _axis_sha256(
+                    [str(value) for value in self.dates]
+                ),
+                "isin_count": len(self.isins),
+                "isin_identity_sha256": _axis_sha256(self.isins),
+                "horizons": list(HORIZONS),
+                "decision_minute_index": DECISION_MINUTE_INDEX,
+            },
+            "indices": index_inventory,
+            "arrays": inventory,
+            "tables": table_inventory,
+            "feature_names": {
+                key: list(value) for key, value in (feature_names or {}).items()
+            },
+            "sources": [dict(value) for value in sources],
+            "metadata": dict(metadata or {}),
+            "official_validation_accessed": False,
+            "test_accessed": False,
+        }
+        manifest_path = self.staging / "manifest.json"
+        manifest_path.write_bytes(_json_bytes(manifest))
+        (self.staging / "manifest.sha256").write_text(
+            f"{sha256_file(manifest_path)}  manifest.json\n", encoding="ascii"
+        )
+        os.replace(self.staging, self.output)
+        self._sealed = True
+        opened = V2Store._open_internal(
+            self.output, verify_hashes=True, grant=_WRITE_VERIFICATION
+        )
+        opened.close()
+        return self.output
 
 
 def write_store(
@@ -147,10 +457,6 @@ def write_store(
 ) -> Path:
     """Atomically create one immutable, manifest-hashed v2 store."""
 
-    output = Path(output_dir).resolve()
-    if output.exists():
-        raise FileExistsError(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
     date_axis = np.asarray(dates, dtype="datetime64[D]")
     isin_axis = tuple(str(value) for value in isins)
     _validate_axes(date_axis, isin_axis)
@@ -187,90 +493,26 @@ def write_store(
         if selected_rows.size == 1 or np.all(np.diff(selected_rows) == 1):
             # A first-axis slice is a view; advanced indexing would allocate a
             # full copy of every selected tensor during the atomic write.
-            selected_rows = slice(
-                int(selected_rows[0]), int(selected_rows[-1]) + 1
-            )
+            selected_rows = slice(int(selected_rows[0]), int(selected_rows[-1]) + 1)
     elif source_date_count != date_axis.size:
         raise ValueError("store arrays do not match the output date axis")
-    staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.building-", dir=output.parent))
-    try:
-        np.save(staging / "date_index.npy", date_axis, allow_pickle=False)
-        np.save(staging / "isin_index.npy", np.asarray(isin_axis, dtype=np.str_), allow_pickle=False)
-        inventory: dict[str, dict[str, object]] = {}
+    with StoreStaging(output_dir, dates=date_axis, isins=isin_axis) as staging:
         for name, source_value in sorted(materialized.items()):
-            value = (
-                source_value
-                if selected_rows is None
-                else np.asarray(source_value[selected_rows])
+            staging.write_array(
+                name,
+                source_value,
+                row_indices=(
+                    None
+                    if selected_rows is None
+                    else np.arange(source_date_count, dtype=np.int64)[selected_rows]
+                ),
             )
-            path = staging / f"{name}.npy"
-            np.save(path, value, allow_pickle=False)
-            inventory[name] = {
-                "path": path.name,
-                "shape": list(value.shape),
-                "dtype": value.dtype.str,
-                "bytes": path.stat().st_size,
-                "sha256": sha256_file(path),
-            }
-            del value
-        index_inventory = {}
-        for name in ("date_index.npy", "isin_index.npy"):
-            path = staging / name
-            index_inventory[name] = {
-                "bytes": path.stat().st_size,
-                "sha256": sha256_file(path),
-            }
-        table_inventory: dict[str, dict[str, object]] = {}
-        for name, frame in sorted((tables or {}).items()):
-            if not _SAFE_NAME.fullmatch(name):
-                raise ValueError(f"unsafe table name: {name}")
-            path = staging / f"{name}.parquet"
-            frame.write_parquet(path)
-            table_inventory[name] = {
-                "path": path.name,
-                "rows": frame.height,
-                "columns": frame.columns,
-                "bytes": path.stat().st_size,
-                "sha256": sha256_file(path),
-            }
-        manifest: dict[str, Any] = {
-            "schema": STORE_SCHEMA,
-            "created_at_utc": datetime.now(timezone.utc).isoformat(),
-            "axes": {
-                "date_count": int(date_axis.size),
-                "date_start": str(date_axis[0]),
-                "date_end": str(date_axis[-1]),
-                "date_identity_sha256": _axis_sha256([str(value) for value in date_axis]),
-                "isin_count": len(isin_axis),
-                "isin_identity_sha256": _axis_sha256(isin_axis),
-                "horizons": list(HORIZONS),
-                "decision_minute_index": DECISION_MINUTE_INDEX,
-            },
-            "indices": index_inventory,
-            "arrays": inventory,
-            "tables": table_inventory,
-            "feature_names": {
-                key: list(value) for key, value in (feature_names or {}).items()
-            },
-            "sources": [dict(value) for value in sources],
-            "metadata": dict(metadata or {}),
-            "official_validation_accessed": False,
-            "test_accessed": False,
-        }
-        manifest_path = staging / "manifest.json"
-        manifest_path.write_bytes(_json_bytes(manifest))
-        (staging / "manifest.sha256").write_text(
-            f"{sha256_file(manifest_path)}  manifest.json\n", encoding="ascii"
+        return staging.seal(
+            feature_names=feature_names,
+            sources=sources,
+            metadata=metadata,
+            tables=tables,
         )
-        os.replace(staging, output)
-    except BaseException:
-        shutil.rmtree(staging, ignore_errors=True)
-        raise
-    opened = V2Store._open_internal(
-        output, verify_hashes=True, grant=_WRITE_VERIFICATION
-    )
-    opened.close()
-    return output
 
 
 @dataclass
@@ -292,8 +534,7 @@ class V2Store:
     ) -> "V2Store":
         del root, verify_hashes
         raise PermissionError(
-            "v2 feature and target arrays must be opened through "
-            "open_store_for_dates"
+            "v2 feature and target arrays must be opened through open_store_for_dates"
         )
 
     @classmethod
@@ -339,7 +580,10 @@ class V2Store:
             ):
                 raise ValueError(f"store array hash mismatch: {name}")
             value = np.load(item, mmap_mode="r", allow_pickle=False)
-            if list(value.shape) != record["shape"] or value.dtype.str != record["dtype"]:
+            if (
+                list(value.shape) != record["shape"]
+                or value.dtype.str != record["dtype"]
+            ):
                 raise ValueError(f"store array schema mismatch: {name}")
             arrays[name] = value
         for name, record in manifest.get("tables", {}).items():
@@ -399,7 +643,12 @@ class V2Store:
 
     def _checked_date_selector(
         self,
-        selector: int | np.integer | slice | range | Sequence[int] | NDArray[np.integer],
+        selector: int
+        | np.integer
+        | slice
+        | range
+        | Sequence[int]
+        | NDArray[np.integer],
     ) -> int | NDArray[np.int64]:
         date_count = int(self.dates.size)
         if isinstance(selector, (int, np.integer)) and not isinstance(
@@ -450,12 +699,7 @@ class V2Store:
         self,
         name: str,
         date_selector: (
-            int
-            | np.integer
-            | slice
-            | range
-            | Sequence[int]
-            | NDArray[np.integer]
+            int | np.integer | slice | range | Sequence[int] | NDArray[np.integer]
         ),
     ) -> NDArray[np.generic]:
         """Copy authorized date rows without exposing the backing whole-store mmap."""
@@ -612,9 +856,7 @@ def _per_sample_integer_parameter(
     *,
     name: str,
 ) -> NDArray[np.int64]:
-    if isinstance(value, (int, np.integer)) and not isinstance(
-        value, (bool, np.bool_)
-    ):
+    if isinstance(value, (int, np.integer)) and not isinstance(value, (bool, np.bool_)):
         return np.full(count, int(value), dtype=np.int64)
     raw = np.asarray(value)
     if (
@@ -673,9 +915,7 @@ def open_store_for_samples(
         raise ValueError("causal history endpoint is outside the store")
     authorized = set(int(value) for value in indices)
     for end, lookback in zip(ends.tolist(), lookbacks.tolist(), strict=True):
-        authorized.update(
-            range(max(0, int(end) - int(lookback) + 1), int(end) + 1)
-        )
+        authorized.update(range(max(0, int(end) - int(lookback) + 1), int(end) + 1))
     grant = _StoreAccessGrant(
         root=path,
         date_indices=frozenset(authorized),
