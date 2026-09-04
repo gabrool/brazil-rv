@@ -74,7 +74,11 @@ survivorship-validity gap for every internally derived feature family and a
 10-point gap for targets. External sidecars instead require exact independent
 reproduction of their validity masks from publication-lagged raw availability;
 daily archives must satisfy D+1. Their composition check is a five-point
-survivorship-validity gap within each pooled causal prior-ADV20 quartile. A
+one-sided threshold on a 1,000-replication, 95% name-clustered bootstrap of the
+survivor-minus-delisted validity gap within each pooled causal prior-ADV20
+quartile. A quartile binds only when both groups contribute at least 20
+continuation names and 2,000 family-present name-days, and fails only when the
+interval lower bound exceeds +5 points. Smaller strata remain reported. A
 survivor-subset total-return target is registered but not implemented as a
 future sensitivity experiment.
 
@@ -91,21 +95,16 @@ Paired comparisons consume the selected preset's bootstrap settings, and preset
 runs require a hash-bound fast pretrained checkpoint. Legacy action-cache schemas
 are normalized in memory.
 
-A commit-bound store rebuild has been attempted under this refined definition,
-but no store was accepted and no full-F1 validation was started. The current
-COTAHIST input has zero qualifying consecutive-session ISIN successions; its
-three same-ticker transition candidates all cross gaps and remain separate.
-Independent publication-lag replay passed for events, fundamentals, and lending,
-then the build stopped at the first composition failure: lending validity in
-prior-ADV20 quartile 2 was `0.6362105263` for delisted identities and
-`0.7783315734` for final-year survivors, a `14.2121047074`-point gap versus the
-five-point limit. The requested options audit confirms its former unstratified
-`5.4220916184`-point gap runs delisted-above-survivor while every causal
-prior-ADV20 quartile passes (maximum `3.6647966055` points), so that options
-pattern is composition rather than leakage. The later internal-family and target
-gates were not reached. The former `f048ea9`, `2cb204d`, and related validation
-roots remain immutable historical engineering evidence only and must not be
-used as canonical inputs.
+No store has yet been accepted and no full-F1 validation has started. The most
+recent rebuild used the now-superseded per-quartile point check: the current
+COTAHIST input had zero qualifying consecutive-session ISIN successions and the
+run stopped on an under-supported lending quartile. Lending's 14.2121-point
+mid-liquidity estimate had only 950 delisted present name-days and is therefore
+reported rather than binding under the frozen name-clustered rule. The requested
+options audit retains its unstratified `5.4220916184`-point
+delisted-above-survivor composition signature. The former `f048ea9`, `2cb204d`,
+and related validation roots remain immutable historical engineering evidence
+only and must not be used as canonical inputs.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused

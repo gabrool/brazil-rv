@@ -118,20 +118,17 @@ def test_prior_adv20_uses_only_sessions_before_the_decision() -> None:
     np.testing.assert_array_equal(baseline[:22], mutated[:22])
 
 
-def test_external_gate_is_stratified_by_prior_adv20_not_unconditional() -> None:
-    dates = np.asarray(
-        ["2023-12-27", "2023-12-28", "2023-12-29", "2024-01-02"],
-        dtype="datetime64[D]",
-    )
-    observed = np.ones((4, 8), dtype=np.bool_)
-    observed[-1, :4] = False
+def test_external_gate_uses_supported_name_clustered_one_sided_intervals() -> None:
+    dates = np.datetime64("2023-01-01") + np.arange(800).astype("timedelta64[D]")
+    observed = np.ones((800, 40), dtype=np.bool_)
+    observed[400:, :20] = False
     active = observed.copy()
     prior_adv = np.broadcast_to(
-        np.asarray([1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0]),
+        (1.0 + np.arange(800) % 4)[:, None],
         observed.shape,
     ).copy()
     present = observed.copy()
-    valid = np.broadcast_to(present[..., None], (*present.shape, 2)).copy()
+    valid = present[..., None].copy()
     table = _external_feature_validity_by_survival_liquidity(
         dates,
         active,
@@ -142,22 +139,80 @@ def test_external_gate_is_stratified_by_prior_adv20_not_unconditional() -> None:
         present,
     )
     assert set(table.get_column("prior_adv20_quartile")) == {0, 1, 2, 3, 4}
-    assert table.filter(pl.col("prior_adv20_quartile") > 0).get_column(
-        "stratified_gate_passed"
-    ).all()
+    binding = table.filter(pl.col("prior_adv20_quartile") > 0)
+    assert binding.get_column("stratum_is_binding").all()
+    assert binding.get_column("stratified_gate_passed").all()
+    assert binding.get_column("bootstrap_replications").unique().to_list() == [1000]
+    assert binding.get_column("supported_continuation_name_count").min() == 20
+    assert binding.get_column("family_present_name_days").min() == 2000
 
-    skewed = valid.copy()
-    skewed[:-1, 0, :] = False
-    with pytest.raises(ValueError, match="prior-ADV20 quartile"):
+    delisted_above = valid.copy()
+    q2_survivors = (prior_adv == 2.0) & observed
+    q2_survivors[:, :20] = False
+    delisted_above[q2_survivors] = False
+    one_sided = _external_feature_validity_by_survival_liquidity(
+        dates,
+        active,
+        observed,
+        prior_adv,
+        "sidecar_options",
+        delisted_above,
+        present,
+    )
+    q2 = one_sided.filter(pl.col("prior_adv20_quartile") == 2)
+    assert q2.get_column("survivor_minus_delisted_gap").unique().to_list() == [
+        -1.0
+    ]
+    assert q2.get_column("bootstrap_upper_95").max() == -1.0
+    assert q2.get_column("stratified_gate_passed").all()
+
+    survivor_above = valid.copy()
+    q2_delisted = (prior_adv == 2.0) & observed
+    q2_delisted[:, 20:] = False
+    survivor_above[q2_delisted] = False
+    with pytest.raises(ValueError, match="name-bootstrap lower bound"):
         _external_feature_validity_by_survival_liquidity(
             dates,
             active,
             observed,
             prior_adv,
             "sidecar_options",
-            skewed,
+            survivor_above,
             present,
         )
+
+
+def test_external_gate_reports_but_does_not_gate_thin_strata() -> None:
+    dates = np.datetime64("2023-01-01") + np.arange(800).astype("timedelta64[D]")
+    observed = np.ones((800, 40), dtype=np.bool_)
+    observed[400:, :19] = False
+    active = observed.copy()
+    prior_adv = np.broadcast_to(
+        (1.0 + np.arange(800) % 4)[:, None], observed.shape
+    ).copy()
+    present = observed.copy()
+    valid = present[..., None].copy()
+    q2_delisted = (prior_adv == 2.0) & observed
+    q2_delisted[:, 19:] = False
+    valid[q2_delisted] = False
+
+    table = _external_feature_validity_by_survival_liquidity(
+        dates,
+        active,
+        observed,
+        prior_adv,
+        "sidecar_lending",
+        valid,
+        present,
+    )
+    q2 = table.filter(pl.col("prior_adv20_quartile") == 2)
+    assert q2.get_column("survivor_minus_delisted_gap").unique().to_list() == [1.0]
+    assert not q2.get_column("stratum_is_binding").any()
+    assert q2.get_column("stratified_gate_passed").null_count() == 2
+    assert q2.get_column("gate_decision").unique().to_list() == [
+        "reported_not_gated_insufficient_support"
+    ]
+    assert q2.get_column("coverage_note").str.contains("5,212").all()
 
 
 def _base_store(tmp_path, *, external_fast=None, stored_fast_present=None):

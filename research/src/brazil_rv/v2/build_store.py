@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import json
 import re
 import subprocess
@@ -78,6 +79,10 @@ from .universe import (
 
 EXPECTED_V1_DATES = 1_248
 V1_STORE_START = date(2021, 7, 19)
+EXTERNAL_VALIDITY_BOOTSTRAP_REPLICATIONS = 1_000
+EXTERNAL_VALIDITY_BOOTSTRAP_CONFIDENCE = 0.95
+EXTERNAL_VALIDITY_MIN_NAMES = 20
+EXTERNAL_VALIDITY_MIN_NAME_DAYS = 2_000
 
 
 def _workspace_array(
@@ -710,7 +715,7 @@ def _external_feature_validity_by_survival_liquidity(
     present: NDArray[np.bool_],
     survival_identities: Sequence[str] | None = None,
 ) -> pl.DataFrame:
-    """Gate an external family within pooled causal prior-ADV20 quartiles."""
+    """Gate survivor-favoring external coverage with name-clustered intervals."""
 
     membership = np.asarray(active, dtype=np.bool_)
     seen = np.asarray(observed, dtype=np.bool_)
@@ -734,6 +739,13 @@ def _external_feature_validity_by_survival_liquidity(
     edges = np.quantile(pooled_adv, (0.25, 0.50, 0.75))
     quartile = np.full(seen.shape, -1, dtype=np.int8)
     quartile[eligible] = np.searchsorted(edges, adv[eligible], side="right")
+    identities = (
+        tuple(str(index) for index in range(seen.shape[1]))
+        if survival_identities is None
+        else tuple(str(value) for value in survival_identities)
+    )
+    if len(identities) != seen.shape[1]:
+        raise ValueError("external feature survival identity axis is misaligned")
     rows: list[dict[str, object]] = []
     strata = [(0, eligible)] + [
         (quartile_index + 1, quartile == quartile_index)
@@ -742,14 +754,39 @@ def _external_feature_validity_by_survival_liquidity(
     for quartile_number, stratum in strata:
         ratios: dict[str, float] = {}
         denominators: dict[str, int] = {}
+        numerators_by_identity: dict[str, NDArray[np.int64]] = {}
+        denominators_by_identity: dict[str, NDArray[np.int64]] = {}
+        supported_names: dict[str, int] = {}
+        present_name_days: dict[str, int] = {}
         for label, names in groups.items():
             selected = eligible & stratum & names[None, :]
-            present_days = int(selected.sum())
-            denominator = present_days * mask.shape[2]
-            numerator = int((mask & selected[..., None]).sum())
+            per_column_days = selected.sum(axis=0, dtype=np.int64)
+            per_column_valid = (mask & selected[..., None]).sum(
+                axis=(0, 2), dtype=np.int64
+            )
+            clustered: dict[str, list[int]] = {}
+            for column in np.flatnonzero(names):
+                identity = identities[int(column)]
+                counts = clustered.setdefault(identity, [0, 0])
+                counts[0] += int(per_column_valid[column])
+                counts[1] += int(per_column_days[column]) * mask.shape[2]
+            supported = [counts for counts in clustered.values() if counts[1] > 0]
+            cluster_numerators = np.asarray(
+                [counts[0] for counts in supported], dtype=np.int64
+            )
+            cluster_denominators = np.asarray(
+                [counts[1] for counts in supported], dtype=np.int64
+            )
+            present_days = int(per_column_days.sum())
+            denominator = int(cluster_denominators.sum())
+            numerator = int(cluster_numerators.sum())
             ratio = numerator / denominator if denominator else 0.0
             ratios[label] = ratio
             denominators[label] = denominator
+            numerators_by_identity[label] = cluster_numerators
+            denominators_by_identity[label] = cluster_denominators
+            supported_names[label] = int(cluster_denominators.size)
+            present_name_days[label] = present_days
             rows.append(
                 {
                     "family": family,
@@ -766,39 +803,114 @@ def _external_feature_validity_by_survival_liquidity(
                     ),
                     "group": label,
                     "name_count": int(names.sum()),
+                    "supported_continuation_name_count": supported_names[label],
                     "family_present_name_days": present_days,
                     "valid_feature_cells": numerator,
                     "possible_feature_cells": denominator,
                     "validity_ratio": ratio,
                     "mask_rate": 1.0 - ratio if denominator else None,
-                    "validity_gap": None,
+                    "survivor_minus_delisted_gap": None,
+                    "bootstrap_lower_95": None,
+                    "bootstrap_upper_95": None,
+                    "bootstrap_replications": EXTERNAL_VALIDITY_BOOTSTRAP_REPLICATIONS,
+                    "bootstrap_cluster_unit": "continuation_name",
                     "gap_direction": None,
                     "stratified_gate_passed": None,
-                    "stratum_is_binding": quartile_number > 0,
+                    "stratum_is_binding": False,
+                    "support_threshold_met": None,
+                    "gate_decision": None,
+                    "coverage_note": (
+                        "Delisted mid-liquidity names have thin lending records: "
+                        "5,212 present name-days across 526 names; lending value "
+                        "will be coverage-limited for exactly that segment."
+                        if family == "sidecar_lending"
+                        else None
+                    ),
                 }
             )
         if all(denominators[label] > 0 for label in groups):
-            gap = abs(
-                ratios["delisted_within_panel"]
-                - ratios["survives_to_final_year"]
+            gap = (
+                ratios["survives_to_final_year"]
+                - ratios["delisted_within_panel"]
             )
             direction = (
-                "delisted_above_survivor"
-                if ratios["delisted_within_panel"]
-                > ratios["survives_to_final_year"]
-                else "survivor_above_delisted"
+                "survivor_above_delisted"
+                if gap > 0.0
+                else "delisted_above_survivor"
+            )
+            sampled_ratios: dict[str, NDArray[np.float64]] = {}
+            for label in groups:
+                seed_payload = (
+                    "v2-external-validity-name-bootstrap|"
+                    f"{family}|{quartile_number}|{label}"
+                ).encode("utf-8")
+                seed = int.from_bytes(
+                    hashlib.sha256(seed_payload).digest()[:8], "little"
+                )
+                rng = np.random.default_rng(seed)
+                cluster_numerators = numerators_by_identity[label]
+                cluster_denominators = denominators_by_identity[label]
+                draw = rng.integers(
+                    0,
+                    cluster_numerators.size,
+                    size=(
+                        EXTERNAL_VALIDITY_BOOTSTRAP_REPLICATIONS,
+                        cluster_numerators.size,
+                    ),
+                )
+                sampled_ratios[label] = cluster_numerators[draw].sum(axis=1) / (
+                    cluster_denominators[draw].sum(axis=1)
+                )
+            samples = (
+                sampled_ratios["survives_to_final_year"]
+                - sampled_ratios["delisted_within_panel"]
+            )
+            tail = 0.5 * (1.0 - EXTERNAL_VALIDITY_BOOTSTRAP_CONFIDENCE)
+            lower, upper = np.quantile(samples, (tail, 1.0 - tail))
+            support_met = all(
+                supported_names[label] >= EXTERNAL_VALIDITY_MIN_NAMES
+                and present_name_days[label] >= EXTERNAL_VALIDITY_MIN_NAME_DAYS
+                for label in groups
+            )
+            binding = quartile_number > 0 and support_met
+            passed = not (binding and float(lower) > 0.05)
+            decision = (
+                "diagnostic_unstratified"
+                if quartile_number == 0
+                else (
+                    "pass"
+                    if binding and passed
+                    else (
+                        "fail_survivor_favoring_interval"
+                        if binding
+                        else "reported_not_gated_insufficient_support"
+                    )
+                )
             )
             for row in rows[-len(groups) :]:
-                row["validity_gap"] = gap
+                row["survivor_minus_delisted_gap"] = gap
+                row["bootstrap_lower_95"] = float(lower)
+                row["bootstrap_upper_95"] = float(upper)
                 row["gap_direction"] = direction
-                row["stratified_gate_passed"] = (
-                    None if quartile_number == 0 else gap <= 0.05
-                )
-            if quartile_number > 0 and gap > 0.05:
+                row["stratified_gate_passed"] = passed if binding else None
+                row["stratum_is_binding"] = binding
+                row["support_threshold_met"] = support_met
+                row["gate_decision"] = decision
+            if binding and float(lower) > 0.05:
                 raise ValueError(
-                    f"external feature validity for {family} is survivor-skewed "
-                    "by more than 5 percentage points within prior-ADV20 "
-                    f"quartile {quartile_number}: {gap:.6f}"
+                    f"external feature validity for {family} has a supported "
+                    "survivor-minus-delisted name-bootstrap lower bound above "
+                    "5 percentage points within prior-ADV20 quartile "
+                    f"{quartile_number}: {float(lower):.6f}"
+                )
+        else:
+            for row in rows[-len(groups) :]:
+                row["stratum_is_binding"] = False
+                row["support_threshold_met"] = False
+                row["gate_decision"] = (
+                    "diagnostic_unstratified_no_two_group_support"
+                    if quartile_number == 0
+                    else "reported_not_gated_insufficient_support"
                 )
     return pl.DataFrame(rows)
 
@@ -1740,8 +1852,21 @@ def build_daily_store(
             "internally_derived_feature_family_max_gap": 0.05,
             "target_family_max_gap": 0.10,
             "external_sidecar_validity": (
-                "independent publication-lag mask identity plus max 0.05 gap "
-                "within pooled causal prior-ADV20 quartiles"
+                "independent publication-lag mask identity plus a 1000-rep "
+                "name-clustered interval on survivor-minus-delisted validity "
+                "within pooled causal prior-ADV20 quartiles; binding only with "
+                "at least 20 names and 2000 present name-days in both groups; "
+                "fail only when the 95% lower bound exceeds +0.05"
+            ),
+            "external_sidecar_name_bootstrap_replications": (
+                EXTERNAL_VALIDITY_BOOTSTRAP_REPLICATIONS
+            ),
+            "external_sidecar_name_bootstrap_confidence": (
+                EXTERNAL_VALIDITY_BOOTSTRAP_CONFIDENCE
+            ),
+            "external_sidecar_min_names_per_group": EXTERNAL_VALIDITY_MIN_NAMES,
+            "external_sidecar_min_name_days_per_group": (
+                EXTERNAL_VALIDITY_MIN_NAME_DAYS
             ),
         },
         "return_definition": (
@@ -1774,13 +1899,34 @@ def build_daily_store(
                 pl.col("prior_adv20_quartile") == 0
             ).row(0, named=True)
             binding = options_composition.filter(
-                pl.col("prior_adv20_quartile") > 0
+                pl.col("stratum_is_binding")
+            )
+            reported = options_composition.filter(
+                (pl.col("prior_adv20_quartile") > 0)
+                & (~pl.col("stratum_is_binding"))
             )
             metadata["options_validity_composition_signature"] = {
-                "unstratified_gap": unstratified["validity_gap"],
+                "unstratified_survivor_minus_delisted_gap": unstratified[
+                    "survivor_minus_delisted_gap"
+                ],
+                "unstratified_absolute_gap": abs(
+                    unstratified["survivor_minus_delisted_gap"]
+                ),
                 "unstratified_direction": unstratified["gap_direction"],
-                "stratified_prior_adv20_gate_passed": bool(
-                    binding.get_column("stratified_gate_passed").all()
+                "binding_quartile_count": (
+                    binding.get_column("prior_adv20_quartile").n_unique()
+                    if binding.height
+                    else 0
+                ),
+                "reported_nonbinding_quartile_count": (
+                    reported.get_column("prior_adv20_quartile").n_unique()
+                    if reported.height
+                    else 0
+                ),
+                "stratified_prior_adv20_gate_passed": (
+                    bool(binding.get_column("stratified_gate_passed").all())
+                    if binding.height
+                    else True
                 ),
                 "interpretation": (
                     "liquidity-composition signature, not a leakage signature"

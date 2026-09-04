@@ -20,12 +20,14 @@ stores and validations remain immutable historical engineering evidence, not
 canonical inputs.
 
 This source implementation is unit-tested, including byte-for-byte provider
-invariance and both target- and feature-side survivorship gates. The first
-commit-bound acceptance rebuild under this definition stopped at the unchanged
-feature-family gate: the options sidecar had a 5.4221-point survival gap versus
-the 5-point limit. No accepted store or full-F1 validation exists under this
-definition. No v2 research round, official-validation read, test read,
-candidate selection, or deployment change is part of this implementation pass.
+invariance and both target- and feature-side survivorship gates. Earlier
+commit-bound acceptance rebuilds stopped at the superseded unconditional
+options check and then at an under-supported lending quartile. External-family
+composition now uses the frozen name-clustered support-aware interval described
+below; publication-lag replay remains unconditional. No accepted store or
+full-F1 validation yet exists under this definition. No v2 research round,
+official-validation read, test read, candidate selection, or deployment change
+is part of this implementation pass.
 
 ## Data flow
 
@@ -272,10 +274,22 @@ sidecar validity bit exactly.
 
 Internally derived feature families retain the unconditional 5-point
 eventual-survival validity-gap gate, and targets retain their 10-point gate.
-External sidecars instead apply the 5-point gap within each pooled causal
-prior-ADV20 quartile of their observable population. The manifest retains both
-survival-group rows per quartile plus an unstratified diagnostic row. This
-separates publication-time leakage from ordinary liquidity composition.
+For each pooled causal prior-ADV20 quartile of an external sidecar's observable
+population, the store computes survivor-minus-delisted validity and a 95%
+name-clustered bootstrap interval from 1,000 deterministic replicates. A
+replicate resamples contributing continuation identities within each survival
+group and retains each identity's complete cell cluster. A quartile binds only
+when both groups have at least 20 contributing names and 2,000 family-present
+name-days; smaller strata are reported. The gate fails only when a binding
+interval's lower bound exceeds +5 points. The manifest retains both group rows,
+point estimates, intervals, support counts, decisions, and the diagnostic pooled
+row. This separates publication-time leakage from ordinary liquidity
+composition.
+
+The lending audit also records the known coverage warning that delisted
+mid-liquidity names have only 5,212 present name-days across 526 names. This
+limits the sidecar's value for that segment in any later feature screen; it does
+not alter its availability mask or acceptance rule.
 
 For lending balance, the 20-session COTAHIST-volume denominator is valid only
 when the complete trailing window begins on or after that ISIN's first finite

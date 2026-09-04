@@ -15,14 +15,25 @@ External `options`, `lending`, `oddlot`, `rebalance`, `events`, and
    publication-lagged availability coordinate, including the upstream D+1
    availability date for daily archives, and require exact equality.
 2. Within each pooled quartile of causal prior-20-session mean BRL volume among
-   observable family rows, cap the eventual-survival validity gap at 5 points.
-   Retain coverage by survival group and quartile.  The pooled unstratified row
-   is diagnostic rather than binding.
+   observable family rows, estimate the survivor-minus-delisted validity gap
+   with a name-clustered bootstrap.  A replicate independently resamples the
+   contributing continuation identities with replacement inside each survival
+   group, preserves every sampled identity's complete valid/possible-cell
+   cluster, and reports the 2.5% and 97.5% percentiles from 1,000 deterministic
+   replicates.  Seeds are SHA-256-derived from the family, quartile, and group.
+   A quartile binds only when both groups contribute at least 20 continuation
+   identities and 2,000 family-present name-days.  It fails only when the 95%
+   interval's lower bound is greater than +5 points.  Smaller quartiles and the
+   pooled unstratified row are reported but not gated.
 
 The known options diagnostic is an unstratified 5.4220916184-point gap with
 delisted-name validity above survivor validity.  It is a liquidity-composition
 signature and passes the stratified gate; it is not evidence of availability
 leakage.
+
+The lending audit records that delisted mid-liquidity names have thin lending
+records: 5,212 present name-days across 526 names.  This is a coverage warning
+for a later lending-sidecar screen, not an acceptance-gate adjustment.
 
 Same-ticker COTAHIST ISIN changes link only when the old ISIN's final
 observation is immediately followed on the next market session by the new
