@@ -912,7 +912,22 @@ def _external_feature_validity_by_survival_liquidity(
                     if quartile_number == 0
                     else "reported_not_gated_insufficient_support"
                 )
-    return pl.DataFrame(rows)
+    return pl.DataFrame(
+        rows,
+        schema_overrides={
+            "prior_adv20_lower_brl": pl.Float64,
+            "prior_adv20_upper_brl": pl.Float64,
+            "mask_rate": pl.Float64,
+            "survivor_minus_delisted_gap": pl.Float64,
+            "bootstrap_lower_95": pl.Float64,
+            "bootstrap_upper_95": pl.Float64,
+            "gap_direction": pl.String,
+            "stratified_gate_passed": pl.Boolean,
+            "support_threshold_met": pl.Boolean,
+            "gate_decision": pl.String,
+            "coverage_note": pl.String,
+        },
+    )
 
 
 def _fast_sigma_ratio_table(

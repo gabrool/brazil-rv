@@ -5156,3 +5156,22 @@ makes the non-lending note an empty String and adds a schema regression test; it
 changes no source, value, mask, stratum, bootstrap, support threshold, gate, or
 score. No result-changing retry, GPU validation, official-validation/test read,
 or Section-D work occurred.
+
+The next fresh root at commit
+`65d6751279240483eb15b5fc099512f07e869d6a` is also retained as score-free
+operational evidence:
+
+    D:\quant-data\b3\processed\v2_daily_store_65d6751_20260904T165215Z
+
+All external calculations again returned without a gate exception, but the
+same final concatenation exposed a second inference case: a family with no
+binding strata inferred `stratified_gate_passed` as `Null`, while a family with
+binding support inferred `Boolean`. No audit table, store manifest,
+internal/target gate result, or validation score was written. The failure-record
+and inventory SHA-256 values are
+`b666d4c811d5f3360df4384c4c1d9c16853f957f96414bb9ed61f541e7a9c0e3` and
+`9077a5fbdaa593c565f9005125d2084f3b31de84e690ecad60cbc6e8f59e5002`;
+the inventory covers 60 files totaling 2,754,189,291 bytes. The bounded repair
+assigns explicit stable dtypes to every nullable audit column and tests the
+all-nonbinding schema. It changes no statistical or research value. No
+result-changing retry or protected-data access occurred.

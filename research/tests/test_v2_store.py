@@ -211,6 +211,8 @@ def test_external_gate_reports_but_does_not_gate_thin_strata() -> None:
     assert q2.get_column("survivor_minus_delisted_gap").unique().to_list() == [1.0]
     assert not q2.get_column("stratum_is_binding").any()
     assert q2.get_column("stratified_gate_passed").null_count() == 2
+    assert table.schema["stratified_gate_passed"] == pl.Boolean
+    assert table.schema["bootstrap_lower_95"] == pl.Float64
     assert q2.get_column("gate_decision").unique().to_list() == [
         "reported_not_gated_insufficient_support"
     ]
