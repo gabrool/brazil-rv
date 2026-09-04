@@ -4993,3 +4993,32 @@ recursive access flag. It records `pipeline_validation=true`,
 `test_accessed=false`. No 2025 or 2026 v2 feature or target payload was decoded,
 no v2 candidate was selected, and no deployment changed. The entire rebuild and
 validation ran locally; no paid Lambda instance was active.
+
+## V2 Section-C acceptance attempt (2026-09-04)
+
+Before the acceptance run, commit
+`839f7d21be9c43bc77b2387b93a4b9391b223d1b` corrected the integration-only
+GBDT triage driver to use all five registered GBDT seeds
+`(11, 29, 47, 61, 79)` on F1-F2. The pipeline test now requires the resulting
+100 persisted head files. Local and Linux Ruff/compile checks and all 598
+research tests passed before the store attempt.
+
+The fresh commit-bound store attempt stopped at the first Section-C failure,
+as required, at:
+
+    D:\quant-data\b3\processed\v2_daily_store_839f7d2_20260904T140628Z
+
+The 16-GiB local builder exhausted virtual memory while rank-normalizing the
+21-field rebalance sidecar: NumPy could not allocate the next 325-MiB float32
+array with shape `(4348, 933, 21)`. This occurred before either survivorship
+gate and before store creation. No retry was performed. No immutable store,
+full-F1 validation root, model, prediction, evaluation score, Section-D
+registration/run, official-validation access, test access, or deployment
+change resulted.
+
+The failure record and log-inclusive artifact inventory SHA-256 values are
+`0b220d8fe36aab8f688bad92f230a9386591b65039efd86fc26f97c0a4630e89`
+and `3e91093a9c0474df2ed837ed1fae4cead2721d3f7e7097e50244d9306b5f8f75`.
+The copied stderr/stdout SHA-256 values are
+`0325f114f1e6bed831d5167da4283a3736373f9ff62b0effeb751c5baebfaed5`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
