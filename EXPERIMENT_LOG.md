@@ -5247,3 +5247,9 @@ the latter covers 201 files totaling 72,310,881 bytes. Recursive
 registrations are null, and every completed artifact is explicitly an
 integration check rather than a research claim. Section D was not started and
 no candidate or deployment changed.
+
+After commit `3bfe8a14450e97ad6a4a712aea56d8067ec2ea1b` reached GitHub and
+the local, GitHub, and instance checkouts matched, paid instance
+`473d8702cc8f4aa1af3e47dbe117fc01` was terminated. Provider inventory reads at
+2026-09-04T17:55:04.1967166Z and 2026-09-04T17:55:26.4912761Z confirmed that
+exact ID absent and zero active instances.
