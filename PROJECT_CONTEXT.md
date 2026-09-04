@@ -14,11 +14,12 @@ The v2 foundation, model, GBDT, baselines, training stages, and evaluation
 harness are implemented and unit-tested. The second review pass makes the panel
 definition independent of provider corporate-action coverage: only official
 COTAHIST histories may affect price adjustments, features, masks, and targets;
-provider actions are audit-only. Prior v2 stores and bounded validations predate
-this definition and are superseded. There is no accepted current v2 store or
-full-F1 validation. No v2 research candidate has been selected, no v2 official-
-validation or test date has been evaluated, and no prediction, execution, or
-deployment recipe has changed.
+provider actions are audit-only. The current v2 store is accepted and
+hash-sealed. Spec-scale baseline and GBDT integration checks are complete, but
+full-F1 neural validation remains incomplete after the first scratch-F leg
+stopped on non-finite selection predictions. No v2 research candidate has been
+selected, no v2 official-validation or test date has been evaluated, and no
+prediction, execution, or deployment recipe has changed.
 
 The accepted incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
@@ -95,6 +96,16 @@ Paired comparisons consume the selected preset's bootstrap settings, and preset
 runs require a hash-bound fast pretrained checkpoint. Legacy action-cache schemas
 are normalized in memory.
 
+External artifacts recorded by a sealed manifest are identified by their byte
+count and SHA-256, not by the host spelling of their path. A foreign absolute
+path is relocated through a `BRAZIL_RV_DATA_ROOTS` JSON override kept outside
+the immutable data root. Loaders require the mapped file to match the sealed
+byte count and SHA-256 before decoding it, and every recorded-to-resolved path,
+mapping prefix, override path, and override-file hash is written into the run
+manifest. Relocation is excluded from model-input identity so the same sealed
+artifact can move between Windows and Linux without changing the training
+contract.
+
 The accepted Section-C store is
 `D:\quant-data\b3\processed\v2_daily_store_98e9386_20260904T165924Z`
 (manifest SHA-256
@@ -112,15 +123,31 @@ delisted continuation names and 950 delisted present name-days.
 
 The first spec-scale full-F1 validation started from that accepted store on
 Linux and completed all 12 F1-F3 baseline evaluations plus both F1-F2 GBDT
-evaluations and their 100 head/seed model files. It then stopped at the first
-neural Stage-P loader failure: the store's provenance records a Windows
-absolute `v1_fast_store` path, which is not a bindable Linux path. Stage P,
-Stage F, and persistence training produced no histories, checkpoints, or
-evaluations. This is an unresolved portability blocker for full-F1 validation,
-not a research result. Official-validation and test access remained false;
-Section D remains unauthorized and unrun. The former `f048ea9`, `2cb204d`, and
-related validation roots remain immutable historical engineering evidence only
-and must not be used as canonical inputs.
+evaluations and their 100 head/seed model files. It then stopped before neural
+training because the sealed store recorded its v1 fast inputs under a Windows
+absolute path. Commits `4d525f68c4fb5c38e5b2e7e84dad4943ec21994f` and
+`b61b0d8d5bbc6ef35014762c88f3a04c9667955e` resolved that portability issue,
+added hash-verifying foreign-path tests, and froze the exact completed-classical
+source audit. The sealed store manifest was not changed and the completed
+baseline/GBDT legs were not repeated.
+
+The network-only continuation root is
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/v2_pipeline_network_resume_b61b0d8_20260904T185200Z`.
+Its first full-F1 scratch-F `select_even` leg completed one in-memory training
+epoch, then the selection forward pass emitted at least one non-finite value;
+the finite-vector rank guard stopped the run before history append or artifact
+sealing. It contains zero checkpoints, histories, scores, evaluations, and run
+manifests. Failure-record and log-inclusive inventory SHA-256 values are
+`0fa8b46b23a34434f13240569fd89bbc64123cb387cddf49319b90fc1a0b005f`
+and `e1ccd0824dcffd878dfbd6f1524b7c9e93c8c935b5b66cb97406a2e1fd0995bf`.
+No retry was performed. Stage P, checkpoint hand-off, the opposite scratch
+parity, and both persistence parities remain unrun. Full-F1 neural validation
+is therefore blocked at this first numerical failure, not by artifact
+portability, and remains an integration check rather than a research result.
+Official-validation and test access remained false; Section D remains
+unauthorized and unrun. The former `f048ea9`, `2cb204d`, and related validation
+roots remain immutable historical engineering evidence only and must not be
+used as canonical inputs.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused

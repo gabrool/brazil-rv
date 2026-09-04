@@ -5253,3 +5253,62 @@ the local, GitHub, and instance checkouts matched, paid instance
 `473d8702cc8f4aa1af3e47dbe117fc01` was terminated. Provider inventory reads at
 2026-09-04T17:55:04.1967166Z and 2026-09-04T17:55:26.4912761Z confirmed that
 exact ID absent and zero active instances.
+
+### Section-C relocatable inputs and network-only first-failure stop
+
+Commit `4d525f68c4fb5c38e5b2e7e84dad4943ec21994f` added an
+environment-selected, external `BRAZIL_RV_DATA_ROOTS` override for foreign-OS
+absolute paths. The immutable accepted-store manifest remains byte-for-byte
+unchanged. Before decoding an external input, the loader now resolves its
+recorded path through the longest matching root prefix and requires the local
+file's recorded byte count and SHA-256. Run and training manifests retain every
+recorded/resolved path, mapping prefix, override path, and override-file hash;
+only recorded path, byte count, and content hash enter model-input identity.
+Tests cover Windows-to-Linux relocation, hash mismatch rejection, and
+checkpoint identity across locations.
+
+The bounded, score-free source-audit repair in commit
+`b61b0d8d5bbc6ef35014762c88f3a04c9667955e` binds the prior partial root's
+actual `artifact_inventory.json` and failure schema and ties its classical
+implementation to the accepted store-build commit. Local and Linux Ruff and
+compilation passed, and all 610 research tests passed with two known warnings.
+Both commits reached local and GitHub `main` before the continuation score.
+
+Only the three sealed v1 fast files consumed by the model were copied to the
+mapped NFS location. Their byte counts and SHA-256 values matched the unchanged
+store manifest: `equity_features.npy` 8,305,390,208 bytes at
+`a2e404f345e858a867df07aec638432f63da489413a42b8d0091fb6a9d0665e4`,
+`equity_slow.npy` 25,239,680 bytes at
+`7c25f05bb87d3a93e85994421ee55e2cee2f3fc042802ece3633aa0f0c207ee5`,
+and `equity_data_ready.npy` 197,312 bytes at
+`7c38a013902130d6aeecbd5403569a1e6283b12d062922eec7feaf7ea65331c5`.
+The Lambda override file SHA-256 was
+`84c421c8f27b799367201865bf66e66476711d247b465b00c4851894ce497e15`.
+The development CDI extension was also reproduced byte-for-byte at the
+previous classical run's exact SHA-256
+`a60147d598ffabea13a64228e3ec3f18beee7956b8ddca9e0d725cdc63250d23`.
+
+The network-only continuation reused the completed 12 baseline and two GBDT
+evaluations without repeating them. Its exact root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/v2_pipeline_network_resume_b61b0d8_20260904T185200Z
+
+The first full-F1 scratch-F leg, seed 11 with lookback 60 and a three-epoch cap,
+completed epoch one's in-memory optimizer updates. During the immediately
+following selection pass, at least one prediction was non-finite and
+`average_ranks` raised `ValueError: average_ranks expects one finite vector`.
+The required first-failure stop occurred before the history append and before
+any checkpoint, score panel, evaluation, or run manifest was sealed. The root
+therefore contains zero files of each of those artifact types. The opposite
+scratch parity, both one-epoch persistence-lambda-0.1 parities, Stage P, and its
+checkpoint hand-off were not started. No result-changing retry or protocol
+change was made.
+
+The exact invocation, frozen parameters, verified path resolutions, explicit
+access audit, and traceback are sealed with copied operational logs. The
+failure-record and self-verified log-inclusive inventory SHA-256 values are
+`0fa8b46b23a34434f13240569fd89bbc64123cb387cddf49319b90fc1a0b005f`
+and `e1ccd0824dcffd878dfbd6f1524b7c9e93c8c935b5b66cb97406a2e1fd0995bf`.
+The inventory covers three files totaling 9,289 bytes. Official validation and
+the permanently spent test were not accessed, Section D was not started, and
+no research claim, candidate selection, or deployment change was made.
