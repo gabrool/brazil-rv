@@ -24,7 +24,7 @@ def test_rolling_statistics_accept_eighty_percent_complete_window() -> None:
     assert not invalid[-1, 0]
 
 
-def test_exact_return_invalidates_lookbacks_crossing_unresolved_action() -> None:
+def test_exact_return_invalidates_lookbacks_crossing_ambiguous_action() -> None:
     close = np.arange(10.0, 16.0)[:, None]
     unresolved = np.zeros_like(close, dtype=np.bool_)
     unresolved[2, 0] = True
@@ -59,7 +59,7 @@ def test_yang_zhang_matches_hand_computed_fixture() -> None:
     assert result[3, 0] == expected
 
 
-def test_yang_zhang_masks_windows_crossing_unresolved_actions() -> None:
+def test_yang_zhang_masks_windows_crossing_ambiguous_actions() -> None:
     close = np.arange(100.0, 108.0)[:, None]
     open_ = close * 0.999
     high = close * 1.01
@@ -112,7 +112,6 @@ def test_slow_features_are_unchanged_by_future_mutation() -> None:
         base * 1.01,
         base * 0.99,
         base,
-        base,
         np.full_like(base, 3_000_000.0),
         np.full_like(base, 1_000.0),
         seen,
@@ -126,7 +125,6 @@ def test_slow_features_are_unchanged_by_future_mutation() -> None:
         changed,
         changed * 1.01,
         changed * 0.99,
-        changed,
         changed,
         np.full_like(base, 3_000_000.0),
         np.full_like(base, 1_000.0),
@@ -156,7 +154,6 @@ def test_cluster_peer_path_is_unchanged_by_future_mutation() -> None:
             close,
             close * 1.01,
             close * 0.99,
-            close,
             close,
             np.full_like(close, 3_000_000.0),
             np.full_like(close, 1_000.0),
@@ -223,7 +220,6 @@ def test_five_session_range_is_log_window_extrema_not_mean_daily_range() -> None
         high,
         low,
         close,
-        close,
         np.full_like(close, 3_000_000.0),
         np.full_like(close, 1_000.0),
         np.ones_like(close, dtype=bool),
@@ -235,7 +231,7 @@ def test_five_session_range_is_log_window_extrema_not_mean_daily_range() -> None
     assert result.values[64, 0, 23] == np.float32(np.log(15.0 / 7.0))
 
 
-def test_unresolved_split_crossing_masks_only_affected_price_features() -> None:
+def test_ambiguous_event_masks_only_affected_price_features() -> None:
     days = 270
     close = 100.0 + np.arange(days, dtype=np.float64)[:, None]
     high = close * 1.01
@@ -249,14 +245,13 @@ def test_unresolved_split_crossing_masks_only_affected_price_features() -> None:
         high,
         low,
         close,
-        close,
         np.full_like(close, 3_000_000.0),
         np.full_like(close, 1_000.0),
         np.ones_like(close, dtype=bool),
         np.ones_like(close, dtype=bool),
         dates,
         cluster_labels=np.zeros_like(close, dtype=np.int16),
-        unresolved_action=unresolved,
+        ambiguous_action=unresolved,
     )
 
     # Same-session scale-free shape/activity fields do not cross the break.
@@ -264,36 +259,52 @@ def test_unresolved_split_crossing_masks_only_affected_price_features() -> None:
     assert result.valid[261, 0, 24]
     assert result.valid[261, 0, 17]
     # The current adjusted price and every trailing price/return interval that
-    # crosses the unresolved split disagreement are excluded.
+    # crosses the ambiguous boundary are excluded.
     assert not result.valid[261, 0, 25]
-    assert not result.valid[269, 0, 25]
+    assert result.valid[269, 0, 25]
     assert not result.valid[264, 0, 1]
     assert not result.valid[264, 0, 7]
     assert not result.valid[264, 0, 14]
     assert not result.valid[264, 0, 23]
 
-    cash_only = build_slow_features(
-        close,
-        high,
-        low,
-        close,
-        close,
-        np.full_like(close, 3_000_000.0),
-        np.full_like(close, 1_000.0),
-        np.ones_like(close, dtype=bool),
-        np.ones_like(close, dtype=bool),
-        dates,
-        cluster_labels=np.zeros_like(close, dtype=np.int16),
-        unresolved_action=unresolved,
-        price_adjustment_unresolved=np.zeros_like(unresolved),
+
+
+def test_monthly_cluster_labels_are_end_to_end_causal() -> None:
+    days, names = 180, 14
+    dates = np.arange(
+        np.datetime64("2023-01-02"),
+        np.datetime64("2023-01-02") + np.timedelta64(days, "D"),
     )
-    # Cash-source uncertainty invalidates total-return features only. Price-
-    # factor features remain usable because no split factor is unresolved.
-    assert not cash_only.valid[264, 0, 1]
-    assert cash_only.valid[264, 0, 7]
-    assert cash_only.valid[264, 0, 23]
-    assert cash_only.valid[269, 0, 14]
-    assert cash_only.valid[269, 0, 25]
+    time = np.arange(days, dtype=np.float64)[:, None]
+    name = np.arange(names, dtype=np.float64)[None, :]
+    daily_return = 0.002 * np.sin(time / 7.0 + name / 3.0) + 0.0001 * name
+    close = 100.0 * np.exp(np.cumsum(daily_return, axis=0))
+    observed = np.ones_like(close, dtype=np.bool_)
+    active = observed.copy()
+    cutoff = 139
+
+    def build(values: np.ndarray):
+        return build_slow_features(
+            values * 0.999,
+            values * 1.01,
+            values * 0.99,
+            values,
+            np.full_like(values, 3_000_000.0),
+            np.full_like(values, 1_000.0),
+            observed,
+            active,
+            dates,
+        ).cluster_labels
+
+    original = build(close)
+    changed = close.copy()
+    changed[cutoff + 1 :] *= 1.0 + (
+        np.arange(days - cutoff - 1)[:, None] + 1
+    ) * np.linspace(-0.003, 0.003, names)[None, :]
+    mutated = build(changed)
+
+    assert (original[cutoff] >= 0).all()
+    np.testing.assert_array_equal(original[: cutoff + 1], mutated[: cutoff + 1])
 
 
 def test_cluster_peer_features_exclude_focal_and_require_three_valid_peers() -> None:

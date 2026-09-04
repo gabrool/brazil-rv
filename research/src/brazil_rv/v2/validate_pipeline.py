@@ -59,6 +59,7 @@ _MIN_WINDOW_SESSIONS = max(HORIZONS) + 2
 _REQUIRED_ARRAYS = frozenset(
     {
         "active",
+        "ambiguous_action_mask",
         "observed",
         "slow_values",
         "slow_valid",
@@ -70,7 +71,8 @@ _REQUIRED_ARRAYS = frozenset(
         "target_raw_midrank",
         "target_raw_valid",
         "target_raw_log_return",
-        "total_return_close",
+        "adjusted_close",
+        "target_exclusion_event_mask",
     }
 )
 
@@ -422,9 +424,9 @@ def _evaluation_inputs(
         target_mask=target_mask,
         raw_target_mask=raw_target_mask,
         active=np.asarray(store.read("active", indices), dtype=np.bool_),
-        total_return_close=store.read("total_return_close", indices),
-        unresolved_action=np.asarray(
-            store.read("unresolved_action", indices), dtype=np.bool_
+        adjusted_close=store.read("adjusted_close", indices),
+        target_exclusion_event=np.asarray(
+            store.read("target_exclusion_event_mask", indices), dtype=np.bool_
         ),
         cdi_returns=cdi,
         source_artifact_hashes=dict(source_hashes),
@@ -607,18 +609,18 @@ def _run_baselines(
     baseline_indices = np.arange(
         baseline_start, last_index + 1, dtype=np.int64
     )
-    close = store.read("total_return_close", baseline_indices)
+    close = store.read("adjusted_close", baseline_indices)
     observed = np.asarray(
         store.read("observed", baseline_indices), dtype=np.bool_
     )
     active = np.asarray(
         store.read("active", baseline_indices), dtype=np.bool_
     )
-    unresolved = np.asarray(
-        store.read("unresolved_action", baseline_indices), dtype=np.bool_
+    ambiguous = np.asarray(
+        store.read("ambiguous_action_mask", baseline_indices), dtype=np.bool_
     )
     panels = build_baselines(
-        close, observed, active, unresolved, slow_lag=1
+        close, observed, active, ambiguous, slow_lag=1
     )
     records: list[dict[str, object]] = []
     for fold, indices in fold_indices.items():

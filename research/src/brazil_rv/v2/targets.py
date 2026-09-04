@@ -38,23 +38,23 @@ def _rank_row(
 
 
 def build_multi_day_targets(
-    total_return_close: NDArray[np.floating],
+    adjusted_close: NDArray[np.floating],
     active: NDArray[np.bool_],
     yang_zhang_sigma_20: NDArray[np.floating],
-    unresolved_action: NDArray[np.bool_],
+    target_exclusion_event: NDArray[np.bool_],
     *,
     horizons: tuple[int, ...] = HORIZONS,
     winsor_limit: float = 5.0,
 ) -> MultiDayTargets:
     """Construct causal-entry, future-realized multi-session targets."""
 
-    close = np.asarray(total_return_close, dtype=np.float64)
+    close = np.asarray(adjusted_close, dtype=np.float64)
     membership = np.asarray(active, dtype=np.bool_)
     sigma = np.asarray(yang_zhang_sigma_20, dtype=np.float64)
-    unresolved = np.asarray(unresolved_action, dtype=np.bool_)
+    excluded_event = np.asarray(target_exclusion_event, dtype=np.bool_)
     if close.ndim != 2 or any(
         value.shape != close.shape
-        for value in (membership, sigma, unresolved)
+        for value in (membership, sigma, excluded_event)
     ):
         raise ValueError("target inputs must be aligned [date, name]")
     if not horizons or any(value <= 0 for value in horizons) or len(set(horizons)) != len(horizons):
@@ -71,7 +71,9 @@ def build_multi_day_targets(
         for day in range(max(0, close.shape[0] - horizon)):
             path = close[day : day + horizon + 1]
             path_valid = np.isfinite(path).all(axis=0) & (path > 0).all(axis=0)
-            action_clear = ~unresolved[day + 1 : day + horizon + 1].any(axis=0)
+            action_clear = ~excluded_event[
+                day + 1 : day + horizon + 1
+            ].any(axis=0)
             base_valid = membership[day] & path_valid & action_clear
             row = np.full(close.shape[1], np.nan, dtype=np.float64)
             row[base_valid] = np.log(close[day + horizon, base_valid] / close[day, base_valid])

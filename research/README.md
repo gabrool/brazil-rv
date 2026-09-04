@@ -41,3 +41,10 @@ parent; the challenger is informational and ensemble weights are never learned.
 `modeling.run_discovery_campaign` cannot request official validation or test rows.
 See [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for the durable contract and
 [RESEARCH_HANDOFF.md](../RESEARCH_HANDOFF.md) for the result and artifact record.
+
+The additive `brazil_rv.v2` package implements the daily 15:45 research stack.
+Its current panel uses COTAHIST-only split/bonus classification and
+split-adjusted price returns; provider actions are audit-only. No store built
+under an older provider-dependent total-return definition is canonical. See
+[docs/v2_README.md](../docs/v2_README.md) for the executable contract and the
+pending, non-research store/full-F1 acceptance steps.

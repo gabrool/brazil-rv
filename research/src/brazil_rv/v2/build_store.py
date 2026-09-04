@@ -24,19 +24,17 @@ from .contract import (
 )
 from .corporate_actions import (
     action_calendar_alignment_table,
-    action_presence_array,
     action_coverage_table,
     adjust_daily_ohlc,
     align_action_arrays,
     audit_m1_adjustment_status,
     cash_unit_adjustment_audit,
-    cash_reinvestment_review_table,
-    cash_reinvestment_unavailable_mask,
+    cotahist_action_classification_table,
     dividend_close_drop_audit,
+    detect_cotahist_actions,
     detect_distribution_changes,
-    detect_split_candidates,
-    distribution_review_table,
-    provider_failure_mask,
+    m1_cotahist_mismatch_by_year,
+    provider_split_detection_audit,
     split_review_table,
     validate_action_table,
 )
@@ -58,7 +56,6 @@ from .intraday_features import (
 from .normalization import rank_gauss_panel
 from .sidecars import (
     SidecarResult,
-    add_distribution_event_features,
     available_archive_mapping,
     derive_known_archive_features,
     materialize_known_archive,
@@ -383,6 +380,7 @@ def stream_intraday_from_assignments(
             session_close_valid=session_close_valid,
             realized_daily_vol=realized,
             fast_present=present,
+            close_anchor_consistent=session_close_valid.copy(),
         ),
         audit=pl.DataFrame(audit_rows),
         source_paths=tuple(sorted(set(source_paths))),
@@ -503,6 +501,73 @@ def _target_validity_tables(
     return pl.DataFrame(yearly), pl.DataFrame(survival_rows)
 
 
+def _feature_validity_by_survival(
+    dates: NDArray[np.datetime64],
+    active: NDArray[np.bool_],
+    observed: NDArray[np.bool_],
+    families: Mapping[
+        str, tuple[NDArray[np.bool_], NDArray[np.bool_]]
+    ],
+) -> pl.DataFrame:
+    """Gate feature-mask rates against eventual panel survival.
+
+    The denominator is a family's observable population, supplied separately
+    from its feature masks.  This distinguishes a missing optional archive
+    from feature invalidation inside rows where that archive is present.
+    """
+
+    membership = np.asarray(active, dtype=np.bool_)
+    seen = np.asarray(observed, dtype=np.bool_)
+    if membership.shape != seen.shape or membership.shape[0] != len(dates):
+        raise ValueError("feature-survival axes are misaligned")
+    years = dates.astype("datetime64[Y]").astype(np.int64) + 1970
+    last_seen = np.full(seen.shape[1], -1, dtype=np.int64)
+    for name in range(seen.shape[1]):
+        rows = np.flatnonzero(seen[:, name])
+        if rows.size:
+            last_seen[name] = rows[-1]
+    final_year = int(years[-1])
+    survives = (last_seen >= 0) & (years[np.maximum(last_seen, 0)] == final_year)
+    groups = {"delisted_within_panel": ~survives, "survives_to_final_year": survives}
+    rows: list[dict[str, object]] = []
+    ratios: dict[tuple[str, str], float] = {}
+    denominators: dict[tuple[str, str], int] = {}
+    for family, (raw_valid, raw_present) in sorted(families.items()):
+        valid = np.asarray(raw_valid, dtype=np.bool_)
+        present = np.asarray(raw_present, dtype=np.bool_)
+        if valid.ndim != 3 or valid.shape[:2] != seen.shape or present.shape != seen.shape:
+            raise ValueError(f"feature family {family} is misaligned")
+        for label, names in groups.items():
+            eligible = membership & seen & present & names[None, :]
+            denominator = int(eligible.sum()) * valid.shape[2]
+            numerator = int((valid & eligible[..., None]).sum())
+            ratio = numerator / denominator if denominator else 0.0
+            ratios[(family, label)] = ratio
+            denominators[(family, label)] = denominator
+            rows.append(
+                {
+                    "family": family,
+                    "group": label,
+                    "name_count": int(names.sum()),
+                    "valid_feature_cells": numerator,
+                    "possible_feature_cells": denominator,
+                    "validity_ratio": ratio,
+                    "mask_rate": 1.0 - ratio if denominator else None,
+                }
+            )
+        if all(denominators[(family, label)] > 0 for label in groups):
+            gap = abs(
+                ratios[(family, "delisted_within_panel")]
+                - ratios[(family, "survives_to_final_year")]
+            )
+            if gap > 0.05:
+                raise ValueError(
+                    f"feature validity for {family} is survivor-skewed by more "
+                    f"than 5 percentage points: {gap:.6f}"
+                )
+    return pl.DataFrame(rows)
+
+
 def _fast_sigma_ratio_table(
     dates: NDArray[np.datetime64],
     fast_sigma: NDArray[np.floating],
@@ -619,6 +684,7 @@ def _align_intraday_result(
     session_close = np.full(output_shape, np.nan, dtype=np.float64)
     session_close_valid = np.zeros(output_shape, dtype=np.bool_)
     present = np.zeros(output_shape, dtype=np.bool_)
+    anchor_consistent = np.zeros(output_shape, dtype=np.bool_)
     for source_date, day in enumerate(minute_dates.astype("datetime64[D]").tolist()):
         target_date = date_lookup.get(day)
         if target_date is None:
@@ -645,6 +711,9 @@ def _align_intraday_result(
             present[target_date, target_isin] = result.fast_present[
                 source_date, source_isin
             ]
+            anchor_consistent[target_date, target_isin] = (
+                result.close_anchor_consistent[source_date, source_isin]
+            )
     return IntradayDailyResult(
         values=values,
         valid=valid,
@@ -654,6 +723,7 @@ def _align_intraday_result(
         session_close_valid=session_close_valid,
         realized_daily_vol=realized,
         fast_present=present,
+        close_anchor_consistent=anchor_consistent,
     )
 
 
@@ -703,48 +773,29 @@ def build_daily_store(
             raise ValueError("v1 date axis differs from the matching COTAHIST calendar slice")
 
     checked_actions = validate_action_table(actions)
-    split, cash_distribution, unresolved = align_action_arrays(
-        checked_actions, panel.dates, panel.isins
-    )
-    price_adjustment_unresolved = unresolved.copy()
-    recorded_action = action_presence_array(
+    provider_split, provider_cash_distribution, _ = align_action_arrays(
         checked_actions, panel.dates, panel.isins
     )
     distribution_changed = detect_distribution_changes(
         panel.distribution_number, panel.observed
     )
-    distribution_unresolved = distribution_changed & ~recorded_action
-    unresolved |= distribution_unresolved
-    split_detected = detect_split_candidates(
-        panel.close_brl, panel.quantity, panel.observed
+    detected_actions = detect_cotahist_actions(
+        panel.close_brl,
+        panel.quantity,
+        panel.distribution_number,
+        panel.observed,
     )
-    provider_failed = np.zeros(panel.observed.shape, dtype=np.bool_)
-    if action_acquisition_audit is not None:
-        provider_failed = provider_failure_mask(
-            action_acquisition_audit,
-            panel.dates,
-            panel.isins,
-            panel.observed,
-            distribution_changed | split_detected,
-            maximum_horizon=max(HORIZONS),
-        )
-        unresolved |= provider_failed
-    split_disagreement = split_detected != (split != 1.0)
-    unresolved |= split_disagreement
-    price_adjustment_unresolved |= split_disagreement
-    cash_reinvestment_unavailable = cash_reinvestment_unavailable_mask(
-        panel.close_brl, cash_distribution
+    target_exclusion_event = (
+        detected_actions.cash_event | detected_actions.ambiguous_event
     )
-    unresolved |= cash_reinvestment_unavailable
-    intraday_action_boundary = (split != 1.0) | price_adjustment_unresolved
+    intraday_action_boundary = detected_actions.split_event
     adjusted = adjust_daily_ohlc(
         panel.open_brl,
         panel.high_brl,
         panel.low_brl,
         panel.close_brl,
-        split,
-        cash_distribution,
-        unresolved,
+        detected_actions.price_ratio,
+        detected_actions.split_event,
     )
     universe = build_daily_universe(panel.close_brl, panel.volume_brl, panel.observed)
     slow_raw = build_slow_features(
@@ -752,14 +803,12 @@ def build_daily_store(
         adjusted.adjusted_high,
         adjusted.adjusted_low,
         adjusted.adjusted_close,
-        adjusted.total_return_close,
         panel.volume_brl,
         panel.trades,
         panel.observed,
         universe.active,
         panel.dates,
-        unresolved_action=unresolved,
-        price_adjustment_unresolved=price_adjustment_unresolved,
+        ambiguous_action=detected_actions.ambiguous_event,
     )
     slow_values, slow_valid = rank_gauss_panel(
         slow_raw.values, slow_raw.valid, universe.active
@@ -774,6 +823,8 @@ def build_daily_store(
     entry_valid = np.zeros(shape, dtype=np.bool_)
     realized_daily = np.full(shape, np.nan, dtype=np.float64)
     m1_session_close = np.full(shape, np.nan, dtype=np.float64)
+    m1_session_close_valid = np.zeros(shape, dtype=np.bool_)
+    close_anchor_consistent = np.zeros(shape, dtype=np.bool_)
     if minute_panel is not None:
         native = build_intraday_daily_features(
             minute_panel.open_brl,
@@ -787,6 +838,7 @@ def build_daily_store(
             native, minute_panel.dates, minute_panel.isins, panel.dates, panel.isins
         )
         m1_session_close = aligned.session_close.copy()
+        m1_session_close_valid = aligned.session_close_valid.copy()
         aligned = replace_daily_close_anchors(
             aligned, panel.close_brl, panel.observed, copy_buffers=False
         )
@@ -799,11 +851,13 @@ def build_daily_store(
         entry = aligned.entry_open
         entry_valid = aligned.entry_open_valid
         realized_daily = aligned.realized_daily_vol
+        close_anchor_consistent = aligned.close_anchor_consistent
     elif streamed_intraday is not None:
         aligned = streamed_intraday.result
         if aligned.values.shape[:2] != shape:
             raise ValueError("streamed intraday derivatives are misaligned")
         m1_session_close = aligned.session_close.copy()
+        m1_session_close_valid = aligned.session_close_valid.copy()
         aligned = replace_daily_close_anchors(
             aligned, panel.close_brl, panel.observed, copy_buffers=False
         )
@@ -816,13 +870,14 @@ def build_daily_store(
         entry = aligned.entry_open
         entry_valid = aligned.entry_open_valid
         realized_daily = aligned.realized_daily_vol
+        close_anchor_consistent = aligned.close_anchor_consistent
 
     slow_sigma = np.where(slow_raw.valid[..., 8], slow_raw.values[..., 8], np.nan)
     targets = build_multi_day_targets(
-        adjusted.total_return_close,
+        adjusted.adjusted_close,
         universe.active,
         slow_sigma,
-        unresolved,
+        target_exclusion_event,
     )
     arrays: dict[str, NDArray[np.generic]] = {
         "active": universe.active,
@@ -835,24 +890,18 @@ def build_daily_store(
         "adjusted_high": adjusted.adjusted_high,
         "adjusted_low": adjusted.adjusted_low,
         "adjusted_close": adjusted.adjusted_close,
-        "total_return_close": adjusted.total_return_close,
         "price_adjustment_factor": adjusted.price_factor,
-        "total_return_adjustment_factor": adjusted.total_return_factor,
         "volume_brl": panel.volume_brl,
         "trade_count": panel.trades,
         "quantity": panel.quantity,
         "distribution_number": panel.distribution_number,
-        "recorded_action_mask": recorded_action,
         "distribution_change_mask": distribution_changed,
-        "provider_action_failure_mask": provider_failed,
-        "split_disagreement_mask": split_disagreement,
-        "cash_reinvestment_unavailable_mask": cash_reinvestment_unavailable,
+        "detected_event_mask": detected_actions.event_candidate,
+        "detected_split_mask": detected_actions.split_event,
+        "detected_cash_event_mask": detected_actions.cash_event,
+        "ambiguous_action_mask": detected_actions.ambiguous_event,
+        "target_exclusion_event_mask": target_exclusion_event,
         "intraday_action_boundary_mask": intraday_action_boundary,
-        "price_adjustment_unresolved": price_adjustment_unresolved,
-        "adjusted_price_level_valid": ~np.maximum.accumulate(
-            price_adjustment_unresolved, axis=0
-        ),
-        "unresolved_action": unresolved,
         "slow_values": slow_values,
         "slow_valid": slow_valid,
         "intraday_values": intraday_values,
@@ -871,7 +920,7 @@ def build_daily_store(
             np.where(panel.observed, panel.close_brl, np.nan),
             realized_daily,
             universe.active,
-            fast_present & entry_valid,
+            fast_present & entry_valid & close_anchor_consistent,
         )
         arrays.update(
             {
@@ -879,6 +928,7 @@ def build_daily_store(
                 "target_to_close_valid": to_close.valid,
                 "target_to_close_normalized_residual": to_close.normalized_residual,
                 "target_to_close_raw_log_return": to_close.raw_log_return,
+                "m1_cotahist_close_consistent_mask": close_anchor_consistent,
             }
         )
     feature_names: dict[str, Sequence[str]] = {
@@ -896,13 +946,6 @@ def build_daily_store(
         ),
     ]
     prepared_sidecars = dict(sidecars or {})
-    if "events" in prepared_sidecars:
-        prepared_sidecars["events"] = add_distribution_event_features(
-            prepared_sidecars["events"],
-            checked_actions,
-            panel.dates,
-            panel.isins,
-        )
     sidecar_masks: dict[
         str, tuple[Sequence[str], NDArray[np.bool_], Sequence[str]]
     ] = {}
@@ -932,20 +975,16 @@ def build_daily_store(
             }
         ),
         "corporate_action_split_review": split_review_table(
-            panel.dates.astype(object), panel.isins, split_detected, split
+            panel.dates.astype(object),
+            panel.isins,
+            detected_actions.split_event,
+            provider_split,
         ),
-        "corporate_action_distribution_review": distribution_review_table(
+        "cotahist_action_classification": cotahist_action_classification_table(
             panel.dates,
             panel.isins,
             distribution_changed,
-            recorded_action,
-        ),
-        "corporate_action_cash_reinvestment_review": cash_reinvestment_review_table(
-            panel.dates,
-            panel.isins,
-            cash_distribution,
-            panel.close_brl,
-            panel.observed,
+            detected_actions,
         ),
         "corporate_action_calendar_alignment": action_calendar_alignment_table(
             checked_actions, panel.dates, panel.isins
@@ -956,9 +995,16 @@ def build_daily_store(
         "corporate_action_dividend_close_drop": dividend_close_drop_audit(
             panel.dates,
             panel.isins,
-            cash_distribution,
+            provider_cash_distribution,
             panel.close_brl,
             panel.observed,
+        ),
+        "provider_split_detection_audit": provider_split_detection_audit(
+            panel.dates,
+            panel.isins,
+            detected_actions.split_event,
+            checked_actions,
+            action_acquisition_audit,
         ),
         "fast_rv_to_yang_zhang_ratio": _fast_sigma_ratio_table(
             panel.dates, fast_sigma, slow_sigma, fast_present
@@ -990,14 +1036,29 @@ def build_daily_store(
     if action_acquisition_audit is not None:
         tables["corporate_action_acquisition_audit"] = action_acquisition_audit
     if minute_panel is not None or streamed_intraday is not None:
-        tables["m1_adjustment_audit"] = audit_m1_adjustment_status(
+        detected_split_factor = np.ones(shape, dtype=np.float64)
+        detected_split_factor[detected_actions.split_event] = (
+            1.0 / detected_actions.price_ratio[detected_actions.split_event]
+        )
+        m1_adjustment = audit_m1_adjustment_status(
             panel.dates,
             panel.isins,
             m1_session_close,
             panel.close_brl,
             adjusted.adjusted_close,
-            split,
-            cash_distribution,
+            detected_split_factor,
+            np.zeros(shape, dtype=np.float64),
+        )
+        tables["m1_adjustment_audit"] = m1_adjustment
+        tables["m1_price_adjusted_segments"] = m1_adjustment.filter(
+            pl.col("status") == "price_adjusted"
+        )
+        tables["m1_cotahist_mismatch_by_year"] = m1_cotahist_mismatch_by_year(
+            panel.dates,
+            m1_session_close,
+            m1_session_close_valid,
+            panel.close_brl,
+            panel.observed,
         )
     if streamed_intraday is not None:
         tables["m1_source_audit"] = streamed_intraday.audit
@@ -1043,6 +1104,31 @@ def build_daily_store(
         universe.active[keep],
         panel.observed[keep],
     )
+    feature_gate_families: dict[
+        str, tuple[NDArray[np.bool_], NDArray[np.bool_]]
+    ] = {
+        "slow": (slow_valid[keep], panel.observed[keep]),
+    }
+    if minute_panel is not None or streamed_intraday is not None:
+        feature_gate_families["intraday"] = (
+            intraday_valid[keep],
+            fast_present[keep],
+        )
+    feature_gate_families.update(
+        {
+            f"sidecar_{group}": (
+                np.asarray(mask, dtype=np.bool_)[keep],
+                np.asarray(mask, dtype=np.bool_)[keep].any(axis=2),
+            )
+            for group, (_, mask, _) in sidecar_masks.items()
+        }
+    )
+    tables["feature_validity_by_survival"] = _feature_validity_by_survival(
+        kept_dates,
+        universe.active[keep],
+        panel.observed[keep],
+        feature_gate_families,
+    )
     v1_fast_files: list[dict[str, object]] = []
     if v1_fast_store is not None:
         if v1_assignments is None:
@@ -1068,11 +1154,12 @@ def build_daily_store(
         "v1_isin_subset_verified": v1_assignments is not None,
         "v1_calendar_verified": v1_calendar is not None,
         "implementation_git_commit": implementation_commit,
-        "cash_reinvestment_unavailable_count_foundation": int(
-            cash_reinvestment_unavailable.sum()
+        "return_definition": (
+            "COTAHIST price return adjusted only for detected split/bonus "
+            "boundaries; provider actions are audit-only"
         ),
-        "cash_reinvestment_unavailable_count_store_rows": int(
-            cash_reinvestment_unavailable[keep].sum()
+        "future_total_return_variant": (
+            "registered but not implemented: survivor-subset sensitivity only"
         ),
         "cotahist_provenance": {
             "raw_archives": source_records(cotahist_raw_sources),

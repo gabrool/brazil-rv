@@ -18,6 +18,7 @@ class IntradayDailyResult:
     session_close_valid: NDArray[np.bool_]
     realized_daily_vol: NDArray[np.float64]
     fast_present: NDArray[np.bool_]
+    close_anchor_consistent: NDArray[np.bool_]
     feature_names: tuple[str, ...] = INTRADAY_DAILY_FEATURES
 
 
@@ -73,6 +74,7 @@ def mask_action_boundaries(
         session_close_valid=result.session_close_valid,
         realized_daily_vol=result.realized_daily_vol,
         fast_present=result.fast_present,
+        close_anchor_consistent=result.close_anchor_consistent,
         feature_names=result.feature_names,
     )
 
@@ -161,9 +163,10 @@ def replace_daily_close_anchors(
     official_close: NDArray[np.floating],
     official_close_observed: NDArray[np.bool_],
     *,
+    maximum_log_mismatch: float = 0.005,
     copy_buffers: bool = True,
 ) -> IntradayDailyResult:
-    """Replace full-session M1 close anchors with the COTAHIST session close."""
+    """Use a COTAHIST anchor only when its units match the exact M1 close."""
 
     official = np.asarray(official_close, dtype=np.float64)
     observed = np.asarray(official_close_observed, dtype=np.bool_)
@@ -176,6 +179,18 @@ def replace_daily_close_anchors(
     valid = result.valid.copy() if copy_buffers else result.valid
     old_close = np.asarray(result.session_close, dtype=np.float64)
     old_valid = np.asarray(result.session_close_valid, dtype=np.bool_)
+    comparable = (
+        official_valid
+        & old_valid
+        & np.isfinite(old_close)
+        & (old_close > 0)
+    )
+    log_mismatch = np.full(official.shape, np.nan, dtype=np.float64)
+    log_mismatch[comparable] = np.abs(
+        np.log(old_close[comparable] / official[comparable])
+    )
+    anchor_consistent = comparable & (log_mismatch <= maximum_log_mismatch)
+    official_valid &= anchor_consistent
 
     # Feature 1 is log(entry/day-open), which exposes the exact day-open anchor
     # without reading any post-decision bar.
@@ -250,6 +265,7 @@ def replace_daily_close_anchors(
         session_close_valid=official_valid,
         realized_daily_vol=result.realized_daily_vol,
         fast_present=result.fast_present,
+        close_anchor_consistent=anchor_consistent,
         feature_names=result.feature_names,
     )
 
@@ -520,4 +536,5 @@ def build_intraday_daily_features(
         session_close_valid=final_valid,
         realized_daily_vol=realized,
         fast_present=entry_valid & realized_valid,
+        close_anchor_consistent=final_valid.copy(),
     )

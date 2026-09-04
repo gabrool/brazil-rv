@@ -1,7 +1,7 @@
 # Brazil-RV v2 daily model
 
 Brazil-RV v2 is an additive daily research stack. It predicts cross-sectional
-total-return ranks over 1, 2, 3, 5, and 10 B3 sessions and makes one decision
+split-adjusted price-return ranks over 1, 2, 3, 5, and 10 B3 sessions and makes one decision
 per session at 15:45 for a closing-auction entry. The v1 intraday package,
 artifacts, and deployed recipe are unchanged.
 
@@ -11,30 +11,27 @@ system.
 
 ## Current review status
 
-The review-fix implementation is complete through commit `2cb204d`. The fresh
-corporate-action bundle contains 10,037 action rows across 942 ticker segments:
-384 downloaded, 39 price-verified zero-action (including three current-ticker
-fallbacks), and 519 provider failures. The rebuilt store is not accepted. Its
-fixed target-survivorship gate stopped construction before atomic promotion:
-horizon-1 target validity was 83.3932% for names that disappear before 2026
-and 98.1521% for names surviving into 2026, a 14.7589-point gap versus the
-fixed 10-point maximum. Price-path and Yang-Zhang coverage for the delisted
-group were 99.9290% and 99.7671%; action-clear coverage was only 83.6241%.
+The second review pass removes the structural dependence on provider action
+coverage. The panel definition now uses only official COTAHIST price, quantity,
+and `DISMES` histories to classify split/bonus, cash-type, and ambiguous events.
+Yahoo actions remain audit evidence only and cannot alter a stored feature,
+mask, or target. The preceding provider-dependent `f048ea9` and `2cb204d`
+stores and validations remain immutable historical engineering evidence, not
+canonical inputs.
 
-Accordingly, the prior `f048ea9` store and validation are historical,
-superseded artifacts, and there is currently no accepted review-fixed v2
-store or full-F1 validation. The gate and the required plus/minus-ten-session
-provider-failure neighborhoods have not been weakened. A fuller authoritative
-corporate-action source for delisted names is required before construction can
-continue.
+This source implementation is unit-tested, including byte-for-byte provider
+invariance and both target- and feature-side survivorship gates. It has not yet
+been used for a clean commit-bound store rebuild or full-F1 validation. No v2
+research round, official-validation read, test read, candidate selection, or
+deployment change is part of this implementation pass.
 
 ## Data flow
 
 ```mermaid
 flowchart LR
     A[Official B3 COTAHIST 2009-2026] --> B[ISIN daily panel]
-    C[Yahoo batch download\nactions=True] --> D[Action reconciliation]
-    A --> D
+    A --> D[COTAHIST-only action classification]
+    C[Yahoo actions] -. audit only .-> D
     D --> B
     B --> E[PIT daily universe]
     B --> F[32 slow daily features]
@@ -85,69 +82,35 @@ The source panel keeps cash-market type 010, standard-lot BDI 02, and
 ON/OR/PN/PNA–PNF/UNT securities (plus any explicit accepted-v1 exception).
 Each observed row contains raw OHLC, BRL volume, trade count, and quantity.
 
-Corporate actions are fetched in bounded ticker batches with
-`yfinance.download(..., actions=True, auto_adjust=False, group_by="ticker")`.
-The result is cut back to each dated ticker segment before it is bound to ISIN
-and written to an immutable, hash-recorded cache. The acquisition audit keeps
-`downloaded`, `downloaded_current_ticker`, `cache_hit`, `zero_actions`, and
-`failed` distinct. A zero-action result is accepted only when Yahoo supplies a
-finite price inside that exact segment. Missing batch members receive two
-individual retries. For an ISIN with historical aliases, the current ticker is
-also queried over each uncovered historical segment before the segment is
-classified as failed.
+The panel's action definition is provider-independent. An event candidate is a
+`DISMES` change or an adjacent price jump above the 4% log band, whether or not
+`DISMES` changes. At each candidate, the classifier compares medians of up to
+three observed sessions before and after the boundary. It labels a split/bonus
+when `abs(log(price_ratio)) > 0.08` and
+`abs(log(price_ratio * quantity_ratio)) < 0.15`; the causal price adjustment
+uses that price ratio. A 4–8% price jump with inconsistent quantity continuity
+is ambiguous. Every remaining candidate is cash-type and receives no price
+adjustment.
 
-A remaining provider failure does not erase the segment. Its
-`provider_action_failure_mask` is confined to independently detected price /
-quantity jumps and COTAHIST distribution-number changes, plus or minus the
-maximum ten-session target horizon. This uncertainty is total-return-only:
-return targets and total-return features crossing it are invalid, while
-price-factor features remain valid unless split evidence itself disagrees.
+Targets exclude holding intervals whose future leg contains a cash-type or
+ambiguous event. Return-type features use split-adjusted prices without masking
+cash events; only ambiguous events propagate an unresolved shadow through the
+affected lookback. The M1 cross-session boundary mask contains detected splits
+only. These rules depend uniformly on official COTAHIST fields for current and
+delisted securities.
 
-The canonical action schema can represent split, reverse split, bonus,
-dividend, JCP, and subscription rights, but the implemented free Yahoo source
-guarantees only dividends and stock splits. Its cash-distribution field cannot
-reliably distinguish dividend from JCP, and it does not guarantee separate
-bonus or subscription-right records. Yahoo rows use `known_date=ex_date`: they
-can drive the adjustment from the ex-date, but they do not support a
-pre-announcement event feature. These taxonomy and coverage limitations are
-recorded per ISIN-year in `corporate_action_coverage.parquet`, including ticker
-segment counts and the exact `covered_actions`, `covered_zero_actions`,
-`provider_failure`, `partial_provider_failure`, and `no_acquisition_segment`
-states.
+Yahoo actions may still be fetched in bounded, dated-ticker batches and retained
+in immutable caches, but only for audits. Detection precision/recall is reported
+against provider-covered splits; provider dividends feed the close-drop audit;
+off-calendar rows are counted. Provider rows, failures, taxonomy, coverage, and
+cache state never enter panel arrays. Legacy cache schemas are upgraded in
+memory and are not rewritten.
 
-Yahoo cash distributions are quoted in current-share units. Before use, each
-cash amount is multiplied by the cumulative product of strictly later Yahoo
-split factors for that ISIN, restoring contemporaneous COTAHIST share units.
-The bundle retains the provider amount, unit factor, adjusted amount, known
-split examples, off-calendar action counts, and dividend-versus-close-drop
-outliers as auditable tables.
-
-Split candidates are independently flagged when the absolute close-to-close
-log move exceeds 0.35 and the quantity move approximately offsets it. A
-detected/recorded split mismatch is both target- and price-factor-unresolved.
-A distribution-number change without a recorded cash action, or a bounded
-provider-failure neighborhood, is target- and total-return-unresolved but does
-not invalidate split-adjusted OHLC. The relevant review tables retain every
-case. A held portfolio interval whose exit is unresolved is excluded from
-realized economics without changing its previously formed weights.
-
-A recorded cash event can fall on a market session when that exact ISIN did not
-trade. In that case there is no COTAHIST ex-date close at which to apply the
-specified reinvestment. The store never substitutes a stale, later, or
-cross-provider price: it leaves that cash multiplier neutral, records the cell
-in `cash_reinvestment_unavailable_mask` and
-`corporate_action_cash_reinvestment_review.parquet`, and marks it unresolved.
-Trailing total-return features crossing the event are invalid. Yang-Zhang,
-range, high-watermark, and adjusted-price features use the independent
-price-factor uncertainty mask and remain valid for a cash-only uncertainty.
-Activity-only features retain their own masks.
-
-Adjustment factors are forward-recursive. A future action never rewrites an
-earlier row. On an effective date, split/bonus factors make the price series
-continuous; cash distributions are reinvested at the ex-date close for the
-total-return-close series. The action audit records source/cache hashes,
-ISIN-year coverage, disagreements, and an M1 adjustment-status check using both
-event-day close levels and pre/post-event ratios.
+Price factors are forward-recursive. A future split never rewrites an earlier
+row, and cash distributions are not reinvested. Audits retain source/cache
+hashes, the official action classification, provider comparisons, and M1 unit
+status. The build also requires provider variants to produce byte-identical
+feature, mask, and target arrays.
 
 ## Point-in-time universe
 
@@ -180,18 +143,17 @@ Core arrays begin with `[date, isin]`:
 | `observed` | — | COTAHIST row exists |
 | `active` | — | causal PIT universe membership |
 | `raw_open`, `raw_high`, `raw_low`, `raw_close` | — | unadjusted COTAHIST OHLC |
-| `adjusted_open`, `adjusted_high`, `adjusted_low`, `adjusted_close` | — | causal split-adjusted OHLC |
-| `total_return_close` | — | split- and distribution-adjusted close |
-| `price_adjustment_factor`, `total_return_adjustment_factor` | — | causal cumulative factors |
+| `adjusted_open`, `adjusted_high`, `adjusted_low`, `adjusted_close` | — | causal COTAHIST-only split/bonus-adjusted OHLC |
+| `price_adjustment_factor` | — | causal cumulative split/bonus factor |
 | `volume_brl`, `trade_count`, `quantity`, `distribution_number` | — | raw daily activity/action fields |
-| `recorded_action_mask`, `distribution_change_mask`, `provider_action_failure_mask`, `split_disagreement_mask`, `cash_reinvestment_unavailable_mask`, `intraday_action_boundary_mask`, `price_adjustment_unresolved`, `adjusted_price_level_valid`, `unresolved_action` | — | action evidence, target/return-feature exclusions, M1 boundary exclusions, and persistent adjusted-price-level trust state |
+| `distribution_change_mask`, `detected_event_mask`, `detected_split_mask`, `detected_cash_event_mask`, `ambiguous_action_mask`, `target_exclusion_event_mask`, `intraday_action_boundary_mask` | — | official action classification, target exclusions, and split-only M1 boundaries |
 | `slow_values`, `slow_valid` | 32 features | rank-Gauss slow library |
 | `intraday_values`, `intraday_valid` | 20 features | rank-Gauss M1 summaries |
 | `sidecar_<group>_values`, `sidecar_<group>_valid` | group features | optional PIT sidecars |
 | `target_primary`, `target_valid`, `target_normalized_residual` | 5 horizons | primary midrank, mask, and pre-rank residual |
 | `target_raw_midrank`, `target_raw_valid`, `target_raw_log_return` | 5 horizons | raw-return comparison target family |
 | `target_to_close`, `target_to_close_valid`, `target_to_close_normalized_residual`, `target_to_close_raw_log_return` | — | optional 15:45-to-close target family |
-| `fast_present` | — | exact M1 fast stream available |
+| `fast_present`, `m1_cotahist_close_consistent_mask` | — | exact M1 stream and same-name/day close-unit agreement |
 
 The usual store does not duplicate the dense v1 minute tensors. Instead, its
 manifest hash-binds the external v1 `equity_features.npy`, `equity_slow.npy`,
@@ -211,7 +173,7 @@ window. They do not interpolate the missing observations.
 
 | Family | Features |
 |---|---|
-| Return | log total returns over 1, 5, 21, 63, 126, 252; 12-1 momentum = return 252 − return 21 |
+| Return | log split-adjusted price returns over 1, 5, 21, 63, 126, 252; 12-1 momentum = return 252 − return 21 |
 | Volatility | Yang–Zhang 5/20/60; standard deviation of 5-session YZ over 60; 60-session return skew and excess kurtosis |
 | Extremes | maximum daily return over 21; `log(close / 252-session high)` |
 | Market exposure | 60-session beta and residual volatility against the daily cross-sectional median return |
@@ -248,15 +210,16 @@ use the prior session.
 - 20-session realized skew, Roll spread, and Corwin–Schultz spread; and
 - volume through 15:45 divided by its 20-session same-time median.
 
-The source M1 archive has raw, adjusted, and indeterminate event histories.
-Every recorded or unresolved corporate-action boundary therefore masks the
-overnight return and its 5/20-session dependants, the overnight-minus-intraday
-features, and the 20-session Corwin-Schultz feature. Same-session scale-free
-ratios and activity features remain independently valid.
+Only COTAHIST-detected split/bonus sessions create an M1 action boundary. They
+mask the cross-session feature whose interval crosses that boundary and its
+dependent lookbacks. Cash-type and provider-only events do not affect M1 masks;
+same-session scale-free ratios and activity fields remain independently valid.
 
-All full-session anchors use the official COTAHIST close. The original final
-M1 close is retained only for the close-anchor audit. This applies to the
-overnight and lagged intraday summaries and to the to-close target endpoint.
+Before an official COTAHIST close can replace the same-name/day final M1 close
+as a full-session anchor, `abs(log(M1_close / COTAHIST_close))` must be at most
+0.005. A mismatch keeps the anchor unavailable: dependent later cross-session
+features and that day's to-close target are masked. Audits report mismatch
+rates by year and explicitly list M1 segments classified as price-adjusted.
 
 The Roll estimator uses sample serial covariance of 5-minute returns and is
 valid only when that covariance is strictly negative; a non-negative estimate
@@ -272,7 +235,7 @@ broader than what the currently known archives can support exactly:
 | Group | Exactly backed by the known archive adapter | Frozen but currently unavailable |
 |---|---|---|
 | `lending` | raw balance divided by the aligned 20-session mean COTAHIST BRL volume and its exact 1- and 5-session changes; exact inversion of the archive's one-to-one taker-fee transform for the loan-rate level and its exact 5-session change | none |
-| `events` | causal sessions since the latest RAD ITR/DFP transition; ex-distribution flags for t+1, t+2, and t+3 when the action was known by t | sessions until an announced earnings date; standardized unexpected earnings (EPS is absent) |
+| `events` | causal sessions since the latest RAD ITR/DFP transition | sessions until an announced earnings date; standardized unexpected earnings; future ex-distribution flags (uniform announcement data is absent) |
 | `options` | exact inversion of the archive's one-to-one transforms for put/call OI ratio, one-session OI change divided by stock ADV20, and put skew | ATM IV divided by its 20-session median |
 | `oddlot` | raw odd-lot BRL-volume share and exact 5-session change | none |
 | `rebalance` | all 21 Experiment-33 fields: seven release-safe state fields for each of IBOV, IBXX, and SMLL | none |
@@ -312,8 +275,8 @@ No fitted scaler or future cross-section is used.
 
 ## Targets
 
-For `D in {1,2,3,5,10}`, raw total return is
-`r_D = log(TRC[t+D] / TRC[t])`. The primary pre-rank target is
+For `D in {1,2,3,5,10}`, raw split-adjusted price return is
+`r_D = log(adjusted_close[t+D] / adjusted_close[t])`. The primary pre-rank target is
 
 `clip(r_D / (sigma_t*sqrt(D)) - cross_section_median, -5, 5)`.
 
@@ -325,10 +288,14 @@ without volatility normalization or median removal; raw log return is also
 stored for spreads.
 
 A raw target requires active membership at `t`, a close on every calendar
-session from `t` through `t+D`, and no unresolved action in `(t,t+D]`. The
-primary target additionally requires a finite positive selected volatility.
-Each requested loader/evaluation window clears its last `D` target rows, so an
-endpoint cannot cross a selection or sealed boundary.
+session from `t` through `t+D`, and no COTAHIST-classified cash-type or
+ambiguous event in `(t,t+D]`. Detected split/bonus events are adjusted rather
+than masked. The primary target additionally requires a finite positive
+selected volatility. Each requested loader/evaluation window clears its last
+`D` target rows, so an endpoint cannot cross a selection or sealed boundary.
+
+A survivor-subset total-return target is registered as a future sensitivity
+variant but is deliberately not implemented by the foundation store.
 
 The sixth head is a fast-only auxiliary: the log return from the open of the
 15:45 minute to session close, normalized to its remaining-session volatility,
@@ -472,8 +439,10 @@ explicitly invalid and counted. The same applies when the exit row carries an
 unresolved corporate action: the decision weight is preserved, but that held
 interval cannot enter headline economics.
 
-Paired comparisons use identical dates and inputs and a deterministic moving
-block bootstrap of daily IC and net-excess deltas, length 20, 10,000 draws.
+Paired comparisons use identical dates and inputs and consume the selected
+protocol's bootstrap settings. Full uses a deterministic length-20 moving-block
+bootstrap with 10,000 draws. Triage uses zero draws and reports the aligned
+point estimate with null interval endpoints.
 
 ## Presets and operations
 
@@ -484,8 +453,10 @@ block bootstrap of daily IC and net-excess deltas, length 20, 10,000 draws.
 
 `python -m brazil_rv.v2.run_many` uses spawn isolation, deterministic job
 ordering, exact config/store/commit binding, completed-result hash checks,
-per-process source-hash caching, and no automatic retry. Both presets execute
-the train and score legs. A failed trajectory remains failed for inspection.
+per-process source-hash caching, and no automatic retry. Preset execution
+requires a fast pretrained checkpoint and its expected SHA-256; both are passed
+to every train leg. Both presets execute the train and score legs. A failed
+trajectory remains failed for inspection.
 
 The corporate-action output and store output directories must be new. The
 action file passed to the store builder must sit beside the acquisition

@@ -239,12 +239,19 @@ def preset_jobs(
     name: str,
     store: Path,
     output_root: Path,
+    fast_pretrained_checkpoint: Path,
+    fast_pretrained_sha256: str,
     sidecars: Sequence[str] = (),
     compile_forward: bool = True,
 ) -> tuple[tuple[TrajectoryJob, ...], int, dict[str, object]]:
     """Expand a frozen named preset into full train-and-score trajectories."""
 
     preset = protocol_preset(name)
+    checkpoint = fast_pretrained_checkpoint.resolve()
+    if not checkpoint.is_file():
+        raise FileNotFoundError(checkpoint)
+    if _sha256(checkpoint) != fast_pretrained_sha256:
+        raise ValueError("fast pretrained checkpoint SHA-256 mismatch")
     jobs: list[TrajectoryJob] = []
     for fold in preset.folds:
         for seed in preset.seeds:
@@ -271,6 +278,10 @@ def preset_jobs(
                     str(parity),
                     "--maximum-epochs",
                     str(preset.max_epochs_override or 20),
+                    "--fast-pretrained-checkpoint",
+                    str(checkpoint),
+                    "--fast-pretrained-sha256",
+                    fast_pretrained_sha256,
                 ]
                 if not compile_forward:
                     command.append("--no-compile-forward")
@@ -298,6 +309,8 @@ def preset_jobs(
         "seeds": list(preset.seeds),
         "paired_bootstrap_replications": preset.bootstrap_replications,
         "paired_bootstrap_block_sessions": preset.bootstrap_block_length,
+        "fast_pretrained_checkpoint": str(checkpoint),
+        "fast_pretrained_sha256": fast_pretrained_sha256,
         "trajectory_contract": "stage-F train plus raw-Patience score artifact",
     }
     return tuple(jobs), preset.max_parallel, metadata
@@ -342,6 +355,8 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--store", type=Path)
     parser.add_argument("--output-root", type=Path)
+    parser.add_argument("--fast-pretrained-checkpoint", type=Path)
+    parser.add_argument("--fast-pretrained-sha256")
     parser.add_argument("--sidecar", action="append", default=[])
     parser.add_argument(
         "--compile-forward", action=argparse.BooleanOptionalAction, default=True
@@ -351,12 +366,22 @@ def main() -> None:
     if arguments.plan is not None:
         jobs, max_parallel = load_plan(arguments.plan)
     else:
-        if arguments.store is None or arguments.output_root is None:
-            parser.error("--preset requires --store and --output-root")
+        if (
+            arguments.store is None
+            or arguments.output_root is None
+            or arguments.fast_pretrained_checkpoint is None
+            or arguments.fast_pretrained_sha256 is None
+        ):
+            parser.error(
+                "--preset requires --store, --output-root, "
+                "--fast-pretrained-checkpoint, and --fast-pretrained-sha256"
+            )
         jobs, max_parallel, metadata = preset_jobs(
             name=arguments.preset,
             store=arguments.store,
             output_root=arguments.output_root,
+            fast_pretrained_checkpoint=arguments.fast_pretrained_checkpoint,
+            fast_pretrained_sha256=arguments.fast_pretrained_sha256,
             sidecars=arguments.sidecar,
             compile_forward=arguments.compile_forward,
         )

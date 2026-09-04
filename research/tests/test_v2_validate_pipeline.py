@@ -46,7 +46,10 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         arrays={
             "active": np.ones((day_count, name_count), dtype=np.bool_),
             "observed": np.ones((day_count, name_count), dtype=np.bool_),
-            "unresolved_action": np.zeros(
+            "target_exclusion_event_mask": np.zeros(
+                (day_count, name_count), dtype=np.bool_
+            ),
+            "ambiguous_action_mask": np.zeros(
                 (day_count, name_count), dtype=np.bool_
             ),
             "slow_values": slow,
@@ -59,7 +62,7 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
             "target_raw_midrank": targets.copy(),
             "target_raw_valid": np.ones_like(targets, dtype=np.bool_),
             "target_raw_log_return": targets.astype(np.float64) * 0.0001,
-            "total_return_close": close,
+            "adjusted_close": close,
         },
         feature_names={
             "slow": [f"slow_{index}" for index in range(32)],

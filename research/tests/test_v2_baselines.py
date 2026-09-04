@@ -66,7 +66,7 @@ def test_baselines_are_causal_and_keep_missing_endpoint_masked() -> None:
     assert not missing["reversal_5"].score_mask[260, 0].any()
 
 
-def test_baselines_mask_returns_crossing_unresolved_actions() -> None:
+def test_baselines_mask_returns_crossing_ambiguous_actions() -> None:
     close, observed = _prices()
     active = np.ones_like(observed)
     unresolved = np.zeros_like(observed)

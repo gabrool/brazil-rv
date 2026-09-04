@@ -131,9 +131,6 @@ SIDECAR_FEATURES: Final[dict[str, tuple[str, ...]]] = {
     "events": (
         "sessions_until_announced_earnings",
         "sessions_since_earnings",
-        "ex_distribution_next_1",
-        "ex_distribution_next_2",
-        "ex_distribution_next_3",
         "standardized_unexpected_earnings",
     ),
     "options": (

@@ -18,6 +18,7 @@ from brazil_rv.execution.daily_swing import (
 from brazil_rv.modeling.metrics import average_ranks, moving_block_bootstrap
 
 from .artifacts import write_json_atomic
+from .config import FULL_PROTOCOL, ProtocolPreset
 from .contract import HORIZONS, PRIMARY_HORIZONS
 from .splits import (
     PREREGISTRATION_ROOT,
@@ -26,8 +27,6 @@ from .splits import (
 )
 
 MIN_CROSS_SECTION = 30
-BOOTSTRAP_BLOCK_LENGTH = 20
-BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
@@ -47,8 +46,8 @@ class EvaluationInputs:
     target_mask: NDArray[np.bool_]
     raw_target_mask: NDArray[np.bool_]
     active: NDArray[np.bool_]
-    total_return_close: NDArray[np.floating]
-    unresolved_action: NDArray[np.bool_]
+    adjusted_close: NDArray[np.floating]
+    target_exclusion_event: NDArray[np.bool_]
     cdi_returns: NDArray[np.floating]
     horizons: tuple[int, ...] = HORIZONS
     source_artifact_hashes: Mapping[str, str] | None = None
@@ -149,10 +148,10 @@ def _validate(inputs: EvaluationInputs) -> None:
     matrix_shape = expected[:2]
     if active.shape != matrix_shape:
         raise ValueError("active mask shape differs from scores")
-    if np.asarray(inputs.total_return_close).shape != matrix_shape:
-        raise ValueError("total-return close shape differs from scores")
-    if np.asarray(inputs.unresolved_action).shape != matrix_shape:
-        raise ValueError("unresolved-action mask shape differs from scores")
+    if np.asarray(inputs.adjusted_close).shape != matrix_shape:
+        raise ValueError("adjusted close shape differs from scores")
+    if np.asarray(inputs.target_exclusion_event).shape != matrix_shape:
+        raise ValueError("target-exclusion event mask shape differs from scores")
     if np.asarray(inputs.cdi_returns).shape != (len(dates),):
         raise ValueError("CDI return axis differs from evaluation dates")
     if np.asarray(inputs.score_mask).dtype != np.bool_:
@@ -163,8 +162,8 @@ def _validate(inputs: EvaluationInputs) -> None:
         raise TypeError("raw_target_mask must be a Boolean array")
     if active.dtype != np.bool_:
         raise TypeError("active must be a Boolean array")
-    if np.asarray(inputs.unresolved_action).dtype != np.bool_:
-        raise TypeError("unresolved_action must be a Boolean array")
+    if np.asarray(inputs.target_exclusion_event).dtype != np.bool_:
+        raise TypeError("target_exclusion_event must be a Boolean array")
     if bool(inputs.pathwise_scores) != bool(inputs.pathwise_score_masks):
         raise ValueError("pathwise scores and masks must be supplied together")
     if inputs.pathwise_scores:
@@ -394,7 +393,7 @@ def _swing_rows(
                 "missing_exit_position_count": int(
                     result.missing_exit_position_count[index]
                 ),
-                "unresolved_action_position_count": int(
+                "target_exclusion_event_position_count": int(
                     result.unresolved_action_position_count[index]
                 ),
                 "gross_pnl_bps": _finite_or_none(result.gross_pnl_bps[index]),
@@ -424,10 +423,15 @@ def _average_swing_summary(
     output: dict[str, float | bool] = {}
     for key in summaries[0]:
         values = [summary[key] for summary in summaries]
+        output_key = (
+            "target_exclusion_event_position_count"
+            if key == "unresolved_action_position_count"
+            else key
+        )
         if all(isinstance(value, bool) for value in values):
-            output[key] = all(bool(value) for value in values)
+            output[output_key] = all(bool(value) for value in values)
         else:
-            output[key] = _finite_mean(np.asarray(values, dtype=np.float64))
+            output[output_key] = _finite_mean(np.asarray(values, dtype=np.float64))
     return output
 
 
@@ -454,10 +458,12 @@ def _average_swing_rows(
         "net_excess_all_cash_bps",
         "deployed_gross_fraction_nav",
     )
-    count_fields = (
-        "missing_exit_position_count",
-        "unresolved_action_position_count",
-    )
+    count_fields = {
+        "missing_exit_position_count": "missing_exit_position_count",
+        "target_exclusion_event_position_count": (
+            "unresolved_action_position_count"
+        ),
+    }
     rows: list[dict[str, object]] = []
     for index, exit_date in enumerate(results[0].exit_dates):
         row: dict[str, object] = {
@@ -468,9 +474,11 @@ def _average_swing_rows(
             "path_model_count": len(results),
             "interval_valid": all(bool(result.interval_valid[index]) for result in results),
         }
-        for field in count_fields:
-            row[field] = float(
-                np.mean([float(getattr(result, field)[index]) for result in results])
+        for output_field, result_field in count_fields.items():
+            row[output_field] = float(
+                np.mean(
+                    [float(getattr(result, result_field)[index]) for result in results]
+                )
             )
         for field in float_fields:
             path_values = np.asarray(
@@ -498,8 +506,10 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         "target_mask": _array_sha256(np.asarray(inputs.target_mask)),
         "raw_target_mask": _array_sha256(np.asarray(inputs.raw_target_mask)),
         "active": _array_sha256(np.asarray(inputs.active)),
-        "total_return_close": _array_sha256(np.asarray(inputs.total_return_close)),
-        "unresolved_action": _array_sha256(np.asarray(inputs.unresolved_action)),
+        "adjusted_close": _array_sha256(np.asarray(inputs.adjusted_close)),
+        "target_exclusion_event": _array_sha256(
+            np.asarray(inputs.target_exclusion_event)
+        ),
         "cdi_returns": _array_sha256(np.asarray(inputs.cdi_returns)),
     }
     for index, (scores, mask) in enumerate(
@@ -526,9 +536,10 @@ def _economics_contract() -> dict[str, object]:
         "margin_fraction_of_gross": config.margin_fraction_of_gross,
         "annual_sessions": config.annual_sessions,
         "terminal_liquidation": config.terminal_liquidation,
-        "unresolved_action_policy": (
+        "target_exclusion_event_policy": (
             "positions are frozen from decision-time scores; a held close-to-close "
-            "interval is invalid ex post when its exit date is unresolved"
+            "interval is invalid ex post when its future path crosses a detected "
+            "cash-type or ambiguous COTAHIST event"
         ),
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
         "annual_borrow_rates": list(ECONOMICS_ANNUAL_BORROW_RATES),
@@ -581,8 +592,8 @@ def evaluate_scores(
                 scores=economics_score,
                 score_mask=economics_mask,
                 active=np.asarray(inputs.active, dtype=bool),
-                total_return_close=inputs.total_return_close,
-                unresolved_action=inputs.unresolved_action,
+                total_return_close=inputs.adjusted_close,
+                unresolved_action=inputs.target_exclusion_event,
                 cdi_returns=inputs.cdi_returns,
                 costs_bps=ECONOMICS_COSTS_BPS,
                 annual_borrow_rates=ECONOMICS_ANNUAL_BORROW_RATES,
@@ -683,8 +694,8 @@ def evaluate_scores(
                 np.mean([int(mask.sum()) for mask in economics_masks])
             ),
             "economics_path_model_count": len(score_paths),
-            "unresolved_action_true": int(
-                np.asarray(inputs.unresolved_action, dtype=np.bool_).sum()
+            "target_exclusion_event_true": int(
+                np.asarray(inputs.target_exclusion_event, dtype=np.bool_).sum()
             ),
         },
     }
@@ -705,11 +716,22 @@ def evaluate_scores(
     )
 
 
-def _bootstrap_payload(values: NDArray[np.floating]) -> dict[str, float | None]:
+def _bootstrap_payload(
+    values: NDArray[np.floating],
+    *,
+    replications: int,
+    block_length: int,
+) -> dict[str, float | None]:
+    if replications == 0:
+        return {
+            "estimate": _finite_or_none(_finite_mean(values)),
+            "lower_95": None,
+            "upper_95": None,
+        }
     output = moving_block_bootstrap(
         values,
-        replications=BOOTSTRAP_REPLICATIONS,
-        block_length=BOOTSTRAP_BLOCK_LENGTH,
+        replications=replications,
+        block_length=block_length,
         seed=BOOTSTRAP_SEED,
     )
     return {
@@ -724,6 +746,7 @@ def paired_comparison(
     *,
     registration_path: Path | None = None,
     preregistration_root: Path = PREREGISTRATION_ROOT,
+    protocol: ProtocolPreset = FULL_PROTOCOL,
 ) -> dict[str, object]:
     """Compare aligned daily metrics without estimating on another window."""
     ledger = authorize_dates(
@@ -749,19 +772,34 @@ def paired_comparison(
     economics_delta = (
         candidate.headline_net_excess_bps - baseline.headline_net_excess_bps
     )
-    if min(len(ic_delta), len(economics_delta)) < BOOTSTRAP_BLOCK_LENGTH:
-        raise ValueError("paired comparison requires at least 20 sessions")
+    if (
+        protocol.bootstrap_replications > 0
+        and min(len(ic_delta), len(economics_delta))
+        < protocol.bootstrap_block_length
+    ):
+        raise ValueError(
+            "paired comparison requires at least the preset bootstrap block length"
+        )
     return {
         "schema": "BRAZIL_RV_V2_PAIRED_COMPARISON_V1",
         "access": ledger.payload(),
         "official_validation_accessed": ledger.official_validation_accessed,
         "test_accessed": ledger.test_accessed,
         "date_identity_sha256": _dates_sha256(candidate.dates),
-        "block_length_sessions": BOOTSTRAP_BLOCK_LENGTH,
-        "replications": BOOTSTRAP_REPLICATIONS,
+        "protocol": protocol.name,
+        "block_length_sessions": protocol.bootstrap_block_length,
+        "replications": protocol.bootstrap_replications,
         "seed": BOOTSTRAP_SEED,
-        "daily_primary_ic_delta": _bootstrap_payload(ic_delta),
-        "daily_headline_net_excess_bps_delta": _bootstrap_payload(economics_delta),
+        "daily_primary_ic_delta": _bootstrap_payload(
+            ic_delta,
+            replications=protocol.bootstrap_replications,
+            block_length=protocol.bootstrap_block_length,
+        ),
+        "daily_headline_net_excess_bps_delta": _bootstrap_payload(
+            economics_delta,
+            replications=protocol.bootstrap_replications,
+            block_length=protocol.bootstrap_block_length,
+        ),
         "daily_primary_ic_delta_table": [
             {
                 "date": value.isoformat(),
@@ -790,8 +828,8 @@ _PAIRED_INPUT_KEYS = (
     "target_mask",
     "raw_target_mask",
     "active",
-    "total_return_close",
-    "unresolved_action",
+    "adjusted_close",
+    "target_exclusion_event",
     "cdi_returns",
 )
 
@@ -845,8 +883,8 @@ def _validate_paired_identity(
     ]
     if mismatched:
         raise ValueError(
-            "paired comparison requires identical dates, targets, masks, close, "
-            "unresolved actions, and CDI inputs; mismatched identities: "
+            "paired comparison requires identical dates, targets, masks, adjusted "
+            "close, target-exclusion events, and CDI inputs; mismatched identities: "
             f"{mismatched}"
         )
     if candidate_report["source_artifact_hashes"] != baseline_report[

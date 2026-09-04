@@ -7,6 +7,7 @@ from datetime import date, timedelta
 import numpy as np
 import pytest
 
+from brazil_rv.v2.config import TRIAGE_PROTOCOL
 from brazil_rv.v2.evaluate import (
     EvaluationInputs,
     _economics_signal,
@@ -37,10 +38,15 @@ def _fixture() -> EvaluationInputs:
     raw_return = np.empty_like(scores)
     for day in range(len(dates)):
         for horizon_index, horizon in enumerate(horizons):
-            scores[day, :, horizon_index] = base + day * 0.01 + horizon * 0.001
-            residual[day, :, horizon_index] = base / (names - 1)
-            raw_rank[day, :, horizon_index] = base / (names - 1)
-            raw_return[day, :, horizon_index] = base * horizon / 10_000.0
+            phase = 0.23 * day + 0.11 * horizon_index
+            score = np.sin(base * 0.19 + phase) + 0.35 * np.cos(
+                base * 0.07 - 0.31 * day
+            )
+            target = 0.55 * score + np.cos(base * 0.31 + 0.17 * day)
+            scores[day, :, horizon_index] = score
+            residual[day, :, horizon_index] = target
+            raw_rank[day, :, horizon_index] = target
+            raw_return[day, :, horizon_index] = target * horizon / 10_000.0
     score_mask = np.ones_like(scores, dtype=bool)
     target_mask = np.ones_like(scores, dtype=bool)
     for horizon_index, horizon in enumerate(horizons):
@@ -58,24 +64,27 @@ def _fixture() -> EvaluationInputs:
         target_mask=target_mask,
         raw_target_mask=target_mask.copy(),
         active=np.ones((len(dates), names), dtype=bool),
-        total_return_close=np.full((len(dates), names), 100.0),
-        unresolved_action=np.zeros((len(dates), names), dtype=bool),
+        adjusted_close=np.full((len(dates), names), 100.0),
+        target_exclusion_event=np.zeros((len(dates), names), dtype=bool),
         cdi_returns=np.zeros(len(dates)),
         source_artifact_hashes={"store_manifest": "a" * 64},
     )
 
 
-def test_harness_metrics_match_monotone_hand_fixture() -> None:
+def test_harness_metrics_are_nontrivial_on_rotating_fixture() -> None:
     result = evaluate_scores(_fixture(), window_name="F2")
     report = result.report
 
-    assert report["pooled_primary_ic"] == pytest.approx(1.0)
+    assert 0.0 < report["pooled_primary_ic"] < 1.0
     for row in report["horizon_readouts"]:
-        assert row["mean_residual_spearman_ic"] == pytest.approx(1.0)
-        assert row["mean_raw_rank_ic"] == pytest.approx(1.0)
-        assert row["mean_decile_spread_bps_per_holding_session"] == pytest.approx(54.0)
-        assert row["mean_persistence_1_session"] == pytest.approx(1.0)
-        assert row["mean_persistence_5_sessions"] == pytest.approx(1.0)
+        assert 0.0 < abs(row["mean_residual_spearman_ic"]) < 1.0
+        assert 0.0 < abs(row["mean_raw_rank_ic"]) < 1.0
+        assert row["mean_decile_spread_bps_per_holding_session"] != 0.0
+        assert 0.0 < abs(row["mean_persistence_1_session"]) < 1.0
+        assert 0.0 < abs(row["mean_persistence_5_sessions"]) < 1.0
+        assert row["mean_persistence_1_session"] != pytest.approx(
+            row["mean_persistence_5_sessions"]
+        )
     assert report["official_validation_accessed"] is False
     assert report["test_accessed"] is False
 
@@ -103,7 +112,12 @@ def test_crossfit_persistence_uses_complete_model_paths_not_stitched_boundaries(
     stitched_readout = stitched_result.report["horizon_readouts"][0]
     pathwise_readout = pathwise_result.report["horizon_readouts"][0]
     assert stitched_readout["mean_persistence_1_session"] < 1.0
-    assert pathwise_readout["mean_persistence_1_session"] == pytest.approx(1.0)
+    reference = evaluate_scores(inputs, window_name="F2").report[
+        "horizon_readouts"
+    ][0]
+    assert pathwise_readout["mean_persistence_1_session"] == pytest.approx(
+        reference["mean_persistence_1_session"]
+    )
     summaries = pathwise_result.report["economics"]["summaries"]
     assert all(row["path_model_count"] == 2 for row in summaries)
 
@@ -173,8 +187,8 @@ def test_economics_signal_is_primary_head_rank_average_and_excludes_d10() -> Non
         target_mask=np.zeros_like(cube_mask),
         raw_target_mask=np.zeros_like(cube_mask),
         active=matrix,
-        total_return_close=np.ones((1, 4)),
-        unresolved_action=np.zeros((1, 4), dtype=bool),
+        adjusted_close=np.ones((1, 4)),
+        target_exclusion_event=np.zeros((1, 4), dtype=bool),
         cdi_returns=np.zeros(1),
         source_artifact_hashes={"store_manifest": "a" * 64},
     )
@@ -233,6 +247,7 @@ def test_paired_bootstrap_uses_daily_primary_and_headline_deltas() -> None:
 
     comparison = paired_comparison(candidate, baseline)
 
+    assert comparison["protocol"] == "full"
     assert comparison["block_length_sessions"] == 20
     assert comparison["replications"] == 10_000
     assert comparison["daily_primary_ic_delta"] == {
@@ -246,14 +261,23 @@ def test_paired_bootstrap_uses_daily_primary_and_headline_deltas() -> None:
         "upper_95": 3.0,
     }
 
+    triage = paired_comparison(candidate, baseline, protocol=TRIAGE_PROTOCOL)
+    assert triage["protocol"] == "triage"
+    assert triage["replications"] == 0
+    assert triage["daily_primary_ic_delta"] == {
+        "estimate": 2.0,
+        "lower_95": None,
+        "upper_95": None,
+    }
+
 
 @pytest.mark.parametrize(
     ("field", "message"),
     [
-        ("target_mask", "identical dates, targets, masks, close"),
-        ("total_return_close", "identical dates, targets, masks, close"),
-        ("unresolved_action", "identical dates, targets, masks, close"),
-        ("cdi_returns", "identical dates, targets, masks, close"),
+        ("target_mask", "identical dates, targets, masks, adjusted"),
+        ("adjusted_close", "identical dates, targets, masks, adjusted"),
+        ("target_exclusion_event", "identical dates, targets, masks, adjusted"),
+        ("cdi_returns", "identical dates, targets, masks, adjusted"),
     ],
 )
 def test_paired_comparison_rejects_different_evaluation_population(
@@ -295,13 +319,13 @@ def test_paired_comparison_rejects_source_or_economics_contract_mismatch() -> No
         paired_comparison(changed_contract, baseline)
 
 
-def test_evaluation_hashes_and_reports_unresolved_economic_intervals() -> None:
+def test_evaluation_hashes_and_reports_excluded_economic_intervals() -> None:
     inputs = _fixture()
-    unresolved = np.asarray(inputs.unresolved_action).copy()
-    unresolved[1, 0] = True
+    excluded = np.asarray(inputs.target_exclusion_event).copy()
+    excluded[1, 0] = True
 
     result = evaluate_scores(
-        replace(inputs, unresolved_action=unresolved), window_name="F2"
+        replace(inputs, target_exclusion_event=excluded), window_name="F2"
     )
     report = result.report
     economics = report["economics"]
@@ -314,6 +338,6 @@ def test_evaluation_hashes_and_reports_unresolved_economic_intervals() -> None:
         if row["cost_bps_per_side"] == 4.0 and row["annual_borrow_rate"] == 0.02
     )
     assert first_headline["interval_valid"] is False
-    assert first_headline["unresolved_action_position_count"] == 1
-    assert report["mask_coverage"]["unresolved_action_true"] == 1
-    assert "unresolved_action" in report["input_hashes"]
+    assert first_headline["target_exclusion_event_position_count"] == 1
+    assert report["mask_coverage"]["target_exclusion_event_true"] == 1
+    assert "target_exclusion_event" in report["input_hashes"]

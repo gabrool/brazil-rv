@@ -12,24 +12,23 @@ from brazil_rv.v2.corporate_actions import (
     action_calendar_alignment_table,
     action_coverage_table,
     audit_m1_adjustment_status,
-    cash_reinvestment_review_table,
-    cash_reinvestment_unavailable_mask,
-    causal_adjustment_factors,
+    causal_price_adjustment_factor,
+    detect_cotahist_actions,
     detect_distribution_changes,
-    detect_split_candidates,
+    normalize_cached_action_schema,
     normalize_yfinance_actions,
-    provider_failure_mask,
     unadjust_yfinance_cash_distributions,
 )
 
 
-def test_split_jump_detection_and_action_alignment_are_explicit() -> None:
+def test_cotahist_split_detection_and_provider_alignment_are_independent() -> None:
     dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
     close = np.asarray([[100.0], [50.0], [51.0]])
     quantity = np.asarray([[1_000.0], [2_000.0], [2_100.0]])
     observed = np.ones_like(close, dtype=np.bool_)
-    detected = detect_split_candidates(close, quantity, observed)
-    assert detected[:, 0].tolist() == [False, True, False]
+    dismes = np.ones_like(close)
+    detected = detect_cotahist_actions(close, quantity, dismes, observed)
+    assert detected.split_event[:, 0].tolist() == [False, True, False]
 
     actions = normalize_yfinance_actions(
         pl.DataFrame(
@@ -51,54 +50,95 @@ def test_split_jump_detection_and_action_alignment_are_explicit() -> None:
     assert not unresolved.any()
 
 
-def test_forward_adjustment_never_rewrites_history_and_retains_recorded_actions() -> None:
-    close = np.full((5, 1), 10.0)
-    split = np.ones_like(close)
-    split[2, 0] = 2.0
-    cash = np.zeros_like(close)
-    cash[3, 0] = 1.0
-    price, total_return = causal_adjustment_factors(close, split, cash)
+def test_forward_split_adjustment_never_rewrites_history() -> None:
+    ratio = np.full((5, 1), np.nan)
+    ratio[2, 0] = 0.5
+    split = np.zeros_like(ratio, dtype=bool)
+    split[2, 0] = True
+    price = causal_price_adjustment_factor(ratio, split)
     np.testing.assert_array_equal(price[:, 0], [1.0, 1.0, 2.0, 2.0, 2.0])
-    np.testing.assert_allclose(total_return[:, 0], [1.0, 1.0, 2.0, 2.2, 2.2])
-
-    unresolved = np.zeros_like(close, dtype=bool)
-    unresolved[2, 0] = True
-    flagged, _ = causal_adjustment_factors(close, split, cash, unresolved)
-    np.testing.assert_array_equal(flagged[:, 0], price[:, 0])
 
 
-def test_missing_cash_reinvestment_close_requires_explicit_unresolved_flag() -> None:
-    close = np.asarray([[10.0], [np.nan], [12.0]])
-    split = np.ones_like(close)
-    split[1, 0] = 2.0
-    cash = np.asarray([[0.0], [1.0], [0.0]])
-    unavailable = cash_reinvestment_unavailable_mask(close, cash)
-    assert unavailable[:, 0].tolist() == [False, True, False]
-    with np.testing.assert_raises_regex(ValueError, "positive ex-date close"):
-        causal_adjustment_factors(close, split, cash)
-
-    price, total_return = causal_adjustment_factors(
-        close, split, cash, unavailable
+def test_cotahist_classifies_cash_and_ambiguous_dismes_changes() -> None:
+    close = np.asarray(
+        [[100.0, 100.0], [100.0, 100.0], [95.0, 99.0], [95.0, 99.0]]
     )
-    np.testing.assert_array_equal(price[:, 0], [1.0, 2.0, 2.0])
-    np.testing.assert_array_equal(total_return[:, 0], [1.0, 2.0, 2.0])
-    review = cash_reinvestment_review_table(
-        [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)],
-        ["BRTESTACNOR1"],
-        cash,
-        close,
+    quantity = np.asarray(
+        [[100.0, 100.0], [100.0, 100.0], [50.0, 100.0], [50.0, 100.0]]
     )
-    assert review.to_dicts() == [
+    dismes = np.asarray([[1.0, 1.0], [1.0, 1.0], [2.0, 2.0], [2.0, 2.0]])
+    result = detect_cotahist_actions(
+        close, quantity, dismes, np.ones_like(close, dtype=bool)
+    )
+    assert result.ambiguous_event[2, 0]
+    assert result.cash_event[2, 1]
+    assert not result.split_event[2].any()
+
+    # A large price jump is a candidate even without a DISMES change. With no
+    # offsetting quantity move it is cash-type, not a split adjustment.
+    no_dismes = np.ones((4, 1))
+    large_drop = np.asarray([[100.0], [100.0], [80.0], [80.0]])
+    large_result = detect_cotahist_actions(
+        large_drop,
+        np.full_like(large_drop, 100.0),
+        no_dismes,
+        np.ones_like(large_drop, dtype=bool),
+    )
+    assert large_result.event_candidate[2, 0]
+    assert large_result.cash_event[2, 0]
+
+    moderate_drop = np.asarray([[100.0], [100.0], [94.0], [94.0]])
+    moderate_result = detect_cotahist_actions(
+        moderate_drop,
+        np.asarray([[100.0], [100.0], [50.0], [50.0]]),
+        no_dismes,
+        np.ones_like(moderate_drop, dtype=bool),
+    )
+    assert moderate_result.event_candidate[2, 0]
+    assert moderate_result.ambiguous_event[2, 0]
+
+
+def test_legacy_canonical_cache_schema_is_upgraded_in_memory() -> None:
+    fetched_at = datetime(2024, 2, 1, tzinfo=timezone.utc)
+    legacy = pl.DataFrame(
         {
-            "trade_date": date(2024, 1, 3),
-            "isin": "BRTESTACNOR1",
-            "cash_distribution_brl": 1.0,
-            "raw_close_brl": None,
-            "observed": False,
-            "unresolved": True,
-            "status": "unresolved_missing_ex_date_close",
+            "isin": ["BRTESTACNOR1"],
+            "ex_date": [date(2024, 1, 2)],
+            "action_type": ["dividend"],
+            "split_factor": [1.0],
+            "cash_distribution_brl": [0.5],
         }
-    ]
+    )
+    upgraded = normalize_cached_action_schema(
+        legacy,
+        isin="BRTESTACNOR1",
+        ticker="TEST3",
+        fetched_at=fetched_at,
+    )
+    assert upgraded[0, "provider_cash_distribution_brl"] == 0.5
+    assert upgraded[0, "cash_unit_adjustment_factor"] == 1.0
+    assert upgraded[0, "known_date"] == date(2024, 1, 2)
+    assert upgraded[0, "source_ticker"] == "TEST3"
+
+
+def test_legacy_provider_cache_schema_is_normalized_in_memory() -> None:
+    fetched_at = datetime(2024, 2, 1, tzinfo=timezone.utc)
+    cached = pl.DataFrame(
+        {
+            "Date": [date(2024, 1, 15)],
+            "Dividends": [0.5],
+            "Stock Splits": [0.0],
+        }
+    )
+    upgraded = normalize_cached_action_schema(
+        cached,
+        isin="BRTESTACNOR1",
+        ticker="TEST3",
+        fetched_at=fetched_at,
+    )
+    assert upgraded[0, "action_type"] == "dividend"
+    assert upgraded[0, "cash_distribution_brl"] == 0.5
+    assert upgraded[0, "source_ticker"] == "TEST3"
 
 
 def test_normalize_yfinance_emits_split_and_dividend_rows() -> None:
@@ -246,35 +286,18 @@ def test_historical_segment_retries_under_current_isin_ticker(
     assert result.filter(pl.col("ex_date") == date(2020, 1, 10)).height == 1
 
 
-def test_provider_failures_and_distribution_changes_are_unresolved() -> None:
-    dates = np.asarray(
-        ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05", "2024-01-08"],
-        dtype="datetime64[D]",
-    )
+def test_provider_failure_state_does_not_enter_cotahist_classification() -> None:
     observed = np.ones((5, 1), dtype=bool)
-    audit = pl.DataFrame(
-        {
-            "isin": ["BRTESTACNOR1"],
-            "first_date": [date(2024, 1, 2)],
-            "last_date": [date(2024, 1, 8)],
-            "status": ["failed"],
-        }
-    )
-    event_candidates = np.zeros_like(observed)
-    event_candidates[2, 0] = True
-    failed = provider_failure_mask(
-        audit,
-        dates,
-        ["BRTESTACNOR1"],
+    dismes = np.asarray([[1.0], [1.0], [2.0], [2.0], [2.0]])
+    result = detect_cotahist_actions(
+        np.full((5, 1), 100.0),
+        np.full((5, 1), 1_000.0),
+        dismes,
         observed,
-        event_candidates,
-        maximum_horizon=1,
     )
-    assert failed[:, 0].tolist() == [False, True, True, True, False]
-    changed = detect_distribution_changes(
-        np.asarray([[1.0], [1.0], [2.0], [2.0], [2.0]]), observed
-    )
-    assert changed[:, 0].tolist() == [False, False, True, False, False]
+    assert result.cash_event[:, 0].tolist() == [False, False, True, False, False]
+    changed = detect_distribution_changes(dismes, observed)
+    np.testing.assert_array_equal(changed, result.event_candidate)
 
 
 def test_cash_units_use_only_strictly_later_split_factors() -> None:

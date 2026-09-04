@@ -4685,6 +4685,35 @@ and `a0fa1167e4d731fdc91870d04b9f800fa6ff717d540baf1c709bf92619994b5df`.
 The deleted failed-root copies are not recoverable at their former keys, but
 their exact bytes remain in the documented completed-root authorities.
 
+## V2 provider-independent definition fix pass (2026-09-04)
+
+The remaining defects in `v2_fix_pass_2.md` were implemented as a source-only
+pass. V2 now uses split-adjusted price returns whose split/bonus factors are
+classified uniformly from COTAHIST `DISMES`, price, and quantity histories.
+Future cash-type and ambiguous events exclude targets; cash events do not mask
+features; ambiguous events shadow affected price-return lookbacks; and only
+detected splits create M1 action boundaries. Yahoo action rows and provider
+failures are confined to audit tables. A small-store regression proves that
+full provider evidence versus empty actions/all-failed acquisition evidence
+produces byte-identical NumPy arrays.
+
+The pass also added the five-point feature-family survivorship gate, the 0.005
+absolute-log M1/COTAHIST anchor gate and year/adjustment audits, removed dead
+future distribution flags from the RAD event sidecar, made paired comparisons
+consume the selected protocol's bootstrap settings, required hash-bound fast
+pretrained checkpoints for preset runs, normalized legacy action caches in
+memory, and replaced degenerate metric/cluster tests with nontrivial and
+end-to-end causal fixtures. The survivor-only total-return sensitivity is
+registered but remains unimplemented.
+
+Ruff and compilation passed. The research suite passed 598 tests with the two
+expected sparse-intraday-fixture warnings, and the collector suite passed all
+24 tests. Per the implementation-only instruction, no store rebuild, full-F1
+pipeline validation, Section-D research run, official-validation/test read,
+candidate selection, or deployment change was performed. All older v2 stores
+and validations therefore remain superseded historical engineering evidence;
+a clean commit-bound rebuild is still required before v2 acceptance.
+
 ## V2 blocking-review fix pass (2026-09-04)
 
 The blocking review in `v2_review_fixes.md` was implemented without changing

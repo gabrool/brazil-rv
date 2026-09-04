@@ -1,10 +1,10 @@
 import numpy as np
 
-from brazil_rv.v2.corporate_actions import causal_adjustment_factors
+from brazil_rv.v2.corporate_actions import causal_price_adjustment_factor
 from brazil_rv.v2.targets import build_multi_day_targets, build_to_close_target
 
 
-def test_target_masks_exact_path_and_unresolved_ex_date() -> None:
+def test_target_masks_exact_path_and_excluded_event_date() -> None:
     close = np.array(
         [
             [100.0, 100.0, 100.0],
@@ -57,18 +57,18 @@ def test_to_close_target_is_cross_sectionally_ranked() -> None:
     np.testing.assert_array_equal(result.target[0], [0.0, 0.5, 1.0])
 
 
-def test_ex_date_total_return_target_reinvests_cash_distribution() -> None:
-    raw_close = np.asarray([[100.0, 100.0], [90.0, 110.0]])
-    cash = np.asarray([[0.0, 0.0], [10.0, 0.0]])
-    _, factor = causal_adjustment_factors(
-        raw_close, np.ones_like(raw_close), cash
-    )
-    total_return_close = raw_close * factor
+def test_split_adjusted_target_is_continuous_and_cash_event_is_excluded() -> None:
+    raw_close = np.asarray([[100.0, 100.0], [50.0, 110.0]])
+    price_ratio = np.asarray([[np.nan, np.nan], [0.5, 1.1]])
+    split = np.asarray([[False, False], [True, False]])
+    adjusted_close = raw_close * causal_price_adjustment_factor(price_ratio, split)
+    excluded = np.asarray([[False, False], [False, True]])
     result = build_multi_day_targets(
-        total_return_close,
+        adjusted_close,
         np.ones_like(raw_close, dtype=bool),
         np.full_like(raw_close, 0.02),
-        np.zeros_like(raw_close, dtype=bool),
+        excluded,
         horizons=(1,),
     )
     np.testing.assert_allclose(result.raw_log_return[0, 0, 0], 0.0, atol=1e-12)
+    assert not result.raw_valid[0, 1, 0]

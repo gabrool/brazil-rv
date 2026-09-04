@@ -166,10 +166,15 @@ def test_named_protocol_json_files_match_frozen_presets() -> None:
 
 def test_named_preset_expands_to_train_and_score_commands(tmp_path) -> None:
     store = tmp_path / "store"
+    checkpoint = tmp_path / "fast.pt"
+    checkpoint.write_bytes(b"accepted-fast-checkpoint")
+    checkpoint_sha = launcher._sha256(checkpoint)
     jobs, maximum, metadata = launcher.preset_jobs(
         name="triage",
         store=store,
         output_root=tmp_path / "runs",
+        fast_pretrained_checkpoint=checkpoint,
+        fast_pretrained_sha256=checkpoint_sha,
         sidecars=("events",),
         compile_forward=False,
     )
@@ -179,7 +184,23 @@ def test_named_preset_expands_to_train_and_score_commands(tmp_path) -> None:
     assert metadata["paired_bootstrap_block_sessions"] == 20
     assert all("brazil_rv.v2.train" in job.command for job in jobs)
     assert all("--score-output-dir" in job.command for job in jobs)
+    assert all("--fast-pretrained-checkpoint" in job.command for job in jobs)
+    assert all("--fast-pretrained-sha256" in job.command for job in jobs)
     assert all("--no-compile-forward" in job.command for job in jobs)
+    assert metadata["fast_pretrained_sha256"] == checkpoint_sha
+
+
+def test_named_preset_rejects_unbound_fast_checkpoint(tmp_path) -> None:
+    checkpoint = tmp_path / "fast.pt"
+    checkpoint.write_bytes(b"accepted-fast-checkpoint")
+    with pytest.raises(ValueError, match="SHA-256 mismatch"):
+        launcher.preset_jobs(
+            name="triage",
+            store=tmp_path / "store",
+            output_root=tmp_path / "runs",
+            fast_pretrained_checkpoint=checkpoint,
+            fast_pretrained_sha256="0" * 64,
+        )
 
 
 def test_protocol_loader_rejects_any_config_drift(tmp_path) -> None:

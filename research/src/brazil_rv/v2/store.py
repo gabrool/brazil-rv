@@ -116,7 +116,6 @@ def _validate_array_shapes(
             "active",
             "observed",
             "fast_present",
-            "unresolved_action",
         }:
             if value.dtype != np.bool_:
                 raise ValueError(f"mask array must have boolean dtype: {name}")

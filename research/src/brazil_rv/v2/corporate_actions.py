@@ -29,13 +29,22 @@ def _sha256(path: Path) -> str:
 @dataclass(frozen=True)
 class AdjustmentResult:
     price_factor: NDArray[np.float64]
-    total_return_factor: NDArray[np.float64]
     adjusted_open: NDArray[np.float64]
     adjusted_high: NDArray[np.float64]
     adjusted_low: NDArray[np.float64]
     adjusted_close: NDArray[np.float64]
-    total_return_close: NDArray[np.float64]
-    unresolved: NDArray[np.bool_]
+
+
+@dataclass(frozen=True)
+class DetectedActionResult:
+    """COTAHIST-only action classification on the aligned daily panel."""
+
+    event_candidate: NDArray[np.bool_]
+    split_event: NDArray[np.bool_]
+    cash_event: NDArray[np.bool_]
+    ambiguous_event: NDArray[np.bool_]
+    price_ratio: NDArray[np.float64]
+    quantity_ratio: NDArray[np.float64]
 
 
 def normalize_yfinance_actions(
@@ -109,6 +118,85 @@ def normalize_yfinance_actions(
         "unresolved": pl.Boolean,
     }
     return pl.DataFrame(rows, schema=schema)
+
+
+def normalize_cached_action_schema(
+    frame: pl.DataFrame,
+    *,
+    isin: str,
+    ticker: str,
+    fetched_at: datetime,
+) -> pl.DataFrame:
+    """Upgrade legacy immutable cache rows in memory without rewriting them."""
+
+    raw_columns = {"date", "dividends", "stock_splits"}
+    provider_columns = {"Date", "Dividends", "Stock Splits"}
+    if raw_columns.issubset(frame.columns) or provider_columns.issubset(frame.columns):
+        return normalize_yfinance_actions(
+            frame, isin=isin, ticker=ticker, fetched_at=fetched_at
+        )
+    required = {
+        "isin",
+        "ex_date",
+        "action_type",
+        "split_factor",
+        "cash_distribution_brl",
+    }
+    if not required.issubset(frame.columns):
+        raise ValueError(
+            "legacy action cache columns missing: "
+            f"{sorted(required - set(frame.columns))}"
+        )
+    additions: list[pl.Expr] = []
+    if "provider_cash_distribution_brl" not in frame.columns:
+        additions.append(
+            pl.col("cash_distribution_brl")
+            .cast(pl.Float64)
+            .alias("provider_cash_distribution_brl")
+        )
+    if "cash_unit_adjustment_factor" not in frame.columns:
+        additions.append(pl.lit(1.0).alias("cash_unit_adjustment_factor"))
+    if "known_date" not in frame.columns:
+        additions.append(pl.col("ex_date").cast(pl.Date).alias("known_date"))
+    if "source_ticker" not in frame.columns:
+        additions.append(pl.lit(ticker).alias("source_ticker"))
+    if "source" not in frame.columns:
+        additions.append(pl.lit("yfinance.actions").alias("source"))
+    if "fetched_at" not in frame.columns:
+        additions.append(pl.lit(fetched_at).alias("fetched_at"))
+    if "unresolved" not in frame.columns:
+        additions.append(pl.lit(False).alias("unresolved"))
+    upgraded = frame.with_columns(additions) if additions else frame
+    columns = (
+        "isin",
+        "ex_date",
+        "action_type",
+        "split_factor",
+        "cash_distribution_brl",
+        "provider_cash_distribution_brl",
+        "cash_unit_adjustment_factor",
+        "known_date",
+        "source_ticker",
+        "source",
+        "fetched_at",
+        "unresolved",
+    )
+    return upgraded.select(columns).cast(
+        {
+            "isin": pl.String,
+            "ex_date": pl.Date,
+            "action_type": pl.String,
+            "split_factor": pl.Float64,
+            "cash_distribution_brl": pl.Float64,
+            "provider_cash_distribution_brl": pl.Float64,
+            "cash_unit_adjustment_factor": pl.Float64,
+            "known_date": pl.Date,
+            "source_ticker": pl.String,
+            "source": pl.String,
+            "fetched_at": pl.Datetime("us"),
+            "unresolved": pl.Boolean,
+        }
+    )
 
 
 def _empty_yfinance_frame() -> pl.DataFrame:
@@ -471,7 +559,12 @@ def acquire_yfinance_actions(
                     status = "zero_actions_current_ticker"
             else:
                 status = "zero_actions" if frame.is_empty() else "downloaded"
-        frame = pl.read_parquet(path)
+        frame = normalize_cached_action_schema(
+            pl.read_parquet(path),
+            isin=str(row["isin"]),
+            ticker=query_ticker,
+            fetched_at=timestamp,
+        )
         frames.append(frame)
         audit_rows.append(
             {
@@ -555,72 +648,6 @@ def align_action_arrays(
     return split, cash, unresolved
 
 
-def action_presence_array(
-    actions: pl.DataFrame,
-    dates: Sequence[date | np.datetime64],
-    isins: Sequence[str],
-) -> NDArray[np.bool_]:
-    """Mark every recorded action, including neutral-factor rights/bonuses."""
-
-    checked = validate_action_table(actions)
-    normalized_dates = tuple(_as_date(value) for value in dates)
-    date_lookup = {value: index for index, value in enumerate(normalized_dates)}
-    isin_lookup = {value: index for index, value in enumerate(isins)}
-    present = np.zeros((len(normalized_dates), len(isins)), dtype=np.bool_)
-    for ex_date, isin in checked.select("ex_date", "isin").iter_rows():
-        date_index = date_lookup.get(ex_date)
-        isin_index = isin_lookup.get(isin)
-        if date_index is not None and isin_index is not None:
-            present[date_index, isin_index] = True
-    return present
-
-
-def provider_failure_mask(
-    acquisition_audit: pl.DataFrame,
-    dates: Sequence[date | np.datetime64],
-    isins: Sequence[str],
-    observed: NDArray[np.bool_],
-    event_candidates: NDArray[np.bool_],
-    *,
-    maximum_horizon: int,
-) -> NDArray[np.bool_]:
-    """Mask bounded event neighborhoods inside provider-failed segments."""
-
-    required = {"isin", "first_date", "last_date", "status"}
-    if not required.issubset(acquisition_audit.columns):
-        raise ValueError(
-            "action acquisition audit columns missing: "
-            f"{sorted(required - set(acquisition_audit.columns))}"
-        )
-    normalized_dates = np.asarray(dates, dtype="datetime64[D]")
-    seen = np.asarray(observed, dtype=np.bool_)
-    candidates = np.asarray(event_candidates, dtype=np.bool_)
-    if (
-        seen.shape != (len(normalized_dates), len(isins))
-        or candidates.shape != seen.shape
-    ):
-        raise ValueError("provider failure mask axes are misaligned")
-    if maximum_horizon < 0:
-        raise ValueError("maximum_horizon must be non-negative")
-    isin_lookup = {value: index for index, value in enumerate(isins)}
-    failed = np.zeros(seen.shape, dtype=np.bool_)
-    for row in acquisition_audit.filter(pl.col("status") == "failed").iter_rows(
-        named=True
-    ):
-        isin_index = isin_lookup.get(str(row["isin"]))
-        if isin_index is None:
-            continue
-        first = np.datetime64(_as_date(row["first_date"]), "D")
-        last = np.datetime64(_as_date(row["last_date"]), "D")
-        within = (normalized_dates >= first) & (normalized_dates <= last)
-        for event_day in np.flatnonzero(within & candidates[:, isin_index]):
-            start = max(0, event_day - maximum_horizon)
-            stop = min(len(normalized_dates), event_day + maximum_horizon + 1)
-            bounded = within[start:stop] & seen[start:stop, isin_index]
-            failed[start:stop, isin_index] |= bounded
-    return failed
-
-
 def action_calendar_alignment_table(
     actions: pl.DataFrame,
     dates: Sequence[date | np.datetime64],
@@ -679,142 +706,210 @@ def detect_distribution_changes(
     return changed
 
 
-def distribution_review_table(
+def detect_cotahist_actions(
+    raw_close: NDArray[np.floating],
+    quantity: NDArray[np.floating],
+    distribution_number: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    *,
+    median_sessions: int = 3,
+    split_log_price_threshold: float = 0.08,
+    ambiguous_log_price_threshold: float = 0.04,
+    volume_continuity_tolerance: float = 0.15,
+) -> DetectedActionResult:
+    """Classify daily corporate-action boundaries from official data only.
+
+    Each event-day ratio compares the median of up to three observed sessions
+    before the boundary with the median of up to three observed sessions from
+    the boundary onward.  A price jump above the ambiguous-band threshold is a
+    candidate even when ``DISMES`` is unchanged; every other candidate originates
+    from a ``DISMES`` change.  No provider action or provider-coverage flag enters
+    the classification.
+    """
+
+    close = np.asarray(raw_close, dtype=np.float64)
+    qty = np.asarray(quantity, dtype=np.float64)
+    distribution = np.asarray(distribution_number, dtype=np.float64)
+    seen = np.asarray(observed, dtype=np.bool_)
+    if (
+        close.ndim != 2
+        or qty.shape != close.shape
+        or distribution.shape != close.shape
+        or seen.shape != close.shape
+    ):
+        raise ValueError("COTAHIST action inputs must align [date, name]")
+    if median_sessions < 1:
+        raise ValueError("median_sessions must be positive")
+    if not (
+        0.0 < ambiguous_log_price_threshold < split_log_price_threshold
+        and volume_continuity_tolerance > 0.0
+    ):
+        raise ValueError("COTAHIST action thresholds are invalid")
+
+    distribution_changed = detect_distribution_changes(distribution, seen)
+    immediate_price = np.full(close.shape, np.nan, dtype=np.float64)
+    immediate_quantity = np.full(close.shape, np.nan, dtype=np.float64)
+    adjacent = (
+        seen[1:]
+        & seen[:-1]
+        & np.isfinite(close[1:])
+        & np.isfinite(close[:-1])
+        & np.isfinite(qty[1:])
+        & np.isfinite(qty[:-1])
+        & (close[1:] > 0)
+        & (close[:-1] > 0)
+        & (qty[1:] > 0)
+        & (qty[:-1] > 0)
+    )
+    np.divide(close[1:], close[:-1], out=immediate_price[1:], where=adjacent)
+    np.divide(qty[1:], qty[:-1], out=immediate_quantity[1:], where=adjacent)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        immediate_log_price = np.log(immediate_price)
+        immediate_log_quantity = np.log(immediate_quantity)
+    immediate_jump = (
+        np.isfinite(immediate_log_price)
+        & np.isfinite(immediate_log_quantity)
+        & (np.abs(immediate_log_price) > ambiguous_log_price_threshold)
+    )
+    event_candidate = distribution_changed | immediate_jump
+
+    price_ratio = np.full(close.shape, np.nan, dtype=np.float64)
+    quantity_ratio = np.full(close.shape, np.nan, dtype=np.float64)
+    for day, name in np.argwhere(event_candidate):
+        if day == 0:
+            continue
+        before = slice(max(0, day - median_sessions), day)
+        after = slice(day, min(close.shape[0], day + median_sessions))
+        before_mask = (
+            seen[before, name]
+            & np.isfinite(close[before, name])
+            & (close[before, name] > 0)
+            & np.isfinite(qty[before, name])
+            & (qty[before, name] > 0)
+        )
+        after_mask = (
+            seen[after, name]
+            & np.isfinite(close[after, name])
+            & (close[after, name] > 0)
+            & np.isfinite(qty[after, name])
+            & (qty[after, name] > 0)
+        )
+        if not before_mask.any() or not after_mask.any():
+            continue
+        before_close = float(np.median(close[before, name][before_mask]))
+        after_close = float(np.median(close[after, name][after_mask]))
+        before_quantity = float(np.median(qty[before, name][before_mask]))
+        after_quantity = float(np.median(qty[after, name][after_mask]))
+        price_ratio[day, name] = after_close / before_close
+        quantity_ratio[day, name] = after_quantity / before_quantity
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log_price = np.log(price_ratio)
+        log_quantity = np.log(quantity_ratio)
+    comparable = np.isfinite(log_price) & np.isfinite(log_quantity)
+    volume_continuous = comparable & (
+        np.abs(log_price + log_quantity) < volume_continuity_tolerance
+    )
+    split_like = (
+        comparable
+        & (np.abs(log_price) > split_log_price_threshold)
+        & volume_continuous
+    )
+    split_event = event_candidate & split_like
+    ambiguous_event = (
+        event_candidate
+        & ~split_event
+        & comparable
+        & (np.abs(log_price) > ambiguous_log_price_threshold)
+        & (np.abs(log_price) <= split_log_price_threshold)
+        & ~volume_continuous
+    )
+    cash_event = event_candidate & ~split_event & ~ambiguous_event
+    return DetectedActionResult(
+        event_candidate=event_candidate,
+        split_event=split_event,
+        cash_event=cash_event,
+        ambiguous_event=ambiguous_event,
+        price_ratio=price_ratio,
+        quantity_ratio=quantity_ratio,
+    )
+
+
+def cotahist_action_classification_table(
     dates: Sequence[date | np.datetime64],
     isins: Sequence[str],
-    changed: NDArray[np.bool_],
-    recorded_action: NDArray[np.bool_],
+    distribution_changed: NDArray[np.bool_],
+    result: DetectedActionResult,
 ) -> pl.DataFrame:
-    change = np.asarray(changed, dtype=np.bool_)
-    recorded = np.asarray(recorded_action, dtype=np.bool_)
-    if change.shape != recorded.shape or change.shape != (len(dates), len(isins)):
-        raise ValueError("distribution review axes are misaligned")
+    changed = np.asarray(distribution_changed, dtype=np.bool_)
+    shape = (len(dates), len(isins))
+    arrays = (
+        result.event_candidate,
+        result.split_event,
+        result.cash_event,
+        result.ambiguous_event,
+        result.price_ratio,
+        result.quantity_ratio,
+    )
+    if changed.shape != shape or any(np.asarray(value).shape != shape for value in arrays):
+        raise ValueError("COTAHIST action classification axes are misaligned")
     rows = [
         {
             "date": _as_date(dates[day]),
             "isin": isins[name],
-            "recorded_action": bool(recorded[day, name]),
-            "unresolved": not bool(recorded[day, name]),
+            "distribution_number_changed": bool(changed[day, name]),
+            "split_event": bool(result.split_event[day, name]),
+            "cash_event": bool(result.cash_event[day, name]),
+            "ambiguous_event": bool(result.ambiguous_event[day, name]),
+            "price_ratio": (
+                float(result.price_ratio[day, name])
+                if np.isfinite(result.price_ratio[day, name])
+                else None
+            ),
+            "quantity_ratio": (
+                float(result.quantity_ratio[day, name])
+                if np.isfinite(result.quantity_ratio[day, name])
+                else None
+            ),
         }
-        for day, name in np.argwhere(change)
+        for day, name in np.argwhere(result.event_candidate)
     ]
     return pl.DataFrame(
         rows,
         schema={
             "date": pl.Date,
             "isin": pl.String,
-            "recorded_action": pl.Boolean,
-            "unresolved": pl.Boolean,
+            "distribution_number_changed": pl.Boolean,
+            "split_event": pl.Boolean,
+            "cash_event": pl.Boolean,
+            "ambiguous_event": pl.Boolean,
+            "price_ratio": pl.Float64,
+            "quantity_ratio": pl.Float64,
         },
     )
 
 
-def causal_adjustment_factors(
-    raw_close: NDArray[np.floating],
-    split_factor: NDArray[np.floating],
-    cash_distribution_brl: NDArray[np.floating],
-    unresolved: NDArray[np.bool_] | None = None,
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Compute forward-only price and total-return factors.
+def causal_price_adjustment_factor(
+    event_price_ratio: NDArray[np.floating],
+    split_event: NDArray[np.bool_],
+) -> NDArray[np.float64]:
+    """Return the forward-only level factor implied by detected split ratios.
 
-    Historical rows are never rewritten when a later action occurs. A split of
-    ``s`` multiplies the factor from its ex-date onward. A cash distribution
-    multiplies the total-return factor by ``1 + cash / raw_close`` on its ex-date.
+    ``event_price_ratio`` is post-event price divided by pre-event price.  The
+    adjusted level therefore divides every row from the split session onward
+    by that boundary ratio.  Later events never rewrite earlier observations.
     """
 
-    close = np.asarray(raw_close, dtype=np.float64)
-    split = np.asarray(split_factor, dtype=np.float64)
-    cash = np.asarray(cash_distribution_brl, dtype=np.float64)
-    bad = np.zeros(close.shape, dtype=np.bool_) if unresolved is None else np.asarray(unresolved, dtype=np.bool_)
-    if close.ndim != 2 or split.shape != close.shape or cash.shape != close.shape or bad.shape != close.shape:
-        raise ValueError("daily action arrays must be aligned [date, name]")
-    if np.any(~np.isfinite(split) | (split <= 0)) or np.any(~np.isfinite(cash) | (cash < 0)):
-        raise ValueError("invalid action factor arrays")
-    price = np.ones(close.shape, dtype=np.float64)
-    distribution = np.ones(close.shape, dtype=np.float64)
-    for date_index in range(close.shape[0]):
-        if date_index:
-            price[date_index] = price[date_index - 1]
-            distribution[date_index] = distribution[date_index - 1]
-        # ``unresolved`` is normally a target-eligibility flag, not permission
-        # to erase a recorded action. The sole exception is a cash event for
-        # which this exact ISIN has no positive ex-date close: the specified
-        # reinvestment factor is then unknowable. The caller must flag that
-        # cell unresolved; substituting another session's close would change
-        # the return definition.
-        price[date_index] *= split[date_index]
-        has_cash = cash[date_index] > 0
-        invalid_cash = has_cash & (~np.isfinite(close[date_index]) | (close[date_index] <= 0))
-        unflagged_invalid = invalid_cash & ~bad[date_index]
-        if unflagged_invalid.any():
-            slots = np.flatnonzero(unflagged_invalid).tolist()
-            raise ValueError(f"cash distribution has no positive ex-date close at slots {slots}")
-        has_cash &= ~invalid_cash
-        distribution[date_index, has_cash] *= 1.0 + cash[date_index, has_cash] / close[date_index, has_cash]
-    return price, price * distribution
-
-
-def cash_reinvestment_unavailable_mask(
-    raw_close: NDArray[np.floating],
-    cash_distribution_brl: NDArray[np.floating],
-) -> NDArray[np.bool_]:
-    """Flag cash events lacking the exact positive ex-date close."""
-
-    close = np.asarray(raw_close, dtype=np.float64)
-    cash = np.asarray(cash_distribution_brl, dtype=np.float64)
-    if close.ndim != 2 or cash.shape != close.shape:
-        raise ValueError("cash-reinvestment inputs must align [date, name]")
-    return (cash > 0) & (~np.isfinite(close) | (close <= 0))
-
-
-def cash_reinvestment_review_table(
-    dates: Sequence[date | np.datetime64],
-    isins: Sequence[str],
-    cash_distribution_brl: NDArray[np.floating],
-    raw_close: NDArray[np.floating],
-    observed: NDArray[np.bool_] | None = None,
-) -> pl.DataFrame:
-    """Retain recorded cash events whose exact reinvestment close is absent."""
-
-    cash = np.asarray(cash_distribution_brl, dtype=np.float64)
-    close = np.asarray(raw_close, dtype=np.float64)
-    seen = (
-        np.isfinite(close)
-        if observed is None
-        else np.asarray(observed, dtype=np.bool_)
-    )
-    unavailable = cash_reinvestment_unavailable_mask(close, cash)
-    if (
-        unavailable.shape != (len(dates), len(isins))
-        or seen.shape != unavailable.shape
-    ):
-        raise ValueError("cash-reinvestment axes are misaligned")
-    rows = [
-        {
-            "trade_date": _as_date(dates[day]),
-            "isin": str(isins[name]),
-            "cash_distribution_brl": float(cash[day, name]),
-            "raw_close_brl": (
-                float(close[day, name]) if np.isfinite(close[day, name]) else None
-            ),
-            "observed": bool(seen[day, name]),
-            "unresolved": True,
-            "status": "unresolved_missing_ex_date_close",
-        }
-        for day, name in np.argwhere(unavailable)
-    ]
-    return pl.DataFrame(
-        rows,
-        schema={
-            "trade_date": pl.Date,
-            "isin": pl.String,
-            "cash_distribution_brl": pl.Float64,
-            "raw_close_brl": pl.Float64,
-            "observed": pl.Boolean,
-            "unresolved": pl.Boolean,
-            "status": pl.String,
-        },
-    )
+    ratio = np.asarray(event_price_ratio, dtype=np.float64)
+    split = np.asarray(split_event, dtype=np.bool_)
+    if ratio.ndim != 2 or split.shape != ratio.shape:
+        raise ValueError("split ratios and masks must align [date, name]")
+    invalid = split & (~np.isfinite(ratio) | (ratio <= 0))
+    if invalid.any():
+        raise ValueError("detected split has no positive finite price ratio")
+    boundary = np.ones(ratio.shape, dtype=np.float64)
+    boundary[split] = 1.0 / ratio[split]
+    return np.cumprod(boundary, axis=0, dtype=np.float64)
 
 
 def adjust_daily_ohlc(
@@ -822,67 +917,23 @@ def adjust_daily_ohlc(
     raw_high: NDArray[np.floating],
     raw_low: NDArray[np.floating],
     raw_close: NDArray[np.floating],
-    split_factor: NDArray[np.floating],
-    cash_distribution_brl: NDArray[np.floating],
-    unresolved: NDArray[np.bool_] | None = None,
+    event_price_ratio: NDArray[np.floating],
+    split_event: NDArray[np.bool_],
 ) -> AdjustmentResult:
+    """Apply only official-data split/bonus adjustments to daily OHLC."""
+
     close = np.asarray(raw_close, dtype=np.float64)
     arrays = tuple(np.asarray(value, dtype=np.float64) for value in (raw_open, raw_high, raw_low))
     if any(value.shape != close.shape for value in arrays):
         raise ValueError("OHLC arrays are misaligned")
-    bad = np.zeros(close.shape, dtype=np.bool_) if unresolved is None else np.asarray(unresolved, dtype=np.bool_)
-    price_factor, total_return_factor = causal_adjustment_factors(
-        close, split_factor, cash_distribution_brl, bad
-    )
+    price_factor = causal_price_adjustment_factor(event_price_ratio, split_event)
     return AdjustmentResult(
         price_factor=price_factor,
-        total_return_factor=total_return_factor,
         adjusted_open=arrays[0] * price_factor,
         adjusted_high=arrays[1] * price_factor,
         adjusted_low=arrays[2] * price_factor,
         adjusted_close=close * price_factor,
-        total_return_close=close * total_return_factor,
-        unresolved=bad.copy(),
     )
-
-
-def detect_split_candidates(
-    raw_close: NDArray[np.floating],
-    quantity: NDArray[np.floating],
-    observed: NDArray[np.bool_],
-    *,
-    log_price_jump: float = 0.35,
-    maximum_log_offset_error: float = 0.20,
-) -> NDArray[np.bool_]:
-    """Flag price jumps with approximately offsetting traded-quantity jumps.
-
-    This is deliberately an audit signal, not an inferred adjustment factor.
-    """
-
-    close = np.asarray(raw_close, dtype=np.float64)
-    qty = np.asarray(quantity, dtype=np.float64)
-    seen = np.asarray(observed, dtype=np.bool_)
-    if close.shape != qty.shape or close.shape != seen.shape or close.ndim != 2:
-        raise ValueError("split-detection inputs must be aligned [date, name]")
-    output = np.zeros(close.shape, dtype=np.bool_)
-    price_change = np.log(close[1:] / close[:-1])
-    quantity_change = np.log(qty[1:] / qty[:-1])
-    comparable = (
-        seen[1:]
-        & seen[:-1]
-        & np.isfinite(price_change)
-        & np.isfinite(quantity_change)
-        & (close[1:] > 0)
-        & (close[:-1] > 0)
-        & (qty[1:] > 0)
-        & (qty[:-1] > 0)
-    )
-    output[1:] = (
-        comparable
-        & (np.abs(price_change) > log_price_jump)
-        & (np.abs(price_change + quantity_change) <= maximum_log_offset_error)
-    )
-    return output
 
 
 def split_review_table(
@@ -918,6 +969,87 @@ def split_review_table(
             "recorded_split_factor": pl.Float64,
             "agreement": pl.Boolean,
             "unresolved": pl.Boolean,
+        },
+    )
+
+
+def provider_split_detection_audit(
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+    detected_split: NDArray[np.bool_],
+    provider_actions: pl.DataFrame,
+    acquisition_audit: pl.DataFrame | None = None,
+) -> pl.DataFrame:
+    """Measure COTAHIST split detection only where the provider was available."""
+
+    normalized_dates = np.asarray(dates, dtype="datetime64[D]")
+    detected = np.asarray(detected_split, dtype=np.bool_)
+    shape = (len(normalized_dates), len(isins))
+    if detected.shape != shape:
+        raise ValueError("provider split audit axes are misaligned")
+    provider_factor, _, _ = align_action_arrays(
+        provider_actions, dates, isins
+    )
+    provider_split = provider_factor != 1.0
+    covered = np.zeros(shape, dtype=np.bool_)
+    isin_lookup = {isin: index for index, isin in enumerate(isins)}
+    if acquisition_audit is None:
+        for isin in provider_actions.get_column("isin").unique().to_list():
+            name = isin_lookup.get(str(isin))
+            if name is not None:
+                covered[:, name] = True
+    else:
+        required = {"isin", "first_date", "last_date", "status"}
+        if not required.issubset(acquisition_audit.columns):
+            raise ValueError("corporate-action acquisition audit has wrong schema")
+        for row in acquisition_audit.filter(
+            pl.col("status") != "failed"
+        ).iter_rows(named=True):
+            name = isin_lookup.get(str(row["isin"]))
+            if name is None:
+                continue
+            first = np.datetime64(_as_date(row["first_date"]), "D")
+            last = np.datetime64(_as_date(row["last_date"]), "D")
+            covered[:, name] |= (normalized_dates >= first) & (
+                normalized_dates <= last
+            )
+
+    years = normalized_dates.astype("datetime64[Y]").astype(np.int64) + 1970
+    periods: list[tuple[str, NDArray[np.bool_]]] = [("all", covered)]
+    periods.extend(
+        (str(int(year)), covered & (years == year)[:, None])
+        for year in sorted(set(years.tolist()))
+    )
+    rows: list[dict[str, object]] = []
+    for period, eligible in periods:
+        predicted = detected & eligible
+        actual = provider_split & eligible
+        true_positive = int((predicted & actual).sum())
+        predicted_count = int(predicted.sum())
+        actual_count = int(actual.sum())
+        rows.append(
+            {
+                "period": period,
+                "covered_name_days": int(eligible.sum()),
+                "detected_split_count": predicted_count,
+                "provider_split_count": actual_count,
+                "true_positive_count": true_positive,
+                "precision": (
+                    true_positive / predicted_count if predicted_count else None
+                ),
+                "recall": true_positive / actual_count if actual_count else None,
+            }
+        )
+    return pl.DataFrame(
+        rows,
+        schema={
+            "period": pl.String,
+            "covered_name_days": pl.Int64,
+            "detected_split_count": pl.Int64,
+            "provider_split_count": pl.Int64,
+            "true_positive_count": pl.Int64,
+            "precision": pl.Float64,
+            "recall": pl.Float64,
         },
     )
 
@@ -997,8 +1129,8 @@ def action_coverage_table(
                 "provider_taxonomy": "yfinance dividends and stock splits",
                 "source_limitations": (
                     "bonus, JCP, and subscription-right taxonomy is not "
-                    "guaranteed by the provider and unresolved source gaps "
-                    "remain target-masked"
+                    "guaranteed by the provider; these provider gaps affect "
+                    "audit coverage only"
                 ),
             }
             )
@@ -1262,6 +1394,76 @@ def audit_m1_adjustment_status(
             "raw_ratio_relative_error": pl.Float64,
             "adjusted_ratio_relative_error": pl.Float64,
             "status": pl.String,
+        },
+    )
+
+
+def m1_cotahist_mismatch_by_year(
+    dates: Sequence[date | np.datetime64],
+    m1_session_close: NDArray[np.floating],
+    m1_session_close_valid: NDArray[np.bool_],
+    cotahist_close: NDArray[np.floating],
+    cotahist_observed: NDArray[np.bool_],
+    *,
+    maximum_log_mismatch: float = 0.005,
+) -> pl.DataFrame:
+    """Report the exact close-unit gate used before COTAHIST anchoring."""
+
+    minute = np.asarray(m1_session_close, dtype=np.float64)
+    minute_valid = np.asarray(m1_session_close_valid, dtype=np.bool_)
+    official = np.asarray(cotahist_close, dtype=np.float64)
+    official_valid = np.asarray(cotahist_observed, dtype=np.bool_)
+    if (
+        minute.ndim != 2
+        or minute_valid.shape != minute.shape
+        or official.shape != minute.shape
+        or official_valid.shape != minute.shape
+        or len(dates) != minute.shape[0]
+    ):
+        raise ValueError("M1/COTAHIST mismatch axes are misaligned")
+    comparable = (
+        minute_valid
+        & official_valid
+        & np.isfinite(minute)
+        & np.isfinite(official)
+        & (minute > 0)
+        & (official > 0)
+    )
+    error = np.full(minute.shape, np.nan, dtype=np.float64)
+    error[comparable] = np.abs(np.log(minute[comparable] / official[comparable]))
+    mismatch = comparable & (error > maximum_log_mismatch)
+    years = np.asarray(dates, dtype="datetime64[Y]").astype(np.int64) + 1970
+    rows: list[dict[str, object]] = []
+    for year in sorted(set(years.tolist())):
+        selected = (years == year)[:, None]
+        comparable_count = int((selected & comparable).sum())
+        mismatch_count = int((selected & mismatch).sum())
+        finite_error = error[selected & comparable]
+        rows.append(
+            {
+                "year": int(year),
+                "comparable_name_days": comparable_count,
+                "mismatch_name_days": mismatch_count,
+                "unavailable_name_days": int((selected & ~comparable).sum()),
+                "mismatch_rate": (
+                    mismatch_count / comparable_count if comparable_count else None
+                ),
+                "median_absolute_log_ratio": (
+                    float(np.median(finite_error)) if finite_error.size else None
+                ),
+                "maximum_allowed_absolute_log_ratio": maximum_log_mismatch,
+            }
+        )
+    return pl.DataFrame(
+        rows,
+        schema={
+            "year": pl.Int32,
+            "comparable_name_days": pl.Int64,
+            "mismatch_name_days": pl.Int64,
+            "unavailable_name_days": pl.Int64,
+            "mismatch_rate": pl.Float64,
+            "median_absolute_log_ratio": pl.Float64,
+            "maximum_allowed_absolute_log_ratio": pl.Float64,
         },
     )
 

@@ -14,6 +14,7 @@ from brazil_rv.v2.build_store import (
     EXPECTED_V1_DATES,
     MinutePanel,
     V1_STORE_START,
+    _feature_validity_by_survival,
     _require_clean_implementation_commit,
     _validate_v1_calendar,
     build_daily_store,
@@ -60,6 +61,34 @@ def test_store_cli_requires_clean_worktree_before_binding_commit(
         _require_clean_implementation_commit(tmp_path, "a" * 40)
 
 
+def test_feature_validity_survivorship_gate_uses_family_population() -> None:
+    dates = np.asarray(
+        ["2023-12-27", "2023-12-28", "2023-12-29", "2024-01-02"],
+        dtype="datetime64[D]",
+    )
+    observed = np.asarray(
+        [[True, True], [True, True], [True, True], [False, True]]
+    )
+    active = observed.copy()
+    present = observed.copy()
+    balanced = np.ones((4, 2, 2), dtype=np.bool_)
+    table = _feature_validity_by_survival(
+        dates,
+        active,
+        observed,
+        {"slow": (balanced, present)},
+    )
+    assert table.height == 2
+
+    skewed = balanced.copy()
+    skewed[:3, 0, 0] = False
+    with pytest.raises(ValueError, match="more than 5 percentage points"):
+        _feature_validity_by_survival(
+            dates,
+            active,
+            observed,
+            {"slow": (skewed, present)},
+        )
 def _base_store(tmp_path, *, external_fast=None, stored_fast_present=None):
     days, names = 25, 3
     dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(days)]
@@ -643,10 +672,9 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
     names = ("BRTESTACNOR1", "BRTESTACNPR0")
     dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(days)]
     daily_rows = []
-    for day in dates:
+    cotahist_close = float((100.0 + 404 * 0.01) * 1.0001)
+    for day_index, day in enumerate(dates):
         for name_index, isin in enumerate(names):
-            if day == dates[10] and name_index == 1:
-                continue
             daily_rows.append(
                 {
                     "trade_date": day,
@@ -655,14 +683,16 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
                     "security_spec_base": "ON",
                     "bdi_code": "02",
                     "market_type": 10,
-                    "open_brl": 200.0,
-                    "high_brl": 201.0,
-                    "low_brl": 199.0,
-                    "close_brl": 200.0,
+                    "open_brl": cotahist_close,
+                    "high_brl": cotahist_close * 1.01,
+                    "low_brl": cotahist_close * 0.99,
+                    "close_brl": cotahist_close,
                     "volume_brl": 3_000_000.0,
                     "trades": 100.0,
                     "quantity": 100_000.0,
-                    "distribution_number": 1,
+                    "distribution_number": (
+                        2 if name_index == 1 and day_index >= 63 else 1
+                    ),
                 }
             )
     minute = np.broadcast_to(
@@ -694,65 +724,70 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
         },
         schema_overrides={"ex_date": pl.Date},
     )
+    successful_audit = pl.DataFrame(
+        {
+            "isin": list(names),
+            "first_date": [dates[0]] * len(names),
+            "last_date": [dates[-1]] * len(names),
+            "status": ["downloaded"] * len(names),
+            "action_rows": [1] * len(names),
+        }
+    )
+    failed_audit = successful_audit.with_columns(
+        pl.lit("failed").alias("status"),
+        pl.lit(0).alias("action_rows"),
+    )
     root = build_daily_store(
         pl.DataFrame(daily_rows),
         actions,
         tmp_path / "daily_store",
         minute_panel=panel,
+        action_acquisition_audit=successful_audit,
         minimum_calendar_names=1,
         store_start=None,
     )
+    provider_empty_root = build_daily_store(
+        pl.DataFrame(daily_rows),
+        actions.head(0),
+        tmp_path / "daily_store_provider_empty",
+        minute_panel=panel,
+        action_acquisition_audit=failed_audit,
+        minimum_calendar_names=1,
+        store_start=None,
+    )
+    assert {
+        path.name: path.read_bytes() for path in root.glob("*.npy")
+    } == {
+        path.name: path.read_bytes()
+        for path in provider_empty_root.glob("*.npy")
+    }
     raw = np.load(root / "target_to_close_raw_log_return.npy")
     valid = np.load(root / "target_to_close_valid.npy")
-    expected = np.log(200.0 / minute[65, 0, 345])
-    assert raw[65, 0] == expected
-    assert raw[65, 0] != pytest.approx(np.log(123.45 / minute[65, 0, 345]))
-    assert valid[65, 0]
-    assert valid[65, 1]
-    unavailable = np.load(root / "cash_reinvestment_unavailable_mask.npy")
-    unresolved = np.load(root / "unresolved_action.npy")
-    price_unresolved = np.load(root / "price_adjustment_unresolved.npy")
-    price_level_valid = np.load(root / "adjusted_price_level_valid.npy")
-    assert unavailable[10, 1]
-    assert unresolved[10, 1]
-    assert not price_unresolved[10, 1]
-    assert price_level_valid[64, 1]
-    assert unresolved[63, 0]
-    assert price_unresolved[63, 0]
-    assert not price_level_valid[63:, 0].any()
+    expected = np.log(cotahist_close / minute[64, 0, 345])
+    assert raw[64, 0] == expected
+    assert valid[64].all()
+    assert np.isnan(raw[65, 0])
+    assert not valid[65].any()
+    consistent = np.load(root / "m1_cotahist_close_consistent_mask.npy")
+    assert not consistent[65].any()
+    cash_event = np.load(root / "detected_cash_event_mask.npy")
+    target_exclusion = np.load(root / "target_exclusion_event_mask.npy")
+    ambiguous = np.load(root / "ambiguous_action_mask.npy")
+    assert cash_event[63, 1]
+    assert target_exclusion[63, 1]
+    assert not ambiguous.any()
     slow_valid = np.load(root / "slow_valid.npy")
-    assert not slow_valid[63, 1, 3]
-    assert not slow_valid[63, 0, 0]
+    assert slow_valid[63, 1, 3]
     assert slow_valid[64, 0, 0]
-    assert not slow_valid[64, 0, 25]
+    assert slow_valid[64, 0, 25]
     target_raw_valid = np.load(root / "target_raw_valid.npy")
-    assert not target_raw_valid[5, 1, 4]
-    assert not target_raw_valid[62, 0, 0]
-    assert target_raw_valid[63, 0, 0]
-    target_valid = np.load(root / "target_valid.npy")
-    assert not target_valid[62, 0, 0]
-    assert not target_valid[63, 0, 0]
-    review = pl.read_parquet(
-        root / "corporate_action_cash_reinvestment_review.parquet"
-    )
-    assert review.select("observed", "unresolved").to_dicts() == [
-        {"observed": False, "unresolved": True}
-    ]
-    assert review.select("trade_date", "isin", "cash_distribution_brl").to_dicts() == [
-        {
-            "trade_date": dates[10],
-            "isin": names[1],
-            "cash_distribution_brl": 0.5,
-        }
-    ]
+    assert target_raw_valid[61, 1, 0]
+    assert not target_raw_valid[62, 1, 0]
+    assert target_raw_valid[63, 1, 0]
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    assert (
-        manifest["metadata"]["cash_reinvestment_unavailable_count_foundation"]
-        == 1
-    )
-    assert (
-        manifest["metadata"]["cash_reinvestment_unavailable_count_store_rows"]
-        == 1
+    assert "cash_reinvestment_unavailable_count_foundation" not in manifest["metadata"]
+    assert manifest["metadata"]["future_total_return_variant"].startswith(
+        "registered but not implemented"
     )
     assert tuple(
         manifest["metadata"]["v1_store_v2_zero_slow_fields"]

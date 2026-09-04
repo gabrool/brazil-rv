@@ -27,20 +27,20 @@ def _aligned_daily(*arrays: NDArray[np.generic]) -> tuple[NDArray[np.float64], .
     return converted
 
 
-def _unresolved_interval_clear(
-    unresolved_action: NDArray[np.bool_], horizon: int
+def _ambiguous_interval_clear(
+    ambiguous_action: NDArray[np.bool_], horizon: int
 ) -> NDArray[np.bool_]:
-    """Mark trailing ``(t-horizon, t]`` intervals without unresolved actions."""
+    """Mark trailing ``(t-horizon, t]`` intervals without ambiguous actions."""
 
-    unresolved = np.asarray(unresolved_action, dtype=np.bool_)
-    if unresolved.ndim != 2 or horizon < 0:
+    ambiguous = np.asarray(ambiguous_action, dtype=np.bool_)
+    if ambiguous.ndim != 2 or horizon < 0:
         raise ValueError(
-            "unresolved_action must be [date, name] and horizon non-negative"
+            "ambiguous_action must be [date, name] and horizon non-negative"
         )
     if horizon == 0:
-        return np.ones(unresolved.shape, dtype=np.bool_)
-    clear = np.zeros(unresolved.shape, dtype=np.bool_)
-    cumulative = np.cumsum(unresolved, axis=0, dtype=np.int32)
+        return np.ones(ambiguous.shape, dtype=np.bool_)
+    clear = np.zeros(ambiguous.shape, dtype=np.bool_)
+    cumulative = np.cumsum(ambiguous, axis=0, dtype=np.int32)
     clear[horizon:] = cumulative[horizon:] - cumulative[:-horizon] == 0
     return clear
 
@@ -48,7 +48,7 @@ def _unresolved_interval_clear(
 def exact_log_return(
     close: NDArray[np.floating],
     horizon: int,
-    unresolved_action: NDArray[np.bool_] | None = None,
+    ambiguous_action: NDArray[np.bool_] | None = None,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
     values = np.asarray(close, dtype=np.float64)
     if values.ndim != 2 or horizon <= 0:
@@ -64,12 +64,12 @@ def exact_log_return(
         & (values[horizon:] > 0)
         & (values[:-horizon] > 0)
     )
-    if unresolved_action is not None:
-        unresolved = np.asarray(unresolved_action, dtype=np.bool_)
-        if unresolved.shape != values.shape:
-            raise ValueError("unresolved_action must align with close")
+    if ambiguous_action is not None:
+        ambiguous = np.asarray(ambiguous_action, dtype=np.bool_)
+        if ambiguous.shape != values.shape:
+            raise ValueError("ambiguous_action must align with close")
         # For a return ending at t, exclude events in (t-horizon, t].
-        mask &= _unresolved_interval_clear(unresolved, horizon)[horizon:]
+        mask &= _ambiguous_interval_clear(ambiguous, horizon)[horizon:]
     output[horizon:] = np.where(mask, candidate, np.nan)
     valid[horizon:] = mask
     return output, valid
@@ -81,7 +81,7 @@ def yang_zhang_volatility(
     low: NDArray[np.floating],
     close: NDArray[np.floating],
     window: int,
-    unresolved_action: NDArray[np.bool_] | None = None,
+    ambiguous_action: NDArray[np.bool_] | None = None,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
     """Yang-Zhang daily volatility with sample variances and exact windows."""
 
@@ -89,14 +89,14 @@ def yang_zhang_volatility(
     if window < 2:
         raise ValueError("Yang-Zhang window must be at least two")
     shape = close_.shape
-    unresolved = (
+    ambiguous = (
         np.zeros(shape, dtype=np.bool_)
-        if unresolved_action is None
-        else np.asarray(unresolved_action, dtype=np.bool_)
+        if ambiguous_action is None
+        else np.asarray(ambiguous_action, dtype=np.bool_)
     )
-    if unresolved.shape != shape:
-        raise ValueError("unresolved_action must align with daily prices")
-    interval_clear = _unresolved_interval_clear(unresolved, window)
+    if ambiguous.shape != shape:
+        raise ValueError("ambiguous_action must align with daily prices")
+    interval_clear = _ambiguous_interval_clear(ambiguous, window)
     output = np.full(shape, np.nan, dtype=np.float64)
     valid = np.zeros(shape, dtype=np.bool_)
     k = 0.34 / (1.34 + (window + 1) / (window - 1))
@@ -211,20 +211,20 @@ def _rolling_high_low_range(
     low: NDArray[np.float64],
     observed: NDArray[np.bool_],
     window: int,
-    unresolved_action: NDArray[np.bool_] | None = None,
+    ambiguous_action: NDArray[np.bool_] | None = None,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
     """Return ``log(max(H)/min(L))`` over an exact session window."""
 
     output = np.full(high.shape, np.nan, dtype=np.float64)
     valid = np.zeros(high.shape, dtype=np.bool_)
-    unresolved = (
+    ambiguous = (
         np.zeros(high.shape, dtype=np.bool_)
-        if unresolved_action is None
-        else np.asarray(unresolved_action, dtype=np.bool_)
+        if ambiguous_action is None
+        else np.asarray(ambiguous_action, dtype=np.bool_)
     )
-    if unresolved.shape != high.shape:
-        raise ValueError("unresolved_action must align with daily ranges")
-    interval_clear = _unresolved_interval_clear(unresolved, window - 1)
+    if ambiguous.shape != high.shape:
+        raise ValueError("ambiguous_action must align with daily ranges")
+    interval_clear = _ambiguous_interval_clear(ambiguous, window - 1)
     for end in range(window - 1, high.shape[0]):
         start = end - window + 1
         usable_rows = (
@@ -520,7 +520,6 @@ def build_slow_features(
     adjusted_high: NDArray[np.floating],
     adjusted_low: NDArray[np.floating],
     adjusted_close: NDArray[np.floating],
-    total_return_close: NDArray[np.floating],
     volume_brl: NDArray[np.floating],
     trades: NDArray[np.floating],
     observed: NDArray[np.bool_],
@@ -528,17 +527,15 @@ def build_slow_features(
     dates: Sequence[object],
     *,
     cluster_labels: NDArray[np.integer] | None = None,
-    unresolved_action: NDArray[np.bool_] | None = None,
-    price_adjustment_unresolved: NDArray[np.bool_] | None = None,
+    ambiguous_action: NDArray[np.bool_] | None = None,
 ) -> SlowFeatureResult:
     """Build the frozen 32-field causal slow library."""
 
-    open_, high, low, close, tr_close, volume, trade_count = _aligned_daily(
+    open_, high, low, close, volume, trade_count = _aligned_daily(
         adjusted_open,
         adjusted_high,
         adjusted_low,
         adjusted_close,
-        total_return_close,
         volume_brl,
         trades,
     )
@@ -546,21 +543,13 @@ def build_slow_features(
     membership = np.asarray(active, dtype=np.bool_)
     if seen.shape != close.shape or membership.shape != close.shape:
         raise ValueError("observed and active are misaligned")
-    unresolved = (
+    ambiguous = (
         np.zeros(close.shape, dtype=np.bool_)
-        if unresolved_action is None
-        else np.asarray(unresolved_action, dtype=np.bool_)
+        if ambiguous_action is None
+        else np.asarray(ambiguous_action, dtype=np.bool_)
     )
-    if unresolved.shape != close.shape:
-        raise ValueError("unresolved_action is misaligned")
-    price_level_break = (
-        unresolved
-        if price_adjustment_unresolved is None
-        else np.asarray(price_adjustment_unresolved, dtype=np.bool_)
-    )
-    if price_level_break.shape != close.shape:
-        raise ValueError("price_adjustment_unresolved is misaligned")
-    price_level_valid = ~np.maximum.accumulate(price_level_break, axis=0)
+    if ambiguous.shape != close.shape:
+        raise ValueError("ambiguous_action is misaligned")
     values = np.zeros((*close.shape, len(SLOW_FEATURES)), dtype=np.float32)
     valid = np.zeros(values.shape, dtype=np.bool_)
 
@@ -571,7 +560,7 @@ def build_slow_features(
 
     returns: dict[int, tuple[NDArray[np.float64], NDArray[np.bool_]]] = {}
     for index, horizon in enumerate((1, 5, 21, 63, 126, 252)):
-        returns[horizon] = exact_log_return(tr_close, horizon, unresolved)
+        returns[horizon] = exact_log_return(close, horizon, ambiguous)
         assign(index, *returns[horizon])
     momentum = returns[252][0] - returns[21][0]
     assign(6, momentum, returns[252][1] & returns[21][1])
@@ -579,16 +568,25 @@ def build_slow_features(
     yz: dict[int, tuple[NDArray[np.float64], NDArray[np.bool_]]] = {}
     for index, window in zip((7, 8, 9), (5, 20, 60), strict=True):
         yz[window] = yang_zhang_volatility(
-            open_, high, low, close, window, price_level_break
+            open_, high, low, close, window, ambiguous
         )
         assign(index, *yz[window])
     vol_of_vol, vol_of_vol_valid = _rolling_stat(yz[5][0], 60, "std")
-    assign(10, vol_of_vol, vol_of_vol_valid)
+    assign(
+        10,
+        vol_of_vol,
+        vol_of_vol_valid & _ambiguous_interval_clear(ambiguous, 64),
+    )
     skew, kurtosis, moments_valid = _rolling_moments(returns[1][0], 60)
+    moments_valid &= _ambiguous_interval_clear(ambiguous, 60)
     assign(11, skew, moments_valid)
     assign(12, kurtosis, moments_valid)
     maximum, maximum_valid = _rolling_stat(returns[1][0], 21, "max")
-    assign(13, maximum, maximum_valid)
+    assign(
+        13,
+        maximum,
+        maximum_valid & _ambiguous_interval_clear(ambiguous, 21),
+    )
     rolling_high, rolling_high_valid = _rolling_stat(high, 252, "max")
     with np.errstate(divide="ignore", invalid="ignore"):
         high_distance = np.log(close / rolling_high)
@@ -598,7 +596,7 @@ def build_slow_features(
         rolling_high_valid
         & seen
         & (close > 0)
-        & _unresolved_interval_clear(price_level_break, 251),
+        & _ambiguous_interval_clear(ambiguous, 251),
     )
 
     market = np.full(close.shape[0], np.nan, dtype=np.float64)
@@ -624,6 +622,7 @@ def build_slow_features(
             beta[day, name] = coefficient
             idio[day, name] = float(np.std(residual))
             beta_valid[day, name] = True
+    beta_valid &= _ambiguous_interval_clear(ambiguous, 60)
     assign(15, beta, beta_valid)
     assign(16, idio, beta_valid)
 
@@ -641,7 +640,11 @@ def build_slow_features(
     with np.errstate(divide="ignore", invalid="ignore"):
         amihud_daily = np.abs(returns[1][0]) / volume
     amihud, amihud_valid = _rolling_stat(amihud_daily, 20, "mean")
-    assign(19, amihud, amihud_valid)
+    assign(
+        19,
+        amihud,
+        amihud_valid & _ambiguous_interval_clear(ambiguous, 20),
+    )
     trades_for_window = np.where(
         seen & np.isfinite(trade_count), np.maximum(trade_count, 0.0), np.nan
     )
@@ -658,7 +661,7 @@ def build_slow_features(
     range_valid = seen & np.isfinite(range_1) & (high > 0) & (low > 0)
     assign(22, range_1, range_valid)
     range_5, range_5_valid = _rolling_high_low_range(
-        high, low, seen, 5, price_level_break
+        high, low, seen, 5, ambiguous
     )
     assign(23, range_5, range_5_valid)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -666,7 +669,7 @@ def build_slow_features(
     assign(24, close_location, seen & (high > low) & np.isfinite(close_location))
     with np.errstate(divide="ignore", invalid="ignore"):
         log_close = np.log(close)
-    assign(25, log_close, seen & (close > 0) & price_level_valid)
+    assign(25, log_close, seen & (close > 0) & ~ambiguous)
     listing_age = np.zeros(close.shape, dtype=np.float64)
     listing_valid = np.zeros(close.shape, dtype=np.bool_)
     for name in range(close.shape[1]):

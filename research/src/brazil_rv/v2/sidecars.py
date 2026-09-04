@@ -27,9 +27,6 @@ ARCHIVE_COLUMN_MAP: dict[str, dict[str, str | None]] = {
     "events": {
         "sessions_until_announced_earnings": None,
         "sessions_since_earnings": None,
-        "ex_distribution_next_1": None,
-        "ex_distribution_next_2": None,
-        "ex_distribution_next_3": None,
         "standardized_unexpected_earnings": None,
     },
     "options": {
@@ -527,62 +524,6 @@ def derive_known_archive_features(
     if group == "events":
         return _raw_events_features(source, dates)
     return source
-
-
-def add_distribution_event_features(
-    result: SidecarResult,
-    actions: pl.DataFrame,
-    dates: Sequence[date | np.datetime64],
-    isins: Sequence[str],
-) -> SidecarResult:
-    """Add causally announced ex-distribution indicators for t+1 through t+3."""
-
-    if result.group != "events" or result.feature_names != SIDECAR_FEATURES["events"]:
-        raise ValueError("distribution flags require the canonical events sidecar")
-    values = result.values.copy()
-    valid = result.valid.copy()
-    normalized_dates = tuple(_as_date(value) for value in dates)
-    date_lookup = {value: index for index, value in enumerate(normalized_dates)}
-    isin_lookup = {value: index for index, value in enumerate(isins)}
-    # RAD identity coverage is the safe negative-observation population.
-    rad_covered = valid[..., 1]
-    for lag, feature_index in zip((1, 2, 3), (2, 3, 4), strict=True):
-        valid[..., feature_index] = rad_covered
-        values[..., feature_index] = 0.0
-        for row in actions.filter(pl.col("cash_distribution_brl") > 0).iter_rows(
-            named=True
-        ):
-            event = date_lookup.get(_as_date(row["ex_date"]))
-            name = isin_lookup.get(str(row["isin"]))
-            decision = None if event is None else event - lag
-            known = _as_date(row.get("known_date") or row["ex_date"])
-            if (
-                decision is not None
-                and decision >= 0
-                and name is not None
-                and known <= normalized_dates[decision]
-                and rad_covered[decision, name]
-            ):
-                values[decision, name, feature_index] = 1.0
-    available = set(result.archive_semantics_available)
-    available.update(
-        {
-            "sessions_since_earnings",
-            "ex_distribution_next_1",
-            "ex_distribution_next_2",
-            "ex_distribution_next_3",
-        }
-    )
-    return SidecarResult(
-        group=result.group,
-        feature_names=result.feature_names,
-        values=values,
-        valid=valid,
-        coverage_by_year=result.coverage_by_year,
-        archive_semantics_available=tuple(
-            name for name in result.feature_names if name in available
-        ),
-    )
 
 
 def bind_sidecar_isins(source: pl.DataFrame, assignments: pl.DataFrame) -> pl.DataFrame:

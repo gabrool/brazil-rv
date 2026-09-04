@@ -79,7 +79,7 @@ def test_five_minute_returns_are_adjacent_block_close_to_close() -> None:
 def test_cotahist_close_replaces_full_session_anchor() -> None:
     result = build_intraday_daily_features(*_minutes())
     official = result.session_close.copy()
-    official[-2, 0] *= 1.02
+    official[-2, 0] *= 1.004
     replaced = replace_daily_close_anchors(
         result, official, np.ones_like(official, dtype=bool)
     )
@@ -95,7 +95,7 @@ def test_cotahist_close_in_place_mode_matches_copy_mode() -> None:
     copied_input = build_intraday_daily_features(*_minutes())
     in_place_input = build_intraday_daily_features(*_minutes())
     official = copied_input.session_close.copy()
-    official[-2, 0] *= 1.02
+    official[-2, 0] *= 1.004
     observed = np.ones_like(official, dtype=bool)
     copied = replace_daily_close_anchors(copied_input, official, observed)
     in_place_values = in_place_input.values
@@ -111,6 +111,22 @@ def test_cotahist_close_in_place_mode_matches_copy_mode() -> None:
     np.testing.assert_array_equal(
         in_place.session_close_valid, copied.session_close_valid
     )
+
+
+def test_m1_cotahist_unit_mismatch_masks_cross_session_features() -> None:
+    result = build_intraday_daily_features(*_minutes())
+    official = result.session_close.copy()
+    official[-2, 0] *= 1.006
+    replaced = replace_daily_close_anchors(
+        result, official, np.ones_like(official, dtype=bool)
+    )
+
+    assert not replaced.close_anchor_consistent[-2, 0]
+    assert not replaced.session_close_valid[-2, 0]
+    assert not replaced.valid[-1, 0, 0]
+    assert not replaced.valid[-1, 0, 8]
+    assert not replaced.valid[-1, 0, 10]
+    assert replaced.valid[-2, 0, 1]
 
 
 def test_decision_features_exclude_every_entry_and_later_bar_field() -> None:

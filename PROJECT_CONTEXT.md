@@ -7,16 +7,18 @@ Last verified: 2026-09-04.
 Brazil-RV now has two additive offline research stacks. The accepted v1 intraday
 system and its deployed research recipe remain unchanged and reproducible. The
 current engineering foundation is v2, a daily system that predicts 1-, 2-, 3-,
-5-, and 10-session cross-sectional total-return residual ranks once per session at
+5-, and 10-session cross-sectional split-adjusted price-return residual ranks once per session at
 15:45 for closing-auction entry.
 
 The v2 foundation, model, GBDT, baselines, training stages, and evaluation
-harness are implemented and unit-tested. A source-validity review superseded
-the prior local store and bounded validation. The review-fixed rebuild currently
-fails its fixed corporate-action survivorship gate, so there is no accepted v2
-store or current full-F1 validation. No v2 research candidate has been selected,
-no v2 official-validation or test date has been evaluated, and no prediction,
-execution, or deployment recipe has changed.
+harness are implemented and unit-tested. The second review pass makes the panel
+definition independent of provider corporate-action coverage: only official
+COTAHIST histories may affect price adjustments, features, masks, and targets;
+provider actions are audit-only. Prior v2 stores and bounded validations predate
+this definition and are superseded. There is no accepted current v2 store or
+full-F1 validation. No v2 research candidate has been selected, no v2 official-
+validation or test date has been evaluated, and no prediction, execution, or
+deployment recipe has changed.
 
 The accepted incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
@@ -57,52 +59,31 @@ history, exact results, artifact identities, and interpretations.
 ## V2 daily foundation contract
 
 The additive v2 implementation lives under `brazil_rv.v2`; its detailed
-executable contract is documented in `docs/v2_README.md`. The review-fixed
-implementation is complete through commit
-`2cb204d21951ead130cd790ff2f161a2e6b1f5e8`. Ruff, compilation, all 592
-research tests, and all 24 collector tests pass. The fixes include bounded
-provider-failure masks, current-ticker and retry acquisition, split-unit
-correction for Yahoo cash distributions, a uniform Yang-Zhang target scale,
-80%-complete rolling estimators, COTAHIST full-session anchors, causal event
-features, pathwise parity economics, Stage J decay, per-trajectory train/score
-CLIs, complete presets, and source-hash caching.
+executable contract is documented in `docs/v2_README.md`. Corporate-action
+candidates come from COTAHIST `DISMES` changes and independent price jumps.
+Robust three-session medians and price/quantity continuity classify split/bonus,
+cash-type, and ambiguous events. Only split/bonus events adjust prices; future
+cash-type or ambiguous events invalidate targets; only ambiguous events shadow
+return-feature lookbacks; only detected splits create M1 boundaries.
 
-The fresh immutable corporate-action bundle is:
+Provider acquisition, taxonomy, failures, and off-calendar rows remain available
+for recall/precision and dividend-drop audits but cannot enter a panel array. A
+mandatory small-store test verifies byte-identical arrays with full versus empty/
+failed provider evidence. Store acceptance retains the target-validity
+survivorship gap limit of 10 percentage points and adds a per-feature-family
+validity gap limit of 5 points. A survivor-subset total-return target is registered
+but not implemented as a future sensitivity experiment.
 
-    C:\quant-data\b3\interim\external\v2_corporate_actions_027fdbf_20260904T115629Z
+COTAHIST full-session M1 anchors additionally require same-name/day close-unit
+agreement within 0.005 absolute log return. Events expose only causal RAD
+sessions-since; announcement-dependent future flags and SUE remain unavailable.
+Paired comparisons consume the selected preset's bootstrap settings, and preset
+runs require a hash-bound fast pretrained checkpoint. Legacy action-cache schemas
+are normalized in memory.
 
-Its manifest SHA-256 is
-`f6918d3ae1a766ba900c5fb6c944577082a39714584f51a556df7c872adf5796`.
-It contains 10,037 action rows and a 349-row cash-unit audit. Of 942 ticker
-segments, 384 returned actions, 39 returned a finite-price-verified zero-action
-result (three through the current-ticker fallback), and 519 failed. The free
-Yahoo source still does not cover many delisted names.
-
-The latest clean rebuild stopped before atomic store promotion at:
-
-    D:\quant-data\b3\processed\v2_daily_store_2cb204d_20260904T122315Z
-
-The fixed survivorship gate compares valid target name-days with observed
-active name-days. At horizon 1 it found 83.393216% validity for 526 names that
-disappear before the final 2026 panel year and 98.152093% for 407 names that
-survive into 2026: a 14.758877-point gap, above the fixed 10-point limit. The
-delisted group was 99.928953% price-path-complete and 99.767067%
-Yang-Zhang-complete but only 83.624120% action-clear, proving that remaining
-source coverage—not price or volatility construction—drives the failure. The
-failure-record and diagnostic SHA-256 values are
-`7f84478efd393cfc4404bbf82163ac8dee5b15dcc9c1f468ab7112ab10563996`
-and `5823b0f19743f4c369d77d909cc7bbd8e6ea89057651f18c35d37606fee8f69b`.
-Neither sealed feature/target arrays nor official-validation/test data were
-decoded.
-
-The required plus/minus-ten-session provider-failure neighborhoods and the
-10-point gate remain unchanged. A more complete authoritative corporate-action
-source for delisted names is required before an accepted store can be built.
-Therefore the former `f048ea9` store and
-`v2_pipeline_validation_f048ea9_20260903T215944Z` are immutable historical
-engineering evidence only; they are superseded, are not canonical inputs, and
-their bounded validation is not current evidence. Full-F1 validation has not
-run because no review-fixed store passed acceptance.
+No store rebuild or full-F1 validation has been run under this new definition.
+The former `f048ea9`, `2cb204d`, and related validation roots remain immutable
+historical engineering evidence only and must not be used as canonical inputs.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused

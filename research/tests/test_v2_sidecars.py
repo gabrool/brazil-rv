@@ -6,7 +6,6 @@ import pytest
 
 from brazil_rv.v2.build_store import _parse_sidecars, _sidecar_coverage_table
 from brazil_rv.v2.sidecars import (
-    add_distribution_event_features,
     available_archive_mapping,
     derive_known_archive_features,
     materialize_known_archive,
@@ -102,7 +101,7 @@ def test_reversible_option_transforms_are_inverted() -> None:
     assert result.valid[0, 0].tolist() == [True, True, False, True]
 
 
-def test_events_sidecar_derives_earnings_age_and_causal_distribution_flags() -> None:
+def test_events_sidecar_derives_only_causal_earnings_age() -> None:
     days = [date(2024, 1, 2) + timedelta(days=index) for index in range(8)]
     isin = "BRTESTACNOR1"
     source = pl.DataFrame(
@@ -115,24 +114,10 @@ def test_events_sidecar_derives_earnings_age_and_causal_distribution_flags() -> 
     )
     derived = derive_known_archive_features(source, days, [isin], group="events")
     result = materialize_known_archive(derived, days, [isin], group="events")
-    actions = pl.DataFrame(
-        {
-            "isin": [isin],
-            "ex_date": [days[6]],
-            "action_type": ["dividend"],
-            "split_factor": [1.0],
-            "cash_distribution_brl": [1.0],
-            "known_date": [days[2]],
-            "unresolved": [False],
-        }
-    )
-    enriched = add_distribution_event_features(result, actions, days, [isin])
-    assert enriched.values[1, 0, 1] == 0.0
-    assert enriched.values[5, 0, 1] == 4.0
-    assert enriched.values[3, 0, 4] == 1.0
-    assert enriched.values[4, 0, 3] == 1.0
-    assert enriched.values[5, 0, 2] == 1.0
-    assert not enriched.valid[..., 5].any()
+    assert result.values[1, 0, 1] == 0.0
+    assert result.values[5, 0, 1] == 4.0
+    assert not result.valid[..., 0].any()
+    assert not result.valid[..., 2].any()
 
 
 def test_event_projection_does_not_duplicate_an_explicit_mask(tmp_path) -> None:
@@ -152,7 +137,7 @@ def test_event_projection_does_not_duplicate_an_explicit_mask(tmp_path) -> None:
         ["BRTESTACNOR1"],
         None,
     )
-    assert parsed["events"].values.shape == (2, 1, 6)
+    assert parsed["events"].values.shape == (2, 1, 3)
     assert parsed["events"].valid[1, 0, 1]
 
 
