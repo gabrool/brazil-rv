@@ -512,7 +512,9 @@ have the same schema and byte-identical `trade_date` and `daily_cdi_rate`
 columns (with zero maximum rate difference). The recorded provenance includes
 both paths and hashes plus this overlap proof. The validation CLI also exposes
 the registered GBDT round limits, lookback, device, compilation toggle, and
-explicitly bounded session-count controls for diagnostic runs.
+explicitly bounded session-count controls for diagnostic runs. Its F1-F2 GBDT
+triage uses the five registered GBDT seeds `(11, 29, 47, 61, 79)` at those
+round limits.
 
 Only the development folds may be passed to the foundation validation driver.
 The required smoke trajectories are explicitly labeled

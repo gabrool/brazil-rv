@@ -28,6 +28,7 @@ from .contract import (
     ALLOWED_LOOKBACKS,
     DEVELOPMENT_END,
     FINETUNE_START,
+    GBDT_SEEDS,
     HORIZONS,
     OFFICIAL_START,
     PRETRAIN_END,
@@ -680,12 +681,11 @@ def _run_gbdt(
     source_hashes: Mapping[str, str],
     runtime: ValidationRuntime,
     sidecars: Sequence[str],
-    seed: int,
 ) -> list[dict[str, object]]:
     config = GBDTConfig(
         maximum_rounds=runtime.gbdt_maximum_rounds,
         early_stopping_rounds=runtime.gbdt_early_stopping_rounds,
-        seeds=(seed,),
+        seeds=GBDT_SEEDS,
         num_threads=runtime.gbdt_num_threads,
     )
     feature_names = _gbdt_feature_names(store, sidecars)
@@ -754,7 +754,7 @@ def _run_gbdt(
             {
                 "engine": "lightgbm",
                 "fold": fold,
-                "seed": seed,
+                "seeds": list(config.seeds),
                 "config": asdict(config),
                 "feature_names": list(feature_names),
                 "feature_importance": importance,
@@ -783,7 +783,7 @@ def _run_gbdt(
             {
                 "engine": "gbdt",
                 "fold": fold,
-                "seed": seed,
+                "seeds": list(config.seeds),
                 "score_manifest": str(manifest_path),
                 "score_manifest_sha256": manifest_sha,
                 "evaluation": _evaluation_summary(
@@ -1423,7 +1423,6 @@ def run_pipeline_validation(
             source_hashes=source_hashes,
             runtime=runtime,
             sidecars=sidecars,
-            seed=triage.seeds[0],
         )
         network = _run_network_smokes(
             store=store,

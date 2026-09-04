@@ -365,7 +365,11 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
     assert len(manifest["results"]["baselines"]) == 12
     assert len(manifest["results"]["gbdt_triage"]) == 2
     assert len(_FakeGBDT.fit_calls) == 4
-    assert len(list((result.root / "gbdt_triage" / "models").rglob("*.txt"))) == 20
+    assert all(
+        record["seeds"] == [11, 29, 47, 61, 79]
+        for record in manifest["results"]["gbdt_triage"]
+    )
+    assert len(list((result.root / "gbdt_triage" / "models").rglob("*.txt"))) == 100
     assert len(training_calls) == 6
     assert all(
         call["train_loader"].batch_sampler.pairs_per_batch == 8
