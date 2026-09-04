@@ -69,10 +69,20 @@ return-feature lookbacks; only detected splits create M1 boundaries.
 Provider acquisition, taxonomy, failures, and off-calendar rows remain available
 for recall/precision and dividend-drop audits but cannot enter a panel array. A
 mandatory small-store test verifies byte-identical arrays with full versus empty/
-failed provider evidence. Store acceptance retains the target-validity
-survivorship gap limit of 10 percentage points and adds a per-feature-family
-validity gap limit of 5 points. A survivor-subset total-return target is registered
-but not implemented as a future sensitivity experiment.
+failed provider evidence. Store acceptance retains an unconditional five-point
+survivorship-validity gap for every internally derived feature family and a
+10-point gap for targets. External sidecars instead require exact independent
+reproduction of their validity masks from publication-lagged raw availability;
+daily archives must satisfy D+1. Their composition check is a five-point
+survivorship-validity gap within each pooled causal prior-ADV20 quartile. A
+survivor-subset total-return target is registered but not implemented as a
+future sensitivity experiment.
+
+Exact same-ticker COTAHIST ISIN changes qualify as identity continuations only
+when the predecessor's final observation is followed by the successor's first
+observation on the next market session, with no same-date ambiguity, branch, or
+cycle. Qualifying successors inherit strictly prior feature history and share a
+survival identity; ticker reuse after a gap remains separate.
 
 COTAHIST full-session M1 anchors additionally require same-name/day close-unit
 agreement within 0.005 absolute log return. Events expose only causal RAD
@@ -81,13 +91,21 @@ Paired comparisons consume the selected preset's bootstrap settings, and preset
 runs require a hash-bound fast pretrained checkpoint. Legacy action-cache schemas
 are normalized in memory.
 
-A commit-bound store rebuild has been attempted under this new definition, but
-no store was accepted and no full-F1 validation was started. The bounded-memory
-builder stayed below 4.35 GiB observed peak RSS; the attempt stopped at the
-unchanged feature-family gate because the options sidecar's validity gap by
-eventual survival was 5.4221 percentage points versus the 5-point limit. The
-former `f048ea9`, `2cb204d`, and related validation roots remain immutable
-historical engineering evidence only and must not be used as canonical inputs.
+A commit-bound store rebuild has been attempted under this refined definition,
+but no store was accepted and no full-F1 validation was started. The current
+COTAHIST input has zero qualifying consecutive-session ISIN successions; its
+three same-ticker transition candidates all cross gaps and remain separate.
+Independent publication-lag replay passed for events, fundamentals, and lending,
+then the build stopped at the first composition failure: lending validity in
+prior-ADV20 quartile 2 was `0.6362105263` for delisted identities and
+`0.7783315734` for final-year survivors, a `14.2121047074`-point gap versus the
+five-point limit. The requested options audit confirms its former unstratified
+`5.4220916184`-point gap runs delisted-above-survivor while every causal
+prior-ADV20 quartile passes (maximum `3.6647966055` points), so that options
+pattern is composition rather than leakage. The later internal-family and target
+gates were not reached. The former `f048ea9`, `2cb204d`, and related validation
+roots remain immutable historical engineering evidence only and must not be
+used as canonical inputs.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused

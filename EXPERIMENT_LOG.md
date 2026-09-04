@@ -5062,3 +5062,66 @@ No immutable store manifest was sealed. The target gate was not reached, GPU
 full-F1 validation was not started, Section D was not registered or run, and
 official-validation/test access flags remain false. No paid Lambda instance
 was claimed for this resumed local build.
+
+### Section-C refined external gate and ISIN-continuation stop
+
+Commit `43c55ec0412637dc7784aaabaa5a7e6e508406f5` implemented the authorized
+gate refinement without weakening the leakage guard. Internally derived slow,
+intraday, peer, target-support, and classification-mask families retain their
+unconditional five-point survivorship-validity gate, while the target gate
+remains 10 points. Each external family now independently rebuilds its validity
+mask from the raw publication-lagged archive and requires exact equality; daily
+source dates must precede availability by at least D+1. External composition is
+then gated within pooled causal prior-ADV20 quartiles at five points. The build
+manifest schema includes the full survival-group by liquidity-quartile table.
+
+The same commit added bounded ISIN succession detection. A link requires the
+same COTAHIST ticker to end under one ISIN and begin under another on consecutive
+market sessions, with no same-date ambiguity, branch, returning ISIN, or cycle.
+Linked successors inherit only strictly prior predecessor feature history and
+share the continuation identity used by survival grouping; their future targets
+remain their own realized path. Synthetic link, gap-reuse, causal inheritance,
+future-mutation, stratified-gate, and independent D+1 mask-replay tests passed.
+Ruff, compilation, all 606 research tests, and the exact `4,348 x 933`
+all-family subprocess memory guard passed before the real rebuild. Local and
+GitHub `main` matched the commit.
+
+The real COTAHIST scan found no qualifying succession link. The three observed
+same-ticker transition candidates were BIDI11 once and BPAC13 twice; their
+market-session gaps were 293, 134, and 84, so all remain distinct identities.
+The fresh local rebuild stopped at the first refined acceptance failure at:
+
+    D:\quant-data\b3\processed\v2_daily_store_43c55ec_20260904T161358Z
+
+The independent contemporaneity replay passed before the stop for events,
+fundamentals, and lending. Lending replay checked 94,349 daily source-date
+relationships and found zero D+1 violations. Its unstratified survival gap was
+only `3.9099942579` points, and prior-ADV20 quartiles 1, 3, and 4 passed at
+`3.3476056897`, `1.6786306022`, and `4.0065180778` points. Quartile 2 failed:
+delisted validity was `0.6362105263` versus `0.7783315734` for final-year
+survivors, a survivor-above-delisted gap of `14.2121047074` points. The five-point
+limit was not relaxed and no result-changing retry was made.
+
+As explicitly requested, a post-stop audit-only options replay records the
+composition signature without advancing the failed build. Options validity is
+`0.6555142503` for delisted identities and `0.6012933341` for survivors, an
+unstratified `5.4220916184`-point gap running delisted-above-survivor. All four
+causal prior-ADV20 strata pass: their gaps are `3.6647966055`, `1.5089161196`,
+`3.5892673727`, and `0.1231257846` points. Its publication-lag validity mask was
+also reproduced exactly with zero D+1 violations. This is recorded as a
+composition signature, not a leakage signature.
+
+The excluded root preserves 70 hash-verified files totaling 2,237,701,892 bytes,
+including the partial float32/mask arrays, reconstructed date/ISIN axes, empty
+qualifying-link table, nonqualifying transition table, contemporaneity and
+stratified coverage tables, operational logs, failure record, and failed-build
+manifest. The failure-record, failed-build-manifest, and inventory SHA-256 values
+are `6adb2e574fc421a6ae68db30a5020afefd021095e74c6c32b0dfd60f6b84bb57`,
+`c81ef880d2aad0c47292f86d61daa212309c6cb0140701045962a1110d4931d0`, and
+`35c395fbfd5b1c26361f50ba8e2461fed83539816e3f703e6846c3c750bf61c0`.
+Observed working set reached at least 4.1489 GiB and remained below the 8-GiB
+guard in every observation; no accepted store manifest was sealed because the
+gate failed first. The later internal-family and target gates were not reached,
+GPU full-F1 validation was not started, Section D was not registered or run,
+and official-validation/test access flags remain false. No paid Lambda instance
+was claimed.
