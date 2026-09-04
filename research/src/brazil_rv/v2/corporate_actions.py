@@ -68,6 +68,8 @@ def normalize_yfinance_actions(
                     "action_type": "split" if split >= 1 else "reverse_split",
                     "split_factor": split,
                     "cash_distribution_brl": 0.0,
+                    "provider_cash_distribution_brl": 0.0,
+                    "cash_unit_adjustment_factor": 1.0,
                     "known_date": ex_date,
                     "source_ticker": ticker,
                     "source": "yfinance.actions",
@@ -83,6 +85,8 @@ def normalize_yfinance_actions(
                     "action_type": "dividend",
                     "split_factor": 1.0,
                     "cash_distribution_brl": dividend,
+                    "provider_cash_distribution_brl": dividend,
+                    "cash_unit_adjustment_factor": 1.0,
                     "known_date": ex_date,
                     "source_ticker": ticker,
                     "source": "yfinance.actions",
@@ -96,6 +100,8 @@ def normalize_yfinance_actions(
         "action_type": pl.String,
         "split_factor": pl.Float64,
         "cash_distribution_brl": pl.Float64,
+        "provider_cash_distribution_brl": pl.Float64,
+        "cash_unit_adjustment_factor": pl.Float64,
         "known_date": pl.Date,
         "source_ticker": pl.String,
         "source": pl.String,
@@ -107,7 +113,12 @@ def normalize_yfinance_actions(
 
 def _empty_yfinance_frame() -> pl.DataFrame:
     return pl.DataFrame(
-        schema={"date": pl.Date, "dividends": pl.Float64, "stock_splits": pl.Float64}
+        schema={
+            "date": pl.Date,
+            "dividends": pl.Float64,
+            "stock_splits": pl.Float64,
+            "price_observed": pl.Boolean,
+        }
     )
 
 
@@ -145,29 +156,78 @@ def _extract_yfinance_actions(raw: Any, symbol: str) -> pl.DataFrame | None:
     price_values = (
         np.asarray(frame[price_columns].to_numpy(), dtype=np.float64)
         if price_columns
-        else np.empty(0, dtype=np.float64)
+        else np.empty((len(frame), 0), dtype=np.float64)
     )
-    if price_columns and not np.isfinite(price_values).any():
+    if not price_columns or not np.isfinite(price_values).any():
         # yfinance keeps failed symbols in a batch MultiIndex, filling their
         # complete price frame with NaN.  That is a provider failure, not proof
         # that a live symbol had genuinely zero actions.
         return None
     rows: list[dict[str, object]] = []
-    for timestamp, record in frame.iterrows():
+    price_observed = np.isfinite(price_values).any(axis=1)
+    for (timestamp, record), has_price in zip(
+        frame.iterrows(), price_observed, strict=True
+    ):
+        if not has_price:
+            continue
         dividend = _finite_or_zero(record.get("Dividends", 0.0))
         split = _finite_or_zero(record.get("Stock Splits", 0.0))
-        if dividend or split:
-            rows.append(
-                {
-                    "date": timestamp.date(),
-                    "dividends": dividend,
-                    "stock_splits": split,
-                }
-            )
+        rows.append(
+            {
+                "date": timestamp.date(),
+                "dividends": dividend,
+                "stock_splits": split,
+                "price_observed": True,
+            }
+        )
     return pl.DataFrame(
         rows,
-        schema={"date": pl.Date, "dividends": pl.Float64, "stock_splits": pl.Float64},
+        schema={
+            "date": pl.Date,
+            "dividends": pl.Float64,
+            "stock_splits": pl.Float64,
+            "price_observed": pl.Boolean,
+        },
     )
+
+
+def unadjust_yfinance_cash_distributions(actions: pl.DataFrame) -> pl.DataFrame:
+    """Restore Yahoo cash actions to contemporaneous pre-later-split units."""
+
+    checked = validate_action_table(actions)
+    if checked.is_empty():
+        return checked
+    rows: list[dict[str, object]] = []
+    for group in checked.partition_by("isin", maintain_order=True):
+        group_rows = list(group.sort("ex_date", "action_type").iter_rows(named=True))
+        split_by_date: dict[date, float] = {}
+        for row in group_rows:
+            ex_date = _as_date(row["ex_date"])
+            split_by_date[ex_date] = split_by_date.get(ex_date, 1.0) * float(
+                row["split_factor"]
+            )
+        later_factor_by_date: dict[date, float] = {}
+        later_factor = 1.0
+        for ex_date in sorted(split_by_date, reverse=True):
+            later_factor_by_date[ex_date] = later_factor
+            later_factor *= split_by_date[ex_date]
+        for row in group_rows:
+            output = dict(row)
+            output.setdefault(
+                "provider_cash_distribution_brl", row["cash_distribution_brl"]
+            )
+            output.setdefault("cash_unit_adjustment_factor", 1.0)
+            provider_cash = float(
+                row.get("provider_cash_distribution_brl")
+                or row["cash_distribution_brl"]
+            )
+            if str(row["action_type"]) in {"dividend", "jcp"}:
+                unit_factor = later_factor_by_date[_as_date(row["ex_date"])]
+                output["provider_cash_distribution_brl"] = provider_cash
+                output["cash_unit_adjustment_factor"] = unit_factor
+                output["cash_distribution_brl"] = provider_cash * unit_factor
+            rows.append(output)
+    return validate_action_table(pl.DataFrame(rows, infer_schema_length=None))
 
 
 def _download_yfinance_batch(
@@ -276,6 +336,57 @@ def acquire_yfinance_actions(
             for ticker in batch:
                 failures[ticker] = f"{type(error).__name__}: {error}"[:1000]
 
+    # A batch may succeed while silently omitting one failed symbol. Retry every
+    # missing symbol individually and retain the last provider error in the audit.
+    for ticker in unique_tickers:
+        if ticker in downloaded:
+            continue
+        start, last = bounds[ticker]
+        for attempt in range(2):
+            try:
+                result = _download_yfinance_batch(
+                    [ticker], start=start, end=last + timedelta(days=1)
+                )
+                if ticker in result:
+                    downloaded[ticker] = result[ticker]
+                    failures.pop(ticker, None)
+                    break
+                failures[ticker] = "symbol missing from provider response"
+            except Exception as error:
+                failures[ticker] = (
+                    f"attempt {attempt + 1}: {type(error).__name__}: {error}"
+                )[:1000]
+
+    current_ticker = {
+        str(group[0, "isin"]): str(
+            group.sort("last_date", descending=True)[0, "ticker"]
+        )
+        for group in security_master.partition_by("isin", maintain_order=True)
+    }
+    fallback_rows = [
+        row
+        for row in pending
+        if current_ticker[str(row["isin"])] != str(row["ticker"])
+    ]
+    fallback_downloads: dict[tuple[str, str], pl.DataFrame] = {}
+    for isin in sorted({str(row["isin"]) for row in fallback_rows}):
+        alias = current_ticker[isin]
+        related = [row for row in fallback_rows if str(row["isin"]) == isin]
+        start = min(row["first_date"] for row in related)
+        end = max(row["last_date"] for row in related) + timedelta(days=1)
+        for attempt in range(2):
+            try:
+                result = _download_yfinance_batch([alias], start=start, end=end)
+                if alias in result:
+                    fallback_downloads[(isin, alias)] = result[alias]
+                    break
+            except Exception as error:
+                for row in related:
+                    failures[str(row["ticker"])] = (
+                        f"current-ticker {alias} attempt {attempt + 1}: "
+                        f"{type(error).__name__}: {error}"
+                    )[:1000]
+
     for row in rows:
         identity = "|".join(
             (
@@ -289,14 +400,33 @@ def acquire_yfinance_actions(
         path = cached_paths.get(identity)
         status = "cache_hit"
         error = None
+        query_ticker = ticker
         if path is None:
             raw_frame = downloaded.get(ticker)
+            alias = current_ticker[str(row["isin"])]
+            if raw_frame is not None:
+                raw_frame = raw_frame.filter(
+                    pl.col("date").is_between(
+                        row["first_date"], row["last_date"], closed="both"
+                    )
+                )
+            alias_frame = fallback_downloads.get((str(row["isin"]), alias))
+            if (raw_frame is None or raw_frame.is_empty()) and alias_frame is not None:
+                raw_frame = alias_frame
+                raw_frame = raw_frame.filter(
+                    pl.col("date").is_between(
+                        row["first_date"], row["last_date"], closed="both"
+                    )
+                )
+                query_ticker = alias
+                status = "downloaded_current_ticker"
             if raw_frame is None:
                 error = failures.get(ticker, "symbol missing from provider response")
                 audit_rows.append(
                     {
                         "isin": row["isin"],
                         "ticker": ticker,
+                        "query_ticker": query_ticker,
                         "first_date": row["first_date"],
                         "last_date": row["last_date"],
                         "cache_path": None,
@@ -307,15 +437,26 @@ def acquire_yfinance_actions(
                     }
                 )
                 continue
-            raw_frame = raw_frame.filter(
-                pl.col("date").is_between(
-                    row["first_date"], row["last_date"], closed="both"
+            if raw_frame.is_empty():
+                audit_rows.append(
+                    {
+                        "isin": row["isin"],
+                        "ticker": ticker,
+                        "query_ticker": query_ticker,
+                        "first_date": row["first_date"],
+                        "last_date": row["last_date"],
+                        "cache_path": None,
+                        "cache_sha256": None,
+                        "action_rows": 0,
+                        "status": "failed",
+                        "error": "no finite provider price inside segment window",
+                    }
                 )
-            )
+                continue
             frame = normalize_yfinance_actions(
                 raw_frame,
                 isin=str(row["isin"]),
-                ticker=ticker,
+                ticker=query_ticker,
                 fetched_at=timestamp,
             )
             key = identities[identity]
@@ -325,13 +466,18 @@ def acquire_yfinance_actions(
             temporary = path.with_suffix(".parquet.tmp")
             frame.write_parquet(temporary)
             temporary.replace(path)
-            status = "zero_actions" if frame.is_empty() else "downloaded"
+            if status == "downloaded_current_ticker":
+                if frame.is_empty():
+                    status = "zero_actions_current_ticker"
+            else:
+                status = "zero_actions" if frame.is_empty() else "downloaded"
         frame = pl.read_parquet(path)
         frames.append(frame)
         audit_rows.append(
             {
                 "isin": row["isin"],
                 "ticker": ticker,
+                "query_ticker": query_ticker,
                 "first_date": row["first_date"],
                 "last_date": row["last_date"],
                 "cache_path": str(path),
@@ -350,7 +496,7 @@ def acquire_yfinance_actions(
             ticker="EMPTY",
             fetched_at=timestamp,
         )
-    return validate_action_table(combined), pl.DataFrame(audit_rows)
+    return unadjust_yfinance_cash_distributions(combined), pl.DataFrame(audit_rows)
 
 
 def validate_action_table(actions: pl.DataFrame) -> pl.DataFrame:
@@ -434,8 +580,11 @@ def provider_failure_mask(
     dates: Sequence[date | np.datetime64],
     isins: Sequence[str],
     observed: NDArray[np.bool_],
+    event_candidates: NDArray[np.bool_],
+    *,
+    maximum_horizon: int,
 ) -> NDArray[np.bool_]:
-    """Conservatively mark observed dates in provider-failed ticker segments."""
+    """Mask bounded event neighborhoods inside provider-failed segments."""
 
     required = {"isin", "first_date", "last_date", "status"}
     if not required.issubset(acquisition_audit.columns):
@@ -445,8 +594,14 @@ def provider_failure_mask(
         )
     normalized_dates = np.asarray(dates, dtype="datetime64[D]")
     seen = np.asarray(observed, dtype=np.bool_)
-    if seen.shape != (len(normalized_dates), len(isins)):
+    candidates = np.asarray(event_candidates, dtype=np.bool_)
+    if (
+        seen.shape != (len(normalized_dates), len(isins))
+        or candidates.shape != seen.shape
+    ):
         raise ValueError("provider failure mask axes are misaligned")
+    if maximum_horizon < 0:
+        raise ValueError("maximum_horizon must be non-negative")
     isin_lookup = {value: index for index, value in enumerate(isins)}
     failed = np.zeros(seen.shape, dtype=np.bool_)
     for row in acquisition_audit.filter(pl.col("status") == "failed").iter_rows(
@@ -458,8 +613,47 @@ def provider_failure_mask(
         first = np.datetime64(_as_date(row["first_date"]), "D")
         last = np.datetime64(_as_date(row["last_date"]), "D")
         within = (normalized_dates >= first) & (normalized_dates <= last)
-        failed[within, isin_index] = seen[within, isin_index]
+        for event_day in np.flatnonzero(within & candidates[:, isin_index]):
+            start = max(0, event_day - maximum_horizon)
+            stop = min(len(normalized_dates), event_day + maximum_horizon + 1)
+            bounded = within[start:stop] & seen[start:stop, isin_index]
+            failed[start:stop, isin_index] |= bounded
     return failed
+
+
+def action_calendar_alignment_table(
+    actions: pl.DataFrame,
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+) -> pl.DataFrame:
+    """Account for action rows not represented on the aligned trading calendar."""
+
+    checked = validate_action_table(actions)
+    calendar = {_as_date(value) for value in dates}
+    names = set(isins)
+    rows = [
+        {
+            "isin": str(row["isin"]),
+            "ex_date": row["ex_date"],
+            "action_type": str(row["action_type"]),
+            "reason": (
+                "off_calendar_ex_date"
+                if row["ex_date"] not in calendar
+                else "outside_isin_axis"
+            ),
+        }
+        for row in checked.iter_rows(named=True)
+        if row["ex_date"] not in calendar or str(row["isin"]) not in names
+    ]
+    return pl.DataFrame(
+        rows,
+        schema={
+            "isin": pl.String,
+            "ex_date": pl.Date,
+            "action_type": pl.String,
+            "reason": pl.String,
+        },
+    )
 
 
 def detect_distribution_changes(
@@ -826,6 +1020,118 @@ def action_coverage_table(
     )
 
 
+def cash_unit_adjustment_audit(actions: pl.DataFrame) -> pl.DataFrame:
+    """Summarize the direction and magnitude of restored Yahoo cash units."""
+
+    checked = validate_action_table(actions)
+    cash = checked.filter(pl.col("cash_distribution_brl") > 0)
+    if cash.is_empty():
+        return pl.DataFrame(
+            schema={
+                "isin": pl.String,
+                "cash_action_count": pl.Int32,
+                "adjusted_cash_action_count": pl.Int32,
+                "minimum_factor": pl.Float64,
+                "maximum_factor": pl.Float64,
+                "direction_proof": pl.String,
+            }
+        )
+    factor = (
+        pl.col("cash_unit_adjustment_factor").cast(pl.Float64)
+        if "cash_unit_adjustment_factor" in cash.columns
+        else pl.lit(1.0)
+    )
+    return (
+        cash.with_columns(factor.alias("factor"))
+        .group_by("isin")
+        .agg(
+            pl.len().cast(pl.Int32).alias("cash_action_count"),
+            (pl.col("factor") != 1.0)
+            .sum()
+            .cast(pl.Int32)
+            .alias("adjusted_cash_action_count"),
+            pl.col("factor").min().alias("minimum_factor"),
+            pl.col("factor").max().alias("maximum_factor"),
+        )
+        .with_columns(
+            pl.lit(
+                "provider cash multiplied by the product of strictly later "
+                "split factors to restore contemporaneous raw-share units"
+            ).alias("direction_proof")
+        )
+        .sort("isin")
+    )
+
+
+def dividend_close_drop_audit(
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+    cash_distribution_brl: NDArray[np.floating],
+    raw_close: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    *,
+    outlier_absolute_error: float = 0.20,
+) -> pl.DataFrame:
+    """Compare ex-date close-to-close returns with the mechanical cash yield."""
+
+    cash = np.asarray(cash_distribution_brl, dtype=np.float64)
+    close = np.asarray(raw_close, dtype=np.float64)
+    seen = np.asarray(observed, dtype=np.bool_)
+    shape = (len(dates), len(isins))
+    if cash.shape != shape or close.shape != shape or seen.shape != shape:
+        raise ValueError("dividend audit axes are misaligned")
+    rows: list[dict[str, object]] = []
+    for name, isin in enumerate(isins):
+        returns: list[float] = []
+        mechanical: list[float] = []
+        for day in np.flatnonzero(cash[:, name] > 0):
+            prior = next(
+                (
+                    index
+                    for index in range(day - 1, -1, -1)
+                    if seen[index, name]
+                    and np.isfinite(close[index, name])
+                    and close[index, name] > 0
+                ),
+                None,
+            )
+            if (
+                prior is None
+                or not seen[day, name]
+                or not np.isfinite(close[day, name])
+                or close[day, name] <= 0
+            ):
+                continue
+            returns.append(float(close[day, name] / close[prior, name] - 1.0))
+            mechanical.append(float(-cash[day, name] / close[prior, name]))
+        if not returns:
+            continue
+        mean_return = float(np.mean(returns))
+        mean_mechanical = float(np.mean(mechanical))
+        error = mean_return - mean_mechanical
+        rows.append(
+            {
+                "isin": isin,
+                "comparable_cash_action_count": len(returns),
+                "mean_ex_date_close_return": mean_return,
+                "mean_negative_cash_yield": mean_mechanical,
+                "mean_difference": error,
+                "outlier": abs(error) > outlier_absolute_error,
+            }
+        )
+    return pl.DataFrame(
+        rows,
+        schema={
+            "isin": pl.String,
+            "comparable_cash_action_count": pl.Int32,
+            "mean_ex_date_close_return": pl.Float64,
+            "mean_negative_cash_yield": pl.Float64,
+            "mean_difference": pl.Float64,
+            "outlier": pl.Boolean,
+        },
+    ).sort("isin")
+
+
 def audit_m1_adjustment_status(
     dates: Sequence[date | np.datetime64],
     isins: Sequence[str],
@@ -1039,15 +1345,18 @@ def main(arguments: Sequence[str] | None = None) -> None:
     master_path = output / "security_master.parquet"
     actions_path = output / "corporate_actions.parquet"
     audit_path = output / "yfinance_acquisition_audit.parquet"
+    cash_unit_path = output / "cash_unit_adjustment_audit.parquet"
     security_master.write_parquet(master_path)
     actions.write_parquet(actions_path)
     audit.write_parquet(audit_path)
+    cash_unit_adjustment_audit(actions).write_parquet(cash_unit_path)
     manifest = {
-        "schema": "V2_CORPORATE_ACTIONS_V1",
+        "schema": "V2_CORPORATE_ACTIONS_V2",
         "provider_taxonomy": "yfinance dividends and stock splits",
         "source_limitations": (
-            "bonus, JCP, and subscription-right taxonomy is not guaranteed "
-            "by the provider; failed ticker segments remain unresolved"
+            "bonus, JCP, and subscription-right taxonomy is not guaranteed by "
+            "the provider; failed segments are resolved only around independently "
+            "detected event candidates, and cash uncertainty is total-return-only"
         ),
         "acquisition_status_counts": {
             str(row["status"]): int(row["len"])
@@ -1060,6 +1369,11 @@ def main(arguments: Sequence[str] | None = None) -> None:
         },
         "actions": {"path": actions_path.name, "rows": actions.height, "sha256": _sha256(actions_path)},
         "acquisition_audit": {"path": audit_path.name, "rows": audit.height, "sha256": _sha256(audit_path)},
+        "cash_unit_adjustment_audit": {
+            "path": cash_unit_path.name,
+            "rows": pl.read_parquet(cash_unit_path).height,
+            "sha256": _sha256(cash_unit_path),
+        },
         "inputs": [
             {
                 "path": str(path.resolve()),

@@ -52,6 +52,8 @@ class EvaluationInputs:
     cdi_returns: NDArray[np.floating]
     horizons: tuple[int, ...] = HORIZONS
     source_artifact_hashes: Mapping[str, str] | None = None
+    pathwise_scores: tuple[NDArray[np.floating], ...] = ()
+    pathwise_score_masks: tuple[NDArray[np.bool_], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -163,6 +165,20 @@ def _validate(inputs: EvaluationInputs) -> None:
         raise TypeError("active must be a Boolean array")
     if np.asarray(inputs.unresolved_action).dtype != np.bool_:
         raise TypeError("unresolved_action must be a Boolean array")
+    if bool(inputs.pathwise_scores) != bool(inputs.pathwise_score_masks):
+        raise ValueError("pathwise scores and masks must be supplied together")
+    if inputs.pathwise_scores:
+        if len(inputs.pathwise_scores) != 2 or len(inputs.pathwise_score_masks) != 2:
+            raise ValueError("cross-fit evaluation requires both parity-model paths")
+        for path_scores, path_mask in zip(
+            inputs.pathwise_scores, inputs.pathwise_score_masks, strict=True
+        ):
+            if np.asarray(path_scores).shape != expected:
+                raise ValueError("pathwise scores differ from the evaluation axes")
+            if np.asarray(path_mask).shape != expected:
+                raise ValueError("pathwise score masks differ from the evaluation axes")
+            if np.asarray(path_mask).dtype != np.bool_:
+                raise TypeError("pathwise score masks must be Boolean arrays")
     if not np.isfinite(np.asarray(inputs.cdi_returns, dtype=np.float64)).all():
         raise ValueError("CDI returns must be finite")
     for horizon_index, horizon in enumerate(HORIZONS):
@@ -276,26 +292,45 @@ def _daily_metrics(
 def _persistence(
     inputs: EvaluationInputs,
 ) -> tuple[dict[int, NDArray[np.float64]], list[dict[str, object]]]:
-    scores = np.asarray(inputs.scores, dtype=np.float64)
-    score_mask = np.asarray(inputs.score_mask, dtype=bool)
+    score_paths = (
+        tuple(np.asarray(values, dtype=np.float64) for values in inputs.pathwise_scores)
+        if inputs.pathwise_scores
+        else (np.asarray(inputs.scores, dtype=np.float64),)
+    )
+    mask_paths = (
+        tuple(np.asarray(values, dtype=bool) for values in inputs.pathwise_score_masks)
+        if inputs.pathwise_score_masks
+        else (np.asarray(inputs.score_mask, dtype=bool),)
+    )
     active = np.asarray(inputs.active, dtype=bool)
     results: dict[int, NDArray[np.float64]] = {}
     rows: list[dict[str, object]] = []
     for lag in (1, 5):
-        values = np.full((len(inputs.dates), len(HORIZONS)), np.nan)
-        for day in range(lag, len(inputs.dates)):
-            for horizon_index, _ in enumerate(HORIZONS):
-                valid = (
-                    active[day]
-                    & active[day - lag]
-                    & score_mask[day, :, horizon_index]
-                    & score_mask[day - lag, :, horizon_index]
-                )
-                values[day, horizon_index] = _spearman(
-                    scores[day, :, horizon_index],
-                    scores[day - lag, :, horizon_index],
-                    valid,
-                )
+        path_values: list[NDArray[np.float64]] = []
+        for scores, score_mask in zip(score_paths, mask_paths, strict=True):
+            values = np.full((len(inputs.dates), len(HORIZONS)), np.nan)
+            for day in range(lag, len(inputs.dates)):
+                for horizon_index, _ in enumerate(HORIZONS):
+                    valid = (
+                        active[day]
+                        & active[day - lag]
+                        & score_mask[day, :, horizon_index]
+                        & score_mask[day - lag, :, horizon_index]
+                    )
+                    values[day, horizon_index] = _spearman(
+                        scores[day, :, horizon_index],
+                        scores[day - lag, :, horizon_index],
+                        valid,
+                    )
+            path_values.append(values)
+        stacked = np.stack(path_values)
+        finite_count = np.isfinite(stacked).sum(axis=0)
+        values = np.divide(
+            np.nansum(stacked, axis=0),
+            finite_count,
+            out=np.full(stacked.shape[1:], np.nan),
+            where=finite_count > 0,
+        )
         results[lag] = values
         for day, day_value in enumerate(inputs.dates):
             for horizon_index, horizon in enumerate(HORIZONS):
@@ -304,6 +339,7 @@ def _persistence(
                         "date": day_value.isoformat(),
                         "lag_sessions": lag,
                         "horizon_sessions": horizon,
+                        "path_model_count": len(score_paths),
                         "spearman": _finite_or_none(values[day, horizon_index]),
                     }
                 )
@@ -312,10 +348,16 @@ def _persistence(
 
 def _economics_signal(
     inputs: EvaluationInputs,
+    scores_input: NDArray[np.floating] | None = None,
+    score_mask_input: NDArray[np.bool_] | None = None,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
     indexes = [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS]
-    scores = np.asarray(inputs.scores, dtype=np.float64)[..., indexes]
-    masks = np.asarray(inputs.score_mask, dtype=bool)[..., indexes]
+    scores = np.asarray(
+        inputs.scores if scores_input is None else scores_input, dtype=np.float64
+    )[..., indexes]
+    masks = np.asarray(
+        inputs.score_mask if score_mask_input is None else score_mask_input, dtype=bool
+    )[..., indexes]
     active = np.asarray(inputs.active, dtype=bool)
     composite = np.full(scores.shape[:2], np.nan, dtype=np.float64)
     composite_mask = masks.all(axis=-1) & active & np.isfinite(scores).all(axis=-1)
@@ -375,8 +417,74 @@ def _swing_rows(
     return rows
 
 
+def _average_swing_summary(
+    results: Sequence[DailySwingResult],
+) -> dict[str, float | bool]:
+    summaries = [result.summary() for result in results]
+    output: dict[str, float | bool] = {}
+    for key in summaries[0]:
+        values = [summary[key] for summary in summaries]
+        if all(isinstance(value, bool) for value in values):
+            output[key] = all(bool(value) for value in values)
+        else:
+            output[key] = _finite_mean(np.asarray(values, dtype=np.float64))
+    return output
+
+
+def _average_swing_rows(
+    results: Sequence[DailySwingResult],
+    *,
+    cost_bps: float,
+    annual_borrow_rate: float,
+) -> list[dict[str, object]]:
+    if any(
+        result.signal_dates != results[0].signal_dates
+        or result.exit_dates != results[0].exit_dates
+        for result in results[1:]
+    ):
+        raise ValueError("parity-model economics paths have different date axes")
+    float_fields = (
+        "gross_pnl_bps",
+        "turnover_fraction_nav",
+        "turnover_cost_bps",
+        "borrow_cost_bps",
+        "cdi_earned_bps",
+        "all_cash_cdi_bps",
+        "net_pnl_bps",
+        "net_excess_all_cash_bps",
+        "deployed_gross_fraction_nav",
+    )
+    count_fields = (
+        "missing_exit_position_count",
+        "unresolved_action_position_count",
+    )
+    rows: list[dict[str, object]] = []
+    for index, exit_date in enumerate(results[0].exit_dates):
+        row: dict[str, object] = {
+            "signal_date": results[0].signal_dates[index].isoformat(),
+            "exit_date": exit_date.isoformat(),
+            "cost_bps_per_side": cost_bps,
+            "annual_borrow_rate": annual_borrow_rate,
+            "path_model_count": len(results),
+            "interval_valid": all(bool(result.interval_valid[index]) for result in results),
+        }
+        for field in count_fields:
+            row[field] = float(
+                np.mean([float(getattr(result, field)[index]) for result in results])
+            )
+        for field in float_fields:
+            path_values = np.asarray(
+                [float(getattr(result, field)[index]) for result in results]
+            )
+            row[field] = (
+                float(path_values.mean()) if np.isfinite(path_values).all() else None
+            )
+        rows.append(row)
+    return rows
+
+
 def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
-    return {
+    result = {
         "dates": _dates_sha256(inputs.dates),
         "canonical_calendar": inputs.calendar_identity_sha256,
         "session_indices": _array_sha256(np.asarray(inputs.session_indices)),
@@ -394,6 +502,12 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         "unresolved_action": _array_sha256(np.asarray(inputs.unresolved_action)),
         "cdi_returns": _array_sha256(np.asarray(inputs.cdi_returns)),
     }
+    for index, (scores, mask) in enumerate(
+        zip(inputs.pathwise_scores, inputs.pathwise_score_masks, strict=True)
+    ):
+        result[f"pathwise_scores_{index}"] = _array_sha256(np.asarray(scores))
+        result[f"pathwise_score_mask_{index}"] = _array_sha256(np.asarray(mask))
+    return result
 
 
 def _economics_contract() -> dict[str, object]:
@@ -402,7 +516,8 @@ def _economics_contract() -> dict[str, object]:
         "signal_construction": (
             "arithmetic mean of each D=1,2,3,5 head's tie-aware "
             "cross-sectional ranks, centered and rescaled to [-1,1]; "
-            "all four score masks required and D=10 excluded"
+            "all four score masks required and D=10 excluded; cross-fit inputs "
+            "are simulated per complete parity-model path and then averaged"
         ),
         "signal_horizons_sessions": list(PRIMARY_HORIZONS),
         "k_per_side": config.k_per_side,
@@ -451,19 +566,29 @@ def evaluate_scores(
         ],
         dtype=np.float64,
     )
-    economics_score, economics_mask = _economics_signal(inputs)
-    grid = swing_sensitivity_grid(
-        dates=inputs.dates,
-        scores=economics_score,
-        score_mask=economics_mask,
-        active=np.asarray(inputs.active, dtype=bool),
-        total_return_close=inputs.total_return_close,
-        unresolved_action=inputs.unresolved_action,
-        cdi_returns=inputs.cdi_returns,
-        costs_bps=ECONOMICS_COSTS_BPS,
-        annual_borrow_rates=ECONOMICS_ANNUAL_BORROW_RATES,
-    )
-    headline = grid[ECONOMICS_HEADLINE]
+    score_paths = inputs.pathwise_scores or (inputs.scores,)
+    mask_paths = inputs.pathwise_score_masks or (inputs.score_mask,)
+    grids: list[dict[tuple[float, float], DailySwingResult]] = []
+    economics_masks: list[NDArray[np.bool_]] = []
+    for path_scores, path_mask in zip(score_paths, mask_paths, strict=True):
+        economics_score, economics_mask = _economics_signal(
+            inputs, path_scores, path_mask
+        )
+        economics_masks.append(economics_mask)
+        grids.append(
+            swing_sensitivity_grid(
+                dates=inputs.dates,
+                scores=economics_score,
+                score_mask=economics_mask,
+                active=np.asarray(inputs.active, dtype=bool),
+                total_return_close=inputs.total_return_close,
+                unresolved_action=inputs.unresolved_action,
+                cdi_returns=inputs.cdi_returns,
+                costs_bps=ECONOMICS_COSTS_BPS,
+                annual_borrow_rates=ECONOMICS_ANNUAL_BORROW_RATES,
+            )
+        )
+    headline_paths = [grid[ECONOMICS_HEADLINE] for grid in grids]
     horizon_rows: list[dict[str, object]] = []
     for horizon_index, horizon in enumerate(HORIZONS):
         horizon_rows.append(
@@ -489,19 +614,23 @@ def evaluate_scores(
         )
     economics_summaries: list[dict[str, object]] = []
     economics_daily: list[dict[str, object]] = []
-    for (cost, borrow), result in sorted(grid.items()):
+    for cost, borrow in sorted(grids[0]):
+        path_results = [grid[(cost, borrow)] for grid in grids]
         economics_summaries.append(
             {
                 "cost_bps_per_side": cost,
                 "annual_borrow_rate": borrow,
+                "path_model_count": len(path_results),
                 **{
                     key: _finite_or_none(value) if isinstance(value, float) else value
-                    for key, value in result.summary().items()
+                    for key, value in _average_swing_summary(path_results).items()
                 },
             }
         )
         economics_daily.extend(
-            _swing_rows(result, cost_bps=cost, annual_borrow_rate=borrow)
+            _average_swing_rows(
+                path_results, cost_bps=cost, annual_borrow_rate=borrow
+            )
         )
     report: dict[str, object] = {
         "schema": "BRAZIL_RV_V2_EVALUATION_V1",
@@ -550,18 +679,29 @@ def evaluate_scores(
             "score_mask_true": int(np.asarray(inputs.score_mask).sum()),
             "target_mask_true": int(np.asarray(inputs.target_mask).sum()),
             "raw_target_mask_true": int(np.asarray(inputs.raw_target_mask).sum()),
-            "economics_score_mask_true": int(economics_mask.sum()),
+            "economics_score_mask_true": int(
+                np.mean([int(mask.sum()) for mask in economics_masks])
+            ),
+            "economics_path_model_count": len(score_paths),
             "unresolved_action_true": int(
                 np.asarray(inputs.unresolved_action, dtype=np.bool_).sum()
             ),
         },
     }
+    headline_values = np.stack(
+        [result.net_excess_all_cash_bps for result in headline_paths]
+    )
+    headline_complete = np.isfinite(headline_values).all(axis=0)
+    headline_average = np.full(headline_values.shape[1], np.nan)
+    headline_average[headline_complete] = headline_values[
+        :, headline_complete
+    ].mean(axis=0)
     return EvaluationResult(
         report=report,
         dates=inputs.dates,
         daily_primary_ic=daily_primary,
-        headline_exit_dates=headline.exit_dates,
-        headline_net_excess_bps=headline.net_excess_all_cash_bps.copy(),
+        headline_exit_dates=headline_paths[0].exit_dates,
+        headline_net_excess_bps=headline_average,
     )
 
 

@@ -1,19 +1,21 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import os
 import shutil
 import tempfile
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 
 from .artifacts import sha256_file, write_json_atomic
 from .config import ModelConfig
-from .contract import ALLOWED_SEEDS, HORIZONS
+from .contract import HORIZONS, V1_READ_SEEDS
 from .data import V2DailyDataset
 from .model import DailyMultiHorizonModel
 from .train import (
@@ -185,7 +187,7 @@ def score_checkpoint_artifact(
     if (
         stage not in {"P", "F", "J"}
         or type(seed) is not int
-        or seed not in ALLOWED_SEEDS
+        or seed not in V1_READ_SEEDS
         or not isinstance(fold, str)
         or not fold
     ):
@@ -371,3 +373,81 @@ def score_checkpoint_artifact(
         manifest_sha256=manifest_sha256,
         checkpoint_sha256=checkpoint_sha256,
     )
+
+
+def _score_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Score one canonical v2 trajectory")
+    parser.add_argument("--store", type=Path, required=True)
+    parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--checkpoint-sha256")
+    parser.add_argument("--fast-pretrained-checkpoint", type=Path)
+    parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    arguments = _score_parser().parse_args(argv)
+    checkpoint = arguments.checkpoint.resolve()
+    payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
+    if not isinstance(payload, Mapping):
+        raise ValueError("stage checkpoint payload is not a mapping")
+    contract = _verified_checkpoint_input_contract(payload)
+    config_payload = contract.get("model_config")
+    selection = contract.get("selection")
+    if not isinstance(config_payload, Mapping) or not isinstance(selection, Mapping):
+        raise ValueError("checkpoint lacks model or selection input provenance")
+    dates = selection.get("dates")
+    features = selection.get("features")
+    if not isinstance(dates, Mapping) or not isinstance(features, Mapping):
+        raise ValueError("checkpoint selection provenance is incomplete")
+    first = int(dates["first_index"])
+    last = int(dates["last_index"])
+    count = int(dates["count"])
+    indices = np.arange(first, last + 1, dtype=np.int64)
+    if indices.size != count:
+        raise ValueError("checkpoint selection dates are not one contiguous axis")
+    sidecars = features.get("enabled_sidecar_groups")
+    if not isinstance(sidecars, list) or not all(
+        isinstance(value, str) for value in sidecars
+    ):
+        raise ValueError("checkpoint sidecar provenance is malformed")
+    raw_config = dict(config_payload)
+    fast_pretrained = bool(raw_config.get("fast_pretrained"))
+    raw_config["fast_pretrained_checkpoint"] = (
+        arguments.fast_pretrained_checkpoint if fast_pretrained else None
+    )
+    model_config = ModelConfig(**raw_config)
+    stage = payload.get("stage")
+    dataset = V2DailyDataset(
+        arguments.store.resolve(),
+        indices,
+        stage="pretrain" if stage == "P" else "evaluation",
+        lookback=int(selection["lookback_sessions"]),
+        enabled_sidecars=tuple(sidecars),
+        purpose="evaluation",
+    )
+    loader = DataLoader(
+        dataset,
+        batch_size=arguments.batch_size,
+        shuffle=False,
+        num_workers=arguments.num_workers,
+    )
+    device = None if arguments.device == "auto" else torch.device(arguments.device)
+    score_checkpoint_artifact(
+        checkpoint=checkpoint,
+        model_config=model_config,
+        loader=loader,
+        output_dir=arguments.output_dir,
+        expected_checkpoint_sha256=(
+            arguments.checkpoint_sha256 or sha256_file(checkpoint)
+        ),
+        device=device,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

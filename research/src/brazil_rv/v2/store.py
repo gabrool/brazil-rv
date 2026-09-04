@@ -38,6 +38,7 @@ _TARGET_VALUE_MASKS = {
     "target_to_close_raw_log_return": "target_to_close_valid",
 }
 _MULTI_HORIZON_TARGET_MASKS = frozenset(("target_valid", "target_raw_valid"))
+_VERIFIED_HASHES: set[tuple[str, int, int, str]] = set()
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,21 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _matches_verified_file(path: Path, *, size: int, sha256: str) -> bool:
+    """Verify immutable store content once per process and stable file stat."""
+
+    stat = path.stat()
+    if stat.st_size != size:
+        return False
+    identity = (str(path.resolve()), stat.st_size, stat.st_mtime_ns, sha256)
+    if identity in _VERIFIED_HASHES:
+        return True
+    if sha256_file(path) != sha256:
+        return False
+    _VERIFIED_HASHES.add(identity)
+    return True
 
 
 def _json_bytes(value: object) -> bytes:
@@ -300,13 +316,16 @@ class V2Store:
         if manifest.get("schema") != STORE_SCHEMA:
             raise ValueError("not a v2 daily store")
         sha_record = (path / "manifest.sha256").read_text(encoding="ascii").split()[0]
-        if verify_hashes and sha_record != sha256_file(manifest_path):
+        if verify_hashes and not _matches_verified_file(
+            manifest_path,
+            size=manifest_path.stat().st_size,
+            sha256=sha_record,
+        ):
             raise ValueError("store manifest hash mismatch")
         for name, record in manifest["indices"].items():
             item = path / name
-            if verify_hashes and (
-                item.stat().st_size != int(record["bytes"])
-                or sha256_file(item) != record["sha256"]
+            if verify_hashes and not _matches_verified_file(
+                item, size=int(record["bytes"]), sha256=str(record["sha256"])
             ):
                 raise ValueError(f"store index hash mismatch: {name}")
         dates = np.load(path / "date_index.npy", mmap_mode="r", allow_pickle=False)
@@ -316,9 +335,8 @@ class V2Store:
         arrays: dict[str, NDArray[np.generic]] = {}
         for name, record in manifest["arrays"].items():
             item = path / record["path"]
-            if verify_hashes and (
-                item.stat().st_size != int(record["bytes"])
-                or sha256_file(item) != record["sha256"]
+            if verify_hashes and not _matches_verified_file(
+                item, size=int(record["bytes"]), sha256=str(record["sha256"])
             ):
                 raise ValueError(f"store array hash mismatch: {name}")
             value = np.load(item, mmap_mode="r", allow_pickle=False)
@@ -327,9 +345,8 @@ class V2Store:
             arrays[name] = value
         for name, record in manifest.get("tables", {}).items():
             item = path / record["path"]
-            if verify_hashes and (
-                item.stat().st_size != int(record["bytes"])
-                or sha256_file(item) != record["sha256"]
+            if verify_hashes and not _matches_verified_file(
+                item, size=int(record["bytes"]), sha256=str(record["sha256"])
             ):
                 raise ValueError(f"store table hash mismatch: {name}")
         _validate_array_shapes(arrays, dates.size, len(isins))

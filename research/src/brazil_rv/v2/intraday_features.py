@@ -28,6 +28,7 @@ _ACTION_BOUNDARY_WINDOWS = {
     6: 1,
     7: 20,
     17: 20,
+    19: 20,
 }
 
 
@@ -137,7 +138,7 @@ def five_minute_returns(
     *,
     cutoff: int = DECISION_MINUTE_INDEX,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
-    """Build completed five-minute returns from minutes strictly before cutoff."""
+    """Build adjacent completed five-minute close-to-close returns."""
 
     open_ = np.asarray(open_price, dtype=np.float64)
     close_ = np.asarray(close, dtype=np.float64)
@@ -146,14 +147,104 @@ def five_minute_returns(
         raise ValueError("five-minute inputs are misaligned")
     if cutoff <= 0 or cutoff > open_.shape[2] or cutoff % 5:
         raise ValueError("invalid five-minute cutoff")
-    block_count = cutoff // 5
-    starts = open_[..., :cutoff:5]
-    ends = close_[..., 4:cutoff:5]
-    block_seen = seen[..., :cutoff].reshape(*seen.shape[:2], block_count, 5).all(axis=-1)
-    returns, valid = _safe_log_ratio(ends, starts)
-    valid &= block_seen
+    del open_
+    block_closes = close_[..., 4:cutoff:5]
+    block_seen = seen[..., 4:cutoff:5]
+    returns, valid = _safe_log_ratio(block_closes[..., 1:], block_closes[..., :-1])
+    valid &= block_seen[..., 1:] & block_seen[..., :-1]
     returns[~valid] = np.nan
     return returns, valid
+
+
+def replace_daily_close_anchors(
+    result: IntradayDailyResult,
+    official_close: NDArray[np.floating],
+    official_close_observed: NDArray[np.bool_],
+) -> IntradayDailyResult:
+    """Replace full-session M1 close anchors with the COTAHIST session close."""
+
+    official = np.asarray(official_close, dtype=np.float64)
+    observed = np.asarray(official_close_observed, dtype=np.bool_)
+    if official.shape != result.values.shape[:2] or observed.shape != official.shape:
+        raise ValueError("official close anchors are misaligned")
+    official_valid = observed & np.isfinite(official) & (official > 0)
+    values = np.asarray(result.values).copy()
+    valid = np.asarray(result.valid, dtype=np.bool_).copy()
+    old_close = np.asarray(result.session_close, dtype=np.float64)
+    old_valid = np.asarray(result.session_close_valid, dtype=np.bool_)
+
+    # Feature 1 is log(entry/day-open), which exposes the exact day-open anchor
+    # without reading any post-decision bar.
+    day_open = np.full(official.shape, np.nan, dtype=np.float64)
+    day_open_valid = result.entry_open_valid & valid[..., 1]
+    day_open[day_open_valid] = result.entry_open[day_open_valid] / np.exp(
+        values[..., 1][day_open_valid]
+    )
+    overnight = np.full(official.shape, np.nan, dtype=np.float64)
+    overnight_valid = np.zeros(official.shape, dtype=np.bool_)
+    if len(official) > 1:
+        overnight[1:], overnight_valid[1:] = _safe_log_ratio(
+            day_open[1:], official[:-1]
+        )
+        overnight_valid[1:] &= day_open_valid[1:] & official_valid[:-1]
+    values[..., 0] = 0.0
+    values[..., 0][overnight_valid] = overnight[overnight_valid].astype(np.float32)
+    valid[..., 0] = overnight_valid
+    for index, window in ((2, 5), (3, 20)):
+        column, mask = _rolling_sum(overnight, overnight_valid, window)
+        values[..., index] = 0.0
+        values[..., index][mask] = column[mask].astype(np.float32)
+        valid[..., index] = mask
+    differential = overnight - np.asarray(values[..., 1], dtype=np.float64)
+    differential_valid = overnight_valid & valid[..., 1]
+    values[..., 6] = 0.0
+    values[..., 6][differential_valid] = differential[differential_valid].astype(
+        np.float32
+    )
+    valid[..., 6] = differential_valid
+    column, mask = _rolling_mean(differential, differential_valid, 20)
+    values[..., 7] = 0.0
+    values[..., 7][mask] = column[mask].astype(np.float32)
+    valid[..., 7] = mask
+
+    # The two lagged full-session features can be translated exactly because
+    # their original M1 close and current ratio are retained.
+    anchor_delta = np.full(official.shape, np.nan, dtype=np.float64)
+    anchor_valid = official_valid & old_valid & np.isfinite(old_close) & (old_close > 0)
+    anchor_delta[anchor_valid] = np.log(official[anchor_valid] / old_close[anchor_valid])
+    for day in range(1, len(official)):
+        prior_valid = anchor_valid[day - 1] & day_open_valid[day - 1]
+        if valid[day, :, 8].any():
+            old_full = np.full(official.shape[1], np.nan)
+            old_full[prior_valid] = np.log(
+                old_close[day - 1, prior_valid] / day_open[day - 1, prior_valid]
+            )
+            new_full = old_full + anchor_delta[day - 1]
+            usable = valid[day, :, 8] & prior_valid & (np.abs(new_full) > 1e-12)
+            old_last30 = values[day, :, 8].astype(np.float64) * old_full
+            values[day, :, 8] = 0.0
+            values[day, usable, 8] = (
+                (old_last30[usable] + anchor_delta[day - 1, usable])
+                / new_full[usable]
+            ).astype(np.float32)
+            valid[day, :, 8] = usable
+        usable_vwap = valid[day, :, 10] & anchor_valid[day - 1]
+        values[day, usable_vwap, 10] += anchor_delta[day - 1, usable_vwap].astype(
+            np.float32
+        )
+        valid[day, :, 10] &= anchor_valid[day - 1]
+        values[day, ~valid[day, :, 10], 10] = 0.0
+    return IntradayDailyResult(
+        values=values,
+        valid=valid,
+        entry_open=result.entry_open,
+        entry_open_valid=result.entry_open_valid,
+        session_close=np.where(official_valid, official, np.nan),
+        session_close_valid=official_valid,
+        realized_daily_vol=result.realized_daily_vol,
+        fast_present=result.fast_present,
+        feature_names=result.feature_names,
+    )
 
 
 def _daily_realized_vol(

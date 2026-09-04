@@ -7,7 +7,9 @@ from brazil_rv.v2.build_store import stream_intraday_from_assignments
 from brazil_rv.v2.intraday_features import (
     _rolling_roll_spread,
     build_intraday_daily_features,
+    five_minute_returns,
     mask_action_boundaries,
+    replace_daily_close_anchors,
 )
 
 
@@ -57,11 +59,36 @@ def test_action_boundaries_mask_overnight_and_exact_rolling_dependants() -> None
     assert not masked.valid[24, 0, 3]
     assert not masked.valid[24, 0, 7]
     assert not masked.valid[24, 0, 17]
+    assert not masked.valid[24, 0, 19]
     assert masked.valid[24, 1, 0]
     assert masked.valid[24, 0, 1]
     assert masked.valid[24, 0, 4]
     assert masked.valid[24, 0, 18]
     assert np.all(masked.values[~masked.valid] == 0.0)
+
+
+def test_five_minute_returns_are_adjacent_block_close_to_close() -> None:
+    close = np.asarray([[[1.0, 1.0, 1.0, 1.0, 100.0, 1.0, 1.0, 1.0, 1.0, 110.0]]])
+    returns, valid = five_minute_returns(
+        close.copy(), close, np.ones_like(close, dtype=bool), cutoff=10
+    )
+    np.testing.assert_allclose(returns, np.log(1.1))
+    assert valid.all()
+
+
+def test_cotahist_close_replaces_full_session_anchor() -> None:
+    result = build_intraday_daily_features(*_minutes())
+    official = result.session_close.copy()
+    official[-2, 0] *= 1.02
+    replaced = replace_daily_close_anchors(
+        result, official, np.ones_like(official, dtype=bool)
+    )
+    assert replaced.session_close[-2, 0] == official[-2, 0]
+    expected_overnight = np.log(
+        (result.entry_open[-1, 0] / np.exp(result.values[-1, 0, 1]))
+        / official[-2, 0]
+    )
+    assert replaced.values[-1, 0, 0] == np.float32(expected_overnight)
 
 
 def test_decision_features_exclude_every_entry_and_later_bar_field() -> None:

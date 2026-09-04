@@ -45,6 +45,7 @@ class ModelConfig:
     soft_rank_temperature: float = SOFT_RANK_TEMPERATURE
     use_bf16: bool = False
     compile_forward: bool = True
+    time_decay_half_life_sessions: float | None = None
 
     def __post_init__(self) -> None:
         if self.slow_feature_count <= 0:
@@ -69,6 +70,8 @@ class ModelConfig:
             raise ValueError("lambda_persistence is outside the frozen grid")
         if self.soft_rank_temperature not in SOFT_RANK_TEMPERATURES:
             raise ValueError("soft-rank temperature is outside the frozen grid")
+        if self.time_decay_half_life_sessions not in (None, 756.0):
+            raise ValueError("time-decay half-life must be None or 756 sessions")
         has_fast_path = self.fast_pretrained_checkpoint is not None
         has_fast_sha = self.fast_pretrained_sha256 is not None
         if self.fast_pretrained != has_fast_path or has_fast_path != has_fast_sha:

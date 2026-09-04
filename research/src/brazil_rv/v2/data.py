@@ -564,6 +564,10 @@ class V2DailyDataset(Dataset[dict[str, object]]):
                 ):
                     clipped[:, horizon_index] = False
             sample[key] = clipped
+        if isinstance(sample.get("to_close_mask"), np.ndarray):
+            sample["to_close_mask"] = np.asarray(
+                sample["to_close_mask"], dtype=np.bool_
+            ) & np.asarray(fast_present, dtype=np.bool_)
         for value_key, mask_key in (
             ("targets", "target_mask"),
             ("raw_targets", "raw_target_mask"),

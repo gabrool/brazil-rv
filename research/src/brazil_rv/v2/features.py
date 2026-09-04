@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Sequence
 
 import numpy as np
@@ -140,7 +141,7 @@ def _rolling_stat(
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
     output = np.full(values.shape, np.nan, dtype=np.float64)
     valid = np.zeros(values.shape, dtype=np.bool_)
-    needed = window if minimum is None else minimum
+    needed = math.ceil(0.8 * window) if minimum is None else minimum
     for end in range(window - 1, values.shape[0]):
         sample = values[end - window + 1 : end + 1]
         finite = np.isfinite(sample)
@@ -172,18 +173,19 @@ def _rolling_moments(
     valid = np.zeros(values.shape, dtype=np.bool_)
     for end in range(window - 1, values.shape[0]):
         sample = values[end - window + 1 : end + 1]
-        complete = np.isfinite(sample).all(axis=0)
+        finite = np.isfinite(sample)
+        complete = finite.sum(axis=0) >= math.ceil(0.8 * window)
         if not complete.any():
             continue
-        selected = sample[:, complete]
-        centered = selected - selected.mean(axis=0)
-        scale = np.sqrt(np.mean(centered**2, axis=0))
+        selected = np.where(finite[:, complete], sample[:, complete], np.nan)
+        centered = selected - np.nanmean(selected, axis=0)
+        scale = np.sqrt(np.nanmean(centered**2, axis=0))
         nonzero = scale > 0
         slots = np.flatnonzero(complete)[nonzero]
         if slots.size:
             standardized = centered[:, nonzero] / scale[nonzero]
-            skew[end, slots] = np.mean(standardized**3, axis=0)
-            kurtosis[end, slots] = np.mean(standardized**4, axis=0) - 3.0
+            skew[end, slots] = np.nanmean(standardized**3, axis=0)
+            kurtosis[end, slots] = np.nanmean(standardized**4, axis=0) - 3.0
             valid[end, slots] = True
     return skew, kurtosis, valid
 
@@ -209,18 +211,27 @@ def _rolling_high_low_range(
     interval_clear = _unresolved_interval_clear(unresolved, window - 1)
     for end in range(window - 1, high.shape[0]):
         start = end - window + 1
+        usable_rows = (
+            observed[start : end + 1]
+            & np.isfinite(high[start : end + 1])
+            & np.isfinite(low[start : end + 1])
+            & (high[start : end + 1] > 0)
+            & (low[start : end + 1] > 0)
+        )
         complete = (
-            observed[start : end + 1].all(axis=0)
-            & np.isfinite(high[start : end + 1]).all(axis=0)
-            & np.isfinite(low[start : end + 1]).all(axis=0)
-            & (high[start : end + 1] > 0).all(axis=0)
-            & (low[start : end + 1] > 0).all(axis=0)
+            (usable_rows.sum(axis=0) >= math.ceil(0.8 * window))
             & interval_clear[end]
         )
         if not complete.any():
             continue
-        maximum = np.max(high[start : end + 1, complete], axis=0)
-        minimum = np.min(low[start : end + 1, complete], axis=0)
+        maximum = np.nanmax(
+            np.where(usable_rows[:, complete], high[start : end + 1, complete], np.nan),
+            axis=0,
+        )
+        minimum = np.nanmin(
+            np.where(usable_rows[:, complete], low[start : end + 1, complete], np.nan),
+            axis=0,
+        )
         usable = maximum >= minimum
         slots = np.flatnonzero(complete)[usable]
         output[end, slots] = np.log(maximum[usable] / minimum[usable])
@@ -587,7 +598,7 @@ def build_slow_features(
         for name in range(close.shape[1]):
             name_window = returns[1][0][day - 59 : day + 1, name]
             mask = np.isfinite(market_window) & np.isfinite(name_window)
-            if int(mask.sum()) < 60 or np.var(market_window[mask]) <= 0:
+            if int(mask.sum()) < math.ceil(0.8 * 60) or np.var(market_window[mask]) <= 0:
                 continue
             coefficient = float(
                 np.cov(name_window[mask], market_window[mask], ddof=0)[0, 1]

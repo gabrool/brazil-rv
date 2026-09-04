@@ -1,5 +1,6 @@
 import numpy as np
 
+from brazil_rv.v2.corporate_actions import causal_adjustment_factors
 from brazil_rv.v2.targets import build_multi_day_targets, build_to_close_target
 
 
@@ -13,17 +14,13 @@ def test_target_masks_exact_path_and_unresolved_ex_date() -> None:
         ]
     )
     active = np.ones_like(close, dtype=bool)
-    fast_sigma = np.full_like(close, 0.02)
     slow_sigma = np.full_like(close, 0.03)
-    fast = np.ones_like(close, dtype=bool)
     unresolved = np.zeros_like(close, dtype=bool)
     unresolved[1, 1] = True
     result = build_multi_day_targets(
         close,
         active,
-        fast_sigma,
         slow_sigma,
-        fast,
         unresolved,
         horizons=(1, 2),
     )
@@ -40,8 +37,6 @@ def test_raw_target_validity_is_independent_of_missing_sigma() -> None:
         close,
         active,
         np.full_like(close, np.nan),
-        np.full_like(close, np.nan),
-        np.zeros_like(close, dtype=bool),
         np.zeros_like(close, dtype=bool),
         horizons=(1,),
     )
@@ -60,3 +55,20 @@ def test_to_close_target_is_cross_sectionally_ranked() -> None:
         np.ones_like(entry, dtype=bool),
     )
     np.testing.assert_array_equal(result.target[0], [0.0, 0.5, 1.0])
+
+
+def test_ex_date_total_return_target_reinvests_cash_distribution() -> None:
+    raw_close = np.asarray([[100.0, 100.0], [90.0, 110.0]])
+    cash = np.asarray([[0.0, 0.0], [10.0, 0.0]])
+    _, factor = causal_adjustment_factors(
+        raw_close, np.ones_like(raw_close), cash
+    )
+    total_return_close = raw_close * factor
+    result = build_multi_day_targets(
+        total_return_close,
+        np.ones_like(raw_close, dtype=bool),
+        np.full_like(raw_close, 0.02),
+        np.zeros_like(raw_close, dtype=bool),
+        horizons=(1,),
+    )
+    np.testing.assert_allclose(result.raw_log_return[0, 0, 0], 0.0, atol=1e-12)

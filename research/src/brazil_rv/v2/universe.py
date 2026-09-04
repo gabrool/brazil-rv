@@ -88,9 +88,13 @@ def build_daily_universe(
             continue
         age = np.where(first_seen >= 0, date_index - first_seen, 0)
         history[date_index] = age.astype(np.int32)
-        prior_close[date_index] = np.where(
-            seen[date_index - 1], close[date_index - 1], np.nan
-        )
+        prior_start = max(0, date_index - prior_sessions)
+        for name in range(name_count):
+            prior_rows = np.flatnonzero(seen[prior_start:date_index, name])
+            if prior_rows.size:
+                prior_close[date_index, name] = close[
+                    prior_start + prior_rows[-1], name
+                ]
         if date_index < prior_sessions:
             continue
         start = date_index - prior_sessions
@@ -177,3 +181,61 @@ def v1_pit_coverage_table(
             ),
         }
     )
+
+
+def v1_pit_inactive_exceptions_table(
+    dates: NDArray[np.datetime64],
+    all_isins: tuple[str, ...],
+    active: NDArray[np.bool_],
+    required_isins: tuple[str, ...],
+    *,
+    start: date = FINETUNE_START,
+) -> pl.DataFrame:
+    """Document every mapped v1 name not PIT-eligible on every post-start date."""
+
+    calendar = np.asarray(dates, dtype="datetime64[D]")
+    membership = np.asarray(active, dtype=np.bool_)
+    if membership.shape != (calendar.size, len(all_isins)):
+        raise ValueError("v1 PIT exception axes are misaligned")
+    assert_security_subset(all_isins, required_isins)
+    selected = calendar >= np.datetime64(start)
+    lookup = {isin: index for index, isin in enumerate(all_isins)}
+    rows: list[dict[str, object]] = []
+    for isin in required_isins:
+        values = membership[selected, lookup[isin]]
+        active_rows = np.flatnonzero(values)
+        inactive_count = int((~values).sum())
+        if not inactive_count:
+            continue
+        selected_dates = calendar[selected]
+        rows.append(
+            {
+                "isin": isin,
+                "inactive_session_count": inactive_count,
+                "post_start_session_count": int(values.size),
+                "first_active_date": (
+                    selected_dates[active_rows[0]].astype(object)
+                    if active_rows.size
+                    else None
+                ),
+                "last_active_date": (
+                    selected_dates[active_rows[-1]].astype(object)
+                    if active_rows.size
+                    else None
+                ),
+                "reason": (
+                    "dynamic point-in-time liquidity, price, history, or delisting screen"
+                ),
+            }
+        )
+    return pl.DataFrame(
+        rows,
+        schema={
+            "isin": pl.String,
+            "inactive_session_count": pl.Int32,
+            "post_start_session_count": pl.Int32,
+            "first_active_date": pl.Date,
+            "last_active_date": pl.Date,
+            "reason": pl.String,
+        },
+    ).sort("isin")

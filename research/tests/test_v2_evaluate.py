@@ -80,6 +80,34 @@ def test_harness_metrics_match_monotone_hand_fixture() -> None:
     assert report["test_accessed"] is False
 
 
+def test_crossfit_persistence_uses_complete_model_paths_not_stitched_boundaries() -> None:
+    inputs = _fixture()
+    first = np.asarray(inputs.scores).copy()
+    second = -first
+    stitched = first.copy()
+    for day in range(len(inputs.dates)):
+        if (day // 5) % 2 == 0:
+            stitched[day] = second[day]
+    stitched_result = evaluate_scores(
+        replace(inputs, scores=stitched), window_name="F2_stitched"
+    )
+    pathwise_result = evaluate_scores(
+        replace(
+            inputs,
+            scores=stitched,
+            pathwise_scores=(first, second),
+            pathwise_score_masks=(inputs.score_mask, inputs.score_mask),
+        ),
+        window_name="F2_pathwise",
+    )
+    stitched_readout = stitched_result.report["horizon_readouts"][0]
+    pathwise_readout = pathwise_result.report["horizon_readouts"][0]
+    assert stitched_readout["mean_persistence_1_session"] < 1.0
+    assert pathwise_readout["mean_persistence_1_session"] == pytest.approx(1.0)
+    summaries = pathwise_result.report["economics"]["summaries"]
+    assert all(row["path_model_count"] == 2 for row in summaries)
+
+
 def test_target_mask_never_becomes_the_economics_score_mask() -> None:
     inputs = _fixture()
     changed_residual = np.asarray(inputs.residual_midrank_targets).copy()

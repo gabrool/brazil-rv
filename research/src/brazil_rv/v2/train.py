@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import math
@@ -13,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from torch import nn
-from torch.utils.data import Sampler
+from torch.utils.data import DataLoader, Sampler
 
 from brazil_rv.modeling.contract import (
     ADAMW_BETAS,
@@ -33,11 +34,12 @@ from brazil_rv.modeling.trajectory import ModelEMA
 from .artifacts import sha256_file, write_json_atomic
 from .config import ModelConfig
 from .contract import (
-    ALLOWED_SEEDS,
     DEVELOPMENT_END,
     FINETUNE_START,
     PRETRAIN_END,
+    SOFT_RANK_TEMPERATURE,
     STORE_START,
+    V1_READ_SEEDS,
 )
 from .losses import multi_horizon_loss
 from .model import DailyMultiHorizonModel
@@ -419,8 +421,8 @@ def load_pretrain_handoff(
 ) -> frozenset[str]:
     """Load stage-P learned state without replacing the separately bound v1 TCN."""
 
-    if expected_sha256 is None or expected_seed is None:
-        raise ValueError("stage-P handoff requires its expected SHA-256 and seed")
+    if expected_sha256 is None:
+        raise ValueError("stage-P handoff requires its expected SHA-256")
     actual_sha256 = sha256_file(checkpoint)
     if actual_sha256 != expected_sha256:
         raise ValueError("stage-P checkpoint SHA-256 differs from the frozen manifest")
@@ -429,11 +431,13 @@ def load_pretrain_handoff(
         not isinstance(payload, Mapping)
         or payload.get("schema") != "V2_RAW_PATIENCE"
         or payload.get("stage") != "P"
-        or payload.get("seed") != expected_seed
+        or (expected_seed is not None and payload.get("seed") != expected_seed)
         or not isinstance(payload.get("fold"), str)
         or not payload.get("fold")
     ):
-        raise ValueError("stage-P handoff schema, stage, seed, or fold is invalid")
+        raise ValueError(
+            "stage-P handoff schema, stage, optional seed, or fold is invalid"
+        )
     contract = _verified_checkpoint_input_contract(payload)
     if contract.get("model_config") != model_config_contract(model.config):
         raise ValueError("stage-P model contract differs from stage F")
@@ -723,12 +727,15 @@ def _set_loader_epoch(loader: Iterable[Mapping[str, object]], epoch: int) -> Non
 
 def _require_production_pair_sampler(
     loader: Iterable[Mapping[str, object]],
+    *,
+    time_decay_half_life: float | None = None,
 ) -> None:
     sampler = getattr(loader, "batch_sampler", None)
     if (
         not isinstance(sampler, DatePairBatchSampler)
         or sampler.pairs_per_batch != 8
         or sampler.drop_last is not True
+        or sampler.time_decay_half_life != time_decay_half_life
     ):
         raise ValueError(
             "production training requires DatePairBatchSampler with "
@@ -1328,8 +1335,8 @@ def train_stage(
 
     if stage not in {"P", "F", "J"}:
         raise ValueError("stage must be P, F, or J")
-    if seed not in ALLOWED_SEEDS:
-        raise ValueError("seed differs from the frozen v2 screen roster")
+    if seed not in V1_READ_SEEDS:
+        raise ValueError("seed differs from the accepted v1 read roster")
     if not fold:
         raise ValueError("fold must be nonempty")
     if not 1 <= maximum_epochs <= MAX_EPOCHS:
@@ -1340,6 +1347,11 @@ def train_stage(
         raise ValueError("stage P uses its embargoed internal holdout without parity")
     if stage == "P" and pretrain_checkpoint is not None:
         raise ValueError("stage P cannot initialize itself from a pretrain checkpoint")
+    expected_decay = 756.0 if stage == "J" else None
+    if model_config.time_decay_half_life_sessions != expected_decay:
+        raise ValueError(
+            f"stage {stage} requires time_decay_half_life_sessions={expected_decay}"
+        )
     access_ledgers = {
         "training": _loader_access_payload(train_loader),
         "selection": _loader_access_payload(selection_loader),
@@ -1385,7 +1397,10 @@ def train_stage(
         raise ValueError(
             "stage-P handoff checkpoint and expected SHA-256 must be set together"
         )
-    _require_production_pair_sampler(train_loader)
+    _require_production_pair_sampler(
+        train_loader,
+        time_decay_half_life=model_config.time_decay_half_life_sessions,
+    )
     set_deterministic_seed(seed)
     model = DailyMultiHorizonModel(model_config)
     pretrain_provenance: dict[str, object] | None = None
@@ -1394,7 +1409,7 @@ def train_stage(
             model,
             pretrain_checkpoint,
             expected_sha256=expected_pretrain_sha256,
-            expected_seed=seed,
+            expected_seed=None,
             fine_tune_input_contract=checkpoint_input_contract,
         )
         pretrain_payload = torch.load(
@@ -1606,3 +1621,188 @@ def train_stage(
         selection_parity=selection_parity,
         evaluation_parity=(None if selection_parity is None else 1 - selection_parity),
     )
+
+
+def _cli_stage_indices(
+    store_root: Path, stage: str, fold: str
+) -> tuple[np.ndarray, np.ndarray]:
+    dates = np.load(store_root / "date_index.npy", allow_pickle=False).astype(
+        "datetime64[D]", copy=False
+    )
+    if stage == "P":
+        pretrain = np.flatnonzero(
+            (dates >= np.datetime64(STORE_START))
+            & (dates <= np.datetime64(PRETRAIN_END))
+        ).astype(np.int64)
+        fit, _, selection = pretrain_internal_split(pretrain)
+        return fit, selection
+    python_dates = dates.astype(object).tolist()
+    by_name = {item.name: item for item in development_folds(python_dates)}
+    try:
+        selected = by_name[fold]
+    except KeyError as error:
+        raise ValueError(f"unknown development fold: {fold}") from error
+    positions = {value: index for index, value in enumerate(python_dates)}
+    fit = np.asarray([positions[value] for value in selected.fit_dates], dtype=np.int64)
+    selection = np.asarray(
+        [positions[value] for value in selected.selection_dates], dtype=np.int64
+    )
+    if stage == "J":
+        pretrain = np.flatnonzero(
+            (dates >= np.datetime64(STORE_START))
+            & (dates <= np.datetime64(PRETRAIN_END))
+        ).astype(np.int64)
+        fit = np.concatenate((pretrain, fit))
+    return fit, selection
+
+
+def _cli_feature_count(store_root: Path, sidecars: Sequence[str]) -> int:
+    manifest = json.loads((store_root / "manifest.json").read_text(encoding="utf-8"))
+    names = manifest.get("feature_names")
+    if not isinstance(names, Mapping) or not isinstance(names.get("slow"), list):
+        raise ValueError("store manifest lacks ordered slow feature names")
+    count = len(names["slow"])
+    for group in sidecars:
+        values = names.get(f"sidecar_{group}")
+        if not isinstance(values, list):
+            raise ValueError(f"store lacks the requested sidecar group: {group}")
+        count += len(values)
+    return count
+
+
+def _train_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run one canonical v2 trajectory")
+    parser.add_argument("--store", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--score-output-dir", type=Path)
+    parser.add_argument("--stage", choices=("P", "F", "J"), required=True)
+    parser.add_argument("--fold", default="F1")
+    parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("--selection-parity", type=int, choices=(0, 1))
+    parser.add_argument("--maximum-epochs", type=int, default=MAX_EPOCHS)
+    parser.add_argument("--patience", type=int, default=EARLY_STOP_PATIENCE)
+    parser.add_argument("--lookback", type=int, default=60)
+    parser.add_argument("--pairs-per-batch", type=int, default=8)
+    parser.add_argument("--selection-batch-size", type=int, default=16)
+    parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--sidecar", action="append", default=[])
+    parser.add_argument("--lambda-persistence", type=float, default=0.0)
+    parser.add_argument(
+        "--soft-rank-temperature", type=float, default=SOFT_RANK_TEMPERATURE
+    )
+    parser.add_argument("--use-bf16", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--compile-forward", action=argparse.BooleanOptionalAction, default=True
+    )
+    parser.add_argument("--fast-pretrained-checkpoint", type=Path)
+    parser.add_argument("--fast-pretrained-sha256")
+    parser.add_argument("--pretrain-checkpoint", type=Path)
+    parser.add_argument("--pretrain-sha256")
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    from .data import V2DailyDataset
+
+    arguments = _train_parser().parse_args(argv)
+    store_root = arguments.store.resolve()
+    stage = str(arguments.stage)
+    fold = "pretrain_internal" if stage == "P" else str(arguments.fold)
+    fit_indices, selection_indices = _cli_stage_indices(store_root, stage, fold)
+    dataset_stage = {"P": "pretrain", "F": "finetune", "J": "joint"}[stage]
+    sidecars = tuple(dict.fromkeys(str(value) for value in arguments.sidecar))
+    train_dataset = V2DailyDataset(
+        store_root,
+        fit_indices,
+        stage=dataset_stage,
+        lookback=arguments.lookback,
+        enabled_sidecars=sidecars,
+        purpose="training",
+    )
+    selection_dataset = V2DailyDataset(
+        store_root,
+        selection_indices,
+        stage=dataset_stage,
+        lookback=arguments.lookback,
+        enabled_sidecars=sidecars,
+        purpose="selection",
+    )
+    decay = 756.0 if stage == "J" else None
+    sampler = DatePairBatchSampler(
+        train_dataset.date_indices,
+        pairs_per_batch=arguments.pairs_per_batch,
+        seed=arguments.seed,
+        time_decay_half_life=decay,
+        drop_last=True,
+    )
+    train_loader = DataLoader(
+        train_dataset,
+        batch_sampler=sampler,
+        num_workers=arguments.num_workers,
+    )
+    selection_loader = DataLoader(
+        selection_dataset,
+        batch_size=arguments.selection_batch_size,
+        shuffle=False,
+        num_workers=arguments.num_workers,
+    )
+    fast_checkpoint = arguments.fast_pretrained_checkpoint
+    model_config = ModelConfig(
+        slow_feature_count=_cli_feature_count(store_root, sidecars),
+        slow_lookback=arguments.lookback,
+        fast_pretrained=fast_checkpoint is not None,
+        fast_pretrained_checkpoint=fast_checkpoint,
+        fast_pretrained_sha256=arguments.fast_pretrained_sha256,
+        lambda_persistence=arguments.lambda_persistence,
+        soft_rank_temperature=arguments.soft_rank_temperature,
+        use_bf16=arguments.use_bf16,
+        compile_forward=arguments.compile_forward,
+        time_decay_half_life_sessions=decay,
+    )
+    device = None if arguments.device == "auto" else torch.device(arguments.device)
+    result = train_stage(
+        stage=stage,
+        seed=arguments.seed,
+        fold=fold,
+        train_loader=train_loader,
+        selection_loader=selection_loader,
+        output_dir=arguments.output_dir,
+        model_config=model_config,
+        pretrain_checkpoint=arguments.pretrain_checkpoint,
+        expected_pretrain_sha256=arguments.pretrain_sha256,
+        selection_parity=arguments.selection_parity,
+        maximum_epochs=arguments.maximum_epochs,
+        patience=arguments.patience,
+        device=device,
+    )
+    if arguments.score_output_dir is not None:
+        from .score import score_checkpoint_artifact
+
+        score_dataset = V2DailyDataset(
+            store_root,
+            selection_indices,
+            stage="pretrain" if stage == "P" else "evaluation",
+            lookback=arguments.lookback,
+            enabled_sidecars=sidecars,
+            purpose="evaluation",
+        )
+        score_loader = DataLoader(
+            score_dataset,
+            batch_size=arguments.selection_batch_size,
+            shuffle=False,
+            num_workers=arguments.num_workers,
+        )
+        score_checkpoint_artifact(
+            checkpoint=result.raw_patience_checkpoint,
+            model_config=model_config,
+            loader=score_loader,
+            output_dir=arguments.score_output_dir,
+            expected_checkpoint_sha256=sha256_file(result.raw_patience_checkpoint),
+            device=device,
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

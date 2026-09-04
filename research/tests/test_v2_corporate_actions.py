@@ -8,15 +8,47 @@ from brazil_rv.v2 import corporate_actions as actions_module
 from brazil_rv.v2.corporate_actions import (
     _extract_yfinance_actions,
     acquire_yfinance_actions,
+    align_action_arrays,
+    action_calendar_alignment_table,
     action_coverage_table,
     audit_m1_adjustment_status,
     cash_reinvestment_review_table,
     cash_reinvestment_unavailable_mask,
     causal_adjustment_factors,
     detect_distribution_changes,
+    detect_split_candidates,
     normalize_yfinance_actions,
     provider_failure_mask,
+    unadjust_yfinance_cash_distributions,
 )
+
+
+def test_split_jump_detection_and_action_alignment_are_explicit() -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    close = np.asarray([[100.0], [50.0], [51.0]])
+    quantity = np.asarray([[1_000.0], [2_000.0], [2_100.0]])
+    observed = np.ones_like(close, dtype=np.bool_)
+    detected = detect_split_candidates(close, quantity, observed)
+    assert detected[:, 0].tolist() == [False, True, False]
+
+    actions = normalize_yfinance_actions(
+        pl.DataFrame(
+            {
+                "date": [dates[1]],
+                "dividends": [0.5],
+                "stock_splits": [2.0],
+            }
+        ),
+        isin="BRTESTACNOR1",
+        ticker="TEST3",
+        fetched_at=datetime(2024, 2, 1, tzinfo=timezone.utc),
+    )
+    split, cash, unresolved = align_action_arrays(
+        actions, dates, ["BRTESTACNOR1"]
+    )
+    np.testing.assert_array_equal(split[:, 0], [1.0, 2.0, 1.0])
+    np.testing.assert_array_equal(cash[:, 0], [0.0, 0.5, 0.0])
+    assert not unresolved.any()
 
 
 def test_forward_adjustment_never_rewrites_history_and_retains_recorded_actions() -> None:
@@ -120,7 +152,8 @@ def test_yfinance_all_nan_symbol_frame_is_provider_failure() -> None:
     present.loc[:, ("FAIL3.SA", "Close")] = 10.0
     extracted = _extract_yfinance_actions(present, "FAIL3.SA")
     assert extracted is not None
-    assert extracted.is_empty()
+    assert extracted.height == 1
+    assert extracted[0, "dividends"] == 0.0
 
 
 def test_batched_acquisition_records_symbol_failure_without_aborting(
@@ -162,23 +195,135 @@ def test_batched_acquisition_records_symbol_failure_without_aborting(
     assert audit.filter(pl.col("status") == "failed")[0, "cache_path"] is None
 
 
+def test_historical_segment_retries_under_current_isin_ticker(
+    tmp_path, monkeypatch
+) -> None:
+    master = pl.DataFrame(
+        {
+            "isin": ["BRTESTACNOR1", "BRTESTACNOR1"],
+            "ticker": ["OLD3", "NEW3"],
+            "first_date": [date(2020, 1, 1), date(2024, 1, 1)],
+            "last_date": [date(2020, 1, 31), date(2024, 1, 31)],
+        }
+    )
+
+    def fake_download(tickers, *, start, end):
+        del end
+        ticker = tickers[0]
+        if ticker == "OLD3":
+            return {
+                ticker: pl.DataFrame(
+                    {
+                        "date": [date(2024, 1, 10)],
+                        "dividends": [0.0],
+                        "stock_splits": [0.0],
+                        "price_observed": [True],
+                    }
+                )
+            }
+        day = date(2020, 1, 10) if start.year == 2020 else date(2024, 1, 10)
+        return {
+            ticker: pl.DataFrame(
+                {
+                    "date": [day],
+                    "dividends": [0.25 if day.year == 2020 else 0.0],
+                    "stock_splits": [0.0],
+                    "price_observed": [True],
+                }
+            )
+        }
+
+    monkeypatch.setattr(actions_module, "_download_yfinance_batch", fake_download)
+    result, audit = acquire_yfinance_actions(
+        master,
+        tmp_path,
+        fetched_at=datetime(2024, 2, 1, tzinfo=timezone.utc),
+        batch_size=1,
+    )
+    old = audit.filter(pl.col("ticker") == "OLD3").row(0, named=True)
+    assert old["query_ticker"] == "NEW3"
+    assert old["status"] == "downloaded_current_ticker"
+    assert result.filter(pl.col("ex_date") == date(2020, 1, 10)).height == 1
+
+
 def test_provider_failures_and_distribution_changes_are_unresolved() -> None:
-    dates = np.asarray(["2024-01-02", "2024-01-03", "2024-01-04"], dtype="datetime64[D]")
-    observed = np.ones((3, 1), dtype=bool)
+    dates = np.asarray(
+        ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05", "2024-01-08"],
+        dtype="datetime64[D]",
+    )
+    observed = np.ones((5, 1), dtype=bool)
     audit = pl.DataFrame(
         {
             "isin": ["BRTESTACNOR1"],
             "first_date": [date(2024, 1, 2)],
-            "last_date": [date(2024, 1, 4)],
+            "last_date": [date(2024, 1, 8)],
             "status": ["failed"],
         }
     )
-    failed = provider_failure_mask(audit, dates, ["BRTESTACNOR1"], observed)
-    assert failed[:, 0].all()
-    changed = detect_distribution_changes(
-        np.asarray([[1.0], [1.0], [2.0]]), observed
+    event_candidates = np.zeros_like(observed)
+    event_candidates[2, 0] = True
+    failed = provider_failure_mask(
+        audit,
+        dates,
+        ["BRTESTACNOR1"],
+        observed,
+        event_candidates,
+        maximum_horizon=1,
     )
-    assert changed[:, 0].tolist() == [False, False, True]
+    assert failed[:, 0].tolist() == [False, True, True, True, False]
+    changed = detect_distribution_changes(
+        np.asarray([[1.0], [1.0], [2.0], [2.0], [2.0]]), observed
+    )
+    assert changed[:, 0].tolist() == [False, False, True, False, False]
+
+
+def test_cash_units_use_only_strictly_later_split_factors() -> None:
+    fetched_at = datetime(2024, 2, 1, tzinfo=timezone.utc)
+    same_day = normalize_yfinance_actions(
+        pl.DataFrame(
+            {
+                "date": [date(2020, 1, 2), date(2021, 1, 4)],
+                "dividends": [1.0, 0.0],
+                "stock_splits": [2.0, 5.0],
+            }
+        ),
+        isin="BRTESTACNOR1",
+        ticker="TEST3",
+        fetched_at=fetched_at,
+    )
+    adjusted = unadjust_yfinance_cash_distributions(same_day)
+    dividend = adjusted.filter(pl.col("action_type") == "dividend").row(
+        0, named=True
+    )
+    assert dividend["provider_cash_distribution_brl"] == 1.0
+    assert dividend["cash_unit_adjustment_factor"] == 5.0
+    assert dividend["cash_distribution_brl"] == 5.0
+
+
+def test_action_alignment_audit_counts_off_calendar_rows() -> None:
+    actions = normalize_yfinance_actions(
+        pl.DataFrame(
+            {
+                "date": [date(2024, 1, 6)],
+                "dividends": [0.5],
+                "stock_splits": [0.0],
+            }
+        ),
+        isin="BRTESTACNOR1",
+        ticker="TEST3",
+        fetched_at=datetime(2024, 2, 1, tzinfo=timezone.utc),
+    )
+    audit = action_calendar_alignment_table(
+        actions, [date(2024, 1, 5), date(2024, 1, 8)], ["BRTESTACNOR1"]
+    )
+    assert audit.to_dicts() == [
+        {
+            "isin": "BRTESTACNOR1",
+            "ex_date": date(2024, 1, 6),
+            "action_type": "dividend",
+            "reason": "off_calendar_ex_date",
+        }
+    ]
 
 
 def test_action_coverage_distinguishes_true_zero_from_provider_failure() -> None:

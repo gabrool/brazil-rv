@@ -16,19 +16,23 @@ from numpy.typing import NDArray
 from .contract import (
     ACCUMULATED_TEST_AFTER,
     COTAHIST_YEARS,
+    HORIZONS,
     INTRADAY_DAILY_FEATURES,
     SLOW_FEATURES,
     STORE_START,
     V1_STORE_V2_ZERO_SLOW_FIELDS,
 )
 from .corporate_actions import (
+    action_calendar_alignment_table,
     action_presence_array,
     action_coverage_table,
     adjust_daily_ohlc,
     align_action_arrays,
     audit_m1_adjustment_status,
+    cash_unit_adjustment_audit,
     cash_reinvestment_review_table,
     cash_reinvestment_unavailable_mask,
+    dividend_close_drop_audit,
     detect_distribution_changes,
     detect_split_candidates,
     distribution_review_table,
@@ -49,17 +53,24 @@ from .intraday_features import (
     IntradayDailyResult,
     build_intraday_daily_features,
     mask_action_boundaries,
+    replace_daily_close_anchors,
 )
 from .normalization import rank_gauss_panel
 from .sidecars import (
     SidecarResult,
+    add_distribution_event_features,
     available_archive_mapping,
     derive_known_archive_features,
     materialize_known_archive,
 )
 from .store import write_store
 from .targets import build_multi_day_targets, build_to_close_target
-from .universe import build_daily_universe, session_calendar, v1_pit_coverage_table
+from .universe import (
+    build_daily_universe,
+    session_calendar,
+    v1_pit_coverage_table,
+    v1_pit_inactive_exceptions_table,
+)
 
 EXPECTED_V1_DATES = 1_248
 V1_STORE_START = date(2021, 7, 19)
@@ -408,6 +419,124 @@ def _coverage_table(
     return pl.DataFrame(rows)
 
 
+def _target_validity_tables(
+    dates: NDArray[np.datetime64],
+    valid: NDArray[np.bool_],
+    active: NDArray[np.bool_],
+    observed: NDArray[np.bool_],
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Audit target coverage by year and by eventual panel survival."""
+
+    mask = np.asarray(valid, dtype=np.bool_)
+    membership = np.asarray(active, dtype=np.bool_)
+    seen = np.asarray(observed, dtype=np.bool_)
+    if mask.shape != (*membership.shape, len(HORIZONS)) or seen.shape != membership.shape:
+        raise ValueError("target-validity audit axes are misaligned")
+    years = dates.astype("datetime64[Y]").astype(np.int64) + 1970
+    yearly: list[dict[str, object]] = []
+    for year in sorted(set(years.tolist())):
+        year_rows = years == year
+        for horizon_index, horizon in enumerate(HORIZONS):
+            eligible_rows = year_rows.copy()
+            eligible_rows[max(0, len(dates) - horizon) :] = False
+            denominator_mask = membership[eligible_rows] & seen[eligible_rows]
+            denominator = int(denominator_mask.sum())
+            numerator = int(
+                (mask[eligible_rows, :, horizon_index] & denominator_mask).sum()
+            )
+            yearly.append(
+                {
+                    "year": int(year),
+                    "horizon_sessions": horizon,
+                    "valid_target_name_days": numerator,
+                    "observed_member_name_days": denominator,
+                    "validity_ratio": numerator / denominator if denominator else 0.0,
+                }
+            )
+
+    last_seen = np.full(seen.shape[1], -1, dtype=np.int64)
+    for name in range(seen.shape[1]):
+        rows = np.flatnonzero(seen[:, name])
+        if rows.size:
+            last_seen[name] = rows[-1]
+    final_year = int(years[-1])
+    survives = (last_seen >= 0) & (years[np.maximum(last_seen, 0)] == final_year)
+    groups = {"delisted_within_panel": ~survives, "survives_to_final_year": survives}
+    survival_rows: list[dict[str, object]] = []
+    ratios: dict[tuple[str, int], float] = {}
+    denominators: dict[tuple[str, int], int] = {}
+    for label, names in groups.items():
+        for horizon_index, horizon in enumerate(HORIZONS):
+            eligible_dates = np.arange(len(dates)) < len(dates) - horizon
+            denominator_mask = (
+                membership & seen & eligible_dates[:, None] & names[None, :]
+            )
+            denominator = int(denominator_mask.sum())
+            numerator = int((mask[..., horizon_index] & denominator_mask).sum())
+            ratio = numerator / denominator if denominator else 0.0
+            ratios[(label, horizon)] = ratio
+            denominators[(label, horizon)] = denominator
+            survival_rows.append(
+                {
+                    "group": label,
+                    "horizon_sessions": horizon,
+                    "name_count": int(names.sum()),
+                    "valid_target_name_days": numerator,
+                    "observed_member_name_days": denominator,
+                    "validity_ratio": ratio,
+                }
+            )
+    for horizon in HORIZONS:
+        if not all(
+            denominators[(label, horizon)] > 0 for label in groups
+        ):
+            continue
+        gap = abs(
+            ratios[("delisted_within_panel", horizon)]
+            - ratios[("survives_to_final_year", horizon)]
+        )
+        if gap > 0.10:
+            raise ValueError(
+                "target validity is survivor-skewed by more than 10 percentage "
+                f"points at horizon {horizon}: {gap:.6f}"
+            )
+    return pl.DataFrame(yearly), pl.DataFrame(survival_rows)
+
+
+def _fast_sigma_ratio_table(
+    dates: NDArray[np.datetime64],
+    fast_sigma: NDArray[np.floating],
+    daily_sigma: NDArray[np.floating],
+    fast_present: NDArray[np.bool_],
+) -> pl.DataFrame:
+    fast = np.asarray(fast_sigma, dtype=np.float64)
+    daily = np.asarray(daily_sigma, dtype=np.float64)
+    present = np.asarray(fast_present, dtype=np.bool_)
+    if fast.shape != daily.shape or present.shape != fast.shape:
+        raise ValueError("fast/daily sigma audit axes are misaligned")
+    years = dates.astype("datetime64[Y]").astype(np.int64) + 1970
+    rows: list[dict[str, object]] = []
+    for year in sorted(set(years.tolist())):
+        mask = (
+            (years == year)[:, None]
+            & present
+            & np.isfinite(fast)
+            & np.isfinite(daily)
+            & (daily > 0)
+        )
+        ratio = fast[mask] / daily[mask]
+        rows.append(
+            {
+                "year": int(year),
+                "comparable_name_days": int(ratio.size),
+                "ratio_p05": float(np.quantile(ratio, 0.05)) if ratio.size else None,
+                "ratio_median": float(np.median(ratio)) if ratio.size else None,
+                "ratio_p95": float(np.quantile(ratio, 0.95)) if ratio.size else None,
+            }
+        )
+    return pl.DataFrame(rows)
+
+
 def _sidecar_coverage_table(
     dates: NDArray[np.datetime64],
     groups: Mapping[
@@ -586,7 +715,9 @@ def build_daily_store(
     )
     distribution_unresolved = distribution_changed & ~recorded_action
     unresolved |= distribution_unresolved
-    price_adjustment_unresolved |= distribution_unresolved
+    split_detected = detect_split_candidates(
+        panel.close_brl, panel.quantity, panel.observed
+    )
     provider_failed = np.zeros(panel.observed.shape, dtype=np.bool_)
     if action_acquisition_audit is not None:
         provider_failed = provider_failure_mask(
@@ -594,12 +725,10 @@ def build_daily_store(
             panel.dates,
             panel.isins,
             panel.observed,
+            distribution_changed | split_detected,
+            maximum_horizon=max(HORIZONS),
         )
         unresolved |= provider_failed
-        price_adjustment_unresolved |= provider_failed
-    split_detected = detect_split_candidates(
-        panel.close_brl, panel.quantity, panel.observed
-    )
     split_disagreement = split_detected != (split != 1.0)
     unresolved |= split_disagreement
     price_adjustment_unresolved |= split_disagreement
@@ -607,7 +736,7 @@ def build_daily_store(
         panel.close_brl, cash_distribution
     )
     unresolved |= cash_reinvestment_unavailable
-    intraday_action_boundary = recorded_action | unresolved
+    intraday_action_boundary = (split != 1.0) | price_adjustment_unresolved
     adjusted = adjust_daily_ohlc(
         panel.open_brl,
         panel.high_brl,
@@ -645,7 +774,6 @@ def build_daily_store(
     entry_valid = np.zeros(shape, dtype=np.bool_)
     realized_daily = np.full(shape, np.nan, dtype=np.float64)
     m1_session_close = np.full(shape, np.nan, dtype=np.float64)
-    m1_session_close_valid = np.zeros(shape, dtype=np.bool_)
     if minute_panel is not None:
         native = build_intraday_daily_features(
             minute_panel.open_brl,
@@ -658,6 +786,10 @@ def build_daily_store(
         aligned = _align_intraday_result(
             native, minute_panel.dates, minute_panel.isins, panel.dates, panel.isins
         )
+        m1_session_close = aligned.session_close.copy()
+        aligned = replace_daily_close_anchors(
+            aligned, panel.close_brl, panel.observed
+        )
         aligned = mask_action_boundaries(aligned, intraday_action_boundary)
         intraday_values, intraday_valid = rank_gauss_panel(
             aligned.values, aligned.valid, universe.active
@@ -667,12 +799,14 @@ def build_daily_store(
         entry = aligned.entry_open
         entry_valid = aligned.entry_open_valid
         realized_daily = aligned.realized_daily_vol
-        m1_session_close = aligned.session_close
-        m1_session_close_valid = aligned.session_close_valid
     elif streamed_intraday is not None:
         aligned = streamed_intraday.result
         if aligned.values.shape[:2] != shape:
             raise ValueError("streamed intraday derivatives are misaligned")
+        m1_session_close = aligned.session_close.copy()
+        aligned = replace_daily_close_anchors(
+            aligned, panel.close_brl, panel.observed
+        )
         aligned = mask_action_boundaries(aligned, intraday_action_boundary)
         intraday_values, intraday_valid = rank_gauss_panel(
             aligned.values, aligned.valid, universe.active
@@ -682,16 +816,12 @@ def build_daily_store(
         entry = aligned.entry_open
         entry_valid = aligned.entry_open_valid
         realized_daily = aligned.realized_daily_vol
-        m1_session_close = aligned.session_close
-        m1_session_close_valid = aligned.session_close_valid
 
     slow_sigma = np.where(slow_raw.valid[..., 8], slow_raw.values[..., 8], np.nan)
     targets = build_multi_day_targets(
         adjusted.total_return_close,
         universe.active,
-        fast_sigma,
         slow_sigma,
-        fast_present,
         unresolved,
     )
     arrays: dict[str, NDArray[np.generic]] = {
@@ -738,7 +868,7 @@ def build_daily_store(
     if minute_panel is not None or streamed_intraday is not None:
         to_close = build_to_close_target(
             entry,
-            np.where(m1_session_close_valid, m1_session_close, np.nan),
+            np.where(panel.observed, panel.close_brl, np.nan),
             realized_daily,
             universe.active,
             fast_present & entry_valid,
@@ -765,10 +895,18 @@ def build_daily_store(
             family="intraday",
         ),
     ]
+    prepared_sidecars = dict(sidecars or {})
+    if "events" in prepared_sidecars:
+        prepared_sidecars["events"] = add_distribution_event_features(
+            prepared_sidecars["events"],
+            checked_actions,
+            panel.dates,
+            panel.isins,
+        )
     sidecar_masks: dict[
         str, tuple[Sequence[str], NDArray[np.bool_], Sequence[str]]
     ] = {}
-    for group, result in sorted((sidecars or {}).items()):
+    for group, result in sorted(prepared_sidecars.items()):
         if result.values.shape[:2] != shape:
             raise ValueError(f"sidecar {group} does not match the store axes")
         values, valid = rank_gauss_panel(result.values, result.valid, universe.active)
@@ -809,6 +947,22 @@ def build_daily_store(
             panel.close_brl,
             panel.observed,
         ),
+        "corporate_action_calendar_alignment": action_calendar_alignment_table(
+            checked_actions, panel.dates, panel.isins
+        ),
+        "corporate_action_cash_unit_adjustment": cash_unit_adjustment_audit(
+            checked_actions
+        ),
+        "corporate_action_dividend_close_drop": dividend_close_drop_audit(
+            panel.dates,
+            panel.isins,
+            cash_distribution,
+            panel.close_brl,
+            panel.observed,
+        ),
+        "fast_rv_to_yang_zhang_ratio": _fast_sigma_ratio_table(
+            panel.dates, fast_sigma, slow_sigma, fast_present
+        ),
         "corporate_action_coverage": action_coverage_table(
             checked_actions,
             panel.dates,
@@ -818,11 +972,20 @@ def build_daily_store(
         "corporate_actions": checked_actions,
     }
     if v1_assignments is not None:
+        v1_isins = tuple(
+            v1_assignments.get_column("isin").cast(pl.String).to_list()
+        )
         tables["v1_pit_active_coverage"] = v1_pit_coverage_table(
             panel.dates,
             panel.isins,
             universe.active,
-            tuple(v1_assignments.get_column("isin").cast(pl.String).to_list()),
+            v1_isins,
+        )
+        tables["v1_pit_inactive_exceptions"] = v1_pit_inactive_exceptions_table(
+            panel.dates,
+            panel.isins,
+            universe.active,
+            v1_isins,
         )
     if action_acquisition_audit is not None:
         tables["corporate_action_acquisition_audit"] = action_acquisition_audit
@@ -870,6 +1033,15 @@ def build_daily_store(
     )
     tables["universe_size"] = tables["universe_size"].filter(
         pl.col("trade_date") >= kept_dates[0].astype(object)
+    )
+    (
+        tables["target_validity_by_year"],
+        tables["target_validity_by_survival"],
+    ) = _target_validity_tables(
+        kept_dates,
+        targets.primary_valid[keep],
+        universe.active[keep],
+        panel.observed[keep],
     )
     v1_fast_files: list[dict[str, object]] = []
     if v1_fast_store is not None:
@@ -993,10 +1165,15 @@ def _load_action_bundle(
             f"corporate-action acquisition manifest is missing: {manifest_path}"
         )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("schema") != "V2_CORPORATE_ACTIONS_V1":
+    if manifest.get("schema") != "V2_CORPORATE_ACTIONS_V2":
         raise ValueError("corporate-action acquisition manifest has wrong schema")
     paths: dict[str, Path] = {}
-    for key in ("security_master", "actions", "acquisition_audit"):
+    for key in (
+        "security_master",
+        "actions",
+        "acquisition_audit",
+        "cash_unit_adjustment_audit",
+    ):
         record = manifest.get(key)
         if not isinstance(record, dict) or not {"path", "sha256"}.issubset(record):
             raise ValueError(f"corporate-action manifest lacks {key}")
@@ -1062,6 +1239,10 @@ def _parse_sidecars(
                 "source_trade_date",
                 "regular_volume_brl",
                 "odd_lot_volume_brl",
+            ),
+            "events": (
+                "event_itr_dfp_recent_5s",
+                "event_itr_dfp_recent_5s_mask",
             ),
         }.get(group, ())
         value_columns = sorted(

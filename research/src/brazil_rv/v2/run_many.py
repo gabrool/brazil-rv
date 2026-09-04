@@ -4,13 +4,15 @@ import argparse
 import hashlib
 import json
 import subprocess
+import sys
 from concurrent.futures import FIRST_EXCEPTION, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
 from .artifacts import write_json_atomic
-from .contract import ALLOWED_SEEDS
+from .config import protocol_preset
+from .contract import V1_READ_SEEDS
 
 MAX_PARALLEL_TRAJECTORIES = 6
 
@@ -139,8 +141,8 @@ def _preflight(
     for job in jobs:
         if not job.name or not job.fold or not job.command or not job.command[0]:
             raise ValueError("trajectory name, fold, and command must be nonempty")
-        if job.seed not in ALLOWED_SEEDS:
-            raise ValueError("trajectory seed differs from the frozen v2 roster")
+        if job.seed not in V1_READ_SEEDS:
+            raise ValueError("trajectory seed differs from the accepted v1 read roster")
         if job.run_dir.exists():
             if not job.run_dir.is_dir() or not job.manifest_path.is_file():
                 raise FileExistsError(
@@ -177,6 +179,7 @@ def run_many(
     *,
     max_parallel: int,
     launcher_manifest_path: Path | None = None,
+    launcher_metadata: Mapping[str, object] | None = None,
 ) -> tuple[TrajectoryOutcome, ...]:
     """Run isolated child processes once, with immutable-root resume semantics."""
     job_list = tuple(jobs)
@@ -211,6 +214,7 @@ def run_many(
                 "schema": "BRAZIL_RV_V2_RUN_MANY_V1",
                 "status": "failed" if failed_job is not None else "completed",
                 "max_parallel": max_parallel,
+                "metadata": dict(launcher_metadata or {}),
                 "planned_jobs": [
                     {
                         "name": job.name,
@@ -228,6 +232,75 @@ def run_many(
     if failed_job is not None:
         raise failures[failed_job]
     return ordered
+
+
+def preset_jobs(
+    *,
+    name: str,
+    store: Path,
+    output_root: Path,
+    sidecars: Sequence[str] = (),
+    compile_forward: bool = True,
+) -> tuple[tuple[TrajectoryJob, ...], int, dict[str, object]]:
+    """Expand a frozen named preset into full train-and-score trajectories."""
+
+    preset = protocol_preset(name)
+    jobs: list[TrajectoryJob] = []
+    for fold in preset.folds:
+        for seed in preset.seeds:
+            for parity in (0, 1):
+                label = "even" if parity == 0 else "odd"
+                run_dir = output_root / f"{fold}_seed{seed}_select_{label}"
+                command = [
+                    sys.executable,
+                    "-m",
+                    "brazil_rv.v2.train",
+                    "--store",
+                    str(store.resolve()),
+                    "--output-dir",
+                    str(run_dir.resolve()),
+                    "--score-output-dir",
+                    str((run_dir / "scores").resolve()),
+                    "--stage",
+                    "F",
+                    "--fold",
+                    fold,
+                    "--seed",
+                    str(seed),
+                    "--selection-parity",
+                    str(parity),
+                    "--maximum-epochs",
+                    str(preset.max_epochs_override or 20),
+                ]
+                if not compile_forward:
+                    command.append("--no-compile-forward")
+                for group in sidecars:
+                    command.extend(("--sidecar", group))
+                jobs.append(
+                    TrajectoryJob(
+                        name=f"{fold}_seed{seed}_select_{label}",
+                        seed=seed,
+                        fold=fold,
+                        run_dir=run_dir,
+                        command=tuple(command),
+                        cwd=Path(__file__).resolve().parents[4],
+                        expected_manifest={
+                            "stage": "F",
+                            "selection_parity": parity,
+                            "official_validation_accessed": False,
+                            "test_accessed": False,
+                        },
+                    )
+                )
+    metadata = {
+        "preset": preset.name,
+        "folds": list(preset.folds),
+        "seeds": list(preset.seeds),
+        "paired_bootstrap_replications": preset.bootstrap_replications,
+        "paired_bootstrap_block_sessions": preset.bootstrap_block_length,
+        "trajectory_contract": "stage-F train plus raw-Patience score artifact",
+    }
+    return tuple(jobs), preset.max_parallel, metadata
 
 
 def load_plan(path: Path) -> tuple[tuple[TrajectoryJob, ...], int]:
@@ -263,14 +336,35 @@ def load_plan(path: Path) -> tuple[tuple[TrajectoryJob, ...], int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run v2 trajectories concurrently")
-    parser.add_argument("--plan", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--plan", type=Path)
+    source.add_argument("--preset", choices=("triage", "full"))
     parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--store", type=Path)
+    parser.add_argument("--output-root", type=Path)
+    parser.add_argument("--sidecar", action="append", default=[])
+    parser.add_argument(
+        "--compile-forward", action=argparse.BooleanOptionalAction, default=True
+    )
     arguments = parser.parse_args()
-    jobs, max_parallel = load_plan(arguments.plan)
+    metadata: dict[str, object] = {}
+    if arguments.plan is not None:
+        jobs, max_parallel = load_plan(arguments.plan)
+    else:
+        if arguments.store is None or arguments.output_root is None:
+            parser.error("--preset requires --store and --output-root")
+        jobs, max_parallel, metadata = preset_jobs(
+            name=arguments.preset,
+            store=arguments.store,
+            output_root=arguments.output_root,
+            sidecars=arguments.sidecar,
+            compile_forward=arguments.compile_forward,
+        )
     run_many(
         jobs,
         max_parallel=max_parallel,
         launcher_manifest_path=arguments.manifest,
+        launcher_metadata=metadata,
     )
 
 

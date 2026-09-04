@@ -9,6 +9,7 @@ import pytest
 from torch.utils.data import DataLoader
 
 import brazil_rv.v2.build_store as build_store_module
+import brazil_rv.v2.store as store_module
 from brazil_rv.v2.build_store import (
     EXPECTED_V1_DATES,
     MinutePanel,
@@ -69,6 +70,8 @@ def _base_store(tmp_path, *, external_fast=None, stored_fast_present=None):
         "slow_values": slow,
         "slow_valid": np.ones_like(slow, dtype=bool),
         "active": np.ones((days, names), dtype=bool),
+        "target_to_close": np.ones((days, names), dtype=np.float32),
+        "target_to_close_valid": np.ones((days, names), dtype=bool),
     }
     metadata = {}
     tables = {}
@@ -146,6 +149,29 @@ def test_store_is_immutable_and_hash_verified(tmp_path) -> None:
         stream.write(bytes([final[0] ^ 1]))
     with pytest.raises(ValueError, match="hash mismatch"):
         open_store_for_dates(path, [0], purpose="training")
+
+
+def test_store_hashes_are_cached_per_process_for_unchanged_files(
+    tmp_path, monkeypatch
+) -> None:
+    path = _base_store(tmp_path)
+    store_module._VERIFIED_HASHES.clear()
+    original = store_module.sha256_file
+    calls = 0
+
+    def counted(item: Path) -> str:
+        nonlocal calls
+        calls += 1
+        return original(item)
+
+    monkeypatch.setattr(store_module, "sha256_file", counted)
+    first, _ = open_store_for_dates(path, list(range(25)), purpose="training")
+    first.close()
+    first_count = calls
+    second, _ = open_store_for_dates(path, list(range(25)), purpose="training")
+    second.close()
+    assert first_count > 0
+    assert calls == first_count
 
 
 def test_store_writer_selects_source_rows_one_array_at_a_time(tmp_path) -> None:
@@ -308,6 +334,7 @@ def test_external_fast_ready_is_intersected_with_store_presence(tmp_path) -> Non
     )
     sample = V2DailyDataset(path, [20], stage="finetune", lookback=20)[0]
     assert sample["fast_present"].tolist() == [True, False, False]
+    assert sample["to_close_mask"].tolist() == [True, False, False]
     assert not sample["fast_patch_mask"][2].any()
     assert np.all(sample["fast_patches"][2] == 0.0)
     retained = sorted(set(range(32)) - set(V1_STORE_V2_ZERO_SLOW_FIELDS))
@@ -555,7 +582,8 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
     assert second["targets"].tolist() == [[0.0] * 5]
     assert second["raw_targets"].tolist() == [[0.0] * 5]
     assert second["raw_log_returns"].tolist() == [[0.0] * 5]
-    assert second["to_close_target"].tolist() == [44.0]
+    assert second["to_close_mask"].tolist() == [False]
+    assert second["to_close_target"].tolist() == [0.0]
     direct_targets = dataset.store.read(
         "target_primary", [days - 3, days - 2]
     )
@@ -610,7 +638,7 @@ def test_v1_calendar_includes_physical_warmup_before_finetune() -> None:
         _validate_v1_calendar([FINETUNE_START, *calendar[1:]])
 
 
-def test_store_to_close_uses_exact_m1_final_close_not_cotahist(tmp_path) -> None:
+def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
     days = 70
     names = ("BRTESTACNOR1", "BRTESTACNPR0")
     dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(days)]
@@ -676,11 +704,11 @@ def test_store_to_close_uses_exact_m1_final_close_not_cotahist(tmp_path) -> None
     )
     raw = np.load(root / "target_to_close_raw_log_return.npy")
     valid = np.load(root / "target_to_close_valid.npy")
-    expected = np.log(123.45 / minute[65, 0, 345])
+    expected = np.log(200.0 / minute[65, 0, 345])
     assert raw[65, 0] == expected
-    assert raw[65, 0] != pytest.approx(np.log(200.0 / minute[65, 0, 345]))
+    assert raw[65, 0] != pytest.approx(np.log(123.45 / minute[65, 0, 345]))
     assert valid[65, 0]
-    assert not valid[65, 1]
+    assert valid[65, 1]
     unavailable = np.load(root / "cash_reinvestment_unavailable_mask.npy")
     unresolved = np.load(root / "unresolved_action.npy")
     price_unresolved = np.load(root / "price_adjustment_unresolved.npy")
@@ -703,7 +731,7 @@ def test_store_to_close_uses_exact_m1_final_close_not_cotahist(tmp_path) -> None
     assert target_raw_valid[63, 0, 0]
     target_valid = np.load(root / "target_valid.npy")
     assert not target_valid[62, 0, 0]
-    assert target_valid[63, 0, 0]
+    assert not target_valid[63, 0, 0]
     review = pl.read_parquet(
         root / "corporate_action_cash_reinvestment_review.parquet"
     )

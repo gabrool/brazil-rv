@@ -33,7 +33,7 @@ ARCHIVE_COLUMN_MAP: dict[str, dict[str, str | None]] = {
         "standardized_unexpected_earnings": None,
     },
     "options": {
-        "put_call_oi_ratio": None,
+        "put_call_oi_ratio": "options_put_call_oi_log_ratio_tanh",
         # This is the archived one-session OI change divided by trailing
         # stock ADV20, behind a reversible signed-log/tanh transform.
         "delta_oi_to_volume_1": "options_oi_change_to_stock_adv20_tanh",
@@ -371,6 +371,12 @@ def _raw_options_features(source: pl.DataFrame) -> pl.DataFrame:
     output = source
     transforms = (
         (
+            "options_put_call_oi_log_ratio_tanh",
+            "put_call_oi_ratio",
+            3.0,
+            False,
+        ),
+        (
             "options_oi_change_to_stock_adv20_tanh",
             "delta_oi_to_volume_1",
             3.0,
@@ -390,6 +396,8 @@ def _raw_options_features(source: pl.DataFrame) -> pl.DataFrame:
         latent = scale * np.arctanh(np.where(valid, values, 0.0))
         if signed_log:
             inverse[valid] = np.sign(latent[valid]) * np.expm1(np.abs(latent[valid]))
+        elif feature == "put_call_oi_ratio":
+            inverse[valid] = np.exp(latent[valid])
         else:
             inverse[valid] = latent[valid]
         valid &= np.isfinite(inverse)
@@ -399,6 +407,43 @@ def _raw_options_features(source: pl.DataFrame) -> pl.DataFrame:
             pl.Series(f"{feature}_mask", valid),
         )
     return output
+
+
+def _raw_events_features(
+    source: pl.DataFrame, dates: Sequence[date | np.datetime64]
+) -> pl.DataFrame:
+    """Derive causal sessions since the latest observable RAD earnings event."""
+
+    required = {"available_date", "isin", "event_itr_dfp_recent_5s"}
+    if not required.issubset(source.columns):
+        return source
+    rows = list(source.sort("isin", "available_date").iter_rows(named=True))
+    prior_recent: dict[str, bool] = {}
+    last_event: dict[str, date] = {}
+    session_position = {_as_date(value): index for index, value in enumerate(dates)}
+    for row in rows:
+        isin = str(row["isin"])
+        current_date = _as_date(row["available_date"])
+        recent_value = row.get("event_itr_dfp_recent_5s")
+        recent = recent_value is not None and float(recent_value) > 0.5
+        recent_mask = row.get("event_itr_dfp_recent_5s_mask") is not False
+        if recent_mask and recent and not prior_recent.get(isin, False):
+            last_event[isin] = current_date
+        previous = last_event.get(isin)
+        valid = (
+            previous is not None
+            and current_date in session_position
+            and previous in session_position
+        )
+        row["sessions_since_earnings"] = (
+            float(session_position[current_date] - session_position[previous])
+            if valid
+            else 0.0
+        )
+        row["sessions_since_earnings_mask"] = valid
+        if recent_mask:
+            prior_recent[isin] = recent
+    return pl.DataFrame(rows, infer_schema_length=None)
 
 
 def _raw_oddlot_features(
@@ -479,7 +524,65 @@ def derive_known_archive_features(
         return _raw_oddlot_features(source, dates)
     if group == "options":
         return _raw_options_features(source)
+    if group == "events":
+        return _raw_events_features(source, dates)
     return source
+
+
+def add_distribution_event_features(
+    result: SidecarResult,
+    actions: pl.DataFrame,
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+) -> SidecarResult:
+    """Add causally announced ex-distribution indicators for t+1 through t+3."""
+
+    if result.group != "events" or result.feature_names != SIDECAR_FEATURES["events"]:
+        raise ValueError("distribution flags require the canonical events sidecar")
+    values = result.values.copy()
+    valid = result.valid.copy()
+    normalized_dates = tuple(_as_date(value) for value in dates)
+    date_lookup = {value: index for index, value in enumerate(normalized_dates)}
+    isin_lookup = {value: index for index, value in enumerate(isins)}
+    # RAD identity coverage is the safe negative-observation population.
+    rad_covered = valid[..., 1]
+    for lag, feature_index in zip((1, 2, 3), (2, 3, 4), strict=True):
+        valid[..., feature_index] = rad_covered
+        values[..., feature_index] = 0.0
+        for row in actions.filter(pl.col("cash_distribution_brl") > 0).iter_rows(
+            named=True
+        ):
+            event = date_lookup.get(_as_date(row["ex_date"]))
+            name = isin_lookup.get(str(row["isin"]))
+            decision = None if event is None else event - lag
+            known = _as_date(row.get("known_date") or row["ex_date"])
+            if (
+                decision is not None
+                and decision >= 0
+                and name is not None
+                and known <= normalized_dates[decision]
+                and rad_covered[decision, name]
+            ):
+                values[decision, name, feature_index] = 1.0
+    available = set(result.archive_semantics_available)
+    available.update(
+        {
+            "sessions_since_earnings",
+            "ex_distribution_next_1",
+            "ex_distribution_next_2",
+            "ex_distribution_next_3",
+        }
+    )
+    return SidecarResult(
+        group=result.group,
+        feature_names=result.feature_names,
+        values=values,
+        valid=valid,
+        coverage_by_year=result.coverage_by_year,
+        archive_semantics_available=tuple(
+            name for name in result.feature_names if name in available
+        ),
+    )
 
 
 def bind_sidecar_isins(source: pl.DataFrame, assignments: pl.DataFrame) -> pl.DataFrame:

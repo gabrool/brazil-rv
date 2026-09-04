@@ -164,6 +164,24 @@ def test_named_protocol_json_files_match_frozen_presets() -> None:
     assert protocol_preset("full") == FULL_PROTOCOL
 
 
+def test_named_preset_expands_to_train_and_score_commands(tmp_path) -> None:
+    store = tmp_path / "store"
+    jobs, maximum, metadata = launcher.preset_jobs(
+        name="triage",
+        store=store,
+        output_root=tmp_path / "runs",
+        sidecars=("events",),
+        compile_forward=False,
+    )
+    assert len(jobs) == 4
+    assert maximum == 1
+    assert metadata["paired_bootstrap_replications"] == 0
+    assert metadata["paired_bootstrap_block_sessions"] == 20
+    assert all("brazil_rv.v2.train" in job.command for job in jobs)
+    assert all("--score-output-dir" in job.command for job in jobs)
+    assert all("--no-compile-forward" in job.command for job in jobs)
+
+
 def test_protocol_loader_rejects_any_config_drift(tmp_path) -> None:
     source = Path("research/configs/v2/triage.json")
     payload = json.loads(source.read_text(encoding="utf-8"))

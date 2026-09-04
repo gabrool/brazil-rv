@@ -40,9 +40,7 @@ def _rank_row(
 def build_multi_day_targets(
     total_return_close: NDArray[np.floating],
     active: NDArray[np.bool_],
-    fast_sigma_20: NDArray[np.floating],
     yang_zhang_sigma_20: NDArray[np.floating],
-    fast_present: NDArray[np.bool_],
     unresolved_action: NDArray[np.bool_],
     *,
     horizons: tuple[int, ...] = HORIZONS,
@@ -52,18 +50,15 @@ def build_multi_day_targets(
 
     close = np.asarray(total_return_close, dtype=np.float64)
     membership = np.asarray(active, dtype=np.bool_)
-    fast_sigma = np.asarray(fast_sigma_20, dtype=np.float64)
-    slow_sigma = np.asarray(yang_zhang_sigma_20, dtype=np.float64)
-    has_fast = np.asarray(fast_present, dtype=np.bool_)
+    sigma = np.asarray(yang_zhang_sigma_20, dtype=np.float64)
     unresolved = np.asarray(unresolved_action, dtype=np.bool_)
     if close.ndim != 2 or any(
         value.shape != close.shape
-        for value in (membership, fast_sigma, slow_sigma, has_fast, unresolved)
+        for value in (membership, sigma, unresolved)
     ):
         raise ValueError("target inputs must be aligned [date, name]")
     if not horizons or any(value <= 0 for value in horizons) or len(set(horizons)) != len(horizons):
         raise ValueError("target horizons must be unique and positive")
-    sigma = np.where(has_fast, fast_sigma, slow_sigma)
     shape = (*close.shape, len(horizons))
     primary = np.zeros(shape, dtype=np.float32)
     primary_valid = np.zeros(shape, dtype=np.bool_)

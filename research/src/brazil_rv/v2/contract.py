@@ -19,6 +19,7 @@ PRIMARY_HORIZONS: Final[tuple[int, ...]] = (1, 2, 3, 5)
 ALLOWED_LOOKBACKS: Final[tuple[int, ...]] = (20, 60, 120)
 DEFAULT_LOOKBACK: Final[int] = 60
 ALLOWED_SEEDS: Final[tuple[int, ...]] = (11, 29, 47)
+V1_READ_SEEDS: Final[tuple[int, ...]] = (11, 29, 47, 61, 79, 97, 113, 131, 149, 167)
 GBDT_SEEDS: Final[tuple[int, ...]] = (11, 29, 47, 61, 79)
 
 # The M1 grid starts at 10:00. Index 345 is the 15:45 bar. Features consume

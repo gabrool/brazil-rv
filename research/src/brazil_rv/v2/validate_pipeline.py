@@ -253,6 +253,7 @@ def _training_loaders(
     runtime: ValidationRuntime,
     sidecars: Sequence[str],
     seed: int,
+    time_decay_half_life: float | None = None,
 ) -> tuple[DataLoader[dict[str, object]], DataLoader[dict[str, object]]]:
     fit = _dataset(
         store,
@@ -274,6 +275,7 @@ def _training_loaders(
         fit.date_indices,
         pairs_per_batch=runtime.pairs_per_batch,
         seed=seed,
+        time_decay_half_life=time_decay_half_life,
         drop_last=True,
     )
     return (
@@ -384,6 +386,8 @@ def _evaluation_inputs(
     score_mask: NDArray[np.bool_],
     cdi_by_index: NDArray[np.float64],
     source_hashes: Mapping[str, str],
+    pathwise_scores: tuple[NDArray[np.floating], ...] = (),
+    pathwise_score_masks: tuple[NDArray[np.bool_], ...] = (),
 ) -> EvaluationInputs:
     targets = store.read("target_primary", indices)
     raw_targets = store.read("target_raw_midrank", indices)
@@ -424,6 +428,8 @@ def _evaluation_inputs(
         ),
         cdi_returns=cdi,
         source_artifact_hashes=dict(source_hashes),
+        pathwise_scores=pathwise_scores,
+        pathwise_score_masks=pathwise_score_masks,
     )
 
 
@@ -437,6 +443,8 @@ def _evaluate_and_write(
     source_hashes: Mapping[str, str],
     window_name: str,
     path: Path,
+    pathwise_scores: tuple[NDArray[np.floating], ...] = (),
+    pathwise_score_masks: tuple[NDArray[np.bool_], ...] = (),
 ) -> tuple[EvaluationResult, str]:
     result = evaluate_scores(
         _evaluation_inputs(
@@ -446,6 +454,8 @@ def _evaluate_and_write(
             score_mask,
             cdi_by_index,
             source_hashes,
+            pathwise_scores,
+            pathwise_score_masks,
         ),
         window_name=window_name,
     )
@@ -537,10 +547,11 @@ def _train_once(
         store,
         fit_indices,
         selection_indices,
-        stage="pretrain" if stage == "P" else "finetune",
+        stage={"P": "pretrain", "F": "finetune", "J": "joint"}[stage],
         runtime=runtime,
         sidecars=sidecars,
         seed=seed,
+        time_decay_half_life=model_config.time_decay_half_life_sessions,
     )
     result = train_stage(
         stage=stage,
@@ -763,6 +774,8 @@ def _run_gbdt(
             source_hashes={**source_hashes, "score_manifest": manifest_sha},
             window_name=fold,
             path=artifact_root / "evaluation.json",
+            pathwise_scores=(predictions[0], predictions[1]),
+            pathwise_score_masks=(score_mask, score_mask),
         )
         records.append(
             {
@@ -905,6 +918,8 @@ def _run_network_smokes(
         source_hashes=network_sources,
         window_name="F1",
         path=crossfit_root / "evaluation.json",
+        pathwise_scores=(selected_on_even, selected_on_odd),
+        pathwise_score_masks=(even_mask, odd_mask),
     )
 
     persistence_config = replace(base_config, lambda_persistence=0.1)
@@ -992,6 +1007,8 @@ def _run_network_smokes(
         },
         window_name="F1_lambda_persistence_0_1",
         path=persistence_crossfit / "evaluation.json",
+        pathwise_scores=(persistence_even, persistence_odd),
+        pathwise_score_masks=(persistence_even_mask, persistence_odd_mask),
     )
 
     pretrain = _train_once(

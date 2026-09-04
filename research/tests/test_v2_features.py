@@ -4,12 +4,24 @@ import numpy as np
 
 from brazil_rv.v2.features import (
     _peer_features,
+    _rolling_stat,
     build_slow_features,
     deterministic_average_linkage,
     exact_log_return,
     pairwise_masked_correlation,
     yang_zhang_volatility,
 )
+
+
+def test_rolling_statistics_accept_eighty_percent_complete_window() -> None:
+    values = np.arange(20.0)[:, None]
+    values[[2, 5, 8, 11], 0] = np.nan
+    mean, valid = _rolling_stat(values, 20, "mean")
+    assert valid[-1, 0]
+    assert mean[-1, 0] == np.nanmean(values[:, 0])
+    values[14, 0] = np.nan
+    _, invalid = _rolling_stat(values, 20, "mean")
+    assert not invalid[-1, 0]
 
 
 def test_exact_return_invalidates_lookbacks_crossing_unresolved_action() -> None:
@@ -107,6 +119,42 @@ def test_slow_features_are_unchanged_by_future_mutation() -> None:
         dates,
         cluster_labels=labels,
     )
+    np.testing.assert_array_equal(original.values[70], mutated.values[70])
+    np.testing.assert_array_equal(original.valid[70], mutated.valid[70])
+
+
+def test_cluster_peer_path_is_unchanged_by_future_mutation() -> None:
+    days, names = 90, 8
+    time = np.arange(days, dtype=np.float64)[:, None]
+    name = np.arange(names, dtype=np.float64)[None, :]
+    base = 10.0 * np.exp(0.0007 * time + 0.004 * np.sin(time + name))
+    seen = np.ones_like(base, dtype=np.bool_)
+    active = np.ones_like(base, dtype=np.bool_)
+    dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(days)]
+    labels = np.broadcast_to(
+        np.asarray([0, 0, 0, 0, 1, 1, 1, 1], dtype=np.int16), base.shape
+    ).copy()
+
+    def build(close: np.ndarray):
+        return build_slow_features(
+            close,
+            close * 1.01,
+            close * 0.99,
+            close,
+            close,
+            np.full_like(close, 3_000_000.0),
+            np.full_like(close, 1_000.0),
+            seen,
+            active,
+            dates,
+            cluster_labels=labels,
+        )
+
+    original = build(base)
+    changed = base.copy()
+    changed[71:, :4] *= np.linspace(2.0, 5.0, 4)
+    mutated = build(changed)
+    assert original.valid[70, :, 27:32].any()
     np.testing.assert_array_equal(original.values[70], mutated.values[70])
     np.testing.assert_array_equal(original.valid[70], mutated.valid[70])
 

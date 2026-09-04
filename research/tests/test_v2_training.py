@@ -140,6 +140,44 @@ def test_time_decay_sampler_is_epoch_deterministic() -> None:
     assert list(left) == list(right)
 
 
+def test_stage_j_requires_the_frozen_time_decay_and_other_stages_reject_it(
+    tmp_path,
+) -> None:
+    base = ModelConfig(slow_feature_count=32, compile_forward=False)
+    with pytest.raises(
+        ValueError, match="stage J requires time_decay_half_life_sessions=756.0"
+    ):
+        train_stage(
+            stage="J",
+            seed=11,
+            fold="F1",
+            train_loader=[],
+            selection_loader=[],
+            output_dir=tmp_path / "j_without_decay",
+            model_config=base,
+            selection_parity=0,
+            maximum_epochs=1,
+        )
+    with pytest.raises(
+        ValueError, match="stage F requires time_decay_half_life_sessions=None"
+    ):
+        train_stage(
+            stage="F",
+            seed=11,
+            fold="F1",
+            train_loader=[],
+            selection_loader=[],
+            output_dir=tmp_path / "f_with_decay",
+            model_config=ModelConfig(
+                slow_feature_count=32,
+                compile_forward=False,
+                time_decay_half_life_sessions=756.0,
+            ),
+            selection_parity=0,
+            maximum_epochs=1,
+        )
+
+
 def test_date_pair_sampler_never_crosses_a_window_gap() -> None:
     sampler = DatePairBatchSampler(
         (4, 5, 9, 10), session_indices=(20, 21, 40, 41), pairs_per_batch=8
@@ -412,7 +450,9 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
         path = tmp_path / f"invalid_handoff_{index}.pt"
         torch.save(invalid, path)
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        with pytest.raises(ValueError, match="handoff schema, stage, seed, or fold"):
+        with pytest.raises(
+            ValueError, match="handoff schema, stage, optional seed, or fold"
+        ):
             load_pretrain_handoff(
                 DailyMultiHorizonModel(config),
                 path,

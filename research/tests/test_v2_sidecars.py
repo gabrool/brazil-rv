@@ -6,6 +6,7 @@ import pytest
 
 from brazil_rv.v2.build_store import _parse_sidecars, _sidecar_coverage_table
 from brazil_rv.v2.sidecars import (
+    add_distribution_event_features,
     available_archive_mapping,
     derive_known_archive_features,
     materialize_known_archive,
@@ -57,7 +58,7 @@ def test_reversible_option_fields_are_available_and_leverage_is_exact() -> None:
         ],
     )
     assert options == {
-        "put_call_oi_ratio": None,
+        "put_call_oi_ratio": "options_put_call_oi_log_ratio_tanh",
         "delta_oi_to_volume_1": "options_oi_change_to_stock_adv20_tanh",
         "atm_iv_to_median_20": None,
         "put_skew": "options_put_skew_tanh",
@@ -70,12 +71,17 @@ def test_reversible_option_fields_are_available_and_leverage_is_exact() -> None:
 
 
 def test_reversible_option_transforms_are_inverted() -> None:
+    put_call_ratio = 2.5
     delta = -0.75
     skew = 0.12
     source = pl.DataFrame(
         {
             "available_date": [date(2024, 1, 2)],
             "isin": ["BRTESTACNOR1"],
+            "options_put_call_oi_log_ratio_tanh": [
+                np.tanh(np.log(put_call_ratio) / 3.0)
+            ],
+            "options_put_call_oi_log_ratio_tanh_mask": [True],
             "options_oi_change_to_stock_adv20_tanh": [
                 np.tanh(np.sign(delta) * np.log1p(abs(delta)) / 3.0)
             ],
@@ -90,9 +96,43 @@ def test_reversible_option_transforms_are_inverted() -> None:
     result = materialize_known_archive(
         derived, [date(2024, 1, 2)], ["BRTESTACNOR1"], group="options"
     )
+    assert result.values[0, 0, 0] == pytest.approx(put_call_ratio)
     assert result.values[0, 0, 1] == pytest.approx(delta)
     assert result.values[0, 0, 3] == pytest.approx(skew)
-    assert result.valid[0, 0].tolist() == [False, True, False, True]
+    assert result.valid[0, 0].tolist() == [True, True, False, True]
+
+
+def test_events_sidecar_derives_earnings_age_and_causal_distribution_flags() -> None:
+    days = [date(2024, 1, 2) + timedelta(days=index) for index in range(8)]
+    isin = "BRTESTACNOR1"
+    source = pl.DataFrame(
+        {
+            "available_date": days,
+            "isin": [isin] * len(days),
+            "event_itr_dfp_recent_5s": [0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            "event_itr_dfp_recent_5s_mask": [True] * len(days),
+        }
+    )
+    derived = derive_known_archive_features(source, days, [isin], group="events")
+    result = materialize_known_archive(derived, days, [isin], group="events")
+    actions = pl.DataFrame(
+        {
+            "isin": [isin],
+            "ex_date": [days[6]],
+            "action_type": ["dividend"],
+            "split_factor": [1.0],
+            "cash_distribution_brl": [1.0],
+            "known_date": [days[2]],
+            "unresolved": [False],
+        }
+    )
+    enriched = add_distribution_event_features(result, actions, days, [isin])
+    assert enriched.values[1, 0, 1] == 0.0
+    assert enriched.values[5, 0, 1] == 4.0
+    assert enriched.values[3, 0, 4] == 1.0
+    assert enriched.values[4, 0, 3] == 1.0
+    assert enriched.values[5, 0, 2] == 1.0
+    assert not enriched.valid[..., 5].any()
 
 
 def test_raw_lending_formulas_use_source_date_volume_and_d_plus_one() -> None:
