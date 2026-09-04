@@ -5022,3 +5022,7 @@ and `3e91093a9c0474df2ed837ed1fae4cead2721d3f7e7097e50244d9306b5f8f75`.
 The copied stderr/stdout SHA-256 values are
 `0325f114f1e6bed831d5167da4283a3736373f9ff62b0effeb751c5baebfaed5`
 and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Paid GH200 instance `ecbf4e74c04a416db28d79dc84b25fd0`, claimed only for
+this acceptance attempt, was terminated after the evidence was secured. Two
+provider inventory reads confirmed the exact ID absent and zero remaining
+nonterminal instances.
