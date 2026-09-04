@@ -188,6 +188,28 @@ def lazy_slow_window(
     return output, output_valid, history_mask
 
 
+def _zero_invalid_values(
+    values: NDArray[np.generic],
+    valid: NDArray[np.bool_],
+    *,
+    name: str,
+) -> NDArray[np.generic]:
+    """Zero unavailable cells and reject non-finite values marked available."""
+
+    array = np.asarray(values)
+    mask = np.asarray(valid, dtype=np.bool_)
+    while mask.ndim < array.ndim:
+        mask = mask[..., None]
+    try:
+        aligned = np.broadcast_to(mask, array.shape)
+    except ValueError as error:
+        raise ValueError(f"{name} and its validity mask are misaligned") from error
+    clean = np.where(aligned, array, 0).astype(array.dtype, copy=False)
+    if np.issubdtype(clean.dtype, np.floating) and not np.isfinite(clean).all():
+        raise ValueError(f"{name} contains non-finite values marked available")
+    return clean
+
+
 class V2DailyDataset(Dataset[dict[str, object]]):
     """One full cross-section per session, with lazy stage-correct slow history."""
 
@@ -577,6 +599,10 @@ class V2DailyDataset(Dataset[dict[str, object]]):
                 sample["to_close_mask"], dtype=np.bool_
             ) & np.asarray(fast_present, dtype=np.bool_)
         for value_key, mask_key in (
+            ("slow_features", "slow_feature_mask"),
+            ("fast_patches", "fast_patch_mask"),
+            ("v1_equity_slow", "fast_present"),
+            ("intraday_features", "intraday_feature_mask"),
             ("targets", "target_mask"),
             ("raw_targets", "raw_target_mask"),
             ("raw_log_returns", "raw_target_mask"),
@@ -588,11 +614,18 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             mask = sample.get(mask_key)
             if not isinstance(value, np.ndarray) or not isinstance(mask, np.ndarray):
                 raise ValueError(f"{value_key} requires its aligned validity mask")
-            if value.shape != mask.shape:
-                raise ValueError(f"{value_key} and {mask_key} are misaligned")
-            sample[value_key] = np.where(mask, value, 0).astype(
-                value.dtype, copy=False
+            sample[value_key] = _zero_invalid_values(
+                value,
+                mask,
+                name=value_key,
             )
+        for key, value in sample.items():
+            if (
+                isinstance(value, np.ndarray)
+                and np.issubdtype(value.dtype, np.floating)
+                and not np.isfinite(value).all()
+            ):
+                raise ValueError(f"dataset boundary produced non-finite {key}")
         return sample
 
 

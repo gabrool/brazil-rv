@@ -294,6 +294,25 @@ def test_sam_updates_model_and_ema() -> None:
     assert not torch.equal(ema.shadow["weight"], before)
 
 
+@pytest.mark.parametrize("failing_pass", [1, 2])
+def test_sam_rejects_each_nonfinite_training_loss(failing_pass: int) -> None:
+    model = nn.Linear(2, 1)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
+    before = {name: value.detach().clone() for name, value in model.state_dict().items()}
+    calls = 0
+
+    def closure() -> torch.Tensor:
+        nonlocal calls
+        calls += 1
+        loss = model.weight.square().sum()
+        return loss * torch.nan if calls == failing_pass else loss
+
+    with pytest.raises(FloatingPointError, match="training loss is non-finite"):
+        sam_step(model, optimizer, closure)
+    for name, value in model.state_dict().items():
+        assert torch.equal(value, before[name])
+
+
 def test_fullgraph_compile_captures_gru_forward() -> None:
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
     model = DailyMultiHorizonModel(config).eval()

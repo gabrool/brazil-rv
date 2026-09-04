@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import asdict, dataclass
-from functools import lru_cache
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Mapping, Sequence
 
@@ -84,19 +83,16 @@ def _matching_mapping(recorded: str, mappings: Mapping[str, str]) -> tuple[str, 
     return max(matches, key=lambda item: len(item[0]))
 
 
-@lru_cache(maxsize=128)
-def _verified_sha256(path: str, size: int, modified_ns: int) -> str:
-    del size, modified_ns
-    return sha256_file(Path(path))
-
-
 def _verify(path: Path, record: Mapping[str, object]) -> tuple[int, str]:
     expected_size = int(record["bytes"])
     expected_sha = str(record["sha256"]).casefold()
     stat = path.stat()
     if stat.st_size != expected_size:
         raise ValueError(f"external artifact size mismatch: {path}")
-    actual_sha = _verified_sha256(str(path), stat.st_size, stat.st_mtime_ns)
+    # External manifests bind content rather than a mutable filesystem inode.
+    # Hash on every resolution so a same-size rewrite within one timestamp tick
+    # cannot reuse stale verification state.
+    actual_sha = sha256_file(path)
     if actual_sha.casefold() != expected_sha:
         raise ValueError(f"external artifact SHA-256 mismatch: {path}")
     return stat.st_size, actual_sha

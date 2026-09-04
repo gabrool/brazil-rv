@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import numpy as np
 import polars as pl
 import pytest
+import torch
 from torch.utils.data import DataLoader
 
 import brazil_rv.v2.build_store as build_store_module
@@ -21,12 +22,14 @@ from brazil_rv.v2.build_store import (
     _validate_v1_calendar,
     build_daily_store,
 )
+from brazil_rv.v2.config import ModelConfig
 from brazil_rv.v2.contract import ACCUMULATED_TEST_AFTER, FINETUNE_START
 from brazil_rv.v2.data import (
     V1_STORE_V2_ZERO_DYNAMIC_CHANNELS,
     V1_STORE_V2_ZERO_SLOW_FIELDS,
     V2DailyDataset,
 )
+from brazil_rv.v2.model import DailyMultiHorizonModel
 from brazil_rv.v2.store import (
     V2Store,
     open_store_for_dates,
@@ -219,7 +222,13 @@ def test_external_gate_reports_but_does_not_gate_thin_strata() -> None:
     assert q2.get_column("coverage_note").str.contains("5,212").all()
 
 
-def _base_store(tmp_path, *, external_fast=None, stored_fast_present=None):
+def _base_store(
+    tmp_path,
+    *,
+    external_fast=None,
+    stored_fast_present=None,
+    extra_arrays=None,
+):
     days, names = 25, 3
     dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(days)]
     slow = np.broadcast_to(
@@ -270,6 +279,7 @@ def _base_store(tmp_path, *, external_fast=None, stored_fast_present=None):
         }
     if stored_fast_present is not None:
         arrays["fast_present"] = np.asarray(stored_fast_present, dtype=bool)
+    arrays.update(extra_arrays or {})
     path = write_store(
         tmp_path / "store",
         dates=dates,
@@ -462,6 +472,117 @@ def test_finetune_dataset_keeps_first_active_day_with_empty_slow_history(
     assert not sample["slow_history_mask"][1].any()
     assert not sample["slow_features"][1].any()
     assert sample["target_mask"][1].tolist() == [True, True, True, False, False]
+
+
+def test_dataset_boundary_cleans_every_masked_array_before_model_use(
+    tmp_path: Path,
+) -> None:
+    fast = tmp_path / "v1"
+    fast.mkdir()
+    external_fast = np.ones((1, 2, 405, 26), dtype=np.float32)
+    external_fast[0, 1] = np.nan
+    np.save(fast / "equity_features.npy", external_fast, allow_pickle=False)
+    external_slow = np.ones((1, 2, 32), dtype=np.float32)
+    external_slow[0, 1] = np.nan
+    np.save(fast / "equity_slow.npy", external_slow, allow_pickle=False)
+    np.save(
+        fast / "equity_data_ready.npy",
+        np.asarray([[True, False]], dtype=np.bool_),
+        allow_pickle=False,
+    )
+
+    days, names = 25, 3
+    slow = np.ones((days, names, 2), dtype=np.float32)
+    slow_valid = np.ones_like(slow, dtype=np.bool_)
+    slow[:, 1] = np.nan
+    slow_valid[:, 1] = False
+    slow[19, 0, 0] = np.nan
+    slow_valid[19, 0, 0] = False
+    arrays: dict[str, np.ndarray] = {
+        "slow_values": slow,
+        "slow_valid": slow_valid,
+        "target_primary": np.ones((days, names, 5), dtype=np.float32),
+        "target_valid": np.ones((days, names, 5), dtype=np.bool_),
+        "target_raw_midrank": np.ones((days, names, 5), dtype=np.float32),
+        "target_raw_valid": np.ones((days, names, 5), dtype=np.bool_),
+        "target_raw_log_return": np.ones((days, names, 5), dtype=np.float32),
+        "target_to_close": np.ones((days, names), dtype=np.float32),
+        "target_to_close_valid": np.ones((days, names), dtype=np.bool_),
+        "intraday_values": np.ones((days, names, 3), dtype=np.float32),
+        "intraday_valid": np.ones((days, names, 3), dtype=np.bool_),
+    }
+    masked_pairs = (
+        ("target_primary", "target_valid"),
+        ("target_raw_midrank", "target_raw_valid"),
+        ("target_raw_log_return", "target_raw_valid"),
+        ("target_to_close", "target_to_close_valid"),
+        ("intraday_values", "intraday_valid"),
+    )
+    for value_name, valid_name in masked_pairs:
+        arrays[value_name][20, 0, ...] = np.nan
+        arrays[valid_name][20, 0, ...] = False
+    sidecars = ("options", "lending", "oddlot", "rebalance", "events", "fundamentals")
+    for group in sidecars:
+        values = np.ones((days, names, 1), dtype=np.float32)
+        valid = np.ones_like(values, dtype=np.bool_)
+        values[:, 1] = np.nan
+        valid[:, 1] = False
+        values[19, 0] = np.nan
+        valid[19, 0] = False
+        arrays[f"sidecar_{group}_values"] = values
+        arrays[f"sidecar_{group}_valid"] = valid
+
+    path = _base_store(tmp_path, external_fast=fast, extra_arrays=arrays)
+    dataset = V2DailyDataset(
+        path,
+        list(range(20, 25)),
+        stage="finetune",
+        lookback=20,
+        enabled_sidecars=sidecars,
+    )
+    sample = dataset[0]
+    for value in sample.values():
+        if isinstance(value, np.ndarray) and np.issubdtype(value.dtype, np.floating):
+            assert np.isfinite(value).all()
+    assert not sample["slow_history_mask"][1].any()
+    assert not sample["fast_present"][2]
+    assert not sample["fast_patch_mask"][2].any()
+
+    batch = next(iter(DataLoader(dataset, batch_size=1, shuffle=False)))
+    model = DailyMultiHorizonModel(
+        ModelConfig(
+            slow_feature_count=int(sample["slow_features"].shape[-1]),
+            slow_lookback=20,
+        )
+    ).eval()
+    with torch.no_grad():
+        predictions = model(
+            batch["slow_features"],
+            batch["slow_history_mask"],
+            batch["active_mask"],
+            batch["fast_patches"],
+            batch["fast_patch_mask"],
+            batch["fast_present"],
+            batch["days_since_last_slow_row"],
+            None,
+            batch["v1_equity_slow"],
+        )
+    assert torch.isfinite(predictions[batch["active_mask"]]).all()
+
+
+def test_dataset_boundary_rejects_nonfinite_available_value(tmp_path: Path) -> None:
+    slow = np.ones((25, 3, 2), dtype=np.float32)
+    slow[19, 0, 0] = np.nan
+    path = _base_store(
+        tmp_path,
+        extra_arrays={
+            "slow_values": slow,
+            "slow_valid": np.ones_like(slow, dtype=np.bool_),
+        },
+    )
+    dataset = V2DailyDataset(path, [20], stage="finetune", lookback=20)
+    with pytest.raises(ValueError, match="non-finite values marked available"):
+        dataset[0]
 
 
 def test_external_fast_ready_is_intersected_with_store_presence(tmp_path) -> None:

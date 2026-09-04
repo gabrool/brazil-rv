@@ -9,6 +9,7 @@ from torch import nn
 
 from brazil_rv.modeling.model import SharedCausalTCN
 from brazil_rv.v2.config import ModelConfig
+from brazil_rv.v2.contract import V1_STORE_V2_ZERO_SLOW_FIELDS
 from brazil_rv.v2.model import (
     DailyMultiHorizonModel,
     count_non_fast_parameters,
@@ -116,6 +117,37 @@ def test_active_name_with_empty_slow_history_uses_zero_initial_state() -> None:
     assert tracked.grad is not None
     assert torch.isfinite(tracked.grad).all()
     assert torch.count_nonzero(tracked.grad[0, 1]) == 0
+
+
+def test_nan_masking_covers_empty_slow_and_fast_histories() -> None:
+    model = DailyMultiHorizonModel(
+        ModelConfig(slow_feature_count=32, slow_lookback=60)
+    ).eval()
+    slow, history, active = _inputs()
+    slow[0, 1] = torch.nan
+    history[0, 1] = False
+    patches = torch.randn(2, 4, 69, 130)
+    patch_mask = torch.ones(2, 4, 69, dtype=torch.bool)
+    patches[0, 1] = torch.nan
+    patch_mask[0, 1] = False
+    present = torch.ones(2, 4, dtype=torch.bool)
+    v1_slow = torch.randn(2, 4, 32)
+    v1_slow[0, 1, V1_STORE_V2_ZERO_SLOW_FIELDS[0]] = torch.nan
+
+    with torch.no_grad():
+        predictions = model(
+            slow,
+            history,
+            active,
+            patches,
+            patch_mask,
+            present,
+            None,
+            None,
+            v1_slow,
+        )
+
+    assert torch.isfinite(predictions[active]).all()
 
 
 def test_fast_encoder_runs_only_present_flattened_rows() -> None:

@@ -85,7 +85,11 @@ class FastTCNEncoder(nn.Module):
         )
         absolute_patches = torch.cat((prefix, patches), dim=2)
         absolute_mask = torch.cat((prefix_mask, patch_mask), dim=2)
-        masked = absolute_patches * absolute_mask[..., None].to(patches.dtype)
+        masked = torch.where(
+            absolute_mask[..., None],
+            absolute_patches,
+            torch.zeros_like(absolute_patches),
+        )
         absolute_patch_count = masked.shape[2]
         hidden = (
             self.input_projection(masked)
@@ -122,8 +126,11 @@ class FastTCNEncoder(nn.Module):
         )
         index = last[..., None, None].expand(-1, -1, 1, _FAST_HIDDEN_WIDTH)
         raw = sequence.gather(2, index).squeeze(2)
-        neutralized_slow = v1_equity_slow * self.slow_keep_mask.to(
-            dtype=v1_equity_slow.dtype
+        slow_keep = self.slow_keep_mask.to(dtype=torch.bool)
+        neutralized_slow = torch.where(
+            slow_keep,
+            v1_equity_slow,
+            torch.zeros_like(v1_equity_slow),
         )
         return self.state_norm(raw + self.slow_projection(neutralized_slow))
 

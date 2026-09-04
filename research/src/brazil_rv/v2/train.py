@@ -261,6 +261,8 @@ def sam_step(
     optimizer.zero_grad(set_to_none=True)
     try:
         first_loss = closure()
+        if first_loss.numel() != 1 or not bool(torch.isfinite(first_loss.detach())):
+            raise FloatingPointError("SAM first-pass training loss is non-finite")
         first_loss.backward()
         first_norm = torch.nn.utils.clip_grad_norm_(
             parameters, float("inf"), error_if_nonfinite=True
@@ -273,6 +275,8 @@ def sam_step(
         optimizer.zero_grad(set_to_none=True)
         _restore_rng(start_rng)
         second_loss = closure()
+        if second_loss.numel() != 1 or not bool(torch.isfinite(second_loss.detach())):
+            raise FloatingPointError("SAM second-pass training loss is non-finite")
         second_loss.backward()
         with torch.no_grad():
             for parameter, original in zip(parameters, originals, strict=True):
@@ -694,6 +698,13 @@ def compile_forward(
 ) -> nn.Module:
     # PyTorch requires the RNN opt-in before Dynamo will capture nn.GRU.
     torch._dynamo.config.allow_rnn = True
+    if backend == "inductor":
+        # The sparse fast path has a data-dependent present-name count.  CUDA
+        # graph capture can reuse a stale dynamic buffer when the whole GRU +
+        # sparse TCN graph is composed, even though every compiled subgraph is
+        # finite.  Let Inductor compile that graph but skip CUDA graph capture
+        # whenever it detects the dynamic shape.
+        torch._inductor.config.triton.cudagraph_skip_dynamic_graphs = True
     options: dict[str, object] = {
         "backend": backend,
         "fullgraph": True,
