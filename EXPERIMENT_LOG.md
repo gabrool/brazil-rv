@@ -5312,3 +5312,10 @@ and `e1ccd0824dcffd878dfbd6f1524b7c9e93c8c935b5b66cb97406a2e1fd0995bf`.
 The inventory covers three files totaling 9,289 bytes. Official validation and
 the permanently spent test were not accessed, Section D was not started, and
 no research claim, candidate selection, or deployment change was made.
+
+After the evidence and documentation reached local `main`, GitHub `main`, and
+the instance at commit `93691c67b64db0d5f42bbdb18601cfcb143ddfe1`, exact
+paid GH200 instance `9519c52f3a504525976c34710edf2427` was terminated.
+Separate provider inventory reads at 2026-09-04T19:09:48.2998191Z and
+2026-09-04T19:10:09.0341517Z confirmed that exact ID absent and zero remaining
+nonterminal instances.
