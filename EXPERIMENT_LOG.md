@@ -4685,6 +4685,79 @@ and `a0fa1167e4d731fdc91870d04b9f800fa6ff717d540baf1c709bf92619994b5df`.
 The deleted failed-root copies are not recoverable at their former keys, but
 their exact bytes remain in the documented completed-root authorities.
 
+## V2 blocking-review fix pass (2026-09-04)
+
+The blocking review in `v2_review_fixes.md` was implemented without changing
+the v1 intraday system or any deployed recipe. Commit
+`027fdbfdf9bf6493dc14fc04facfd543ebc7d0ed` closed the corporate-action,
+target-scale, universe, feature, sidecar, parity-evaluation, Stage-J,
+trajectory-CLI, preset, seed-crossing, and hash-cache defects. Bounded
+score-free build repairs followed at
+`74732af4c66e0515b95e853009c68984eb52b2ac` (duplicate RAD mask projection)
+and `18847955c797339c5b7b9641db3a974a8f468abf` (output-identical in-place
+close-anchor translation). The full rebuild then exposed two still-missed
+review requirements; `2cb204d21951ead130cd790ff2f161a2e6b1f5e8` completed
+80%-complete Yang-Zhang windows and separated total-return-only cash
+uncertainty from price-factor volatility, high-distance, and range masks.
+
+The fresh corporate-action bundle is:
+
+    C:\quant-data\b3\interim\external\v2_corporate_actions_027fdbf_20260904T115629Z
+
+Its manifest SHA-256 is
+`f6918d3ae1a766ba900c5fb6c944577082a39714584f51a556df7c872adf5796`.
+The bundle contains 10,037 actions, 349 cash-unit audit rows, off-calendar and
+dividend-close-drop evidence, and exact cache/source hashes. Of 942 ticker
+segments, 384 returned actions, 36 returned segment-price-verified zero-action
+responses, three returned zero actions through the current-ticker fallback,
+and 519 failed after batch inspection and two individual retries.
+
+Ruff and compilation passed at `2cb204d`; the research suite passed 592 tests
+with two expected sparse-intraday-fixture warnings, and the collector suite
+passed 24 tests. The new tests cover bounded failed-provider masks,
+inside-segment price evidence and current-ticker fallback, cash split units,
+ex-date total-return alignment, all universe thresholds and delisting, 80%
+rolling/Yang-Zhang completeness, cash-only versus price-factor uncertainty,
+nonzero cluster causality, COTAHIST close anchors, adjacent five-minute block
+returns, Stage-J decay, parity-model path economics, train/score presets,
+per-process hash caching, v1 PIT exceptions, and the target survivorship gate.
+
+Four excluded pre-store attempts are retained as forensic evidence:
+
+| Attempt root | Stop condition | Failure-record SHA-256 |
+|---|---|---|
+| `D:\quant-data\b3\processed\v2_daily_store_027fdbf_20260904T120429Z` | duplicate RAD mask projection before store creation | `1cb32f832e5590b7055133077d0fd9b32b48248bccf2c0d599b728ef46f40005` |
+| `D:\quant-data\b3\processed\v2_daily_store_74732af_20260904T120640Z` | peak-memory failure before store creation | `979dc86b367d084aedf874f9332b0853741a97493e1cfe92af69afc8da3ffcb9` |
+| `D:\quant-data\b3\processed\v2_daily_store_1884795_20260904T121409Z` | clean-tree guard rejected an untracked orchestration marker before input loading | `d73456d6ea7bce571a56deadcda4bf5f41b7b0c5b147dbd69efe26d5733cd9a2` |
+| `D:\quant-data\b3\processed\v2_daily_store_1884795_20260904T121448Z` | first survivorship audit exposed the missed Yang-Zhang/mask requirements | `05b2db1e6134442e8f7dc181075b6f0e83f032c62da68cd12bc3eb757f01e7bd` |
+
+None wrote an immutable store, model, prediction, evaluation, or score. The
+final clean rebuild then correctly failed the unchanged data-acceptance gate
+at:
+
+    D:\quant-data\b3\processed\v2_daily_store_2cb204d_20260904T122315Z
+
+Horizon-1 target validity was `0.8339321600` for 526 names that disappear
+before the final 2026 panel year and `0.9815209259` for 407 names surviving
+into 2026, a `0.1475887659` gap versus the fixed `0.10` maximum. For the
+delisted group, price-path coverage was `0.9992895276`, Yang-Zhang coverage
+was `0.9976706656`, and action-clear coverage was only `0.8362411952`; survivor
+action-clear coverage was `0.9907524554`. Thus the remaining failure is the
+concentration of unavailable corporate-action history in delisted names, not
+price-path or volatility construction. The final failure record and full
+five-horizon diagnostic SHA-256 values are
+`7f84478efd393cfc4404bbf82163ac8dee5b15dcc9c1f468ab7112ab10563996`
+and `5823b0f19743f4c369d77d909cc7bbd8e6ea89057651f18c35d37606fee8f69b`.
+
+The required plus/minus-ten-session provider-failure masks and 10-point gate
+were not weakened. No accepted review-fixed store exists, so the required
+full-F1 validation was not run. The former `f048ea9` store and validation are
+superseded historical engineering evidence, not canonical inputs. No sealed
+2025/2026 feature or target array, official-validation date, or test date was
+decoded; no v2 research result was claimed and no deployment changed. A more
+complete authoritative corporate-action source for delisted names is required
+to resume the rebuild.
+
 ## V2 foundation implementation and development-only validation (2026-09-03)
 
 The additive daily v2 foundation was implemented without changing the v1

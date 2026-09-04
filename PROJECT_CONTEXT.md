@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-03.
+Last verified: 2026-09-04.
 
 ## Purpose and current research state
 
@@ -10,10 +10,13 @@ current engineering foundation is v2, a daily system that predicts 1-, 2-, 3-,
 5-, and 10-session cross-sectional total-return residual ranks once per session at
 15:45 for closing-auction entry.
 
-The v2 foundation, store, model, GBDT, baselines, training stages, and evaluation
-harness are implemented and development-tested. No v2 research candidate has
-been selected, no v2 official-validation or test date has been evaluated, and no
-prediction, execution, or deployment recipe has changed.
+The v2 foundation, model, GBDT, baselines, training stages, and evaluation
+harness are implemented and unit-tested. A source-validity review superseded
+the prior local store and bounded validation. The review-fixed rebuild currently
+fails its fixed corporate-action survivorship gate, so there is no accepted v2
+store or current full-F1 validation. No v2 research candidate has been selected,
+no v2 official-validation or test date has been evaluated, and no prediction,
+execution, or deployment recipe has changed.
 
 The accepted incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
@@ -54,64 +57,58 @@ history, exact results, artifact identities, and interpretations.
 ## V2 daily foundation contract
 
 The additive v2 implementation lives under `brazil_rv.v2`; its detailed
-executable contract is documented in `docs/v2_README.md`. The canonical local
-immutable store was built from implementation commit
-`f048ea934f782e72f4ca3738b0e53019cbfb6067` at:
+executable contract is documented in `docs/v2_README.md`. The review-fixed
+implementation is complete through commit
+`2cb204d21951ead130cd790ff2f161a2e6b1f5e8`. Ruff, compilation, all 592
+research tests, and all 24 collector tests pass. The fixes include bounded
+provider-failure masks, current-ticker and retry acquisition, split-unit
+correction for Yahoo cash distributions, a uniform Yang-Zhang target scale,
+80%-complete rolling estimators, COTAHIST full-session anchors, causal event
+features, pathwise parity economics, Stage J decay, per-trajectory train/score
+CLIs, complete presets, and source-hash caching.
 
-    D:\quant-data\b3\processed\v2_daily_store_f048ea9_20260903T215233Z
+The fresh immutable corporate-action bundle is:
 
-Its manifest, post-build audit, and log-inclusive artifact-inventory SHA-256
-values are respectively
-`b2a18de90bb57e8c572244293088614be1b5d8b8bad9badfa11e4595418552e5`,
-`de4b0252b87f763d9ebe01370f7770ff5b60d75e6ebc65b2b2b5c21e330cad39`,
-and `57747b9f26cb3c51643cd6b8b720112107ac970e153dc9abfd3942bb7d999413`.
-The inventory covers 77 files totaling 2,790,744,427 bytes, plus itself and its
-SHA sidecar. All 202 unique source files, including 176 declared sources, 18
-raw COTAHIST archives, the parse audit, and seven v1-fast files, hash-verified.
-The earlier `e74204d` store and its validation remain immutable historical
-engineering evidence but are superseded and are not canonical inputs.
+    C:\quant-data\b3\interim\external\v2_corporate_actions_027fdbf_20260904T115629Z
 
-The store has 4,102 sessions from 2010-01-04 through 2026-07-17 and 933
-permanent ISIN identities. Its causal point-in-time universe ranges from 101 to
-243 members per session, with median 141. It contains 32 rank-Gauss daily
-features, 20 rank-Gauss intraday-derived daily features, optional point-in-time
-sidecar groups, five residual and raw multi-session target families, and the
-15:45-to-close auxiliary target. The exact 158-name v1 identity mapping and
-complete 1,248-date M1 calendar overlap were verified. V2 makes exactly one daily
-decision at minute index 345; same-day fast inputs end before that minute, while
-fine-tune slow history ends at t-1.
+Its manifest SHA-256 is
+`f6918d3ae1a766ba900c5fb6c944577082a39714584f51a556df7c872adf5796`.
+It contains 10,037 action rows and a 349-row cash-unit audit. Of 942 ticker
+segments, 384 returned actions, 39 returned a finite-price-verified zero-action
+result (three through the current-ticker fallback), and 519 failed. The free
+Yahoo source still does not cover many delisted names.
 
-Corporate actions are deliberately conservative. The free Yahoo source
-guarantees dividends and stock splits but cannot reliably distinguish dividends
-from JCP and does not guarantee separate bonus or subscription-right records. Of
-942 dated ticker-acquisition segments, 410 returned actions, 79 returned a
-confirmed zero-action result, and 453 failed. In addition, 1,536 cash-action rows
-lacked an observed same-ISIN ex-date close for reinvestment. Provider failures,
-action disagreements, and unavailable reinvestment points remain explicitly
-unresolved. The repaired contract masks affected price-derived feature and
-target intervals and excludes a held interval whose exit is unresolved from
-realized economics without changing the decision weights; no stale or
-substituted price is used.
+The latest clean rebuild stopped before atomic store promotion at:
+
+    D:\quant-data\b3\processed\v2_daily_store_2cb204d_20260904T122315Z
+
+The fixed survivorship gate compares valid target name-days with observed
+active name-days. At horizon 1 it found 83.393216% validity for 526 names that
+disappear before the final 2026 panel year and 98.152093% for 407 names that
+survive into 2026: a 14.758877-point gap, above the fixed 10-point limit. The
+delisted group was 99.928953% price-path-complete and 99.767067%
+Yang-Zhang-complete but only 83.624120% action-clear, proving that remaining
+source coverage—not price or volatility construction—drives the failure. The
+failure-record and diagnostic SHA-256 values are
+`7f84478efd393cfc4404bbf82163ac8dee5b15dcc9c1f468ab7112ab10563996`
+and `5823b0f19743f4c369d77d909cc7bbd8e6ea89057651f18c35d37606fee8f69b`.
+Neither sealed feature/target arrays nor official-validation/test data were
+decoded.
+
+The required plus/minus-ten-session provider-failure neighborhoods and the
+10-point gate remain unchanged. A more complete authoritative corporate-action
+source for delisted names is required before an accepted store can be built.
+Therefore the former `f048ea9` store and
+`v2_pipeline_validation_f048ea9_20260903T215944Z` are immutable historical
+engineering evidence only; they are superseded, are not canonical inputs, and
+their bounded validation is not current evidence. Full-F1 validation has not
+run because no review-fixed store passed acceptance.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused
 unconditionally by this code version. Target masks and corresponding numeric
 values are clipped at the store capability boundary and again at each exact
-evaluation window. The canonical store audit decoded only the date and ISIN axes,
-reports `sealed_feature_or_target_payload_decoded=false`, and records both access
-flags false. Its development-only sidecar replay passed, including exact lending
-and options inversions; this is distinct from the bounded pipeline validation,
-which deliberately ran with `enabled_sidecars=[]` at:
-
-    D:\quant-data\b3\processed\v2_pipeline_validation_f048ea9_20260903T215944Z
-
-That validation is clean-commit/store bound, completed with
-`pipeline_validation=true`, `research_claim=false`, and both access flags false.
-Its manifest, post-validation audit, and final log-inclusive inventory SHA-256
-values are respectively
-`85cfd310f7a5935853646fa4307e153493d1a26edcb34099a844ede6e1ba36d1`,
-`035036b61e1a87b97b52d2dda185aa8da2e108b6d5d34ef520befe6d675508cd`,
-and `06cb81ece83cc380086f0a8fc681c50d1e99149d8d65e9b1b2d39c52f1142fd1`.
+evaluation window.
 
 ## V1 intraday feature-store contract
 
