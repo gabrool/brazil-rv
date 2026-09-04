@@ -5026,3 +5026,39 @@ Paid GH200 instance `ecbf4e74c04a416db28d79dc84b25fd0`, claimed only for
 this acceptance attempt, was terminated after the evidence was secured. Two
 provider inventory reads confirmed the exact ID absent and zero remaining
 nonterminal instances.
+
+### Section-C bounded-memory resume and real-data gate stop
+
+Commit `370f51ac1b2f24c547fa3c6620ab3885f81d3f94` replaced broad in-memory
+store assembly with family-at-a-time float32 memmaps, row-wise rank-Gauss, and
+horizon-at-a-time target writes. Adjusted OHLC is written to a disk-backed
+workspace and reread by consumers. The build manifest now records peak RSS.
+The exact `4,348 x 933` all-family subprocess guard passed below its 8-GiB
+ceiling; Ruff, compilation, and all 625 research tests passed before the real
+rebuild. Local `main`, GitHub `main`, and the build commit matched.
+
+The authorized fresh rebuild stayed within the local host, with observed peak
+working set below 4.35 GiB, but stopped at the first real-data acceptance gate
+failure at:
+
+    D:\quant-data\b3\processed\v2_daily_store_370f51a_20260904T143728Z
+
+The unchanged 5-point feature-family gate rejected `sidecar_options`: validity
+was `0.6555142503` for names delisted within the panel and `0.6012933341` for
+names surviving to the final year, a `5.4220916184`-point gap. Pooled-volume
+quartile diagnostics reduce the maximum within-stratum gap to `4.2286810767`
+points. The aggregate difference is dominated by options availability and
+liquidity composition—especially put-skew validity (`0.6537118396` versus
+`0.4490456086`)—rather than end-of-segment truncation: only 416 of 8,877
+delisted options-present name-days lie within 60 sessions of last observation.
+The aggregate gate was not relaxed.
+
+The failed root retains the partial disk-backed tensors, exact operational
+logs, JSON and CSV/Parquet gate diagnostics, and full hash inventory. The
+failure-record and inventory SHA-256 values are
+`f592e85c1638c0d26823eaabdff0c52838d5a5ba31596acf6ef32e662ede9e0b`
+and `6f4297f3af9c94581f23597d71afeb896976ebced2234e33d305ab8af65b9fb5`.
+No immutable store manifest was sealed. The target gate was not reached, GPU
+full-F1 validation was not started, Section D was not registered or run, and
+official-validation/test access flags remain false. No paid Lambda instance
+was claimed for this resumed local build.

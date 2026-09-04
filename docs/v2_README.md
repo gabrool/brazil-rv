@@ -20,10 +20,12 @@ stores and validations remain immutable historical engineering evidence, not
 canonical inputs.
 
 This source implementation is unit-tested, including byte-for-byte provider
-invariance and both target- and feature-side survivorship gates. It has not yet
-been used for a clean commit-bound store rebuild or full-F1 validation. No v2
-research round, official-validation read, test read, candidate selection, or
-deployment change is part of this implementation pass.
+invariance and both target- and feature-side survivorship gates. The first
+commit-bound acceptance rebuild under this definition stopped at the unchanged
+feature-family gate: the options sidecar had a 5.4221-point survival gap versus
+the 5-point limit. No accepted store or full-F1 validation exists under this
+definition. No v2 research round, official-validation read, test read,
+candidate selection, or deployment change is part of this implementation pass.
 
 ## Data flow
 
@@ -135,6 +137,15 @@ atomic promotion. NumPy arrays are uncompressed and memory-mappable. The
 manifest binds all axes, feature names, source paths/hashes, coverage tables,
 array shapes/dtypes/hashes, action review, calendar assertions, and access
 flags. `manifest.sha256` binds the deterministic manifest bytes.
+
+The builder processes slow, intraday, target, and optional sidecar families in
+sequence. Each family's rank-Gauss transform is row-wise over one date's cross
+section and writes float32 values directly to a preallocated memmap; raw family
+buffers are released before the next family. Multi-session targets are written
+one horizon at a time, and adjusted daily OHLC is materialized once in a
+disk-backed workspace for downstream rereads. The manifest records peak build
+RSS. A production-axis `4,348 x 933` synthetic test with every family enabled
+enforces an 8-GiB peak-RSS ceiling.
 
 Core arrays begin with `[date, isin]`:
 

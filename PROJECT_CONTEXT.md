@@ -81,8 +81,12 @@ Paired comparisons consume the selected preset's bootstrap settings, and preset
 runs require a hash-bound fast pretrained checkpoint. Legacy action-cache schemas
 are normalized in memory.
 
-No store rebuild or full-F1 validation has been run under this new definition.
-The former `f048ea9`, `2cb204d`, and related validation roots remain immutable
+A commit-bound store rebuild has been attempted under this new definition, but
+no store was accepted and no full-F1 validation was started. The bounded-memory
+builder stayed below 4.35 GiB observed peak RSS; the attempt stopped at the
+unchanged feature-family gate because the options sidecar's validity gap by
+eventual survival was 5.4221 percentage points versus the 5-point limit. The
+former `f048ea9`, `2cb204d`, and related validation roots remain immutable
 historical engineering evidence only and must not be used as canonical inputs.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
