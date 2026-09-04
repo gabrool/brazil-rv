@@ -7,7 +7,7 @@ import re
 import subprocess
 import tempfile
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -43,7 +43,10 @@ from .corporate_actions import (
 )
 from .data_foundation import (
     build_security_master,
+    continuation_identity_axis,
+    detect_isin_successions,
     filter_cash_equities,
+    inherit_linked_history,
     load_cotahist,
     panel_from_daily,
     source_records,
@@ -62,6 +65,7 @@ from .sidecars import (
     available_archive_mapping,
     derive_known_archive_features,
     materialize_known_archive,
+    rebuild_publication_lag_validity,
 )
 from .store import close_memmap, peak_rss_bytes, write_store
 from .targets import build_multi_day_targets_into, build_to_close_target
@@ -498,6 +502,7 @@ def _target_validity_tables(
     valid: NDArray[np.bool_],
     active: NDArray[np.bool_],
     observed: NDArray[np.bool_],
+    survival_identities: Sequence[str] | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Audit target coverage by year and by eventual panel survival."""
 
@@ -531,14 +536,7 @@ def _target_validity_tables(
                 }
             )
 
-    last_seen = np.full(seen.shape[1], -1, dtype=np.int64)
-    for name in range(seen.shape[1]):
-        rows = np.flatnonzero(seen[:, name])
-        if rows.size:
-            last_seen[name] = rows[-1]
-    final_year = int(years[-1])
-    survives = (last_seen >= 0) & (years[np.maximum(last_seen, 0)] == final_year)
-    groups = {"delisted_within_panel": ~survives, "survives_to_final_year": survives}
+    groups = _eventual_survival_groups(dates, seen, survival_identities)
     survival_rows: list[dict[str, object]] = []
     ratios: dict[tuple[str, int], float] = {}
     denominators: dict[tuple[str, int], int] = {}
@@ -583,6 +581,8 @@ def _feature_validity_by_survival(
     active: NDArray[np.bool_],
     observed: NDArray[np.bool_],
     families: Mapping[str, tuple[NDArray[np.bool_], NDArray[np.bool_]]],
+    survival_identities: Sequence[str] | None = None,
+    maximum_gap: float | None = 0.05,
 ) -> pl.DataFrame:
     """Gate feature-mask rates against eventual panel survival.
 
@@ -595,15 +595,7 @@ def _feature_validity_by_survival(
     seen = np.asarray(observed, dtype=np.bool_)
     if membership.shape != seen.shape or membership.shape[0] != len(dates):
         raise ValueError("feature-survival axes are misaligned")
-    years = dates.astype("datetime64[Y]").astype(np.int64) + 1970
-    last_seen = np.full(seen.shape[1], -1, dtype=np.int64)
-    for name in range(seen.shape[1]):
-        rows = np.flatnonzero(seen[:, name])
-        if rows.size:
-            last_seen[name] = rows[-1]
-    final_year = int(years[-1])
-    survives = (last_seen >= 0) & (years[np.maximum(last_seen, 0)] == final_year)
-    groups = {"delisted_within_panel": ~survives, "survives_to_final_year": survives}
+    groups = _eventual_survival_groups(dates, seen, survival_identities)
     rows: list[dict[str, object]] = []
     ratios: dict[tuple[str, str], float] = {}
     denominators: dict[tuple[str, str], int] = {}
@@ -634,15 +626,179 @@ def _feature_validity_by_survival(
                     "mask_rate": 1.0 - ratio if denominator else None,
                 }
             )
-        if all(denominators[(family, label)] > 0 for label in groups):
+        if maximum_gap is not None and all(
+            denominators[(family, label)] > 0 for label in groups
+        ):
             gap = abs(
                 ratios[(family, "delisted_within_panel")]
                 - ratios[(family, "survives_to_final_year")]
             )
-            if gap > 0.05:
+            if gap > maximum_gap:
                 raise ValueError(
                     f"feature validity for {family} is survivor-skewed by more "
-                    f"than 5 percentage points: {gap:.6f}"
+                    f"than {100.0 * maximum_gap:g} percentage points: {gap:.6f}"
+                )
+    return pl.DataFrame(rows)
+
+
+def _eventual_survival_groups(
+    dates: NDArray[np.datetime64],
+    observed: NDArray[np.bool_],
+    survival_identities: Sequence[str] | None = None,
+) -> dict[str, NDArray[np.bool_]]:
+    """Classify names by the final observation of their continuation identity."""
+
+    calendar = np.asarray(dates, dtype="datetime64[D]")
+    seen = np.asarray(observed, dtype=np.bool_)
+    if seen.ndim != 2 or seen.shape[0] != calendar.size:
+        raise ValueError("survival-group axes are misaligned")
+    identities = (
+        tuple(str(index) for index in range(seen.shape[1]))
+        if survival_identities is None
+        else tuple(str(value) for value in survival_identities)
+    )
+    if len(identities) != seen.shape[1]:
+        raise ValueError("survival identity axis is misaligned")
+    years = calendar.astype("datetime64[Y]").astype(np.int64) + 1970
+    identity_last: dict[str, int] = {}
+    for name, identity in enumerate(identities):
+        rows = np.flatnonzero(seen[:, name])
+        if rows.size:
+            identity_last[identity] = max(identity_last.get(identity, -1), int(rows[-1]))
+    final_year = int(years[-1])
+    survives = np.asarray(
+        [
+            identity in identity_last and years[identity_last[identity]] == final_year
+            for identity in identities
+        ],
+        dtype=np.bool_,
+    )
+    return {
+        "delisted_within_panel": ~survives,
+        "survives_to_final_year": survives,
+    }
+
+
+def _prior_adv20(
+    volume_brl: NDArray[np.floating], observed: NDArray[np.bool_]
+) -> NDArray[np.float32]:
+    """Return the causal mean BRL volume over the 20 sessions before each row."""
+
+    volume = np.asarray(volume_brl, dtype=np.float64)
+    seen = np.asarray(observed, dtype=np.bool_)
+    if volume.ndim != 2 or seen.shape != volume.shape:
+        raise ValueError("prior-ADV20 axes are misaligned")
+    output = np.full(volume.shape, np.nan, dtype=np.float32)
+    clean = np.where(seen & np.isfinite(volume) & (volume >= 0.0), volume, 0.0)
+    cumulative = np.vstack(
+        (np.zeros((1, volume.shape[1]), dtype=np.float64), np.cumsum(clean, axis=0))
+    )
+    for day in range(20, volume.shape[0]):
+        output[day] = ((cumulative[day] - cumulative[day - 20]) / 20.0).astype(
+            np.float32
+        )
+    return output
+
+
+def _external_feature_validity_by_survival_liquidity(
+    dates: NDArray[np.datetime64],
+    active: NDArray[np.bool_],
+    observed: NDArray[np.bool_],
+    prior_adv20: NDArray[np.floating],
+    family: str,
+    valid: NDArray[np.bool_],
+    present: NDArray[np.bool_],
+    survival_identities: Sequence[str] | None = None,
+) -> pl.DataFrame:
+    """Gate an external family within pooled causal prior-ADV20 quartiles."""
+
+    membership = np.asarray(active, dtype=np.bool_)
+    seen = np.asarray(observed, dtype=np.bool_)
+    mask = np.asarray(valid, dtype=np.bool_)
+    availability = np.asarray(present, dtype=np.bool_)
+    adv = np.asarray(prior_adv20, dtype=np.float64)
+    if (
+        membership.shape != seen.shape
+        or adv.shape != seen.shape
+        or availability.shape != seen.shape
+        or mask.ndim != 3
+        or mask.shape[:2] != seen.shape
+        or seen.shape[0] != len(dates)
+    ):
+        raise ValueError(f"external feature family {family} is misaligned")
+    groups = _eventual_survival_groups(dates, seen, survival_identities)
+    eligible = membership & seen & availability & np.isfinite(adv)
+    pooled_adv = adv[eligible]
+    if pooled_adv.size == 0:
+        raise ValueError(f"external feature family {family} has no observable population")
+    edges = np.quantile(pooled_adv, (0.25, 0.50, 0.75))
+    quartile = np.full(seen.shape, -1, dtype=np.int8)
+    quartile[eligible] = np.searchsorted(edges, adv[eligible], side="right")
+    rows: list[dict[str, object]] = []
+    strata = [(0, eligible)] + [
+        (quartile_index + 1, quartile == quartile_index)
+        for quartile_index in range(4)
+    ]
+    for quartile_number, stratum in strata:
+        ratios: dict[str, float] = {}
+        denominators: dict[str, int] = {}
+        for label, names in groups.items():
+            selected = eligible & stratum & names[None, :]
+            present_days = int(selected.sum())
+            denominator = present_days * mask.shape[2]
+            numerator = int((mask & selected[..., None]).sum())
+            ratio = numerator / denominator if denominator else 0.0
+            ratios[label] = ratio
+            denominators[label] = denominator
+            rows.append(
+                {
+                    "family": family,
+                    "prior_adv20_quartile": quartile_number,
+                    "prior_adv20_lower_brl": (
+                        None
+                        if quartile_number in {0, 1}
+                        else float(edges[quartile_number - 2])
+                    ),
+                    "prior_adv20_upper_brl": (
+                        None
+                        if quartile_number in {0, 4}
+                        else float(edges[quartile_number - 1])
+                    ),
+                    "group": label,
+                    "name_count": int(names.sum()),
+                    "family_present_name_days": present_days,
+                    "valid_feature_cells": numerator,
+                    "possible_feature_cells": denominator,
+                    "validity_ratio": ratio,
+                    "mask_rate": 1.0 - ratio if denominator else None,
+                    "validity_gap": None,
+                    "gap_direction": None,
+                    "stratified_gate_passed": None,
+                    "stratum_is_binding": quartile_number > 0,
+                }
+            )
+        if all(denominators[label] > 0 for label in groups):
+            gap = abs(
+                ratios["delisted_within_panel"]
+                - ratios["survives_to_final_year"]
+            )
+            direction = (
+                "delisted_above_survivor"
+                if ratios["delisted_within_panel"]
+                > ratios["survives_to_final_year"]
+                else "survivor_above_delisted"
+            )
+            for row in rows[-len(groups) :]:
+                row["validity_gap"] = gap
+                row["gap_direction"] = direction
+                row["stratified_gate_passed"] = (
+                    None if quartile_number == 0 else gap <= 0.05
+                )
+            if quartile_number > 0 and gap > 0.05:
+                raise ValueError(
+                    f"external feature validity for {family} is survivor-skewed "
+                    "by more than 5 percentage points within prior-ADV20 "
+                    f"quartile {quartile_number}: {gap:.6f}"
                 )
     return pl.DataFrame(rows)
 
@@ -851,6 +1007,8 @@ def build_daily_store(
     if not calendar:
         raise ValueError("COTAHIST produced no qualifying sessions")
     panel = panel_from_daily(cash, dates=calendar)
+    isin_successions = detect_isin_successions(cash)
+    continuation_isins = continuation_identity_axis(panel.isins, isin_successions)
     keep = np.ones(len(panel.dates), dtype=np.bool_)
     if store_start is not None:
         keep &= panel.dates >= np.datetime64(store_start)
@@ -930,18 +1088,38 @@ def build_daily_store(
     adjusted_close = np.load(
         adjusted_paths["adjusted_close"], mmap_mode="r", allow_pickle=False
     )
-    universe = build_daily_universe(panel.close_brl, panel.volume_brl, panel.observed)
+    linked_universe_inputs = tuple(
+        inherit_linked_history(values, panel.dates, panel.isins, isin_successions)
+        for values in (panel.close_brl, panel.volume_brl, panel.observed)
+    )
+    universe = build_daily_universe(*linked_universe_inputs)
+    date_lookup = {value: index for index, value in enumerate(panel.dates)}
+    isin_lookup = {value: index for index, value in enumerate(panel.isins)}
+    for row in isin_successions.iter_rows(named=True):
+        boundary = date_lookup[np.datetime64(row["successor_first_date"], "D")]
+        predecessor = isin_lookup[str(row["predecessor_isin"])]
+        successor = isin_lookup[str(row["successor_isin"])]
+        universe.active[boundary:, predecessor] = False
+        universe.active[:boundary, successor] = False
+    linked_slow_inputs = tuple(
+        inherit_linked_history(values, panel.dates, panel.isins, isin_successions)
+        for values in (
+            adjusted_open,
+            adjusted_high,
+            adjusted_low,
+            adjusted_close,
+            linked_universe_inputs[1],
+            panel.trades,
+            linked_universe_inputs[2],
+            detected_actions.ambiguous_event,
+        )
+    )
     slow_raw = build_slow_features(
-        adjusted_open,
-        adjusted_high,
-        adjusted_low,
-        adjusted_close,
-        panel.volume_brl,
-        panel.trades,
-        panel.observed,
+        *linked_slow_inputs[:6],
+        linked_slow_inputs[6],
         universe.active,
         panel.dates,
-        ambiguous_action=detected_actions.ambiguous_event,
+        ambiguous_action=linked_slow_inputs[7],
     )
     slow_sigma = _copy_workspace_array(
         workspace,
@@ -969,7 +1147,22 @@ def build_daily_store(
         slow_valid,
         source_rows=kept_rows,
     )
+    inherit_linked_history(
+        slow_values,
+        kept_dates,
+        panel.isins,
+        isin_successions,
+        copy=False,
+    )
+    inherit_linked_history(
+        slow_valid,
+        kept_dates,
+        panel.isins,
+        isin_successions,
+        copy=False,
+    )
     del slow_raw
+    del linked_slow_inputs
     gc.collect()
 
     shape = panel.observed.shape
@@ -1091,6 +1284,21 @@ def build_daily_store(
         streamed_intraday = None
         gc.collect()
 
+    inherit_linked_history(
+        intraday_values,
+        kept_dates,
+        panel.isins,
+        isin_successions,
+        copy=False,
+    )
+    inherit_linked_history(
+        intraday_valid,
+        kept_dates,
+        panel.isins,
+        isin_successions,
+        copy=False,
+    )
+
     target_shape = (kept_rows.size, len(panel.isins), len(HORIZONS))
     target_primary = _workspace_array(
         workspace, "target_primary", target_shape, np.float32
@@ -1206,9 +1414,32 @@ def build_daily_store(
 
     sidecar_coverage_frames: list[pl.DataFrame] = []
     sidecar_survival_frames: list[pl.DataFrame] = []
+    sidecar_liquidity_frames: list[pl.DataFrame] = []
+    sidecar_contemporaneity_rows: list[dict[str, object]] = []
+    prior_adv20 = _prior_adv20(
+        linked_universe_inputs[1][keep], linked_universe_inputs[2][keep]
+    )
     for group, result in iter_sidecars():
         if result.values.shape[:2] != shape:
             raise ValueError(f"sidecar {group} does not match the store axes")
+        if not result.publication_lag_reproduced:
+            raise ValueError(
+                f"sidecar {group} lacks an independent publication-lag validity proof"
+            )
+        sidecar_contemporaneity_rows.append(
+            {
+                "family": f"sidecar_{group}",
+                "publication_lag_validity_reproduced": True,
+                "publication_lag_valid_cells": result.publication_lag_valid_cells,
+                "publication_lag_source_rows": result.publication_lag_source_rows,
+                "d_plus_one_rows_checked": result.d_plus_one_rows_checked,
+                "d_plus_one_violations": result.d_plus_one_violations,
+                "availability_contract": (
+                    "raw archive available_date/decision coordinate; daily source "
+                    "archives are D+1-lagged upstream"
+                ),
+            }
+        )
         values = _workspace_array(
             workspace,
             f"sidecar_{group}_values",
@@ -1228,6 +1459,20 @@ def build_daily_store(
             values,
             valid,
             source_rows=kept_rows,
+        )
+        inherit_linked_history(
+            values,
+            kept_dates,
+            panel.isins,
+            isin_successions,
+            copy=False,
+        )
+        inherit_linked_history(
+            valid,
+            kept_dates,
+            panel.isins,
+            isin_successions,
+            copy=False,
         )
         arrays[f"sidecar_{group}_values"] = values
         arrays[f"sidecar_{group}_valid"] = valid
@@ -1257,13 +1502,32 @@ def build_daily_store(
                         raw_valid.any(axis=2),
                     )
                 },
+                continuation_isins,
+                maximum_gap=None,
+            )
+        )
+        sidecar_liquidity_frames.append(
+            _external_feature_validity_by_survival_liquidity(
+                kept_dates,
+                universe.active[keep],
+                panel.observed[keep],
+                prior_adv20,
+                f"sidecar_{group}",
+                raw_valid,
+                raw_valid.any(axis=2),
+                continuation_isins,
             )
         )
         del raw_valid, result
         gc.collect()
+    del prior_adv20, linked_universe_inputs
+    gc.collect()
 
     tables = {
-        "security_master": build_security_master(cash),
+        "security_master": build_security_master(
+            cash, succession_links=isin_successions
+        ),
+        "isin_succession_links": isin_successions,
         "feature_coverage": pl.concat(coverage_tables),
         "sidecar_coverage": (
             pl.concat(sidecar_coverage_frames)
@@ -1318,6 +1582,23 @@ def build_daily_store(
             action_acquisition_audit,
         ),
         "corporate_actions": checked_actions,
+        "sidecar_contemporaneity": pl.DataFrame(
+            sidecar_contemporaneity_rows,
+            schema={
+                "family": pl.String,
+                "publication_lag_validity_reproduced": pl.Boolean,
+                "publication_lag_valid_cells": pl.Int64,
+                "publication_lag_source_rows": pl.Int64,
+                "d_plus_one_rows_checked": pl.Int64,
+                "d_plus_one_violations": pl.Int64,
+                "availability_contract": pl.String,
+            },
+        ),
+        "external_feature_validity_by_survival_adv20_quartile": (
+            pl.concat(sidecar_liquidity_frames)
+            if sidecar_liquidity_frames
+            else pl.DataFrame()
+        ),
     }
     if v1_assignments is not None:
         v1_isins = tuple(v1_assignments.get_column("isin").cast(pl.String).to_list())
@@ -1389,9 +1670,23 @@ def build_daily_store(
         target_valid,
         universe.active[keep],
         panel.observed[keep],
+        continuation_isins,
     )
     feature_gate_families: dict[str, tuple[NDArray[np.bool_], NDArray[np.bool_]]] = {
-        "slow": (slow_valid, panel.observed[keep]),
+        "slow_return": (slow_valid[..., :7], panel.observed[keep]),
+        "slow_volatility": (slow_valid[..., 7:17], panel.observed[keep]),
+        "slow_liquidity_and_state": (
+            slow_valid[..., 17:27],
+            panel.observed[keep],
+        ),
+        "slow_peer": (slow_valid[..., 27:], panel.observed[keep]),
+        "classification_masks": (
+            np.broadcast_to(
+                panel.observed[keep, :, None],
+                (*panel.observed[keep].shape, 7),
+            ),
+            panel.observed[keep],
+        ),
     }
     if has_intraday:
         feature_gate_families["intraday"] = (
@@ -1403,6 +1698,7 @@ def build_daily_store(
         universe.active[keep],
         panel.observed[keep],
         feature_gate_families,
+        continuation_isins,
     )
     tables["feature_validity_by_survival"] = pl.concat(
         [base_feature_survival, *sidecar_survival_frames]
@@ -1433,6 +1729,21 @@ def build_daily_store(
         "v1_isin_subset_verified": v1_assignments is not None,
         "v1_calendar_verified": v1_calendar is not None,
         "implementation_git_commit": implementation_commit,
+        "isin_succession_link_count": isin_successions.height,
+        "survival_identity": (
+            "root ISIN after exact same-ticker consecutive-session COTAHIST succession"
+        ),
+        "feature_history_identity": (
+            "successor ISIN inherits predecessor rows strictly before its first session"
+        ),
+        "survivorship_gates": {
+            "internally_derived_feature_family_max_gap": 0.05,
+            "target_family_max_gap": 0.10,
+            "external_sidecar_validity": (
+                "independent publication-lag mask identity plus max 0.05 gap "
+                "within pooled causal prior-ADV20 quartiles"
+            ),
+        },
         "return_definition": (
             "COTAHIST price return adjusted only for detected split/bonus "
             "boundaries; provider actions are audit-only"
@@ -1451,6 +1762,30 @@ def build_daily_store(
         "build_peak_rss_bytes": build_peak_rss,
         "build_peak_rss_gib": build_peak_rss / (1024**3),
     }
+    options_composition = tables[
+        "external_feature_validity_by_survival_adv20_quartile"
+    ]
+    if options_composition.width:
+        options_composition = options_composition.filter(
+            pl.col("family") == "sidecar_options"
+        )
+        if options_composition.height:
+            unstratified = options_composition.filter(
+                pl.col("prior_adv20_quartile") == 0
+            ).row(0, named=True)
+            binding = options_composition.filter(
+                pl.col("prior_adv20_quartile") > 0
+            )
+            metadata["options_validity_composition_signature"] = {
+                "unstratified_gap": unstratified["validity_gap"],
+                "unstratified_direction": unstratified["gap_direction"],
+                "stratified_prior_adv20_gate_passed": bool(
+                    binding.get_column("stratified_gate_passed").all()
+                ),
+                "interpretation": (
+                    "liquidity-composition signature, not a leakage signature"
+                ),
+            }
     if "v1_pit_active_coverage" in tables:
         active_counts = tables["v1_pit_active_coverage"].get_column("active_v1_count")
         metadata["v1_pit_active_count"] = {
@@ -1623,6 +1958,8 @@ def _parse_sidecars(
                 "odd_lot_volume_brl",
             ),
             "events": ("event_itr_dfp_recent_5s",),
+            "options": ("source_trade_date",),
+            "fundamentals": ("source_receipt_date",),
         }.get(group, ())
         value_columns = sorted(
             {
@@ -1734,7 +2071,49 @@ def _parse_sidecars(
             group=group,
             daily_volume_brl=daily_volume_brl,
         )
-        output[group] = materialize_known_archive(source, dates, isins, group=group)
+        materialized = materialize_known_archive(source, dates, isins, group=group)
+        rebuilt = rebuild_publication_lag_validity(
+            source,
+            dates,
+            isins,
+            group=group,
+            feature_columns=available_archive_mapping(group, source.columns),
+            date_only_available_before_decision=True,
+        )
+        if not np.array_equal(materialized.valid, rebuilt):
+            differing = int(np.count_nonzero(materialized.valid != rebuilt))
+            raise ValueError(
+                f"sidecar {group} validity is not reproducible from its "
+                f"publication-lagged archive: {differing} cells differ"
+            )
+        lag_columns = [
+            column
+            for column in ("source_trade_date", "source_position_date")
+            if column in source.columns
+        ]
+        lag_rows = 0
+        lag_violations = 0
+        for column in lag_columns:
+            comparable = source.filter(
+                pl.col(column).is_not_null() & pl.col("available_date").is_not_null()
+            )
+            lag_rows += comparable.height
+            lag_violations += comparable.filter(
+                pl.col("available_date") <= pl.col(column)
+            ).height
+        if lag_violations:
+            raise ValueError(
+                f"sidecar {group} has {lag_violations} daily rows not delayed to D+1"
+            )
+        output[group] = replace(
+            materialized,
+            publication_lag_reproduced=True,
+            publication_lag_valid_cells=int(rebuilt.sum()),
+            publication_lag_source_rows=source.height,
+            d_plus_one_rows_checked=lag_rows,
+            d_plus_one_violations=lag_violations,
+        )
+        del rebuilt
     return output
 
 

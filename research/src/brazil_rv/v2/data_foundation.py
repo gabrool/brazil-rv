@@ -122,8 +122,10 @@ def load_cotahist(paths: Sequence[Path], *, v1_isins: Sequence[str] = ()) -> pl.
     )
 
 
-def build_security_master(daily: pl.DataFrame) -> pl.DataFrame:
-    """Create non-overlapping observed ticker segments per permanent ISIN."""
+def build_security_master(
+    daily: pl.DataFrame, *, succession_links: pl.DataFrame | None = None
+) -> pl.DataFrame:
+    """Create ticker segments and their audited continuation identity."""
 
     identity = _identity_column(daily)
     ticker = "ticker" if "ticker" in daily.columns else "latest_ticker"
@@ -153,7 +155,187 @@ def build_security_master(daily: pl.DataFrame) -> pl.DataFrame:
             rows.append(
                 {"isin": isin, "ticker": current_ticker, "first_date": first, "last_date": last}
             )
-    return pl.DataFrame(rows).sort("isin", "first_date")
+    master = pl.DataFrame(rows).sort("isin", "first_date")
+    links = (
+        detect_isin_successions(daily)
+        if succession_links is None
+        else succession_links
+    )
+    roots = continuation_identity_axis(
+        tuple(master.get_column("isin").unique(maintain_order=True).to_list()),
+        links,
+    )
+    continuation = pl.DataFrame(
+        {
+            "isin": master.get_column("isin").unique(maintain_order=True),
+            "continuation_isin": roots,
+        }
+    )
+    return master.join(continuation, on="isin", how="left", validate="m:1").sort(
+        "isin", "first_date"
+    )
+
+
+def detect_isin_successions(daily: pl.DataFrame) -> pl.DataFrame:
+    """Detect exact same-ticker ISIN changes on adjacent COTAHIST sessions.
+
+    A successor must make its first appearance on the session immediately after
+    the predecessor's final appearance.  This excludes ticker reuse after a
+    gap, concurrent identities, and a previously listed ISIN returning under a
+    ticker.
+    """
+
+    identity = _identity_column(daily)
+    ticker = "ticker" if "ticker" in daily.columns else "latest_ticker"
+    if ticker not in daily.columns or "trade_date" not in daily.columns:
+        raise ValueError("daily data must contain trade_date, ISIN, and ticker")
+    frame = (
+        daily.select(
+            pl.col("trade_date"),
+            pl.col(identity).cast(pl.String).alias("isin"),
+            pl.col(ticker).cast(pl.String).str.strip_chars().str.to_uppercase().alias("ticker"),
+        )
+        .filter(pl.col("isin").is_not_null() & (pl.col("ticker") != ""))
+        .unique()
+        .sort("trade_date", "ticker", "isin")
+    )
+    schema = {
+        "ticker": pl.String,
+        "predecessor_isin": pl.String,
+        "successor_isin": pl.String,
+        "predecessor_last_date": pl.Date,
+        "successor_first_date": pl.Date,
+        "continuation_isin": pl.String,
+    }
+    if frame.is_empty():
+        return pl.DataFrame(schema=schema)
+    ambiguous = (
+        frame.group_by("trade_date", "ticker")
+        .agg(pl.col("isin").n_unique().alias("identity_count"))
+        .filter(pl.col("identity_count") != 1)
+    )
+    if ambiguous.height:
+        raise ValueError("one COTAHIST ticker maps to multiple ISINs on one session")
+
+    calendar = frame.get_column("trade_date").unique().sort().to_list()
+    date_index = {value: index for index, value in enumerate(calendar)}
+    bounds = frame.group_by("isin").agg(
+        pl.col("trade_date").min().alias("first_date"),
+        pl.col("trade_date").max().alias("last_date"),
+    )
+    first = dict(bounds.select("isin", "first_date").iter_rows())
+    last = dict(bounds.select("isin", "last_date").iter_rows())
+    candidates: list[dict[str, object]] = []
+    for key, group in frame.group_by("ticker", maintain_order=True):
+        ticker_value = str(key[0] if isinstance(key, tuple) else key)
+        observations = group.select("trade_date", "isin").sort("trade_date").iter_rows()
+        previous: tuple[object, str] | None = None
+        for value_date, value_isin in observations:
+            value_isin = str(value_isin)
+            if previous is not None:
+                prior_date, prior_isin = previous
+                if (
+                    prior_isin != value_isin
+                    and date_index[value_date] == date_index[prior_date] + 1
+                    and last[prior_isin] == prior_date
+                    and first[value_isin] == value_date
+                ):
+                    candidates.append(
+                        {
+                            "ticker": ticker_value,
+                            "predecessor_isin": prior_isin,
+                            "successor_isin": value_isin,
+                            "predecessor_last_date": prior_date,
+                            "successor_first_date": value_date,
+                        }
+                    )
+            previous = (value_date, value_isin)
+    if not candidates:
+        return pl.DataFrame(schema=schema)
+    links = pl.DataFrame(candidates).unique().sort("successor_first_date", "ticker")
+    if (
+        links.get_column("predecessor_isin").n_unique() != links.height
+        or links.get_column("successor_isin").n_unique() != links.height
+    ):
+        raise ValueError("ISIN succession links must be one-to-one")
+    roots: dict[str, str] = {}
+    for row in links.iter_rows(named=True):
+        predecessor = str(row["predecessor_isin"])
+        successor = str(row["successor_isin"])
+        root = roots.get(predecessor, predecessor)
+        if successor == root:
+            raise ValueError("ISIN succession links contain a cycle")
+        roots[successor] = root
+    return links.with_columns(
+        pl.col("successor_isin")
+        .replace_strict(roots, default=pl.col("successor_isin"))
+        .alias("continuation_isin")
+    ).select(*schema)
+
+
+def continuation_identity_axis(
+    isins: Sequence[str], links: pl.DataFrame
+) -> tuple[str, ...]:
+    """Map each permanent ISIN to the root of its audited continuation chain."""
+
+    required = {"predecessor_isin", "successor_isin"}
+    if not required.issubset(links.columns):
+        if links.is_empty():
+            return tuple(isins)
+        raise ValueError("ISIN succession table has the wrong schema")
+    roots = {str(isin): str(isin) for isin in isins}
+    rows = (
+        links.sort("successor_first_date").iter_rows(named=True)
+        if "successor_first_date" in links.columns
+        else links.iter_rows(named=True)
+    )
+    for row in rows:
+        predecessor = str(row["predecessor_isin"])
+        successor = str(row["successor_isin"])
+        if predecessor not in roots or successor not in roots:
+            raise ValueError("ISIN succession link is outside the panel axis")
+        roots[successor] = roots[predecessor]
+    return tuple(roots[str(isin)] for isin in isins)
+
+
+def inherit_linked_history(
+    values: NDArray[np.generic],
+    dates: Sequence[object],
+    isins: Sequence[str],
+    links: pl.DataFrame,
+    *,
+    copy: bool = True,
+) -> NDArray[np.generic]:
+    """Copy predecessor rows into the successor's strictly prior history.
+
+    The successor's first and later observations are never overwritten.  Links
+    are applied chronologically so a multi-ISIN chain carries its complete
+    causal history forward.
+    """
+
+    source = np.asarray(values)
+    if source.ndim < 2 or source.shape[:2] != (len(dates), len(isins)):
+        raise ValueError("linked-history array is misaligned")
+    if links.is_empty():
+        return source
+    output = source.copy() if copy else source
+    if not output.flags.writeable:
+        raise ValueError("in-place linked-history destination is read-only")
+    date_lookup = {
+        np.datetime64(value, "D"): index for index, value in enumerate(dates)
+    }
+    isin_lookup = {str(value): index for index, value in enumerate(isins)}
+    for row in links.sort("successor_first_date").iter_rows(named=True):
+        successor_date = np.datetime64(row["successor_first_date"], "D")
+        boundary = date_lookup.get(successor_date)
+        predecessor = isin_lookup.get(str(row["predecessor_isin"]))
+        successor = isin_lookup.get(str(row["successor_isin"]))
+        if boundary is None and len(dates) and successor_date < np.datetime64(dates[0], "D"):
+            continue
+        if boundary is None or predecessor is None or successor is None:
+            raise ValueError("ISIN succession link is outside the history axes")
+        output[:boundary, successor] = output[:boundary, predecessor]
+    return output
 
 
 def verify_v1_mapping(assignments: pl.DataFrame, available_isins: Sequence[str]) -> pl.DataFrame:

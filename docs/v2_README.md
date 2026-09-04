@@ -83,6 +83,11 @@ mislabeling a v1 sample.
 The source panel keeps cash-market type 010, standard-lot BDI 02, and
 ON/OR/PN/PNA–PNF/UNT securities (plus any explicit accepted-v1 exception).
 Each observed row contains raw OHLC, BRL volume, trade count, and quantity.
+When the same COTAHIST ticker changes from one ISIN to a new ISIN on adjacent
+market sessions, with the old identity ending and the new identity beginning at
+that boundary, the security master records an audited continuation link. Ticker
+reuse after a gap does not link. The successor inherits only strictly prior
+feature history; survival audits use the root continuation identity.
 
 The panel's action definition is provider-independent. An event candidate is a
 `DISMES` change or an adjacent price jump above the 4% log band, whether or not
@@ -261,7 +266,16 @@ archive quantity is substituted.
 
 An adapter may expose a value on `t` only when its source availability
 timestamp is no later than 15:45 on `t`. Existing v1 D+1 publication rules are
-preserved by the source's `available_date`/timestamp.
+preserved by the source's `available_date`/timestamp. During every build, an
+independent replay from those raw publication coordinates must reproduce every
+sidecar validity bit exactly.
+
+Internally derived feature families retain the unconditional 5-point
+eventual-survival validity-gap gate, and targets retain their 10-point gate.
+External sidecars instead apply the 5-point gap within each pooled causal
+prior-ADV20 quartile of their observable population. The manifest retains both
+survival-group rows per quartile plus an unstratified diagnostic row. This
+separates publication-time leakage from ordinary liquidity composition.
 
 For lending balance, the 20-session COTAHIST-volume denominator is valid only
 when the complete trailing window begins on or after that ISIN's first finite

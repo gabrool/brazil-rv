@@ -59,6 +59,11 @@ class SidecarResult:
     valid: NDArray[np.bool_]
     coverage_by_year: tuple[dict[str, object], ...]
     archive_semantics_available: tuple[str, ...] = ()
+    publication_lag_reproduced: bool = False
+    publication_lag_valid_cells: int = 0
+    publication_lag_source_rows: int = 0
+    d_plus_one_rows_checked: int = 0
+    d_plus_one_violations: int = 0
 
 
 def _as_date(value: object) -> date:
@@ -217,6 +222,71 @@ def materialize_sidecar(
             name for name in names if columns[name] is not None
         ),
     )
+
+
+def rebuild_publication_lag_validity(
+    source: pl.DataFrame,
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+    *,
+    group: str,
+    feature_columns: Mapping[str, str | None] | None = None,
+    decision_time: time = time(15, 45),
+    date_only_available_before_decision: bool = False,
+) -> NDArray[np.bool_]:
+    """Independently rebuild validity from publication-lagged archive rows.
+
+    This intentionally does not consume a materialized ``SidecarResult``.  It
+    replays the raw archive's availability coordinate, latest-known snapshot,
+    finite-value rule, and archived source masks so the store can assert that
+    no survival- or end-of-panel condition entered external feature validity.
+    """
+
+    if group not in SIDECAR_FEATURES:
+        raise ValueError(f"unknown sidecar group: {group}")
+    identity = "isin" if "isin" in source.columns else "security_id"
+    if identity not in source.columns or "available_date" not in source.columns:
+        raise ValueError("sidecar source needs identity and available_date")
+    names = SIDECAR_FEATURES[group]
+    columns = dict(feature_columns or {name: name for name in names})
+    if set(columns) != set(names):
+        raise ValueError("feature mapping must cover the exact frozen group")
+    normalized_dates = tuple(_as_date(value) for value in dates)
+    date_lookup = {value: index for index, value in enumerate(normalized_dates)}
+    isin_lookup = {str(value): index for index, value in enumerate(isins)}
+    selected: dict[tuple[int, int], Mapping[str, object]] = {}
+    for row in source.iter_rows(named=True):
+        available_date = _as_date(row["available_date"])
+        coordinate = (date_lookup.get(available_date), isin_lookup.get(str(row[identity])))
+        if coordinate[0] is None or coordinate[1] is None:
+            continue
+        if not _available_before_decision(
+            row,
+            available_date,
+            decision_time,
+            date_only_available_before_decision=date_only_available_before_decision,
+        ):
+            continue
+        key = (int(coordinate[0]), int(coordinate[1]))
+        previous = selected.get(key)
+        if previous is not None and _availability_order(previous) == _availability_order(row):
+            raise ValueError("sidecar has ambiguous rows at one availability coordinate")
+        if previous is None or _availability_order(row) > _availability_order(previous):
+            selected[key] = row
+    rebuilt = np.zeros((len(dates), len(isins), len(names)), dtype=np.bool_)
+    source_columns = set(source.columns)
+    for (date_index, isin_index), row in selected.items():
+        for feature_index, name in enumerate(names):
+            column = columns[name]
+            if column is None:
+                continue
+            value = row[column]
+            valid = value is not None and np.isfinite(float(value))
+            mask_column = f"{column}_mask"
+            if mask_column in source_columns:
+                valid &= bool(row[mask_column])
+            rebuilt[date_index, isin_index, feature_index] = valid
+    return rebuilt
 
 
 def _raw_lending_features(

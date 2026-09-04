@@ -14,7 +14,9 @@ from brazil_rv.v2.build_store import (
     EXPECTED_V1_DATES,
     MinutePanel,
     V1_STORE_START,
+    _external_feature_validity_by_survival_liquidity,
     _feature_validity_by_survival,
+    _prior_adv20,
     _require_clean_implementation_commit,
     _validate_v1_calendar,
     build_daily_store,
@@ -84,6 +86,77 @@ def test_feature_validity_survivorship_gate_uses_family_population() -> None:
             active,
             observed,
             {"slow": (skewed, present)},
+        )
+
+
+def test_linked_survival_identity_treats_predecessor_as_continuing() -> None:
+    dates = np.asarray(
+        ["2023-12-28", "2023-12-29", "2024-01-02"], dtype="datetime64[D]"
+    )
+    observed = np.asarray([[True, False], [True, False], [False, True]])
+    valid = np.ones((3, 2, 1), dtype=np.bool_)
+    table = _feature_validity_by_survival(
+        dates,
+        observed,
+        observed,
+        {"slow_return": (valid, observed)},
+        ("BRROOTACNOR1", "BRROOTACNOR1"),
+    )
+    delisted = table.filter(pl.col("group") == "delisted_within_panel")
+    assert delisted[0, "name_count"] == 0
+    assert table.filter(pl.col("group") == "survives_to_final_year")[0, "name_count"] == 2
+
+
+def test_prior_adv20_uses_only_sessions_before_the_decision() -> None:
+    volume = np.arange(25, dtype=np.float64)[:, None] + 1.0
+    observed = np.ones_like(volume, dtype=np.bool_)
+    baseline = _prior_adv20(volume, observed)
+    changed = volume.copy()
+    changed[21:] = 1_000_000.0
+    mutated = _prior_adv20(changed, observed)
+    assert baseline[20, 0] == np.mean(volume[:20, 0])
+    np.testing.assert_array_equal(baseline[:22], mutated[:22])
+
+
+def test_external_gate_is_stratified_by_prior_adv20_not_unconditional() -> None:
+    dates = np.asarray(
+        ["2023-12-27", "2023-12-28", "2023-12-29", "2024-01-02"],
+        dtype="datetime64[D]",
+    )
+    observed = np.ones((4, 8), dtype=np.bool_)
+    observed[-1, :4] = False
+    active = observed.copy()
+    prior_adv = np.broadcast_to(
+        np.asarray([1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0]),
+        observed.shape,
+    ).copy()
+    present = observed.copy()
+    valid = np.broadcast_to(present[..., None], (*present.shape, 2)).copy()
+    table = _external_feature_validity_by_survival_liquidity(
+        dates,
+        active,
+        observed,
+        prior_adv,
+        "sidecar_options",
+        valid,
+        present,
+    )
+    assert set(table.get_column("prior_adv20_quartile")) == {0, 1, 2, 3, 4}
+    assert table.filter(pl.col("prior_adv20_quartile") > 0).get_column(
+        "stratified_gate_passed"
+    ).all()
+
+    skewed = valid.copy()
+    skewed[:-1, 0, :] = False
+    with pytest.raises(ValueError, match="prior-ADV20 quartile"):
+        _external_feature_validity_by_survival_liquidity(
+            dates,
+            active,
+            observed,
+            prior_adv,
+            "sidecar_options",
+            skewed,
+            present,
         )
 
 

@@ -10,6 +10,7 @@ from brazil_rv.v2.sidecars import (
     derive_known_archive_features,
     materialize_known_archive,
     materialize_sidecar,
+    rebuild_publication_lag_validity,
 )
 
 
@@ -157,6 +158,15 @@ def test_raw_lending_formulas_use_source_date_volume_and_d_plus_one() -> None:
         source, days, [isin], group="lending", daily_volume_brl=volume
     )
     result = materialize_known_archive(derived, days, [isin], group="lending")
+    rebuilt = rebuild_publication_lag_validity(
+        derived,
+        days,
+        [isin],
+        group="lending",
+        feature_columns=available_archive_mapping("lending", derived.columns),
+        date_only_available_before_decision=True,
+    )
+    np.testing.assert_array_equal(result.valid, rebuilt)
     # The position at source session 19 becomes visible only on session 20.
     assert not result.valid[19, 0].any()
     assert result.values[20, 0, 0] == pytest.approx(2.0)
@@ -244,6 +254,9 @@ def test_parser_combines_balance_and_reversible_rate_archives(tmp_path) -> None:
     assert result.values[120, 0, 3] == pytest.approx(0.10)
     assert result.values[125, 0, 4] == pytest.approx(0.15)
     assert result.valid[125, 0].tolist() == [True, True, True, True, True]
+    assert result.publication_lag_reproduced
+    assert result.publication_lag_valid_cells == int(result.valid.sum())
+    assert result.publication_lag_source_rows > 0
 
 
 def test_raw_oddlot_share_and_exact_session_lag_change() -> None:

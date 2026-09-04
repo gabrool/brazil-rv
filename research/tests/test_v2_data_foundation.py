@@ -1,11 +1,15 @@
 from datetime import date
 
+import numpy as np
 import polars as pl
 import pytest
 
 from brazil_rv.v2.data_foundation import (
     build_security_master,
+    continuation_identity_axis,
+    detect_isin_successions,
     filter_cash_equities,
+    inherit_linked_history,
     load_cotahist,
     panel_from_daily,
     verify_v1_mapping,
@@ -71,6 +75,50 @@ def test_security_master_splits_ticker_runs_and_panel_uses_isin() -> None:
     panel = panel_from_daily(daily)
     assert panel.isins == ("BRTESTACNOR1",)
     assert panel.observed.all()
+
+
+def test_consecutive_same_ticker_isin_succession_links_history_and_survival_identity() -> None:
+    predecessor = "BRTESTACNOR1"
+    successor = "BRTESTACNPR0"
+    dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    daily = pl.DataFrame(
+        [
+            _row(dates[0], predecessor, "TEST3"),
+            _row(dates[1], predecessor, "TEST3"),
+            _row(dates[2], successor, "TEST3"),
+        ]
+    )
+    links = detect_isin_successions(daily)
+    assert links.select(
+        "ticker", "predecessor_isin", "successor_isin", "continuation_isin"
+    ).row(0) == ("TEST3", predecessor, successor, predecessor)
+    assert continuation_identity_axis((predecessor, successor), links) == (
+        predecessor,
+        predecessor,
+    )
+    master = build_security_master(daily)
+    assert master.get_column("continuation_isin").to_list() == [
+        predecessor,
+        predecessor,
+    ]
+
+    values = np.asarray([[1.0, np.nan], [2.0, np.nan], [np.nan, 3.0]])
+    inherited = inherit_linked_history(
+        values, dates, (predecessor, successor), links
+    )
+    np.testing.assert_allclose(inherited[:, 1], [1.0, 2.0, 3.0])
+    assert np.isnan(inherited[2, 0])
+
+
+def test_ticker_reuse_after_gap_is_not_an_isin_succession() -> None:
+    daily = pl.DataFrame(
+        [
+            _row(date(2024, 1, 2), "BRTESTACNOR1", "TEST3"),
+            _row(date(2024, 1, 3), "BROTHERACN01", "OTHR3"),
+            _row(date(2024, 1, 4), "BRTESTACNPR0", "TEST3"),
+        ]
+    )
+    assert detect_isin_successions(daily).is_empty()
 
 
 def test_v1_mapping_is_strictly_one_to_one() -> None:
