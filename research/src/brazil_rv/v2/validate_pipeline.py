@@ -1343,7 +1343,7 @@ def _verified_classical_source(
     expected_failure_sha256: str,
 ) -> dict[str, object]:
     source = Path(root).resolve(strict=True)
-    inventory_path = source / "inventory.json"
+    inventory_path = source / "artifact_inventory.json"
     failure_path = source / "failure_record.json"
     if sha256_file(inventory_path).casefold() != expected_inventory_sha256.casefold():
         raise ValueError("completed classical inventory SHA-256 mismatch")
@@ -1353,12 +1353,36 @@ def _verified_classical_source(
     failure = json.loads(failure_path.read_text(encoding="utf-8"))
     if not isinstance(inventory_payload, Mapping) or not isinstance(failure, Mapping):
         raise ValueError("completed classical audit payload is malformed")
-    for payload in (inventory_payload, failure):
-        if (
-            payload.get("official_validation_accessed") is not False
-            or payload.get("test_accessed") is not False
-        ):
-            raise ValueError("completed classical source records sealed-window access")
+    if (
+        inventory_payload.get("schema")
+        != "BRAZIL_RV_V2_PIPELINE_VALIDATION_FAILURE_INVENTORY_V1"
+        or inventory_payload.get("status") != "failed"
+        or failure.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_FAILURE_V1"
+        or failure.get("status") != "failed"
+    ):
+        raise ValueError("completed classical failure schemas are not recognized")
+    access = failure.get("access_audit")
+    if not isinstance(access, Mapping) or (
+        access.get("pipeline_validation") is not True
+        or access.get("research_claim") is not False
+        or access.get("official_validation_accessed") is not False
+        or access.get("test_accessed") is not False
+        or access.get("all_registrations_null") is not True
+        or access.get("json_sidecars_verified") is not True
+    ):
+        raise ValueError("completed classical source records invalid access state")
+    completed = failure.get("completed_before_failure")
+    not_started = failure.get("not_started")
+    if not isinstance(completed, Mapping) or not isinstance(not_started, Mapping) or (
+        completed.get("baseline_evaluations") != 12
+        or completed.get("gbdt_evaluations") != 2
+        or completed.get("gbdt_head_models") != 100
+        or completed.get("gbdt_model_manifests") != 4
+        or not_started.get("checkpoint_count") != 0
+        or not_started.get("network_artifact_count") != 0
+        or not_started.get("neural_history_count") != 0
+    ):
+        raise ValueError("completed classical failure boundary is not score-free")
     excluded_raw = inventory_payload.get("excluded_self")
     rows = inventory_payload.get("files")
     if (
@@ -1388,6 +1412,7 @@ def _verified_classical_source(
         "inventory_sha256": expected_inventory_sha256.casefold(),
         "failure_record": str(failure_path),
         "failure_record_sha256": expected_failure_sha256.casefold(),
+        "implementation_commit": failure.get("implementation_commit"),
         "baseline_evaluation_count": len(baseline_evaluations),
         "gbdt_evaluation_count": len(gbdt_evaluations),
         "gbdt_model_count": len(gbdt_models),
@@ -1670,6 +1695,8 @@ def resume_network_validation(
         expected_inventory_sha256=completed_classical_inventory_sha256,
         expected_failure_sha256=completed_classical_failure_sha256,
     )
+    if classical_source["implementation_commit"] != store_build_commit:
+        raise ValueError("completed classical run differs from the store build commit")
     sidecars = _validate_sidecars(store_manifest, enabled_sidecars)
     external_resolutions = _external_artifact_resolutions(store_manifest)
     _assert_overrides_outside_store(store_path, external_resolutions)

@@ -456,19 +456,37 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
     failure_sha = write_json_atomic(
         classical / "failure_record.json",
         {
-            "status": "failed_before_neural_training",
-            "official_validation_accessed": False,
-            "test_accessed": False,
+            "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_FAILURE_V1",
+            "status": "failed",
+            "implementation_commit": "1" * 40,
+            "access_audit": {
+                "pipeline_validation": True,
+                "research_claim": False,
+                "official_validation_accessed": False,
+                "test_accessed": False,
+                "all_registrations_null": True,
+                "json_sidecars_verified": True,
+            },
+            "completed_before_failure": {
+                "baseline_evaluations": 12,
+                "gbdt_evaluations": 2,
+                "gbdt_head_models": 100,
+                "gbdt_model_manifests": 4,
+            },
+            "not_started": {
+                "checkpoint_count": 0,
+                "network_artifact_count": 0,
+                "neural_history_count": 0,
+            },
         },
     )
-    excluded = {"inventory.json", "inventory.json.sha256"}
+    excluded = {"artifact_inventory.json", "artifact_inventory.json.sha256"}
     rows = pipeline.inventory(classical, exclude=excluded)
     inventory_sha = write_json_atomic(
-        classical / "inventory.json",
+        classical / "artifact_inventory.json",
         {
-            "status": "failed_after_classical_completion",
-            "official_validation_accessed": False,
-            "test_accessed": False,
+            "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_FAILURE_INVENTORY_V1",
+            "status": "failed",
             "excluded_self": sorted(excluded),
             "files": rows,
         },
