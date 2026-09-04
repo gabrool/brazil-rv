@@ -95,16 +95,32 @@ Paired comparisons consume the selected preset's bootstrap settings, and preset
 runs require a hash-bound fast pretrained checkpoint. Legacy action-cache schemas
 are normalized in memory.
 
-No store has yet been accepted and no full-F1 validation has started. The most
-recent rebuild used the now-superseded per-quartile point check: the current
-COTAHIST input had zero qualifying consecutive-session ISIN successions and the
-run stopped on an under-supported lending quartile. Lending's 14.2121-point
-mid-liquidity estimate had only 950 delisted present name-days and is therefore
-reported rather than binding under the frozen name-clustered rule. The requested
-options audit retains its unstratified `5.4220916184`-point
-delisted-above-survivor composition signature. The former `f048ea9`, `2cb204d`,
-and related validation roots remain immutable historical engineering evidence
-only and must not be used as canonical inputs.
+The accepted Section-C store is
+`D:\quant-data\b3\processed\v2_daily_store_98e9386_20260904T165924Z`
+(manifest SHA-256
+`6a7e13195c6cde92fbdc756a585e4cb65d73998faa94e237595c7be7cdfb6919`).
+Its 4,102-by-933 panel spans 2010-01-04 through 2026-07-17, peaked at 5.991
+GiB RSS, and passed the 8-GiB memory ceiling. All six external publication-lag
+masks reproduced exactly with zero D+1 violations. The four binding bootstrap
+strata were the odd-lot quartiles and all passed; the largest binding 95% lower
+bound was +0.0834 points. The maximum unconditional internal-family and target
+gaps were 1.2899 and 1.8227 points. No qualifying consecutive-session ISIN
+succession was present. The options audit retains its unstratified 5.4221-point
+delisted-above-survivor composition signature, while lending's 14.2121-point
+quartile-2 estimate remains reported rather than gated because it has only 5
+delisted continuation names and 950 delisted present name-days.
+
+The first spec-scale full-F1 validation started from that accepted store on
+Linux and completed all 12 F1-F3 baseline evaluations plus both F1-F2 GBDT
+evaluations and their 100 head/seed model files. It then stopped at the first
+neural Stage-P loader failure: the store's provenance records a Windows
+absolute `v1_fast_store` path, which is not a bindable Linux path. Stage P,
+Stage F, and persistence training produced no histories, checkpoints, or
+evaluations. This is an unresolved portability blocker for full-F1 validation,
+not a research result. Official-validation and test access remained false;
+Section D remains unauthorized and unrun. The former `f048ea9`, `2cb204d`, and
+related validation roots remain immutable historical engineering evidence only
+and must not be used as canonical inputs.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused

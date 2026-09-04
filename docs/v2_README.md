@@ -20,14 +20,15 @@ stores and validations remain immutable historical engineering evidence, not
 canonical inputs.
 
 This source implementation is unit-tested, including byte-for-byte provider
-invariance and both target- and feature-side survivorship gates. Earlier
-commit-bound acceptance rebuilds stopped at the superseded unconditional
-options check and then at an under-supported lending quartile. External-family
-composition now uses the frozen name-clustered support-aware interval described
-below; publication-lag replay remains unconditional. No accepted store or
-full-F1 validation yet exists under this definition. No v2 research round,
+invariance and both target- and feature-side survivorship gates. The accepted
+Section-C store at commit `98e9386` passed the publication-lag, support-aware
+name-clustered external-family gate, unconditional internal-family gate, target
+gate, and 8-GiB build-memory ceiling. The subsequent spec-scale full-F1
+integration run stopped at its first failure after baselines and GBDT: the
+Linux neural loader cannot bind the Windows absolute `v1_fast_store` provenance
+path sealed into that store. Stage P/F did not start. No v2 research round,
 official-validation read, test read, candidate selection, or deployment change
-is part of this implementation pass.
+resulted.
 
 ## Data flow
 

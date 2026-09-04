@@ -5175,3 +5175,75 @@ the inventory covers 60 files totaling 2,754,189,291 bytes. The bounded repair
 assigns explicit stable dtypes to every nullable audit column and tests the
 all-nonbinding schema. It changes no statistical or research value. No
 result-changing retry or protected-data access occurred.
+
+### Section-C accepted store and full-F1 first-failure stop
+
+Commit `98e9386b160140af588f80110259f6c6a1a5545c` completed the explicit
+nullable audit schema. Local Ruff, compilation, all 607 research tests, and the
+exact `4,348 x 933` memory guard passed before the fresh real-data rebuild. The
+accepted immutable store is:
+
+    D:\quant-data\b3\processed\v2_daily_store_98e9386_20260904T165924Z
+
+It contains 4,102 sessions from 2010-01-04 through 2026-07-17 and 933 ISINs.
+Peak RSS was 6,432,698,368 bytes (5.990917 GiB), below the 8-GiB ceiling. All
+feature and target value tensors are float32; daily source/adjustment work
+arrays retain their source precision. The store manifest, post-build audit,
+log-inclusive inventory, and annual COTAHIST-classification summary SHA-256
+values are respectively
+`6a7e13195c6cde92fbdc756a585e4cb65d73998faa94e237595c7be7cdfb6919`,
+`f656a44c06915f05bda40a0992b92fd3619b5fef2bf5ccdda5db4d88f19e17bc`,
+`711c7e0c9f701195ea658818892efa6b97d442f9322eb1a5f67f91eba4521f46`,
+and `36261db798f8869a4f8fcb6526672b1d0d94272914f690b2f94452faf7c88fb2`.
+The inventory covers 88 files. The remote NFS copy was independently verified
+against every inventory row before validation.
+
+All six external sidecar families reproduced their validity masks exactly from
+publication-lagged archives; the lending, odd-lot, and options daily archives
+had zero D+1 violations. Four strata were gate-binding, all from odd-lot, and
+all passed. The largest binding 95% lower bound on the survivor-minus-delisted
+gap was `0.0008337553` (+0.0834 percentage points), below +5 points. Smaller
+strata were reported without gating. The options pooled gap remains
+`-0.0542209162` (delisted above survivor) and is recorded as composition, not
+leakage. The requested lending note records 5,212 delisted mid-liquidity
+present name-days across 526 names; the quartile-2 support actually entering
+the gate table is 5 delisted continuation names and 950 delisted present
+name-days, so its 14.2121-point estimate is nonbinding. The maximum absolute
+unconditional internal-family gap was `0.0128993848` (intraday), and the
+maximum target gap was `0.0182272005` (10 sessions), within their 5- and
+10-point limits. All requested action, split, dividend, M1 mismatch/adjustment,
+universe, target, feature, sidecar, and v1-inclusion audit tables are retained.
+The real scan found zero qualifying ISIN successions. Store access flags are
+false for official validation and test.
+
+The first paid allocation, `4705cd6d2ced4f519d20e10563c0495d`, never became
+active, transitioned to `unhealthy`, and was terminated; two later provider
+reads confirmed it absent with zero active instances. Exact replacement GH200
+`473d8702cc8f4aa1af3e47dbe117fc01` at `192.222.57.123` bootstrapped commit
+`98e9386`; Linux Ruff, compilation, and all 607 tests passed before any score.
+
+The exact spec-scale validation root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/v2_pipeline_validation_98e9386_20260904T174613Z
+
+The run used full registered windows, lookback 60, Stage P one epoch, Stage F
+three epochs, persistence lambda 0.1, default 3,000-round/100-round-stopping
+five-seed GBDT triage, F1-F3 baselines, CUDA, and no sidecars. All 12 baseline
+evaluations and both F1-F2 GBDT evaluations completed, including exactly 100
+GBDT head files and four parity model manifests. Neural Stage P then stopped at
+the first failure before training: `V2DailyDataset` resolved the store's sealed
+Windows absolute `v1_fast_store` provenance literally on Linux and could not
+bind `equity_features.npy`. No neural history, checkpoint, selection,
+evaluation, persistence score, or GPU training artifact exists, and no retry
+was performed.
+
+The copied operational logs, recursive JSON/hash and access audit, failure
+record, and complete partial inventory are secured in the root. Failure-record
+and inventory SHA-256 values are
+`b9c18fa2b685986de8cc870918626b275b67070651cb93e6e5a94b97d3a3de2c` and
+`b2ad9fc8bc01aab11afadaf0af3afb4c08e6e995318bf0c11905717f51e250bc`;
+the latter covers 201 files totaling 72,310,881 bytes. Recursive
+`official_validation_accessed` and `test_accessed` flags are false, all
+registrations are null, and every completed artifact is explicitly an
+integration check rather than a research claim. Section D was not started and
+no candidate or deployment changed.
