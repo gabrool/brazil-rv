@@ -5412,3 +5412,11 @@ and `48d553e5ef1dc7848eb5c1404eb27bdf416234c26924d78e6fab33303832ac4d`;
 the latter covers 82 files totaling 31,635,333 bytes. Official validation and
 the permanently spent test were not accessed, Section D was not started, and
 no candidate or deployment changed.
+
+After the implementation and evidence record reached local `main`, GitHub
+`main`, and the instance at commit
+`a39c7e98166cb031a09832ecd8245fc70596c0bf`, exact paid GH200 instance
+`86ee7e3fc35e4c8ba0daa1b7ff6d633f` at `192.222.58.61` was terminated through
+the provider API. Separate inventory reads at
+2026-09-04T20:09:32.7623726Z and 2026-09-04T20:09:57.4535979Z confirmed the
+exact ID absent and zero remaining instances.

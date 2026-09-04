@@ -191,6 +191,11 @@ log-inclusive completion audit and inventory SHA-256 values are
 and `48d553e5ef1dc7848eb5c1404eb27bdf416234c26924d78e6fab33303832ac4d`;
 the inventory covers 82 files totaling 31,635,333 bytes. All protected-access
 flags are false. Section D remains unrun and no candidate or deployment changed.
+After commit `a39c7e98166cb031a09832ecd8245fc70596c0bf` matched local,
+GitHub, and the instance, exact paid GH200 instance
+`86ee7e3fc35e4c8ba0daa1b7ff6d633f` was terminated. Provider inventory reads
+at 2026-09-04T20:09:32.7623726Z and 2026-09-04T20:09:57.4535979Z confirmed
+that exact ID absent and zero remaining instances.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused
