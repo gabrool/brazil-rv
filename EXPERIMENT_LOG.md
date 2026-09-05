@@ -5420,3 +5420,9 @@ After the implementation and evidence record reached local `main`, GitHub
 the provider API. Separate inventory reads at
 2026-09-04T20:09:32.7623726Z and 2026-09-04T20:09:57.4535979Z confirmed the
 exact ID absent and zero remaining instances.
+
+# Multi-day research log
+
+The multi-day v2 research program is tracked separately in
+`V2_EXPERIMENT_LOG.md`. This file remains the canonical complete history for the
+intraday v1 program and its execution follow-ups.
