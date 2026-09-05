@@ -78,6 +78,9 @@ def test_folded_bootstrap_records_undefined_readout_as_null() -> None:
 def test_paired_readouts_cover_all_registered_families() -> None:
     baseline = {fold: _report(0.0) for fold in ("F1", "F2", "F3")}
     candidate = {fold: _report(1.0) for fold in ("F1", "F2", "F3")}
+    for fold in ("F1", "F2", "F3"):
+        baseline[fold]["input_hashes"]["pathwise_scores_0"] = "baseline"
+        candidate[fold]["input_hashes"]["pathwise_scores_0"] = "candidate"
     paired = _paired_readouts(candidate, baseline)
     assert set(paired["pooled"]) == {
         "residual_ic",

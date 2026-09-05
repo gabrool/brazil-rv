@@ -390,6 +390,7 @@ def _paired_readouts(
                 if left_report["input_hashes"].get(key)
                 != right_report["input_hashes"].get(key)
                 and key != "scores"
+                and not key.startswith("pathwise_scores_")
             }
             if differing:
                 raise ValueError(
@@ -922,6 +923,18 @@ def _existing_score_and_evaluation_record(root: Path) -> dict[str, object]:
             or sha256_file(path) != raw_record["sha256"]
         ):
             raise ValueError(f"registered score artifact hash mismatch: {path}")
+    metadata = manifest.get("metadata")
+    if isinstance(metadata, Mapping) and isinstance(metadata.get("models"), Mapping):
+        for raw_model in metadata["models"].values():
+            if not isinstance(raw_model, Mapping):
+                raise ValueError(f"malformed model record: {manifest_path}")
+            model_manifest = Path(str(raw_model["manifest"])).resolve(strict=True)
+            expected = str(raw_model["manifest_sha256"])
+            restored = MultiHorizonGBDT.load(
+                model_manifest.parent,
+                expected_manifest_sha256=expected,
+            )
+            del restored
     _evaluation_from_path(evaluation_path)
     return {
         "score_manifest": str(manifest_path),
@@ -931,8 +944,8 @@ def _existing_score_and_evaluation_record(root: Path) -> dict[str, object]:
     }
 
 
-def recover_round1_result(*, output_root: Path) -> str:
-    """Serialize completed Round-1 artifacts after a reporting-only failure."""
+def resume_round1(*, output_root: Path, num_threads: int) -> str:
+    """Reuse complete candidates and score only registered candidates still absent."""
     output = output_root.resolve(strict=True)
     result_path = output / "round1_result.json"
     if result_path.exists():
@@ -945,6 +958,38 @@ def recover_round1_result(*, output_root: Path) -> str:
     ):
         raise ValueError("Round-1 root is not a frozen registered design")
     recovery_code = _git_identity()
+    if num_threads != design.get("gbdt_num_threads"):
+        raise ValueError("Round-1 thread setting differs from the frozen design")
+
+    store_root = Path(str(design["store"]["root"]))
+    if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
+        raise ValueError("Round-1 store manifest hash mismatch")
+    _, dates = _read_store_header(store_root)
+    fit, selection, _ = _fold_indices(dates)
+    pretrain = _pretrain_indices(dates)
+    cdi_design = design["cdi"]
+    cdi, cdi_provenance = _load_development_cdi(
+        dates=dates,
+        cdi_path=Path(str(cdi_design["development_extension"]["path"])),
+        expected_sha256=str(cdi_design["development_extension"]["sha256"]),
+        experiment52_cdi_path=Path(str(cdi_design["experiment52_reference"]["path"])),
+        experiment52_expected_sha256=str(
+            cdi_design["experiment52_reference"]["sha256"]
+        ),
+    )
+    store, access = _open_round_store(store_root, fit, selection, pretrain)
+    source_hashes = {
+        "v2_store_manifest": str(design["store"]["manifest_sha256"]),
+        "cdi_development_extension": str(
+            cdi_provenance["development_extension"]["sha256"]
+        ),
+        "cdi_experiment52_reference": str(
+            cdi_provenance["experiment52_reference"]["sha256"]
+        ),
+        "preregistration": str(design["preregistration"]["sha256"]),
+    }
+    reused_candidates = ["all_naive_baselines"]
+    scored_candidates: list[str] = []
 
     baseline_reports: dict[str, dict[str, dict[str, object]]] = {}
     baseline_records: dict[str, dict[str, object]] = {}
@@ -969,12 +1014,35 @@ def recover_round1_result(*, output_root: Path) -> str:
     kept: list[str] = []
     previous: str | None = None
     for rung in RUNG_GROUPS:
-        reports: dict[str, dict[str, object]] = {}
-        records: dict[str, object] = {}
-        for fold in ("F1", "F2", "F3"):
-            root = output / "gbdt_ladder" / rung / fold
-            reports[fold] = _evaluation_from_path(root / "evaluation.json")
-            records[fold] = _existing_score_and_evaluation_record(root)
+        candidate_root = output / "gbdt_ladder" / rung
+        completed = tuple(
+            (candidate_root / fold / "evaluation.json").is_file()
+            for fold in ("F1", "F2", "F3")
+        )
+        if all(completed):
+            reports = {}
+            records = {}
+            for fold in ("F1", "F2", "F3"):
+                root = candidate_root / fold
+                reports[fold] = _evaluation_from_path(root / "evaluation.json")
+                records[fold] = _existing_score_and_evaluation_record(root)
+            reused_candidates.append(f"gbdt_ladder/{rung}")
+        elif any(completed) or candidate_root.exists():
+            raise ValueError(f"refusing to resume partial registered candidate: {rung}")
+        else:
+            reports, records = _run_gbdt_candidate(
+                store=store,
+                rung=rung,
+                fit=fit,
+                selection=selection,
+                pretrain=None,
+                decay_half_life=None,
+                cdi=cdi,
+                source_hashes=source_hashes,
+                root=candidate_root,
+                num_threads=num_threads,
+            )
+            scored_candidates.append(f"gbdt_ladder/{rung}")
         rung_reports[rung] = reports
         rung_records[rung] = records
         rung_summaries[rung] = _pooled_readouts(reports)
@@ -1006,12 +1074,38 @@ def recover_round1_result(*, output_root: Path) -> str:
     }
     span_records: dict[str, object] = {"fine_only": rung_records[parent]}
     for arm in ("pretrain_uniform", "pretrain_decay_756"):
-        reports = {}
-        records = {}
-        for fold in ("F1", "F2", "F3"):
-            root = output / "gbdt_data_span" / arm / fold
-            reports[fold] = _evaluation_from_path(root / "evaluation.json")
-            records[fold] = _existing_score_and_evaluation_record(root)
+        candidate_root = output / "gbdt_data_span" / arm
+        completed = tuple(
+            (candidate_root / fold / "evaluation.json").is_file()
+            for fold in ("F1", "F2", "F3")
+        )
+        if all(completed):
+            reports = {}
+            records = {}
+            for fold in ("F1", "F2", "F3"):
+                root = candidate_root / fold
+                reports[fold] = _evaluation_from_path(root / "evaluation.json")
+                records[fold] = _existing_score_and_evaluation_record(root)
+            reused_candidates.append(f"gbdt_data_span/{arm}")
+        elif any(completed) or candidate_root.exists():
+            raise ValueError(
+                f"refusing to resume partial registered data-span candidate: {arm}"
+            )
+        else:
+            decay = None if arm == "pretrain_uniform" else 756.0
+            reports, records = _run_gbdt_candidate(
+                store=store,
+                rung=parent,
+                fit=fit,
+                selection=selection,
+                pretrain=pretrain,
+                decay_half_life=decay,
+                cdi=cdi,
+                source_hashes=source_hashes,
+                root=candidate_root,
+                num_threads=num_threads,
+            )
+            scored_candidates.append(f"gbdt_data_span/{arm}")
         span_reports[arm] = reports
         span_records[arm] = records
     span_summaries = {
@@ -1023,23 +1117,7 @@ def recover_round1_result(*, output_root: Path) -> str:
         if arm != "fine_only"
     }
 
-    store_root = Path(str(design["store"]["root"]))
-    _, dates = _read_store_header(store_root)
-    fit, selection, _ = _fold_indices(dates)
-    store, access = _open_round_store(
-        store_root, fit, selection, _pretrain_indices(dates)
-    )
     store.close()
-    source_hashes = {
-        "v2_store_manifest": str(design["store"]["manifest_sha256"]),
-        "cdi_development_extension": str(
-            design["cdi"]["development_extension"]["sha256"]
-        ),
-        "cdi_experiment52_reference": str(
-            design["cdi"]["experiment52_reference"]["sha256"]
-        ),
-        "preregistration": str(design["preregistration"]["sha256"]),
-    }
     result = {
         "schema": ROUND1_SCHEMA,
         "status": "completed",
@@ -1053,11 +1131,14 @@ def recover_round1_result(*, output_root: Path) -> str:
         "score_implementation": design["implementation"],
         "reporting_recovery": {
             "scope": (
-                "serialize undefined zero-support readouts as JSON null; all score, "
-                "model, and evaluation artifacts were hash-verified and reused without "
-                "recomputation"
+                "ignore prediction-specific hashes in paired-input identity, serialize "
+                "undefined zero-support readouts as JSON null, hash-verify and reuse "
+                "complete candidates, and score only registered candidates still absent"
             ),
             "implementation": recovery_code,
+            "reused_candidates": reused_candidates,
+            "scored_candidates": scored_candidates,
+            "result_changing_retry": False,
         },
         "store_access": access,
         "sources": source_hashes,
@@ -1874,8 +1955,9 @@ def _parser() -> argparse.ArgumentParser:
     run = commands.add_parser("run-round1")
     run.add_argument("--output-root", type=Path, required=True)
     run.add_argument("--num-threads", type=int, default=0)
-    recover = commands.add_parser("recover-round1-result")
-    recover.add_argument("--output-root", type=Path, required=True)
+    resume = commands.add_parser("resume-round1")
+    resume.add_argument("--output-root", type=Path, required=True)
+    resume.add_argument("--num-threads", type=int, default=0)
     seal = commands.add_parser("seal-root")
     seal.add_argument("--root", type=Path, required=True)
     seal.add_argument("--stdout-log", type=Path)
@@ -1917,8 +1999,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_root=arguments.output_root,
             num_threads=arguments.num_threads,
         )
-    elif arguments.command == "recover-round1-result":
-        digest = recover_round1_result(output_root=arguments.output_root)
+    elif arguments.command == "resume-round1":
+        digest = resume_round1(
+            output_root=arguments.output_root,
+            num_threads=arguments.num_threads,
+        )
     elif arguments.command == "freeze-round2":
         digest = freeze_round2(
             round1_root=arguments.round1_root,
