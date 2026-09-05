@@ -64,6 +64,17 @@ def test_folded_bootstrap_never_crosses_fold_boundaries() -> None:
     assert result["finite_observations"] == 50
 
 
+def test_folded_bootstrap_records_undefined_readout_as_null() -> None:
+    result = _folded_bootstrap(
+        (np.full(25, np.nan), np.full(25, np.nan)),
+        replications=100,
+    )
+    assert result["estimate"] is None
+    assert result["lower_95"] is None
+    assert result["upper_95"] is None
+    assert result["finite_observations"] == 0
+
+
 def test_paired_readouts_cover_all_registered_families() -> None:
     baseline = {fold: _report(0.0) for fold in ("F1", "F2", "F3")}
     candidate = {fold: _report(1.0) for fold in ("F1", "F2", "F3")}

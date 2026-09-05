@@ -302,13 +302,24 @@ def _folded_bootstrap(
     *,
     replications: int = BOOTSTRAP_REPLICATIONS,
     seed: int = BOOTSTRAP_SEED,
-) -> dict[str, float | int]:
+) -> dict[str, float | int | None]:
     arrays = tuple(np.asarray(value, dtype=np.float64) for value in values)
     if not arrays or any(
         value.ndim != 1 or len(value) < BOOTSTRAP_BLOCK for value in arrays
     ):
         raise ValueError("each fold needs at least one bootstrap block")
     finite = np.concatenate(arrays)
+    finite_observations = int(np.isfinite(finite).sum())
+    if finite_observations == 0:
+        return {
+            "estimate": None,
+            "lower_95": None,
+            "upper_95": None,
+            "finite_observations": 0,
+            "replications": replications,
+            "block_length_sessions": BOOTSTRAP_BLOCK,
+            "fold_boundary_preserved": True,
+        }
     estimate = float(np.nanmean(finite))
     generator = np.random.default_rng(seed)
     sums = np.zeros(replications, dtype=np.float64)
@@ -331,7 +342,7 @@ def _folded_bootstrap(
         "estimate": estimate,
         "lower_95": float(np.nanquantile(draws, 0.025)),
         "upper_95": float(np.nanquantile(draws, 0.975)),
-        "finite_observations": int(np.isfinite(finite).sum()),
+        "finite_observations": finite_observations,
         "replications": replications,
         "block_length_sessions": BOOTSTRAP_BLOCK,
         "fold_boundary_preserved": True,
@@ -886,6 +897,198 @@ def run_round1(
         return write_json_atomic(output / "round1_result.json", result)
     finally:
         store.close()
+
+
+def _existing_score_and_evaluation_record(root: Path) -> dict[str, object]:
+    manifest_path = root / "score_manifest.json"
+    evaluation_path = root / "evaluation.json"
+    manifest = _read_json(manifest_path)
+    _assert_false_access(manifest, path=manifest_path)
+    if (
+        manifest.get("schema") != "BRAZIL_RV_V2_RESEARCH_SCORE_V1"
+        or manifest.get("status") != "completed"
+    ):
+        raise ValueError(f"incomplete registered score artifact: {root}")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, Mapping):
+        raise ValueError(f"score manifest lacks artifacts: {manifest_path}")
+    for name, raw_record in artifacts.items():
+        if not isinstance(name, str) or not isinstance(raw_record, Mapping):
+            raise ValueError(f"malformed score artifact record: {manifest_path}")
+        path = root / name
+        if (
+            not path.is_file()
+            or path.stat().st_size != int(raw_record["bytes"])
+            or sha256_file(path) != raw_record["sha256"]
+        ):
+            raise ValueError(f"registered score artifact hash mismatch: {path}")
+    _evaluation_from_path(evaluation_path)
+    return {
+        "score_manifest": str(manifest_path),
+        "score_manifest_sha256": sha256_file(manifest_path),
+        "evaluation": str(evaluation_path),
+        "evaluation_sha256": sha256_file(evaluation_path),
+    }
+
+
+def recover_round1_result(*, output_root: Path) -> str:
+    """Serialize completed Round-1 artifacts after a reporting-only failure."""
+    output = output_root.resolve(strict=True)
+    result_path = output / "round1_result.json"
+    if result_path.exists():
+        raise FileExistsError(result_path)
+    design_path = output / "frozen_design.json"
+    design = _read_json(design_path)
+    if (
+        design.get("schema") != ROUND1_SCHEMA
+        or design.get("status") != "frozen_before_score"
+    ):
+        raise ValueError("Round-1 root is not a frozen registered design")
+    recovery_code = _git_identity()
+
+    baseline_reports: dict[str, dict[str, dict[str, object]]] = {}
+    baseline_records: dict[str, dict[str, object]] = {}
+    for raw_name in design["baseline_roster"]:
+        name = str(raw_name)
+        baseline_reports[name] = {}
+        baseline_records[name] = {}
+        for fold in ("F1", "F2", "F3"):
+            root = output / "baselines" / name / fold
+            baseline_reports[name][fold] = _evaluation_from_path(
+                root / "evaluation.json"
+            )
+            baseline_records[name][fold] = _existing_score_and_evaluation_record(root)
+    baseline_summary = {
+        name: _pooled_readouts(reports) for name, reports in baseline_reports.items()
+    }
+
+    rung_reports: dict[str, dict[str, dict[str, object]]] = {}
+    rung_records: dict[str, object] = {}
+    rung_summaries: dict[str, object] = {}
+    rung_comparisons: dict[str, object] = {}
+    kept: list[str] = []
+    previous: str | None = None
+    for rung in RUNG_GROUPS:
+        reports: dict[str, dict[str, object]] = {}
+        records: dict[str, object] = {}
+        for fold in ("F1", "F2", "F3"):
+            root = output / "gbdt_ladder" / rung / fold
+            reports[fold] = _evaluation_from_path(root / "evaluation.json")
+            records[fold] = _existing_score_and_evaluation_record(root)
+        rung_reports[rung] = reports
+        rung_records[rung] = records
+        rung_summaries[rung] = _pooled_readouts(reports)
+        if previous is None:
+            kept.append(rung)
+        else:
+            paired = _paired_readouts(reports, rung_reports[previous])
+            rung_comparisons[f"{rung}_minus_{previous}"] = paired
+            pooled = paired["pooled"]
+            if not (
+                float(pooled["residual_ic"]["estimate"]) < 0.0
+                and float(pooled["headline_net_excess_bps"]["estimate"]) < 0.0
+            ):
+                kept.append(rung)
+        previous = rung
+    parent = max(
+        kept,
+        key=lambda rung: (
+            float(rung_summaries[rung]["pooled"]["residual_ic"]["estimate"]),
+            float(
+                rung_summaries[rung]["pooled"]["headline_net_excess_bps"]["estimate"]
+            ),
+            -list(RUNG_GROUPS).index(rung),
+        ),
+    )
+
+    span_reports: dict[str, dict[str, dict[str, object]]] = {
+        "fine_only": rung_reports[parent]
+    }
+    span_records: dict[str, object] = {"fine_only": rung_records[parent]}
+    for arm in ("pretrain_uniform", "pretrain_decay_756"):
+        reports = {}
+        records = {}
+        for fold in ("F1", "F2", "F3"):
+            root = output / "gbdt_data_span" / arm / fold
+            reports[fold] = _evaluation_from_path(root / "evaluation.json")
+            records[fold] = _existing_score_and_evaluation_record(root)
+        span_reports[arm] = reports
+        span_records[arm] = records
+    span_summaries = {
+        arm: _pooled_readouts(reports) for arm, reports in span_reports.items()
+    }
+    span_comparisons = {
+        f"{arm}_minus_fine_only": _paired_readouts(reports, span_reports["fine_only"])
+        for arm, reports in span_reports.items()
+        if arm != "fine_only"
+    }
+
+    store_root = Path(str(design["store"]["root"]))
+    _, dates = _read_store_header(store_root)
+    fit, selection, _ = _fold_indices(dates)
+    store, access = _open_round_store(
+        store_root, fit, selection, _pretrain_indices(dates)
+    )
+    store.close()
+    source_hashes = {
+        "v2_store_manifest": str(design["store"]["manifest_sha256"]),
+        "cdi_development_extension": str(
+            design["cdi"]["development_extension"]["sha256"]
+        ),
+        "cdi_experiment52_reference": str(
+            design["cdi"]["experiment52_reference"]["sha256"]
+        ),
+        "preregistration": str(design["preregistration"]["sha256"]),
+    }
+    result = {
+        "schema": ROUND1_SCHEMA,
+        "status": "completed",
+        **RESEARCH_FLAGS,
+        "completed_at_utc": _utc_now(),
+        "frozen_design": {
+            "path": str(design_path),
+            "sha256": sha256_file(design_path),
+        },
+        "implementation": recovery_code,
+        "score_implementation": design["implementation"],
+        "reporting_recovery": {
+            "scope": (
+                "serialize undefined zero-support readouts as JSON null; all score, "
+                "model, and evaluation artifacts were hash-verified and reused without "
+                "recomputation"
+            ),
+            "implementation": recovery_code,
+        },
+        "store_access": access,
+        "sources": source_hashes,
+        "baselines": {"artifacts": baseline_records, "readouts": baseline_summary},
+        "gbdt_ladder": {
+            "artifacts": rung_records,
+            "readouts": rung_summaries,
+            "paired_deltas": rung_comparisons,
+            "kept_rungs": kept,
+            "parent_rung": parent,
+            "preference_rule": (
+                "keep a rung if pooled-IC delta is positive with an interval mostly "
+                "above zero OR headline net excess improves; drop a rung that worsens "
+                "both; keep ambiguous rungs; parent is best kept pooled IC with "
+                "economics as tie-break"
+            ),
+        },
+        "gbdt_data_span_preview": {
+            "artifacts": span_records,
+            "readouts": span_summaries,
+            "paired_deltas": span_comparisons,
+            "decision_weight": "informational_only",
+        },
+        "operational_events": [
+            {
+                "event": "round1_reporting_recovered_from_completed_artifacts",
+                "at_utc": _utc_now(),
+            }
+        ],
+    }
+    return write_json_atomic(result_path, result)
 
 
 def _verify_sealed_root(root: Path, *, expected_schema: str) -> dict[str, object]:
@@ -1671,6 +1874,8 @@ def _parser() -> argparse.ArgumentParser:
     run = commands.add_parser("run-round1")
     run.add_argument("--output-root", type=Path, required=True)
     run.add_argument("--num-threads", type=int, default=0)
+    recover = commands.add_parser("recover-round1-result")
+    recover.add_argument("--output-root", type=Path, required=True)
     seal = commands.add_parser("seal-root")
     seal.add_argument("--root", type=Path, required=True)
     seal.add_argument("--stdout-log", type=Path)
@@ -1712,6 +1917,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_root=arguments.output_root,
             num_threads=arguments.num_threads,
         )
+    elif arguments.command == "recover-round1-result":
+        digest = recover_round1_result(output_root=arguments.output_root)
     elif arguments.command == "freeze-round2":
         digest = freeze_round2(
             round1_root=arguments.round1_root,
