@@ -349,6 +349,46 @@ def _folded_bootstrap(
     }
 
 
+def _readout_point(readout: Mapping[str, object]) -> float | None:
+    value = readout.get("estimate")
+    return None if value is None else float(value)
+
+
+def _ranking_point(readout: Mapping[str, object]) -> float:
+    value = _readout_point(readout)
+    return -math.inf if value is None else value
+
+
+def _point_is_negative(readout: Mapping[str, object]) -> bool:
+    value = _readout_point(readout)
+    return value is not None and value < 0.0
+
+
+def _economics_not_worse(
+    candidate: Mapping[str, object], baseline: Mapping[str, object]
+) -> bool:
+    candidate_value = _readout_point(candidate)
+    baseline_value = _readout_point(baseline)
+    return (
+        candidate_value is None
+        or baseline_value is None
+        or candidate_value >= baseline_value
+    )
+
+
+def _small_interval_spanning_zero(readout: Mapping[str, object]) -> bool:
+    estimate = _readout_point(readout)
+    lower = readout.get("lower_95")
+    upper = readout.get("upper_95")
+    return (
+        estimate is not None
+        and lower is not None
+        and upper is not None
+        and estimate <= 0.002
+        and float(lower) <= 0.0 <= float(upper)
+    )
+
+
 def _pooled_readouts(reports: Mapping[str, Mapping[str, object]]) -> dict[str, object]:
     if tuple(reports) != ("F1", "F2", "F3"):
         raise ValueError("pooled report roster must be F1/F2/F3")
@@ -815,8 +855,8 @@ def run_round1(
                 rung_comparisons[f"{rung}_minus_{previous}"] = paired
                 pooled = paired["pooled"]
                 if not (
-                    pooled["residual_ic"]["estimate"] < 0.0
-                    and pooled["headline_net_excess_bps"]["estimate"] < 0.0
+                    _point_is_negative(pooled["residual_ic"])
+                    and _point_is_negative(pooled["headline_net_excess_bps"])
                 ):
                     kept.append(rung)
             previous = rung
@@ -824,8 +864,10 @@ def run_round1(
         parent = max(
             kept,
             key=lambda rung: (
-                rung_summaries[rung]["pooled"]["residual_ic"]["estimate"],
-                rung_summaries[rung]["pooled"]["headline_net_excess_bps"]["estimate"],
+                _ranking_point(rung_summaries[rung]["pooled"]["residual_ic"]),
+                _ranking_point(
+                    rung_summaries[rung]["pooled"]["headline_net_excess_bps"]
+                ),
                 -list(RUNG_GROUPS).index(rung),
             ),
         )
@@ -1053,18 +1095,16 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             rung_comparisons[f"{rung}_minus_{previous}"] = paired
             pooled = paired["pooled"]
             if not (
-                float(pooled["residual_ic"]["estimate"]) < 0.0
-                and float(pooled["headline_net_excess_bps"]["estimate"]) < 0.0
+                _point_is_negative(pooled["residual_ic"])
+                and _point_is_negative(pooled["headline_net_excess_bps"])
             ):
                 kept.append(rung)
         previous = rung
     parent = max(
         kept,
         key=lambda rung: (
-            float(rung_summaries[rung]["pooled"]["residual_ic"]["estimate"]),
-            float(
-                rung_summaries[rung]["pooled"]["headline_net_excess_bps"]["estimate"]
-            ),
+            _ranking_point(rung_summaries[rung]["pooled"]["residual_ic"]),
+            _ranking_point(rung_summaries[rung]["pooled"]["headline_net_excess_bps"]),
             -list(RUNG_GROUPS).index(rung),
         ),
     )
@@ -1692,20 +1732,15 @@ def finalize_round2(*, output_root: Path) -> str:
             "C_minus_A": _paired_readouts(arm_reports["arm_C"], arm_reports["arm_A"]),
         }
         eligible = ["arm_A"]
-        a_economics = arm_readouts["arm_A"]["pooled"]["headline_net_excess_bps"][
-            "estimate"
-        ]
+        a_economics = arm_readouts["arm_A"]["pooled"]["headline_net_excess_bps"]
         for arm in ("arm_B", "arm_C"):
-            if (
-                arm_readouts[arm]["pooled"]["headline_net_excess_bps"]["estimate"]
-                >= a_economics
+            if _economics_not_worse(
+                arm_readouts[arm]["pooled"]["headline_net_excess_bps"],
+                a_economics,
             ):
                 eligible.append(arm)
         long_small_and_uncertain = all(
-            arm_deltas[label]["pooled"]["residual_ic"]["estimate"] <= 0.002
-            and arm_deltas[label]["pooled"]["residual_ic"]["lower_95"]
-            <= 0.0
-            <= arm_deltas[label]["pooled"]["residual_ic"]["upper_95"]
+            _small_interval_spanning_zero(arm_deltas[label]["pooled"]["residual_ic"])
             for label in ("B_minus_A", "C_minus_A")
         )
         arm_order = {"arm_A": 2, "arm_B": 1, "arm_C": 0}
@@ -1715,8 +1750,10 @@ def finalize_round2(*, output_root: Path) -> str:
             else max(
                 eligible,
                 key=lambda arm: (
-                    arm_readouts[arm]["pooled"]["residual_ic"]["estimate"],
-                    arm_readouts[arm]["pooled"]["headline_net_excess_bps"]["estimate"],
+                    _ranking_point(arm_readouts[arm]["pooled"]["residual_ic"]),
+                    _ranking_point(
+                        arm_readouts[arm]["pooled"]["headline_net_excess_bps"]
+                    ),
                     arm_order[arm],
                 ),
             )
@@ -1829,10 +1866,10 @@ def finalize_round2(*, output_root: Path) -> str:
         v2_parent = max(
             comparator_readouts,
             key=lambda name: (
-                comparator_readouts[name]["pooled"]["residual_ic"]["estimate"],
-                comparator_readouts[name]["pooled"]["headline_net_excess_bps"][
-                    "estimate"
-                ],
+                _ranking_point(comparator_readouts[name]["pooled"]["residual_ic"]),
+                _ranking_point(
+                    comparator_readouts[name]["pooled"]["headline_net_excess_bps"]
+                ),
                 parent_order[name],
             ),
         )
