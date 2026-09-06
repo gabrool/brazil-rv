@@ -6,6 +6,12 @@ This memo is intended for the authors/reviewers of
 were reconciled, what was implemented, what was intentionally changed or
 deferred, and why the result stops before new research experiments.
 
+Section 9 records the later `v2_fix_pass_4.md` continuation. That pass does
+not reverse the refactor's leakage, identity, decision-clock, or accounting
+rules. It adds two explicitly labelled development-data tiers so the model can
+eventually produce a screening number without misrepresenting inferred terms
+or a reconstructed calendar as verified source truth.
+
 The short version is:
 
 - The full multi-day refactor plan was treated as the semantic authority when
@@ -25,6 +31,10 @@ The short version is:
   repository lacks an authoritative dated B3 session schedule and several
   other sources needed to validate headline economics. Those capabilities are
   reported as `unsupported`, not silently imputed.
+- A later development-only route now exists for inferred COTAHIST/DISMES action
+  terms and a reconstructed session schedule. It remains unaccepted on real
+  data because the mandated local build could not start with only 6.45 GiB of
+  free physical memory against the fixed 10-GiB admission gate.
 - No revised development study, Section-D experiment, official-validation or
   held-out outcome read for a research decision, or deployment change was
   performed. The paid GH200 used by the superseded Round-2 run was terminated
@@ -537,7 +547,77 @@ would create unjustified infrastructure:
 test work. It should not be confused with the user's prohibited experimental
 Section D. No new experiment was run.
 
-## 8. Final verification
+## 8. Development-grade continuation (`v2_fix_pass_4.md`)
+
+Pass 4 correctly identified a contract deadlock: the verified action path
+cannot cover the historical inactive-name panel with the available sources,
+and provider timestamps fetched in 2026 cannot be backdated into historical
+decision inputs. Rather than weakening the verified contract, the
+implementation adds a separate and permanently labelled tier:
+
+- `action_terms_source=inferred_cotahist_dismes_v1` infers U1 unit changes,
+  C1 bounded market-relative cash drops, and U2 undocumented unit changes
+  uniformly from COTAHIST. Provider rows are excluded from every model array
+  and retained only for audit. Inferred rows remain `coverage_status=inferred`
+  and are never promoted to verified terms.
+- Prior price and activity windows run in cumulative unit-adjusted space, so
+  a U2 followed shortly by a DISMES change cannot create a second synthetic
+  jump. U2 keeps the specified per-trade inverse-move test, falls back to total
+  quantity only when trade counts are unavailable, and retains the exact 0.35
+  tolerance.
+- A row for session `e`, timestamped at end of session, is first available to
+  the next decision `e+1`. The daily action alignment therefore uses the next
+  session's 15:45 cutoff. The same-session intraday path remains isolated and
+  uses only its causal open-gap boundary diagnostic.
+- `schedule_source=reconstructed_v1` is generated from COTAHIST sessions with
+  at least 50 records, cross-checked against a committed ANBIMA holiday table,
+  and reconciled against an explicit zero-unexplained-exception inventory.
+  M1 cross-name modal bounds support dates from 2021-08-16; earlier dates and
+  anomalous M1 bounds use an attributed dated regime table. This is a
+  reconstructed development schedule, not an authoritative exchange claim.
+- Verified terminal status is no longer a universal build blocker. The signed
+  ledger's unresolved inventory counts/notional and last-mark plus haircut
+  scenarios are mandatory report fields. Verified auction marks and
+  executable borrow remain unsupported, so economics retain the
+  development-grade close-proxy label.
+
+The pass-4 audit extension was run against the immutable old store before any
+rebuild. Its new evidence root is
+`D:\quant-data\b3\processed\v2_development_action_audit_d42df9a_20260906T152426Z`;
+the audit SHA-256 is
+`9db65755c654b54da26dbef62ef5704ebe8e4832b7c99090cd0a0045925762df`.
+Of 272 provider rows with `|log factor| > 0.30`, 222 (81.62%) had a matching
+large COTAHIST price move within two sessions. All 222 price-corroborated rows
+had a DISMES change within two sessions. U2 matched 1.80% under the per-trade
+test and 0.45% under the total-quantity test. These figures are diagnostic by
+registration: they neither enable nor disable U2 and cannot tune its rule.
+
+Provider invariance is structural and tested: changing the provider bundle in
+the inferred tier leaves all model arrays byte-identical. The store and every
+training, checkpoint, score, evaluation, ledger, acceptance, and research
+artifact carry both source-tier labels. A separate independent native-fast
+audit re-computes all seven channels from raw M1 for exactly 20 names by 20
+sessions and is required by the development acceptance report.
+
+The revised registration is
+`research/preregistrations/v2_round1_round2_rev2.md`. The Round-1 and Round-2
+candidate roster is unchanged. Round 2 now starts with one disposable
+Arm-A/F1/seed-11, one-epoch, no-score smoke trajectory; it is never reused by a
+registered run, and Stage P cannot be planned unless that smoke passes. The
+legacy v1 fast checkpoint remains excluded from clean research; Round 2 uses
+fresh native fast weights.
+
+The completed source-tier implementation is commit
+`d42df9a61c0a45ddcd00c184c5b9e97fb9f91781`. Ruff and all 814 research tests
+passed, including the 4,348-by-933 all-family peak-RSS invariant under 8 GiB.
+No real store, development acceptance number, Round-1 candidate, Round-2
+trajectory, official-validation/test access, deployment change, or new paid
+instance followed. The local host exposed only 6.45 GiB of free physical
+memory, so the unchanged 10-GiB preflight stopped the real rebuild exactly as
+specified. Consequently the branch is pushed for review but is not merged to
+`main` and the rev2 registration remains frozen-but-unexecuted.
+
+## 9. Pre-pass-4 verification record
 
 - Final implementation commit:
   `f0cf568303715e8783e539a683568535e2232c7f`.
