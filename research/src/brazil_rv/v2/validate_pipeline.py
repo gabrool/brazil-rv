@@ -82,6 +82,14 @@ _BASELINE_SIGNAL_SIGNS = {
 _NAIVE_SIGNAL_BASELINES = tuple(
     name for name in _BASELINE_SIGNAL_SIGNS if name != "inverse_volatility_20"
 )
+_LEDGER_MASK_COVERAGE_FIELDS = frozenset(
+    {
+        "stale_mark_name_days",
+        "unresolved_action_name_days",
+        "valuation_scenario_count",
+        "actual_risk_breach_dates",
+    }
+)
 _REQUIRED_ARRAYS = frozenset(
     {
         "active",
@@ -1885,11 +1893,19 @@ def _load_prior_score_panel(
 
 
 def _non_ledger_report(report: Mapping[str, object]) -> dict[str, object]:
-    return {
+    payload = {
         key: value
         for key, value in report.items()
         if key not in {"economics", "schema"}
     }
+    coverage = payload.get("mask_coverage")
+    if isinstance(coverage, Mapping):
+        payload["mask_coverage"] = {
+            key: value
+            for key, value in coverage.items()
+            if key not in _LEDGER_MASK_COVERAGE_FIELDS
+        }
+    return payload
 
 
 def _canonical_payload_sha256(payload: object) -> str:
@@ -2452,6 +2468,12 @@ def replay_classical_economics(
         ):
             raise ValueError("evaluation economics payload is malformed")
         local_changed = _changed_field_paths(old_economics, new_economics)
+        old_coverage = old_report.get("mask_coverage")
+        new_coverage = new_result.report.get("mask_coverage")
+        if isinstance(old_coverage, Mapping) and isinstance(new_coverage, Mapping):
+            for key in _LEDGER_MASK_COVERAGE_FIELDS:
+                if old_coverage.get(key) != new_coverage.get(key):
+                    local_changed.add(f"mask_coverage.{key}")
         changed_paths.update(local_changed)
         label = (
             f"baseline:{fold}:{record.get('name')}"

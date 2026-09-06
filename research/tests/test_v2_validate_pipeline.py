@@ -1097,12 +1097,20 @@ def test_ledger_replay_comparison_excludes_only_economics_and_schema() -> None:
         "schema": "OLD",
         "metric": {"ic": 0.0123},
         "coverage": {"dates": 124},
+        "mask_coverage": {
+            "score_mask_true": 100,
+            "actual_risk_breach_dates": 2,
+        },
         "economics": {"headline": {"gross": 0.4}, "daily": [{"gross": 0.5}]},
     }
     new = {
         "schema": "NEW",
         "metric": {"ic": 0.0123},
         "coverage": {"dates": 124},
+        "mask_coverage": {
+            "score_mask_true": 100,
+            "actual_risk_breach_dates": 16,
+        },
         "economics": {"headline": {"gross": 2.0}, "daily": [{"gross": 1.9}]},
     }
 
