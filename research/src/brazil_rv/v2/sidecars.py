@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Mapping, Sequence
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
 
 from .contract import SIDECAR_FEATURES
+
+
+B3_TIMEZONE = ZoneInfo("America/Sao_Paulo")
+_PUBLICATION_ORDER_COLUMN = "__publication_order_us"
+_ROW_INDEX_COLUMN = "__row_index"
 
 
 ARCHIVE_COLUMN_MAP: dict[str, dict[str, str | None]] = {
@@ -89,10 +95,15 @@ def _available_before_decision(
             timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
         if not isinstance(timestamp, datetime):
             raise ValueError("availability timestamp has an unsupported type")
-        candidate = datetime.combine(decision_date, decision_time)
-        if timestamp.tzinfo is not None:
-            candidate = candidate.replace(tzinfo=timestamp.tzinfo)
-        return timestamp <= candidate
+        # Source archives historically stored naive CVM timestamps in B3 local
+        # time.  Aware timestamps may use any honest zone/offset; compare both
+        # instants in UTC instead of attaching the source offset to 15:45.
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=B3_TIMEZONE)
+        candidate = datetime.combine(
+            decision_date, decision_time, tzinfo=B3_TIMEZONE
+        )
+        return timestamp.astimezone(UTC) <= candidate.astimezone(UTC)
     available_date = _as_date(row.get("available_date"))
     if available_date < decision_date:
         return True
@@ -116,13 +127,13 @@ def _availability_order(row: Mapping[str, object]) -> tuple[datetime, int]:
     if isinstance(timestamp, str):
         timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
     if isinstance(timestamp, datetime):
-        if timestamp.tzinfo is not None:
-            timestamp = timestamp.replace(tzinfo=None)
-        return timestamp, int(row.get("decision_idx") or -1)
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=B3_TIMEZONE)
+        return timestamp.astimezone(UTC), int(row.get("decision_idx") or -1)
     available_date = _as_date(row["available_date"])
-    return datetime.combine(available_date, time.min), int(
-        row.get("decision_idx") if row.get("decision_idx") is not None else -1
-    )
+    return datetime.combine(available_date, time.min, tzinfo=B3_TIMEZONE).astimezone(
+        UTC
+    ), int(row.get("decision_idx") if row.get("decision_idx") is not None else -1)
 
 
 def materialize_sidecar(
@@ -289,6 +300,135 @@ def rebuild_publication_lag_validity(
     return rebuilt
 
 
+def _publication_order_expression(source: pl.DataFrame) -> pl.Expr:
+    """Return each row's publication instant as UTC microseconds.
+
+    Daily archives usually expose only ``available_date`` (and occasionally a
+    v1 ``decision_idx``).  Timestamped archives may use either a timezone-aware
+    instant or the historical naive B3-local convention.  One integer ordering
+    lets the as-of joins below remain deterministic across input order/chunks.
+    """
+
+    timestamp_expressions: list[pl.Expr] = []
+    for column in ("available_timestamp", "delivery_timestamp"):
+        if column not in source.columns:
+            continue
+        dtype = source.schema[column]
+        if not isinstance(dtype, pl.Datetime):
+            raise ValueError(f"{column} must have a Datetime dtype")
+        value = pl.col(column)
+        if dtype.time_zone is None:
+            value = value.dt.replace_time_zone(str(B3_TIMEZONE))
+        else:
+            value = value.dt.convert_time_zone("UTC")
+        timestamp_expressions.append(value.dt.convert_time_zone("UTC").dt.epoch("us"))
+
+    available_midnight = (
+        pl.col("available_date")
+        .cast(pl.Date)
+        .cast(pl.Datetime("us"))
+        .dt.replace_time_zone(str(B3_TIMEZONE))
+        .dt.convert_time_zone("UTC")
+        .dt.epoch("us")
+    )
+    if "decision_idx" in source.columns:
+        # v1 intraday coordinates start at 10:15 and advance in five-minute
+        # increments. Null retains the date-only midnight ordering.
+        intraday_offset = (
+            (pl.lit(10 * 60 + 15) + 5 * pl.col("decision_idx").cast(pl.Int64))
+            * 60
+            * 1_000_000
+        )
+        date_order = pl.when(pl.col("decision_idx").is_not_null()).then(
+            available_midnight + intraday_offset
+        ).otherwise(available_midnight)
+    else:
+        date_order = available_midnight
+    return pl.coalesce(*timestamp_expressions, date_order).cast(pl.Int64)
+
+
+def _canonical_publication_frame(source: pl.DataFrame) -> pl.DataFrame:
+    """Deduplicate exact rows and impose a publication-stable row order."""
+
+    output = source.unique(maintain_order=False).with_columns(
+        _publication_order_expression(source).alias(_PUBLICATION_ORDER_COLUMN)
+    )
+    sort_columns = ["isin", _PUBLICATION_ORDER_COLUMN, "available_date"]
+    sort_columns.extend(
+        column
+        for column in ("source_position_date", "source_trade_date", "decision_idx")
+        if column in output.columns
+    )
+    return output.sort(sort_columns, nulls_last=True).with_row_index(_ROW_INDEX_COLUMN)
+
+
+def _reject_ambiguous_vintages(
+    source: pl.DataFrame, source_date_column: str
+) -> None:
+    """Reject conflicting records at one exact publication coordinate."""
+
+    relevant = source.filter(pl.col(source_date_column).is_not_null())
+    if relevant.is_empty():
+        return
+    keys = ["isin", source_date_column, _PUBLICATION_ORDER_COLUMN]
+    ambiguous = relevant.group_by(keys).len().filter(pl.col("len") > 1)
+    if not ambiguous.is_empty():
+        preview = ambiguous.head(10).select(keys).to_dicts()
+        raise ValueError(
+            f"ambiguous {source_date_column} revisions at one publication "
+            f"coordinate: {preview}"
+        )
+
+
+def _vintage_lag_values(
+    source: pl.DataFrame,
+    calendar: tuple[date, ...],
+    *,
+    source_date_column: str,
+    value_column: str,
+    valid_column: str,
+    lag: int,
+) -> pl.DataFrame:
+    """Select an exact-session lag at the vintage known by each source row."""
+
+    prior_column = f"__prior_source_date_{lag}"
+    prior_value = f"__prior_{value_column}_{lag}"
+    prior_valid = f"__prior_{valid_column}_{lag}"
+    prior_dates = [
+        calendar[index - lag] if index >= lag else None
+        for index in range(len(calendar))
+    ]
+    calendar_lookup = pl.DataFrame(
+        {
+            source_date_column: calendar,
+            prior_column: prior_dates,
+        },
+        schema_overrides={source_date_column: pl.Date, prior_column: pl.Date},
+    )
+    left = source.join(calendar_lookup, on=source_date_column, how="left")
+    right = source.select(
+        "isin",
+        pl.col(source_date_column).alias("__candidate_source_date"),
+        pl.col(_PUBLICATION_ORDER_COLUMN).alias("__candidate_publication_order"),
+        pl.col(value_column).alias(prior_value),
+        pl.col(valid_column).alias(prior_valid),
+    )
+    selected = left.sort(_PUBLICATION_ORDER_COLUMN).join_asof(
+        right.sort("__candidate_publication_order"),
+        left_on=_PUBLICATION_ORDER_COLUMN,
+        right_on="__candidate_publication_order",
+        by_left=["isin", prior_column],
+        by_right=["isin", "__candidate_source_date"],
+        strategy="backward",
+        check_sortedness=False,
+    )
+    return selected.select(
+        _ROW_INDEX_COLUMN,
+        pl.col(prior_value).fill_null(0.0),
+        pl.col(prior_valid).fill_null(False),
+    )
+
+
 def _raw_lending_features(
     source: pl.DataFrame,
     dates: Sequence[date | np.datetime64],
@@ -311,124 +451,225 @@ def _raw_lending_features(
     if not has_balance and not has_rate:
         return source
     calendar = tuple(_as_date(value) for value in dates)
-    date_lookup = {value: index for index, value in enumerate(calendar)}
-    isin_lookup = {value: index for index, value in enumerate(isins)}
     volume = np.asarray(daily_volume_brl, dtype=np.float64)
     if volume.shape != (len(calendar), len(isins)):
         raise ValueError("daily BRL volume is misaligned with lending axes")
+
+    balance_derived_columns = {
+        "loan_balance_to_volume_20",
+        "loan_balance_to_volume_20_mask",
+        "loan_balance_change_1",
+        "loan_balance_change_1_mask",
+        "loan_balance_change_5",
+        "loan_balance_change_5_mask",
+    }
+    rate_derived_columns = {
+        "loan_rate",
+        "loan_rate_mask",
+        "loan_rate_change_5",
+        "loan_rate_change_5_mask",
+    }
+    derived_columns = (
+        (balance_derived_columns if has_balance else set())
+        | (rate_derived_columns if has_rate else set())
+    )
+    output = _canonical_publication_frame(
+        source.drop(
+            [column for column in derived_columns if column in source.columns]
+        )
+    )
+    calendar_positions = pl.DataFrame(
+        {
+            "__calendar_date": calendar,
+            "__day_index": np.arange(len(calendar), dtype=np.int32),
+        },
+        schema_overrides={"__calendar_date": pl.Date},
+    )
+    name_positions = pl.DataFrame(
+        {
+            "isin": list(isins),
+            "__name_index": np.arange(len(isins), dtype=np.int32),
+        }
+    )
+
     volume_observed = np.isfinite(volume)
     first_observed = np.full(len(isins), len(calendar), dtype=np.int64)
     observed_names = volume_observed.any(axis=0)
     first_observed[observed_names] = np.argmax(
         volume_observed[:, observed_names], axis=0
     )
-    levels: dict[tuple[str, date], tuple[float, bool]] = {}
-    rates: dict[tuple[str, date], tuple[float, bool]] = {}
-    output_rows: list[dict[str, object]] = []
-    for row in source.iter_rows(named=True):
-        isin = str(row["isin"])
-        output = dict(row)
-        if has_balance:
-            output.update(
-                {
-                    "loan_balance_to_volume_20": 0.0,
-                    "loan_balance_to_volume_20_mask": False,
-                    "loan_balance_change_1": 0.0,
-                    "loan_balance_change_1_mask": False,
-                    "loan_balance_change_5": 0.0,
-                    "loan_balance_change_5_mask": False,
-                }
+
+    if has_balance:
+        _reject_ambiguous_vintages(output, "source_position_date")
+        balance = (
+            output.filter(pl.col("source_position_date").is_not_null())
+            .join(
+                calendar_positions,
+                left_on="source_position_date",
+                right_on="__calendar_date",
+                how="left",
             )
-        if has_rate:
-            output.update(
-                {
-                    "loan_rate": 0.0,
-                    "loan_rate_mask": False,
-                    "loan_rate_change_5": 0.0,
-                    "loan_rate_change_5_mask": False,
-                }
+            .join(name_positions, on="isin", how="left")
+        )
+        zero_volume = np.where(volume_observed, volume, 0.0)
+        rolling_volume = np.zeros_like(volume, dtype=np.float64)
+        if len(calendar) >= 20:
+            volume_windows = np.lib.stride_tricks.sliding_window_view(
+                zero_volume, 20, axis=0
             )
-        source_position = row.get("source_position_date")
-        if has_balance and source_position is not None:
-            source_date = _as_date(source_position)
-            day = date_lookup.get(source_date)
-            name = isin_lookup.get(isin)
-            balance = row.get("lending_balance_brl")
-            valid = (
-                day is not None
-                and name is not None
-                and day - 19 >= first_observed[name]
+            rolling_volume[19:] = np.mean(
+                volume_windows, axis=-1, dtype=np.float64
             )
-            mean_volume = np.nan
-            if valid:
-                history = volume[day - 19 : day + 1, name]
-                # A non-trading name-day is an economic zero in the exact
-                # calendar window. Negative recorded volume is invalid.
-                valid = bool(np.all(~np.isfinite(history) | (history >= 0.0)))
-                mean_volume = (
-                    float(np.mean(np.where(np.isfinite(history), history, 0.0)))
-                    if valid
-                    else np.nan
-                )
-                valid &= (
-                    balance is not None
-                    and np.isfinite(float(balance))
-                    and float(balance) >= 0.0
-                    and np.isfinite(mean_volume)
-                    and mean_volume > 0.0
-                )
-            level = float(balance) / mean_volume if valid else 0.0
-            levels[(isin, source_date)] = (level, valid)
-            output["loan_balance_to_volume_20"] = level
-            output["loan_balance_to_volume_20_mask"] = valid
-        source_trade = row.get("source_trade_date")
-        transformed = row.get("lending_taker_fee_level_log_tanh")
-        transformed_mask = row.get("lending_taker_fee_level_log_tanh_mask")
-        if has_rate and source_trade is not None:
-            source_date = _as_date(source_trade)
-            valid = (
-                transformed is not None
-                and transformed_mask is not False
-                and np.isfinite(float(transformed))
-                and abs(float(transformed)) < 1.0
+        negative = np.isfinite(volume) & (volume < 0.0)
+        rolling_negative = np.zeros(volume.shape, dtype=np.bool_)
+        if len(calendar) >= 20:
+            negative_windows = np.lib.stride_tricks.sliding_window_view(
+                negative, 20, axis=0
             )
-            rate = (
-                float(np.expm1(2.0 * np.arctanh(float(transformed)))) if valid else 0.0
+            rolling_negative[19:] = np.any(negative_windows, axis=-1)
+
+        day_index = (
+            balance.get_column("__day_index").fill_null(-1).to_numpy().astype(np.int64)
+        )
+        name_index = (
+            balance.get_column("__name_index")
+            .fill_null(-1)
+            .to_numpy()
+            .astype(np.int64)
+        )
+        safe_day = np.clip(day_index, 0, max(len(calendar) - 1, 0))
+        safe_name = np.clip(name_index, 0, max(len(isins) - 1, 0))
+        mean_volume = rolling_volume[safe_day, safe_name]
+        has_negative = rolling_negative[safe_day, safe_name]
+        balance_value = (
+            balance.get_column("lending_balance_brl")
+            .cast(pl.Float64)
+            .fill_null(np.nan)
+            .to_numpy()
+        )
+        level_valid = (
+            (day_index >= 19)
+            & (name_index >= 0)
+            & ((day_index - 19) >= first_observed[safe_name])
+            & ~has_negative
+            & np.isfinite(balance_value)
+            & (balance_value >= 0.0)
+            & np.isfinite(mean_volume)
+            & (mean_volume > 0.0)
+        )
+        level = np.zeros(balance.height, dtype=np.float64)
+        level[level_valid] = balance_value[level_valid] / mean_volume[level_valid]
+        balance = balance.with_columns(
+            pl.Series("loan_balance_to_volume_20", level),
+            pl.Series("loan_balance_to_volume_20_mask", level_valid),
+        )
+        for lag in (1, 5):
+            prior = _vintage_lag_values(
+                balance,
+                calendar,
+                source_date_column="source_position_date",
+                value_column="loan_balance_to_volume_20",
+                valid_column="loan_balance_to_volume_20_mask",
+                lag=lag,
             )
-            valid &= np.isfinite(rate) and rate >= 0.0
-            rates[(isin, source_date)] = (rate, valid)
-            output["loan_rate"] = rate if valid else 0.0
-            output["loan_rate_mask"] = valid
-        output_rows.append(output)
-    for row in output_rows:
-        source_position = row.get("source_position_date")
-        if source_position is not None:
-            source_date = _as_date(source_position)
-            day = date_lookup.get(source_date)
-            current = levels.get((row["isin"], source_date), (0.0, False))
-            for lag in (1, 5):
-                prior_date = (
-                    calendar[day - lag] if day is not None and day >= lag else None
-                )
-                prior = levels.get((row["isin"], prior_date), (0.0, False))
-                valid = current[1] and prior[1]
-                feature = f"loan_balance_change_{lag}"
-                row[feature] = current[0] - prior[0] if valid else 0.0
-                row[f"{feature}_mask"] = valid
-        source_trade = row.get("source_trade_date")
-        if source_trade is not None:
-            source_date = _as_date(source_trade)
-            day = date_lookup.get(source_date)
-            prior_date = calendar[day - 5] if day is not None and day >= 5 else None
-            current = rates.get((row["isin"], source_date), (0.0, False))
-            prior = rates.get((row["isin"], prior_date), (0.0, False))
-            valid = current[1] and prior[1]
-            row["loan_rate_change_5"] = current[0] - prior[0] if valid else 0.0
-            row["loan_rate_change_5_mask"] = valid
+            balance = balance.join(prior, on=_ROW_INDEX_COLUMN, how="left")
+            feature = f"loan_balance_change_{lag}"
+            prior_value = f"__prior_loan_balance_to_volume_20_{lag}"
+            prior_valid = f"__prior_loan_balance_to_volume_20_mask_{lag}"
+            valid = pl.col("loan_balance_to_volume_20_mask") & pl.col(prior_valid)
+            balance = balance.with_columns(
+                pl.when(valid)
+                .then(pl.col("loan_balance_to_volume_20") - pl.col(prior_value))
+                .otherwise(0.0)
+                .alias(feature),
+                valid.alias(f"{feature}_mask"),
+            ).drop(prior_value, prior_valid)
+        output = output.join(
+            balance.select(
+                _ROW_INDEX_COLUMN,
+                "loan_balance_to_volume_20",
+                "loan_balance_to_volume_20_mask",
+                "loan_balance_change_1",
+                "loan_balance_change_1_mask",
+                "loan_balance_change_5",
+                "loan_balance_change_5_mask",
+            ),
+            on=_ROW_INDEX_COLUMN,
+            how="left",
+        )
+
+    if has_rate:
+        _reject_ambiguous_vintages(output, "source_trade_date")
+        rate = output.filter(pl.col("source_trade_date").is_not_null())
+        transformed = (
+            rate.get_column("lending_taker_fee_level_log_tanh")
+            .cast(pl.Float64)
+            .fill_null(np.nan)
+            .to_numpy()
+        )
+        if "lending_taker_fee_level_log_tanh_mask" in rate.columns:
+            rate_mask = (
+                rate.get_column("lending_taker_fee_level_log_tanh_mask")
+                .fill_null(True)
+                .to_numpy()
+            )
+        else:
+            rate_mask = np.ones(rate.height, dtype=np.bool_)
+        rate_valid = rate_mask & np.isfinite(transformed) & (np.abs(transformed) < 1.0)
+        raw_rate = np.zeros(rate.height, dtype=np.float64)
+        raw_rate[rate_valid] = np.expm1(2.0 * np.arctanh(transformed[rate_valid]))
+        rate_valid &= np.isfinite(raw_rate) & (raw_rate >= 0.0)
+        raw_rate[~rate_valid] = 0.0
+        rate = rate.with_columns(
+            pl.Series("loan_rate", raw_rate),
+            pl.Series("loan_rate_mask", rate_valid),
+        )
+        prior = _vintage_lag_values(
+            rate,
+            calendar,
+            source_date_column="source_trade_date",
+            value_column="loan_rate",
+            valid_column="loan_rate_mask",
+            lag=5,
+        )
+        rate = rate.join(prior, on=_ROW_INDEX_COLUMN, how="left")
+        valid = pl.col("loan_rate_mask") & pl.col("__prior_loan_rate_mask_5")
+        rate = rate.with_columns(
+            pl.when(valid)
+            .then(pl.col("loan_rate") - pl.col("__prior_loan_rate_5"))
+            .otherwise(0.0)
+            .alias("loan_rate_change_5"),
+            valid.alias("loan_rate_change_5_mask"),
+        )
+        output = output.join(
+            rate.select(
+                _ROW_INDEX_COLUMN,
+                "loan_rate",
+                "loan_rate_mask",
+                "loan_rate_change_5",
+                "loan_rate_change_5_mask",
+            ),
+            on=_ROW_INDEX_COLUMN,
+            how="left",
+        )
+
+    value_columns = sorted(
+        column for column in derived_columns if not column.endswith("_mask")
+    )
+    mask_columns = sorted(column for column in derived_columns if column.endswith("_mask"))
+    for column in value_columns:
+        if column not in output.columns:
+            output = output.with_columns(pl.lit(0.0).alias(column))
+    for column in mask_columns:
+        if column not in output.columns:
+            output = output.with_columns(pl.lit(False).alias(column))
     return (
-        pl.DataFrame(output_rows, infer_schema_length=None)
-        if output_rows
-        else pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
+        output.with_columns(
+            *(pl.col(column).fill_null(0.0).cast(pl.Float64) for column in value_columns),
+            *(pl.col(column).fill_null(False).cast(pl.Boolean) for column in mask_columns),
+        )
+        .sort(_ROW_INDEX_COLUMN)
+        .drop(_ROW_INDEX_COLUMN, _PUBLICATION_ORDER_COLUMN)
     )
 
 
@@ -484,33 +725,106 @@ def _raw_events_features(
     required = {"available_date", "isin", "event_itr_dfp_recent_5s"}
     if not required.issubset(source.columns):
         return source
-    rows = list(source.sort("isin", "available_date").iter_rows(named=True))
-    prior_recent: dict[str, bool] = {}
-    last_event: dict[str, date] = {}
-    session_position = {_as_date(value): index for index, value in enumerate(dates)}
-    for row in rows:
-        isin = str(row["isin"])
-        current_date = _as_date(row["available_date"])
-        recent_value = row.get("event_itr_dfp_recent_5s")
-        recent = recent_value is not None and float(recent_value) > 0.5
-        recent_mask = row.get("event_itr_dfp_recent_5s_mask") is not False
-        if recent_mask and recent and not prior_recent.get(isin, False):
-            last_event[isin] = current_date
-        previous = last_event.get(isin)
-        valid = (
-            previous is not None
-            and current_date in session_position
-            and previous in session_position
+    output = _canonical_publication_frame(source)
+    ambiguous = (
+        output.group_by("isin", _PUBLICATION_ORDER_COLUMN)
+        .len()
+        .filter(pl.col("len") > 1)
+    )
+    if not ambiguous.is_empty():
+        raise ValueError(
+            "ambiguous event states at one publication coordinate: "
+            f"{ambiguous.head(10).to_dicts()}"
         )
-        row["sessions_since_earnings"] = (
-            float(session_position[current_date] - session_position[previous])
-            if valid
-            else 0.0
+    recent = (
+        pl.col("event_itr_dfp_recent_5s").cast(pl.Float64).fill_null(0.0) > 0.5
+    )
+    if "event_itr_dfp_recent_5s_mask" in output.columns:
+        # Historical event-state archives treated a null mask as an update;
+        # only explicit false freezes the prior state.
+        mask_ok = pl.col("event_itr_dfp_recent_5s_mask").fill_null(True)
+    else:
+        mask_ok = pl.lit(True)
+    output = (
+        output.with_columns(
+            recent.alias("__recent"),
+            mask_ok.alias("__mask_ok"),
         )
-        row["sessions_since_earnings_mask"] = valid
-        if recent_mask:
-            prior_recent[isin] = recent
-    return pl.DataFrame(rows, infer_schema_length=None)
+        .with_columns(
+            pl.when(pl.col("__mask_ok"))
+            .then(pl.col("__recent"))
+            .otherwise(None)
+            .alias("__masked_recent")
+        )
+        .with_columns(
+            pl.col("__masked_recent")
+            .forward_fill()
+            .shift(1)
+            .over("isin")
+            .alias("__prior_recent")
+        )
+        .with_columns(
+            (
+                pl.col("__mask_ok")
+                & pl.col("__recent")
+                & ~pl.col("__prior_recent").fill_null(False)
+            ).alias("__event")
+        )
+        .with_columns(
+            pl.when(pl.col("__event"))
+            .then(pl.col("available_date").cast(pl.Date))
+            .otherwise(None)
+            .forward_fill()
+            .over("isin")
+            .alias("__last_event_date")
+        )
+    )
+    calendar = tuple(_as_date(value) for value in dates)
+    current_positions = pl.DataFrame(
+        {
+            "available_date": calendar,
+            "__current_session_position": np.arange(len(calendar), dtype=np.int32),
+        },
+        schema_overrides={"available_date": pl.Date},
+    )
+    event_positions = current_positions.rename(
+        {
+            "available_date": "__last_event_date",
+            "__current_session_position": "__event_session_position",
+        }
+    )
+    output = output.join(current_positions, on="available_date", how="left").join(
+        event_positions, on="__last_event_date", how="left"
+    )
+    valid = pl.col("__current_session_position").is_not_null() & pl.col(
+        "__event_session_position"
+    ).is_not_null()
+    return (
+        output.with_columns(
+            pl.when(valid)
+            .then(
+                pl.col("__current_session_position")
+                - pl.col("__event_session_position")
+            )
+            .otherwise(0.0)
+            .cast(pl.Float64)
+            .alias("sessions_since_earnings"),
+            valid.alias("sessions_since_earnings_mask"),
+        )
+        .sort(_ROW_INDEX_COLUMN)
+        .drop(
+            _ROW_INDEX_COLUMN,
+            _PUBLICATION_ORDER_COLUMN,
+            "__recent",
+            "__mask_ok",
+            "__masked_recent",
+            "__prior_recent",
+            "__event",
+            "__last_event_date",
+            "__current_session_position",
+            "__event_session_position",
+        )
+    )
 
 
 def _raw_oddlot_features(
@@ -529,47 +843,70 @@ def _raw_oddlot_features(
     if not required.issubset(source.columns):
         return pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
     calendar = tuple(_as_date(value) for value in dates)
-    date_lookup = {value: index for index, value in enumerate(calendar)}
-    shares: dict[tuple[str, date], tuple[float, bool]] = {}
-    rows: list[dict[str, object]] = []
-    for row in source.iter_rows(named=True):
-        isin = str(row["isin"])
-        source_date = _as_date(row["source_trade_date"])
-        regular = row["regular_volume_brl"]
-        odd = row["odd_lot_volume_brl"]
-        valid = (
-            date_lookup.get(source_date) is not None
-            and regular is not None
-            and odd is not None
-            and np.isfinite(float(regular))
-            and np.isfinite(float(odd))
-            and float(regular) >= 0.0
-            and float(odd) >= 0.0
-            and float(regular) + float(odd) > 0.0
+    output = _canonical_publication_frame(source)
+    _reject_ambiguous_vintages(output, "source_trade_date")
+    calendar_dates = pl.DataFrame(
+        {"source_trade_date": calendar},
+        schema_overrides={"source_trade_date": pl.Date},
+    ).with_columns(pl.lit(True).alias("__is_session"))
+    output = output.join(calendar_dates, on="source_trade_date", how="left")
+    regular = pl.col("regular_volume_brl").cast(pl.Float64)
+    odd = pl.col("odd_lot_volume_brl").cast(pl.Float64)
+    total = regular + odd
+    valid = (
+        pl.col("__is_session").fill_null(False)
+        & regular.is_finite()
+        & odd.is_finite()
+        & (regular >= 0.0)
+        & (odd >= 0.0)
+        & (total > 0.0)
+    ).fill_null(False)
+    output = output.with_columns(
+        pl.when(valid)
+        .then(odd / total)
+        .otherwise(0.0)
+        .alias("oddlot_volume_share"),
+        valid.alias("oddlot_volume_share_mask"),
+    )
+    prior = _vintage_lag_values(
+        output,
+        calendar,
+        source_date_column="source_trade_date",
+        value_column="oddlot_volume_share",
+        valid_column="oddlot_volume_share_mask",
+        lag=5,
+    )
+    output = output.join(prior, on=_ROW_INDEX_COLUMN, how="left")
+    change_valid = pl.col("oddlot_volume_share_mask") & pl.col(
+        "__prior_oddlot_volume_share_mask_5"
+    )
+    output_columns = ["available_date", "isin", "source_trade_date"]
+    output_columns.extend(
+        column
+        for column in ("decision_idx", "available_timestamp", "delivery_timestamp")
+        if column in output.columns
+    )
+    output_columns.extend(
+        (
+            "oddlot_volume_share",
+            "oddlot_volume_share_mask",
+            "oddlot_volume_share_change_5",
+            "oddlot_volume_share_change_5_mask",
         )
-        share = float(odd) / (float(regular) + float(odd)) if valid else 0.0
-        shares[(isin, source_date)] = (share, valid)
-        rows.append(
-            {
-                "available_date": _as_date(row["available_date"]),
-                "isin": isin,
-                "source_trade_date": source_date,
-                "oddlot_volume_share": share,
-                "oddlot_volume_share_mask": valid,
-            }
-        )
-    for row in rows:
-        day = date_lookup.get(row["source_trade_date"])
-        prior_date = calendar[day - 5] if day is not None and day >= 5 else None
-        current = shares[(row["isin"], row["source_trade_date"])]
-        prior = shares.get((row["isin"], prior_date), (0.0, False))
-        valid = current[1] and prior[1]
-        row["oddlot_volume_share_change_5"] = current[0] - prior[0] if valid else 0.0
-        row["oddlot_volume_share_change_5_mask"] = valid
+    )
     return (
-        pl.DataFrame(rows)
-        if rows
-        else pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
+        output.with_columns(
+            pl.when(change_valid)
+            .then(
+                pl.col("oddlot_volume_share")
+                - pl.col("__prior_oddlot_volume_share_5")
+            )
+            .otherwise(0.0)
+            .alias("oddlot_volume_share_change_5"),
+            change_valid.alias("oddlot_volume_share_change_5_mask"),
+        )
+        .sort(_ROW_INDEX_COLUMN)
+        .select(output_columns)
     )
 
 

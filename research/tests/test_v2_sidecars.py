@@ -1,8 +1,9 @@
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 import numpy as np
 import polars as pl
 import pytest
+from polars.testing import assert_frame_equal
 
 from brazil_rv.v2.build_store import _parse_sidecars, _sidecar_coverage_table
 from brazil_rv.v2.sidecars import (
@@ -12,6 +13,75 @@ from brazil_rv.v2.sidecars import (
     materialize_sidecar,
     rebuild_publication_lag_validity,
 )
+
+
+def _event_row_reference(source: pl.DataFrame, days: list[date]) -> pl.DataFrame:
+    """Small oracle for the historical event-state contract."""
+
+    rows = list(source.sort("isin", "available_date").iter_rows(named=True))
+    prior_recent: dict[str, bool] = {}
+    last_event: dict[str, date] = {}
+    positions = {day: index for index, day in enumerate(days)}
+    for row in rows:
+        isin = str(row["isin"])
+        current_date = row["available_date"]
+        value = row["event_itr_dfp_recent_5s"]
+        recent = value is not None and float(value) > 0.5
+        mask_ok = row["event_itr_dfp_recent_5s_mask"] is not False
+        if mask_ok and recent and not prior_recent.get(isin, False):
+            last_event[isin] = current_date
+        event_date = last_event.get(isin)
+        valid = current_date in positions and event_date in positions
+        row["sessions_since_earnings"] = (
+            float(positions[current_date] - positions[event_date]) if valid else 0.0
+        )
+        row["sessions_since_earnings_mask"] = valid
+        if mask_ok:
+            prior_recent[isin] = recent
+    return pl.DataFrame(rows, infer_schema_length=None)
+
+
+def _oddlot_row_reference(source: pl.DataFrame, days: list[date]) -> pl.DataFrame:
+    """Small no-revision oracle for odd-lot share and exact lag-5 change."""
+
+    positions = {day: index for index, day in enumerate(days)}
+    shares: dict[tuple[str, date], tuple[float, bool]] = {}
+    rows: list[dict[str, object]] = []
+    for row in source.iter_rows(named=True):
+        source_date = row["source_trade_date"]
+        regular = row["regular_volume_brl"]
+        odd = row["odd_lot_volume_brl"]
+        valid = (
+            source_date in positions
+            and regular is not None
+            and odd is not None
+            and np.isfinite(float(regular))
+            and np.isfinite(float(odd))
+            and float(regular) >= 0.0
+            and float(odd) >= 0.0
+            and float(regular) + float(odd) > 0.0
+        )
+        share = float(odd) / (float(regular) + float(odd)) if valid else 0.0
+        key = (str(row["isin"]), source_date)
+        shares[key] = (share, valid)
+        rows.append(
+            {
+                "available_date": row["available_date"],
+                "isin": str(row["isin"]),
+                "source_trade_date": source_date,
+                "oddlot_volume_share": share,
+                "oddlot_volume_share_mask": valid,
+            }
+        )
+    for row in rows:
+        day = positions.get(row["source_trade_date"])
+        prior_date = days[day - 5] if day is not None and day >= 5 else None
+        current = shares[(row["isin"], row["source_trade_date"])]
+        prior = shares.get((row["isin"], prior_date), (0.0, False))
+        valid = current[1] and prior[1]
+        row["oddlot_volume_share_change_5"] = current[0] - prior[0] if valid else 0.0
+        row["oddlot_volume_share_change_5_mask"] = valid
+    return pl.DataFrame(rows).sort("isin", "available_date", "source_trade_date")
 
 
 def test_reversible_lending_rate_archive_is_inverted() -> None:
@@ -121,6 +191,79 @@ def test_events_sidecar_derives_only_causal_earnings_age() -> None:
     assert not result.valid[..., 2].any()
 
 
+def test_vectorized_events_match_randomized_row_oracle() -> None:
+    rng = np.random.default_rng(20260905)
+    sessions = [date(2024, 1, 2) + timedelta(days=index) for index in range(30)]
+    # Off-calendar rows exercise the exact invalid-age behavior without making
+    # the publication state itself disappear.
+    archive_days = [sessions[0] - timedelta(days=1), *sessions]
+    rows: list[dict[str, object]] = []
+    for name_index in range(5):
+        recent = rng.choice([0.0, 1.0, None], size=len(archive_days)).tolist()
+        masks = rng.choice([True, False, None], size=len(archive_days)).tolist()
+        # Explicit first-row event and consecutive true states cover both edge
+        # cases even if the random draw misses them.
+        recent[:3] = [1.0, 1.0, 0.0]
+        masks[:3] = [True, True, True]
+        rows.extend(
+            {
+                "available_date": day,
+                "isin": f"BRTEST{name_index:02d}",
+                "event_itr_dfp_recent_5s": value,
+                "event_itr_dfp_recent_5s_mask": mask,
+            }
+            for day, value, mask in zip(archive_days, recent, masks, strict=True)
+        )
+    source = pl.DataFrame(rows, infer_schema_length=None).sample(
+        fraction=1.0, shuffle=True, seed=47
+    )
+    expected = _event_row_reference(source, sessions)
+    actual = derive_known_archive_features(
+        source, sessions, sorted(source.get_column("isin").unique()), group="events"
+    )
+    assert_frame_equal(actual, expected, check_exact=True)
+
+
+def test_sidecar_timestamps_compare_absolute_instants_to_b3_decision() -> None:
+    decision_date = date(2024, 1, 2)
+    # UTC-5 13:40 is 15:40 in Sao Paulo and is usable; UTC-5 14:00 is
+    # 16:00 in Sao Paulo and is not. A non-B3 offset is therefore accepted or
+    # rejected by its instant, never by its timezone label.
+    utc_minus_five = timezone(timedelta(hours=-5))
+    early = pl.DataFrame(
+        {
+            "available_date": [decision_date],
+            "available_timestamp": [
+                datetime(2024, 1, 2, 13, 40, tzinfo=utc_minus_five)
+            ],
+            "isin": ["BRTESTACNOR1"],
+            "oddlot_volume_share": [0.25],
+            "oddlot_volume_share_change_5": [0.0],
+        }
+    )
+    accepted = materialize_sidecar(
+        early,
+        [decision_date],
+        ["BRTESTACNOR1"],
+        group="oddlot",
+        decision_time=time(15, 45),
+    )
+    assert accepted.valid[0, 0].all()
+    late = early.with_columns(
+        pl.lit(datetime(2024, 1, 2, 14, 0, tzinfo=utc_minus_five)).alias(
+            "available_timestamp"
+        )
+    )
+    rejected = materialize_sidecar(
+        late,
+        [decision_date],
+        ["BRTESTACNOR1"],
+        group="oddlot",
+        decision_time=time(15, 45),
+    )
+    assert not rejected.valid.any()
+
+
 def test_event_projection_does_not_duplicate_an_explicit_mask(tmp_path) -> None:
     days = [date(2024, 1, 2), date(2024, 1, 3)]
     source = tmp_path / "events.parquet"
@@ -186,6 +329,53 @@ def test_raw_lending_formulas_use_source_date_volume_and_d_plus_one() -> None:
     )
     causal_result = materialize_known_archive(causal, days, [isin], group="lending")
     assert causal_result.values[20, 0, 0] == result.values[20, 0, 0]
+
+
+def test_lending_lags_use_the_vintage_known_at_each_publication() -> None:
+    days = [date(2024, 1, 1) + timedelta(days=index) for index in range(27)]
+    isin = "BRTESTACNOR1"
+    original = pl.DataFrame(
+        {
+            "source_position_date": [days[19], days[20]],
+            "available_date": [days[20], days[21]],
+            "isin": [isin, isin],
+            "lending_balance_brl": [100.0, 120.0],
+        }
+    )
+    revision = pl.DataFrame(
+        {
+            "source_position_date": [days[19]],
+            "available_date": [days[25]],
+            "isin": [isin],
+            "lending_balance_brl": [900.0],
+        }
+    )
+    volume = np.full((len(days), 1), 100.0)
+    baseline = derive_known_archive_features(
+        original, days, [isin], group="lending", daily_volume_brl=volume
+    )
+    revised_source = pl.concat([original, revision], rechunk=False).sample(
+        fraction=1.0, shuffle=True, seed=29
+    )
+    revised = derive_known_archive_features(
+        revised_source, days, [isin], group="lending", daily_volume_brl=volume
+    )
+    before_revision = revised.filter(pl.col("available_date") < days[25])
+    assert_frame_equal(before_revision, baseline, check_exact=True)
+    # The source-day-20 publication saw the original source-day-19 vintage:
+    # +0.2 must not become -7.8 after the future correction is appended.
+    row = revised.filter(pl.col("source_position_date") == days[20]).row(
+        0, named=True
+    )
+    assert row["loan_balance_change_1"] == pytest.approx(0.2)
+    assert row["loan_balance_change_1_mask"]
+    chunked = pl.concat(
+        [revised_source.slice(0, 1), revised_source.slice(1)], rechunk=False
+    )
+    chunked_result = derive_known_archive_features(
+        chunked, days, [isin], group="lending", daily_volume_brl=volume
+    )
+    assert_frame_equal(chunked_result, revised, check_exact=True)
 
 
 def test_lending_volume_window_does_not_invent_prelisting_zeroes() -> None:
@@ -277,6 +467,87 @@ def test_raw_oddlot_share_and_exact_session_lag_change() -> None:
     assert result.values[1, 0, 0] == pytest.approx(0.1)
     assert not result.valid[5, 0, 1]
     assert result.values[6, 0, 1] == pytest.approx(0.6)
+
+
+def test_vectorized_oddlot_matches_randomized_row_oracle() -> None:
+    rng = np.random.default_rng(57)
+    sessions = [date(2024, 1, 1) + timedelta(days=index) for index in range(25)]
+    archive_dates = [*sessions, sessions[-1] + timedelta(days=2)]
+    rows: list[dict[str, object]] = []
+    for name_index in range(4):
+        regular = rng.uniform(0.0, 1_000.0, size=len(archive_dates)).tolist()
+        odd = rng.uniform(0.0, 500.0, size=len(archive_dates)).tolist()
+        regular[2] = None
+        odd[3] = None
+        regular[4] = -1.0
+        regular[5] = 0.0
+        odd[5] = 0.0
+        rows.extend(
+            {
+                "source_trade_date": day,
+                "available_date": day + timedelta(days=1),
+                "isin": f"BRTEST{name_index:02d}",
+                "regular_volume_brl": regular_value,
+                "odd_lot_volume_brl": odd_value,
+            }
+            for day, regular_value, odd_value in zip(
+                archive_dates, regular, odd, strict=True
+            )
+        )
+    source = pl.DataFrame(rows, infer_schema_length=None).sample(
+        fraction=1.0, shuffle=True, seed=61
+    )
+    expected = _oddlot_row_reference(source, sessions)
+    actual = derive_known_archive_features(
+        source, sessions, sorted(source.get_column("isin").unique()), group="oddlot"
+    ).sort("isin", "available_date", "source_trade_date")
+    assert_frame_equal(actual, expected, check_exact=False, abs_tol=1e-12)
+
+
+def test_oddlot_lags_use_the_vintage_known_at_each_publication() -> None:
+    days = [date(2024, 1, 1) + timedelta(days=index) for index in range(10)]
+    isin = "BRTESTACNOR1"
+    original = pl.DataFrame(
+        {
+            "source_trade_date": [days[0], days[5]],
+            "available_date": [days[1], days[6]],
+            "isin": [isin, isin],
+            "regular_volume_brl": [90.0, 70.0],
+            "odd_lot_volume_brl": [10.0, 30.0],
+        }
+    )
+    revision = pl.DataFrame(
+        {
+            "source_trade_date": [days[0]],
+            "available_date": [days[8]],
+            "isin": [isin],
+            "regular_volume_brl": [10.0],
+            "odd_lot_volume_brl": [90.0],
+        }
+    )
+    baseline = derive_known_archive_features(
+        original, days, [isin], group="oddlot"
+    )
+    shuffled = pl.concat([original, revision], rechunk=False).sample(
+        fraction=1.0, shuffle=True, seed=97
+    )
+    revised = derive_known_archive_features(
+        shuffled, days, [isin], group="oddlot"
+    )
+    assert_frame_equal(
+        revised.filter(pl.col("available_date") < days[8]),
+        baseline,
+        check_exact=True,
+    )
+    row = revised.filter(pl.col("source_trade_date") == days[5]).row(0, named=True)
+    assert row["oddlot_volume_share_change_5"] == pytest.approx(0.2)
+    assert row["oddlot_volume_share_change_5_mask"]
+    chunked = pl.concat([shuffled.head(1), shuffled.tail(shuffled.height - 1)], rechunk=False)
+    assert_frame_equal(
+        derive_known_archive_features(chunked, days, [isin], group="oddlot"),
+        revised,
+        check_exact=True,
+    )
 
 
 def test_rebalance_contract_preserves_experiment33_field_names() -> None:

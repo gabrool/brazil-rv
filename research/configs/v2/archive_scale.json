@@ -1,0 +1,56 @@
+{
+  "schema": "V2_SIDECAR_ARCHIVE_SCALE_V1",
+  "measured_on": "2026-09-05",
+  "source_store_manifest_sha256": "6a7e13195c6cde92fbdc756a585e4cb65d73998faa94e237595c7be7cdfb6919",
+  "archives": [
+    {
+      "group": "rebalance",
+      "file": "index_rebalance.parquet",
+      "rows": 2526262,
+      "bytes": 790742,
+      "sha256": "88bfd453c8365416a3c3f5525988a0d72dd246c9bd01daad1d760c73cf444ebf"
+    },
+    {
+      "group": "oddlot",
+      "file": "odd_lot_activity.parquet",
+      "rows": 258845,
+      "bytes": 13998010,
+      "sha256": "a056d19ff37de8ca9c219eda328cc26eab2a9bc2fa53bf8887cc6718924cc3fc"
+    },
+    {
+      "group": "fundamentals",
+      "file": "cvm_fundamentals_intraday.parquet",
+      "rows": 5212350,
+      "bytes": 1929895,
+      "sha256": "a6e9d4afd6b5df38ae8b0e07dbda74230fd9cc609f60cb0a65b726cb60840a0d"
+    },
+    {
+      "group": "events",
+      "file": "cvm_rad_event_state.parquet",
+      "rows": 6072440,
+      "bytes": 10472841,
+      "sha256": "9ffd1cdf8610f1678083f974a7e73c3fbdcfc4d745a23489bbb509077a0eb0f8"
+    },
+    {
+      "group": "lending",
+      "file": "bdi_lending_open_balance.parquet",
+      "rows": 63647,
+      "bytes": 1349334,
+      "sha256": "d6404ff9c385fdd5b07b6cbfa63d6faa47cf58069c25761f4a9196c2510c6081"
+    },
+    {
+      "group": "lending",
+      "file": "bdi_lending_strong.parquet",
+      "rows": 30702,
+      "bytes": 949238,
+      "sha256": "6e2cc7c3ae950b17ce6e9d7f5243272ce947567c92df0d7ad08abf7d5c3b0262"
+    },
+    {
+      "group": "options",
+      "file": "full_options.parquet",
+      "rows": 95045,
+      "bytes": 4138393,
+      "sha256": "6a0cff033fb48a3b190ba49389e173c385ee1df0211a335e81665e9ec2af5686"
+    }
+  ]
+}
