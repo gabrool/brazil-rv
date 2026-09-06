@@ -113,3 +113,47 @@ inspection. Operational-log SHA-256 is
 `e0335ffec7049b50dda59072bfa34c49d100830f25bd1a727ab2f0193ffce97c`.
 Per the bounded-memory acceptance instruction, work stops here for an explicit
 decision before changing the sidecar adapter or attempting another rebuild.
+
+## Canonical multi-day refactor closeout (2026-09-06)
+
+The canonical refactor implementation is frozen at
+`f0cf568303715e8783e539a683568535e2232c7f`. Phases A–F passed their
+engineering and deterministic-fixture acceptance: one 15:45 decision row,
+validated raw observations and masks, contractual action/identity interfaces,
+typed and revision-safe features, bounded native consumers, intended orders
+before fills, signed-share/cash/claim accounting, unified common-population
+evaluation, and explicit rejection of stale semantic artifacts. This is an
+incompatible current-model contract; earlier stores and Round-1/Round-2
+results remain immutable historical evidence and cannot be resumed.
+
+Phase G real-data acceptance is **unsupported**, not passed or failed. Its
+present hard blockers are the missing verified historical B3 session schedule
+and complete contractual action/conversion/terminal-settlement evidence. The
+available raw point-in-time inputs also cannot attest every proposed options,
+fundamentals, or rebalance field. No substitute was inferred. Verified auction
+marks/capacity and executable borrow would strengthen an economics claim, but
+are not universal blockers: the plan permits explicitly labelled
+`close_proxy`, conditional-borrow, or long-only screening. The expanded
+immutable-source action audit is
+`D:\quant-data\b3\processed\v2_refactor_action_audit_c316330_20260906T013921Z`:
+audit SHA-256
+`d717899d7174cfb4645d06db63957c88ab3fea608ad3f33ebf49aac96c340d43`,
+detailed-breakdown SHA-256
+`98bd1b9133c30cc30ca1337c8219a7692c903f3a183a2e714b82e0576692e871`,
+and source-store manifest SHA-256
+`6a7e13195c6cde92fbdc756a585e4cb65d73998faa94e237595c7be7cdfb6919`.
+At audit commit `c316330`, both the legacy classifier and strict fallback
+failed the declared coverage/precision gates; consequently
+`canonical_price_ratio_adjustment_authorized=false` and uncovered action
+intervals remain unresolved. This supersedes the earlier provisional
+fix-pass statement that DISMES-only could become accepted economics.
+
+Phase H and the user's experimental Section D were **not run / not
+authorized**. There was no revised preregistration, new model score,
+official-validation access, permanently spent test access, or deployment
+change. Final local verification recorded Ruff pass, Python compile pass, 810
+passing research tests, five passing dedicated T23 resource/memory tests, and
+one passing authentic synthetic T24 raw-to-store-to-fit/score/ledger/report
+test. The T23 tests exercise populated production axes and actual archive row
+counts; T24 independently exercises semantic integration from deterministic
+raw fixtures. No paid Lambda instance was launched for this refactor.

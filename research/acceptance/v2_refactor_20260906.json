@@ -1,0 +1,153 @@
+{
+  "schema": "BRAZIL_RV_V2_ENGINEERING_ACCEPTANCE_V1",
+  "created_at": "2026-09-06T10:36:42.7137700-03:00",
+  "status": "unsupported",
+  "status_reason": "Phases A-F pass deterministic engineering acceptance, but real-data Phase G cannot currently be accepted because the authoritative dated exchange schedule and complete contractual corporate-action, identity, and terminal-status evidence are unavailable and the diagnostic action audit failed its declared thresholds. Auction and borrow evidence remain conditional claim limitations, not universal blockers.",
+  "implementation": {
+    "git_commit": "f0cf568303715e8783e539a683568535e2232c7f",
+    "branch_before_closeout": "refactor/v2-canonical-multiday",
+    "base_commit": "ce24fa8",
+    "semantic_break": true,
+    "prior_v2_artifacts_compatible": false
+  },
+  "source_documents": [
+    {
+      "name": "v2_fix_pass_3_addendum.md",
+      "sha256": "2bdde525fba8bc0ff1ff403d81ec4a88042b4933f4c44dba7269a47b373087ee"
+    },
+    {
+      "name": "v2_fix_pass_3c.md",
+      "sha256": "0ca2bf071db859229b0491e2446004c2078043279fc6553229901cd3e786ce4d"
+    },
+    {
+      "name": "Brazil_RV_Multiday_Refactor_Plan.md",
+      "sha256": "35d04407916c4ff555dff70d89e6e06b382f92f3e96e4584b951fb751d623b81"
+    }
+  ],
+  "phase_status": {
+    "A_contracts": "passed_implementation_fixture",
+    "B_raw_foundation": "passed_implementation_fixture_real_source_coverage_unsupported",
+    "C_features_asof_state": "passed_implementation_fixture",
+    "D_consumers": "passed_implementation_fixture",
+    "E_orders_accounting": "passed_implementation_fixture_real_execution_inputs_unsupported",
+    "F_evaluation_migration": "passed_implementation_fixture",
+    "G_real_data_acceptance": "unsupported",
+    "H_registered_development": "not_run_not_authorized"
+  },
+  "verification": {
+    "ruff": {
+      "command": "uv run ruff check src tests",
+      "status": "passed"
+    },
+    "compile": {
+      "command": "uv run python -m compileall -q src tests",
+      "status": "passed"
+    },
+    "research_full_suite": {
+      "command": "$env:BRAZIL_RV_TEST_SCRATCH='D:\\'; uv run pytest -q",
+      "status": "passed",
+      "passed": 810,
+      "duration_seconds": 372.11
+    },
+    "collector_cotahist": {
+      "command": "uv run --group dev pytest tests/test_parse_b3_cotahist.py -q",
+      "status": "passed",
+      "passed": 4,
+      "duration_seconds": 0.18
+    },
+    "T23_resource_contract": {
+      "command": "$env:BRAZIL_RV_TEST_SCRATCH='D:\\'; uv run pytest tests/test_v2_build_memory.py tests/test_v2_memory_preflight.py -q",
+      "status": "passed",
+      "passed": 5,
+      "duration_seconds": 213.0,
+      "production_axis_sessions": 4348,
+      "production_axis_names": 933,
+      "all_feature_families_enabled": true,
+      "archive_scale_source": "research/configs/v2/archive_scale.json",
+      "peak_rss_limit_bytes": 8589934592,
+      "peak_rss_below_limit": true,
+      "minimum_available_build_memory_bytes": 10737418240,
+      "claim_boundary": "Component-scale deterministic fixture: populated dense family/target components, bounded source derivations at committed archive row counts, and native collation/forward are exercised separately. It is not an integrated large-source materialization/full builder, does not persist exact peak bytes, and is not a real-archive accepted store build."
+    },
+    "T24_full_path": {
+      "command": "$env:BRAZIL_RV_TEST_SCRATCH='D:\\'; uv run pytest tests/test_v2_t24_acceptance.py -q",
+      "status": "passed",
+      "passed": 1,
+      "duration_seconds": 78.53,
+      "fixed_width_cotahist_record_bytes": 245,
+      "uses_timestamped_m1_raw_fixture": true,
+      "uses_native_fast_path": true,
+      "covers": [
+        "raw_parse_and_promotion",
+        "current_store_build",
+        "post_decision_invariance",
+        "native_fit_and_hash_bound_score",
+        "intended_orders_and_fills",
+        "persistent_ledger_and_report",
+        "relocation_identity",
+        "stale_artifact_and_resume_rejection"
+      ],
+      "claim_boundary": "Authentic code path over deterministic synthetic raw fixtures; not real-source acceptance or a research result."
+    }
+  },
+  "real_source_action_audit": {
+    "root": "D:\\quant-data\\b3\\processed\\v2_refactor_action_audit_c316330_20260906T013921Z",
+    "audit_implementation_commit": "c316330",
+    "source_store_manifest_sha256": "6a7e13195c6cde92fbdc756a585e4cb65d73998faa94e237595c7be7cdfb6919",
+    "audit_sha256": "d717899d7174cfb4645d06db63957c88ab3fea608ad3f33ebf49aac96c340d43",
+    "breakdown_sha256": "98bd1b9133c30cc30ca1337c8219a7692c903f3a183a2e714b82e0576692e871",
+    "provider_labelled_splits": 478,
+    "low_factor_rows": 58,
+    "low_factor_dismes_within_two_fraction": 0.8103,
+    "larger_factor_rows": 420,
+    "larger_factor_dismes_detection_fraction": 0.2167,
+    "very_large_factor_rows": 272,
+    "jump_precedes_dismes_count": 0,
+    "dismes_only_within_two_recall": 0.1925,
+    "dismes_only_within_two_precision": 0.4646,
+    "dismes_plus_fallback_within_two_recall": 0.2134,
+    "dismes_plus_fallback_within_two_precision": 0.3003,
+    "legacy_inferred_cash_events": 114604,
+    "legacy_inferred_cash_events_without_dismes": 102372,
+    "canonical_price_ratio_adjustment_authorized": false,
+    "fallback_authorized": false,
+    "uncovered_action_intervals": "unresolved"
+  },
+  "hard_phase_g_blockers": [
+    "authoritative versioned historical B3 equity-session schedule",
+    "complete point-in-time contractual share, cash, conversion, payment, and availability terms",
+    "verified historical terminal status and settlement outcomes"
+  ],
+  "conditional_real_capability_limitations": [
+    "verified closing-auction marks and executable capacity; labelled daily-last-trade close_proxy screening remains permitted",
+    "executable point-in-time borrow availability and rates; conditional uniform-borrow or long-only screening remains permitted",
+    "canonical options OI unit, multiplier, expiry, and adjustment metadata",
+    "complete fundamentals filing reference, version, basis, and issuer applicability",
+    "rebalance announcement, current/preview, and effective-date semantics"
+  ],
+  "research_and_access": {
+    "current_schema_real_store_built": false,
+    "current_schema_real_store_accepted": false,
+    "new_research_score_produced": false,
+    "revised_preregistration_created": false,
+    "section_d_experiments_run": false,
+    "official_validation_accessed": false,
+    "permanently_spent_test_accessed": false,
+    "deployment_changed": false
+  },
+  "paid_compute": {
+    "instance_launched_for_this_refactor": false,
+    "provider_inventory_checks": [
+      {
+        "checked_at": "2026-09-06T10:36:04.9890654-03:00",
+        "instance_count": 0
+      },
+      {
+        "checked_at": "2026-09-06T10:38:27.0801881-03:00",
+        "instance_count": 0
+      }
+    ],
+    "exact_pre_refactor_instance": "46ee1e1c16f14d7c8fd737919ed66400",
+    "exact_pre_refactor_instance_present": false
+  }
+}

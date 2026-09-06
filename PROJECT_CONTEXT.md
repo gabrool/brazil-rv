@@ -1,24 +1,28 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-04.
+Last verified: 2026-09-06.
 
 ## Purpose and current research state
 
-Brazil-RV now has two additive offline research stacks. The accepted v1 intraday
-system and its deployed research recipe remain unchanged and reproducible. The
-current engineering foundation is v2, a daily system that predicts 1-, 2-, 3-,
-5-, and 10-session cross-sectional split-adjusted price-return residual ranks once per session at
-15:45 for closing-auction entry.
+Brazil-RV has two offline research programs. The accepted v1 intraday system
+and its deployed research recipe remain unchanged and reproducible. V2 is now
+an intentionally incompatible multi-day system whose canonical implementation
+is commit `f0cf568303715e8783e539a683568535e2232c7f`. It predicts five daily
+horizons from one 15:45 decision snapshot, but the refactor is currently an
+engineering implementation rather than an accepted real-data research stack.
 
-The v2 foundation, model, GBDT, baselines, training stages, and evaluation
-harness are implemented and unit-tested. The second review pass makes the panel
-definition independent of provider corporate-action coverage: only official
-COTAHIST histories may affect price adjustments, features, masks, and targets;
-provider actions are audit-only. The current v2 store is accepted and
-hash-sealed. Spec-scale baseline, GBDT, and full-F1 neural integration checks
-are complete after a bounded compiled-inference repair. No v2 research
-candidate has been selected, no v2 official-validation or test date has been
-evaluated, and no prediction, execution, or deployment recipe has changed.
+The current v2 Phases A-F engineering fixtures pass: contracts and raw
+foundation, causal features and point-in-time state, canonical consumers,
+orders/accounting, unified evaluation, and incompatible-artifact migration.
+Real-data Phase G acceptance is `unsupported`, not passed: the repository lacks
+an authoritative dated B3 session schedule and a complete contractual-action
+master, while the available provider/DISMES/price-jump evidence fails the
+registered action-quality thresholds and cannot prove historical share, cash,
+conversion, payment, or terminal-claim terms. Consequently there is no accepted
+real current-schema v2 store and no accepted v2 candidate. Older v2 stores and
+runs remain immutable historical evidence only. Phase H and experimental
+Section D have not begun; no official-validation or test outcome was accessed
+for this refactor, and no prediction, execution, or deployment recipe changed.
 
 The accepted incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
@@ -56,7 +60,60 @@ history, exact results, artifact identities, and interpretations.
   contract. V2 uses its separately documented causal daily 20-session
   activity, liquidity, price, and listing-history rules.
 
-## V2 daily foundation contract
+## Current canonical v2 refactor contract
+
+The executable contract is documented in [docs/v2_README.md](docs/v2_README.md),
+with the semantic break and required rebuild described in
+[docs/v2_MIGRATION.md](docs/v2_MIGRATION.md). Canonical decision row `t` is the
+information available at exactly 15:45 `America/Sao_Paulo`: daily market state
+ends at `t-1`, decision-available publications may enter on `t`, completed
+intraday bars exclude the 15:45 entry bar, and no consumer applies another
+stage-specific lag. A versioned dated B3 schedule is required as calendar
+authority. Source completeness, price observation, trade observation, valid
+activity, entry eligibility, feature validity, and outcome validity remain
+independent masks.
+
+ISIN is permanent identity and ticker is only a dated attribute. A succession
+can affect history or economics only through a verified point-in-time allowlist
+with contractual share/cash terms and evidence; the current allowlist is empty.
+The same verified action primitive must feed shareholder-wealth features,
+targets, intended orders, and signed-share accounting. Price return, gross
+shareholder holding return, and the median-adjusted volatility-scaled model
+target are separate outcome families. Unknown actions or terminal wealth stay
+unknown; known zero terminal wealth remains a valid total loss.
+
+Every enabled model field has a mandatory ordered `FeatureSpec` and schema hash.
+Neural, GBDT, baseline, scoring, and evaluation adapters share one canonical
+date/security feature view with per-feature validity and true source age. Neural
+inputs zero invalid payloads; GBDT uses NaN only where the same mask says the
+value is invalid. The canonical fast branch uses native, compact, separately
+masked five-minute inputs and fresh weights; v1 fast artifacts are isolated as
+contaminated historical diagnostics and are not a clean-path dependency.
+
+The store builder streams family-by-family into disk-backed float32 arrays and
+records peak RSS. Intended orders are fixed before later fill observations;
+unfilled exposure, contractual claims, cash, funding, costs, and insolvency are
+carried through one persistent ledger. Evaluation uses a common supported
+population for D1/D2/D3/D5, keeps D10 diagnostic-only where required, preserves
+chronological/fold blocks, and reports unsupported statistics rather than
+coercing them to zero. Current schemas reject prior stores, checkpoints, scores,
+and partial resumes rather than silently translating them.
+
+Phases A-F have fixture-level engineering acceptance at commit
+`f0cf568303715e8783e539a683568535e2232c7f`. Phase G requires new authoritative
+calendar/action/status evidence and a fresh real current-schema build; it cannot
+be established by renaming or reopening the formerly accepted store. Until that
+source gate is satisfied, no revised research registration or Section D run is
+authorized.
+
+## Superseded historical v2 foundation context
+
+> **Historical only.** Everything in this section through the next `V1`
+> heading describes the pre-refactor v2 schema, stores, Section-C integration,
+> and their immutable evidence. Those paths and hashes remain useful for
+> reproduction and audit, but none is a current-schema store, accepted current
+> candidate, or authority for a new run. Where this history says a v2 store was
+> “accepted” or “canonical,” read that strictly within its superseded schema.
 
 The additive v2 implementation lives under `brazil_rv.v2`; its detailed
 executable contract is documented in `docs/v2_README.md`. Corporate-action
