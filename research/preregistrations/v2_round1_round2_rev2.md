@@ -32,13 +32,19 @@ executable borrow.
   execution proxy. Terminal inventory uses last marking in the headline ledger and the
   registered haircut sensitivity beside it. Unresolved inventory notional and counts
   are mandatory reporting fields, not silently discarded observations.
+- The planned absolute-net cap is 20%. With 30 independently filled slots on each
+  side, the former 10% cap treated ordinary asynchronous entry/exit imbalance as a
+  liquidation event and prevented the light side from refilling. The wider cap remains
+  a binding directional-risk limit; gross 2.25 and per-name 5% caps are unchanged, and
+  breaches are corrected with partial lowest-conviction risk trims rather than a
+  whole-book liquidation.
 - Seeds are 11/29/47 for networks and the five fixed GBDT seeds in the implementation.
   CPU is used for Round 1. Round 2 uses at most one paid GH200 and 4–6 concurrent
   registered trajectories after its one-job smoke succeeds.
 
 ## Pre-research acceptance and sanity bounds
 
-Before Round 1 can freeze, a completed `BRAZIL_RV_V2_PIPELINE_VALIDATION_V3` report
+Before Round 1 can freeze, a completed `BRAZIL_RV_V2_PIPELINE_VALIDATION_V4` report
 must bind the exact implementation and store and have status
 `development_grade_inferred_actions`, no failed reasons, and both sealed-window access
 flags false. It includes the survivorship gates, provider-invariance evidence, finite
@@ -161,7 +167,7 @@ after artifacts and logs are secured. No deployment changes occur.
       "buffer_per_side": 30,
       "gross_target": 2.0,
       "planned_gross_cap": 2.25,
-      "planned_absolute_net_cap": 0.1,
+      "planned_absolute_net_cap": 0.2,
       "planned_name_weight_cap": 0.05,
       "cost_bps_per_side": 4.0,
       "annual_borrow_rate": 0.02,

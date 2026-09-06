@@ -61,7 +61,8 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V3"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V4"
+_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V3"
 PIPELINE_NETWORK_RESUME_SCHEMA = "BRAZIL_RV_V2_PIPELINE_NETWORK_RESUME_V2"
 PIPELINE_FLAGS: dict[str, bool] = {
     "pipeline_validation": True,
@@ -894,6 +895,12 @@ def _development_acceptance(
             {
                 "evaluation": label,
                 "mean_deployed_gross_fraction_nav": gross,
+                "minimum_deployed_gross_fraction_nav": headline.get(
+                    "minimum_gross_fraction_nav"
+                ),
+                "maximum_deployed_gross_fraction_nav": headline.get(
+                    "maximum_gross_fraction_nav"
+                ),
                 "gross_target": 2.0,
                 "within_ten_percent_of_gross_target": (
                     gross is not None and 1.8 <= gross <= 2.2
@@ -906,6 +913,20 @@ def _development_acceptance(
                 ),
                 "terminal_nav": headline.get("terminal_nav"),
                 "absolute_terminal_unresolved_inventory_fraction_nav": unresolved,
+                "zero_entry_days_by_cause": headline.get("zero_entry_days_by_cause"),
+                "blocked_entry_candidates_by_cause": headline.get(
+                    "blocked_entry_candidates_by_cause"
+                ),
+                "risk_trim_days_by_type": headline.get("risk_trim_days_by_type"),
+                "risk_trim_notional_by_type": headline.get(
+                    "risk_trim_notional_by_type"
+                ),
+                "intended_entry_count": headline.get("intended_entry_count"),
+                "intended_entry_fill_rate": headline.get("intended_entry_fill_rate"),
+                "mean_pending_exit_age_sessions": headline.get(
+                    "mean_pending_exit_age_sessions"
+                ),
+                "cancellations_by_reason": headline.get("cancellations_by_reason"),
             }
         )
         if gross is None or not 1.8 <= gross <= 2.2:
@@ -1730,6 +1751,176 @@ def _verify_inventory_rows(
         raise RuntimeError("pipeline validation inventory changed while sealing")
 
 
+def _verify_bound_inventory_files(root: Path, rows: object) -> None:
+    if not isinstance(rows, list) or any(not isinstance(row, Mapping) for row in rows):
+        raise ValueError("prior classical inventory file list is malformed")
+    for row in rows:
+        relative = row.get("path")
+        expected_bytes = row.get("bytes")
+        expected_sha = row.get("sha256")
+        if (
+            not isinstance(relative, str)
+            or not isinstance(expected_bytes, int)
+            or not isinstance(expected_sha, str)
+        ):
+            raise ValueError("prior classical inventory row is malformed")
+        path = (root / relative).resolve(strict=True)
+        if not path.is_relative_to(root):
+            raise ValueError("prior classical inventory escapes its immutable root")
+        if path.stat().st_size != expected_bytes or sha256_file(path) != expected_sha:
+            raise ValueError(f"prior classical artifact hash mismatch: {relative}")
+
+
+def _verified_prior_acceptance(
+    *,
+    root: Path,
+    expected_manifest_sha256: str,
+    expected_inventory_sha256: str,
+    store_manifest_sha256: str,
+) -> tuple[Path, dict[str, object], dict[str, object]]:
+    source = Path(root).resolve(strict=True)
+    manifest_path = source / "pipeline_validation_manifest.json"
+    inventory_path = source / "inventory.json"
+    if sha256_file(manifest_path).casefold() != expected_manifest_sha256.casefold():
+        raise ValueError("prior acceptance manifest SHA-256 mismatch")
+    if sha256_file(inventory_path).casefold() != expected_inventory_sha256.casefold():
+        raise ValueError("prior acceptance inventory SHA-256 mismatch")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    inventory_payload = json.loads(inventory_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) or not isinstance(inventory_payload, dict):
+        raise ValueError("prior acceptance audit payload is malformed")
+    if (
+        manifest.get("schema") != _PRIOR_PIPELINE_SCHEMA
+        or manifest.get("status") != "completed"
+        or manifest.get("pipeline_validation") is not True
+        or manifest.get("research_claim") is not False
+        or manifest.get("official_validation_accessed") is not False
+        or manifest.get("test_accessed") is not False
+        or manifest.get("transfer_chronology_clean") is not True
+    ):
+        raise ValueError("prior acceptance manifest is stale or has invalid access")
+    if (
+        inventory_payload.get("schema") != f"{_PRIOR_PIPELINE_SCHEMA}_INVENTORY"
+        or inventory_payload.get("status") != "completed"
+    ):
+        raise ValueError("prior acceptance inventory schema is stale")
+    _verify_bound_inventory_files(source, inventory_payload.get("files"))
+    sources = manifest.get("sources")
+    store_source = sources.get("store") if isinstance(sources, Mapping) else None
+    if not isinstance(store_source, Mapping) or (
+        str(store_source.get("manifest_sha256", "")).casefold()
+        != store_manifest_sha256.casefold()
+    ):
+        raise ValueError("prior acceptance used a different immutable store")
+    results = manifest.get("results")
+    if not isinstance(results, Mapping):
+        raise ValueError("prior acceptance lacks its result roster")
+    baselines = results.get("baselines")
+    gbdt = results.get("gbdt_triage")
+    if (
+        not isinstance(baselines, list)
+        or len(baselines) != 15
+        or not isinstance(gbdt, list)
+        or len(gbdt) != 1
+        or any(not isinstance(row, dict) for row in (*baselines, *gbdt))
+    ):
+        raise ValueError("prior acceptance classical roster is incomplete")
+    return source, manifest, inventory_payload
+
+
+def _load_prior_score_panel(
+    *,
+    source_root: Path,
+    record: Mapping[str, object],
+    expected_indices: NDArray[np.int64],
+    expected_name_count: int,
+) -> tuple[NDArray[np.float32], NDArray[np.bool_], str]:
+    manifest_raw = record.get("score_manifest")
+    expected_manifest_sha = record.get("score_manifest_sha256")
+    if not isinstance(manifest_raw, str) or not isinstance(expected_manifest_sha, str):
+        raise ValueError("prior classical record lacks its score binding")
+    manifest_path = Path(manifest_raw).resolve(strict=True)
+    if not manifest_path.is_relative_to(source_root):
+        raise ValueError("prior score panel is outside its immutable acceptance root")
+    if sha256_file(manifest_path) != expected_manifest_sha:
+        raise ValueError("prior score-panel manifest SHA-256 mismatch")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, Mapping) or (
+        manifest.get("schema") != _PRIOR_PIPELINE_SCHEMA
+        or manifest.get("status") != "completed"
+        or manifest.get("pipeline_validation") is not True
+        or manifest.get("research_claim") is not False
+        or manifest.get("official_validation_accessed") is not False
+        or manifest.get("test_accessed") is not False
+        or manifest.get("transfer_chronology_clean") is not True
+    ):
+        raise ValueError("prior score panel is stale or has invalid access")
+    metadata = manifest.get("metadata")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(metadata, Mapping) or not isinstance(artifacts, Mapping):
+        raise ValueError("prior score panel manifest is malformed")
+    index_values = metadata.get("date_indices", metadata.get("evaluation_date_indices"))
+    if not isinstance(index_values, list) or not np.array_equal(
+        np.asarray(index_values, dtype=np.int64), expected_indices
+    ):
+        raise ValueError("prior score panel has a different evaluation window")
+    arrays: list[NDArray[np.generic]] = []
+    for filename in ("scores.npy", "score_mask.npy"):
+        path = manifest_path.parent / filename
+        row = artifacts.get(filename)
+        if not isinstance(row, Mapping) or (
+            path.stat().st_size != int(row.get("bytes", -1))
+            or sha256_file(path) != row.get("sha256")
+        ):
+            raise ValueError(f"prior score-panel artifact hash mismatch: {path}")
+        arrays.append(np.load(path, allow_pickle=False))
+    scores = np.asarray(arrays[0], dtype=np.float32)
+    score_mask = np.asarray(arrays[1], dtype=np.bool_)
+    if scores.shape != score_mask.shape or scores.shape[:2] != (
+        len(expected_indices),
+        expected_name_count,
+    ):
+        raise ValueError("prior score panel arrays are misaligned")
+    return scores, score_mask, expected_manifest_sha
+
+
+def _non_ledger_report(report: Mapping[str, object]) -> dict[str, object]:
+    return {
+        key: value
+        for key, value in report.items()
+        if key not in {"economics", "schema"}
+    }
+
+
+def _canonical_payload_sha256(payload: object) -> str:
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _changed_field_paths(
+    left: object, right: object, prefix: str = "economics"
+) -> set[str]:
+    if isinstance(left, Mapping) and isinstance(right, Mapping):
+        paths: set[str] = set()
+        for key in set(left) | set(right):
+            path = f"{prefix}.{key}"
+            if key not in left or key not in right:
+                paths.add(path)
+            else:
+                paths.update(_changed_field_paths(left[key], right[key], path))
+        return paths
+    if isinstance(left, list) and isinstance(right, list):
+        if len(left) != len(right):
+            return {f"{prefix}[]"}
+        paths: set[str] = set()
+        for old, new in zip(left, right, strict=True):
+            paths.update(_changed_field_paths(old, new, f"{prefix}[]"))
+        return paths
+    return set() if left == right else {prefix}
+
+
 def _verified_classical_source(
     *,
     root: Path,
@@ -2060,6 +2251,354 @@ def run_pipeline_validation(
     )
 
 
+def replay_classical_economics(
+    *,
+    store_root: Path,
+    store_manifest_sha256: str,
+    cdi_path: Path,
+    cdi_sha256: str,
+    experiment52_cdi_path: Path,
+    experiment52_cdi_sha256: str,
+    prior_classical_root: Path,
+    prior_classical_manifest_sha256: str,
+    prior_classical_inventory_sha256: str,
+    output_root: Path,
+) -> PipelineValidationResult:
+    """Re-evaluate sealed classical scores after a ledger-only repair.
+
+    Models and score panels are never recomputed. Every prior input is verified
+    against the sealed inventory, and the complete evaluation report outside
+    ``economics`` (apart from the intentional schema version) must be exactly
+    equal as a decoded JSON value before the replay can be accepted.
+    """
+
+    store_path = Path(store_root).resolve(strict=True)
+    output = Path(output_root).resolve()
+    if output.exists():
+        raise FileExistsError(output)
+    code = _git_identity()
+    store_manifest, dates = _read_store_header(store_path)
+    actual_store_sha = sha256_file(store_path / "manifest.json")
+    if actual_store_sha.casefold() != store_manifest_sha256.casefold():
+        raise ValueError("sealed store manifest SHA-256 mismatch")
+    store_metadata = store_manifest.get("metadata")
+    if not isinstance(store_metadata, Mapping):
+        raise ValueError("store metadata is malformed")
+    store_build_commit = store_metadata.get("implementation_git_commit")
+    if not isinstance(store_build_commit, str):
+        raise ValueError("store lacks its build implementation commit")
+
+    source_root, prior, _ = _verified_prior_acceptance(
+        root=prior_classical_root,
+        expected_manifest_sha256=prior_classical_manifest_sha256,
+        expected_inventory_sha256=prior_classical_inventory_sha256,
+        store_manifest_sha256=actual_store_sha,
+    )
+    prior_code = prior.get("code")
+    if not isinstance(prior_code, Mapping) or (
+        prior_code.get("commit") != store_build_commit
+    ):
+        raise ValueError("prior acceptance code does not match the sealed store build")
+    if output == source_root or output.is_relative_to(source_root):
+        raise ValueError(
+            "ledger replay output must be outside the prior immutable root"
+        )
+
+    runtime_payload = prior.get("runtime")
+    if not isinstance(runtime_payload, Mapping):
+        raise ValueError("prior acceptance runtime is malformed")
+    runtime = ValidationRuntime(**dict(runtime_payload))
+    _, _, _, evaluation_indices, fold_payload = _development_indices(
+        dates, runtime=runtime
+    )
+    expected_folds = {name: evaluation_indices[name] for name in ("F1", "F2", "F3")}
+    sidecars_raw = prior.get("enabled_sidecars")
+    if not isinstance(sidecars_raw, list):
+        raise ValueError("prior acceptance sidecar roster is malformed")
+    sidecars = _validate_sidecars(
+        store_manifest, [str(value) for value in sidecars_raw]
+    )
+    external_resolutions = _external_artifact_resolutions(store_manifest)
+    _assert_overrides_outside_store(store_path, external_resolutions)
+
+    cdi_by_index, cdi_provenance = _load_development_cdi(
+        dates=dates,
+        cdi_path=Path(cdi_path),
+        expected_sha256=cdi_sha256,
+        experiment52_cdi_path=Path(experiment52_cdi_path),
+        experiment52_expected_sha256=experiment52_cdi_sha256,
+    )
+    prior_sources = prior.get("sources")
+    prior_cdi = prior_sources.get("cdi") if isinstance(prior_sources, Mapping) else None
+    if not isinstance(prior_cdi, Mapping):
+        raise ValueError("prior acceptance CDI provenance is missing")
+    for key in ("development_extension", "experiment52_reference"):
+        old = prior_cdi.get(key)
+        new = cdi_provenance.get(key)
+        if (
+            not isinstance(old, Mapping)
+            or not isinstance(new, Mapping)
+            or (old.get("sha256") != new.get("sha256"))
+        ):
+            raise ValueError(f"ledger replay CDI identity differs for {key}")
+    prior_fast = (
+        prior_sources.get("native_fast_raw_audit")
+        if isinstance(prior_sources, Mapping)
+        else None
+    )
+    if not isinstance(prior_fast, Mapping):
+        raise ValueError("prior acceptance lacks the native-fast audit binding")
+    fast_path = prior_fast.get("path")
+    fast_sha = prior_fast.get("sha256")
+    if not isinstance(fast_path, str) or not isinstance(fast_sha, str):
+        raise ValueError("prior native-fast audit binding is malformed")
+    native_fast_audit = _verify_native_fast_audit(
+        Path(fast_path),
+        expected_sha256=fast_sha,
+        store_manifest_sha256=actual_store_sha,
+    )
+
+    results = prior["results"]
+    assert isinstance(results, Mapping)
+    baseline_source = results["baselines"]
+    gbdt_source = results["gbdt_triage"]
+    assert isinstance(baseline_source, list) and isinstance(gbdt_source, list)
+    baseline_roster = {
+        (str(record.get("fold")), str(record.get("name")))
+        for record in baseline_source
+        if isinstance(record, Mapping)
+    }
+    expected_baselines = {
+        (fold, name) for fold in expected_folds for name in _BASELINE_SIGNAL_SIGNS
+    }
+    if baseline_roster != expected_baselines:
+        raise ValueError("prior acceptance baseline roster differs from the contract")
+    if {str(record.get("fold")) for record in gbdt_source} != {"F1"}:
+        raise ValueError("prior acceptance GBDT roster differs from the contract")
+
+    requested_indices = np.unique(np.concatenate(list(expected_folds.values()))).astype(
+        np.int64, copy=False
+    )
+    requested_dates = _dates_for_indices(dates, requested_indices)
+    if any(value >= OFFICIAL_START for value in requested_dates):
+        raise PermissionError("ledger replay refuses every 2025/2026 session")
+    store, source_access = open_store_for_samples(
+        store_path,
+        requested_indices,
+        purpose="evaluation",
+        history_lookbacks=np.full(len(requested_indices), 253, dtype=np.int64),
+        history_end_offsets=np.full(len(requested_indices), -1, dtype=np.int64),
+    )
+    source_hashes = {
+        "v2_store_manifest": actual_store_sha,
+        "cdi_development_extension": str(
+            cdi_provenance["development_extension"]["sha256"]
+        ),
+        "cdi_experiment52_reference": str(
+            cdi_provenance["experiment52_reference"]["sha256"]
+        ),
+    }
+    output.mkdir(parents=True, exist_ok=False)
+    comparison_rows: list[dict[str, object]] = []
+    changed_paths: set[str] = set()
+
+    def replay_record(
+        record: Mapping[str, object], *, destination: Path
+    ) -> dict[str, object]:
+        fold = str(record.get("fold"))
+        indices = expected_folds.get(fold)
+        if indices is None:
+            raise ValueError(f"prior score uses an unexpected fold: {fold}")
+        scores, score_mask, score_manifest_sha = _load_prior_score_panel(
+            source_root=source_root,
+            record=record,
+            expected_indices=indices,
+            expected_name_count=len(store.isins),
+        )
+        old_summary = record.get("evaluation")
+        if not isinstance(old_summary, Mapping):
+            raise ValueError("prior classical record lacks its evaluation summary")
+        old_path_raw = old_summary.get("report")
+        old_sha = old_summary.get("report_sha256")
+        if not isinstance(old_path_raw, str) or not isinstance(old_sha, str):
+            raise ValueError("prior evaluation binding is malformed")
+        old_path = Path(old_path_raw).resolve(strict=True)
+        if not old_path.is_relative_to(source_root) or sha256_file(old_path) != old_sha:
+            raise ValueError("prior evaluation report identity mismatch")
+        old_report = json.loads(old_path.read_text(encoding="utf-8"))
+        if not isinstance(old_report, Mapping):
+            raise ValueError("prior evaluation report is malformed")
+        destination.mkdir(parents=True, exist_ok=False)
+        new_result, new_sha = _evaluate_and_write(
+            store=store,
+            indices=indices,
+            scores=scores,
+            score_mask=score_mask,
+            cdi_by_index=cdi_by_index,
+            source_hashes={**source_hashes, "score_manifest": score_manifest_sha},
+            window_name=fold,
+            path=destination / "evaluation.json",
+        )
+        old_non_ledger = _non_ledger_report(old_report)
+        new_non_ledger = _non_ledger_report(new_result.report)
+        if old_non_ledger != new_non_ledger:
+            raise RuntimeError(
+                f"non-ledger evaluation fields changed during replay: {fold}"
+            )
+        old_economics = old_report.get("economics")
+        new_economics = new_result.report.get("economics")
+        if not isinstance(old_economics, Mapping) or not isinstance(
+            new_economics, Mapping
+        ):
+            raise ValueError("evaluation economics payload is malformed")
+        local_changed = _changed_field_paths(old_economics, new_economics)
+        changed_paths.update(local_changed)
+        label = (
+            f"baseline:{fold}:{record.get('name')}"
+            if record.get("engine") == "baseline"
+            else f"gbdt:{fold}"
+        )
+        comparison_rows.append(
+            {
+                "evaluation": label,
+                "prior_report": str(old_path),
+                "prior_report_sha256": old_sha,
+                "replayed_report": str(destination / "evaluation.json"),
+                "replayed_report_sha256": new_sha,
+                "non_ledger_payload_sha256": _canonical_payload_sha256(new_non_ledger),
+                "non_ledger_fields_bit_identical": True,
+                "changed_ledger_field_paths": sorted(local_changed),
+            }
+        )
+        return {
+            **{key: value for key, value in record.items() if key != "evaluation"},
+            "evaluation": _evaluation_summary(
+                new_result, destination / "evaluation.json", new_sha
+            ),
+            "score_reused_without_recomputation": True,
+        }
+
+    try:
+        baseline_records = [
+            replay_record(
+                record,
+                destination=(
+                    output / "baselines" / str(record["fold"]) / str(record["name"])
+                ),
+            )
+            for record in baseline_source
+        ]
+        gbdt_records = [
+            replay_record(
+                record,
+                destination=output / "gbdt_triage" / str(record["fold"]),
+            )
+            for record in gbdt_source
+        ]
+        acceptance = _development_acceptance(
+            baseline_records=baseline_records,
+            gbdt_records=gbdt_records,
+            action_terms_source=store_metadata.get("action_terms_source"),
+            schedule_source=store_metadata.get("schedule_source"),
+            native_fast_audit_passed=native_fast_audit is not None,
+        )
+        protocol_hashes = {
+            name: {
+                "path": str(PROTOCOL_CONFIG_ROOT / f"{name}.json"),
+                "sha256": sha256_file(PROTOCOL_CONFIG_ROOT / f"{name}.json"),
+            }
+            for name in ("triage", "full")
+        }
+        manifest_path = output / "pipeline_validation_manifest.json"
+        manifest_sha = write_json_atomic(
+            manifest_path,
+            {
+                "schema": PIPELINE_SCHEMA,
+                "status": "completed",
+                "engineering_acceptance_status": acceptance["status"],
+                "engineering_acceptance_reasons": acceptance["reasons"],
+                **PIPELINE_FLAGS,
+                "scope": (
+                    "development-only ledger replay over hash-reused classical "
+                    "scores; numbers are not research claims"
+                ),
+                "code": code,
+                "store_build_implementation_commit": store_build_commit,
+                "runtime": asdict(runtime),
+                "protocols": protocol_hashes,
+                "enabled_sidecars": list(sidecars),
+                "sources": {
+                    "store": {
+                        "root": str(store_path),
+                        "manifest_sha256": actual_store_sha,
+                        "access_ledger": source_access.payload(),
+                        "external_artifact_resolutions": external_resolutions,
+                    },
+                    "cdi": cdi_provenance,
+                    "native_fast_raw_audit": native_fast_audit,
+                    "prior_classical_acceptance": {
+                        "root": str(source_root),
+                        "manifest_sha256": prior_classical_manifest_sha256,
+                        "inventory_sha256": prior_classical_inventory_sha256,
+                        "implementation_commit": prior_code.get("commit"),
+                    },
+                },
+                "date_contract": {
+                    "minimum_date": min(requested_dates).isoformat(),
+                    "maximum_date": max(requested_dates).isoformat(),
+                    "official_validation_accessed": False,
+                    "test_accessed": False,
+                    "development_folds": fold_payload,
+                },
+                "ledger_replay_proof": {
+                    "score_or_model_recomputation": False,
+                    "prior_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V4",
+                    "replayed_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V5",
+                    "schema_field_is_the_only_non_economics_exception": True,
+                    "all_non_ledger_fields_bit_identical": all(
+                        row["non_ledger_fields_bit_identical"] is True
+                        for row in comparison_rows
+                    ),
+                    "comparison_count": len(comparison_rows),
+                    "changed_ledger_field_paths": sorted(changed_paths),
+                    "comparisons": comparison_rows,
+                },
+                "results": {
+                    "development_acceptance": acceptance,
+                    "baselines": baseline_records,
+                    "gbdt_triage": gbdt_records,
+                    "network_smokes": {
+                        "status": "not_run",
+                        "reason": "neural validation belongs to the registered round",
+                    },
+                },
+            },
+        )
+        excluded = {"inventory.json", "inventory.json.sha256"}
+        rows = inventory(output, exclude=excluded)
+        inventory_path = output / "inventory.json"
+        inventory_sha = write_json_atomic(
+            inventory_path,
+            {
+                "schema": f"{PIPELINE_SCHEMA}_INVENTORY",
+                "status": "completed",
+                **PIPELINE_FLAGS,
+                "excluded_self": sorted(excluded),
+                "files": rows,
+            },
+        )
+        _verify_inventory_rows(output, rows, excluded=excluded)
+    finally:
+        store.close()
+    return PipelineValidationResult(
+        root=output,
+        manifest_path=manifest_path,
+        manifest_sha256=manifest_sha,
+        inventory_path=inventory_path,
+        inventory_sha256=inventory_sha,
+    )
+
+
 def resume_network_validation(
     *,
     store_root: Path,
@@ -2328,6 +2867,16 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--completed-classical-inventory-sha256")
     parser.add_argument("--completed-classical-failure-sha256")
+    parser.add_argument(
+        "--prior-classical-root",
+        type=Path,
+        help=(
+            "Sealed completed classical acceptance whose score panels are reused "
+            "for a ledger-only replay."
+        ),
+    )
+    parser.add_argument("--prior-classical-manifest-sha256")
+    parser.add_argument("--prior-classical-inventory-sha256")
     parser.add_argument("--sidecar", action="append", default=[])
     parser.add_argument("--fine-epochs", type=int, default=3)
     parser.add_argument("--handoff-epochs", type=int, default=1)
@@ -2374,7 +2923,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         arguments.completed_classical_inventory_sha256,
         arguments.completed_classical_failure_sha256,
     )
-    if any(value is not None for value in continuation):
+    ledger_replay = (
+        arguments.store_manifest_sha256,
+        arguments.prior_classical_root,
+        arguments.prior_classical_manifest_sha256,
+        arguments.prior_classical_inventory_sha256,
+    )
+    if any(value is not None for value in ledger_replay[1:]):
+        if any(value is None for value in ledger_replay):
+            raise ValueError("ledger replay requires all four source bindings")
+        if any(value is not None for value in continuation[1:]):
+            raise ValueError("ledger replay and network continuation are exclusive")
+        result = replay_classical_economics(
+            store_root=arguments.store_root,
+            store_manifest_sha256=arguments.store_manifest_sha256,
+            cdi_path=arguments.cdi_path,
+            cdi_sha256=arguments.cdi_sha256,
+            experiment52_cdi_path=arguments.experiment52_cdi_path,
+            experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
+            prior_classical_root=arguments.prior_classical_root,
+            prior_classical_manifest_sha256=(arguments.prior_classical_manifest_sha256),
+            prior_classical_inventory_sha256=(
+                arguments.prior_classical_inventory_sha256
+            ),
+            output_root=arguments.output_root,
+        )
+    elif any(value is not None for value in continuation):
         if any(value is None for value in continuation):
             raise ValueError("network continuation requires all four source bindings")
         result = resume_network_validation(

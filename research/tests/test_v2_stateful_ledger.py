@@ -700,6 +700,9 @@ def test_retention_width_cannot_overlap_rank_bands() -> None:
             buffer_per_side=4,
             cost_bps_per_side=0.0,
             annual_borrow_rate=0.0,
+            # Single-name admission is intentional: a 50% slot must pass the
+            # net cap before its opposite-side order exists.
+            planned_absolute_net_cap=0.50,
             planned_name_weight_cap=0.60,
         ),
     )
@@ -734,7 +737,9 @@ def test_risk_caps_are_bound_to_prior_positive_nav() -> None:
             buffer_per_side=0,
             gross_target=2.0,
             planned_gross_cap=2.25,
-            planned_absolute_net_cap=0.10,
+            # The independent-entry contract checks each 50% slot rather than
+            # relying on a paired-order exception.
+            planned_absolute_net_cap=0.50,
             planned_name_weight_cap=0.50,
             cost_bps_per_side=0.0,
             annual_borrow_rate=0.0,
@@ -744,3 +749,163 @@ def test_risk_caps_are_bound_to_prior_positive_nav() -> None:
     assert result.planned_net_fraction_nav[1] == 0.0
     assert result.planned_name_weight_fraction_nav[1] == 0.5
     assert not result.actual_risk_breach[1]
+
+
+def test_sixty_slot_book_refills_while_three_names_per_side_rotate() -> None:
+    days, names = 120, 250
+    generator = np.random.default_rng(57)
+    close = 100.0 * np.exp(
+        np.cumsum(generator.uniform(0.0, 1e-5, size=(days, names)), axis=0)
+    )
+    base = np.arange(names, dtype=np.float64)
+    scores = np.stack(
+        [base if day < 2 else np.roll(base, 3 * (day - 1)) for day in range(days)]
+    )
+    result = _run(
+        close,
+        scores,
+        config=LedgerConfig(
+            k_per_side=30,
+            buffer_per_side=0,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+        ),
+        initial_reference_price=np.full(names, 100.0),
+    )
+
+    assert np.sum(result.position_sign[1] > 0) == 30
+    assert np.sum(result.position_sign[1] < 0) == 30
+    assert np.all(result.submitted_entry_count[3:-1] == 6)
+    assert np.all(result.gross_fraction_nav[1:-1] >= 1.8 - 1e-12)
+    assert np.all(result.gross_fraction_nav[1:-1] <= 2.2 + 1e-12)
+
+
+def test_asymmetric_exit_fills_trim_only_the_heavy_side() -> None:
+    days, names = 6, 250
+    base = np.arange(names, dtype=np.float64)
+    scores = np.tile(base, (days, 1))
+    for day in range(1, days):
+        scores[day, 246:250] = 100.0 + np.arange(4)
+        scores[day, 100:104] = 300.0 + np.arange(4)
+        scores[day, 0] = 120.0
+        scores[day, 104] = -10.0
+    result = _run(
+        np.full((days, names), 100.0),
+        scores,
+        config=LedgerConfig(
+            k_per_side=30,
+            buffer_per_side=0,
+            planned_absolute_net_cap=0.08,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+        ),
+        initial_reference_price=np.full(names, 100.0),
+    )
+
+    risk_orders = [
+        order
+        for order in result.intended_orders
+        if order.decision_session == 2 and order.purpose == "risk_exit"
+    ]
+    assert risk_orders
+    assert all(order.side == "buy" for order in risk_orders)
+    assert len(risk_orders) < 29
+    assert result.risk_trim_net_notional[2] > 0.0
+    assert result.risk_trim_gross_notional[2] == 0.0
+    assert result.gross_fraction_nav[2] > 1.8
+
+
+def test_adverse_fifteen_percent_rally_uses_proportional_gross_trims() -> None:
+    days, names = 5, 100
+    scores = np.tile(np.arange(names, dtype=np.float64), (days, 1))
+    close = np.full((days, names), 100.0)
+    close[1:, :30] = 115.0
+    result = _run(
+        close,
+        scores,
+        config=LedgerConfig(
+            k_per_side=30,
+            buffer_per_side=30,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+        ),
+        initial_reference_price=np.full(names, 100.0),
+    )
+
+    risk_orders = [
+        order
+        for order in result.intended_orders
+        if order.decision_session == 2 and order.purpose == "risk_exit"
+    ]
+    long_trim = sum(
+        order.quantity * order.reference_price
+        for order in risk_orders
+        if order.side == "sell"
+    )
+    short_trim = sum(
+        order.quantity * order.reference_price
+        for order in risk_orders
+        if order.side == "buy"
+    )
+    assert result.gross_fraction_nav[1] > 2.25
+    assert result.gross_fraction_nav[2] <= 2.0 + 1e-12
+    np.testing.assert_allclose(long_trim, 0.15, atol=1e-12)
+    np.testing.assert_allclose(short_trim, 0.30, atol=1e-12)
+
+
+def test_missing_reference_skips_candidate_and_admits_the_next_name() -> None:
+    names = 100
+    scores = np.tile(np.arange(names, dtype=np.float64), (4, 1))
+    references = np.full(names, 100.0)
+    references[99] = np.nan
+    result = _run(
+        np.full((4, names), 100.0),
+        scores,
+        config=LedgerConfig(
+            k_per_side=30,
+            buffer_per_side=30,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+        ),
+        initial_reference_price=references,
+    )
+
+    day_zero_buys = {
+        order.security_index
+        for order in result.intended_orders
+        if order.decision_session == 0
+        and order.purpose == "entry"
+        and order.side == "buy"
+    }
+    assert 99 not in day_zero_buys
+    assert 98 in day_zero_buys
+    assert result.blocked_entry_no_reference_count[0] == 1
+
+
+def test_full_long_side_does_not_block_empty_short_side() -> None:
+    names = 100
+    scores = np.tile(np.arange(names, dtype=np.float64), (4, 1))
+    references = np.full(names, 100.0)
+    references[:30] = np.nan
+    result = _run(
+        np.full((4, names), 100.0),
+        scores,
+        config=LedgerConfig(
+            k_per_side=30,
+            buffer_per_side=30,
+            planned_absolute_net_cap=1.10,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+        ),
+        initial_reference_price=references,
+    )
+
+    assert np.sum(result.position_sign[0] > 0) == 30
+    assert np.sum(result.position_sign[0] < 0) == 0
+    assert np.sum(result.position_sign[1] > 0) == 30
+    assert np.sum(result.position_sign[1] < 0) == 30
+    assert all(
+        order.side == "sell"
+        for order in result.intended_orders
+        if order.decision_session == 1 and order.purpose == "entry"
+    )

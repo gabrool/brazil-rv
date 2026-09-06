@@ -1090,3 +1090,65 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
     )
     assert rejected["status"] == "unsupported"
     assert any("deployed_gross" in value for value in rejected["reasons"])
+
+
+def test_ledger_replay_comparison_excludes_only_economics_and_schema() -> None:
+    old = {
+        "schema": "OLD",
+        "metric": {"ic": 0.0123},
+        "coverage": {"dates": 124},
+        "economics": {"headline": {"gross": 0.4}, "daily": [{"gross": 0.5}]},
+    }
+    new = {
+        "schema": "NEW",
+        "metric": {"ic": 0.0123},
+        "coverage": {"dates": 124},
+        "economics": {"headline": {"gross": 2.0}, "daily": [{"gross": 1.9}]},
+    }
+
+    assert pipeline._non_ledger_report(old) == pipeline._non_ledger_report(new)
+    assert pipeline._changed_field_paths(old["economics"], new["economics"]) == {
+        "economics.headline.gross",
+        "economics.daily[].gross",
+    }
+
+
+def test_prior_score_replay_fails_loudly_on_hash_mismatch(tmp_path: Path) -> None:
+    root = tmp_path.resolve()
+    panel = root / "panel"
+    panel.mkdir()
+    scores = np.zeros((2, 3, len(HORIZONS)), dtype=np.float32)
+    score_mask = np.ones_like(scores, dtype=np.bool_)
+    np.save(panel / "scores.npy", scores, allow_pickle=False)
+    np.save(panel / "score_mask.npy", score_mask, allow_pickle=False)
+    manifest_path = panel / "validation_manifest.json"
+    manifest_sha = write_json_atomic(
+        manifest_path,
+        {
+            "schema": pipeline._PRIOR_PIPELINE_SCHEMA,
+            "status": "completed",
+            **pipeline.PIPELINE_FLAGS,
+            "metadata": {"date_indices": [10, 11]},
+            "artifacts": {
+                name: {
+                    "bytes": (panel / name).stat().st_size,
+                    "sha256": sha256_file(panel / name),
+                }
+                for name in ("scores.npy", "score_mask.npy")
+            },
+        },
+    )
+    record = {
+        "score_manifest": str(manifest_path),
+        "score_manifest_sha256": manifest_sha,
+    }
+    scores[0, 0, 0] = 1.0
+    np.save(panel / "scores.npy", scores, allow_pickle=False)
+
+    with pytest.raises(ValueError, match="artifact hash mismatch"):
+        pipeline._load_prior_score_panel(
+            source_root=root,
+            record=record,
+            expected_indices=np.asarray([10, 11], dtype=np.int64),
+            expected_name_count=3,
+        )

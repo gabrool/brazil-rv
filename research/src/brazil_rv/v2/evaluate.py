@@ -34,7 +34,7 @@ BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V4"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V5"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
@@ -760,6 +760,36 @@ def _ledger_rows(
             "pending_entry_count": int(result.pending_entry_count[index]),
             "pending_exit_count": int(result.pending_exit_count[index]),
             "cancelled_entry_count": int(result.cancelled_entry_count[index]),
+            "submitted_entry_count": int(result.submitted_entry_count[index]),
+            "blocked_entry_no_reference_count": int(
+                result.blocked_entry_no_reference_count[index]
+            ),
+            "blocked_entry_gross_cap_count": int(
+                result.blocked_entry_gross_cap_count[index]
+            ),
+            "blocked_entry_net_cap_count": int(
+                result.blocked_entry_net_cap_count[index]
+            ),
+            "blocked_entry_name_cap_count": int(
+                result.blocked_entry_name_cap_count[index]
+            ),
+            "zero_entry_small_universe": bool(result.zero_entry_small_universe[index]),
+            "zero_entry_gross_cap": bool(result.zero_entry_gross_cap[index]),
+            "zero_entry_net_cap": bool(result.zero_entry_net_cap[index]),
+            "zero_entry_name_cap": bool(result.zero_entry_name_cap[index]),
+            "zero_entry_no_reference": bool(result.zero_entry_no_reference[index]),
+            "risk_trim_gross_notional": _finite_or_none(
+                result.risk_trim_gross_notional[index]
+            ),
+            "risk_trim_net_notional": _finite_or_none(
+                result.risk_trim_net_notional[index]
+            ),
+            "risk_trim_name_notional": _finite_or_none(
+                result.risk_trim_name_notional[index]
+            ),
+            "pending_exit_mean_age_sessions": _finite_or_none(
+                result.pending_exit_mean_age_sessions[index]
+            ),
             "intended_order_count": order_count[day],
             "fill_count": fill_count[day],
             "order_cancellation_count": cancellation_count[day],
@@ -1349,9 +1379,19 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         "k_per_side": config.k_per_side,
         "buffer_per_side": config.buffer_per_side,
         "gross_target": config.gross_target,
+        "planned_gross_cap": config.planned_gross_cap,
+        "planned_absolute_net_cap": config.planned_absolute_net_cap,
+        "planned_name_weight_cap": config.planned_name_weight_cap,
+        "planned_net_cap_rationale": (
+            "20% permits ordinary asynchronous imbalance across 30 independent "
+            "slots per side while retaining a binding directional-risk limit"
+        ),
         "annual_sessions": config.annual_sessions,
         "terminal_liquidation": True,
-        "stateful_policy": "buffered held inventory; no resizing or drift trades",
+        "stateful_policy": (
+            "buffered held inventory; independent side refills; partial lowest-"
+            "conviction gross/net/name risk trims; no discretionary drift trades"
+        ),
         "missing_print_policy": (
             "stale mark while an exit is pending; fill at the first print and "
             "report a valuation scenario after 10 missing sessions"
