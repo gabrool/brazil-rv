@@ -22,33 +22,32 @@ class IntradayDailyResult:
     feature_names: tuple[str, ...] = INTRADAY_DAILY_FEATURES
 
 
-_ACTION_BOUNDARY_WINDOWS = {
+_SAME_DAY_BOUNDARY_WINDOWS = {
     0: 1,
     2: 5,
     3: 20,
     6: 1,
     7: 20,
     17: 20,
-    19: 20,
 }
 
 
 def mask_action_boundaries(
     result: IntradayDailyResult,
-    action_boundary: NDArray[np.bool_],
+    same_day_boundary: NDArray[np.bool_],
 ) -> IntradayDailyResult:
-    """Remove M1 features whose raw-price path crosses an action boundary.
+    """Remove M1 features whose cross-session path crosses a known boundary.
 
-    The M1 archive contains a mixture of raw, adjusted, and indeterminate
-    event histories.  Same-session ratios remain scale-free, but overnight
-    returns and the two-day Corwin-Schultz primitive cannot be reconciled
-    safely at recorded or unresolved action boundaries.  Their trailing
-    dependants are masked for the exact windows that consume those values.
+    ``same_day_boundary[t]`` must be knowable by the decision on ``t`` (for
+    example, an opening gap against the last prior raw close or a verified
+    action effective at the open).  Post-close classifications are not valid
+    inputs to this function.  Same-session ratios remain scale-free; only
+    cross-session primitives and their exact trailing dependants are masked.
     """
 
-    boundaries = np.asarray(action_boundary, dtype=np.bool_)
+    boundaries = np.asarray(same_day_boundary, dtype=np.bool_)
     if boundaries.shape != result.values.shape[:2]:
-        raise ValueError("action_boundary must align with intraday result axes")
+        raise ValueError("same_day_boundary must align with intraday result axes")
     values = np.asarray(result.values).copy()
     valid = np.asarray(result.valid, dtype=np.bool_).copy()
     cumulative = np.concatenate(
@@ -58,7 +57,7 @@ def mask_action_boundaries(
         ),
         axis=0,
     )
-    for feature_index, window in _ACTION_BOUNDARY_WINDOWS.items():
+    for feature_index, window in _SAME_DAY_BOUNDARY_WINDOWS.items():
         clear = np.zeros(boundaries.shape, dtype=np.bool_)
         clear[window - 1 :] = cumulative[window:] - cumulative[:-window] == 0
         valid[..., feature_index] &= clear
@@ -77,6 +76,46 @@ def mask_action_boundaries(
         close_anchor_consistent=result.close_anchor_consistent,
         feature_names=result.feature_names,
     )
+
+
+def detect_open_gap_boundaries(
+    raw_open: NDArray[np.floating],
+    raw_close: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    *,
+    maximum_absolute_log_gap: float = 0.30,
+) -> NDArray[np.bool_]:
+    """Flag large open gaps using only information available at that open.
+
+    The comparison uses the last observed close strictly before each row.  It
+    never consults the current close, quantity, distribution code or any
+    later classification, so mutating post-decision data cannot change the
+    decision row's boundary mask.
+    """
+
+    open_ = np.asarray(raw_open, dtype=np.float64)
+    close = np.asarray(raw_close, dtype=np.float64)
+    seen = np.asarray(observed, dtype=np.bool_)
+    if open_.ndim != 2 or open_.shape != close.shape or open_.shape != seen.shape:
+        raise ValueError("daily open/close/observed arrays must align [date, name]")
+    if not np.isfinite(maximum_absolute_log_gap) or maximum_absolute_log_gap <= 0:
+        raise ValueError("maximum_absolute_log_gap must be finite and positive")
+    output = np.zeros(open_.shape, dtype=np.bool_)
+    last_close = np.full(open_.shape[1], np.nan, dtype=np.float64)
+    for row in range(open_.shape[0]):
+        usable = (
+            np.isfinite(open_[row])
+            & (open_[row] > 0.0)
+            & np.isfinite(last_close)
+            & (last_close > 0.0)
+        )
+        output[row, usable] = (
+            np.abs(np.log(open_[row, usable] / last_close[usable]))
+            > maximum_absolute_log_gap
+        )
+        close_valid = seen[row] & np.isfinite(close[row]) & (close[row] > 0.0)
+        last_close[close_valid] = close[row, close_valid]
+    return output
 
 
 def _validate_minutes(
@@ -535,6 +574,9 @@ def build_intraday_daily_features(
         session_close=np.where(final_valid, final_close, np.nan),
         session_close_valid=final_valid,
         realized_daily_vol=realized,
-        fast_present=entry_valid & realized_valid,
+        # Fast representation presence is a property of the completed prefix.
+        # The entry-bar open has its own validity and is never allowed to make
+        # a decision input present or absent.
+        fast_present=prefix_valid & realized_valid,
         close_anchor_consistent=final_valid.copy(),
     )

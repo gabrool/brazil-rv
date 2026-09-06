@@ -7,6 +7,7 @@ from brazil_rv.v2.build_store import stream_intraday_from_assignments
 from brazil_rv.v2.intraday_features import (
     _rolling_roll_spread,
     build_intraday_daily_features,
+    detect_open_gap_boundaries,
     five_minute_returns,
     mask_action_boundaries,
     replace_daily_close_anchors,
@@ -38,12 +39,12 @@ def test_intraday_features_use_completed_bars_before_cutoff_only() -> None:
     np.testing.assert_array_equal(original.entry_open[24], mutated.entry_open[24])
 
 
-def test_missing_entry_bar_disables_fast_presence() -> None:
+def test_entry_bar_does_not_control_fast_presence() -> None:
     inputs = list(_minutes())
     inputs[-1][24, 0, 345] = False
     result = build_intraday_daily_features(*inputs)
     assert not result.entry_open_valid[24, 0]
-    assert not result.fast_present[24, 0]
+    assert result.fast_present[24, 0]
 
 
 def test_action_boundaries_mask_overnight_and_exact_rolling_dependants() -> None:
@@ -59,12 +60,37 @@ def test_action_boundaries_mask_overnight_and_exact_rolling_dependants() -> None
     assert not masked.valid[24, 0, 3]
     assert not masked.valid[24, 0, 7]
     assert not masked.valid[24, 0, 17]
-    assert not masked.valid[24, 0, 19]
+    assert masked.valid[24, 0, 19]
     assert masked.valid[24, 1, 0]
     assert masked.valid[24, 0, 1]
     assert masked.valid[24, 0, 4]
     assert masked.valid[24, 0, 18]
     assert np.all(masked.values[~masked.valid] == 0.0)
+
+
+def test_open_gap_boundary_is_decision_known_and_close_t_invariant() -> None:
+    raw_open = np.asarray([[100.0], [50.0], [51.0]])
+    raw_close = np.asarray([[100.0], [52.0], [53.0]])
+    observed = np.ones_like(raw_open, dtype=bool)
+    expected = detect_open_gap_boundaries(raw_open, raw_close, observed)
+    assert expected[:, 0].tolist() == [False, True, False]
+
+    changed = raw_close.copy()
+    changed[1, 0] = 5_200.0
+    actual = detect_open_gap_boundaries(raw_open, changed, observed)
+    assert actual[1, 0] == expected[1, 0]
+    assert actual[2, 0] != expected[2, 0]
+
+
+def test_fast_presence_ignores_every_entry_bar_field() -> None:
+    inputs = _minutes()
+    original = build_intraday_daily_features(*inputs)
+    changed = [value.copy() for value in inputs]
+    for index in range(5):
+        changed[index][24, :, 345] = np.nan
+    changed[-1][24, :, 345] = False
+    mutated = build_intraday_daily_features(*changed)
+    np.testing.assert_array_equal(original.fast_present[24], mutated.fast_present[24])
 
 
 def test_five_minute_returns_are_adjacent_block_close_to_close() -> None:
