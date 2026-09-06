@@ -41,3 +41,54 @@ GBDT feature ladder, and GBDT data-span preview on CPU. Round 2 compares the
 registered neural data-span arms, the selected network, the GBDT parent, and
 their fixed equal-weight rank ensemble on one GH200 session. No deployment
 change is authorized.
+
+## Round 1 / Round 2 registration voided (2026-09-05)
+
+Round 1/2 registration `v2_round1_round2.md` was voided before any result was
+read for a research decision. The interrupted run is engineering evidence
+only: no result is admissible or cited as a research claim. External review
+confirmed five measurement defects in code at `29ffb88`: (F1) the specified
+corporate-action heuristic treated ordinary price jumps as actions and used
+future observations, (F2) the specified stateless simulator discarded whole
+portfolio days, (F3) the specified target removed the cross-sectional median
+after volatility scaling and used same-day volatility, (F4) block-parity
+selection and evaluation shared label increments and economic dates, and (F5)
+the specified swing simulator did not maintain inventory. F1–F5 arose from
+the specification supplied to the implementation; the implementation followed
+that contract. No v1 artifact, sealed window, or deployment was changed.
+
+The exact paid GH200 `46ee1e1c16f14d7c8fd737919ed66400` was stopped before
+queued work continued, terminated, and confirmed absent in two independent
+provider inventories. The partial Round-2 root was superseded before any
+trajectory wrote a history, manifest, checkpoint, or score. The completed
+Round-1 headline-cell interval support audit was:
+
+| candidate | F1 valid/total | F2 valid/total | F3 valid/total |
+|---|---:|---:|---:|
+| momentum | 123/123 | 123/123 | 126/126 |
+| reversal21 | 2/123 | 6/123 | 9/126 |
+| reversal5 | 0/123 | 0/123 | 2/126 |
+| blend | 123/123 | 123/123 | 126/126 |
+| a_slow | 1/123 | 3/123 | 2/126 |
+| b_intraday | 0/123 | 1/123 | 3/126 |
+| c_lending | 0/123 | 2/123 | 5/126 |
+| d_all_sidecars | 1/123 | 2/123 | 2/126 |
+| uniform | 0/123 | 1/123 | 1/126 |
+| decay | 1/123 | 0/123 | 2/126 |
+
+There were 61 zero-support readouts serialized as JSON `null`. This quantifies
+the F1/F2 missing-outcome defect and is not a performance result.
+
+The preregistered standalone action audit on the immutable accepted store is
+`v2_fix_pass_3_action_audit_20260905T230000Z`, audit SHA-256
+`29188dbe8a07236e8abd40d7cdc5ed1e6ff5ea2c67c4e8fa5f93e09a17128e73`.
+The audit hash-verifies its accepted source manifest and every array/table it
+reads; source-manifest SHA-256 is
+`6a7e13195c6cde92fbdc756a585e4cb65d73998faa94e237595c7be7cdfb6919`.
+DISMES-only split recall/precision were `0.192469/0.464646`; adding the strict
+fallback changed them to `0.192469/0.253444`, a recall gain of zero and a
+precision loss of `0.211203`. The frozen decision rule therefore rejects the
+fallback. The old classifier labelled 114,604 cash events, of which 102,372
+(`89.3267%`) had no DISMES change. Old target validity fell from `51.9151%` at
+D1 to `30.1509%` at D10. The replacement is consequently DISMES-only, causal,
+and fixed before the rebuilt store.

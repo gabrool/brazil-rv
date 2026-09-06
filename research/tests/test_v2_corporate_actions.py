@@ -26,7 +26,7 @@ def test_cotahist_split_detection_and_provider_alignment_are_independent() -> No
     close = np.asarray([[100.0], [50.0], [51.0]])
     quantity = np.asarray([[1_000.0], [2_000.0], [2_100.0]])
     observed = np.ones_like(close, dtype=np.bool_)
-    dismes = np.ones_like(close)
+    dismes = np.asarray([[1.0], [2.0], [2.0]])
     detected = detect_cotahist_actions(close, quantity, dismes, observed)
     assert detected.split_event[:, 0].tolist() == [False, True, False]
 
@@ -74,8 +74,7 @@ def test_cotahist_classifies_cash_and_ambiguous_dismes_changes() -> None:
     assert result.cash_event[2, 1]
     assert not result.split_event[2].any()
 
-    # A large price jump is a candidate even without a DISMES change. With no
-    # offsetting quantity move it is cash-type, not a split adjustment.
+    # Price jumps without a DISMES change are audit anomalies only.
     no_dismes = np.ones((4, 1))
     large_drop = np.asarray([[100.0], [100.0], [80.0], [80.0]])
     large_result = detect_cotahist_actions(
@@ -84,8 +83,9 @@ def test_cotahist_classifies_cash_and_ambiguous_dismes_changes() -> None:
         no_dismes,
         np.ones_like(large_drop, dtype=bool),
     )
-    assert large_result.event_candidate[2, 0]
-    assert large_result.cash_event[2, 0]
+    assert not large_result.event_candidate.any()
+    assert not large_result.cash_event.any()
+    assert large_result.price_jump_anomaly_mask[2, 0]
 
     moderate_drop = np.asarray([[100.0], [100.0], [94.0], [94.0]])
     moderate_result = detect_cotahist_actions(
@@ -94,8 +94,108 @@ def test_cotahist_classifies_cash_and_ambiguous_dismes_changes() -> None:
         no_dismes,
         np.ones_like(moderate_drop, dtype=bool),
     )
-    assert moderate_result.event_candidate[2, 0]
-    assert moderate_result.ambiguous_event[2, 0]
+    assert not moderate_result.event_candidate.any()
+    assert not moderate_result.ambiguous_event.any()
+    assert moderate_result.price_jump_anomaly_mask[2, 0]
+
+
+def test_jump_only_examples_are_anomalies_and_never_adjusted() -> None:
+    examples = (
+        [100, 100, 100, 110, 110, 110, 110, 110],
+        [100, 100, 100, 80, 80, 80, 80, 80],
+        [100, 100, 100, 105, 105, 105, 105, 105],
+        [100, 100, 100, 105, 100, 100, 100, 100],
+        [100, 100, 100, 90, 92, 92, 92, 92],
+    )
+    for raw in examples:
+        close = np.asarray(raw, dtype=np.float64)[:, None]
+        result = detect_cotahist_actions(
+            close,
+            np.full_like(close, 100.0),
+            np.ones_like(close),
+            np.ones_like(close, dtype=np.bool_),
+        )
+        assert not result.event_candidate.any()
+        assert not result.split_event.any()
+        assert not result.cash_event.any()
+        assert not result.ambiguous_event.any()
+        assert result.price_jump_anomaly_mask.any()
+        np.testing.assert_array_equal(
+            causal_price_adjustment_factor(result.price_ratio, result.split_event),
+            np.ones_like(close),
+        )
+
+
+def test_cotahist_classifier_is_causal_and_exercises_all_classes() -> None:
+    close = np.asarray([[100.0], [100.0], [50.0], [51.0], [52.0]])
+    quantity = np.asarray([[100.0], [100.0], [200.0], [210.0], [220.0]])
+    dismes = np.asarray([[1.0], [1.0], [2.0], [2.0], [2.0]])
+    observed = np.ones_like(close, dtype=np.bool_)
+    original = detect_cotahist_actions(close, quantity, dismes, observed)
+    mutated_close = close.copy()
+    mutated_quantity = quantity.copy()
+    mutated_close[3:] *= 7.0
+    mutated_quantity[3:] *= 0.2
+    changed = detect_cotahist_actions(
+        mutated_close, mutated_quantity, dismes, observed
+    )
+    assert original.split_event[2, 0]
+    np.testing.assert_array_equal(original.split_event[:3], changed.split_event[:3])
+    np.testing.assert_array_equal(original.price_ratio[:3], changed.price_ratio[:3])
+    original_adjusted = close * causal_price_adjustment_factor(
+        original.price_ratio, original.split_event
+    )
+    changed_adjusted = mutated_close * causal_price_adjustment_factor(
+        changed.price_ratio, changed.split_event
+    )
+    np.testing.assert_array_equal(original_adjusted[:3], changed_adjusted[:3])
+
+    def classify(price: float, qty: float) -> tuple[bool, bool, bool]:
+        values = np.asarray([[100.0], [100.0], [price]])
+        quantities = np.asarray([[100.0], [100.0], [qty]])
+        distributions = np.asarray([[1.0], [1.0], [2.0]])
+        result = detect_cotahist_actions(
+            values, quantities, distributions, np.ones_like(values, dtype=np.bool_)
+        )
+        return (
+            bool(result.split_event[2, 0]),
+            bool(result.cash_event[2, 0]),
+            bool(result.ambiguous_event[2, 0]),
+        )
+
+    assert classify(99.0, 100.0) == (False, True, False)
+    assert classify(94.0, 100.0) == (False, False, True)
+    assert classify(90.0, 220.0) == (False, True, False)
+
+
+def test_strict_fallback_and_large_ratio_tolerance_boundary() -> None:
+    close = np.asarray([[100.0], [100.0], [1_000.0]])
+    quantity = np.asarray([[100.0], [100.0], [10.0]])
+    dismes = np.ones_like(close)
+    observed = np.ones_like(close, dtype=np.bool_)
+    disabled = detect_cotahist_actions(close, quantity, dismes, observed)
+    enabled = detect_cotahist_actions(
+        close,
+        quantity,
+        dismes,
+        observed,
+        undocumented_split_fallback=True,
+    )
+    assert disabled.price_jump_anomaly_mask[2, 0]
+    assert not disabled.split_event.any()
+    assert enabled.split_event[2, 0]
+    assert not enabled.price_jump_anomaly_mask[2, 0]
+
+    for log_price, tolerance in ((0.299999, 0.15), (0.300001, 0.35)):
+        price = 100.0 * np.exp(log_price)
+        quantity_ratio = np.exp(-log_price + tolerance * 0.5)
+        result = detect_cotahist_actions(
+            np.asarray([[100.0], [100.0], [price]]),
+            np.asarray([[100.0], [100.0], [100.0 * quantity_ratio]]),
+            np.asarray([[1.0], [1.0], [2.0]]),
+            np.ones((3, 1), dtype=np.bool_),
+        )
+        assert result.split_event[2, 0]
 
 
 def test_legacy_canonical_cache_schema_is_upgraded_in_memory() -> None:

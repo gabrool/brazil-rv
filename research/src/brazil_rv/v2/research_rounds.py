@@ -22,11 +22,7 @@ from .evaluate import EvaluationResult, evaluate_scores
 from .gbdt import GBDTConfig, MultiHorizonGBDT
 from .splits import development_folds
 from .store import V2Store, open_store_for_samples
-from .train import (
-    block_parity_mask,
-    rank_average_ensemble,
-    stitch_block_parity_predictions,
-)
+from .train import rank_average_ensemble
 from .validate_pipeline import (
     _date_indices,
     _evaluation_inputs,
@@ -35,9 +31,14 @@ from .validate_pipeline import (
     _window_target_mask,
 )
 
-ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_V1"
-ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_V1"
-PREREGISTRATION = PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2.md"
+ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_REV2_V1"
+ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_REV2_V1"
+PREREGISTRATION = (
+    PROJECT_ROOT
+    / "research"
+    / "preregistrations"
+    / "v2_round1_round2_rev2.md"
+)
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
 BOOTSTRAP_SEED = 20260815
@@ -143,20 +144,25 @@ def _persist_scores(
 def _fold_indices(
     dates: NDArray[np.datetime64],
 ) -> tuple[
-    dict[str, NDArray[np.int64]], dict[str, NDArray[np.int64]], dict[str, object]
+    dict[str, NDArray[np.int64]],
+    dict[str, NDArray[np.int64]],
+    dict[str, NDArray[np.int64]],
+    dict[str, object],
 ]:
     python_dates = tuple(dates.astype("datetime64[D]").astype(object).tolist())
     folds = development_folds(python_dates)
     fit: dict[str, NDArray[np.int64]] = {}
     selection: dict[str, NDArray[np.int64]] = {}
+    evaluation: dict[str, NDArray[np.int64]] = {}
     payload: dict[str, object] = {}
     for fold in folds:
         fit[fold.name] = _date_indices(dates, fold.fit_dates)
         selection[fold.name] = _date_indices(dates, fold.selection_dates)
+        evaluation[fold.name] = _date_indices(dates, fold.evaluation_dates)
         payload[fold.name] = fold.payload()
     if tuple(fit) != ("F1", "F2", "F3"):
         raise ValueError("development fold roster differs from the registration")
-    return fit, selection, payload
+    return fit, selection, evaluation, payload
 
 
 def _pretrain_indices(dates: NDArray[np.datetime64]) -> NDArray[np.int64]:
@@ -172,6 +178,7 @@ def _open_round_store(
     store_root: Path,
     fit: Mapping[str, NDArray[np.int64]],
     selection: Mapping[str, NDArray[np.int64]],
+    evaluation: Mapping[str, NDArray[np.int64]],
     pretrain: NDArray[np.int64],
 ) -> tuple[V2Store, dict[str, object]]:
     requested = np.unique(
@@ -180,6 +187,7 @@ def _open_round_store(
                 pretrain,
                 *(fit[name] for name in ("F1", "F2", "F3")),
                 *(selection[name] for name in ("F1", "F2", "F3")),
+                *(evaluation[name] for name in ("F1", "F2", "F3")),
             )
         )
     ).astype(np.int64)
@@ -203,7 +211,6 @@ def _evaluate(
     source_hashes: Mapping[str, str],
     fold: str,
     output: Path,
-    pathwise_scores: tuple[NDArray[np.floating], ...] = (),
 ) -> EvaluationResult:
     inputs = _evaluation_inputs(
         store,
@@ -212,8 +219,6 @@ def _evaluate(
         score_mask,
         cdi,
         source_hashes,
-        pathwise_scores,
-        tuple(score_mask for _ in pathwise_scores),
     )
     result = evaluate_scores(inputs, window_name=fold)
     result.report.update(RESEARCH_FLAGS)
@@ -278,7 +283,7 @@ def _daily_series(report: Mapping[str, object]) -> dict[str, NDArray[np.float64]
         and float(row.get("annual_borrow_rate", -1.0)) == 0.02
     ]
     return {
-        "residual_ic": primary_values,
+        "median_residual_ic": primary_values,
         "raw_rank_ic": average_rows(metrics, "raw_rank_ic"),
         "persistence_1": average_rows(persistence, "spearman", lag=1),
         "persistence_5": average_rows(persistence, "spearman", lag=5),
@@ -370,9 +375,9 @@ def _economics_not_worse(
     candidate_value = _readout_point(candidate)
     baseline_value = _readout_point(baseline)
     return (
-        candidate_value is None
-        or baseline_value is None
-        or candidate_value >= baseline_value
+        candidate_value is not None
+        and baseline_value is not None
+        and candidate_value >= baseline_value
     )
 
 
@@ -430,7 +435,6 @@ def _paired_readouts(
                 if left_report["input_hashes"].get(key)
                 != right_report["input_hashes"].get(key)
                 and key != "scores"
-                and not key.startswith("pathwise_scores_")
             }
             if differing:
                 raise ValueError(
@@ -540,6 +544,7 @@ def _run_gbdt_candidate(
     rung: str,
     fit: Mapping[str, NDArray[np.int64]],
     selection: Mapping[str, NDArray[np.int64]],
+    evaluation: Mapping[str, NDArray[np.int64]],
     pretrain: NDArray[np.int64] | None,
     decay_half_life: float | None,
     cdi: NDArray[np.float64],
@@ -557,18 +562,20 @@ def _run_gbdt_candidate(
         train_pretrain = np.zeros(len(train_indices), dtype=np.bool_)
         if pretrain is not None:
             train_pretrain[: len(pretrain)] = True
-        evaluation_indices = selection[fold]
+        selection_indices = selection[fold]
+        evaluation_indices = evaluation[fold]
         train_x = _gbdt_features(
             store, train_indices, rung, pretrain_mask=train_pretrain
         )
+        selection_x = _gbdt_features(store, selection_indices, rung)
         evaluation_x = _gbdt_features(store, evaluation_indices, rung)
         train_y = np.asarray(store.read("target_primary", train_indices))
-        train_mask = _window_target_mask(
-            store.read("target_valid", train_indices), train_indices
+        train_mask = np.asarray(
+            store.read("target_valid", train_indices), dtype=np.bool_
         )
-        selection_y = np.asarray(store.read("target_primary", evaluation_indices))
+        selection_y = np.asarray(store.read("target_primary", selection_indices))
         selection_mask = _window_target_mask(
-            store.read("target_valid", evaluation_indices), evaluation_indices
+            store.read("target_valid", selection_indices), selection_indices
         )
         active = np.asarray(store.read("active", evaluation_indices), dtype=np.bool_)
         score_mask = np.repeat(active[..., None], len(HORIZONS), axis=-1)
@@ -576,44 +583,35 @@ def _run_gbdt_candidate(
         if decay_half_life is not None:
             ages = train_indices[-1] - train_indices
             sample_weights = np.power(0.5, ages / decay_half_life)
-        predictions: dict[int, NDArray[np.float32]] = {}
-        model_records: dict[str, object] = {}
-        importance: dict[str, object] = {}
-        for parity in (0, 1):
-            selected = block_parity_mask(len(evaluation_indices), parity)
-            model = MultiHorizonGBDT(config, feature_names=feature_names)
-            model.fit(
-                train_x,
-                train_y,
-                train_mask,
-                evaluation_x[selected],
-                selection_y[selected],
-                selection_mask[selected],
-                train_dates=train_indices,
-                validation_dates=evaluation_indices[selected],
-                sample_weights=sample_weights,
-            )
-            predictions[parity] = model.predict_ranks(evaluation_x, score_mask)
-            label = "even" if parity == 0 else "odd"
-            raw_importance = model.feature_importance(evaluation_x)
-            importance[f"selected_on_{label}"] = {
-                name: values.tolist() for name, values in raw_importance.items()
-            }
-            model_records[f"selected_on_{label}"] = _persist_model(
-                model,
-                root / "models" / fold / f"selected_on_{label}",
-                evaluation_x,
-                score_mask,
-            )
-        stitched = stitch_block_parity_predictions(predictions[0], predictions[1])
+        model = MultiHorizonGBDT(config, feature_names=feature_names)
+        model.fit(
+            train_x,
+            train_y,
+            train_mask,
+            selection_x,
+            selection_y,
+            selection_mask,
+            train_dates=train_indices,
+            validation_dates=selection_indices,
+            sample_weights=sample_weights,
+        )
+        predictions = model.predict_ranks(evaluation_x, score_mask)
+        raw_importance = model.feature_importance(evaluation_x)
+        importance = {
+            name: values.tolist() for name, values in raw_importance.items()
+        }
+        model_record = _persist_model(
+            model,
+            root / "models" / fold,
+            evaluation_x,
+            score_mask,
+        )
         fold_root = root / fold
         manifest, manifest_sha = _persist_scores(
             fold_root,
             {
-                "scores": stitched,
+                "scores": predictions,
                 "score_mask": score_mask,
-                "selected_on_even_scores": predictions[0],
-                "selected_on_odd_scores": predictions[1],
             },
             {
                 "engine": "lightgbm",
@@ -624,21 +622,21 @@ def _run_gbdt_candidate(
                 "pretrain_included": pretrain is not None,
                 "time_decay_half_life_sessions": decay_half_life,
                 "fit_date_indices": train_indices.tolist(),
-                "selection_date_indices": evaluation_indices.tolist(),
-                "models": model_records,
+                "selection_date_indices": selection_indices.tolist(),
+                "evaluation_date_indices": evaluation_indices.tolist(),
+                "model": model_record,
                 "importance": importance,
             },
         )
         evaluated = _evaluate(
             store=store,
             indices=evaluation_indices,
-            scores=stitched,
+            scores=predictions,
             score_mask=score_mask,
             cdi=cdi,
             source_hashes=source_hashes,
             fold=fold,
             output=fold_root / "evaluation.json",
-            pathwise_scores=(predictions[0], predictions[1]),
         )
         reports[fold] = evaluated.report
         records[fold] = {
@@ -647,7 +645,7 @@ def _run_gbdt_candidate(
             "evaluation": str(fold_root / "evaluation.json"),
             "evaluation_sha256": sha256_file(fold_root / "evaluation.json"),
         }
-        del model, train_x, evaluation_x, train_y, selection_y
+        del model, train_x, selection_x, evaluation_x, train_y, selection_y
     return reports, records
 
 
@@ -667,7 +665,7 @@ def freeze_round1(
         raise FileExistsError(output)
     store = store_root.resolve(strict=True)
     store_manifest, dates = _read_store_header(store)
-    fit, selection, folds = _fold_indices(dates)
+    fit, selection, evaluation, folds = _fold_indices(dates)
     _load_development_cdi(
         dates=dates,
         cdi_path=cdi_path,
@@ -709,6 +707,7 @@ def freeze_round1(
             "reversal_21",
             "momentum_12_1",
             "reversal_5_momentum_12_1_blend",
+            "inverse_volatility_20",
         ],
         "gbdt_rungs": {name: list(groups) for name, groups in RUNG_GROUPS.items()},
         "gbdt_seeds": list(GBDT_SEEDS),
@@ -748,7 +747,7 @@ def run_round1(
     store_manifest, dates = _read_store_header(store_root)
     if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
         raise ValueError("Round-1 store manifest hash mismatch")
-    fit, selection, _ = _fold_indices(dates)
+    fit, selection, evaluation, _ = _fold_indices(dates)
     pretrain = _pretrain_indices(dates)
     cdi_design = design["cdi"]
     cdi, cdi_provenance = _load_development_cdi(
@@ -760,7 +759,9 @@ def run_round1(
             cdi_design["experiment52_reference"]["sha256"]
         ),
     )
-    store, access = _open_round_store(store_root, fit, selection, pretrain)
+    store, access = _open_round_store(
+        store_root, fit, selection, evaluation, pretrain
+    )
     source_hashes = {
         "v2_store_manifest": str(design["store"]["manifest_sha256"]),
         "cdi_development_extension": str(
@@ -775,14 +776,18 @@ def run_round1(
         {"event": "round1_started", "at_utc": _utc_now()}
     ]
     try:
-        baseline_start = max(0, min(int(x[0]) for x in selection.values()) - 253)
-        baseline_end = max(int(x[-1]) for x in selection.values())
+        baseline_start = max(0, min(int(x[0]) for x in evaluation.values()) - 253)
+        baseline_end = max(int(x[-1]) for x in evaluation.values())
         baseline_axis = np.arange(baseline_start, baseline_end + 1, dtype=np.int64)
+        slow_names = tuple(store.manifest["feature_names"]["slow"])
+        volatility_index = slow_names.index("yang_zhang_vol_20")
         panels = build_baselines(
             store.read("adjusted_close", baseline_axis),
             store.read("observed", baseline_axis),
             store.read("active", baseline_axis),
             store.read("ambiguous_action_mask", baseline_axis),
+            store.read("slow_values", baseline_axis)[..., volatility_index],
+            store.read("slow_valid", baseline_axis)[..., volatility_index],
             slow_lag=1,
         )
         baseline_reports: dict[str, dict[str, dict[str, object]]] = {
@@ -790,7 +795,7 @@ def run_round1(
         }
         baseline_records: dict[str, dict[str, object]] = {name: {} for name in panels}
         for fold in ("F1", "F2", "F3"):
-            indices = selection[fold]
+            indices = evaluation[fold]
             local = indices - baseline_start
             for name, panel in panels.items():
                 assert isinstance(panel, BaselinePanel)
@@ -838,6 +843,7 @@ def run_round1(
                 rung=rung,
                 fit=fit,
                 selection=selection,
+                evaluation=evaluation,
                 pretrain=None,
                 decay_half_life=None,
                 cdi=cdi,
@@ -855,7 +861,7 @@ def run_round1(
                 rung_comparisons[f"{rung}_minus_{previous}"] = paired
                 pooled = paired["pooled"]
                 if not (
-                    _point_is_negative(pooled["residual_ic"])
+                    _point_is_negative(pooled["median_residual_ic"])
                     and _point_is_negative(pooled["headline_net_excess_bps"])
                 ):
                     kept.append(rung)
@@ -864,7 +870,9 @@ def run_round1(
         parent = max(
             kept,
             key=lambda rung: (
-                _ranking_point(rung_summaries[rung]["pooled"]["residual_ic"]),
+                _ranking_point(
+                    rung_summaries[rung]["pooled"]["median_residual_ic"]
+                ),
                 _ranking_point(
                     rung_summaries[rung]["pooled"]["headline_net_excess_bps"]
                 ),
@@ -882,6 +890,7 @@ def run_round1(
                 rung=parent,
                 fit=fit,
                 selection=selection,
+                evaluation=evaluation,
                 pretrain=pretrain,
                 decay_half_life=decay,
                 cdi=cdi,
@@ -966,17 +975,15 @@ def _existing_score_and_evaluation_record(root: Path) -> dict[str, object]:
         ):
             raise ValueError(f"registered score artifact hash mismatch: {path}")
     metadata = manifest.get("metadata")
-    if isinstance(metadata, Mapping) and isinstance(metadata.get("models"), Mapping):
-        for raw_model in metadata["models"].values():
-            if not isinstance(raw_model, Mapping):
-                raise ValueError(f"malformed model record: {manifest_path}")
-            model_manifest = Path(str(raw_model["manifest"])).resolve(strict=True)
-            expected = str(raw_model["manifest_sha256"])
-            restored = MultiHorizonGBDT.load(
-                model_manifest.parent,
-                expected_manifest_sha256=expected,
-            )
-            del restored
+    if isinstance(metadata, Mapping) and isinstance(metadata.get("model"), Mapping):
+        raw_model = metadata["model"]
+        model_manifest = Path(str(raw_model["manifest"])).resolve(strict=True)
+        expected = str(raw_model["manifest_sha256"])
+        restored = MultiHorizonGBDT.load(
+            model_manifest.parent,
+            expected_manifest_sha256=expected,
+        )
+        del restored
     _evaluation_from_path(evaluation_path)
     return {
         "score_manifest": str(manifest_path),
@@ -1007,7 +1014,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
         raise ValueError("Round-1 store manifest hash mismatch")
     _, dates = _read_store_header(store_root)
-    fit, selection, _ = _fold_indices(dates)
+    fit, selection, evaluation, _ = _fold_indices(dates)
     pretrain = _pretrain_indices(dates)
     cdi_design = design["cdi"]
     cdi, cdi_provenance = _load_development_cdi(
@@ -1019,7 +1026,9 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             cdi_design["experiment52_reference"]["sha256"]
         ),
     )
-    store, access = _open_round_store(store_root, fit, selection, pretrain)
+    store, access = _open_round_store(
+        store_root, fit, selection, evaluation, pretrain
+    )
     source_hashes = {
         "v2_store_manifest": str(design["store"]["manifest_sha256"]),
         "cdi_development_extension": str(
@@ -1077,6 +1086,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 rung=rung,
                 fit=fit,
                 selection=selection,
+                evaluation=evaluation,
                 pretrain=None,
                 decay_half_life=None,
                 cdi=cdi,
@@ -1095,7 +1105,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             rung_comparisons[f"{rung}_minus_{previous}"] = paired
             pooled = paired["pooled"]
             if not (
-                _point_is_negative(pooled["residual_ic"])
+                _point_is_negative(pooled["median_residual_ic"])
                 and _point_is_negative(pooled["headline_net_excess_bps"])
             ):
                 kept.append(rung)
@@ -1103,7 +1113,9 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     parent = max(
         kept,
         key=lambda rung: (
-            _ranking_point(rung_summaries[rung]["pooled"]["residual_ic"]),
+            _ranking_point(
+                rung_summaries[rung]["pooled"]["median_residual_ic"]
+            ),
             _ranking_point(rung_summaries[rung]["pooled"]["headline_net_excess_bps"]),
             -list(RUNG_GROUPS).index(rung),
         ),
@@ -1138,6 +1150,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 rung=parent,
                 fit=fit,
                 selection=selection,
+                evaluation=evaluation,
                 pretrain=pretrain,
                 decay_half_life=decay,
                 cdi=cdi,
@@ -1355,7 +1368,6 @@ def _training_command(
     stage: str,
     seed: int,
     fold: str | None = None,
-    parity: int | None = None,
     pretrain_checkpoint: Path | None = None,
     pretrain_sha256: str | None = None,
 ) -> list[str]:
@@ -1392,8 +1404,6 @@ def _training_command(
     ]
     if fold is not None:
         command.extend(("--fold", fold))
-    if parity is not None:
-        command.extend(("--selection-parity", str(parity)))
     for group in design["enabled_sidecars"]:
         command.extend(("--sidecar", str(group)))
     fast = design["v1_fast_initialization"]
@@ -1428,7 +1438,6 @@ def _plan_job(
     run_dir: Path,
     command: Sequence[str],
     stage: str,
-    parity: int | None,
 ) -> dict[str, object]:
     return {
         "name": name,
@@ -1439,7 +1448,6 @@ def _plan_job(
         "command": list(command),
         "expected_manifest": {
             "stage": stage,
-            "selection_parity": parity,
             "official_validation_accessed": False,
             "test_accessed": False,
         },
@@ -1467,7 +1475,6 @@ def write_round2_plan_p(*, output_root: Path) -> str:
                     design=design, output_dir=run_dir, stage="P", seed=seed
                 ),
                 stage="P",
-                parity=None,
             )
         )
     return write_json_atomic(
@@ -1511,37 +1518,28 @@ def write_round2_plan_main(*, output_root: Path) -> str:
     for arm, stage, uses_handoff in arms:
         for fold in ("F1", "F2", "F3"):
             for seed in NETWORK_SEEDS:
-                for parity in (0, 1):
-                    label = "even" if parity == 0 else "odd"
-                    run_dir = (
-                        root
-                        / "trajectories"
-                        / arm
-                        / f"{fold}_seed_{seed}_select_{label}"
-                    )
-                    handoff, handoff_sha = (
-                        handoffs[seed] if uses_handoff else (None, None)
-                    )
-                    jobs.append(
-                        _plan_job(
-                            name=f"{arm}_{fold}_seed_{seed}_select_{label}",
+                run_dir = root / "trajectories" / arm / f"{fold}_seed_{seed}"
+                handoff, handoff_sha = (
+                    handoffs[seed] if uses_handoff else (None, None)
+                )
+                jobs.append(
+                    _plan_job(
+                        name=f"{arm}_{fold}_seed_{seed}",
+                        seed=seed,
+                        fold=fold,
+                        run_dir=run_dir,
+                        command=_training_command(
+                            design=design,
+                            output_dir=run_dir,
+                            stage=stage,
                             seed=seed,
                             fold=fold,
-                            run_dir=run_dir,
-                            command=_training_command(
-                                design=design,
-                                output_dir=run_dir,
-                                stage=stage,
-                                seed=seed,
-                                fold=fold,
-                                parity=parity,
-                                pretrain_checkpoint=handoff,
-                                pretrain_sha256=handoff_sha,
-                            ),
-                            stage=stage,
-                            parity=parity,
-                        )
+                            pretrain_checkpoint=handoff,
+                            pretrain_sha256=handoff_sha,
+                        ),
+                        stage=stage,
                     )
+                )
     return write_json_atomic(
         root / "round2_plan_main.json",
         {
@@ -1583,49 +1581,38 @@ def _score_artifact(root: Path) -> tuple[NDArray[np.float32], NDArray[np.bool_]]
 
 def _aggregate_network_fold(
     root: Path, arm: str, fold: str
-) -> tuple[NDArray[np.float32], NDArray[np.bool_], tuple[NDArray[np.float32], ...]]:
-    stitched = []
-    paths = []
+) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
+    members = []
     reference_mask: NDArray[np.bool_] | None = None
     for seed in NETWORK_SEEDS:
-        parity_scores = {}
-        for parity, label in ((0, "even"), (1, "odd")):
-            run = root / "trajectories" / arm / f"{fold}_seed_{seed}_select_{label}"
-            manifest = _read_json(run / "run_manifest.json")
-            _assert_false_access(manifest, path=run / "run_manifest.json")
-            if (
-                manifest.get("status") != "completed"
-                or manifest.get("selection_parity") != parity
-            ):
-                raise ValueError(f"trajectory is incomplete: {run}")
-            scores, mask = _score_artifact(run / "scores")
-            if reference_mask is None:
-                reference_mask = mask
-            elif not np.array_equal(reference_mask, mask):
-                raise ValueError("network member score masks differ")
-            parity_scores[parity] = scores
-            paths.append(scores)
-        stitched.append(
-            stitch_block_parity_predictions(parity_scores[0], parity_scores[1])
-        )
+        run = root / "trajectories" / arm / f"{fold}_seed_{seed}"
+        manifest = _read_json(run / "run_manifest.json")
+        _assert_false_access(manifest, path=run / "run_manifest.json")
+        if (
+            manifest.get("status") != "completed"
+            or manifest.get("seed") != seed
+            or manifest.get("fold") != fold
+        ):
+            raise ValueError(f"trajectory is incomplete: {run}")
+        scores, mask = _score_artifact(run / "scores")
+        if reference_mask is None:
+            reference_mask = mask
+        elif not np.array_equal(reference_mask, mask):
+            raise ValueError("network member score masks differ")
+        members.append(scores)
     assert reference_mask is not None
-    ensemble = rank_average_ensemble(stitched, reference_mask)
-    return ensemble, reference_mask, tuple(paths)
+    ensemble = rank_average_ensemble(members, reference_mask)
+    return ensemble, reference_mask
 
 
 def _load_round1_parent_fold(
     round1_root: Path, parent: str, fold: str
-) -> tuple[NDArray[np.float32], NDArray[np.bool_], tuple[NDArray[np.float32], ...]]:
+) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
     root = round1_root / "gbdt_ladder" / parent / fold
     manifest = _read_json(root / "score_manifest.json")
     _assert_false_access(manifest, path=root / "score_manifest.json")
     arrays = {}
-    for label in (
-        "scores",
-        "score_mask",
-        "selected_on_even_scores",
-        "selected_on_odd_scores",
-    ):
+    for label in ("scores", "score_mask"):
         path = root / f"{label}.npy"
         record = manifest["artifacts"][path.name]
         if (
@@ -1634,17 +1621,13 @@ def _load_round1_parent_fold(
         ):
             raise ValueError(f"Round-1 parent score hash mismatch: {path}")
         arrays[label] = np.load(path, allow_pickle=False)
-    return (
-        arrays["scores"],
-        arrays["score_mask"],
-        (arrays["selected_on_even_scores"], arrays["selected_on_odd_scores"]),
-    )
+    return arrays["scores"], arrays["score_mask"]
 
 
 def _evaluation_from_path(path: Path) -> dict[str, object]:
     payload = _read_json(path)
     _assert_false_access(payload, path=path)
-    if payload.get("schema") != "BRAZIL_RV_V2_EVALUATION_V1":
+    if payload.get("schema") != "BRAZIL_RV_V2_EVALUATION_V2":
         raise ValueError(f"not a v2 evaluation: {path}")
     return payload
 
@@ -1664,9 +1647,11 @@ def finalize_round2(*, output_root: Path) -> str:
     parent = str(design["round1"]["gbdt_parent_rung"])
     store_root = Path(str(design["store"]["root"]))
     store_manifest, dates = _read_store_header(store_root)
-    fit, selection, _ = _fold_indices(dates)
+    fit, selection, evaluation, _ = _fold_indices(dates)
     pretrain = _pretrain_indices(dates)
-    store, access = _open_round_store(store_root, fit, selection, pretrain)
+    store, access = _open_round_store(
+        store_root, fit, selection, evaluation, pretrain
+    )
     cdi_design = design["cdi"]
     cdi, provenance = _load_development_cdi(
         dates=dates,
@@ -1693,7 +1678,7 @@ def finalize_round2(*, output_root: Path) -> str:
             arm_reports[arm] = {}
             arm_artifacts[arm] = {}
             for fold in ("F1", "F2", "F3"):
-                scores, mask, paths = _aggregate_network_fold(root, arm, fold)
+                scores, mask = _aggregate_network_fold(root, arm, fold)
                 aggregate = root / "aggregates" / arm / fold
                 manifest, digest = _persist_scores(
                     aggregate,
@@ -1703,19 +1688,18 @@ def finalize_round2(*, output_root: Path) -> str:
                         "arm": arm,
                         "fold": fold,
                         "seeds": list(NETWORK_SEEDS),
-                        "seed_aggregation": "opposite-parity stitch then tie-aware rank average",
+                        "seed_aggregation": "tie-aware rank average",
                     },
                 )
                 evaluated = _evaluate(
                     store=store,
-                    indices=selection[fold],
+                    indices=evaluation[fold],
                     scores=scores,
                     score_mask=mask,
                     cdi=cdi,
                     source_hashes=source_hashes,
                     fold=fold,
                     output=aggregate / "evaluation.json",
-                    pathwise_scores=paths,
                 )
                 arm_reports[arm][fold] = evaluated.report
                 arm_artifacts[arm][fold] = {
@@ -1740,7 +1724,9 @@ def finalize_round2(*, output_root: Path) -> str:
             ):
                 eligible.append(arm)
         long_small_and_uncertain = all(
-            _small_interval_spanning_zero(arm_deltas[label]["pooled"]["residual_ic"])
+            _small_interval_spanning_zero(
+                arm_deltas[label]["pooled"]["median_residual_ic"]
+            )
             for label in ("B_minus_A", "C_minus_A")
         )
         arm_order = {"arm_A": 2, "arm_B": 1, "arm_C": 0}
@@ -1750,7 +1736,9 @@ def finalize_round2(*, output_root: Path) -> str:
             else max(
                 eligible,
                 key=lambda arm: (
-                    _ranking_point(arm_readouts[arm]["pooled"]["residual_ic"]),
+                    _ranking_point(
+                        arm_readouts[arm]["pooled"]["median_residual_ic"]
+                    ),
                     _ranking_point(
                         arm_readouts[arm]["pooled"]["headline_net_excess_bps"]
                     ),
@@ -1778,8 +1766,7 @@ def finalize_round2(*, output_root: Path) -> str:
                 root / "aggregates" / chosen_arm / fold / "score_mask.npy",
                 allow_pickle=False,
             )
-            _, _, network_paths = _aggregate_network_fold(root, chosen_arm, fold)
-            gbdt_scores, gbdt_mask, gbdt_paths = _load_round1_parent_fold(
+            gbdt_scores, gbdt_mask = _load_round1_parent_fold(
                 round1_root, parent, fold
             )
             if not np.array_equal(network_mask, gbdt_mask):
@@ -1792,14 +1779,13 @@ def finalize_round2(*, output_root: Path) -> str:
             )
             g_eval = _evaluate(
                 store=store,
-                indices=selection[fold],
+                indices=evaluation[fold],
                 scores=gbdt_scores,
                 score_mask=gbdt_mask,
                 cdi=cdi,
                 source_hashes=source_hashes,
                 fold=fold,
                 output=gbdt_root / "evaluation.json",
-                pathwise_scores=gbdt_paths,
             )
             comparator_reports["gbdt"][fold] = g_eval.report
             comparator_artifacts["gbdt"][fold] = {
@@ -1811,12 +1797,6 @@ def finalize_round2(*, output_root: Path) -> str:
 
             ensemble_scores = rank_average_ensemble(
                 (network_scores, gbdt_scores), network_mask
-            )
-            parity_ensembles = tuple(
-                rank_average_ensemble(
-                    (network_path, gbdt_paths[index % 2]), network_mask
-                )
-                for index, network_path in enumerate(network_paths)
             )
             ensemble_root = root / "comparators" / "ensemble" / fold
             e_manifest, e_digest = _persist_scores(
@@ -1831,14 +1811,13 @@ def finalize_round2(*, output_root: Path) -> str:
             )
             e_eval = _evaluate(
                 store=store,
-                indices=selection[fold],
+                indices=evaluation[fold],
                 scores=ensemble_scores,
                 score_mask=network_mask,
                 cdi=cdi,
                 source_hashes=source_hashes,
                 fold=fold,
                 output=ensemble_root / "evaluation.json",
-                pathwise_scores=parity_ensembles,
             )
             comparator_reports["ensemble"][fold] = e_eval.report
             comparator_artifacts["ensemble"][fold] = {
@@ -1866,7 +1845,9 @@ def finalize_round2(*, output_root: Path) -> str:
         v2_parent = max(
             comparator_readouts,
             key=lambda name: (
-                _ranking_point(comparator_readouts[name]["pooled"]["residual_ic"]),
+                _ranking_point(
+                    comparator_readouts[name]["pooled"]["median_residual_ic"]
+                ),
                 _ranking_point(
                     comparator_readouts[name]["pooled"]["headline_net_excess_bps"]
                 ),
@@ -1930,7 +1911,11 @@ def finalize_round2(*, output_root: Path) -> str:
 
 
 def seal_root(
-    *, root: Path, stdout_log: Path | None = None, stderr_log: Path | None = None
+    *,
+    root: Path,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+    research_claim: bool = True,
 ) -> str:
     output = root.resolve(strict=True)
     for source, label in ((stdout_log, "stdout.log"), (stderr_log, "stderr.log")):
@@ -1951,10 +1936,11 @@ def seal_root(
         if "official_validation_accessed" in payload or "test_accessed" in payload:
             _assert_false_access(payload, path=path)
             flagged.append(path.relative_to(output).as_posix())
+    access_flags = {**RESEARCH_FLAGS, "research_claim": research_claim}
     audit = {
         "schema": "BRAZIL_RV_V2_RESEARCH_ACCESS_AUDIT_V1",
         "status": "passed",
-        **RESEARCH_FLAGS,
+        **access_flags,
         "json_artifacts_with_access_flags": flagged,
         "json_artifact_count": len(json_paths),
         "audited_at_utc": _utc_now(),
@@ -1965,7 +1951,7 @@ def seal_root(
     inventory_payload = {
         "schema": "BRAZIL_RV_V2_RESEARCH_INVENTORY_V1",
         "status": "passed",
-        **RESEARCH_FLAGS,
+        **access_flags,
         "excluded_self": sorted(excluded),
         "file_count": len(rows),
         "total_bytes": sum(int(row["bytes"]) for row in rows),
@@ -1999,6 +1985,9 @@ def _parser() -> argparse.ArgumentParser:
     seal.add_argument("--root", type=Path, required=True)
     seal.add_argument("--stdout-log", type=Path)
     seal.add_argument("--stderr-log", type=Path)
+    seal.add_argument(
+        "--research-claim", action=argparse.BooleanOptionalAction, default=True
+    )
     freeze2 = commands.add_parser("freeze-round2")
     freeze2.add_argument("--round1-root", type=Path, required=True)
     freeze2.add_argument("--store", type=Path, required=True)
@@ -2065,6 +2054,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             root=arguments.root,
             stdout_log=arguments.stdout_log,
             stderr_log=arguments.stderr_log,
+            research_claim=arguments.research_claim,
         )
     print(digest)
     return 0

@@ -616,7 +616,6 @@ def _selection_score(
     device: torch.device,
     *,
     stage: str,
-    parity: int | None,
     use_bf16: bool,
 ) -> float:
     model.eval()
@@ -666,14 +665,9 @@ def _selection_score(
         predictions = predictions[order]
         targets = targets[order]
         mask = mask[order]
-    selected_dates = (
-        np.ones(predictions.shape[0], dtype=bool)
-        if parity is None
-        else block_parity_mask(predictions.shape[0], parity)
-    )
     correlations: list[list[float]] = [[] for _ in range(4)]
     for head in range(4):
-        for date in np.flatnonzero(selected_dates):
+        for date in range(predictions.shape[0]):
             valid = mask[date, :, head]
             if valid.sum() < 2:
                 continue
@@ -685,7 +679,7 @@ def _selection_score(
             if denominator > 0:
                 correlations[head].append(float(np.sum(left * right) / denominator))
     if any(not values for values in correlations):
-        raise ValueError("selection parity lacks a primary-horizon IC group")
+        raise ValueError("selection window lacks a primary-horizon IC group")
     horizon_means = [np.mean(values) for values in correlations]
     return float(np.mean(horizon_means))
 
@@ -824,6 +818,18 @@ def _loader_input_payload(
                 raise ValueError("store intraday feature names are malformed")
             selected_dates = np.asarray(dates[indices], dtype="datetime64[D]")
             date_strings = [str(value) for value in selected_dates]
+            target_indices = np.asarray(
+                getattr(candidate, "target_window_indices", indices), dtype="<i8"
+            )
+            if (
+                target_indices.ndim != 1
+                or not target_indices.size
+                or np.any(np.diff(target_indices) <= 0)
+            ):
+                raise ValueError("loader target window must be chronological")
+            target_dates = np.asarray(
+                dates[target_indices], dtype="datetime64[D]"
+            )
             stage = str(getattr(candidate, "stage", ""))
             segments = _model_input_segments(
                 np.asarray(dates, dtype="datetime64[D]"), indices, stage
@@ -882,6 +888,22 @@ def _loader_input_payload(
                     "last_index": int(indices[-1]),
                     "first_date": date_strings[0],
                     "last_date": date_strings[-1],
+                },
+                "target_window": {
+                    "indices_sha256": hashlib.sha256(
+                        target_indices.tobytes()
+                    ).hexdigest(),
+                    "identity_sha256": hashlib.sha256(
+                        json.dumps(
+                            [str(value) for value in target_dates],
+                            separators=(",", ":"),
+                        ).encode()
+                    ).hexdigest(),
+                    "count": int(target_indices.size),
+                    "first_index": int(target_indices[0]),
+                    "last_index": int(target_indices[-1]),
+                    "first_date": str(target_dates[0]),
+                    "last_date": str(target_dates[-1]),
                 },
             }
         candidate = getattr(candidate, "dataset", None)
@@ -983,10 +1005,23 @@ def _canonical_split_payload(dates: object) -> dict[str, object]:
         selection_indices = np.asarray(
             [positions[value] for value in fold.selection_dates], dtype=np.int64
         )
+        purge_before_indices = np.asarray(
+            [positions[value] for value in fold.purge_before_dates], dtype=np.int64
+        )
+        purge_after_indices = np.asarray(
+            [positions[value] for value in fold.purge_after_dates], dtype=np.int64
+        )
+        evaluation_indices = np.asarray(
+            [positions[value] for value in fold.evaluation_dates], dtype=np.int64
+        )
         result[fold.name] = {
             "fit": _date_span_payload(axis, fit_indices),
+            "purge_before": _date_span_payload(axis, purge_before_indices),
             "selection": _date_span_payload(axis, selection_indices),
-            "embargo_sessions": 75,
+            "purge_after": _date_span_payload(axis, purge_after_indices),
+            "evaluation": _date_span_payload(axis, evaluation_indices),
+            "label_intervals_sha256": fold.payload()["label_intervals_sha256"],
+            "no_label_overlap_assertion": True,
         }
     return result
 
@@ -1151,8 +1186,8 @@ def _validate_tracked_stage_inputs(
             )
         if stage == "F" and train_start_date < np.datetime64(FINETUNE_START):
             raise ValueError("stage F inputs are outside the canonical fine-tune split")
-        if gap != 75:
-            raise ValueError(f"stage {stage} requires its exact 75-session embargo")
+        if gap != 10:
+            raise ValueError(f"stage {stage} requires its first 10-session purge")
         matches = [
             name
             for name in ("F1", "F2", "F3")
@@ -1343,8 +1378,6 @@ class StageTrainingResult:
     manifest_path: Path
     selected_epoch: int
     stopped_epoch: int
-    selection_parity: int | None
-    evaluation_parity: int | None
 
 
 def train_stage(
@@ -1358,27 +1391,25 @@ def train_stage(
     model_config: ModelConfig,
     pretrain_checkpoint: Path | None = None,
     expected_pretrain_sha256: str | None = None,
-    selection_parity: int | None = None,
     maximum_epochs: int = MAX_EPOCHS,
     patience: int = EARLY_STOP_PATIENCE,
     learning_rate: float = ADAMW_LR,
     sam_rho: float = SAM_RHO,
     device: torch.device | None = None,
+    selection_parity: int | None = None,
 ) -> StageTrainingResult:
     """Run one frozen P/F/J trajectory and archive raw-Patience plus final EMA."""
 
     if stage not in {"P", "F", "J"}:
         raise ValueError("stage must be P, F, or J")
+    if selection_parity is not None:
+        raise ValueError("v2 rev2 research stages do not accept selection parity")
     if seed not in V1_READ_SEEDS:
         raise ValueError("seed differs from the accepted v1 read roster")
     if not fold:
         raise ValueError("fold must be nonempty")
     if not 1 <= maximum_epochs <= MAX_EPOCHS:
         raise ValueError("maximum_epochs must be between one and twenty")
-    if stage in {"F", "J"} and selection_parity is None:
-        raise ValueError("development F/J stages require an explicit block parity")
-    if stage == "P" and selection_parity is not None:
-        raise ValueError("stage P uses its embargoed internal holdout without parity")
     if stage == "P" and pretrain_checkpoint is not None:
         raise ValueError("stage P cannot initialize itself from a pretrain checkpoint")
     expected_decay = 756.0 if stage == "J" else None
@@ -1549,7 +1580,6 @@ def train_stage(
             selection_loader,
             device,
             stage=stage,
-            parity=selection_parity,
             use_bf16=model_config.use_bf16,
         )
         history.append(
@@ -1607,10 +1637,6 @@ def train_stage(
             "fold": fold,
             "epochs_completed": tracker.stopped_epoch,
             "selected_epoch": tracker.selected_epoch,
-            "selection_parity": selection_parity,
-            "evaluation_parity": (
-                None if selection_parity is None else 1 - selection_parity
-            ),
             "model_config": model_config_payload,
             "fast_checkpoint_sha256": model.fast_checkpoint_sha256,
             "pretrain_checkpoint": (
@@ -1652,14 +1678,12 @@ def train_stage(
         manifest_path=manifest_path,
         selected_epoch=tracker.selected_epoch,
         stopped_epoch=tracker.stopped_epoch,
-        selection_parity=selection_parity,
-        evaluation_parity=(None if selection_parity is None else 1 - selection_parity),
     )
 
 
 def _cli_stage_indices(
     store_root: Path, stage: str, fold: str
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     dates = np.load(store_root / "date_index.npy", allow_pickle=False).astype(
         "datetime64[D]", copy=False
     )
@@ -1669,7 +1693,7 @@ def _cli_stage_indices(
             & (dates <= np.datetime64(PRETRAIN_END))
         ).astype(np.int64)
         fit, _, selection = pretrain_internal_split(pretrain)
-        return fit, selection
+        return fit, selection, selection, fit
     python_dates = dates.astype(object).tolist()
     by_name = {item.name: item for item in development_folds(python_dates)}
     try:
@@ -1681,13 +1705,24 @@ def _cli_stage_indices(
     selection = np.asarray(
         [positions[value] for value in selected.selection_dates], dtype=np.int64
     )
+    fit_target_window = np.asarray(
+        [
+            positions[value]
+            for value in (*selected.fit_dates, *selected.purge_before_dates)
+        ],
+        dtype=np.int64,
+    )
+    evaluation = np.asarray(
+        [positions[value] for value in selected.evaluation_dates], dtype=np.int64
+    )
     if stage == "J":
         pretrain = np.flatnonzero(
             (dates >= np.datetime64(STORE_START))
             & (dates <= np.datetime64(PRETRAIN_END))
         ).astype(np.int64)
         fit = np.concatenate((pretrain, fit))
-    return fit, selection
+        fit_target_window = np.concatenate((pretrain, fit_target_window))
+    return fit, selection, evaluation, fit_target_window
 
 
 def _cli_feature_count(store_root: Path, sidecars: Sequence[str]) -> int:
@@ -1712,7 +1747,6 @@ def _train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stage", choices=("P", "F", "J"), required=True)
     parser.add_argument("--fold", default="F1")
     parser.add_argument("--seed", type=int, required=True)
-    parser.add_argument("--selection-parity", type=int, choices=(0, 1))
     parser.add_argument("--maximum-epochs", type=int, default=MAX_EPOCHS)
     parser.add_argument("--patience", type=int, default=EARLY_STOP_PATIENCE)
     parser.add_argument("--lookback", type=int, default=60)
@@ -1743,7 +1777,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     store_root = arguments.store.resolve()
     stage = str(arguments.stage)
     fold = "pretrain_internal" if stage == "P" else str(arguments.fold)
-    fit_indices, selection_indices = _cli_stage_indices(store_root, stage, fold)
+    (
+        fit_indices,
+        selection_indices,
+        evaluation_indices,
+        fit_target_window,
+    ) = _cli_stage_indices(store_root, stage, fold)
     dataset_stage = {"P": "pretrain", "F": "finetune", "J": "joint"}[stage]
     sidecars = tuple(dict.fromkeys(str(value) for value in arguments.sidecar))
     train_dataset = V2DailyDataset(
@@ -1753,6 +1792,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         lookback=arguments.lookback,
         enabled_sidecars=sidecars,
         purpose="training",
+        target_window_indices=fit_target_window,
     )
     selection_dataset = V2DailyDataset(
         store_root,
@@ -1761,6 +1801,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         lookback=arguments.lookback,
         enabled_sidecars=sidecars,
         purpose="selection",
+        target_window_indices=selection_indices,
     )
     decay = 756.0 if stage == "J" else None
     sampler = DatePairBatchSampler(
@@ -1805,7 +1846,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         model_config=model_config,
         pretrain_checkpoint=arguments.pretrain_checkpoint,
         expected_pretrain_sha256=arguments.pretrain_sha256,
-        selection_parity=arguments.selection_parity,
         maximum_epochs=arguments.maximum_epochs,
         patience=arguments.patience,
         device=device,
@@ -1815,7 +1855,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         score_dataset = V2DailyDataset(
             store_root,
-            selection_indices,
+            evaluation_indices,
             stage="pretrain" if stage == "P" else "evaluation",
             lookback=arguments.lookback,
             enabled_sidecars=sidecars,

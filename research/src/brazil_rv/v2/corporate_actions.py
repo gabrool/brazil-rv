@@ -43,6 +43,7 @@ class DetectedActionResult:
     split_event: NDArray[np.bool_]
     cash_event: NDArray[np.bool_]
     ambiguous_event: NDArray[np.bool_]
+    price_jump_anomaly_mask: NDArray[np.bool_]
     price_ratio: NDArray[np.float64]
     quantity_ratio: NDArray[np.float64]
 
@@ -716,15 +717,15 @@ def detect_cotahist_actions(
     split_log_price_threshold: float = 0.08,
     ambiguous_log_price_threshold: float = 0.04,
     volume_continuity_tolerance: float = 0.15,
+    large_ratio_tolerance: float = 0.35,
+    undocumented_split_fallback: bool = False,
 ) -> DetectedActionResult:
-    """Classify daily corporate-action boundaries from official data only.
+    """Classify COTAHIST action boundaries causally from ``DISMES`` changes.
 
-    Each event-day ratio compares the median of up to three observed sessions
-    before the boundary with the median of up to three observed sessions from
-    the boundary onward.  A price jump above the ambiguous-band threshold is a
-    candidate even when ``DISMES`` is unchanged; every other candidate originates
-    from a ``DISMES`` change.  No provider action or provider-coverage flag enters
-    the classification.
+    Event ratios compare the current session with up to three strictly prior
+    observed sessions. Ordinary price jumps are audit anomalies, never cash
+    events. The optional strict fallback promotes only an inverse price/quantity
+    jump of at least 30 percent to a split.
     """
 
     close = np.asarray(raw_close, dtype=np.float64)
@@ -743,93 +744,100 @@ def detect_cotahist_actions(
     if not (
         0.0 < ambiguous_log_price_threshold < split_log_price_threshold
         and volume_continuity_tolerance > 0.0
+        and large_ratio_tolerance > volume_continuity_tolerance
     ):
         raise ValueError("COTAHIST action thresholds are invalid")
 
     distribution_changed = detect_distribution_changes(distribution, seen)
     immediate_price = np.full(close.shape, np.nan, dtype=np.float64)
-    immediate_quantity = np.full(close.shape, np.nan, dtype=np.float64)
-    adjacent = (
+    adjacent_price = (
         seen[1:]
         & seen[:-1]
         & np.isfinite(close[1:])
         & np.isfinite(close[:-1])
-        & np.isfinite(qty[1:])
-        & np.isfinite(qty[:-1])
         & (close[1:] > 0)
         & (close[:-1] > 0)
-        & (qty[1:] > 0)
-        & (qty[:-1] > 0)
     )
-    np.divide(close[1:], close[:-1], out=immediate_price[1:], where=adjacent)
-    np.divide(qty[1:], qty[:-1], out=immediate_quantity[1:], where=adjacent)
+    np.divide(
+        close[1:], close[:-1], out=immediate_price[1:], where=adjacent_price
+    )
     with np.errstate(divide="ignore", invalid="ignore"):
         immediate_log_price = np.log(immediate_price)
-        immediate_log_quantity = np.log(immediate_quantity)
-    immediate_jump = (
+    jump_without_distribution = (
         np.isfinite(immediate_log_price)
-        & np.isfinite(immediate_log_quantity)
         & (np.abs(immediate_log_price) > ambiguous_log_price_threshold)
+        & ~distribution_changed
     )
-    event_candidate = distribution_changed | immediate_jump
 
     price_ratio = np.full(close.shape, np.nan, dtype=np.float64)
     quantity_ratio = np.full(close.shape, np.nan, dtype=np.float64)
-    for day, name in np.argwhere(event_candidate):
-        if day == 0:
-            continue
-        before = slice(max(0, day - median_sessions), day)
-        after = slice(day, min(close.shape[0], day + median_sessions))
-        before_mask = (
-            seen[before, name]
-            & np.isfinite(close[before, name])
-            & (close[before, name] > 0)
-            & np.isfinite(qty[before, name])
-            & (qty[before, name] > 0)
-        )
-        after_mask = (
-            seen[after, name]
-            & np.isfinite(close[after, name])
-            & (close[after, name] > 0)
-            & np.isfinite(qty[after, name])
-            & (qty[after, name] > 0)
-        )
-        if not before_mask.any() or not after_mask.any():
-            continue
-        before_close = float(np.median(close[before, name][before_mask]))
-        after_close = float(np.median(close[after, name][after_mask]))
-        before_quantity = float(np.median(qty[before, name][before_mask]))
-        after_quantity = float(np.median(qty[after, name][after_mask]))
-        price_ratio[day, name] = after_close / before_close
-        quantity_ratio[day, name] = after_quantity / before_quantity
+    ratio_candidates = distribution_changed | jump_without_distribution
+    for name in range(close.shape[1]):
+        prior_close: list[float] = []
+        prior_quantity: list[float] = []
+        for day in range(close.shape[0]):
+            current_valid = bool(
+                seen[day, name]
+                and np.isfinite(close[day, name])
+                and close[day, name] > 0
+                and np.isfinite(qty[day, name])
+                and qty[day, name] > 0
+            )
+            if ratio_candidates[day, name] and current_valid and prior_close:
+                before_close = float(np.median(prior_close))
+                before_quantity = float(np.median(prior_quantity))
+                price_ratio[day, name] = close[day, name] / before_close
+                quantity_ratio[day, name] = qty[day, name] / before_quantity
+            if current_valid:
+                prior_close.append(float(close[day, name]))
+                prior_quantity.append(float(qty[day, name]))
+                if len(prior_close) > median_sessions:
+                    del prior_close[0]
+                    del prior_quantity[0]
 
     with np.errstate(divide="ignore", invalid="ignore"):
         log_price = np.log(price_ratio)
         log_quantity = np.log(quantity_ratio)
     comparable = np.isfinite(log_price) & np.isfinite(log_quantity)
-    volume_continuous = comparable & (
-        np.abs(log_price + log_quantity) < volume_continuity_tolerance
+    opposite = comparable & (log_price * log_quantity < 0.0)
+    tolerance = np.where(
+        np.abs(log_price) <= 0.30,
+        volume_continuity_tolerance,
+        large_ratio_tolerance,
     )
     split_like = (
         comparable
         & (np.abs(log_price) > split_log_price_threshold)
-        & volume_continuous
+        & opposite
+        & (np.abs(log_price + log_quantity) < tolerance)
     )
-    split_event = event_candidate & split_like
+    documented_split = distribution_changed & split_like
+    fallback_split = (
+        jump_without_distribution
+        & comparable
+        & (np.abs(log_price) >= 0.30)
+        & opposite
+        & (np.abs(log_price + log_quantity) < large_ratio_tolerance)
+    )
+    if not undocumented_split_fallback:
+        fallback_split[...] = False
+    split_event = documented_split | fallback_split
     ambiguous_event = (
-        event_candidate
+        distribution_changed
         & ~split_event
         & comparable
         & (np.abs(log_price) > ambiguous_log_price_threshold)
         & (np.abs(log_price) <= split_log_price_threshold)
-        & ~volume_continuous
     )
-    cash_event = event_candidate & ~split_event & ~ambiguous_event
+    cash_event = distribution_changed & ~split_event & ~ambiguous_event
+    event_candidate = distribution_changed | fallback_split
+    price_jump_anomaly_mask = jump_without_distribution & ~fallback_split
     return DetectedActionResult(
         event_candidate=event_candidate,
         split_event=split_event,
         cash_event=cash_event,
         ambiguous_event=ambiguous_event,
+        price_jump_anomaly_mask=price_jump_anomaly_mask,
         price_ratio=price_ratio,
         quantity_ratio=quantity_ratio,
     )
@@ -848,6 +856,7 @@ def cotahist_action_classification_table(
         result.split_event,
         result.cash_event,
         result.ambiguous_event,
+        result.price_jump_anomaly_mask,
         result.price_ratio,
         result.quantity_ratio,
     )
@@ -861,6 +870,7 @@ def cotahist_action_classification_table(
             "split_event": bool(result.split_event[day, name]),
             "cash_event": bool(result.cash_event[day, name]),
             "ambiguous_event": bool(result.ambiguous_event[day, name]),
+            "price_jump_anomaly": bool(result.price_jump_anomaly_mask[day, name]),
             "price_ratio": (
                 float(result.price_ratio[day, name])
                 if np.isfinite(result.price_ratio[day, name])
@@ -872,7 +882,9 @@ def cotahist_action_classification_table(
                 else None
             ),
         }
-        for day, name in np.argwhere(result.event_candidate)
+        for day, name in np.argwhere(
+            result.event_candidate | result.price_jump_anomaly_mask
+        )
     ]
     return pl.DataFrame(
         rows,
@@ -883,6 +895,7 @@ def cotahist_action_classification_table(
             "split_event": pl.Boolean,
             "cash_event": pl.Boolean,
             "ambiguous_event": pl.Boolean,
+            "price_jump_anomaly": pl.Boolean,
             "price_ratio": pl.Float64,
             "quantity_ratio": pl.Float64,
         },

@@ -28,6 +28,62 @@ class ToCloseTarget:
     raw_log_return: NDArray[np.float32]
 
 
+@dataclass(frozen=True)
+class NeutralizedReturns:
+    log_return: NDArray[np.float32]
+    valid: NDArray[np.bool_]
+    cross_sectional_median: NDArray[np.float32]
+
+
+def build_neutralized_log_returns(
+    adjusted_close: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    active: NDArray[np.bool_],
+    return_neutralized_event: NDArray[np.bool_],
+    *,
+    minimum_cross_section: int = 20,
+) -> NeutralizedReturns:
+    """Build daily split-adjusted returns with distribution days market-marked."""
+
+    close = np.asarray(adjusted_close, dtype=np.float64)
+    seen = np.asarray(observed, dtype=np.bool_)
+    membership = np.asarray(active, dtype=np.bool_)
+    neutralize = np.asarray(return_neutralized_event, dtype=np.bool_)
+    if close.ndim != 2 or any(
+        value.shape != close.shape for value in (seen, membership, neutralize)
+    ):
+        raise ValueError("neutralized-return inputs must align [date, name]")
+    if minimum_cross_section < 1:
+        raise ValueError("minimum_cross_section must be positive")
+    values = np.zeros(close.shape, dtype=np.float32)
+    valid = np.zeros(close.shape, dtype=np.bool_)
+    median = np.full(close.shape[0], np.nan, dtype=np.float32)
+    for day in range(1, close.shape[0]):
+        base_valid = (
+            seen[day]
+            & seen[day - 1]
+            & np.isfinite(close[day])
+            & np.isfinite(close[day - 1])
+            & (close[day] > 0)
+            & (close[day - 1] > 0)
+        )
+        raw = np.zeros(close.shape[1], dtype=np.float64)
+        raw[base_valid] = np.log(close[day, base_valid] / close[day - 1, base_valid])
+        non_event = base_valid & membership[day] & ~neutralize[day]
+        if int(non_event.sum()) >= minimum_cross_section:
+            median[day] = np.float32(np.median(raw[non_event]))
+        row_valid = base_valid.copy()
+        event = base_valid & neutralize[day]
+        if event.any():
+            if np.isfinite(median[day]):
+                raw[event] = float(median[day])
+            else:
+                row_valid[event] = False
+        values[day, row_valid] = raw[row_valid].astype(np.float32)
+        valid[day] = row_valid
+    return NeutralizedReturns(values, valid, median)
+
+
 def _rank_row(
     values: NDArray[np.float64], valid: NDArray[np.bool_]
 ) -> NDArray[np.float32]:
@@ -38,22 +94,23 @@ def _rank_row(
 
 
 def build_multi_day_targets(
-    adjusted_close: NDArray[np.floating],
+    neutralized_log_return: NDArray[np.floating],
+    neutralized_log_return_valid: NDArray[np.bool_],
     active: NDArray[np.bool_],
     yang_zhang_sigma_20: NDArray[np.floating],
-    target_exclusion_event: NDArray[np.bool_],
     *,
     horizons: tuple[int, ...] = HORIZONS,
     winsor_limit: float = 5.0,
 ) -> MultiDayTargets:
     """Construct causal-entry, future-realized multi-session targets."""
 
-    close = np.asarray(adjusted_close, dtype=np.float64)
+    daily_return = np.asarray(neutralized_log_return, dtype=np.float64)
+    return_valid = np.asarray(neutralized_log_return_valid, dtype=np.bool_)
     membership = np.asarray(active, dtype=np.bool_)
     sigma = np.asarray(yang_zhang_sigma_20, dtype=np.float64)
-    excluded_event = np.asarray(target_exclusion_event, dtype=np.bool_)
-    if close.ndim != 2 or any(
-        value.shape != close.shape for value in (membership, sigma, excluded_event)
+    if daily_return.ndim != 2 or any(
+        value.shape != daily_return.shape
+        for value in (return_valid, membership, sigma)
     ):
         raise ValueError("target inputs must be aligned [date, name]")
     if (
@@ -62,7 +119,7 @@ def build_multi_day_targets(
         or len(set(horizons)) != len(horizons)
     ):
         raise ValueError("target horizons must be unique and positive")
-    shape = (*close.shape, len(horizons))
+    shape = (*daily_return.shape, len(horizons))
     primary = np.zeros(shape, dtype=np.float32)
     primary_valid = np.zeros(shape, dtype=np.bool_)
     residual = np.zeros(shape, dtype=np.float32)
@@ -71,10 +128,10 @@ def build_multi_day_targets(
     raw_return = np.empty(shape, dtype=np.float32)
 
     build_multi_day_targets_into(
-        close,
+        daily_return,
+        return_valid,
         membership,
         sigma,
-        excluded_event,
         primary=primary,
         primary_valid=primary_valid,
         normalized_residual=residual,
@@ -96,10 +153,10 @@ def build_multi_day_targets(
 
 
 def build_multi_day_targets_into(
-    adjusted_close: NDArray[np.floating],
+    neutralized_log_return: NDArray[np.floating],
+    neutralized_log_return_valid: NDArray[np.bool_],
     active: NDArray[np.bool_],
     yang_zhang_sigma_20: NDArray[np.floating],
-    target_exclusion_event: NDArray[np.bool_],
     *,
     primary: NDArray[np.float32],
     primary_valid: NDArray[np.bool_],
@@ -113,12 +170,13 @@ def build_multi_day_targets_into(
 ) -> None:
     """Stream one target horizon at a time into pre-allocated arrays."""
 
-    close = np.asarray(adjusted_close)
+    daily_return = np.asarray(neutralized_log_return)
+    return_valid = np.asarray(neutralized_log_return_valid, dtype=np.bool_)
     membership = np.asarray(active, dtype=np.bool_)
     sigma = np.asarray(yang_zhang_sigma_20)
-    excluded_event = np.asarray(target_exclusion_event, dtype=np.bool_)
-    if close.ndim != 2 or any(
-        value.shape != close.shape for value in (membership, sigma, excluded_event)
+    if daily_return.ndim != 2 or any(
+        value.shape != daily_return.shape
+        for value in (return_valid, membership, sigma)
     ):
         raise ValueError("target inputs must be aligned [date, name]")
     if (
@@ -128,15 +186,15 @@ def build_multi_day_targets_into(
     ):
         raise ValueError("target horizons must be unique and positive")
     if source_rows is None:
-        rows = np.arange(close.shape[0], dtype=np.int64)
+        rows = np.arange(daily_return.shape[0], dtype=np.int64)
     else:
         raw_rows = np.asarray(source_rows)
         if raw_rows.ndim != 1 or not np.issubdtype(raw_rows.dtype, np.integer):
             raise TypeError("source_rows must be a one-dimensional integer array")
         rows = raw_rows.astype(np.int64, copy=False)
-        if np.any(rows < 0) or np.any(rows >= close.shape[0]):
+        if np.any(rows < 0) or np.any(rows >= daily_return.shape[0]):
             raise ValueError("source_rows contains an out-of-range index")
-    shape = (rows.size, close.shape[1], len(horizons))
+    shape = (rows.size, daily_return.shape[1], len(horizons))
     destinations = (
         primary,
         primary_valid,
@@ -163,28 +221,25 @@ def build_multi_day_targets_into(
 
     for horizon_index, horizon in enumerate(horizons):
         for output_day, day in enumerate(rows):
-            if day + horizon >= close.shape[0]:
+            if day == 0 or day + horizon >= daily_return.shape[0]:
                 continue
-            path = close[day : day + horizon + 1]
-            path_valid = np.isfinite(path).all(axis=0) & (path > 0).all(axis=0)
-            action_clear = ~excluded_event[day + 1 : day + horizon + 1].any(axis=0)
-            base_valid = membership[day] & path_valid & action_clear
-            row = np.full(close.shape[1], np.nan, dtype=np.float64)
-            row[base_valid] = np.log(
-                close[day + horizon, base_valid] / close[day, base_valid]
-            )
+            path = daily_return[day + 1 : day + horizon + 1]
+            path_valid = return_valid[day + 1 : day + horizon + 1].all(axis=0)
+            base_valid = membership[day] & path_valid
+            row = np.full(daily_return.shape[1], np.nan, dtype=np.float64)
+            row[base_valid] = path[:, base_valid].sum(axis=0, dtype=np.float64)
             raw_log_return[output_day, :, horizon_index] = row.astype(np.float32)
             raw_valid[output_day, :, horizon_index] = base_valid
             raw_midrank[output_day, :, horizon_index] = _rank_row(row, base_valid)
 
-            usable_sigma = np.isfinite(sigma[day]) & (sigma[day] > 0)
+            usable_sigma = np.isfinite(sigma[day - 1]) & (sigma[day - 1] > 0)
             target_valid = base_valid & usable_sigma
             if not target_valid.any():
                 continue
-            normalized = row[target_valid] / (
-                sigma[day, target_valid] * np.sqrt(horizon)
+            median_return = float(np.median(row[base_valid]))
+            normalized = (row[target_valid] - median_return) / (
+                sigma[day - 1, target_valid] * np.sqrt(horizon)
             )
-            normalized -= np.median(normalized)
             normalized = np.clip(normalized, -winsor_limit, winsor_limit)
             normalized_residual[output_day, target_valid, horizon_index] = (
                 normalized.astype(np.float32)

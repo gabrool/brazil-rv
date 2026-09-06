@@ -18,25 +18,35 @@ def _weekdays(start: date, end: date) -> tuple[date, ...]:
     return tuple(values)
 
 
-def test_development_folds_have_exact_windows_and_75_session_embargo() -> None:
+def test_development_folds_have_chronological_selection_and_evaluation() -> None:
     calendar = _weekdays(date(2021, 8, 16), date(2024, 12, 30))
     folds = splits.development_folds(calendar)
 
     assert [fold.name for fold in folds] == ["F1", "F2", "F3"]
-    assert [(fold.selection_dates[0], fold.selection_dates[-1]) for fold in folds] == [
+    assert [(fold.evaluation_dates[0], fold.evaluation_dates[-1]) for fold in folds] == [
         (date(2023, 7, 3), date(2023, 12, 29)),
         (date(2024, 1, 2), date(2024, 6, 28)),
         (date(2024, 7, 1), date(2024, 12, 30)),
     ]
     positions = {value: index for index, value in enumerate(calendar)}
     for fold in folds:
-        assert len(fold.embargo_dates) == 75
+        assert len(fold.purge_before_dates) == 10
+        assert len(fold.selection_dates) == 55
+        assert len(fold.purge_after_dates) == 10
         assert (
             positions[fold.fit_dates[-1]] + max(splits.HORIZONS)
             < positions[fold.selection_dates[0]]
         )
-        assert fold.fit_dates[-1] < fold.embargo_dates[0]
-        assert fold.embargo_dates[-1] < fold.selection_dates[0]
+        assert (
+            positions[fold.selection_dates[-1]] + max(splits.HORIZONS)
+            < positions[fold.evaluation_dates[0]]
+        )
+        assert fold.fit_dates[-1] < fold.purge_before_dates[0]
+        assert fold.purge_before_dates[-1] < fold.selection_dates[0]
+        assert fold.selection_dates[-1] < fold.purge_after_dates[0]
+        assert fold.purge_after_dates[-1] < fold.evaluation_dates[0]
+        assert splits.assert_no_label_overlap(fold)
+        assert len(fold.payload()["label_intervals_sha256"]) == 64
 
 
 def test_development_fold_uses_sessions_inside_a_closed_date_boundary() -> None:
@@ -48,9 +58,24 @@ def test_development_fold_uses_sessions_inside_a_closed_date_boundary() -> None:
 
     folds = splits.development_folds(calendar)
 
-    assert folds[0].selection_dates[0] == date(2023, 7, 3)
-    assert folds[0].selection_dates[-1] == date(2023, 12, 28)
-    assert date(2024, 1, 2) not in folds[0].selection_dates
+    assert folds[0].evaluation_dates[0] == date(2023, 7, 3)
+    assert folds[0].evaluation_dates[-1] == date(2023, 12, 28)
+    assert date(2024, 1, 2) not in folds[0].evaluation_dates
+
+
+def test_overlap_assertion_rejects_selection_without_second_purge() -> None:
+    calendar = _weekdays(date(2021, 8, 16), date(2024, 12, 30))
+    fold = splits.development_folds(calendar)[0]
+    malformed = splits.DevelopmentFold(
+        name=fold.name,
+        fit_dates=fold.fit_dates,
+        purge_before_dates=fold.purge_before_dates,
+        selection_dates=fold.selection_dates + fold.purge_after_dates,
+        purge_after_dates=(),
+        evaluation_dates=fold.evaluation_dates,
+    )
+    with pytest.raises(ValueError, match="selection label reaches evaluation"):
+        splits.assert_no_label_overlap(malformed)
 
 
 def test_block_parity_is_window_local_and_complementary() -> None:

@@ -221,6 +221,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         stage: Stage,
         lookback: int = 60,
         enabled_sidecars: Sequence[str] = (),
+        target_window_indices: Sequence[int] | None = None,
         fast_store: str | Path | None = None,
         verify_fast_hashes: bool = True,
         purpose: AccessPurpose | None = None,
@@ -231,9 +232,22 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         self.stage = stage
         self.lookback = lookback
         self.enabled_sidecars = tuple(enabled_sidecars)
-        self._sample_date_indices = frozenset(
-            int(value) for value in self.date_indices
+        target_indices = (
+            self.date_indices
+            if target_window_indices is None
+            else np.asarray(target_window_indices, dtype=np.int64)
         )
+        if target_indices.ndim != 1 or not target_indices.size:
+            raise ValueError("target window indices must be a nonempty vector")
+        if (
+            np.unique(target_indices).size != target_indices.size
+            or np.any(np.diff(target_indices) <= 0)
+        ):
+            raise ValueError(
+                "target window indices must be strictly ordered and unique"
+            )
+        self.target_window_indices = target_indices
+        self._target_date_indices = frozenset(int(value) for value in target_indices)
         access_purpose: AccessPurpose = purpose or (
             "evaluation" if stage == "evaluation" else "training"
         )
@@ -315,6 +329,15 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             (self.date_indices < 0) | (self.date_indices >= self.store.dates.size)
         ):
             raise ValueError("date indices are outside the store")
+        if np.any(
+            (self.target_window_indices < 0)
+            | (self.target_window_indices >= self.store.dates.size)
+        ):
+            raise ValueError("target window indices are outside the store")
+        if not set(self.date_indices.tolist()).issubset(
+            self._target_date_indices
+        ):
+            raise ValueError("every sample date must be inside its target window")
         if stage in {"finetune", "evaluation"} and np.any(self.date_indices == 0):
             raise ValueError("fine/evaluation samples need a prior slow session")
         self.store.array_shape("slow_values")
@@ -589,7 +612,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             clipped = np.asarray(value, dtype=np.bool_).copy()
             for horizon_index, horizon in enumerate(HORIZONS):
                 if any(
-                    endpoint not in self._sample_date_indices
+                    endpoint not in self._target_date_indices
                     for endpoint in range(date_index, date_index + horizon + 1)
                 ):
                     clipped[:, horizon_index] = False

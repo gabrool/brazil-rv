@@ -183,7 +183,7 @@ def test_stage_j_requires_the_frozen_time_decay_and_other_stages_reject_it(
             selection_loader=[],
             output_dir=tmp_path / "j_without_decay",
             model_config=base,
-            selection_parity=0,
+            selection_parity=None,
             maximum_epochs=1,
         )
     with pytest.raises(
@@ -201,7 +201,7 @@ def test_stage_j_requires_the_frozen_time_decay_and_other_stages_reject_it(
                 compile_forward=False,
                 time_decay_half_life_sessions=756.0,
             ),
-            selection_parity=0,
+            selection_parity=None,
             maximum_epochs=1,
         )
 
@@ -577,12 +577,14 @@ def _tracked_input(
     }
 
 
-def test_stage_input_contract_rejects_overlap_and_wrong_f_embargo() -> None:
+def test_stage_input_contract_rejects_overlap_and_wrong_f_purge() -> None:
     canonical = {
         "F1": {
             "fit": {"first_index": 0, "last_index": 9},
-            "selection": {"first_index": 85, "last_index": 120},
-            "embargo_sessions": 75,
+            "purge_before": {"first_index": 10, "last_index": 19},
+            "selection": {"first_index": 20, "last_index": 74},
+            "purge_after": {"first_index": 75, "last_index": 84},
+            "evaluation": {"first_index": 85, "last_index": 120},
         }
     }
     training = _tracked_input(
@@ -594,16 +596,16 @@ def test_stage_input_contract_rejects_overlap_and_wrong_f_embargo() -> None:
         canonical_splits=canonical,
     )
     valid_selection = _tracked_input(
-        first_index=85,
-        last_index=90,
-        first_date="2023-07-03",
-        last_date="2023-07-10",
+        first_index=20,
+        last_index=25,
+        first_date="2023-03-20",
+        last_date="2023-03-27",
         alignment="through_t_minus_1",
         canonical_splits=canonical,
     )
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
     _validate_tracked_stage_inputs(
-        "F", "F1_select_even", config, training, valid_selection
+        "F", "F1", config, training, valid_selection
     )
     overlap = dict(valid_selection)
     overlap["dates"] = {
@@ -612,16 +614,16 @@ def test_stage_input_contract_rejects_overlap_and_wrong_f_embargo() -> None:
     }
     with pytest.raises(ValueError, match="ordered and disjoint"):
         _validate_tracked_stage_inputs(
-            "F", "F1_select_even", config, training, overlap
+            "F", "F1", config, training, overlap
         )
     short_embargo = dict(valid_selection)
     short_embargo["dates"] = {
         **valid_selection["dates"],
-        "first_index": 84,
+        "first_index": 19,
     }
-    with pytest.raises(ValueError, match="75-session embargo"):
+    with pytest.raises(ValueError, match="10-session purge"):
         _validate_tracked_stage_inputs(
-            "F", "F1_select_even", config, training, short_embargo
+            "F", "F1", config, training, short_embargo
         )
 
 
@@ -723,14 +725,16 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
                 "last_date": "2023-03-17",
                 "count": 10,
             },
+            "purge_before": {"first_index": 120, "last_index": 129},
             "selection": {
-                "first_index": 195,
-                "last_index": 200,
-                "first_date": "2023-07-03",
-                "last_date": "2023-12-29",
-                "count": 6,
+                "first_index": 130,
+                "last_index": 184,
+                "first_date": "2023-03-20",
+                "last_date": "2023-06-02",
+                "count": 55,
             },
-            "embargo_sessions": 75,
+            "purge_after": {"first_index": 185, "last_index": 194},
+            "evaluation": {"first_index": 195, "last_index": 200},
         }
     }
     training = _tracked_input(
@@ -755,10 +759,10 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
         ),
     ]
     selection = _tracked_input(
-        first_index=195,
-        last_index=200,
-        first_date="2023-07-03",
-        last_date="2023-12-29",
+        first_index=130,
+        last_index=184,
+        first_date="2023-03-20",
+        last_date="2023-06-02",
         alignment="through_t_minus_1",
         canonical_splits=canonical,
     )
@@ -766,19 +770,19 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
         _joint_segment(
             "F",
             "through_t_minus_1",
-            195,
-            200,
-            "2023-07-03",
-            "2023-12-29",
+            130,
+            184,
+            "2023-03-20",
+            "2023-06-02",
         )
     ]
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
     _validate_tracked_stage_inputs(
-        "J", "F1_joint", config, training, selection
+        "J", "F1", config, training, selection
     )
 
     training["segments"] = list(reversed(training["segments"]))
     with pytest.raises(ValueError, match="ordered P/F training"):
         _validate_tracked_stage_inputs(
-            "J", "F1_joint", config, training, selection
+            "J", "F1", config, training, selection
         )

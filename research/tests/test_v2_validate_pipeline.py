@@ -9,9 +9,9 @@ import polars as pl
 import pytest
 
 from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
-from brazil_rv.v2.contract import FINETUNE_START, HORIZONS
+from brazil_rv.v2.contract import FINETUNE_START, HORIZONS, SLOW_FEATURES
 from brazil_rv.v2.score import ScoreArtifact
-from brazil_rv.v2.store import V2Store, open_store_for_dates, write_store
+from brazil_rv.v2.store import V2Store, open_store_for_samples, write_store
 from brazil_rv.v2.train import StageTrainingResult
 from brazil_rv.v2 import validate_pipeline as pipeline
 
@@ -26,7 +26,7 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
     dates = date_axis.astype(object).tolist()
     day_count = len(dates)
     name_count = 4
-    slow = np.zeros((day_count, name_count, 32), dtype=np.float32)
+    slow = np.zeros((day_count, name_count, len(SLOW_FEATURES)), dtype=np.float32)
     intraday = np.zeros((day_count, name_count, 20), dtype=np.float32)
     name_axis = np.arange(name_count, dtype=np.float32)[None, :, None]
     horizon_axis = np.arange(len(HORIZONS), dtype=np.float32)[None, None, :]
@@ -46,7 +46,7 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         arrays={
             "active": np.ones((day_count, name_count), dtype=np.bool_),
             "observed": np.ones((day_count, name_count), dtype=np.bool_),
-            "target_exclusion_event_mask": np.zeros(
+            "return_neutralized_event_mask": np.zeros(
                 (day_count, name_count), dtype=np.bool_
             ),
             "ambiguous_action_mask": np.zeros(
@@ -63,9 +63,21 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
             "target_raw_valid": np.ones_like(targets, dtype=np.bool_),
             "target_raw_log_return": targets.astype(np.float64) * 0.0001,
             "adjusted_close": close,
+            "neutralized_log_return": np.zeros(
+                (day_count, name_count), dtype=np.float32
+            ),
+            "neutralized_log_return_valid": np.ones(
+                (day_count, name_count), dtype=np.bool_
+            ),
+            "cross_sectional_median_log_return": np.zeros(
+                day_count, dtype=np.float32
+            ),
+            "target_scale_sigma": np.full(
+                (day_count, name_count), 0.02, dtype=np.float32
+            ),
         },
         feature_names={
-            "slow": [f"slow_{index}" for index in range(32)],
+            "slow": list(SLOW_FEATURES),
             "intraday": [f"intraday_{index}" for index in range(20)],
         },
         sources=[{"path": "fixture", "sha256": "a" * 64}],
@@ -194,6 +206,7 @@ def test_pipeline_rejects_store_built_by_a_different_commit(
     with pytest.raises(ValueError, match="store implementation commit differs"):
         pipeline.run_pipeline_validation(
             store_root=store_root,
+            old_store_root=store_root,
             cdi_path=cdi_path,
             cdi_sha256=cdi_sha,
             experiment52_cdi_path=reference_path,
@@ -328,6 +341,7 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
     )
     result = pipeline.run_pipeline_validation(
         store_root=store_root,
+        old_store_root=store_root,
         cdi_path=cdi_path,
         cdi_sha256=cdi_sha,
         experiment52_cdi_path=experiment52_cdi_path,
@@ -362,35 +376,25 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         "max_abs_daily_cdi_rate": 0.0,
         "exact_byte_match": True,
     }
-    assert len(manifest["results"]["baselines"]) == 12
-    assert len(manifest["results"]["gbdt_triage"]) == 2
-    assert len(_FakeGBDT.fit_calls) == 4
+    assert len(manifest["results"]["baselines"]) == 15
+    comparison = manifest["results"]["old_new_baseline_ic_comparison"]
+    assert len(comparison) == 75
+    assert all(
+        row["new_minus_old_mean_daily_spearman_ic"] in (0.0, None)
+        for row in comparison
+    )
+    assert manifest["sources"]["superseded_old_store"]["scope"] == (
+        "IC only; the superseded economics evaluator was not invoked"
+    )
+    assert len(manifest["results"]["gbdt_triage"]) == 1
+    assert len(_FakeGBDT.fit_calls) == 1
     assert all(
         record["seeds"] == [11, 29, 47, 61, 79]
         for record in manifest["results"]["gbdt_triage"]
     )
-    assert len(list((result.root / "gbdt_triage" / "models").rglob("*.txt"))) == 100
-    assert len(training_calls) == 6
-    assert all(
-        call["train_loader"].batch_sampler.pairs_per_batch == 8
-        and call["train_loader"].batch_sampler.drop_last is True
-        for call in training_calls
-    )
-    assert [call["stage"] for call in training_calls].count("P") == 1
-    persistence = [
-        call
-        for call in training_calls
-        if call["model_config"].lambda_persistence == 0.1
-    ]
-    assert len(persistence) == 2
-    assert all(call["maximum_epochs"] == 1 for call in persistence)
-    handoff = next(
-        call for call in training_calls if call.get("pretrain_checkpoint") is not None
-    )
-    assert handoff["stage"] == "F"
-    assert handoff["expected_pretrain_sha256"] == sha256_file(
-        Path(handoff["pretrain_checkpoint"])
-    )
+    assert len(list((result.root / "gbdt_triage" / "models").rglob("*.txt"))) == 25
+    assert training_calls == []
+    assert manifest["results"]["network_smokes"]["status"] == "not_run"
 
     for path in result.root.rglob("*.json"):
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -410,6 +414,7 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
     with pytest.raises(FileExistsError):
         pipeline.run_pipeline_validation(
             store_root=store_root,
+            old_store_root=store_root,
             cdi_path=cdi_path,
             cdi_sha256=cdi_sha,
             experiment52_cdi_path=experiment52_cdi_path,
@@ -663,13 +668,14 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
 ) -> None:
     store_root, _, _, _, _ = _development_store(tmp_path)
     dates = np.load(store_root / "date_index.npy", allow_pickle=False)
-    authorized = np.arange(len(dates) - 3, len(dates), dtype=np.int64)
-    store, _ = open_store_for_dates(
+    indices = np.arange(len(dates) - 3, len(dates) - 1, dtype=np.int64)
+    store, _ = open_store_for_samples(
         store_root,
-        authorized,
+        indices,
         purpose="evaluation",
+        history_lookbacks=20,
+        history_end_offsets=-1,
     )
-    indices = authorized[:2]
     score_shape = (len(indices), len(store.isins), len(HORIZONS))
     try:
         inputs = pipeline._evaluation_inputs(
@@ -685,7 +691,9 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
 
     assert not inputs.target_mask[-1].any()
     assert not inputs.raw_target_mask[-1].any()
-    assert np.all(inputs.residual_midrank_targets[~inputs.target_mask] == 0.0)
+    assert np.all(
+        inputs.median_residual_midrank_targets[~inputs.target_mask] == 0.0
+    )
     assert np.all(inputs.raw_midrank_targets[~inputs.raw_target_mask] == 0.0)
     assert np.all(inputs.raw_log_returns[~inputs.raw_target_mask] == 0.0)
 

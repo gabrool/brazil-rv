@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -22,6 +22,7 @@ from brazil_rv.v2.build_store import (
     _validate_v1_calendar,
     build_daily_store,
 )
+from brazil_rv.v2.corporate_actions import normalize_yfinance_actions
 from brazil_rv.v2.config import ModelConfig
 from brazil_rv.v2.contract import ACCUMULATED_TEST_AFTER, FINETUNE_START
 from brazil_rv.v2.data import (
@@ -1007,10 +1008,12 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
     consistent = np.load(root / "m1_cotahist_close_consistent_mask.npy")
     assert not consistent[65].any()
     cash_event = np.load(root / "detected_cash_event_mask.npy")
-    target_exclusion = np.load(root / "target_exclusion_event_mask.npy")
+    neutralized_event = np.load(root / "return_neutralized_event_mask.npy")
+    anomaly = np.load(root / "price_jump_anomaly_mask.npy")
     ambiguous = np.load(root / "ambiguous_action_mask.npy")
     assert cash_event[63, 1]
-    assert target_exclusion[63, 1]
+    assert neutralized_event[63, 1]
+    assert not anomaly.any()
     assert not ambiguous.any()
     slow_valid = np.load(root / "slow_valid.npy")
     assert slow_valid[63, 1, 3]
@@ -1029,3 +1032,158 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
         tuple(manifest["metadata"]["v1_store_v2_zero_slow_fields"])
         == V1_STORE_V2_ZERO_SLOW_FIELDS
     )
+    assert manifest["metadata"]["undocumented_split_fallback"] is False
+    assert "cotahist_action_counts_by_year" in manifest["tables"]
+    assert "neutralized_return_coverage_by_year" in manifest["tables"]
+
+
+def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
+    days = 75
+    cutoff = 65
+    dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(days)]
+    names = ("BRTESTACNOR1", "BRTESTACNPR0")
+    close = np.empty((days, 2), dtype=np.float64)
+    quantity = np.full((days, 2), 100_000.0, dtype=np.float64)
+    distribution = np.ones((days, 2), dtype=np.float64)
+    for day_index in range(days):
+        close[day_index] = (100.0 + 0.1 * day_index, 80.0 + 0.08 * day_index)
+    close[30:, 0] *= 0.5
+    quantity[30:, 0] *= 2.0
+    distribution[30:, 0] = 2.0
+    close[70:, 1] *= 10.0
+    quantity[70:, 1] *= 0.1
+    distribution[70:, 1] = 2.0
+
+    def daily_frame(
+        price: np.ndarray, qty: np.ndarray, dismes: np.ndarray, volume_scale: float = 1.0
+    ) -> pl.DataFrame:
+        return pl.DataFrame(
+            [
+                {
+                    "trade_date": day,
+                    "isin": isin,
+                    "ticker": f"TEST{name_index + 3}",
+                    "security_spec_base": "ON",
+                    "bdi_code": "02",
+                    "market_type": 10,
+                    "open_brl": float(price[day_index, name_index] * 0.999),
+                    "high_brl": float(price[day_index, name_index] * 1.01),
+                    "low_brl": float(price[day_index, name_index] * 0.99),
+                    "close_brl": float(price[day_index, name_index]),
+                    "volume_brl": float(
+                        (volume_scale if day_index > cutoff else 1.0)
+                        * (3_000_000.0 + 1_000.0 * day_index)
+                    ),
+                    "trades": float(
+                        (volume_scale if day_index > cutoff else 1.0)
+                        * (100 + day_index)
+                    ),
+                    "quantity": float(qty[day_index, name_index]),
+                    "distribution_number": float(dismes[day_index, name_index]),
+                }
+                for day_index, day in enumerate(dates)
+                for name_index, isin in enumerate(names)
+            ]
+        )
+
+    minute_fraction = np.linspace(-0.001, 0.0, 405, dtype=np.float64)
+
+    def minute_panel(price: np.ndarray, *, future_scale: float = 1.0) -> MinutePanel:
+        minute_close = price[:, :, None] * (1.0 + minute_fraction)
+        minute_volume = np.full_like(minute_close, 1_000.0)
+        if future_scale != 1.0:
+            minute_close[cutoff + 1 :] *= future_scale
+            minute_volume[cutoff + 1 :] *= 7.0
+        return MinutePanel(
+            dates=np.asarray(dates, dtype="datetime64[D]"),
+            isins=names,
+            open_brl=minute_close * 0.9999,
+            high_brl=minute_close * 1.0002,
+            low_brl=minute_close * 0.9998,
+            close_brl=minute_close,
+            volume=minute_volume,
+            observed=np.ones_like(minute_close, dtype=np.bool_),
+        )
+
+    actions = normalize_yfinance_actions(
+        pl.DataFrame(
+            schema={"Date": pl.Date, "Dividends": pl.Float64, "Stock Splits": pl.Float64}
+        ),
+        isin=names[0],
+        ticker="TEST3",
+        fetched_at=datetime(2023, 4, 1, tzinfo=timezone.utc),
+    )
+    sidecar_rows = [
+        {
+            "available_date": day,
+            "isin": isin,
+            "fund_leverage": float(0.1 * name_index + 0.001 * day_index),
+        }
+        for day_index, day in enumerate(dates)
+        for name_index, isin in enumerate(names)
+    ]
+    sidecar_a = tmp_path / "fundamentals_a.parquet"
+    sidecar_b = tmp_path / "fundamentals_b.parquet"
+    pl.DataFrame(sidecar_rows).write_parquet(sidecar_a)
+    pl.DataFrame(sidecar_rows).with_columns(
+        pl.when(pl.col("available_date") > dates[cutoff])
+        .then(pl.col("fund_leverage") + 100.0)
+        .otherwise(pl.col("fund_leverage"))
+        .alias("fund_leverage")
+    ).write_parquet(sidecar_b)
+
+    mutated_close = close.copy()
+    mutated_quantity = quantity.copy()
+    mutated_distribution = distribution.copy()
+    mutated_close[cutoff + 1 :] *= 3.0
+    mutated_quantity[cutoff + 1 :] *= 7.0
+    mutated_distribution[cutoff + 1 :] += 5.0
+    first = build_daily_store(
+        daily_frame(close, quantity, distribution),
+        actions,
+        tmp_path / "causal_a",
+        minute_panel=minute_panel(close),
+        sidecar_arguments=(f"fundamentals={sidecar_a}",),
+        minimum_calendar_names=1,
+        store_start=None,
+    )
+    second = build_daily_store(
+        daily_frame(
+            mutated_close,
+            mutated_quantity,
+            mutated_distribution,
+            volume_scale=7.0,
+        ),
+        actions,
+        tmp_path / "causal_b",
+        minute_panel=minute_panel(close, future_scale=3.0),
+        sidecar_arguments=(f"fundamentals={sidecar_b}",),
+        minimum_calendar_names=1,
+        store_start=None,
+    )
+
+    exact_names = {
+        "adjusted_open",
+        "adjusted_high",
+        "adjusted_low",
+        "adjusted_close",
+        "price_adjustment_factor",
+        "detected_split_mask",
+        "return_neutralized_event_mask",
+        "active",
+        "fast_present",
+        "intraday_action_boundary_mask",
+    }
+    exact_names.update(
+        path.stem
+        for path in first.glob("*.npy")
+        if path.stem.startswith(("slow_", "intraday_", "sidecar_"))
+    )
+    for name in sorted(exact_names):
+        left = np.load(first / f"{name}.npy", mmap_mode="r")
+        right = np.load(second / f"{name}.npy", mmap_mode="r")
+        np.testing.assert_array_equal(left[: cutoff + 1], right[: cutoff + 1], err_msg=name)
+
+    detected = np.load(first / "detected_split_mask.npy")
+    assert detected[30, 0]
+    assert detected[70, 1]

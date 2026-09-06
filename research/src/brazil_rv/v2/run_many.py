@@ -255,54 +255,49 @@ def preset_jobs(
     jobs: list[TrajectoryJob] = []
     for fold in preset.folds:
         for seed in preset.seeds:
-            for parity in (0, 1):
-                label = "even" if parity == 0 else "odd"
-                run_dir = output_root / f"{fold}_seed{seed}_select_{label}"
-                command = [
-                    sys.executable,
-                    "-m",
-                    "brazil_rv.v2.train",
-                    "--store",
-                    str(store.resolve()),
-                    "--output-dir",
-                    str(run_dir.resolve()),
-                    "--score-output-dir",
-                    str((run_dir / "scores").resolve()),
-                    "--stage",
-                    "F",
-                    "--fold",
-                    fold,
-                    "--seed",
-                    str(seed),
-                    "--selection-parity",
-                    str(parity),
-                    "--maximum-epochs",
-                    str(preset.max_epochs_override or 20),
-                    "--fast-pretrained-checkpoint",
-                    str(checkpoint),
-                    "--fast-pretrained-sha256",
-                    fast_pretrained_sha256,
-                ]
-                if not compile_forward:
-                    command.append("--no-compile-forward")
-                for group in sidecars:
-                    command.extend(("--sidecar", group))
-                jobs.append(
-                    TrajectoryJob(
-                        name=f"{fold}_seed{seed}_select_{label}",
-                        seed=seed,
-                        fold=fold,
-                        run_dir=run_dir,
-                        command=tuple(command),
-                        cwd=Path(__file__).resolve().parents[4],
-                        expected_manifest={
-                            "stage": "F",
-                            "selection_parity": parity,
-                            "official_validation_accessed": False,
-                            "test_accessed": False,
-                        },
-                    )
+            run_dir = output_root / f"{fold}_seed{seed}"
+            command = [
+                sys.executable,
+                "-m",
+                "brazil_rv.v2.train",
+                "--store",
+                str(store.resolve()),
+                "--output-dir",
+                str(run_dir.resolve()),
+                "--score-output-dir",
+                str((run_dir / "scores").resolve()),
+                "--stage",
+                "F",
+                "--fold",
+                fold,
+                "--seed",
+                str(seed),
+                "--maximum-epochs",
+                str(preset.max_epochs_override or 20),
+                "--fast-pretrained-checkpoint",
+                str(checkpoint),
+                "--fast-pretrained-sha256",
+                fast_pretrained_sha256,
+            ]
+            if not compile_forward:
+                command.append("--no-compile-forward")
+            for group in sidecars:
+                command.extend(("--sidecar", group))
+            jobs.append(
+                TrajectoryJob(
+                    name=f"{fold}_seed{seed}",
+                    seed=seed,
+                    fold=fold,
+                    run_dir=run_dir,
+                    command=tuple(command),
+                    cwd=Path(__file__).resolve().parents[4],
+                    expected_manifest={
+                        "stage": "F",
+                        "official_validation_accessed": False,
+                        "test_accessed": False,
+                    },
                 )
+            )
     metadata = {
         "preset": preset.name,
         "folds": list(preset.folds),
@@ -311,7 +306,10 @@ def preset_jobs(
         "paired_bootstrap_block_sessions": preset.bootstrap_block_length,
         "fast_pretrained_checkpoint": str(checkpoint),
         "fast_pretrained_sha256": fast_pretrained_sha256,
-        "trajectory_contract": "stage-F train plus raw-Patience score artifact",
+        "trajectory_contract": (
+            "one chronological stage-F model per fold/seed plus its "
+            "raw-Patience evaluation-window score artifact"
+        ),
     }
     return tuple(jobs), preset.max_parallel, metadata
 

@@ -86,6 +86,8 @@ def build_baselines(
     observed: NDArray[np.bool_],
     active: NDArray[np.bool_],
     ambiguous_action: NDArray[np.bool_],
+    yang_zhang_vol_20: NDArray[np.floating],
+    yang_zhang_vol_20_valid: NDArray[np.bool_],
     *,
     slow_lag: int = 1,
 ) -> dict[str, BaselinePanel]:
@@ -99,6 +101,10 @@ def build_baselines(
     observed_mask = np.asarray(observed, dtype=bool)
     active_mask = np.asarray(active, dtype=bool)
     ambiguous = np.asarray(ambiguous_action, dtype=np.bool_)
+    volatility = np.asarray(yang_zhang_vol_20, dtype=np.float64)
+    volatility_valid = np.asarray(yang_zhang_vol_20_valid, dtype=np.bool_)
+    if volatility.shape != close_values.shape or volatility_valid.shape != close_values.shape:
+        raise ValueError("inverse-volatility inputs must have shape [date, name]")
     reversal_5, mask_5 = _lagged_return(
         close_values,
         observed_mask,
@@ -131,9 +137,23 @@ def build_baselines(
         rank_gaussianize(reversal_5, blend_mask)
         + rank_gaussianize(momentum_12_1, blend_mask)
     )
+    inverse_volatility = np.zeros(close_values.shape, dtype=np.float64)
+    inverse_volatility_mask = np.zeros(close_values.shape, dtype=np.bool_)
+    for day in range(slow_lag, close_values.shape[0]):
+        source = day - slow_lag
+        valid = (
+            active_mask[day]
+            & volatility_valid[source]
+            & np.isfinite(volatility[source])
+        )
+        inverse_volatility[day, valid] = -volatility[source, valid]
+        inverse_volatility_mask[day] = valid
     return {
         "reversal_5": _rank_panel(reversal_5, mask_5),
         "reversal_21": _rank_panel(reversal_21, mask_21),
         "momentum_12_1": _rank_panel(momentum_12_1, mask_momentum),
         "reversal_5_momentum_12_1_blend": _rank_panel(blend, blend_mask),
+        "inverse_volatility_20": _rank_panel(
+            inverse_volatility, inverse_volatility_mask
+        ),
     }

@@ -11,24 +11,40 @@ system.
 
 ## Current review status
 
-The second review pass removes the structural dependence on provider action
-coverage. The panel definition now uses only official COTAHIST price, quantity,
-and `DISMES` histories to classify split/bonus, cash-type, and ambiguous events.
-Yahoo actions remain audit evidence only and cannot alter a stored feature,
-mask, or target. The preceding provider-dependent `f048ea9` and `2cb204d`
-stores and validations remain immutable historical engineering evidence, not
-canonical inputs.
+Fix pass 3 supersedes every Round-1/Round-2 research claim made from the first
+daily store. The old store remains immutable evidence, but its action classifier
+mistook many ordinary `DISMES` transitions for cash events, masking roughly 89%
+of the old cash-event set without an official distribution change. Its targets
+also mixed cross-sectional median removal and volatility scaling in the wrong
+order, and the old economics wrapper treated independently re-formed daily
+books as PnL instead of maintaining positions and cash.
 
-This source implementation is unit-tested, including byte-for-byte provider
-invariance and both target- and feature-side survivorship gates. The accepted
-Section-C store at commit `98e9386` passed the publication-lag, support-aware
-name-clustered external-family gate, unconditional internal-family gate, target
-gate, and 8-GiB build-memory ceiling. The subsequent spec-scale full-F1
-integration run stopped at its first failure after baselines and GBDT: the
-Linux neural loader cannot bind the Windows absolute `v1_fast_store` provenance
-path sealed into that store. Stage P/F did not start. No v2 research round,
-official-validation read, test read, candidate selection, or deployment change
-resulted.
+The corrected foundation has five inseparable pieces:
+
+1. **F1 — corporate actions:** split/bonus candidates are `DISMES` changes;
+   an optional strict price/quantity fallback is enabled only by a recorded
+   provider-audit decision. Price jumps without `DISMES` are diagnostics, not
+   cash events.
+2. **F2 — returns:** the daily panel first constructs split-adjusted log returns.
+   On a classified cash/ambiguous event, that name's otherwise observed return
+   is replaced by the contemporaneous active non-event cross-sectional median;
+   the leg stays valid. Ordinary large moves remain untouched.
+3. **F3 — targets:** a D-session target sums those neutralized daily returns,
+   removes the target-date cross-sectional median, and only then divides by the
+   name's 20-session Yang-Zhang volatility observed at `t-1`, scaled by
+   `sqrt(D)`.
+4. **F4 — chronology:** every development fold uses one model per seed with a
+   fit window, 10-session purge, 55-session selection window, another
+   10-session purge, and an untouched evaluation window. Block parity is not a
+   v2 selection or evaluation mechanism.
+5. **F5 — economics:** v2 uses a stateful position/cash ledger with explicit
+   entries, exits, holding periods, costs, borrow, interest, missing marks,
+   corporate-action flows, forced liquidation, and terminal liquidation.
+
+The v1 intraday implementation and its accepted artifacts are untouched. The
+old v2 Round-1 root and the score-free partial Round-2 root are retained and
+marked superseded with `research_claim=false`; no completed old score is reused
+by the corrected program.
 
 ## Data flow
 
@@ -47,14 +63,14 @@ flowchart LR
     F --> L
     H --> L
     K --> L
-    B --> M[Five residual and raw targets]
+    B --> M[Five neutralized-return targets]
     G --> N[To-close auxiliary target]
     L --> O[Immutable v2 daily store]
     M --> O
     N --> O
     O --> P[Baselines / LightGBM / neural model]
     P --> Q[Development-only evaluator]
-    Q --> R[IC, persistence, spreads, swing economics]
+    Q --> R[IC, persistence, spreads, stateful economics]
 ```
 
 ## Identity, calendar, and timing
@@ -92,22 +108,22 @@ that boundary, the security master records an audited continuation link. Ticker
 reuse after a gap does not link. The successor inherits only strictly prior
 feature history; survival audits use the root continuation identity.
 
-The panel's action definition is provider-independent. An event candidate is a
-`DISMES` change or an adjacent price jump above the 4% log band, whether or not
-`DISMES` changes. At each candidate, the classifier compares medians of up to
-three observed sessions before and after the boundary. It labels a split/bonus
-when `abs(log(price_ratio)) > 0.08` and
-`abs(log(price_ratio * quantity_ratio)) < 0.15`; the causal price adjustment
-uses that price ratio. A 4–8% price jump with inconsistent quantity continuity
-is ambiguous. Every remaining candidate is cash-type and receives no price
-adjustment.
+The production candidate set is every observed `DISMES` transition. At each
+candidate, the classifier compares the current price/quantity ratio with the
+median of up to three strictly prior observed ratios—future rows never enter
+classification. It labels a split/bonus when the price discontinuity and
+quantity continuity jointly match the frozen tolerance; ambiguous candidates
+remain masked. Other large close jumps are retained in
+`price_jump_anomaly_mask` for audit and are not automatically called cash
+events. A standalone audit compares the DISMES-only classifier with an optional
+strict undocumented-split fallback against provider-covered splits. The
+fallback is adopted only if recall improves by at least one point while
+precision falls by no more than one point.
 
-Targets exclude holding intervals whose future leg contains a cash-type or
-ambiguous event. Return-type features use split-adjusted prices without masking
-cash events; only ambiguous events propagate an unresolved shadow through the
-affected lookback. The M1 cross-session boundary mask contains detected splits
-only. These rules depend uniformly on official COTAHIST fields for current and
-delisted securities.
+Daily log-return legs crossing a classified event or ambiguity are unavailable
+to both return features and multi-day targets. The M1 cross-session boundary
+mask contains detected splits only. These rules depend uniformly on official
+COTAHIST fields for current and delisted securities.
 
 Yahoo actions may still be fetched in bounded, dated-ticker batches and retained
 in immutable caches, but only for audits. Detection precision/recall is reported
@@ -165,10 +181,12 @@ Core arrays begin with `[date, isin]`:
 | `adjusted_open`, `adjusted_high`, `adjusted_low`, `adjusted_close` | — | causal COTAHIST-only split/bonus-adjusted OHLC |
 | `price_adjustment_factor` | — | causal cumulative split/bonus factor |
 | `volume_brl`, `trade_count`, `quantity`, `distribution_number` | — | raw daily activity/action fields |
-| `distribution_change_mask`, `detected_event_mask`, `detected_split_mask`, `detected_cash_event_mask`, `ambiguous_action_mask`, `target_exclusion_event_mask`, `intraday_action_boundary_mask` | — | official action classification, target exclusions, and split-only M1 boundaries |
+| `distribution_change_mask`, `detected_event_mask`, `detected_split_mask`, `detected_cash_event_mask`, `ambiguous_action_mask`, `price_jump_anomaly_mask`, `intraday_action_boundary_mask` | — | official action classification, jump-only diagnostics, and split-only M1 boundaries |
 | `slow_values`, `slow_valid` | 32 features | rank-Gauss slow library |
 | `intraday_values`, `intraday_valid` | 20 features | rank-Gauss M1 summaries |
 | `sidecar_<group>_values`, `sidecar_<group>_valid` | group features | optional PIT sidecars |
+| `neutralized_log_return`, `neutralized_log_return_valid`, `return_neutralized_event_mask`, `cross_sectional_median_log_return` | — | one-session return foundation and event mask |
+| `target_scale_sigma` | — | Yang-Zhang target scaler shifted to `t-1` |
 | `target_primary`, `target_valid`, `target_normalized_residual` | 5 horizons | primary midrank, mask, and pre-rank residual |
 | `target_raw_midrank`, `target_raw_valid`, `target_raw_log_return` | 5 horizons | raw-return comparison target family |
 | `target_to_close`, `target_to_close_valid`, `target_to_close_normalized_residual`, `target_to_close_raw_log_return` | — | optional 15:45-to-close target family |
@@ -315,24 +333,31 @@ No fitted scaler or future cross-section is used.
 
 ## Targets
 
-For `D in {1,2,3,5,10}`, raw split-adjusted price return is
-`r_D = log(adjusted_close[t+D] / adjusted_close[t])`. The primary pre-rank target is
+For each session `u`, first define the split-adjusted one-session log return
+`r[u,i] = log(C[u,i] / C[u-1,i])`. A base leg is valid when both closes are
+observed, finite, and positive. Let `m[u]` be the median return across active,
+valid, non-event names, requiring at least 20. The stored return is
 
-`clip(r_D / (sigma_t*sqrt(D)) - cross_section_median, -5, 5)`.
+`r_neutral[u,i] = m[u]` for a classified cash/ambiguous event and `r[u,i]`
+otherwise. An observed event leg remains valid when `m[u]` exists; no other
+name's return is changed.
 
-`sigma_t` is the 20-session Yang–Zhang volatility for every name. M1 realized
-volatility remains an input feature, and its ratio to Yang-Zhang is retained as
-an audit table rather than mixed into target scaling. The primary target is its
-tie-aware midrank scaled to `[0,1]`. The raw target is the midrank of `r_D`
-without volatility normalization or median removal; raw log return is also
-stored for spreads.
+For `D in {1,2,3,5,10}`, the target-date return is the sum of the next D
+neutralized legs, `R_D[t,i] = sum_{u=t+1}^{t+D} r_neutral[u,i]`. Remove the
+cross-sectional median of `R_D[t]` before scaling, then form
 
-A raw target requires active membership at `t`, a close on every calendar
-session from `t` through `t+D`, and no COTAHIST-classified cash-type or
-ambiguous event in `(t,t+D]`. Detected split/bonus events are adjusted rather
-than masked. The primary target additionally requires a finite positive
-selected volatility. Each requested loader/evaluation window clears its last
-`D` target rows, so an endpoint cannot cross a selection or sealed boundary.
+`z_D[t,i] = clip((R_D[t,i] - median_j(R_D[t,j])) /
+                 (sigma[t-1,i] * sqrt(D)), -5, 5)`.
+
+`sigma[t-1]` is the strictly lagged 20-session Yang-Zhang volatility. This order
+is the primary target definition; median-removing already volatility-scaled
+name returns is not equivalent and is forbidden. The primary target is the
+tie-aware midrank of `z_D` scaled to `[0,1]`. The raw comparison family retains
+the unneutralized split-adjusted D-session log return and its midrank.
+
+Every constituent daily leg must be valid. Each requested fit, selection, or
+evaluation window also clears targets whose endpoint leaves that exact window,
+so labels cannot cross either purge or a sealed boundary.
 
 A survivor-subset total-return target is registered as a future sensitivity
 variant but is deliberately not implemented by the foundation store.
@@ -400,7 +425,7 @@ adjacent full-cross-section date pairs even when `lambda_pers=0`.
 | Stage | Dates and fast stream | Selection |
 |---|---|---|
 | P | 2010-01-04→2021-07-30; slow through `t`; fast absent | last 10% of pretrain, preceded by 70-session embargo |
-| F | 2021-08-16→fold fit end; slow through `t-1`; fast where available | fold selection window, 5-session block-parity cross-fit |
+| F | 2021-08-16→fold fit end; slow through `t-1`; fast where available | one chronological 55-session selection window after a 10-session purge |
 | J | P and F samples together | same registered selection; optional 756-session half-life weighting |
 
 SAM-AdamW uses `rho=0.125`, weight decay 0.01, scratch LR `3e-4`, and LR
@@ -418,13 +443,15 @@ and native TreeSHAP contributions.
 
 ## Development splits and sealing
 
-| Window | Selection dates | Fit rule |
+| Fold component | Frozen rule |
 |---|---|---|
-| F1 | 2023-07-03→2023-12-29 | development dates before selection, then 75-session embargo |
-| F2 | 2024-01-02→2024-06-28 | same |
-| F3 | 2024-07-01→2024-12-30 | same |
-| Official validation | 2025-01-02→2025-12-30 | sealed; evaluation requires a file under `research/preregistrations` and records its SHA-256 |
-| Held-out test | 2026-01-02→2026-07-17 fallback, plus every date after 2026-07-17 | refused unconditionally by this code version |
+| Fit | all eligible development samples before the first purge |
+| Purge before selection | 10 sessions, never sampled |
+| Selection | next 55 chronological sessions; early stopping/checkpoint choice only |
+| Purge before evaluation | 10 sessions, never sampled |
+| Evaluation | the registered F1, F2, or F3 out-of-sample window |
+| Official validation | 2025-01-02→2025-12-30; sealed, with a preregistration required before access |
+| Held-out test | 2026-01-02→2026-07-17 fallback, plus every later date; refused unconditionally by this code version |
 
 The public `V2Store.open` path is disabled. `open_store_for_dates` and
 `open_store_for_samples` first read only the small date index, authorize the
@@ -452,32 +479,36 @@ strict while binding the separately authorized evaluation date axis and its
 ledger into the score manifest. There is no public untracked-loader escape
 hatch for auditable training artifacts.
 
-Within each selection window, consecutive sessions are grouped into blocks of
-five. Even blocks select the model evaluated on odd blocks, and vice versa.
+Each fold/seed produces exactly one fitted model and one untouched evaluation
+panel. A label interval hash proves that fit labels end within fit, selection
+labels end within selection, and evaluation labels end within evaluation.
 
 ## Evaluation
 
 The evaluator reports per-horizon residual Spearman IC, raw Rank-IC,
 day-over-day and lag-5 score persistence, and top-minus-bottom decile raw
 return in bps per holding session. Primary pooled IC is the equal-weight mean
-of D1/D2/D3/D5 mean ICs; D10 is separate. IC uses the stitched block-parity
-score panel. Persistence and swing economics are computed independently on
-both complete parity-model paths and then averaged; a daily/path average is
-reported only when both paths are complete.
+of D1/D2/D3/D5 mean ICs; D10 is separate. Each score panel comes from the one
+chronologically selected model for that fold and seed.
 
 The single economics signal is frozen as a tie-aware rank average of D1, D2,
 D3, and D5 scores, excluding D10. This resolves the otherwise ambiguous
 multi-head-to-one-book mapping before any v2 research read.
 
-The public daily swing wrapper forms a causal dollar-neutral K=30-per-side book
-at gross 2.0 with a 0.3 rank band, closing-auction fills, costs of 2/4/7 bps per
-side, borrow of 2/4% per year, and CDI on NAV less the margin line. The headline
-is 4 bps and 2% borrow. It reports daily net excess over all-cash CDI,
-annualized net-excess Sharpe, turnover, and implied holding period. A missing
-future exit never changes today's weights; the affected PnL interval is
-explicitly invalid and counted. The same applies when the exit row carries an
-unresolved corporate action: the decision weight is preserved, but that held
-interval cannot enter headline economics.
+The v2 economics layer is a stateful close-to-close ledger. It forms the frozen
+rank-band, name-cap, gross and neutrality-constrained desired book, trades only
+the delta from existing positions at the closing auction, and maintains shares
+and cash across sessions. It realizes entry/exit costs, short borrow, CDI cash
+interest, classified corporate-action cash flows, missing-mark logic, forced
+liquidation, and terminal liquidation. Holding-period variants are produced by
+the ledger's rebalance schedule rather than by overlapping independent daily
+portfolios. The headline remains 4 bps per side and 2% annual borrow, with the
+registered cost/borrow grid reported as sensitivities.
+
+Diagnostics include the new causal inverse-volatility baseline, name/date
+coverage and gross/net exposure, incremental PnL attribution, and a matched
+universe comparison. Any candidate/reference economics readout with undefined
+support fails the “not worse” guard; missing values never pass by omission.
 
 Paired comparisons use identical dates and inputs and consume the selected
 protocol's bootstrap settings. Full uses a deterministic length-20 moving-block
@@ -526,6 +557,7 @@ uv run --project research pytest -q research/tests
 
 uv run --project research python -m brazil_rv.v2.validate_pipeline \
   --store-root <v2-daily-store> \
+  --old-store-root <accepted-superseded-v2-daily-store> \
   --cdi-path <development-extension-daily-cdi-parquet> \
   --cdi-sha256 <development-extension-sha256> \
   --experiment52-cdi-path <exact-experiment-52-daily-cdi-parquet> \
@@ -552,9 +584,11 @@ have the same schema and byte-identical `trade_date` and `daily_cdi_rate`
 columns (with zero maximum rate difference). The recorded provenance includes
 both paths and hashes plus this overlap proof. The validation CLI also exposes
 the registered GBDT round limits, lookback, device, compilation toggle, and
-explicitly bounded session-count controls for diagnostic runs. Its F1-F2 GBDT
-triage uses the five registered GBDT seeds `(11, 29, 47, 61, 79)` at those
-round limits.
+explicitly bounded session-count controls for diagnostic runs. Fix-pass-3 CPU
+acceptance runs all five naive baselines on F1–F3, one full-scale F1 GBDT
+triage with the five registered seeds `(11, 29, 47, 61, 79)`, and the paired
+old-store/new-store naive-baseline IC table. The old-store leg is IC-only and
+cannot invoke the superseded economics evaluator.
 
 Only the development folds may be passed to the foundation validation driver.
 The required smoke trajectories are explicitly labeled

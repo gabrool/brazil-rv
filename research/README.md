@@ -43,8 +43,11 @@ See [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for the durable contract and
 [RESEARCH_HANDOFF.md](../RESEARCH_HANDOFF.md) for the result and artifact record.
 
 The additive `brazil_rv.v2` package implements the daily 15:45 research stack.
-Its current panel uses COTAHIST-only split/bonus classification and
-split-adjusted price returns; provider actions are audit-only. No store built
-under an older provider-dependent total-return definition is canonical. See
-[docs/v2_README.md](../docs/v2_README.md) for the executable contract and the
-pending, non-research store/full-F1 acceptance steps.
+Its corrected foundation uses causal DISMES-first action classification,
+market-median event marking of split-adjusted daily returns,
+median-before-lagged-volatility target scaling, chronological
+fit/selection/evaluation splits, and a stateful
+position/cash ledger. Provider actions are audit-only. No result from an older
+provider-dependent, parity-selected, or stateless-economics daily contract is a
+current research claim. See [docs/v2_README.md](../docs/v2_README.md) for the
+executable contract.

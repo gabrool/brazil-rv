@@ -39,6 +39,7 @@ _TARGET_VALUE_MASKS = {
     "target_to_close_raw_log_return": "target_to_close_valid",
 }
 _MULTI_HORIZON_TARGET_MASKS = frozenset(("target_valid", "target_raw_valid"))
+_DATE_ONLY_ARRAYS = frozenset(("cross_sectional_median_log_return",))
 
 
 def peak_rss_bytes() -> int:
@@ -152,6 +153,10 @@ def _validate_array_shapes(
         if not _SAFE_NAME.fullmatch(name):
             raise ValueError(f"unsafe array name: {name}")
         value = np.asarray(raw)
+        if name in _DATE_ONLY_ARRAYS:
+            if value.shape != (date_count,):
+                raise ValueError(f"{name} must have the [date] axis; got {value.shape}")
+            continue
         if value.ndim < 2 or value.shape[:2] != (date_count, isin_count):
             raise ValueError(
                 f"{name} must begin with the [date, ISIN] axes; got {value.shape}"
@@ -251,10 +256,13 @@ class StoreStaging:
         chunk_rows: int = 64,
     ) -> np.memmap:
         normalized_shape = tuple(int(value) for value in shape)
-        if len(normalized_shape) < 2 or normalized_shape[:2] != (
-            self.dates.size,
-            len(self.isins),
-        ):
+        valid_shape = (
+            normalized_shape == (self.dates.size,)
+            if name in _DATE_ONLY_ARRAYS
+            else len(normalized_shape) >= 2
+            and normalized_shape[:2] == (self.dates.size, len(self.isins))
+        )
+        if not valid_shape:
             raise ValueError(
                 "store arrays must begin with the output [date, ISIN] axes"
             )
@@ -285,7 +293,12 @@ class StoreStaging:
         chunk_rows: int = 64,
     ) -> None:
         source = np.asarray(values)
-        if source.ndim < 2 or source.shape[1] != len(self.isins):
+        valid_source = (
+            source.ndim == 1
+            if name in _DATE_ONLY_ARRAYS
+            else source.ndim >= 2 and source.shape[1] == len(self.isins)
+        )
+        if not valid_source:
             raise ValueError(
                 "store source arrays must begin with the [date, ISIN] axes"
             )
@@ -461,8 +474,11 @@ def write_store(
     isin_axis = tuple(str(value) for value in isins)
     _validate_axes(date_axis, isin_axis)
     materialized = {name: np.asarray(value) for name, value in arrays.items()}
-    if any(value.ndim < 2 for value in materialized.values()):
-        raise ValueError("store arrays must begin with the [date, ISIN] axes")
+    if any(
+        value.ndim < (1 if name in _DATE_ONLY_ARRAYS else 2)
+        for name, value in materialized.items()
+    ):
+        raise ValueError("store arrays must begin with their registered axes")
     source_date_counts = {int(value.shape[0]) for value in materialized.values()}
     if len(source_date_counts) > 1:
         raise ValueError("store source arrays do not share one date axis")

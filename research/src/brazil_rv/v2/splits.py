@@ -90,18 +90,32 @@ class AccessLedger:
 class DevelopmentFold:
     name: str
     fit_dates: tuple[date, ...]
-    embargo_dates: tuple[date, ...]
+    purge_before_dates: tuple[date, ...]
     selection_dates: tuple[date, ...]
+    purge_after_dates: tuple[date, ...]
+    evaluation_dates: tuple[date, ...]
 
     def payload(self) -> dict[str, object]:
         return {
             "name": self.name,
             "fit_dates": [value.isoformat() for value in self.fit_dates],
-            "embargo_dates": [value.isoformat() for value in self.embargo_dates],
+            "purge_before_dates": [
+                value.isoformat() for value in self.purge_before_dates
+            ],
             "selection_dates": [value.isoformat() for value in self.selection_dates],
+            "purge_after_dates": [
+                value.isoformat() for value in self.purge_after_dates
+            ],
+            "evaluation_dates": [value.isoformat() for value in self.evaluation_dates],
             "fit_date_identity_sha256": _date_identity(self.fit_dates),
-            "embargo_date_identity_sha256": _date_identity(self.embargo_dates),
+            "purge_before_date_identity_sha256": _date_identity(
+                self.purge_before_dates
+            ),
             "selection_date_identity_sha256": _date_identity(self.selection_dates),
+            "purge_after_date_identity_sha256": _date_identity(self.purge_after_dates),
+            "evaluation_date_identity_sha256": _date_identity(self.evaluation_dates),
+            "label_intervals_sha256": _label_intervals_sha256(self),
+            "no_label_overlap_assertion": assert_no_label_overlap(self),
         }
 
 
@@ -222,21 +236,132 @@ def development_folds(calendar_dates: Sequence[date]) -> tuple[DevelopmentFold, 
     position = {value: index for index, value in enumerate(dates)}
     folds: list[DevelopmentFold] = []
     for name, (start, end) in _SELECTION_WINDOWS.items():
-        selection = tuple(value for value in development if start <= value <= end)
+        evaluation = tuple(value for value in development if start <= value <= end)
         before = tuple(value for value in development if value < start)
-        if dates[0] > start or dates[-1] < end or not selection:
-            raise ValueError(f"{name} selection window is outside the calendar")
+        if dates[0] > start or dates[-1] < end or not evaluation:
+            raise ValueError(f"{name} evaluation window is outside the calendar")
         if len(before) <= FIT_EMBARGO_SESSIONS:
-            raise ValueError(f"{name} has too few pre-selection sessions")
+            raise ValueError(f"{name} has too few pre-evaluation sessions")
         fit = before[:-FIT_EMBARGO_SESSIONS]
-        embargo = before[-FIT_EMBARGO_SESSIONS:]
-        first_selection_position = position[selection[0]]
-        if any(
-            position[value] + max(HORIZONS) >= first_selection_position for value in fit
-        ):
+        heldout = before[-FIT_EMBARGO_SESSIONS:]
+        purge_before = heldout[:10]
+        selection = heldout[10:65]
+        purge_after = heldout[65:]
+        if len(selection) != 55 or len(purge_before) != 10 or len(purge_after) != 10:
+            raise ValueError(f"{name} chronological holdout has the wrong size")
+        if position[fit[-1]] + max(HORIZONS) >= position[selection[0]]:
             raise ValueError(f"{name} fit target interval overlaps selection")
-        folds.append(DevelopmentFold(name, fit, embargo, selection))
+        if position[selection[-1]] + max(HORIZONS) >= position[evaluation[0]]:
+            raise ValueError(f"{name} selection target interval overlaps evaluation")
+        fold = DevelopmentFold(
+            name,
+            fit,
+            purge_before,
+            selection,
+            purge_after,
+            evaluation,
+        )
+        assert_no_label_overlap(fold)
+        folds.append(fold)
     return tuple(folds)
+
+
+def label_intervals(
+    fold: DevelopmentFold,
+) -> dict[str, dict[str, list[tuple[int, int]]]]:
+    """Return usable target entry/exit session pairs for each fold segment."""
+
+    ordered = (
+        *fold.fit_dates,
+        *fold.purge_before_dates,
+        *fold.selection_dates,
+        *fold.purge_after_dates,
+        *fold.evaluation_dates,
+    )
+    if tuple(sorted(ordered)) != ordered or len(set(ordered)) != len(ordered):
+        raise ValueError("fold segments must be unique and chronological")
+    position = {value: index for index, value in enumerate(ordered)}
+    result: dict[str, dict[str, list[tuple[int, int]]]] = {}
+    for segment, entries, exits in (
+        (
+            "fit",
+            fold.fit_dates,
+            (*fold.fit_dates, *fold.purge_before_dates),
+        ),
+        (
+            "selection",
+            fold.selection_dates,
+            fold.selection_dates,
+        ),
+        ("evaluation", fold.evaluation_dates, fold.evaluation_dates),
+    ):
+        allowed_exits = set(exits)
+        by_horizon: dict[str, list[tuple[int, int]]] = {}
+        for horizon in HORIZONS:
+            pairs = []
+            for entry in entries:
+                start = position[entry]
+                stop = start + horizon
+                if stop < len(ordered) and ordered[stop] in allowed_exits:
+                    pairs.append((start, stop))
+            by_horizon[str(horizon)] = pairs
+        result[segment] = by_horizon
+    return result
+
+
+def assert_no_label_overlap(fold: DevelopmentFold) -> bool:
+    """Assert fit, selection, and evaluation labels never enter another segment."""
+
+    intervals = label_intervals(fold)
+    ordered = (
+        *fold.fit_dates,
+        *fold.purge_before_dates,
+        *fold.selection_dates,
+        *fold.purge_after_dates,
+        *fold.evaluation_dates,
+    )
+    position = {value: index for index, value in enumerate(ordered)}
+    if (
+        position[fold.fit_dates[-1]] + max(HORIZONS)
+        >= position[fold.selection_dates[0]]
+    ):
+        raise ValueError("fit label reaches selection")
+    if (
+        position[fold.selection_dates[-1]] + max(HORIZONS)
+        >= position[fold.evaluation_dates[0]]
+    ):
+        raise ValueError("selection label reaches evaluation")
+    allowed_entries = {
+        "fit": set(fold.fit_dates),
+        "selection": set(fold.selection_dates),
+        "evaluation": set(fold.evaluation_dates),
+    }
+    allowed_exits = {
+        "fit": set((*fold.fit_dates, *fold.purge_before_dates)),
+        "selection": set(fold.selection_dates),
+        "evaluation": set(fold.evaluation_dates),
+    }
+    for segment, horizons in intervals.items():
+        for pairs in horizons.values():
+            if any(
+                ordered[start] not in allowed_entries[segment]
+                or ordered[stop] not in allowed_exits[segment]
+                for start, stop in pairs
+            ):
+                raise ValueError(f"{segment} label crosses its registered window")
+    evaluation_d10 = intervals["evaluation"][str(max(HORIZONS))]
+    if evaluation_d10 and any(
+        ordered[stop] > DEVELOPMENT_END for _, stop in evaluation_d10
+    ):
+        raise ValueError("evaluation D10 label crosses the development boundary")
+    return True
+
+
+def _label_intervals_sha256(fold: DevelopmentFold) -> str:
+    payload = json.dumps(
+        label_intervals(fold), sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def block_parity_directions(

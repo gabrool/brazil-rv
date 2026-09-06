@@ -178,7 +178,7 @@ def test_named_preset_expands_to_train_and_score_commands(tmp_path) -> None:
         sidecars=("events",),
         compile_forward=False,
     )
-    assert len(jobs) == 4
+    assert len(jobs) == 2
     assert maximum == 1
     assert metadata["paired_bootstrap_replications"] == 0
     assert metadata["paired_bootstrap_block_sessions"] == 20
@@ -204,7 +204,7 @@ def test_named_preset_rejects_unbound_fast_checkpoint(tmp_path) -> None:
 
 
 def test_protocol_loader_rejects_any_config_drift(tmp_path) -> None:
-    source = Path("research/configs/v2/triage.json")
+    source = Path(__file__).resolve().parents[1] / "configs" / "v2" / "triage.json"
     payload = json.loads(source.read_text(encoding="utf-8"))
     payload["training"]["epochs"] = 19
     changed = tmp_path / "triage.json"

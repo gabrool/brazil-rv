@@ -36,7 +36,7 @@ from .contract import (
 )
 from .data import V2DailyDataset
 from .data_roots import resolve_external_files
-from .evaluate import EvaluationInputs, EvaluationResult, evaluate_scores
+from .evaluate import EvaluationInputs, EvaluationResult, _spearman, evaluate_scores
 from .gbdt import GBDTConfig, MultiHorizonGBDT, assemble_gbdt_features
 from .score import ScoreArtifact, score_checkpoint_artifact
 from .splits import AccessPurpose, development_folds
@@ -44,9 +44,7 @@ from .store import STORE_SCHEMA, V2Store, open_store_for_samples
 from .train import (
     DatePairBatchSampler,
     StageTrainingResult,
-    block_parity_mask,
     pretrain_internal_split,
-    stitch_block_parity_predictions,
     train_stage,
 )
 
@@ -75,7 +73,11 @@ _REQUIRED_ARRAYS = frozenset(
         "target_raw_valid",
         "target_raw_log_return",
         "adjusted_close",
-        "target_exclusion_event_mask",
+        "neutralized_log_return",
+        "neutralized_log_return_valid",
+        "return_neutralized_event_mask",
+        "cross_sectional_median_log_return",
+        "target_scale_sigma",
     }
 )
 _V1_FAST_FILES = (
@@ -269,6 +271,7 @@ def _dataset(
     purpose: AccessPurpose,
     lookback: int,
     sidecars: Sequence[str],
+    target_window_indices: NDArray[np.int64] | None = None,
 ) -> V2DailyDataset:
     requested_dates = _dates_for_indices(store.dates, indices)
     if any(value >= OFFICIAL_START for value in requested_dates):
@@ -280,6 +283,7 @@ def _dataset(
         lookback=lookback,
         enabled_sidecars=sidecars,
         purpose=purpose,
+        target_window_indices=target_window_indices,
     )
 
 
@@ -293,6 +297,7 @@ def _training_loaders(
     sidecars: Sequence[str],
     seed: int,
     time_decay_half_life: float | None = None,
+    fit_target_window_indices: NDArray[np.int64] | None = None,
 ) -> tuple[DataLoader[dict[str, object]], DataLoader[dict[str, object]]]:
     fit = _dataset(
         store,
@@ -301,6 +306,11 @@ def _training_loaders(
         purpose="training",
         lookback=runtime.slow_lookback,
         sidecars=sidecars,
+        target_window_indices=(
+            fit_indices
+            if fit_target_window_indices is None
+            else fit_target_window_indices
+        ),
     )
     selection = _dataset(
         store,
@@ -309,6 +319,7 @@ def _training_loaders(
         purpose="selection",
         lookback=runtime.slow_lookback,
         sidecars=sidecars,
+        target_window_indices=selection_indices,
     )
     sampler = DatePairBatchSampler(
         fit.date_indices,
@@ -425,8 +436,6 @@ def _evaluation_inputs(
     score_mask: NDArray[np.bool_],
     cdi_by_index: NDArray[np.float64],
     source_hashes: Mapping[str, str],
-    pathwise_scores: tuple[NDArray[np.floating], ...] = (),
-    pathwise_score_masks: tuple[NDArray[np.bool_], ...] = (),
 ) -> EvaluationInputs:
     targets = store.read("target_primary", indices)
     raw_targets = store.read("target_raw_midrank", indices)
@@ -449,26 +458,52 @@ def _evaluation_inputs(
     cdi = np.asarray(cdi_by_index[indices], dtype=np.float64)
     if not np.isfinite(cdi).all():
         raise ValueError("development CDI is incomplete for the evaluation window")
+    feature_names = store.manifest.get("feature_names")
+    if not isinstance(feature_names, Mapping) or not isinstance(
+        feature_names.get("slow"), list
+    ):
+        raise ValueError("store manifest lacks ordered slow-feature names")
+    slow_names = tuple(str(value) for value in feature_names["slow"])
+    diagnostic_names = (
+        "yang_zhang_vol_20",
+        "beta_60",
+        "log_volume_mean_20",
+        "momentum_12_1",
+        "log_return_5",
+    )
+    if np.any(indices <= 0):
+        raise ValueError("evaluation diagnostics require a prior slow row")
+    slow_prior = np.asarray(store.read("slow_values", indices - 1))
+    prior_feature_values = {
+        name: slow_prior[..., slow_names.index(name)] for name in diagnostic_names
+    }
     return EvaluationInputs(
         dates=_dates_for_indices(store.dates, indices),
         session_indices=indices.copy(),
         calendar_identity_sha256=calendar_sha,
         scores=np.asarray(scores),
         score_mask=np.asarray(score_mask, dtype=np.bool_),
-        residual_midrank_targets=targets,
+        median_residual_midrank_targets=targets,
         raw_midrank_targets=raw_targets,
         raw_log_returns=raw_returns,
         target_mask=target_mask,
         raw_target_mask=raw_target_mask,
         active=np.asarray(store.read("active", indices), dtype=np.bool_),
         adjusted_close=store.read("adjusted_close", indices),
-        target_exclusion_event=np.asarray(
-            store.read("target_exclusion_event_mask", indices), dtype=np.bool_
+        neutralized_log_return=store.read("neutralized_log_return", indices),
+        neutralized_log_return_valid=np.asarray(
+            store.read("neutralized_log_return_valid", indices), dtype=np.bool_
         ),
+        return_neutralized_event=np.asarray(
+            store.read("return_neutralized_event_mask", indices), dtype=np.bool_
+        ),
+        cross_sectional_median_log_return=store.read(
+            "cross_sectional_median_log_return", indices
+        ),
+        target_scale_sigma=store.read("target_scale_sigma", indices),
+        prior_feature_values=prior_feature_values,
         cdi_returns=cdi,
         source_artifact_hashes=dict(source_hashes),
-        pathwise_scores=pathwise_scores,
-        pathwise_score_masks=pathwise_score_masks,
     )
 
 
@@ -482,8 +517,6 @@ def _evaluate_and_write(
     source_hashes: Mapping[str, str],
     window_name: str,
     path: Path,
-    pathwise_scores: tuple[NDArray[np.floating], ...] = (),
-    pathwise_score_masks: tuple[NDArray[np.bool_], ...] = (),
 ) -> tuple[EvaluationResult, str]:
     result = evaluate_scores(
         _evaluation_inputs(
@@ -493,8 +526,6 @@ def _evaluate_and_write(
             score_mask,
             cdi_by_index,
             source_hashes,
-            pathwise_scores,
-            pathwise_score_masks,
         ),
         window_name=window_name,
     )
@@ -519,7 +550,9 @@ def _evaluation_summary(
     return {
         "report": str(report_path),
         "report_sha256": report_sha256,
-        "pooled_primary_ic": result.report["pooled_primary_ic"],
+        "pooled_primary_median_residual_ic": result.report[
+            "pooled_primary_median_residual_ic"
+        ],
         "headline_economics": dict(headline),
     }
 
@@ -573,12 +606,12 @@ def _train_once(
     stage: str,
     seed: int,
     fold: str,
-    parity: int | None,
     output_dir: Path,
     model_config: ModelConfig,
     maximum_epochs: int,
     runtime: ValidationRuntime,
     sidecars: Sequence[str],
+    fit_target_window_indices: NDArray[np.int64] | None = None,
     pretrain_checkpoint: Path | None = None,
     expected_pretrain_sha256: str | None = None,
 ) -> StageTrainingResult:
@@ -591,6 +624,7 @@ def _train_once(
         sidecars=sidecars,
         seed=seed,
         time_decay_half_life=model_config.time_decay_half_life_sessions,
+        fit_target_window_indices=fit_target_window_indices,
     )
     result = train_stage(
         stage=stage,
@@ -602,7 +636,6 @@ def _train_once(
         model_config=model_config,
         pretrain_checkpoint=pretrain_checkpoint,
         expected_pretrain_sha256=expected_pretrain_sha256,
-        selection_parity=parity,
         maximum_epochs=maximum_epochs,
         device=None if runtime.device is None else torch.device(runtime.device),
     )
@@ -656,8 +689,16 @@ def _run_baselines(
     ambiguous = np.asarray(
         store.read("ambiguous_action_mask", baseline_indices), dtype=np.bool_
     )
+    names = tuple(store.manifest["feature_names"]["slow"])
+    volatility_index = names.index("yang_zhang_vol_20")
     panels = build_baselines(
-        close, observed, active, ambiguous, slow_lag=1
+        close,
+        observed,
+        active,
+        ambiguous,
+        store.read("slow_values", baseline_indices)[..., volatility_index],
+        store.read("slow_valid", baseline_indices)[..., volatility_index],
+        slow_lag=1,
     )
     records: list[dict[str, object]] = []
     for fold, indices in fold_indices.items():
@@ -707,11 +748,143 @@ def _run_baselines(
     return records
 
 
+def _baseline_ic_table(
+    *,
+    store: V2Store,
+    fold_indices: Mapping[str, NDArray[np.int64]],
+) -> dict[tuple[str, str, int], dict[str, object]]:
+    """Compute IC-only baseline diagnostics without invoking an economics ledger."""
+
+    names = tuple(store.manifest["feature_names"]["slow"])
+    volatility_index = names.index("yang_zhang_vol_20")
+    rows: dict[tuple[str, str, int], dict[str, object]] = {}
+    for fold, indices in sorted(fold_indices.items()):
+        baseline_start = max(0, int(indices[0]) - 253)
+        baseline_indices = np.arange(
+            baseline_start, int(indices[-1]) + 1, dtype=np.int64
+        )
+        panels = build_baselines(
+            store.read("adjusted_close", baseline_indices),
+            np.asarray(store.read("observed", baseline_indices), dtype=np.bool_),
+            np.asarray(store.read("active", baseline_indices), dtype=np.bool_),
+            np.asarray(
+                store.read("ambiguous_action_mask", baseline_indices), dtype=np.bool_
+            ),
+            store.read("slow_values", baseline_indices)[..., volatility_index],
+            store.read("slow_valid", baseline_indices)[..., volatility_index],
+            slow_lag=1,
+        )
+        local_indices = indices - baseline_start
+        target = np.asarray(store.read("target_primary", indices), dtype=np.float64)
+        target_mask = np.asarray(store.read("target_valid", indices), dtype=np.bool_)
+        active = np.asarray(store.read("active", indices), dtype=np.bool_)
+        for baseline, panel in sorted(panels.items()):
+            for horizon_index, horizon in enumerate(HORIZONS):
+                daily = np.asarray(
+                    [
+                        _spearman(
+                            panel.scores[local, :, horizon_index],
+                            target[day, :, horizon_index],
+                            panel.score_mask[local, :, horizon_index]
+                            & target_mask[day, :, horizon_index]
+                            & active[day],
+                        )
+                        for day, local in enumerate(local_indices.tolist())
+                    ],
+                    dtype=np.float64,
+                )
+                finite = daily[np.isfinite(daily)]
+                rows[(fold, baseline, horizon)] = {
+                    "mean_daily_spearman_ic": (
+                        None if finite.size == 0 else float(finite.mean())
+                    ),
+                    "finite_date_count": int(finite.size),
+                    "evaluation_date_count": int(len(indices)),
+                }
+    return rows
+
+
+def _old_new_baseline_ic_comparison(
+    *,
+    old_store_root: Path,
+    new_store: V2Store,
+    fold_indices: Mapping[str, NDArray[np.int64]],
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    old_root = Path(old_store_root).resolve(strict=True)
+    old_manifest_path = old_root / "manifest.json"
+    old_manifest_sha = sha256_file(old_manifest_path)
+    old_manifest = json.loads(old_manifest_path.read_text(encoding="utf-8"))
+    if old_manifest.get("schema") != STORE_SCHEMA:
+        raise ValueError("baseline comparison requires an immutable v2 old store")
+    required = {
+        "active",
+        "ambiguous_action_mask",
+        "observed",
+        "slow_values",
+        "slow_valid",
+        "target_primary",
+        "target_valid",
+        "adjusted_close",
+    }
+    if not required.issubset(old_manifest.get("arrays", {})):
+        raise ValueError("old store lacks arrays required for the IC-only diagnostic")
+    old_dates = np.load(old_root / "date_index.npy", allow_pickle=False)
+    old_isins = np.load(old_root / "isin_index.npy", allow_pickle=False)
+    if not np.array_equal(old_dates, np.asarray(new_store.dates)) or tuple(
+        str(value) for value in old_isins.tolist()
+    ) != new_store.isins:
+        raise ValueError("old/new store axes differ; baseline ICs are not paired")
+    samples = np.unique(np.concatenate(tuple(fold_indices.values()))).astype(
+        np.int64, copy=False
+    )
+    old_store, old_access = open_store_for_samples(
+        old_root,
+        samples,
+        purpose="evaluation",
+        history_lookbacks=253,
+        history_end_offsets=-1,
+    )
+    try:
+        old_rows = _baseline_ic_table(store=old_store, fold_indices=fold_indices)
+        new_rows = _baseline_ic_table(store=new_store, fold_indices=fold_indices)
+    finally:
+        old_store.close()
+    if old_rows.keys() != new_rows.keys():
+        raise AssertionError("old/new baseline IC tables do not share one exact grid")
+    comparison: list[dict[str, object]] = []
+    for fold, baseline, horizon in sorted(old_rows):
+        old = old_rows[(fold, baseline, horizon)]
+        new = new_rows[(fold, baseline, horizon)]
+        old_ic = old["mean_daily_spearman_ic"]
+        new_ic = new["mean_daily_spearman_ic"]
+        comparison.append(
+            {
+                "fold": fold,
+                "baseline": baseline,
+                "horizon_sessions": horizon,
+                "old_store": old,
+                "new_store": new,
+                "new_minus_old_mean_daily_spearman_ic": (
+                    None
+                    if old_ic is None or new_ic is None
+                    else float(new_ic) - float(old_ic)
+                ),
+            }
+        )
+    return comparison, {
+        "root": str(old_root),
+        "manifest_sha256": old_manifest_sha,
+        "access_ledger": old_access.payload(),
+        "scope": "IC only; the superseded economics evaluator was not invoked",
+    }
+
+
 def _run_gbdt(
     *,
     store: V2Store,
     fit_indices: Mapping[str, NDArray[np.int64]],
     selection_indices: Mapping[str, NDArray[np.int64]],
+    evaluation_indices: Mapping[str, NDArray[np.int64]],
     cdi_by_index: NDArray[np.float64],
     root: Path,
     source_hashes: Mapping[str, str],
@@ -727,65 +900,58 @@ def _run_gbdt(
     feature_names = _gbdt_feature_names(store, sidecars)
     records: list[dict[str, object]] = []
     for fold, train_indices in fit_indices.items():
-        evaluation_indices = selection_indices[fold]
+        selection_rows = selection_indices[fold]
+        evaluation_rows = evaluation_indices[fold]
         train_features = _gbdt_features(store, train_indices, sidecars)
-        evaluation_features = _gbdt_features(store, evaluation_indices, sidecars)
+        selection_features = _gbdt_features(store, selection_rows, sidecars)
+        evaluation_features = _gbdt_features(store, evaluation_rows, sidecars)
         if train_features.shape[-1] != len(feature_names):
             raise ValueError("GBDT feature names differ from the assembled width")
         train_targets = store.read("target_primary", train_indices)
-        train_mask = _window_target_mask(
-            store.read("target_valid", train_indices), train_indices
+        train_mask = np.asarray(
+            store.read("target_valid", train_indices), dtype=np.bool_
         )
-        selection_targets = store.read("target_primary", evaluation_indices)
+        selection_targets = store.read("target_primary", selection_rows)
         selection_mask = _window_target_mask(
-            store.read("target_valid", evaluation_indices),
-            evaluation_indices,
+            store.read("target_valid", selection_rows),
+            selection_rows,
         )
         active = np.asarray(
-            store.read("active", evaluation_indices), dtype=np.bool_
+            store.read("active", evaluation_rows), dtype=np.bool_
         )
         score_mask = np.repeat(active[..., None], len(HORIZONS), axis=-1)
-        predictions: dict[int, NDArray[np.float32]] = {}
-        importance: dict[str, object] = {}
-        model_artifacts: dict[str, object] = {}
-        for parity in (0, 1):
-            selected = block_parity_mask(len(evaluation_indices), parity)
-            model = MultiHorizonGBDT(config, feature_names=feature_names)
-            model.fit(
-                train_features,
-                train_targets,
-                train_mask,
-                evaluation_features[selected],
-                selection_targets[selected],
-                selection_mask[selected],
-                train_dates=train_indices,
-                validation_dates=evaluation_indices[selected],
-            )
-            predictions[parity] = model.predict_ranks(evaluation_features, score_mask)
-            label = "even" if parity == 0 else "odd"
-            importance[f"selected_on_{label}"] = {
-                name: values.tolist()
-                for name, values in model.feature_importance(
-                    evaluation_features
-                ).items()
-            }
-            model_artifacts[f"selected_on_{label}"] = _persist_gbdt_models(
-                model,
-                root / "models" / fold / f"selected_on_{label}",
-                verification_features=evaluation_features,
-                verification_mask=score_mask,
-            )
-        stitched = stitch_block_parity_predictions(
-            predictions[0], predictions[1]
+        model = MultiHorizonGBDT(config, feature_names=feature_names)
+        model.fit(
+            train_features,
+            train_targets,
+            train_mask,
+            selection_features,
+            selection_targets,
+            selection_mask,
+            train_dates=train_indices,
+            validation_dates=selection_rows,
+        )
+        predictions = model.predict_ranks(
+            evaluation_features, score_mask
         ).astype(np.float32, copy=False)
+        importance = {
+            name: values.tolist()
+            for name, values in model.feature_importance(
+                evaluation_features
+            ).items()
+        }
+        model_artifact = _persist_gbdt_models(
+            model,
+            root / "models" / fold,
+            verification_features=evaluation_features,
+            verification_mask=score_mask,
+        )
         artifact_root = root / fold
         manifest_path, manifest_sha = _persist_score_panel(
             artifact_root,
             {
-                "scores": stitched,
+                "scores": predictions,
                 "score_mask": score_mask,
-                "selected_on_even_scores": predictions[0],
-                "selected_on_odd_scores": predictions[1],
             },
             {
                 "engine": "lightgbm",
@@ -794,26 +960,22 @@ def _run_gbdt(
                 "config": asdict(config),
                 "feature_names": list(feature_names),
                 "feature_importance": importance,
-                "model_artifacts": model_artifacts,
-                "cross_fit": (
-                    "5-session block parity; each parity-selected model scores "
-                    "only the opposite parity"
-                ),
+                "model_artifact": model_artifact,
+                "protocol": "fit then purge then selection then purge then evaluation",
                 "fit_date_indices": train_indices.tolist(),
-                "selection_date_indices": evaluation_indices.tolist(),
+                "selection_date_indices": selection_rows.tolist(),
+                "evaluation_date_indices": evaluation_rows.tolist(),
             },
         )
         result, report_sha = _evaluate_and_write(
             store=store,
-            indices=evaluation_indices,
-            scores=stitched,
+            indices=evaluation_rows,
+            scores=predictions,
             score_mask=score_mask,
             cdi_by_index=cdi_by_index,
             source_hashes={**source_hashes, "score_manifest": manifest_sha},
             window_name=fold,
             path=artifact_root / "evaluation.json",
-            pathwise_scores=(predictions[0], predictions[1]),
-            pathwise_score_masks=(score_mask, score_mask),
         )
         records.append(
             {
@@ -866,7 +1028,9 @@ def _run_network_smokes(
     *,
     store: V2Store,
     fit_indices: NDArray[np.int64],
+    fit_target_window_indices: NDArray[np.int64],
     selection_indices: NDArray[np.int64],
+    evaluation_indices: NDArray[np.int64],
     pretrain_fit_indices: NDArray[np.int64],
     pretrain_selection_indices: NDArray[np.int64],
     cdi_by_index: NDArray[np.float64],
@@ -882,171 +1046,87 @@ def _run_network_smokes(
         lambda_persistence=0.0,
         compile_forward=runtime.compile_forward,
     )
-    scratch_results: dict[int, StageTrainingResult] = {}
-    scratch_scores: dict[int, ScoreArtifact] = {}
-    for parity in (0, 1):
-        label = "even" if parity == 0 else "odd"
-        trained = _train_once(
-            store=store,
-            fit_indices=fit_indices,
-            selection_indices=selection_indices,
-            stage="F",
-            seed=seed,
-            fold=f"F1_select_{label}",
-            parity=parity,
-            output_dir=root / "from_scratch" / f"select_{label}_training",
-            model_config=base_config,
-            maximum_epochs=runtime.fine_epochs,
-            runtime=runtime,
-            sidecars=sidecars,
-        )
-        scratch_results[parity] = trained
-        scratch_scores[parity] = _score_once(
-            store=store,
-            indices=selection_indices,
-            checkpoint=trained.raw_patience_checkpoint,
-            model_config=base_config,
-            output_dir=root / "from_scratch" / f"select_{label}_scores",
-            runtime=runtime,
-            sidecars=sidecars,
-        )
-    selected_on_even = np.load(scratch_scores[0].scores_path, allow_pickle=False)
-    selected_on_odd = np.load(scratch_scores[1].scores_path, allow_pickle=False)
-    even_mask = np.load(scratch_scores[0].score_mask_path, allow_pickle=False)
-    odd_mask = np.load(scratch_scores[1].score_mask_path, allow_pickle=False)
-    if not np.array_equal(even_mask, odd_mask):
-        raise ValueError("block-parity model score masks differ")
-    stitched = stitch_block_parity_predictions(
-        selected_on_even, selected_on_odd
-    ).astype(np.float32, copy=False)
-    crossfit_root = root / "from_scratch" / "crossfit"
-    score_manifest, score_manifest_sha = _persist_score_panel(
-        crossfit_root,
-        {"scores": stitched, "score_mask": even_mask},
-        {
-            "engine": "daily_multi_horizon_network",
-            "fold": "F1",
-            "seed": seed,
-            "lambda_persistence": 0.0,
-            "epochs_cap": runtime.fine_epochs,
-            "cross_fit": (
-                "5-session block parity; each parity-selected model scores only "
-                "the opposite parity"
-            ),
-            "selected_on_even_score_manifest_sha256": sha256_file(
-                scratch_scores[0].manifest_path
-            ),
-            "selected_on_odd_score_manifest_sha256": sha256_file(
-                scratch_scores[1].manifest_path
-            ),
-        },
+    scratch = _train_once(
+        store=store,
+        fit_indices=fit_indices,
+        selection_indices=selection_indices,
+        stage="F",
+        seed=seed,
+        fold="F1",
+        output_dir=root / "from_scratch" / "training",
+        model_config=base_config,
+        maximum_epochs=runtime.fine_epochs,
+        runtime=runtime,
+        sidecars=sidecars,
+        fit_target_window_indices=fit_target_window_indices,
     )
-    network_sources = {
-        **source_hashes,
-        "score_manifest": score_manifest_sha,
-        "selected_on_even_score_manifest": sha256_file(scratch_scores[0].manifest_path),
-        "selected_on_odd_score_manifest": sha256_file(scratch_scores[1].manifest_path),
-    }
+    scratch_score = _score_once(
+        store=store,
+        indices=evaluation_indices,
+        checkpoint=scratch.raw_patience_checkpoint,
+        model_config=base_config,
+        output_dir=root / "from_scratch" / "scores",
+        runtime=runtime,
+        sidecars=sidecars,
+    )
+    scratch_values = np.load(scratch_score.scores_path, allow_pickle=False)
+    scratch_mask = np.load(scratch_score.score_mask_path, allow_pickle=False)
     evaluated, report_sha = _evaluate_and_write(
         store=store,
-        indices=selection_indices,
-        scores=stitched,
-        score_mask=even_mask,
-        cdi_by_index=cdi_by_index,
-        source_hashes=network_sources,
-        window_name="F1",
-        path=crossfit_root / "evaluation.json",
-        pathwise_scores=(selected_on_even, selected_on_odd),
-        pathwise_score_masks=(even_mask, odd_mask),
-    )
-
-    persistence_config = replace(base_config, lambda_persistence=0.1)
-    persistence_results: dict[int, StageTrainingResult] = {}
-    persistence_scores: dict[int, ScoreArtifact] = {}
-    for parity in (0, 1):
-        label = "even" if parity == 0 else "odd"
-        trained = _train_once(
-            store=store,
-            fit_indices=fit_indices,
-            selection_indices=selection_indices,
-            stage="F",
-            seed=seed,
-            fold=f"F1_lambda_persistence_0_1_select_{label}",
-            parity=parity,
-            output_dir=(root / "persistence_lambda_0_1" / f"select_{label}_training"),
-            model_config=persistence_config,
-            maximum_epochs=1,
-            runtime=runtime,
-            sidecars=sidecars,
-        )
-        persistence_results[parity] = trained
-        persistence_scores[parity] = _score_once(
-            store=store,
-            indices=selection_indices,
-            checkpoint=trained.raw_patience_checkpoint,
-            model_config=persistence_config,
-            output_dir=(root / "persistence_lambda_0_1" / f"select_{label}_scores"),
-            runtime=runtime,
-            sidecars=sidecars,
-        )
-    persistence_even = np.load(persistence_scores[0].scores_path, allow_pickle=False)
-    persistence_odd = np.load(persistence_scores[1].scores_path, allow_pickle=False)
-    persistence_even_mask = np.load(
-        persistence_scores[0].score_mask_path, allow_pickle=False
-    )
-    persistence_odd_mask = np.load(
-        persistence_scores[1].score_mask_path, allow_pickle=False
-    )
-    if not np.array_equal(persistence_even_mask, persistence_odd_mask):
-        raise ValueError("persistence-probe block-parity score masks differ")
-    persistence_stitched = stitch_block_parity_predictions(
-        persistence_even, persistence_odd
-    ).astype(np.float32, copy=False)
-    persistence_crossfit = root / "persistence_lambda_0_1" / "crossfit"
-    persistence_manifest, persistence_manifest_sha = _persist_score_panel(
-        persistence_crossfit,
-        {
-            "scores": persistence_stitched,
-            "score_mask": persistence_even_mask,
-        },
-        {
-            "engine": "daily_multi_horizon_network",
-            "fold": "F1",
-            "seed": seed,
-            "lambda_persistence": 0.1,
-            "epochs_cap": 1,
-            "cross_fit": (
-                "5-session block parity; each parity-selected model scores only "
-                "the opposite parity"
-            ),
-            "selected_on_even_score_manifest_sha256": sha256_file(
-                persistence_scores[0].manifest_path
-            ),
-            "selected_on_odd_score_manifest_sha256": sha256_file(
-                persistence_scores[1].manifest_path
-            ),
-        },
-    )
-    persistence_evaluated, persistence_report_sha = _evaluate_and_write(
-        store=store,
-        indices=selection_indices,
-        scores=persistence_stitched,
-        score_mask=persistence_even_mask,
+        indices=evaluation_indices,
+        scores=scratch_values,
+        score_mask=scratch_mask,
         cdi_by_index=cdi_by_index,
         source_hashes={
             **source_hashes,
-            "score_manifest": persistence_manifest_sha,
-            "selected_on_even_score_manifest": sha256_file(
-                persistence_scores[0].manifest_path
-            ),
-            "selected_on_odd_score_manifest": sha256_file(
-                persistence_scores[1].manifest_path
-            ),
+            "score_manifest": sha256_file(scratch_score.manifest_path),
+        },
+        window_name="F1",
+        path=root / "from_scratch" / "evaluation.json",
+    )
+
+    persistence_config = replace(base_config, lambda_persistence=0.1)
+    persistence = _train_once(
+        store=store,
+        fit_indices=fit_indices,
+        selection_indices=selection_indices,
+        stage="F",
+        seed=seed,
+        fold="F1_lambda_persistence_0_1",
+        output_dir=root / "persistence_lambda_0_1" / "training",
+        model_config=persistence_config,
+        maximum_epochs=1,
+        runtime=runtime,
+        sidecars=sidecars,
+        fit_target_window_indices=fit_target_window_indices,
+    )
+    persistence_score = _score_once(
+        store=store,
+        indices=evaluation_indices,
+        checkpoint=persistence.raw_patience_checkpoint,
+        model_config=persistence_config,
+        output_dir=root / "persistence_lambda_0_1" / "scores",
+        runtime=runtime,
+        sidecars=sidecars,
+    )
+    persistence_values = np.load(
+        persistence_score.scores_path, allow_pickle=False
+    )
+    persistence_mask = np.load(
+        persistence_score.score_mask_path, allow_pickle=False
+    )
+    persistence_evaluated, persistence_report_sha = _evaluate_and_write(
+        store=store,
+        indices=evaluation_indices,
+        scores=persistence_values,
+        score_mask=persistence_mask,
+        cdi_by_index=cdi_by_index,
+        source_hashes={
+            **source_hashes,
+            "score_manifest": sha256_file(persistence_score.manifest_path),
         },
         window_name="F1_lambda_persistence_0_1",
-        path=persistence_crossfit / "evaluation.json",
-        pathwise_scores=(persistence_even, persistence_odd),
-        pathwise_score_masks=(persistence_even_mask, persistence_odd_mask),
+        path=root / "persistence_lambda_0_1" / "evaluation.json",
     )
 
     pretrain = _train_once(
@@ -1056,7 +1136,6 @@ def _run_network_smokes(
         stage="P",
         seed=seed,
         fold="pretrain_internal",
-        parity=None,
         output_dir=root / "pretrain_handoff" / "stage_p",
         model_config=base_config,
         maximum_epochs=1,
@@ -1070,15 +1149,15 @@ def _run_network_smokes(
         selection_indices=selection_indices,
         stage="F",
         seed=seed,
-        fold="F1_pretrain_handoff_select_even",
-        parity=0,
-        output_dir=root / "pretrain_handoff" / "stage_f_select_even",
+        fold="F1_pretrain_handoff",
+        output_dir=root / "pretrain_handoff" / "stage_f",
         model_config=base_config,
         maximum_epochs=runtime.handoff_epochs,
         runtime=runtime,
         sidecars=sidecars,
         pretrain_checkpoint=pretrain.raw_patience_checkpoint,
         expected_pretrain_sha256=pretrain_sha,
+        fit_target_window_indices=fit_target_window_indices,
     )
     handoff_manifest = json.loads(handoff.manifest_path.read_text(encoding="utf-8"))
     if handoff_manifest.get("pretrain_checkpoint_sha256") != pretrain_sha:
@@ -1088,28 +1167,24 @@ def _run_network_smokes(
             "fold": "F1",
             "seed": seed,
             "epochs_cap": runtime.fine_epochs,
-            "training_manifests": {
-                "selected_on_even": str(scratch_results[0].manifest_path),
-                "selected_on_odd": str(scratch_results[1].manifest_path),
-            },
-            "score_manifest": str(score_manifest),
-            "score_manifest_sha256": score_manifest_sha,
+            "training_manifest": str(scratch.manifest_path),
+            "score_manifest": str(scratch_score.manifest_path),
+            "score_manifest_sha256": sha256_file(scratch_score.manifest_path),
             "evaluation": _evaluation_summary(
-                evaluated, crossfit_root / "evaluation.json", report_sha
+                evaluated, root / "from_scratch" / "evaluation.json", report_sha
             ),
         },
         "persistence_probe": {
             "lambda_persistence": 0.1,
             "epochs_cap": 1,
-            "training_manifests": {
-                "selected_on_even": str(persistence_results[0].manifest_path),
-                "selected_on_odd": str(persistence_results[1].manifest_path),
-            },
-            "score_manifest": str(persistence_manifest),
-            "score_manifest_sha256": persistence_manifest_sha,
+            "training_manifest": str(persistence.manifest_path),
+            "score_manifest": str(persistence_score.manifest_path),
+            "score_manifest_sha256": sha256_file(
+                persistence_score.manifest_path
+            ),
             "evaluation": _evaluation_summary(
                 persistence_evaluated,
-                persistence_crossfit / "evaluation.json",
+                root / "persistence_lambda_0_1" / "evaluation.json",
                 persistence_report_sha,
             ),
         },
@@ -1180,12 +1255,16 @@ def _development_indices(
 ) -> tuple[
     dict[str, NDArray[np.int64]],
     dict[str, NDArray[np.int64]],
+    dict[str, NDArray[np.int64]],
+    dict[str, NDArray[np.int64]],
     dict[str, object],
 ]:
     python_dates = tuple(dates.astype("datetime64[D]").astype(object).tolist())
     folds = {fold.name: fold for fold in development_folds(python_dates)}
     fit: dict[str, NDArray[np.int64]] = {}
+    fit_target_window: dict[str, NDArray[np.int64]] = {}
     selection: dict[str, NDArray[np.int64]] = {}
+    evaluation: dict[str, NDArray[np.int64]] = {}
     payload: dict[str, object] = {}
     for name, fold in folds.items():
         fit[name] = _bounded(
@@ -1196,12 +1275,17 @@ def _development_indices(
             runtime.max_selection_sessions,
             tail=False,
         )
+        fit_target_window[name] = _date_indices(
+            dates, (*fold.fit_dates, *fold.purge_before_dates)
+        )
+        evaluation[name] = _date_indices(dates, fold.evaluation_dates)
         payload[name] = {
             **fold.payload(),
             "validation_fit_date_indices": fit[name].tolist(),
             "validation_selection_date_indices": selection[name].tolist(),
+            "validation_evaluation_date_indices": evaluation[name].tolist(),
         }
-    return fit, selection, payload
+    return fit, fit_target_window, selection, evaluation, payload
 
 
 def _pretrain_indices(
@@ -1424,6 +1508,7 @@ def _verified_classical_source(
 def run_pipeline_validation(
     *,
     store_root: Path,
+    old_store_root: Path,
     cdi_path: Path,
     cdi_sha256: str,
     experiment52_cdi_path: Path,
@@ -1441,13 +1526,15 @@ def run_pipeline_validation(
     """
 
     store_path = Path(store_root).resolve(strict=True)
+    old_store_path = Path(old_store_root).resolve(strict=True)
     output = Path(output_root).resolve()
     if output.exists():
         raise FileExistsError(output)
-    if (
-        output == store_path
-        or output.is_relative_to(store_path)
-        or store_path.is_relative_to(output)
+    if any(
+        output == source
+        or output.is_relative_to(source)
+        or source.is_relative_to(output)
+        for source in (store_path, old_store_path)
     ):
         raise ValueError("validation output and immutable input store must be disjoint")
     code = _git_identity()
@@ -1463,9 +1550,13 @@ def run_pipeline_validation(
     sidecars = _validate_sidecars(store_manifest, enabled_sidecars)
     external_resolutions = _external_artifact_resolutions(store_manifest)
     _assert_overrides_outside_store(store_path, external_resolutions)
-    fit_indices, selection_indices, fold_payload = _development_indices(
-        dates, runtime=runtime
-    )
+    (
+        fit_indices,
+        fit_target_window_indices,
+        selection_indices,
+        evaluation_indices,
+        fold_payload,
+    ) = _development_indices(dates, runtime=runtime)
     pretrain_fit, pretrain_embargo, pretrain_selection = _pretrain_indices(
         dates, runtime
     )
@@ -1475,7 +1566,7 @@ def run_pipeline_validation(
         raise ValueError("triage protocol differs from the validation contract")
     if full.folds != ("F1", "F2", "F3"):
         raise ValueError("full protocol differs from the validation contract")
-    missing_folds = set(full.folds) - set(selection_indices)
+    missing_folds = set(full.folds) - set(evaluation_indices)
     if missing_folds:
         raise ValueError(
             f"store calendar is missing development folds: {sorted(missing_folds)}"
@@ -1492,7 +1583,9 @@ def run_pipeline_validation(
         pretrain_fit,
         pretrain_selection,
         *[fit_indices[name] for name in full.folds],
+        *[fit_target_window_indices[name] for name in full.folds],
         *[selection_indices[name] for name in full.folds],
+        *[evaluation_indices[name] for name in full.folds],
     )
     requested_indices = np.unique(np.concatenate(requested_groups)).astype(
         np.int64, copy=False
@@ -1504,7 +1597,7 @@ def run_pipeline_validation(
         len(requested_indices), runtime.slow_lookback, dtype=np.int64
     )
     baseline_samples = np.concatenate(
-        [selection_indices[name] for name in full.folds]
+        [evaluation_indices[name] for name in full.folds]
     )
     history_lookbacks[
         np.isin(requested_indices, baseline_samples)
@@ -1532,33 +1625,30 @@ def run_pipeline_validation(
     try:
         baseline_records = _run_baselines(
             store=store,
-            fold_indices={name: selection_indices[name] for name in full.folds},
+            fold_indices={name: evaluation_indices[name] for name in full.folds},
             cdi_by_index=cdi_by_index,
             root=output / "baselines",
             source_hashes=source_hashes,
         )
+        baseline_ic_comparison, old_store_source = (
+            _old_new_baseline_ic_comparison(
+                old_store_root=old_store_path,
+                new_store=store,
+                fold_indices={
+                    name: evaluation_indices[name] for name in full.folds
+                },
+            )
+        )
         gbdt_records = _run_gbdt(
             store=store,
-            fit_indices={name: fit_indices[name] for name in triage.folds},
-            selection_indices={name: selection_indices[name] for name in triage.folds},
+            fit_indices={"F1": fit_indices["F1"]},
+            selection_indices={"F1": selection_indices["F1"]},
+            evaluation_indices={"F1": evaluation_indices["F1"]},
             cdi_by_index=cdi_by_index,
             root=output / "gbdt_triage",
             source_hashes=source_hashes,
             runtime=runtime,
             sidecars=sidecars,
-        )
-        network = _run_network_smokes(
-            store=store,
-            fit_indices=fit_indices["F1"],
-            selection_indices=selection_indices["F1"],
-            pretrain_fit_indices=pretrain_fit,
-            pretrain_selection_indices=pretrain_selection,
-            cdi_by_index=cdi_by_index,
-            root=output / "network_smokes",
-            source_hashes=source_hashes,
-            runtime=runtime,
-            sidecars=sidecars,
-            seed=triage.seeds[0],
         )
         protocol_hashes = {
             name: {
@@ -1589,6 +1679,7 @@ def run_pipeline_validation(
                         "access_ledger": source_access.payload(),
                         "external_artifact_resolutions": external_resolutions,
                     },
+                    "superseded_old_store": old_store_source,
                     "cdi": cdi_provenance,
                 },
                 "date_contract": {
@@ -1603,8 +1694,12 @@ def run_pipeline_validation(
                 },
                 "results": {
                     "baselines": baseline_records,
+                    "old_new_baseline_ic_comparison": baseline_ic_comparison,
                     "gbdt_triage": gbdt_records,
-                    "network_smokes": network,
+                    "network_smokes": {
+                        "status": "not_run",
+                        "reason": "fix-pass-3 acceptance is local CPU classical-only",
+                    },
                 },
             },
         )
@@ -1700,9 +1795,13 @@ def resume_network_validation(
     sidecars = _validate_sidecars(store_manifest, enabled_sidecars)
     external_resolutions = _external_artifact_resolutions(store_manifest)
     _assert_overrides_outside_store(store_path, external_resolutions)
-    fit_indices, selection_indices, fold_payload = _development_indices(
-        dates, runtime=runtime
-    )
+    (
+        fit_indices,
+        fit_target_window_indices,
+        selection_indices,
+        evaluation_indices,
+        fold_payload,
+    ) = _development_indices(dates, runtime=runtime)
     pretrain_fit, pretrain_embargo, pretrain_selection = _pretrain_indices(
         dates, runtime
     )
@@ -1722,7 +1821,9 @@ def resume_network_validation(
                 pretrain_fit,
                 pretrain_selection,
                 fit_indices["F1"],
+                fit_target_window_indices["F1"],
                 selection_indices["F1"],
+                evaluation_indices["F1"],
             )
         )
     ).astype(np.int64, copy=False)
@@ -1758,7 +1859,9 @@ def resume_network_validation(
         network = _run_network_smokes(
             store=store,
             fit_indices=fit_indices["F1"],
+            fit_target_window_indices=fit_target_window_indices["F1"],
             selection_indices=selection_indices["F1"],
+            evaluation_indices=evaluation_indices["F1"],
             pretrain_fit_indices=pretrain_fit,
             pretrain_selection_indices=pretrain_selection,
             cdi_by_index=cdi_by_index,
@@ -1853,6 +1956,14 @@ def _parser() -> argparse.ArgumentParser:
         description="Run the non-research v2 development pipeline validation."
     )
     parser.add_argument("--store-root", type=Path, required=True)
+    parser.add_argument(
+        "--old-store-root",
+        type=Path,
+        help=(
+            "Accepted superseded v2 store used only for the paired naive-baseline "
+            "IC diagnostic. Required unless resuming the legacy GPU validation."
+        ),
+    )
     parser.add_argument(
         "--cdi-path",
         type=Path,
@@ -1955,8 +2066,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             enabled_sidecars=arguments.sidecar,
         )
     else:
+        if arguments.old_store_root is None:
+            raise ValueError("classical acceptance requires --old-store-root")
         result = run_pipeline_validation(
             store_root=arguments.store_root,
+            old_store_root=arguments.old_store_root,
             cdi_path=arguments.cdi_path,
             cdi_sha256=arguments.cdi_sha256,
             experiment52_cdi_path=arguments.experiment52_cdi_path,

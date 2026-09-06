@@ -27,6 +27,7 @@ from .contract import (
     V1_STORE_V2_ZERO_SLOW_FIELDS,
 )
 from .corporate_actions import (
+    DetectedActionResult,
     action_calendar_alignment_table,
     action_coverage_table,
     adjust_daily_ohlc,
@@ -69,7 +70,11 @@ from .sidecars import (
     rebuild_publication_lag_validity,
 )
 from .store import close_memmap, peak_rss_bytes, write_store
-from .targets import build_multi_day_targets_into, build_to_close_target
+from .targets import (
+    build_multi_day_targets_into,
+    build_neutralized_log_returns,
+    build_to_close_target,
+)
 from .universe import (
     build_daily_universe,
     session_calendar,
@@ -581,6 +586,83 @@ def _target_validity_tables(
     return pl.DataFrame(yearly), pl.DataFrame(survival_rows)
 
 
+def _cotahist_action_counts_by_year(
+    dates: NDArray[np.datetime64],
+    distribution_changed: NDArray[np.bool_],
+    detected: DetectedActionResult,
+) -> pl.DataFrame:
+    change = np.asarray(distribution_changed, dtype=np.bool_)
+    shape = (len(dates), detected.split_event.shape[1])
+    arrays = (
+        change,
+        detected.split_event,
+        detected.cash_event,
+        detected.ambiguous_event,
+        detected.price_jump_anomaly_mask,
+    )
+    if any(np.asarray(value).shape != shape for value in arrays):
+        raise ValueError("COTAHIST action-count axes are misaligned")
+    years = dates.astype("datetime64[Y]").astype(np.int64) + 1970
+    rows: list[dict[str, object]] = []
+    for year in sorted(set(years.tolist())):
+        selected = years == year
+        rows.append(
+            {
+                "year": int(year),
+                "distribution_change_count": int(change[selected].sum()),
+                "split_count": int(detected.split_event[selected].sum()),
+                "cash_count": int(detected.cash_event[selected].sum()),
+                "ambiguous_count": int(detected.ambiguous_event[selected].sum()),
+                "jump_only_anomaly_count": int(
+                    detected.price_jump_anomaly_mask[selected].sum()
+                ),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+def _neutralized_return_coverage_by_year(
+    dates: NDArray[np.datetime64],
+    event: NDArray[np.bool_],
+    valid: NDArray[np.bool_],
+    active: NDArray[np.bool_],
+    cross_sectional_median: NDArray[np.floating],
+) -> pl.DataFrame:
+    neutralized = np.asarray(event, dtype=np.bool_)
+    return_valid = np.asarray(valid, dtype=np.bool_)
+    membership = np.asarray(active, dtype=np.bool_)
+    median = np.asarray(cross_sectional_median)
+    shape = (len(dates), neutralized.shape[1])
+    if (
+        neutralized.shape != shape
+        or return_valid.shape != shape
+        or membership.shape != shape
+        or median.shape != (len(dates),)
+    ):
+        raise ValueError("neutralized-return audit axes are misaligned")
+    years = dates.astype("datetime64[Y]").astype(np.int64) + 1970
+    rows: list[dict[str, object]] = []
+    for year in sorted(set(years.tolist())):
+        selected = years == year
+        active_event = neutralized[selected] & membership[selected]
+        rows.append(
+            {
+                "year": int(year),
+                "active_event_name_days": int(active_event.sum()),
+                "neutralized_valid_name_days": int(
+                    (active_event & return_valid[selected]).sum()
+                ),
+                "neutralized_invalid_name_days": int(
+                    (active_event & ~return_valid[selected]).sum()
+                ),
+                "dates_with_valid_cross_sectional_median": int(
+                    np.isfinite(median[selected]).sum()
+                ),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
 def _feature_validity_by_survival(
     dates: NDArray[np.datetime64],
     active: NDArray[np.bool_],
@@ -669,7 +751,9 @@ def _eventual_survival_groups(
     for name, identity in enumerate(identities):
         rows = np.flatnonzero(seen[:, name])
         if rows.size:
-            identity_last[identity] = max(identity_last.get(identity, -1), int(rows[-1]))
+            identity_last[identity] = max(
+                identity_last.get(identity, -1), int(rows[-1])
+            )
     final_year = int(years[-1])
     survives = np.asarray(
         [
@@ -735,7 +819,9 @@ def _external_feature_validity_by_survival_liquidity(
     eligible = membership & seen & availability & np.isfinite(adv)
     pooled_adv = adv[eligible]
     if pooled_adv.size == 0:
-        raise ValueError(f"external feature family {family} has no observable population")
+        raise ValueError(
+            f"external feature family {family} has no observable population"
+        )
     edges = np.quantile(pooled_adv, (0.25, 0.50, 0.75))
     quartile = np.full(seen.shape, -1, dtype=np.int8)
     quartile[eligible] = np.searchsorted(edges, adv[eligible], side="right")
@@ -748,8 +834,7 @@ def _external_feature_validity_by_survival_liquidity(
         raise ValueError("external feature survival identity axis is misaligned")
     rows: list[dict[str, object]] = []
     strata = [(0, eligible)] + [
-        (quartile_index + 1, quartile == quartile_index)
-        for quartile_index in range(4)
+        (quartile_index + 1, quartile == quartile_index) for quartile_index in range(4)
     ]
     for quartile_number, stratum in strata:
         ratios: dict[str, float] = {}
@@ -829,14 +914,9 @@ def _external_feature_validity_by_survival_liquidity(
                 }
             )
         if all(denominators[label] > 0 for label in groups):
-            gap = (
-                ratios["survives_to_final_year"]
-                - ratios["delisted_within_panel"]
-            )
+            gap = ratios["survives_to_final_year"] - ratios["delisted_within_panel"]
             direction = (
-                "survivor_above_delisted"
-                if gap > 0.0
-                else "delisted_above_survivor"
+                "survivor_above_delisted" if gap > 0.0 else "delisted_above_survivor"
             )
             sampled_ratios: dict[str, NDArray[np.float64]] = {}
             for label in groups:
@@ -1109,6 +1189,7 @@ def build_daily_store(
     v1_fast_store: Path | None = None,
     minimum_calendar_names: int = 50,
     store_start: date | None = STORE_START,
+    undocumented_split_fallback: bool = False,
 ) -> Path:
     """Build the immutable aligned daily store from already-acquired sources."""
 
@@ -1174,8 +1255,9 @@ def build_daily_store(
         panel.quantity,
         panel.distribution_number,
         panel.observed,
+        undocumented_split_fallback=undocumented_split_fallback,
     )
-    target_exclusion_event = (
+    return_neutralized_event = (
         detected_actions.cash_event | detected_actions.ambiguous_event
     )
     intraday_action_boundary = detected_actions.split_event
@@ -1254,6 +1336,38 @@ def build_daily_store(
         np.where(slow_raw.valid[..., 8], slow_raw.values[..., 8], np.nan),
         dtype=np.float32,
     )
+    target_scale_sigma = _workspace_array(
+        workspace,
+        "target_scale_sigma",
+        slow_sigma.shape,
+        np.float32,
+    )
+    target_scale_sigma[...] = np.nan
+    target_scale_sigma[1:] = slow_sigma[:-1]
+    neutralized = build_neutralized_log_returns(
+        linked_slow_inputs[3],
+        linked_slow_inputs[6],
+        universe.active,
+        return_neutralized_event,
+    )
+    neutralized_log_return = _copy_workspace_array(
+        workspace,
+        "neutralized_log_return",
+        neutralized.log_return,
+        dtype=np.float32,
+    )
+    neutralized_log_return_valid = _copy_workspace_array(
+        workspace,
+        "neutralized_log_return_valid",
+        neutralized.valid,
+    )
+    cross_sectional_median_log_return = _copy_workspace_array(
+        workspace,
+        "cross_sectional_median_log_return",
+        neutralized.cross_sectional_median,
+        dtype=np.float32,
+    )
+    del neutralized
     slow_values = _workspace_array(
         workspace,
         "slow_values",
@@ -1444,10 +1558,10 @@ def build_daily_store(
         workspace, "target_raw_log_return", target_shape, np.float32
     )
     build_multi_day_targets_into(
-        adjusted_close,
+        neutralized_log_return,
+        neutralized_log_return_valid,
         universe.active,
         slow_sigma,
-        target_exclusion_event,
         primary=target_primary,
         primary_valid=target_valid,
         normalized_residual=target_normalized_residual,
@@ -1477,7 +1591,8 @@ def build_daily_store(
         "detected_split_mask": detected_actions.split_event,
         "detected_cash_event_mask": detected_actions.cash_event,
         "ambiguous_action_mask": detected_actions.ambiguous_event,
-        "target_exclusion_event_mask": target_exclusion_event,
+        "return_neutralized_event_mask": return_neutralized_event,
+        "price_jump_anomaly_mask": detected_actions.price_jump_anomaly_mask,
         "intraday_action_boundary_mask": intraday_action_boundary,
     }
     arrays: dict[str, NDArray[np.generic]] = {
@@ -1501,6 +1616,32 @@ def build_daily_store(
             "target_raw_midrank": target_raw_midrank,
             "target_raw_valid": target_raw_valid,
             "target_raw_log_return": target_raw_log_return,
+            "neutralized_log_return": _copy_selected_workspace_array(
+                workspace,
+                "store_neutralized_log_return",
+                neutralized_log_return,
+                kept_rows,
+            ),
+            "neutralized_log_return_valid": _copy_selected_workspace_array(
+                workspace,
+                "store_neutralized_log_return_valid",
+                neutralized_log_return_valid,
+                kept_rows,
+            ),
+            "cross_sectional_median_log_return": (
+                _copy_selected_workspace_array(
+                    workspace,
+                    "store_cross_sectional_median_log_return",
+                    cross_sectional_median_log_return,
+                    kept_rows,
+                )
+            ),
+            "target_scale_sigma": _copy_selected_workspace_array(
+                workspace,
+                "store_target_scale_sigma",
+                target_scale_sigma,
+                kept_rows,
+            ),
         }
     )
     arrays.update(to_close_arrays)
@@ -1678,6 +1819,20 @@ def build_daily_store(
             panel.isins,
             distribution_changed,
             detected_actions,
+        ),
+        "cotahist_action_counts_by_year": _cotahist_action_counts_by_year(
+            panel.dates,
+            distribution_changed,
+            detected_actions,
+        ),
+        "neutralized_return_coverage_by_year": (
+            _neutralized_return_coverage_by_year(
+                kept_dates,
+                return_neutralized_event[keep],
+                neutralized_log_return_valid[keep],
+                universe.active[keep],
+                cross_sectional_median_log_return[keep],
+            )
         ),
         "corporate_action_calendar_alignment": action_calendar_alignment_table(
             checked_actions, panel.dates, panel.isins
@@ -1857,6 +2012,7 @@ def build_daily_store(
         "v1_calendar_verified": v1_calendar is not None,
         "implementation_git_commit": implementation_commit,
         "isin_succession_link_count": isin_successions.height,
+        "undocumented_split_fallback": undocumented_split_fallback,
         "survival_identity": (
             "root ISIN after exact same-ticker consecutive-session COTAHIST succession"
         ),
@@ -1885,8 +2041,8 @@ def build_daily_store(
             ),
         },
         "return_definition": (
-            "COTAHIST price return adjusted only for detected split/bonus "
-            "boundaries; provider actions are audit-only"
+            "split-adjusted COTAHIST log returns; DISMES cash/ambiguous days "
+            "are replaced by the active non-event cross-sectional median"
         ),
         "future_total_return_variant": (
             "registered but not implemented: survivor-subset sensitivity only"
@@ -1902,9 +2058,7 @@ def build_daily_store(
         "build_peak_rss_bytes": build_peak_rss,
         "build_peak_rss_gib": build_peak_rss / (1024**3),
     }
-    options_composition = tables[
-        "external_feature_validity_by_survival_adv20_quartile"
-    ]
+    options_composition = tables["external_feature_validity_by_survival_adv20_quartile"]
     if options_composition.width:
         options_composition = options_composition.filter(
             pl.col("family") == "sidecar_options"
@@ -1913,12 +2067,9 @@ def build_daily_store(
             unstratified = options_composition.filter(
                 pl.col("prior_adv20_quartile") == 0
             ).row(0, named=True)
-            binding = options_composition.filter(
-                pl.col("stratum_is_binding")
-            )
+            binding = options_composition.filter(pl.col("stratum_is_binding"))
             reported = options_composition.filter(
-                (pl.col("prior_adv20_quartile") > 0)
-                & (~pl.col("stratum_is_binding"))
+                (pl.col("prior_adv20_quartile") > 0) & (~pl.col("stratum_is_binding"))
             )
             metadata["options_validity_composition_signature"] = {
                 "unstratified_survivor_minus_delisted_gap": unstratified[
@@ -1983,6 +2134,10 @@ def build_daily_store(
         adjusted_low,
         adjusted_close,
         slow_sigma,
+        target_scale_sigma,
+        neutralized_log_return,
+        neutralized_log_return_valid,
+        cross_sectional_median_log_return,
     ):
         close_memmap(value)
     workspace_handle.cleanup()
@@ -2021,6 +2176,11 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--minute-npz", type=Path)
     parser.add_argument("--v1-assignments", required=True, type=Path)
     parser.add_argument("--v1-store", required=True, type=Path)
+    parser.add_argument(
+        "--undocumented-split-fallback",
+        action="store_true",
+        help="Enable the audit-selected strict inverse price/quantity split fallback",
+    )
     parser.add_argument(
         "--sidecar",
         action="append",
@@ -2404,6 +2564,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
         cotahist_raw_sources=raw_sources,
         cotahist_parse_audit=args.cotahist_parse_audit,
         v1_fast_store=args.v1_store,
+        undocumented_split_fallback=args.undocumented_split_fallback,
     )
     print(json.dumps({"store": str(output)}, sort_keys=True))
 
