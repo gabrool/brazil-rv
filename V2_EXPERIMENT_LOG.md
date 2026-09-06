@@ -318,3 +318,72 @@ handles the temporary over-allocation. Each side uses
 reports mean daily exits per side and same-close replacements. Gross target,
 gross/name/net caps, targets, folds, seeds, roster, costs, and protected-data
 rules remain unchanged.
+
+## Pass-4d rebuilt store and binding acceptance stop (2026-09-06)
+
+The score-bearing implementation was frozen at clean commit
+`8021e42ae658d3eb7bba19e39b58e2f9c8d65331`. Ruff and Python compilation
+passed, and the complete research suite passed all 830 tests in 361.31
+seconds before the fresh acceptance scores were produced.
+
+The mandatory rebuild completed at
+`D:\quant-data\b3\processed\v2_daily_store_8021e42_20260906T202315Z`.
+Its V3 manifest SHA-256 is
+`deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b`.
+Peak RSS was 7.138950 GiB, below the unchanged measured-build limit of 8 GiB.
+The identity/calendar audits, internal-feature and target survivorship gates,
+external contemporaneity and name-clustered composition checks, and protected
+access audit all passed. The store records raw wealth-chain restarts without
+bridging: 3 active name-days in 2010, 4 in 2011, 1 in 2016, 1 in 2022, and 0
+in every other year. None falls in the active F1/F2/F3 evaluation populations.
+Naive baseline coverage is now 98.22%--99.94% across all fold/book cells,
+confirming that the resolved-action over-mask was removed without inventing
+history. The independent native-fast parity audit is sealed at
+`D:\quant-data\b3\processed\model_runs\v2_native_fast_audit_8021e42_20260906T184200Z`;
+its audit SHA-256 is
+`98d2e5346a0e2555b77fdb0cb034c63e9d8fa7860eb30f6e749680883ba29218`,
+with exact equality for the registered 20-name by 20-session sample.
+
+The full acceptance then ran from scratch at
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_8021e42_20260906T184700Z`.
+The pipeline-manifest and log-inclusive inventory SHA-256 values are
+`f7ce5a47a5be4bc8d8f4e11b5adde83a97c6e334b87038068f0f56a7ba7beaa6`
+and `2caf60d4d3202fa3228b295aa3245d04bf6bf92dc197a00264dbdab9d3672bf2`.
+The access-audit SHA-256 is
+`88caeaec04ab0e3434781299fd2dee0f34dce6257d608cc90dd6a99300834cb3`;
+official-validation and test access are false, transfer chronology is clean,
+`research_claim=false`, and no deployment changed.
+
+All naive signal checks passed: pooled primary IC was `0.03985972` for
+momentum, `-0.01816006` for reversal-21, `-0.00703711` for reversal-5, and
+`0.02366325` for their registered blend. The unchanged 1.8--2.2 gross gate
+passed 13 of 16 books. The registered per-evaluation unresolved/stale mean
+below 0.02 passed 7 of 16. Exact ledger diagnostics are:
+
+| Book | Mean gross | Mean unresolved/stale | Terminal unresolved | Mean exits/side/day | Same-close replacements | Binding failure |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| F1 inverse-volatility | 1.788554 | 0.035150 | 0.068998 | 0.596774 | 68 | gross, unresolved |
+| F1 momentum | 1.798077 | 0.019070 | 0.058789 | 0.572581 | 68 | gross |
+| F1 reversal-21 | 1.968796 | 0.010528 | 0.028309 | 2.326613 | 475 | none |
+| F1 reversal-5 | 1.927972 | 0.013646 | 0.057694 | 6.532258 | 1,370 | none |
+| F1 blend | 1.982435 | 0.014318 | 0.061482 | 4.250000 | 941 | none |
+| F2 inverse-volatility | 1.739684 | 0.021198 | 0.029680 | 0.524194 | 57 | gross, unresolved |
+| F2 momentum | 1.828920 | 0.000000 | 0.000000 | 0.584677 | 74 | none |
+| F2 reversal-21 | 1.934637 | 0.012840 | 0.015506 | 2.197581 | 433 | none |
+| F2 reversal-5 | 1.915457 | 0.030632 | 0.050162 | 6.366935 | 1,344 | unresolved |
+| F2 blend | 1.944545 | 0.018658 | 0.023014 | 3.862903 | 839 | none |
+| F3 inverse-volatility | 1.889690 | 0.038970 | 0.078370 | 0.913386 | 90 | unresolved |
+| F3 momentum | 1.913107 | 0.107829 | 0.125821 | 0.724409 | 62 | unresolved |
+| F3 reversal-21 | 1.936944 | 0.040265 | 0.098445 | 2.271654 | 437 | unresolved |
+| F3 reversal-5 | 1.940560 | 0.055983 | 0.094767 | 6.413386 | 1,383 | unresolved |
+| F3 blend | 1.965007 | 0.109153 | 0.161402 | 3.881890 | 888 | unresolved |
+| F1 GBDT ensemble | 1.856018 | 0.024496 | 0.032407 | 1.145161 | 217 | unresolved |
+
+Because at least one binding gate failed, engineering acceptance is
+`unsupported`. The registered stop prevented a merge to `main`, Round 1,
+Round 2, or any result-changing retry. No acceptance bound, name/gross/net
+cap, score population, or execution rule was changed after observing the
+result. No paid Lambda instance was used for this pass.
+Two provider inventory reads at 2026-09-06T21:55:41Z each returned zero
+instances, confirming there was nothing to terminate and no adjacent instance
+was touched.

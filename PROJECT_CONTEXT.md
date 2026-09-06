@@ -254,37 +254,36 @@ GitHub, and the instance, exact paid GH200 instance
 at 2026-09-04T20:09:32.7623726Z and 2026-09-04T20:09:57.4535979Z confirmed
 that exact ID absent and zero remaining instances.
 
-The later pass-4 development-tier continuation is frozen on branch
-`fix/v2-development-grade-data`. Its matching store remains
-`D:\quant-data\b3\processed\v2_daily_store_12e6ae0_20260906T173300Z`, manifest
+The pass-4d development-tier continuation is frozen on branch
+`fix/v2-development-grade-data` at implementation commit
+`8021e42ae658d3eb7bba19e39b58e2f9c8d65331`. Its current V3 store is
+`D:\quant-data\b3\processed\v2_daily_store_8021e42_20260906T202315Z`, manifest
 SHA-256
-`2f537944ba857675265031da4f2f4327fdffd6d452b76d4de818d752f1272764`.
-It passed the measured 8-GiB build ceiling at 7.802536 GiB RSS, all identity,
-calendar, feature/target survivorship, external contemporaneity/composition,
-and protected-access gates. The exact raw-M1 audit SHA-256 is
-`f1c23ef1884b5bcf3f0224ee4db22533e0bfc6e67d62cae0b0cf701f9ebd7174`.
+`deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b`.
+It passed the measured 8-GiB build ceiling at 7.138950 GiB RSS and all
+identity, calendar, feature/target survivorship, external
+contemporaneity/composition, and protected-access gates. Slow wealth features
+and naive baselines share exact endpoint, raw-chain restart, and
+unresolved-action validity. Raw-price cross-session intraday fields separately
+guard unresolved actions and unit changes; same-session scale-free fields do
+not. The exact native-fast audit SHA-256 is
+`98d2e5346a0e2555b77fdb0cb034c63e9d8fa7860eb30f6e749680883ba29218`.
 
-The first immutable acceptance root is
-`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_12e6ae0_20260906T183511Z`;
-pipeline-manifest SHA-256 is
-`34ac98f8646934cda82290826a1ad0fd12921393876d726a829cb53825669c38`
-and its log-inclusive artifact-inventory SHA-256 is
-`8b011067471067c3ceafb2b78b2153b6331b18a66db4bd89ba6490da04207445`.
-Its ledger-entry starvation was repaired at commits `2bfa986` and `48d5562`
-without changing or recomputing any score. The exact replay root is
-`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_ledger_replay_48d5562_20260906T192609Z`;
-pipeline-manifest and log-inclusive inventory SHA-256 values are
-`b62d53d31986d304fabedd6fbfde6dff32167198e634f5b9fb2dad9aab49bdeb`
-and `dfa783d6500cc72c0cd124ea75cf435f935494a259f9f9a43075265ff7898bcd`.
-All non-ledger fields were bit-identical, but 12 of 16 books still failed the
-unchanged 1.8--2.2 mean-gross gate and mean terminal unresolved inventory was
-`0.0361789`, above 0.02. Several exact momentum/blend score populations contain
-only 15--46 eligible names per day; under the unchanged 5% name cap, many dates
-cannot mathematically reach 1.8 gross. The branch therefore remains unmerged,
-Round 1 and Round 2 remain unrun, no GH200 was launched, official
+The full scratch acceptance root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_8021e42_20260906T184700Z`;
+pipeline-manifest and log-inclusive artifact-inventory SHA-256 values are
+`f7ce5a47a5be4bc8d8f4e11b5adde83a97c6e334b87038068f0f56a7ba7beaa6`
+and `2caf60d4d3202fa3228b295aa3245d04bf6bf92dc197a00264dbdab9d3672bf2`.
+Thirteen of 16 evaluated books passed the unchanged 1.8--2.2 mean-gross gate,
+but F1 inverse-volatility, F1 momentum, and F2 inverse-volatility failed it.
+Only 7 of 16 books met the registered per-evaluation requirement that mean
+daily unresolved/stale inventory be below 0.02 NAV; every F3 naive book failed
+that bound, as did F1 inverse-volatility, F2 inverse-volatility, F2 reversal-5,
+and the F1 GBDT. The result is `unsupported`. The branch therefore remains
+unmerged, Round 1 and Round 2 remain unrun, no GH200 was launched, official
 validation/test remained unread, and no deployment changed. Any continuation
-requires a new pre-result contract rather than reinterpretation of this failed
-acceptance gate.
+requires a new pre-result contract rather than reinterpretation of these failed
+acceptance gates.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused

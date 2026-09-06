@@ -926,3 +926,63 @@ test was mostly a data-end artifact. The gate now measures every evaluation's
 mean daily unresolved-or-stale inventory below 2% of NAV; terminal count,
 notional, and reasons remain visible. No gross, name, net, target, fold, seed,
 roster, cost, leakage, identity, or protected-access rule was changed.
+
+## 14. Pass-4d final disposition: what was accepted, rejected, and deferred
+
+The final implementation follows pass 4d's semantic split rather than either
+earlier proposal wholesale. It keeps the multiday refactor's identity,
+information-clock, economic-return, and stateful-ledger boundaries, but rejects
+the proposed wealth bridge. The observed restart audit showed no F1/F2/F3
+evaluation loss, so bridging would have introduced unobserved continuity for
+no current research benefit. Exact endpoint availability, raw-chain restart,
+and unresolved-action checks are instead shared by slow wealth features and
+naive baselines. Resolved actions remain in the wealth index and do not cause
+double masking.
+
+The old all-purpose corporate-action mask was removed completely. Raw-price
+cross-session intraday fields now receive the stricter unresolved-or-unit-change
+guard, including successor conversions. Same-session scale-free fields receive
+no unnecessary action guard. Targets and execution retain their own already
+aligned economic contracts. Store, evaluator, and validation schemas were
+advanced because this is a real semantic break; compatibility aliases and
+parallel legacy paths were deliberately not kept.
+
+The ledger adopts same-auction slot reuse only after a complete exit order is
+submitted at that close. Older pending exits still consume slots, and a failed
+exit plus filled replacement is exposed to the existing next-day risk trim.
+This preserves honest state and costs. `K_eff = min(K, floor(N/2))` handles
+small candidate sets without changing configured slot size, gross target, or
+the 5% name cap. Per-book mean exits, same-close replacements, unresolved/stale
+daily exposure, terminal inventory, and reason breakdown are all persisted.
+
+The rebuilt V3 store is
+`D:\quant-data\b3\processed\v2_daily_store_8021e42_20260906T202315Z`,
+manifest SHA-256
+`deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b`.
+It peaked at 7.138950 GiB RSS, passed every data and protected-access gate, and
+restored 98.22%--99.94% naive baseline coverage. Its independent native-fast
+audit SHA-256 is
+`98d2e5346a0e2555b77fdb0cb034c63e9d8fa7860eb30f6e749680883ba29218`.
+
+The full scratch acceptance root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_8021e42_20260906T184700Z`;
+pipeline and log-inclusive inventory SHA-256 values are
+`f7ce5a47a5be4bc8d8f4e11b5adde83a97c6e334b87038068f0f56a7ba7beaa6`
+and `2caf60d4d3202fa3228b295aa3245d04bf6bf92dc197a00264dbdab9d3672bf2`.
+The action-mask and slot repairs raised gross utilization into the registered
+band for 13 of 16 books. Three still failed gross, and nine books failed the
+pre-result requirement that mean daily unresolved/stale marked notional be
+below 2% of NAV. F3 is the clearest remaining problem: all five naive books
+fail the unresolved/stale gate, with means from 3.90% to 10.92%. The F1 GBDT
+also fails at 2.45%.
+
+Accordingly, the conditional suggestions to merge `main` and launch Round 1
+and Round 2 were not implemented. Doing so would violate the source documents'
+own acceptance stop. We also did not relax gross, the daily unresolved bound,
+the name cap, score masks, or ledger accounting after seeing the result, and
+did not retry any score. The complete engineering work is pushed on
+`fix/v2-development-grade-data` for independent review; `main` intentionally
+remains at the last accepted state. Official validation and test data were not
+read, no deployment changed, and no paid Lambda instance was required.
+Two direct provider inventories at 2026-09-06T21:55:41Z each returned zero
+instances.
