@@ -6,7 +6,7 @@ This memo is intended for the authors/reviewers of
 were reconciled, what was implemented, what was intentionally changed or
 deferred, and why the result stops before new research experiments.
 
-Section 9 records the later `v2_fix_pass_4.md` continuation. That pass does
+Section 8 records the later `v2_fix_pass_4.md` continuation. That pass does
 not reverse the refactor's leakage, identity, decision-clock, or accounting
 rules. It adds two explicitly labelled development-data tiers so the model can
 eventually produce a screening number without misrepresenting inferred terms
