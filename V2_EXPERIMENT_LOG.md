@@ -191,3 +191,47 @@ Official-validation and test access were false, transfer chronology was clean,
 and no deployment changed. The frozen stop rule therefore prevented Round 1,
 Round 2, a merge to `main`, or a paid-instance launch. No scored candidate was
 retried and the gross gate was not relaxed after seeing the result.
+
+## Pass-4b ledger-policy repair and second acceptance stop (2026-09-06)
+
+Pass 4b repaired the evaluator-side entry starvation without rebuilding the
+store or changing targets, masks, folds, scores, costs, the 5% name cap, or any
+registered acceptance bound. The stateful ledger now accounts for occupied
+slots while exits are pending, refills the long and short sides independently,
+skips blocked candidates instead of abandoning the day's queue, trims only the
+excess exposure on risk breaches, and uses the registered 0.20 absolute planned
+net cap. The code-bearing commits are `2bfa986f4404ae7dd724fdcaa3f98e73d6c00686`
+and the reporting-boundary repair
+`48d55622f094535039ee7ab613ecbeb51b0e8b2e`.
+
+The mandated replay reused the exact 16 sealed score arrays from the prior
+acceptance root; it performed no model fit or score recomputation. All IC,
+persistence, coverage, and other non-ledger report fields were bit-identical.
+The immutable replay root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_ledger_replay_48d5562_20260906T192609Z`.
+Its pipeline manifest, gate-diagnostic report, and log-inclusive artifact
+inventory SHA-256 values are
+`b62d53d31986d304fabedd6fbfde6dff32167198e634f5b9fb2dad9aab49bdeb`,
+`1bdeab6d58da51fec251fec7643f974cb7a617ea676c68deaf806cd4868c8953`,
+and `dfa783d6500cc72c0cd124ea75cf435f935494a259f9f9a43075265ff7898bcd`.
+
+The policy repair materially increased utilization, but the unchanged gate
+still rejected 12 of 16 books. Only F1 reversal-21, F2 reversal-21, F3 inverse
+volatility, and F3 reversal-21 entered the 1.8--2.2 mean-gross band, at
+`1.855342`, `1.810454`, `1.901746`, and `1.848958`. The F1 GBDT reached
+`1.773067` and still failed. All momentum and momentum/reversal-blend books
+remained at zero because their exact primary-head score masks are too small:
+F1 contains at most 34 eligible names per day and F3 at most 24. At a binding
+5% name cap, even holding every eligible name cannot reach 1.8 gross. Mean
+absolute terminal unresolved inventory was `0.0361789` NAV, also above its
+unchanged 0.02 ceiling.
+
+The access audit passed with official-validation and test access both false,
+transfer chronology clean, `research_claim=false`, and no deployment change.
+Per the explicit stop rule, the branch was not merged to `main`, Round 1 and
+Round 2 were not started, and no paid instance was launched. A continuation
+would require a new, pre-result contract resolving the incompatibility between
+the small exact score populations, the 5% name cap, and the 1.8 gross floor;
+none of those research rules was changed after observing this replay.
+Ruff and Python compilation passed on the final branch state, and the complete
+research suite passed all 824 tests in 380.76 seconds.

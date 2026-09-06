@@ -783,3 +783,63 @@ to relax or reinterpret gross utilization were not implemented because that
 would alter a binding preregistered acceptance rule after observing the first
 honest result. The branch remains the review surface; a future continuation
 must diagnose feasibility and be separately authorized or preregistered.
+
+## 11. Pass-4b disposition: repair the ledger, preserve the research boundary
+
+Pass 4b correctly identified four interacting evaluator defects: a blanket
+entry stop while any exit was pending, paired-side refills, day-wide aborts on
+one blocked candidate, and full-book liquidation on an ordinary risk breach.
+The implementation replaced them with occupied-slot accounting, independent
+alternating side queues, candidate-local skips, and partial per-name/gross/net
+risk trims. The planned absolute net cap moved from 0.10 to 0.20 exactly as
+specified and is bound in the executable registration. Gross target 2.0,
+planned gross cap 2.25, name cap 0.05, fills, costs, claims, target construction,
+score masks, folds, and all acceptance thresholds were unchanged.
+
+One requested synthetic test was adjusted in mechanism but not purpose. A 15%
+rally in the long side of a self-financing long/short book increases NAV faster
+than gross exposure and therefore cannot create a gross-fraction breach. The
+test uses an equally sized 15% market rally adverse to the short side, which
+does create the intended gross breach, and verifies that both sides are trimmed
+only in proportion to their excess. Encoding the literally impossible setup
+would have produced a test that could never exercise the requested branch.
+
+The first replay attempt at commit `2bfa986` completed one evaluation and then
+stopped in its reporting comparator. Four `mask_coverage` fields—actual risk
+breach dates, stale-mark name-days, unresolved-action name-days, and valuation
+scenario count—are derived from the ledger path, so classifying them as
+non-ledger identity was incorrect. The failed root and logs were retained. The
+bounded commit `48d5562` classifies only those four fields as ledger-derived;
+it changes no score or economics. The fresh replay then hash-verified and reused
+all 16 prior score panels without fitting or scoring a model. All genuine
+non-ledger fields, including IC, persistence, and coverage, were bit-identical.
+
+The successful immutable replay root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_ledger_replay_48d5562_20260906T192609Z`.
+Its manifest SHA-256 is
+`b62d53d31986d304fabedd6fbfde6dff32167198e634f5b9fb2dad9aab49bdeb`;
+the complete gate diagnostics and log-inclusive inventory SHA-256 values are
+`1bdeab6d58da51fec251fec7643f974cb7a617ea676c68deaf806cd4868c8953`
+and `dfa783d6500cc72c0cd124ea75cf435f935494a259f9f9a43075265ff7898bcd`.
+The access audit passed false/false with no deployment change.
+
+Utilization improved substantially, proving that the policy repair was real,
+but the unchanged acceptance contract still failed. Four books entered the
+1.8--2.2 mean-gross band; 12 did not, including F1 GBDT at 1.773067. Mean
+terminal unresolved inventory also rose to 0.0361789 NAV, above 0.02, because
+the repaired ledger now carries positions that the starving implementation had
+never opened. The exact momentum/blend masks expose a deeper contract conflict:
+they provide only 15--46 eligible names per day, and F1/F3 peak at 34/24. A 5%
+name cap makes the 1.8 gross floor unattainable on those dates even if every
+eligible name is held. This is a population/cap/gate incompatibility, not a
+remaining queue-policy defect.
+
+Accordingly, the suggestions to fast-forward `main` and start Round 1/2 were
+not implemented: the source document made those actions conditional on every
+acceptance gate passing. No bound, mask, cap, or population rule was relaxed
+after the result; no scored candidate was retried; and no paid instance was
+launched. The review branch is intentionally left as the complete engineering
+surface. Any next research pass must preregister how sparse score populations
+interact with portfolio gross, rather than retrofitting the observed result.
+Final verification on the completed branch passed Ruff, Python compilation,
+and all 824 research tests in 380.76 seconds.
