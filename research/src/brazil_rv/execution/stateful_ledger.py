@@ -177,6 +177,8 @@ class StatefulLedgerResult:
     gross_fraction_nav: NDArray[np.float64]
     turnover_fraction_nav: NDArray[np.float64]
     unresolved_stale_inventory_fraction_nav: NDArray[np.float64]
+    unresolved_claim_inventory_fraction_nav: NDArray[np.float64]
+    stale_mark_inventory_fraction_nav: NDArray[np.float64]
     stale_mark_name_days: NDArray[np.int64]
     unresolved_action_name_days: NDArray[np.int64]
     valuation_scenario_count: NDArray[np.int64]
@@ -294,6 +296,18 @@ class StatefulLedgerResult:
             ),
             "maximum_unresolved_stale_inventory_fraction_nav": float(
                 np.max(self.unresolved_stale_inventory_fraction_nav)
+            ),
+            "mean_unresolved_claim_inventory_fraction_nav": float(
+                np.mean(self.unresolved_claim_inventory_fraction_nav)
+            ),
+            "maximum_unresolved_claim_inventory_fraction_nav": float(
+                np.max(self.unresolved_claim_inventory_fraction_nav)
+            ),
+            "mean_stale_mark_inventory_fraction_nav": float(
+                np.mean(self.stale_mark_inventory_fraction_nav)
+            ),
+            "maximum_stale_mark_inventory_fraction_nav": float(
+                np.max(self.stale_mark_inventory_fraction_nav)
             ),
             "average_holding_sessions_approximation": (
                 2.0 * mean_gross / mean_turnover if mean_turnover > 0 else 0.0
@@ -652,6 +666,8 @@ def simulate_stateful_ledger(
     gross_rows: list[float] = []
     turnover_rows: list[float] = []
     unresolved_stale_fraction_rows: list[float] = []
+    unresolved_claim_fraction_rows: list[float] = []
+    stale_mark_fraction_rows: list[float] = []
     stale_rows: list[int] = []
     unresolved_action_rows: list[int] = []
     scenario_count_rows: list[int] = []
@@ -794,9 +810,11 @@ def simulate_stateful_ledger(
         if not np.isclose(start_identity, start_nav, rtol=1e-12, atol=1e-12):
             raise RuntimeError("opening ledger identity does not reconcile")
 
-        newly_uncertain_action = (shares != 0.0) & ~inputs.action_resolved[day]
-        action_uncertainty_seen |= bool(newly_uncertain_action.any())
-        unresolved_action |= newly_uncertain_action
+        # Action-term uncertainty is a property of this session's claim, not
+        # of the position for the rest of its life. A later resolved cell
+        # clears the condition without requiring a fill.
+        unresolved_action = ~inputs.action_resolved[day].copy()
+        action_uncertainty_seen |= bool(((shares != 0.0) & unresolved_action).any())
         # Apply contractual terms to shares held before the session. Cash terms
         # become claims; only the later payment mask transfers them to cash.
         for name in np.flatnonzero(inputs.has_action[day]):
@@ -873,7 +891,6 @@ def simulate_stateful_ledger(
                 last_observed[successor] = converted_reference
                 restricted_by_name[successor] += restricted_by_name[name]
                 restricted_by_name[name] = 0.0
-                unresolved_action[successor] |= unresolved_action[name]
                 if np.isfinite(converted_mark) and converted_mark <= 0.0:
                     unresolved_action[successor] = True
                 unresolved_action[name] = False
@@ -960,7 +977,6 @@ def simulate_stateful_ledger(
             kept = (
                 eligible[name]
                 and retention > 0
-                and not unresolved_action[name]
                 and missing_sessions[name] < config.max_missing_sessions
                 and (
                     ranks[name] >= len(order) - retention
@@ -1184,7 +1200,8 @@ def simulate_stateful_ledger(
                 for name, pending in pending_exits.items()
                 if pending.order.decision_session == day
                 and pending.remaining_quantity
-                >= abs(float(shares[name])) - max(1e-12, abs(float(shares[name])) * 1e-12)
+                >= abs(float(shares[name]))
+                - max(1e-12, abs(float(shares[name])) * 1e-12)
             }
             unavailable = set(np.flatnonzero(shares != 0.0).tolist()) | set(
                 pending_entries
@@ -1213,8 +1230,16 @@ def simulate_stateful_ledger(
             short_band = [int(name) for name in order[:k_eff]]
             if set(long_band) & set(short_band):
                 raise RuntimeError("long and short entry bands overlap")
-            long_candidates = [name for name in long_band if name not in unavailable]
-            short_candidates = [name for name in short_band if name not in unavailable]
+            long_candidates = [
+                name
+                for name in long_band
+                if name not in unavailable and not unresolved_action[name]
+            ]
+            short_candidates = [
+                name
+                for name in short_band
+                if name not in unavailable and not unresolved_action[name]
+            ]
             replacement_capacity = {
                 "buy": sum(shares[name] > 0.0 for name in same_day_exit_names),
                 "sell": sum(shares[name] < 0.0 for name in same_day_exit_names),
@@ -1323,8 +1348,11 @@ def simulate_stateful_ledger(
         costs = 0.0
         cost_rate = config.cost_bps_per_side / 10_000.0
         for pending_map in (pending_exits, pending_entries):
+            entries = pending_map is pending_entries
             for name, pending in tuple(pending_map.items()):
-                if not printed[name] or unresolved_action[name]:
+                # Uncertain action terms can block opening risk, but never a
+                # printed exit, risk reduction, or terminal liquidation.
+                if not printed[name] or (entries and unresolved_action[name]):
                     continue
                 fraction = float(inputs.fill_fraction[day, name])
                 quantity = pending.remaining_quantity * fraction
@@ -1346,7 +1374,6 @@ def simulate_stateful_ledger(
                     entry_session[name] = day
                 if before != 0.0 and shares[name] == 0.0:
                     entry_session[name] = -1
-                    unresolved_action[name] = False
                 fill_cost = cost_rate * notional
                 fills.append(
                     Fill(
@@ -1453,8 +1480,20 @@ def simulate_stateful_ledger(
             | unresolved_action
             | (missing_sessions >= config.max_missing_sessions)
         )
+        unresolved_claim_inventory = held_now & unresolved_action
+        stale_mark_inventory = held_now & ~printed
         unresolved_stale_fraction = (
             float(np.abs(signed_values[unresolved_stale]).sum() / current_nav)
+            if current_nav != 0.0
+            else np.nan
+        )
+        unresolved_claim_fraction = (
+            float(np.abs(signed_values[unresolved_claim_inventory]).sum() / current_nav)
+            if current_nav != 0.0
+            else np.nan
+        )
+        stale_mark_fraction = (
+            float(np.abs(signed_values[stale_mark_inventory]).sum() / current_nav)
             if current_nav != 0.0
             else np.nan
         )
@@ -1483,8 +1522,10 @@ def simulate_stateful_ledger(
         gross_rows.append(gross if np.isfinite(gross) else np.nan)
         turnover_rows.append(traded_notional / start_nav)
         unresolved_stale_fraction_rows.append(unresolved_stale_fraction)
+        unresolved_claim_fraction_rows.append(unresolved_claim_fraction)
+        stale_mark_fraction_rows.append(stale_mark_fraction)
         stale_rows.append(stale)
-        unresolved_action_rows.append(int(unresolved_action.sum()))
+        unresolved_action_rows.append(int(unresolved_claim_inventory.sum()))
         scenario_count_rows.append(int(newly_scenario.sum()))
         signs = np.zeros(name_count, dtype=np.int8)
         signs[shares > 0.0] = 1
@@ -1588,6 +1629,12 @@ def simulate_stateful_ledger(
         turnover_fraction_nav=np.asarray(turnover_rows, dtype=np.float64),
         unresolved_stale_inventory_fraction_nav=np.asarray(
             unresolved_stale_fraction_rows, dtype=np.float64
+        ),
+        unresolved_claim_inventory_fraction_nav=np.asarray(
+            unresolved_claim_fraction_rows, dtype=np.float64
+        ),
+        stale_mark_inventory_fraction_nav=np.asarray(
+            stale_mark_fraction_rows, dtype=np.float64
         ),
         stale_mark_name_days=np.asarray(stale_rows, dtype=np.int64),
         unresolved_action_name_days=np.asarray(unresolved_action_rows, dtype=np.int64),

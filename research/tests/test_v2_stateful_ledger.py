@@ -152,9 +152,9 @@ def test_first_evaluation_decision_uses_explicit_pre_window_reference() -> None:
     assert [order.reference_price for order in first_orders] == [80.0, 120.0]
 
 
-def test_action_reconciliation_mask_never_changes_intended_order() -> None:
-    close = np.full((3, 2), 100.0)
-    scores = np.asarray([[1.0, -1.0]] * 3)
+def test_current_unresolved_action_session_blocks_entry_only() -> None:
+    close = np.full((3, 3), 100.0)
+    scores = np.asarray([[3.0, 0.0, -3.0]] * 3)
     resolved = np.ones_like(close, dtype=np.bool_)
     unresolved = resolved.copy()
     unresolved[0, 0] = False
@@ -166,7 +166,7 @@ def test_action_reconciliation_mask_never_changes_intended_order() -> None:
         has_action=np.zeros_like(unresolved),
         successor_index=base.successor_index,
     )
-    initial = np.asarray([100.0, 100.0])
+    initial = np.asarray([100.0, 100.0, 100.0])
     first = _run(close, scores, actions=base, initial_reference_price=initial)
     second = _run(close, scores, actions=changed, initial_reference_price=initial)
     first_orders = [
@@ -175,7 +175,13 @@ def test_action_reconciliation_mask_never_changes_intended_order() -> None:
     second_orders = [
         order for order in second.intended_orders if order.decision_session == 0
     ]
-    assert first_orders == second_orders
+    assert {(order.security_index, order.side) for order in first_orders} == {
+        (0, "buy"),
+        (2, "sell"),
+    }
+    assert {(order.security_index, order.side) for order in second_orders} == {
+        (2, "sell")
+    }
 
 
 def test_unfilled_top_entry_reserves_slot_and_is_not_replaced() -> None:
@@ -623,11 +629,19 @@ def test_terminal_missing_inventory_is_not_sold_and_has_scenario_views() -> None
     assert short_result.unresolved_excluded_nav[-1] == 1.0
 
 
-def test_unresolved_action_coverage_blocks_fill_and_keeps_inventory() -> None:
-    close = np.full((4, 2), 100.0)
-    scores = np.asarray([[1.0, -1.0]] * 4)
+def test_unresolved_once_then_resolved_name_exits_on_next_instruction() -> None:
+    close = np.full((5, 3), 100.0)
+    scores = np.asarray(
+        [
+            [3.0, 0.0, -3.0],
+            [3.0, 0.0, -3.0],
+            [0.0, 3.0, -3.0],
+            [0.0, 3.0, -3.0],
+            [0.0, 3.0, -3.0],
+        ]
+    )
     resolved = np.ones_like(close, dtype=np.bool_)
-    resolved[2:, 0] = False
+    resolved[1, 0] = False
     actions = AlignedActionTerms(
         shares_per_prior_share=np.ones_like(close),
         cash_per_prior_share=np.zeros_like(close),
@@ -637,19 +651,97 @@ def test_unresolved_action_coverage_blocks_fill_and_keeps_inventory() -> None:
             np.arange(close.shape[1], dtype=np.int64), close.shape
         ).copy(),
     )
-    result = _run(close, scores, actions=actions)
+    result = _run(
+        close,
+        scores,
+        actions=actions,
+        initial_reference_price=np.full(close.shape[1], 100.0),
+    )
 
     exit_order = next(
         order
         for order in result.intended_orders
         if order.security_index == 0 and order.purpose == "exit"
     )
-    assert not any(fill.order_id == exit_order.order_id for fill in result.fills)
-    assert result.pending_exit_count[-1] == 1
-    assert result.unresolved_action_name_days.sum() == 2
-    assert result.unresolved_inventory_count == 1
-    assert result.signed_shares[-1, 0] == 0.01
+    assert exit_order.decision_session == 2
+    assert any(
+        fill.order_id == exit_order.order_id and fill.fill_session == 2
+        for fill in result.fills
+    )
+    assert result.unresolved_action_name_days[1] == 1
+    assert result.unresolved_action_name_days[2] == 0
+    assert result.unresolved_claim_inventory_fraction_nav[1] > 0.0
+    assert result.stale_mark_inventory_fraction_nav[1] == 0.0
+    assert result.signed_shares[2, 0] == 0.0
     assert result.economics_unresolved
+
+
+def test_dividend_receivable_does_not_block_later_exit() -> None:
+    close = np.full((5, 3), 100.0)
+    scores = np.asarray(
+        [
+            [3.0, 0.0, -3.0],
+            [3.0, 0.0, -3.0],
+            [0.0, 3.0, -3.0],
+            [0.0, 3.0, -3.0],
+            [0.0, 3.0, -3.0],
+        ]
+    )
+    actions = _action_terms(close.shape, day=1, d=10.0)
+    payment = np.full(close.shape, -1, dtype=np.int64)
+    payment[1] = 4
+    result = _run(
+        close,
+        scores,
+        actions=actions,
+        payment_session=payment,
+        initial_reference_price=np.full(close.shape[1], 100.0),
+    )
+
+    assert result.receivables[1] > 0.0
+    long_exit = next(
+        order
+        for order in result.intended_orders
+        if order.security_index == 0 and order.purpose == "exit"
+    )
+    assert any(
+        fill.order_id == long_exit.order_id and fill.fill_session == 2
+        for fill in result.fills
+    )
+    assert result.signed_shares[2, 0] == 0.0
+
+
+def test_terminal_liquidates_every_printed_position_regardless_of_action_flag() -> None:
+    close = np.full((3, 3), 100.0)
+    scores = np.asarray([[3.0, 0.0, -3.0]] * 3)
+    resolved = np.ones_like(close, dtype=np.bool_)
+    resolved[-1, (0, 2)] = False
+    actions = AlignedActionTerms(
+        shares_per_prior_share=np.ones_like(close),
+        cash_per_prior_share=np.zeros_like(close),
+        session_resolved=resolved,
+        has_action=np.zeros_like(resolved),
+        successor_index=np.broadcast_to(
+            np.arange(close.shape[1], dtype=np.int64), close.shape
+        ).copy(),
+    )
+    result = _run(
+        close,
+        scores,
+        actions=actions,
+        initial_reference_price=np.full(close.shape[1], 100.0),
+    )
+
+    terminal_orders = [
+        order for order in result.intended_orders if order.purpose == "terminal_exit"
+    ]
+    assert {order.security_index for order in terminal_orders} == {0, 2}
+    assert all(
+        any(fill.order_id == order.order_id for fill in result.fills)
+        for order in terminal_orders
+    )
+    assert not np.any(result.signed_shares[-1])
+    assert result.unresolved_inventory_count == 0
 
 
 def test_insolvency_stops_path_and_future_order_generation() -> None:

@@ -351,10 +351,15 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         manifest = {
             "axes": {"date_identity_sha256": inputs.calendar_identity_sha256},
             "feature_names": {"slow": list(SLOW_FEATURES)},
-            "metadata": {
-                "action_terms_source": inputs.action_terms_source,
-                "schedule_source": inputs.schedule_source,
-            },
+                "metadata": {
+                    "action_terms_source": inputs.action_terms_source,
+                    "schedule_source": inputs.schedule_source,
+                    "corporate_action_contract": {
+                        "stored_action_arrays": (
+                            "retrospective outcome/accounting terms"
+                        )
+                    },
+                },
         }
         dates = np.asarray(
             ["2024-01-01", *(value.isoformat() for value in inputs.dates)],

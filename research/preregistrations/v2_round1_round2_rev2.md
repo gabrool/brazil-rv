@@ -44,7 +44,7 @@ executable borrow.
 
 ## Pre-research acceptance and sanity bounds
 
-Before Round 1 can freeze, a completed `BRAZIL_RV_V2_PIPELINE_VALIDATION_V4` report
+Before Round 1 can freeze, a completed `BRAZIL_RV_V2_PIPELINE_VALIDATION_V6` report
 must bind the exact implementation and store and have status
 `development_grade_inferred_actions`, no failed reasons, and both sealed-window access
 flags false. It includes the survivorship gates, provider-invariance evidence, finite
@@ -72,6 +72,38 @@ and applies it to every day's unresolved-or-stale marked inventory, averaged
 within each evaluation; terminal count/notional and the nonexclusive reason
 breakdown remain reported. No target, score, fold, portfolio cap, action term,
 or accounting rule changes with this engineering-only refinement.
+
+The ledger interpretation was further fixed at `2026-09-06T22:28:39Z`, before
+the pass-4e ledger replay and before any Round-1 score. The sealed diagnostic at
+`D:\quant-data\b3\processed\model_runs\v2_pass4e_unresolved_diagnostic_24abe56_20260906T222757Z`
+(diagnostic-manifest SHA-256
+`2801ea826df263525aec0247c9eeefcdd5975237e73dcab4807d20c68e623310`,
+log-inclusive inventory SHA-256
+`0f93b5e660c7701cfec392b3a92ff25fdb7eaccd212c270deffa91c0d07ed709`)
+found 2,502 held unresolved-or-stale name-days across the 16 registered
+development evaluations. Every one carried the ledger's latched unresolved flag;
+84 (3.3573%) had originated on a session followed by a later print. There were no
+held name-days on which the retrospective action mask was false despite a current
+observed print, and the stored retrospective mask differed from the decision-known
+feature mask as expected. Consequently no store rebuild or coverage reinterpretation
+is authorized.
+
+For the replay, action uncertainty is a current-session accounting state and never a
+position-life latch. It blocks only new entries. Any observed positive close can fill
+an exit, risk reduction, or terminal liquidation; a later resolved cell clears the
+uncertainty state without requiring a fill. Stale-mark notional and current unresolved-
+claim inventory notional are reported separately as well as through their unchanged
+union gate. The evaluator accepts only the store's explicitly labelled retrospective
+outcome/accounting arrays; decision-known action alignment remains feature-only. The
+sealed baseline and GBDT score panels are reused without model or score recomputation,
+and every non-ledger evaluation field must remain bit-identical. The advance expectation
+is that every unresolved-or-stale mean falls below 2% and the three prior borderline
+gross books return to 1.8--2.2. If a low-turnover book remains just below 1.8 without
+frozen inventory, the program stops and reports daily slot occupancy; the bound is not
+changed.
+
+For continuity only, momentum's pooled IC moved from 0.056 on the prior 34-name liquid
+subset to 0.040 on the complete population. Neither value is a research result.
 
 ## Round 1 — baseline floor and GBDT parent (CPU)
 

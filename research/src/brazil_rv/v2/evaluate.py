@@ -34,7 +34,7 @@ BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V6"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V7"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
@@ -108,6 +108,7 @@ class EvaluationInputs:
     source_feature_valid: Mapping[str, NDArray[np.bool_]] | None = None
     initial_reference_price: NDArray[np.floating] | None = None
     eventual_survives_to_final_year: NDArray[np.bool_] | None = None
+    action_alignment: str = "retrospective"
 
 
 @dataclass(frozen=True)
@@ -216,6 +217,10 @@ def _validate(inputs: EvaluationInputs) -> None:
         raise TypeError("transfer_chronology_clean must be an explicit Boolean")
     if not inputs.action_terms_source or not inputs.schedule_source:
         raise ValueError("evaluation requires action and schedule source-tier labels")
+    if inputs.action_alignment != "retrospective":
+        raise ValueError(
+            "ledger accounting requires the retrospective action alignment"
+        )
     scores = np.asarray(inputs.scores)
     active = np.asarray(inputs.active)
     if active.ndim != 2 or active.shape[0] != len(dates):
@@ -725,6 +730,12 @@ def _ledger_rows(
             ),
             "unresolved_stale_inventory_fraction_nav": _finite_or_none(
                 result.unresolved_stale_inventory_fraction_nav[index]
+            ),
+            "unresolved_claim_inventory_fraction_nav": _finite_or_none(
+                result.unresolved_claim_inventory_fraction_nav[index]
+            ),
+            "stale_mark_inventory_fraction_nav": _finite_or_none(
+                result.stale_mark_inventory_fraction_nav[index]
             ),
             "turnover_cost_bps": _finite_or_none(result.cost_bps[index]),
             "borrow_cost_bps": _finite_or_none(result.borrow_bps[index]),

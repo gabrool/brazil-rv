@@ -82,6 +82,10 @@ def write_fixture_store(
     metadata_payload = dict(metadata or {})
     metadata_payload.setdefault("action_terms_source", "verified_contractual_terms")
     metadata_payload.setdefault("schedule_source", "explicit_versioned_schedule")
+    metadata_payload.setdefault(
+        "corporate_action_contract",
+        {"stored_action_arrays": "retrospective outcome/accounting terms"},
+    )
     metadata_payload["feature_schema"] = fixture_feature_schema(names)
     return write_store(
         output_dir,

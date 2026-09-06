@@ -61,8 +61,8 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5"
-_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V4"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V6"
+_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5"
 PIPELINE_NETWORK_RESUME_SCHEMA = "BRAZIL_RV_V2_PIPELINE_NETWORK_RESUME_V2"
 PIPELINE_FLAGS: dict[str, bool] = {
     "pipeline_validation": True,
@@ -201,8 +201,7 @@ def _read_store_header(root: Path) -> tuple[dict[str, object], NDArray[np.dateti
     )
     if (
         not isinstance(calendar_contract, Mapping)
-        or calendar_contract.get("schema")
-        != "BRAZIL_RV_B3_EQUITY_SESSION_SCHEDULE_V1"
+        or calendar_contract.get("schema") != "BRAZIL_RV_B3_EQUITY_SESSION_SCHEDULE_V1"
         or calendar_contract.get("schedule_source") != metadata.get("schedule_source")
     ):
         raise ValueError("store lacks its explicit session-calendar contract")
@@ -236,11 +235,15 @@ def _read_store_header(root: Path) -> tuple[dict[str, object], NDArray[np.dateti
     isin_record = indices.get("isin_index.npy")
     date_path = store_root / "date_index.npy"
     isin_path = store_root / "isin_index.npy"
-    if not isinstance(date_record, Mapping) or not isinstance(isin_record, Mapping) or (
-        int(date_record.get("bytes", -1)) != date_path.stat().st_size
-        or date_record.get("sha256") != sha256_file(date_path)
-        or int(isin_record.get("bytes", -1)) != isin_path.stat().st_size
-        or isin_record.get("sha256") != sha256_file(isin_path)
+    if (
+        not isinstance(date_record, Mapping)
+        or not isinstance(isin_record, Mapping)
+        or (
+            int(date_record.get("bytes", -1)) != date_path.stat().st_size
+            or date_record.get("sha256") != sha256_file(date_path)
+            or int(isin_record.get("bytes", -1)) != isin_path.stat().st_size
+            or isin_record.get("sha256") != sha256_file(isin_path)
+        )
     ):
         raise ValueError("store axes differ from their immutable manifest")
     dates = np.load(date_path, allow_pickle=False)
@@ -673,6 +676,14 @@ def _evaluation_inputs(
     schedule_source = metadata.get("schedule_source")
     if not isinstance(action_terms_source, str) or not isinstance(schedule_source, str):
         raise ValueError("store lacks action and schedule source-tier labels")
+    action_contract = metadata.get("corporate_action_contract")
+    if not isinstance(action_contract, Mapping) or (
+        action_contract.get("stored_action_arrays")
+        != "retrospective outcome/accounting terms"
+    ):
+        raise ValueError(
+            "evaluator requires retrospective outcome/accounting action arrays"
+        )
     slow_names = tuple(str(value) for value in feature_names["slow"])
     diagnostic_names = (
         "yang_zhang_vol_20",
@@ -770,6 +781,7 @@ def _evaluation_inputs(
             store.read("audit_eventual_survives_to_final_year", indices),
             dtype=np.bool_,
         ),
+        action_alignment="retrospective",
     )
 
 
@@ -954,9 +966,7 @@ def _development_acceptance(
         if unresolved_stale is None:
             violations.append(f"{label}_unresolved_stale_fraction_missing")
         elif unresolved_stale >= 0.02:
-            violations.append(
-                f"{label}_mean_unresolved_stale_fraction_not_below_0_02"
-            )
+            violations.append(f"{label}_mean_unresolved_stale_fraction_not_below_0_02")
         else:
             unresolved_stale_fractions.append(unresolved_stale)
 
@@ -2592,8 +2602,8 @@ def replay_classical_economics(
                 },
                 "ledger_replay_proof": {
                     "score_or_model_recomputation": False,
-                    "prior_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V4",
-                    "replayed_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V5",
+                    "prior_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V6",
+                    "replayed_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V7",
                     "schema_field_is_the_only_non_economics_exception": True,
                     "all_non_ledger_fields_bit_identical": all(
                         row["non_ledger_fields_bit_identical"] is True

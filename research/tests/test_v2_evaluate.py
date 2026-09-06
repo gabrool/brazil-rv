@@ -800,3 +800,11 @@ def test_source_validity_without_archive_presence_is_rejected() -> None:
             ),
             window_name="F2",
         )
+
+
+def test_evaluator_rejects_nonretrospective_action_alignment() -> None:
+    with pytest.raises(ValueError, match="retrospective action alignment"):
+        evaluate_scores(
+            replace(_fixture(), action_alignment="decision_known"),
+            window_name="F2",
+        )
