@@ -1,6 +1,5 @@
 from datetime import date
 
-import numpy as np
 import polars as pl
 import pytest
 
@@ -9,9 +8,11 @@ from brazil_rv.v2.data_foundation import (
     continuation_identity_axis,
     detect_isin_successions,
     filter_cash_equities,
-    inherit_linked_history,
+    load_isin_link_allowlist,
     load_cotahist,
     panel_from_daily,
+    prepare_cash_equities,
+    validate_cotahist_daily,
     verify_v1_mapping,
 )
 
@@ -32,6 +33,8 @@ def _row(day: date, isin: str, ticker: str, spec: str = "ON") -> dict[str, objec
         "trades": 100,
         "quantity": 1_000,
         "distribution_number": 1,
+        "currency": "R$",
+        "quote_factor": 1,
     }
 
 
@@ -48,8 +51,8 @@ def test_cash_filter_isin_identity_and_v1_exception() -> None:
         "BRTESTACNOR1",
         "BRTESTACNPR0",
     ]
-    with pytest.raises(ValueError, match="one row"):
-        filter_cash_equities(pl.DataFrame([rows[0], rows[0]]))
+    collapsed = filter_cash_equities(pl.DataFrame([rows[0], rows[0]]))
+    assert collapsed.height == 1
 
 
 def test_cotahist_loader_applies_v1_exception_on_first_filter(tmp_path) -> None:
@@ -77,7 +80,9 @@ def test_security_master_splits_ticker_runs_and_panel_uses_isin() -> None:
     assert panel.observed.all()
 
 
-def test_consecutive_same_ticker_isin_succession_links_history_and_survival_identity() -> None:
+def test_same_ticker_isin_succession_is_proposed_but_not_accepted_by_default(
+    tmp_path,
+) -> None:
     predecessor = "BRTESTACNOR1"
     successor = "BRTESTACNPR0"
     dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
@@ -99,15 +104,35 @@ def test_consecutive_same_ticker_isin_succession_links_history_and_survival_iden
     master = build_security_master(daily)
     assert master.get_column("continuation_isin").to_list() == [
         predecessor,
+        successor,
+    ]
+    allowlist = tmp_path / "isin_links_allowlist.csv"
+    allowlist.write_text(
+        "ticker,predecessor_isin,successor_isin,effective_date,first_known_at,"
+        "shares_received_per_prior_share,cash_entitlement_per_prior_share,"
+        "currency,source,evidence_sha256\n"
+        f"TEST3,{predecessor},{successor},2024-01-04,2024-01-03T18:00:00Z,"
+        f"1.0,0.0,BRL,issuer_notice,{'a' * 64}\n",
+        encoding="utf-8",
+    )
+    accepted = load_isin_link_allowlist(allowlist, links)
+    linked = build_security_master(daily, succession_links=accepted)
+    assert linked.get_column("continuation_isin").to_list() == [
+        predecessor,
         predecessor,
     ]
 
-    values = np.asarray([[1.0, np.nan], [2.0, np.nan], [np.nan, 3.0]])
-    inherited = inherit_linked_history(
-        values, dates, (predecessor, successor), links
+
+def test_empty_isin_allowlist_accepts_no_candidate(tmp_path) -> None:
+    path = tmp_path / "isin_links_allowlist.csv"
+    path.write_text(
+        "ticker,predecessor_isin,successor_isin,effective_date,first_known_at,"
+        "shares_received_per_prior_share,cash_entitlement_per_prior_share,"
+        "currency,source,evidence_sha256\n",
+        encoding="utf-8",
     )
-    np.testing.assert_allclose(inherited[:, 1], [1.0, 2.0, 3.0])
-    assert np.isnan(inherited[2, 0])
+    accepted = load_isin_link_allowlist(path, pl.DataFrame())
+    assert accepted.is_empty()
 
 
 def test_ticker_reuse_after_gap_is_not_an_isin_succession() -> None:
@@ -137,3 +162,37 @@ def test_v1_mapping_is_strictly_one_to_one() -> None:
     )
     with pytest.raises(ValueError, match="multiple v1"):
         verify_v1_mapping(duplicate, ("BRTESTACNOR1",))
+
+
+def test_raw_validation_rejects_impossible_rows_and_conflicting_duplicates() -> None:
+    valid = _row(date(2024, 1, 2), "BRTESTACNOR1", "TEST3")
+    invalid = {
+        **_row(date(2024, 1, 3), "BRTESTACNPR0", "TEST4"),
+        "low_brl": 10.6,
+    }
+    result = prepare_cash_equities(
+        pl.DataFrame([valid, invalid]), require_units=True
+    )
+    assert result.accepted.height == 1
+    assert result.rejected[0, "raw_validation_reason"] == "inconsistent_ohlc_bounds"
+    assert result.audit_by_year.filter(pl.col("reason") == "accepted")[
+        0, "row_count"
+    ] == 1
+
+    conflicting = {**valid, "close_brl": 10.25}
+    with pytest.raises(ValueError, match="conflicting COTAHIST"):
+        validate_cotahist_daily(pl.DataFrame([valid, conflicting]))
+
+
+def test_raw_validation_gate_reports_rejection_rate() -> None:
+    rows = [
+        _row(date(2024, 1, 2), "BRTESTACNOR1", "TEST3"),
+        {
+            **_row(date(2024, 1, 3), "BRTESTACNOR1", "TEST3"),
+            "volume_brl": -1.0,
+        },
+    ]
+    with pytest.raises(ValueError, match="invalid-row fraction"):
+        validate_cotahist_daily(
+            pl.DataFrame(rows), maximum_rejection_fraction=0.005
+        )

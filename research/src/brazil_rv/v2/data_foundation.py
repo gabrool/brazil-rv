@@ -16,6 +16,18 @@ VALID_ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 CASH_EQUITY_SPECS = frozenset(
     {"ON", "OR", "PN", "PNA", "PNB", "PNC", "PND", "PNE", "PNF", "UNT"}
 )
+ISIN_LINK_ALLOWLIST_COLUMNS = (
+    "ticker",
+    "predecessor_isin",
+    "successor_isin",
+    "effective_date",
+    "first_known_at",
+    "shares_received_per_prior_share",
+    "cash_entitlement_per_prior_share",
+    "currency",
+    "source",
+    "evidence_sha256",
+)
 
 
 @dataclass(frozen=True)
@@ -55,6 +67,19 @@ class DailyPanel:
             raise ValueError("DailyPanel dates must be strictly increasing")
 
 
+@dataclass(frozen=True)
+class DailyValidationResult:
+    accepted: pl.DataFrame
+    rejected: pl.DataFrame
+    audit_by_year: pl.DataFrame
+    exact_duplicate_rows_collapsed: int
+
+    @property
+    def rejection_fraction(self) -> float:
+        total = self.accepted.height + self.rejected.height
+        return self.rejected.height / total if total else 0.0
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as source:
@@ -79,11 +104,9 @@ def _identity_column(frame: pl.DataFrame) -> str:
     raise ValueError("COTAHIST data has no ISIN identity column")
 
 
-def filter_cash_equities(
+def _select_cash_equities(
     daily: pl.DataFrame, *, v1_isins: Sequence[str] = ()
 ) -> pl.DataFrame:
-    """Apply the v2 cash-equity contract and normalize identity to ``isin``."""
-
     identity = _identity_column(daily)
     spec = "security_spec_base" if "security_spec_base" in daily.columns else "security_spec"
     required = {"trade_date", identity, spec, "market_type"}
@@ -108,9 +131,167 @@ def filter_cash_equities(
     )
     if invalid.height:
         raise ValueError("v2 cash-equity rows contain non-ISIN/fallback identities")
-    if result.select(pl.struct("trade_date", "isin").n_unique()).item() != result.height:
-        raise ValueError("COTAHIST must contain one row per date and ISIN")
     return result.sort("trade_date", "isin")
+
+
+def validate_cotahist_daily(
+    daily: pl.DataFrame,
+    *,
+    require_units: bool = True,
+    maximum_rejection_fraction: float | None = None,
+) -> DailyValidationResult:
+    """Validate economic COTAHIST rows before they enter canonical arrays.
+
+    Exact duplicate source rows collapse to one. Distinct records for the same
+    date/ISIN are conflicting economic observations and stop the build.
+    Invalid observations remain in the returned audit but not the accepted
+    panel; no price or activity value is repaired or invented.
+    """
+
+    identity = _identity_column(daily)
+    required = {
+        "trade_date",
+        identity,
+        "open_brl",
+        "high_brl",
+        "low_brl",
+        "close_brl",
+        "volume_brl",
+        "trades",
+        "quantity",
+    }
+    if require_units:
+        required.update(("currency", "quote_factor"))
+    if not required.issubset(daily.columns):
+        raise ValueError(
+            f"COTAHIST validation columns missing: {sorted(required - set(daily.columns))}"
+        )
+    unique = daily.unique(maintain_order=True)
+    exact_duplicates = daily.height - unique.height
+    conflicts = (
+        unique.group_by("trade_date", identity)
+        .len()
+        .filter(pl.col("len") > 1)
+    )
+    if conflicts.height:
+        examples = (
+            unique.join(conflicts.select("trade_date", identity), on=("trade_date", identity))
+            .sort("trade_date", identity)
+            .head(20)
+            .to_dicts()
+        )
+        raise ValueError(f"conflicting COTAHIST date/ISIN rows: {examples}")
+
+    price_columns = ("open_brl", "high_brl", "low_brl", "close_brl")
+    bad_price = pl.any_horizontal(
+        pl.col(column).is_null()
+        | ~pl.col(column).cast(pl.Float64).is_finite()
+        | (pl.col(column).cast(pl.Float64) <= 0.0)
+        for column in price_columns
+    )
+    bad_bounds = ~(
+        (pl.col("low_brl") <= pl.min_horizontal("open_brl", "close_brl"))
+        & (pl.min_horizontal("open_brl", "close_brl")
+           <= pl.max_horizontal("open_brl", "close_brl"))
+        & (pl.max_horizontal("open_brl", "close_brl") <= pl.col("high_brl"))
+    )
+    bad_activity = pl.any_horizontal(
+        pl.col(column).is_null()
+        | ~pl.col(column).cast(pl.Float64).is_finite()
+        | (pl.col(column).cast(pl.Float64) < 0.0)
+        for column in ("volume_brl", "trades", "quantity")
+    )
+    reason = (
+        pl.when(bad_price)
+        .then(pl.lit("nonfinite_or_nonpositive_ohlc"))
+        .when(bad_bounds)
+        .then(pl.lit("inconsistent_ohlc_bounds"))
+        .when(bad_activity)
+        .then(pl.lit("negative_or_nonfinite_activity"))
+    )
+    if require_units:
+        reason = (
+            reason.when(
+                ~pl.col("currency")
+                .cast(pl.String)
+                .str.strip_chars()
+                .is_in(("R$", "BRL"))
+            )
+            .then(pl.lit("unsupported_currency"))
+            .when(
+                pl.col("quote_factor").is_null()
+                | ~pl.col("quote_factor").cast(pl.Float64).is_finite()
+                | (pl.col("quote_factor").cast(pl.Float64) <= 0.0)
+            )
+            .then(pl.lit("invalid_quote_factor"))
+        )
+    validated = unique.with_columns(
+        reason.otherwise(pl.lit(None, dtype=pl.String)).alias(
+            "raw_validation_reason"
+        )
+    )
+    rejected = validated.filter(pl.col("raw_validation_reason").is_not_null())
+    accepted = validated.filter(pl.col("raw_validation_reason").is_null()).drop(
+        "raw_validation_reason"
+    )
+    status_rows = pl.concat(
+        (
+            accepted.select(
+                pl.col("trade_date"), pl.lit("accepted").alias("reason")
+            ),
+            rejected.select("trade_date", pl.col("raw_validation_reason").alias("reason")),
+        )
+    )
+    audit = (
+        status_rows.with_columns(pl.col("trade_date").dt.year().alias("year"))
+        .group_by("year", "reason")
+        .len()
+        .rename({"len": "row_count"})
+        .sort("year", "reason")
+    )
+    result = DailyValidationResult(
+        accepted=accepted.sort("trade_date", identity),
+        rejected=rejected.sort("trade_date", identity),
+        audit_by_year=audit,
+        exact_duplicate_rows_collapsed=exact_duplicates,
+    )
+    if (
+        maximum_rejection_fraction is not None
+        and result.rejection_fraction > maximum_rejection_fraction
+    ):
+        raise ValueError(
+            "COTAHIST invalid-row fraction exceeds the build gate: "
+            f"{result.rejection_fraction:.6%} > {maximum_rejection_fraction:.6%}; "
+            f"audit={audit.to_dicts()}"
+        )
+    return result
+
+
+def prepare_cash_equities(
+    daily: pl.DataFrame,
+    *,
+    v1_isins: Sequence[str] = (),
+    require_units: bool = True,
+    maximum_rejection_fraction: float | None = None,
+) -> DailyValidationResult:
+    return validate_cotahist_daily(
+        _select_cash_equities(daily, v1_isins=v1_isins),
+        require_units=require_units,
+        maximum_rejection_fraction=maximum_rejection_fraction,
+    )
+
+
+def filter_cash_equities(
+    daily: pl.DataFrame,
+    *,
+    v1_isins: Sequence[str] = (),
+    require_units: bool = False,
+) -> pl.DataFrame:
+    """Return validated cash-equity observations for bounded callers."""
+
+    return prepare_cash_equities(
+        daily, v1_isins=v1_isins, require_units=require_units
+    ).accepted
 
 
 def load_cotahist(paths: Sequence[Path], *, v1_isins: Sequence[str] = ()) -> pl.DataFrame:
@@ -119,13 +300,19 @@ def load_cotahist(paths: Sequence[Path], *, v1_isins: Sequence[str] = ()) -> pl.
     return filter_cash_equities(
         pl.concat((pl.read_parquet(path) for path in paths), how="diagonal_relaxed"),
         v1_isins=v1_isins,
+        require_units=True,
     )
 
 
 def build_security_master(
     daily: pl.DataFrame, *, succession_links: pl.DataFrame | None = None
 ) -> pl.DataFrame:
-    """Create ticker segments and their audited continuation identity."""
+    """Create ticker segments and apply only explicitly accepted conversions.
+
+    Same-ticker adjacency is a reconciliation candidate, not evidence that two
+    ISINs represent the same economic claim.  Callers must pass a verified
+    allowlist result; the safe default is therefore no continuation links.
+    """
 
     identity = _identity_column(daily)
     ticker = "ticker" if "ticker" in daily.columns else "latest_ticker"
@@ -156,11 +343,9 @@ def build_security_master(
                 {"isin": isin, "ticker": current_ticker, "first_date": first, "last_date": last}
             )
     master = pl.DataFrame(rows).sort("isin", "first_date")
-    links = (
-        detect_isin_successions(daily)
-        if succession_links is None
-        else succession_links
-    )
+    links = pl.DataFrame(
+        schema={"predecessor_isin": pl.String, "successor_isin": pl.String}
+    ) if succession_links is None else succession_links
     roots = continuation_identity_axis(
         tuple(master.get_column("isin").unique(maintain_order=True).to_list()),
         links,
@@ -177,7 +362,7 @@ def build_security_master(
 
 
 def detect_isin_successions(daily: pl.DataFrame) -> pl.DataFrame:
-    """Detect exact same-ticker ISIN changes on adjacent COTAHIST sessions.
+    """Propose same-ticker ISIN changes for human/source reconciliation.
 
     A successor must make its first appearance on the session immediately after
     the predecessor's final appearance.  This excludes ticker reuse after a
@@ -271,6 +456,116 @@ def detect_isin_successions(daily: pl.DataFrame) -> pl.DataFrame:
         .replace_strict(roots, default=pl.col("successor_isin"))
         .alias("continuation_isin")
     ).select(*schema)
+
+
+def load_isin_link_allowlist(
+    path: Path, candidates: pl.DataFrame
+) -> pl.DataFrame:
+    """Load source-backed ISIN conversions and bind them to detected candidates.
+
+    The repository allowlist is intentionally empty until contractual terms
+    and their historical availability have been verified.  A populated row is
+    accepted only when it names a detected adjacency and supplies complete,
+    dimensionally meaningful conversion terms and immutable source evidence.
+    """
+
+    if not path.is_file():
+        raise FileNotFoundError(f"ISIN-link allowlist not found: {path}")
+    links = pl.read_csv(
+        path,
+        try_parse_dates=True,
+        schema_overrides={
+            "ticker": pl.String,
+            "predecessor_isin": pl.String,
+            "successor_isin": pl.String,
+            "effective_date": pl.Date,
+            "first_known_at": pl.Datetime(time_zone="UTC"),
+            "shares_received_per_prior_share": pl.Float64,
+            "cash_entitlement_per_prior_share": pl.Float64,
+            "currency": pl.String,
+            "source": pl.String,
+            "evidence_sha256": pl.String,
+        },
+    )
+    missing = set(ISIN_LINK_ALLOWLIST_COLUMNS) - set(links.columns)
+    if missing:
+        raise ValueError(f"ISIN-link allowlist columns missing: {sorted(missing)}")
+    links = links.select(*ISIN_LINK_ALLOWLIST_COLUMNS)
+    if links.is_empty():
+        return links.with_columns(
+            pl.lit(None, dtype=pl.Date).alias("predecessor_last_date"),
+            pl.lit(None, dtype=pl.String).alias("continuation_isin"),
+        ).select(
+            "ticker",
+            "predecessor_isin",
+            "successor_isin",
+            "predecessor_last_date",
+            pl.col("effective_date").alias("successor_first_date"),
+            "continuation_isin",
+            *ISIN_LINK_ALLOWLIST_COLUMNS[4:],
+        )
+    if links.unique(("predecessor_isin", "successor_isin")).height != links.height:
+        raise ValueError("ISIN-link allowlist contains duplicate conversions")
+    invalid = links.filter(
+        ~pl.col("predecessor_isin").str.contains(VALID_ISIN.pattern)
+        | ~pl.col("successor_isin").str.contains(VALID_ISIN.pattern)
+        | pl.col("effective_date").is_null()
+        | pl.col("first_known_at").is_null()
+        | ~pl.col("shares_received_per_prior_share").is_finite()
+        | (pl.col("shares_received_per_prior_share") <= 0.0)
+        | ~pl.col("cash_entitlement_per_prior_share").is_finite()
+        | (pl.col("cash_entitlement_per_prior_share") < 0.0)
+        | ~pl.col("currency").is_in(("BRL", "R$"))
+        | (pl.col("source").str.strip_chars() == "")
+        | ~pl.col("evidence_sha256").str.contains(r"^[0-9a-f]{64}$")
+    )
+    if invalid.height:
+        raise ValueError(f"invalid ISIN-link allowlist rows: {invalid.to_dicts()}")
+    required_candidates = {
+        "ticker",
+        "predecessor_isin",
+        "successor_isin",
+        "predecessor_last_date",
+        "successor_first_date",
+    }
+    if not required_candidates.issubset(candidates.columns):
+        raise ValueError("ISIN-link candidates have the wrong schema")
+    bound = links.join(
+        candidates.select(*required_candidates),
+        on=("ticker", "predecessor_isin", "successor_isin"),
+        how="left",
+        validate="1:1",
+    )
+    unmatched = bound.filter(
+        pl.col("successor_first_date").is_null()
+        | (pl.col("effective_date") != pl.col("successor_first_date"))
+    )
+    if unmatched.height:
+        raise ValueError(
+            "ISIN-link allowlist row is not an exact detected transition: "
+            f"{unmatched.to_dicts()}"
+        )
+    roots: dict[str, str] = {}
+    continuation: list[str] = []
+    for row in bound.sort("successor_first_date").iter_rows(named=True):
+        predecessor = str(row["predecessor_isin"])
+        successor = str(row["successor_isin"])
+        root = roots.get(predecessor, predecessor)
+        if successor == root:
+            raise ValueError("ISIN-link allowlist contains a cycle")
+        roots[successor] = root
+        continuation.append(root)
+    return bound.with_columns(
+        pl.Series("continuation_isin", continuation, dtype=pl.String)
+    ).select(
+        "ticker",
+        "predecessor_isin",
+        "successor_isin",
+        "predecessor_last_date",
+        "successor_first_date",
+        "continuation_isin",
+        *ISIN_LINK_ALLOWLIST_COLUMNS[4:],
+    )
 
 
 def continuation_identity_axis(

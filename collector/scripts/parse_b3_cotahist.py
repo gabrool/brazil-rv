@@ -122,7 +122,16 @@ def parse_quote_line(line: bytes) -> dict[str, object] | None:
     spec = parse_text(line[39:49])
     if not is_equity_candidate(cod_bdi, market_type, spec):
         return None
-    quote_factor = parse_int(line[210:217]) or 1
+    quote_factor = parse_int(line[210:217])
+    if quote_factor <= 0:
+        raise ValueError(
+            f"invalid FATCOT={quote_factor} for {ticker} on {trade_date}"
+        )
+    currency = parse_text(line[52:56])
+    if currency not in {"R$", "BRL"}:
+        raise ValueError(
+            f"unsupported quote currency={currency!r} for {ticker} on {trade_date}"
+        )
     isin = parse_text(line[230:242])
     security_id, fallback = security_id_for(isin, ticker, spec)
     return {
@@ -136,7 +145,7 @@ def parse_quote_line(line: bytes) -> dict[str, object] | None:
         "security_spec_base": spec.split()[0] if spec else "",
         "bdi_code": cod_bdi,
         "market_type": market_type,
-        "currency": parse_text(line[52:56]),
+        "currency": currency,
         "open_brl": price_from_cents(line[56:69]) / quote_factor,
         "high_brl": price_from_cents(line[69:82]) / quote_factor,
         "low_brl": price_from_cents(line[82:95]) / quote_factor,
@@ -188,24 +197,30 @@ def rows_to_frame(rows: list[dict[str, object]]) -> pl.DataFrame:
 def collapse_security_days(frame: pl.DataFrame) -> tuple[pl.DataFrame, int]:
     if frame.is_empty():
         return frame, 0
-    duplicate_count = frame.height - frame.select(pl.struct(["trade_date", "security_id"]).n_unique()).item()
-    if duplicate_count <= 0:
-        return frame.with_columns(pl.lit(1).alias("source_row_count")), 0
-    identity_and_price = [
-        "ticker", "issuer_short_name", "security_spec", "security_spec_base", "bdi_code",
-        "market_type", "currency", "open_brl", "high_brl", "low_brl", "average_brl",
-        "close_brl", "best_bid_brl", "best_ask_brl", "quote_factor",
-        "distribution_number", "isin", "security_id_is_fallback",
-    ]
-    expressions: list[pl.Expr] = [pl.col(column).sort_by("volume_brl").last().alias(column) for column in identity_and_price]
-    expressions.extend([
-        pl.col("trades").sum().alias("trades"),
-        pl.col("quantity").sum().alias("quantity"),
-        pl.col("volume_brl").sum().alias("volume_brl"),
-        pl.len().alias("source_row_count"),
-    ])
-    collapsed = frame.group_by(["trade_date", "security_id"]).agg(expressions)
-    return collapsed.sort(["trade_date", "security_id"]), duplicate_count
+    unique = frame.unique(maintain_order=True)
+    duplicate_count = frame.height - unique.height
+    conflicts = (
+        unique.group_by("trade_date", "security_id")
+        .len()
+        .filter(pl.col("len") > 1)
+    )
+    if conflicts.height:
+        examples = (
+            unique.join(
+                conflicts.select("trade_date", "security_id"),
+                on=("trade_date", "security_id"),
+            )
+            .sort("trade_date", "security_id")
+            .head(20)
+            .to_dicts()
+        )
+        raise ValueError(f"conflicting duplicate COTAHIST rows: {examples}")
+    return (
+        unique.with_columns(pl.lit(1).alias("source_row_count")).sort(
+            "trade_date", "security_id"
+        ),
+        duplicate_count,
+    )
 
 
 def parse_year(source_zip: Path, year: int, out_root: Path) -> ParseAudit:
@@ -275,6 +290,12 @@ def parse_year(source_zip: Path, year: int, out_root: Path) -> ParseAudit:
                 f"{audit.record_count_warning}; {extra}"
                 if audit.record_count_warning
                 else extra
+            )
+
+        if not audit.record_count_valid:
+            raise ValueError(
+                "COTAHIST structural/trailer audit failed: "
+                f"{audit.record_count_warning or 'unknown mismatch'}"
             )
 
         audit.candidate_equity_records = len(rows)
