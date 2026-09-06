@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, time
 from typing import Sequence
@@ -52,6 +53,44 @@ def _minute_of_day(value: time, session: SessionDefinition) -> int:
     return value.hour * 60 + value.minute
 
 
+def _native_session_layout(
+    sessions: Sequence[SessionDefinition],
+    *,
+    date_count: int,
+    minute_count: int,
+    block_minutes: int,
+) -> tuple[
+    NDArray[np.int64],
+    NDArray[np.int64],
+    NDArray[np.int64],
+    NDArray[np.int64],
+]:
+    if block_minutes != 5:
+        raise ValueError("the native fast contract requires five-minute blocks")
+    if date_count <= 0 or len(sessions) != date_count:
+        raise ValueError("one SessionDefinition is required for each date row")
+    prefix_minutes = np.empty(date_count, dtype=np.int64)
+    continuous_minutes = np.empty(date_count, dtype=np.int64)
+    open_minutes = np.empty(date_count, dtype=np.int64)
+    patch_counts = np.empty(date_count, dtype=np.int64)
+    for day, session in enumerate(sessions):
+        open_minutes[day] = _minute_of_day(session.continuous_open, session)
+        prefix_minutes[day] = _clock_minutes(
+            session.continuous_open, session.decision_time, session
+        )
+        continuous_minutes[day] = _clock_minutes(
+            session.continuous_open, session.continuous_close, session
+        )
+        if prefix_minutes[day] >= continuous_minutes[day]:
+            raise ValueError(f"decision must precede the close on {session.trade_date}")
+        patch_counts[day] = prefix_minutes[day] // block_minutes
+    if np.any(patch_counts == 0):
+        raise ValueError("every session prefix must contain a completed block")
+    if np.any(prefix_minutes > minute_count):
+        raise ValueError("M1 inputs do not reach every session decision")
+    return prefix_minutes, continuous_minutes, open_minutes, patch_counts
+
+
 def build_native_fast_features(
     high: NDArray[np.floating],
     low: NDArray[np.floating],
@@ -67,60 +106,18 @@ def build_native_fast_features(
     block_minutes: int = 5,
     minimum_sigma: float = 1e-8,
 ) -> NativeFastResult:
-    """Build the causal native within-day representation.
+    """Allocate and build the causal native within-day representation."""
 
-    M1 inputs are ``[date, name, minute]`` and minute zero is each date's
-    declared continuous open. ``volume_valid`` certifies that a minute's
-    activity value is meaningful, including documented no-trade zeros;
-    ``observed`` means an actual price bar exists. Inputs after the declared
-    decision are never read.
-    """
-
-    price_arrays = tuple(
-        np.asarray(value, dtype=np.float64) for value in (high, low, close, volume)
-    )
-    high_, low_, close_, volume_ = price_arrays
-    seen = np.asarray(observed)
-    activity_seen = np.asarray(volume_valid)
-    supported = np.asarray(session_valid)
-    sigma = np.asarray(sigma_asof, dtype=np.float64)
-    if high_.ndim != 3 or any(value.shape != high_.shape for value in price_arrays):
+    input_shape = np.shape(high)
+    if len(input_shape) != 3:
         raise ValueError("native fast M1 arrays must align [date, name, minute]")
-    if seen.dtype != np.bool_ or activity_seen.dtype != np.bool_:
-        raise TypeError("observed and volume_valid must be boolean arrays")
-    if seen.shape != high_.shape or activity_seen.shape != high_.shape:
-        raise ValueError("native fast M1 masks must align [date, name, minute]")
-    expected_daily_shape = high_.shape[:2]
-    if supported.dtype != np.bool_ or supported.shape != expected_daily_shape:
-        raise ValueError("session_valid must be boolean and align [date, name]")
-    if sigma.shape != expected_daily_shape:
-        raise ValueError("sigma_asof must align [date, name]")
-    if len(sessions) != high_.shape[0]:
-        raise ValueError("one SessionDefinition is required for each date row")
-    if block_minutes != 5:
-        raise ValueError("the native fast contract requires five-minute blocks")
-    if not np.isfinite(minimum_sigma) or minimum_sigma <= 0.0:
-        raise ValueError("minimum_sigma must be positive and finite")
-
-    prefix_minutes = np.empty(len(sessions), dtype=np.int64)
-    continuous_minutes = np.empty(len(sessions), dtype=np.int64)
-    open_minutes = np.empty(len(sessions), dtype=np.int64)
-    patch_counts = np.empty(len(sessions), dtype=np.int64)
-    for day, session in enumerate(sessions):
-        open_minutes[day] = _minute_of_day(session.continuous_open, session)
-        prefix_minutes[day] = _clock_minutes(
-            session.continuous_open, session.decision_time, session
-        )
-        continuous_minutes[day] = _clock_minutes(
-            session.continuous_open, session.continuous_close, session
-        )
-        if prefix_minutes[day] >= continuous_minutes[day]:
-            raise ValueError(f"decision must precede the close on {session.trade_date}")
-        patch_counts[day] = prefix_minutes[day] // block_minutes
-    if np.any(prefix_minutes > high_.shape[2]):
-        raise ValueError("M1 inputs do not reach every session decision")
-
-    required_patches = int(patch_counts.max(initial=0))
+    _, _, _, patch_counts = _native_session_layout(
+        sessions,
+        date_count=input_shape[0],
+        minute_count=input_shape[2],
+        block_minutes=block_minutes,
+    )
+    required_patches = int(patch_counts.max())
     if max_patches is None:
         max_patches = required_patches
     if not isinstance(max_patches, (int, np.integer)) or isinstance(
@@ -128,165 +125,281 @@ def build_native_fast_features(
     ):
         raise TypeError("max_patches must be an integer")
     max_patches = int(max_patches)
-    if max_patches <= 0:
-        raise ValueError("max_patches must be a positive integer")
     if max_patches < required_patches:
         raise ValueError("max_patches cannot truncate a session prefix")
 
-    dates, names = expected_daily_shape
-    shape = (dates, names, max_patches)
-    values = np.zeros((*shape, len(NATIVE_FAST_FEATURES)), dtype=np.float32)
-    valid = np.zeros(values.shape, dtype=np.bool_)
-    patch_mask = np.zeros(shape, dtype=np.bool_)
-    age_minutes = np.zeros(shape, dtype=np.float32)
-    age_valid = np.zeros(shape, dtype=np.bool_)
-
-    endpoint_close = np.zeros(shape, dtype=np.float64)
-    endpoint_valid = np.zeros(shape, dtype=np.bool_)
-    block_high = np.zeros(shape, dtype=np.float64)
-    block_low = np.zeros(shape, dtype=np.float64)
-    block_close = np.zeros(shape, dtype=np.float64)
-    complete_price = np.zeros(shape, dtype=np.bool_)
-    block_volume = np.zeros(shape, dtype=np.float64)
-    block_volume_valid = np.zeros(shape, dtype=np.bool_)
-
-    finite_positive_close = seen & np.isfinite(close_) & (close_ > 0.0)
-    price_bar_valid = (
-        seen
-        & np.isfinite(high_)
-        & np.isfinite(low_)
-        & np.isfinite(close_)
-        & (low_ > 0.0)
-        & (high_ >= low_)
-        & (close_ >= low_)
-        & (close_ <= high_)
-    )
-    activity_minute_valid = (
-        activity_seen & np.isfinite(volume_) & (volume_ >= 0.0)
+    dates, names, _ = input_shape
+    patch_shape = (dates, names, max_patches)
+    return build_native_fast_features_into(
+        high,
+        low,
+        close,
+        volume,
+        observed,
+        volume_valid=volume_valid,
+        session_valid=session_valid,
+        sigma_asof=sigma_asof,
+        sessions=sessions,
+        values_out=np.zeros(
+            (*patch_shape, len(NATIVE_FAST_FEATURES)), dtype=np.float32
+        ),
+        valid_out=np.zeros(
+            (*patch_shape, len(NATIVE_FAST_FEATURES)), dtype=np.bool_
+        ),
+        patch_mask_out=np.zeros(patch_shape, dtype=np.bool_),
+        last_price_age_minutes_out=np.zeros(patch_shape, dtype=np.float32),
+        last_price_age_valid_out=np.zeros(patch_shape, dtype=np.bool_),
+        block_minutes=block_minutes,
+        minimum_sigma=minimum_sigma,
     )
 
+
+def build_native_fast_features_into(
+    high: NDArray[np.floating],
+    low: NDArray[np.floating],
+    close: NDArray[np.floating],
+    volume: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    *,
+    volume_valid: NDArray[np.bool_],
+    session_valid: NDArray[np.bool_],
+    sigma_asof: NDArray[np.floating],
+    sessions: Sequence[SessionDefinition],
+    values_out: NDArray[np.float32],
+    valid_out: NDArray[np.bool_],
+    patch_mask_out: NDArray[np.bool_],
+    last_price_age_minutes_out: NDArray[np.float32],
+    last_price_age_valid_out: NDArray[np.bool_],
+    block_minutes: int = 5,
+    minimum_sigma: float = 1e-8,
+) -> NativeFastResult:
+    """Stream native features into caller-owned arrays, including memmaps.
+
+    M1 inputs are ``[date, name, minute]`` and minute zero is each date's
+    declared continuous open. ``volume_valid`` certifies meaningful activity,
+    including documented no-trade zeros; ``observed`` means an actual price
+    bar exists. Only slices before the declared decision are accessed.
+    """
+
+    high_, low_, close_, volume_ = (
+        np.asarray(value) for value in (high, low, close, volume)
+    )
+    seen = np.asarray(observed)
+    activity_seen = np.asarray(volume_valid)
+    supported = np.asarray(session_valid)
+    sigma = np.asarray(sigma_asof)
+    numeric_inputs = (high_, low_, close_, volume_)
+    if high_.ndim != 3 or any(value.shape != high_.shape for value in numeric_inputs):
+        raise ValueError("native fast M1 arrays must align [date, name, minute]")
+    if any(not np.issubdtype(value.dtype, np.number) for value in numeric_inputs):
+        raise TypeError("native fast market inputs must be numeric")
+    if seen.dtype != np.bool_ or activity_seen.dtype != np.bool_:
+        raise TypeError("observed and volume_valid must be boolean arrays")
+    if seen.shape != high_.shape or activity_seen.shape != high_.shape:
+        raise ValueError("native fast M1 masks must align [date, name, minute]")
+    daily_shape = high_.shape[:2]
+    if supported.dtype != np.bool_ or supported.shape != daily_shape:
+        raise ValueError("session_valid must be boolean and align [date, name]")
+    if sigma.shape != daily_shape or not np.issubdtype(sigma.dtype, np.number):
+        raise ValueError("sigma_asof must be numeric and align [date, name]")
+    if not np.isfinite(minimum_sigma) or minimum_sigma <= 0.0:
+        raise ValueError("minimum_sigma must be positive and finite")
+
+    prefix_minutes, continuous_minutes, open_minutes, patch_counts = (
+        _native_session_layout(
+            sessions,
+            date_count=high_.shape[0],
+            minute_count=high_.shape[2],
+            block_minutes=block_minutes,
+        )
+    )
+    values = np.asarray(values_out)
+    valid = np.asarray(valid_out)
+    patch_mask = np.asarray(patch_mask_out)
+    age_minutes = np.asarray(last_price_age_minutes_out)
+    age_valid = np.asarray(last_price_age_valid_out)
+    if values.ndim != 4 or values.shape[:2] != daily_shape:
+        raise ValueError("values_out must align [date, name, patch, channel]")
+    if values.shape[3] != len(NATIVE_FAST_FEATURES):
+        raise ValueError("values_out has the wrong native channel count")
+    patch_shape = values.shape[:3]
+    if patch_shape[2] < int(patch_counts.max()):
+        raise ValueError("output patch axis cannot truncate a session prefix")
+    outputs = (
+        (values, values.shape, np.dtype(np.float32), "values_out"),
+        (valid, values.shape, np.dtype(np.bool_), "valid_out"),
+        (patch_mask, patch_shape, np.dtype(np.bool_), "patch_mask_out"),
+        (
+            age_minutes,
+            patch_shape,
+            np.dtype(np.float32),
+            "last_price_age_minutes_out",
+        ),
+        (
+            age_valid,
+            patch_shape,
+            np.dtype(np.bool_),
+            "last_price_age_valid_out",
+        ),
+    )
+    for output, expected_shape, expected_dtype, name in outputs:
+        if output.shape != expected_shape or output.dtype != expected_dtype:
+            raise ValueError(
+                f"{name} must have shape {expected_shape} and dtype {expected_dtype}"
+            )
+        if not output.flags.writeable:
+            raise ValueError(f"{name} must be writable")
+        output.fill(0)
+
+    dates, names = daily_shape
+    activity_history: deque[
+        dict[int, tuple[NDArray[np.float64], NDArray[np.bool_]]]
+    ] = deque(maxlen=20)
+    log_two = np.log(2.0)
     for day in range(dates):
+        session_supported = supported[day]
+        sigma_day = np.asarray(sigma[day], dtype=np.float64)
+        risk_valid = np.isfinite(sigma_day) & (sigma_day > minimum_sigma)
+        s5 = sigma_day * np.sqrt(block_minutes / continuous_minutes[day])
         last_price_minute = np.full(names, -1, dtype=np.int64)
+        previous_endpoint = np.zeros(names, dtype=np.float64)
+        previous_endpoint_valid = np.zeros(names, dtype=np.bool_)
+        current_activity: dict[
+            int, tuple[NDArray[np.float64], NDArray[np.bool_]]
+        ] = {}
         for patch in range(int(patch_counts[day])):
             start = patch * block_minutes
             stop = start + block_minutes
-            session_patch = supported[day]
-            patch_mask[day, :, patch] = session_patch
+            clock_minute = int(open_minutes[day] + start)
+            patch_mask[day, :, patch] = session_supported
 
-            price_slice = price_bar_valid[day, :, start:stop]
-            complete = session_patch & price_slice.all(axis=1)
-            complete_price[day, :, patch] = complete
-            block_high[day, :, patch] = high_[day, :, start:stop].max(axis=1)
-            block_low[day, :, patch] = low_[day, :, start:stop].min(axis=1)
-            block_close[day, :, patch] = close_[day, :, stop - 1]
+            high_slice = np.asarray(high_[day, :, start:stop], dtype=np.float64)
+            low_slice = np.asarray(low_[day, :, start:stop], dtype=np.float64)
+            close_slice = np.asarray(close_[day, :, start:stop], dtype=np.float64)
+            seen_slice = seen[day, :, start:stop]
+            price_bar_valid = (
+                seen_slice
+                & np.isfinite(high_slice)
+                & np.isfinite(low_slice)
+                & np.isfinite(close_slice)
+                & (low_slice > 0.0)
+                & (high_slice >= low_slice)
+                & (close_slice >= low_slice)
+                & (close_slice <= high_slice)
+            )
+            complete_price = session_supported & price_bar_valid.all(axis=1)
+            block_high = high_slice.max(axis=1)
+            block_low = low_slice.min(axis=1)
+            block_close = close_slice[:, -1]
 
-            endpoint = session_patch & finite_positive_close[day, :, stop - 1]
-            endpoint_valid[day, :, patch] = endpoint
-            endpoint_close[day, :, patch] = close_[day, :, stop - 1]
-
-            activity_slice = activity_minute_valid[day, :, start:stop]
-            activity_complete = session_patch & activity_slice.all(axis=1)
-            block_volume_valid[day, :, patch] = activity_complete
-            block_volume[day, :, patch] = np.where(
-                activity_slice, volume_[day, :, start:stop], 0.0
-            ).sum(axis=1)
-
-            valid[day, :, patch, 4] = session_patch
-            values[day, :, patch, 4] = (
-                seen[day, :, start:stop].sum(axis=1) / block_minutes
+            range_valid = complete_price & risk_valid
+            valid[day, range_valid, patch, 1] = True
+            values[day, range_valid, patch, 1] = (
+                np.log(block_high[range_valid] / block_low[range_valid])
+                / s5[range_valid]
             ).astype(np.float32)
-            valid[day, :, patch, 5] = session_patch
-            values[day, :, patch, 5] = np.float32(
+
+            valid[day, complete_price, patch, 2] = True
+            positive_range = complete_price & (block_high > block_low)
+            values[day, positive_range, patch, 2] = (
+                2.0
+                * (block_close[positive_range] - block_low[positive_range])
+                / (block_high[positive_range] - block_low[positive_range])
+                - 1.0
+            ).astype(np.float32)
+
+            endpoint_valid = (
+                session_supported
+                & seen_slice[:, -1]
+                & np.isfinite(block_close)
+                & (block_close > 0.0)
+            )
+            if patch:
+                return_valid = (
+                    endpoint_valid & previous_endpoint_valid & risk_valid
+                )
+                valid[day, return_valid, patch, 0] = True
+                values[day, return_valid, patch, 0] = (
+                    np.log(
+                        block_close[return_valid]
+                        / previous_endpoint[return_valid]
+                    )
+                    / s5[return_valid]
+                ).astype(np.float32)
+            previous_endpoint = block_close.copy()
+            previous_endpoint_valid = endpoint_valid
+
+            valid[day, session_supported, patch, 4] = True
+            values[day, session_supported, patch, 4] = (
+                seen_slice[session_supported].sum(axis=1) / block_minutes
+            ).astype(np.float32)
+            valid[day, session_supported, patch, 5] = True
+            values[day, session_supported, patch, 5] = np.float32(
                 stop / prefix_minutes[day]
             )
 
-            for minute in range(start, stop):
-                current = session_patch & finite_positive_close[day, :, minute]
-                last_price_minute[current] = minute
-            current_age_valid = session_patch & (last_price_minute >= 0)
+            close_observed = (
+                seen_slice & np.isfinite(close_slice) & (close_slice > 0.0)
+            )
+            for minute in range(block_minutes):
+                current = session_supported & close_observed[:, minute]
+                last_price_minute[current] = start + minute
+            current_age_valid = session_supported & (last_price_minute >= 0)
             raw_age = stop - 1 - last_price_minute
-            age_valid[day, :, patch] = current_age_valid
+            age_valid[day, current_age_valid, patch] = True
             age_minutes[day, current_age_valid, patch] = raw_age[
                 current_age_valid
             ].astype(np.float32)
-            valid[day, :, patch, 6] = current_age_valid
+            valid[day, current_age_valid, patch, 6] = True
             values[day, current_age_valid, patch, 6] = np.clip(
                 raw_age[current_age_valid] / continuous_minutes[day], 0.0, 1.0
             ).astype(np.float32)
 
-    risk_valid = np.isfinite(sigma) & (sigma > minimum_sigma)
-    s5 = sigma * np.sqrt(block_minutes / continuous_minutes[:, None])
-    s5[~risk_valid] = 0.0
-
-    return_valid = np.zeros(shape, dtype=np.bool_)
-    return_valid[..., 1:] = (
-        endpoint_valid[..., 1:]
-        & endpoint_valid[..., :-1]
-        & risk_valid[..., None]
-    )
-    return_values = np.zeros(shape, dtype=np.float64)
-    return_values[return_valid] = (
-        np.log(
-            endpoint_close[..., 1:][return_valid[..., 1:]]
-            / endpoint_close[..., :-1][return_valid[..., 1:]]
-        )
-        / np.broadcast_to(s5[..., None], shape)[return_valid]
-    )
-    values[..., 0][return_valid] = return_values[return_valid].astype(np.float32)
-    valid[..., 0] = return_valid
-
-    range_valid = complete_price & risk_valid[..., None]
-    range_values = np.zeros(shape, dtype=np.float64)
-    range_values[range_valid] = (
-        np.log(block_high[range_valid] / block_low[range_valid])
-        / np.broadcast_to(s5[..., None], shape)[range_valid]
-    )
-    values[..., 1][range_valid] = range_values[range_valid].astype(np.float32)
-    valid[..., 1] = range_valid
-
-    location_valid = complete_price
-    positive_range = location_valid & (block_high > block_low)
-    location = np.zeros(shape, dtype=np.float64)
-    location[positive_range] = (
-        2.0
-        * (block_close[positive_range] - block_low[positive_range])
-        / (block_high[positive_range] - block_low[positive_range])
-        - 1.0
-    )
-    values[..., 2][location_valid] = location[location_valid].astype(np.float32)
-    valid[..., 2] = location_valid
-
-    for day in range(20, dates):
-        for patch in range(int(patch_counts[day])):
-            clock_minute = open_minutes[day] + patch * block_minutes
-            history_values = np.zeros((20, names), dtype=np.float64)
-            history_valid = np.zeros((20, names), dtype=np.bool_)
-            for history_offset, history_day in enumerate(range(day - 20, day)):
-                minute_offset = clock_minute - open_minutes[history_day]
-                if minute_offset < 0 or minute_offset % block_minutes:
-                    continue
-                history_patch = minute_offset // block_minutes
-                if history_patch >= patch_counts[history_day]:
-                    continue
-                history_values[history_offset] = block_volume[
-                    history_day, :, history_patch
-                ]
-                history_valid[history_offset] = block_volume_valid[
-                    history_day, :, history_patch
-                ]
-            counts = history_valid.sum(axis=0)
-            for name in np.flatnonzero(
-                block_volume_valid[day, :, patch] & (counts >= 16)
-            ):
-                history = history_values[history_valid[:, name], name]
-                baseline = np.median(history)
-                if not np.isfinite(baseline) or baseline <= 0.0:
-                    continue
-                relative = np.log1p(block_volume[day, name, patch] / baseline)
-                values[day, name, patch, 3] = np.float32(
-                    np.clip(relative - np.log(2.0), -5.0, 5.0)
-                )
-                valid[day, name, patch, 3] = True
+            volume_slice = np.asarray(
+                volume_[day, :, start:stop], dtype=np.float64
+            )
+            activity_slice_valid = (
+                activity_seen[day, :, start:stop]
+                & np.isfinite(volume_slice)
+                & (volume_slice >= 0.0)
+            )
+            block_volume_valid = (
+                session_supported & activity_slice_valid.all(axis=1)
+            )
+            block_volume = np.where(
+                activity_slice_valid, volume_slice, 0.0
+            ).sum(axis=1)
+            if len(activity_history) == 20 and block_volume_valid.any():
+                history_values = np.zeros((20, names), dtype=np.float64)
+                history_valid = np.zeros((20, names), dtype=np.bool_)
+                for history_index, history_day in enumerate(activity_history):
+                    prior = history_day.get(clock_minute)
+                    if prior is not None:
+                        history_values[history_index] = prior[0]
+                        history_valid[history_index] = prior[1]
+                candidates = block_volume_valid & (history_valid.sum(axis=0) >= 16)
+                candidate_names = np.flatnonzero(candidates)
+                if candidate_names.size:
+                    candidate_history = np.where(
+                        history_valid[:, candidate_names],
+                        history_values[:, candidate_names],
+                        np.nan,
+                    )
+                    baseline = np.nanmedian(candidate_history, axis=0)
+                    usable = np.isfinite(baseline) & (baseline > 0.0)
+                    usable_names = candidate_names[usable]
+                    relative = np.log1p(
+                        block_volume[usable_names] / baseline[usable]
+                    )
+                    valid[day, usable_names, patch, 3] = True
+                    values[day, usable_names, patch, 3] = np.clip(
+                        relative - log_two, -5.0, 5.0
+                    ).astype(np.float32)
+            current_activity[clock_minute] = (
+                block_volume.copy(),
+                block_volume_valid.copy(),
+            )
+        activity_history.append(current_activity)
 
     return NativeFastResult(
         values=values,

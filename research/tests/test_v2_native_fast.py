@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import gc
+import tracemalloc
 from datetime import date, time, timedelta
+from pathlib import Path
 
 import numpy as np
 
@@ -8,6 +11,7 @@ from brazil_rv.v2.decision_clock import SessionDefinition
 from brazil_rv.v2.intraday_features import (
     NATIVE_FAST_FEATURES,
     build_native_fast_features,
+    build_native_fast_features_into,
 )
 
 
@@ -29,6 +33,42 @@ def _sessions(
         )
         for day in range(count)
     )
+
+
+def _memmap_outputs(
+    directory: Path, patch_shape: tuple[int, int, int]
+) -> tuple[np.memmap, np.memmap, np.memmap, np.memmap, np.memmap]:
+    values = np.lib.format.open_memmap(
+        directory / "values.npy",
+        mode="w+",
+        dtype=np.float32,
+        shape=(*patch_shape, len(NATIVE_FAST_FEATURES)),
+    )
+    valid = np.lib.format.open_memmap(
+        directory / "valid.npy",
+        mode="w+",
+        dtype=np.bool_,
+        shape=values.shape,
+    )
+    patch_mask = np.lib.format.open_memmap(
+        directory / "patch_mask.npy",
+        mode="w+",
+        dtype=np.bool_,
+        shape=patch_shape,
+    )
+    age = np.lib.format.open_memmap(
+        directory / "age.npy",
+        mode="w+",
+        dtype=np.float32,
+        shape=patch_shape,
+    )
+    age_valid = np.lib.format.open_memmap(
+        directory / "age_valid.npy",
+        mode="w+",
+        dtype=np.bool_,
+        shape=patch_shape,
+    )
+    return values, valid, patch_mask, age, age_valid
 
 
 def test_native_fast_exact_channels_and_padding() -> None:
@@ -312,3 +352,141 @@ def test_native_fast_uses_each_session_prefix_and_ignores_later_minutes() -> Non
     np.testing.assert_array_equal(
         changed.last_price_age_minutes, baseline.last_price_age_minutes
     )
+
+
+def test_native_fast_into_memmaps_matches_allocating_wrapper(tmp_path: Path) -> None:
+    days, names, minutes = 21, 2, 20
+    close = np.full((days, names, minutes), 100.0, dtype=np.float32)
+    close[..., 5:10] = 101.0
+    high = close + np.float32(1.0)
+    low = close - np.float32(1.0)
+    volume = np.full(close.shape, 2.0, dtype=np.float32)
+    volume[-1, ..., :10] = 5.0
+    observed = np.ones(close.shape, dtype=np.bool_)
+    observed[5, 0, 9] = False
+    volume_valid = np.ones(close.shape, dtype=np.bool_)
+    volume_valid[8:12, 1, :5] = False
+    session_valid = np.ones((days, names), dtype=np.bool_)
+    sigma = np.full((days, names), 0.02, dtype=np.float32)
+    sessions = _sessions(days)
+    expected = build_native_fast_features(
+        high,
+        low,
+        close,
+        volume,
+        observed,
+        volume_valid=volume_valid,
+        session_valid=session_valid,
+        sigma_asof=sigma,
+        sessions=sessions,
+        max_patches=3,
+    )
+    outputs = _memmap_outputs(tmp_path, (days, names, 3))
+    outputs[0].fill(np.nan)
+    outputs[1].fill(True)
+    outputs[2].fill(True)
+    outputs[3].fill(np.nan)
+    outputs[4].fill(True)
+
+    actual = build_native_fast_features_into(
+        high,
+        low,
+        close,
+        volume,
+        observed,
+        volume_valid=volume_valid,
+        session_valid=session_valid,
+        sigma_asof=sigma,
+        sessions=sessions,
+        values_out=outputs[0],
+        valid_out=outputs[1],
+        patch_mask_out=outputs[2],
+        last_price_age_minutes_out=outputs[3],
+        last_price_age_valid_out=outputs[4],
+    )
+
+    assert all(
+        np.shares_memory(value, output)
+        for value, output in zip(
+            (
+                actual.values,
+                actual.valid,
+                actual.patch_mask,
+                actual.last_price_age_minutes,
+                actual.last_price_age_valid,
+            ),
+            outputs,
+            strict=True,
+        )
+    )
+    for actual_value, expected_value in zip(
+        (
+            actual.values,
+            actual.valid,
+            actual.patch_mask,
+            actual.last_price_age_minutes,
+            actual.last_price_age_valid,
+        ),
+        (
+            expected.values,
+            expected.valid,
+            expected.patch_mask,
+            expected.last_price_age_minutes,
+            expected.last_price_age_valid,
+        ),
+        strict=True,
+    ):
+        np.testing.assert_array_equal(actual_value, expected_value)
+    for output in outputs:
+        output.flush()
+    del actual, outputs
+    gc.collect()
+
+
+def test_native_fast_into_peak_heap_stays_below_one_full_float64_panel(
+    tmp_path: Path,
+) -> None:
+    days, names, minutes, patches = 64, 128, 10, 69
+    price_row = np.full((1, 1, minutes), 100.0, dtype=np.float32)
+    close = np.broadcast_to(price_row, (days, names, minutes))
+    high = np.broadcast_to(price_row + 1.0, close.shape)
+    low = np.broadcast_to(price_row - 1.0, close.shape)
+    volume = np.broadcast_to(
+        np.ones((1, 1, minutes), dtype=np.float32), close.shape
+    )
+    observed = np.broadcast_to(
+        np.ones((1, 1, minutes), dtype=np.bool_), close.shape
+    )
+    volume_valid = observed
+    session_valid = np.ones((days, names), dtype=np.bool_)
+    sigma = np.full((days, names), 0.02, dtype=np.float32)
+    outputs = _memmap_outputs(tmp_path, (days, names, patches))
+
+    tracemalloc.start()
+    result = build_native_fast_features_into(
+        high,
+        low,
+        close,
+        volume,
+        observed,
+        volume_valid=volume_valid,
+        session_valid=session_valid,
+        sigma_asof=sigma,
+        sessions=_sessions(days),
+        values_out=outputs[0],
+        valid_out=outputs[1],
+        patch_mask_out=outputs[2],
+        last_price_age_minutes_out=outputs[3],
+        last_price_age_valid_out=outputs[4],
+    )
+    _, peak_bytes = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    one_full_float64_panel = days * names * patches * np.dtype(np.float64).itemsize
+    assert peak_bytes < one_full_float64_panel
+    assert result.patch_mask[..., :2].all()
+    assert not result.patch_mask[..., 2:].any()
+    for output in outputs:
+        output.flush()
+    del result, outputs
+    gc.collect()
