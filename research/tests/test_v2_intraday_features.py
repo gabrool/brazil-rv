@@ -1,4 +1,4 @@
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 
 import numpy as np
 import polars as pl
@@ -70,6 +70,68 @@ def _scheduled_minutes() -> tuple[
         volume,
         observed,
     ), tuple(sessions)
+
+
+def _source_bars(
+    sessions: tuple[SessionDefinition, ...],
+    included_dates: frozenset[date],
+    *,
+    marked_date: date | None = None,
+) -> pl.DataFrame:
+    rows: list[dict[str, object]] = []
+    for day, session in enumerate(sessions):
+        if session.trade_date not in included_dates:
+            continue
+        continuous_minutes = (
+            session.continuous_close.hour * 60
+            + session.continuous_close.minute
+            - session.continuous_open.hour * 60
+            - session.continuous_open.minute
+        )
+        decision_index = (
+            session.decision_time.hour * 60
+            + session.decision_time.minute
+            - session.continuous_open.hour * 60
+            - session.continuous_open.minute
+        )
+        start = datetime.combine(session.trade_date, session.continuous_open)
+        for minute in range(continuous_minutes):
+            price = 100.0 + day * 0.1 + minute * 0.001
+            bar_open = price
+            bar_close = price + 0.0005
+            if session.trade_date == marked_date and minute == decision_index:
+                bar_open = 777.0
+                bar_close = 777.0
+            if session.trade_date == marked_date and minute == continuous_minutes - 1:
+                bar_open = 123.45
+                bar_close = 123.45
+            rows.append(
+                {
+                    "symbol": "TEST3",
+                    "ts_exchange": start + timedelta(minutes=minute),
+                    "open": bar_open,
+                    "high": max(bar_open, bar_close) + 0.01,
+                    "low": min(bar_open, bar_close) - 0.01,
+                    "close": bar_close,
+                    "real_volume": 1.0,
+                }
+            )
+        for timestamp in (
+            start - timedelta(minutes=1),
+            datetime.combine(session.trade_date, session.continuous_close),
+        ):
+            rows.append(
+                {
+                    "symbol": "TEST3",
+                    "ts_exchange": timestamp,
+                    "open": 999.0,
+                    "high": 1_000.0,
+                    "low": 998.0,
+                    "close": 999.0,
+                    "real_volume": 1.0,
+                }
+            )
+    return pl.DataFrame(rows)
 
 
 def test_intraday_features_use_completed_bars_before_cutoff_only() -> None:
@@ -305,37 +367,96 @@ def test_streamed_intraday_carries_exact_observed_final_m1_close(
 ) -> None:
     dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(25)]
     isin = "BRTESTACNOR1"
+    isins = ["BRNOM1ACNOR0", isin]
+    sessions = list(
+        SessionDefinition(
+            trade_date=value,
+            continuous_open=time(10, 0),
+            decision_time=time(15, 45),
+            continuous_close=time(17, 0),
+            auction_close=time(17, 15),
+            source="test",
+        )
+        for value in dates
+    )
+    sessions[-1] = SessionDefinition(
+        trade_date=dates[-1],
+        continuous_open=time(10, 30),
+        decision_time=time(15, 45),
+        continuous_close=time(16, 30),
+        auction_close=time(17, 0),
+        source="test-shifted",
+    )
+    schedule = tuple(sessions)
     source_path = tmp_path / "source.parquet"
     source_path.write_bytes(b"immutable-source")
     assignments = pl.DataFrame(
-        {"isin": [isin], "source_file": [str(source_path)]}
+        {
+            "security_id": ["SEC_TEST"],
+            "isin": [isin],
+            "source_file": [str(source_path)],
+        }
     )
-    daily = pl.DataFrame(
-        {"isin": [isin] * len(dates), "trade_date": dates}
+    daily = pl.DataFrame({"isin": [isin] * len(dates), "trade_date": dates})
+    source = _source_bars(
+        schedule, frozenset(dates), marked_date=dates[-1]
     )
-    grid = np.zeros((len(dates), 405, 5), dtype=np.float64)
-    base = 100.0 + np.arange(405) * 0.01
-    grid[..., 0] = base
-    grid[..., 1] = base * 1.001
-    grid[..., 2] = base * 0.999
-    grid[..., 3] = base * 1.0001
-    grid[..., 4] = 1.0
-    grid[24, -1, 3] = 123.45
-    observed = np.ones((len(dates), 405), dtype=bool)
-    observed[23, -1] = False
 
     import brazil_rv.preprocessing.io as io
 
-    monkeypatch.setattr(io, "load_source_file", lambda path: object())
-    monkeypatch.setattr(io, "prepare_session_bars", lambda *args: object())
-    monkeypatch.setattr(io, "dense_grid", lambda *args: (grid, observed))
+    dense_grid = io.dense_grid
+    grid_calls: list[tuple[pl.DataFrame, int, int]] = []
+
+    def capture_grid(bars, date_count, minute_count):
+        grid_calls.append((bars.clone(), date_count, minute_count))
+        return dense_grid(bars, date_count, minute_count)
+
+    monkeypatch.setattr(io, "load_source_file", lambda path: source)
+    monkeypatch.setattr(io, "dense_grid", capture_grid)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    kept_rows = np.asarray([23, 24], dtype=np.int64)
     result = stream_intraday_from_assignments(
-        assignments, daily, dates, [isin]
+        assignments,
+        daily,
+        schedule,
+        isins,
+        sigma_asof=np.full((len(dates), len(isins)), 0.02),
+        kept_rows=kept_rows,
+        workspace=workspace,
     )
-    assert result.result.session_close[24, 0] == 123.45
-    assert result.result.session_close_valid[24, 0]
-    assert np.isnan(result.result.session_close[23, 0])
-    assert not result.result.session_close_valid[23, 0]
+
+    assert len(grid_calls) == 1
+    gridded_bars, date_count, minute_count = grid_calls[0]
+    assert (date_count, minute_count) == (25, 420)
+    shifted = gridded_bars.filter(pl.col("trade_date") == dates[-1])
+    assert shifted.height == 360
+    assert shifted.get_column("minute_idx").min() == 0
+    assert shifted.get_column("minute_idx").max() == 359
+    expected_mark = 100.0 + 24 * 0.1 + 314 * 0.001 + 0.0005
+    np.testing.assert_allclose(result.result.entry_open[24, 1], expected_mark)
+    np.testing.assert_allclose(result.to_close_entry[24, 1], 777.0)
+    assert result.result.entry_open[24, 1] != result.to_close_entry[24, 1]
+    assert result.result.session_close[24, 1] == np.float32(123.45)
+    assert result.result.session_close_valid[24, 1]
+    assert not result.to_close_entry_valid[:, 0].any()
+
+    assert result.native_mapping.to_dicts() == [
+        {
+            "fast_index": 0,
+            "store_name_index": 1,
+            "isin": isin,
+            "security_id": "SEC_TEST",
+        }
+    ]
+    native = result.native_arrays
+    assert native["fast_patch_values"].shape == (2, 1, 69, 7)
+    np.testing.assert_array_equal(
+        native["fast_patch_mask"][:, 0].sum(axis=1), [69, 63]
+    )
+    assert native["fast_patch_valid"][1, 0, :63].any()
+    assert native["fast_last_price_age_valid"][1, 0, :63].all()
+    assert not native["fast_patch_mask"][1, 0, 63:].any()
 
 
 def test_streamed_intraday_grids_only_the_assignment_date_span(
@@ -344,74 +465,87 @@ def test_streamed_intraday_grids_only_the_assignment_date_span(
     dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(80)]
     allowed_dates = dates[27:52]
     isin = "BRTESTACNOR1"
+    sessions = [
+        SessionDefinition(
+            trade_date=value,
+            continuous_open=time(10, 0),
+            decision_time=time(15, 45),
+            continuous_close=time(17, 0),
+            auction_close=time(17, 15),
+            source="test",
+        )
+        for value in dates
+    ]
+    sessions[30] = SessionDefinition(
+        trade_date=dates[30],
+        continuous_open=time(10, 30),
+        decision_time=time(15, 45),
+        continuous_close=time(16, 30),
+        auction_close=time(17, 0),
+        source="test-shifted",
+    )
+    schedule = tuple(sessions)
     source_path = tmp_path / "source.parquet"
     source_path.write_bytes(b"immutable-source")
-    assignments = pl.DataFrame({"isin": [isin], "source_file": [str(source_path)]})
+    assignments = pl.DataFrame(
+        {
+            "security_id": ["SEC_TEST"],
+            "isin": [isin],
+            "source_file": [str(source_path)],
+        }
+    )
     daily = pl.DataFrame(
         {"isin": [isin] * len(allowed_dates), "trade_date": allowed_dates}
     )
-    seen_calendars: list[tuple[date, ...]] = []
-    local_grids: list[tuple[np.ndarray, np.ndarray]] = []
+    source = _source_bars(schedule, frozenset(allowed_dates))
+    grid_calls: list[tuple[pl.DataFrame, int, int]] = []
 
     import brazil_rv.preprocessing.io as io
 
-    monkeypatch.setattr(io, "load_source_file", lambda path: object())
+    dense_grid = io.dense_grid
 
-    def prepare(*args):
-        seen_calendars.append(args[3])
-        return object()
+    def capture_grid(bars, date_count, minute_count):
+        grid_calls.append((bars.clone(), date_count, minute_count))
+        return dense_grid(bars, date_count, minute_count)
 
-    def grid(_bars, date_count, minute_count):
-        values = np.zeros((date_count, minute_count, 5), dtype=np.float64)
-        base = 100.0 + np.arange(minute_count) * 0.01
-        values[..., 0] = base
-        values[..., 1] = base * 1.001
-        values[..., 2] = base * 0.999
-        values[..., 3] = base * 1.0001
-        values[..., 4] = 1.0
-        session_observed = np.asarray(
-            [value in frozenset(allowed_dates) for value in seen_calendars[-1]]
-        )
-        values[~session_observed] = 0.0
-        observed = np.broadcast_to(
-            session_observed[:, None], (date_count, minute_count)
-        ).copy()
-        local_grids.append((values, observed))
-        return values, observed
+    monkeypatch.setattr(io, "load_source_file", lambda path: source)
+    monkeypatch.setattr(io, "dense_grid", capture_grid)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    kept_rows = np.asarray([27, 30, 51], dtype=np.int64)
+    result = stream_intraday_from_assignments(
+        assignments,
+        daily,
+        schedule,
+        [isin],
+        sigma_asof=np.full((len(dates), 1), 0.02),
+        kept_rows=kept_rows,
+        workspace=workspace,
+    )
 
-    monkeypatch.setattr(io, "prepare_session_bars", prepare)
-    monkeypatch.setattr(io, "dense_grid", grid)
-    result = stream_intraday_from_assignments(assignments, daily, dates, [isin])
-    local_grid, local_observed = local_grids[0]
-    full_grid = np.zeros((len(dates), 405, 5), dtype=np.float64)
-    full_observed = np.zeros((len(dates), 405), dtype=bool)
-    full_grid[7:72] = local_grid
-    full_observed[7:72] = local_observed
-    expected = build_intraday_daily_features(
-        full_grid[:, None, :, 0],
-        full_grid[:, None, :, 1],
-        full_grid[:, None, :, 2],
-        full_grid[:, None, :, 3],
-        full_grid[:, None, :, 4],
-        full_observed[:, None, :],
-    )
-    assert seen_calendars == [tuple(dates[7:72])]
-    np.testing.assert_array_equal(result.result.values, expected.values)
-    np.testing.assert_array_equal(result.result.valid, expected.valid)
-    np.testing.assert_equal(result.result.entry_open, expected.entry_open)
-    np.testing.assert_array_equal(
-        result.result.entry_open_valid, expected.entry_open_valid
-    )
-    np.testing.assert_equal(result.result.session_close, expected.session_close)
-    np.testing.assert_array_equal(
-        result.result.session_close_valid, expected.session_close_valid
-    )
-    np.testing.assert_equal(
-        result.result.realized_daily_vol, expected.realized_daily_vol
-    )
-    np.testing.assert_array_equal(result.result.fast_present, expected.fast_present)
+    assert len(grid_calls) == 1
+    bars, date_count, minute_count = grid_calls[0]
+    assert (date_count, minute_count) == (45, 420)
+    assert set(bars.get_column("trade_date")) == set(allowed_dates)
+    assert set(bars.get_column("date_idx")) == set(range(20, 45))
+    shifted = bars.filter(pl.col("trade_date") == dates[30])
+    assert shifted.height == 360
+    assert shifted.get_column("minute_idx").min() == 0
+    assert shifted.get_column("minute_idx").max() == 359
     assert not result.result.fast_present[:27].any()
     assert result.result.fast_present[27:52].all()
     assert not result.result.fast_present[52:].any()
-    assert not result.result.entry_open[:27].any()
-    assert not result.result.entry_open[52:].any()
+    assert result.to_close_entry_valid[27:52].all()
+    assert not result.to_close_entry_valid[:27].any()
+    assert not result.to_close_entry_valid[52:].any()
+    assert np.all(
+        result.result.entry_open[27:52]
+        != result.to_close_entry[27:52]
+    )
+    np.testing.assert_array_equal(
+        result.native_arrays["fast_patch_mask"][:, 0].sum(axis=1),
+        [69, 63, 69],
+    )
+    assert result.native_mapping.get_column("security_id").to_list() == [
+        "SEC_TEST"
+    ]
