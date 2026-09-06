@@ -817,7 +817,7 @@ def _corwin_schultz(
     return output, valid
 
 
-def build_intraday_daily_features(
+def _build_fixed_intraday_daily_features(
     open_price: NDArray[np.floating],
     high: NDArray[np.floating],
     low: NDArray[np.floating],
@@ -981,4 +981,441 @@ def build_intraday_daily_features(
         # a decision input present or absent.
         fast_present=prefix_valid & realized_valid,
         close_anchor_consistent=final_valid.copy(),
+    )
+
+
+def _rolling_total(
+    values: NDArray[np.floating] | NDArray[np.integer], window: int
+) -> NDArray[np.float64]:
+    source = np.asarray(values, dtype=np.float64)
+    cumulative = np.concatenate(
+        (
+            np.zeros((1, *source.shape[1:]), dtype=np.float64),
+            np.cumsum(source, axis=0, dtype=np.float64),
+        ),
+        axis=0,
+    )
+    output = np.zeros(source.shape, dtype=np.float64)
+    output[window - 1 :] = cumulative[window:] - cumulative[:-window]
+    return output
+
+
+def _rolling_skew_from_moments(
+    count: NDArray[np.integer],
+    first: NDArray[np.floating],
+    second: NDArray[np.floating],
+    third: NDArray[np.floating],
+    expected_per_day: NDArray[np.integer],
+    window: int,
+) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
+    rolling_count = _rolling_total(count, window)
+    rolling_first = _rolling_total(first, window)
+    rolling_second = _rolling_total(second, window)
+    rolling_third = _rolling_total(third, window)
+    expected = _rolling_total(expected_per_day, window)
+    safe_count = np.maximum(rolling_count, 1.0)
+    mean = rolling_first / safe_count
+    variance = np.maximum(rolling_second / safe_count - mean**2, 0.0)
+    third_central = (
+        rolling_third / safe_count
+        - 3.0 * mean * rolling_second / safe_count
+        + 2.0 * mean**3
+    )
+    minimum = np.ceil(0.8 * expected)[:, None]
+    valid = (rolling_count >= minimum) & (variance > 0.0)
+    valid[: window - 1] = False
+    output = np.full(count.shape, np.nan, dtype=np.float64)
+    output[valid] = third_central[valid] / np.power(variance[valid], 1.5)
+    return output, valid
+
+
+def _rolling_spread_from_moments(
+    count: NDArray[np.integer],
+    sum_left: NDArray[np.floating],
+    sum_right: NDArray[np.floating],
+    cross: NDArray[np.floating],
+    expected_per_day: NDArray[np.integer],
+    window: int,
+) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
+    rolling_count = _rolling_total(count, window)
+    rolling_left = _rolling_total(sum_left, window)
+    rolling_right = _rolling_total(sum_right, window)
+    rolling_cross = _rolling_total(cross, window)
+    safe_count = np.maximum(rolling_count, 1.0)
+    covariance = (
+        rolling_cross - rolling_left * rolling_right / safe_count
+    ) / np.maximum(rolling_count - 1.0, 1.0)
+    minimum = np.maximum(
+        np.ceil(0.8 * _rolling_total(expected_per_day, window))[:, None], 2.0
+    )
+    valid = (rolling_count >= minimum) & (covariance < 0.0)
+    valid[: window - 1] = False
+    output = np.full(count.shape, np.nan, dtype=np.float64)
+    output[valid] = 2.0 * np.sqrt(-covariance[valid])
+    return output, valid
+
+
+def _build_scheduled_intraday_daily_features(
+    open_price: NDArray[np.floating],
+    high: NDArray[np.floating],
+    low: NDArray[np.floating],
+    close: NDArray[np.floating],
+    volume: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    sessions: Sequence[SessionDefinition],
+) -> IntradayDailyResult:
+    market = tuple(
+        np.asarray(value) for value in (open_price, high, low, close, volume)
+    )
+    open_, high_, low_, close_, volume_ = market
+    seen = np.asarray(observed)
+    if open_.ndim != 3 or any(value.shape != open_.shape for value in market):
+        raise ValueError("M1 arrays must be aligned [date, name, minute]")
+    if any(not np.issubdtype(value.dtype, np.number) for value in market):
+        raise TypeError("M1 market arrays must be numeric")
+    if seen.dtype != np.bool_ or seen.shape != open_.shape:
+        raise ValueError("observed must be boolean and align with M1 arrays")
+
+    prefix_minutes, continuous_minutes, _, patch_counts = _native_session_layout(
+        sessions,
+        date_count=open_.shape[0],
+        minute_count=open_.shape[2],
+        block_minutes=5,
+    )
+    if np.any(continuous_minutes > open_.shape[2]):
+        raise ValueError("M1 inputs do not cover every continuous session")
+
+    dates, names = open_.shape[:2]
+    shape = (dates, names)
+
+    def floats() -> NDArray[np.float64]:
+        return np.full(shape, np.nan, dtype=np.float64)
+
+    day_open = floats()
+    open_valid = np.zeros(shape, dtype=np.bool_)
+    decision_mark = floats()
+    decision_mark_valid = np.zeros(shape, dtype=np.bool_)
+    final_close = floats()
+    final_valid = np.zeros(shape, dtype=np.bool_)
+    last30_open = floats()
+    last30_open_valid = np.zeros(shape, dtype=np.bool_)
+    full_volume = np.zeros(shape, dtype=np.float64)
+    full_volume_valid = np.zeros(shape, dtype=np.bool_)
+    last_hour_volume = np.zeros(shape, dtype=np.float64)
+    last_hour_valid = np.zeros(shape, dtype=np.bool_)
+    full_vwap = floats()
+    prefix_total = np.zeros(shape, dtype=np.float64)
+    prefix_vwap = floats()
+    prefix_valid = np.zeros(shape, dtype=np.bool_)
+    day_high = floats()
+    day_low = floats()
+    day_range_valid = np.zeros(shape, dtype=np.bool_)
+    realized = floats()
+    realized_valid = np.zeros(shape, dtype=np.bool_)
+
+    return_count = np.zeros(shape, dtype=np.int32)
+    return_first = np.zeros(shape, dtype=np.float64)
+    return_second = np.zeros(shape, dtype=np.float64)
+    return_third = np.zeros(shape, dtype=np.float64)
+    pair_count = np.zeros(shape, dtype=np.int32)
+    pair_left = np.zeros(shape, dtype=np.float64)
+    pair_right = np.zeros(shape, dtype=np.float64)
+    pair_cross = np.zeros(shape, dtype=np.float64)
+    expected_returns = np.maximum(patch_counts - 1, 0).astype(np.int32)
+    expected_pairs = np.maximum(patch_counts - 2, 0).astype(np.int32)
+
+    for day in range(dates):
+        prefix = int(prefix_minutes[day])
+        continuous = int(continuous_minutes[day])
+        open_day = np.asarray(open_[day, :, :continuous], dtype=np.float64)
+        high_day = np.asarray(high_[day, :, :continuous], dtype=np.float64)
+        low_day = np.asarray(low_[day, :, :continuous], dtype=np.float64)
+        close_day = np.asarray(close_[day, :, :continuous], dtype=np.float64)
+        volume_day = np.asarray(volume_[day, :, :continuous], dtype=np.float64)
+        seen_day = seen[day, :, :continuous]
+
+        day_open[day] = open_day[:, 0]
+        open_valid[day] = (
+            seen_day[:, 0]
+            & np.isfinite(day_open[day])
+            & (day_open[day] > 0.0)
+        )
+        final_close[day] = close_day[:, -1]
+        final_valid[day] = (
+            seen_day[:, -1]
+            & np.isfinite(final_close[day])
+            & (final_close[day] > 0.0)
+        )
+        if continuous >= 30:
+            last30_open[day] = open_day[:, continuous - 30]
+            last30_open_valid[day] = (
+                seen_day[:, continuous - 30]
+                & np.isfinite(last30_open[day])
+                & (last30_open[day] > 0.0)
+            )
+
+        prefix_seen = seen_day[:, :prefix]
+        prefix_close = close_day[:, :prefix]
+        completed_price = (
+            prefix_seen & np.isfinite(prefix_close) & (prefix_close > 0.0)
+        )
+        has_completed_price = completed_price.any(axis=1)
+        if has_completed_price.any():
+            last_offset = prefix - 1 - np.argmax(
+                completed_price[has_completed_price, ::-1], axis=1
+            )
+            decision_mark[day, has_completed_price] = prefix_close[
+                has_completed_price, last_offset
+            ]
+            decision_mark_valid[day, has_completed_price] = True
+
+        safe_volume = np.where(
+            seen_day & np.isfinite(volume_day) & (volume_day >= 0.0),
+            volume_day,
+            0.0,
+        )
+        full_volume[day] = safe_volume.sum(axis=1)
+        full_seen_count = seen_day.sum(axis=1)
+        full_volume_valid[day] = full_seen_count >= int(np.ceil(0.8 * continuous))
+        full_vwap[day] = (
+            np.where(seen_day, close_day, 0.0) * safe_volume
+        ).sum(axis=1) / np.maximum(full_volume[day], 1.0)
+        if continuous >= 60:
+            last_hour_volume[day] = safe_volume[:, -60:].sum(axis=1)
+            last_hour_valid[day] = (
+                (full_volume[day] > 0.0)
+                & full_volume_valid[day]
+                & (seen_day[:, -60:].sum(axis=1) >= 48)
+            )
+
+        prefix_volume = safe_volume[:, :prefix]
+        prefix_total[day] = prefix_volume.sum(axis=1)
+        prefix_vwap[day] = (
+            np.where(prefix_seen, prefix_close, 0.0) * prefix_volume
+        ).sum(axis=1) / np.maximum(prefix_total[day], 1.0)
+        prefix_count = prefix_seen.sum(axis=1)
+        prefix_valid[day] = prefix_count >= int(np.ceil(0.8 * prefix))
+        day_high[day] = np.max(
+            np.where(prefix_seen, high_day[:, :prefix], -np.inf), axis=1
+        )
+        day_low[day] = np.min(
+            np.where(prefix_seen, low_day[:, :prefix], np.inf), axis=1
+        )
+        day_range_valid[day] = (
+            (prefix_count >= int(0.8 * prefix))
+            & np.isfinite(day_high[day])
+            & np.isfinite(day_low[day])
+            & (day_high[day] >= day_low[day])
+            & (day_low[day] > 0.0)
+        )
+
+        block_closes = prefix_close[:, 4:prefix:5]
+        block_seen = prefix_seen[:, 4:prefix:5]
+        if block_closes.shape[1] < 2:
+            continue
+        block_returns = np.zeros(
+            (names, block_closes.shape[1] - 1), dtype=np.float64
+        )
+        block_valid = (
+            block_seen[:, 1:]
+            & block_seen[:, :-1]
+            & np.isfinite(block_closes[:, 1:])
+            & np.isfinite(block_closes[:, :-1])
+            & (block_closes[:, 1:] > 0.0)
+            & (block_closes[:, :-1] > 0.0)
+        )
+        block_returns[block_valid] = np.log(
+            block_closes[:, 1:][block_valid]
+            / block_closes[:, :-1][block_valid]
+        )
+        return_count[day] = block_valid.sum(axis=1)
+        return_first[day] = np.where(block_valid, block_returns, 0.0).sum(axis=1)
+        return_second[day] = np.where(block_valid, block_returns**2, 0.0).sum(
+            axis=1
+        )
+        return_third[day] = np.where(block_valid, block_returns**3, 0.0).sum(
+            axis=1
+        )
+        minimum_returns = int(np.ceil(0.8 * expected_returns[day]))
+        realized_valid[day] = return_count[day] >= minimum_returns
+        realized[day, realized_valid[day]] = np.sqrt(
+            return_second[day, realized_valid[day]]
+        )
+
+        if block_returns.shape[1] < 2:
+            continue
+        adjacent_valid = block_valid[:, 1:] & block_valid[:, :-1]
+        left = block_returns[:, :-1]
+        right = block_returns[:, 1:]
+        pair_count[day] = adjacent_valid.sum(axis=1)
+        pair_left[day] = np.where(adjacent_valid, left, 0.0).sum(axis=1)
+        pair_right[day] = np.where(adjacent_valid, right, 0.0).sum(axis=1)
+        pair_cross[day] = np.where(adjacent_valid, left * right, 0.0).sum(axis=1)
+
+    values = np.zeros((*shape, len(INTRADAY_DAILY_FEATURES)), dtype=np.float32)
+    masks = np.zeros(values.shape, dtype=np.bool_)
+
+    def assign(
+        index: int, column: NDArray[np.floating], valid: NDArray[np.bool_]
+    ) -> None:
+        usable = np.asarray(valid, dtype=np.bool_) & np.isfinite(column)
+        values[..., index][usable] = np.asarray(column)[usable].astype(np.float32)
+        masks[..., index] = usable
+
+    overnight = floats()
+    overnight_valid = np.zeros(shape, dtype=np.bool_)
+    if dates > 1:
+        overnight[1:], overnight_valid[1:] = _safe_log_ratio(
+            day_open[1:], final_close[:-1]
+        )
+        overnight_valid[1:] &= open_valid[1:] & final_valid[:-1]
+        overnight[~overnight_valid] = np.nan
+    intraday, intraday_valid = _safe_log_ratio(decision_mark, day_open)
+    intraday_valid &= decision_mark_valid & open_valid
+    intraday[~intraday_valid] = np.nan
+    assign(0, overnight, overnight_valid)
+    assign(1, intraday, intraday_valid)
+    for index, base, base_valid, window in (
+        (2, overnight, overnight_valid, 5),
+        (3, overnight, overnight_valid, 20),
+        (4, intraday, intraday_valid, 5),
+        (5, intraday, intraday_valid, 20),
+    ):
+        assign(index, *_rolling_sum(base, base_valid, window))
+    differential = overnight - intraday
+    differential_valid = overnight_valid & intraday_valid
+    assign(6, differential, differential_valid)
+    assign(7, *_rolling_mean(differential, differential_valid, 20))
+
+    last30, last30_valid = _safe_log_ratio(final_close, last30_open)
+    full_return, full_return_valid = _safe_log_ratio(final_close, day_open)
+    last30_valid &= final_valid & last30_open_valid
+    full_return_valid &= final_valid & open_valid
+    with np.errstate(divide="ignore", invalid="ignore"):
+        last30_share = last30 / full_return
+    last30_share_valid = (
+        last30_valid & full_return_valid & (np.abs(full_return) > 1e-12)
+    )
+    prior_last30 = floats()
+    prior_last30_valid = np.zeros(shape, dtype=np.bool_)
+    prior_last30[1:] = last30_share[:-1]
+    prior_last30_valid[1:] = last30_share_valid[:-1]
+    assign(8, prior_last30, prior_last30_valid)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        last_hour_share = last_hour_volume / full_volume
+    lag_last_hour = floats()
+    lag_last_hour_valid = np.zeros(shape, dtype=np.bool_)
+    lag_last_hour[1:] = last_hour_share[:-1]
+    lag_last_hour_valid[1:] = last_hour_valid[:-1]
+    assign(9, lag_last_hour, lag_last_hour_valid)
+
+    close_vwap, close_vwap_valid = _safe_log_ratio(final_close, full_vwap)
+    close_vwap_valid &= final_valid & full_volume_valid & (full_volume > 0.0)
+    lag_close_vwap = floats()
+    lag_close_vwap_valid = np.zeros(shape, dtype=np.bool_)
+    lag_close_vwap[1:] = close_vwap[:-1]
+    lag_close_vwap_valid[1:] = close_vwap_valid[:-1]
+    assign(10, lag_close_vwap, lag_close_vwap_valid)
+
+    vwap_deviation, vwap_valid = _safe_log_ratio(decision_mark, prefix_vwap)
+    vwap_valid &= decision_mark_valid & prefix_valid & (prefix_total > 0.0)
+    assign(11, vwap_deviation, vwap_valid)
+    assign(12, realized, realized_valid)
+    assign(13, *_rolling_mean(realized, realized_valid, 5))
+    assign(14, *_rolling_mean(realized, realized_valid, 20))
+    assign(
+        15,
+        *_rolling_skew_from_moments(
+            return_count,
+            return_first,
+            return_second,
+            return_third,
+            expected_returns,
+            20,
+        ),
+    )
+    assign(
+        16,
+        *_rolling_spread_from_moments(
+            pair_count,
+            pair_left,
+            pair_right,
+            pair_cross,
+            expected_pairs,
+            20,
+        ),
+    )
+    spread, spread_valid = _corwin_schultz(day_high, day_low, day_range_valid)
+    assign(17, *_rolling_mean(spread, spread_valid, 20))
+    range_value, range_valid = _safe_log_ratio(day_high, day_low)
+    range_valid &= day_range_valid
+    assign(18, range_value, range_valid)
+
+    relative = floats()
+    relative_valid = np.zeros(shape, dtype=np.bool_)
+    for day in range(20, dates):
+        history_valid = prefix_valid[day - 20 : day].all(axis=0)
+        median = np.median(prefix_total[day - 20 : day], axis=0)
+        usable = (
+            prefix_valid[day]
+            & history_valid
+            & np.isfinite(median)
+            & (median > 0.0)
+        )
+        relative[day, usable] = prefix_total[day, usable] / median[usable]
+        relative_valid[day, usable] = True
+    assign(19, relative, relative_valid)
+
+    return IntradayDailyResult(
+        values=values,
+        valid=masks,
+        # Scheduled mode never reads the decision row. This legacy field
+        # carries the completed decision mark so close-anchor replacement can
+        # still recover day_open; execution entry is sourced by the caller.
+        entry_open=decision_mark,
+        entry_open_valid=decision_mark_valid,
+        session_close=np.where(final_valid, final_close, np.nan),
+        session_close_valid=final_valid,
+        realized_daily_vol=realized,
+        fast_present=prefix_valid & realized_valid,
+        close_anchor_consistent=final_valid.copy(),
+    )
+
+
+def build_intraday_daily_features(
+    open_price: NDArray[np.floating],
+    high: NDArray[np.floating],
+    low: NDArray[np.floating],
+    close: NDArray[np.floating],
+    volume: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    *,
+    cutoff: int = DECISION_MINUTE_INDEX,
+    sessions: Sequence[SessionDefinition] | None = None,
+) -> IntradayDailyResult:
+    """Build decision-state and lagged continuous-session M1 summaries.
+
+    Without ``sessions``, this preserves the original fixed-grid contract.
+    With an authoritative schedule, each row begins at that date's continuous
+    open, the decision prefix excludes the decision row, and full-day lagged
+    summaries end at the continuous close before the auction. In that mode,
+    ``entry_open`` carries the last completed decision mark solely for legacy
+    anchor replacement; it is not the execution entry.
+    """
+
+    if sessions is None:
+        return _build_fixed_intraday_daily_features(
+            open_price,
+            high,
+            low,
+            close,
+            volume,
+            observed,
+            cutoff=cutoff,
+        )
+    if cutoff != DECISION_MINUTE_INDEX:
+        raise ValueError("cutoff cannot override an authoritative session schedule")
+    return _build_scheduled_intraday_daily_features(
+        open_price, high, low, close, volume, observed, sessions
     )

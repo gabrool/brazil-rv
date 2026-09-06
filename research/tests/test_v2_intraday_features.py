@@ -1,9 +1,10 @@
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 import numpy as np
 import polars as pl
 
 from brazil_rv.v2.build_store import stream_intraday_from_assignments
+from brazil_rv.v2.decision_clock import SessionDefinition
 from brazil_rv.v2.intraday_features import (
     _rolling_roll_spread,
     build_intraday_daily_features,
@@ -26,6 +27,51 @@ def _minutes() -> tuple[np.ndarray, ...]:
     return base, base * 1.001, base * 0.999, base + 0.0005, np.ones(base.shape), observed
 
 
+def _scheduled_minutes() -> tuple[
+    tuple[np.ndarray, ...], tuple[SessionDefinition, ...]
+]:
+    days, names, minutes = 26, 1, 420
+    open_price = np.full((days, names, minutes), 100.0)
+    close = np.full_like(open_price, 100.0)
+    volume = np.ones_like(open_price)
+    observed = np.ones(open_price.shape, dtype=np.bool_)
+    sessions = [
+        SessionDefinition(
+            trade_date=date(2024, 1, 1) + timedelta(days=day),
+            continuous_open=time(10, 0),
+            decision_time=time(15, 45),
+            continuous_close=time(17, 0),
+            auction_close=time(17, 15),
+            source="test",
+        )
+        for day in range(days)
+    ]
+    sessions[24] = SessionDefinition(
+        trade_date=sessions[24].trade_date,
+        continuous_open=time(10, 30),
+        decision_time=time(15, 45),
+        continuous_close=time(16, 30),
+        auction_close=time(17, 0),
+        source="test-shifted",
+    )
+    open_price[24, 0, 315] = 777.0
+    open_price[24, 0, 330] = 110.0
+    close[24, 0, 359] = 120.0
+    close[24, 0, 360:] = 999.0
+    volume[24, 0, 300:360] = 2.0
+    volume[24, 0, 360:] = 1_000_000.0
+    high = close + 1.0
+    low = close - 1.0
+    return (
+        open_price,
+        high,
+        low,
+        close,
+        volume,
+        observed,
+    ), tuple(sessions)
+
+
 def test_intraday_features_use_completed_bars_before_cutoff_only() -> None:
     inputs = _minutes()
     original = build_intraday_daily_features(*inputs)
@@ -37,6 +83,44 @@ def test_intraday_features_use_completed_bars_before_cutoff_only() -> None:
     np.testing.assert_array_equal(original.values[24], mutated.values[24])
     np.testing.assert_array_equal(original.valid[24], mutated.valid[24])
     np.testing.assert_array_equal(original.entry_open[24], mutated.entry_open[24])
+
+
+def test_scheduled_intraday_uses_shifted_prefix_and_continuous_close() -> None:
+    inputs, sessions = _scheduled_minutes()
+    result = build_intraday_daily_features(*inputs, sessions=sessions)
+
+    assert result.entry_open[24, 0] == 100.0
+    assert result.entry_open_valid[24, 0]
+    assert result.session_close[24, 0] == 120.0
+    assert result.session_close[24, 0] != inputs[3][24, 0, -1]
+    np.testing.assert_allclose(result.values[25, 0, 0], np.log(100.0 / 120.0))
+    expected_last30_share = np.log(120.0 / 110.0) / np.log(120.0 / 100.0)
+    np.testing.assert_allclose(result.values[25, 0, 8], expected_last30_share)
+    np.testing.assert_allclose(result.values[25, 0, 9], 120.0 / 420.0)
+    continuous_vwap = 42_040.0 / 420.0
+    np.testing.assert_allclose(
+        result.values[25, 0, 10], np.log(120.0 / continuous_vwap)
+    )
+
+
+def test_scheduled_intraday_decision_state_ignores_decision_and_later_rows() -> None:
+    inputs, sessions = _scheduled_minutes()
+    baseline = build_intraday_daily_features(*inputs, sessions=sessions)
+    changed = [value.copy() for value in inputs]
+    for index in range(5):
+        changed[index][25, :, 345:] = np.nan
+    changed[-1][25, :, 345:] = False
+
+    actual = build_intraday_daily_features(*changed, sessions=sessions)
+
+    np.testing.assert_array_equal(actual.values[25], baseline.values[25])
+    np.testing.assert_array_equal(actual.valid[25], baseline.valid[25])
+    np.testing.assert_array_equal(
+        actual.realized_daily_vol[25], baseline.realized_daily_vol[25]
+    )
+    np.testing.assert_array_equal(actual.fast_present[25], baseline.fast_present[25])
+    np.testing.assert_array_equal(actual.entry_open[25], baseline.entry_open[25])
+    assert not actual.session_close_valid[25, 0]
 
 
 def test_entry_bar_does_not_control_fast_presence() -> None:
