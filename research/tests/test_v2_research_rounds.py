@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import copy
 import json
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+import brazil_rv.v2.research_rounds as research_rounds
 from brazil_rv.v2.artifacts import sha256_file
 from brazil_rv.v2.contract import HORIZONS, SLOW_FEATURES
 from brazil_rv.v2.evaluate import EvaluationInputs, _input_hashes, evaluate_scores
@@ -19,6 +21,8 @@ from brazil_rv.v2.research_rounds import (
     _evaluation_from_artifacts,
     _fold_indices,
     _folded_bootstrap,
+    _feature_names,
+    _gbdt_features,
     _paired_readouts,
     _point_is_negative,
     _pretrain_indices,
@@ -27,6 +31,48 @@ from brazil_rv.v2.research_rounds import (
     _window_target_mask,
     seal_root,
 )
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda root: research_rounds.freeze_round1(
+            store_root=root / "store",
+            cdi_path=root / "cdi",
+            cdi_sha256="0" * 64,
+            experiment52_cdi_path=root / "exp52-cdi",
+            experiment52_cdi_sha256="1" * 64,
+            output_root=root / "round1",
+            num_threads=1,
+        ),
+        lambda root: research_rounds.run_round1(
+            output_root=root / "round1", num_threads=1
+        ),
+        lambda root: research_rounds.resume_round1(
+            output_root=root / "round1", num_threads=1
+        ),
+        lambda root: research_rounds.freeze_round2(
+            round1_root=root / "round1",
+            store_root=root / "store",
+            cdi_path=root / "cdi",
+            cdi_sha256="0" * 64,
+            experiment52_cdi_path=root / "exp52-cdi",
+            experiment52_cdi_sha256="1" * 64,
+            output_root=root / "round2",
+            fast_checkpoint=None,
+            fast_checkpoint_sha256=None,
+            max_parallel=4,
+        ),
+        lambda root: research_rounds.write_round2_plan_p(output_root=root),
+        lambda root: research_rounds.write_round2_plan_main(output_root=root),
+        lambda root: research_rounds.finalize_round2(output_root=root),
+    ],
+)
+def test_voided_round1_round2_entrypoints_refuse_before_filesystem_access(
+    tmp_path: Path, call: Callable[[Path], object]
+) -> None:
+    with pytest.raises(RuntimeError, match="registration was voided"):
+        call(tmp_path)
 
 
 def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
@@ -76,6 +122,12 @@ def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
         "action_payment_session": np.full_like(identity_successor, -1),
         "security_ids": tuple(f"BRTEST{index:04d}" for index in range(name_count)),
         "target_scale_sigma": np.full_like(raw_close, 0.02),
+        "history_age_sessions": np.zeros_like(raw_close, dtype=np.float64),
+        "initial_reference_price": np.full(name_count, np.nan, dtype=np.float64),
+        "eventual_survives_to_final_year": np.broadcast_to(
+            np.arange(name_count)[None, :] < name_count // 2,
+            (day_count, name_count),
+        ).copy(),
         "prior_feature_values": {
             name: np.zeros_like(raw_close, dtype=np.float32)
             for name in (
@@ -191,11 +243,11 @@ def test_paired_readouts_use_the_exact_common_four_head_population() -> None:
     assert first["undefined_reason"] is None
 
 
-def test_pretrain_samples_exclude_first_store_row_without_prior_history() -> None:
+def test_pretrain_samples_include_first_canonical_decision_snapshot() -> None:
     dates = np.asarray(
         ["2010-01-04", "2010-01-05", "2010-01-06"], dtype="datetime64[D]"
     )
-    assert _pretrain_indices(dates).tolist() == [1, 2]
+    assert _pretrain_indices(dates).tolist() == [0, 1, 2]
 
 
 def test_round_fit_targets_may_end_in_registered_purge_before() -> None:
@@ -266,6 +318,12 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         "target_price_midrank": prefixed(np.asarray(inputs.price_midrank_targets)),
         "active": prefixed(np.asarray(inputs.active)),
         "raw_close": prefixed(np.asarray(inputs.raw_close)),
+        "prior_reference_close": np.full(
+            (day_count + 1, name_count), np.nan, dtype=np.float64
+        ),
+        "audit_eventual_survives_to_final_year": prefixed(
+            np.asarray(inputs.eventual_survives_to_final_year)
+        ),
         "action_shares_per_prior_share": prefixed(
             np.asarray(inputs.action_shares_per_prior_share)
         ),
@@ -279,6 +337,9 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         "target_scale_sigma": prefixed(np.asarray(inputs.target_scale_sigma)),
         "slow_values": np.zeros(
             (day_count + 1, name_count, len(SLOW_FEATURES)), dtype=np.float32
+        ),
+        "slow_valid": np.ones(
+            (day_count + 1, name_count, len(SLOW_FEATURES)), dtype=np.bool_
         ),
     }
 
@@ -441,7 +502,7 @@ def test_network_score_artifact_binds_date_security_and_feature_axes(
     (tmp_path / "score_manifest.json").write_text(
         json.dumps(
             {
-                "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V1",
+                "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V2",
                 "status": "completed",
                 "official_validation_accessed": False,
                 "test_accessed": False,
@@ -488,6 +549,116 @@ def test_registered_gbdt_ladder_is_exact_and_cumulative() -> None:
         "rebalance",
         "events",
         "fundamentals",
+    )
+
+    store = type(
+        "FixtureStore",
+        (),
+        {
+            "manifest": {
+                "feature_names": {
+                    "slow": ["slow_a", "slow_b"],
+                    "intraday": ["current_a", "current_b"],
+                    **{
+                        f"sidecar_{group}": [f"{group}_a"]
+                        for group in RUNG_GROUPS["d_all_sidecars"]
+                    },
+                }
+            }
+        },
+    )()
+    assert _feature_names(store, "a_slow") == (
+        "slow_a",
+        "slow_b",
+        "slow_a__age_sessions",
+        "slow_b__age_sessions",
+    )
+    assert _feature_names(store, "c_lending") == (
+        "slow_a",
+        "slow_b",
+        "slow_a__age_sessions",
+        "slow_b__age_sessions",
+        "current_a",
+        "current_b",
+        "current_a__age_sessions",
+        "current_b__age_sessions",
+        "fast_present",
+        "lending_a",
+        "lending_a__age_sessions",
+    )
+
+
+def test_round_gbdt_adapter_uses_shared_views_and_preserves_frozen_order() -> None:
+    arrays = {
+        "active": np.asarray([[True, False], [True, True]], dtype=np.bool_),
+        "slow_values": np.asarray(
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            dtype=np.float32,
+        ),
+        "slow_valid": np.ones((2, 2, 2), dtype=np.bool_),
+        "slow_age_sessions": np.asarray(
+            [[[0.0, 1.0], [2.0, 3.0]], [[4.0, 5.0], [6.0, 7.0]]],
+            dtype=np.float32,
+        ),
+        "intraday_values": np.asarray(
+            [[[10.0, 11.0], [12.0, 13.0]], [[14.0, 15.0], [16.0, 17.0]]],
+            dtype=np.float32,
+        ),
+        "intraday_valid": np.ones((2, 2, 2), dtype=np.bool_),
+        "intraday_age_sessions": np.zeros((2, 2, 2), dtype=np.float32),
+        "fast_present": np.asarray([[True, True], [False, True]], dtype=np.bool_),
+        "sidecar_lending_values": np.asarray(
+            [[[20.0], [99.0]], [[22.0], [23.0]]], dtype=np.float32
+        ),
+        "sidecar_lending_valid": np.asarray(
+            [[[True], [False]], [[True], [True]]], dtype=np.bool_
+        ),
+        "sidecar_lending_age_sessions": np.asarray(
+            [[[1.0], [-1.0]], [[3.0], [4.0]]], dtype=np.float32
+        ),
+    }
+
+    class Store:
+        dates = np.asarray(["2024-01-02", "2024-01-03"], dtype="datetime64[D]")
+        isins = ("BR1", "BR2")
+        manifest = {
+            "feature_names": {
+                "slow": ["slow_a", "slow_b"],
+                "intraday": ["current_a", "current_b"],
+                "sidecar_lending": ["lending_a"],
+            }
+        }
+
+        @staticmethod
+        def read(name, indices):
+            return arrays[name][indices]
+
+    actual = _gbdt_features(
+        Store(),
+        np.asarray([0, 1], dtype=np.int64),
+        "c_lending",
+        pretrain_mask=np.asarray([True, False]),
+    )
+
+    assert actual.shape == (2, 2, 11)
+    np.testing.assert_array_equal(actual[..., :2], arrays["slow_values"])
+    assert np.isnan(actual[0, :, 4:8]).all()
+    assert actual[0, :, 8].tolist() == [0.0, 0.0]
+    np.testing.assert_array_equal(actual[1, :, 4:6], arrays["intraday_values"][1])
+    assert np.isnan(actual[0, 1, 9:11]).all()
+    assert actual[1, 1, 9] == 23.0
+    assert _feature_names(Store(), "c_lending") == (
+        "slow_a",
+        "slow_b",
+        "slow_a__age_sessions",
+        "slow_b__age_sessions",
+        "current_a",
+        "current_b",
+        "current_a__age_sessions",
+        "current_b__age_sessions",
+        "fast_present",
+        "lending_a",
+        "lending_a__age_sessions",
     )
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Sequence
+from typing import Callable, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -20,8 +20,10 @@ class SlowFeatureResult:
 
 def _aligned_daily(*arrays: NDArray[np.generic]) -> tuple[NDArray[np.float64], ...]:
     converted = tuple(np.asarray(value, dtype=np.float64) for value in arrays)
-    if not converted or converted[0].ndim != 2 or any(
-        value.shape != converted[0].shape for value in converted
+    if (
+        not converted
+        or converted[0].ndim != 2
+        or any(value.shape != converted[0].shape for value in converted)
     ):
         raise ValueError("daily arrays must be aligned [date, name]")
     return converted
@@ -120,9 +122,7 @@ def yang_zhang_volatility(
     for end in range(window, shape[0]):
         start = end - window
         component_window = component_valid[start:end]
-        complete = (
-            component_window.sum(axis=0) >= minimum
-        ) & interval_clear[end]
+        complete = (component_window.sum(axis=0) >= minimum) & interval_clear[end]
         if not complete.any():
             continue
         usable = component_window[:, complete]
@@ -140,9 +140,7 @@ def yang_zhang_volatility(
             np.where(usable, rogers_satchell[start:end, complete], np.nan),
             axis=0,
         )
-        variance = np.maximum(
-            sigma_open + k * sigma_close + (1.0 - k) * sigma_rs, 0.0
-        )
+        variance = np.maximum(sigma_open + k * sigma_close + (1.0 - k) * sigma_rs, 0.0)
         output[end, complete] = np.sqrt(variance)
         valid[end, complete] = True
     return output, valid
@@ -235,9 +233,8 @@ def _rolling_high_low_range(
             & (low[start : end + 1] > 0)
         )
         complete = (
-            (usable_rows.sum(axis=0) >= math.ceil(0.8 * window))
-            & interval_clear[end]
-        )
+            usable_rows.sum(axis=0) >= math.ceil(0.8 * window)
+        ) & interval_clear[end]
         if not complete.any():
             continue
         maximum = np.nanmax(
@@ -286,9 +283,8 @@ def monthly_cluster_labels(
             start = max(0, day - lookback)
             sample = returns[start:day]
             sample_valid = available[start:day]
-            eligible = (
-                (sample_valid.sum(axis=0) >= minimum_observed)
-                & (membership[day - 1] if day else False)
+            eligible = (sample_valid.sum(axis=0) >= minimum_observed) & (
+                membership[day - 1] if day else False
             )
             slots = np.flatnonzero(eligible)
             if slots.size >= cluster_count:
@@ -325,9 +321,7 @@ def pairwise_masked_correlation(
     if array.ndim != 2 or mask.shape != array.shape or minimum_observed < 2:
         raise ValueError("invalid pairwise-correlation inputs")
     row_count, name_count = array.shape
-    common_ranks = np.zeros(
-        (name_count, row_count, name_count), dtype=np.float32
-    )
+    common_ranks = np.zeros((name_count, row_count, name_count), dtype=np.float32)
     for subject in range(name_count):
         observed_rows = np.flatnonzero(mask[:, subject])
         order = observed_rows[
@@ -368,9 +362,7 @@ def pairwise_masked_correlation(
         covariance = cross - left_sum * right_sum / safe_count
         left_variance = left_square - left_sum**2 / safe_count
         right_variance = right_square - right_sum**2 / safe_count
-        denominator = np.sqrt(
-            np.maximum(left_variance * right_variance, 0.0)
-        )
+        denominator = np.sqrt(np.maximum(left_variance * right_variance, 0.0))
         usable = (count >= minimum_observed) & (denominator > 0)
         row = np.full(name_count - left - 1, np.nan, dtype=np.float64)
         row[usable] = covariance[usable] / denominator[usable]
@@ -393,15 +385,17 @@ def deterministic_average_linkage(
 
     matrix = np.asarray(correlations, dtype=np.float64)
     allowed = np.asarray(eligible, dtype=np.bool_)
-    if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1] or allowed.shape != (matrix.shape[0],):
+    if (
+        matrix.ndim != 2
+        or matrix.shape[0] != matrix.shape[1]
+        or allowed.shape != (matrix.shape[0],)
+    ):
         raise ValueError("average-linkage inputs are misaligned")
     slots = np.flatnonzero(allowed)
     labels = np.full(matrix.shape[0], -1, dtype=np.int16)
     if slots.size < cluster_count or cluster_count <= 0 or minimum_size <= 0:
         return labels
-    active: dict[int, tuple[int, ...]] = {
-        int(slot): (int(slot),) for slot in slots
-    }
+    active: dict[int, tuple[int, ...]] = {int(slot): (int(slot),) for slot in slots}
     distances: dict[tuple[int, int], float] = {}
     heap: list[tuple[float, int, int, int, int]] = []
     for left_position, left_slot in enumerate(slots[:-1]):
@@ -409,7 +403,11 @@ def deterministic_average_linkage(
         for right_slot in slots[left_position + 1 :]:
             right = int(right_slot)
             correlation = matrix[left, right]
-            distance = 2.0 if not np.isfinite(correlation) else float(np.clip(1.0 - correlation, 0.0, 2.0))
+            distance = (
+                2.0
+                if not np.isfinite(correlation)
+                else float(np.clip(1.0 - correlation, 0.0, 2.0))
+            )
             distances[(left, right)] = distance
             heapq.heappush(heap, (distance, left, right, left, right))
     next_id = matrix.shape[0]
@@ -432,8 +430,7 @@ def deterministic_average_linkage(
             left_distance = distances[left_key]
             right_distance = distances[right_key]
             updated = (
-                len(left_members) * left_distance
-                + len(right_members) * right_distance
+                len(left_members) * left_distance + len(right_members) * right_distance
             ) / len(new_members)
             key = (min(new_id, other), max(new_id, other))
             distances[key] = updated
@@ -458,19 +455,11 @@ def deterministic_average_linkage(
         destination = min(
             (index for index in range(len(ordered)) if index != source),
             key=lambda index: (
-                float(
-                    np.mean(
-                        distance[
-                            np.ix_(ordered[source], ordered[index])
-                        ]
-                    )
-                ),
+                float(np.mean(distance[np.ix_(ordered[source], ordered[index])])),
                 index,
             ),
         )
-        ordered[destination] = tuple(
-            sorted((*ordered[destination], *ordered[source]))
-        )
+        ordered[destination] = tuple(sorted((*ordered[destination], *ordered[source])))
         del ordered[source]
     ordered.sort(key=lambda members: members[0])
     for label, members in enumerate(ordered):
@@ -515,34 +504,84 @@ def _peer_features(
     return output, valid
 
 
-def build_slow_features(
-    adjusted_open: NDArray[np.floating],
-    adjusted_high: NDArray[np.floating],
-    adjusted_low: NDArray[np.floating],
-    adjusted_close: NDArray[np.floating],
+def build_slow_features_into(
+    shareholder_wealth_open: NDArray[np.floating],
+    shareholder_wealth_high: NDArray[np.floating],
+    shareholder_wealth_low: NDArray[np.floating],
+    shareholder_wealth_close: NDArray[np.floating],
     volume_brl: NDArray[np.floating],
     trades: NDArray[np.floating],
-    observed: NDArray[np.bool_],
+    shareholder_wealth_valid: NDArray[np.bool_],
     active: NDArray[np.bool_],
     dates: Sequence[object],
     *,
+    raw_high: NDArray[np.floating],
+    raw_low: NDArray[np.floating],
+    raw_close: NDArray[np.floating],
+    price_observed: NDArray[np.bool_],
+    history_observed: NDArray[np.bool_],
+    activity_valid: NDArray[np.bool_],
+    consume: Callable[[int, NDArray[np.floating], NDArray[np.bool_]], None],
     cluster_labels: NDArray[np.integer] | None = None,
     ambiguous_action: NDArray[np.bool_] | None = None,
-) -> SlowFeatureResult:
-    """Build the frozen 32-field causal slow library."""
+) -> NDArray[np.int16]:
+    """Compute one slow field at a time and immediately hand it to ``consume``.
 
-    open_, high, low, close, volume, trade_count = _aligned_daily(
-        adjusted_open,
-        adjusted_high,
-        adjusted_low,
-        adjusted_close,
-        volume_brl,
-        trades,
+    The callback is responsible for writing/normalizing the field.  Raw
+    32-field cubes are never materialized by this path; only the small set of
+    dependency panels needed by later formulas remains live.  Cross-session
+    price features consume the shareholder-wealth coordinate and its validity;
+    same-session shape, activity, and linked observation age retain independent
+    raw-source masks.
+    """
+
+    open_, high, low, close, volume, trade_count = tuple(
+        np.asarray(value)
+        for value in (
+            shareholder_wealth_open,
+            shareholder_wealth_high,
+            shareholder_wealth_low,
+            shareholder_wealth_close,
+            volume_brl,
+            trades,
+        )
     )
-    seen = np.asarray(observed, dtype=np.bool_)
+    if close.ndim != 2 or any(
+        value.shape != close.shape for value in (open_, high, low, volume, trade_count)
+    ):
+        raise ValueError("daily arrays must be aligned [date, name]")
+    wealth_seen = np.asarray(shareholder_wealth_valid, dtype=np.bool_)
+    raw_high_, raw_low_, raw_close_ = tuple(
+        np.asarray(value) for value in (raw_high, raw_low, raw_close)
+    )
+    price_seen = np.asarray(price_observed, dtype=np.bool_)
+    history_seen = np.asarray(history_observed, dtype=np.bool_)
+    activity_seen = np.asarray(activity_valid, dtype=np.bool_)
     membership = np.asarray(active, dtype=np.bool_)
-    if seen.shape != close.shape or membership.shape != close.shape:
-        raise ValueError("observed and active are misaligned")
+    if (
+        wealth_seen.shape != close.shape
+        or any(
+            value.shape != close.shape for value in (raw_high_, raw_low_, raw_close_)
+        )
+        or price_seen.shape != close.shape
+        or history_seen.shape != close.shape
+        or activity_seen.shape != close.shape
+        or membership.shape != close.shape
+    ):
+        raise ValueError(
+            "shareholder-wealth, raw-price, history, activity, and active "
+            "inputs are misaligned"
+        )
+    if np.any(
+        activity_seen
+        & (
+            ~np.isfinite(volume)
+            | (volume < 0.0)
+            | ~np.isfinite(trade_count)
+            | (trade_count < 0.0)
+        )
+    ):
+        raise ValueError("valid slow activity must be finite and non-negative")
     ambiguous = (
         np.zeros(close.shape, dtype=np.bool_)
         if ambiguous_action is None
@@ -550,38 +589,46 @@ def build_slow_features(
     )
     if ambiguous.shape != close.shape:
         raise ValueError("ambiguous_action is misaligned")
-    values = np.zeros((*close.shape, len(SLOW_FEATURES)), dtype=np.float32)
-    valid = np.zeros(values.shape, dtype=np.bool_)
 
-    def assign(index: int, column: NDArray[np.floating], mask: NDArray[np.bool_]) -> None:
+    def assign(
+        index: int, column: NDArray[np.floating], mask: NDArray[np.bool_]
+    ) -> None:
         usable = np.asarray(mask, dtype=np.bool_) & np.isfinite(column)
-        values[..., index][usable] = np.asarray(column)[usable].astype(np.float32)
-        valid[..., index] = usable
+        consume(index, np.asarray(column), usable)
 
-    returns: dict[int, tuple[NDArray[np.float64], NDArray[np.bool_]]] = {}
+    retained_returns: dict[int, tuple[NDArray[np.float64], NDArray[np.bool_]]] = {}
     for index, horizon in enumerate((1, 5, 21, 63, 126, 252)):
-        returns[horizon] = exact_log_return(close, horizon, ambiguous)
-        assign(index, *returns[horizon])
-    momentum = returns[252][0] - returns[21][0]
-    assign(6, momentum, returns[252][1] & returns[21][1])
+        result = exact_log_return(close, horizon, ambiguous)
+        assign(index, *result)
+        if horizon in {1, 5, 21, 252}:
+            retained_returns[horizon] = result
+        else:
+            del result
+    momentum = retained_returns[252][0] - retained_returns[21][0]
+    assign(
+        6,
+        momentum,
+        retained_returns[252][1] & retained_returns[21][1],
+    )
+    del momentum, retained_returns[252]
 
-    yz: dict[int, tuple[NDArray[np.float64], NDArray[np.bool_]]] = {}
     for index, window in zip((7, 8, 9), (5, 20, 60), strict=True):
-        yz[window] = yang_zhang_volatility(
-            open_, high, low, close, window, ambiguous
-        )
-        assign(index, *yz[window])
-    vol_of_vol, vol_of_vol_valid = _rolling_stat(yz[5][0], 60, "std")
+        yz_result = yang_zhang_volatility(open_, high, low, close, window, ambiguous)
+        assign(index, *yz_result)
+        if window == 5:
+            yz_5 = yz_result
+    vol_of_vol, vol_of_vol_valid = _rolling_stat(yz_5[0], 60, "std")
     assign(
         10,
         vol_of_vol,
         vol_of_vol_valid & _ambiguous_interval_clear(ambiguous, 64),
     )
-    skew, kurtosis, moments_valid = _rolling_moments(returns[1][0], 60)
+    del vol_of_vol, vol_of_vol_valid, yz_5, yz_result
+    skew, kurtosis, moments_valid = _rolling_moments(retained_returns[1][0], 60)
     moments_valid &= _ambiguous_interval_clear(ambiguous, 60)
     assign(11, skew, moments_valid)
     assign(12, kurtosis, moments_valid)
-    maximum, maximum_valid = _rolling_stat(returns[1][0], 21, "max")
+    maximum, maximum_valid = _rolling_stat(retained_returns[1][0], 21, "max")
     assign(
         13,
         maximum,
@@ -594,25 +641,28 @@ def build_slow_features(
         14,
         high_distance,
         rolling_high_valid
-        & seen
+        & wealth_seen
         & (close > 0)
         & _ambiguous_interval_clear(ambiguous, 251),
     )
 
     market = np.full(close.shape[0], np.nan, dtype=np.float64)
     for day in range(close.shape[0]):
-        mask = returns[1][1][day] & membership[day]
+        mask = retained_returns[1][1][day] & membership[day]
         if mask.any():
-            market[day] = float(np.median(returns[1][0][day, mask]))
+            market[day] = float(np.median(retained_returns[1][0][day, mask]))
     beta = np.full(close.shape, np.nan, dtype=np.float64)
     idio = np.full(close.shape, np.nan, dtype=np.float64)
     beta_valid = np.zeros(close.shape, dtype=np.bool_)
     for day in range(59, close.shape[0]):
         market_window = market[day - 59 : day + 1]
         for name in range(close.shape[1]):
-            name_window = returns[1][0][day - 59 : day + 1, name]
+            name_window = retained_returns[1][0][day - 59 : day + 1, name]
             mask = np.isfinite(market_window) & np.isfinite(name_window)
-            if int(mask.sum()) < math.ceil(0.8 * 60) or np.var(market_window[mask]) <= 0:
+            if (
+                int(mask.sum()) < math.ceil(0.8 * 60)
+                or np.var(market_window[mask]) <= 0
+            ):
                 continue
             coefficient = float(
                 np.cov(name_window[mask], market_window[mask], ddof=0)[0, 1]
@@ -626,60 +676,73 @@ def build_slow_features(
     assign(15, beta, beta_valid)
     assign(16, idio, beta_valid)
 
-    volume_for_window = np.where(
-        seen & np.isfinite(volume), np.maximum(volume, 0.0), np.nan
+    volume_for_window = np.where(activity_seen, volume, np.nan)
+    volume_mean, volume_window_valid = _rolling_stat(
+        volume_for_window, 20, "mean", minimum=20
     )
-    volume_mean, volume_window_valid = _rolling_stat(volume_for_window, 20, "mean")
     with np.errstate(divide="ignore", invalid="ignore"):
         log_volume = np.log(volume_mean)
     assign(17, log_volume, volume_window_valid & (volume_mean > 0))
-    volume_std, _ = _rolling_stat(volume_for_window, 20, "std")
+    volume_std, _ = _rolling_stat(volume_for_window, 20, "std", minimum=20)
     with np.errstate(divide="ignore", invalid="ignore"):
         volume_z = (volume - volume_mean) / volume_std
-    assign(18, volume_z, seen & volume_window_valid & (volume_std > 0))
-    with np.errstate(divide="ignore", invalid="ignore"):
-        amihud_daily = np.abs(returns[1][0]) / volume
-    amihud, amihud_valid = _rolling_stat(amihud_daily, 20, "mean")
+    assign(
+        18,
+        volume_z,
+        activity_seen & volume_window_valid & (volume_std > 0),
+    )
+    amihud_daily = np.full(close.shape, np.nan, dtype=np.float64)
+    amihud_source_valid = (
+        activity_seen & retained_returns[1][1] & np.isfinite(volume) & (volume > 0.0)
+    )
+    amihud_daily[amihud_source_valid] = (
+        np.abs(retained_returns[1][0][amihud_source_valid])
+        / volume[amihud_source_valid]
+    )
+    amihud, amihud_valid = _rolling_stat(
+        amihud_daily, 20, "mean", minimum=20
+    )
     assign(
         19,
         amihud,
         amihud_valid & _ambiguous_interval_clear(ambiguous, 20),
     )
-    trades_for_window = np.where(
-        seen & np.isfinite(trade_count), np.maximum(trade_count, 0.0), np.nan
-    )
-    trades_mean, trades_valid = _rolling_stat(trades_for_window, 20, "mean")
-    trades_std, _ = _rolling_stat(trades_for_window, 20, "std")
+    trades_for_window = np.where(activity_seen, trade_count, np.nan)
+    trades_mean, trades_valid = _rolling_stat(trades_for_window, 20, "mean", minimum=20)
+    trades_std, _ = _rolling_stat(trades_for_window, 20, "std", minimum=20)
     with np.errstate(divide="ignore", invalid="ignore"):
         trades_z = (trade_count - trades_mean) / trades_std
-    assign(20, trades_z, seen & trades_valid & (trades_std > 0))
+    assign(20, trades_z, activity_seen & trades_valid & (trades_std > 0))
     with np.errstate(divide="ignore", invalid="ignore"):
         turnover = volume / volume_mean
-    assign(21, turnover, seen & volume_window_valid & (volume_mean > 0))
+    assign(
+        21,
+        turnover,
+        activity_seen & volume_window_valid & (volume_mean > 0),
+    )
     with np.errstate(divide="ignore", invalid="ignore"):
-        range_1 = np.log(high / low)
-    range_valid = seen & np.isfinite(range_1) & (high > 0) & (low > 0)
+        range_1 = np.log(raw_high_ / raw_low_)
+    range_valid = price_seen & np.isfinite(range_1) & (raw_high_ > 0) & (raw_low_ > 0)
     assign(22, range_1, range_valid)
     range_5, range_5_valid = _rolling_high_low_range(
-        high, low, seen, 5, ambiguous
+        high, low, wealth_seen, 5, ambiguous
     )
     assign(23, range_5, range_5_valid)
     close_location = np.full(close.shape, 0.5, dtype=np.float64)
-    nonzero_range = seen & (high > low)
+    nonzero_range = price_seen & (raw_high_ > raw_low_)
     close_location[nonzero_range] = (
-        (close[nonzero_range] - low[nonzero_range])
-        / (high[nonzero_range] - low[nonzero_range])
-    )
+        raw_close_[nonzero_range] - raw_low_[nonzero_range]
+    ) / (raw_high_[nonzero_range] - raw_low_[nonzero_range])
     assign(
         24,
         close_location,
-        seen & (high >= low) & np.isfinite(close_location),
+        price_seen & (raw_high_ >= raw_low_) & np.isfinite(close_location),
     )
     history_age = np.zeros(close.shape, dtype=np.float64)
     history_left_censored = np.zeros(close.shape, dtype=np.float64)
     history_valid = np.zeros(close.shape, dtype=np.bool_)
     for name in range(close.shape[1]):
-        slots = np.flatnonzero(seen[:, name])
+        slots = np.flatnonzero(history_seen[:, name])
         if slots.size:
             indices = np.arange(slots[0], close.shape[0])
             history_age[indices, name] = indices - slots[0]
@@ -688,8 +751,8 @@ def build_slow_features(
     assign(25, history_age, history_valid)
     assign(26, history_left_censored, history_valid)
 
-    daily_residual = returns[1][0].copy()
-    residual_valid = returns[1][1] & membership
+    daily_residual = retained_returns[1][0].copy()
+    residual_valid = retained_returns[1][1] & membership
     for day in range(close.shape[0]):
         mask = residual_valid[day] & membership[day]
         if mask.any():
@@ -704,13 +767,70 @@ def build_slow_features(
     if labels.shape != close.shape:
         raise ValueError("cluster_labels must have shape [date, name]")
     peer_values, peer_valid = _peer_features(
-        returns[5][0],
-        returns[5][1],
-        returns[21][0],
-        returns[21][1],
+        retained_returns[5][0],
+        retained_returns[5][1],
+        retained_returns[21][0],
+        retained_returns[21][1],
         labels,
         membership,
     )
     for offset in range(5):
         assign(27 + offset, peer_values[..., offset], peer_valid[..., offset])
+    return labels
+
+
+def build_slow_features(
+    shareholder_wealth_open: NDArray[np.floating],
+    shareholder_wealth_high: NDArray[np.floating],
+    shareholder_wealth_low: NDArray[np.floating],
+    shareholder_wealth_close: NDArray[np.floating],
+    volume_brl: NDArray[np.floating],
+    trades: NDArray[np.floating],
+    shareholder_wealth_valid: NDArray[np.bool_],
+    active: NDArray[np.bool_],
+    dates: Sequence[object],
+    *,
+    raw_high: NDArray[np.floating],
+    raw_low: NDArray[np.floating],
+    raw_close: NDArray[np.floating],
+    price_observed: NDArray[np.bool_],
+    history_observed: NDArray[np.bool_],
+    activity_valid: NDArray[np.bool_],
+    cluster_labels: NDArray[np.integer] | None = None,
+    ambiguous_action: NDArray[np.bool_] | None = None,
+) -> SlowFeatureResult:
+    """Convenience in-memory wrapper around the streamed slow producer."""
+
+    shape = np.asarray(shareholder_wealth_close).shape
+    if len(shape) != 2:
+        raise ValueError("shareholder_wealth_close must be [date, name]")
+    values = np.zeros((*shape, len(SLOW_FEATURES)), dtype=np.float32)
+    valid = np.zeros(values.shape, dtype=np.bool_)
+
+    def consume(
+        index: int, column: NDArray[np.floating], mask: NDArray[np.bool_]
+    ) -> None:
+        values[..., index][mask] = np.asarray(column)[mask].astype(np.float32)
+        valid[..., index] = mask
+
+    labels = build_slow_features_into(
+        shareholder_wealth_open,
+        shareholder_wealth_high,
+        shareholder_wealth_low,
+        shareholder_wealth_close,
+        volume_brl,
+        trades,
+        shareholder_wealth_valid,
+        active,
+        dates,
+        raw_high=raw_high,
+        raw_low=raw_low,
+        raw_close=raw_close,
+        price_observed=price_observed,
+        history_observed=history_observed,
+        activity_valid=activity_valid,
+        consume=consume,
+        cluster_labels=cluster_labels,
+        ambiguous_action=ambiguous_action,
+    )
     return SlowFeatureResult(values=values, valid=valid, cluster_labels=labels)

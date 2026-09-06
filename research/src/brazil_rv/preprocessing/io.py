@@ -385,7 +385,7 @@ def validate_session_bars(bars: pl.DataFrame, source_path: Path) -> None:
         | (pl.col("high") < pl.max_horizontal("open", "close"))
         | (pl.col("low") > pl.min_horizontal("open", "close"))
         | ~pl.col("real_volume").is_finite()
-        | (pl.col("real_volume") <= 0)
+        | (pl.col("real_volume") < 0)
         | (pl.col("ts_exchange").dt.second() != 0)
         | (pl.col("ts_exchange").dt.microsecond() != 0)
     )

@@ -1,5 +1,5 @@
 {
-  "schema": "BRAZIL_RV_V2_PROTOCOL_V1",
+  "schema": "BRAZIL_RV_V2_PROTOCOL_V2",
   "name": "triage",
   "folds": ["F1", "F2"],
   "seeds": [11],

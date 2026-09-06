@@ -11,6 +11,7 @@ from brazil_rv.v2.features import (
     pairwise_masked_correlation,
     yang_zhang_volatility,
 )
+from brazil_rv.v2.universe import build_daily_universe
 
 
 def test_rolling_statistics_accept_eighty_percent_complete_window() -> None:
@@ -46,14 +47,10 @@ def test_yang_zhang_matches_hand_computed_fixture() -> None:
     intraday = np.log(close[1:, 0] / open_[1:, 0])
     rs = np.log(high[1:, 0] / close[1:, 0]) * np.log(
         high[1:, 0] / open_[1:, 0]
-    ) + np.log(low[1:, 0] / close[1:, 0]) * np.log(
-        low[1:, 0] / open_[1:, 0]
-    )
+    ) + np.log(low[1:, 0] / close[1:, 0]) * np.log(low[1:, 0] / open_[1:, 0])
     k = 0.34 / (1.34 + 4 / 2)
     expected = np.sqrt(
-        np.var(overnight, ddof=1)
-        + k * np.var(intraday, ddof=1)
-        + (1 - k) * np.mean(rs)
+        np.var(overnight, ddof=1) + k * np.var(intraday, ddof=1) + (1 - k) * np.mean(rs)
     )
     assert valid[3, 0]
     assert result[3, 0] == expected
@@ -117,6 +114,12 @@ def test_slow_features_are_unchanged_by_future_mutation() -> None:
         seen,
         active,
         dates,
+        raw_high=base * 1.01,
+        raw_low=base * 0.99,
+        raw_close=base,
+        price_observed=seen,
+        history_observed=seen,
+        activity_valid=seen,
         cluster_labels=labels,
     )
     changed = base.copy()
@@ -131,6 +134,12 @@ def test_slow_features_are_unchanged_by_future_mutation() -> None:
         seen,
         active,
         dates,
+        raw_high=changed * 1.01,
+        raw_low=changed * 0.99,
+        raw_close=changed,
+        price_observed=seen,
+        history_observed=seen,
+        activity_valid=seen,
         cluster_labels=labels,
     )
     np.testing.assert_array_equal(original.values[70], mutated.values[70])
@@ -160,6 +169,12 @@ def test_cluster_peer_path_is_unchanged_by_future_mutation() -> None:
             seen,
             active,
             dates,
+            raw_high=close * 1.01,
+            raw_low=close * 0.99,
+            raw_close=close,
+            price_observed=seen,
+            history_observed=seen,
+            activity_valid=seen,
             cluster_labels=labels,
         )
 
@@ -196,13 +211,9 @@ def test_vectorized_correlation_and_linkage_are_deterministic() -> None:
 
 
 def test_pairwise_correlation_is_exact_spearman_under_missingness() -> None:
-    values = np.array(
-        [[1.0, 10.0], [2.0, np.nan], [3.0, 30.0], [4.0, 20.0]]
-    )
+    values = np.array([[1.0, 10.0], [2.0, np.nan], [3.0, 30.0], [4.0, 20.0]])
     valid = np.isfinite(values)
-    correlation = pairwise_masked_correlation(
-        values, valid, minimum_observed=3
-    )
+    correlation = pairwise_masked_correlation(values, valid, minimum_observed=3)
     assert correlation[0, 1] == 0.5
     assert correlation[1, 0] == 0.5
 
@@ -225,6 +236,12 @@ def test_five_session_range_is_log_window_extrema_not_mean_daily_range() -> None
         np.ones_like(close, dtype=bool),
         np.ones_like(close, dtype=bool),
         dates,
+        raw_high=high,
+        raw_low=low,
+        raw_close=close,
+        price_observed=np.ones_like(close, dtype=bool),
+        history_observed=np.ones_like(close, dtype=bool),
+        activity_valid=np.ones_like(close, dtype=bool),
         cluster_labels=np.zeros_like(close, dtype=np.int16),
     )
     assert result.valid[64, 0, 23]
@@ -250,6 +267,12 @@ def test_ambiguous_event_masks_only_affected_price_features() -> None:
         np.ones_like(close, dtype=bool),
         np.ones_like(close, dtype=bool),
         dates,
+        raw_high=high,
+        raw_low=low,
+        raw_close=close,
+        price_observed=np.ones_like(close, dtype=bool),
+        history_observed=np.ones_like(close, dtype=bool),
+        activity_valid=np.ones_like(close, dtype=bool),
         cluster_labels=np.zeros_like(close, dtype=np.int16),
         ambiguous_action=unresolved,
     )
@@ -268,6 +291,141 @@ def test_ambiguous_event_masks_only_affected_price_features() -> None:
     assert not result.valid[264, 0, 23]
 
 
+def test_unresolved_wealth_does_not_erase_safe_price_activity_or_history() -> None:
+    days = 65
+    shape = (days, 1)
+    raw_close = np.full(shape, 10.0)
+    raw_high = np.full(shape, 11.0)
+    raw_low = np.full(shape, 9.0)
+    price_observed = np.ones(shape, dtype=np.bool_)
+    price_observed[:10] = False
+    history_observed = np.ones(shape, dtype=np.bool_)
+    wealth = np.zeros(shape, dtype=np.float64)
+    wealth_valid = np.zeros(shape, dtype=np.bool_)
+    activity_valid = np.ones(shape, dtype=np.bool_)
+    dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(days)]
+
+    result = build_slow_features(
+        wealth,
+        wealth,
+        wealth,
+        wealth,
+        np.full(shape, 3_000_000.0),
+        np.full(shape, 1_000.0),
+        wealth_valid,
+        np.ones(shape, dtype=np.bool_),
+        dates,
+        raw_high=raw_high,
+        raw_low=raw_low,
+        raw_close=raw_close,
+        price_observed=price_observed,
+        history_observed=history_observed,
+        activity_valid=activity_valid,
+        cluster_labels=np.zeros(shape, dtype=np.int16),
+        ambiguous_action=np.ones(shape, dtype=np.bool_),
+    )
+
+    # Cross-session wealth fields cannot cross unresolved action coverage.
+    assert not result.valid[64, 0, 0]
+    assert not result.valid[64, 0, 7]
+    assert not result.valid[64, 0, 19]
+    assert not result.valid[64, 0, 23]
+    # Same-session raw-price shape, complete-source activity, and linked raw
+    # observation history remain usable under their independent contracts.
+    assert result.valid[64, 0, 22]
+    assert result.values[64, 0, 22] == np.float32(np.log(11.0 / 9.0))
+    assert result.valid[64, 0, 24]
+    assert result.values[64, 0, 24] == np.float32(0.5)
+    assert result.valid[64, 0, 17]
+    assert result.valid[64, 0, 21]
+    assert result.valid[64, 0, 25]
+    assert result.values[64, 0, 25] == np.float32(64.0)
+    assert result.values[64, 0, 26] == np.float32(1.0)
+
+
+def test_activity_features_and_universe_share_exact_calendar_session_support() -> None:
+    days = 21
+    shape = (days, 1)
+    close = np.full(shape, 10.0)
+    volume = np.arange(1.0, days + 1.0)[:, None]
+    trades = volume * 2.0
+    observed = np.ones(shape, dtype=np.bool_)
+    trade_observed = observed.copy()
+    # A complete-source missing row is a valid no-trade zero.
+    observed[5, 0] = False
+    trade_observed[5, 0] = False
+    volume[5, 0] = 0.0
+    trades[5, 0] = 0.0
+    activity_valid = np.ones(shape, dtype=np.bool_)
+    dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(days)]
+
+    def build(activity: np.ndarray):
+        return build_slow_features(
+            close,
+            close,
+            close,
+            close,
+            volume,
+            trades,
+            np.ones(shape, dtype=np.bool_),
+            np.ones(shape, dtype=np.bool_),
+            dates,
+            raw_high=close,
+            raw_low=close,
+            raw_close=close,
+            price_observed=observed,
+            history_observed=observed,
+            activity_valid=activity,
+            cluster_labels=np.zeros(shape, dtype=np.int16),
+        )
+
+    slow = build(activity_valid)
+    window = volume[:20, 0]
+    expected_mean = np.mean(window)
+    expected_z = (volume[19, 0] - expected_mean) / np.std(window, ddof=0)
+    assert slow.valid[19, 0, 17]
+    assert slow.values[19, 0, 17] == np.float32(np.log(expected_mean))
+    assert slow.values[19, 0, 18] == np.float32(expected_z)
+    assert slow.values[19, 0, 20] == np.float32(expected_z)
+    assert slow.values[19, 0, 21] == np.float32(volume[19, 0] / expected_mean)
+
+    universe = build_daily_universe(
+        close,
+        volume,
+        observed,
+        trade_observed=trade_observed,
+        activity_valid=activity_valid,
+        source_session_complete=np.ones(days, dtype=np.bool_),
+        prior_sessions=20,
+        minimum_traded=19,
+        minimum_median_volume_brl=0.0,
+        minimum_prior_close_brl=1.0,
+        minimum_history_sessions=20,
+    )
+    assert universe.active[20, 0]
+
+    unknown_activity = activity_valid.copy()
+    unknown_activity[5, 0] = False
+    unknown_slow = build(unknown_activity)
+    assert not unknown_slow.valid[19, 0, [17, 18, 20, 21]].any()
+    unknown_source = np.ones(days, dtype=np.bool_)
+    unknown_source[5] = False
+    unknown_universe = build_daily_universe(
+        close,
+        volume,
+        observed,
+        trade_observed=trade_observed,
+        activity_valid=unknown_activity,
+        source_session_complete=unknown_source,
+        prior_sessions=20,
+        minimum_traded=19,
+        minimum_median_volume_brl=0.0,
+        minimum_prior_close_brl=1.0,
+        minimum_history_sessions=20,
+    )
+    assert not unknown_universe.active[20, 0]
+
+
 def test_history_age_is_not_listing_age_and_flat_close_location_is_valid() -> None:
     days = 65
     close = np.full((days, 2), 10.0)
@@ -284,13 +442,18 @@ def test_history_age_is_not_listing_age_and_flat_close_location_is_valid() -> No
         seen,
         seen,
         dates,
+        raw_high=close,
+        raw_low=close,
+        raw_close=close,
+        price_observed=seen,
+        history_observed=seen,
+        activity_valid=seen,
         cluster_labels=np.zeros_like(close, dtype=np.int16),
     )
     assert result.valid[64, :, 24].all()
     np.testing.assert_array_equal(result.values[64, :, 24], [0.5, 0.5])
     np.testing.assert_array_equal(result.values[64, :, 25], [64.0, 54.0])
     np.testing.assert_array_equal(result.values[64, :, 26], [1.0, 0.0])
-
 
 
 def test_monthly_cluster_labels_are_end_to_end_causal() -> None:
@@ -318,13 +481,21 @@ def test_monthly_cluster_labels_are_end_to_end_causal() -> None:
             observed,
             active,
             dates,
+            raw_high=values * 1.01,
+            raw_low=values * 0.99,
+            raw_close=values,
+            price_observed=observed,
+            history_observed=observed,
+            activity_valid=observed,
         ).cluster_labels
 
     original = build(close)
     changed = close.copy()
-    changed[cutoff + 1 :] *= 1.0 + (
-        np.arange(days - cutoff - 1)[:, None] + 1
-    ) * np.linspace(-0.003, 0.003, names)[None, :]
+    changed[cutoff + 1 :] *= (
+        1.0
+        + (np.arange(days - cutoff - 1)[:, None] + 1)
+        * np.linspace(-0.003, 0.003, names)[None, :]
+    )
     mutated = build(changed)
 
     assert (original[cutoff] >= 0).all()

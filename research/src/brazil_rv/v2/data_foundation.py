@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable, Sequence
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-
-from .universe import session_calendar
 
 VALID_ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 CASH_EQUITY_SPECS = frozenset(
@@ -32,6 +30,15 @@ ISIN_LINK_ALLOWLIST_COLUMNS = (
 
 @dataclass(frozen=True)
 class DailyPanel:
+    """Canonical daily observations with independent source/price/activity state.
+
+    ``observed`` is the price-observation mask retained by the store contract.
+    ``trade_observed`` records an actual COTAHIST security row.  In contrast,
+    ``activity_valid`` may also be true with zero activity when the complete
+    daily source contains no row for a security whose causal history has
+    already begun.  A missing/incomplete source session never implies zero.
+    """
+
     dates: NDArray[np.datetime64]
     isins: tuple[str, ...]
     open_brl: NDArray[np.float64]
@@ -43,6 +50,9 @@ class DailyPanel:
     quantity: NDArray[np.float64]
     distribution_number: NDArray[np.float64]
     observed: NDArray[np.bool_]
+    trade_observed: NDArray[np.bool_]
+    activity_valid: NDArray[np.bool_]
+    source_session_complete: NDArray[np.bool_]
 
     def __post_init__(self) -> None:
         shape = (self.dates.size, len(self.isins))
@@ -56,6 +66,8 @@ class DailyPanel:
             self.quantity,
             self.distribution_number,
             self.observed,
+            self.trade_observed,
+            self.activity_valid,
         )
         if self.dates.ndim != 1 or any(value.shape != shape for value in arrays):
             raise ValueError("DailyPanel arrays are not aligned")
@@ -63,8 +75,33 @@ class DailyPanel:
             not VALID_ISIN.fullmatch(value) for value in self.isins
         ):
             raise ValueError("DailyPanel must have unique valid ISIN identities")
-        if self.dates.size and np.any(np.diff(self.dates.astype("datetime64[D]").astype(np.int64)) <= 0):
+        if self.dates.size and np.any(
+            np.diff(self.dates.astype("datetime64[D]").astype(np.int64)) <= 0
+        ):
             raise ValueError("DailyPanel dates must be strictly increasing")
+        if (
+            self.observed.dtype != np.bool_
+            or self.trade_observed.dtype != np.bool_
+            or self.activity_valid.dtype != np.bool_
+            or self.source_session_complete.shape != (self.dates.size,)
+            or self.source_session_complete.dtype != np.bool_
+        ):
+            raise ValueError("DailyPanel observation/completeness masks are invalid")
+        if np.any(self.trade_observed & ~self.activity_valid):
+            raise ValueError("an observed daily activity row must be activity-valid")
+        if np.any(self.observed & ~self.source_session_complete[:, None]):
+            raise ValueError("daily prices cannot be observed on an incomplete source session")
+        if np.any(self.activity_valid & ~self.source_session_complete[:, None]):
+            raise ValueError("activity cannot be valid on an incomplete source session")
+        activity = (self.volume_brl, self.trades, self.quantity)
+        if any(
+            np.any(self.activity_valid & (~np.isfinite(value) | (value < 0.0)))
+            for value in activity
+        ):
+            raise ValueError("valid daily activity must be finite and non-negative")
+        implied_zero = self.activity_valid & ~self.trade_observed
+        if any(np.any(value[implied_zero] != 0.0) for value in activity):
+            raise ValueError("complete-source no-trade activity must be exact zero")
 
 
 @dataclass(frozen=True)
@@ -73,6 +110,7 @@ class DailyValidationResult:
     rejected: pl.DataFrame
     audit_by_year: pl.DataFrame
     exact_duplicate_rows_collapsed: int
+    source_session_dates: tuple[object, ...]
 
     @property
     def rejection_fraction(self) -> float:
@@ -254,6 +292,9 @@ def validate_cotahist_daily(
         rejected=rejected.sort("trade_date", identity),
         audit_by_year=audit,
         exact_duplicate_rows_collapsed=exact_duplicates,
+        source_session_dates=tuple(
+            unique.get_column("trade_date").unique().sort().to_list()
+        ),
     )
     if (
         maximum_rejection_fraction is not None
@@ -274,10 +315,21 @@ def prepare_cash_equities(
     require_units: bool = True,
     maximum_rejection_fraction: float | None = None,
 ) -> DailyValidationResult:
-    return validate_cotahist_daily(
+    result = validate_cotahist_daily(
         _select_cash_equities(daily, v1_isins=v1_isins),
         require_units=require_units,
         maximum_rejection_fraction=maximum_rejection_fraction,
+    )
+    if "trade_date" not in daily.columns:
+        raise ValueError("COTAHIST data must contain trade_date")
+    # Source-session coverage belongs to the physical archive, not to the
+    # filtered cash-equity population.  A source date stays complete even if
+    # no row on it survives the security-type filter.
+    return replace(
+        result,
+        source_session_dates=tuple(
+            daily.get_column("trade_date").unique().sort().to_list()
+        ),
     )
 
 
@@ -502,6 +554,7 @@ def load_isin_link_allowlist(
             "predecessor_last_date",
             pl.col("effective_date").alias("successor_first_date"),
             "continuation_isin",
+            "effective_date",
             *ISIN_LINK_ALLOWLIST_COLUMNS[4:],
         )
     if links.unique(("predecessor_isin", "successor_isin")).height != links.height:
@@ -564,6 +617,7 @@ def load_isin_link_allowlist(
         "predecessor_last_date",
         "successor_first_date",
         "continuation_isin",
+        "effective_date",
         *ISIN_LINK_ALLOWLIST_COLUMNS[4:],
     )
 
@@ -593,46 +647,6 @@ def continuation_identity_axis(
     return tuple(roots[str(isin)] for isin in isins)
 
 
-def inherit_linked_history(
-    values: NDArray[np.generic],
-    dates: Sequence[object],
-    isins: Sequence[str],
-    links: pl.DataFrame,
-    *,
-    copy: bool = True,
-) -> NDArray[np.generic]:
-    """Copy predecessor rows into the successor's strictly prior history.
-
-    The successor's first and later observations are never overwritten.  Links
-    are applied chronologically so a multi-ISIN chain carries its complete
-    causal history forward.
-    """
-
-    source = np.asarray(values)
-    if source.ndim < 2 or source.shape[:2] != (len(dates), len(isins)):
-        raise ValueError("linked-history array is misaligned")
-    if links.is_empty():
-        return source
-    output = source.copy() if copy else source
-    if not output.flags.writeable:
-        raise ValueError("in-place linked-history destination is read-only")
-    date_lookup = {
-        np.datetime64(value, "D"): index for index, value in enumerate(dates)
-    }
-    isin_lookup = {str(value): index for index, value in enumerate(isins)}
-    for row in links.sort("successor_first_date").iter_rows(named=True):
-        successor_date = np.datetime64(row["successor_first_date"], "D")
-        boundary = date_lookup.get(successor_date)
-        predecessor = isin_lookup.get(str(row["predecessor_isin"]))
-        successor = isin_lookup.get(str(row["successor_isin"]))
-        if boundary is None and len(dates) and successor_date < np.datetime64(dates[0], "D"):
-            continue
-        if boundary is None or predecessor is None or successor is None:
-            raise ValueError("ISIN succession link is outside the history axes")
-        output[:boundary, successor] = output[:boundary, predecessor]
-    return output
-
-
 def verify_v1_mapping(assignments: pl.DataFrame, available_isins: Sequence[str]) -> pl.DataFrame:
     """Verify and return the exact one-to-one v1 security-id to ISIN mapping."""
 
@@ -655,17 +669,22 @@ def verify_v1_mapping(assignments: pl.DataFrame, available_isins: Sequence[str])
 def panel_from_daily(
     daily: pl.DataFrame,
     *,
-    dates: Sequence[object] | None = None,
+    dates: Sequence[object],
+    source_session_complete: Sequence[bool],
     isins: Sequence[str] | None = None,
+    invalid_observations: pl.DataFrame | None = None,
 ) -> DailyPanel:
     identity = _identity_column(daily)
-    calendar = tuple(dates) if dates is not None else session_calendar(daily)
+    calendar = tuple(dates)
     security_axis = tuple(sorted(isins if isins is not None else daily.get_column(identity).unique().to_list()))
     if len(set(security_axis)) != len(security_axis):
         raise ValueError("duplicate ISIN on requested axis")
     date_lookup = {value: index for index, value in enumerate(calendar)}
     isin_lookup = {value: index for index, value in enumerate(security_axis)}
     shape = (len(calendar), len(security_axis))
+    complete = np.asarray(source_session_complete, dtype=np.bool_)
+    if complete.shape != (len(calendar),):
+        raise ValueError("source_session_complete must align with the date axis")
     values = {
         name: np.full(shape, np.nan, dtype=np.float64)
         for name in (
@@ -680,6 +699,17 @@ def panel_from_daily(
         )
     }
     observed = np.zeros(shape, dtype=np.bool_)
+    trade_observed = np.zeros(shape, dtype=np.bool_)
+    excluded = np.zeros(shape, dtype=np.bool_)
+    if invalid_observations is not None and invalid_observations.height:
+        invalid_identity = _identity_column(invalid_observations)
+        for invalid_date, invalid_isin in invalid_observations.select(
+            "trade_date", invalid_identity
+        ).iter_rows():
+            date_index = date_lookup.get(invalid_date)
+            isin_index = isin_lookup.get(invalid_isin)
+            if date_index is not None and isin_index is not None:
+                excluded[date_index, isin_index] = True
     needed = {"trade_date", identity, *(set(values) - {"distribution_number"})}
     if not needed.issubset(daily.columns):
         raise ValueError(f"daily panel columns missing: {sorted(needed - set(daily.columns))}")
@@ -699,9 +729,26 @@ def panel_from_daily(
             value = row[name]
             values[name][date_index, isin_index] = np.nan if value is None else float(value)
         observed[date_index, isin_index] = True
+        trade_observed[date_index, isin_index] = True
+
+    activity_valid = np.zeros(shape, dtype=np.bool_)
+    for isin_index in range(len(security_axis)):
+        history_started = np.maximum.accumulate(
+            observed[:, isin_index] | trade_observed[:, isin_index]
+        )
+        activity_valid[:, isin_index] = (
+            complete & history_started & ~excluded[:, isin_index]
+        )
+    implied_no_trade = activity_valid & ~trade_observed
+    for name in ("volume_brl", "trades", "quantity"):
+        values[name][implied_no_trade] = 0.0
+        values[name][~activity_valid] = np.nan
     return DailyPanel(
         dates=np.asarray(calendar, dtype="datetime64[D]"),
         isins=security_axis,
         observed=observed,
+        trade_observed=trade_observed,
+        activity_valid=activity_valid,
+        source_session_complete=complete,
         **values,
     )

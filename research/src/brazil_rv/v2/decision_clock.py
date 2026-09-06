@@ -147,7 +147,22 @@ def load_session_schedule(path: Path) -> tuple[SessionDefinition, ...]:
             auction_close=_parse_clock(row["auction_close"], field="auction_close"),
             source=str(row["source"]).strip(),
         )
-        if not session.source:
+        rows.append(session)
+    schedule = tuple(rows)
+    validate_session_schedule(schedule)
+    return schedule
+
+
+def validate_session_schedule(schedule: Sequence[SessionDefinition]) -> None:
+    """Validate an in-memory schedule at the same boundary as a loaded one."""
+
+    if not schedule:
+        raise ValueError("session schedule must be nonempty")
+    dates = [row.trade_date for row in schedule]
+    if dates != sorted(dates) or len(set(dates)) != len(dates):
+        raise ValueError("session schedule dates must be unique and chronological")
+    for session in schedule:
+        if not session.source.strip():
             raise ValueError("session schedule row lacks source attribution")
         if session.decision_time != DECISION_TIME:
             raise ValueError("v2 session schedule must use the 15:45 decision")
@@ -158,8 +173,6 @@ def load_session_schedule(path: Path) -> tuple[SessionDefinition, ...]:
             <= session.auction_close
         ):
             raise ValueError(f"invalid session clock ordering on {session.trade_date}")
-        rows.append(session)
-    return tuple(rows)
 
 
 def schedule_frame(schedule: Sequence[SessionDefinition]) -> pl.DataFrame:
@@ -197,6 +210,7 @@ def calendar_completeness_table(
 def assert_calendar_complete(
     schedule: Sequence[SessionDefinition], archive_dates: Sequence[date]
 ) -> None:
+    validate_session_schedule(schedule)
     mismatches = calendar_completeness_table(schedule, archive_dates)
     if mismatches.height:
         preview = mismatches.head(20).to_dicts()

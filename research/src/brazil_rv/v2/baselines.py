@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
 
+from .data import read_scalar_feature_view
 from .normalization import average_ranks, rank_gauss_panel
+from .store import V2Store
 
 
 @dataclass(frozen=True)
@@ -27,44 +30,47 @@ def rank_gaussianize(
 
 
 def _lagged_return(
-    close: NDArray[np.floating],
-    observed: NDArray[np.bool_],
+    shareholder_wealth_close: NDArray[np.floating],
+    shareholder_wealth_valid: NDArray[np.bool_],
     active: NDArray[np.bool_],
-    ambiguous_action: NDArray[np.bool_],
+    decision_action_boundary: NDArray[np.bool_],
     *,
     recent_lag: int,
     distant_lag: int,
     sign: float,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
-    ambiguous = np.asarray(ambiguous_action, dtype=np.bool_)
+    action_boundary = np.asarray(decision_action_boundary, dtype=np.bool_)
     if (
-        close.ndim != 2
-        or observed.shape != close.shape
-        or active.shape != close.shape
-        or ambiguous.shape != close.shape
+        shareholder_wealth_close.ndim != 2
+        or shareholder_wealth_valid.shape != shareholder_wealth_close.shape
+        or active.shape != shareholder_wealth_close.shape
+        or action_boundary.shape != shareholder_wealth_close.shape
     ):
         raise ValueError(
-            "close, observed, active, and ambiguous_action must have shape [date, name]"
+            "shareholder wealth, validity, active, and decision_action_boundary "
+            "must have shape [date, name]"
         )
     if not 0 <= recent_lag < distant_lag:
         raise ValueError("baseline lags must satisfy 0 <= recent < distant")
-    values = np.zeros(close.shape, dtype=np.float64)
-    mask = np.zeros(close.shape, dtype=bool)
-    cumulative = np.cumsum(ambiguous, axis=0, dtype=np.int32)
-    for date in range(distant_lag, close.shape[0]):
+    values = np.zeros(shareholder_wealth_close.shape, dtype=np.float64)
+    mask = np.zeros(shareholder_wealth_close.shape, dtype=bool)
+    cumulative = np.cumsum(action_boundary, axis=0, dtype=np.int32)
+    for date in range(distant_lag, shareholder_wealth_close.shape[0]):
         recent = date - recent_lag
         distant = date - distant_lag
         valid = (
             active[date]
-            & observed[recent]
-            & observed[distant]
-            & np.isfinite(close[recent])
-            & np.isfinite(close[distant])
-            & (close[distant] > 0)
+            & shareholder_wealth_valid[recent]
+            & shareholder_wealth_valid[distant]
+            & np.isfinite(shareholder_wealth_close[recent])
+            & np.isfinite(shareholder_wealth_close[distant])
+            & (shareholder_wealth_close[distant] > 0)
             & (cumulative[recent] - cumulative[distant] == 0)
         )
         values[date, valid] = sign * (
-            close[recent, valid] / close[distant, valid] - 1.0
+            shareholder_wealth_close[recent, valid]
+            / shareholder_wealth_close[distant, valid]
+            - 1.0
         )
         mask[date] = valid
     return values, mask
@@ -82,54 +88,53 @@ def _rank_panel(values: NDArray[np.floating], mask: NDArray[np.bool_]) -> Baseli
 
 
 def build_baselines(
-    close: NDArray[np.floating],
-    observed: NDArray[np.bool_],
+    shareholder_wealth_close: NDArray[np.floating],
+    shareholder_wealth_valid: NDArray[np.bool_],
     active: NDArray[np.bool_],
-    ambiguous_action: NDArray[np.bool_],
-    yang_zhang_vol_20: NDArray[np.floating],
-    yang_zhang_vol_20_valid: NDArray[np.bool_],
-    *,
-    slow_lag: int = 1,
+    decision_action_boundary: NDArray[np.bool_],
+    target_scale_sigma: NDArray[np.floating],
 ) -> dict[str, BaselinePanel]:
-    """Build causal ranks; fine-tuning uses t-1 slow data (``slow_lag=1``)."""
+    """Build decision-time baseline ranks from canonical raw inputs.
 
-    if slow_lag not in (0, 1):
-        raise ValueError(
-            "slow_lag must be zero for pretraining or one for v2 fine/eval"
-        )
-    close_values = np.asarray(close, dtype=np.float64)
-    observed_mask = np.asarray(observed, dtype=bool)
+    Return controls consume the corrected shareholder-wealth series through
+    ``t-1``. ``target_scale_sigma`` is already the canonical decision-row value
+    lagged by the store builder, so inverse volatility consumes row ``t``
+    without applying a second lag.
+    """
+
+    source_lag = 1
+    wealth_values = np.asarray(shareholder_wealth_close, dtype=np.float64)
+    wealth_valid = np.asarray(shareholder_wealth_valid, dtype=bool)
     active_mask = np.asarray(active, dtype=bool)
-    ambiguous = np.asarray(ambiguous_action, dtype=np.bool_)
-    volatility = np.asarray(yang_zhang_vol_20, dtype=np.float64)
-    volatility_valid = np.asarray(yang_zhang_vol_20_valid, dtype=np.bool_)
-    if volatility.shape != close_values.shape or volatility_valid.shape != close_values.shape:
-        raise ValueError("inverse-volatility inputs must have shape [date, name]")
+    action_boundary = np.asarray(decision_action_boundary, dtype=np.bool_)
+    volatility = np.asarray(target_scale_sigma, dtype=np.float64)
+    if volatility.shape != wealth_values.shape:
+        raise ValueError("target_scale_sigma must have shape [date, name]")
     reversal_5, mask_5 = _lagged_return(
-        close_values,
-        observed_mask,
+        wealth_values,
+        wealth_valid,
         active_mask,
-        ambiguous,
-        recent_lag=slow_lag,
-        distant_lag=5 + slow_lag,
+        action_boundary,
+        recent_lag=source_lag,
+        distant_lag=5 + source_lag,
         sign=-1.0,
     )
     reversal_21, mask_21 = _lagged_return(
-        close_values,
-        observed_mask,
+        wealth_values,
+        wealth_valid,
         active_mask,
-        ambiguous,
-        recent_lag=slow_lag,
-        distant_lag=21 + slow_lag,
+        action_boundary,
+        recent_lag=source_lag,
+        distant_lag=21 + source_lag,
         sign=-1.0,
     )
     momentum_12_1, mask_momentum = _lagged_return(
-        close_values,
-        observed_mask,
+        wealth_values,
+        wealth_valid,
         active_mask,
-        ambiguous,
-        recent_lag=21 + slow_lag,
-        distant_lag=252 + slow_lag,
+        action_boundary,
+        recent_lag=21 + source_lag,
+        distant_lag=252 + source_lag,
         sign=1.0,
     )
     blend_mask = mask_5 & mask_momentum
@@ -137,16 +142,13 @@ def build_baselines(
         rank_gaussianize(reversal_5, blend_mask)
         + rank_gaussianize(momentum_12_1, blend_mask)
     )
-    inverse_volatility = np.zeros(close_values.shape, dtype=np.float64)
-    inverse_volatility_mask = np.zeros(close_values.shape, dtype=np.bool_)
-    for day in range(slow_lag, close_values.shape[0]):
-        source = day - slow_lag
+    inverse_volatility = np.zeros(wealth_values.shape, dtype=np.float64)
+    inverse_volatility_mask = np.zeros(wealth_values.shape, dtype=np.bool_)
+    for day in range(wealth_values.shape[0]):
         valid = (
-            active_mask[day]
-            & volatility_valid[source]
-            & np.isfinite(volatility[source])
+            active_mask[day] & np.isfinite(volatility[day]) & (volatility[day] > 0.0)
         )
-        inverse_volatility[day, valid] = -volatility[source, valid]
+        inverse_volatility[day, valid] = -volatility[day, valid]
         inverse_volatility_mask[day] = valid
     return {
         "reversal_5": _rank_panel(reversal_5, mask_5),
@@ -157,3 +159,23 @@ def build_baselines(
             inverse_volatility, inverse_volatility_mask
         ),
     }
+
+
+def build_store_baselines(
+    store: V2Store,
+    date_indices: Sequence[int] | NDArray[np.integer],
+) -> dict[str, BaselinePanel]:
+    """Build baselines on the same canonical decision axes as model consumers."""
+
+    # Baselines consume their declared raw controls, not normalized model
+    # features.  The zero-family view shares the canonical decision axes and
+    # entry eligibility without materializing the full slow feature panel.
+    view = read_scalar_feature_view(store, date_indices, ())
+    indices = view.date_indices
+    return build_baselines(
+        store.read("shareholder_wealth_close", indices),
+        store.read("shareholder_wealth_valid", indices),
+        view.active,
+        store.read("decision_action_boundary_mask", indices),
+        store.read("target_scale_sigma", indices),
+    )

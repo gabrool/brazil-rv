@@ -15,6 +15,7 @@ from brazil_rv.v2.config import (
     load_protocol_preset,
     protocol_preset,
 )
+from brazil_rv.v2.contract import RUN_MANY_PLAN_SCHEMA
 
 
 def _job(root: Path, index: int) -> launcher.TrajectoryJob:
@@ -134,6 +135,8 @@ def test_plan_loader_and_parallel_limit(tmp_path) -> None:
     plan.write_text(
         json.dumps(
             {
+                "schema": RUN_MANY_PLAN_SCHEMA,
+                "phase": "engineering_acceptance",
                 "max_parallel": 2,
                 "jobs": [
                     {
@@ -164,43 +167,36 @@ def test_named_protocol_json_files_match_frozen_presets() -> None:
     assert protocol_preset("full") == FULL_PROTOCOL
 
 
-def test_named_preset_expands_to_train_and_score_commands(tmp_path) -> None:
-    store = tmp_path / "store"
+def test_voided_named_preset_is_hard_disabled(tmp_path) -> None:
     checkpoint = tmp_path / "fast.pt"
     checkpoint.write_bytes(b"accepted-fast-checkpoint")
-    checkpoint_sha = launcher._sha256(checkpoint)
-    jobs, maximum, metadata = launcher.preset_jobs(
-        name="triage",
-        store=store,
-        output_root=tmp_path / "runs",
-        fast_pretrained_checkpoint=checkpoint,
-        fast_pretrained_sha256=checkpoint_sha,
-        sidecars=("events",),
-        compile_forward=False,
-    )
-    assert len(jobs) == 2
-    assert maximum == 1
-    assert metadata["paired_bootstrap_replications"] == 0
-    assert metadata["paired_bootstrap_block_sessions"] == 20
-    assert all("brazil_rv.v2.train" in job.command for job in jobs)
-    assert all("--score-output-dir" in job.command for job in jobs)
-    assert all("--fast-pretrained-checkpoint" in job.command for job in jobs)
-    assert all("--fast-pretrained-sha256" in job.command for job in jobs)
-    assert all("--no-compile-forward" in job.command for job in jobs)
-    assert metadata["fast_pretrained_sha256"] == checkpoint_sha
-
-
-def test_named_preset_rejects_unbound_fast_checkpoint(tmp_path) -> None:
-    checkpoint = tmp_path / "fast.pt"
-    checkpoint.write_bytes(b"accepted-fast-checkpoint")
-    with pytest.raises(ValueError, match="SHA-256 mismatch"):
+    with pytest.raises(RuntimeError, match="voided v2 Round 1/Round 2"):
         launcher.preset_jobs(
             name="triage",
             store=tmp_path / "store",
             output_root=tmp_path / "runs",
             fast_pretrained_checkpoint=checkpoint,
-            fast_pretrained_sha256="0" * 64,
+            fast_pretrained_sha256=launcher._sha256(checkpoint),
         )
+
+
+def test_plan_loader_rejects_stale_schema_and_voided_research_phase(tmp_path) -> None:
+    plan = tmp_path / "plan.json"
+    payload = {
+        "schema": "BRAZIL_RV_V2_RUN_MANY_PLAN_V1",
+        "phase": "engineering_acceptance",
+        "max_parallel": 1,
+        "jobs": [],
+    }
+    plan.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="stale or lacks the current schema"):
+        launcher.load_plan(plan)
+
+    payload["schema"] = RUN_MANY_PLAN_SCHEMA
+    payload["phase"] = "registered_arms"
+    plan.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="voided v2 Round 1/Round 2"):
+        launcher.load_plan(plan)
 
 
 def test_protocol_loader_rejects_any_config_drift(tmp_path) -> None:

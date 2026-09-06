@@ -4,17 +4,21 @@ import argparse
 import hashlib
 import json
 import subprocess
-import sys
 from concurrent.futures import FIRST_EXCEPTION, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
 from .artifacts import write_json_atomic
-from .config import protocol_preset
-from .contract import V1_READ_SEEDS
+from .contract import RUN_MANY_PLAN_SCHEMA, RUN_MANY_RESULT_SCHEMA, V1_READ_SEEDS
 
 MAX_PARALLEL_TRAJECTORIES = 6
+VOIDED_RESEARCH_PLAN_PHASES = frozenset({"stage_P", "registered_arms"})
+VOIDED_PRESET_MESSAGE = (
+    "the triage/full presets belong to the voided v2 Round 1/Round 2 "
+    "registration; create a new hash-bound plan only after engineering "
+    "acceptance and revised preregistration"
+)
 
 
 @dataclass(frozen=True)
@@ -211,7 +215,7 @@ def run_many(
         write_json_atomic(
             launcher_manifest_path,
             {
-                "schema": "BRAZIL_RV_V2_RUN_MANY_V1",
+                "schema": RUN_MANY_RESULT_SCHEMA,
                 "status": "failed" if failed_job is not None else "completed",
                 "max_parallel": max_parallel,
                 "metadata": dict(launcher_metadata or {}),
@@ -244,78 +248,19 @@ def preset_jobs(
     sidecars: Sequence[str] = (),
     compile_forward: bool = True,
 ) -> tuple[tuple[TrajectoryJob, ...], int, dict[str, object]]:
-    """Expand a frozen named preset into full train-and-score trajectories."""
+    """Refuse the superseded named research presets."""
 
-    preset = protocol_preset(name)
-    checkpoint = fast_pretrained_checkpoint.resolve()
-    if not checkpoint.is_file():
-        raise FileNotFoundError(checkpoint)
-    if _sha256(checkpoint) != fast_pretrained_sha256:
-        raise ValueError("fast pretrained checkpoint SHA-256 mismatch")
-    jobs: list[TrajectoryJob] = []
-    for fold in preset.folds:
-        for seed in preset.seeds:
-            run_dir = output_root / f"{fold}_seed{seed}"
-            command = [
-                sys.executable,
-                "-m",
-                "brazil_rv.v2.train",
-                "--store",
-                str(store.resolve()),
-                "--output-dir",
-                str(run_dir.resolve()),
-                "--score-output-dir",
-                str((run_dir / "scores").resolve()),
-                "--stage",
-                "F",
-                "--fold",
-                fold,
-                "--seed",
-                str(seed),
-                "--maximum-epochs",
-                str(preset.max_epochs_override or 20),
-                "--fast-pretrained-checkpoint",
-                str(checkpoint),
-                "--fast-pretrained-sha256",
-                fast_pretrained_sha256,
-            ]
-            if not compile_forward:
-                command.append("--no-compile-forward")
-            for group in sidecars:
-                command.extend(("--sidecar", group))
-            jobs.append(
-                TrajectoryJob(
-                    name=f"{fold}_seed{seed}",
-                    seed=seed,
-                    fold=fold,
-                    run_dir=run_dir,
-                    command=tuple(command),
-                    cwd=Path(__file__).resolve().parents[4],
-                    expected_manifest={
-                        "stage": "F",
-                        "official_validation_accessed": False,
-                        "test_accessed": False,
-                    },
-                )
-            )
-    metadata = {
-        "preset": preset.name,
-        "folds": list(preset.folds),
-        "seeds": list(preset.seeds),
-        "paired_bootstrap_replications": preset.bootstrap_replications,
-        "paired_bootstrap_block_sessions": preset.bootstrap_block_length,
-        "fast_pretrained_checkpoint": str(checkpoint),
-        "fast_pretrained_sha256": fast_pretrained_sha256,
-        "trajectory_contract": (
-            "one chronological stage-F model per fold/seed plus its "
-            "raw-Patience evaluation-window score artifact"
-        ),
-    }
-    return tuple(jobs), preset.max_parallel, metadata
+    del name, store, output_root, fast_pretrained_checkpoint
+    del fast_pretrained_sha256, sidecars, compile_forward
+    raise RuntimeError(VOIDED_PRESET_MESSAGE)
 
 
 def load_plan(path: Path) -> tuple[tuple[TrajectoryJob, ...], int]:
     payload = _read_json(path)
+    if payload.get("schema") != RUN_MANY_PLAN_SCHEMA:
+        raise ValueError("run-many plan is stale or lacks the current schema")
+    if payload.get("phase") in VOIDED_RESEARCH_PLAN_PHASES:
+        raise RuntimeError(VOIDED_PRESET_MESSAGE)
     raw_jobs = payload.get("jobs")
     if not isinstance(raw_jobs, list):
         raise ValueError("run-many plan must contain a jobs list")

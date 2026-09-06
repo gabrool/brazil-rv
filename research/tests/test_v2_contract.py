@@ -10,9 +10,17 @@ from brazil_rv.v2.contract import (
 
 def test_v2_contract_has_frozen_feature_and_horizon_axes() -> None:
     schema = StoreSchema()
-    assert len(SLOW_FEATURES) == 32
-    assert len(INTRADAY_DAILY_FEATURES) == 20
+    assert schema.slow_features == SLOW_FEATURES
+    assert schema.intraday_daily_features == INTRADAY_DAILY_FEATURES
     assert schema.horizons == HORIZONS == (1, 2, 3, 5, 10)
+
+
+def test_store_schema_does_not_hardcode_feature_widths() -> None:
+    schema = StoreSchema(
+        slow_features=("one",), intraday_daily_features=("two", "three")
+    )
+    assert schema.slow_features == ("one",)
+    assert schema.intraday_daily_features == ("two", "three")
 
 
 def test_v2_decision_is_single_1545_cutoff() -> None:

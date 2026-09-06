@@ -15,7 +15,12 @@ from torch.utils.data import DataLoader
 
 from .artifacts import sha256_file, write_json_atomic
 from .config import ModelConfig
-from .contract import HORIZONS, V1_READ_SEEDS
+from .contract import (
+    DECISION_FEATURE_ALIGNMENT,
+    HORIZONS,
+    SCORE_ARTIFACT_SCHEMA,
+    V1_READ_SEEDS,
+)
 from .data import V2DailyDataset, collate_v2_daily
 from .model import DailyMultiHorizonModel
 from .train import (
@@ -73,13 +78,16 @@ def _model_batch(
         "slow_features",
         "slow_feature_mask",
         "slow_history_mask",
+        "slow_feature_age_sessions",
         "active_mask",
+        "current_features",
+        "current_feature_mask",
+        "current_feature_age_sessions",
         "fast_patch_values",
         "fast_patch_valid",
         "fast_patch_mask",
         "fast_name_index",
         "fast_present",
-        "days_since_last_slow_row",
         "fast_state_position",
         "v1_equity_slow",
     }
@@ -101,9 +109,12 @@ def _model_batch(
         "slow_features",
         "slow_feature_mask",
         "slow_history_mask",
+        "slow_feature_age_sessions",
         "active_mask",
+        "current_features",
+        "current_feature_mask",
+        "current_feature_age_sessions",
         "fast_present",
-        "days_since_last_slow_row",
     }
     missing = required - result.keys()
     if missing:
@@ -139,9 +150,12 @@ def _forward(
         batch["slow_feature_mask"],
         batch["slow_history_mask"],
         batch["active_mask"],
+        current_features=batch["current_features"],
+        current_feature_mask=batch["current_feature_mask"],
+        slow_feature_age_sessions=batch["slow_feature_age_sessions"],
+        current_feature_age_sessions=batch["current_feature_age_sessions"],
         fast_patch_mask=batch.get("fast_patch_mask"),
         fast_present=batch.get("fast_present"),
-        days_since_last_slow_row=batch.get("days_since_last_slow_row"),
         fast_state_position=batch.get("fast_state_position"),
         v1_equity_slow=batch.get("v1_equity_slow"),
         fast_patch_values=batch.get("fast_patch_values"),
@@ -206,6 +220,14 @@ def score_checkpoint_artifact(
     checkpoint_contract = _verified_checkpoint_input_contract(checkpoint_payload)
     if checkpoint_contract.get("model_config") != model_config_contract(model_config):
         raise ValueError("scoring model config differs from the checkpoint contract")
+    transfer_chronology_clean = checkpoint_payload.get(
+        "transfer_chronology_clean"
+    )
+    if type(transfer_chronology_clean) is not bool:
+        raise ValueError("stage checkpoint lacks explicit transfer chronology")
+    feature_schema_sha256 = checkpoint_payload.get("feature_schema_sha256")
+    if not isinstance(feature_schema_sha256, str) or len(feature_schema_sha256) != 64:
+        raise ValueError("stage checkpoint lacks its feature-schema SHA-256")
     raw_fast_provenance = checkpoint_payload.get("fast_initialization_provenance")
     if raw_fast_provenance is None:
         fast_provenance: dict[str, object] = {
@@ -229,6 +251,12 @@ def score_checkpoint_artifact(
     )
     if bool(fast_provenance.get("contaminated")) != expected_contamination:
         raise ValueError("checkpoint fast-initialization provenance contradicts config")
+    if expected_contamination and transfer_chronology_clean:
+        raise ValueError("contaminated fast initialization cannot be chronology-clean")
+    if access.get("official_validation_accessed") and not transfer_chronology_clean:
+        raise PermissionError(
+            "official validation refuses chronology-contaminated transfer artifacts"
+        )
     recorded_commit = checkpoint_contract.get("implementation_commit")
     current_commit = _repository_commit_if_available()
     if recorded_commit is not None and current_commit != recorded_commit:
@@ -239,11 +267,20 @@ def score_checkpoint_artifact(
         checkpoint_selection, Mapping
     ):
         raise ValueError("scoring or checkpoint selection provenance is missing")
+    scoring_store = scoring_input.get("store")
+    checkpoint_store = checkpoint_selection.get("store")
+    if (
+        not isinstance(scoring_store, Mapping)
+        or not isinstance(checkpoint_store, Mapping)
+        or scoring_store.get("feature_schema_sha256") != feature_schema_sha256
+        or checkpoint_store.get("feature_schema_sha256") != feature_schema_sha256
+    ):
+        raise ValueError("scoring feature schema differs from the checkpoint")
     if _input_static_identity(scoring_input) != _input_static_identity(
         checkpoint_selection
     ):
         raise ValueError("scoring dataset differs from the checkpoint input identity")
-    expected_alignment = "through_t_minus_1"
+    expected_alignment = DECISION_FEATURE_ALIGNMENT
     expected_dataset_stage = "pretrain" if stage == "P" else "evaluation"
     if (
         dataset.stage != expected_dataset_stage
@@ -342,7 +379,7 @@ def score_checkpoint_artifact(
         config_payload = model_config_contract(model_config)
         index_bytes = np.asarray(expected_indices, dtype="<i8").tobytes()
         manifest = {
-            "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V1",
+            "schema": SCORE_ARTIFACT_SCHEMA,
             "status": "completed",
             "checkpoint": {
                 "path": str(checkpoint),
@@ -354,6 +391,8 @@ def score_checkpoint_artifact(
             },
             "model_config": config_payload,
             "fast_initialization_provenance": fast_provenance,
+            "transfer_chronology_clean": transfer_chronology_clean,
+            "feature_schema_sha256": feature_schema_sha256,
             "checkpoint_input_contract_sha256": checkpoint_contract["sha256"],
             "scoring_input": scoring_input_payload,
             "scoring_input_sha256": scoring_input_sha256,

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 
 from brazil_rv.v2.decision_clock import (
+    SessionDefinition,
     assert_calendar_complete,
     decision_timestamp,
     load_session_schedule,
@@ -59,4 +60,19 @@ def test_authoritative_schedule_loader_and_completeness_gate(tmp_path) -> None:
     ]
     assert_calendar_complete(schedule, [date(2024, 1, 2), date(2024, 1, 3)])
     with pytest.raises(ValueError, match="scheduled_session_missing"):
+        assert_calendar_complete(schedule, [date(2024, 1, 2)])
+
+
+def test_in_memory_schedule_cannot_bypass_canonical_decision_clock() -> None:
+    schedule = (
+        SessionDefinition(
+            trade_date=date(2024, 1, 2),
+            continuous_open=time(10),
+            decision_time=time(15, 44),
+            continuous_close=time(16, 55),
+            auction_close=time(17),
+            source="fixture",
+        ),
+    )
+    with pytest.raises(ValueError, match="15:45"):
         assert_calendar_complete(schedule, [date(2024, 1, 2)])

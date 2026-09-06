@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 from brazil_rv.execution.inputs import load_daily_cdi_rates
 
 from .artifacts import inventory, sha256_file, write_json_atomic
-from .baselines import BaselinePanel, build_baselines
+from .baselines import BaselinePanel, build_store_baselines
 from .config import (
     PROJECT_ROOT,
     PROTOCOL_CONFIG_ROOT,
@@ -32,12 +32,24 @@ from .contract import (
     HORIZONS,
     OFFICIAL_START,
     PRETRAIN_END,
+    SCORE_ARTIFACT_SCHEMA,
+    SIDECAR_FEATURES,
     STORE_START,
 )
-from .data import V2DailyDataset, collate_v2_daily
+from .data import (
+    V2DailyDataset,
+    collate_v2_daily,
+    read_scalar_feature_view,
+    scalar_feature_names,
+)
 from .data_roots import resolve_external_files
 from .evaluate import EvaluationInputs, EvaluationResult, evaluate_scores
-from .gbdt import GBDTConfig, MultiHorizonGBDT, assemble_gbdt_features
+from .gbdt import (
+    GBDTConfig,
+    MultiHorizonGBDT,
+    assemble_gbdt_scalar_view,
+    gbdt_scalar_feature_names,
+)
 from .score import ScoreArtifact, score_checkpoint_artifact
 from .splits import AccessPurpose, development_folds
 from .store import STORE_SCHEMA, V2Store, open_store_for_samples
@@ -61,8 +73,10 @@ _MIN_WINDOW_SESSIONS = max(HORIZONS) + 2
 _REQUIRED_ARRAYS = frozenset(
     {
         "active",
-        "ambiguous_action_mask",
+        "decision_action_boundary_mask",
         "observed",
+        "shareholder_wealth_close",
+        "shareholder_wealth_valid",
         "slow_values",
         "slow_valid",
         "intraday_values",
@@ -82,6 +96,8 @@ _REQUIRED_ARRAYS = frozenset(
         "action_has_action",
         "action_successor_index",
         "action_payment_session",
+        "prior_reference_close",
+        "audit_eventual_survives_to_final_year",
         "target_scale_sigma",
     }
 )
@@ -442,7 +458,7 @@ def _load_score_arrays(
     if not isinstance(manifest, Mapping):
         raise ValueError("score manifest must be an object")
     if (
-        manifest.get("schema") != "BRAZIL_RV_V2_SCORE_ARTIFACT_V1"
+        manifest.get("schema") != SCORE_ARTIFACT_SCHEMA
         or manifest.get("status") != "completed"
     ):
         raise ValueError("score artifact is stale or incomplete")
@@ -593,12 +609,45 @@ def _evaluation_inputs(
         "momentum_12_1",
         "log_return_5",
     )
-    if np.any(indices <= 0):
-        raise ValueError("evaluation diagnostics require a prior slow row")
-    slow_prior = np.asarray(store.read("slow_values", indices - 1))
+    # Store row t is the canonical decision snapshot. Its internally derived
+    # daily fields were sourced from t-1 during construction, so consumers
+    # must not apply another shift here.
+    slow_prior = np.asarray(store.read("slow_values", indices))
     prior_feature_values = {
         name: slow_prior[..., slow_names.index(name)] for name in diagnostic_names
     }
+    history_index = slow_names.index("observed_history_age_sessions")
+    history_valid = np.asarray(store.read("slow_valid", indices), dtype=np.bool_)[
+        ..., history_index
+    ]
+    transformed_history_age = np.asarray(
+        slow_prior[..., history_index], dtype=np.float64
+    )
+    history_age_sessions = np.where(
+        history_valid,
+        np.expm1(np.clip(transformed_history_age, 0.0, 1.0) * np.log1p(252.0)),
+        np.nan,
+    )
+    source_archive_present: dict[str, NDArray[np.bool_]] = {}
+    source_feature_valid: dict[str, NDArray[np.bool_]] = {}
+    for group in SIDECAR_FEATURES:
+        names = feature_names.get(f"sidecar_{group}")
+        if not isinstance(names, list) or not names:
+            continue
+        valid = np.asarray(
+            store.read(f"sidecar_{group}_valid", indices), dtype=np.bool_
+        )
+        ages = np.asarray(
+            store.read(f"sidecar_{group}_age_sessions", indices), dtype=np.float64
+        )
+        source_archive_present[group] = np.any(ages >= 0.0, axis=-1)
+        source_feature_valid[group] = np.any(valid, axis=-1)
+    initial_reference_price = np.asarray(
+        store.read("prior_reference_close", np.asarray([indices[0]], dtype=np.int64))[
+            0
+        ],
+        dtype=np.float64,
+    )
     action_payment_session = np.asarray(
         store.read("action_payment_session", indices), dtype=np.int64
     )
@@ -639,6 +688,14 @@ def _evaluation_inputs(
         cdi_returns=cdi,
         transfer_chronology_clean=transfer_chronology_clean,
         source_artifact_hashes=dict(source_hashes),
+        history_age_sessions=history_age_sessions,
+        source_archive_present=source_archive_present or None,
+        source_feature_valid=source_feature_valid or None,
+        initial_reference_price=initial_reference_price,
+        eventual_survives_to_final_year=np.asarray(
+            store.read("audit_eventual_survives_to_final_year", indices),
+            dtype=np.bool_,
+        ),
     )
 
 
@@ -707,44 +764,36 @@ def _gbdt_features(
     indices: NDArray[np.int64],
     sidecars: Sequence[str],
 ) -> NDArray[np.float32]:
-    if np.any(indices <= 0):
-        raise ValueError("fine-tune GBDT rows require a prior slow session")
-    slow_parts = [store.read("slow_values", indices - 1)]
-    slow_valid_parts = [
-        np.asarray(store.read("slow_valid", indices - 1), dtype=np.bool_)
-    ]
-    slow_parts.extend(
-        store.read(f"sidecar_{group}_values", indices - 1) for group in sidecars
+    if np.any(indices < 0):
+        raise ValueError("GBDT rows are outside the canonical store")
+    slow = read_scalar_feature_view(
+        store,
+        indices,
+        ("slow", *(f"sidecar_{group}" for group in sidecars)),
     )
-    slow_valid_parts.extend(
-        np.asarray(store.read(f"sidecar_{group}_valid", indices - 1), dtype=np.bool_)
-        for group in sidecars
-    )
-    slow = np.concatenate(slow_parts, axis=-1)[:, :, None, :]
-    slow_valid = np.concatenate(slow_valid_parts, axis=-1)[:, :, None, :]
-    intraday = store.read("intraday_values", indices)
-    intraday_valid = np.asarray(store.read("intraday_valid", indices), dtype=np.bool_)
+    current = read_scalar_feature_view(store, indices, ("intraday",))
     fast_present = np.asarray(store.read("fast_present", indices), dtype=np.bool_)
-    days = np.ones(fast_present.shape, dtype=np.float32)
-    return assemble_gbdt_features(
-        slow,
-        intraday,
-        fast_present,
-        days,
-        slow_feature_mask=slow_valid,
-        intraday_feature_mask=intraday_valid,
+    return np.concatenate(
+        (
+            assemble_gbdt_scalar_view(slow, label="slow"),
+            assemble_gbdt_scalar_view(current, label="intraday"),
+            fast_present[..., None],
+        ),
+        axis=-1,
+        dtype=np.float32,
     )
 
 
 def _gbdt_feature_names(store: V2Store, sidecars: Sequence[str]) -> tuple[str, ...]:
-    names = store.manifest.get("feature_names")
-    if not isinstance(names, Mapping):
-        raise ValueError("store manifest lacks feature names")
-    result = list(names.get("slow", ()))
-    for group in sidecars:
-        result.extend(names.get(f"sidecar_{group}", ()))
-    result.extend(names.get("intraday", ()))
-    result.extend(("fast_present", "days_since_last_slow_row"))
+    slow_names = scalar_feature_names(
+        store, ("slow", *(f"sidecar_{group}" for group in sidecars))
+    )
+    intraday_names = scalar_feature_names(store, ("intraday",))
+    result = [
+        *gbdt_scalar_feature_names(slow_names),
+        *gbdt_scalar_feature_names(intraday_names),
+    ]
+    result.append("fast_present")
     if not all(isinstance(value, str) and value for value in result):
         raise ValueError("store feature names are malformed")
     return tuple(result)
@@ -829,23 +878,7 @@ def _run_baselines(
     last_index = max(int(indices[-1]) for indices in fold_indices.values())
     baseline_start = max(0, first_index - 253)
     baseline_indices = np.arange(baseline_start, last_index + 1, dtype=np.int64)
-    close = store.read("raw_close", baseline_indices)
-    observed = np.asarray(store.read("observed", baseline_indices), dtype=np.bool_)
-    active = np.asarray(store.read("active", baseline_indices), dtype=np.bool_)
-    ambiguous = np.asarray(
-        store.read("ambiguous_action_mask", baseline_indices), dtype=np.bool_
-    )
-    names = tuple(store.manifest["feature_names"]["slow"])
-    volatility_index = names.index("yang_zhang_vol_20")
-    panels = build_baselines(
-        close,
-        observed,
-        active,
-        ambiguous,
-        store.read("slow_values", baseline_indices)[..., volatility_index],
-        store.read("slow_valid", baseline_indices)[..., volatility_index],
-        slow_lag=1,
-    )
+    panels = build_store_baselines(store, baseline_indices)
     records: list[dict[str, object]] = []
     for fold, indices in fold_indices.items():
         for name, panel in sorted(panels.items()):
@@ -862,7 +895,7 @@ def _run_baselines(
                     "engine": "naive_baseline",
                     "fold": fold,
                     "baseline": name,
-                    "slow_lag_sessions": 1,
+                    "decision_source_max_session_offset": -1,
                     "date_indices": indices.tolist(),
                 },
             )
@@ -1247,7 +1280,7 @@ def _git_identity() -> dict[str, object]:
 def _validate_sidecars(
     store_manifest: Mapping[str, object], sidecars: Sequence[str]
 ) -> tuple[str, ...]:
-    normalized = tuple(sidecars)
+    normalized = tuple(sorted(sidecars))
     if len(set(normalized)) != len(normalized):
         raise ValueError("enabled sidecar groups must be unique")
     arrays = store_manifest.get("arrays")
@@ -1259,7 +1292,11 @@ def _validate_sidecars(
             raise ValueError(f"invalid sidecar group name: {group!r}")
         values = f"sidecar_{group}_values"
         valid = f"sidecar_{group}_valid"
-        if values not in arrays or valid not in arrays or group not in feature_names:
+        if (
+            values not in arrays
+            or valid not in arrays
+            or f"sidecar_{group}" not in feature_names
+        ):
             raise ValueError(
                 f"store does not contain the requested sidecar group: {group}"
             )
@@ -1685,6 +1722,11 @@ def run_pipeline_validation(
             {
                 "schema": PIPELINE_SCHEMA,
                 "status": "completed",
+                "engineering_acceptance_status": "unsupported",
+                "engineering_acceptance_reasons": [
+                    "neural_network_validation_not_run",
+                    "corporate_action_economics_not_accepted",
+                ],
                 **PIPELINE_FLAGS,
                 "scope": (
                     "development-only integration validation; numbers are not "
@@ -1718,7 +1760,10 @@ def run_pipeline_validation(
                     "gbdt_triage": gbdt_records,
                     "network_smokes": {
                         "status": "not_run",
-                        "reason": "fix-pass-3 acceptance is local CPU classical-only",
+                        "reason": (
+                            "local CPU validation is classical-only and cannot establish "
+                            "engineering acceptance"
+                        ),
                     },
                 },
             },

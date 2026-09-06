@@ -4,7 +4,7 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Literal, Mapping
 
 from .contract import (
     ALLOWED_LOOKBACKS,
@@ -13,15 +13,17 @@ from .contract import (
     DECISION_MINUTE_INDEX,
     GBDT_SEEDS as GBDT_SEEDS,
     HORIZONS as HORIZONS,
+    INTRADAY_DAILY_FEATURES,
+    PROTOCOL_SCHEMA,
     PRIMARY_HORIZONS as PRIMARY_HORIZONS,
     SOFT_RANK_TEMPERATURE,
 )
 
 PERSISTENCE_WEIGHTS = (0.0, 0.1, 0.3)
 SOFT_RANK_TEMPERATURES = (SOFT_RANK_TEMPERATURE, 1.0)
+TO_CLOSE_WEIGHTS = (0.0, 0.2)
 DECISION_CUTOFF_INDEX = DECISION_MINUTE_INDEX
 FAST_PRESENT_FLAG = "fast_present"
-DAYS_SINCE_LAST_SLOW_ROW_FLAG = "days_since_last_slow_row"
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 PROTOCOL_CONFIG_ROOT = PROJECT_ROOT / "research" / "configs" / "v2"
 
@@ -31,6 +33,7 @@ class ModelConfig:
     """Frozen starter-model controls that are independent of a store manifest."""
 
     slow_feature_count: int
+    current_feature_count: int = len(INTRADAY_DAILY_FEATURES)
     slow_lookback: int = DEFAULT_LOOKBACK
     gru_layers: int = 1
     hidden_width: int = 64
@@ -38,10 +41,13 @@ class ModelConfig:
     trunk_blocks: int = 2
     trunk_swiglu_hidden: int = 48
     dropout: float = 0.1
+    fast_encoder_mode: Literal["native", "legacy_v1_contaminated"] = "native"
     fast_pretrained: bool = False
     fast_pretrained_checkpoint: Path | None = None
     fast_pretrained_sha256: str | None = None
+    allow_contaminated_v1_initialization: bool = False
     lambda_persistence: float = 0.0
+    to_close_weight: float = 0.0
     soft_rank_temperature: float = SOFT_RANK_TEMPERATURE
     use_bf16: bool = False
     compile_forward: bool = True
@@ -50,6 +56,8 @@ class ModelConfig:
     def __post_init__(self) -> None:
         if self.slow_feature_count <= 0:
             raise ValueError("slow_feature_count must come from a nonempty store")
+        if self.current_feature_count <= 0:
+            raise ValueError("current_feature_count must come from a nonempty store")
         if self.slow_lookback not in ALLOWED_LOOKBACKS:
             raise ValueError("slow_lookback must be 20, 60, or 120 sessions")
         if self.gru_layers not in (1, 2):
@@ -68,6 +76,8 @@ class ModelConfig:
             raise ValueError("dropout must be finite and in [0, 1)")
         if self.lambda_persistence not in PERSISTENCE_WEIGHTS:
             raise ValueError("lambda_persistence is outside the frozen grid")
+        if self.to_close_weight not in TO_CLOSE_WEIGHTS:
+            raise ValueError("to_close_weight must be 0.0 or 0.2")
         if self.soft_rank_temperature not in SOFT_RANK_TEMPERATURES:
             raise ValueError("soft-rank temperature is outside the frozen grid")
         if self.time_decay_half_life_sessions not in (None, 756.0):
@@ -86,6 +96,21 @@ class ModelConfig:
             )
         ):
             raise ValueError("fast_pretrained_sha256 must be lowercase hexadecimal")
+        if self.fast_encoder_mode == "native":
+            if self.fast_pretrained or self.allow_contaminated_v1_initialization:
+                raise ValueError(
+                    "native fast initialization must be fresh and uncontaminated"
+                )
+        elif self.fast_encoder_mode == "legacy_v1_contaminated":
+            if not self.allow_contaminated_v1_initialization:
+                raise ValueError(
+                    "legacy v1 fast initialization requires the explicit "
+                    "allow_contaminated_v1_initialization flag"
+                )
+        else:
+            raise ValueError("fast_encoder_mode is not recognized")
+        if self.fast_pretrained and self.fast_encoder_mode != "legacy_v1_contaminated":
+            raise ValueError("v1 fast checkpoints require the contaminated legacy mode")
 
 
 @dataclass(frozen=True)
@@ -137,7 +162,7 @@ PROTOCOL_PRESETS = {
 
 def _expected_protocol_payload(preset: ProtocolPreset) -> dict[str, object]:
     return {
-        "schema": "BRAZIL_RV_V2_PROTOCOL_V1",
+        "schema": PROTOCOL_SCHEMA,
         "name": preset.name,
         "folds": list(preset.folds),
         "seeds": list(preset.seeds),

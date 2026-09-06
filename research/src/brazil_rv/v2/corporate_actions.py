@@ -59,15 +59,6 @@ def _sha256(path: Path) -> str:
 
 
 @dataclass(frozen=True)
-class AdjustmentResult:
-    price_factor: NDArray[np.float64]
-    adjusted_open: NDArray[np.float64]
-    adjusted_high: NDArray[np.float64]
-    adjusted_low: NDArray[np.float64]
-    adjusted_close: NDArray[np.float64]
-
-
-@dataclass(frozen=True)
 class DetectedActionResult:
     """Audit-only COTAHIST action classification on the daily panel.
 
@@ -117,8 +108,10 @@ class VerifiedActionTerm:
             raise ValueError(f"unsupported action type: {self.action_type}")
         if not self.isin or not self.source or not self.evidence:
             raise ValueError("verified actions require ISIN, source, and evidence")
-        if not self.currency or not self.coverage_status:
-            raise ValueError("verified actions require currency and coverage status")
+        if self.currency not in {"BRL", "R$"} or not self.coverage_status:
+            raise ValueError(
+                "verified actions require BRL currency and coverage status"
+            )
         if self.sequence < 0:
             raise ValueError("action sequence must be non-negative")
         _require_aware_timestamp(self.available_at, "available_at")
@@ -145,11 +138,13 @@ class VerifiedActionTerm:
             raise ValueError("unresolved actions cannot carry economic fallback terms")
         if (
             self.resolved
-            and q != 1.0
+            and (q != 1.0 or self.action_type == "simple_conversion")
             and d != 0.0
             and self.effective_date != self.ex_date
         ):
-            raise ValueError("combined q/d terms require one common event session")
+            raise ValueError(
+                "combined conversion/share and cash terms require one common event session"
+            )
 
 
 @dataclass(frozen=True)
@@ -200,6 +195,7 @@ def validate_verified_action_terms(
         event_date = (
             term.effective_date
             if term.shares_per_prior_share != 1.0
+            or term.action_type == "simple_conversion"
             else term.ex_date
         )
         key = (term.isin, event_date, term.sequence)
@@ -331,17 +327,88 @@ def provider_actions_to_verified_terms(
     return validate_verified_action_terms(terms)
 
 
+def verified_conversion_terms_from_links(
+    links: pl.DataFrame,
+) -> tuple[VerifiedActionTerm, ...]:
+    """Convert source-audited ISIN-link rows into contractual action terms.
+
+    The identity foundation is responsible for candidate/allowlist matching.
+    This boundary preserves the verified conversion ratio, cash, effective
+    session, first-known timestamp, and evidence in the one canonical action
+    representation used by targets and accounting.
+    """
+
+    if links.is_empty():
+        return ()
+    required = {
+        "predecessor_isin",
+        "successor_isin",
+        "effective_date",
+        "first_known_at",
+        "shares_received_per_prior_share",
+        "cash_entitlement_per_prior_share",
+        "currency",
+        "source",
+        "evidence_sha256",
+    }
+    missing = required - set(links.columns)
+    if missing:
+        raise ValueError(
+            f"verified ISIN conversions are missing columns: {sorted(missing)}"
+        )
+    terms: list[VerifiedActionTerm] = []
+    for row in links.sort(
+        "effective_date", "predecessor_isin", "successor_isin"
+    ).iter_rows(named=True):
+        first_known = row["first_known_at"]
+        effective = row["effective_date"]
+        evidence_sha256 = str(row["evidence_sha256"])
+        if not isinstance(first_known, datetime):
+            raise ValueError("verified ISIN conversions require first_known_at")
+        _require_aware_timestamp(first_known, "first_known_at")
+        if not isinstance(effective, date):
+            raise ValueError("verified ISIN conversions require effective_date")
+        if len(evidence_sha256) != 64 or any(
+            character not in "0123456789abcdef" for character in evidence_sha256
+        ):
+            raise ValueError("verified ISIN conversion evidence must be a SHA-256")
+        terms.append(
+            VerifiedActionTerm(
+                action_type="simple_conversion",
+                isin=str(row["predecessor_isin"]),
+                issuer_id=None,
+                effective_date=effective,
+                ex_date=effective,
+                payment_date=None,
+                announced_at=None,
+                available_at=first_known,
+                shares_per_prior_share=float(row["shares_received_per_prior_share"]),
+                cash_per_prior_share=float(row["cash_entitlement_per_prior_share"]),
+                currency=str(row["currency"]),
+                source=str(row["source"]),
+                evidence=f"sha256:{evidence_sha256}",
+                coverage_status="verified_isin_conversion_allowlist",
+                resulting_isin=str(row["successor_isin"]),
+            )
+        )
+    return validate_verified_action_terms(terms)
+
+
 def action_coverage_resolved_mask(
     acquisition_audit: pl.DataFrame,
     dates: Sequence[date | np.datetime64],
     isins: Sequence[str],
 ) -> NDArray[np.bool_]:
-    """Map successfully observed provider segments onto the session/name grid.
+    """Map *economically complete* source segments onto the session/name grid.
 
-    Absence of an action row is evidence of no action only inside a successfully
-    acquired ticker segment.  Failed or overlapping contradictory acquisition
-    coverage remains unresolved.  This deliberately does not infer coverage
-    from price continuity or DISMES.
+    A successful provider request proves only that its advertised action
+    taxonomy was queried.  It does not prove that every split, bonus, JCP,
+    right, conversion, or cash entitlement is represented.  Consequently a
+    segment resolves no-action cells only when its acquisition audit carries
+    ``economic_terms_complete=True`` from independently verified source
+    evidence.  Missing/false flags are the safe default and leave the segment
+    unresolved.  Explicit verified action rows remain usable on their own
+    event cells when aligned below.
     """
 
     required = {"isin", "first_date", "last_date", "status"}
@@ -366,9 +433,10 @@ def action_coverage_resolved_mask(
             raise ValueError("action acquisition segment ends before it starts")
         covered = (normalized_dates >= first) & (normalized_dates <= last)
         is_failure = str(row["status"]).casefold() == "failed"
+        economically_complete = bool(row.get("economic_terms_complete") or False)
         if is_failure:
             failure[covered, name] = True
-        else:
+        elif economically_complete:
             success[covered, name] = True
     return success & ~failure
 
@@ -380,13 +448,66 @@ def align_verified_action_terms(
     *,
     coverage_resolved: NDArray[np.bool_],
 ) -> AlignedActionTerms:
-    """Align contractual q/d terms without treating absent evidence as coverage.
+    """Align retrospective contractual terms for outcomes and accounting.
 
     ``coverage_resolved`` is mandatory: an empty action table alone does not
     prove that a name/session had no action.  Multiple terms are applied in
     their declared sequence and collapsed to q/d in the session's opening
-    share units.
+    share units.  This retrospective alignment may use terms acquired after an
+    event, so it must not be used for historical decision-time features; use
+    :func:`align_decision_known_action_terms` for that purpose.
     """
+
+    return _align_verified_action_terms(
+        terms,
+        dates,
+        isins,
+        coverage_resolved=coverage_resolved,
+        decision_timestamps=None,
+    )
+
+
+def align_decision_known_action_terms(
+    terms: Sequence[VerifiedActionTerm],
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+    *,
+    coverage_resolved: NDArray[np.bool_],
+    decision_timestamps: Sequence[datetime],
+) -> AlignedActionTerms:
+    """Align only action components known by each historical decision.
+
+    A term acquired after its event is deliberately absent from that earlier
+    snapshot.  Retrospective settlement callers use
+    :func:`align_verified_action_terms` instead.  Keeping the two entry points
+    distinct prevents later action evidence from rewriting historical model
+    inputs or their masks.
+    """
+
+    cutoffs = tuple(decision_timestamps)
+    if len(cutoffs) != len(dates):
+        raise ValueError("decision timestamps must align the action date axis")
+    for cutoff in cutoffs:
+        _require_aware_timestamp(cutoff, "decision timestamp")
+    if any(left >= right for left, right in zip(cutoffs, cutoffs[1:], strict=False)):
+        raise ValueError("decision timestamps must be strictly chronological")
+    return _align_verified_action_terms(
+        terms,
+        dates,
+        isins,
+        coverage_resolved=coverage_resolved,
+        decision_timestamps=cutoffs,
+    )
+
+
+def _align_verified_action_terms(
+    terms: Sequence[VerifiedActionTerm],
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+    *,
+    coverage_resolved: NDArray[np.bool_],
+    decision_timestamps: Sequence[datetime] | None,
+) -> AlignedActionTerms:
 
     normalized_dates = tuple(
         value.astype(object) if isinstance(value, np.datetime64) else value
@@ -399,9 +520,7 @@ def align_verified_action_terms(
     resolved = resolved.copy()
     date_lookup = {value: index for index, value in enumerate(normalized_dates)}
     isin_lookup = {value: index for index, value in enumerate(isins)}
-    grouped: dict[
-        tuple[int, int], list[tuple[int, float, float, bool, int]]
-    ] = {}
+    grouped: dict[tuple[int, int], list[tuple[int, float, float, bool, int]]] = {}
     has_action = np.zeros(shape, dtype=np.bool_)
     for term in validate_verified_action_terms(terms):
         name = isin_lookup.get(term.isin)
@@ -415,16 +534,22 @@ def align_verified_action_terms(
         if term.resulting_isin is not None and successor is None:
             raise ValueError("a resolved conversion successor is outside the ISIN axis")
         components: list[tuple[date, float, float, int]] = []
-        if (
-            term.shares_per_prior_share != 1.0
-            and term.cash_per_prior_share != 0.0
-        ):
+        if term.action_type == "simple_conversion":
             components.append(
                 (
-                    term.ex_date,
+                    term.effective_date,
                     term.shares_per_prior_share,
                     term.cash_per_prior_share,
                     int(successor),
+                )
+            )
+        elif term.shares_per_prior_share != 1.0 and term.cash_per_prior_share != 0.0:
+            components.append(
+                (
+                    term.effective_date,
+                    term.shares_per_prior_share,
+                    term.cash_per_prior_share,
+                    name,
                 )
             )
         else:
@@ -438,14 +563,24 @@ def align_verified_action_terms(
                     )
                 )
             if term.cash_per_prior_share != 0.0:
-                components.append(
-                    (term.ex_date, 1.0, term.cash_per_prior_share, name)
-                )
+                components.append((term.ex_date, 1.0, term.cash_per_prior_share, name))
             if not components:
                 components.append((term.ex_date, 1.0, 0.0, int(successor)))
         for event_date, q, d, next_name in components:
             day = date_lookup.get(event_date)
             if day is None:
+                continue
+            if (
+                decision_timestamps is not None
+                and term.available_at > decision_timestamps[day]
+            ):
+                # The retrospective archive proves that an action affected this
+                # session, but its contractual terms were unavailable at the
+                # historical decision.  Keep it out of the decision-known
+                # action signal while explicitly breaking the unit/wealth
+                # chain; treating the absent terms as q=1, d=0 would silently
+                # manufacture a known cross-session return.
+                resolved[day, name] = False
                 continue
             has_action[day, name] = True
             grouped.setdefault((day, name), []).append(
@@ -458,6 +593,11 @@ def align_verified_action_terms(
         np.arange(len(isins), dtype=np.int64), shape
     ).copy()
     for (day, name), rows in grouped.items():
+        # A source-verified term resolves this event even when the broader
+        # acquisition audit cannot prove that every no-action session in the
+        # surrounding segment was observed.  Coverage remains the authority
+        # only for cells without an explicit term.
+        resolved[day, name] = True
         q_total = 1.0
         d_total = 0.0
         next_name = name
@@ -506,9 +646,7 @@ def align_action_payment_sessions(
     if len(isin_lookup) != len(isins):
         raise ValueError("payment alignment ISIN axis must be unique")
 
-    output = np.full(
-        (normalized_dates.size, len(isins)), -1, dtype=np.int64
-    )
+    output = np.full((normalized_dates.size, len(isins)), -1, dtype=np.int64)
     payment_by_event: dict[tuple[int, int], date | None] = {}
     for term in validate_verified_action_terms(terms):
         if not term.resolved or term.cash_per_prior_share == 0.0:
@@ -521,9 +659,8 @@ def align_action_payment_sessions(
                 normalized_dates, np.datetime64(term.ex_date, "D"), side="left"
             )
         )
-        if (
-            event >= normalized_dates.size
-            or normalized_dates[event] != np.datetime64(term.ex_date, "D")
+        if event >= normalized_dates.size or normalized_dates[event] != np.datetime64(
+            term.ex_date, "D"
         ):
             continue
         key = (event, name)
@@ -578,7 +715,9 @@ def apply_contractual_action(
         or (q < 0.0).any()
         or (d < 0.0).any()
     ):
-        raise ValueError("action holdings and terms must be finite, with q/d non-negative")
+        raise ValueError(
+            "action holdings and terms must be finite, with q/d non-negative"
+        )
     new_cash = cash_array + share_array * d
     new_shares = share_array * q
     if new_shares.ndim == 0:
@@ -604,9 +743,43 @@ def build_shareholder_wealth_ohlc(
     volatility estimate.
     """
 
+    shape = np.asarray(raw_close).shape
+    outputs = [np.empty(shape, dtype=np.float64) for _ in range(4)]
+    valid = np.empty(shape, dtype=np.bool_)
+    build_shareholder_wealth_ohlc_into(
+        raw_open,
+        raw_high,
+        raw_low,
+        raw_close,
+        observed,
+        actions,
+        wealth_open=outputs[0],
+        wealth_high=outputs[1],
+        wealth_low=outputs[2],
+        wealth_close=outputs[3],
+        wealth_valid=valid,
+    )
+    return ShareholderWealthOHLC(*outputs, valid)
+
+
+def build_shareholder_wealth_ohlc_into(
+    raw_open: NDArray[np.floating],
+    raw_high: NDArray[np.floating],
+    raw_low: NDArray[np.floating],
+    raw_close: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    actions: AlignedActionTerms,
+    *,
+    wealth_open: NDArray[np.floating],
+    wealth_high: NDArray[np.floating],
+    wealth_low: NDArray[np.floating],
+    wealth_close: NDArray[np.floating],
+    wealth_valid: NDArray[np.bool_],
+) -> None:
+    """Write shareholder-wealth OHLC directly to caller-owned storage."""
+
     open_, high, low, close = (
-        np.asarray(value, dtype=np.float64)
-        for value in (raw_open, raw_high, raw_low, raw_close)
+        np.asarray(value) for value in (raw_open, raw_high, raw_low, raw_close)
     )
     seen = np.asarray(observed, dtype=np.bool_)
     shape = close.shape
@@ -615,7 +788,9 @@ def build_shareholder_wealth_ohlc(
         actions.cash_per_prior_share,
         actions.session_resolved,
     )
-    if close.ndim != 2 or any(value.shape != shape for value in (open_, high, low, seen)):
+    if close.ndim != 2 or any(
+        value.shape != shape for value in (open_, high, low, seen)
+    ):
         raise ValueError("raw OHLC and observed must align [date, name]")
     if any(np.asarray(value).shape != shape for value in action_arrays):
         raise ValueError("aligned action arrays do not match OHLC")
@@ -627,7 +802,11 @@ def build_shareholder_wealth_ohlc(
         if actions.successor_index is None
         else np.asarray(actions.successor_index, dtype=np.int64)
     )
-    if successor.shape != shape or (successor < 0).any() or (successor >= shape[1]).any():
+    if (
+        successor.shape != shape
+        or (successor < 0).any()
+        or (successor >= shape[1]).any()
+    ):
         raise ValueError("action successor indices are invalid")
     raw_valid = (
         seen
@@ -647,8 +826,23 @@ def build_shareholder_wealth_ohlc(
     if invalid_terms.any():
         raise ValueError("resolved action terms must have finite non-negative q/d")
 
-    outputs = [np.full(shape, np.nan, dtype=np.float64) for _ in range(4)]
-    valid = np.zeros(shape, dtype=np.bool_)
+    outputs = [
+        np.asarray(value)
+        for value in (wealth_open, wealth_high, wealth_low, wealth_close)
+    ]
+    valid = np.asarray(wealth_valid)
+    if (
+        any(
+            value.shape != shape or not np.issubdtype(value.dtype, np.floating)
+            for value in outputs
+        )
+        or valid.shape != shape
+        or valid.dtype != np.bool_
+    ):
+        raise ValueError("shareholder-wealth destinations are misaligned")
+    for output in outputs:
+        output[...] = 0.0
+    valid[...] = False
     nontrivial = (q != 1.0) | (d != 0.0)
     for name in range(shape[1]):
         claim = name
@@ -662,9 +856,7 @@ def build_shareholder_wealth_ohlc(
             if day == 0 or not valid[day - 1, name]:
                 if nontrivial[day, prior_claim] or claim != prior_claim:
                     continue
-                for output, raw in zip(
-                    outputs, (open_, high, low, close), strict=True
-                ):
+                for output, raw in zip(outputs, (open_, high, low, close), strict=True):
                     output[day, name] = raw[day, claim]
                 valid[day, name] = True
                 continue
@@ -677,10 +869,7 @@ def build_shareholder_wealth_ohlc(
             for raw in (open_, high, low, close):
                 candidates.append(
                     scale
-                    * (
-                        q[day, prior_claim] * raw[day, claim]
-                        + d[day, prior_claim]
-                    )
+                    * (q[day, prior_claim] * raw[day, claim] + d[day, prior_claim])
                 )
             if not all(np.isfinite(value) and value > 0.0 for value in candidates):
                 continue
@@ -689,7 +878,6 @@ def build_shareholder_wealth_ohlc(
                     q[day, prior_claim] * raw[day, claim] + d[day, prior_claim]
                 )
             valid[day, name] = True
-    return ShareholderWealthOHLC(*outputs, valid)
 
 
 def normalize_yfinance_actions(
@@ -703,7 +891,9 @@ def normalize_yfinance_actions(
 
     date_column = "Date" if "Date" in actions.columns else "date"
     dividend_column = "Dividends" if "Dividends" in actions.columns else "dividends"
-    split_column = "Stock Splits" if "Stock Splits" in actions.columns else "stock_splits"
+    split_column = (
+        "Stock Splits" if "Stock Splits" in actions.columns else "stock_splits"
+    )
     required = {date_column, dividend_column, split_column}
     if not required.issubset(actions.columns):
         raise ValueError("yfinance action frame lacks Date/Dividends/Stock Splits")
@@ -1097,9 +1287,7 @@ def acquire_yfinance_actions(
         for group in security_master.partition_by("isin", maintain_order=True)
     }
     fallback_rows = [
-        row
-        for row in pending
-        if current_ticker[str(row["isin"])] != str(row["ticker"])
+        row for row in pending if current_ticker[str(row["isin"])] != str(row["ticker"])
     ]
     fallback_downloads: dict[tuple[str, str], pl.DataFrame] = {}
     for isin in sorted({str(row["isin"]) for row in fallback_rows}):
@@ -1234,7 +1422,14 @@ def acquire_yfinance_actions(
             ticker="EMPTY",
             fetched_at=timestamp,
         )
-    return unadjust_yfinance_cash_distributions(combined), pl.DataFrame(audit_rows)
+    # Yahoo request success is useful acquisition provenance, but this source
+    # does not certify a complete Brazilian corporate-action taxonomy.  Keep
+    # the distinction machine-readable so downstream economics cannot promote
+    # a provider zero to a verified economic no-action interval.
+    acquisition = pl.DataFrame(audit_rows).with_columns(
+        pl.lit(False, dtype=pl.Boolean).alias("economic_terms_complete")
+    )
+    return unadjust_yfinance_cash_distributions(combined), acquisition
 
 
 def validate_action_table(actions: pl.DataFrame) -> pl.DataFrame:
@@ -1247,7 +1442,9 @@ def validate_action_table(actions: pl.DataFrame) -> pl.DataFrame:
         "unresolved",
     }
     if not required.issubset(actions.columns):
-        raise ValueError(f"action columns missing: {sorted(required - set(actions.columns))}")
+        raise ValueError(
+            f"action columns missing: {sorted(required - set(actions.columns))}"
+        )
     invalid_types = set(actions.get_column("action_type").unique()) - ACTION_TYPES
     if invalid_types:
         raise ValueError(f"unknown action types: {sorted(invalid_types)}")
@@ -1258,9 +1455,13 @@ def validate_action_table(actions: pl.DataFrame) -> pl.DataFrame:
         | ~pl.col("cash_distribution_brl").is_finite()
     ).height:
         raise ValueError("action factors/distributions must be finite and non-negative")
-    if "known_date" in actions.columns and actions.filter(
-        pl.col("known_date").is_not_null() & (pl.col("known_date") > pl.col("ex_date"))
-    ).height:
+    if (
+        "known_date" in actions.columns
+        and actions.filter(
+            pl.col("known_date").is_not_null()
+            & (pl.col("known_date") > pl.col("ex_date"))
+        ).height
+    ):
         raise ValueError("an action cannot be treated as known after its ex-date")
     return actions.sort("isin", "ex_date", "action_type")
 
@@ -1274,7 +1475,8 @@ def align_action_arrays(
 
     checked = validate_action_table(actions)
     normalized_dates = tuple(
-        value.astype(object) if isinstance(value, np.datetime64) else value for value in dates
+        value.astype(object) if isinstance(value, np.datetime64) else value
+        for value in dates
     )
     date_lookup = {value: index for index, value in enumerate(normalized_dates)}
     isin_lookup = {value: index for index, value in enumerate(isins)}
@@ -1402,9 +1604,7 @@ def detect_cotahist_actions(
         & (close[1:] > 0)
         & (close[:-1] > 0)
     )
-    np.divide(
-        close[1:], close[:-1], out=immediate_price[1:], where=adjacent_price
-    )
+    np.divide(close[1:], close[:-1], out=immediate_price[1:], where=adjacent_price)
     with np.errstate(divide="ignore", invalid="ignore"):
         immediate_log_price = np.log(immediate_price)
     jump_without_distribution = (
@@ -1504,7 +1704,9 @@ def cotahist_action_classification_table(
         result.price_ratio,
         result.quantity_ratio,
     )
-    if changed.shape != shape or any(np.asarray(value).shape != shape for value in arrays):
+    if changed.shape != shape or any(
+        np.asarray(value).shape != shape for value in arrays
+    ):
         raise ValueError("COTAHIST action classification axes are misaligned")
     rows = [
         {
@@ -1543,53 +1745,6 @@ def cotahist_action_classification_table(
             "price_ratio": pl.Float64,
             "quantity_ratio": pl.Float64,
         },
-    )
-
-
-def causal_price_adjustment_factor(
-    event_price_ratio: NDArray[np.floating],
-    split_event: NDArray[np.bool_],
-) -> NDArray[np.float64]:
-    """Return the forward-only level factor implied by detected split ratios.
-
-    ``event_price_ratio`` is post-event price divided by pre-event price.  The
-    adjusted level therefore divides every row from the split session onward
-    by that boundary ratio.  Later events never rewrite earlier observations.
-    """
-
-    ratio = np.asarray(event_price_ratio, dtype=np.float64)
-    split = np.asarray(split_event, dtype=np.bool_)
-    if ratio.ndim != 2 or split.shape != ratio.shape:
-        raise ValueError("split ratios and masks must align [date, name]")
-    invalid = split & (~np.isfinite(ratio) | (ratio <= 0))
-    if invalid.any():
-        raise ValueError("detected split has no positive finite price ratio")
-    boundary = np.ones(ratio.shape, dtype=np.float64)
-    boundary[split] = 1.0 / ratio[split]
-    return np.cumprod(boundary, axis=0, dtype=np.float64)
-
-
-def adjust_daily_ohlc(
-    raw_open: NDArray[np.floating],
-    raw_high: NDArray[np.floating],
-    raw_low: NDArray[np.floating],
-    raw_close: NDArray[np.floating],
-    event_price_ratio: NDArray[np.floating],
-    split_event: NDArray[np.bool_],
-) -> AdjustmentResult:
-    """Apply only official-data split/bonus adjustments to daily OHLC."""
-
-    close = np.asarray(raw_close, dtype=np.float64)
-    arrays = tuple(np.asarray(value, dtype=np.float64) for value in (raw_open, raw_high, raw_low))
-    if any(value.shape != close.shape for value in arrays):
-        raise ValueError("OHLC arrays are misaligned")
-    price_factor = causal_price_adjustment_factor(event_price_ratio, split_event)
-    return AdjustmentResult(
-        price_factor=price_factor,
-        adjusted_open=arrays[0] * price_factor,
-        adjusted_high=arrays[1] * price_factor,
-        adjusted_low=arrays[2] * price_factor,
-        adjusted_close=close * price_factor,
     )
 
 
@@ -1644,9 +1799,7 @@ def provider_split_detection_audit(
     shape = (len(normalized_dates), len(isins))
     if detected.shape != shape:
         raise ValueError("provider split audit axes are misaligned")
-    provider_factor, _, _ = align_action_arrays(
-        provider_actions, dates, isins
-    )
+    provider_factor, _, _ = align_action_arrays(provider_actions, dates, isins)
     provider_split = provider_factor != 1.0
     covered = np.zeros(shape, dtype=np.bool_)
     isin_lookup = {isin: index for index, isin in enumerate(isins)}
@@ -1659,17 +1812,15 @@ def provider_split_detection_audit(
         required = {"isin", "first_date", "last_date", "status"}
         if not required.issubset(acquisition_audit.columns):
             raise ValueError("corporate-action acquisition audit has wrong schema")
-        for row in acquisition_audit.filter(
-            pl.col("status") != "failed"
-        ).iter_rows(named=True):
+        for row in acquisition_audit.filter(pl.col("status") != "failed").iter_rows(
+            named=True
+        ):
             name = isin_lookup.get(str(row["isin"]))
             if name is None:
                 continue
             first = np.datetime64(_as_date(row["first_date"]), "D")
             last = np.datetime64(_as_date(row["last_date"]), "D")
-            covered[:, name] |= (normalized_dates >= first) & (
-                normalized_dates <= last
-            )
+            covered[:, name] |= (normalized_dates >= first) & (normalized_dates <= last)
 
     years = normalized_dates.astype("datetime64[Y]").astype(np.int64) + 1970
     periods: list[tuple[str, NDArray[np.bool_]]] = [("all", covered)]
@@ -1757,8 +1908,7 @@ def action_coverage_table(
             failed = sum(str(row["status"]) == "failed" for row in segments)
             succeeded = len(segments) - failed
             zeros = sum(
-                str(row["status"]) != "failed"
-                and int(row.get("action_rows") or 0) == 0
+                str(row["status"]) != "failed" and int(row.get("action_rows") or 0) == 0
                 for row in segments
             )
             action_count, unresolved_count = counts.get((isin, year), (0, 0))
@@ -1774,22 +1924,22 @@ def action_coverage_table(
                 status = "no_acquisition_segment"
             rows.append(
                 {
-                "isin": isin,
-                "year": year,
-                "action_count": action_count,
-                "unresolved_count": unresolved_count,
-                "ticker_segment_count": len(segments),
-                "successful_segment_count": succeeded,
-                "zero_action_segment_count": zeros,
-                "failed_segment_count": failed,
-                "acquisition_status": status,
-                "provider_taxonomy": "yfinance dividends and stock splits",
-                "source_limitations": (
-                    "bonus, JCP, and subscription-right taxonomy is not "
-                    "guaranteed by the provider; these provider gaps affect "
-                    "audit coverage only"
-                ),
-            }
+                    "isin": isin,
+                    "year": year,
+                    "action_count": action_count,
+                    "unresolved_count": unresolved_count,
+                    "ticker_segment_count": len(segments),
+                    "successful_segment_count": succeeded,
+                    "zero_action_segment_count": zeros,
+                    "failed_segment_count": failed,
+                    "acquisition_status": status,
+                    "provider_taxonomy": "yfinance dividends and stock splits",
+                    "source_limitations": (
+                        "bonus, JCP, and subscription-right taxonomy is not "
+                        "guaranteed by the provider; query success therefore does "
+                        "not resolve economic no-action cells"
+                    ),
+                }
             )
     return pl.DataFrame(
         rows,
@@ -1949,8 +2099,7 @@ def audit_m1_adjustment_status(
                 candidate
                 for candidate in range(day - 1, -1, -1)
                 if all(
-                    np.isfinite(value[candidate, name])
-                    and value[candidate, name] > 0
+                    np.isfinite(value[candidate, name]) and value[candidate, name] > 0
                     for value in (minute, raw, adjusted)
                 )
             ),
@@ -1968,20 +2117,14 @@ def audit_m1_adjustment_status(
             abs(minute[day, name] / raw[day, name] - 1.0) if comparable else np.nan
         )
         adjusted_error = (
-            abs(minute[day, name] / adjusted[day, name] - 1.0)
-            if comparable
-            else np.nan
+            abs(minute[day, name] / adjusted[day, name] - 1.0) if comparable else np.nan
         )
         ratio_comparable = comparable and prior_day is not None
         m1_event_ratio = (
-            minute[day, name] / minute[prior_day, name]
-            if ratio_comparable
-            else np.nan
+            minute[day, name] / minute[prior_day, name] if ratio_comparable else np.nan
         )
         raw_event_ratio = (
-            raw[day, name] / raw[prior_day, name]
-            if ratio_comparable
-            else np.nan
+            raw[day, name] / raw[prior_day, name] if ratio_comparable else np.nan
         )
         adjusted_event_ratio = (
             adjusted[day, name] / adjusted[prior_day, name]
@@ -2000,7 +2143,11 @@ def audit_m1_adjustment_status(
         )
         if not comparable:
             status = "missing"
-        elif ratio_comparable and raw_ratio_error <= relative_tolerance and raw_ratio_error <= adjusted_ratio_error:
+        elif (
+            ratio_comparable
+            and raw_ratio_error <= relative_tolerance
+            and raw_ratio_error <= adjusted_ratio_error
+        ):
             status = "raw_unadjusted"
         elif ratio_comparable and adjusted_ratio_error <= relative_tolerance:
             status = "price_adjusted"
@@ -2132,7 +2279,9 @@ def _as_date(value: date | np.datetime64) -> date:
 
 
 def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Acquire cached ISIN-bound yfinance corporate actions")
+    parser = argparse.ArgumentParser(
+        description="Acquire cached ISIN-bound yfinance corporate actions"
+    )
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--security-master", type=Path)
     source.add_argument("--cotahist-root", type=Path)
@@ -2186,9 +2335,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
                 f"v1 assignments must bind exactly {EXPECTED_EQUITIES} ISINs"
             )
 
-        input_paths = sorted(
-            args.cotahist_root.glob("year=*/equities_daily_*.parquet")
-        )
+        input_paths = sorted(args.cotahist_root.glob("year=*/equities_daily_*.parquet"))
         v1_isins = tuple(assignments.get_column("isin").to_list())
         daily = load_cotahist(input_paths, v1_isins=v1_isins).filter(
             pl.col("trade_date").dt.year().is_in(COTAHIST_YEARS)
@@ -2226,8 +2373,16 @@ def main(arguments: Sequence[str] | None = None) -> None:
             "rows": security_master.height,
             "sha256": _sha256(master_path),
         },
-        "actions": {"path": actions_path.name, "rows": actions.height, "sha256": _sha256(actions_path)},
-        "acquisition_audit": {"path": audit_path.name, "rows": audit.height, "sha256": _sha256(audit_path)},
+        "actions": {
+            "path": actions_path.name,
+            "rows": actions.height,
+            "sha256": _sha256(actions_path),
+        },
+        "acquisition_audit": {
+            "path": audit_path.name,
+            "rows": audit.height,
+            "sha256": _sha256(audit_path),
+        },
         "cash_unit_adjustment_audit": {
             "path": cash_unit_path.name,
             "rows": pl.read_parquet(cash_unit_path).height,

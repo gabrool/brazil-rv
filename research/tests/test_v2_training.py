@@ -12,11 +12,19 @@ from torch.utils.data import DataLoader
 
 from brazil_rv.modeling.engine import soft_spearman_loss
 from brazil_rv.modeling.trajectory import ModelEMA
-from brazil_rv.v2.config import ModelConfig
-from brazil_rv.v2.contract import PRETRAIN_END, STORE_START
+from brazil_rv.v2.config import INTRADAY_DAILY_FEATURES, ModelConfig
+from brazil_rv.v2.contract import (
+    DECISION_FEATURE_CONTRACT,
+    DECISION_FEATURE_ALIGNMENT,
+    FEATURE_AGE_CONTRACT,
+    PRETRAIN_END,
+    STORE_START,
+)
 from brazil_rv.v2.data import V2DailyDataset
 from brazil_rv.v2.losses import (
+    multi_horizon_loss,
     multi_horizon_loss_components,
+    multi_horizon_loss_normalizers,
     score_persistence_penalty,
 )
 from brazil_rv.v2.model import DailyMultiHorizonModel
@@ -30,15 +38,19 @@ from brazil_rv.v2.train import (
     pretrain_internal_split,
     rank_average_ensemble,
     reshape_date_pair_batch,
+    sam_accumulated_step,
     sam_step,
     stitch_block_parity_predictions,
     train_stage,
+    _common_primary_selection_score,
+    _date_pair_microbatches,
     _input_static_identity,
+    _loader_input_payload,
     _model_input_segments,
     _require_production_pair_sampler,
     _validate_tracked_stage_inputs,
 )
-from brazil_rv.v2.store import write_store
+from v2_store_fixtures import write_fixture_store as write_store
 
 
 def test_external_location_is_not_part_of_model_input_identity() -> None:
@@ -139,6 +151,63 @@ def test_persistence_is_forced_to_float32_outside_autocast() -> None:
     assert penalty.dtype == torch.float32
 
 
+def test_microbatch_loss_and_gradients_match_full_effective_batch() -> None:
+    generator = torch.Generator().manual_seed(71)
+    full_scores = torch.randn(8, 2, 24, 6, generator=generator, requires_grad=True)
+    micro_scores = full_scores.detach().clone().requires_grad_(True)
+    targets = torch.randn(8, 2, 24, 6, generator=generator)
+    mask = torch.rand(8, 2, 24, 6, generator=generator) > 0.18
+    active = torch.rand(8, 2, 24, generator=generator) > 0.12
+    normalizers = multi_horizon_loss_normalizers(mask, score_mask=active)
+    full_loss = multi_horizon_loss(
+        full_scores,
+        targets,
+        mask,
+        score_mask=active,
+        persistence_weight=0.1,
+        to_close_weight=0.2,
+        normalization_counts=normalizers,
+    )
+    full_loss.backward()
+
+    micro_loss = sum(
+        (
+            multi_horizon_loss(
+                micro_scores[start:stop],
+                targets[start:stop],
+                mask[start:stop],
+                score_mask=active[start:stop],
+                persistence_weight=0.1,
+                to_close_weight=0.2,
+                normalization_counts=normalizers,
+            )
+            for start, stop in ((0, 3), (3, 6), (6, 8))
+        ),
+        torch.zeros(()),
+    )
+    micro_loss.backward()
+
+    assert torch.allclose(micro_loss, full_loss, rtol=2e-6, atol=2e-6)
+    assert torch.allclose(
+        micro_scores.grad, full_scores.grad, rtol=3e-5, atol=3e-6
+    )
+
+
+def test_selection_uses_one_supported_population_for_all_primary_heads() -> None:
+    base = np.arange(24, dtype=np.float32)
+    predictions = np.stack((base, base, base, base), axis=-1)[None]
+    targets = predictions.copy()
+    mask = np.ones_like(predictions, dtype=bool)
+    active = np.ones((1, 24), dtype=bool)
+    assert _common_primary_selection_score(predictions, targets, mask, active) == pytest.approx(
+        1.0
+    )
+
+    mask[0, :5, 3] = False
+    with pytest.raises(ValueError, match="common four-head population"):
+        _common_primary_selection_score(predictions, targets, mask, active)
+
+
 def test_date_pair_sampler_keeps_adjacent_rows_and_is_deterministic() -> None:
     sampler = DatePairBatchSampler(range(7), pairs_per_batch=2, seed=11)
     first = list(sampler)
@@ -150,6 +219,22 @@ def test_date_pair_sampler_keeps_adjacent_rows_and_is_deterministic() -> None:
             assert batch[offset + 1] == batch[offset] + 1
     tensor = torch.arange(12).reshape(6, 2)
     assert reshape_date_pair_batch(tensor).shape == (3, 2, 2)
+
+
+def test_microbatch_slicing_never_splits_a_date_pair() -> None:
+    batch = {
+        "slow_features": torch.arange(16).reshape(16, 1),
+        "date_index": torch.arange(100, 116),
+        "static": "kept",
+    }
+    pieces = _date_pair_microbatches(batch, 3)
+    assert [piece["slow_features"].shape[0] for piece in pieces] == [6, 6, 4]
+    assert [piece["date_index"].tolist() for piece in pieces] == [
+        list(range(100, 106)),
+        list(range(106, 112)),
+        list(range(112, 116)),
+    ]
+    assert all(piece["static"] == "kept" for piece in pieces)
 
 
 def test_production_pair_sampler_emits_only_exact_eight_pair_batches() -> None:
@@ -321,6 +406,68 @@ def test_sam_updates_model_and_ema() -> None:
     assert not torch.equal(ema.shadow["weight"], before)
 
 
+def test_accumulated_sam_matches_full_batch_update_and_advances_once() -> None:
+    torch.manual_seed(83)
+    full_model = nn.Linear(3, 2)
+    accumulated_model = nn.Linear(3, 2)
+    accumulated_model.load_state_dict(full_model.state_dict())
+    inputs = torch.randn(16, 3)
+    targets = torch.randn(16, 2)
+    full_optimizer = torch.optim.AdamW(full_model.parameters(), lr=1e-3)
+    accumulated_optimizer = torch.optim.AdamW(
+        accumulated_model.parameters(), lr=1e-3
+    )
+    full_scheduler = torch.optim.lr_scheduler.StepLR(full_optimizer, step_size=1)
+    accumulated_scheduler = torch.optim.lr_scheduler.StepLR(
+        accumulated_optimizer, step_size=1
+    )
+    full_ema = ModelEMA(full_model, 0.995)
+    accumulated_ema = ModelEMA(accumulated_model, 0.995)
+
+    def full_closure() -> torch.Tensor:
+        return (full_model(inputs) - targets).square().mean()
+
+    denominator = float(targets.numel())
+    closures = tuple(
+        (
+            lambda start=start, stop=stop: (
+                accumulated_model(inputs[start:stop]) - targets[start:stop]
+            )
+            .square()
+            .sum()
+            / denominator
+        )
+        for start, stop in ((0, 4), (4, 10), (10, 16))
+    )
+    full_result = sam_step(
+        full_model,
+        full_optimizer,
+        full_closure,
+        scheduler=full_scheduler,
+        ema=full_ema,
+    )
+    accumulated_result = sam_accumulated_step(
+        accumulated_model,
+        accumulated_optimizer,
+        closures,
+        scheduler=accumulated_scheduler,
+        ema=accumulated_ema,
+    )
+
+    for full, accumulated in zip(
+        full_model.parameters(), accumulated_model.parameters(), strict=True
+    ):
+        assert torch.allclose(full, accumulated, rtol=1e-6, atol=1e-7)
+    assert accumulated_result.first_loss == pytest.approx(
+        full_result.first_loss, rel=1e-6, abs=1e-7
+    )
+    assert accumulated_scheduler.last_epoch == full_scheduler.last_epoch == 1
+    for name in full_ema.shadow:
+        assert torch.allclose(
+            full_ema.shadow[name], accumulated_ema.shadow[name], rtol=1e-6, atol=1e-7
+        )
+
+
 @pytest.mark.parametrize("failing_pass", [1, 2])
 def test_sam_rejects_each_nonfinite_training_loss(failing_pass: int) -> None:
     model = nn.Linear(2, 1)
@@ -344,11 +491,19 @@ def test_fullgraph_compile_captures_gru_forward() -> None:
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
     model = DailyMultiHorizonModel(config).eval()
     compiled = compile_forward(model, backend="eager", mode=None)
+    current_features = torch.randn(2, 3, config.current_feature_count)
+    current_feature_mask = torch.ones_like(current_features, dtype=torch.bool)
+    slow_feature_age_sessions = torch.zeros(2, 3, 20, 32)
+    current_feature_age_sessions = torch.zeros_like(current_features)
     scores = compiled(
         torch.randn(2, 3, 20, 32),
         torch.ones(2, 3, 20, 32, dtype=torch.bool),
         torch.ones(2, 3, 20, dtype=torch.bool),
         torch.ones(2, 3, dtype=torch.bool),
+        current_features=current_features,
+        current_feature_mask=current_feature_mask,
+        slow_feature_age_sessions=slow_feature_age_sessions,
+        current_feature_age_sessions=current_feature_age_sessions,
     )
     assert scores.shape == (2, 3, 6)
     fast_values = torch.randn(2, 2, 5, 7)
@@ -370,6 +525,10 @@ def test_fullgraph_compile_captures_gru_forward() -> None:
         fast_present=torch.tensor(
             [[True, False, True], [False, True, False]]
         ),
+        current_features=current_features,
+        current_feature_mask=current_feature_mask,
+        slow_feature_age_sessions=slow_feature_age_sessions,
+        current_feature_age_sessions=current_feature_age_sessions,
     )
     assert fast_scores.shape == (2, 3, 6)
 
@@ -383,13 +542,16 @@ def _tracked_pretrain_loaders(tmp_path):
     dates = calendar[np.is_busday(calendar)]
     fit, _, selection = pretrain_internal_split(np.arange(dates.size))
     generator = np.random.default_rng(19)
-    name_count = 4
+    name_count = 24
     slow = generator.standard_normal((dates.size, name_count, 32)).astype(
         np.float32
     )
     targets = generator.standard_normal((dates.size, name_count, 5)).astype(
         np.float32
     )
+    intraday = generator.standard_normal(
+        (dates.size, name_count, len(INTRADAY_DAILY_FEATURES))
+    ).astype(np.float32)
     store = write_store(
         tmp_path / "tracked_store",
         dates=dates,
@@ -397,13 +559,24 @@ def _tracked_pretrain_loaders(tmp_path):
         arrays={
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=np.bool_),
+            "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
+            "slow_timestep_valid": np.ones(
+                (dates.size, name_count), dtype=np.bool_
+            ),
+            "intraday_values": intraday,
+            "intraday_valid": np.ones_like(intraday, dtype=np.bool_),
+            "intraday_age_sessions": np.zeros_like(intraday, dtype=np.float32),
             "active": np.ones((dates.size, name_count), dtype=np.bool_),
             "target_primary": targets,
             "target_valid": np.ones_like(targets, dtype=np.bool_),
         },
         feature_names={
             "slow": [f"slow_{index}" for index in range(32)],
-            "intraday": [],
+            "intraday": list(INTRADAY_DAILY_FEATURES),
+        },
+        metadata={
+            "feature_age_contract": dict(FEATURE_AGE_CONTRACT),
+            "slow_entry_alignment": dict(DECISION_FEATURE_CONTRACT),
         },
     )
     train_dataset = V2DailyDataset(
@@ -440,6 +613,38 @@ def _tracked_pretrain_loaders(tmp_path):
         num_workers=0,
     )
     return train_loader, selection_loader
+
+
+def test_model_input_identity_requires_canonical_row_and_feature_age_contract(
+    tmp_path,
+) -> None:
+    train_loader_factory, _ = _tracked_pretrain_loaders(tmp_path)
+    loader = train_loader_factory()
+    payload = _loader_input_payload(loader)
+    assert payload is not None
+    features = payload["features"]
+    assert features["decision_sample_schema"] == "BRAZIL_RV_V2_DECISION_SAMPLE_V2"
+    assert features["decision_feature_contract"] == DECISION_FEATURE_CONTRACT
+    assert features["feature_age_contract"] == FEATURE_AGE_CONTRACT
+
+    changed = json.loads(json.dumps(payload))
+    changed["features"]["feature_age_contract"]["unit"] = "calendar_days"
+    assert _input_static_identity(payload) != _input_static_identity(changed)
+
+    metadata = loader.dataset.store.manifest["metadata"]
+    age_contract = metadata["feature_age_contract"]
+    metadata["feature_age_contract"] = {**age_contract, "unit": "calendar_days"}
+    with pytest.raises(ValueError, match="feature-age contract"):
+        _loader_input_payload(loader)
+    metadata["feature_age_contract"] = age_contract
+
+    decision_contract = metadata["slow_entry_alignment"]
+    metadata["slow_entry_alignment"] = {
+        **decision_contract,
+        "consumer_side_shift": True,
+    }
+    with pytest.raises(ValueError, match="decision-feature alignment"):
+        _loader_input_payload(loader)
 
 
 def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
@@ -483,6 +688,8 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
         "explicitly_allowed": False,
         "checkpoint_sha256": None,
     }
+    assert manifest["transfer_chronology_clean"] is True
+    assert len(manifest["feature_schema_sha256"]) == 64
     assert manifest["checkpoint_input_contract"]["training"] is not None
     assert manifest["checkpoint_input_contract"]["selection"] is not None
 
@@ -506,6 +713,10 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
     first_state = raw_payload["model_state_dict"]
     assert raw_payload["fast_initialization_provenance"] == manifest[
         "fast_initialization_provenance"
+    ]
+    assert raw_payload["transfer_chronology_clean"] is True
+    assert raw_payload["feature_schema_sha256"] == manifest[
+        "feature_schema_sha256"
     ]
     repeated_state = torch.load(
         repeated.raw_patience_checkpoint, map_location="cpu", weights_only=False
@@ -545,7 +756,7 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
     )
     for index, (field, value) in enumerate(
         (
-            ("schema", "V2_FINAL_EMA_0995"),
+            ("schema", "BRAZIL_RV_V2_FINAL_EMA_0995_V2"),
             ("stage", "F"),
             ("seed", 47),
             ("fold", ""),
@@ -611,9 +822,9 @@ def _tracked_input(
     canonical_splits: dict[str, object],
 ) -> dict[str, object]:
     return {
-        "schema": "BRAZIL_RV_V2_MODEL_INPUT_V1",
+        "schema": "BRAZIL_RV_V2_MODEL_INPUT_V2",
         "store": {
-            "schema": "BRAZIL_RV_V2_STORE_V1",
+            "schema": "BRAZIL_RV_V2_DAILY_STORE_V2",
             "manifest_sha256": "a" * 64,
             "axes": {"date_count": 1_000, "isin_count": 4},
             "fast_identity": {},
@@ -622,7 +833,7 @@ def _tracked_input(
             "ordered_slow_and_sidecar_names": [f"slow_{i}" for i in range(32)],
             "enabled_sidecar_groups": [],
             "ordered_sidecar_names": {},
-            "ordered_intraday_names": [],
+            "ordered_intraday_names": list(INTRADAY_DAILY_FEATURES),
         },
         "lookback_sessions": 20,
         "entry_alignment": alignment,
@@ -651,7 +862,7 @@ def test_stage_input_contract_rejects_overlap_and_wrong_f_purge() -> None:
         last_index=9,
         first_date="2021-08-16",
         last_date="2023-03-17",
-        alignment="through_t_minus_1",
+        alignment=DECISION_FEATURE_ALIGNMENT,
         canonical_splits=canonical,
     )
     valid_selection = _tracked_input(
@@ -659,7 +870,7 @@ def test_stage_input_contract_rejects_overlap_and_wrong_f_purge() -> None:
         last_index=25,
         first_date="2023-03-20",
         last_date="2023-03-27",
-        alignment="through_t_minus_1",
+        alignment=DECISION_FEATURE_ALIGNMENT,
         canonical_splits=canonical,
     )
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
@@ -700,7 +911,7 @@ def test_stage_input_contract_rejects_wrong_p_embargo_and_boundaries() -> None:
         last_index=99,
         first_date="2010-01-04",
         last_date="2020-12-31",
-        alignment="through_t_minus_1",
+        alignment=DECISION_FEATURE_ALIGNMENT,
         canonical_splits=canonical,
     )
     selection = _tracked_input(
@@ -708,7 +919,7 @@ def test_stage_input_contract_rejects_wrong_p_embargo_and_boundaries() -> None:
         last_index=199,
         first_date="2021-01-04",
         last_date="2021-07-30",
-        alignment="through_t_minus_1",
+        alignment=DECISION_FEATURE_ALIGNMENT,
         canonical_splits=canonical,
     )
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
@@ -764,8 +975,8 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
     )
     assert [segment["name"] for segment in segments] == ["P", "F"]
     assert [segment["entry_alignment"] for segment in segments] == [
-        "through_t_minus_1",
-        "through_t_minus_1",
+        DECISION_FEATURE_ALIGNMENT,
+        DECISION_FEATURE_ALIGNMENT,
     ]
     assert segments[0]["indices_sha256"] != segments[1]["indices_sha256"]
 
@@ -801,16 +1012,16 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
         last_index=119,
         first_date="2010-01-04",
         last_date="2023-03-17",
-        alignment="through_t_minus_1",
+        alignment=DECISION_FEATURE_ALIGNMENT,
         canonical_splits=canonical,
     )
     training["segments"] = [
         _joint_segment(
-            "P", "through_t_minus_1", 0, 99, "2010-01-04", "2021-07-30"
+            "P", DECISION_FEATURE_ALIGNMENT, 0, 99, "2010-01-04", "2021-07-30"
         ),
         _joint_segment(
             "F",
-            "through_t_minus_1",
+            DECISION_FEATURE_ALIGNMENT,
             110,
             119,
             "2021-08-16",
@@ -822,13 +1033,13 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
         last_index=184,
         first_date="2023-03-20",
         last_date="2023-06-02",
-        alignment="through_t_minus_1",
+        alignment=DECISION_FEATURE_ALIGNMENT,
         canonical_splits=canonical,
     )
     selection["segments"] = [
         _joint_segment(
             "F",
-            "through_t_minus_1",
+            DECISION_FEATURE_ALIGNMENT,
             130,
             184,
             "2023-03-20",

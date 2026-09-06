@@ -49,8 +49,11 @@ def session_calendar(
 def build_daily_universe(
     close_brl: NDArray[np.floating],
     volume_brl: NDArray[np.floating],
-    observed: NDArray[np.bool_],
+    price_observed: NDArray[np.bool_],
     *,
+    trade_observed: NDArray[np.bool_],
+    activity_valid: NDArray[np.bool_],
+    source_session_complete: NDArray[np.bool_],
     prior_sessions: int = UNIVERSE_PRIOR_SESSIONS,
     minimum_traded: int = UNIVERSE_MIN_TRADED,
     minimum_median_volume_brl: float = UNIVERSE_MIN_MEDIAN_VOLUME_BRL,
@@ -59,16 +62,32 @@ def build_daily_universe(
 ) -> UniverseResult:
     """Build a strictly prior-session daily universe.
 
-    Missing security observations count as zero volume and as not traded. History
-    is calendar-session age since the first observed security-day; no value from
-    the candidate date is consulted.
+    A missing security row counts as zero activity only when the canonical daily
+    source certifies that session complete and the security's causal history has
+    begun.  Incomplete source sessions invalidate the exact prior-session
+    window. History is calendar-session age since the first observed price row;
+    no value from the candidate date is consulted.
     """
 
     close = np.asarray(close_brl, dtype=np.float64)
     volume = np.asarray(volume_brl, dtype=np.float64)
-    seen = np.asarray(observed, dtype=np.bool_)
-    if close.ndim != 2 or close.shape != volume.shape or close.shape != seen.shape:
-        raise ValueError("close, volume, and observed must be aligned [date, name]")
+    seen = np.asarray(price_observed, dtype=np.bool_)
+    traded = np.asarray(trade_observed, dtype=np.bool_)
+    activity = np.asarray(activity_valid, dtype=np.bool_)
+    complete = np.asarray(source_session_complete, dtype=np.bool_)
+    if (
+        close.ndim != 2
+        or close.shape != volume.shape
+        or close.shape != seen.shape
+        or traded.shape != close.shape
+        or activity.shape != close.shape
+        or complete.shape != (close.shape[0],)
+    ):
+        raise ValueError("daily universe price/activity/source axes are misaligned")
+    if np.any(traded & ~activity) or np.any(activity & ~complete[:, None]):
+        raise ValueError("daily universe masks violate source/activity containment")
+    if np.any(activity & (~np.isfinite(volume) | (volume < 0.0))):
+        raise ValueError("activity-valid volume must be finite and non-negative")
     if prior_sessions <= 0 or not 0 <= minimum_traded <= prior_sessions:
         raise ValueError("invalid prior-session/traded thresholds")
     if minimum_history_sessions <= 0 or minimum_median_volume_brl < 0:
@@ -98,16 +117,18 @@ def build_daily_universe(
         if date_index < prior_sessions:
             continue
         start = date_index - prior_sessions
-        window_seen = seen[start:date_index]
-        window_volume = np.where(
-            window_seen & np.isfinite(volume[start:date_index]),
-            volume[start:date_index],
-            0.0,
+        window_activity = activity[start:date_index]
+        exact_activity_window = window_activity.all(axis=0)
+        window_volume = np.where(window_activity, volume[start:date_index], 0.0)
+        traded_count[date_index] = traded[start:date_index].sum(axis=0).astype(
+            np.int16
         )
-        traded_count[date_index] = window_seen.sum(axis=0).astype(np.int16)
-        median_volume[date_index] = np.median(window_volume, axis=0)
+        median_volume[date_index, exact_activity_window] = np.median(
+            window_volume[:, exact_activity_window], axis=0
+        )
         active[date_index] = (
-            (traded_count[date_index] >= minimum_traded)
+            exact_activity_window
+            & (traded_count[date_index] >= minimum_traded)
             & (median_volume[date_index] >= minimum_median_volume_brl)
             & np.isfinite(prior_close[date_index])
             & (prior_close[date_index] >= minimum_prior_close_brl)

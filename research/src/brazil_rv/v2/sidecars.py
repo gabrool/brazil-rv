@@ -15,6 +15,22 @@ from .contract import SIDECAR_FEATURES
 B3_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 _PUBLICATION_ORDER_COLUMN = "__publication_order_us"
 _ROW_INDEX_COLUMN = "__row_index"
+_TIMESTAMP_COLUMNS = (
+    "public_available_at",
+    "available_timestamp",
+    "delivery_timestamp",
+    "filing_receipt_timestamp",
+    "receipt_timestamp",
+    "state_asof_timestamp",
+)
+_PRECISION_UPPER_BOUND = {
+    "instant": timedelta(0),
+    "exact": timedelta(0),
+    "microsecond": timedelta(microseconds=1),
+    "millisecond": timedelta(milliseconds=1),
+    "second": timedelta(seconds=1),
+    "minute": timedelta(minutes=1),
+}
 
 
 ARCHIVE_COLUMN_MAP: dict[str, dict[str, str | None]] = {
@@ -60,6 +76,7 @@ class SidecarResult:
     feature_names: tuple[str, ...]
     values: NDArray[np.float32]
     valid: NDArray[np.bool_]
+    age_sessions: NDArray[np.float32]
     coverage_by_year: tuple[dict[str, object], ...]
     archive_semantics_available: tuple[str, ...] = ()
     source_missing_candidates: tuple[str, ...] = ()
@@ -87,21 +104,12 @@ def _available_before_decision(
     *,
     date_only_available_before_decision: bool,
 ) -> bool:
-    timestamp = row.get("available_timestamp") or row.get("delivery_timestamp")
-    if timestamp is not None:
-        if isinstance(timestamp, str):
-            timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-        if not isinstance(timestamp, datetime):
-            raise ValueError("availability timestamp has an unsupported type")
-        # Source archives historically stored naive CVM timestamps in B3 local
-        # time.  Aware timestamps may use any honest zone/offset; compare both
-        # instants in UTC instead of attaching the source offset to 15:45.
-        if timestamp.tzinfo is None:
-            timestamp = timestamp.replace(tzinfo=B3_TIMEZONE)
+    effective = _effective_public_availability(row)
+    if effective is not None:
         candidate = datetime.combine(
             decision_date, decision_time, tzinfo=B3_TIMEZONE
         )
-        return timestamp.astimezone(UTC) <= candidate.astimezone(UTC)
+        return effective <= candidate.astimezone(UTC)
     available_date = _as_date(row.get("available_date"))
     if available_date < decision_date:
         return True
@@ -120,18 +128,177 @@ def _available_before_decision(
     return source_time.time() <= decision_time
 
 
-def _availability_order(row: Mapping[str, object]) -> tuple[datetime, int]:
-    timestamp = row.get("available_timestamp") or row.get("delivery_timestamp")
+def _timestamp_column(row: Mapping[str, object]) -> str | None:
+    selected = [column for column in _TIMESTAMP_COLUMNS if row.get(column) is not None]
+    if len(selected) > 1:
+        instants = {str(row[column]) for column in selected}
+        if len(instants) > 1:
+            raise ValueError(
+                f"sidecar row has conflicting public timestamps: {selected}"
+            )
+    return selected[0] if selected else None
+
+
+def _effective_public_availability(
+    row: Mapping[str, object],
+) -> datetime | None:
+    """Return the conservative, latency-adjusted public instant in UTC."""
+
+    column = _timestamp_column(row)
+    if column is None:
+        return None
+    timestamp = row[column]
     if isinstance(timestamp, str):
         timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-    if isinstance(timestamp, datetime):
-        if timestamp.tzinfo is None:
-            timestamp = timestamp.replace(tzinfo=B3_TIMEZONE)
-        return timestamp.astimezone(UTC), int(row.get("decision_idx") or -1)
+    if not isinstance(timestamp, datetime):
+        raise ValueError(f"{column} has an unsupported timestamp type")
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=B3_TIMEZONE)
+    precision = row.get(f"{column}_precision", row.get("timestamp_precision"))
+    if precision is None:
+        raise ValueError(f"{column} requires declared timestamp precision")
+    precision_name = str(precision).strip().casefold()
+    try:
+        precision_delay = _PRECISION_UPPER_BOUND[precision_name]
+    except KeyError as error:
+        raise ValueError(f"unsupported timestamp precision: {precision}") from error
+    latency = row.get(
+        f"{column}_processing_latency_seconds",
+        row.get("processing_latency_seconds"),
+    )
+    if latency is None:
+        raise ValueError(f"{column} requires declared processing latency")
+    latency_seconds = float(latency)
+    if not np.isfinite(latency_seconds) or latency_seconds < 0.0:
+        raise ValueError("processing latency must be finite and nonnegative")
+    return (
+        timestamp.astimezone(UTC)
+        + precision_delay
+        + timedelta(seconds=latency_seconds)
+    )
+
+
+def _availability_order(row: Mapping[str, object]) -> tuple[datetime, int]:
+    timestamp = _effective_public_availability(row)
+    if timestamp is not None:
+        return timestamp, int(row.get("decision_idx") or -1)
     available_date = _as_date(row["available_date"])
     return datetime.combine(available_date, time.min, tzinfo=B3_TIMEZONE).astimezone(
         UTC
     ), int(row.get("decision_idx") if row.get("decision_idx") is not None else -1)
+
+
+def _source_age_date(
+    row: Mapping[str, object], group: str, feature: str
+) -> date:
+    if feature.startswith("sessions_since_"):
+        return _as_date(row["available_date"])
+    preferred: tuple[str, ...]
+    if group == "lending" and feature.startswith("loan_balance"):
+        preferred = ("source_position_date",)
+    elif group in {"lending", "oddlot", "options"}:
+        preferred = (
+            "source_trade_date",
+            "source_position_date",
+            "snapshot_date",
+            "reference_date",
+        )
+    elif group == "rebalance":
+        preferred = ("announcement_date", "source_date")
+    else:
+        preferred = (
+            "filing_receipt_date",
+            "source_date",
+            "reference_date",
+        )
+    for column in preferred:
+        value = row.get(column)
+        if value is not None:
+            return _as_date(value)
+    timestamp = _effective_public_availability(row)
+    if timestamp is not None:
+        return timestamp.astimezone(B3_TIMEZONE).date()
+    return _as_date(row["available_date"])
+
+
+def _exchange_session_age(
+    calendar: NDArray[np.datetime64], decision_index: int, source_date: date
+) -> float:
+    source = np.datetime64(source_date, "D")
+    insertion = int(np.searchsorted(calendar, source, side="left"))
+    if insertion > decision_index:
+        raise ValueError("sidecar source date is after its decision session")
+    return float(decision_index - insertion)
+
+
+def _decision_index_for_row(
+    row: Mapping[str, object],
+    normalized_dates: tuple[date, ...],
+    decision_time: time,
+    *,
+    date_only_available_before_decision: bool,
+    allow_pre_window_state: bool,
+) -> int | None:
+    effective = _effective_public_availability(row)
+    if effective is not None:
+        decisions = tuple(
+            datetime.combine(day, decision_time, tzinfo=B3_TIMEZONE).astimezone(UTC)
+            for day in normalized_dates
+        )
+        index = int(np.searchsorted(np.asarray(decisions, dtype=object), effective))
+        return index if index < len(normalized_dates) else None
+    available_date = _as_date(row["available_date"])
+    index = int(
+        np.searchsorted(
+            np.asarray(normalized_dates, dtype="datetime64[D]"),
+            np.datetime64(available_date, "D"),
+        )
+    )
+    if index >= len(normalized_dates):
+        return None
+    if normalized_dates[index] != available_date:
+        return 0 if index == 0 and allow_pre_window_state else None
+    if not _available_before_decision(
+        row,
+        available_date,
+        decision_time,
+        date_only_available_before_decision=date_only_available_before_decision,
+    ):
+        return None
+    return index
+
+
+def _same_logical_record(
+    left: Mapping[str, object],
+    right: Mapping[str, object],
+    columns: Sequence[str],
+) -> bool:
+    for column in columns:
+        left_value = left.get(column)
+        right_value = right.get(column)
+        left_mask = left.get(f"{column}_mask", True)
+        right_mask = right.get(f"{column}_mask", True)
+        if bool(left_mask) != bool(right_mask):
+            return False
+        if left_value is None or right_value is None:
+            if left_value is not None or right_value is not None:
+                return False
+            continue
+        try:
+            equal = bool(
+                np.isclose(
+                    float(left_value),
+                    float(right_value),
+                    rtol=0.0,
+                    atol=0.0,
+                    equal_nan=True,
+                )
+            )
+        except (TypeError, ValueError):
+            equal = left_value == right_value
+        if not equal:
+            return False
+    return True
 
 
 def materialize_sidecar(
@@ -172,39 +339,65 @@ def materialize_sidecar(
     if absent:
         raise ValueError(f"sidecar source columns missing: {absent}")
     normalized_dates = tuple(_as_date(value) for value in dates)
-    date_lookup = {value: index for index, value in enumerate(normalized_dates)}
+    if any(
+        left >= right
+        for left, right in zip(normalized_dates, normalized_dates[1:], strict=False)
+    ):
+        raise ValueError("sidecar decision dates must be strictly increasing")
     isin_lookup = {value: index for index, value in enumerate(isins)}
     values = np.zeros((len(dates), len(isins), len(names)), dtype=np.float32)
     valid = np.zeros(values.shape, dtype=np.bool_)
-    chosen: dict[tuple[int, int], Mapping[str, object]] = {}
+    age_sessions = np.full(values.shape, -1.0, dtype=np.float32)
+    chosen: dict[tuple[int, int, str], Mapping[str, object]] = {}
+    stateful = group in {"events", "rebalance", "fundamentals"}
     for row in source.iter_rows(named=True):
-        available_date = _as_date(row["available_date"])
-        date_index = date_lookup.get(available_date)
+        date_index = _decision_index_for_row(
+            row,
+            normalized_dates,
+            decision_time,
+            date_only_available_before_decision=date_only_available_before_decision,
+            allow_pre_window_state=stateful,
+        )
         isin_index = isin_lookup.get(row[identity])
         if date_index is None or isin_index is None:
             continue
-        if not _available_before_decision(
-            row,
-            available_date,
-            decision_time,
-            date_only_available_before_decision=date_only_available_before_decision,
-        ):
-            continue
-        key = (date_index, isin_index)
+        record_family = str(row.get("__record_family") or group)
+        key = (date_index, isin_index, record_family)
         previous = chosen.get(key)
-        if previous is not None and _availability_order(
-            previous
-        ) == _availability_order(row):
-            raise ValueError(
-                "sidecar has ambiguous rows at one availability coordinate"
+        provided_columns = tuple(
+            column
+            for column in columns.values()
+            if column is not None
+            and (
+                f"__provided__{column}" not in source.columns
+                or bool(row[f"__provided__{column}"])
             )
+        )
+        if not provided_columns:
+            continue
+        if previous is not None and _availability_order(previous) == _availability_order(row):
+            if not _same_logical_record(previous, row, provided_columns):
+                raise ValueError(
+                    "sidecar has conflicting logical records at one publication "
+                    f"coordinate: {group}/{record_family}"
+                )
+            continue
         if previous is None or _availability_order(row) > _availability_order(previous):
             chosen[key] = row
-    for (date_index, isin_index), row in chosen.items():
+    updated = np.zeros(values.shape, dtype=np.bool_)
+    calendar = np.asarray(normalized_dates, dtype="datetime64[D]")
+    for (date_index, isin_index, record_family), row in chosen.items():
         for feature_index, name in enumerate(names):
             column = columns[name]
             if column is None:
                 continue
+            marker = f"__provided__{column}"
+            if marker in source.columns and not bool(row[marker]):
+                continue
+            if updated[date_index, isin_index, feature_index]:
+                raise ValueError(
+                    f"multiple logical records provide {group}/{name} at one decision"
+                )
             value = row[column]
             mask_column = f"{column}_mask"
             is_valid = value is not None and np.isfinite(float(value))
@@ -213,6 +406,27 @@ def materialize_sidecar(
             if is_valid:
                 values[date_index, isin_index, feature_index] = float(value)
                 valid[date_index, isin_index, feature_index] = True
+            updated[date_index, isin_index, feature_index] = True
+            age_sessions[date_index, isin_index, feature_index] = (
+                float(value)
+                if name.startswith("sessions_since_")
+                and value is not None
+                and np.isfinite(float(value))
+                and float(value) >= 0.0
+                else _exchange_session_age(
+                    calendar,
+                    date_index,
+                    _source_age_date(row, group, name),
+                )
+            )
+    if stateful:
+        for date_index in range(1, len(normalized_dates)):
+            carry = ~updated[date_index] & (age_sessions[date_index - 1] >= 0.0)
+            values[date_index][carry] = values[date_index - 1][carry]
+            valid[date_index][carry] = valid[date_index - 1][carry]
+            age_sessions[date_index][carry] = (
+                age_sessions[date_index - 1][carry] + 1.0
+            )
     coverage: list[dict[str, object]] = []
     years = np.asarray([value.year for value in normalized_dates], dtype=np.int16)
     for year in sorted(set(years.tolist())):
@@ -235,6 +449,7 @@ def materialize_sidecar(
         feature_names=names,
         values=values,
         valid=valid,
+        age_sessions=age_sessions,
         coverage_by_year=tuple(coverage),
         archive_semantics_available=tuple(
             name for name in names if columns[name] is not None
@@ -280,41 +495,129 @@ def rebuild_publication_lag_validity(
     names = tuple(name for name in candidates if columns.get(name) is not None)
     columns = {name: columns[name] for name in names}
     normalized_dates = tuple(_as_date(value) for value in dates)
-    date_lookup = {value: index for index, value in enumerate(normalized_dates)}
     isin_lookup = {str(value): index for index, value in enumerate(isins)}
-    selected: dict[tuple[int, int], Mapping[str, object]] = {}
+    stateful = group in {"events", "rebalance", "fundamentals"}
+    selected: dict[tuple[int, int, str], Mapping[str, object]] = {}
     for row in source.iter_rows(named=True):
-        available_date = _as_date(row["available_date"])
-        coordinate = (date_lookup.get(available_date), isin_lookup.get(str(row[identity])))
-        if coordinate[0] is None or coordinate[1] is None:
-            continue
-        if not _available_before_decision(
+        date_index = _decision_index_for_row(
             row,
-            available_date,
+            normalized_dates,
             decision_time,
             date_only_available_before_decision=date_only_available_before_decision,
-        ):
+            allow_pre_window_state=stateful,
+        )
+        isin_index = isin_lookup.get(str(row[identity]))
+        if date_index is None or isin_index is None:
             continue
-        key = (int(coordinate[0]), int(coordinate[1]))
+        record_family = str(row.get("__record_family") or group)
+        key = (int(date_index), int(isin_index), record_family)
+        provided_columns = tuple(
+            column
+            for column in columns.values()
+            if column is not None
+            and (
+                f"__provided__{column}" not in source.columns
+                or bool(row[f"__provided__{column}"])
+            )
+        )
+        if not provided_columns:
+            continue
         previous = selected.get(key)
         if previous is not None and _availability_order(previous) == _availability_order(row):
-            raise ValueError("sidecar has ambiguous rows at one availability coordinate")
+            if not _same_logical_record(previous, row, provided_columns):
+                raise ValueError(
+                    "sidecar has conflicting logical records at one publication "
+                    f"coordinate: {group}/{record_family}"
+                )
+            continue
         if previous is None or _availability_order(row) > _availability_order(previous):
             selected[key] = row
     rebuilt = np.zeros((len(dates), len(isins), len(names)), dtype=np.bool_)
+    updated = np.zeros_like(rebuilt)
     source_columns = set(source.columns)
-    for (date_index, isin_index), row in selected.items():
+    for (date_index, isin_index, _record_family), row in selected.items():
         for feature_index, name in enumerate(names):
             column = columns[name]
             if column is None:
                 continue
+            marker = f"__provided__{column}"
+            if marker in source_columns and not bool(row[marker]):
+                continue
+            if updated[date_index, isin_index, feature_index]:
+                raise ValueError(
+                    f"multiple logical records provide {group}/{name} at one decision"
+                )
             value = row[column]
             valid = value is not None and np.isfinite(float(value))
             mask_column = f"{column}_mask"
             if mask_column in source_columns:
                 valid &= bool(row[mask_column])
             rebuilt[date_index, isin_index, feature_index] = valid
+            updated[date_index, isin_index, feature_index] = True
+    if stateful:
+        known = updated[0].copy() if len(dates) else np.zeros(rebuilt.shape[1:])
+        for date_index in range(1, len(dates)):
+            carry = ~updated[date_index] & known
+            rebuilt[date_index][carry] = rebuilt[date_index - 1][carry]
+            known |= updated[date_index]
     return rebuilt
+
+
+def _timestamp_upper_expression(source: pl.DataFrame, column: str) -> pl.Expr:
+    """Conservative upper precision bound plus declared processing latency."""
+
+    dtype = source.schema[column]
+    if not isinstance(dtype, pl.Datetime):
+        raise ValueError(f"{column} must have a Datetime dtype")
+    precision_column = (
+        f"{column}_precision"
+        if f"{column}_precision" in source.columns
+        else "timestamp_precision"
+    )
+    latency_column = (
+        f"{column}_processing_latency_seconds"
+        if f"{column}_processing_latency_seconds" in source.columns
+        else "processing_latency_seconds"
+    )
+    present = source.get_column(column).is_not_null()
+    if present.any() and precision_column not in source.columns:
+        raise ValueError(f"{column} requires declared timestamp precision")
+    if present.any() and latency_column not in source.columns:
+        raise ValueError(f"{column} requires declared processing latency")
+    if not present.any():
+        return pl.lit(None, dtype=pl.Int64)
+    precision = pl.col(precision_column).cast(pl.String).str.to_lowercase()
+    invalid_precision = source.filter(
+        pl.col(column).is_not_null()
+        & ~precision.is_in(tuple(_PRECISION_UPPER_BOUND))
+    )
+    if not invalid_precision.is_empty():
+        raise ValueError(f"{column} has missing or unsupported timestamp precision")
+    latency = pl.col(latency_column).cast(pl.Float64)
+    invalid_latency = source.filter(
+        pl.col(column).is_not_null()
+        & (~latency.is_finite() | (latency < 0.0))
+    )
+    if not invalid_latency.is_empty():
+        raise ValueError(f"{column} has invalid declared processing latency")
+    value = pl.col(column)
+    if dtype.time_zone is None:
+        value = value.dt.replace_time_zone(str(B3_TIMEZONE))
+    value_us = value.dt.convert_time_zone("UTC").dt.epoch("us")
+    resolution_us = (
+        pl.when(precision.is_in(("instant", "exact")))
+        .then(0)
+        .when(precision == "microsecond")
+        .then(1)
+        .when(precision == "millisecond")
+        .then(1_000)
+        .when(precision == "second")
+        .then(1_000_000)
+        .when(precision == "minute")
+        .then(60_000_000)
+        .otherwise(None)
+    )
+    return (value_us + resolution_us + latency * 1_000_000).cast(pl.Int64)
 
 
 def _publication_order_expression(source: pl.DataFrame) -> pl.Expr:
@@ -327,18 +630,10 @@ def _publication_order_expression(source: pl.DataFrame) -> pl.Expr:
     """
 
     timestamp_expressions: list[pl.Expr] = []
-    for column in ("available_timestamp", "delivery_timestamp"):
+    for column in _TIMESTAMP_COLUMNS:
         if column not in source.columns:
             continue
-        dtype = source.schema[column]
-        if not isinstance(dtype, pl.Datetime):
-            raise ValueError(f"{column} must have a Datetime dtype")
-        value = pl.col(column)
-        if dtype.time_zone is None:
-            value = value.dt.replace_time_zone(str(B3_TIMEZONE))
-        else:
-            value = value.dt.convert_time_zone("UTC")
-        timestamp_expressions.append(value.dt.convert_time_zone("UTC").dt.epoch("us"))
+        timestamp_expressions.append(_timestamp_upper_expression(source, column))
 
     available_midnight = (
         pl.col("available_date")
@@ -516,13 +811,6 @@ def _raw_lending_features(
         }
     )
 
-    volume_observed = np.isfinite(volume)
-    first_observed = np.full(len(isins), len(calendar), dtype=np.int64)
-    observed_names = volume_observed.any(axis=0)
-    first_observed[observed_names] = np.argmax(
-        volume_observed[:, observed_names], axis=0
-    )
-
     if has_balance:
         _reject_ambiguous_vintages(output, "source_position_date")
         balance = (
@@ -535,22 +823,33 @@ def _raw_lending_features(
             )
             .join(name_positions, on="isin", how="left")
         )
-        zero_volume = np.where(volume_observed, volume, 0.0)
         rolling_volume = np.zeros_like(volume, dtype=np.float64)
-        if len(calendar) >= 20:
-            volume_windows = np.lib.stride_tricks.sliding_window_view(
-                zero_volume, 20, axis=0
-            )
-            rolling_volume[19:] = np.mean(
-                volume_windows, axis=-1, dtype=np.float64
-            )
-        negative = np.isfinite(volume) & (volume < 0.0)
+        rolling_support = np.zeros(volume.shape, dtype=np.int16)
         rolling_negative = np.zeros(volume.shape, dtype=np.bool_)
         if len(calendar) >= 20:
-            negative_windows = np.lib.stride_tricks.sliding_window_view(
-                negative, 20, axis=0
-            )
-            rolling_negative[19:] = np.any(negative_windows, axis=-1)
+            rolling_sum = np.zeros(len(isins), dtype=np.float64)
+            support_count = np.zeros(len(isins), dtype=np.int16)
+            negative_count = np.zeros(len(isins), dtype=np.int16)
+            for day in range(len(calendar)):
+                current = volume[day]
+                current_finite = np.isfinite(current)
+                rolling_sum += np.where(current_finite, current, 0.0)
+                support_count += current_finite.astype(np.int16)
+                negative_count += (current_finite & (current < 0.0)).astype(
+                    np.int16
+                )
+                if day >= 20:
+                    expired = volume[day - 20]
+                    expired_finite = np.isfinite(expired)
+                    rolling_sum -= np.where(expired_finite, expired, 0.0)
+                    support_count -= expired_finite.astype(np.int16)
+                    negative_count -= (
+                        expired_finite & (expired < 0.0)
+                    ).astype(np.int16)
+                if day >= 19:
+                    rolling_volume[day] = rolling_sum / 20.0
+                    rolling_support[day] = support_count
+                    rolling_negative[day] = negative_count > 0
 
         day_index = (
             balance.get_column("__day_index").fill_null(-1).to_numpy().astype(np.int64)
@@ -564,6 +863,7 @@ def _raw_lending_features(
         safe_day = np.clip(day_index, 0, max(len(calendar) - 1, 0))
         safe_name = np.clip(name_index, 0, max(len(isins) - 1, 0))
         mean_volume = rolling_volume[safe_day, safe_name]
+        support = rolling_support[safe_day, safe_name]
         has_negative = rolling_negative[safe_day, safe_name]
         balance_value = (
             balance.get_column("lending_balance_brl")
@@ -574,7 +874,7 @@ def _raw_lending_features(
         level_valid = (
             (day_index >= 19)
             & (name_index >= 0)
-            & ((day_index - 19) >= first_observed[safe_name])
+            & (support == 20)
             & ~has_negative
             & np.isfinite(balance_value)
             & (balance_value >= 0.0)
@@ -777,10 +1077,7 @@ def _raw_events_features(
             .str.to_uppercase()
             .is_in(["ITR", "DFP", "FINANCIAL_FILING"])
         )
-    timestamp = pl.col(timestamp_column)
-    if dtype.time_zone is None:
-        timestamp = timestamp.dt.replace_time_zone(str(B3_TIMEZONE))
-    publication_us = timestamp.dt.convert_time_zone("UTC").dt.epoch("us")
+    publication_us = _timestamp_upper_expression(events, timestamp_column)
     events = events.with_columns(publication_us.alias("__filing_publication_us"))
 
     calendar = tuple(_as_date(value) for value in dates)
@@ -812,7 +1109,6 @@ def _raw_events_features(
         .group_by("isin", "__session_position", maintain_order=True)
         .agg(
             pl.col("__filing_publication_us").last(),
-            pl.col(timestamp_column).last(),
         )
         .rename({"__session_position": "__event_session_position"})
     )
@@ -835,7 +1131,14 @@ def _raw_events_features(
     return states.select(
         "available_date",
         "isin",
-        pl.col(timestamp_column).alias("available_timestamp"),
+        pl.col("__decision_us")
+        .cast(pl.Datetime("us", time_zone="UTC"))
+        .alias("public_available_at"),
+        pl.lit("exact").alias("public_available_at_precision"),
+        pl.lit(0.0).alias("public_available_at_processing_latency_seconds"),
+        pl.col("__filing_publication_us")
+        .cast(pl.Datetime("us", time_zone="UTC"))
+        .alias("event_time"),
         pl.when(valid)
         .then(
             pl.col("__session_position")
@@ -993,9 +1296,21 @@ def derive_known_archive_features(
     if group == "options":
         return _raw_options_features(source)
     if group == "events":
-        return _raw_events_features(source, dates)
+        # A legacy decision-grid age is not an exact event identity/timestamp.
+        # Rebuild the current 15:45 state only from genuine public records.
+        derived = _raw_events_features(source, dates)
+        if derived is source:
+            return pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
+        return derived
     if group == "fundamentals":
         return _raw_fundamental_features(source)
+    if group == "rebalance":
+        # Experiment-33's 55-coordinate state ends at 14:45 and cannot be
+        # promoted to a 15:45 snapshot.  Timestamped current-state records are
+        # accepted; unsupported legacy grids are disabled rather than delayed.
+        if not any(column in source.columns for column in _TIMESTAMP_COLUMNS):
+            return pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
+        return source
     return source
 
 
@@ -1064,12 +1379,23 @@ def validate_sidecar(
 ) -> None:
     if result.values.shape != result.valid.shape or result.values.ndim != 3:
         raise ValueError("sidecar arrays must be aligned [date, name, feature]")
+    if result.age_sessions.shape != result.values.shape:
+        raise ValueError("sidecar source ages must align with feature arrays")
     if result.values.shape[2] != len(result.feature_names):
         raise ValueError("sidecar feature axis is misaligned")
     if not np.isfinite(result.values).all() or np.any(
         result.values[~result.valid] != 0
     ):
         raise ValueError("sidecar values must be finite and invalid cells exactly zero")
+    if (
+        not np.isfinite(result.age_sessions).all()
+        or np.any(result.valid & (result.age_sessions < 0.0))
+        or np.any(result.age_sessions < -1.0)
+    ):
+        raise ValueError(
+            "sidecar source ages must be finite last-observation ages or -1, and "
+            "every valid feature must have a known age"
+        )
     if active is not None:
         membership = np.asarray(active, dtype=np.bool_)
         if membership.shape != result.values.shape[:2]:

@@ -11,10 +11,15 @@ from torch.utils.data import DataLoader, default_collate
 
 from brazil_rv.v2.artifacts import sha256_file
 from brazil_rv.v2.config import ModelConfig
+from brazil_rv.v2.contract import (
+    DECISION_FEATURE_CONTRACT,
+    FEATURE_AGE_CONTRACT,
+    INTRADAY_DAILY_FEATURES,
+)
 from brazil_rv.v2.data import V2DailyDataset
 from brazil_rv.v2.model import DailyMultiHorizonModel
 from brazil_rv.v2.score import score_checkpoint_artifact
-from brazil_rv.v2.store import write_store
+from v2_store_fixtures import write_fixture_store as write_store
 from brazil_rv.v2.train import build_checkpoint_input_contract
 
 
@@ -45,6 +50,9 @@ def _scoring_fixture(
     day_count = len(dates)
     generator = np.random.default_rng(17)
     slow = generator.standard_normal((day_count, name_count, 2)).astype(np.float32)
+    intraday = generator.standard_normal(
+        (day_count, name_count, len(INTRADAY_DAILY_FEATURES))
+    ).astype(np.float32)
     active = np.ones((day_count, name_count), dtype=np.bool_)
     active[21, 2] = False
     store = write_store(
@@ -54,9 +62,23 @@ def _scoring_fixture(
         arrays={
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=np.bool_),
+            "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
+            "slow_timestep_valid": np.ones(
+                (day_count, name_count), dtype=np.bool_
+            ),
+            "intraday_values": intraday,
+            "intraday_valid": np.ones_like(intraday, dtype=np.bool_),
+            "intraday_age_sessions": np.zeros_like(intraday, dtype=np.float32),
             "active": active,
         },
-        feature_names={"slow": list(slow_names), "intraday": []},
+        feature_names={
+            "slow": list(slow_names),
+            "intraday": list(INTRADAY_DAILY_FEATURES),
+        },
+        metadata={
+            "feature_age_contract": dict(FEATURE_AGE_CONTRACT),
+            "slow_entry_alignment": dict(DECISION_FEATURE_CONTRACT),
+        },
     )
     dataset = V2DailyDataset(
         store,
@@ -80,12 +102,16 @@ def _scoring_fixture(
     checkpoint = tmp_path / "raw_patience.pt"
     torch.save(
         {
-            "schema": "V2_RAW_PATIENCE",
+            "schema": "BRAZIL_RV_V2_RAW_PATIENCE_V2",
             "stage": "F",
             "seed": 29,
             "fold": "F1",
             "model_state_dict": model.state_dict(),
             "input_contract": input_contract,
+            "transfer_chronology_clean": True,
+            "feature_schema_sha256": dataset.store.manifest[
+                "feature_schema_sha256"
+            ],
         },
         checkpoint,
     )
@@ -130,11 +156,12 @@ def test_scoring_is_repeat_bit_identical_and_provenance_bound(tmp_path) -> None:
     assert np.all(scores[~score_mask] == 0.0)
 
     manifest = json.loads(first.manifest_path.read_text(encoding="utf-8"))
-    assert manifest["checkpoint"]["kind"] == "V2_RAW_PATIENCE"
+    assert manifest["checkpoint"]["kind"] == "BRAZIL_RV_V2_RAW_PATIENCE_V2"
     assert manifest["checkpoint"]["seed"] == 29
     assert manifest["access_ledger"]["purpose"] == "evaluation"
     assert manifest["fast_initialization_provenance"]["mode"] == "fresh"
     assert manifest["fast_initialization_provenance"]["contaminated"] is False
+    assert manifest["transfer_chronology_clean"] is True
     assert manifest["scoring_input"]["dates"]["first_date"] == "2024-01-21"
     assert len(manifest["scoring_input_sha256"]) == 64
     assert manifest["official_validation_accessed"] is False
@@ -151,7 +178,7 @@ def test_scoring_is_repeat_bit_identical_and_provenance_bound(tmp_path) -> None:
 def test_scoring_accepts_ema_and_rejects_nonchronological_loader(tmp_path) -> None:
     dataset, config, raw_checkpoint, _ = _scoring_fixture(tmp_path)
     payload = torch.load(raw_checkpoint, map_location="cpu", weights_only=False)
-    payload["schema"] = "V2_FINAL_EMA_0995"
+    payload["schema"] = "BRAZIL_RV_V2_FINAL_EMA_0995_V2"
     ema_checkpoint = tmp_path / "final_ema.pt"
     torch.save(payload, ema_checkpoint)
     result = score_checkpoint_artifact(
@@ -167,7 +194,7 @@ def test_scoring_accepts_ema_and_rejects_nonchronological_loader(tmp_path) -> No
         device=torch.device("cpu"),
     )
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
-    assert manifest["checkpoint"]["kind"] == "V2_FINAL_EMA_0995"
+    assert manifest["checkpoint"]["kind"] == "BRAZIL_RV_V2_FINAL_EMA_0995_V2"
 
     reverse_loader = DataLoader(
         dataset,
@@ -229,7 +256,7 @@ def test_scoring_rejects_swapped_ordered_features_before_output(tmp_path) -> Non
         tmp_path / "swapped", slow_names=("slow_1", "slow_0")
     )
     output = tmp_path / "swapped_scores"
-    with pytest.raises(ValueError, match="dataset differs"):
+    with pytest.raises(ValueError, match="feature schema differs"):
         score_checkpoint_artifact(
             checkpoint=checkpoint,
             model_config=config,
@@ -271,7 +298,7 @@ def test_scoring_restores_checkpoint_after_initializer_is_deleted(tmp_path) -> N
     checkpoint = tmp_path / "initialized_stage.pt"
     torch.save(
         {
-            "schema": "V2_RAW_PATIENCE",
+            "schema": "BRAZIL_RV_V2_RAW_PATIENCE_V2",
             "stage": "F",
             "seed": 29,
             "fold": "F1",
@@ -279,6 +306,10 @@ def test_scoring_restores_checkpoint_after_initializer_is_deleted(tmp_path) -> N
             "input_contract": build_checkpoint_input_contract(
                 config, loader, loader
             ),
+            "transfer_chronology_clean": False,
+            "feature_schema_sha256": dataset.store.manifest[
+                "feature_schema_sha256"
+            ],
         },
         checkpoint,
     )
@@ -291,6 +322,44 @@ def test_scoring_restores_checkpoint_after_initializer_is_deleted(tmp_path) -> N
         device=torch.device("cpu"),
     )
     assert result.scores_path.is_file()
+
+
+def test_official_scoring_rejects_unclean_transfer_before_output(tmp_path) -> None:
+    development, config, checkpoint, _ = _scoring_fixture(
+        tmp_path / "fixture", include_official=True
+    )
+    payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
+    payload["transfer_chronology_clean"] = False
+    unclean = tmp_path / "unclean.pt"
+    torch.save(payload, unclean)
+    registration_root = tmp_path / "research" / "preregistrations"
+    registration_root.mkdir(parents=True)
+    registration = registration_root / "official_read.md"
+    registration.write_text("frozen official read\n", encoding="utf-8")
+    official = V2DailyDataset(
+        development.store.root,
+        [25, 26, 27],
+        stage="evaluation",
+        lookback=20,
+        purpose="evaluation",
+        registration_path=registration,
+        preregistration_root=registration_root,
+    )
+    output = tmp_path / "unclean_official_scores"
+    with pytest.raises(PermissionError, match="chronology-contaminated"):
+        score_checkpoint_artifact(
+            checkpoint=unclean,
+            model_config=config,
+            loader=DataLoader(
+                official,
+                batch_size=2,
+                shuffle=False,
+                collate_fn=_omit_absent_fast,
+            ),
+            output_dir=output,
+            device=torch.device("cpu"),
+        )
+    assert not output.exists()
 
 
 def test_registered_official_dates_are_independently_scored_and_recorded(

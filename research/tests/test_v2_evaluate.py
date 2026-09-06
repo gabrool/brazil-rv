@@ -578,7 +578,7 @@ def test_paired_comparison_preserves_undefined_dates_and_reason() -> None:
 def test_paired_comparison_refuses_stale_evaluation_schema() -> None:
     evaluated = evaluate_scores(_fixture(), window_name="F2")
     stale_report = copy.deepcopy(evaluated.report)
-    stale_report["schema"] = "BRAZIL_RV_V2_EVALUATION_V2"
+    stale_report["schema"] = "BRAZIL_RV_V2_EVALUATION_V3"
 
     with pytest.raises(ValueError, match="stale or incompatible"):
         paired_comparison(replace(evaluated, report=stale_report), evaluated)
@@ -710,3 +710,93 @@ def test_report_exposes_primary_and_economic_coverage() -> None:
     assert report["economics"]["coverage"]["finite_net_excess_date_count"] == 25
     assert report["economics"]["d5_only_diagnostic"]["horizon_sessions"] == 5
     assert len(report["economics"]["d5_only_diagnostic"]["daily_table"]) == 25
+
+
+def test_report_persists_state_transactions_holding_ages_and_action_claims() -> None:
+    inputs = _fixture()
+    has_action = np.asarray(inputs.action_has_action).copy()
+    cash = np.asarray(inputs.action_cash_per_prior_share).copy()
+    payment = np.asarray(inputs.action_payment_session).copy()
+    has_action[4, 0] = True
+    cash[4, 0] = 1.25
+    payment[4, 0] = 7
+
+    report = evaluate_scores(
+        replace(
+            inputs,
+            action_has_action=has_action,
+            action_cash_per_prior_share=cash,
+            action_payment_session=payment,
+        ),
+        window_name="F2",
+    ).report
+    audit = report["economics"]["headline_audit"]
+
+    assert len(audit["daily_state"]) == len(inputs.dates)
+    assert all("deployed_net_fraction_nav" in row for row in audit["daily_state"])
+    assert all("reconciliation_error" in row for row in audit["daily_state"])
+    assert audit["intended_orders"]
+    assert audit["fills"]
+    assert isinstance(audit["cancellations"], list)
+    assert (
+        audit["holding_age_distribution"]["population"]
+        == "end_of_session_held_name_days"
+    )
+    assert audit["holding_age_distribution"]["holdings"]
+    action_rows = audit["claims_and_action_attribution"]["rows"]
+    assert len(action_rows) == 1
+    assert action_rows[0]["cash_per_prior_share"] == 1.25
+    assert action_rows[0]["claim_payment_date"] == inputs.dates[7].isoformat()
+    assert "mean_deployed_net_fraction_nav" in report["economics"]["headline"]
+
+
+def test_quality_strata_report_archive_and_conditional_validity_separately() -> None:
+    inputs = _fixture()
+    shape = inputs.active.shape
+    present = np.zeros(shape, dtype=np.bool_)
+    valid = np.zeros(shape, dtype=np.bool_)
+    present[:, :40] = True
+    valid[:, :20] = True
+    age = np.broadcast_to(np.arange(shape[1], dtype=np.float64), shape).copy()
+    survives = np.broadcast_to(np.arange(shape[1])[None, :] < 30, shape).copy()
+
+    report = evaluate_scores(
+        replace(
+            inputs,
+            history_age_sessions=age,
+            source_archive_present={"options": present},
+            source_feature_valid={"options": valid},
+            eventual_survives_to_final_year=survives,
+        ),
+        window_name="F2",
+    ).report
+    diagnostics = report["quality_and_coverage_stratification"]
+    source = diagnostics["source_coverage"][0]
+
+    assert source["source"] == "options"
+    assert source["archive_coverage_rate"] == pytest.approx(2.0 / 3.0)
+    assert source["feature_valid_conditional_on_archive_presence"] == pytest.approx(0.5)
+    assert {row["dimension"] for row in diagnostics["rows"]} >= {
+        "calendar_year",
+        "causal_liquidity_quartile",
+        "history_age_sessions",
+        "source_archive_availability",
+        "eventual_survival_audit_label",
+        "verified_terminal_status",
+        "window_terminal_quote_status",
+    }
+    assert report["declared_subperiod_readouts"]["rows"]
+
+
+def test_source_validity_without_archive_presence_is_rejected() -> None:
+    inputs = _fixture()
+    shape = inputs.active.shape
+    with pytest.raises(ValueError, match="without archive presence"):
+        evaluate_scores(
+            replace(
+                inputs,
+                source_archive_present={"options": np.zeros(shape, dtype=np.bool_)},
+                source_feature_valid={"options": np.ones(shape, dtype=np.bool_)},
+            ),
+            window_name="F2",
+        )

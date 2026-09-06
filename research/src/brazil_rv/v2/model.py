@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -23,6 +24,29 @@ _NATIVE_FAST_INPUT_WIDTH = 2 * _NATIVE_FAST_CHANNELS
 _FAST_HIDDEN_WIDTH = TCN_ARCHITECTURE.width
 _V1_EQUITY_PREFIX_PATCHES = 12
 _V1_ABSOLUTE_STATE_POSITION = _V1_EQUITY_PREFIX_PATCHES + FAST_REAL_PATCHES
+_FEATURE_AGE_CAP_SESSIONS = 252.0
+_FEATURE_AGE_LOG_DENOMINATOR = math.log1p(_FEATURE_AGE_CAP_SESSIONS)
+
+
+def _bounded_feature_age(
+    age_sessions: torch.Tensor,
+    valid: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return bounded age and its independent known/left-censored indicator."""
+
+    torch._assert_async(
+        torch.all(torch.isfinite(age_sessions)),
+        "feature ages must be finite",
+    )
+    age_known = age_sessions >= 0.0
+    torch._assert_async(
+        torch.all((age_sessions >= -1.0) & (~valid | age_known)),
+        "feature ages must be at least -1 and known for every valid feature",
+    )
+    bounded = torch.log1p(
+        age_sessions.clamp(min=0.0, max=_FEATURE_AGE_CAP_SESSIONS)
+    ) / _FEATURE_AGE_LOG_DENOMINATOR
+    return torch.where(age_known, bounded, torch.zeros_like(bounded)), age_known
 
 
 class FastTCNEncoder(nn.Module):
@@ -231,16 +255,20 @@ class DailyMultiHorizonModel(nn.Module):
             "checkpoint_sha256": None,
         }
         self.slow_input_projection = nn.Linear(
-            2 * config.slow_feature_count, config.hidden_width
+            4 * config.slow_feature_count, config.hidden_width
         )
         self.slow_input_norm = nn.LayerNorm(config.hidden_width)
         self.slow_encoder = nn.GRU(
-            config.hidden_width + 2,
+            config.hidden_width,
             config.hidden_width,
             num_layers=config.gru_layers,
             batch_first=True,
             dropout=config.dropout if config.gru_layers == 2 else 0.0,
         )
+        self.current_input_projection = nn.Linear(
+            4 * config.current_feature_count, config.hidden_width
+        )
+        self.current_input_norm = nn.LayerNorm(config.hidden_width)
         self.fast_encoder = FastTCNEncoder(legacy_v1_context=legacy_fast)
         self.absent_state = nn.Parameter(torch.zeros(_FAST_HIDDEN_WIDTH))
         self.fast_gate = nn.Linear(
@@ -252,7 +280,10 @@ class DailyMultiHorizonModel(nn.Module):
             2 * config.hidden_width,
         )
         fusion_input_width = (
-            config.hidden_width + _FAST_HIDDEN_WIDTH + 2 * config.hidden_width + 2
+            2 * config.hidden_width
+            + _FAST_HIDDEN_WIDTH
+            + 2 * config.hidden_width
+            + 1
         )
         self.fusion_projection = nn.Linear(fusion_input_width, config.fusion_width)
         self.trunk = nn.Sequential(
@@ -287,22 +318,13 @@ class DailyMultiHorizonModel(nn.Module):
                 config.fast_pretrained_checkpoint,
                 expected_sha256=config.fast_pretrained_sha256,
             )
-        fast_ids = {id(parameter) for parameter in self.fast_encoder.parameters()}
-        non_fast_count = sum(
-            parameter.numel()
-            for parameter in self.parameters()
-            if parameter.requires_grad and id(parameter) not in fast_ids
-        )
-        if non_fast_count > 165_000:
-            raise ValueError("starter-model non-fast parameter count exceeds 165k")
 
     def _slow_states(
         self,
         slow_features: torch.Tensor,
         slow_feature_mask: torch.Tensor,
         slow_history_mask: torch.Tensor,
-        fast_present: torch.Tensor,
-        days_since_last_slow_row: torch.Tensor,
+        slow_feature_age_sessions: torch.Tensor,
     ) -> torch.Tensor:
         if slow_features.ndim != 4:
             raise ValueError("slow_features must have shape [batch, name, date, field]")
@@ -310,51 +332,110 @@ class DailyMultiHorizonModel(nn.Module):
             raise ValueError("slow_history_mask is misaligned with slow_features")
         if slow_feature_mask.shape != slow_features.shape:
             raise ValueError("slow_feature_mask is misaligned with slow_features")
+        if slow_feature_age_sessions.shape != slow_features.shape:
+            raise ValueError("slow feature ages are misaligned with slow_features")
         if slow_features.shape[-1] != self.config.slow_feature_count:
             raise ValueError("slow feature width differs from the model configuration")
         batch_size, name_count, lookback, _ = slow_features.shape
         if lookback != self.config.slow_lookback:
             raise ValueError("slow lookback differs from the model configuration")
         feature_valid = slow_feature_mask.bool()
-        valid = slow_history_mask.bool() & feature_valid.any(dim=-1)
+        valid = slow_history_mask.bool()
+        torch._assert_async(
+            torch.all(~feature_valid | valid[..., None]),
+            "slow features cannot be valid in left-padding rows",
+        )
+        torch._assert_async(
+            torch.all(~valid[..., :-1] | valid[..., 1:]),
+            "slow history must be a left-padded calendar suffix",
+        )
         clean = torch.where(
             feature_valid, slow_features, torch.zeros_like(slow_features)
         )
+        bounded_age, age_known = _bounded_feature_age(
+            slow_feature_age_sessions.to(dtype=clean.dtype), feature_valid
+        )
         projected = self.slow_input_norm(
             self.slow_input_projection(
-                torch.cat((clean, feature_valid.to(clean.dtype)), dim=-1)
+                torch.cat(
+                    (
+                        clean,
+                        feature_valid.to(clean.dtype),
+                        bounded_age,
+                        age_known.to(clean.dtype),
+                    ),
+                    dim=-1,
+                )
             )
         )
         projected = torch.where(
             valid[..., None], projected, torch.zeros_like(projected)
         )
-        flags = torch.stack(
-            (
-                fast_present.to(projected.dtype),
-                days_since_last_slow_row.to(projected.dtype),
-            ),
-            dim=-1,
+        flat = projected.reshape(batch_size * name_count, lookback, -1)
+        lengths = valid.reshape(batch_size * name_count, lookback).sum(dim=1)
+        has_history = lengths > 0
+        # Move each real calendar suffix to the front without compressing
+        # missing sessions inside it.
+        positions = torch.arange(lookback, device=slow_features.device)[None, :]
+        source = lookback - lengths[:, None] + positions
+        source = source.clamp(min=0, max=lookback - 1)
+        packed_inputs = flat.gather(
+            1, source[..., None].expand(-1, -1, flat.shape[-1])
         )
-        flags = flags[:, :, None].expand(-1, -1, lookback, -1)
-        inputs = torch.cat((projected, flags), dim=-1)
-        inputs = torch.where(valid[..., None], inputs, torch.zeros_like(inputs))
-        sequence, _ = self.slow_encoder(
-            inputs.reshape(batch_size * name_count, lookback, -1)
+        packed_inputs = torch.where(
+            positions[..., None] < lengths[:, None, None],
+            packed_inputs,
+            torch.zeros_like(packed_inputs),
         )
-        sequence = sequence.reshape(
-            batch_size, name_count, lookback, self.config.hidden_width
-        )
-        positions = torch.arange(lookback, device=slow_features.device)
-        last = torch.where(valid, positions, -1).amax(dim=-1)
-        has_history = last >= 0
-        last = last.clamp_min(0)
-        index = last[..., None, None].expand(-1, -1, 1, self.config.hidden_width)
-        state = sequence.gather(2, index).squeeze(2)
+        # The real suffix is now right-padded.  Gather the output at its final
+        # real calendar step, before any padded zero can advance the recurrent
+        # state.  This is equivalent to a packed GRU while remaining friendly
+        # to full-graph compilation.
+        sequence, _ = self.slow_encoder(packed_inputs)
+        last = (lengths - 1).clamp_min(0)
+        state = sequence.gather(
+            1,
+            last[:, None, None].expand(-1, 1, sequence.shape[-1]),
+        )[:, 0].reshape(batch_size, name_count, self.config.hidden_width)
+        has_history = has_history.reshape(batch_size, name_count)
         # A name can enter today's strictly prior-session universe before it
         # has a rank-normalized row in the t-1 slow window.  The GRU state of
         # that genuinely empty sequence is its fixed zero initial state.  The
         # learned absent_state remains reserved for the optional fast stream.
         return torch.where(has_history[..., None], state, torch.zeros_like(state))
+
+    def _current_states(
+        self,
+        current_features: torch.Tensor,
+        current_feature_mask: torch.Tensor,
+        current_feature_age_sessions: torch.Tensor,
+    ) -> torch.Tensor:
+        if current_features.ndim != 3:
+            raise ValueError("current_features must have shape [batch, name, field]")
+        if current_feature_mask.shape != current_features.shape:
+            raise ValueError("current_feature_mask is misaligned with current_features")
+        if current_feature_age_sessions.shape != current_features.shape:
+            raise ValueError("current feature ages are misaligned with current_features")
+        if current_features.shape[-1] != self.config.current_feature_count:
+            raise ValueError("current feature width differs from the model configuration")
+        valid = current_feature_mask.bool()
+        clean = torch.where(valid, current_features, torch.zeros_like(current_features))
+        bounded_age, age_known = _bounded_feature_age(
+            current_feature_age_sessions.to(dtype=clean.dtype), valid
+        )
+        return self.current_input_norm(
+            self.current_input_projection(
+                torch.cat(
+                    (
+                        clean,
+                        valid.to(clean.dtype),
+                        bounded_age,
+                        age_known.to(clean.dtype),
+                    ),
+                    dim=-1,
+                )
+            )
+        )
 
     @staticmethod
     def _flags(
@@ -573,10 +654,13 @@ class DailyMultiHorizonModel(nn.Module):
         fast_patches: torch.Tensor | None = None,
         fast_patch_mask: torch.Tensor | None = None,
         fast_present: torch.Tensor | None = None,
-        days_since_last_slow_row: torch.Tensor | None = None,
         fast_state_position: torch.Tensor | None = None,
         v1_equity_slow: torch.Tensor | None = None,
         *,
+        current_features: torch.Tensor,
+        current_feature_mask: torch.Tensor,
+        slow_feature_age_sessions: torch.Tensor,
+        current_feature_age_sessions: torch.Tensor,
         fast_patch_values: torch.Tensor | None = None,
         fast_patch_valid: torch.Tensor | None = None,
         fast_name_index: torch.Tensor | None = None,
@@ -620,10 +704,19 @@ class DailyMultiHorizonModel(nn.Module):
         else:
             inferred_present = 0.0 if fast_patches is None else 1.0
             present = self._flags(slow_features, fast_present, inferred_present)
-        days = self._flags(slow_features, days_since_last_slow_row, 1.0)
         slow = self._slow_states(
-            slow_features, slow_feature_mask, slow_history_mask, present, days
+            slow_features,
+            slow_feature_mask,
+            slow_history_mask,
+            slow_feature_age_sessions,
         )
+        current = self._current_states(
+            current_features,
+            current_feature_mask,
+            current_feature_age_sessions,
+        )
+        if current.shape[:2] != slow.shape[:2]:
+            raise ValueError("current and slow feature axes are misaligned")
         if fast_patches is not None:
             fast = self._legacy_dense_fast_states(
                 slow,
@@ -663,7 +756,7 @@ class DailyMultiHorizonModel(nn.Module):
             torch.sigmoid(self.pool_gate(torch.cat((slow, pooled), dim=-1))) * pooled
         )
         fused = torch.cat(
-            (slow, gated_fast, gated_pool, present[..., None], days[..., None]), dim=-1
+            (slow, current, gated_fast, gated_pool, present[..., None]), dim=-1
         )
         hidden = self.trunk(self.fusion_projection(fused))
         predictions = torch.cat(

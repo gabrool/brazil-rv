@@ -1,5 +1,6 @@
 from datetime import date
 
+import numpy as np
 import polars as pl
 import pytest
 
@@ -53,6 +54,11 @@ def test_cash_filter_isin_identity_and_v1_exception() -> None:
     ]
     collapsed = filter_cash_equities(pl.DataFrame([rows[0], rows[0]]))
     assert collapsed.height == 1
+    prepared = prepare_cash_equities(pl.DataFrame(rows), v1_isins=("BRTESTACNPR0",))
+    assert prepared.source_session_dates == (
+        date(2024, 1, 2),
+        date(2024, 1, 3),
+    )
 
 
 def test_cotahist_loader_applies_v1_exception_on_first_filter(tmp_path) -> None:
@@ -75,9 +81,65 @@ def test_security_master_splits_ticker_runs_and_panel_uses_isin() -> None:
     master = build_security_master(daily)
     assert master.get_column("ticker").to_list() == ["OLD3", "NEW3"]
     assert master.get_column("last_date").to_list()[0] == date(2024, 1, 3)
-    panel = panel_from_daily(daily)
+    panel = panel_from_daily(
+        daily,
+        dates=daily.get_column("trade_date").unique().sort().to_list(),
+        source_session_complete=[True, True, True],
+    )
     assert panel.isins == ("BRTESTACNOR1",)
     assert panel.observed.all()
+
+
+def test_daily_panel_separates_price_activity_and_source_completeness() -> None:
+    isin = "BRTESTACNOR1"
+    dates = [date(2024, 1, day) for day in range(2, 7)]
+    malformed_activity = {
+        **_row(dates[3], isin, "TEST3"),
+        "volume_brl": float("nan"),
+    }
+    explicit_zero = {
+        **_row(dates[4], isin, "TEST3"),
+        "volume_brl": 0.0,
+        "trades": 0,
+        "quantity": 0,
+    }
+    validation = validate_cotahist_daily(
+        pl.DataFrame([_row(dates[0], isin, "TEST3"), malformed_activity, explicit_zero])
+    )
+    panel = panel_from_daily(
+        validation.accepted,
+        dates=dates,
+        source_session_complete=[True, True, False, True, True],
+        invalid_observations=validation.rejected,
+    )
+
+    # A complete source with no row certifies no activity after listing, but
+    # it cannot invent a price print.
+    assert not panel.observed[1, 0]
+    assert not panel.trade_observed[1, 0]
+    assert panel.activity_valid[1, 0]
+    assert panel.volume_brl[1, 0] == panel.trades[1, 0] == 0.0
+    # A missing whole source session and a rejected activity row remain
+    # unknown; neither is silently converted to zero.
+    assert not panel.source_session_complete[2]
+    assert not panel.activity_valid[2, 0]
+    assert np.isnan(panel.volume_brl[2, 0])
+    assert not panel.activity_valid[3, 0]
+    assert np.isnan(panel.volume_brl[3, 0])
+    # An explicit valid zero record is distinct from missingness.
+    assert panel.observed[4, 0]
+    assert panel.trade_observed[4, 0]
+    assert panel.activity_valid[4, 0]
+    assert panel.volume_brl[4, 0] == 0.0
+
+
+def test_daily_panel_requires_explicit_authoritative_calendar_contract() -> None:
+    daily = pl.DataFrame([_row(date(2024, 1, 2), "BRTESTACNOR1", "TEST3")])
+    with pytest.raises(TypeError, match="source_session_complete"):
+        panel_from_daily(
+            daily,
+            dates=[date(2024, 1, 2), date(2024, 1, 3)],
+        )
 
 
 def test_same_ticker_isin_succession_is_proposed_but_not_accepted_by_default(

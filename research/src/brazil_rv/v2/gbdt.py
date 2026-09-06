@@ -14,7 +14,8 @@ from numpy.typing import NDArray
 
 from .artifacts import sha256_file, write_json_atomic
 from .baselines import rank_gaussianize
-from .contract import GBDT_SEEDS
+from .contract import GBDT_MODELS_SCHEMA, GBDT_SEEDS
+from .data import ScalarFeatureView
 from .normalization import average_ranks
 
 try:
@@ -58,26 +59,121 @@ class GBDTConfig:
             raise ValueError("boosting and early-stopping rounds must be positive")
 
 
+def gbdt_scalar_feature_names(names: Sequence[str]) -> tuple[str, ...]:
+    """Return the value/age column names for one scalar feature view."""
+
+    feature_names = tuple(str(name) for name in names)
+    if (
+        not feature_names
+        or any(not name for name in feature_names)
+        or len(feature_names) != len(set(feature_names))
+    ):
+        raise ValueError("GBDT scalar feature names must be nonempty and unique")
+    return (*feature_names, *(f"{name}__age_sessions" for name in feature_names))
+
+
+def assemble_gbdt_scalar_view(
+    view: ScalarFeatureView,
+    *,
+    label: str = "scalar",
+) -> NDArray[np.float32]:
+    """Encode one canonical scalar view using LightGBM missing-value semantics."""
+
+    values = np.asarray(view.values, dtype=np.float32)
+    valid = np.asarray(view.valid, dtype=np.bool_)
+    ages = np.asarray(view.age_sessions, dtype=np.float32)
+    if values.ndim != 3 or valid.shape != values.shape or ages.shape != values.shape:
+        raise ValueError(f"GBDT {label} scalar feature view is misaligned")
+    if values.shape[-1] != len(view.names):
+        raise ValueError(f"GBDT {label} scalar feature names are misaligned")
+    if np.isinf(values).any():
+        raise ValueError(f"GBDT {label} feature payloads cannot contain infinities")
+    if not np.isfinite(values[valid]).all():
+        raise ValueError(f"valid {label} feature cells must be finite")
+    if (
+        not np.isfinite(ages).all()
+        or np.any(valid & (ages < 0.0))
+        or np.any(ages < -1.0)
+    ):
+        raise ValueError(
+            f"{label} feature ages must be at least -1 and known for valid features"
+        )
+    encoded_values = np.where(valid, values, np.nan)
+    encoded_ages = np.where(
+        ages >= 0.0,
+        np.log1p(np.clip(ages, 0.0, 252.0)) / np.log1p(252.0),
+        np.nan,
+    )
+    return np.concatenate(
+        (encoded_values, encoded_ages), axis=-1, dtype=np.float32
+    )
+
+
 def assemble_gbdt_features(
     slow_features: NDArray[np.floating],
     intraday_features: NDArray[np.floating],
     fast_present: NDArray[np.bool_],
-    days_since_last_slow_row: NDArray[np.floating],
+    *,
+    slow_feature_mask: NDArray[np.bool_],
+    intraday_feature_mask: NDArray[np.bool_],
+    slow_feature_age_sessions: NDArray[np.floating],
+    intraday_feature_age_sessions: NDArray[np.floating],
 ) -> NDArray[np.float32]:
-    """Combine the normalized last slow/sidecar step, intraday fields, and flags."""
+    """Combine masked values, bounded session ages, and the fast-presence flag."""
 
     slow = np.asarray(slow_features, dtype=np.float32)
     intraday = np.asarray(intraday_features, dtype=np.float32)
     present = np.asarray(fast_present, dtype=np.float32)
-    days = np.asarray(days_since_last_slow_row, dtype=np.float32)
+    slow_valid = np.asarray(slow_feature_mask, dtype=np.bool_)
+    intraday_valid = np.asarray(intraday_feature_mask, dtype=np.bool_)
+    slow_age = np.asarray(slow_feature_age_sessions, dtype=np.float32)
+    intraday_age = np.asarray(intraday_feature_age_sessions, dtype=np.float32)
     if slow.ndim != 4 or intraday.ndim != 3:
         raise ValueError("slow and intraday features must be daily panels")
     if slow.shape[:2] != intraday.shape[:2]:
         raise ValueError("slow and intraday panels are misaligned")
-    if present.shape != slow.shape[:2] or days.shape != slow.shape[:2]:
-        raise ValueError("GBDT flags are misaligned with the feature panels")
+    if present.shape != slow.shape[:2]:
+        raise ValueError("GBDT fast-present flag is misaligned with the feature panels")
+    if not np.isfinite(present).all():
+        raise ValueError("GBDT fast-present flag must be finite")
+    if slow_valid.shape != slow.shape or slow_age.shape != slow.shape:
+        raise ValueError("slow feature validity and ages are misaligned")
+    if intraday_valid.shape != intraday.shape or intraday_age.shape != intraday.shape:
+        raise ValueError("intraday feature validity and ages are misaligned")
+    date_indices = np.arange(slow.shape[0], dtype=np.int64)
+    dates = date_indices.astype("datetime64[D]")
+    isins = tuple(str(index) for index in range(slow.shape[1]))
+    active = np.ones(slow.shape[:2], dtype=np.bool_)
+    slow_columns = assemble_gbdt_scalar_view(
+        ScalarFeatureView(
+            date_indices=date_indices,
+            dates=dates,
+            isins=isins,
+            active=active,
+            names=tuple(f"slow_{index}" for index in range(slow.shape[-1])),
+            values=slow[:, :, -1],
+            valid=slow_valid[:, :, -1],
+            age_sessions=slow_age[:, :, -1],
+        ),
+        label="slow",
+    )
+    intraday_columns = assemble_gbdt_scalar_view(
+        ScalarFeatureView(
+            date_indices=date_indices,
+            dates=dates,
+            isins=isins,
+            active=active,
+            names=tuple(
+                f"intraday_{index}" for index in range(intraday.shape[-1])
+            ),
+            values=intraday,
+            valid=intraday_valid,
+            age_sessions=intraday_age,
+        ),
+        label="intraday",
+    )
     return np.concatenate(
-        (slow[:, :, -1], intraday, present[..., None], days[..., None]),
+        (slow_columns, intraday_columns, present[..., None]),
         axis=-1,
         dtype=np.float32,
     )
@@ -94,6 +190,10 @@ def _validate_panel(
         raise ValueError("targets and mask must have shape [date, name, 5]")
     if features.shape[:2] != targets.shape[:2]:
         raise ValueError("feature and target panels are misaligned")
+    if np.isinf(features).any():
+        raise ValueError("GBDT features cannot contain infinities")
+    if not np.isfinite(targets[np.asarray(mask, dtype=np.bool_)]).all():
+        raise ValueError("valid GBDT targets must be finite")
     return features.shape
 
 
@@ -301,6 +401,8 @@ class MultiHorizonGBDT:
         if features.ndim != 3:
             raise ValueError("features must have shape [date, name, feature]")
         date_count, name_count, feature_count = features.shape
+        if np.isinf(features).any():
+            raise ValueError("GBDT features cannot contain infinities")
         flat = np.asarray(features, dtype=np.float32).reshape(-1, feature_count)
         result = np.empty((date_count, name_count, 5), dtype=np.float32)
         for head, models in self.models.items():
@@ -321,6 +423,8 @@ class MultiHorizonGBDT:
         self._require_fit()
         if features.ndim != 3:
             raise ValueError("features must have shape [date, name, feature]")
+        if np.isinf(features).any():
+            raise ValueError("GBDT features cannot contain infinities")
         date_count, name_count, _ = features.shape
         mask = np.asarray(score_mask, dtype=bool)
         if mask.ndim == 2:
@@ -360,6 +464,8 @@ class MultiHorizonGBDT:
         )
         result = {"gain": np.asarray(gain, dtype=np.float64)}
         if features is not None:
+            if np.isinf(features).any():
+                raise ValueError("GBDT features cannot contain infinities")
             flat = np.asarray(features, dtype=np.float32).reshape(
                 -1, features.shape[-1]
             )
@@ -416,7 +522,7 @@ class MultiHorizonGBDT:
             manifest_sha256 = write_json_atomic(
                 manifest_path,
                 {
-                    "schema": "BRAZIL_RV_V2_GBDT_MODELS_V1",
+                    "schema": GBDT_MODELS_SCHEMA,
                     "config": asdict(self.config),
                     "feature_names": (
                         None
@@ -453,7 +559,7 @@ class MultiHorizonGBDT:
         if sha_record != expected_manifest_sha256:
             raise ValueError("GBDT manifest sidecar SHA-256 mismatch")
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if payload.get("schema") != "BRAZIL_RV_V2_GBDT_MODELS_V1":
+        if payload.get("schema") != GBDT_MODELS_SCHEMA:
             raise ValueError("GBDT model manifest schema is not recognized")
         config_payload = payload.get("config")
         if not isinstance(config_payload, dict):

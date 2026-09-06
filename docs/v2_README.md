@@ -1,595 +1,446 @@
-# Brazil-RV v2 daily model
+# Brazil-RV v2 multi-day research pipeline
 
-Brazil-RV v2 is an additive daily research stack. It predicts cross-sectional
-split-adjusted price-return ranks over 1, 2, 3, 5, and 10 B3 sessions and makes one decision
-per session at 15:45 for a closing-auction entry. The v1 intraday package,
-artifacts, and deployed recipe are unchanged.
+Brazil-RV v2 is the current one-decision-per-session research pipeline. At
+15:45:00 `America/Sao_Paulo` it produces cross-sectional forecasts for
+1, 2, 3, 5, and 10 B3 equity sessions. Historical intraday experiments remain
+archival evidence; their clocks, tensors, checkpoints, and adjusted-return
+semantics do not define this pipeline.
 
-This document describes the implementation contract. It does not authorize an
-official-validation or test read and it does not describe a live trading
-system.
+This document is the canonical implementation contract. It describes research
+plumbing, not a live trading system, and it does not authorize access to sealed
+official-validation or test dates. A fresh real-data rebuild and the acceptance
+matrix are still required before results from this contract can support a
+research claim.
 
-## Current review status
+Where earlier fix-pass notes conflict, the full multi-day refactor semantics
+documented here win. Compatible tactical requirements—bounded memory,
+decision-prefix causality, revision-safe as-of state, explicit order/fill
+separation, and common-population evaluation—remain mandatory.
 
-Fix pass 3 supersedes every Round-1/Round-2 research claim made from the first
-daily store. The old store remains immutable evidence, but its action classifier
-mistook many ordinary `DISMES` transitions for cash events, masking roughly 89%
-of the old cash-event set without an official distribution change. Its targets
-also mixed cross-sectional median removal and volatility scaling in the wrong
-order, and the old economics wrapper treated independently re-formed daily
-books as PnL instead of maintaining positions and cash.
+The schema transition is intentionally incompatible. See
+[v2_MIGRATION.md](v2_MIGRATION.md) before opening or resuming any earlier v2
+artifact.
 
-The corrected foundation has five inseparable pieces:
+## End-to-end contract
 
-1. **F1 — corporate actions:** split/bonus candidates are `DISMES` changes;
-   an optional strict price/quantity fallback is enabled only by a recorded
-   provider-audit decision. Price jumps without `DISMES` are diagnostics, not
-   cash events.
-2. **F2 — returns:** the daily panel first constructs split-adjusted log returns.
-   On a classified cash/ambiguous event, that name's otherwise observed return
-   is replaced by the contemporaneous active non-event cross-sectional median;
-   the leg stays valid. Ordinary large moves remain untouched.
-3. **F3 — targets:** a D-session target sums those neutralized daily returns,
-   removes the target-date cross-sectional median, and only then divides by the
-   name's 20-session Yang-Zhang volatility observed at `t-1`, scaled by
-   `sqrt(D)`.
-4. **F4 — chronology:** every development fold uses one model per seed with a
-   fit window, 10-session purge, 55-session selection window, another
-   10-session purge, and an untouched evaluation window. Block parity is not a
-   v2 selection or evaluation mechanism.
-5. **F5 — economics:** v2 uses a stateful position/cash ledger with explicit
-   entries, exits, holding periods, costs, borrow, interest, missing marks,
-   corporate-action flows, forced liquidation, and terminal liquidation.
+The only current path is:
 
-The v1 intraday implementation and its accepted artifacts are untouched. The
-old v2 Round-1 root and the score-free partial Round-2 root are retained and
-marked superseded with `research_claim=false`; no completed old score is reused
-by the corrected program.
+`validated raw observations and revisions -> canonical decision snapshots -> model adapters -> forecasts -> intended orders -> fills -> signed-share/cash accounting -> evaluation`
 
-## Data flow
+The priority order is information and economic correctness, then model
+interfaces and bounded resources, then controlled research. A finite score or
+PnL array is not evidence that identity, timing, actions, or missing outcomes
+were handled correctly.
 
-```mermaid
-flowchart LR
-    A[Official B3 COTAHIST 2009-2026] --> B[ISIN daily panel]
-    A --> D[COTAHIST-only action classification]
-    C[Yahoo actions] -. audit only .-> D
-    D --> B
-    B --> E[PIT daily universe]
-    B --> F[32 slow daily features]
-    G[XP M1 archive] --> H[20 intraday daily features]
-    G --> I[15:45 fast TCN patches]
-    J[Optional PIT sidecars] --> K[Sidecar adapters]
-    E --> L[Per-date rank-Gauss]
-    F --> L
-    H --> L
-    K --> L
-    B --> M[Five neutralized-return targets]
-    G --> N[To-close auxiliary target]
-    L --> O[Immutable v2 daily store]
-    M --> O
-    N --> O
-    O --> P[Baselines / LightGBM / neural model]
-    P --> Q[Development-only evaluator]
-    Q --> R[IC, persistence, spreads, stateful economics]
-```
+## Decision clock and row meaning
 
-## Identity, calendar, and timing
+- The decision is exactly 15:45:00 in `America/Sao_Paulo`, converted to UTC
+  with historical timezone rules.
+- A canonical feature row `t` means information available by that decision.
+  Daily market inputs in that row end at `t-1`; publications genuinely
+  available by the decision may be current on `t`. The store applies those
+  source lags once, and every consumer reads row `t` without another shift.
+- Today's market prefix contains only completed bars ending by the decision.
+  The bar starting at 15:45, including its open and observation flag, is not an
+  input.
+- Public data uses its actual release or receipt timestamp and declared
+  latency. Date-only publications follow a documented conservative
+  availability rule and next-session lags use the exchange calendar.
+- Historical rows are historical decision snapshots. Later revisions,
+  identities, actions, prices, and source records cannot rewrite them.
+- Full-session lagged summaries use the dated continuous/auction schedule.
+  There is no fixed historical close and no legacy 405-minute full-session
+  assumption.
 
-Permanent equity identity is the 12-character B3 ISIN (`CODISI`). Ticker is a
-dated attribute represented by one or more `(ticker, first_date, last_date)`
-segments in `security_master.parquet`. Fallback ticker identities are rejected.
+The session axis is a versioned B3 equity calendar covering warm-up, holidays,
+exceptional sessions, and dated session boundaries. Missing source sessions
+remain on that axis and are reported as source incompleteness; the number of
+observed names is a coverage diagnostic, not a calendar generator.
 
-The session calendar contains COTAHIST dates with at least 50 distinct traded
-cash equities. The raw foundation includes 2009 for lookbacks; persisted store
-rows begin on 2010-01-04. The current v1 physical date axis has exactly 1,248
-sessions from 2021-07-19 through 2026-07-17, including its pre-fine-tune warm-up
-rows. Store construction asserts that this complete axis equals the matching
-COTAHIST calendar slice. Stage F samples begin later, on 2021-08-16.
+The decision-time reference price, later entry/fill price, and target
+entry/exit marks are separate quantities. Until verified auction marks exist,
+targets and close-proxy execution use the explicitly named
+`daily_last_trade_close_proxy`.
 
-All 158 accepted v1 `security_id` values must map one-to-one to distinct ISINs
-on the v2 axis. The PIT audit requires each mapped identity to be active at
-least once from the Stage F start; it deliberately does not claim that all 158
-are active simultaneously on every date.
+## Raw data, identity, and actions
 
-The M1 grid starts at 10:00. V2 has exactly one decision sample: index 345,
-the instant the 15:45 minute opens. Completed intraday bars are indices 0–344.
-The high, low, close, and volume of minute 345 are never inputs. V1's last
-stored decision is 14:45, so v2 synthesizes the new cutoff rather than
-mislabeling a v1 sample.
+Accepted COTAHIST and M1 observations must have supported units and timestamps,
+finite positive prices, consistent OHLC bounds, and nonnegative activity.
+Exact duplicate economic records may collapse; conflicting duplicates and
+structural parse/audit failures prevent promotion. Invalid observations and
+their reasons belong in audit output, not in accepted model arrays.
 
-## Daily panel and corporate actions
+Permanent security identity is the B3 ISIN. Ticker is a dated attribute, and
+security, issuer, ISIN, and ticker are not interchangeable. Same-ticker
+adjacency may propose a link but never accepts one automatically. A
+predecessor/successor conversion requires contractual ratio/cash terms,
+effective date, first-known timestamp, and evidence in the verified allowlist.
+Each source row is assigned to exactly one security/date segment.
 
-The source panel keeps cash-market type 010, standard-lot BDI 02, and
-ON/OR/PN/PNA–PNF/UNT securities (plus any explicit accepted-v1 exception).
-Each observed row contains raw OHLC, BRL volume, trade count, and quantity.
-When the same COTAHIST ticker changes from one ISIN to a new ISIN on adjacent
-market sessions, with the old identity ending and the new identity beginning at
-that boundary, the security master records an audited continuation link. Ticker
-reuse after a gap does not link. The successor inherits only strictly prior
-feature history; survival audits use the root continuation identity.
+Corporate-action economics use one contractual representation:
 
-The production candidate set is every observed `DISMES` transition. At each
-candidate, the classifier compares the current price/quantity ratio with the
-median of up to three strictly prior observed ratios—future rows never enter
-classification. It labels a split/bonus when the price discontinuity and
-quantity continuity jointly match the frozen tolerance; ambiguous candidates
-remain masked. Other large close jumps are retained in
-`price_jump_anomaly_mask` for audit and are not automatically called cash
-events. A standalone audit compares the DISMES-only classifier with an optional
-strict undocumented-split fallback against provider-covered splits. The
-fallback is adopted only if recall improves by at least one point while
-precision falls by no more than one point.
+- shares received per prior share;
+- cash entitlement per prior share;
+- effective/ex-date and payment session;
+- predecessor/successor claim mapping;
+- decision-time availability, source evidence, and resolution status.
 
-Daily log-return legs crossing a classified event or ambiguity are unavailable
-to both return features and multi-day targets. The M1 cross-session boundary
-mask contains detected splits only. These rules depend uniformly on official
-COTAHIST fields for current and delisted securities.
+Splits change units, distributions create cash receivables/payables, and
+payment clears the claim without creating a second gain. `DISMES` and
+price/quantity jumps remain diagnostics; realized price ratios and
+market-median residuals are not accepted action terms. Unsupported rights,
+spin-offs, multi-claim mergers, or unmapped conversions remain unresolved.
 
-Yahoo actions may still be fetched in bounded, dated-ticker batches and retained
-in immutable caches, but only for audits. Detection precision/recall is reported
-against provider-covered splits; provider dividends feed the close-drop audit;
-off-calendar rows are counted. Provider rows, failures, taxonomy, coverage, and
-cache state never enter panel arrays. Legacy cache schemas are upgraded in
-memory and are not rewritten.
+A coherent shareholder-wealth OHLC path supplies return features and the
+lagged Yang-Zhang scale. For a supported action on session `u`, with
+`q_u` post-action shares and `d_u` cash per prior share:
 
-Price factors are forward-recursive. A future split never rewrites an earlier
-row, and cash distributions are not reinvested. Audits retain source/cache
-hashes, the official action classification, provider comparisons, and M1 unit
-status. The build also requires provider variants to produce byte-identical
-feature, mask, and target arrays.
+`W_X,u = W_C,u-1 * (q_u * X_u + d_u) / P_C,u-1`, for
+`X in {O, H, L, C}`.
+
+This index uses a declared reinvest-at-close convention for features and risk.
+The holding target and ledger instead retain distributions as cash or claims;
+the conventions are named separately.
 
 ## Point-in-time universe
 
-A name is eligible on session `t` from information available before `t` when:
+A name is eligible on decision session `t` using only information available
+before `t` when it has:
 
-- it traded on at least 15 of the prior 20 market sessions;
-- its prior-20-session median BRL volume, counting missing observations as
-  zero, is at least R$2,000,000;
-- its last observed close within those prior 20 sessions is at least R$1.00;
-  and
-- it has at least 60 market sessions of listing history.
+- trades on at least 15 of the prior 20 exchange sessions;
+- prior-20-session median BRL volume of at least R$2,000,000, with verified
+  no-trade sessions counted as zero;
+- a last observed prior close of at least R$1.00; and
+- at least 60 sessions of observed history.
 
-Eligibility is distinct from observation, feature, score, and target masks.
-That separation is deliberate: a future endpoint's availability must never
-change the ranked universe or a portfolio formed at `t`.
+Observed-history age is not claimed to be exchange listing age and includes a
+left-censor flag. Eligibility is independent from observation, feature,
+forecast, outcome, execution, borrow, and terminal-status masks. Future
+outcome availability never changes the universe or an order formed at `t`.
 
-## Store schema
+## Immutable daily store
 
-`python -m brazil_rv.v2.build_store` creates one new
-`v2_daily_store_<timestamp>` directory through a staging directory and an
-atomic promotion. NumPy arrays are uncompressed and memory-mappable. The
-manifest binds all axes, feature names, source paths/hashes, coverage tables,
-array shapes/dtypes/hashes, action review, calendar assertions, and access
-flags. `manifest.sha256` binds the deterministic manifest bytes.
+The current store schema is `BRAZIL_RV_V2_DAILY_STORE_V2`. A build writes to
+a new staging root, validates it, and promotes only a complete store. Arrays
+are uncompressed and memory-mappable. The manifest binds the date, security,
+slow/current/fast and horizon axes; source paths and hashes; clock and calendar;
+FeatureSpec order and hash; identity/action mappings; target definitions;
+array shapes, dtypes, and hashes; coverage; and peak build memory.
 
-The builder processes slow, intraday, target, and optional sidecar families in
-sequence. Each family's rank-Gauss transform is row-wise over one date's cross
-section and writes float32 values directly to a preallocated memmap; raw family
-buffers are released before the next family. Multi-session targets are written
-one horizon at a time, and adjusted daily OHLC is materialized once in a
-disk-backed workspace for downstream rereads. The manifest records peak build
-RSS. A production-axis `4,348 x 933` synthetic test with every family enabled
-enforces an 8-GiB peak-RSS ceiling.
+Important core arrays are:
 
-Core arrays begin with `[date, isin]`:
-
-| Array | Additional axis | Meaning |
-|---|---:|---|
-| `observed` | — | COTAHIST row exists |
-| `active` | — | causal PIT universe membership |
-| `raw_open`, `raw_high`, `raw_low`, `raw_close` | — | unadjusted COTAHIST OHLC |
-| `adjusted_open`, `adjusted_high`, `adjusted_low`, `adjusted_close` | — | causal COTAHIST-only split/bonus-adjusted OHLC |
-| `price_adjustment_factor` | — | causal cumulative split/bonus factor |
-| `volume_brl`, `trade_count`, `quantity`, `distribution_number` | — | raw daily activity/action fields |
-| `distribution_change_mask`, `detected_event_mask`, `detected_split_mask`, `detected_cash_event_mask`, `ambiguous_action_mask`, `price_jump_anomaly_mask`, `intraday_action_boundary_mask` | — | official action classification, jump-only diagnostics, and split-only M1 boundaries |
-| `slow_values`, `slow_valid` | 32 features | rank-Gauss slow library |
-| `intraday_values`, `intraday_valid` | 20 features | rank-Gauss M1 summaries |
-| `sidecar_<group>_values`, `sidecar_<group>_valid` | group features | optional PIT sidecars |
-| `neutralized_log_return`, `neutralized_log_return_valid`, `return_neutralized_event_mask`, `cross_sectional_median_log_return` | — | one-session return foundation and event mask |
-| `target_scale_sigma` | — | Yang-Zhang target scaler shifted to `t-1` |
-| `target_primary`, `target_valid`, `target_normalized_residual` | 5 horizons | primary midrank, mask, and pre-rank residual |
-| `target_raw_midrank`, `target_raw_valid`, `target_raw_log_return` | 5 horizons | raw-return comparison target family |
-| `target_to_close`, `target_to_close_valid`, `target_to_close_normalized_residual`, `target_to_close_raw_log_return` | — | optional 15:45-to-close target family |
-| `fast_present`, `m1_cotahist_close_consistent_mask` | — | exact M1 stream and same-name/day close-unit agreement |
-
-The usual store does not duplicate the dense v1 minute tensors. Instead, its
-manifest hash-binds the external v1 `equity_features.npy`, `equity_slow.npy`,
-readiness array, schemas, and date/ISIN mapping tables.
-
-Slow lookbacks are not materialized on disk. `V2DailyDataset` builds 20-, 60-,
-or 120-session windows lazily. A pretraining sample ending on `t` uses the slow
-row through `t`; a fine-tune/evaluation sample uses slow rows only through
-`t-1`.
-
-## Slow feature library
-
-All windows are B3 sessions and use only rows through the slow cutoff.
-Each raw value has a validity bit before normalization.
-Rolling reducers require at least 80% finite observations in their stated
-window. They do not interpolate the missing observations.
-
-| Family | Features |
-|---|---|
-| Return | log split-adjusted price returns over 1, 5, 21, 63, 126, 252; 12-1 momentum = return 252 − return 21 |
-| Volatility | Yang–Zhang 5/20/60; standard deviation of 5-session YZ over 60; 60-session return skew and excess kurtosis |
-| Extremes | maximum daily return over 21; `log(close / 252-session high)` |
-| Market exposure | 60-session beta and residual volatility against the daily cross-sectional median return |
-| Liquidity | log 20-session mean BRL volume; current-volume z-score; 20-session mean `abs(return)/volume`; trade-count z-score; volume/20-session mean |
-| Price shape | `log(H/L)` for 1 session; `log(max_{u=t-4,...,t} H_u / min_{u=t-4,...,t} L_u)` for the exact 5-session range; `(C-L)/(H-L)`; log adjusted close; log sessions since listing |
-| Given graph | monthly 12-cluster peer mean returns over 5/21; name-minus-peer returns over 5/21; peer 21-session dispersion; the focal name is excluded and a row requires at least three other valid active peers |
-
-Yang–Zhang uses
-
-`sigma² = sigma_o² + k*sigma_c² + (1-k)*sigma_rs²`,
-
-where `sigma_o²` is the sample variance of `log(O_t/C_{t-1})`, `sigma_c²`
-is the sample variance of `log(C_t/O_t)`, `sigma_rs²` is the mean
-Rogers–Satchell term, and `k = 0.34 / (1.34 + (n+1)/(n-1))`.
-Each Yang-Zhang window likewise requires at least 80% valid daily components;
-the statistics use only those valid components.
-
-Peer clusters are recomputed at each month boundary from the prior 126 daily
-median-removed returns with deterministic average linkage and 12 clusters.
-
-## Intraday-derived daily library
-
-These fields are valid only where the 158-name M1 archive exists. Same-session
-fields use completed data before 15:45; full-session fields carry `_lag1` and
-use the prior session.
-
-- overnight return and open-to-15:45 return, plus 5- and 20-session sums;
-- overnight minus intraday and its 20-session mean;
-- prior-session last-30-minute return share, last-hour volume share, and
-  close-versus-VWAP deviation;
-- same-session VWAP deviation and range through the decision;
-- realized volatility from adjacent five-minute block-close to block-close
-  returns over 1, 5, and 20 sessions;
-- 20-session realized skew, Roll spread, and Corwin–Schultz spread; and
-- volume through 15:45 divided by its 20-session same-time median.
-
-Only COTAHIST-detected split/bonus sessions create an M1 action boundary. They
-mask the cross-session feature whose interval crosses that boundary and its
-dependent lookbacks. Cash-type and provider-only events do not affect M1 masks;
-same-session scale-free ratios and activity fields remain independently valid.
-
-Before an official COTAHIST close can replace the same-name/day final M1 close
-as a full-session anchor, `abs(log(M1_close / COTAHIST_close))` must be at most
-0.005. A mismatch keeps the anchor unavailable: dependent later cross-session
-features and that day's to-close target are masked. Audits report mismatch
-rates by year and explicitly list M1 segments classified as price-adjusted.
-
-The Roll estimator uses sample serial covariance of 5-minute returns and is
-valid only when that covariance is strictly negative; a non-negative estimate
-is masked rather than reported as a zero spread.
-
-## Optional sidecars
-
-Every adapter emits `(values, valid, feature_names, coverage_by_year)`. Missing
-archive fields stay exactly zero with mask zero; they are not imputed or
-relabelled from a merely similar transformed field. The frozen schemas are
-broader than what the currently known archives can support exactly:
-
-| Group | Exactly backed by the known archive adapter | Frozen but currently unavailable |
+| Family | Arrays | Meaning |
 |---|---|---|
-| `lending` | raw balance divided by the aligned 20-session mean COTAHIST BRL volume and its exact 1- and 5-session changes; exact inversion of the archive's one-to-one taker-fee transform for the loan-rate level and its exact 5-session change | none |
-| `events` | causal sessions since the latest RAD ITR/DFP transition | sessions until an announced earnings date; standardized unexpected earnings; future ex-distribution flags (uniform announcement data is absent) |
-| `options` | exact inversion of the archive's one-to-one transforms for put/call OI ratio, one-session OI change divided by stock ADV20, and put skew | ATM IV divided by its 20-session median |
-| `oddlot` | raw odd-lot BRL-volume share and exact 5-session change | none |
-| `rebalance` | all 21 Experiment-33 fields: seven release-safe state fields for each of IBOV, IBXX, and SMLL | none |
-| `fundamentals` | `fund_leverage` as leverage, when present | log market cap, book-to-market, gross profitability |
+| Membership/source | `active`, `observed`, raw OHLC/activity | decision-time eligibility and canonical raw observations |
+| Action economics | `shareholder_wealth_{open,high,low,close}`, `shareholder_wealth_valid`, `action_*` | coherent wealth coordinates and contractual action terms/status |
+| Slow | `slow_values`, `slow_valid`, `slow_age_sessions`, `slow_timestep_valid` | 32 daily features, per-feature validity/age, and calendar/padding state |
+| Current | `intraday_values`, `intraday_valid`, `intraday_age_sessions` | 20 scalar within-day or explicitly lagged full-session features with validity/age |
+| Native fast | `fast_patch_values`, `fast_patch_valid`, `fast_patch_mask`, `fast_present` | compact seven-channel five-minute prefix |
+| Risk/targets | `target_scale_sigma`, `target_*` | lagged risk scale and independent primary/shareholder/price/to-close families |
 
-The seven rebalance suffixes are `current_weight_sqrt`,
-`preview_delta_signed_sqrt`, `preview_add`, `preview_delete`,
-`preview_pressure`, `pre_effective_ramp`, and
-`post_effective_reversal`. Unavailable event, fundamentals, and options fields
-remain exact zeros with false masks and zero coverage; no merely similar
-archive quantity is substituted.
+Slow windows are assembled lazily for 20, 60, or 120 sessions; they are not
+duplicated on disk. Native fast tensors are read only for names and dates where
+the branch is present.
 
-An adapter may expose a value on `t` only when its source availability
-timestamp is no later than 15:45 on `t`. Existing v1 D+1 publication rules are
-preserved by the source's `available_date`/timestamp. During every build, an
-independent replay from those raw publication coordinates must reproduce every
-sidecar validity bit exactly.
+### Mask semantics
 
-Internally derived feature families retain the unconditional 5-point
-eventual-survival validity-gap gate, and targets retain their 10-point gate.
-For each pooled causal prior-ADV20 quartile of an external sidecar's observable
-population, the store computes survivor-minus-delisted validity and a 95%
-name-clustered bootstrap interval from 1,000 deterministic replicates. A
-replicate resamples contributing continuation identities within each survival
-group and retains each identity's complete cell cluster. A quartile binds only
-when both groups have at least 20 contributing names and 2,000 family-present
-name-days; smaller strata are reported. The gate fails only when a binding
-interval's lower bound exceeds +5 points. The manifest retains both group rows,
-point estimates, intervals, support counts, decisions, and the diagnostic pooled
-row. This separates publication-time leakage from ordinary liquidity
-composition.
+Masks are independent contracts, not interchangeable readiness flags:
 
-The lending audit also records the known coverage warning that delisted
-mid-liquidity names have only 5,212 present name-days across 526 names. This
-limits the sidecar's value for that segment in any later feature screen; it does
-not alter its availability mask or acceptance rule.
+| Store/sample mask | Contract |
+|---|---|
+| `slow_valid` / `slow_feature_mask` | validity of each slow or enabled-sidecar value |
+| `slow_age_sessions` / `slow_feature_age_sessions` | exchange sessions since the most recent usable source observation; `-1` means unknown/left-censored |
+| `slow_timestep_valid` / `slow_history_mask` | a real elapsed per-name calendar timestep versus left padding; a genuine missing market observation remains a timestep |
+| `intraday_valid` / `current_feature_mask` | validity of each current scalar value |
+| `intraday_age_sessions` / `current_feature_age_sessions` | current-feature source age under the same sentinel contract |
+| `fast_patch_valid` | per-channel validity inside each five-minute patch |
+| `fast_patch_mask` | real contiguous prefix patches versus sequence padding |
+| `fast_present` | the name has a permitted native prefix; slow-only samples remain valid when false |
+| `active` / `active_mask` | decision-time entry universe, independent of future labels |
+| `target_valid`, `target_shareholder_valid`, `target_price_valid` | independent outcome support for each target family and horizon |
 
-For lending balance, the 20-session COTAHIST-volume denominator is valid only
-when the complete trailing window begins on or after that ISIN's first finite
-COTAHIST observation. Missing name-days count as zero only after listing; the
-adapter never manufactures pre-listing volume history.
+An invalid tensor payload is stored/passed as zero only with a false aligned
+mask. Economic zero remains valid. Changing an invalid payload or adding left
+padding must not change a prediction; inserting a real missing calendar
+session may change state and age as intended.
 
-To add a sidecar group:
+## Feature preprocessing
 
-1. add its frozen feature tuple to `v2.contract.SIDECAR_FEATURES`;
-2. provide an archive-column map and authoritative availability column;
-3. call `materialize_sidecar` on the store axes;
-4. rank-Gauss values inside the active universe;
-5. include its values, masks, coverage, source identity, and tests in the
-   store manifest.
+`FeatureSpec` is the ordered semantic contract for every model field. It
+records source family, unit, timing rule, formula/support, validity,
+age/staleness treatment, transform, and version. The manifest derives feature
+order and dimensions from these specifications.
 
-## Normalization
+The default transforms preserve type:
 
-For every date and feature independently, take valid active names, calculate
-tie-aware average ranks, set `p=(rank_zero_based+0.5)/n`, and return
-`clip(Phi^-1(p), -3, 3)`. Invalid values are exactly zero and retain mask zero.
-No fitted scaler or future cross-section is used.
+- continuous cross-sectional relative states use tie-aware rank-Gauss over at
+  least 20 valid active names, clipped to +/-3;
+- binary flags remain 0/1;
+- fractions in [0,1] map to [-1,1], while already signed values retain their
+  sign;
+- session ages use a capped log1p transform and retain raw age/censor status;
+- standardized signed descriptors use their declared model-only clipping;
+- annual loan rates use `clip(asinh(x / 0.01), -5, 5)`; and
+- rebalance timing ramps preserve their signed timing multiplier.
+
+No global learned scaler is fitted during store construction. If a later
+registered variant uses a fitted scaler, it is trained inside each fit window,
+frozen and hashed, and never sees selection or evaluation.
+
+The 32 slow features cover exact-session shareholder-wealth returns and
+momentum, Yang-Zhang volatility, higher moments and extremes, beta/residual
+risk, liquidity/activity, price shape, observed-history state, and
+past-only leave-one-out peer clusters. `log_adjusted_close` is not a model
+feature. Rolling reducers keep their documented support rules; exact endpoint
+returns never become partial sums.
+
+The 20 current scalars contain same-session completed-prefix information and
+explicitly named lag-one full-session summaries. Current endpoints use the
+last completed observed price plus age. Lagged closing summaries use the
+actual dated session endpoint and disclose whether an auction is supported.
+No close-derived action classification may mask the same day's input.
+
+Optional lending, events, options, odd-lot, rebalance, and fundamentals
+sidecars are publication-ordered as-of snapshots. Revisions may affect later
+decisions but cannot rewrite earlier ones. A missing or irreversibly transformed
+source field stays unavailable; a similar proxy is not relabelled as the
+requested field. Sidecar values, masks, and exchange-session ages join the
+slow snapshot sequence, and GBDT receives the same canonical scalar fields,
+ages, and validity information.
+
+## Native five-minute fast stream
+
+The default fast path is native to the current clock and works without any v1
+directory or checkpoint. It uses completed five-minute blocks from the dated
+continuous open to the decision, normally 69 blocks for a 10:00-15:45 prefix.
+There are no 12 artificial compatibility patches.
+
+Its seven channels, each with separate validity, are:
+
+1. adjacent endpoint log return divided by `s5`;
+2. block log high/low range divided by `s5`;
+3. signed close location;
+4. relative same-clock volume against the prior 20 sessions;
+5. observed-minute fraction;
+6. elapsed-session fraction; and
+7. last observed price age as a fraction of scheduled continuous minutes.
+
+`s5 = sigma_asof(t) * sqrt(5 / scheduled_continuous_minutes_t)`, using the
+same positive-scale guard as the daily target. Returns do not bridge missing
+endpoints or sessions. Exact OHLC channels require their stated within-block
+support, and price and activity validity remain separate.
+
+Only present names are collated. A six-block, 64-wide causal TCN encodes their
+real prefix and scatters 64-wide states back to the broad security axis.
+Absent fast data uses an explicit learned missing state and presence flag.
+Native weights are freshly initialized by default.
+
+An isolated `legacy_v1_contaminated` adapter may be used only for explicitly
+labelled historical diagnostics with complete ancestor chronology. A file
+hash proves identity, not temporal admissibility. Contaminated or unknown
+ancestry is not eligible for a clean comparison or official evaluation.
 
 ## Targets
 
-For each session `u`, first define the split-adjusted one-session log return
-`r[u,i] = log(C[u,i] / C[u-1,i])`. A base leg is valid when both closes are
-observed, finite, and positive. Let `m[u]` be the median return across active,
-valid, non-event names, requiring at least 20. The stored return is
+All horizon targets use `H in {1, 2, 3, 5, 10}`, entry after the decision on
+`t`, and exit on `t+H`. Entry and exit marks are the declared daily
+last-trade close proxy until a verified auction source is introduced.
 
-`r_neutral[u,i] = m[u]` for a classified cash/ambiguous event and `r[u,i]`
-otherwise. An observed event leg remains valid when `m[u]` exists; no other
-name's return is changed.
+### Gross shareholder holding family
 
-For `D in {1,2,3,5,10}`, the target-date return is the sum of the next D
-neutralized legs, `R_D[t,i] = sum_{u=t+1}^{t+D} r_neutral[u,i]`. Remove the
-cross-sectional median of `R_D[t]` before scaling, then form
+Entry wealth buys the claim at close(`t`). Contractual conversions and cash
+entitlements over `(t, t+H]` are applied exactly once; distributions stay as
+cash/receivables rather than being discretionarily reinvested. A verified
+endpoint can remain valid despite a missing intermediate quote. An unresolved
+action chain or unknown terminal claim remains invalid.
 
-`z_D[t,i] = clip((R_D[t,i] - median_j(R_D[t,j])) /
-                 (sigma[t-1,i] * sqrt(D)), -5, 5)`.
+`target_shareholder_simple_return`, `target_terminal_wealth`, and
+`target_terminal_loss` preserve the economic result.
+`target_shareholder_midrank` is the tie-aware rank of the raw holding return.
+A known zero terminal wealth is a valid -100% outcome and ranks at the bottom.
 
-`sigma[t-1]` is the strictly lagged 20-session Yang-Zhang volatility. This order
-is the primary target definition; median-removing already volatility-scaled
-name returns is not equivalent and is forbidden. The primary target is the
-tie-aware midrank of `z_D` scaled to `[0,1]`. The raw comparison family retains
-the unneutralized split-adjusted D-session log return and its midrank.
+### Price-return family
 
-Every constituent daily leg must be valid. Each requested fit, selection, or
-evaluation window also clears targets whose endpoint leaves that exact window,
-so labels cannot cross either purge or a sealed boundary.
+The price family measures the same economic share claim after contractual
+split/unit conversions but excludes cash distributions. It has its own
+`target_price_simple_return`, `target_price_midrank`, and
+`target_price_valid`; it is not a substitute for shareholder wealth.
 
-A survivor-subset total-return target is registered as a future sensitivity
-variant but is deliberately not implemented by the foundation store.
+### Primary training target
 
-The sixth head is a fast-only auxiliary: the log return from the open of the
-15:45 minute to session close, normalized to its remaining-session volatility,
-median-removed, and midranked. Its validity is intersected with actual
-`fast_present`; a mapped name alone cannot make the target available.
+For positive terminal shareholder wealth, let
+`R_i,t,H = log(terminal_wealth_i,t,H)`. Known zero wealth participates as
+negative infinity in the cross-sectional order statistic. With the risk scale
+already available as of the decision:
 
-## Model
+`z_i,t,H = clip((R_i,t,H - median_j R_j,t,H) / (sigma_i,t * sqrt(H)), -5, 5)`.
 
-```mermaid
-flowchart LR
-    S[32 slow fields + enabled sidecars\n20/60/120 sessions] --> LN[LayerNorm]
-    FL[fast-present + slow-row-age flags] --> GRU
-    LN --> GRU[GRU hidden 64]
-    F[69 real five-minute patches] --> PX[prepend 12 empty clock patches]
-    PX --> TCN[v1 causal TCN\n81 absolute positions]
-    VS[v1 equity slow\n18 fields zeroed] --> SP[v1 slow projection]
-    TCN --> RD[read state 81 / index 80]
-    RD --> FT[fast state 64]
-    SP --> FT
-    A[learned absent state] --> FT
-    GRU --> POOL[masked mean + dispersion 128]
-    GRU --> GATE[gated fusion]
-    FT --> GATE
-    POOL --> GATE
-    GATE --> PROJ[linear width 128]
-    PROJ --> T[2 residual LN + SwiGLU blocks]
-    T --> H[heads D1/D2/D3/D5/D10/to-close]
-```
+Median subtraction occurs before name-specific volatility scaling.
+`target_primary` is the tie-aware midrank of supported `z`;
+`target_normalized_residual` retains `z`; and
+`target_normalized_cross_section_valid` reports whether the median itself
+was finite. A known zero-wealth name maps to the lower clipped value when the
+median is finite, while its exact loss remains in the shareholder arrays.
 
-Weights are shared across names and there are no security, ticker, or sector
-embeddings. Fast and pooled gates start with bias −2. The to-close head is
-zero-initialized. The supported one- and two-layer GRU configurations remain
-below 150,000 trainable parameters excluding the fast encoder.
+Synthetic market-neutralized cash flows are absent from the default target and
+headline PnL paths. Every target family has an independent mask, and requested
+fit/selection/evaluation capabilities clear a target unless its full endpoint
+interval stays inside that exact window.
 
-The fast path reproduces the deployed v1 store-v2 state rather than treating
-the 69 available patches as a new clock. It takes completed minute indices
-0–344, zeros v1 dynamic channels `(9, 11, 14, 22, 24, 25)`, packs 69
-five-minute × 26-field patches, prepends 12 masked zero patches, and reads the
-81st absolute state (zero-based index 80). The v1 slow projection is also part
-of this state: `equity_slow.npy` is mapped by date and v1 slot, with fields
-`(1, 2, 3, 12, 13, 14, 15, 16, 18, 20, 22, 23, 24, 25, 26, 27, 28, 29)`
-zeroed exactly. Missing/pretrain rows use zeros and the learned fast absent
-state. A supplied v1 initialization checkpoint must include the input
-projection, TCN blocks, slow projection, and state norm and must match an
-explicit expected SHA-256.
+The sixth, to-close head is an optional future-outcome auxiliary. It never
+enters the decision input. Its default loss weight is `0.0`; the only
+registered enabled weight is `0.2`, with its target, mask, coefficient, and
+gradient path explicit.
 
-`intraday_values` are persisted for audit and are inputs to LightGBM. The
-neural starter consumes the underlying v1 minute patches through the fast TCN;
-its GRU input comprises the 32 slow fields plus enabled sidecars and the two
-sample flags.
+## Neural model and objective
 
-The loss averages five per-date soft-Spearman horizon losses, adds `0.5` times
-the valid to-close loss, and optionally adds persistence:
+The reference model shares weights across names and has no security, ticker,
+or sector embedding:
 
-`lambda_pers * mean((zscore(score_t)-zscore(score_{t-1}))²)`
+1. Zero invalid slow payloads, concatenate per-feature masks, project to width
+   64, apply LayerNorm, and run a one- or two-layer 64-wide GRU. Calendar
+   padding does not advance state.
+2. Zero invalid current scalar payloads, concatenate their masks, and project
+   to a normalized 64-wide state.
+3. Encode the compact native prefix into a 64-wide fast state, or use the
+   explicit absent state.
+4. Pool slow states across active names as mean plus dispersion. Gate the fast
+   and pooled states, concatenate slow/current/fast/pool states and the
+   presence flag, then project to width 128.
+5. Apply two residual LayerNorm/SwiGLU blocks and emit D1/D2/D3/D5/D10 plus
+   to-close scores.
 
-over common decision-time-valid names and five horizon heads. Batches contain
-adjacent full-cross-section date pairs even when `lambda_pers=0`.
+The daily objective is the equal mean of five per-date soft-Spearman horizon
+losses. Persistence is optional. The to-close term contributes nothing at its
+default zero weight. Complete date cross-sections, or complete adjacent-date
+pairs when persistence is enabled, remain intact during microbatch
+accumulation. With SAM, perturbation and update occur once per effective batch.
 
-## Training stages
+LightGBM trains one regressor per horizon on the same canonical last-step slow,
+current, sidecar, mask/age information, using NaN only for invalid numeric
+cells. It does not receive the extra native minute sequence.
 
-| Stage | Dates and fast stream | Selection |
-|---|---|---|
-| P | 2010-01-04→2021-07-30; slow through `t`; fast absent | last 10% of pretrain, preceded by 70-session embargo |
-| F | 2021-08-16→fold fit end; slow through `t-1`; fast where available | one chronological 55-session selection window after a 10-session purge |
-| J | P and F samples together | same registered selection; optional 756-session half-life weighting |
+## Stage chronology
 
-SAM-AdamW uses `rho=0.125`, weight decay 0.01, scratch LR `3e-4`, and LR
-multiplier 0.3 for checkpoint-initialized parameters. EMA decay is 0.995.
-Default trajectories run at most 20 epochs with patience 3 and retain both the
-selected raw-Patience state and final EMA state. BF16 autocast is opt-in.
-Stage J applies the frozen 756-session half-life through deterministic
-sample weights in the date-pair sampler and training driver.
+Every stage uses the same decision-row meaning and slow history through
+`t-1`:
 
-LightGBM trains one regressor per horizon and seed on last-step slow values,
-intraday daily fields, enabled sidecars, and the two flags. Defaults are 31
-leaves, learning rate 0.03, feature/bag fractions 0.7, minimum leaf 200,
-L2 1.0, up to 3,000 rounds, and 100-round early stopping. Reports include gain
-and native TreeSHAP contributions.
+| Stage | Fit population | Fast stream | Model selection |
+|---|---|---|---|
+| P | 2010-01-04 through 2021-07-30 | absent | final 10% chronological holdout, preceded by a 70-session embargo |
+| F | 2021-08-16 through each fold's fit boundary | native where present | 10-session purge, 55-session selection window, 10-session purge, then evaluation |
+| J | authorized P and F fit segments together | absent on P, native where present on F | the registered F selection window; optional 756-session half-life weighting |
 
-## Development splits and sealing
+P therefore cannot gain same-day close information merely because M1 is
+absent. Native F/J fast weights are freshly initialized, including when a
+clean P checkpoint initializes the compatible non-fast parameters.
+Raw-Patience and final EMA (decay 0.995) checkpoints bind the store, feature
+schema, stage, fold, dates, lookback, configuration, and input chronology.
 
-| Fold component | Frozen rule |
-|---|---|---|
-| Fit | all eligible development samples before the first purge |
-| Purge before selection | 10 sessions, never sampled |
-| Selection | next 55 chronological sessions; early stopping/checkpoint choice only |
-| Purge before evaluation | 10 sessions, never sampled |
-| Evaluation | the registered F1, F2, or F3 out-of-sample window |
-| Official validation | 2025-01-02→2025-12-30; sealed, with a preregistration required before access |
-| Held-out test | 2026-01-02→2026-07-17 fallback, plus every later date; refused unconditionally by this code version |
+## Selection and evaluation
 
-The public `V2Store.open` path is disabled. `open_store_for_dates` and
-`open_store_for_samples` first read only the small date index, authorize the
-exact requested sample dates, and only then memory-map any feature, target, or
-external fast array. Sample grants add only the frozen 20-, 60-, 120-, or
-253-session causal history ending at `t` or `t-1`; the ledger still records the
-exact sample dates. Every array read must stay inside that capability and
-returns copied rows rather than exposing a whole-store mmap.
+Chronology is always `fit -> purge -> selection -> purge -> evaluation`.
+Block parity is not a selection or evaluation mechanism. Each fold/seed yields
+one selected model and one continuous evaluation path.
 
-Multi-horizon target masks are clipped at the store boundary unless each
-label endpoint is inside the exact capability. Their corresponding target
-values are replaced with exact zeros before they reach a dataset, evaluator,
-or artifact hash. Evaluation windows apply the same rule again to their own
-date axis, even when a broader development capability is open. Runtime table
-access is limited to the static ISIN mapping and an authorized-date slice of
-the fast-date mapping; coverage and audit tables remain immutable artifacts
-outside training/evaluation handles.
+Primary selection and evaluation freeze `P = {D1, D2, D3, D5}`:
 
-Loaders and evaluators derive `official_validation_accessed` and
-`test_accessed` from the dates they actually authorize; callers cannot assert
-these flags themselves. Training is never authorized on official validation.
-A registration token cannot open a test date.
-Official-validation scoring keeps checkpoint/store/feature/lookback identity
-strict while binding the separately authorized evaluation date axis and its
-ledger into the score manifest. There is no public untracked-loader escape
-hatch for auditable training artifacts.
+1. On each date, intersect entry eligibility, positive finite risk scale,
+   outcome validity, and finite score validity across all four heads.
+2. Require at least 20 common names.
+3. Compute every head's Spearman correlation on that same population.
+4. Define the daily primary as the equal mean only when all four correlations
+   are defined; otherwise record an undefined reason.
+5. Define fold primary as the equal mean of defined daily-primary values.
+   Pooled primary concatenates actual fold dates before averaging, so unequal
+   fold lengths are not silently equal-weighted.
 
-Each fold/seed produces exactly one fitted model and one untouched evaluation
-panel. A label interval hash proves that fit labels end within fit, selection
-labels end within selection, and evaluation labels end within evaluation.
+D10 is a separate all-five-horizon diagnostic with its own common population.
+It never governs primary checkpoint selection. To-close is auxiliary only.
+Reports keep possible/used dates, outcome support, score-support loss, and name
+counts rather than using `nanmean` across changing heads.
 
-## Evaluation
+Evaluation reports the median-adjusted/scaled primary IC, shareholder-return
+Rank-IC, price-return Rank-IC, and raw shareholder top-minus-bottom spread by
+horizon. Paired candidate/baseline comparisons use exactly common dates,
+names, score masks, and outcome masks. Moving-block bootstrap samples preserve
+20-session order and fold boundaries.
 
-The evaluator reports per-horizon residual Spearman IC, raw Rank-IC,
-day-over-day and lag-5 score persistence, and top-minus-bottom decile raw
-return in bps per holding session. Primary pooled IC is the equal-weight mean
-of D1/D2/D3/D5 mean ICs; D10 is separate. Each score panel comes from the one
-chronologically selected model for that fold and seed.
+The reference economic signal is the tie-aware rank average of D1/D2/D3/D5;
+D10 is excluded. A separately labelled D5-only diagnostic may be run after
+engineering acceptance. Results include total and per-session return spreads,
+score persistence, deployed gross/net, turnover, actual holding ages, fills,
+cost/borrow/funding attribution, action-affected PnL, and unresolved exposure.
 
-The single economics signal is frozen as a tie-aware rank average of D1, D2,
-D3, and D5 scores, excluding D10. This resolves the otherwise ambiguous
-multi-head-to-one-book mapping before any v2 research read.
+Economics uses immutable intended orders created from the decision snapshot,
+then later fill observations. A missing fill cannot cause a hindsight
+replacement. The persistent ledger carries signed shares, free/restricted
+cash, receivables/payables, pending orders, costs, financing, borrow, and
+valuation status. Eligibility loss requests an exit but does not fabricate a
+sale; unresolved inventory stays visible. Net performance is compared with
+compounded all-cash equity. Insolvency stops trading and remains in the report.
 
-The v2 economics layer is a stateful close-to-close ledger. It forms the frozen
-rank-band, name-cap, gross and neutrality-constrained desired book, trades only
-the delta from existing positions at the closing auction, and maintains shares
-and cash across sessions. It realizes entry/exit costs, short borrow, CDI cash
-interest, classified corporate-action cash flows, missing-mark logic, forced
-liquidation, and terminal liquidation. Holding-period variants are produced by
-the ledger's rebalance schedule rather than by overlapping independent daily
-portfolios. The headline remains 4 bps per side and 2% annual borrow, with the
-registered cost/borrow grid reported as sensitivities.
+Undefined comparisons fail the not-worse guard. An all-cash result can be
+well-defined but is not evidence of deployment feasibility.
 
-Diagnostics include the new causal inverse-volatility baseline, name/date
-coverage and gross/net exposure, incremental PnL attribution, and a matched
-universe comparison. Any candidate/reference economics readout with undefined
-support fails the “not worse” guard; missing values never pass by omission.
+## Development windows and sealing
 
-Paired comparisons use identical dates and inputs and consume the selected
-protocol's bootstrap settings. Full uses a deterministic length-20 moving-block
-bootstrap with 10,000 draws. Triage uses zero draws and reports the aligned
-point estimate with null interval endpoints.
+F1-F3 are chronological development folds and may be used for model decisions.
+Each has fit, 10-session purge, 55-session selection, 10-session purge, and
+evaluation segments. Label endpoints are clipped centrally so no horizon
+crosses a segment, purge, or sealed boundary.
 
-## Presets and operations
+Official validation is 2025-01-02 through 2025-12-30 and requires a repository
+preregistration before evaluation access. It cannot be used for training or
+selection. Dates from 2026-01-02 onward are held-out test dates and are refused
+by the current code.
 
-- `research/configs/v2/triage.json`: seed 11, folds F1–F2, no paired
-  bootstrap, one concurrent trajectory.
-- `research/configs/v2/full.json`: seeds 11/29/47, folds F1–F3, block-20
-  10,000-draw comparisons, up to six concurrent trajectories.
+Store capabilities authorize dates before mapping model or target arrays.
+Access ledgers derive official/test access from actual requested dates; callers
+cannot self-declare those flags.
 
-`python -m brazil_rv.v2.run_many` uses spawn isolation, deterministic job
-ordering, exact config/store/commit binding, completed-result hash checks,
-per-process source-hash caching, and no automatic retry. Preset execution
-requires a fast pretrained checkpoint and its expected SHA-256; both are passed
-to every train leg. Both presets execute the train and score legs. A failed
-trajectory remains failed for inspection.
+## Operations
 
-The corporate-action output and store output directories must be new. The
-action file passed to the store builder must sit beside the acquisition
-`manifest.json` that hash-binds it, its acquisition audit, and its security
-master. A representative command shape is:
+Use Python 3.12 through `uv`. Store, action, validation, and run outputs must
+be new roots; raw archives remain immutable. A representative store build is:
 
-```text
-uv run --project research python -m brazil_rv.v2.corporate_actions \
-  --cotahist-root <parsed-cotahist-root> \
-  --v1-assignments <accepted-v1-assignment-file-or-directory> \
-  --cache-dir <immutable-action-cache> \
-  --output <new-corporate-action-bundle>
+    uv run --project research python -m brazil_rv.v2.build_store --cotahist-root <parsed-cotahist-root> --cotahist-raw-root <raw-cotahist-root> --cotahist-parse-audit <parse-audit> --session-schedule <versioned-session-schedule> --isin-links-allowlist <verified-links-csv> --implementation-commit <full-current-git-sha> --actions <verified-action-bundle>/corporate_actions.parquet --m1-assignments <m1-assignments> --output-dir <new-v2-store>
 
-uv run --project research python -m brazil_rv.v2.build_store \
-  --cotahist-root <parsed-cotahist-root> \
-  --cotahist-raw-root <directory-containing-COTAHIST_A2009.ZIP-through-A2026.ZIP> \
-  --cotahist-parse-audit <parse-audit-file> \
-  --implementation-commit <full-40-character-current-git-sha> \
-  --actions <corporate-action-bundle>/corporate_actions.parquet \
-  --v1-assignments <accepted-v1-assignment-file-or-directory> \
-  --v1-store <canonical-v1-feature-store> \
-  --sidecar lending=<lending-parquet> \
-  --sidecar oddlot=<oddlot-parquet> \
-  --output-dir <new-v2-daily-store>
+Repeat `--sidecar GROUP=PARQUET` for intentionally materialized sidecars.
+`--minute-npz` may point to a pre-aligned native M1 bundle, but the assignment
+provenance remains required.
 
-uv run --project research pytest -q research/tests
+A single canonical trajectory can be exercised with:
 
-uv run --project research python -m brazil_rv.v2.validate_pipeline \
-  --store-root <v2-daily-store> \
-  --old-store-root <accepted-superseded-v2-daily-store> \
-  --cdi-path <development-extension-daily-cdi-parquet> \
-  --cdi-sha256 <development-extension-sha256> \
-  --experiment52-cdi-path <exact-experiment-52-daily-cdi-parquet> \
-  --experiment52-cdi-sha256 <exact-experiment-52-cdi-sha256> \
-  --output-root <validation-output-parent> \
-  --fine-epochs 3 \
-  --handoff-epochs 1 \
-  --pairs-per-batch 8 \
-  --device cuda
-```
+    uv run --project research python -m brazil_rv.v2.train --store <v2-store> --output-dir <new-run-dir> --stage F --fold F1 --seed 11
 
-`corporate_actions` alternatively accepts `--security-master` instead of
-`--cotahist-root`; the latter form requires `--v1-assignments`. Use its
-explicit `--refresh` switch only when a new immutable provider fetch is
-intended. `build_store` also accepts a pre-aligned `--minute-npz` in place of
-streaming the assignment sources. Repeat
-`--sidecar GROUP=PARQUET` for any group intentionally materialized in the
-store, and repeat `--sidecar GROUP` in `validate_pipeline` to enable it. The
-validation driver hash-verifies both CDI files. The
-`--experiment52-cdi-path` input is the exact immutable Experiment-52
-reference; `--cdi-path` is its development-date extension. The reference date
-span must be fully contained in the extension, and the sorted overlap must
-have the same schema and byte-identical `trade_date` and `daily_cdi_rate`
-columns (with zero maximum rate difference). The recorded provenance includes
-both paths and hashes plus this overlap proof. The validation CLI also exposes
-the registered GBDT round limits, lookback, device, compilation toggle, and
-explicitly bounded session-count controls for diagnostic runs. Fix-pass-3 CPU
-acceptance runs all five naive baselines on F1–F3, one full-scale F1 GBDT
-triage with the five registered seeds `(11, 29, 47, 61, 79)`, and the paired
-old-store/new-store naive-baseline IC table. The old-store leg is IC-only and
-cannot invoke the superseded economics evaluator.
+The native default requires no fast checkpoint. The legacy checkpoint flags
+are only for the explicit contaminated diagnostic adapter.
 
-Only the development folds may be passed to the foundation validation driver.
-The required smoke trajectories are explicitly labeled
-`pipeline_validation=true` and `research_claim=false`.
+The development-only integration driver is:
+
+    uv run --project research python -m brazil_rv.v2.validate_pipeline --store-root <v2-store> --cdi-path <development-cdi> --cdi-sha256 <sha256> --experiment52-cdi-path <reference-cdi> --experiment52-cdi-sha256 <sha256> --output-root <new-validation-root> --device cuda
+
+Diagnostic session limits do not constitute full-scale acceptance. Record the
+exact command, commit, configuration, store manifest hash, source hashes, and
+tests actually run.
+
+## Engineering acceptance
+
+Before registered research, the revised path must demonstrate:
+
+- raw quality, official calendar, decision-prefix causality, contractual
+  actions, identity conversions, and known/unknown terminal outcomes;
+- revision-safe as-of sidecars and timezone/publication correctness;
+- typed-feature semantics, consumer parity, mask/padding invariance, and a
+  native tiny fit/score with no v1 assets;
+- order-before-fill behavior and hand-reconciled signed-share/cash/action
+  ledger paths, including failed exits and insolvency;
+- exact common-population evaluation and fold-preserving comparisons;
+- populated production-axis build and real-scale adapter memory below the
+  declared 8-GiB working-set target; and
+- explicit rejection of stale stores, checkpoints, scores, and resume roots.
+
+Unavailable source capability is reported as unsupported, not imputed into a
+passing result. Only after these checks and a fresh immutable build should
+development research be preregistered and run.

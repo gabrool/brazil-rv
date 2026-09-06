@@ -12,9 +12,10 @@ import pytest
 from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
 from brazil_rv.v2.contract import FINETUNE_START, HORIZONS, SLOW_FEATURES
 from brazil_rv.v2.score import ScoreArtifact
-from brazil_rv.v2.store import V2Store, open_store_for_samples, write_store
+from brazil_rv.v2.store import V2Store, open_store_for_samples
 from brazil_rv.v2.train import StageTrainingResult
 from brazil_rv.v2 import validate_pipeline as pipeline
+from v2_store_fixtures import write_fixture_store as write_store
 
 
 def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
@@ -40,6 +41,9 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         + np.arange(day_count, dtype=np.float64)[:, None] * 0.01
         + np.arange(name_count, dtype=np.float64)[None, :]
     )
+    prior_reference_close = np.vstack(
+        (np.full((1, name_count), np.nan, dtype=np.float64), close[:-1])
+    )
     action_cash = np.zeros((day_count, name_count), dtype=np.float64)
     action_has_action = np.zeros((day_count, name_count), dtype=np.bool_)
     action_payment_session = np.full((day_count, name_count), -1, dtype=np.int64)
@@ -53,12 +57,20 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         arrays={
             "active": np.ones((day_count, name_count), dtype=np.bool_),
             "observed": np.ones((day_count, name_count), dtype=np.bool_),
-            "ambiguous_action_mask": np.zeros((day_count, name_count), dtype=np.bool_),
+            "shareholder_wealth_close": close.copy(),
+            "shareholder_wealth_valid": np.ones(
+                (day_count, name_count), dtype=np.bool_
+            ),
+            "decision_action_boundary_mask": np.zeros(
+                (day_count, name_count), dtype=np.bool_
+            ),
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=np.bool_),
+            "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
             "slow_timestep_valid": np.ones((day_count, name_count), dtype=np.bool_),
             "intraday_values": intraday,
             "intraday_valid": np.ones_like(intraday, dtype=np.bool_),
+            "intraday_age_sessions": np.zeros_like(intraday, dtype=np.float32),
             "fast_present": np.zeros((day_count, name_count), dtype=np.bool_),
             "target_primary": targets,
             "target_valid": np.ones_like(targets, dtype=np.bool_),
@@ -68,6 +80,10 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
             "target_price_midrank": targets.copy(),
             "target_price_valid": np.ones_like(targets, dtype=np.bool_),
             "raw_close": close,
+            "prior_reference_close": prior_reference_close,
+            "audit_eventual_survives_to_final_year": np.ones(
+                (day_count, name_count), dtype=np.bool_
+            ),
             "action_shares_per_prior_share": np.ones(
                 (day_count, name_count), dtype=np.float64
             ),
@@ -166,7 +182,7 @@ class _FakeGBDT:
         manifest_sha = write_json_atomic(
             manifest,
             {
-                "schema": "BRAZIL_RV_V2_GBDT_MODELS_V1",
+                "schema": "BRAZIL_RV_V2_GBDT_MODELS_V2",
                 **dict(metadata or {}),
             },
         )
@@ -186,6 +202,32 @@ class _FakeGBDT:
             "gain": np.arange(width, dtype=np.float64),
             "split": np.zeros(width, dtype=np.float64),
         }
+
+
+def test_gbdt_feature_names_match_value_and_age_column_order() -> None:
+    store = SimpleNamespace(
+        manifest={
+            "feature_names": {
+                "slow": ["slow_a", "slow_b"],
+                "intraday": ["current_a", "current_b"],
+                "sidecar_lending": ["lending_a"],
+            }
+        }
+    )
+
+    assert pipeline._gbdt_feature_names(store, ("lending",)) == (
+        "slow_a",
+        "slow_b",
+        "lending_a",
+        "slow_a__age_sessions",
+        "slow_b__age_sessions",
+        "lending_a__age_sessions",
+        "current_a",
+        "current_b",
+        "current_a__age_sessions",
+        "current_b__age_sessions",
+        "fast_present",
+    )
 
 
 class _FakeBooster:
@@ -248,7 +290,7 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         write_json_atomic(
             manifest,
             {
-                "schema": "BRAZIL_RV_V2_TRAINING_STAGE_V1",
+                "schema": "BRAZIL_RV_V2_TRAINING_STAGE_V2",
                 "status": "completed",
                 "stage": kwargs["stage"],
                 "seed": kwargs["seed"],
@@ -303,7 +345,7 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         manifest_sha = write_json_atomic(
             manifest,
             {
-                "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V1",
+                "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V2",
                 "status": "completed",
                 "official_validation_accessed": False,
                 "test_accessed": False,
@@ -373,6 +415,11 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
     assert manifest["official_validation_accessed"] is False
     assert manifest["test_accessed"] is False
     assert manifest["transfer_chronology_clean"] is True
+    assert manifest["engineering_acceptance_status"] == "unsupported"
+    assert manifest["engineering_acceptance_reasons"] == [
+        "neural_network_validation_not_run",
+        "corporate_action_economics_not_accepted",
+    ]
     assert manifest["date_contract"]["maximum_date"] <= "2024-12-30"
     cdi_source = manifest["sources"]["cdi"]
     assert cdi_source["development_extension"] == {
@@ -751,6 +798,14 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
     assert inputs.action_payment_session[0, 0] == len(indices)
     assert np.all(inputs.action_payment_session[:, 1:] == -1)
     assert inputs.security_ids == store.isins
+    np.testing.assert_array_equal(
+        inputs.initial_reference_price,
+        np.load(store_root / "prior_reference_close.npy", allow_pickle=False)[
+            indices[0]
+        ],
+    )
+    assert inputs.eventual_survives_to_final_year is not None
+    assert inputs.eventual_survives_to_final_year.all()
 
 
 def test_score_manifest_rejects_contaminated_transfer_before_payload_access(
@@ -763,7 +818,7 @@ def test_score_manifest_rejects_contaminated_transfer_before_payload_access(
     write_json_atomic(
         root / "score_manifest.json",
         {
-            "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V1",
+            "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V2",
             "status": "completed",
             "official_validation_accessed": False,
             "test_accessed": False,
@@ -813,7 +868,7 @@ def test_score_loader_verifies_manifest_identity_and_both_axes(tmp_path: Path) -
     manifest_sha = write_json_atomic(
         root / "score_manifest.json",
         {
-            "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V1",
+            "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V2",
             "status": "completed",
             "official_validation_accessed": False,
             "test_accessed": False,
@@ -864,7 +919,7 @@ def test_score_once_returns_the_rewritten_manifest_identity(
     original_sha = write_json_atomic(
         manifest,
         {
-            "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V1",
+            "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V2",
             "status": "completed",
             "official_validation_accessed": False,
             "test_accessed": False,

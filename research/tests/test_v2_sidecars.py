@@ -172,6 +172,8 @@ def test_overlapping_financial_filings_reset_exact_session_age() -> None:
                 datetime(2024, 1, 2, 15, 0, tzinfo=b3),
                 datetime(2024, 1, 3, 15, 46, tzinfo=b3),
             ],
+            "filing_receipt_timestamp_precision": ["second", "second"],
+            "filing_receipt_timestamp_processing_latency_seconds": [0.0, 0.0],
         }
     )
     derived = derive_known_archive_features(source, days, [isin], group="events")
@@ -225,6 +227,8 @@ def test_sidecar_timestamps_compare_absolute_instants_to_b3_decision() -> None:
             "available_timestamp": [
                 datetime(2024, 1, 2, 13, 40, tzinfo=utc_minus_five)
             ],
+            "available_timestamp_precision": ["second"],
+            "available_timestamp_processing_latency_seconds": [0.0],
             "isin": ["BRTESTACNOR1"],
             "oddlot_volume_share": [0.25],
             "oddlot_volume_share_change_5": [0.0],
@@ -251,6 +255,29 @@ def test_sidecar_timestamps_compare_absolute_instants_to_b3_decision() -> None:
         decision_time=time(15, 45),
     )
     assert not rejected.valid.any()
+
+
+def test_minute_precision_and_latency_are_conservative_at_strict_decision() -> None:
+    day = date(2024, 1, 2)
+    b3 = ZoneInfo("America/Sao_Paulo")
+    source = pl.DataFrame(
+        {
+            "available_date": [day, day, day],
+            "available_timestamp": [
+                datetime(2024, 1, 2, 15, 44, tzinfo=b3),
+                datetime(2024, 1, 2, 15, 45, tzinfo=b3),
+                datetime(2024, 1, 2, 15, 44, 30, tzinfo=b3),
+            ],
+            "available_timestamp_precision": ["minute", "minute", "exact"],
+            "available_timestamp_processing_latency_seconds": [0.0, 0.0, 31.0],
+            "isin": ["EARLY", "LATE", "LATENCY"],
+            "oddlot_volume_share": [0.1, 0.2, 0.3],
+        }
+    )
+    result = materialize_sidecar(
+        source, [day], ["EARLY", "LATE", "LATENCY"], group="oddlot"
+    )
+    assert result.valid[0, :, 0].tolist() == [True, False, False]
 
 
 def test_enabled_features_are_an_ordered_supported_subset() -> None:
@@ -384,6 +411,48 @@ def test_lending_volume_window_does_not_invent_prelisting_zeroes() -> None:
     assert result.values[20, 0, 0] == 0.0
     assert result.valid[30, 0, 0]
     assert result.values[30, 0, 0] == pytest.approx(2.0)
+
+
+def test_lending_volume_window_rejects_an_internal_missing_session() -> None:
+    days = [date(2024, 1, 1) + timedelta(days=index) for index in range(21)]
+    isin = "BRTESTACNOR1"
+    source = pl.DataFrame(
+        {
+            "source_position_date": [days[19]],
+            "available_date": [days[20]],
+            "isin": [isin],
+            "lending_balance_brl": [200.0],
+        }
+    )
+    volume = np.full((len(days), 1), 100.0)
+    volume[15, 0] = np.nan
+    derived = derive_known_archive_features(
+        source, days, [isin], group="lending", daily_volume_brl=volume
+    )
+    result = materialize_known_archive(derived, days, [isin], group="lending")
+    assert not result.valid[20, 0, 0]
+    assert result.values[20, 0, 0] == 0.0
+
+
+def test_lending_volume_window_counts_observed_zero_as_support() -> None:
+    days = [date(2024, 1, 1) + timedelta(days=index) for index in range(21)]
+    isin = "BRTESTACNOR1"
+    source = pl.DataFrame(
+        {
+            "source_position_date": [days[19]],
+            "available_date": [days[20]],
+            "isin": [isin],
+            "lending_balance_brl": [200.0],
+        }
+    )
+    volume = np.full((len(days), 1), 100.0)
+    volume[15, 0] = 0.0
+    derived = derive_known_archive_features(
+        source, days, [isin], group="lending", daily_volume_brl=volume
+    )
+    result = materialize_known_archive(derived, days, [isin], group="lending")
+    assert result.valid[20, 0, 0]
+    assert result.values[20, 0, 0] == pytest.approx(200.0 / 95.0)
 
 
 def test_balance_and_raw_rate_archives_combine_without_legacy_inversion() -> None:
@@ -587,6 +656,71 @@ def test_unknown_same_day_availability_is_rejected_and_latest_snapshot_wins() ->
         group="oddlot",
     )
     assert not rejected.valid.any()
+
+
+def test_stateful_sidecar_preserves_pre_window_asof_record_and_age() -> None:
+    days = [date(2024, 1, 3), date(2024, 1, 4)]
+    source = pl.DataFrame(
+        {
+            "available_date": [date(2024, 1, 2)],
+            "isin": ["BRTESTACNOR1"],
+            "liabilities_to_assets": [1.25],
+            "liabilities_to_assets_mask": [True],
+        }
+    )
+    result = materialize_known_archive(
+        source, days, ["BRTESTACNOR1"], group="fundamentals"
+    )
+    assert result.valid[:, 0, 0].all()
+    assert result.values[:, 0, 0].tolist() == pytest.approx([1.25, 1.25])
+    assert result.age_sessions[:, 0, 0].tolist() == [0.0, 1.0]
+
+
+def test_equal_priority_conflicting_logical_records_are_rejected() -> None:
+    day = date(2024, 1, 2)
+    source = pl.DataFrame(
+        {
+            "available_date": [day, day],
+            "isin": ["BRTESTACNOR1", "BRTESTACNOR1"],
+            "liabilities_to_assets": [1.0, 2.0],
+            "liabilities_to_assets_mask": [True, True],
+            "__record_family": ["fundamental_filing", "fundamental_filing"],
+        }
+    )
+    with pytest.raises(ValueError, match="conflicting logical records"):
+        materialize_known_archive(
+            source, [day], ["BRTESTACNOR1"], group="fundamentals"
+        )
+
+
+def test_rebalance_requires_timestamped_current_state_not_legacy_grid() -> None:
+    day = date(2024, 1, 2)
+    legacy = pl.DataFrame(
+        {
+            "available_date": [day],
+            "decision_idx": [54],
+            "isin": ["BRTESTACNOR1"],
+            "ibov_current_weight_sqrt": [0.2],
+        }
+    )
+    assert derive_known_archive_features(
+        legacy, [day], ["BRTESTACNOR1"], group="rebalance"
+    ).is_empty()
+    current = legacy.drop("decision_idx").with_columns(
+        pl.lit(datetime(2024, 1, 2, 15, 0, tzinfo=ZoneInfo("America/Sao_Paulo")))
+        .alias("public_available_at"),
+        pl.lit("minute").alias("public_available_at_precision"),
+        pl.lit(0.0).alias("public_available_at_processing_latency_seconds"),
+    )
+    result = materialize_known_archive(
+        derive_known_archive_features(
+            current, [day], ["BRTESTACNOR1"], group="rebalance"
+        ),
+        [day],
+        ["BRTESTACNOR1"],
+        group="rebalance",
+    )
+    assert result.valid[0, 0, 0]
 
 
 def test_legacy_clipped_fundamental_is_source_missing(tmp_path) -> None:

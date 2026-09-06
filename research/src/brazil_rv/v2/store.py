@@ -8,7 +8,7 @@ import shutil
 import sys
 import tempfile
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields as dataclass_fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -18,6 +18,7 @@ import polars as pl
 from numpy.typing import NDArray
 
 from .contract import ALLOWED_LOOKBACKS, DECISION_MINUTE_INDEX, HORIZONS
+from .feature_spec import FeatureSpec, feature_schema_sha256
 from .splits import (
     PREREGISTRATION_ROOT,
     AccessLedger,
@@ -26,7 +27,9 @@ from .splits import (
 )
 
 STORE_SCHEMA = "BRAZIL_RV_V2_DAILY_STORE_V2"
-_SUPERSEDED_STORE_SCHEMAS = frozenset(("V2_DAILY_STORE_V1",))
+_SUPERSEDED_STORE_SCHEMAS = frozenset(
+    ("V2_DAILY_STORE_V1", "BRAZIL_RV_V2_DAILY_STORE_V1")
+)
 _SAFE_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 _WRITE_VERIFICATION = object()
 _MAX_CAUSAL_HISTORY_ROWS = max(*ALLOWED_LOOKBACKS, 253)
@@ -48,6 +51,9 @@ _MULTI_HORIZON_TARGET_MASKS = frozenset(
 )
 _DATE_ONLY_ARRAYS: frozenset[str] = frozenset()
 _DATE_HORIZON_ARRAYS = frozenset(("target_normalized_cross_section_valid",))
+_DATE_COMMON_STATE_ARRAYS = frozenset(
+    ("common_state_diagnostic_values", "common_state_diagnostic_valid")
+)
 _SPARSE_FAST_ARRAYS = frozenset(
     {
         "fast_patch_values",
@@ -72,6 +78,71 @@ _FORBIDDEN_CURRENT_ARRAYS = frozenset(
         "target_raw_log_return",
     }
 )
+_FEATURE_SPEC_KEYS = frozenset(item.name for item in dataclass_fields(FeatureSpec))
+_NON_MODEL_FEATURE_NAME_GROUPS = frozenset(("common_state_diagnostic", "horizons"))
+_PRIMARY_MODEL_FEATURE_GROUPS = ("slow", "intraday", "native_fast")
+
+
+def _validated_feature_schema_sha256(
+    metadata: Mapping[str, object],
+    feature_names: Mapping[str, Sequence[str]],
+) -> str:
+    """Validate and hash the complete ordered FeatureSpec contract."""
+
+    if not isinstance(metadata, Mapping) or not isinstance(feature_names, Mapping):
+        raise ValueError("current v2 stores require feature schema mappings")
+    schema = metadata.get("feature_schema")
+    if not isinstance(schema, Mapping):
+        raise ValueError("current v2 stores require metadata.feature_schema")
+    raw_specs = schema.get("specifications")
+    if (
+        not isinstance(raw_specs, Sequence)
+        or isinstance(raw_specs, (str, bytes))
+    ):
+        raise ValueError("current v2 stores require FeatureSpec specifications")
+    specs: list[FeatureSpec] = []
+    for raw_spec in raw_specs:
+        if not isinstance(raw_spec, Mapping) or set(raw_spec) != _FEATURE_SPEC_KEYS:
+            raise ValueError("FeatureSpec specification fields are incomplete")
+        try:
+            specs.append(FeatureSpec(**dict(raw_spec)))
+        except (TypeError, ValueError) as error:
+            raise ValueError("invalid FeatureSpec specification") from error
+
+    declared_model_groups = set(feature_names) - _NON_MODEL_FEATURE_NAME_GROUPS
+    unknown_groups = declared_model_groups - set(_PRIMARY_MODEL_FEATURE_GROUPS) - {
+        key for key in declared_model_groups if key.startswith("sidecar_")
+    }
+    if unknown_groups:
+        raise ValueError(f"unregistered feature groups: {sorted(unknown_groups)}")
+    model_groups = tuple(
+        key for key in _PRIMARY_MODEL_FEATURE_GROUPS if key in declared_model_groups
+    ) + tuple(
+        sorted(key for key in declared_model_groups if key.startswith("sidecar_"))
+    )
+    ordered_names = tuple(
+        str(name) for key in model_groups for name in feature_names[key]
+    )
+    if tuple(spec.name for spec in specs) != ordered_names:
+        raise ValueError(
+            "FeatureSpec order does not match ordered feature names: "
+            f"specifications={tuple(spec.name for spec in specs)!r}; "
+            f"feature_names={ordered_names!r}"
+        )
+    if tuple(dict.fromkeys(spec.family for spec in specs)) != model_groups:
+        raise ValueError("FeatureSpec families do not match ordered feature groups")
+
+    declared_sha = schema.get("sha256")
+    if (
+        not isinstance(declared_sha, str)
+        or len(declared_sha) != 64
+        or any(character not in "0123456789abcdef" for character in declared_sha)
+    ):
+        raise ValueError("metadata feature-schema SHA-256 is malformed")
+    calculated_sha = feature_schema_sha256(specs)
+    if declared_sha != calculated_sha:
+        raise ValueError("metadata feature-schema SHA-256 mismatch")
+    return calculated_sha
 
 
 def peak_rss_bytes() -> int:
@@ -119,8 +190,8 @@ def peak_rss_bytes() -> int:
     return peak if sys.platform == "darwin" else peak * 1024
 
 
-def available_physical_memory_bytes() -> int:
-    """Return currently available physical memory without a third-party probe."""
+def _raw_memory_status_bytes() -> dict[str, int | None]:
+    """Read one system memory snapshot without a third-party dependency."""
 
     if sys.platform == "win32":
         import ctypes
@@ -142,11 +213,48 @@ def available_physical_memory_bytes() -> int:
         status.dwLength = ctypes.sizeof(status)
         if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
             raise OSError("GlobalMemoryStatusEx failed")
-        return int(status.ullAvailPhys)
+        return {
+            "total_physical_memory_bytes": int(status.ullTotalPhys),
+            "available_physical_memory_bytes": int(status.ullAvailPhys),
+            "commit_limit_bytes": int(status.ullTotalPageFile),
+            "available_commit_memory_bytes": int(status.ullAvailPageFile),
+        }
 
     page_size = int(os.sysconf("SC_PAGE_SIZE"))
     available_pages = int(os.sysconf("SC_AVPHYS_PAGES"))
-    return page_size * available_pages
+    total_pages = int(os.sysconf("SC_PHYS_PAGES"))
+    return {
+        "total_physical_memory_bytes": page_size * total_pages,
+        "available_physical_memory_bytes": page_size * available_pages,
+        "commit_limit_bytes": None,
+        "available_commit_memory_bytes": None,
+    }
+
+
+def available_memory_status_bytes() -> dict[str, int | str | None]:
+    """Return memory headroom used to admit a store build.
+
+    Windows allocations consume system commit as well as resident memory.  A
+    build is therefore admitted against the smaller of available physical and
+    available commit memory.  Other supported platforms retain the physical
+    headroom rule because they do not expose an equivalent hard commit budget
+    through the standard library.
+    """
+
+    status: dict[str, int | str | None] = dict(_raw_memory_status_bytes())
+    available_physical = int(status["available_physical_memory_bytes"])
+    available_commit = status["available_commit_memory_bytes"]
+    if available_commit is None:
+        status["available_build_memory_bytes"] = available_physical
+        status["admission_basis"] = "available_physical_memory"
+    else:
+        status["available_build_memory_bytes"] = min(
+            available_physical, int(available_commit)
+        )
+        status["admission_basis"] = (
+            "minimum_of_available_physical_and_available_commit_memory"
+        )
+    return status
 
 
 _VERIFIED_HASHES: set[tuple[str, int, int, str]] = set()
@@ -232,6 +340,18 @@ def _validate_array_shapes(
             if value.dtype != np.bool_:
                 raise ValueError(f"mask array must have boolean dtype: {name}")
             continue
+        if name in _DATE_COMMON_STATE_ARRAYS:
+            if value.ndim != 2 or value.shape[0] != date_count:
+                raise ValueError(
+                    f"{name} must have the [date, common-state] axes; got "
+                    f"{value.shape}"
+                )
+            expected_dtype = (
+                np.bool_ if name.endswith("_valid") else np.dtype(np.float32)
+            )
+            if value.dtype != expected_dtype:
+                raise ValueError(f"unexpected common-state dtype: {name}")
+            continue
         if name in _SPARSE_FAST_ARRAYS:
             if value.ndim < 3 or value.shape[0] != date_count:
                 raise ValueError(
@@ -265,9 +385,80 @@ def _validate_array_shapes(
         ):
             if value.dtype != np.bool_:
                 raise ValueError(f"mask array must have boolean dtype: {name}")
+    feature_families = (
+        ("slow_values", "slow_valid", "slow_age_sessions"),
+        ("intraday_values", "intraday_valid", "intraday_age_sessions"),
+        *tuple(
+            (
+                name,
+                f"{name.removesuffix('_values')}_valid",
+                f"{name.removesuffix('_values')}_age_sessions",
+            )
+            for name in arrays
+            if name.startswith("sidecar_") and name.endswith("_values")
+        ),
+    )
+    common_state_present = tuple(name in arrays for name in _DATE_COMMON_STATE_ARRAYS)
+    if any(common_state_present) and not all(common_state_present):
+        raise ValueError(
+            "common-state diagnostic values and validity must be stored together"
+        )
+    if all(common_state_present) and (
+        arrays["common_state_diagnostic_values"].shape
+        != arrays["common_state_diagnostic_valid"].shape
+    ):
+        raise ValueError("common-state diagnostic values and validity are misaligned")
+    declared_feature_arrays = {
+        array_name
+        for family in feature_families
+        for array_name in family
+    }
+    orphan_feature_arrays = {
+        name
+        for name in arrays
+        if (
+            name in {"slow_valid", "slow_age_sessions", "intraday_valid", "intraday_age_sessions"}
+            or (
+                name.startswith("sidecar_")
+                and (name.endswith("_valid") or name.endswith("_age_sessions"))
+            )
+        )
+        and name not in declared_feature_arrays
+    }
+    if orphan_feature_arrays:
+        raise ValueError(
+            "feature validity/age arrays lack their value array: "
+            f"{sorted(orphan_feature_arrays)}"
+        )
+    for values_name, mask_name, age_name in feature_families:
+        present = tuple(name in arrays for name in (values_name, mask_name, age_name))
+        if any(present) and not all(present):
+            raise ValueError(
+                f"{values_name}, {mask_name}, and {age_name} must be stored together"
+            )
+        if not all(present):
+            continue
+        shape = arrays[values_name].shape
+        if arrays[mask_name].shape != shape or arrays[age_name].shape != shape:
+            raise ValueError(
+                f"{values_name}, {mask_name}, and {age_name} are misaligned"
+            )
+        ages = np.asarray(arrays[age_name])
+        if ages.dtype != np.float32:
+            raise ValueError(f"feature age array must have float32 dtype: {age_name}")
+        for start in range(0, date_count, 32):
+            block = ages[start : start + 32]
+            valid_block = np.asarray(arrays[mask_name][start : start + 32])
+            if (
+                not np.isfinite(block).all()
+                or np.any(block < -1.0)
+                or np.any(valid_block & (block < 0.0))
+            ):
+                raise ValueError(
+                    f"{age_name} must contain finite last-observation ages or -1, "
+                    "and every valid feature must have a known age"
+                )
     paired = (
-        ("slow_values", "slow_valid"),
-        ("intraday_values", "intraday_valid"),
         ("fast_patch_values", "fast_patch_valid"),
         ("target_primary", "target_valid"),
         ("target_shareholder_midrank", "target_shareholder_valid"),
@@ -282,6 +473,17 @@ def _validate_array_shapes(
             and arrays[values_name].shape != arrays[mask_name].shape
         ):
             raise ValueError(f"{values_name} and {mask_name} are misaligned")
+    if "slow_values" in arrays:
+        timestep_valid = arrays.get("slow_timestep_valid")
+        if timestep_valid is None:
+            raise ValueError("slow values require slow_timestep_valid")
+        if (
+            timestep_valid.shape != arrays["slow_values"].shape[:2]
+            or timestep_valid.dtype != np.bool_
+        ):
+            raise ValueError("slow_timestep_valid must be boolean [date, ISIN]")
+        if np.any(arrays["slow_valid"] & ~timestep_valid[..., None]):
+            raise ValueError("slow features cannot be valid outside real timesteps")
     if "fast_patch_values" in arrays:
         fast_shape = arrays["fast_patch_values"].shape
         if len(fast_shape) != 4 or fast_shape[-1] != 7:
@@ -325,6 +527,8 @@ def _validate_array_shapes(
     if present_actions:
         q = np.asarray(arrays["action_shares_per_prior_share"])
         d = np.asarray(arrays["action_cash_per_prior_share"])
+        resolved = np.asarray(arrays["action_session_resolved"], dtype=np.bool_)
+        has_action = np.asarray(arrays["action_has_action"], dtype=np.bool_)
         successor = np.asarray(arrays["action_successor_index"])
         payment = np.asarray(arrays["action_payment_session"])
         if (
@@ -346,6 +550,47 @@ def _validate_array_shapes(
             or (payment > date_count).any()
         ):
             raise ValueError("canonical action payment sessions are invalid")
+        identity_successor = np.broadcast_to(
+            np.arange(isin_count, dtype=np.int64), (date_count, isin_count)
+        )
+        silent_terms = ~has_action & (
+            (q != 1.0) | (d != 0.0) | (successor != identity_successor)
+        )
+        if silent_terms.any():
+            raise ValueError("economic action terms require has_action=true")
+        event_session = np.broadcast_to(
+            np.arange(date_count, dtype=np.int64)[:, None],
+            (date_count, isin_count),
+        )
+        if ((payment >= 0) & (payment < event_session)).any():
+            raise ValueError(
+                "action payment sessions cannot precede their action session"
+            )
+        invalid_payment_binding = (payment >= 0) & (
+            ~has_action | ~resolved | (d == 0.0)
+        )
+        if invalid_payment_binding.any():
+            raise ValueError(
+                "payment sessions require a resolved cash-bearing action on the same cell"
+            )
+    if "prior_reference_close" in arrays:
+        prior_reference = np.asarray(arrays["prior_reference_close"])
+        if (
+            not np.issubdtype(prior_reference.dtype, np.floating)
+            or np.isinf(prior_reference).any()
+            or np.any(np.isfinite(prior_reference) & (prior_reference <= 0.0))
+        ):
+            raise ValueError(
+                "prior_reference_close must contain positive prices or NaN"
+            )
+    if "audit_eventual_survives_to_final_year" in arrays:
+        eventual_survival = np.asarray(
+            arrays["audit_eventual_survives_to_final_year"]
+        )
+        if eventual_survival.dtype != np.bool_:
+            raise ValueError(
+                "audit_eventual_survives_to_final_year must be boolean"
+            )
 
 
 def _validate_native_fast_mapping(
@@ -377,13 +622,19 @@ def _validate_native_fast_mapping(
 
 
 def close_memmap(array: NDArray[np.generic]) -> None:
-    """Flush and close one NumPy memmap without retaining an OS mapping."""
+    """Flush and close a NumPy memmap, including through ndarray views."""
 
-    if isinstance(array, np.memmap):
-        array.flush()
-    mapping = getattr(array, "_mmap", None)
-    if mapping is not None:
-        mapping.close()
+    candidate: object = array
+    seen: set[int] = set()
+    while isinstance(candidate, np.ndarray) and id(candidate) not in seen:
+        seen.add(id(candidate))
+        if isinstance(candidate, np.memmap):
+            mapping = getattr(candidate, "_mmap", None)
+            if mapping is not None and not mapping.closed:
+                candidate.flush()
+                mapping.close()
+            return
+        candidate = candidate.base
 
 
 class StoreStaging:
@@ -445,6 +696,10 @@ class StoreStaging:
             if name in _DATE_ONLY_ARRAYS
             else normalized_shape == (self.dates.size, len(HORIZONS))
             if name in _DATE_HORIZON_ARRAYS
+            else len(normalized_shape) == 2
+            and normalized_shape[0] == self.dates.size
+            and normalized_shape[1] > 0
+            if name in _DATE_COMMON_STATE_ARRAYS
             else len(normalized_shape) >= 3
             and normalized_shape[0] == self.dates.size
             if name in _SPARSE_FAST_ARRAYS
@@ -487,6 +742,8 @@ class StoreStaging:
             if name in _DATE_ONLY_ARRAYS
             else source.ndim == 2 and source.shape[1] == len(HORIZONS)
             if name in _DATE_HORIZON_ARRAYS
+            else source.ndim == 2 and source.shape[1] > 0
+            if name in _DATE_COMMON_STATE_ARRAYS
             else source.ndim >= 3
             if name in _SPARSE_FAST_ARRAYS
             else source.ndim >= 2 and source.shape[1] == len(self.isins)
@@ -624,29 +881,9 @@ class StoreStaging:
             key: list(value) for key, value in (feature_names or {}).items()
         }
         metadata_payload = dict(metadata or {})
-        declared_feature_schema = metadata_payload.get("feature_schema")
-        declared_feature_sha = (
-            declared_feature_schema.get("sha256")
-            if isinstance(declared_feature_schema, Mapping)
-            else None
+        feature_schema_identity = _validated_feature_schema_sha256(
+            metadata_payload, ordered_feature_names
         )
-        if declared_feature_sha is None:
-            feature_schema_sha256 = hashlib.sha256(
-                _json_bytes(ordered_feature_names)
-            ).hexdigest()
-            feature_schema_source = "ordered_feature_names_only"
-        elif (
-            not isinstance(declared_feature_sha, str)
-            or len(declared_feature_sha) != 64
-            or any(
-                character not in "0123456789abcdef"
-                for character in declared_feature_sha
-            )
-        ):
-            raise ValueError("metadata feature-schema SHA-256 is malformed")
-        else:
-            feature_schema_sha256 = declared_feature_sha
-            feature_schema_source = "metadata_feature_specifications"
         manifest: dict[str, Any] = {
             "schema": STORE_SCHEMA,
             "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -666,8 +903,8 @@ class StoreStaging:
             "arrays": inventory,
             "tables": table_inventory,
             "feature_names": ordered_feature_names,
-            "feature_schema_sha256": feature_schema_sha256,
-            "feature_schema_source": feature_schema_source,
+            "feature_schema_sha256": feature_schema_identity,
+            "feature_schema_source": "metadata_feature_specifications",
             "sources": [dict(value) for value in sources],
             "metadata": metadata_payload,
             "official_validation_accessed": False,
@@ -810,6 +1047,15 @@ class V2Store:
             )
         if schema != STORE_SCHEMA:
             raise ValueError("not a current v2 daily store")
+        feature_schema_identity = _validated_feature_schema_sha256(
+            manifest.get("metadata", {}), manifest.get("feature_names", {})
+        )
+        if (
+            manifest.get("feature_schema_sha256") != feature_schema_identity
+            or manifest.get("feature_schema_source")
+            != "metadata_feature_specifications"
+        ):
+            raise ValueError("store FeatureSpec identity mismatch")
         sha_record = (path / "manifest.sha256").read_text(encoding="ascii").split()[0]
         if verify_hashes and not _matches_verified_file(
             manifest_path,

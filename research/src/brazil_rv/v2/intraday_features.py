@@ -200,6 +200,12 @@ def build_native_fast_features_into(
     daily_shape = high_.shape[:2]
     if supported.dtype != np.bool_ or supported.shape != daily_shape:
         raise ValueError("session_valid must be boolean and align [date, name]")
+    if np.any(seen & ~supported[..., None]) or np.any(
+        activity_seen & ~supported[..., None]
+    ):
+        raise ValueError("native M1 observations cannot exist outside source support")
+    if np.any(activity_seen & (~np.isfinite(volume_) | (volume_ < 0.0))):
+        raise ValueError("valid native M1 activity must be finite and non-negative")
     if sigma.shape != daily_shape or not np.issubdtype(sigma.dtype, np.number):
         raise ValueError("sigma_asof must be numeric and align [date, name]")
     if not np.isfinite(minimum_sigma) or minimum_sigma <= 0.0:
@@ -433,39 +439,79 @@ _SAME_DAY_BOUNDARY_WINDOWS = {
     17: 20,
 }
 
+# Number of strictly prior rows used by each lagged/rolling feature.  A
+# detected action on row t is classified with row-t closing data, so row t
+# itself must never consult that bit.  It may first affect row t+1.
+_LAGGED_BOUNDARY_LOOKBACKS = {
+    2: 4,
+    3: 19,
+    4: 4,
+    5: 19,
+    7: 19,
+    8: 1,
+    9: 1,
+    10: 1,
+    13: 4,
+    14: 19,
+    15: 19,
+    16: 19,
+    17: 19,
+    19: 20,
+}
+
 
 def mask_action_boundaries(
     result: IntradayDailyResult,
+    *,
+    lagged_boundary: NDArray[np.bool_],
     same_day_boundary: NDArray[np.bool_],
+    copy_buffers: bool = True,
 ) -> IntradayDailyResult:
-    """Remove M1 features whose cross-session path crosses a known boundary.
+    """Mask current and historical action boundaries on their causal clocks.
 
-    ``same_day_boundary[t]`` must be knowable by the decision on ``t`` (for
-    example, an opening gap against the last prior raw close or a verified
-    action effective at the open).  Post-close classifications are not valid
-    inputs to this function.  Same-session ratios remain scale-free; only
-    cross-session primitives and their exact trailing dependants are masked.
+    ``same_day_boundary[t]`` is decision-known at the open and governs row-t
+    cross-session features plus their exact trailing dependants.
+    ``lagged_boundary[t]`` may use the close of t, so it is consulted only by
+    later rows whose historical dependency includes t. This preserves the
+    current decision row when an ex-post action classification changes.
     """
 
-    boundaries = np.asarray(same_day_boundary, dtype=np.bool_)
-    if boundaries.shape != result.values.shape[:2]:
-        raise ValueError("same_day_boundary must align with intraday result axes")
-    values = np.asarray(result.values).copy()
-    valid = np.asarray(result.valid, dtype=np.bool_).copy()
-    cumulative = np.concatenate(
+    lagged = np.asarray(lagged_boundary, dtype=np.bool_)
+    same_day = np.asarray(same_day_boundary, dtype=np.bool_)
+    expected = result.values.shape[:2]
+    if lagged.shape != expected or same_day.shape != expected:
+        raise ValueError("action boundaries must align with intraday result axes")
+    values = np.asarray(result.values)
+    valid = np.asarray(result.valid, dtype=np.bool_)
+    if copy_buffers:
+        values = values.copy()
+        valid = valid.copy()
+
+    same_day_cumulative = np.concatenate(
         (
-            np.zeros((1, boundaries.shape[1]), dtype=np.int32),
-            np.cumsum(boundaries, axis=0, dtype=np.int32),
+            np.zeros((1, same_day.shape[1]), dtype=np.int32),
+            np.cumsum(same_day, axis=0, dtype=np.int32),
         ),
         axis=0,
     )
+    rows = np.arange(lagged.shape[0], dtype=np.int64)
     for feature_index, window in _SAME_DAY_BOUNDARY_WINDOWS.items():
-        clear = np.zeros(boundaries.shape, dtype=np.bool_)
-        clear[window - 1 :] = cumulative[window:] - cumulative[:-window] == 0
+        starts = np.maximum(rows - window + 1, 0)
+        clear = same_day_cumulative[rows + 1] - same_day_cumulative[starts] == 0
         valid[..., feature_index] &= clear
-        values[..., feature_index] = np.where(
-            valid[..., feature_index], values[..., feature_index], 0.0
-        )
+
+    lagged_cumulative = np.concatenate(
+        (
+            np.zeros((1, lagged.shape[1]), dtype=np.int32),
+            np.cumsum(lagged, axis=0, dtype=np.int32),
+        ),
+        axis=0,
+    )
+    for feature_index, lookback in _LAGGED_BOUNDARY_LOOKBACKS.items():
+        starts = np.maximum(rows - lookback, 0)
+        clear = lagged_cumulative[rows] - lagged_cumulative[starts] == 0
+        valid[..., feature_index] &= clear
+    values[~valid] = 0.0
     return IntradayDailyResult(
         values=values,
         valid=valid,
@@ -1062,6 +1108,8 @@ def _build_scheduled_intraday_daily_features(
     close: NDArray[np.floating],
     volume: NDArray[np.floating],
     observed: NDArray[np.bool_],
+    volume_valid: NDArray[np.bool_],
+    session_valid: NDArray[np.bool_],
     sessions: Sequence[SessionDefinition],
 ) -> IntradayDailyResult:
     market = tuple(
@@ -1069,12 +1117,24 @@ def _build_scheduled_intraday_daily_features(
     )
     open_, high_, low_, close_, volume_ = market
     seen = np.asarray(observed)
+    activity_seen = np.asarray(volume_valid)
+    supported = np.asarray(session_valid)
     if open_.ndim != 3 or any(value.shape != open_.shape for value in market):
         raise ValueError("M1 arrays must be aligned [date, name, minute]")
     if any(not np.issubdtype(value.dtype, np.number) for value in market):
         raise TypeError("M1 market arrays must be numeric")
-    if seen.dtype != np.bool_ or seen.shape != open_.shape:
-        raise ValueError("observed must be boolean and align with M1 arrays")
+    if seen.dtype != np.bool_ or activity_seen.dtype != np.bool_:
+        raise TypeError("observed and volume_valid must be boolean")
+    if seen.shape != open_.shape or activity_seen.shape != open_.shape:
+        raise ValueError("M1 price/activity masks must align with market arrays")
+    if supported.dtype != np.bool_ or supported.shape != open_.shape[:2]:
+        raise ValueError("session_valid must be boolean and align [date, name]")
+    if np.any(seen & ~supported[..., None]) or np.any(
+        activity_seen & ~supported[..., None]
+    ):
+        raise ValueError("M1 observations cannot exist outside source support")
+    if np.any(activity_seen & (~np.isfinite(volume_) | (volume_ < 0.0))):
+        raise ValueError("valid M1 activity must be finite and non-negative")
 
     prefix_minutes, continuous_minutes, _, patch_counts = _native_session_layout(
         sessions,
@@ -1104,9 +1164,12 @@ def _build_scheduled_intraday_daily_features(
     last_hour_volume = np.zeros(shape, dtype=np.float64)
     last_hour_valid = np.zeros(shape, dtype=np.bool_)
     full_vwap = floats()
+    full_vwap_valid = np.zeros(shape, dtype=np.bool_)
     prefix_total = np.zeros(shape, dtype=np.float64)
     prefix_vwap = floats()
-    prefix_valid = np.zeros(shape, dtype=np.bool_)
+    prefix_price_valid = np.zeros(shape, dtype=np.bool_)
+    prefix_activity_valid = np.zeros(shape, dtype=np.bool_)
+    prefix_vwap_valid = np.zeros(shape, dtype=np.bool_)
     day_high = floats()
     day_low = floats()
     day_range_valid = np.zeros(shape, dtype=np.bool_)
@@ -1133,6 +1196,7 @@ def _build_scheduled_intraday_daily_features(
         close_day = np.asarray(close_[day, :, :continuous], dtype=np.float64)
         volume_day = np.asarray(volume_[day, :, :continuous], dtype=np.float64)
         seen_day = seen[day, :, :continuous]
+        activity_day = activity_seen[day, :, :continuous]
 
         day_open[day] = open_day[:, 0]
         open_valid[day] = (
@@ -1169,32 +1233,58 @@ def _build_scheduled_intraday_daily_features(
             ]
             decision_mark_valid[day, has_completed_price] = True
 
-        safe_volume = np.where(
-            seen_day & np.isfinite(volume_day) & (volume_day >= 0.0),
-            volume_day,
-            0.0,
-        )
+        safe_volume = np.where(activity_day, volume_day, 0.0)
         full_volume[day] = safe_volume.sum(axis=1)
-        full_seen_count = seen_day.sum(axis=1)
-        full_volume_valid[day] = full_seen_count >= int(np.ceil(0.8 * continuous))
-        full_vwap[day] = (
-            np.where(seen_day, close_day, 0.0) * safe_volume
-        ).sum(axis=1) / np.maximum(full_volume[day], 1.0)
+        full_volume_valid[day] = activity_day.all(axis=1)
+        finite_close = seen_day & np.isfinite(close_day) & (close_day > 0.0)
+        priced_activity = activity_day & (
+            (volume_day == 0.0)
+            | finite_close
+        )
+        full_vwap_valid[day] = (
+            full_volume_valid[day]
+            & priced_activity.all(axis=1)
+            & (full_volume[day] > 0.0)
+        )
+        weighted_full = (
+            np.where(finite_close, close_day, 0.0) * safe_volume
+        ).sum(axis=1)
+        full_vwap[day, full_vwap_valid[day]] = (
+            weighted_full[full_vwap_valid[day]]
+            / full_volume[day, full_vwap_valid[day]]
+        )
         if continuous >= 60:
             last_hour_volume[day] = safe_volume[:, -60:].sum(axis=1)
             last_hour_valid[day] = (
                 (full_volume[day] > 0.0)
                 & full_volume_valid[day]
-                & (seen_day[:, -60:].sum(axis=1) >= 48)
             )
 
         prefix_volume = safe_volume[:, :prefix]
         prefix_total[day] = prefix_volume.sum(axis=1)
-        prefix_vwap[day] = (
-            np.where(prefix_seen, prefix_close, 0.0) * prefix_volume
-        ).sum(axis=1) / np.maximum(prefix_total[day], 1.0)
+        prefix_activity = activity_day[:, :prefix]
+        prefix_activity_valid[day] = prefix_activity.all(axis=1)
+        finite_prefix_close = (
+            prefix_seen & np.isfinite(prefix_close) & (prefix_close > 0.0)
+        )
+        priced_prefix_activity = prefix_activity & (
+            (volume_day[:, :prefix] == 0.0)
+            | finite_prefix_close
+        )
+        prefix_vwap_valid[day] = (
+            prefix_activity_valid[day]
+            & priced_prefix_activity.all(axis=1)
+            & (prefix_total[day] > 0.0)
+        )
+        weighted_prefix = (
+            np.where(finite_prefix_close, prefix_close, 0.0) * prefix_volume
+        ).sum(axis=1)
+        prefix_vwap[day, prefix_vwap_valid[day]] = (
+            weighted_prefix[prefix_vwap_valid[day]]
+            / prefix_total[day, prefix_vwap_valid[day]]
+        )
         prefix_count = prefix_seen.sum(axis=1)
-        prefix_valid[day] = prefix_count >= int(np.ceil(0.8 * prefix))
+        prefix_price_valid[day] = prefix_count >= int(np.ceil(0.8 * prefix))
         day_high[day] = np.max(
             np.where(prefix_seen, high_day[:, :prefix], -np.inf), axis=1
         )
@@ -1311,7 +1401,7 @@ def _build_scheduled_intraday_daily_features(
     assign(9, lag_last_hour, lag_last_hour_valid)
 
     close_vwap, close_vwap_valid = _safe_log_ratio(final_close, full_vwap)
-    close_vwap_valid &= final_valid & full_volume_valid & (full_volume > 0.0)
+    close_vwap_valid &= final_valid & full_vwap_valid
     lag_close_vwap = floats()
     lag_close_vwap_valid = np.zeros(shape, dtype=np.bool_)
     lag_close_vwap[1:] = close_vwap[:-1]
@@ -1319,7 +1409,7 @@ def _build_scheduled_intraday_daily_features(
     assign(10, lag_close_vwap, lag_close_vwap_valid)
 
     vwap_deviation, vwap_valid = _safe_log_ratio(decision_mark, prefix_vwap)
-    vwap_valid &= decision_mark_valid & prefix_valid & (prefix_total > 0.0)
+    vwap_valid &= decision_mark_valid & prefix_vwap_valid
     assign(11, vwap_deviation, vwap_valid)
     assign(12, realized, realized_valid)
     assign(13, *_rolling_mean(realized, realized_valid, 5))
@@ -1355,10 +1445,10 @@ def _build_scheduled_intraday_daily_features(
     relative = floats()
     relative_valid = np.zeros(shape, dtype=np.bool_)
     for day in range(20, dates):
-        history_valid = prefix_valid[day - 20 : day].all(axis=0)
+        history_valid = prefix_activity_valid[day - 20 : day].all(axis=0)
         median = np.median(prefix_total[day - 20 : day], axis=0)
         usable = (
-            prefix_valid[day]
+            prefix_activity_valid[day]
             & history_valid
             & np.isfinite(median)
             & (median > 0.0)
@@ -1378,8 +1468,31 @@ def _build_scheduled_intraday_daily_features(
         session_close=np.where(final_valid, final_close, np.nan),
         session_close_valid=final_valid,
         realized_daily_vol=realized,
-        fast_present=prefix_valid & realized_valid,
+        fast_present=prefix_price_valid & realized_valid,
         close_anchor_consistent=final_valid.copy(),
+    )
+
+
+def build_legacy_fixed_intraday_daily_features(
+    open_price: NDArray[np.floating],
+    high: NDArray[np.floating],
+    low: NDArray[np.floating],
+    close: NDArray[np.floating],
+    volume: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    *,
+    cutoff: int = DECISION_MINUTE_INDEX,
+) -> IntradayDailyResult:
+    """Build the retired fixed-grid summaries for isolated legacy tests only."""
+
+    return _build_fixed_intraday_daily_features(
+        open_price,
+        high,
+        low,
+        close,
+        volume,
+        observed,
+        cutoff=cutoff,
     )
 
 
@@ -1391,31 +1504,27 @@ def build_intraday_daily_features(
     volume: NDArray[np.floating],
     observed: NDArray[np.bool_],
     *,
-    cutoff: int = DECISION_MINUTE_INDEX,
-    sessions: Sequence[SessionDefinition] | None = None,
+    volume_valid: NDArray[np.bool_],
+    session_valid: NDArray[np.bool_],
+    sessions: Sequence[SessionDefinition],
 ) -> IntradayDailyResult:
-    """Build decision-state and lagged continuous-session M1 summaries.
+    """Build canonical scheduled summaries from independent M1 masks.
 
-    Without ``sessions``, this preserves the original fixed-grid contract.
-    With an authoritative schedule, each row begins at that date's continuous
-    open, the decision prefix excludes the decision row, and full-day lagged
-    summaries end at the continuous close before the auction. In that mode,
-    ``entry_open`` carries the last completed decision mark solely for legacy
-    anchor replacement; it is not the execution entry.
+    Each row begins at that date's declared continuous open.  The decision
+    prefix excludes the decision row, and full-day lagged summaries end at the
+    continuous close before the auction. ``entry_open`` carries the last
+    completed decision mark solely for close-anchor replacement; execution
+    entry is sourced by the caller.
     """
 
-    if sessions is None:
-        return _build_fixed_intraday_daily_features(
-            open_price,
-            high,
-            low,
-            close,
-            volume,
-            observed,
-            cutoff=cutoff,
-        )
-    if cutoff != DECISION_MINUTE_INDEX:
-        raise ValueError("cutoff cannot override an authoritative session schedule")
     return _build_scheduled_intraday_daily_features(
-        open_price, high, low, close, volume, observed, sessions
+        open_price,
+        high,
+        low,
+        close,
+        volume,
+        observed,
+        volume_valid,
+        session_valid,
+        sessions,
     )

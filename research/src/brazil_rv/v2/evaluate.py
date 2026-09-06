@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -34,8 +34,8 @@ BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V3"
-PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V2"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V4"
+PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
 @dataclass(frozen=True)
@@ -67,6 +67,11 @@ class EvaluationInputs:
     transfer_chronology_clean: bool
     horizons: tuple[int, ...] = HORIZONS
     source_artifact_hashes: Mapping[str, str] | None = None
+    history_age_sessions: NDArray[np.floating] | None = None
+    source_archive_present: Mapping[str, NDArray[np.bool_]] | None = None
+    source_feature_valid: Mapping[str, NDArray[np.bool_]] | None = None
+    initial_reference_price: NDArray[np.floating] | None = None
+    eventual_survives_to_final_year: NDArray[np.bool_] | None = None
 
 
 @dataclass(frozen=True)
@@ -257,6 +262,14 @@ def _validate(inputs: EvaluationInputs) -> None:
             raise ValueError(f"{name} shape differs from scores")
     if np.asarray(inputs.cdi_returns).shape != (len(dates),):
         raise ValueError("CDI return axis differs from evaluation dates")
+    if inputs.initial_reference_price is not None:
+        reference = np.asarray(inputs.initial_reference_price, dtype=np.float64)
+        if reference.shape != (matrix_shape[1],):
+            raise ValueError("initial reference-price axis differs from securities")
+        if np.isinf(reference).any() or np.any(
+            reference[np.isfinite(reference)] <= 0.0
+        ):
+            raise ValueError("initial reference prices must be positive or missing")
     for name, values in (
         ("action_session_resolved", inputs.action_session_resolved),
         ("action_has_action", inputs.action_has_action),
@@ -289,6 +302,44 @@ def _validate(inputs: EvaluationInputs) -> None:
         for values in inputs.prior_feature_values.values()
     ):
         raise ValueError("evaluation prior-feature arrays are misaligned")
+    if inputs.history_age_sessions is not None:
+        history_age = np.asarray(inputs.history_age_sessions, dtype=np.float64)
+        if history_age.shape != matrix_shape:
+            raise ValueError("history-age diagnostics are misaligned")
+        if np.isinf(history_age).any() or np.any(
+            history_age[np.isfinite(history_age)] < 0
+        ):
+            raise ValueError("history-age diagnostics must be non-negative or missing")
+    if inputs.eventual_survives_to_final_year is not None:
+        survives = np.asarray(inputs.eventual_survives_to_final_year)
+        if survives.shape != matrix_shape:
+            raise ValueError("eventual-survival audit labels are misaligned")
+        if survives.dtype != np.bool_:
+            raise TypeError("eventual-survival audit labels must be Boolean")
+    present = inputs.source_archive_present
+    valid = inputs.source_feature_valid
+    if (present is None) != (valid is None):
+        raise ValueError(
+            "source coverage diagnostics require both archive presence and validity"
+        )
+    if present is not None and valid is not None:
+        if not present or set(present) != set(valid):
+            raise ValueError("source coverage diagnostic rosters differ or are empty")
+        for source in sorted(present):
+            source_present = np.asarray(present[source])
+            source_valid = np.asarray(valid[source])
+            if (
+                not source
+                or source_present.shape != matrix_shape
+                or source_valid.shape != matrix_shape
+            ):
+                raise ValueError("source coverage diagnostics are misaligned")
+            if source_present.dtype != np.bool_ or source_valid.dtype != np.bool_:
+                raise TypeError("source coverage diagnostics must be Boolean")
+            if np.any(source_valid & ~source_present):
+                raise ValueError(
+                    "source feature validity exists without archive presence"
+                )
     if not np.isfinite(np.asarray(inputs.cdi_returns, dtype=np.float64)).all():
         raise ValueError("CDI returns must be finite")
     if not inputs.source_artifact_hashes:
@@ -600,6 +651,29 @@ def _ledger_rows(
     cost_bps: float,
     annual_borrow_rate: float,
 ) -> list[dict[str, object]]:
+    order_count = {day: 0 for day in result.dates}
+    fill_count = {day: 0 for day in result.dates}
+    cancellation_count = {day: 0 for day in result.dates}
+    for order in result.intended_orders:
+        if order.decision_date in order_count:
+            order_count[order.decision_date] += 1
+    for fill in result.fills:
+        if fill.fill_date in fill_count:
+            fill_count[fill.fill_date] += 1
+    for cancellation in result.cancellations:
+        if cancellation.cancellation_date in cancellation_count:
+            cancellation_count[cancellation.cancellation_date] += 1
+    signed_values = np.where(
+        (result.signed_shares != 0.0) & np.isfinite(result.mark_price),
+        result.signed_shares * result.mark_price,
+        0.0,
+    )
+    actual_net = np.divide(
+        signed_values.sum(axis=1),
+        result.nav,
+        out=np.full(len(result.dates), np.nan, dtype=np.float64),
+        where=result.nav != 0.0,
+    )
     return [
         {
             "date": day.isoformat(),
@@ -620,6 +694,16 @@ def _ledger_rows(
             "deployed_gross_fraction_nav": _finite_or_none(
                 result.gross_fraction_nav[index]
             ),
+            "deployed_net_fraction_nav": _finite_or_none(actual_net[index]),
+            "nav": _finite_or_none(result.nav[index]),
+            "free_cash": _finite_or_none(result.free_cash[index]),
+            "restricted_cash": _finite_or_none(result.restricted_cash[index]),
+            "receivables": _finite_or_none(result.receivables[index]),
+            "payables": _finite_or_none(result.payables[index]),
+            "marked_signed_holdings": _finite_or_none(
+                result.marked_signed_holdings[index]
+            ),
+            "reconciliation_error": _finite_or_none(result.reconciliation_error[index]),
             "stale_mark_name_days": int(result.stale_mark_name_days[index]),
             "unresolved_action_name_days": int(
                 result.unresolved_action_name_days[index]
@@ -637,9 +721,487 @@ def _ledger_rows(
             "actual_risk_breach": bool(result.actual_risk_breach[index]),
             "pending_entry_count": int(result.pending_entry_count[index]),
             "pending_exit_count": int(result.pending_exit_count[index]),
+            "cancelled_entry_count": int(result.cancelled_entry_count[index]),
+            "intended_order_count": order_count[day],
+            "fill_count": fill_count[day],
+            "order_cancellation_count": cancellation_count[day],
         }
         for index, day in enumerate(result.dates)
     ]
+
+
+def _serialise_records(records: Sequence[object]) -> list[dict[str, object]]:
+    output: list[dict[str, object]] = []
+    for record in records:
+        row = asdict(record)
+        for key, value in row.items():
+            if isinstance(value, date):
+                row[key] = value.isoformat()
+        output.append(row)
+    return output
+
+
+def _holding_audit(
+    result: StatefulLedgerResult,
+    security_ids: Sequence[str],
+) -> dict[str, object]:
+    rows: list[dict[str, object]] = []
+    daily: list[dict[str, object]] = []
+    observed_ages: list[int] = []
+    for day_index, day_value in enumerate(result.dates):
+        held = np.flatnonzero(result.signed_shares[day_index] != 0.0)
+        ages = result.holding_age_sessions[day_index, held]
+        observed_ages.extend(int(value) for value in ages)
+        daily.append(
+            {
+                "date": day_value.isoformat(),
+                "held_name_count": int(held.size),
+                "mean_holding_age_sessions": (
+                    _finite_or_none(float(np.mean(ages))) if ages.size else None
+                ),
+                "median_holding_age_sessions": (
+                    _finite_or_none(float(np.median(ages))) if ages.size else None
+                ),
+                "maximum_holding_age_sessions": (
+                    int(np.max(ages)) if ages.size else None
+                ),
+            }
+        )
+        for name in held:
+            mark = float(result.mark_price[day_index, name])
+            shares = float(result.signed_shares[day_index, name])
+            nav = float(result.nav[day_index])
+            rows.append(
+                {
+                    "date": day_value.isoformat(),
+                    "security": security_ids[name],
+                    "security_index": int(name),
+                    "signed_shares": shares,
+                    "mark_price": _finite_or_none(mark),
+                    "signed_marked_value": _finite_or_none(shares * mark),
+                    "signed_weight_fraction_nav": (
+                        _finite_or_none(shares * mark / nav)
+                        if math.isfinite(mark) and nav != 0.0
+                        else None
+                    ),
+                    "holding_age_sessions": int(
+                        result.holding_age_sessions[day_index, name]
+                    ),
+                }
+            )
+    age_array = np.asarray(observed_ages, dtype=np.int64)
+    histogram = (
+        {
+            str(int(value)): int(count)
+            for value, count in zip(
+                *np.unique(age_array, return_counts=True), strict=True
+            )
+        }
+        if age_array.size
+        else {}
+    )
+    return {
+        "population": "end_of_session_held_name_days",
+        "held_name_day_count": int(age_array.size),
+        "mean_sessions": (
+            _finite_or_none(float(np.mean(age_array))) if age_array.size else None
+        ),
+        "median_sessions": (
+            _finite_or_none(float(np.median(age_array))) if age_array.size else None
+        ),
+        "p25_sessions": (
+            _finite_or_none(float(np.quantile(age_array, 0.25)))
+            if age_array.size
+            else None
+        ),
+        "p75_sessions": (
+            _finite_or_none(float(np.quantile(age_array, 0.75)))
+            if age_array.size
+            else None
+        ),
+        "p95_sessions": (
+            _finite_or_none(float(np.quantile(age_array, 0.95)))
+            if age_array.size
+            else None
+        ),
+        "maximum_sessions": int(np.max(age_array)) if age_array.size else None,
+        "histogram": histogram,
+        "daily": daily,
+        "holdings": rows,
+    }
+
+
+def _action_attribution(
+    inputs: EvaluationInputs,
+    result: StatefulLedgerResult,
+) -> dict[str, object]:
+    action_rows: list[dict[str, object]] = []
+    daily_total = np.zeros(len(result.dates), dtype=np.float64)
+    daily_defined = np.zeros(len(result.dates), dtype=np.int64)
+    daily_unresolved = np.zeros(len(result.dates), dtype=np.int64)
+    has_action = np.asarray(inputs.action_has_action, dtype=np.bool_)
+    resolved = np.asarray(inputs.action_session_resolved, dtype=np.bool_)
+    action_q = np.asarray(inputs.action_shares_per_prior_share, dtype=np.float64)
+    action_d = np.asarray(inputs.action_cash_per_prior_share, dtype=np.float64)
+    successor = np.asarray(inputs.action_successor_index, dtype=np.int64)
+    payment = np.asarray(inputs.action_payment_session, dtype=np.int64)
+    for day_index in range(len(result.dates)):
+        for name in np.flatnonzero(has_action[day_index]):
+            prior_shares = (
+                float(result.signed_shares[day_index - 1, name])
+                if day_index > 0
+                else 0.0
+            )
+            prior_mark = (
+                float(result.mark_price[day_index - 1, name])
+                if day_index > 0
+                else math.nan
+            )
+            successor_index = int(successor[day_index, name])
+            action_resolved = bool(resolved[day_index, name])
+            cash_claim = (
+                prior_shares * float(action_d[day_index, name])
+                if action_resolved
+                else math.nan
+            )
+            crossing_pnl = math.nan
+            current_mark = math.nan
+            if (
+                action_resolved
+                and day_index > 0
+                and prior_shares != 0.0
+                and math.isfinite(prior_mark)
+                and 0 <= successor_index < len(inputs.security_ids)
+            ):
+                current_mark = float(result.mark_price[day_index, successor_index])
+                q = float(action_q[day_index, name])
+                d = float(action_d[day_index, name])
+                if (
+                    math.isfinite(current_mark)
+                    and math.isfinite(q)
+                    and math.isfinite(d)
+                ):
+                    crossing_pnl = prior_shares * (q * current_mark + d - prior_mark)
+                    daily_total[day_index] += crossing_pnl
+                    daily_defined[day_index] += 1
+            if prior_shares != 0.0 and not action_resolved:
+                daily_unresolved[day_index] += 1
+            payment_index = int(payment[day_index, name])
+            action_rows.append(
+                {
+                    "date": result.dates[day_index].isoformat(),
+                    "security": inputs.security_ids[name],
+                    "security_index": int(name),
+                    "held_prior_to_action": prior_shares != 0.0,
+                    "prior_signed_shares": prior_shares,
+                    "prior_mark_price": _finite_or_none(prior_mark),
+                    "action_resolved": action_resolved,
+                    "shares_per_prior_share": (
+                        _finite_or_none(action_q[day_index, name])
+                        if action_resolved
+                        else None
+                    ),
+                    "cash_per_prior_share": (
+                        _finite_or_none(action_d[day_index, name])
+                        if action_resolved
+                        else None
+                    ),
+                    "successor_security": (
+                        inputs.security_ids[successor_index]
+                        if 0 <= successor_index < len(inputs.security_ids)
+                        else None
+                    ),
+                    "successor_security_index": successor_index,
+                    "current_successor_mark_price": _finite_or_none(current_mark),
+                    "current_successor_mark_observed": bool(
+                        0 <= successor_index < len(inputs.security_ids)
+                        and np.isfinite(inputs.raw_close[day_index, successor_index])
+                    ),
+                    "cash_claim_signed": _finite_or_none(cash_claim),
+                    "claim_payment_date": (
+                        result.dates[payment_index].isoformat()
+                        if 0 <= payment_index < len(result.dates)
+                        else None
+                    ),
+                    "claim_payment_session": payment_index,
+                    "action_crossing_shareholder_pnl": _finite_or_none(crossing_pnl),
+                    "action_crossing_shareholder_pnl_bps_start_nav": (
+                        _finite_or_none(crossing_pnl / result.nav[day_index - 1] * 1e4)
+                        if day_index > 0
+                        and math.isfinite(crossing_pnl)
+                        and result.nav[day_index - 1] != 0.0
+                        else None
+                    ),
+                }
+            )
+    return {
+        "interpretation": (
+            "contractual shareholder wealth change across action-affected held "
+            "claims; includes contemporaneous underlying price movement and is "
+            "not an isolated action-alpha estimate"
+        ),
+        "rows": action_rows,
+        "daily": [
+            {
+                "date": day_value.isoformat(),
+                "defined_held_action_count": int(daily_defined[index]),
+                "unresolved_held_action_count": int(daily_unresolved[index]),
+                "action_crossing_shareholder_pnl": (
+                    _finite_or_none(daily_total[index])
+                    if daily_defined[index]
+                    else None
+                ),
+            }
+            for index, day_value in enumerate(result.dates)
+        ],
+    }
+
+
+def _liquidity_quartiles(inputs: EvaluationInputs) -> NDArray[np.int8]:
+    values = np.asarray(
+        inputs.prior_feature_values["log_volume_mean_20"], dtype=np.float64
+    )
+    active = np.asarray(inputs.active, dtype=np.bool_)
+    quartiles = np.full(values.shape, -1, dtype=np.int8)
+    for day in range(values.shape[0]):
+        names = np.flatnonzero(active[day] & np.isfinite(values[day]))
+        if not names.size:
+            continue
+        ranks = average_ranks(values[day, names])
+        quartiles[day, names] = np.minimum(
+            (4.0 * (ranks + 0.5) / names.size).astype(np.int8), 3
+        )
+    return quartiles
+
+
+def _quality_stratification(
+    inputs: EvaluationInputs,
+    primary_scores: NDArray[np.float64],
+    primary_targets: NDArray[np.float64],
+    primary_outcome_mask: NDArray[np.bool_],
+    primary_score_mask: NDArray[np.bool_],
+) -> dict[str, object]:
+    shape = primary_outcome_mask.shape
+    rows: list[dict[str, object]] = []
+
+    def add(group: str, label: str, stratum: NDArray[np.bool_]) -> None:
+        mask = np.asarray(stratum, dtype=np.bool_)
+        if mask.shape != shape:
+            raise ValueError(f"quality stratum {group}/{label} is misaligned")
+        outcome = primary_outcome_mask & mask
+        score = primary_score_mask & mask
+        _, daily, _ = _primary_daily_metrics(
+            primary_scores,
+            primary_targets,
+            outcome,
+            score,
+            inputs.dates,
+        )
+        rows.append(
+            {
+                "dimension": group,
+                "stratum": label,
+                "possible_date_count": int(
+                    (outcome.sum(axis=1) >= MIN_CROSS_SECTION).sum()
+                ),
+                "used_date_count": int(np.isfinite(daily).sum()),
+                "possible_name_days": int(outcome.sum()),
+                "used_name_days": int((outcome & score).sum()),
+                "mean_daily_primary_scaled_target_ic": _finite_or_none(
+                    _finite_mean(daily)
+                ),
+                "status": "supported" if np.isfinite(daily).any() else "unsupported",
+                "undefined_reason": (
+                    None
+                    if np.isfinite(daily).any()
+                    else "no_date_has_20_names_with_four_defined_heads"
+                ),
+            }
+        )
+
+    years = np.asarray([value.year for value in inputs.dates], dtype=np.int32)
+    for year in np.unique(years):
+        add(
+            "calendar_year",
+            str(int(year)),
+            np.broadcast_to((years == year)[:, None], shape),
+        )
+
+    quartiles = _liquidity_quartiles(inputs)
+    for quartile in range(4):
+        add("causal_liquidity_quartile", f"Q{quartile + 1}", quartiles == quartile)
+
+    if inputs.history_age_sessions is None:
+        rows.append(
+            {
+                "dimension": "history_age_sessions",
+                "stratum": "unavailable",
+                "possible_date_count": 0,
+                "used_date_count": 0,
+                "possible_name_days": 0,
+                "used_name_days": 0,
+                "mean_daily_primary_scaled_target_ic": None,
+                "status": "unsupported",
+                "undefined_reason": "history_age_not_supplied_by_evaluation_source",
+            }
+        )
+    else:
+        age = np.asarray(inputs.history_age_sessions, dtype=np.float64)
+        add("history_age_sessions", "0_to_59", np.isfinite(age) & (age < 60))
+        add(
+            "history_age_sessions",
+            "60_to_251",
+            np.isfinite(age) & (age >= 60) & (age < 252),
+        )
+        add("history_age_sessions", "252_plus", np.isfinite(age) & (age >= 252))
+
+    if inputs.eventual_survives_to_final_year is None:
+        rows.append(
+            {
+                "dimension": "eventual_survival_audit_label",
+                "stratum": "unavailable",
+                "possible_date_count": 0,
+                "used_date_count": 0,
+                "possible_name_days": 0,
+                "used_name_days": 0,
+                "mean_daily_primary_scaled_target_ic": None,
+                "status": "unsupported",
+                "undefined_reason": "eventual_survival_audit_label_not_supplied",
+            }
+        )
+    else:
+        survives = np.asarray(inputs.eventual_survives_to_final_year, dtype=np.bool_)
+        add("eventual_survival_audit_label", "survives_to_final_year", survives)
+        add("eventual_survival_audit_label", "delisted_within_panel", ~survives)
+    rows.append(
+        {
+            "dimension": "verified_terminal_status",
+            "stratum": "unsupported",
+            "possible_date_count": 0,
+            "used_date_count": 0,
+            "possible_name_days": 0,
+            "used_name_days": 0,
+            "mean_daily_primary_scaled_target_ic": None,
+            "status": "unsupported",
+            "undefined_reason": (
+                "no verified terminal-settlement roster is supplied; final-window "
+                "quote absence is not treated as terminal status"
+            ),
+        }
+    )
+
+    final_quote = np.isfinite(np.asarray(inputs.raw_close, dtype=np.float64)[-1])
+    add(
+        "window_terminal_quote_status",
+        "observed_on_final_evaluation_session",
+        np.broadcast_to(final_quote[None, :], shape),
+    )
+    add(
+        "window_terminal_quote_status",
+        "not_observed_on_final_evaluation_session",
+        np.broadcast_to((~final_quote)[None, :], shape),
+    )
+
+    source_rows: list[dict[str, object]] = []
+    if (
+        inputs.source_archive_present is not None
+        and inputs.source_feature_valid is not None
+    ):
+        active = np.asarray(inputs.active, dtype=np.bool_)
+        for source in sorted(inputs.source_archive_present):
+            present = np.asarray(inputs.source_archive_present[source], dtype=np.bool_)
+            valid = np.asarray(inputs.source_feature_valid[source], dtype=np.bool_)
+            add("source_archive_availability", f"{source}:present", present)
+            add("source_archive_availability", f"{source}:absent", ~present)
+            active_present = active & present
+            source_rows.append(
+                {
+                    "source": source,
+                    "active_name_days": int(active.sum()),
+                    "archive_present_name_days": int(active_present.sum()),
+                    "archive_coverage_rate": _finite_or_none(
+                        active_present.sum() / active.sum()
+                    )
+                    if active.any()
+                    else None,
+                    "feature_valid_name_days": int((active & valid).sum()),
+                    "feature_valid_conditional_on_archive_presence": (
+                        _finite_or_none((active & valid).sum() / active_present.sum())
+                        if active_present.any()
+                        else None
+                    ),
+                    "status": "supported" if active_present.any() else "unsupported",
+                }
+            )
+    else:
+        source_rows.append(
+            {
+                "source": "all_external_families",
+                "status": "unsupported",
+                "undefined_reason": "archive_presence_and_feature_validity_not_supplied",
+            }
+        )
+    return {
+        "definition": (
+            "diagnostic only; every IC uses the registered four-head common "
+            "population within the named causal stratum, and sparse strata stay "
+            "explicitly unsupported"
+        ),
+        "rows": rows,
+        "source_coverage": source_rows,
+    }
+
+
+def _declared_subperiod_readouts(
+    inputs: EvaluationInputs,
+    scaled_ic: NDArray[np.float64],
+    shareholder_ic: NDArray[np.float64],
+    price_ic: NDArray[np.float64],
+    spread_total_bps: NDArray[np.float64],
+    *,
+    window_name: str,
+) -> dict[str, object]:
+    years = np.asarray([value.year for value in inputs.dates], dtype=np.int32)
+    rows: list[dict[str, object]] = []
+    for year in np.unique(years):
+        selected = years == year
+        for horizon_index, horizon in enumerate(HORIZONS):
+            rows.append(
+                {
+                    "evaluation_window": window_name,
+                    "subperiod": str(int(year)),
+                    "horizon_sessions": horizon,
+                    "calendar_date_count": int(selected.sum()),
+                    "scaled_target_used_date_count": int(
+                        np.isfinite(scaled_ic[selected, horizon_index]).sum()
+                    ),
+                    "mean_scaled_target_spearman_ic": _finite_or_none(
+                        _finite_mean(scaled_ic[selected, horizon_index])
+                    ),
+                    "shareholder_rank_used_date_count": int(
+                        np.isfinite(shareholder_ic[selected, horizon_index]).sum()
+                    ),
+                    "mean_shareholder_rank_ic": _finite_or_none(
+                        _finite_mean(shareholder_ic[selected, horizon_index])
+                    ),
+                    "price_return_rank_used_date_count": int(
+                        np.isfinite(price_ic[selected, horizon_index]).sum()
+                    ),
+                    "mean_price_return_rank_ic": _finite_or_none(
+                        _finite_mean(price_ic[selected, horizon_index])
+                    ),
+                    "spread_used_date_count": int(
+                        np.isfinite(spread_total_bps[selected, horizon_index]).sum()
+                    ),
+                    "mean_shareholder_return_spread_total_bps": _finite_or_none(
+                        _finite_mean(spread_total_bps[selected, horizon_index])
+                    ),
+                }
+            )
+    return {
+        "definition": "calendar-year subperiods within the named evaluation window",
+        "rows": rows,
+    }
 
 
 def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
@@ -690,9 +1252,44 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         "transfer_chronology_clean": _array_sha256(
             np.asarray(inputs.transfer_chronology_clean, dtype=np.bool_)
         ),
+        "history_age_sessions": _array_sha256(
+            np.asarray(
+                inputs.history_age_sessions
+                if inputs.history_age_sessions is not None
+                else "unsupported"
+            )
+        ),
+        "initial_reference_price": _array_sha256(
+            np.asarray(
+                inputs.initial_reference_price
+                if inputs.initial_reference_price is not None
+                else "unsupported"
+            )
+        ),
+        "eventual_survives_to_final_year": _array_sha256(
+            np.asarray(
+                inputs.eventual_survives_to_final_year
+                if inputs.eventual_survives_to_final_year is not None
+                else "unsupported"
+            )
+        ),
     }
     for name, values in sorted(inputs.prior_feature_values.items()):
         result[f"prior_feature_{name}"] = _array_sha256(np.asarray(values))
+    for roster_name, roster in (
+        ("source_archive_present", inputs.source_archive_present),
+        ("source_feature_valid", inputs.source_feature_valid),
+    ):
+        digest = hashlib.sha256()
+        if roster is None:
+            digest.update(b"unsupported")
+        else:
+            for name, values in sorted(roster.items()):
+                digest.update(name.encode("utf-8"))
+                digest.update(b"\0")
+                digest.update(_array_sha256(np.asarray(values)).encode("ascii"))
+                digest.update(b"\n")
+        result[roster_name] = digest.hexdigest()
     return result
 
 
@@ -941,6 +1538,7 @@ def evaluate_scores(
         action_payment_session=inputs.action_payment_session,
         cdi_returns=inputs.cdi_returns,
         security_ids=inputs.security_ids,
+        initial_reference_price=inputs.initial_reference_price,
     )
     configurations = ledger_configurations()
     headline_name = f"cost_{ECONOMICS_HEADLINE[0]:g}_borrow_{ECONOMICS_HEADLINE[1]:g}"
@@ -963,6 +1561,7 @@ def evaluate_scores(
         cdi_returns=inputs.cdi_returns,
         security_ids=inputs.security_ids,
         config=LedgerConfig(),
+        initial_reference_price=inputs.initial_reference_price,
     )
     active = np.asarray(inputs.active, dtype=np.bool_)
     scaled_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
@@ -1076,6 +1675,29 @@ def evaluate_scores(
                     annual_borrow_rate=config.annual_borrow_rate,
                 )
             )
+    headline_daily = _ledger_rows(
+        headline,
+        cost_bps=ECONOMICS_HEADLINE[0],
+        annual_borrow_rate=ECONOMICS_HEADLINE[1],
+    )
+    holding_audit = _holding_audit(headline, inputs.security_ids)
+    action_attribution = _action_attribution(inputs, headline)
+    deployed_net = np.asarray(
+        [
+            float(row["deployed_net_fraction_nav"])
+            if row["deployed_net_fraction_nav"] is not None
+            else math.nan
+            for row in headline_daily
+        ],
+        dtype=np.float64,
+    )
+    quality_stratification = _quality_stratification(
+        inputs,
+        primary_scores,
+        primary_targets,
+        primary_outcome_mask,
+        primary_score_mask,
+    )
     report: dict[str, object] = {
         "schema": EVALUATION_SCHEMA,
         "window": {
@@ -1129,6 +1751,14 @@ def evaluate_scores(
         },
         "daily_primary_ic": primary_rows,
         "horizon_readouts": horizon_rows,
+        "declared_subperiod_readouts": _declared_subperiod_readouts(
+            inputs,
+            scaled_ic,
+            shareholder_ic,
+            price_ic,
+            spread_total_bps,
+            window_name=window_name,
+        ),
         "daily_metric_table": metric_rows,
         "persistence_table": persistence_rows,
         "economics": {
@@ -1139,9 +1769,27 @@ def evaluate_scores(
                     key: _finite_or_none(value) if isinstance(value, float) else value
                     for key, value in headline.summary().items()
                 },
+                "mean_deployed_net_fraction_nav": _finite_or_none(
+                    _finite_mean(deployed_net)
+                ),
+                "terminal_unresolved_inventory_fraction_nav": (
+                    _finite_or_none(
+                        headline.unresolved_inventory_notional / headline.nav[-1]
+                    )
+                    if headline.nav[-1] != 0.0
+                    else None
+                ),
             },
             "summaries": economics_summaries,
             "daily_table": economics_daily,
+            "headline_audit": {
+                "daily_state": headline_daily,
+                "intended_orders": _serialise_records(headline.intended_orders),
+                "fills": _serialise_records(headline.fills),
+                "cancellations": _serialise_records(headline.cancellations),
+                "holding_age_distribution": holding_audit,
+                "claims_and_action_attribution": action_attribution,
+            },
             "d5_only_diagnostic": {
                 "horizon_sessions": 5,
                 "contract": "D5 score head with the exact headline ledger settings",
@@ -1169,6 +1817,7 @@ def evaluate_scores(
             },
         },
         "diagnostics": _diagnostics(inputs),
+        "quality_and_coverage_stratification": quality_stratification,
         "input_hashes": _input_hashes(inputs),
         "source_artifact_hashes": dict(
             sorted((inputs.source_artifact_hashes or {}).items())
@@ -1474,6 +2123,11 @@ _PAIRED_INPUT_KEYS = (
     "security_ids",
     "target_scale_sigma",
     "cdi_returns",
+    "history_age_sessions",
+    "source_archive_present",
+    "source_feature_valid",
+    "initial_reference_price",
+    "eventual_survives_to_final_year",
     "prior_feature_beta_60",
     "prior_feature_log_return_5",
     "prior_feature_log_volume_mean_20",

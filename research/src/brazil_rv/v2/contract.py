@@ -4,6 +4,33 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Final
 
+PROTOCOL_SCHEMA: Final[str] = "BRAZIL_RV_V2_PROTOCOL_V2"
+MODEL_INPUT_SCHEMA: Final[str] = "BRAZIL_RV_V2_MODEL_INPUT_V2"
+CHECKPOINT_INPUT_SCHEMA: Final[str] = "BRAZIL_RV_V2_CHECKPOINT_INPUT_V2"
+RAW_PATIENCE_SCHEMA: Final[str] = "BRAZIL_RV_V2_RAW_PATIENCE_V2"
+FINAL_EMA_SCHEMA: Final[str] = "BRAZIL_RV_V2_FINAL_EMA_0995_V2"
+TRAINING_STAGE_SCHEMA: Final[str] = "BRAZIL_RV_V2_TRAINING_STAGE_V2"
+SCORE_ARTIFACT_SCHEMA: Final[str] = "BRAZIL_RV_V2_SCORE_ARTIFACT_V2"
+GBDT_MODELS_SCHEMA: Final[str] = "BRAZIL_RV_V2_GBDT_MODELS_V2"
+RUN_MANY_PLAN_SCHEMA: Final[str] = "BRAZIL_RV_V2_RUN_MANY_PLAN_V2"
+RUN_MANY_RESULT_SCHEMA: Final[str] = "BRAZIL_RV_V2_RUN_MANY_V2"
+DECISION_SAMPLE_SCHEMA: Final[str] = "BRAZIL_RV_V2_DECISION_SAMPLE_V2"
+DECISION_FEATURE_ALIGNMENT: Final[str] = "canonical_decision_snapshot_t"
+DECISION_FEATURE_CONTRACT: Final[dict[str, object]] = {
+    "all_stages": DECISION_FEATURE_ALIGNMENT,
+    "daily_market_source": "through_t_minus_1",
+    "decision_available_publications": "through_decision_t",
+    "consumer_side_shift": False,
+}
+FEATURE_AGE_CONTRACT: Final[dict[str, object]] = {
+    "unit": "exchange_sessions",
+    "definition": "sessions since the most recent usable source observation",
+    "current_observation": 0.0,
+    "unknown_or_left_censored_sentinel": -1.0,
+    "model_transform": "log1p(min(age,252))/log1p(252)",
+    "age_known_is_independent_of_feature_validity": True,
+}
+
 COTAHIST_YEARS: Final[tuple[int, ...]] = tuple(range(2009, 2027))
 STORE_START: Final[date] = date(2010, 1, 4)
 PRETRAIN_END: Final[date] = date(2021, 7, 30)
@@ -118,6 +145,11 @@ INTRADAY_DAILY_FEATURES: Final[tuple[str, ...]] = (
     "corwin_schultz_spread_20",
     "intraday_range_1545",
     "volume_1545_relative_median_20",
+)
+INTRADAY_PRIOR_SESSION_FEATURES: Final[tuple[str, ...]] = (
+    "last_30_minute_return_share_lag1",
+    "last_hour_volume_share_lag1",
+    "close_vwap_deviation_lag1",
 )
 
 SIDECAR_FEATURES: Final[dict[str, tuple[str, ...]]] = {

@@ -61,6 +61,7 @@ from brazil_rv.preprocessing.io import (
     validate_physical_source_identity,
     validate_source_date_isolation,
     validate_rate_source_scale,
+    validate_session_bars,
 )
 from brazil_rv.preprocessing.transforms import (
     add_equity_cross_sectional_dynamic,
@@ -76,6 +77,24 @@ from brazil_rv.preprocessing.transforms import (
     time_to_expiry_scaled,
     rate_change_basis_points,
 )
+
+
+def test_session_bar_volume_is_nonnegative_not_strictly_positive() -> None:
+    source = Path("synthetic.csv")
+    base = {
+        "symbol": ["TEST3"],
+        "trade_date": [date(2024, 1, 2)],
+        "ts_exchange": [datetime(2024, 1, 2, 10, 0)],
+        "open": [10.0],
+        "high": [10.1],
+        "low": [9.9],
+        "close": [10.0],
+    }
+    validate_session_bars(pl.DataFrame({**base, "real_volume": [0.0]}), source)
+    with pytest.raises(ValueError, match="Invalid used bar"):
+        validate_session_bars(
+            pl.DataFrame({**base, "real_volume": [-1.0]}), source
+        )
 
 
 def _synthetic_grid(

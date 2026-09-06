@@ -59,6 +59,7 @@ def build_economic_multi_day_targets(
     horizons: tuple[int, ...] = HORIZONS,
     winsor_limit: float = 5.0,
     minimum_sigma: float = 1e-8,
+    minimum_rank_names: int = 20,
     entry_mark_type: str = "daily_last_trade_close_proxy",
     exit_mark_type: str = "daily_last_trade_close_proxy",
 ) -> EconomicMultiDayTargets:
@@ -111,6 +112,7 @@ def build_economic_multi_day_targets(
         horizons=horizons,
         winsor_limit=winsor_limit,
         minimum_sigma=minimum_sigma,
+        minimum_rank_names=minimum_rank_names,
         entry_mark_type=entry_mark_type,
         exit_mark_type=exit_mark_type,
     )
@@ -156,6 +158,7 @@ def build_economic_multi_day_targets_into(
     horizons: tuple[int, ...] = HORIZONS,
     winsor_limit: float = 5.0,
     minimum_sigma: float = 1e-8,
+    minimum_rank_names: int = 20,
     entry_mark_type: str = "daily_last_trade_close_proxy",
     exit_mark_type: str = "daily_last_trade_close_proxy",
 ) -> None:
@@ -197,6 +200,8 @@ def build_economic_multi_day_targets_into(
         raise ValueError("winsor_limit must be positive and finite")
     if not np.isfinite(minimum_sigma) or minimum_sigma <= 0.0:
         raise ValueError("minimum_sigma must be positive and finite")
+    if minimum_rank_names < 1:
+        raise ValueError("minimum_rank_names must be positive")
     if not entry_mark_type or not exit_mark_type:
         raise ValueError("entry and exit mark types must be explicit")
     invalid_resolved_terms = resolved & (
@@ -299,9 +304,7 @@ def build_economic_multi_day_targets_into(
                 )
                 shares = np.asarray(shares, dtype=np.float64)
                 cash = np.asarray(cash, dtype=np.float64)
-                claim = np.where(
-                    event_resolved, successor[event_day, claim], claim
-                )
+                claim = np.where(event_resolved, successor[event_day, claim], claim)
 
             exit_observed = (
                 observed[end, claim]
@@ -318,24 +321,18 @@ def build_economic_multi_day_targets_into(
                 terminal_value_per_entry_share[economic_valid]
                 / close[day, economic_valid]
             )
-            holding_valid = (
-                economic_valid & np.isfinite(wealth) & (wealth >= 0.0)
-            )
-            price_endpoint_valid = (
-                entry_valid
-                & observed[end]
-                & np.isfinite(close[end])
-                & (close[end] > 0.0)
-            )
+            holding_valid = economic_valid & np.isfinite(wealth) & (wealth >= 0.0)
+            # Price return follows the same contractual economic claim as the
+            # shareholder return, including share-unit conversions and ISIN
+            # succession, but deliberately excludes cash entitlements.
+            price_endpoint_valid = chain_resolved & endpoint_known
             price_wealth = np.full(close.shape[1], np.nan, dtype=np.float64)
             price_wealth[price_endpoint_valid] = (
-                close[end, price_endpoint_valid]
+                terminal_price_per_entry_share[price_endpoint_valid]
                 / close[day, price_endpoint_valid]
             )
             row_price_valid = (
-                price_endpoint_valid
-                & np.isfinite(price_wealth)
-                & (price_wealth >= 0.0)
+                price_endpoint_valid & np.isfinite(price_wealth) & (price_wealth >= 0.0)
             )
             holding_simple = wealth - 1.0
             price_simple = price_wealth - 1.0
@@ -354,9 +351,9 @@ def build_economic_multi_day_targets_into(
                 holding_simple, holding_valid
             )
             price_valid[output_day, :, horizon_index] = row_price_valid
-            price_simple_return[output_day, row_price_valid, horizon_index] = price_simple[
-                row_price_valid
-            ].astype(np.float32)
+            price_simple_return[output_day, row_price_valid, horizon_index] = (
+                price_simple[row_price_valid].astype(np.float32)
+            )
             price_midrank[output_day, :, horizon_index] = _rank_row(
                 price_simple, row_price_valid
             )
@@ -370,17 +367,16 @@ def build_economic_multi_day_targets_into(
             median_return = float(np.median(log_wealth[holding_valid]))
             if not np.isfinite(median_return):
                 continue
-            normalized_cross_section_valid[output_day, horizon_index] = True
             usable_sigma = np.isfinite(sigma[day]) & (sigma[day] > minimum_sigma)
             row_target_valid = holding_valid & usable_sigma
-            if not row_target_valid.any():
+            if int(row_target_valid.sum()) < minimum_rank_names:
                 continue
+            normalized_cross_section_valid[output_day, horizon_index] = True
             row_normalized = np.full(close.shape[1], np.nan, dtype=np.float64)
             row_positive = row_target_valid & (wealth > 0.0)
             row_normalized[row_positive] = (
-                (log_wealth[row_positive] - median_return)
-                / (sigma[day, row_positive] * np.sqrt(horizon))
-            )
+                log_wealth[row_positive] - median_return
+            ) / (sigma[day, row_positive] * np.sqrt(horizon))
             row_normalized[row_target_valid & (wealth == 0.0)] = -winsor_limit
             row_normalized[row_target_valid] = np.clip(
                 row_normalized[row_target_valid], -winsor_limit, winsor_limit
@@ -392,7 +388,6 @@ def build_economic_multi_day_targets_into(
                 midrank_unit_interval(row_normalized[row_target_valid])
             )
             primary_valid[output_day, row_target_valid, horizon_index] = True
-
 
 
 def build_to_close_target(

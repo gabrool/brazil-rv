@@ -18,15 +18,18 @@ from brazil_rv.v2.build_store import (
     _prior_adv20,
     _require_clean_implementation_commit,
     build_daily_store,
+    load_minute_npz,
 )
 from brazil_rv.v2.corporate_actions import normalize_yfinance_actions
 from brazil_rv.v2.config import ModelConfig
-from brazil_rv.v2.contract import FINETUNE_START
+from brazil_rv.v2.contract import FINETUNE_START, INTRADAY_DAILY_FEATURES
 from brazil_rv.v2.data import (
     V1_STORE_V2_ZERO_DYNAMIC_CHANNELS,
     V1_STORE_V2_ZERO_SLOW_FIELDS,
     V2DailyDataset,
     collate_v2_daily,
+    lazy_slow_window,
+    read_scalar_feature_view,
 )
 from brazil_rv.v2.decision_clock import SessionDefinition
 from brazil_rv.v2.model import DailyMultiHorizonModel
@@ -35,8 +38,9 @@ from brazil_rv.v2.store import (
     open_store_for_dates,
     open_store_for_samples,
     sha256_file,
-    write_store,
+    write_store as write_store_without_feature_schema,
 )
+from v2_store_fixtures import fixture_feature_schema, write_fixture_store as write_store
 
 
 def _session_schedule(dates: list[date]) -> tuple[SessionDefinition, ...]:
@@ -51,6 +55,49 @@ def _session_schedule(dates: list[date]) -> tuple[SessionDefinition, ...]:
         )
         for value in dates
     )
+
+
+def test_close_memmap_reaches_mapping_through_ndarray_view(tmp_path: Path) -> None:
+    path = tmp_path / "view_backed.npy"
+    mapped = np.lib.format.open_memmap(path, mode="w+", dtype=np.float32, shape=(2,))
+    view = np.asarray(mapped)
+    assert not isinstance(view, np.memmap)
+    store_module.close_memmap(view)
+    assert mapped._mmap.closed
+    path.unlink()
+
+
+def test_minute_archive_requires_independent_activity_and_source_masks(
+    tmp_path: Path,
+) -> None:
+    shape = (1, 1, 5)
+    market = np.ones(shape, dtype=np.float64)
+    observed = np.ones(shape, dtype=np.bool_)
+    common = {
+        "dates": np.asarray(["2024-01-02"], dtype="datetime64[D]"),
+        "isins": np.asarray(["BRTESTACNOR1"]),
+        "open": market,
+        "high": market,
+        "low": market,
+        "close": market,
+        "volume": market,
+        "observed": observed,
+    }
+    missing_masks = tmp_path / "missing_masks.npz"
+    np.savez(missing_masks, **common)
+    with pytest.raises(ValueError, match="session_valid.*volume_valid|volume_valid"):
+        load_minute_npz(missing_masks)
+
+    complete = tmp_path / "complete.npz"
+    np.savez(
+        complete,
+        **common,
+        volume_valid=observed,
+        session_valid=np.ones((1, 1), dtype=np.bool_),
+    )
+    panel = load_minute_npz(complete)
+    assert panel.volume_valid.all()
+    assert panel.session_valid.all()
 
 
 def test_store_cli_requires_clean_worktree_before_binding_commit(
@@ -121,7 +168,9 @@ def test_linked_survival_identity_treats_predecessor_as_continuing() -> None:
     )
     delisted = table.filter(pl.col("group") == "delisted_within_panel")
     assert delisted[0, "name_count"] == 0
-    assert table.filter(pl.col("group") == "survives_to_final_year")[0, "name_count"] == 2
+    assert (
+        table.filter(pl.col("group") == "survives_to_final_year")[0, "name_count"] == 2
+    )
 
 
 def test_prior_adv20_uses_only_sessions_before_the_decision() -> None:
@@ -133,6 +182,10 @@ def test_prior_adv20_uses_only_sessions_before_the_decision() -> None:
     mutated = _prior_adv20(changed, observed)
     assert baseline[20, 0] == np.mean(volume[:20, 0])
     np.testing.assert_array_equal(baseline[:22], mutated[:22])
+    unknown = observed.copy()
+    unknown[5, 0] = False
+    invalidated = _prior_adv20(volume, unknown)
+    assert np.isnan(invalidated[20, 0])
 
 
 def test_external_gate_uses_supported_name_clustered_one_sided_intervals() -> None:
@@ -179,9 +232,7 @@ def test_external_gate_uses_supported_name_clustered_one_sided_intervals() -> No
         present,
     )
     q2 = one_sided.filter(pl.col("prior_adv20_quartile") == 2)
-    assert q2.get_column("survivor_minus_delisted_gap").unique().to_list() == [
-        -1.0
-    ]
+    assert q2.get_column("survivor_minus_delisted_gap").unique().to_list() == [-1.0]
     assert q2.get_column("bootstrap_upper_95").max() == -1.0
     assert q2.get_column("stratified_gate_passed").all()
 
@@ -252,6 +303,8 @@ def _base_store(
     arrays = {
         "slow_values": slow,
         "slow_valid": np.ones_like(slow, dtype=bool),
+        "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
+        **_sample_support_arrays(days, names),
         "active": np.ones((days, names), dtype=bool),
         "target_to_close": np.ones((days, names), dtype=np.float32),
         "target_to_close_valid": np.ones((days, names), dtype=bool),
@@ -307,6 +360,53 @@ def _base_store(
     return path
 
 
+def _sample_support_arrays(
+    days: int,
+    names: int,
+    *,
+    timestep_valid: np.ndarray | None = None,
+) -> dict[str, np.ndarray]:
+    timesteps = (
+        np.ones((days, names), dtype=np.bool_)
+        if timestep_valid is None
+        else np.asarray(timestep_valid, dtype=np.bool_)
+    )
+    current_shape = (days, names, len(INTRADAY_DAILY_FEATURES))
+    return {
+        "slow_timestep_valid": timesteps,
+        "intraday_values": np.zeros(current_shape, dtype=np.float32),
+        "intraday_valid": np.zeros(current_shape, dtype=np.bool_),
+        "intraday_age_sessions": np.full(current_shape, -1.0, dtype=np.float32),
+    }
+
+
+def _feature_age(valid: np.ndarray) -> np.ndarray:
+    return np.where(valid, 0.0, -1.0).astype(np.float32)
+
+
+def test_lazy_slow_window_preserves_source_age_and_left_padding() -> None:
+    values = np.asarray([1.0, 2.0, 3.0], dtype=np.float32).reshape(3, 1, 1)
+    valid = np.ones_like(values, dtype=np.bool_)
+    timesteps = np.ones((3, 1), dtype=np.bool_)
+    ages = np.asarray([0.0, 1.0, 2.0], dtype=np.float32).reshape(3, 1, 1)
+
+    window, window_valid, history, window_age = lazy_slow_window(
+        values,
+        valid,
+        timesteps,
+        ages,
+        end_index=2,
+        lookback=20,
+    )
+
+    assert window.shape == (1, 20, 1)
+    assert window_valid[0, -3:, 0].all()
+    assert history[0, -3:].all()
+    assert not history[0, :-3].any()
+    assert window_age[0, -3:, 0].tolist() == [0.0, 1.0, 2.0]
+    assert np.all(window_age[0, :-3, 0] == -1.0)
+
+
 def test_store_is_immutable_and_hash_verified(tmp_path) -> None:
     path = _base_store(tmp_path)
     store, _ = open_store_for_dates(path, list(range(25)), purpose="training")
@@ -330,6 +430,52 @@ def test_store_is_immutable_and_hash_verified(tmp_path) -> None:
         stream.write(bytes([final[0] ^ 1]))
     with pytest.raises(ValueError, match="hash mismatch"):
         open_store_for_dates(path, [0], purpose="training")
+
+
+def test_current_store_requires_complete_featurespec_identity(tmp_path: Path) -> None:
+    dates = [date(2024, 1, 2)]
+    arrays = {"active": np.ones((1, 1), dtype=np.bool_)}
+    with pytest.raises(ValueError, match="metadata.feature_schema"):
+        write_store_without_feature_schema(
+            tmp_path / "missing_schema",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays=arrays,
+        )
+
+    names = {
+        "sidecar_zeta": ("zeta_value",),
+        "slow": ("slow_value",),
+        "sidecar_alpha": ("alpha_value",),
+        "intraday": ("intraday_value",),
+    }
+    schema = fixture_feature_schema(names)
+    stale_schema = json.loads(json.dumps(schema))
+    stale_schema["specifications"][0]["formula"] = "changed without rehashing"
+    with pytest.raises(ValueError, match="SHA-256 mismatch"):
+        write_store_without_feature_schema(
+            tmp_path / "stale_schema_hash",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays=arrays,
+            feature_names=names,
+            metadata={"feature_schema": stale_schema},
+        )
+
+    path = write_store_without_feature_schema(
+        tmp_path / "canonical_schema_order",
+        dates=dates,
+        isins=["BRTESTACNOR1"],
+        arrays=arrays,
+        feature_names=names,
+        metadata={"feature_schema": schema},
+    )
+    manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["feature_schema_source"] == "metadata_feature_specifications"
+    assert [
+        record["family"]
+        for record in manifest["metadata"]["feature_schema"]["specifications"]
+    ] == ["slow", "intraday", "sidecar_alpha", "sidecar_zeta"]
 
 
 def test_store_hashes_are_cached_per_process_for_unchanged_files(
@@ -363,6 +509,8 @@ def test_store_writer_selects_source_rows_one_array_at_a_time(tmp_path) -> None:
         arrays={
             "slow_values": np.arange(4, dtype=np.float32).reshape(4, 1, 1),
             "slow_valid": np.ones((4, 1, 1), dtype=np.bool_),
+            "slow_age_sessions": np.zeros((4, 1, 1), dtype=np.float32),
+            "slow_timestep_valid": np.ones((4, 1), dtype=np.bool_),
             "active": np.ones((4, 1), dtype=np.bool_),
         },
         row_indices=np.asarray([1, 3], dtype=np.int64),
@@ -377,6 +525,32 @@ def test_store_writer_selects_source_rows_one_array_at_a_time(tmp_path) -> None:
             isins=["BRTESTACNOR1"],
             arrays={"active": np.ones((4, 1), dtype=np.bool_)},
             row_indices=[0, 1],
+        )
+
+
+def test_store_writer_accepts_aligned_date_common_state_audit_arrays(tmp_path) -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3)]
+    path = write_store(
+        tmp_path / "common_state",
+        dates=dates,
+        isins=["BRTESTACNOR1"],
+        arrays={
+            "common_state_diagnostic_values": np.ones((2, 3), dtype=np.float32),
+            "common_state_diagnostic_valid": np.ones((2, 3), dtype=np.bool_),
+        },
+    )
+    manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["arrays"]["common_state_diagnostic_values"]["shape"] == [2, 3]
+
+    with pytest.raises(ValueError, match="misaligned"):
+        write_store(
+            tmp_path / "bad_common_state",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays={
+                "common_state_diagnostic_values": np.ones((2, 3), dtype=np.float32),
+                "common_state_diagnostic_valid": np.ones((2, 2), dtype=np.bool_),
+            },
         )
 
 
@@ -421,6 +595,16 @@ def test_current_store_rejects_superseded_arrays_and_unmapped_native_fast(
         )
 
 
+def test_open_store_rejects_the_superseded_daily_schema(tmp_path: Path) -> None:
+    path = _base_store(tmp_path)
+    manifest_path = path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["schema"] = "BRAZIL_RV_V2_DAILY_STORE_V1"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="superseded v2 daily store"):
+        open_store_for_dates(path, [0], purpose="training")
+
+
 def test_store_requires_complete_bounded_action_contract(tmp_path: Path) -> None:
     dates = [date(2024, 1, 2), date(2024, 1, 3)]
     with pytest.raises(ValueError, match="one complete contract"):
@@ -428,11 +612,7 @@ def test_store_requires_complete_bounded_action_contract(tmp_path: Path) -> None
             tmp_path / "partial_actions",
             dates=dates,
             isins=["BRTESTACNOR1"],
-            arrays={
-                "action_shares_per_prior_share": np.ones(
-                    (2, 1), dtype=np.float32
-                )
-            },
+            arrays={"action_shares_per_prior_share": np.ones((2, 1), dtype=np.float32)},
         )
     complete = {
         "action_shares_per_prior_share": np.ones((2, 1), dtype=np.float32),
@@ -448,6 +628,79 @@ def test_store_requires_complete_bounded_action_contract(tmp_path: Path) -> None
             dates=dates,
             isins=["BRTESTACNOR1"],
             arrays=complete,
+        )
+
+
+def test_store_rejects_action_arrays_the_ledger_cannot_interpret(
+    tmp_path: Path,
+) -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3)]
+    shape = (2, 1)
+
+    def action_arrays() -> dict[str, np.ndarray]:
+        return {
+            "action_shares_per_prior_share": np.ones(shape, dtype=np.float32),
+            "action_cash_per_prior_share": np.zeros(shape, dtype=np.float32),
+            "action_session_resolved": np.ones(shape, dtype=np.bool_),
+            "action_has_action": np.zeros(shape, dtype=np.bool_),
+            "action_successor_index": np.zeros(shape, dtype=np.int32),
+            "action_payment_session": np.full(shape, -1, dtype=np.int32),
+        }
+
+    silent = action_arrays()
+    silent["action_shares_per_prior_share"][0, 0] = 2.0
+    with pytest.raises(ValueError, match="require has_action"):
+        write_store(
+            tmp_path / "silent_action",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays=silent,
+        )
+
+    early_payment = action_arrays()
+    early_payment["action_has_action"][1, 0] = True
+    early_payment["action_cash_per_prior_share"][1, 0] = 1.0
+    early_payment["action_payment_session"][1, 0] = 0
+    with pytest.raises(ValueError, match="cannot precede"):
+        write_store(
+            tmp_path / "early_payment",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays=early_payment,
+        )
+
+    unbound_payment = action_arrays()
+    unbound_payment["action_payment_session"][0, 0] = 1
+    with pytest.raises(ValueError, match="resolved cash-bearing"):
+        write_store(
+            tmp_path / "unbound_payment",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays=unbound_payment,
+        )
+
+
+def test_store_validates_reference_prices_and_audit_only_survival_group(
+    tmp_path: Path,
+) -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3)]
+    with pytest.raises(ValueError, match="positive prices or NaN"):
+        write_store(
+            tmp_path / "bad_reference",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays={
+                "prior_reference_close": np.asarray([[10.0], [0.0]], dtype=np.float32)
+            },
+        )
+    with pytest.raises(ValueError, match="must be boolean"):
+        write_store(
+            tmp_path / "bad_survival_audit",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays={
+                "audit_eventual_survives_to_final_year": np.ones((2, 1), dtype=np.int8)
+            },
         )
 
 
@@ -471,6 +724,8 @@ def test_store_writer_streams_a_contiguous_row_selection(
         arrays={
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=np.bool_),
+            "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
+            "slow_timestep_valid": np.ones((6, 1), dtype=np.bool_),
             "active": np.ones((6, 1), dtype=np.bool_),
         },
         row_indices=np.arange(2, 6, dtype=np.int64),
@@ -490,7 +745,9 @@ def test_store_writer_streams_a_contiguous_row_selection(
     store.close()
 
 
-def test_dataset_applies_slow_shift_and_external_sparse_fast_mapping(tmp_path) -> None:
+def test_dataset_reads_canonical_decision_row_and_external_sparse_fast_mapping(
+    tmp_path,
+) -> None:
     fast = tmp_path / "v1"
     fast.mkdir()
     features = np.ones((1, 2, 405, 26), dtype=np.float32)
@@ -502,11 +759,69 @@ def test_dataset_applies_slow_shift_and_external_sparse_fast_mapping(tmp_path) -
         np.array([[True, False]]),
         allow_pickle=False,
     )
-    path = _base_store(tmp_path, external_fast=fast)
-    dataset = V2DailyDataset(path, [20], stage="finetune", lookback=20)
+    slow_age = np.zeros((25, 3, 2), dtype=np.float32)
+    slow_age[20, 0, 0] = 3.0
+    current_publication = np.broadcast_to(
+        np.arange(25, dtype=np.float32)[:, None, None] + 100.0,
+        (25, 3, 1),
+    ).copy()
+    path = _base_store(
+        tmp_path,
+        external_fast=fast,
+        extra_arrays={
+            "slow_age_sessions": slow_age,
+            "sidecar_fundamentals_values": current_publication,
+            "sidecar_fundamentals_valid": np.ones_like(
+                current_publication, dtype=np.bool_
+            ),
+            "sidecar_fundamentals_age_sessions": np.zeros_like(
+                current_publication, dtype=np.float32
+            ),
+        },
+    )
+    dataset = V2DailyDataset(
+        path,
+        [20],
+        stage="finetune",
+        lookback=20,
+        enabled_sidecars=("fundamentals",),
+    )
     sample = dataset[0]
-    assert sample["slow_features"][0, -1, 0] == 19.0
-    assert sample["days_since_last_slow_row"][0] == 1.0
+    slow_view = read_scalar_feature_view(
+        dataset.store,
+        [20],
+        ("sidecar_fundamentals", "slow"),
+    )
+    current_view = read_scalar_feature_view(dataset.store, [20], ("intraday",))
+    assert slow_view.names == (
+        "slow_fixture_0",
+        "slow_fixture_1",
+        "sidecar_fundamentals_fixture_0",
+    )
+    assert slow_view.date_indices.tolist() == [20]
+    np.testing.assert_array_equal(slow_view.dates, dataset.store.dates[[20]])
+    assert slow_view.isins == dataset.store.isins
+    np.testing.assert_array_equal(slow_view.active[0], sample["active_mask"])
+    np.testing.assert_array_equal(
+        sample["slow_features"][:, -1], slow_view.values[0]
+    )
+    np.testing.assert_array_equal(
+        sample["slow_feature_mask"][:, -1], slow_view.valid[0]
+    )
+    np.testing.assert_array_equal(
+        sample["slow_feature_age_sessions"][:, -1], slow_view.age_sessions[0]
+    )
+    np.testing.assert_array_equal(sample["current_features"], current_view.values[0])
+    np.testing.assert_array_equal(
+        sample["current_feature_mask"], current_view.valid[0]
+    )
+    np.testing.assert_array_equal(
+        sample["current_feature_age_sessions"], current_view.age_sessions[0]
+    )
+    assert sample["slow_features"][0, -1, 0] == 20.0
+    assert sample["slow_features"][0, -1, 2] == 120.0
+    assert sample["slow_feature_age_sessions"][0, -1, 0] == 3.0
+    assert np.count_nonzero(sample["slow_feature_age_sessions"][0]) == 1
     assert sample["fast_present"].tolist() == [True, False, False]
     expected_slow = legacy_slow[0, 0].copy()
     expected_slow[list(V1_STORE_V2_ZERO_SLOW_FIELDS)] = 0.0
@@ -542,7 +857,9 @@ def test_finetune_dataset_keeps_first_active_day_with_empty_slow_history(
     dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(days)]
     slow = np.zeros((days, names, 1), dtype=np.float32)
     slow_valid = np.ones_like(slow, dtype=np.bool_)
-    slow_valid[:20, 1] = False
+    slow_valid[:21, 1] = False
+    timestep_valid = np.ones((days, names), dtype=np.bool_)
+    timestep_valid[:21, 1] = False
     active = np.ones((days, names), dtype=np.bool_)
     active[:20, 1] = False
     targets = np.zeros((days, names, 5), dtype=np.float32)
@@ -554,6 +871,8 @@ def test_finetune_dataset_keeps_first_active_day_with_empty_slow_history(
         arrays={
             "slow_values": slow,
             "slow_valid": slow_valid,
+            "slow_age_sessions": _feature_age(slow_valid),
+            **_sample_support_arrays(days, names, timestep_valid=timestep_valid),
             "active": active,
             "target_primary": targets,
             "target_valid": target_valid,
@@ -565,6 +884,7 @@ def test_finetune_dataset_keeps_first_active_day_with_empty_slow_history(
     assert sample["active_mask"].tolist() == [True, True]
     assert not sample["slow_history_mask"][1].any()
     assert not sample["slow_features"][1].any()
+    assert np.all(sample["slow_feature_age_sessions"][1] == -1.0)
     assert sample["target_mask"][1].tolist() == [True, True, True, False, False]
 
 
@@ -595,28 +915,18 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
     arrays: dict[str, np.ndarray] = {
         "slow_values": slow,
         "slow_valid": slow_valid,
+        "slow_age_sessions": _feature_age(slow_valid),
+        "slow_timestep_valid": np.ones((days, names), dtype=np.bool_),
         "target_primary": np.ones((days, names, 5), dtype=np.float32),
         "target_valid": np.ones((days, names, 5), dtype=np.bool_),
-        "target_shareholder_midrank": np.ones(
-            (days, names, 5), dtype=np.float32
-        ),
-        "target_shareholder_valid": np.ones(
-            (days, names, 5), dtype=np.bool_
-        ),
-        "target_shareholder_simple_return": np.ones(
-            (days, names, 5), dtype=np.float32
-        ),
-        "target_terminal_wealth": np.ones(
-            (days, names, 5), dtype=np.float32
-        ),
-        "target_terminal_loss": np.zeros(
-            (days, names, 5), dtype=np.bool_
-        ),
+        "target_shareholder_midrank": np.ones((days, names, 5), dtype=np.float32),
+        "target_shareholder_valid": np.ones((days, names, 5), dtype=np.bool_),
+        "target_shareholder_simple_return": np.ones((days, names, 5), dtype=np.float32),
+        "target_terminal_wealth": np.ones((days, names, 5), dtype=np.float32),
+        "target_terminal_loss": np.zeros((days, names, 5), dtype=np.bool_),
         "target_price_midrank": np.ones((days, names, 5), dtype=np.float32),
         "target_price_valid": np.ones((days, names, 5), dtype=np.bool_),
-        "target_price_simple_return": np.ones(
-            (days, names, 5), dtype=np.float32
-        ),
+        "target_price_simple_return": np.ones((days, names, 5), dtype=np.float32),
         "target_to_close": np.ones((days, names), dtype=np.float32),
         "target_to_close_valid": np.ones((days, names), dtype=np.bool_),
         "intraday_values": np.ones((days, names, 3), dtype=np.float32),
@@ -635,6 +945,7 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
     for value_name, valid_name in masked_pairs:
         arrays[value_name][20, 0, ...] = np.nan
         arrays[valid_name][20, 0, ...] = False
+    arrays["intraday_age_sessions"] = _feature_age(arrays["intraday_valid"])
     sidecars = ("options", "lending", "oddlot", "rebalance", "events", "fundamentals")
     for group in sidecars:
         values = np.ones((days, names, 1), dtype=np.float32)
@@ -645,6 +956,7 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
         valid[19, 0] = False
         arrays[f"sidecar_{group}_values"] = values
         arrays[f"sidecar_{group}_valid"] = valid
+        arrays[f"sidecar_{group}_age_sessions"] = _feature_age(valid)
 
     path = _base_store(tmp_path, external_fast=fast, extra_arrays=arrays)
     dataset = V2DailyDataset(
@@ -658,7 +970,8 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
     for value in sample.values():
         if isinstance(value, np.ndarray) and np.issubdtype(value.dtype, np.floating):
             assert np.isfinite(value).all()
-    assert not sample["slow_history_mask"][1].any()
+    assert sample["slow_history_mask"][1].all()
+    assert not sample["slow_features"][1].any()
     assert not sample["fast_present"][2]
     assert sample["fast_name_index"].tolist() == [0]
 
@@ -675,6 +988,7 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
     model = DailyMultiHorizonModel(
         ModelConfig(
             slow_feature_count=int(sample["slow_features"].shape[-1]),
+            current_feature_count=int(sample["current_features"].shape[-1]),
             slow_lookback=20,
             fast_encoder_mode="legacy_v1_contaminated",
             allow_contaminated_v1_initialization=True,
@@ -686,12 +1000,14 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
             batch["slow_feature_mask"],
             batch["slow_history_mask"],
             batch["active_mask"],
-            None,
-            batch["fast_patch_mask"],
-            batch["fast_present"],
-            batch["days_since_last_slow_row"],
-            batch["fast_state_position"],
-            batch["v1_equity_slow"],
+            current_features=batch["current_features"],
+            current_feature_mask=batch["current_feature_mask"],
+            slow_feature_age_sessions=batch["slow_feature_age_sessions"],
+            current_feature_age_sessions=batch["current_feature_age_sessions"],
+            fast_patch_mask=batch["fast_patch_mask"],
+            fast_present=batch["fast_present"],
+            fast_state_position=batch["fast_state_position"],
+            v1_equity_slow=batch["v1_equity_slow"],
             fast_patch_values=batch["fast_patch_values"],
             fast_patch_valid=batch["fast_patch_valid"],
             fast_name_index=batch["fast_name_index"],
@@ -707,6 +1023,7 @@ def test_dataset_boundary_rejects_nonfinite_available_value(tmp_path: Path) -> N
         extra_arrays={
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=np.bool_),
+            "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
         },
     )
     dataset = V2DailyDataset(path, [20], stage="finetune", lookback=20)
@@ -749,8 +1066,7 @@ def test_external_fast_ready_is_intersected_with_store_presence(tmp_path) -> Non
         assert not patches[0, :, channel::26].any()
     retained_dynamic = set(range(26)) - set(V1_STORE_V2_ZERO_DYNAMIC_CHANNELS)
     assert all(
-        np.all(patches[0, :, channel::26] == 1.0)
-        for channel in retained_dynamic
+        np.all(patches[0, :, channel::26] == 1.0) for channel in retained_dynamic
     )
     retained = sorted(set(range(32)) - set(V1_STORE_V2_ZERO_SLOW_FIELDS))
     assert np.all(sample["v1_equity_slow"][0, retained] == 7.0)
@@ -780,17 +1096,18 @@ def test_native_fast_arrays_do_not_open_legacy_v1_context(tmp_path) -> None:
         tmp_path,
         external_fast=fast,
         extra_arrays={
-            "fast_patch_values": np.ones(
-                (25, 2, 69, 7), dtype=np.float32
-            ),
+            "fast_patch_values": np.ones((25, 2, 69, 7), dtype=np.float32),
             "fast_patch_valid": np.ones((25, 2, 69, 7), dtype=np.bool_),
             "fast_patch_mask": np.ones((25, 2, 69), dtype=np.bool_),
-            "fast_last_price_age_minutes": np.zeros(
-                (25, 2, 69), dtype=np.float32
+            "fast_present": np.column_stack(
+                (
+                    np.ones(25, dtype=np.bool_),
+                    np.zeros(25, dtype=np.bool_),
+                    np.ones(25, dtype=np.bool_),
+                )
             ),
-            "fast_last_price_age_valid": np.ones(
-                (25, 2, 69), dtype=np.bool_
-            ),
+            "fast_last_price_age_minutes": np.zeros((25, 2, 69), dtype=np.float32),
+            "fast_last_price_age_valid": np.ones((25, 2, 69), dtype=np.bool_),
         },
         extra_tables={
             "native_fast_security_mapping": pl.DataFrame(
@@ -840,7 +1157,9 @@ def test_external_v1_slow_is_hash_bound(tmp_path) -> None:
         V2DailyDataset(path, [20], stage="finetune", lookback=20)
 
 
-def test_joint_dataset_uses_each_windows_entry_alignment(tmp_path) -> None:
+def test_joint_dataset_uses_same_canonical_decision_row_in_each_window(
+    tmp_path,
+) -> None:
     dates = [date(2021, 7, 1) + timedelta(days=index) for index in range(25)]
     dates.append(date(2021, 8, 16))
     slow = np.broadcast_to(
@@ -853,15 +1172,18 @@ def test_joint_dataset_uses_each_windows_entry_alignment(tmp_path) -> None:
         arrays={
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=bool),
+            "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
+            **_sample_support_arrays(26, 1),
             "active": np.ones((26, 1), dtype=bool),
         },
     )
+    early = V2DailyDataset(path, [5], stage="joint", lookback=20)[0]
     dataset = V2DailyDataset(path, [24, 25], stage="joint", lookback=20)
     pretrain, finetune = dataset[0], dataset[1]
-    assert pretrain["slow_features"][0, -1, 0] == 23.0
-    assert pretrain["days_since_last_slow_row"][0] == 1.0
-    assert finetune["slow_features"][0, -1, 0] == 24.0
-    assert finetune["days_since_last_slow_row"][0] == 1.0
+    assert np.all(early["slow_feature_age_sessions"][0, :14] == -1.0)
+    assert np.all(early["slow_feature_age_sessions"][0, 14:] == 0.0)
+    assert pretrain["slow_features"][0, -1, 0] == 24.0
+    assert finetune["slow_features"][0, -1, 0] == 25.0
     assert not pretrain["v1_equity_slow"].any()
     assert not finetune["v1_equity_slow"].any()
 
@@ -1021,6 +1343,8 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
         arrays={
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=np.bool_),
+            "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
+            **_sample_support_arrays(days, 1),
             "active": np.ones((days, 1), dtype=np.bool_),
             "target_primary": target,
             "target_valid": target_valid,
@@ -1062,19 +1386,11 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
     assert first["shareholder_target_mask"].tolist() == [
         [True, False, False, False, False]
     ]
-    assert first["price_target_mask"].tolist() == [
-        [True, False, False, False, False]
-    ]
+    assert first["price_target_mask"].tolist() == [[True, False, False, False, False]]
     assert first["targets"].tolist() == [[11.0, 0.0, 0.0, 0.0, 0.0]]
-    assert first["shareholder_targets"].tolist() == [
-        [22.0, 0.0, 0.0, 0.0, 0.0]
-    ]
-    assert first["shareholder_simple_returns"].tolist() == [
-        [33.0, 0.0, 0.0, 0.0, 0.0]
-    ]
-    assert first["price_targets"].tolist() == [
-        [55.0, 0.0, 0.0, 0.0, 0.0]
-    ]
+    assert first["shareholder_targets"].tolist() == [[22.0, 0.0, 0.0, 0.0, 0.0]]
+    assert first["shareholder_simple_returns"].tolist() == [[33.0, 0.0, 0.0, 0.0, 0.0]]
+    assert first["price_targets"].tolist() == [[55.0, 0.0, 0.0, 0.0, 0.0]]
     assert first["to_close_mask"].tolist() == [False]
     assert first["to_close_target"].tolist() == [0.0]
     assert second["target_mask"].tolist() == [[False] * 5]
@@ -1158,6 +1474,8 @@ def test_dataset_rejects_dates_outside_its_stage_before_array_open(tmp_path) -> 
         arrays={
             "slow_values": np.zeros((3, 1, 1), dtype=np.float32),
             "slow_valid": np.ones((3, 1, 1), dtype=bool),
+            "slow_age_sessions": np.zeros((3, 1, 1), dtype=np.float32),
+            **_sample_support_arrays(3, 1),
             "active": np.ones((3, 1), dtype=bool),
         },
     )
@@ -1214,6 +1532,8 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
         close_brl=minute_close,
         volume=np.ones_like(minute),
         observed=observed,
+        volume_valid=observed.copy(),
+        session_valid=np.ones(observed.shape[:2], dtype=np.bool_),
     )
     actions = pl.DataFrame(
         {
@@ -1237,6 +1557,7 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
             "last_date": [dates[-1]] * len(names),
             "status": ["downloaded"] * len(names),
             "action_rows": [1] * len(names),
+            "economic_terms_complete": [True] * len(names),
         }
     )
     failed_audit = successful_audit.with_columns(
@@ -1255,6 +1576,12 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
     )
     build_metadata = json.loads((root / "manifest.json").read_text())["metadata"]
     assert 0 < build_metadata["build_peak_rss_bytes"] < 8 * 1024**3
+    np.testing.assert_array_equal(
+        np.load(root / "trade_observed.npy"),
+        np.load(root / "observed.npy"),
+    )
+    assert np.load(root / "activity_valid.npy").all()
+    assert np.load(root / "source_session_complete.npy").all()
     provider_empty_root = build_daily_store(
         pl.DataFrame(daily_rows),
         actions.head(0),
@@ -1265,9 +1592,7 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
         minimum_rank_names=1,
         store_start=None,
     )
-    assert not np.load(
-        provider_empty_root / "target_shareholder_valid.npy"
-    ).any()
+    assert not np.load(provider_empty_root / "target_shareholder_valid.npy").any()
     raw = np.load(root / "target_to_close_raw_log_return.npy")
     valid = np.load(root / "target_to_close_valid.npy")
     expected = np.log(cotahist_close / minute[64, 0, 345])
@@ -1285,15 +1610,29 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
     assert not anomaly.any()
     assert not ambiguous.any()
     slow_valid = np.load(root / "slow_valid.npy")
-    assert slow_valid[63, 1, 3]
+    assert not slow_valid[63, 1, 3]
+    # The provider row was acquired after the historical event, so the
+    # decision-time 63-session feature stays invalid while its window crosses
+    # that then-unknown action.  Retrospective targets still use the term.
+    assert not slow_valid[64, 1, 3]
     assert not slow_valid[64, 0, 0]
     assert slow_valid[64, 1, 0]
     assert slow_valid[64, 0, 25]
+    intraday_valid = np.load(root / "intraday_valid.npy")
+    intraday_age = np.load(root / "intraday_age_sessions.npy")
+    assert intraday_valid[64, 0, 1]
+    assert intraday_age[64, 0, 1] == 0.0
+    # The lagged price-path intraday summaries cross the unresolved action at
+    # row 63, so they remain invalid at decision row 64.  Independent activity
+    # summaries above remain available.
+    for feature_index in (8, 9, 10):
+        assert not intraday_valid[64, 0, feature_index]
+        assert intraday_age[64, 0, feature_index] == 2.0
     shareholder_valid = np.load(root / "target_shareholder_valid.npy")
     price_valid = np.load(root / "target_price_valid.npy")
     assert not shareholder_valid[62, 0, 0]
     assert shareholder_valid[63, 0, 0]
-    assert price_valid[62, 0, 0]
+    assert not price_valid[62, 0, 0]
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     assert "cash_reinvestment_unavailable_count_foundation" not in manifest["metadata"]
     assert manifest["metadata"]["return_definition"]["synthetic_cash_distribution"] == (
@@ -1317,9 +1656,140 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
         ),
         "legacy_v1_artifact_required": False,
     }
-    assert manifest["metadata"]["undocumented_split_fallback"] is False
+    assert manifest["metadata"]["cotahist_action_detection_role"] == "diagnostic_only"
     assert "cotahist_action_counts_by_year" in manifest["tables"]
     assert "corporate_actions_verified_terms" in manifest["tables"]
+
+
+def test_store_routes_a_verified_isin_conversion_without_restart_or_double_count(
+    tmp_path: Path,
+) -> None:
+    dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(75)]
+    predecessor = "BRTESTACNOR1"
+    successor = "BRTESTACNPR0"
+    boundary = 65
+    split_day = 30
+    price = np.empty(len(dates), dtype=np.float64)
+    price[0] = 100.0
+    for day_index in range(1, len(dates)):
+        price[day_index] = price[day_index - 1] * 1.001
+        if day_index == split_day:
+            price[day_index] /= 2.0
+    price[boundary] = price[boundary - 1] - 1.0
+    for day_index in range(boundary + 1, len(dates)):
+        price[day_index] = price[day_index - 1] * 1.001
+    daily = pl.DataFrame(
+        [
+            {
+                "trade_date": day,
+                "isin": predecessor if day_index < boundary else successor,
+                "ticker": "TEST3",
+                "security_spec_base": "ON",
+                "bdi_code": "02",
+                "market_type": 10,
+                "open_brl": float(price[day_index]),
+                "high_brl": float(price[day_index] * 1.01),
+                "low_brl": float(price[day_index] * 0.99),
+                "close_brl": float(price[day_index]),
+                "volume_brl": 3_000_000.0,
+                "trades": 100.0,
+                "quantity": 100_000.0,
+                "distribution_number": 2 if day_index >= split_day else 1,
+                "currency": "BRL",
+                "quote_factor": 1.0,
+            }
+            for day_index, day in enumerate(dates)
+        ]
+    )
+    actions = normalize_yfinance_actions(
+        pl.DataFrame(
+            {
+                "Date": [dates[split_day]],
+                "Dividends": [0.0],
+                "Stock Splits": [2.0],
+            },
+            schema_overrides={"Date": pl.Date},
+        ),
+        isin=predecessor,
+        ticker="TEST3",
+        fetched_at=datetime.combine(
+            dates[split_day - 1], time(12), tzinfo=timezone.utc
+        ),
+    )
+    acquisition = pl.DataFrame(
+        {
+            "isin": [predecessor, successor],
+            "first_date": [dates[0], dates[boundary]],
+            "last_date": [dates[boundary - 1], dates[-1]],
+            "status": ["downloaded", "downloaded"],
+            "action_rows": [1, 0],
+            "economic_terms_complete": [True, True],
+        }
+    )
+    allowlist = tmp_path / "isin_links_allowlist.csv"
+    allowlist.write_text(
+        "ticker,predecessor_isin,successor_isin,effective_date,first_known_at,"
+        "shares_received_per_prior_share,cash_entitlement_per_prior_share,"
+        "currency,source,evidence_sha256\n"
+        f"TEST3,{predecessor},{successor},{dates[boundary].isoformat()},"
+        f"{dates[boundary - 1].isoformat()}T12:00:00Z,1.0,1.0,BRL,"
+        f"issuer_notice,{'a' * 64}\n",
+        encoding="utf-8",
+    )
+    root = build_daily_store(
+        daily,
+        actions,
+        tmp_path / "linked_store",
+        action_acquisition_audit=acquisition,
+        session_schedule=_session_schedule(dates),
+        isin_link_allowlist=allowlist,
+        minimum_rank_names=1,
+        store_start=None,
+    )
+    isins = (
+        pl.read_parquet(root / "security_master.parquet")
+        .get_column("isin")
+        .unique()
+        .sort()
+        .to_list()
+    )
+    predecessor_index = isins.index(predecessor)
+    successor_index = isins.index(successor)
+    active = np.load(root / "active.npy", allow_pickle=False)
+    assert active[boundary - 1, predecessor_index]
+    assert not active[boundary - 1, successor_index]
+    assert not active[boundary, predecessor_index]
+    assert active[boundary, successor_index]
+    assert active[boundary].sum() == 1
+    prior_reference = np.load(root / "prior_reference_close.npy", allow_pickle=False)
+    np.testing.assert_allclose(
+        prior_reference[boundary, successor_index], price[boundary - 1]
+    )
+    actions_successor = np.load(root / "action_successor_index.npy", allow_pickle=False)
+    assert actions_successor[boundary, predecessor_index] == successor_index
+    shareholder_return = np.load(
+        root / "target_shareholder_simple_return.npy", allow_pickle=False
+    )
+    price_return = np.load(root / "target_price_simple_return.npy", allow_pickle=False)
+    shareholder_valid = np.load(
+        root / "target_shareholder_valid.npy", allow_pickle=False
+    )
+    price_valid = np.load(root / "target_price_valid.npy", allow_pickle=False)
+    assert shareholder_valid[boundary - 1, predecessor_index, 0]
+    assert price_valid[boundary - 1, predecessor_index, 0]
+    np.testing.assert_allclose(
+        shareholder_return[boundary - 1, predecessor_index, 0], 0.0, atol=1e-7
+    )
+    np.testing.assert_allclose(
+        price_return[boundary - 1, predecessor_index, 0],
+        -1.0 / price[boundary - 1],
+        rtol=1e-5,
+    )
+    slow_timestep_valid = np.load(root / "slow_timestep_valid.npy", allow_pickle=False)
+    assert slow_timestep_valid[boundary, successor_index]
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["metadata"]["isin_succession_link_count"] == 1
+    assert "corporate_action_alignment_roles" in manifest["tables"]
 
 
 def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
@@ -1340,7 +1810,10 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
     distribution[70:, 1] = 2.0
 
     def daily_frame(
-        price: np.ndarray, qty: np.ndarray, dismes: np.ndarray, volume_scale: float = 1.0
+        price: np.ndarray,
+        qty: np.ndarray,
+        dismes: np.ndarray,
+        volume_scale: float = 1.0,
     ) -> pl.DataFrame:
         return pl.DataFrame(
             [
@@ -1390,11 +1863,17 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
             close_brl=minute_close,
             volume=minute_volume,
             observed=np.ones_like(minute_close, dtype=np.bool_),
+            volume_valid=np.ones_like(minute_close, dtype=np.bool_),
+            session_valid=np.ones(minute_close.shape[:2], dtype=np.bool_),
         )
 
     actions = normalize_yfinance_actions(
         pl.DataFrame(
-            schema={"Date": pl.Date, "Dividends": pl.Float64, "Stock Splits": pl.Float64}
+            schema={
+                "Date": pl.Date,
+                "Dividends": pl.Float64,
+                "Stock Splits": pl.Float64,
+            }
         ),
         isin=names[0],
         ticker="TEST3",
@@ -1404,7 +1883,8 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
         {
             "available_date": day,
             "isin": isin,
-            "fund_leverage": float(0.1 * name_index + 0.001 * day_index),
+            "total_liabilities_brl": float(10.0 + name_index + 0.01 * day_index),
+            "total_assets_brl": 100.0,
         }
         for day_index, day in enumerate(dates)
         for name_index, isin in enumerate(names)
@@ -1414,9 +1894,9 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
     pl.DataFrame(sidecar_rows).write_parquet(sidecar_a)
     pl.DataFrame(sidecar_rows).with_columns(
         pl.when(pl.col("available_date") > dates[cutoff])
-        .then(pl.col("fund_leverage") + 100.0)
-        .otherwise(pl.col("fund_leverage"))
-        .alias("fund_leverage")
+        .then(pl.col("total_liabilities_brl") + 100.0)
+        .otherwise(pl.col("total_liabilities_brl"))
+        .alias("total_liabilities_brl")
     ).write_parquet(sidecar_b)
 
     mutated_close = close.copy()
@@ -1432,6 +1912,7 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
             "last_date": [dates[-1]] * len(names),
             "status": ["downloaded"] * len(names),
             "action_rows": [0] * len(names),
+            "economic_terms_complete": [True] * len(names),
         }
     )
     first = build_daily_store(
@@ -1475,7 +1956,8 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
         "detected_split_mask",
         "active",
         "fast_present",
-        "intraday_action_boundary_mask",
+        "intraday_boundary_lagged_mask",
+        "intraday_boundary_sameday_mask",
     }
     exact_names.update(
         path.stem
@@ -1485,8 +1967,12 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
     for name in sorted(exact_names):
         left = np.load(first / f"{name}.npy", mmap_mode="r")
         right = np.load(second / f"{name}.npy", mmap_mode="r")
-        np.testing.assert_array_equal(left[: cutoff + 1], right[: cutoff + 1], err_msg=name)
+        np.testing.assert_array_equal(
+            left[: cutoff + 1], right[: cutoff + 1], err_msg=name
+        )
 
     detected = np.load(first / "detected_split_mask.npy")
+    lagged_boundary = np.load(first / "intraday_boundary_lagged_mask.npy")
+    np.testing.assert_array_equal(lagged_boundary, detected)
     assert detected[30, 0]
     assert detected[70, 1]

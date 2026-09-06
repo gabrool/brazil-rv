@@ -6,7 +6,8 @@ import numpy as np
 import polars as pl
 
 from brazil_rv.v2.data import V2DailyDataset, collate_v2_daily
-from brazil_rv.v2.store import write_store
+from brazil_rv.v2.contract import INTRADAY_DAILY_FEATURES
+from v2_store_fixtures import write_fixture_store as write_store
 
 
 def _native_fast_store(tmp_path):
@@ -21,6 +22,8 @@ def _native_fast_store(tmp_path):
     values[-1, 0, :3] = 2.0
     valid[-1, 0, 1, 4] = False
     values[-1, 0, 1, 4] = np.nan
+    fast_present = np.zeros((len(dates), name_count), dtype=np.bool_)
+    fast_present[-1, 2] = True
     return write_store(
         tmp_path / "native_fast",
         dates=dates,
@@ -28,10 +31,30 @@ def _native_fast_store(tmp_path):
         arrays={
             "slow_values": np.zeros((len(dates), name_count, 1), dtype=np.float32),
             "slow_valid": np.ones((len(dates), name_count, 1), dtype=np.bool_),
+            "slow_age_sessions": np.zeros(
+                (len(dates), name_count, 1), dtype=np.float32
+            ),
+            "slow_timestep_valid": np.ones(
+                (len(dates), name_count), dtype=np.bool_
+            ),
+            "intraday_values": np.zeros(
+                (len(dates), name_count, len(INTRADAY_DAILY_FEATURES)),
+                dtype=np.float32,
+            ),
+            "intraday_valid": np.zeros(
+                (len(dates), name_count, len(INTRADAY_DAILY_FEATURES)),
+                dtype=np.bool_,
+            ),
+            "intraday_age_sessions": np.full(
+                (len(dates), name_count, len(INTRADAY_DAILY_FEATURES)),
+                -1.0,
+                dtype=np.float32,
+            ),
             "active": np.ones((len(dates), name_count), dtype=np.bool_),
             "fast_patch_values": values,
             "fast_patch_valid": valid,
             "fast_patch_mask": patch_mask,
+            "fast_present": fast_present,
         },
         tables={
             "native_fast_security_mapping": pl.DataFrame(
@@ -59,6 +82,19 @@ def test_dataset_compacts_native_fast_slots_and_zeroes_invalid_payload(tmp_path)
     assert sample["fast_present"].tolist() == [False, False, True]
     assert sample["fast_patch_values"][0, 1, 4] == 0.0
     assert np.isfinite(sample["fast_patch_values"]).all()
+
+
+def test_native_fast_uses_stored_presence_not_merely_scheduled_patches(tmp_path) -> None:
+    path = _native_fast_store(tmp_path)
+    present = np.load(path / "fast_present.npy", mmap_mode="r+")
+    present[-1, 2] = False
+    present.flush()
+    del present
+
+    sample = V2DailyDataset(path, [21], stage="finetune", lookback=20)[0]
+
+    assert sample["fast_patch_values"].shape == (0, 5, 7)
+    assert not sample["fast_present"].any()
 
 
 def test_pretraining_dataset_never_allocates_fast_name_rows(tmp_path) -> None:

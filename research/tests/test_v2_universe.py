@@ -8,11 +8,29 @@ from brazil_rv.v2.universe import (
 )
 
 
+def _build_universe(
+    close: np.ndarray,
+    volume: np.ndarray,
+    observed: np.ndarray,
+    **kwargs,
+):
+    history_started = np.maximum.accumulate(observed, axis=0)
+    return build_daily_universe(
+        close,
+        volume,
+        observed,
+        trade_observed=observed,
+        activity_valid=history_started,
+        source_session_complete=np.ones(close.shape[0], dtype=np.bool_),
+        **kwargs,
+    )
+
+
 def test_universe_uses_strictly_prior_sessions() -> None:
     close = np.full((8, 2), 10.0)
     volume = np.full((8, 2), 100.0)
     observed = np.ones((8, 2), dtype=bool)
-    result = build_daily_universe(
+    result = _build_universe(
         close,
         volume,
         observed,
@@ -29,7 +47,7 @@ def test_universe_uses_strictly_prior_sessions() -> None:
     changed_close[5] = 0.0
     changed_volume[5] = 0.0
     changed_seen[5] = False
-    mutated = build_daily_universe(
+    mutated = _build_universe(
         changed_close,
         changed_volume,
         changed_seen,
@@ -73,7 +91,7 @@ def test_universe_uses_last_observed_prior_close_within_window() -> None:
     volume = np.full_like(close, 100.0)
     observed = np.ones_like(close, dtype=bool)
     observed[4, 0] = False
-    result = build_daily_universe(
+    result = _build_universe(
         close,
         volume,
         observed,
@@ -99,7 +117,7 @@ def test_universe_applies_all_thresholds_and_drops_a_delisted_name() -> None:
     volume[:20, 2] = 10.0
     close[19, 3] = 0.5
     observed[20:, 4] = False
-    result = build_daily_universe(
+    result = _build_universe(
         close,
         volume,
         observed,
@@ -114,3 +132,46 @@ def test_universe_applies_all_thresholds_and_drops_a_delisted_name() -> None:
     # establish the delisting; the candidate day's missing row is never read.
     assert result.active[25, 4]
     assert not result.active[26, 4]
+
+
+def test_universe_invalidates_unknown_source_but_counts_complete_no_trade_zero() -> None:
+    close = np.full((22, 1), 10.0)
+    volume = np.full((22, 1), 100.0)
+    observed = np.ones((22, 1), dtype=np.bool_)
+    observed[19, 0] = False
+    volume[19, 0] = 0.0
+    activity_valid = np.ones_like(observed)
+    result = build_daily_universe(
+        close,
+        volume,
+        observed,
+        trade_observed=observed,
+        activity_valid=activity_valid,
+        source_session_complete=np.ones(22, dtype=np.bool_),
+        prior_sessions=20,
+        minimum_traded=19,
+        minimum_median_volume_brl=50.0,
+        minimum_prior_close_brl=1.0,
+        minimum_history_sessions=20,
+    )
+    assert result.active[20, 0]
+    assert result.prior_traded_sessions[20, 0] == 19
+
+    activity_valid[19, 0] = False
+    source_complete = np.ones(22, dtype=np.bool_)
+    source_complete[19] = False
+    unknown = build_daily_universe(
+        close,
+        volume,
+        observed,
+        trade_observed=observed,
+        activity_valid=activity_valid,
+        source_session_complete=source_complete,
+        prior_sessions=20,
+        minimum_traded=19,
+        minimum_median_volume_brl=50.0,
+        minimum_prior_close_brl=1.0,
+        minimum_history_sessions=20,
+    )
+    assert not unknown.active[20, 0]
+    assert np.isnan(unknown.prior_median_volume_brl[20, 0])

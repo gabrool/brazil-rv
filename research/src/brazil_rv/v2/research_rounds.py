@@ -10,14 +10,24 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import NoReturn
 
 import numpy as np
 from numpy.typing import NDArray
 
 from .artifacts import inventory, sha256_file, verify_inventory, write_json_atomic
-from .baselines import BaselinePanel, build_baselines
+from .baselines import BaselinePanel, build_store_baselines
 from .config import PROJECT_ROOT
-from .contract import GBDT_SEEDS, HORIZONS, PRETRAIN_END, PRIMARY_HORIZONS, STORE_START
+from .contract import (
+    GBDT_SEEDS,
+    HORIZONS,
+    PRETRAIN_END,
+    PRIMARY_HORIZONS,
+    RUN_MANY_PLAN_SCHEMA,
+    SCORE_ARTIFACT_SCHEMA,
+    STORE_START,
+    TRAINING_STAGE_SCHEMA,
+)
 from .evaluate import (
     EVALUATION_SCHEMA,
     EvaluationInputs,
@@ -30,7 +40,13 @@ from .evaluate import (
     _validate_paired_identity,
     evaluate_scores,
 )
-from .gbdt import GBDTConfig, MultiHorizonGBDT
+from .data import ScalarFeatureView, read_scalar_feature_view, scalar_feature_names
+from .gbdt import (
+    GBDTConfig,
+    MultiHorizonGBDT,
+    assemble_gbdt_scalar_view,
+    gbdt_scalar_feature_names,
+)
 from .splits import development_folds
 from .store import V2Store, open_store_for_samples
 from .train import rank_average_ensemble
@@ -42,11 +58,9 @@ from .validate_pipeline import (
     _window_target_mask,
 )
 
-ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V1"
-ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V1"
+ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V2"
+ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V2"
 RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V2"
-TRAINING_STAGE_SCHEMA = "BRAZIL_RV_V2_TRAINING_STAGE_V1"
-SCORE_ARTIFACT_SCHEMA = "BRAZIL_RV_V2_SCORE_ARTIFACT_V1"
 PREREGISTRATION = PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2.md"
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
@@ -72,6 +86,17 @@ RESEARCH_FLAGS = {
     "deployment_changed": False,
     "transfer_chronology_clean": True,
 }
+
+VOIDED_REGISTRATION_MESSAGE = (
+    "v2 Round 1/Round 2 registration was voided before the canonical multi-day "
+    "refactor; research launch and result-finalization remain disabled until a "
+    "fresh engineering acceptance report passes and a revised preregistration "
+    "is committed"
+)
+
+
+def _refuse_voided_registration() -> NoReturn:
+    raise RuntimeError(VOIDED_REGISTRATION_MESSAGE)
 
 
 @dataclass(frozen=True)
@@ -212,12 +237,10 @@ def _pretrain_indices(dates: NDArray[np.datetime64]) -> NDArray[np.int64]:
     ).astype(np.int64)
     if not full.size or np.any(np.diff(full) != 1):
         raise ValueError("pretrain axis is incomplete")
-    # Every model sample consumes the preceding slow row.  The first store row
-    # has no causal predecessor and therefore is context, never a sample.
-    samples = full[full > 0]
-    if not samples.size:
-        raise ValueError("pretrain axis has no sample with prior slow history")
-    return samples
+    # Each stored row is already the canonical decision snapshot. The store
+    # builder consumes warm-up observations when constructing its first row;
+    # consumers must not discard or shift that row a second time.
+    return full
 
 
 def _open_round_store(
@@ -883,15 +906,15 @@ def _paired_readouts(
 
 
 def _feature_names(store: V2Store, rung: str) -> tuple[str, ...]:
-    names = store.manifest.get("feature_names")
-    if not isinstance(names, Mapping) or not isinstance(names.get("slow"), list):
-        raise ValueError("store lacks ordered feature names")
-    output = list(names["slow"])
+    slow_names = scalar_feature_names(store, ("slow",))
+    output = list(gbdt_scalar_feature_names(slow_names))
     if rung != "a_slow":
-        output.extend(names["intraday"])
-        output.extend(("fast_present", "days_since_last_slow_row"))
+        intraday_names = scalar_feature_names(store, ("intraday",))
+        output.extend(gbdt_scalar_feature_names(intraday_names))
+        output.append("fast_present")
     for group in RUNG_GROUPS[rung]:
-        output.extend(names[f"sidecar_{group}"])
+        group_names = scalar_feature_names(store, (f"sidecar_{group}",))
+        output.extend(gbdt_scalar_feature_names(group_names))
     if len(output) != len(set(output)):
         raise ValueError("GBDT feature names are not unique")
     return tuple(str(value) for value in output)
@@ -911,38 +934,39 @@ def _gbdt_features(
     )
     if pretrain.shape != (len(indices),):
         raise ValueError("pretrain row mask is misaligned")
-    slow_indices = indices - 1
-    if np.any(slow_indices < 0):
-        raise ValueError("GBDT slow history precedes the store")
-    slow = np.asarray(store.read("slow_values", slow_indices), dtype=np.float32)
-    slow_valid = np.asarray(store.read("slow_valid", slow_indices), dtype=np.bool_)
-    if not np.isfinite(slow[slow_valid]).all() or np.isinf(slow).any():
-        raise ValueError("GBDT slow features violate their validity contract")
-    parts = [np.where(slow_valid, slow, np.nan)]
+    if np.any(indices < 0):
+        raise ValueError("GBDT rows are outside the canonical store")
+    slow = read_scalar_feature_view(store, indices, ("slow",))
+    parts = [assemble_gbdt_scalar_view(slow, label="slow")]
     if rung != "a_slow":
-        intraday = np.asarray(store.read("intraday_values", indices), dtype=np.float32)
-        intraday_valid = np.asarray(
-            store.read("intraday_valid", indices), dtype=np.bool_
-        )
-        if not np.isfinite(intraday[intraday_valid]).all() or np.isinf(intraday).any():
-            raise ValueError("GBDT intraday features violate their validity contract")
+        intraday = read_scalar_feature_view(store, indices, ("intraday",))
+        intraday_valid = intraday.valid.copy()
+        intraday_age = intraday.age_sessions.copy()
         intraday_valid[pretrain] = False
-        intraday = np.where(intraday_valid, intraday, np.nan)
+        intraday_age[pretrain] = -1.0
+        masked_intraday = ScalarFeatureView(
+            date_indices=intraday.date_indices,
+            dates=intraday.dates,
+            isins=intraday.isins,
+            active=intraday.active,
+            names=intraday.names,
+            values=intraday.values,
+            valid=intraday_valid,
+            age_sessions=intraday_age,
+        )
         present = np.asarray(store.read("fast_present", indices), dtype=np.float32)
         present[pretrain] = 0.0
-        days = np.ones_like(present, dtype=np.float32)
-        days[pretrain] = 0.0
-        parts.extend((intraday, present[..., None], days[..., None]))
+        parts.extend(
+            (
+                assemble_gbdt_scalar_view(masked_intraday, label="intraday"),
+                present[..., None],
+            )
+        )
     for group in RUNG_GROUPS[rung]:
-        values = np.asarray(
-            store.read(f"sidecar_{group}_values", slow_indices), dtype=np.float32
+        sidecar = read_scalar_feature_view(
+            store, indices, (f"sidecar_{group}",)
         )
-        valid = np.asarray(
-            store.read(f"sidecar_{group}_valid", slow_indices), dtype=np.bool_
-        )
-        if not np.isfinite(values[valid]).all() or np.isinf(values).any():
-            raise ValueError(f"GBDT {group} features violate their validity contract")
-        parts.append(np.where(valid, values, np.nan))
+        parts.append(assemble_gbdt_scalar_view(sidecar, label=group))
     result = np.concatenate(parts, axis=-1, dtype=np.float32)
     if result.shape[-1] != len(_feature_names(store, rung)) or np.isinf(result).any():
         raise ValueError("GBDT feature panel violates its frozen contract")
@@ -1100,6 +1124,7 @@ def freeze_round1(
     output_root: Path,
     num_threads: int,
 ) -> str:
+    _refuse_voided_registration()
     code = _git_identity()
     output = output_root.resolve()
     if output.exists():
@@ -1169,6 +1194,7 @@ def run_round1(
     output_root: Path,
     num_threads: int,
 ) -> str:
+    _refuse_voided_registration()
     output = output_root.resolve(strict=True)
     design_path = output / "frozen_design.json"
     design = _read_json(design_path)
@@ -1220,17 +1246,7 @@ def run_round1(
         baseline_start = max(0, min(int(x[0]) for x in evaluation.values()) - 253)
         baseline_end = max(int(x[-1]) for x in evaluation.values())
         baseline_axis = np.arange(baseline_start, baseline_end + 1, dtype=np.int64)
-        slow_names = tuple(store.manifest["feature_names"]["slow"])
-        volatility_index = slow_names.index("yang_zhang_vol_20")
-        panels = build_baselines(
-            store.read("raw_close", baseline_axis),
-            store.read("observed", baseline_axis),
-            store.read("active", baseline_axis),
-            store.read("ambiguous_action_mask", baseline_axis),
-            store.read("slow_values", baseline_axis)[..., volatility_index],
-            store.read("slow_valid", baseline_axis)[..., volatility_index],
-            slow_lag=1,
-        )
+        panels = build_store_baselines(store, baseline_axis)
         baseline_reports: dict[str, dict[str, _ResearchEvaluation]] = {
             name: {} for name in panels
         }
@@ -1447,6 +1463,7 @@ def _existing_score_and_evaluation_record(root: Path) -> dict[str, object]:
 
 def resume_round1(*, output_root: Path, num_threads: int) -> str:
     """Reuse complete candidates and score only registered candidates still absent."""
+    _refuse_voided_registration()
     output = output_root.resolve(strict=True)
     result_path = output / "round1_result.json"
     if result_path.exists():
@@ -1739,6 +1756,7 @@ def freeze_round2(
     fast_checkpoint_sha256: str | None,
     max_parallel: int,
 ) -> str:
+    _refuse_voided_registration()
     code = _git_identity()
     if not 4 <= max_parallel <= 6:
         raise ValueError("Round 2 requires four to six concurrent trajectories")
@@ -1924,6 +1942,7 @@ def _plan_job(
 
 
 def write_round2_plan_p(*, output_root: Path) -> str:
+    _refuse_voided_registration()
     root = output_root.resolve(strict=True)
     design = _read_json(root / "frozen_design.json")
     if (
@@ -1949,7 +1968,7 @@ def write_round2_plan_p(*, output_root: Path) -> str:
     return write_json_atomic(
         root / "round2_plan_p.json",
         {
-            "schema": "BRAZIL_RV_V2_RUN_MANY_PLAN_V1",
+            "schema": RUN_MANY_PLAN_SCHEMA,
             "phase": "stage_P",
             "max_parallel": int(design["max_parallel_trajectories"]),
             "jobs": jobs,
@@ -1958,6 +1977,7 @@ def write_round2_plan_p(*, output_root: Path) -> str:
 
 
 def write_round2_plan_main(*, output_root: Path) -> str:
+    _refuse_voided_registration()
     root = output_root.resolve(strict=True)
     design = _read_json(root / "frozen_design.json")
     if (
@@ -2011,7 +2031,7 @@ def write_round2_plan_main(*, output_root: Path) -> str:
     return write_json_atomic(
         root / "round2_plan_main.json",
         {
-            "schema": "BRAZIL_RV_V2_RUN_MANY_PLAN_V1",
+            "schema": RUN_MANY_PLAN_SCHEMA,
             "phase": "registered_arms",
             "max_parallel": int(design["max_parallel_trajectories"]),
             "stage_p_handoffs": {
@@ -2255,6 +2275,7 @@ def _evaluation_from_artifacts(
 
 
 def finalize_round2(*, output_root: Path) -> str:
+    _refuse_voided_registration()
     root = output_root.resolve(strict=True)
     design = _read_json(root / "frozen_design.json")
     if (

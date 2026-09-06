@@ -13,19 +13,20 @@ from brazil_rv.v2.corporate_actions import (
     action_coverage_resolved_mask,
     align_action_payment_sessions,
     align_action_arrays,
+    align_decision_known_action_terms,
     align_verified_action_terms,
     apply_contractual_action,
     action_calendar_alignment_table,
     action_coverage_table,
     audit_m1_adjustment_status,
     build_shareholder_wealth_ohlc,
-    causal_price_adjustment_factor,
     detect_cotahist_actions,
     detect_distribution_changes,
     normalize_cached_action_schema,
     normalize_yfinance_actions,
     provider_actions_to_verified_terms,
     unadjust_yfinance_cash_distributions,
+    verified_conversion_terms_from_links,
     verified_action_terms_from_table,
     verified_action_terms_to_table,
 )
@@ -41,19 +42,26 @@ def _term(
     payment_date: date | None = None,
     resolved: bool = True,
     resulting_isin: str | None = None,
+    effective_date: date | None = None,
+    available_at: datetime | None = None,
+    currency: str = "BRL",
 ) -> VerifiedActionTerm:
     return VerifiedActionTerm(
         action_type=action_type,
         isin="BRTESTACNOR1",
         issuer_id="TEST",
-        effective_date=ex_date,
+        effective_date=ex_date if effective_date is None else effective_date,
         ex_date=ex_date,
         payment_date=payment_date,
         announced_at=datetime(2023, 12, 1, 12, tzinfo=timezone.utc),
-        available_at=datetime(2023, 12, 1, 13, tzinfo=timezone.utc),
+        available_at=(
+            datetime(2023, 12, 1, 13, tzinfo=timezone.utc)
+            if available_at is None
+            else available_at
+        ),
         shares_per_prior_share=q,
         cash_per_prior_share=d,
-        currency="BRL",
+        currency=currency,
         source="issuer filing",
         evidence="immutable filing sha256:abc",
         coverage_status="verified",
@@ -66,9 +74,7 @@ def _term(
 def test_verified_terms_require_evidence_and_leave_complex_actions_unresolved() -> None:
     with np.testing.assert_raises(ValueError):
         _term("subscription_rights", ex_date=date(2024, 1, 3), resolved=True)
-    unresolved = _term(
-        "subscription_rights", ex_date=date(2024, 1, 3), resolved=False
-    )
+    unresolved = _term("subscription_rights", ex_date=date(2024, 1, 3), resolved=False)
     assert not unresolved.resolved
     with np.testing.assert_raises(ValueError):
         VerifiedActionTerm(
@@ -87,6 +93,8 @@ def test_verified_terms_require_evidence_and_leave_complex_actions_unresolved() 
             evidence="filing",
             coverage_status="verified",
         )
+    with np.testing.assert_raises_regex(ValueError, "BRL currency"):
+        _term("dividend", ex_date=date(2024, 1, 3), d=1.0, currency="USD")
 
 
 def test_verified_action_table_round_trip_preserves_full_contract() -> None:
@@ -241,6 +249,149 @@ def test_verified_simple_conversion_follows_the_successor_isin() -> None:
     np.testing.assert_array_equal(wealth.close[:, 0], [100.0, 105.0, 110.0])
 
 
+def test_conversion_uses_effective_date_and_carries_same_session_cash() -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    aligned = align_verified_action_terms(
+        [
+            _term(
+                "simple_conversion",
+                effective_date=dates[1],
+                ex_date=dates[1],
+                d=2.0,
+                resulting_isin="BRTESTACNPR0",
+            )
+        ],
+        dates,
+        ["BRTESTACNOR1", "BRTESTACNPR0"],
+        coverage_resolved=np.ones((3, 2), dtype=np.bool_),
+    )
+    assert aligned.has_action[1, 0]
+    assert aligned.successor_index is not None
+    assert aligned.successor_index[1, 0] == 1
+    assert aligned.cash_per_prior_share[1, 0] == 2.0
+
+    with np.testing.assert_raises_regex(ValueError, "common event session"):
+        _term(
+            "simple_conversion",
+            effective_date=dates[1],
+            ex_date=dates[2],
+            d=2.0,
+            resulting_isin="BRTESTACNPR0",
+        )
+
+
+def test_verified_isin_link_becomes_canonical_conversion_term() -> None:
+    effective = date(2024, 1, 3)
+    known = datetime(2024, 1, 2, 18, tzinfo=timezone.utc)
+    terms = verified_conversion_terms_from_links(
+        pl.DataFrame(
+            {
+                "predecessor_isin": ["BRTESTACNOR1"],
+                "successor_isin": ["BRTESTACNPR0"],
+                "effective_date": [effective],
+                "first_known_at": [known],
+                "shares_received_per_prior_share": [1.5],
+                "cash_entitlement_per_prior_share": [2.0],
+                "currency": ["BRL"],
+                "source": ["issuer filing"],
+                "evidence_sha256": ["a" * 64],
+            }
+        )
+    )
+    assert len(terms) == 1
+    term = terms[0]
+    assert term.effective_date == effective
+    assert term.ex_date == effective
+    assert term.available_at == known
+    assert term.shares_per_prior_share == 1.5
+    assert term.cash_per_prior_share == 2.0
+    assert term.resulting_isin == "BRTESTACNPR0"
+
+
+def test_empty_isin_link_table_needs_no_conversion_schema() -> None:
+    links = pl.DataFrame(
+        schema={"predecessor_isin": pl.String, "successor_isin": pl.String}
+    )
+    assert verified_conversion_terms_from_links(links) == ()
+
+
+def test_pure_conversion_uses_effective_date_not_ex_date() -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    aligned = align_verified_action_terms(
+        [
+            _term(
+                "simple_conversion",
+                effective_date=dates[1],
+                ex_date=dates[2],
+                resulting_isin="BRTESTACNPR0",
+            )
+        ],
+        dates,
+        ["BRTESTACNOR1", "BRTESTACNPR0"],
+        coverage_resolved=np.ones((3, 2), dtype=np.bool_),
+    )
+    assert aligned.successor_index is not None
+    assert aligned.successor_index[1, 0] == 1
+    assert aligned.successor_index[2, 0] == 0
+
+
+def test_decision_known_alignment_marks_later_acquired_action_unresolved() -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3)]
+    decisions = [
+        datetime(2024, 1, 2, 18, 45, tzinfo=timezone.utc),
+        datetime(2024, 1, 3, 18, 45, tzinfo=timezone.utc),
+    ]
+    late = _term(
+        "split",
+        ex_date=dates[1],
+        q=2.0,
+        available_at=datetime(2024, 1, 4, 12, tzinfo=timezone.utc),
+    )
+    coverage = np.ones((2, 1), dtype=np.bool_)
+    retrospective = align_verified_action_terms(
+        [late], dates, ["BRTESTACNOR1"], coverage_resolved=coverage
+    )
+    historical = align_decision_known_action_terms(
+        [late],
+        dates,
+        ["BRTESTACNOR1"],
+        coverage_resolved=coverage,
+        decision_timestamps=decisions,
+    )
+    empty_historical = align_decision_known_action_terms(
+        [],
+        dates,
+        ["BRTESTACNOR1"],
+        coverage_resolved=coverage,
+        decision_timestamps=decisions,
+    )
+    assert retrospective.shares_per_prior_share[1, 0] == 2.0
+    assert retrospective.has_action[1, 0]
+    np.testing.assert_array_equal(
+        historical.shares_per_prior_share,
+        empty_historical.shares_per_prior_share,
+    )
+    np.testing.assert_array_equal(historical.has_action, empty_historical.has_action)
+    assert not historical.has_action[1, 0]
+    assert not historical.session_resolved[1, 0]
+    assert empty_historical.session_resolved[1, 0]
+
+
+def test_explicit_verified_term_resolves_event_outside_blanket_coverage() -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3)]
+    aligned = align_verified_action_terms(
+        [_term("split", ex_date=dates[1], q=2.0)],
+        dates,
+        ["BRTESTACNOR1"],
+        coverage_resolved=np.zeros((2, 1), dtype=np.bool_),
+    )
+
+    assert not aligned.session_resolved[0, 0]
+    assert aligned.session_resolved[1, 0]
+    assert aligned.has_action[1, 0]
+    assert aligned.shares_per_prior_share[1, 0] == 2.0
+
+
 def test_cotahist_split_detection_and_provider_alignment_are_independent() -> None:
     dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
     close = np.asarray([[100.0], [50.0], [51.0]])
@@ -262,27 +413,14 @@ def test_cotahist_split_detection_and_provider_alignment_are_independent() -> No
         ticker="TEST3",
         fetched_at=datetime(2024, 2, 1, tzinfo=timezone.utc),
     )
-    split, cash, unresolved = align_action_arrays(
-        actions, dates, ["BRTESTACNOR1"]
-    )
+    split, cash, unresolved = align_action_arrays(actions, dates, ["BRTESTACNOR1"])
     np.testing.assert_array_equal(split[:, 0], [1.0, 2.0, 1.0])
     np.testing.assert_array_equal(cash[:, 0], [0.0, 0.5, 0.0])
     assert not unresolved.any()
 
 
-def test_forward_split_adjustment_never_rewrites_history() -> None:
-    ratio = np.full((5, 1), np.nan)
-    ratio[2, 0] = 0.5
-    split = np.zeros_like(ratio, dtype=bool)
-    split[2, 0] = True
-    price = causal_price_adjustment_factor(ratio, split)
-    np.testing.assert_array_equal(price[:, 0], [1.0, 1.0, 2.0, 2.0, 2.0])
-
-
 def test_cotahist_classifies_cash_and_ambiguous_dismes_changes() -> None:
-    close = np.asarray(
-        [[100.0, 100.0], [100.0, 100.0], [95.0, 99.0], [95.0, 99.0]]
-    )
+    close = np.asarray([[100.0, 100.0], [100.0, 100.0], [95.0, 99.0], [95.0, 99.0]])
     quantity = np.asarray(
         [[100.0, 100.0], [100.0, 100.0], [50.0, 100.0], [50.0, 100.0]]
     )
@@ -319,7 +457,7 @@ def test_cotahist_classifies_cash_and_ambiguous_dismes_changes() -> None:
     assert moderate_result.price_jump_anomaly_mask[2, 0]
 
 
-def test_jump_only_examples_are_anomalies_and_never_adjusted() -> None:
+def test_jump_only_examples_are_audit_anomalies_not_action_terms() -> None:
     examples = (
         [100, 100, 100, 110, 110, 110, 110, 110],
         [100, 100, 100, 80, 80, 80, 80, 80],
@@ -340,10 +478,6 @@ def test_jump_only_examples_are_anomalies_and_never_adjusted() -> None:
         assert not result.cash_event.any()
         assert not result.ambiguous_event.any()
         assert result.price_jump_anomaly_mask.any()
-        np.testing.assert_array_equal(
-            causal_price_adjustment_factor(result.price_ratio, result.split_event),
-            np.ones_like(close),
-        )
 
 
 def test_cotahist_classifier_is_causal_and_exercises_all_classes() -> None:
@@ -356,19 +490,10 @@ def test_cotahist_classifier_is_causal_and_exercises_all_classes() -> None:
     mutated_quantity = quantity.copy()
     mutated_close[3:] *= 7.0
     mutated_quantity[3:] *= 0.2
-    changed = detect_cotahist_actions(
-        mutated_close, mutated_quantity, dismes, observed
-    )
+    changed = detect_cotahist_actions(mutated_close, mutated_quantity, dismes, observed)
     assert original.split_event[2, 0]
     np.testing.assert_array_equal(original.split_event[:3], changed.split_event[:3])
     np.testing.assert_array_equal(original.price_ratio[:3], changed.price_ratio[:3])
-    original_adjusted = close * causal_price_adjustment_factor(
-        original.price_ratio, original.split_event
-    )
-    changed_adjusted = mutated_close * causal_price_adjustment_factor(
-        changed.price_ratio, changed.split_event
-    )
-    np.testing.assert_array_equal(original_adjusted[:3], changed_adjusted[:3])
 
     def classify(price: float, qty: float) -> tuple[bool, bool, bool]:
         values = np.asarray([[100.0], [100.0], [price]])
@@ -635,9 +760,7 @@ def test_cash_units_use_only_strictly_later_split_factors() -> None:
         fetched_at=fetched_at,
     )
     adjusted = unadjust_yfinance_cash_distributions(same_day)
-    dividend = adjusted.filter(pl.col("action_type") == "dividend").row(
-        0, named=True
-    )
+    dividend = adjusted.filter(pl.col("action_type") == "dividend").row(0, named=True)
     assert dividend["provider_cash_distribution_brl"] == 1.0
     assert dividend["cash_unit_adjustment_factor"] == 5.0
     assert dividend["cash_distribution_brl"] == 5.0
@@ -747,7 +870,9 @@ def test_m1_adjustment_audit_uses_pre_post_event_ratios() -> None:
     assert report[0, "status"] == "price_adjusted"
 
 
-def test_provider_actions_become_explicit_terms_without_invented_complex_terms() -> None:
+def test_provider_actions_become_explicit_terms_without_invented_complex_terms() -> (
+    None
+):
     fetched = datetime(2024, 7, 1, tzinfo=timezone.utc)
     scalar = normalize_yfinance_actions(
         pl.DataFrame(
@@ -781,7 +906,7 @@ def test_provider_actions_become_explicit_terms_without_invented_complex_terms()
     assert (rights.shares_per_prior_share, rights.cash_per_prior_share) == (1.0, 0.0)
 
 
-def test_action_coverage_requires_success_and_rejects_conflicting_overlap() -> None:
+def test_action_coverage_requires_explicit_completeness_and_rejects_overlap() -> None:
     dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
     audit = pl.DataFrame(
         {
@@ -789,6 +914,7 @@ def test_action_coverage_requires_success_and_rejects_conflicting_overlap() -> N
             "first_date": [dates[0], dates[1], dates[0]],
             "last_date": [dates[-1], dates[1], dates[-1]],
             "status": ["downloaded", "failed", "zero_actions"],
+            "economic_terms_complete": [True, True, True],
         }
     )
     resolved = action_coverage_resolved_mask(
@@ -796,3 +922,8 @@ def test_action_coverage_requires_success_and_rejects_conflicting_overlap() -> N
     )
     assert resolved[:, 0].tolist() == [True, False, True]
     assert resolved[:, 1].tolist() == [True, True, True]
+
+    provider_only = audit.drop("economic_terms_complete")
+    assert not action_coverage_resolved_mask(
+        provider_only, dates, ["BRTESTACNOR1", "BRTESTACNPR0"]
+    ).any()

@@ -1,5 +1,5 @@
 {
-  "schema": "BRAZIL_RV_V2_PROTOCOL_V1",
+  "schema": "BRAZIL_RV_V2_PROTOCOL_V2",
   "name": "full",
   "folds": ["F1", "F2", "F3"],
   "seeds": [11, 29, 47],

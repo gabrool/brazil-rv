@@ -6,10 +6,11 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 import tempfile
 from collections.abc import Iterator
-from dataclasses import dataclass, replace
-from datetime import date
+from dataclasses import asdict, dataclass, replace
+from datetime import date, datetime
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -18,50 +19,76 @@ import polars as pl
 from numpy.typing import NDArray
 
 from .contract import (
-    ACCUMULATED_TEST_AFTER,
     COTAHIST_YEARS,
+    DECISION_FEATURE_CONTRACT,
+    FEATURE_AGE_CONTRACT,
     HORIZONS,
     INTRADAY_DAILY_FEATURES,
+    INTRADAY_PRIOR_SESSION_FEATURES,
+    SIDECAR_FEATURES,
     SLOW_FEATURES,
     STORE_START,
-    V1_STORE_V2_ZERO_SLOW_FIELDS,
 )
 from .corporate_actions import (
     DetectedActionResult,
+    VerifiedActionTerm,
+    action_coverage_resolved_mask,
     action_calendar_alignment_table,
     action_coverage_table,
-    adjust_daily_ohlc,
+    align_action_payment_sessions,
     align_action_arrays,
-    audit_m1_adjustment_status,
+    align_decision_known_action_terms,
+    align_verified_action_terms,
+    build_shareholder_wealth_ohlc_into,
     cash_unit_adjustment_audit,
     cotahist_action_classification_table,
     dividend_close_drop_audit,
     detect_cotahist_actions,
     detect_distribution_changes,
     m1_cotahist_mismatch_by_year,
+    provider_actions_to_verified_terms,
     provider_split_detection_audit,
     split_review_table,
     validate_action_table,
+    validate_verified_action_terms,
+    verified_conversion_terms_from_links,
+    verified_action_terms_to_table,
 )
 from .data_foundation import (
     build_security_master,
     continuation_identity_axis,
     detect_isin_successions,
-    filter_cash_equities,
-    inherit_linked_history,
+    load_isin_link_allowlist,
     load_cotahist,
     panel_from_daily,
+    prepare_cash_equities,
     source_records,
-    verify_v1_mapping,
 )
-from .features import build_slow_features
+from .decision_clock import (
+    SessionDefinition,
+    assert_calendar_complete,
+    calendar_completeness_table,
+    load_session_schedule,
+    schedule_frame,
+)
+from .features import build_slow_features_into
+from .feature_spec import (
+    FeatureSpec,
+    feature_schema_sha256,
+    feature_specs,
+    native_fast_feature_specs,
+    observation_age_sessions_into,
+    transform_feature_panel_into,
+)
 from .intraday_features import (
     IntradayDailyResult,
+    NATIVE_FAST_FEATURES,
     build_intraday_daily_features,
+    build_native_fast_features_into,
+    detect_open_gap_boundaries,
     mask_action_boundaries,
     replace_daily_close_anchors,
 )
-from .normalization import rank_gauss_panel_into
 from .sidecars import (
     SidecarResult,
     available_archive_mapping,
@@ -69,25 +96,264 @@ from .sidecars import (
     materialize_known_archive,
     rebuild_publication_lag_validity,
 )
-from .store import close_memmap, peak_rss_bytes, write_store
+from .store import (
+    available_memory_status_bytes,
+    close_memmap,
+    peak_rss_bytes,
+    write_store,
+)
 from .targets import (
-    build_multi_day_targets_into,
-    build_neutralized_log_returns,
+    build_economic_multi_day_targets_into,
     build_to_close_target,
 )
 from .universe import (
     build_daily_universe,
-    session_calendar,
-    v1_pit_coverage_table,
-    v1_pit_inactive_exceptions_table,
 )
 
-EXPECTED_V1_DATES = 1_248
-V1_STORE_START = date(2021, 7, 19)
 EXTERNAL_VALIDITY_BOOTSTRAP_REPLICATIONS = 1_000
 EXTERNAL_VALIDITY_BOOTSTRAP_CONFIDENCE = 0.95
 EXTERNAL_VALIDITY_MIN_NAMES = 20
 EXTERNAL_VALIDITY_MIN_NAME_DAYS = 2_000
+MINIMUM_BUILD_FREE_MEMORY_BYTES = 10 * 1024**3
+COMMON_STATE_DIAGNOSTICS = (
+    "recent_market_log_return",
+    "median_raw_daily_volatility",
+    "raw_cross_sectional_return_dispersion",
+)
+
+
+@dataclass(frozen=True)
+class _DecisionContinuationInputs:
+    close_brl: NDArray[np.float64]
+    volume_brl: NDArray[np.float64]
+    trades: NDArray[np.float64]
+    observed: NDArray[np.bool_]
+    trade_observed: NDArray[np.bool_]
+    activity_valid: NDArray[np.bool_]
+    ambiguous_action: NDArray[np.bool_]
+    claim_owner: NDArray[np.bool_]
+
+
+def _action_alignment_role_table(
+    terms: Sequence[VerifiedActionTerm],
+    dates: NDArray[np.datetime64],
+    decision_timestamps: Sequence[datetime],
+) -> pl.DataFrame:
+    """Audit retrospective settlement versus historical feature availability."""
+
+    calendar = tuple(np.asarray(dates, dtype="datetime64[D]").astype(object))
+    decisions = dict(zip(calendar, decision_timestamps, strict=True))
+    rows: list[dict[str, object]] = []
+    for term in validate_verified_action_terms(terms):
+        event_date = (
+            term.effective_date
+            if term.shares_per_prior_share != 1.0
+            or term.action_type == "simple_conversion"
+            else term.ex_date
+        )
+        cutoff = decisions.get(event_date)
+        rows.append(
+            {
+                "action_type": term.action_type,
+                "isin": term.isin,
+                "resulting_isin": term.resulting_isin,
+                "event_date": event_date,
+                "available_at": term.available_at,
+                "source": term.source,
+                "evidence": term.evidence,
+                "resolved_term": term.resolved,
+                "in_store_calendar": cutoff is not None,
+                "known_by_event_decision": (
+                    cutoff is not None and term.available_at <= cutoff
+                ),
+                "retrospective_role": "outcome_and_accounting",
+                "decision_time_role": "feature_input_if_known",
+            }
+        )
+    return pl.DataFrame(
+        rows,
+        schema={
+            "action_type": pl.String,
+            "isin": pl.String,
+            "resulting_isin": pl.String,
+            "event_date": pl.Date,
+            "available_at": pl.Datetime(time_zone="UTC"),
+            "source": pl.String,
+            "evidence": pl.String,
+            "resolved_term": pl.Boolean,
+            "in_store_calendar": pl.Boolean,
+            "known_by_event_decision": pl.Boolean,
+            "retrospective_role": pl.String,
+            "decision_time_role": pl.String,
+        },
+    )
+
+
+def _route_decision_known_continuations(
+    *,
+    dates: NDArray[np.datetime64],
+    isins: Sequence[str],
+    links: pl.DataFrame,
+    decision_timestamps: Sequence[datetime],
+    raw_close: NDArray[np.floating],
+    volume_brl: NDArray[np.floating],
+    trades: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    trade_observed: NDArray[np.bool_],
+    activity_valid: NDArray[np.bool_],
+    ambiguous_action: NDArray[np.bool_],
+    shareholder_wealth_arrays: Sequence[NDArray[np.generic]],
+) -> _DecisionContinuationInputs:
+    """Route explicitly verified conversions without rewriting unknown history.
+
+    Price/wealth, monetary liquidity, trade count, and validity have different
+    units, so this is intentionally not a generic history copier.  A link
+    known by its effective-session decision carries the predecessor's causal
+    lookback into the successor.  A link learned later may retire the
+    predecessor from that later decision onward, but cannot backfill model
+    inputs that were unavailable historically.
+    """
+
+    calendar = np.asarray(dates, dtype="datetime64[D]")
+    shape = (calendar.size, len(isins))
+    cutoffs = tuple(decision_timestamps)
+    raw_arrays = tuple(
+        np.asarray(value)
+        for value in (
+            raw_close,
+            volume_brl,
+            trades,
+            observed,
+            trade_observed,
+            activity_valid,
+            ambiguous_action,
+        )
+    )
+    if len(cutoffs) != calendar.size or any(
+        value.shape != shape for value in raw_arrays
+    ):
+        raise ValueError("continuation routing inputs are misaligned")
+    wealth_arrays = tuple(np.asarray(value) for value in shareholder_wealth_arrays)
+    if any(value.shape != shape for value in wealth_arrays):
+        raise ValueError("shareholder-wealth continuation inputs are misaligned")
+    if links.is_empty():
+        return _DecisionContinuationInputs(
+            close_brl=raw_arrays[0],
+            volume_brl=raw_arrays[1],
+            trades=raw_arrays[2],
+            observed=raw_arrays[3],
+            trade_observed=raw_arrays[4],
+            activity_valid=raw_arrays[5],
+            ambiguous_action=raw_arrays[6],
+            claim_owner=np.ones(shape, dtype=np.bool_),
+        )
+    if any(not value.flags.writeable for value in wealth_arrays):
+        raise ValueError("shareholder-wealth continuation destinations are read-only")
+
+    linked_close = np.asarray(raw_close, dtype=np.float64).copy()
+    linked_volume = np.asarray(volume_brl, dtype=np.float64).copy()
+    linked_trades = np.asarray(trades, dtype=np.float64).copy()
+    linked_observed = np.asarray(observed, dtype=np.bool_).copy()
+    linked_trade_observed = np.asarray(trade_observed, dtype=np.bool_).copy()
+    linked_activity_valid = np.asarray(activity_valid, dtype=np.bool_).copy()
+    linked_ambiguous = np.asarray(ambiguous_action, dtype=np.bool_).copy()
+    claim_owner = np.ones(shape, dtype=np.bool_)
+    date_lookup = {value: index for index, value in enumerate(calendar)}
+    isin_lookup = {str(value): index for index, value in enumerate(isins)}
+
+    for row in links.sort("successor_first_date").iter_rows(named=True):
+        predecessor = isin_lookup.get(str(row["predecessor_isin"]))
+        successor = isin_lookup.get(str(row["successor_isin"]))
+        boundary = date_lookup.get(np.datetime64(row["successor_first_date"], "D"))
+        first_known = row["first_known_at"]
+        if predecessor is None or successor is None or boundary is None:
+            raise ValueError("verified continuation is outside the store axes")
+        if not isinstance(first_known, datetime) or first_known.tzinfo is None:
+            raise ValueError(
+                "verified continuation first_known_at must be timezone-aware"
+            )
+        known_slots = [
+            index
+            for index in range(boundary, calendar.size)
+            if cutoffs[index] >= first_known
+        ]
+        if known_slots:
+            claim_owner[known_slots[0] :, predecessor] = False
+        if first_known > cutoffs[boundary]:
+            continue
+
+        q = float(row["shares_received_per_prior_share"])
+        d = float(row["cash_entitlement_per_prior_share"])
+        if not np.isfinite(q) or q <= 0.0 or not np.isfinite(d) or d < 0.0:
+            raise ValueError("verified continuation q/d terms are invalid")
+        claim_owner[:boundary, successor] = False
+        for wealth in wealth_arrays:
+            wealth[:, successor] = wealth[:, predecessor]
+        linked_volume[:boundary, successor] = linked_volume[:boundary, predecessor]
+        linked_trades[:boundary, successor] = linked_trades[:boundary, predecessor]
+        linked_observed[:boundary, successor] = linked_observed[:boundary, predecessor]
+        linked_trade_observed[:boundary, successor] = linked_trade_observed[
+            :boundary, predecessor
+        ]
+        linked_activity_valid[:boundary, successor] = linked_activity_valid[
+            :boundary, predecessor
+        ]
+        linked_ambiguous[:boundary, successor] = linked_ambiguous[
+            :boundary, predecessor
+        ]
+        linked_close[:boundary, successor] = linked_close[:boundary, predecessor] / q
+        prior_prints = np.flatnonzero(linked_observed[:boundary, predecessor])
+        if prior_prints.size:
+            prior = int(prior_prints[-1])
+            # Keep the successor reference in a price-only coordinate.  The
+            # cash entitlement is represented separately in shareholder
+            # wealth and the claim ledger; subtracting it here would silently
+            # reinvest the cash and erase the corresponding price return.
+            successor_equivalent = linked_close[prior, predecessor] / q
+            if not np.isfinite(successor_equivalent) or successor_equivalent <= 0.0:
+                raise ValueError(
+                    "verified conversion implies a non-positive prior reference price"
+                )
+            linked_close[prior, successor] = successor_equivalent
+
+    return _DecisionContinuationInputs(
+        close_brl=linked_close,
+        volume_brl=linked_volume,
+        trades=linked_trades,
+        observed=linked_observed,
+        trade_observed=linked_trade_observed,
+        activity_valid=linked_activity_valid,
+        ambiguous_action=linked_ambiguous,
+        claim_owner=claim_owner,
+    )
+
+
+def _build_resource_preflight() -> dict[str, object]:
+    status = available_memory_status_bytes()
+    available = int(status["available_build_memory_bytes"])
+    passed = available >= MINIMUM_BUILD_FREE_MEMORY_BYTES
+    preflight: dict[str, object] = {
+        **status,
+        "minimum_required_bytes": MINIMUM_BUILD_FREE_MEMORY_BYTES,
+        "passed": passed,
+    }
+    if passed:
+        return preflight
+
+    physical = int(status["available_physical_memory_bytes"])
+    details = f"physical {physical / 1024**3:.2f} GiB"
+    available_commit = status["available_commit_memory_bytes"]
+    commit_limit = status["commit_limit_bytes"]
+    if available_commit is not None and commit_limit is not None:
+        details += (
+            f", available commit {int(available_commit) / 1024**3:.2f} GiB"
+            f", commit limit {int(commit_limit) / 1024**3:.2f} GiB"
+        )
+    raise MemoryError(
+        "v2 store build refused before source loading: conservative available "
+        f"build memory is {available / 1024**3:.2f} GiB ({details}); at least "
+        f"{MINIMUM_BUILD_FREE_MEMORY_BYTES / 1024**3:.0f} GiB is required"
+    )
 
 
 def _workspace_array(
@@ -158,138 +424,20 @@ def _copy_selected_workspace_array(
     return np.load(directory / f"{name}.npy", mmap_mode="r", allow_pickle=False)
 
 
-def _validate_v1_calendar(values: Sequence[date]) -> None:
-    """Validate the complete physical v1 store axis, including warm-up rows."""
-
-    dates = tuple(values)
-    if (
-        len(dates) != EXPECTED_V1_DATES
-        or dates[0] != V1_STORE_START
-        or dates[-1] != ACCUMULATED_TEST_AFTER
-        or any(left >= right for left, right in zip(dates, dates[1:], strict=False))
-    ):
-        raise ValueError("canonical v1 calendar has the wrong fixed axis")
-
-
 @dataclass(frozen=True)
 class StreamedIntraday:
     result: IntradayDailyResult
     audit: pl.DataFrame
     source_paths: tuple[Path, ...]
-
-
-def build_v1_fast_mappings(
-    v1_store: Path,
-    assignments: pl.DataFrame,
-    dates: NDArray[np.datetime64],
-    isins: Sequence[str],
-) -> tuple[pl.DataFrame, pl.DataFrame, list[Path]]:
-    """Bind the unchanged dense v1 archive to sparse v2 date/ISIN slots."""
-
-    root = Path(v1_store).resolve()
-    required = [
-        root / "date_index.parquet",
-        root / "equity_index.parquet",
-        root / "equity_features.npy",
-        root / "equity_slow.npy",
-        root / "equity_data_ready.npy",
-        root / "manifest.json",
-        root / "feature_schema.json",
-    ]
-    missing = [str(path) for path in required if not path.is_file()]
-    if missing:
-        raise FileNotFoundError(f"v1 fast-store files missing: {missing}")
-    source_dates = pl.read_parquet(required[0]).sort("date_idx")
-    source_equities = pl.read_parquet(required[1]).sort("equity_slot")
-    from brazil_rv.preprocessing.contract import (
-        DYNAMIC_CHANNELS,
-        EQUITY_SESSION_MINUTES,
-        EXPECTED_EQUITIES,
-    )
-
-    if not {"date_idx", "trade_date"}.issubset(source_dates.columns):
-        raise ValueError("v1 date index has the wrong schema")
-    if not {"equity_slot", "security_id"}.issubset(source_equities.columns):
-        raise ValueError("v1 equity index has the wrong schema")
-    if source_dates.get_column("date_idx").to_list() != list(
-        range(source_dates.height)
-    ):
-        raise ValueError("v1 date index is not contiguous")
-    if source_equities.get_column("equity_slot").to_list() != list(
-        range(source_equities.height)
-    ):
-        raise ValueError("v1 equity index is not contiguous")
-    if source_equities.height != EXPECTED_EQUITIES:
-        raise ValueError(
-            f"canonical v1 equity axis must contain {EXPECTED_EQUITIES} names"
-        )
-    v1_dates = source_dates.get_column("trade_date").to_list()
-    _validate_v1_calendar(v1_dates)
-    features = np.load(root / "equity_features.npy", mmap_mode="r", allow_pickle=False)
-    slow = np.load(root / "equity_slow.npy", mmap_mode="r", allow_pickle=False)
-    ready = np.load(root / "equity_data_ready.npy", mmap_mode="r", allow_pickle=False)
-    if (
-        features.shape
-        != (
-            EXPECTED_V1_DATES,
-            EXPECTED_EQUITIES,
-            EQUITY_SESSION_MINUTES,
-            len(DYNAMIC_CHANNELS),
-        )
-        or slow.shape != (EXPECTED_V1_DATES, EXPECTED_EQUITIES, 32)
-        or slow.dtype != np.float32
-        or ready.shape != features.shape[:2]
-        or ready.dtype != np.bool_
-    ):
-        raise ValueError("canonical v1 fast arrays have the wrong fixed axes")
-    for value in (features, slow, ready):
-        mmap = getattr(value, "_mmap", None)
-        if mmap is not None:
-            mmap.close()
-    date_lookup = {value: index for index, value in enumerate(dates.astype(object))}
-    date_rows = []
-    for row in source_dates.iter_rows(named=True):
-        target = date_lookup.get(row["trade_date"])
-        if target is None:
-            raise ValueError(
-                f"v1 fast date absent from daily calendar: {row['trade_date']}"
-            )
-        date_rows.append(
-            {
-                "trade_date": row["trade_date"],
-                "v2_date_index": target,
-                "v1_date_index": int(row["date_idx"]),
-            }
-        )
-    mapping = assignments.select("security_id", "isin").unique()
-    if mapping.get_column("security_id").n_unique() != mapping.height:
-        raise ValueError("v1 assignments are not one-to-one")
-    bound = source_equities.join(mapping, on="security_id", how="left", validate="1:1")
-    if (
-        bound.get_column("isin").null_count()
-        or bound.get_column("isin").n_unique() != bound.height
-    ):
-        raise ValueError("v1 equity slots do not map one-to-one onto ISIN")
-    isin_lookup = {value: index for index, value in enumerate(isins)}
-    isin_rows = []
-    for row in bound.iter_rows(named=True):
-        target = isin_lookup.get(row["isin"])
-        if target is None:
-            raise ValueError(f"v1 ISIN absent from daily axis: {row['isin']}")
-        isin_rows.append(
-            {
-                "isin": row["isin"],
-                "security_id": row["security_id"],
-                "v2_isin_index": target,
-                "v1_equity_slot": int(row["equity_slot"]),
-            }
-        )
-    return pl.DataFrame(date_rows), pl.DataFrame(isin_rows), required
+    native_arrays: Mapping[str, NDArray[np.generic]]
+    native_mapping: pl.DataFrame
+    to_close_entry: NDArray[np.float32]
+    to_close_entry_valid: NDArray[np.bool_]
 
 
 @dataclass(frozen=True)
 class MinutePanel:
-    """M1 arrays on their native (usually v1-only) date and ISIN axes."""
+    """M1 price/activity arrays with independent source-session support."""
 
     dates: NDArray[np.datetime64]
     isins: tuple[str, ...]
@@ -299,6 +447,8 @@ class MinutePanel:
     close_brl: NDArray[np.floating]
     volume: NDArray[np.floating]
     observed: NDArray[np.bool_]
+    volume_valid: NDArray[np.bool_]
+    session_valid: NDArray[np.bool_]
 
     def __post_init__(self) -> None:
         shape = self.open_brl.shape
@@ -315,6 +465,22 @@ class MinutePanel:
             or any(value.shape != shape for value in arrays)
         ):
             raise ValueError("minute panel arrays are misaligned")
+        if self.observed.dtype != np.bool_:
+            raise TypeError("minute observed mask must be boolean")
+        if self.volume_valid.shape != shape or self.volume_valid.dtype != np.bool_:
+            raise ValueError("minute volume_valid must be boolean and aligned")
+        if (
+            self.session_valid.shape != shape[:2]
+            or self.session_valid.dtype != np.bool_
+        ):
+            raise ValueError("minute session_valid must be boolean and aligned")
+        if np.any(self.observed & ~self.session_valid[..., None]):
+            raise ValueError("minute prices cannot be observed outside source support")
+        if np.any(self.volume_valid & ~self.session_valid[..., None]):
+            raise ValueError("minute activity cannot be valid outside source support")
+        activity = np.asarray(self.volume)
+        if np.any(self.volume_valid & (~np.isfinite(activity) | (activity < 0.0))):
+            raise ValueError("valid minute activity must be finite and non-negative")
         if len(set(self.isins)) != len(self.isins):
             raise ValueError("minute panel ISIN axis must be unique")
 
@@ -322,44 +488,177 @@ class MinutePanel:
 def stream_intraday_from_assignments(
     assignments: pl.DataFrame,
     daily: pl.DataFrame,
-    dates: Sequence[date],
+    sessions: Sequence[SessionDefinition],
     isins: Sequence[str],
+    *,
+    sigma_asof: NDArray[np.floating],
+    kept_rows: NDArray[np.integer],
+    workspace: Path,
 ) -> StreamedIntraday:
-    """Build daily M1 derivatives one physical source at a time.
+    """Build sparse native M1 and broad daily summaries source-by-source.
 
     A physical XP file is loaded once, but every accepted identity segment is
-    filtered to its exact COTAHIST ISIN dates before gridding.  Only daily
-    derivatives are retained, so the dense 405-minute archive is never expanded
-    across the broad v2 ISIN axis.
+    filtered to its exact COTAHIST ISIN dates before date-specific gridding.
+    Native patches stay on the compact accepted-M1 identity axis.  Daily scalar
+    summaries alone are scattered to the broad store identity axis.
     """
 
     from brazil_rv.modeling.contract import workspace_path
-    from brazil_rv.preprocessing.contract import (
-        EQUITY_SESSION_MINUTES,
-        EQUITY_SESSION_START_MINUTE,
-    )
     from brazil_rv.preprocessing.io import (
         dense_grid,
         load_source_file,
-        prepare_session_bars,
+        validate_session_bars,
         validate_physical_source_identity,
     )
 
-    required = {"isin", "source_file"}
+    required = {"security_id", "isin", "source_file"}
     if not required.issubset(assignments.columns):
-        raise ValueError("streaming assignments need ISIN and source_file")
-    calendar = tuple(dates)
+        raise ValueError(
+            f"streaming assignments columns missing: {sorted(required - set(assignments.columns))}"
+        )
+    if (
+        assignments.is_empty()
+        or assignments.get_column("security_id").null_count()
+        or assignments.get_column("isin").null_count()
+        or assignments.get_column("source_file").null_count()
+        or assignments.get_column("security_id").n_unique() != assignments.height
+        or assignments.get_column("isin").n_unique() != assignments.height
+    ):
+        raise ValueError("M1 assignments must bind unique non-null security/ISIN rows")
+    if "manual_decision" in assignments.columns and set(
+        assignments.get_column("manual_decision").cast(pl.String).to_list()
+    ) != {"ACCEPTED"}:
+        raise ValueError("every M1 assignment must be explicitly accepted")
+    if "normalization_rule" in assignments.columns and set(
+        assignments.get_column("normalization_rule").cast(pl.String).to_list()
+    ) != {"FILTER_TO_COTAHIST_SECURITY_DATES"}:
+        raise ValueError("M1 assignments have an unsupported identity filter")
+
+    calendar = tuple(row.trade_date for row in sessions)
+    if not calendar:
+        raise ValueError("M1 streaming requires a nonempty session schedule")
+    sigma = np.asarray(sigma_asof)
+    if sigma.shape != (len(calendar), len(isins)):
+        raise ValueError("M1 sigma_asof is misaligned with the daily store axes")
+    selected = np.asarray(kept_rows)
+    if (
+        selected.ndim != 1
+        or not np.issubdtype(selected.dtype, np.integer)
+        or np.any(selected < 0)
+        or np.any(selected >= len(calendar))
+        or (selected.size > 1 and np.any(np.diff(selected) <= 0))
+    ):
+        raise ValueError("M1 kept_rows must be increasing schedule positions")
+    selected = selected.astype(np.int64, copy=False)
     date_lookup = {value: index for index, value in enumerate(calendar)}
     isin_lookup = {value: index for index, value in enumerate(isins)}
     shape = (len(calendar), len(isins))
-    feature_values = np.zeros((*shape, len(INTRADAY_DAILY_FEATURES)), dtype=np.float32)
-    feature_valid = np.zeros(feature_values.shape, dtype=np.bool_)
-    entry = np.full(shape, np.nan, dtype=np.float64)
-    entry_valid = np.zeros(shape, dtype=np.bool_)
-    realized = np.full(shape, np.nan, dtype=np.float64)
-    present = np.zeros(shape, dtype=np.bool_)
-    session_close = np.full(shape, np.nan, dtype=np.float64)
-    session_close_valid = np.zeros(shape, dtype=np.bool_)
+    feature_values = _workspace_array(
+        workspace,
+        "full_intraday_values",
+        (*shape, len(INTRADAY_DAILY_FEATURES)),
+        np.float32,
+        fill=0.0,
+    )
+    feature_valid = _workspace_array(
+        workspace,
+        "full_intraday_valid",
+        feature_values.shape,
+        np.bool_,
+        fill=False,
+    )
+    entry = _workspace_array(
+        workspace, "full_intraday_entry", shape, np.float32, fill=np.nan
+    )
+    entry_valid = _workspace_array(
+        workspace, "full_intraday_entry_valid", shape, np.bool_, fill=False
+    )
+    realized = _workspace_array(
+        workspace, "full_intraday_realized", shape, np.float32, fill=np.nan
+    )
+    present = _workspace_array(
+        workspace, "full_fast_present", shape, np.bool_, fill=False
+    )
+    session_close = _workspace_array(
+        workspace, "full_m1_session_close", shape, np.float32, fill=np.nan
+    )
+    session_close_valid = _workspace_array(
+        workspace, "full_m1_session_close_valid", shape, np.bool_, fill=False
+    )
+    to_close_entry = _workspace_array(
+        workspace, "full_to_close_entry", shape, np.float32, fill=np.nan
+    )
+    to_close_entry_valid = _workspace_array(
+        workspace, "full_to_close_entry_valid", shape, np.bool_, fill=False
+    )
+
+    ordered_assignments = assignments.sort("security_id")
+    fast_mapping_rows: list[dict[str, object]] = []
+    for fast_index, row in enumerate(ordered_assignments.iter_rows(named=True)):
+        isin = str(row["isin"])
+        store_index = isin_lookup.get(isin)
+        if store_index is None:
+            raise ValueError(f"accepted M1 ISIN absent from daily axis: {isin}")
+        fast_mapping_rows.append(
+            {
+                "fast_index": fast_index,
+                "store_name_index": store_index,
+                "isin": isin,
+                "security_id": str(row["security_id"]),
+            }
+        )
+    native_mapping = pl.DataFrame(fast_mapping_rows)
+    fast_by_isin = {
+        str(row["isin"]): int(row["fast_index"]) for row in fast_mapping_rows
+    }
+    patch_count = max(
+        (
+            (row.decision_time.hour * 60 + row.decision_time.minute)
+            - (row.continuous_open.hour * 60 + row.continuous_open.minute)
+        )
+        // 5
+        for row in sessions
+    )
+    native_shape = (selected.size, ordered_assignments.height, patch_count)
+    native_arrays: dict[str, NDArray[np.generic]] = {
+        "fast_patch_values": _workspace_array(
+            workspace,
+            "store_fast_patch_values",
+            (*native_shape, len(NATIVE_FAST_FEATURES)),
+            np.float32,
+            fill=0.0,
+        ),
+        "fast_patch_valid": _workspace_array(
+            workspace,
+            "store_fast_patch_valid",
+            (*native_shape, len(NATIVE_FAST_FEATURES)),
+            np.bool_,
+            fill=False,
+        ),
+        "fast_patch_mask": _workspace_array(
+            workspace,
+            "store_fast_patch_mask",
+            native_shape,
+            np.bool_,
+            fill=False,
+        ),
+        "fast_last_price_age_minutes": _workspace_array(
+            workspace,
+            "store_fast_last_price_age_minutes",
+            native_shape,
+            np.float32,
+            fill=0.0,
+        ),
+        "fast_last_price_age_valid": _workspace_array(
+            workspace,
+            "store_fast_last_price_age_valid",
+            native_shape,
+            np.bool_,
+            fill=False,
+        ),
+    }
+    store_row_by_global = np.full(len(calendar), -1, dtype=np.int64)
+    store_row_by_global[selected] = np.arange(selected.size, dtype=np.int64)
     audit_rows: list[dict[str, object]] = []
     source_paths: list[Path] = []
     dates_by_isin = {
@@ -368,7 +667,7 @@ def stream_intraday_from_assignments(
         )
         for key, group in daily.select("isin", "trade_date").group_by("isin")
     }
-    for group in assignments.partition_by("source_file"):
+    for group in ordered_assignments.partition_by("source_file"):
         raw_path = Path(str(group[0, "source_file"]))
         source_path = raw_path if raw_path.is_file() else workspace_path(raw_path)
         source_path = source_path.resolve()
@@ -377,14 +676,12 @@ def stream_intraday_from_assignments(
         source_sha256 = source_records([source_path])[0]["sha256"]
         if "xp_symbol" in group.columns:
             validate_physical_source_identity(group, source, source_path)
+        claimed_dates: set[date] = set()
         for row in group.iter_rows(named=True):
             isin = str(row["isin"])
             target = isin_lookup.get(isin)
-            if target is None:
-                raise ValueError(f"accepted M1 ISIN absent from daily axis: {isin}")
-            # dense_grid uses zero for an unobserved entry price.  Retain that
-            # masked payload outside the compact working slice as well.
-            entry[:, target] = 0.0
+            assert target is not None
+            fast_index = fast_by_isin[isin]
             allowed = dates_by_isin.get(isin, frozenset())
             first = row.get("first_overlap_date")
             last = row.get("last_overlap_date")
@@ -397,6 +694,13 @@ def stream_intraday_from_assignments(
             if last is not None:
                 allowed = frozenset(value for value in allowed if value <= last)
             allowed = allowed.intersection(date_lookup)
+            overlap = claimed_dates.intersection(allowed)
+            if overlap:
+                raise ValueError(
+                    "one physical M1 source assigns the same session to multiple "
+                    f"identities: {source_path}, {min(overlap)}"
+                )
+            claimed_dates.update(allowed)
             if not allowed:
                 audit_rows.append(
                     {
@@ -415,19 +719,74 @@ def stream_intraday_from_assignments(
             # reducers and one-session lags while avoiding the years of empty
             # M1 history outside this accepted identity segment.
             start = max(date_lookup[min(allowed)] - 20, 0)
-            stop = min(date_lookup[max(allowed)] + 21, len(calendar))
+            stop = date_lookup[max(allowed)] + 1
             local_calendar = calendar[start:stop]
-            bars = prepare_session_bars(
-                source,
-                source_path,
-                allowed,
-                local_calendar,
-                EQUITY_SESSION_START_MINUTE,
-                EQUITY_SESSION_MINUTES,
+            local_sessions = tuple(sessions[start:stop])
+            schedule_index = pl.DataFrame(
+                {
+                    "trade_date": pl.Series(local_calendar, dtype=pl.Date),
+                    "date_idx": pl.Series(range(len(local_calendar)), dtype=pl.Int32),
+                    "continuous_open_minute": pl.Series(
+                        [
+                            value.continuous_open.hour * 60
+                            + value.continuous_open.minute
+                            for value in local_sessions
+                        ],
+                        dtype=pl.Int16,
+                    ),
+                    "continuous_minute_count": pl.Series(
+                        [
+                            value.continuous_close.hour * 60
+                            + value.continuous_close.minute
+                            - value.continuous_open.hour * 60
+                            - value.continuous_open.minute
+                            for value in local_sessions
+                        ],
+                        dtype=pl.Int16,
+                    ),
+                }
             )
-            grid, observed = dense_grid(
-                bars, len(local_calendar), EQUITY_SESSION_MINUTES
+            bars = (
+                source.with_columns(
+                    pl.col("ts_exchange").dt.date().alias("trade_date"),
+                    (
+                        pl.col("ts_exchange").dt.hour().cast(pl.Int16) * 60
+                        + pl.col("ts_exchange").dt.minute().cast(pl.Int16)
+                    ).alias("clock_minute"),
+                )
+                .filter(pl.col("trade_date").is_in(tuple(allowed)))
+                .join(schedule_index, on="trade_date", how="inner")
+                .with_columns(
+                    (pl.col("clock_minute") - pl.col("continuous_open_minute"))
+                    .cast(pl.Int16)
+                    .alias("minute_idx")
+                )
+                .filter(
+                    pl.col("minute_idx") >= 0,
+                    pl.col("minute_idx") < pl.col("continuous_minute_count"),
+                )
+                .sort("ts_exchange")
             )
+            validate_session_bars(bars, source_path)
+            max_minutes = max(
+                value.continuous_close.hour * 60
+                + value.continuous_close.minute
+                - value.continuous_open.hour * 60
+                - value.continuous_open.minute
+                for value in local_sessions
+            )
+            grid, observed = dense_grid(bars, len(local_calendar), max_minutes)
+            session_valid = (
+                np.asarray(
+                    [value in allowed for value in local_calendar], dtype=np.bool_
+                )
+                & observed.any(axis=1)
+            )[:, None]
+            # The accepted sparse MT5 archive does not certify that an absent
+            # minute is a zero-trade minute.  Only physical rows therefore
+            # carry valid activity; gaps remain unknown even on a supported
+            # source session.
+            volume_valid = observed[:, None, :].copy()
             native = build_intraday_daily_features(
                 grid[:, None, :, 0],
                 grid[:, None, :, 1],
@@ -435,7 +794,31 @@ def stream_intraday_from_assignments(
                 grid[:, None, :, 3],
                 grid[:, None, :, 4],
                 observed[:, None, :],
+                volume_valid=volume_valid,
+                session_valid=session_valid,
+                sessions=local_sessions,
             )
+            prefix_indices = np.asarray(
+                [
+                    value.decision_time.hour * 60
+                    + value.decision_time.minute
+                    - value.continuous_open.hour * 60
+                    - value.continuous_open.minute
+                    for value in local_sessions
+                ],
+                dtype=np.int64,
+            )
+            local_entry = grid[np.arange(len(local_calendar)), prefix_indices, 0]
+            local_entry_valid = (
+                observed[np.arange(len(local_calendar)), prefix_indices]
+                & np.isfinite(local_entry)
+                & (local_entry > 0.0)
+                & session_valid[:, 0]
+            )
+            to_close_entry[start:stop, target] = np.where(
+                local_entry_valid, local_entry, np.nan
+            ).astype(np.float32)
+            to_close_entry_valid[start:stop, target] = local_entry_valid
             feature_values[start:stop, target] = native.values[:, 0]
             feature_valid[start:stop, target] = native.valid[:, 0]
             entry[start:stop, target] = native.entry_open[:, 0]
@@ -444,8 +827,58 @@ def stream_intraday_from_assignments(
             present[start:stop, target] = native.fast_present[:, 0]
             session_close[start:stop, target] = native.session_close[:, 0]
             session_close_valid[start:stop, target] = native.session_close_valid[:, 0]
+            local_native_shape = (len(local_calendar), 1, patch_count)
+            local_native_values = np.empty(
+                (*local_native_shape, len(NATIVE_FAST_FEATURES)), dtype=np.float32
+            )
+            local_native_valid = np.empty_like(local_native_values, dtype=np.bool_)
+            local_native_patch_mask = np.empty(local_native_shape, dtype=np.bool_)
+            local_native_age = np.empty(local_native_shape, dtype=np.float32)
+            local_native_age_valid = np.empty(local_native_shape, dtype=np.bool_)
+            build_native_fast_features_into(
+                grid[:, None, :, 1],
+                grid[:, None, :, 2],
+                grid[:, None, :, 3],
+                grid[:, None, :, 4],
+                observed[:, None, :],
+                volume_valid=volume_valid,
+                session_valid=session_valid,
+                sigma_asof=sigma[start:stop, target, None],
+                sessions=local_sessions,
+                values_out=local_native_values,
+                valid_out=local_native_valid,
+                patch_mask_out=local_native_patch_mask,
+                last_price_age_minutes_out=local_native_age,
+                last_price_age_valid_out=local_native_age_valid,
+            )
+            local_store_rows = store_row_by_global[start:stop]
+            retained_local = np.flatnonzero(local_store_rows >= 0)
+            retained_store = local_store_rows[retained_local]
+            native_arrays["fast_patch_values"][retained_store, fast_index] = (
+                local_native_values[retained_local, 0]
+            )
+            native_arrays["fast_patch_valid"][retained_store, fast_index] = (
+                local_native_valid[retained_local, 0]
+            )
+            native_arrays["fast_patch_mask"][retained_store, fast_index] = (
+                local_native_patch_mask[retained_local, 0]
+            )
+            native_arrays["fast_last_price_age_minutes"][retained_store, fast_index] = (
+                local_native_age[retained_local, 0]
+            )
+            native_arrays["fast_last_price_age_valid"][retained_store, fast_index] = (
+                local_native_age_valid[retained_local, 0]
+            )
             has_bar = observed.any(axis=1)
-            exact_close = observed[:, -1]
+            exact_close = np.asarray(
+                [
+                    observed[day_index, minutes - 1]
+                    for day_index, minutes in enumerate(
+                        schedule_index.get_column("continuous_minute_count").to_list()
+                    )
+                ],
+                dtype=np.bool_,
+            )
             audit_rows.append(
                 {
                     "isin": isin,
@@ -458,7 +891,18 @@ def stream_intraday_from_assignments(
                     "fast_present_count": int(native.fast_present.sum()),
                 }
             )
-            del bars, grid, observed, native
+            del (
+                bars,
+                grid,
+                observed,
+                native,
+                volume_valid,
+                local_native_values,
+                local_native_valid,
+                local_native_patch_mask,
+                local_native_age,
+                local_native_age_valid,
+            )
         del source
     return StreamedIntraday(
         result=IntradayDailyResult(
@@ -474,6 +918,10 @@ def stream_intraday_from_assignments(
         ),
         audit=pl.DataFrame(audit_rows),
         source_paths=tuple(sorted(set(source_paths))),
+        native_arrays=native_arrays,
+        native_mapping=native_mapping,
+        to_close_entry=to_close_entry,
+        to_close_entry_valid=to_close_entry_valid,
     )
 
 
@@ -507,12 +955,103 @@ def _coverage_table(
     return pl.DataFrame(rows)
 
 
+def _common_state_diagnostic_panel(
+    wealth_close: NDArray[np.floating],
+    wealth_valid: NDArray[np.bool_],
+    unresolved_action: NDArray[np.bool_],
+    active: NDArray[np.bool_],
+    sigma_asof: NDArray[np.floating],
+    decision_rows: NDArray[np.integer],
+    dates: NDArray[np.datetime64],
+    *,
+    minimum_names: int,
+) -> tuple[NDArray[np.float32], NDArray[np.bool_], pl.DataFrame]:
+    """Build audit-only common market state on the canonical decision clock.
+
+    For decision row ``t``, the return statistics use the exact shareholder-
+    wealth move from raw daily rows ``t-2`` to ``t-1``.  The risk statistic
+    uses the already-lagged raw ``sigma_asof[t]``.  No value is exposed as a
+    model feature in this refactor; the panel documents information removed by
+    cross-sectional ranks and provides a clean input for a later registered
+    two-field context comparison.
+    """
+
+    close = np.asarray(wealth_close, dtype=np.float64)
+    valid = np.asarray(wealth_valid, dtype=np.bool_)
+    unresolved = np.asarray(unresolved_action, dtype=np.bool_)
+    membership = np.asarray(active, dtype=np.bool_)
+    sigma = np.asarray(sigma_asof, dtype=np.float64)
+    rows = np.asarray(decision_rows, dtype=np.int64)
+    if any(
+        value.shape != close.shape for value in (valid, unresolved, membership, sigma)
+    ):
+        raise ValueError("common-state inputs must align [date, name]")
+    if minimum_names < 1:
+        raise ValueError("common-state minimum_names must be positive")
+
+    values = np.zeros((rows.size, len(COMMON_STATE_DIAGNOSTICS)), dtype=np.float32)
+    masks = np.zeros_like(values, dtype=np.bool_)
+    return_support = np.zeros(rows.size, dtype=np.int32)
+    volatility_support = np.zeros(rows.size, dtype=np.int32)
+    for output_row, decision_row in enumerate(rows):
+        source_row = int(decision_row) - 1
+        prior_row = source_row - 1
+        if prior_row >= 0:
+            usable = (
+                membership[decision_row]
+                & valid[source_row]
+                & valid[prior_row]
+                & ~unresolved[source_row]
+                & np.isfinite(close[source_row])
+                & np.isfinite(close[prior_row])
+                & (close[source_row] > 0.0)
+                & (close[prior_row] > 0.0)
+            )
+            return_support[output_row] = int(usable.sum())
+            if return_support[output_row] >= minimum_names:
+                returns = np.log(close[source_row, usable] / close[prior_row, usable])
+                values[output_row, 0] = np.float32(np.median(returns))
+                values[output_row, 2] = np.float32(np.std(returns, ddof=0))
+                masks[output_row, (0, 2)] = True
+
+        usable_sigma = (
+            membership[decision_row]
+            & np.isfinite(sigma[decision_row])
+            & (sigma[decision_row] > 1e-8)
+        )
+        volatility_support[output_row] = int(usable_sigma.sum())
+        if volatility_support[output_row] >= minimum_names:
+            values[output_row, 1] = np.float32(
+                np.median(sigma[decision_row, usable_sigma])
+            )
+            masks[output_row, 1] = True
+
+    table_rows = []
+    for index, decision_row in enumerate(rows):
+        row: dict[str, object] = {
+            "trade_date": np.asarray(dates)[decision_row].astype(object),
+            "return_support_names": int(return_support[index]),
+            "volatility_support_names": int(volatility_support[index]),
+        }
+        for feature_index, name in enumerate(COMMON_STATE_DIAGNOSTICS):
+            row[name] = (
+                float(values[index, feature_index])
+                if masks[index, feature_index]
+                else None
+            )
+            row[f"{name}_valid"] = bool(masks[index, feature_index])
+        table_rows.append(row)
+    return values, masks, pl.DataFrame(table_rows)
+
+
 def _target_validity_tables(
     dates: NDArray[np.datetime64],
     valid: NDArray[np.bool_],
     active: NDArray[np.bool_],
     observed: NDArray[np.bool_],
     survival_identities: Sequence[str] | None = None,
+    *,
+    family: str,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Audit target coverage by year and by eventual panel survival."""
 
@@ -538,6 +1077,7 @@ def _target_validity_tables(
             )
             yearly.append(
                 {
+                    "family": family,
                     "year": int(year),
                     "horizon_sessions": horizon,
                     "valid_target_name_days": numerator,
@@ -563,6 +1103,7 @@ def _target_validity_tables(
             denominators[(label, horizon)] = denominator
             survival_rows.append(
                 {
+                    "family": family,
                     "group": label,
                     "horizon_sessions": horizon,
                     "name_count": int(names.sum()),
@@ -615,48 +1156,6 @@ def _cotahist_action_counts_by_year(
                 "ambiguous_count": int(detected.ambiguous_event[selected].sum()),
                 "jump_only_anomaly_count": int(
                     detected.price_jump_anomaly_mask[selected].sum()
-                ),
-            }
-        )
-    return pl.DataFrame(rows)
-
-
-def _neutralized_return_coverage_by_year(
-    dates: NDArray[np.datetime64],
-    event: NDArray[np.bool_],
-    valid: NDArray[np.bool_],
-    active: NDArray[np.bool_],
-    cross_sectional_median: NDArray[np.floating],
-) -> pl.DataFrame:
-    neutralized = np.asarray(event, dtype=np.bool_)
-    return_valid = np.asarray(valid, dtype=np.bool_)
-    membership = np.asarray(active, dtype=np.bool_)
-    median = np.asarray(cross_sectional_median)
-    shape = (len(dates), neutralized.shape[1])
-    if (
-        neutralized.shape != shape
-        or return_valid.shape != shape
-        or membership.shape != shape
-        or median.shape != (len(dates),)
-    ):
-        raise ValueError("neutralized-return audit axes are misaligned")
-    years = dates.astype("datetime64[Y]").astype(np.int64) + 1970
-    rows: list[dict[str, object]] = []
-    for year in sorted(set(years.tolist())):
-        selected = years == year
-        active_event = neutralized[selected] & membership[selected]
-        rows.append(
-            {
-                "year": int(year),
-                "active_event_name_days": int(active_event.sum()),
-                "neutralized_valid_name_days": int(
-                    (active_event & return_valid[selected]).sum()
-                ),
-                "neutralized_invalid_name_days": int(
-                    (active_event & ~return_valid[selected]).sum()
-                ),
-                "dates_with_valid_cross_sectional_median": int(
-                    np.isfinite(median[selected]).sum()
                 ),
             }
         )
@@ -769,23 +1268,32 @@ def _eventual_survival_groups(
 
 
 def _prior_adv20(
-    volume_brl: NDArray[np.floating], observed: NDArray[np.bool_]
+    volume_brl: NDArray[np.floating], activity_valid: NDArray[np.bool_]
 ) -> NDArray[np.float32]:
-    """Return the causal mean BRL volume over the 20 sessions before each row."""
+    """Return exact causal ADV20, invalidated by unknown source activity."""
 
     volume = np.asarray(volume_brl, dtype=np.float64)
-    seen = np.asarray(observed, dtype=np.bool_)
-    if volume.ndim != 2 or seen.shape != volume.shape:
+    valid = np.asarray(activity_valid, dtype=np.bool_)
+    if volume.ndim != 2 or valid.shape != volume.shape:
         raise ValueError("prior-ADV20 axes are misaligned")
+    if np.any(valid & (~np.isfinite(volume) | (volume < 0.0))):
+        raise ValueError("prior-ADV20 valid activity must be finite and non-negative")
     output = np.full(volume.shape, np.nan, dtype=np.float32)
-    clean = np.where(seen & np.isfinite(volume) & (volume >= 0.0), volume, 0.0)
+    clean = np.where(valid, volume, 0.0)
     cumulative = np.vstack(
         (np.zeros((1, volume.shape[1]), dtype=np.float64), np.cumsum(clean, axis=0))
     )
-    for day in range(20, volume.shape[0]):
-        output[day] = ((cumulative[day] - cumulative[day - 20]) / 20.0).astype(
-            np.float32
+    counts = np.vstack(
+        (
+            np.zeros((1, volume.shape[1]), dtype=np.int32),
+            np.cumsum(valid, axis=0, dtype=np.int32),
         )
+    )
+    for day in range(20, volume.shape[0]):
+        exact = counts[day] - counts[day - 20] == 20
+        output[day, exact] = (
+            (cumulative[day, exact] - cumulative[day - 20, exact]) / 20.0
+        ).astype(np.float32)
     return output
 
 
@@ -1180,16 +1688,16 @@ def build_daily_store(
     stream_intraday: bool = False,
     sidecar_arguments: Sequence[str] = (),
     action_acquisition_audit: pl.DataFrame | None = None,
-    v1_assignments: pl.DataFrame | None = None,
-    v1_calendar: Sequence[date] | None = None,
+    m1_assignments: pl.DataFrame | None = None,
     source_paths: Sequence[Path] = (),
     implementation_commit: str | None = None,
     cotahist_raw_sources: Sequence[Path] = (),
     cotahist_parse_audit: Path | None = None,
-    v1_fast_store: Path | None = None,
-    minimum_calendar_names: int = 50,
+    session_schedule: Sequence[SessionDefinition] | None = None,
+    isin_link_allowlist: Path | None = None,
+    minimum_rank_names: int = 20,
     store_start: date | None = STORE_START,
-    undocumented_split_fallback: bool = False,
+    resource_preflight: Mapping[str, object] | None = None,
 ) -> Path:
     """Build the immutable aligned daily store from already-acquired sources."""
 
@@ -1203,20 +1711,53 @@ def build_daily_store(
         raise ValueError("provide exactly one intraday source mode")
     if sidecars is not None and sidecar_arguments:
         raise ValueError("provide materialized or streamed sidecars, not both")
+    if minimum_rank_names < 1:
+        raise ValueError("minimum_rank_names must be positive")
     has_intraday = (
         minute_panel is not None or streamed_intraday is not None or stream_intraday
     )
 
-    v1_isins: tuple[str, ...] = ()
-    if v1_assignments is not None:
-        v1_isins = tuple(v1_assignments.get_column("isin").cast(pl.String).to_list())
-    cash = filter_cash_equities(daily, v1_isins=v1_isins)
-    calendar = session_calendar(cash, minimum_traded_names=minimum_calendar_names)
+    m1_isins: tuple[str, ...] = ()
+    if m1_assignments is not None:
+        m1_isins = tuple(m1_assignments.get_column("isin").cast(pl.String).to_list())
+    validation = prepare_cash_equities(
+        daily,
+        v1_isins=m1_isins,
+        require_units=True,
+        maximum_rejection_fraction=0.005,
+    )
+    cash = validation.accepted
+    if session_schedule is None:
+        raise ValueError("an authoritative B3 session schedule is required")
+    archive_dates = list(validation.source_session_dates)
+    assert_calendar_complete(session_schedule, archive_dates)
+    calendar = tuple(row.trade_date for row in session_schedule)
     if not calendar:
-        raise ValueError("COTAHIST produced no qualifying sessions")
-    panel = panel_from_daily(cash, dates=calendar)
-    isin_successions = detect_isin_successions(cash)
+        raise ValueError("B3 session schedule is empty")
+    archive_date_set = frozenset(archive_dates)
+    source_session_complete = np.asarray(
+        [value in archive_date_set for value in calendar], dtype=np.bool_
+    )
+    panel = panel_from_daily(
+        cash,
+        dates=calendar,
+        source_session_complete=source_session_complete,
+        invalid_observations=validation.rejected,
+    )
+    proposed_isin_successions = detect_isin_successions(cash)
+    if isin_link_allowlist is None:
+        isin_successions = pl.DataFrame(
+            schema={
+                "predecessor_isin": pl.String,
+                "successor_isin": pl.String,
+            }
+        )
+    else:
+        isin_successions = load_isin_link_allowlist(
+            isin_link_allowlist, proposed_isin_successions
+        )
     continuation_isins = continuation_identity_axis(panel.isins, isin_successions)
+    decision_timestamps = tuple(row.decision_at for row in session_schedule)
     keep = np.ones(len(panel.dates), dtype=np.bool_)
     if store_start is not None:
         keep &= panel.dates >= np.datetime64(store_start)
@@ -1230,23 +1771,49 @@ def build_daily_store(
         prefix=f".{Path(output_dir).name}.arrays-", dir=output_parent
     )
     workspace = Path(workspace_handle.name)
-    if v1_assignments is not None:
-        verify_v1_mapping(v1_assignments, panel.isins)
-    if v1_calendar is not None:
-        if not v1_calendar:
-            raise ValueError("v1 calendar cannot be empty")
-        matching_slice = tuple(
-            day for day in calendar if v1_calendar[0] <= day <= v1_calendar[-1]
-        )
-        if matching_slice != tuple(v1_calendar):
-            raise ValueError(
-                "v1 date axis differs from the matching COTAHIST calendar slice"
-            )
-
     checked_actions = validate_action_table(actions)
+    if action_acquisition_audit is None:
+        raise ValueError(
+            "economic store construction requires an action acquisition audit; "
+            "an empty action table does not prove zero actions"
+        )
     provider_split, provider_cash_distribution, _ = align_action_arrays(
         checked_actions, panel.dates, panel.isins
     )
+    provider_verified_action_terms = provider_actions_to_verified_terms(checked_actions)
+    conversion_verified_action_terms = verified_conversion_terms_from_links(
+        isin_successions
+    )
+    verified_action_terms = validate_verified_action_terms(
+        (*provider_verified_action_terms, *conversion_verified_action_terms)
+    )
+    action_coverage_resolved = action_coverage_resolved_mask(
+        action_acquisition_audit, panel.dates, panel.isins
+    )
+    retrospective_actions = align_verified_action_terms(
+        verified_action_terms,
+        panel.dates,
+        panel.isins,
+        coverage_resolved=action_coverage_resolved,
+    )
+    decision_actions = align_decision_known_action_terms(
+        verified_action_terms,
+        panel.dates,
+        panel.isins,
+        coverage_resolved=action_coverage_resolved,
+        decision_timestamps=decision_timestamps,
+    )
+    action_payment_session = align_action_payment_sessions(
+        verified_action_terms, panel.dates, panel.isins
+    )
+    first_kept_row = int(kept_rows[0])
+    action_payment_session = np.where(
+        action_payment_session < 0,
+        -1,
+        action_payment_session - first_kept_row,
+    ).astype(np.int64)
+    if (action_payment_session[kept_rows] < -1).any():
+        raise ValueError("an in-store action payment predates the store date axis")
     distribution_changed = detect_distribution_changes(
         panel.distribution_number, panel.observed
     )
@@ -1255,119 +1822,130 @@ def build_daily_store(
         panel.quantity,
         panel.distribution_number,
         panel.observed,
-        undocumented_split_fallback=undocumented_split_fallback,
     )
-    return_neutralized_event = (
-        detected_actions.cash_event | detected_actions.ambiguous_event
+    # Price/quantity/DISMES classifications are retained for diagnostics only.
+    # Accepted cross-session features are governed solely by contractual action
+    # terms that were known at that historical decision.  An unresolved cell
+    # must break the unit/history chain rather than silently assuming q=1,d=0.
+    diagnostic_intraday_boundary_lagged = detected_actions.split_event
+    diagnostic_intraday_boundary_sameday = detect_open_gap_boundaries(
+        panel.open_brl, panel.close_brl, panel.observed
     )
-    intraday_action_boundary = detected_actions.split_event
-    adjusted = adjust_daily_ohlc(
+    decision_action_boundary = (
+        decision_actions.has_action | ~decision_actions.session_resolved
+    )
+    wealth_paths = {
+        name: workspace / f"{name}.npy"
+        for name in (
+            "shareholder_wealth_open",
+            "shareholder_wealth_high",
+            "shareholder_wealth_low",
+            "shareholder_wealth_close",
+            "shareholder_wealth_valid",
+        )
+    }
+    shareholder_wealth_open = _workspace_array(
+        workspace, "shareholder_wealth_open", panel.close_brl.shape, np.float32
+    )
+    shareholder_wealth_high = _workspace_array(
+        workspace, "shareholder_wealth_high", panel.close_brl.shape, np.float32
+    )
+    shareholder_wealth_low = _workspace_array(
+        workspace, "shareholder_wealth_low", panel.close_brl.shape, np.float32
+    )
+    shareholder_wealth_close = _workspace_array(
+        workspace, "shareholder_wealth_close", panel.close_brl.shape, np.float32
+    )
+    shareholder_wealth_valid = _workspace_array(
+        workspace, "shareholder_wealth_valid", panel.close_brl.shape, np.bool_
+    )
+    build_shareholder_wealth_ohlc_into(
         panel.open_brl,
         panel.high_brl,
         panel.low_brl,
         panel.close_brl,
-        detected_actions.price_ratio,
-        detected_actions.split_event,
+        panel.observed,
+        decision_actions,
+        wealth_open=shareholder_wealth_open,
+        wealth_high=shareholder_wealth_high,
+        wealth_low=shareholder_wealth_low,
+        wealth_close=shareholder_wealth_close,
+        wealth_valid=shareholder_wealth_valid,
     )
-    adjusted_paths: dict[str, Path] = {}
-    for name, values in (
-        ("price_adjustment_factor", adjusted.price_factor),
-        ("adjusted_open", adjusted.adjusted_open),
-        ("adjusted_high", adjusted.adjusted_high),
-        ("adjusted_low", adjusted.adjusted_low),
-        ("adjusted_close", adjusted.adjusted_close),
+    decision_continuation = _route_decision_known_continuations(
+        dates=panel.dates,
+        isins=panel.isins,
+        links=isin_successions,
+        decision_timestamps=decision_timestamps,
+        raw_close=panel.close_brl,
+        volume_brl=panel.volume_brl,
+        trades=panel.trades,
+        observed=panel.observed,
+        trade_observed=panel.trade_observed,
+        activity_valid=panel.activity_valid,
+        ambiguous_action=~decision_actions.session_resolved,
+        shareholder_wealth_arrays=(
+            shareholder_wealth_open,
+            shareholder_wealth_high,
+            shareholder_wealth_low,
+            shareholder_wealth_close,
+            shareholder_wealth_valid,
+        ),
+    )
+    for materialized in (
+        shareholder_wealth_open,
+        shareholder_wealth_high,
+        shareholder_wealth_low,
+        shareholder_wealth_close,
+        shareholder_wealth_valid,
     ):
-        materialized = _copy_workspace_array(workspace, name, values)
-        adjusted_paths[name] = workspace / f"{name}.npy"
         close_memmap(materialized)
-    del adjusted
     gc.collect()
-    price_adjustment_factor = np.load(
-        adjusted_paths["price_adjustment_factor"], mmap_mode="r", allow_pickle=False
+    shareholder_wealth_open = np.load(
+        wealth_paths["shareholder_wealth_open"], mmap_mode="r", allow_pickle=False
     )
-    adjusted_open = np.load(
-        adjusted_paths["adjusted_open"], mmap_mode="r", allow_pickle=False
+    shareholder_wealth_high = np.load(
+        wealth_paths["shareholder_wealth_high"], mmap_mode="r", allow_pickle=False
     )
-    adjusted_high = np.load(
-        adjusted_paths["adjusted_high"], mmap_mode="r", allow_pickle=False
+    shareholder_wealth_low = np.load(
+        wealth_paths["shareholder_wealth_low"], mmap_mode="r", allow_pickle=False
     )
-    adjusted_low = np.load(
-        adjusted_paths["adjusted_low"], mmap_mode="r", allow_pickle=False
+    shareholder_wealth_close = np.load(
+        wealth_paths["shareholder_wealth_close"], mmap_mode="r", allow_pickle=False
     )
-    adjusted_close = np.load(
-        adjusted_paths["adjusted_close"], mmap_mode="r", allow_pickle=False
+    shareholder_wealth_valid = np.load(
+        wealth_paths["shareholder_wealth_valid"], mmap_mode="r", allow_pickle=False
     )
-    linked_universe_inputs = tuple(
-        inherit_linked_history(values, panel.dates, panel.isins, isin_successions)
-        for values in (panel.close_brl, panel.volume_brl, panel.observed)
+    universe = build_daily_universe(
+        decision_continuation.close_brl,
+        decision_continuation.volume_brl,
+        decision_continuation.observed,
+        trade_observed=decision_continuation.trade_observed,
+        activity_valid=decision_continuation.activity_valid,
+        source_session_complete=panel.source_session_complete,
     )
-    universe = build_daily_universe(*linked_universe_inputs)
-    date_lookup = {value: index for index, value in enumerate(panel.dates)}
-    isin_lookup = {value: index for index, value in enumerate(panel.isins)}
-    for row in isin_successions.iter_rows(named=True):
-        boundary = date_lookup[np.datetime64(row["successor_first_date"], "D")]
-        predecessor = isin_lookup[str(row["predecessor_isin"])]
-        successor = isin_lookup[str(row["successor_isin"])]
-        universe.active[boundary:, predecessor] = False
-        universe.active[:boundary, successor] = False
-    linked_slow_inputs = tuple(
-        inherit_linked_history(values, panel.dates, panel.isins, isin_successions)
-        for values in (
-            adjusted_open,
-            adjusted_high,
-            adjusted_low,
-            adjusted_close,
-            linked_universe_inputs[1],
-            panel.trades,
-            linked_universe_inputs[2],
-            detected_actions.ambiguous_event,
+    universe = replace(
+        universe, active=universe.active & decision_continuation.claim_owner
+    )
+    # A recurrent calendar step exists from an identity's first causal history
+    # row onward.  A decision on t consumes daily market state only through
+    # t-1; accepted, timely conversion links carry that history without a
+    # second consumer-side shift.
+    slow_timestep_valid = np.zeros_like(panel.observed, dtype=np.bool_)
+    if slow_timestep_valid.shape[0] > 1:
+        slow_timestep_valid[1:] = np.maximum.accumulate(
+            decision_continuation.observed[:-1], axis=0
         )
+    linked_slow_inputs = (
+        shareholder_wealth_open,
+        shareholder_wealth_high,
+        shareholder_wealth_low,
+        shareholder_wealth_close,
+        decision_continuation.volume_brl,
+        decision_continuation.trades,
+        shareholder_wealth_valid,
+        decision_continuation.ambiguous_action,
     )
-    slow_raw = build_slow_features(
-        *linked_slow_inputs[:6],
-        linked_slow_inputs[6],
-        universe.active,
-        panel.dates,
-        ambiguous_action=linked_slow_inputs[7],
-    )
-    slow_sigma = _copy_workspace_array(
-        workspace,
-        "slow_sigma",
-        np.where(slow_raw.valid[..., 8], slow_raw.values[..., 8], np.nan),
-        dtype=np.float32,
-    )
-    target_scale_sigma = _workspace_array(
-        workspace,
-        "target_scale_sigma",
-        slow_sigma.shape,
-        np.float32,
-    )
-    target_scale_sigma[...] = np.nan
-    target_scale_sigma[1:] = slow_sigma[:-1]
-    neutralized = build_neutralized_log_returns(
-        linked_slow_inputs[3],
-        linked_slow_inputs[6],
-        universe.active,
-        return_neutralized_event,
-    )
-    neutralized_log_return = _copy_workspace_array(
-        workspace,
-        "neutralized_log_return",
-        neutralized.log_return,
-        dtype=np.float32,
-    )
-    neutralized_log_return_valid = _copy_workspace_array(
-        workspace,
-        "neutralized_log_return_valid",
-        neutralized.valid,
-    )
-    cross_sectional_median_log_return = _copy_workspace_array(
-        workspace,
-        "cross_sectional_median_log_return",
-        neutralized.cross_sectional_median,
-        dtype=np.float32,
-    )
-    del neutralized
     slow_values = _workspace_array(
         workspace,
         "slow_values",
@@ -1380,29 +1958,87 @@ def build_daily_store(
         slow_values.shape,
         np.bool_,
     )
-    rank_gauss_panel_into(
-        slow_raw.values,
-        slow_raw.valid,
+    slow_specs = feature_specs(
+        "slow", SLOW_FEATURES, minimum_rank_names=minimum_rank_names
+    )
+    slow_age_sessions = _workspace_array(
+        workspace,
+        "slow_age_sessions",
+        slow_values.shape,
+        np.float32,
+    )
+    slow_sigma = _workspace_array(
+        workspace,
+        "slow_sigma",
+        panel.observed.shape,
+        np.float32,
+        fill=np.nan,
+    )
+
+    def consume_slow_feature(
+        feature_index: int,
+        raw_values: NDArray[np.floating],
+        raw_valid: NDArray[np.bool_],
+    ) -> None:
+        values_3d = np.asarray(raw_values)[..., None]
+        valid_3d = np.asarray(raw_valid, dtype=np.bool_)[..., None]
+        transform_feature_panel_into(
+            values_3d,
+            valid_3d,
+            universe.active,
+            slow_specs[feature_index : feature_index + 1],
+            slow_values[..., feature_index : feature_index + 1],
+            slow_valid[..., feature_index : feature_index + 1],
+            source_rows=kept_rows - 1,
+            membership_rows=kept_rows,
+            minimum_rank_names=minimum_rank_names,
+        )
+        observation_age_sessions_into(
+            valid_3d,
+            universe.active,
+            slow_age_sessions[..., feature_index : feature_index + 1],
+            source_rows=kept_rows - 1,
+            decision_rows=kept_rows,
+        )
+        if feature_index == 8:
+            slow_sigma[...] = np.where(raw_valid, raw_values, np.nan).astype(np.float32)
+
+    build_slow_features_into(
+        *linked_slow_inputs[:6],
+        linked_slow_inputs[6],
         universe.active,
-        slow_values,
-        slow_valid,
-        source_rows=kept_rows,
+        panel.dates,
+        raw_high=panel.high_brl,
+        raw_low=panel.low_brl,
+        raw_close=panel.close_brl,
+        price_observed=panel.observed,
+        history_observed=decision_continuation.observed,
+        activity_valid=decision_continuation.activity_valid,
+        consume=consume_slow_feature,
+        ambiguous_action=linked_slow_inputs[7],
     )
-    inherit_linked_history(
-        slow_values,
-        kept_dates,
-        panel.isins,
-        isin_successions,
-        copy=False,
+    target_scale_sigma = _workspace_array(
+        workspace,
+        "target_scale_sigma",
+        slow_sigma.shape,
+        np.float32,
+        fill=np.nan,
     )
-    inherit_linked_history(
-        slow_valid,
-        kept_dates,
-        panel.isins,
-        isin_successions,
-        copy=False,
+    target_scale_sigma[1:] = slow_sigma[:-1]
+    (
+        common_state_values,
+        common_state_valid,
+        common_state_table,
+    ) = _common_state_diagnostic_panel(
+        shareholder_wealth_close,
+        shareholder_wealth_valid,
+        decision_continuation.ambiguous_action,
+        universe.active,
+        target_scale_sigma,
+        kept_rows,
+        panel.dates,
+        minimum_names=minimum_rank_names,
     )
-    del slow_raw
     del linked_slow_inputs
     gc.collect()
 
@@ -1421,6 +2057,13 @@ def build_daily_store(
         np.bool_,
         fill=False,
     )
+    intraday_age_sessions = _workspace_array(
+        workspace,
+        "intraday_age_sessions",
+        intraday_values.shape,
+        np.float32,
+        fill=-1.0,
+    )
     fast_sigma = np.full(shape, np.nan, dtype=np.float64)
     fast_present = np.zeros(shape, dtype=np.bool_)
     entry = np.full(shape, np.nan, dtype=np.float64)
@@ -1431,13 +2074,30 @@ def build_daily_store(
     close_anchor_consistent = np.zeros(shape, dtype=np.bool_)
     intraday_audit: pl.DataFrame | None = None
     intraday_source_paths: tuple[Path, ...] = ()
+    native_fast_arrays: dict[str, NDArray[np.generic]] = {}
+    native_fast_mapping: pl.DataFrame | None = None
+    streamed_workspace_arrays: tuple[NDArray[np.generic], ...] = ()
     if stream_intraday:
-        if v1_assignments is None:
-            raise ValueError("streamed intraday construction requires v1 assignments")
+        if m1_assignments is None:
+            raise ValueError("streamed intraday construction requires M1 assignments")
         streamed_intraday = stream_intraday_from_assignments(
-            v1_assignments, cash, calendar, panel.isins
+            m1_assignments,
+            cash,
+            session_schedule,
+            panel.isins,
+            sigma_asof=target_scale_sigma,
+            kept_rows=kept_rows,
+            workspace=workspace,
         )
     if minute_panel is not None:
+        if not np.array_equal(minute_panel.dates, panel.dates):
+            raise ValueError(
+                "native M1 panel dates must exactly match the authoritative schedule"
+            )
+        minute_store_indices = np.asarray(
+            [panel.isins.index(value) for value in minute_panel.isins],
+            dtype=np.int64,
+        )
         native = build_intraday_daily_features(
             minute_panel.open_brl,
             minute_panel.high_brl,
@@ -1445,6 +2105,9 @@ def build_daily_store(
             minute_panel.close_brl,
             minute_panel.volume,
             minute_panel.observed,
+            volume_valid=minute_panel.volume_valid,
+            session_valid=minute_panel.session_valid,
+            sessions=session_schedule,
         )
         aligned = _align_intraday_result(
             native, minute_panel.dates, minute_panel.isins, panel.dates, panel.isins
@@ -1455,25 +2118,145 @@ def build_daily_store(
         aligned = replace_daily_close_anchors(
             aligned, panel.close_brl, panel.observed, copy_buffers=False
         )
-        aligned = mask_action_boundaries(aligned, intraday_action_boundary)
-        rank_gauss_panel_into(
+        aligned = mask_action_boundaries(
+            aligned,
+            lagged_boundary=decision_action_boundary,
+            same_day_boundary=decision_action_boundary,
+            copy_buffers=False,
+        )
+        intraday_specs = feature_specs(
+            "intraday",
+            INTRADAY_DAILY_FEATURES,
+            minimum_rank_names=minimum_rank_names,
+        )
+        transform_feature_panel_into(
             aligned.values,
             aligned.valid,
             universe.active,
+            intraday_specs,
             intraday_values,
             intraday_valid,
             source_rows=kept_rows,
+            minimum_rank_names=minimum_rank_names,
+        )
+        observation_age_sessions_into(
+            aligned.valid,
+            universe.active,
+            intraday_age_sessions,
+            source_rows=kept_rows,
+            decision_rows=kept_rows,
         )
         fast_sigma = np.where(aligned.valid[..., 14], aligned.values[..., 14], np.nan)
         fast_present = aligned.fast_present
-        entry = aligned.entry_open
-        entry_valid = aligned.entry_open_valid
+        prefix_indices = np.asarray(
+            [
+                row.decision_time.hour * 60
+                + row.decision_time.minute
+                - row.continuous_open.hour * 60
+                - row.continuous_open.minute
+                for row in session_schedule
+            ],
+            dtype=np.int64,
+        )
+        if np.any(prefix_indices >= minute_panel.open_brl.shape[2]):
+            raise ValueError("native M1 panel does not contain the decision entry bar")
+        minute_entry = minute_panel.open_brl[
+            np.arange(len(session_schedule)), :, prefix_indices
+        ]
+        minute_entry_valid = minute_panel.observed[
+            np.arange(len(session_schedule)), :, prefix_indices
+        ]
+        minute_entry_valid &= np.isfinite(minute_entry) & (minute_entry > 0.0)
+        entry = np.full(shape, np.nan, dtype=np.float32)
+        entry_valid = np.zeros(shape, dtype=np.bool_)
+        entry[:, minute_store_indices] = np.where(
+            minute_entry_valid, minute_entry, np.nan
+        ).astype(np.float32)
+        entry_valid[:, minute_store_indices] = minute_entry_valid
         realized_daily = aligned.realized_daily_vol
         close_anchor_consistent = aligned.close_anchor_consistent
+        patch_count = max(
+            (
+                (row.decision_time.hour * 60 + row.decision_time.minute)
+                - (row.continuous_open.hour * 60 + row.continuous_open.minute)
+            )
+            // 5
+            for row in session_schedule
+        )
+        native_full_shape = (
+            len(session_schedule),
+            len(minute_panel.isins),
+            patch_count,
+        )
+        native_full = {
+            "fast_patch_values": np.empty(
+                (*native_full_shape, len(NATIVE_FAST_FEATURES)), dtype=np.float32
+            ),
+            "fast_patch_valid": np.empty(
+                (*native_full_shape, len(NATIVE_FAST_FEATURES)), dtype=np.bool_
+            ),
+            "fast_patch_mask": np.empty(native_full_shape, dtype=np.bool_),
+            "fast_last_price_age_minutes": np.empty(
+                native_full_shape, dtype=np.float32
+            ),
+            "fast_last_price_age_valid": np.empty(native_full_shape, dtype=np.bool_),
+        }
+        build_native_fast_features_into(
+            minute_panel.high_brl,
+            minute_panel.low_brl,
+            minute_panel.close_brl,
+            minute_panel.volume,
+            minute_panel.observed,
+            volume_valid=(
+                minute_panel.observed
+                if minute_panel.volume_valid is None
+                else minute_panel.volume_valid
+            ),
+            session_valid=(
+                minute_panel.observed.any(axis=2)
+                if minute_panel.session_valid is None
+                else minute_panel.session_valid
+            ),
+            sigma_asof=target_scale_sigma[:, minute_store_indices],
+            sessions=session_schedule,
+            values_out=native_full["fast_patch_values"],
+            valid_out=native_full["fast_patch_valid"],
+            patch_mask_out=native_full["fast_patch_mask"],
+            last_price_age_minutes_out=native_full["fast_last_price_age_minutes"],
+            last_price_age_valid_out=native_full["fast_last_price_age_valid"],
+        )
+        native_fast_arrays = {
+            name: _copy_selected_workspace_array(
+                workspace, f"store_{name}", values, kept_rows
+            )
+            for name, values in native_full.items()
+        }
+        native_fast_mapping = pl.DataFrame(
+            {
+                "fast_index": np.arange(len(minute_panel.isins), dtype=np.int32),
+                "store_name_index": minute_store_indices.astype(np.int32),
+                "isin": minute_panel.isins,
+                "security_id": [f"ISIN:{value}" for value in minute_panel.isins],
+            }
+        )
+        del native_full
     elif streamed_intraday is not None:
         intraday_audit = streamed_intraday.audit
         intraday_source_paths = streamed_intraday.source_paths
         aligned = streamed_intraday.result
+        streamed_workspace_arrays = (
+            aligned.values,
+            aligned.valid,
+            aligned.entry_open,
+            aligned.entry_open_valid,
+            aligned.session_close,
+            aligned.session_close_valid,
+            aligned.realized_daily_vol,
+            aligned.fast_present,
+            aligned.close_anchor_consistent,
+            streamed_intraday.to_close_entry,
+            streamed_intraday.to_close_entry_valid,
+        )
         if aligned.values.shape[:2] != shape:
             raise ValueError("streamed intraday derivatives are misaligned")
         m1_session_close = aligned.session_close.copy()
@@ -1481,21 +2264,42 @@ def build_daily_store(
         aligned = replace_daily_close_anchors(
             aligned, panel.close_brl, panel.observed, copy_buffers=False
         )
-        aligned = mask_action_boundaries(aligned, intraday_action_boundary)
-        rank_gauss_panel_into(
+        aligned = mask_action_boundaries(
+            aligned,
+            lagged_boundary=decision_action_boundary,
+            same_day_boundary=decision_action_boundary,
+            copy_buffers=False,
+        )
+        intraday_specs = feature_specs(
+            "intraday",
+            INTRADAY_DAILY_FEATURES,
+            minimum_rank_names=minimum_rank_names,
+        )
+        transform_feature_panel_into(
             aligned.values,
             aligned.valid,
             universe.active,
+            intraday_specs,
             intraday_values,
             intraday_valid,
             source_rows=kept_rows,
+            minimum_rank_names=minimum_rank_names,
+        )
+        observation_age_sessions_into(
+            aligned.valid,
+            universe.active,
+            intraday_age_sessions,
+            source_rows=kept_rows,
+            decision_rows=kept_rows,
         )
         fast_sigma = np.where(aligned.valid[..., 14], aligned.values[..., 14], np.nan)
         fast_present = aligned.fast_present
-        entry = aligned.entry_open
-        entry_valid = aligned.entry_open_valid
+        entry = streamed_intraday.to_close_entry
+        entry_valid = streamed_intraday.to_close_entry_valid
         realized_daily = aligned.realized_daily_vol
         close_anchor_consistent = aligned.close_anchor_consistent
+        native_fast_arrays = dict(streamed_intraday.native_arrays)
+        native_fast_mapping = streamed_intraday.native_mapping
 
     to_close_arrays: dict[str, NDArray[np.generic]] = {}
     if has_intraday:
@@ -1525,63 +2329,126 @@ def build_daily_store(
         streamed_intraday = None
         gc.collect()
 
-    inherit_linked_history(
-        intraday_values,
-        kept_dates,
-        panel.isins,
-        isin_successions,
-        copy=False,
+    prior_session_features = np.asarray(
+        [
+            INTRADAY_DAILY_FEATURES.index(name)
+            for name in INTRADAY_PRIOR_SESSION_FEATURES
+        ],
+        dtype=np.int64,
     )
-    inherit_linked_history(
-        intraday_valid,
-        kept_dates,
-        panel.isins,
-        isin_successions,
-        copy=False,
-    )
+    for start in range(0, intraday_age_sessions.shape[0], 32):
+        block = intraday_age_sessions[start : start + 32]
+        for feature_index in prior_session_features:
+            column = block[..., feature_index]
+            column[column >= 0.0] += 1.0
 
     target_shape = (kept_rows.size, len(panel.isins), len(HORIZONS))
-    target_primary = _workspace_array(
-        workspace, "target_primary", target_shape, np.float32
-    )
-    target_valid = _workspace_array(workspace, "target_valid", target_shape, np.bool_)
-    target_normalized_residual = _workspace_array(
-        workspace, "target_normalized_residual", target_shape, np.float32
-    )
-    target_raw_midrank = _workspace_array(
-        workspace, "target_raw_midrank", target_shape, np.float32
-    )
-    target_raw_valid = _workspace_array(
-        workspace, "target_raw_valid", target_shape, np.bool_
-    )
-    target_raw_log_return = _workspace_array(
-        workspace, "target_raw_log_return", target_shape, np.float32
-    )
-    build_multi_day_targets_into(
-        neutralized_log_return,
-        neutralized_log_return_valid,
+    target_arrays: dict[str, NDArray[np.generic]] = {
+        "target_primary": _workspace_array(
+            workspace, "store_target_primary", target_shape, np.float32
+        ),
+        "target_valid": _workspace_array(
+            workspace, "store_target_valid", target_shape, np.bool_
+        ),
+        "target_normalized_residual": _workspace_array(
+            workspace,
+            "store_target_normalized_residual",
+            target_shape,
+            np.float32,
+        ),
+        "target_normalized_cross_section_valid": _workspace_array(
+            workspace,
+            "store_target_normalized_cross_section_valid",
+            (kept_rows.size, len(HORIZONS)),
+            np.bool_,
+        ),
+        "target_shareholder_midrank": _workspace_array(
+            workspace, "store_target_shareholder_midrank", target_shape, np.float32
+        ),
+        "target_shareholder_valid": _workspace_array(
+            workspace, "store_target_shareholder_valid", target_shape, np.bool_
+        ),
+        "target_shareholder_simple_return": _workspace_array(
+            workspace,
+            "store_target_shareholder_simple_return",
+            target_shape,
+            np.float32,
+        ),
+        "target_terminal_wealth": _workspace_array(
+            workspace, "store_target_terminal_wealth", target_shape, np.float32
+        ),
+        "target_terminal_loss": _workspace_array(
+            workspace, "store_target_terminal_loss", target_shape, np.bool_
+        ),
+        "target_price_midrank": _workspace_array(
+            workspace, "store_target_price_midrank", target_shape, np.float32
+        ),
+        "target_price_valid": _workspace_array(
+            workspace, "store_target_price_valid", target_shape, np.bool_
+        ),
+        "target_price_simple_return": _workspace_array(
+            workspace,
+            "store_target_price_simple_return",
+            target_shape,
+            np.float32,
+        ),
+    }
+    build_economic_multi_day_targets_into(
+        panel.close_brl,
+        panel.observed,
         universe.active,
-        slow_sigma,
-        primary=target_primary,
-        primary_valid=target_valid,
-        normalized_residual=target_normalized_residual,
-        raw_midrank=target_raw_midrank,
-        raw_valid=target_raw_valid,
-        raw_log_return=target_raw_log_return,
+        target_scale_sigma,
+        retrospective_actions,
+        primary=target_arrays["target_primary"],
+        primary_valid=target_arrays["target_valid"],
+        normalized_residual=target_arrays["target_normalized_residual"],
+        normalized_cross_section_valid=target_arrays[
+            "target_normalized_cross_section_valid"
+        ],
+        shareholder_midrank=target_arrays["target_shareholder_midrank"],
+        shareholder_valid=target_arrays["target_shareholder_valid"],
+        shareholder_simple_return=target_arrays["target_shareholder_simple_return"],
+        terminal_wealth=target_arrays["target_terminal_wealth"],
+        terminal_loss=target_arrays["target_terminal_loss"],
+        price_midrank=target_arrays["target_price_midrank"],
+        price_valid=target_arrays["target_price_valid"],
+        price_simple_return=target_arrays["target_price_simple_return"],
         source_rows=kept_rows,
+        minimum_rank_names=minimum_rank_names,
+    )
+    eventual_survival_groups = _eventual_survival_groups(
+        panel.dates, panel.observed, continuation_isins
+    )
+    eventual_survival = np.broadcast_to(
+        eventual_survival_groups["survives_to_final_year"][None, :],
+        panel.observed.shape,
     )
     full_store_arrays: dict[str, NDArray[np.generic]] = {
         "active": universe.active,
         "observed": panel.observed,
+        "trade_observed": panel.trade_observed,
+        "activity_valid": panel.activity_valid,
+        "source_session_complete": np.broadcast_to(
+            panel.source_session_complete[:, None], panel.observed.shape
+        ),
+        "slow_timestep_valid": slow_timestep_valid,
         "raw_open": panel.open_brl,
         "raw_high": panel.high_brl,
         "raw_low": panel.low_brl,
         "raw_close": panel.close_brl,
-        "adjusted_open": adjusted_open,
-        "adjusted_high": adjusted_high,
-        "adjusted_low": adjusted_low,
-        "adjusted_close": adjusted_close,
-        "price_adjustment_factor": price_adjustment_factor,
+        "shareholder_wealth_open": shareholder_wealth_open,
+        "shareholder_wealth_high": shareholder_wealth_high,
+        "shareholder_wealth_low": shareholder_wealth_low,
+        "shareholder_wealth_close": shareholder_wealth_close,
+        "shareholder_wealth_valid": shareholder_wealth_valid,
+        "action_shares_per_prior_share": retrospective_actions.shares_per_prior_share,
+        "action_cash_per_prior_share": retrospective_actions.cash_per_prior_share,
+        "action_session_resolved": retrospective_actions.session_resolved,
+        "action_has_action": retrospective_actions.has_action,
+        "action_successor_index": retrospective_actions.successor_index,
+        "action_payment_session": action_payment_session,
+        "prior_reference_close": universe.prior_close_brl,
+        "audit_eventual_survives_to_final_year": eventual_survival,
         "volume_brl": panel.volume_brl,
         "trade_count": panel.trades,
         "quantity": panel.quantity,
@@ -1591,13 +2458,18 @@ def build_daily_store(
         "detected_split_mask": detected_actions.split_event,
         "detected_cash_event_mask": detected_actions.cash_event,
         "ambiguous_action_mask": detected_actions.ambiguous_event,
-        "return_neutralized_event_mask": return_neutralized_event,
         "price_jump_anomaly_mask": detected_actions.price_jump_anomaly_mask,
-        "intraday_action_boundary_mask": intraday_action_boundary,
+        "intraday_boundary_lagged_mask": diagnostic_intraday_boundary_lagged,
+        "intraday_boundary_sameday_mask": diagnostic_intraday_boundary_sameday,
+        "decision_action_boundary_mask": decision_action_boundary,
     }
     arrays: dict[str, NDArray[np.generic]] = {
         name: _copy_selected_workspace_array(
-            workspace, f"store_{name}", values, kept_rows
+            workspace,
+            f"store_{name}",
+            values,
+            kept_rows,
+            dtype=(np.float32 if np.issubdtype(values.dtype, np.floating) else None),
         )
         for name, values in full_store_arrays.items()
     }
@@ -1605,36 +2477,12 @@ def build_daily_store(
         {
             "slow_values": slow_values,
             "slow_valid": slow_valid,
+            "slow_age_sessions": slow_age_sessions,
             "intraday_values": intraday_values,
             "intraday_valid": intraday_valid,
+            "intraday_age_sessions": intraday_age_sessions,
             "fast_present": _copy_selected_workspace_array(
                 workspace, "store_fast_present", fast_present, kept_rows
-            ),
-            "target_primary": target_primary,
-            "target_valid": target_valid,
-            "target_normalized_residual": target_normalized_residual,
-            "target_raw_midrank": target_raw_midrank,
-            "target_raw_valid": target_raw_valid,
-            "target_raw_log_return": target_raw_log_return,
-            "neutralized_log_return": _copy_selected_workspace_array(
-                workspace,
-                "store_neutralized_log_return",
-                neutralized_log_return,
-                kept_rows,
-            ),
-            "neutralized_log_return_valid": _copy_selected_workspace_array(
-                workspace,
-                "store_neutralized_log_return_valid",
-                neutralized_log_return_valid,
-                kept_rows,
-            ),
-            "cross_sectional_median_log_return": (
-                _copy_selected_workspace_array(
-                    workspace,
-                    "store_cross_sectional_median_log_return",
-                    cross_sectional_median_log_return,
-                    kept_rows,
-                )
             ),
             "target_scale_sigma": _copy_selected_workspace_array(
                 workspace,
@@ -1642,14 +2490,31 @@ def build_daily_store(
                 target_scale_sigma,
                 kept_rows,
             ),
+            "common_state_diagnostic_values": common_state_values,
+            "common_state_diagnostic_valid": common_state_valid,
         }
     )
+    arrays.update(target_arrays)
+    del target_arrays
+    gc.collect()
     arrays.update(to_close_arrays)
+    arrays.update(native_fast_arrays)
     feature_names: dict[str, Sequence[str]] = {
         "slow": SLOW_FEATURES,
         "intraday": INTRADAY_DAILY_FEATURES,
+        "native_fast": NATIVE_FAST_FEATURES,
+        "common_state_diagnostic": COMMON_STATE_DIAGNOSTICS,
         "horizons": tuple(str(value) for value in HORIZONS),
     }
+    all_feature_specs: list[FeatureSpec] = [
+        *slow_specs,
+        *feature_specs(
+            "intraday",
+            INTRADAY_DAILY_FEATURES,
+            minimum_rank_names=minimum_rank_names,
+        ),
+        *native_fast_feature_specs(),
+    ]
     coverage_tables = [
         _coverage_table(kept_dates, slow_valid, SLOW_FEATURES, family="slow"),
         _coverage_table(
@@ -1675,7 +2540,7 @@ def build_daily_store(
                 arguments,
                 panel.dates,
                 panel.isins,
-                v1_assignments,
+                m1_assignments,
                 panel.volume_brl,
             )
             yield group, parsed.pop(group)
@@ -1684,8 +2549,11 @@ def build_daily_store(
     sidecar_survival_frames: list[pl.DataFrame] = []
     sidecar_liquidity_frames: list[pl.DataFrame] = []
     sidecar_contemporaneity_rows: list[dict[str, object]] = []
+    sidecar_capability_rows: list[dict[str, object]] = []
+    sidecar_capability_summary: dict[str, dict[str, list[str]]] = {}
     prior_adv20 = _prior_adv20(
-        linked_universe_inputs[1][keep], linked_universe_inputs[2][keep]
+        decision_continuation.volume_brl[keep],
+        decision_continuation.activity_valid[keep],
     )
     for group, result in iter_sidecars():
         if result.values.shape[:2] != shape:
@@ -1708,6 +2576,29 @@ def build_daily_store(
                 ),
             }
         )
+        enabled = list(result.feature_names)
+        missing = list(result.source_missing_candidates)
+        sidecar_capability_summary[group] = {
+            "enabled": enabled,
+            "source_missing": missing,
+        }
+        sidecar_capability_rows.extend(
+            {
+                "group": group,
+                "candidate_feature": candidate,
+                "enabled": candidate in result.feature_names,
+                "status": (
+                    "enabled_exact_source_semantics"
+                    if candidate in result.feature_names
+                    else "disabled_source_semantics_unavailable"
+                ),
+            }
+            for candidate in SIDECAR_FEATURES[group]
+        )
+        if not result.feature_names:
+            del result
+            gc.collect()
+            continue
         values = _workspace_array(
             workspace,
             f"sidecar_{group}_values",
@@ -1720,31 +2611,37 @@ def build_daily_store(
             values.shape,
             np.bool_,
         )
-        rank_gauss_panel_into(
+        age_sessions = _workspace_array(
+            workspace,
+            f"sidecar_{group}_age_sessions",
+            values.shape,
+            np.float32,
+            fill=-1.0,
+        )
+        sidecar_specs = feature_specs(
+            f"sidecar_{group}",
+            result.feature_names,
+            minimum_rank_names=minimum_rank_names,
+        )
+        transform_feature_panel_into(
             result.values,
             result.valid,
             universe.active,
+            sidecar_specs,
             values,
             valid,
             source_rows=kept_rows,
+            minimum_rank_names=minimum_rank_names,
         )
-        inherit_linked_history(
-            values,
-            kept_dates,
-            panel.isins,
-            isin_successions,
-            copy=False,
-        )
-        inherit_linked_history(
-            valid,
-            kept_dates,
-            panel.isins,
-            isin_successions,
-            copy=False,
-        )
+        source_ages = np.asarray(result.age_sessions[kept_rows], dtype=np.float32)
+        if source_ages.shape != age_sessions.shape:
+            raise ValueError(f"sidecar {group} source ages are misaligned")
+        age_sessions[...] = np.where(universe.active[keep, :, None], source_ages, -1.0)
         arrays[f"sidecar_{group}_values"] = values
         arrays[f"sidecar_{group}_valid"] = valid
+        arrays[f"sidecar_{group}_age_sessions"] = age_sessions
         feature_names[f"sidecar_{group}"] = result.feature_names
+        all_feature_specs.extend(sidecar_specs)
         raw_valid = result.valid[kept_rows]
         sidecar_coverage_frames.append(
             _sidecar_coverage_table(
@@ -1788,14 +2685,21 @@ def build_daily_store(
         )
         del raw_valid, result
         gc.collect()
-    del prior_adv20, linked_universe_inputs
+    del prior_adv20
     gc.collect()
 
     tables = {
         "security_master": build_security_master(
             cash, succession_links=isin_successions
         ),
+        "isin_succession_candidates": proposed_isin_successions,
         "isin_succession_links": isin_successions,
+        "b3_session_schedule": schedule_frame(session_schedule),
+        "calendar_completeness": calendar_completeness_table(
+            session_schedule, archive_dates
+        ),
+        "raw_validation_by_year": validation.audit_by_year,
+        "raw_validation_rejections": validation.rejected,
         "feature_coverage": pl.concat(coverage_tables),
         "sidecar_coverage": (
             pl.concat(sidecar_coverage_frames)
@@ -1824,15 +2728,6 @@ def build_daily_store(
             panel.dates,
             distribution_changed,
             detected_actions,
-        ),
-        "neutralized_return_coverage_by_year": (
-            _neutralized_return_coverage_by_year(
-                kept_dates,
-                return_neutralized_event[keep],
-                neutralized_log_return_valid[keep],
-                universe.active[keep],
-                cross_sectional_median_log_return[keep],
-            )
         ),
         "corporate_action_calendar_alignment": action_calendar_alignment_table(
             checked_actions, panel.dates, panel.isins
@@ -1863,7 +2758,13 @@ def build_daily_store(
             panel.isins,
             action_acquisition_audit,
         ),
-        "corporate_actions": checked_actions,
+        "corporate_actions_provider_observations": checked_actions,
+        "corporate_actions_verified_terms": verified_action_terms_to_table(
+            verified_action_terms
+        ),
+        "corporate_action_alignment_roles": _action_alignment_role_table(
+            verified_action_terms, panel.dates, decision_timestamps
+        ),
         "sidecar_contemporaneity": pl.DataFrame(
             sidecar_contemporaneity_rows,
             schema={
@@ -1876,46 +2777,26 @@ def build_daily_store(
                 "availability_contract": pl.String,
             },
         ),
+        "sidecar_capabilities": pl.DataFrame(
+            sidecar_capability_rows,
+            schema={
+                "group": pl.String,
+                "candidate_feature": pl.String,
+                "enabled": pl.Boolean,
+                "status": pl.String,
+            },
+        ),
         "external_feature_validity_by_survival_adv20_quartile": (
             pl.concat(sidecar_liquidity_frames)
             if sidecar_liquidity_frames
             else pl.DataFrame()
         ),
     }
-    if v1_assignments is not None:
-        v1_isins = tuple(v1_assignments.get_column("isin").cast(pl.String).to_list())
-        tables["v1_pit_active_coverage"] = v1_pit_coverage_table(
-            panel.dates,
-            panel.isins,
-            universe.active,
-            v1_isins,
-        )
-        tables["v1_pit_inactive_exceptions"] = v1_pit_inactive_exceptions_table(
-            panel.dates,
-            panel.isins,
-            universe.active,
-            v1_isins,
-        )
+    if native_fast_mapping is not None:
+        tables["native_fast_security_mapping"] = native_fast_mapping
     if action_acquisition_audit is not None:
         tables["corporate_action_acquisition_audit"] = action_acquisition_audit
     if has_intraday:
-        detected_split_factor = np.ones(shape, dtype=np.float64)
-        detected_split_factor[detected_actions.split_event] = (
-            1.0 / detected_actions.price_ratio[detected_actions.split_event]
-        )
-        m1_adjustment = audit_m1_adjustment_status(
-            panel.dates,
-            panel.isins,
-            m1_session_close,
-            panel.close_brl,
-            adjusted_close,
-            detected_split_factor,
-            np.zeros(shape, dtype=np.float64),
-        )
-        tables["m1_adjustment_audit"] = m1_adjustment
-        tables["m1_price_adjusted_segments"] = m1_adjustment.filter(
-            pl.col("status") == "price_adjusted"
-        )
         tables["m1_cotahist_mismatch_by_year"] = m1_cotahist_mismatch_by_year(
             panel.dates,
             m1_session_close,
@@ -1925,6 +2806,7 @@ def build_daily_store(
         )
     if intraday_audit is not None:
         tables["m1_source_audit"] = intraday_audit
+    tables["common_state_diagnostics"] = common_state_table
     tables["feature_coverage"] = pl.concat(
         [
             _coverage_table(
@@ -1944,15 +2826,26 @@ def build_daily_store(
     tables["universe_size"] = tables["universe_size"].filter(
         pl.col("trade_date") >= kept_dates[0].astype(object)
     )
-    (
-        tables["target_validity_by_year"],
-        tables["target_validity_by_survival"],
-    ) = _target_validity_tables(
-        kept_dates,
-        target_valid,
-        universe.active[keep],
-        panel.observed[keep],
-        continuation_isins,
+    target_audits = [
+        _target_validity_tables(
+            kept_dates,
+            np.asarray(arrays[mask_name], dtype=np.bool_),
+            universe.active[keep],
+            panel.observed[keep],
+            continuation_isins,
+            family=family,
+        )
+        for family, mask_name in (
+            ("scaled_median_adjusted", "target_valid"),
+            ("shareholder", "target_shareholder_valid"),
+            ("price", "target_price_valid"),
+        )
+    ]
+    tables["target_validity_by_year"] = pl.concat(
+        [yearly for yearly, _ in target_audits]
+    )
+    tables["target_validity_by_survival"] = pl.concat(
+        [survival for _, survival in target_audits]
     )
     feature_gate_families: dict[str, tuple[NDArray[np.bool_], NDArray[np.bool_]]] = {
         "slow_return": (slow_valid[..., :7], panel.observed[keep]),
@@ -1985,40 +2878,81 @@ def build_daily_store(
     tables["feature_validity_by_survival"] = pl.concat(
         [base_feature_survival, *sidecar_survival_frames]
     )
-    v1_fast_files: list[dict[str, object]] = []
-    if v1_fast_store is not None:
-        if v1_assignments is None:
-            raise ValueError("v1 fast store requires one-to-one v1 assignments")
-        date_mapping, isin_mapping, fast_paths = build_v1_fast_mappings(
-            v1_fast_store, v1_assignments, kept_dates, panel.isins
-        )
-        tables["v1_fast_date_mapping"] = date_mapping
-        tables["v1_fast_isin_mapping"] = isin_mapping
-        v1_fast_files = source_records(fast_paths)
     build_peak_rss = peak_rss_bytes()
     metadata = {
         "store_start": str(kept_dates[0]),
         "store_end": str(kept_dates[-1]),
         "lookback_rows_materialized": False,
-        "slow_entry_alignment": {
-            "pretrain": "through_t",
-            "finetune_evaluation": "through_t_minus_1",
+        "slow_entry_alignment": dict(DECISION_FEATURE_CONTRACT),
+        "native_fast": {
+            "enabled": native_fast_mapping is not None,
+            "security_count": (
+                native_fast_mapping.height if native_fast_mapping is not None else 0
+            ),
+            "channels": list(NATIVE_FAST_FEATURES),
+            "time_axis": (
+                "date-specific continuous-open to 15:45 decision prefix; "
+                "five-minute completed blocks"
+            ),
+            "legacy_v1_artifact_required": False,
         },
-        "v1_fast_store": str(v1_fast_store.resolve()) if v1_fast_store else None,
-        "v1_fast_files": v1_fast_files,
-        "v1_store_v2_zero_dynamic_channels": [9, 11, 14, 22, 24, 25],
-        "v1_store_v2_zero_slow_fields": list(V1_STORE_V2_ZERO_SLOW_FIELDS),
-        "v1_isin_subset_verified": v1_assignments is not None,
-        "v1_calendar_verified": v1_calendar is not None,
         "implementation_git_commit": implementation_commit,
+        "isin_succession_candidate_count": proposed_isin_successions.height,
         "isin_succession_link_count": isin_successions.height,
-        "undocumented_split_fallback": undocumented_split_fallback,
-        "survival_identity": (
-            "root ISIN after exact same-ticker consecutive-session COTAHIST succession"
+        "cotahist_action_detection_role": "diagnostic_only",
+        "survival_identity": "permanent ISIN; only source-verified conversions may link",
+        "eventual_survival_audit": (
+            "future panel observation through the final store year; audit-only and "
+            "never exposed to features, eligibility, normalization, or orders"
         ),
+        "verified_terminal_status": "unsupported by the accepted source archive",
+        "common_state_diagnostics": {
+            "role": "audit_only_not_model_input",
+            "feature_names": list(COMMON_STATE_DIAGNOSTICS),
+            "decision_timing": (
+                "return statistics use shareholder wealth t-2 to t-1; median "
+                "raw volatility uses already-lagged sigma_asof[t]"
+            ),
+            "minimum_support_names": minimum_rank_names,
+        },
         "feature_history_identity": (
-            "successor ISIN inherits predecessor rows strictly before its first session"
+            "permanent ISIN; verified conversions known by the effective-session "
+            "decision route contractual shareholder wealth and separately rebase "
+            "price/liquidity/history inputs by their units"
         ),
+        "calendar_contract": {
+            "schema": "BRAZIL_RV_B3_EQUITY_SESSION_SCHEDULE_V1",
+            "authority": "explicit versioned schedule; never inferred from archive coverage",
+            "minimum_name_count_is_diagnostic_only": True,
+        },
+        "market_observation_masks": {
+            "observed": "raw daily price row observed",
+            "trade_observed": "raw daily activity row observed",
+            "activity_valid": (
+                "activity row observed or exact no-trade zero certified by a "
+                "complete source session after causal history begins"
+            ),
+            "source_session_complete": (
+                "date-level raw-source coverage, broadcast on the stored name axis"
+            ),
+            "incomplete_source_policy": "price and activity remain invalid; never zero",
+            "m1_activity_policy": (
+                "volume validity is independent of price observation; absent minutes "
+                "remain invalid because the accepted M1 archive does not certify zeros"
+            ),
+        },
+        "raw_validation": {
+            "maximum_rejection_fraction": 0.005,
+            "rejection_fraction": validation.rejection_fraction,
+            "rejected_rows": validation.rejected.height,
+            "exact_duplicate_rows_collapsed": validation.exact_duplicate_rows_collapsed,
+        },
+        "feature_schema": {
+            "specifications": [asdict(spec) for spec in all_feature_specs],
+            "sha256": feature_schema_sha256(all_feature_specs),
+            "minimum_rank_names": minimum_rank_names,
+        },
+        "feature_age_contract": dict(FEATURE_AGE_CONTRACT),
         "survivorship_gates": {
             "internally_derived_feature_family_max_gap": 0.05,
             "target_family_max_gap": 0.10,
@@ -2040,13 +2974,44 @@ def build_daily_store(
                 EXTERNAL_VALIDITY_MIN_NAME_DAYS
             ),
         },
-        "return_definition": (
-            "split-adjusted COTAHIST log returns; DISMES cash/ambiguous days "
-            "are replaced by the active non-event cross-sectional median"
-        ),
-        "future_total_return_variant": (
-            "registered but not implemented: survivor-subset sensitivity only"
-        ),
+        "sidecar_capabilities": sidecar_capability_summary,
+        "return_definition": {
+            "primary": (
+                "log shareholder wealth over (t,t+H], cross-sectionally "
+                "median-adjusted, divided name-by-name by the strictly lagged "
+                "Yang-Zhang scale at t times sqrt(H), clipped, then tie-aware "
+                "mid-ranked"
+            ),
+            "shareholder_family": (
+                "verified contractual quantity multipliers plus verified cash "
+                "entitlements held as cash; unresolved action coverage invalidates "
+                "every crossing interval"
+            ),
+            "price_family": (
+                "economic-share price return following verified q and successor "
+                "claims while excluding cash entitlements, with distinct masks; "
+                "never substituted for gross shareholder wealth"
+            ),
+            "entry_exit_price": "daily last-trade close proxy",
+            "synthetic_cash_distribution": "disabled",
+        },
+        "corporate_action_contract": {
+            "provider_rows_are_contractual_terms_only": True,
+            "realized_price_ratios_and_dismes_are_diagnostics_only": True,
+            "stored_action_arrays": "retrospective outcome/accounting terms",
+            "feature_action_alignment": (
+                "terms known by each historical 15:45 decision only"
+            ),
+            "currency": "BRL",
+            "retrospective_coverage_resolved_fraction": float(
+                retrospective_actions.session_resolved.mean()
+            ),
+            "decision_known_coverage_resolved_fraction": float(
+                decision_actions.session_resolved.mean()
+            ),
+            "payment_date_modeling": "unsupported unless explicitly sourced",
+            "complex_or_unmapped_terms": "unresolved",
+        },
         "cotahist_provenance": {
             "raw_archives": source_records(cotahist_raw_sources),
             "parse_audit": (
@@ -2057,6 +3022,7 @@ def build_daily_store(
         },
         "build_peak_rss_bytes": build_peak_rss,
         "build_peak_rss_gib": build_peak_rss / (1024**3),
+        "resource_preflight": dict(resource_preflight or {}),
     }
     options_composition = tables["external_feature_validity_by_survival_adv20_quartile"]
     if options_composition.width:
@@ -2098,55 +3064,54 @@ def build_daily_store(
                     "liquidity-composition signature, not a leakage signature"
                 ),
             }
-    if "v1_pit_active_coverage" in tables:
-        active_counts = tables["v1_pit_active_coverage"].get_column("active_v1_count")
-        metadata["v1_pit_active_count"] = {
-            "semantics": (
-                "dynamic PIT-active subset of the exact mapped v1 identities; "
-                "all mapped identities are active at least once, not necessarily "
-                "simultaneously"
+    try:
+        result = write_store(
+            output_dir,
+            dates=kept_dates,
+            isins=panel.isins,
+            arrays=arrays,
+            feature_names=feature_names,
+            sources=source_records(
+                (
+                    *source_paths,
+                    *intraday_source_paths,
+                )
             ),
-            "minimum": int(active_counts.min()),
-            "median": float(active_counts.median()),
-            "maximum": int(active_counts.max()),
-        }
-    result = write_store(
-        output_dir,
-        dates=kept_dates,
-        isins=panel.isins,
-        arrays=arrays,
-        feature_names=feature_names,
-        sources=source_records(
-            (
-                *source_paths,
-                *intraday_source_paths,
-            )
-        ),
-        metadata=metadata,
-        tables=tables,
-    )
-    for value in arrays.values():
-        close_memmap(value)
-    for value in (
-        price_adjustment_factor,
-        adjusted_open,
-        adjusted_high,
-        adjusted_low,
-        adjusted_close,
-        slow_sigma,
-        target_scale_sigma,
-        neutralized_log_return,
-        neutralized_log_return_valid,
-        cross_sectional_median_log_return,
-    ):
-        close_memmap(value)
-    workspace_handle.cleanup()
+            metadata=metadata,
+            tables=tables,
+        )
+    finally:
+        for value in arrays.values():
+            close_memmap(value)
+        for value in (
+            *streamed_workspace_arrays,
+            shareholder_wealth_open,
+            shareholder_wealth_high,
+            shareholder_wealth_low,
+            shareholder_wealth_close,
+            shareholder_wealth_valid,
+            slow_sigma,
+            target_scale_sigma,
+        ):
+            close_memmap(value)
+        workspace_handle.cleanup()
     return result
 
 
 def load_minute_npz(path: Path) -> MinutePanel:
     archive = np.load(path, allow_pickle=False)
-    required = {"dates", "isins", "open", "high", "low", "close", "volume", "observed"}
+    required = {
+        "dates",
+        "isins",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "observed",
+        "volume_valid",
+        "session_valid",
+    }
     if not required.issubset(archive.files):
         raise ValueError(
             f"minute archive keys missing: {sorted(required - set(archive.files))}"
@@ -2160,6 +3125,8 @@ def load_minute_npz(path: Path) -> MinutePanel:
         close_brl=archive["close"],
         volume=archive["volume"],
         observed=archive["observed"],
+        volume_valid=archive["volume_valid"],
+        session_valid=archive["session_valid"],
     )
 
 
@@ -2170,23 +3137,26 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--cotahist-root", required=True, type=Path)
     parser.add_argument("--cotahist-raw-root", required=True, type=Path)
     parser.add_argument("--cotahist-parse-audit", required=True, type=Path)
+    parser.add_argument("--session-schedule", required=True, type=Path)
+    parser.add_argument(
+        "--isin-links-allowlist",
+        type=Path,
+        default=Path(__file__).resolve().parents[3]
+        / "configs"
+        / "v2"
+        / "isin_links_allowlist.csv",
+    )
     parser.add_argument("--implementation-commit", required=True)
     parser.add_argument("--actions", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--minute-npz", type=Path)
-    parser.add_argument("--v1-assignments", required=True, type=Path)
-    parser.add_argument("--v1-store", required=True, type=Path)
-    parser.add_argument(
-        "--undocumented-split-fallback",
-        action="store_true",
-        help="Enable the audit-selected strict inverse price/quantity split fallback",
-    )
+    parser.add_argument("--m1-assignments", required=True, type=Path)
     parser.add_argument(
         "--sidecar",
         action="append",
         default=[],
         metavar="GROUP=PARQUET",
-        help="Known v1 sidecar archive; may be repeated",
+        help="Known publication-lagged sidecar archive; may be repeated",
     )
     return parser.parse_args(arguments)
 
@@ -2262,6 +3232,7 @@ def _parse_sidecars(
             raise ValueError("--sidecar must be GROUP=PARQUET")
         group, raw_path = argument.split("=", 1)
         path = Path(raw_path)
+        grouped.setdefault(group, [])
         schema = pl.read_parquet_schema(path)
         feature_mapping = available_archive_mapping(group, tuple(schema))
         value_columns = sorted(
@@ -2272,15 +3243,35 @@ def _parse_sidecars(
                 "source_position_date",
                 "source_trade_date",
                 "lending_balance_brl",
+                "loan_rate_annual_decimal",
+                "lending_taker_fee_annual_decimal",
             ),
             "oddlot": (
                 "source_trade_date",
                 "regular_volume_brl",
                 "odd_lot_volume_brl",
             ),
-            "events": ("event_itr_dfp_recent_5s",),
-            "options": ("source_trade_date",),
-            "fundamentals": ("source_receipt_date",),
+            "events": (
+                "filing_receipt_timestamp",
+                "event_type",
+            ),
+            "options": (
+                "source_trade_date",
+                "put_oi",
+                "call_oi",
+                "put_open_interest",
+                "call_open_interest",
+                "oi_snapshot_complete",
+                "open_interest_snapshot_complete",
+            ),
+            "fundamentals": (
+                "source_receipt_date",
+                "receipt_timestamp",
+                "total_liabilities_brl",
+                "total_assets_brl",
+                "liabilities_brl",
+                "assets_brl",
+            ),
         }.get(group, ())
         value_columns = sorted(
             {
@@ -2303,23 +3294,50 @@ def _parse_sidecars(
             column
             for column in (
                 "decision_idx",
+                "public_available_at",
                 "available_timestamp",
                 "delivery_timestamp",
+                "filing_receipt_timestamp",
+                "receipt_timestamp",
+                "state_asof_timestamp",
+                "timestamp_precision",
+                "processing_latency_seconds",
+                "revision",
+                "version",
+                "fetched_at",
+                "event_time",
+                "effective_time",
             )
             if column in schema
         ]
+        for timestamp_column in (
+            "public_available_at",
+            "available_timestamp",
+            "delivery_timestamp",
+            "filing_receipt_timestamp",
+            "receipt_timestamp",
+            "state_asof_timestamp",
+        ):
+            optional.extend(
+                column
+                for column in (
+                    f"{timestamp_column}_precision",
+                    f"{timestamp_column}_processing_latency_seconds",
+                )
+                if column in schema
+            )
         masks = [
             f"{column}_mask" for column in value_columns if f"{column}_mask" in schema
         ]
-        projected = ["available_date", identity, *optional, *value_columns, *masks]
+        projected = list(
+            dict.fromkeys(
+                ["available_date", identity, *optional, *value_columns, *masks]
+            )
+        )
         lazy = (
             pl.scan_parquet(path)
             .select(projected)
-            .filter(
-                pl.col("available_date").is_between(
-                    normalized_dates[0], normalized_dates[-1]
-                )
-            )
+            .filter(pl.col("available_date") <= normalized_dates[-1])
         )
         if identity == "isin":
             lazy = lazy.filter(pl.col("isin").is_in(pl.Series("isin", isins).implode()))
@@ -2342,8 +3360,12 @@ def _parse_sidecars(
         # collected. Peak memory is then proportional to date/ISIN output rows,
         # rather than to the 5M-row physical archive.
         if "decision_idx" in optional and not {
+            "public_available_at",
             "available_timestamp",
             "delivery_timestamp",
+            "filing_receipt_timestamp",
+            "receipt_timestamp",
+            "state_asof_timestamp",
         }.intersection(optional):
             bounds = lazy.select(
                 pl.col("decision_idx").min().alias("minimum"),
@@ -2369,22 +3391,6 @@ def _parse_sidecars(
         source = lazy.collect(engine="streaming")
         if source.get_column("isin").null_count():
             raise ValueError(f"sidecar archive contains unmapped identities: {path}")
-        grouped.setdefault(group, []).append(source)
-    output: dict[str, SidecarResult] = {}
-    for group, sources in grouped.items():
-        if sources:
-            source = pl.concat(sources, how="diagonal_relaxed")
-        else:
-            source = pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
-        identity = "isin" if "isin" in source.columns else "security_id"
-        keys = ["available_date", identity]
-        for optional in ("decision_idx", "available_timestamp", "delivery_timestamp"):
-            if optional in source.columns:
-                keys.append(optional)
-        value_columns = [column for column in source.columns if column not in keys]
-        source = source.group_by(keys, maintain_order=True).agg(
-            pl.col(column).drop_nulls().last().alias(column) for column in value_columns
-        )
         source = derive_known_archive_features(
             source,
             dates,
@@ -2392,6 +3398,50 @@ def _parse_sidecars(
             group=group,
             daily_volume_brl=daily_volume_brl,
         )
+        provided = available_archive_mapping(group, source.columns)
+        partitions: tuple[tuple[str, tuple[str, ...], str | None], ...]
+        if group == "lending":
+            partitions = (
+                (
+                    "lending_position",
+                    SIDECAR_FEATURES["lending"][:3],
+                    "source_position_date",
+                ),
+                (
+                    "lending_rate",
+                    SIDECAR_FEATURES["lending"][3:],
+                    "source_trade_date",
+                ),
+            )
+        else:
+            partitions = ((group, SIDECAR_FEATURES[group], None),)
+        for record_family, partition_features, source_date_column in partitions:
+            partition_columns = sorted(
+                {
+                    provided[name]
+                    for name in partition_features
+                    if provided.get(name) is not None
+                }
+            )
+            if not partition_columns:
+                continue
+            partition = source
+            if source_date_column is not None and source_date_column in source.columns:
+                partition = partition.filter(pl.col(source_date_column).is_not_null())
+            partition = partition.with_columns(
+                pl.lit(record_family).alias("__record_family"),
+                *(
+                    pl.lit(True).alias(f"__provided__{column}")
+                    for column in partition_columns
+                ),
+            )
+            grouped.setdefault(group, []).append(partition)
+    output: dict[str, SidecarResult] = {}
+    for group, sources in grouped.items():
+        if sources:
+            source = pl.concat(sources, how="diagonal_relaxed")
+        else:
+            source = pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
         materialized = materialize_known_archive(source, dates, isins, group=group)
         rebuilt = rebuild_publication_lag_validity(
             source,
@@ -2465,12 +3515,59 @@ def _require_clean_implementation_commit(
         )
 
 
+def _validate_cotahist_parse_audit(
+    audit_path: Path, raw_sources: Sequence[Path]
+) -> None:
+    """Require a successful parser audit bound to every exact raw archive."""
+
+    payload = json.loads(Path(audit_path).read_text(encoding="utf-8"))
+    rows = payload.get("audits") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        raise ValueError("COTAHIST parse audit has the wrong schema")
+    expected = {
+        int(re.search(r"A(\d{4})\.ZIP$", path.name, re.IGNORECASE).group(1)): (
+            path.resolve(),
+            str(source_records((path,))[0]["sha256"]),
+        )
+        for path in raw_sources
+    }
+    if set(int(row.get("year", -1)) for row in rows) != set(expected):
+        raise ValueError("COTAHIST parse audit year coverage differs from raw inputs")
+    for raw in rows:
+        year = int(raw["year"])
+        source_path, source_sha = expected[year]
+        if raw.get("error"):
+            raise ValueError(f"COTAHIST parser failed for {year}: {raw['error']}")
+        if raw.get("record_count_valid") is not True:
+            raise ValueError(f"COTAHIST record-count audit failed for {year}")
+        if (
+            int(raw.get("header_records", 0)) != 1
+            or int(raw.get("trailer_records", 0)) != 1
+        ):
+            raise ValueError(f"COTAHIST structural audit failed for {year}")
+        if (
+            int(raw.get("malformed_length_records", 0)) != 0
+            or int(raw.get("other_records", 0)) != 0
+        ):
+            raise ValueError(f"COTAHIST malformed-record audit failed for {year}")
+        if Path(str(raw.get("source_zip", ""))).resolve() != source_path:
+            raise ValueError(f"COTAHIST raw path mismatch in parse audit for {year}")
+        if raw.get("source_sha256") != source_sha:
+            raise ValueError(f"COTAHIST raw hash mismatch in parse audit for {year}")
+
+
 def main(arguments: Sequence[str] | None = None) -> None:
     args = parse_args(arguments)
     if not re.fullmatch(r"[0-9a-f]{40}", args.implementation_commit):
         raise ValueError("--implementation-commit must be a full lowercase Git SHA")
     repository = Path(__file__).resolve().parents[4]
     _require_clean_implementation_commit(repository, args.implementation_commit)
+    resource_preflight = _build_resource_preflight()
+    print(
+        json.dumps({"resource_preflight": resource_preflight}, sort_keys=True),
+        file=sys.stderr,
+        flush=True,
+    )
     raw_sources = tuple(
         (args.cotahist_raw_root / f"COTAHIST_A{year}.ZIP").resolve()
         for year in COTAHIST_YEARS
@@ -2480,36 +3577,31 @@ def main(arguments: Sequence[str] | None = None) -> None:
         raise FileNotFoundError(f"COTAHIST raw archives missing: {missing_raw}")
     if not args.cotahist_parse_audit.is_file():
         raise FileNotFoundError(args.cotahist_parse_audit)
-    from brazil_rv.preprocessing.contract import EXPECTED_EQUITIES
-
-    if args.v1_assignments.is_dir():
-        from brazil_rv.preprocessing.io import load_assignments
-
-        assignments = load_assignments(args.v1_assignments)
+    _validate_cotahist_parse_audit(args.cotahist_parse_audit, raw_sources)
+    schedule = load_session_schedule(args.session_schedule)
+    if args.m1_assignments.is_dir():
         assignment_path = (
-            args.v1_assignments / "xp_accepted_source_assignments_v1.parquet"
+            args.m1_assignments / "xp_accepted_source_assignments_v1.parquet"
         )
     else:
-        assignments = pl.read_parquet(args.v1_assignments)
-        assignment_path = args.v1_assignments
+        assignment_path = args.m1_assignments
+    assignments = pl.read_parquet(assignment_path)
+    required_assignment_columns = {"security_id", "isin", "source_file"}
     if (
-        assignments.height != EXPECTED_EQUITIES
-        or assignments.get_column("security_id").n_unique() != EXPECTED_EQUITIES
-        or assignments.get_column("isin").n_unique() != EXPECTED_EQUITIES
+        not required_assignment_columns.issubset(assignments.columns)
+        or assignments.is_empty()
+        or assignments.get_column("security_id").n_unique() != assignments.height
+        or assignments.get_column("isin").n_unique() != assignments.height
     ):
         raise ValueError(
-            f"canonical v1 assignments must bind exactly {EXPECTED_EQUITIES} identities"
+            "canonical M1 assignments must bind unique security_id and ISIN rows"
         )
-    v1_isins = (
-        tuple(assignments.get_column("isin").cast(pl.String).to_list())
-        if assignments is not None
-        else ()
-    )
+    m1_isins = tuple(assignments.get_column("isin").cast(pl.String).to_list())
     paths = sorted(args.cotahist_root.glob("year=*/equities_daily_*.parquet"))
-    daily = load_cotahist(paths, v1_isins=v1_isins).filter(
+    daily = load_cotahist(paths, v1_isins=m1_isins).filter(
         pl.col("trade_date").dt.year().is_in(COTAHIST_YEARS)
     )
-    foundation = filter_cash_equities(daily, v1_isins=v1_isins)
+    foundation = daily
     available_years = set(
         foundation.get_column("trade_date").dt.year().unique().to_list()
     )
@@ -2518,13 +3610,6 @@ def main(arguments: Sequence[str] | None = None) -> None:
             "canonical COTAHIST foundation must contain exactly years "
             f"{COTAHIST_YEARS}; got {sorted(available_years)}"
         )
-    v1_calendar = tuple(
-        pl.read_parquet(args.v1_store / "date_index.parquet")
-        .sort("date_idx")
-        .get_column("trade_date")
-        .to_list()
-    )
-    _validate_v1_calendar(v1_calendar)
     actions, acquisition_audit, action_master, action_sources = _load_action_bundle(
         args.actions
     )
@@ -2551,11 +3636,12 @@ def main(arguments: Sequence[str] | None = None) -> None:
         stream_intraday=minute is None,
         sidecar_arguments=args.sidecar,
         action_acquisition_audit=acquisition_audit,
-        v1_assignments=assignments,
-        v1_calendar=v1_calendar,
+        m1_assignments=assignments,
         source_paths=(
             *paths,
             assignment_path,
+            args.session_schedule,
+            args.isin_links_allowlist,
             *action_sources,
             *((args.minute_npz,) if args.minute_npz else ()),
             *(Path(value.split("=", 1)[1]) for value in args.sidecar),
@@ -2563,8 +3649,9 @@ def main(arguments: Sequence[str] | None = None) -> None:
         implementation_commit=args.implementation_commit,
         cotahist_raw_sources=raw_sources,
         cotahist_parse_audit=args.cotahist_parse_audit,
-        v1_fast_store=args.v1_store,
-        undocumented_split_fallback=args.undocumented_split_fallback,
+        session_schedule=schedule,
+        isin_link_allowlist=args.isin_links_allowlist,
+        resource_preflight=resource_preflight,
     )
     print(json.dumps({"store": str(output)}, sort_keys=True))
 

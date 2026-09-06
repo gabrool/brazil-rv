@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -11,6 +12,7 @@ from torch.utils.data import Dataset, default_collate
 
 from .contract import (
     ALLOWED_LOOKBACKS,
+    DECISION_SAMPLE_SCHEMA,
     DECISION_MINUTE_INDEX,
     FAST_PATCH_MINUTES,
     FINETUNE_START,
@@ -37,6 +39,127 @@ _COMPACT_FAST_KEYS = frozenset(
         "v1_equity_slow",
     }
 )
+
+
+@dataclass(frozen=True)
+class ScalarFeatureView:
+    """One ordered store-backed decision-axis scalar feature view."""
+
+    date_indices: NDArray[np.int64]
+    dates: NDArray[np.datetime64]
+    isins: tuple[str, ...]
+    active: NDArray[np.bool_]
+    names: tuple[str, ...]
+    values: NDArray[np.float32]
+    valid: NDArray[np.bool_]
+    age_sessions: NDArray[np.float32]
+
+
+def scalar_feature_names(
+    store: V2Store, families: Sequence[str]
+) -> tuple[str, ...]:
+    """Resolve requested scalar families in canonical FeatureSpec order."""
+
+    requested = set(families)
+    if len(requested) != len(families):
+        raise ValueError("scalar feature families must be unique")
+    allowed = {"slow", "intraday"} | {
+        key
+        for key in requested
+        if isinstance(key, str) and key.startswith("sidecar_")
+    }
+    if requested - allowed:
+        raise ValueError(f"unsupported scalar feature families: {sorted(requested - allowed)}")
+    ordered = tuple(
+        family for family in ("slow", "intraday") if family in requested
+    ) + tuple(sorted(family for family in requested if family.startswith("sidecar_")))
+    manifest_names = store.manifest.get("feature_names")
+    if not isinstance(manifest_names, Mapping):
+        raise ValueError("store manifest lacks ordered feature names")
+    names: list[str] = []
+    for family in ordered:
+        family_names = manifest_names.get(family)
+        if (
+            not isinstance(family_names, list)
+            or not family_names
+            or not all(isinstance(name, str) and name for name in family_names)
+        ):
+            raise ValueError(f"store manifest lacks ordered {family} feature names")
+        names.extend(family_names)
+    return tuple(names)
+
+
+def read_scalar_feature_view(
+    store: V2Store,
+    date_indices: Sequence[int] | NDArray[np.integer],
+    families: Sequence[str],
+) -> ScalarFeatureView:
+    """Read one canonical date/security scalar view for any model consumer."""
+
+    indices = np.asarray(date_indices, dtype=np.int64)
+    if indices.ndim != 1 or not indices.size or np.any(indices < 0):
+        raise ValueError("scalar feature rows must be a nonempty index vector")
+    requested = set(families)
+    ordered = tuple(
+        family for family in ("slow", "intraday") if family in requested
+    ) + tuple(sorted(family for family in requested if family.startswith("sidecar_")))
+    names = scalar_feature_names(store, families)
+    active = np.asarray(store.read("active", indices), dtype=np.bool_)
+    expected_axis = (indices.size, len(store.isins))
+    if active.shape != expected_axis:
+        raise ValueError("scalar feature activity is misaligned with the store axes")
+    values: list[NDArray[np.float32]] = []
+    validity: list[NDArray[np.bool_]] = []
+    ages: list[NDArray[np.float32]] = []
+    for family in ordered:
+        family_values = np.asarray(
+            store.read(f"{family}_values", indices), dtype=np.float32
+        )
+        family_valid = np.asarray(
+            store.read(f"{family}_valid", indices), dtype=np.bool_
+        )
+        family_age = np.asarray(
+            store.read(f"{family}_age_sessions", indices), dtype=np.float32
+        )
+        if (
+            family_values.ndim != 3
+            or family_valid.shape != family_values.shape
+            or family_age.shape != family_values.shape
+        ):
+            raise ValueError(f"{family} scalar feature arrays are misaligned")
+        if np.isinf(family_values).any() or not np.isfinite(
+            family_values[family_valid]
+        ).all():
+            raise ValueError(f"{family} has non-finite values marked available")
+        if (
+            not np.isfinite(family_age).all()
+            or np.any(family_age < -1.0)
+            or np.any(family_valid & (family_age < 0.0))
+        ):
+            raise ValueError(f"{family} feature ages violate the scalar contract")
+        values.append(family_values)
+        validity.append(family_valid)
+        ages.append(family_age)
+    if values:
+        combined_values = np.concatenate(values, axis=-1, dtype=np.float32)
+        combined_valid = np.concatenate(validity, axis=-1, dtype=np.bool_)
+        combined_age = np.concatenate(ages, axis=-1, dtype=np.float32)
+    else:
+        combined_values = np.empty((*expected_axis, 0), dtype=np.float32)
+        combined_valid = np.empty((*expected_axis, 0), dtype=np.bool_)
+        combined_age = np.empty((*expected_axis, 0), dtype=np.float32)
+    if combined_values.shape[-1] != len(names):
+        raise ValueError("scalar feature names do not match the stored feature width")
+    return ScalarFeatureView(
+        date_indices=indices,
+        dates=np.asarray(store.dates[indices], dtype="datetime64[D]"),
+        isins=tuple(store.isins),
+        active=active,
+        names=names,
+        values=combined_values,
+        valid=combined_valid,
+        age_sessions=combined_age,
+    )
 
 
 def collate_v2_daily(
@@ -179,7 +302,7 @@ def slow_row_index(sample_date_index: int, stage: Stage) -> int:
         raise ValueError("sample date index must be non-negative")
     if stage not in {"pretrain", "finetune", "evaluation", "joint"}:
         raise ValueError(f"unknown v2 stage: {stage}")
-    return sample_date_index - 1
+    return sample_date_index
 
 
 def required_store_date_indices(
@@ -229,33 +352,64 @@ def causal_history_end_offsets(
 def lazy_slow_window(
     values: NDArray[np.floating],
     valid: NDArray[np.bool_],
+    timestep_valid: NDArray[np.bool_],
+    age_sessions: NDArray[np.floating],
     *,
     end_index: int,
     lookback: int,
-) -> tuple[NDArray[np.float32], NDArray[np.bool_], NDArray[np.bool_]]:
+) -> tuple[
+    NDArray[np.float32],
+    NDArray[np.bool_],
+    NDArray[np.bool_],
+    NDArray[np.float32],
+]:
     """Create a left-padded `[name, lookback, feature]` view on demand."""
 
     source = np.asarray(values)
     mask = np.asarray(valid, dtype=np.bool_)
+    timesteps = np.asarray(timestep_valid, dtype=np.bool_)
+    ages = np.asarray(age_sessions, dtype=np.float32)
     if source.ndim != 3 or source.shape != mask.shape:
         raise ValueError("slow values and validity must align [date, name, feature]")
+    if ages.shape != source.shape:
+        raise ValueError("slow feature ages must align [date, name, feature]")
+    if timesteps.shape != source.shape[:2]:
+        raise ValueError("slow timestep validity must align [date, name]")
+    if np.any(mask & ~timesteps[..., None]):
+        raise ValueError("slow features cannot be valid outside real timesteps")
+    if (
+        not np.isfinite(ages).all()
+        or np.any(mask & (ages < 0.0))
+        or np.any(ages < -1.0)
+        or np.any((ages >= 0.0) & ~timesteps[..., None])
+    ):
+        raise ValueError(
+            "slow feature ages must be finite last-observation ages or -1, known "
+            "only on real timesteps, with every valid feature age known"
+        )
     if lookback not in ALLOWED_LOOKBACKS:
         raise ValueError("lookback must be 20, 60, or 120")
     output = np.zeros((source.shape[1], lookback, source.shape[2]), dtype=np.float32)
     output_valid = np.zeros(output.shape, dtype=np.bool_)
     history_mask = np.zeros((source.shape[1], lookback), dtype=np.bool_)
+    output_age = np.full(output.shape, -1.0, dtype=np.float32)
     if end_index < 0:
-        return output, output_valid, history_mask
+        return output, output_valid, history_mask, output_age
     if end_index >= source.shape[0]:
         raise IndexError("slow end index exceeds store")
     start = max(0, end_index - lookback + 1)
     sample = np.asarray(source[start : end_index + 1], dtype=np.float32).transpose(1, 0, 2)
     sample_valid = mask[start : end_index + 1].transpose(1, 0, 2)
+    sample_timesteps = timesteps[start : end_index + 1].transpose(1, 0)
+    sample_age = ages[start : end_index + 1].transpose(1, 0, 2)
     offset = lookback - sample.shape[1]
     output[:, offset:] = np.where(sample_valid, sample, 0.0)
     output_valid[:, offset:] = sample_valid
-    history_mask[:, offset:] = sample_valid.any(axis=-1)
-    return output, output_valid, history_mask
+    history_mask[:, offset:] = sample_timesteps
+    output_age[:, offset:] = np.where(
+        sample_timesteps[..., None], sample_age, -1.0
+    )
+    return output, output_valid, history_mask, output_age
 
 
 def _zero_invalid_values(
@@ -301,7 +455,9 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         self.date_indices = np.asarray(date_indices, dtype=np.int64)
         self.stage = stage
         self.lookback = lookback
-        self.enabled_sidecars = tuple(enabled_sidecars)
+        if len(set(enabled_sidecars)) != len(enabled_sidecars):
+            raise ValueError("enabled sidecar groups must be unique")
+        self.enabled_sidecars = tuple(sorted(enabled_sidecars))
         target_indices = (
             self.date_indices
             if target_window_indices is None
@@ -415,14 +571,33 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             self._target_date_indices
         ):
             raise ValueError("every sample date must be inside its target window")
-        if stage in {"finetune", "evaluation"} and np.any(self.date_indices == 0):
-            raise ValueError("fine/evaluation samples need a prior slow session")
         self.store.array_shape("slow_values")
         self.store.array_shape("slow_valid")
+        if self.store.array_shape("slow_age_sessions") != self.store.array_shape(
+            "slow_values"
+        ):
+            raise ValueError("slow feature ages are misaligned with the store")
+        if self.store.array_shape("slow_timestep_valid") != (
+            self.store.dates.size,
+            len(self.store.isins),
+        ):
+            raise ValueError("slow_timestep_valid is misaligned with the store axes")
         self.store.array_shape("active")
+        if not self.store.has_array("intraday_values") or not self.store.has_array(
+            "intraday_valid"
+        ):
+            raise ValueError("canonical v2 samples require current intraday features")
+        if self.store.array_shape("intraday_age_sessions") != self.store.array_shape(
+            "intraday_values"
+        ):
+            raise ValueError("current feature ages are misaligned with the store")
         for group in self.enabled_sidecars:
             self.store.array_shape(f"sidecar_{group}_values")
             self.store.array_shape(f"sidecar_{group}_valid")
+            if self.store.array_shape(
+                f"sidecar_{group}_age_sessions"
+            ) != self.store.array_shape(f"sidecar_{group}_values"):
+                raise ValueError(f"{group} source ages are misaligned with the store")
         native_arrays = {
             "fast_patch_values",
             "fast_patch_valid",
@@ -432,6 +607,10 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         if native_present and native_present != native_arrays:
             raise ValueError("the native fast arrays must be stored together")
         if native_present:
+            if not self.store.has_array("fast_present"):
+                raise ValueError(
+                    "native fast arrays require their stored fast_present source mask"
+                )
             value_shape = self.store.array_shape("fast_patch_values")
             if (
                 len(value_shape) != 4
@@ -551,35 +730,28 @@ class V2DailyDataset(Dataset[dict[str, object]]):
 
     def _slow_window(
         self, end_index: int
-    ) -> tuple[NDArray[np.float32], NDArray[np.bool_], NDArray[np.bool_]]:
+    ) -> tuple[
+        NDArray[np.float32],
+        NDArray[np.bool_],
+        NDArray[np.bool_],
+        NDArray[np.float32],
+    ]:
         """Read and concatenate only the requested windows from mmap sources."""
 
-        windows: list[NDArray[np.float32]] = []
-        masks: list[NDArray[np.bool_]] = []
-        history_masks: list[NDArray[np.bool_]] = []
-        sources = [("slow_values", "slow_valid")]
-        sources.extend(
-            (f"sidecar_{group}_values", f"sidecar_{group}_valid")
-            for group in self.enabled_sidecars
+        start = max(0, end_index - self.lookback + 1)
+        indices = np.arange(start, end_index + 1, dtype=np.int64)
+        view = read_scalar_feature_view(
+            self.store,
+            indices,
+            ("slow", *(f"sidecar_{group}" for group in self.enabled_sidecars)),
         )
-        for value_name, valid_name in sources:
-            start = max(0, end_index - self.lookback + 1)
-            selector = slice(start, end_index + 1)
-            values = self.store.read(value_name, selector)
-            valid = self.store.read(valid_name, selector)
-            window, mask, history = lazy_slow_window(
-                values,
-                valid,
-                end_index=len(values) - 1,
-                lookback=self.lookback,
-            )
-            windows.append(window)
-            masks.append(mask)
-            history_masks.append(history)
-        return (
-            np.concatenate(windows, axis=2),
-            np.concatenate(masks, axis=2),
-            np.logical_or.reduce(history_masks),
+        return lazy_slow_window(
+            view.values,
+            view.valid,
+            self.store.read("slow_timestep_valid", indices),
+            view.age_sessions,
+            end_index=len(indices) - 1,
+            lookback=self.lookback,
         )
 
     def _empty_fast(
@@ -650,7 +822,17 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             )
             if not np.array_equal(patch_mask, expected_mask):
                 raise ValueError("native fast patch masks must be contiguous prefixes")
-            selected = state_position > 0
+            stored_present = np.asarray(
+                self.store.read("fast_present", date_index), dtype=np.bool_
+            )
+            if stored_present.shape != (name_count,):
+                raise ValueError("stored fast_present is misaligned with name axis")
+            native_present = stored_present[self._native_fast_store_indices]
+            if np.any(native_present & (state_position == 0)):
+                raise ValueError(
+                    "stored fast_present cannot identify an empty native patch stream"
+                )
+            selected = native_present & (state_position > 0)
             if not selected.any():
                 return self._empty_fast()
             compact_valid = valid[selected]
@@ -747,7 +929,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
     def __getitem__(self, item: int) -> dict[str, object]:
         date_index = int(self.date_indices[item])
         slow_end = slow_row_index(date_index, self.stage)
-        history, feature_mask, history_mask = self._slow_window(slow_end)
+        history, feature_mask, history_mask, feature_age = self._slow_window(slow_end)
         (
             fast_values,
             fast_valid,
@@ -760,12 +942,17 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         active = np.asarray(
             self.store.read("active", date_index), dtype=np.bool_
         )
+        current_view = read_scalar_feature_view(
+            self.store, np.asarray([date_index], dtype=np.int64), ("intraday",)
+        )
         sample: dict[str, object] = {
+            "schema": DECISION_SAMPLE_SCHEMA,
             "date_index": np.int64(date_index),
             "trade_date": str(self.store.dates[date_index]),
             "slow_features": history,
             "slow_feature_mask": feature_mask,
             "slow_history_mask": history_mask,
+            "slow_feature_age_sessions": feature_age,
             "fast_patch_values": fast_values,
             "fast_patch_valid": fast_valid,
             "fast_patch_mask": patch_mask,
@@ -773,12 +960,10 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             "fast_state_position": fast_state_position,
             "fast_present": fast_present,
             "v1_equity_slow": v1_equity_slow,
-            "days_since_last_slow_row": np.full(
-                len(self.store.isins),
-                1.0,
-                dtype=np.float32,
-            ),
             "active_mask": active,
+            "current_features": current_view.values[0],
+            "current_feature_mask": current_view.valid[0],
+            "current_feature_age_sessions": current_view.age_sessions[0],
         }
         target_pairs = (
             ("target_primary", "target_valid", "targets", "target_mask"),
@@ -850,8 +1035,6 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         for source, destination in (
             ("target_to_close_valid", "to_close_mask"),
             ("target_to_close", "to_close_target"),
-            ("intraday_valid", "intraday_feature_mask"),
-            ("intraday_values", "intraday_features"),
         ):
             if self.store.has_array(source):
                 sample[destination] = self.store.read(source, date_index)
@@ -862,7 +1045,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         for value_key, mask_key in (
             ("slow_features", "slow_feature_mask"),
             ("fast_patch_values", "fast_patch_valid"),
-            ("intraday_features", "intraday_feature_mask"),
+            ("current_features", "current_feature_mask"),
             ("targets", "target_mask"),
             ("raw_targets", "raw_target_mask"),
             ("raw_log_returns", "raw_target_mask"),
