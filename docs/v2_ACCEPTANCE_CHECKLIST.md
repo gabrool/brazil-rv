@@ -23,7 +23,8 @@ is claimed here.
 | Item | Bound value |
 |---|---|
 | Final implementation commit | `f0cf568303715e8783e539a683568535e2232c7f` |
-| Documentation/evidence payload commit | `8c9121e3a0d909ea5336bdc491d1638d931cdab6` |
+| Initial documentation/evidence payload commit | `8c9121e3a0d909ea5336bdc491d1638d931cdab6` |
+| Final machine-evidence content commit | `b356a562691217313f326f3b6fbcb7bce27d631d` |
 | Machine-readable report | `research/acceptance/v2_refactor_20260906.json` |
 | Machine-report SHA-256 | `38393706d8736c08deafe9eda22074a2b4518ab3e06e6e2c63f61b1b7523250e` |
 | Full Ruff/compile/test verification | `uv run ruff check src tests` passed; `uv run python -m compileall -q src tests` passed; PowerShell `$env:BRAZIL_RV_TEST_SCRATCH='D:\'; uv run pytest -q` passed **810** tests in **372.11 s**; collector `uv run --group dev pytest tests/test_parse_b3_cotahist.py -q` passed **4** tests in **0.18 s**. |

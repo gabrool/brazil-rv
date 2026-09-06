@@ -541,8 +541,10 @@ Section D. No new experiment was run.
 
 - Final implementation commit:
   `f0cf568303715e8783e539a683568535e2232c7f`.
-- Documentation/evidence payload commit:
+- Initial documentation/evidence payload commit:
   `8c9121e3a0d909ea5336bdc491d1638d931cdab6`.
+- Final machine-evidence content commit:
+  `b356a562691217313f326f3b6fbcb7bce27d631d`.
 - Main/GitHub synchronization: verified after the final push; local `main` and
   `origin/main` resolve to the closeout commit containing this statement.
 - Ruff/compile/full-suite result: `uv run ruff check src tests` passed;
