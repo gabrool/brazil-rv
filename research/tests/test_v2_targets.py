@@ -1,14 +1,9 @@
 import numpy as np
 
-from brazil_rv.v2.corporate_actions import (
-    AlignedActionTerms,
-    causal_price_adjustment_factor,
-)
+from brazil_rv.v2.corporate_actions import AlignedActionTerms
 from brazil_rv.v2.targets import (
     build_economic_multi_day_targets,
-    build_multi_day_targets,
-    build_multi_day_targets_into,
-    build_neutralized_log_returns,
+    build_economic_multi_day_targets_into,
     build_to_close_target,
 )
 
@@ -46,7 +41,7 @@ def test_economic_targets_distinguish_price_and_shareholder_returns() -> None:
         horizons=(1,),
     )
     np.testing.assert_allclose(
-        result.price_simple_return[0, :, 0], [0.10, -0.20, 0.0], atol=1e-7
+        result.price_simple_return[0, :, 0], [-0.45, -0.20, -0.50], atol=1e-7
     )
     np.testing.assert_allclose(
         result.shareholder_simple_return[0, :, 0], [0.10, -0.19, 0.01], atol=1e-7
@@ -165,79 +160,52 @@ def test_economic_target_follows_verified_successor_identity() -> None:
     np.testing.assert_allclose(result.shareholder_simple_return[0, 0, 0], 0.10)
 
 
-def test_target_masks_exact_path_and_missing_return() -> None:
-    returns = np.log(np.array(
-        [
-            [100.0, 100.0, 100.0],
-            [101.0, 102.0, 103.0],
-            [102.0, 104.0, 106.0],
-            [103.0, 106.0, 109.0],
-        ]
-    )[1:] / np.array(
-        [
-            [100.0, 100.0, 100.0],
-            [101.0, 102.0, 103.0],
-            [102.0, 104.0, 106.0],
-        ]
-    ))
-    returns = np.vstack((np.zeros((1, 3)), returns))
-    active = np.ones_like(returns, dtype=bool)
-    slow_sigma = np.full_like(returns, 0.03)
-    valid = np.ones_like(returns, dtype=bool)
-    valid[1, 1] = False
-    result = build_multi_day_targets(
-        returns,
-        valid,
-        active,
-        slow_sigma,
-        horizons=(1, 2),
-    )
-    assert result.raw_valid[0, 0, 0]
-    assert not result.raw_valid[0, 1, 0]
-    assert result.raw_valid[1, :, 0].all()
-    assert not result.raw_valid[-1].any()
-    assert result.primary_valid[1, 0, 0]
-    assert np.all(result.primary[~result.primary_valid] == 0)
-
-
 def test_raw_target_validity_is_independent_of_missing_sigma() -> None:
     close = np.array([[10.0, 10.0], [11.0, 12.0]])
-    active = np.ones_like(close, dtype=bool)
-    result = build_multi_day_targets(
-        np.vstack((np.zeros((1, 2)), np.log(close[1:] / close[:-1]))),
-        np.ones_like(close, dtype=bool),
-        active,
+    result = build_economic_multi_day_targets(
+        close,
+        np.ones_like(close, dtype=np.bool_),
+        np.ones_like(close, dtype=np.bool_),
         np.full_like(close, np.nan),
+        _actions(np.ones_like(close)),
         horizons=(1,),
     )
-    assert result.raw_valid[0, :, 0].all()
+    assert result.shareholder_valid[0, :, 0].all()
+    assert result.price_valid[0, :, 0].all()
     assert not result.primary_valid.any()
-    assert result.raw_log_return.dtype == np.float32
+    assert result.shareholder_simple_return.dtype == np.float32
 
 
-def test_target_builder_streams_selected_rows_into_float32_destinations() -> None:
+def test_economic_target_builder_streams_selected_rows_into_float32_destinations() -> None:
     close = np.arange(20, dtype=np.float64).reshape(5, 4) + 100.0
     shape = (2, 4, 2)
-    value_arrays = [np.empty(shape, dtype=np.float32) for _ in range(4)]
-    mask_arrays = [np.empty(shape, dtype=np.bool_) for _ in range(2)]
-    build_multi_day_targets_into(
-        np.vstack((np.zeros((1, 4)), np.log(close[1:] / close[:-1]))),
-        np.ones_like(close, dtype=np.bool_),
-        np.ones_like(close, dtype=np.bool_),
-        np.full_like(close, 0.02),
-        primary=value_arrays[0],
-        primary_valid=mask_arrays[0],
-        normalized_residual=value_arrays[1],
-        raw_midrank=value_arrays[2],
-        raw_valid=mask_arrays[1],
-        raw_log_return=value_arrays[3],
+    floats = [np.empty(shape, dtype=np.float32) for _ in range(7)]
+    masks = [np.empty(shape, dtype=np.bool_) for _ in range(4)]
+    normalized_cross_section_valid = np.empty((2, 2), dtype=np.bool_)
+    build_economic_multi_day_targets_into(
+        raw_close=close,
+        close_observed=np.ones_like(close, dtype=np.bool_),
+        active=np.ones_like(close, dtype=np.bool_),
+        sigma_asof=np.full_like(close, 0.02),
+        actions=_actions(np.ones_like(close)),
+        primary=floats[0],
+        primary_valid=masks[0],
+        normalized_residual=floats[1],
+        normalized_cross_section_valid=normalized_cross_section_valid,
+        shareholder_midrank=floats[2],
+        shareholder_valid=masks[1],
+        shareholder_simple_return=floats[3],
+        terminal_wealth=floats[4],
+        terminal_loss=masks[2],
+        price_midrank=floats[5],
+        price_valid=masks[3],
+        price_simple_return=floats[6],
         source_rows=np.asarray([1, 3]),
         horizons=(1, 2),
     )
-    assert mask_arrays[0][0].all()
-    assert not mask_arrays[0][1, :, 1].any()
-    expected = np.log(close[2] / close[1]).astype(np.float32)
-    np.testing.assert_array_equal(value_arrays[3][0, :, 0], expected)
+    assert masks[0][0].all()
+    assert not masks[0][1, :, 1].any()
+    np.testing.assert_allclose(floats[3][0, :, 0], close[2] / close[1] - 1.0)
 
 
 def test_to_close_target_is_cross_sectionally_ranked() -> None:
@@ -253,83 +221,52 @@ def test_to_close_target_is_cross_sectionally_ranked() -> None:
     np.testing.assert_array_equal(result.target[0], [0.0, 0.5, 1.0])
 
 
-def test_neutralized_event_is_valid_and_uses_market_median() -> None:
-    raw_close = np.asarray(
-        [[100.0, 100.0], [100.0, 100.0], [50.0, 110.0], [51.0, 111.0]]
-    )
-    price_ratio = np.asarray(
-        [[np.nan, np.nan], [np.nan, np.nan], [0.5, 1.1], [np.nan, np.nan]]
-    )
-    split = np.asarray(
-        [[False, False], [False, False], [True, False], [False, False]]
-    )
-    adjusted_close = raw_close * causal_price_adjustment_factor(price_ratio, split)
-    event = np.asarray(
-        [[False, False], [False, False], [False, True], [False, False]]
-    )
-    neutralized = build_neutralized_log_returns(
-        adjusted_close,
-        np.ones_like(raw_close, dtype=bool),
-        np.ones_like(raw_close, dtype=bool),
-        event,
-        minimum_cross_section=1,
-    )
-    result = build_multi_day_targets(
-        neutralized.log_return,
-        neutralized.valid,
-        np.ones_like(raw_close, dtype=bool),
-        np.full_like(raw_close, 0.02),
-        horizons=(1,),
-    )
-    np.testing.assert_allclose(result.raw_log_return[1, 0, 0], 0.0, atol=1e-12)
-    assert result.raw_valid[0].all()
-    np.testing.assert_allclose(neutralized.log_return[2], [0.0, 0.0], atol=1e-12)
-
-
 def test_residual_is_median_removed_before_name_specific_scaling() -> None:
-    returns = np.zeros((3, 5), dtype=np.float64)
-    returns[2] = 0.02
-    sigma = np.tile(np.asarray([0.01, 0.02, 0.03, 0.04, 0.05]), (3, 1))
-    result = build_multi_day_targets(
-        returns,
-        np.ones_like(returns, dtype=np.bool_),
-        np.ones_like(returns, dtype=np.bool_),
+    close = np.vstack((np.full(5, 100.0), np.full(5, 100.0 * np.exp(0.02))))
+    sigma = np.tile(np.asarray([0.01, 0.02, 0.03, 0.04, 0.05]), (2, 1))
+    result = build_economic_multi_day_targets(
+        close,
+        np.ones_like(close, dtype=np.bool_),
+        np.ones_like(close, dtype=np.bool_),
         sigma,
+        _actions(np.ones_like(close)),
         horizons=(1,),
     )
-    np.testing.assert_array_equal(result.primary[1, :, 0], np.full(5, 0.5))
+    np.testing.assert_array_equal(result.primary[0, :, 0], np.full(5, 0.5))
 
 
 def test_target_uses_already_lagged_same_row_sigma_and_missing_path_stays_invalid() -> None:
-    returns = np.zeros((4, 3), dtype=np.float64)
-    returns[2] = [-0.02, 0.0, 0.02]
-    sigma = np.full((4, 3), 0.02)
-    first = build_multi_day_targets(
-        returns,
-        np.ones_like(returns, dtype=np.bool_),
-        np.ones_like(returns, dtype=np.bool_),
+    close = np.asarray([[100.0, 100.0, 100.0], [98.0, 100.0, 102.0]])
+    sigma = np.full_like(close, 0.02)
+    first = build_economic_multi_day_targets(
+        close,
+        np.ones_like(close, dtype=np.bool_),
+        np.ones_like(close, dtype=np.bool_),
         sigma,
+        _actions(np.ones_like(close)),
         horizons=(1,),
     )
     changed = sigma.copy()
-    changed[1] = [0.5, 0.6, 0.7]
-    second = build_multi_day_targets(
-        returns,
-        np.ones_like(returns, dtype=np.bool_),
-        np.ones_like(returns, dtype=np.bool_),
+    changed[0] = [0.5, 0.6, 0.7]
+    second = build_economic_multi_day_targets(
+        close,
+        np.ones_like(close, dtype=np.bool_),
+        np.ones_like(close, dtype=np.bool_),
         changed,
+        _actions(np.ones_like(close)),
         horizons=(1,),
     )
     assert not np.array_equal(
-        first.normalized_residual[1], second.normalized_residual[1]
+        first.normalized_residual[0], second.normalized_residual[0]
     )
-    valid = np.ones_like(returns, dtype=np.bool_)
-    valid[2, 0] = False
-    missing = build_multi_day_targets(
-        returns,
-        valid,
-        np.ones_like(returns, dtype=np.bool_),
+    observed = np.ones_like(close, dtype=np.bool_)
+    observed[1, 0] = False
+    missing = build_economic_multi_day_targets(
+        close,
+        observed,
+        np.ones_like(close, dtype=np.bool_),
         sigma,
+        _actions(np.ones_like(close)),
         horizons=(1,),
     )
-    assert not missing.raw_valid[1, 0, 0]
+    assert not missing.shareholder_valid[0, 0, 0]

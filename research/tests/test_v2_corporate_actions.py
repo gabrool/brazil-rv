@@ -11,6 +11,7 @@ from brazil_rv.v2.corporate_actions import (
     _extract_yfinance_actions,
     acquire_yfinance_actions,
     action_coverage_resolved_mask,
+    align_action_payment_sessions,
     align_action_arrays,
     align_verified_action_terms,
     apply_contractual_action,
@@ -140,6 +141,50 @@ def test_action_sequence_uses_common_units_and_signed_cash_obligation() -> None:
     )
     assert (long_shares, long_cash) == (6.0, 8.0)
     assert (short_shares, short_cash) == (-6.0, 2.0)
+
+
+def test_action_payment_sessions_preserve_unknown_and_separate_due_dates() -> None:
+    dates = [
+        date(2024, 1, 2),
+        date(2024, 1, 3),
+        date(2024, 1, 4),
+        date(2024, 1, 5),
+    ]
+    aligned = align_action_payment_sessions(
+        [
+            _term(
+                "dividend",
+                ex_date=dates[1],
+                d=1.0,
+                payment_date=dates[3],
+            ),
+            _term("jcp", ex_date=dates[2], d=0.5, sequence=1),
+        ],
+        dates,
+        ["BRTESTACNOR1"],
+    )
+    assert aligned[:, 0].tolist() == [-1, 3, -1, -1]
+
+    with np.testing.assert_raises_regex(ValueError, "different payment dates"):
+        align_action_payment_sessions(
+            [
+                _term(
+                    "dividend",
+                    ex_date=dates[1],
+                    d=1.0,
+                    payment_date=dates[2],
+                ),
+                _term(
+                    "jcp",
+                    ex_date=dates[1],
+                    d=0.5,
+                    sequence=1,
+                    payment_date=dates[3],
+                ),
+            ],
+            dates,
+            ["BRTESTACNOR1"],
+        )
 
 
 def test_shareholder_wealth_ohlc_uses_contract_terms_and_no_payment_gain() -> None:

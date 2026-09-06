@@ -479,6 +479,78 @@ def align_verified_action_terms(
     )
 
 
+def align_action_payment_sessions(
+    terms: Sequence[VerifiedActionTerm],
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+) -> NDArray[np.int64]:
+    """Align each cash-bearing action to its first payable session.
+
+    Values are absolute positions on ``dates``. ``-1`` means that the source
+    does not establish a payment date. A known payment after the available
+    calendar is represented by ``len(dates)`` so a bounded evaluation window
+    retains the claim rather than silently treating it as unknown or paid.
+
+    The scalar action panel collapses same-session terms into one cash amount.
+    That is only lossless when those terms share the same payment date; mixed
+    payment dates are therefore rejected instead of sweeping unrelated claims
+    together later in the ledger.
+    """
+
+    normalized_dates = np.asarray(dates, dtype="datetime64[D]")
+    if normalized_dates.ndim != 1 or normalized_dates.size == 0:
+        raise ValueError("payment alignment requires a nonempty date axis")
+    if np.any(normalized_dates[1:] <= normalized_dates[:-1]):
+        raise ValueError("payment alignment dates must be strictly chronological")
+    isin_lookup = {value: index for index, value in enumerate(isins)}
+    if len(isin_lookup) != len(isins):
+        raise ValueError("payment alignment ISIN axis must be unique")
+
+    output = np.full(
+        (normalized_dates.size, len(isins)), -1, dtype=np.int64
+    )
+    payment_by_event: dict[tuple[int, int], date | None] = {}
+    for term in validate_verified_action_terms(terms):
+        if not term.resolved or term.cash_per_prior_share == 0.0:
+            continue
+        name = isin_lookup.get(term.isin)
+        if name is None:
+            continue
+        event = int(
+            np.searchsorted(
+                normalized_dates, np.datetime64(term.ex_date, "D"), side="left"
+            )
+        )
+        if (
+            event >= normalized_dates.size
+            or normalized_dates[event] != np.datetime64(term.ex_date, "D")
+        ):
+            continue
+        key = (event, name)
+        prior = payment_by_event.get(key, term.payment_date)
+        if key in payment_by_event and prior != term.payment_date:
+            raise ValueError(
+                "same-session cash actions with different payment dates cannot "
+                "be collapsed into one scalar action cell"
+            )
+        payment_by_event[key] = term.payment_date
+
+    for (event, name), payment_date in payment_by_event.items():
+        if payment_date is None:
+            continue
+        payment = int(
+            np.searchsorted(
+                normalized_dates,
+                np.datetime64(payment_date, "D"),
+                side="left",
+            )
+        )
+        if payment < event:
+            raise ValueError("action payment session cannot precede its ex session")
+        output[event, name] = payment
+    return output
+
+
 def apply_contractual_action(
     shares: float | NDArray[np.floating],
     cash: float | NDArray[np.floating],

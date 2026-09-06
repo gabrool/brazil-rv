@@ -11,29 +11,11 @@ from .normalization import midrank_unit_interval
 
 
 @dataclass(frozen=True)
-class MultiDayTargets:
-    primary: NDArray[np.float32]
-    primary_valid: NDArray[np.bool_]
-    normalized_residual: NDArray[np.float32]
-    raw_midrank: NDArray[np.float32]
-    raw_valid: NDArray[np.bool_]
-    raw_log_return: NDArray[np.float32]
-    horizons: tuple[int, ...] = HORIZONS
-
-
-@dataclass(frozen=True)
 class ToCloseTarget:
     target: NDArray[np.float32]
     valid: NDArray[np.bool_]
     normalized_residual: NDArray[np.float32]
     raw_log_return: NDArray[np.float32]
-
-
-@dataclass(frozen=True)
-class NeutralizedReturns:
-    log_return: NDArray[np.float32]
-    valid: NDArray[np.bool_]
-    cross_sectional_median: NDArray[np.float32]
 
 
 @dataclass(frozen=True)
@@ -55,59 +37,6 @@ class EconomicMultiDayTargets:
     horizons: tuple[int, ...]
     entry_mark_type: str
     exit_mark_type: str
-
-
-def build_neutralized_log_returns(
-    adjusted_close: NDArray[np.floating],
-    observed: NDArray[np.bool_],
-    active: NDArray[np.bool_],
-    return_neutralized_event: NDArray[np.bool_],
-    *,
-    minimum_cross_section: int = 20,
-) -> NeutralizedReturns:
-    """Build an explicitly synthetic market-neutralized diagnostic series.
-
-    This is not a corporate-action adjustment, shareholder return, headline
-    target, or P&L input.  It is retained only for bounded audit comparisons.
-    """
-
-    close = np.asarray(adjusted_close, dtype=np.float64)
-    seen = np.asarray(observed, dtype=np.bool_)
-    membership = np.asarray(active, dtype=np.bool_)
-    neutralize = np.asarray(return_neutralized_event, dtype=np.bool_)
-    if close.ndim != 2 or any(
-        value.shape != close.shape for value in (seen, membership, neutralize)
-    ):
-        raise ValueError("neutralized-return inputs must align [date, name]")
-    if minimum_cross_section < 1:
-        raise ValueError("minimum_cross_section must be positive")
-    values = np.zeros(close.shape, dtype=np.float32)
-    valid = np.zeros(close.shape, dtype=np.bool_)
-    median = np.full(close.shape[0], np.nan, dtype=np.float32)
-    for day in range(1, close.shape[0]):
-        base_valid = (
-            seen[day]
-            & seen[day - 1]
-            & np.isfinite(close[day])
-            & np.isfinite(close[day - 1])
-            & (close[day] > 0)
-            & (close[day - 1] > 0)
-        )
-        raw = np.zeros(close.shape[1], dtype=np.float64)
-        raw[base_valid] = np.log(close[day, base_valid] / close[day - 1, base_valid])
-        non_event = base_valid & membership[day] & ~neutralize[day]
-        if int(non_event.sum()) >= minimum_cross_section:
-            median[day] = np.float32(np.median(raw[non_event]))
-        row_valid = base_valid.copy()
-        event = base_valid & neutralize[day]
-        if event.any():
-            if np.isfinite(median[day]):
-                raw[event] = float(median[day])
-            else:
-                row_valid[event] = False
-        values[day, row_valid] = raw[row_valid].astype(np.float32)
-        valid[day] = row_valid
-    return NeutralizedReturns(values, valid, median)
 
 
 def _rank_row(
@@ -133,6 +62,103 @@ def build_economic_multi_day_targets(
     entry_mark_type: str = "daily_last_trade_close_proxy",
     exit_mark_type: str = "daily_last_trade_close_proxy",
 ) -> EconomicMultiDayTargets:
+    """Allocate the small public result wrapper around the streaming builder."""
+
+    close_shape = np.shape(raw_close)
+    if len(close_shape) != 2:
+        raise ValueError("economic-target raw_close must align [date, name]")
+    if source_rows is None:
+        output_rows = close_shape[0]
+    else:
+        raw_rows = np.asarray(source_rows)
+        if raw_rows.ndim != 1 or not np.issubdtype(raw_rows.dtype, np.integer):
+            raise TypeError("source_rows must be a one-dimensional integer array")
+        output_rows = raw_rows.size
+    shape = (output_rows, close_shape[1], len(horizons))
+    primary = np.empty(shape, dtype=np.float32)
+    primary_valid = np.empty(shape, dtype=np.bool_)
+    normalized = np.empty(shape, dtype=np.float32)
+    normalized_cross_section_valid = np.empty(
+        (output_rows, len(horizons)), dtype=np.bool_
+    )
+    shareholder_rank = np.empty(shape, dtype=np.float32)
+    shareholder_valid = np.empty(shape, dtype=np.bool_)
+    shareholder_return = np.empty(shape, dtype=np.float32)
+    terminal_wealth = np.empty(shape, dtype=np.float32)
+    terminal_loss = np.empty(shape, dtype=np.bool_)
+    price_rank = np.empty(shape, dtype=np.float32)
+    price_valid = np.empty(shape, dtype=np.bool_)
+    price_return = np.empty(shape, dtype=np.float32)
+    build_economic_multi_day_targets_into(
+        raw_close,
+        close_observed,
+        active,
+        sigma_asof,
+        actions,
+        primary=primary,
+        primary_valid=primary_valid,
+        normalized_residual=normalized,
+        normalized_cross_section_valid=normalized_cross_section_valid,
+        shareholder_midrank=shareholder_rank,
+        shareholder_valid=shareholder_valid,
+        shareholder_simple_return=shareholder_return,
+        terminal_wealth=terminal_wealth,
+        terminal_loss=terminal_loss,
+        price_midrank=price_rank,
+        price_valid=price_valid,
+        price_simple_return=price_return,
+        source_rows=source_rows,
+        horizons=horizons,
+        winsor_limit=winsor_limit,
+        minimum_sigma=minimum_sigma,
+        entry_mark_type=entry_mark_type,
+        exit_mark_type=exit_mark_type,
+    )
+    return EconomicMultiDayTargets(
+        primary=primary,
+        primary_valid=primary_valid,
+        normalized_residual=normalized,
+        normalized_cross_section_valid=normalized_cross_section_valid,
+        shareholder_midrank=shareholder_rank,
+        shareholder_valid=shareholder_valid,
+        shareholder_simple_return=shareholder_return,
+        terminal_wealth=terminal_wealth,
+        terminal_loss=terminal_loss,
+        price_midrank=price_rank,
+        price_valid=price_valid,
+        price_simple_return=price_return,
+        horizons=horizons,
+        entry_mark_type=entry_mark_type,
+        exit_mark_type=exit_mark_type,
+    )
+
+
+def build_economic_multi_day_targets_into(
+    raw_close: NDArray[np.floating],
+    close_observed: NDArray[np.bool_],
+    active: NDArray[np.bool_],
+    sigma_asof: NDArray[np.floating],
+    actions: AlignedActionTerms,
+    *,
+    primary: NDArray[np.float32],
+    primary_valid: NDArray[np.bool_],
+    normalized_residual: NDArray[np.float32],
+    normalized_cross_section_valid: NDArray[np.bool_],
+    shareholder_midrank: NDArray[np.float32],
+    shareholder_valid: NDArray[np.bool_],
+    shareholder_simple_return: NDArray[np.float32],
+    terminal_wealth: NDArray[np.float32],
+    terminal_loss: NDArray[np.bool_],
+    price_midrank: NDArray[np.float32],
+    price_valid: NDArray[np.bool_],
+    price_simple_return: NDArray[np.float32],
+    source_rows: NDArray[np.integer] | None = None,
+    horizons: tuple[int, ...] = HORIZONS,
+    winsor_limit: float = 5.0,
+    minimum_sigma: float = 1e-8,
+    entry_mark_type: str = "daily_last_trade_close_proxy",
+    exit_mark_type: str = "daily_last_trade_close_proxy",
+) -> None:
     """Build price and gross shareholder outcomes from verified action terms.
 
     Entry wealth buys at close(t).  Contractual q/d events are applied only
@@ -190,20 +216,49 @@ def build_economic_multi_day_targets(
             raise ValueError("source_rows contains an out-of-range index")
 
     shape = (rows.size, close.shape[1], len(horizons))
-    primary = np.zeros(shape, dtype=np.float32)
-    primary_valid = np.zeros(shape, dtype=np.bool_)
-    normalized = np.zeros(shape, dtype=np.float32)
-    normalized_cross_section_valid = np.zeros(
-        (rows.size, len(horizons)), dtype=np.bool_
-    )
-    shareholder_rank = np.zeros(shape, dtype=np.float32)
-    shareholder_valid = np.zeros(shape, dtype=np.bool_)
-    shareholder_return = np.full(shape, np.nan, dtype=np.float32)
-    terminal_wealth = np.full(shape, np.nan, dtype=np.float32)
-    terminal_loss = np.zeros(shape, dtype=np.bool_)
-    price_rank = np.zeros(shape, dtype=np.float32)
-    price_valid = np.zeros(shape, dtype=np.bool_)
-    price_return = np.full(shape, np.nan, dtype=np.float32)
+    destinations = {
+        "primary": (primary, np.dtype(np.float32), shape),
+        "primary_valid": (primary_valid, np.dtype(np.bool_), shape),
+        "normalized_residual": (
+            normalized_residual,
+            np.dtype(np.float32),
+            shape,
+        ),
+        "normalized_cross_section_valid": (
+            normalized_cross_section_valid,
+            np.dtype(np.bool_),
+            (rows.size, len(horizons)),
+        ),
+        "shareholder_midrank": (
+            shareholder_midrank,
+            np.dtype(np.float32),
+            shape,
+        ),
+        "shareholder_valid": (shareholder_valid, np.dtype(np.bool_), shape),
+        "shareholder_simple_return": (
+            shareholder_simple_return,
+            np.dtype(np.float32),
+            shape,
+        ),
+        "terminal_wealth": (terminal_wealth, np.dtype(np.float32), shape),
+        "terminal_loss": (terminal_loss, np.dtype(np.bool_), shape),
+        "price_midrank": (price_midrank, np.dtype(np.float32), shape),
+        "price_valid": (price_valid, np.dtype(np.bool_), shape),
+        "price_simple_return": (
+            price_simple_return,
+            np.dtype(np.float32),
+            shape,
+        ),
+    }
+    for name, (destination, dtype, expected_shape) in destinations.items():
+        if destination.shape != expected_shape or destination.dtype != dtype:
+            raise TypeError(
+                f"{name} must have shape {expected_shape} and dtype {dtype}"
+            )
+        destination[...] = False if dtype == np.dtype(np.bool_) else 0.0
+    shareholder_simple_return[...] = np.nan
+    terminal_wealth[...] = np.nan
+    price_simple_return[...] = np.nan
 
     for horizon_index, horizon in enumerate(horizons):
         for output_day, day in enumerate(rows):
@@ -266,13 +321,19 @@ def build_economic_multi_day_targets(
             holding_valid = (
                 economic_valid & np.isfinite(wealth) & (wealth >= 0.0)
             )
+            price_endpoint_valid = (
+                entry_valid
+                & observed[end]
+                & np.isfinite(close[end])
+                & (close[end] > 0.0)
+            )
             price_wealth = np.full(close.shape[1], np.nan, dtype=np.float64)
-            price_wealth[economic_valid] = (
-                terminal_price_per_entry_share[economic_valid]
-                / close[day, economic_valid]
+            price_wealth[price_endpoint_valid] = (
+                close[end, price_endpoint_valid]
+                / close[day, price_endpoint_valid]
             )
             row_price_valid = (
-                economic_valid
+                price_endpoint_valid
                 & np.isfinite(price_wealth)
                 & (price_wealth >= 0.0)
             )
@@ -280,7 +341,7 @@ def build_economic_multi_day_targets(
             price_simple = price_wealth - 1.0
 
             shareholder_valid[output_day, :, horizon_index] = holding_valid
-            shareholder_return[output_day, holding_valid, horizon_index] = (
+            shareholder_simple_return[output_day, holding_valid, horizon_index] = (
                 holding_simple[holding_valid].astype(np.float32)
             )
             terminal_wealth[output_day, holding_valid, horizon_index] = wealth[
@@ -289,14 +350,14 @@ def build_economic_multi_day_targets(
             terminal_loss[output_day, holding_valid, horizon_index] = (
                 wealth[holding_valid] == 0.0
             )
-            shareholder_rank[output_day, :, horizon_index] = _rank_row(
+            shareholder_midrank[output_day, :, horizon_index] = _rank_row(
                 holding_simple, holding_valid
             )
             price_valid[output_day, :, horizon_index] = row_price_valid
-            price_return[output_day, row_price_valid, horizon_index] = price_simple[
+            price_simple_return[output_day, row_price_valid, horizon_index] = price_simple[
                 row_price_valid
             ].astype(np.float32)
-            price_rank[output_day, :, horizon_index] = _rank_row(
+            price_midrank[output_day, :, horizon_index] = _rank_row(
                 price_simple, row_price_valid
             )
 
@@ -324,7 +385,7 @@ def build_economic_multi_day_targets(
             row_normalized[row_target_valid] = np.clip(
                 row_normalized[row_target_valid], -winsor_limit, winsor_limit
             )
-            normalized[output_day, row_target_valid, horizon_index] = (
+            normalized_residual[output_day, row_target_valid, horizon_index] = (
                 row_normalized[row_target_valid].astype(np.float32)
             )
             primary[output_day, row_target_valid, horizon_index] = (
@@ -332,184 +393,6 @@ def build_economic_multi_day_targets(
             )
             primary_valid[output_day, row_target_valid, horizon_index] = True
 
-    return EconomicMultiDayTargets(
-        primary=primary,
-        primary_valid=primary_valid,
-        normalized_residual=normalized,
-        normalized_cross_section_valid=normalized_cross_section_valid,
-        shareholder_midrank=shareholder_rank,
-        shareholder_valid=shareholder_valid,
-        shareholder_simple_return=shareholder_return,
-        terminal_wealth=terminal_wealth,
-        terminal_loss=terminal_loss,
-        price_midrank=price_rank,
-        price_valid=price_valid,
-        price_simple_return=price_return,
-        horizons=horizons,
-        entry_mark_type=entry_mark_type,
-        exit_mark_type=exit_mark_type,
-    )
-
-
-def build_multi_day_targets(
-    neutralized_log_return: NDArray[np.floating],
-    neutralized_log_return_valid: NDArray[np.bool_],
-    active: NDArray[np.bool_],
-    yang_zhang_sigma_20: NDArray[np.floating],
-    *,
-    horizons: tuple[int, ...] = HORIZONS,
-    winsor_limit: float = 5.0,
-) -> MultiDayTargets:
-    """Construct the legacy synthetic-return diagnostic targets.
-
-    The accepted economic path uses :func:`build_economic_multi_day_targets`.
-    This compatibility function remains while existing store callers migrate.
-    """
-
-    daily_return = np.asarray(neutralized_log_return, dtype=np.float64)
-    return_valid = np.asarray(neutralized_log_return_valid, dtype=np.bool_)
-    membership = np.asarray(active, dtype=np.bool_)
-    sigma = np.asarray(yang_zhang_sigma_20, dtype=np.float64)
-    if daily_return.ndim != 2 or any(
-        value.shape != daily_return.shape
-        for value in (return_valid, membership, sigma)
-    ):
-        raise ValueError("target inputs must be aligned [date, name]")
-    if (
-        not horizons
-        or any(value <= 0 for value in horizons)
-        or len(set(horizons)) != len(horizons)
-    ):
-        raise ValueError("target horizons must be unique and positive")
-    shape = (*daily_return.shape, len(horizons))
-    primary = np.zeros(shape, dtype=np.float32)
-    primary_valid = np.zeros(shape, dtype=np.bool_)
-    residual = np.zeros(shape, dtype=np.float32)
-    raw_rank = np.zeros(shape, dtype=np.float32)
-    raw_valid = np.zeros(shape, dtype=np.bool_)
-    raw_return = np.empty(shape, dtype=np.float32)
-
-    build_multi_day_targets_into(
-        daily_return,
-        return_valid,
-        membership,
-        sigma,
-        primary=primary,
-        primary_valid=primary_valid,
-        normalized_residual=residual,
-        raw_midrank=raw_rank,
-        raw_valid=raw_valid,
-        raw_log_return=raw_return,
-        horizons=horizons,
-        winsor_limit=winsor_limit,
-    )
-    return MultiDayTargets(
-        primary=primary,
-        primary_valid=primary_valid,
-        normalized_residual=residual,
-        raw_midrank=raw_rank,
-        raw_valid=raw_valid,
-        raw_log_return=raw_return,
-        horizons=horizons,
-    )
-
-
-def build_multi_day_targets_into(
-    neutralized_log_return: NDArray[np.floating],
-    neutralized_log_return_valid: NDArray[np.bool_],
-    active: NDArray[np.bool_],
-    yang_zhang_sigma_20: NDArray[np.floating],
-    *,
-    primary: NDArray[np.float32],
-    primary_valid: NDArray[np.bool_],
-    normalized_residual: NDArray[np.float32],
-    raw_midrank: NDArray[np.float32],
-    raw_valid: NDArray[np.bool_],
-    raw_log_return: NDArray[np.float32],
-    source_rows: NDArray[np.integer] | None = None,
-    horizons: tuple[int, ...] = HORIZONS,
-    winsor_limit: float = 5.0,
-) -> None:
-    """Stream one target horizon at a time into pre-allocated arrays."""
-
-    daily_return = np.asarray(neutralized_log_return)
-    return_valid = np.asarray(neutralized_log_return_valid, dtype=np.bool_)
-    membership = np.asarray(active, dtype=np.bool_)
-    sigma = np.asarray(yang_zhang_sigma_20)
-    if daily_return.ndim != 2 or any(
-        value.shape != daily_return.shape
-        for value in (return_valid, membership, sigma)
-    ):
-        raise ValueError("target inputs must be aligned [date, name]")
-    if (
-        not horizons
-        or any(value <= 0 for value in horizons)
-        or len(set(horizons)) != len(horizons)
-    ):
-        raise ValueError("target horizons must be unique and positive")
-    if source_rows is None:
-        rows = np.arange(daily_return.shape[0], dtype=np.int64)
-    else:
-        raw_rows = np.asarray(source_rows)
-        if raw_rows.ndim != 1 or not np.issubdtype(raw_rows.dtype, np.integer):
-            raise TypeError("source_rows must be a one-dimensional integer array")
-        rows = raw_rows.astype(np.int64, copy=False)
-        if np.any(rows < 0) or np.any(rows >= daily_return.shape[0]):
-            raise ValueError("source_rows contains an out-of-range index")
-    shape = (rows.size, daily_return.shape[1], len(horizons))
-    destinations = (
-        primary,
-        primary_valid,
-        normalized_residual,
-        raw_midrank,
-        raw_valid,
-        raw_log_return,
-    )
-    if any(value.shape != shape for value in destinations):
-        raise ValueError("target destinations are misaligned")
-    if (
-        primary.dtype != np.float32
-        or normalized_residual.dtype != np.float32
-        or raw_midrank.dtype != np.float32
-        or raw_log_return.dtype != np.float32
-        or primary_valid.dtype != np.bool_
-        or raw_valid.dtype != np.bool_
-    ):
-        raise TypeError("target destinations must use float32 values and bool masks")
-
-    for destination in destinations:
-        destination[...] = False if destination.dtype == np.bool_ else 0.0
-    raw_log_return[...] = np.nan
-
-    for horizon_index, horizon in enumerate(horizons):
-        for output_day, day in enumerate(rows):
-            if day + horizon >= daily_return.shape[0]:
-                continue
-            path = daily_return[day + 1 : day + horizon + 1]
-            path_valid = return_valid[day + 1 : day + horizon + 1].all(axis=0)
-            base_valid = membership[day] & path_valid
-            row = np.full(daily_return.shape[1], np.nan, dtype=np.float64)
-            row[base_valid] = path[:, base_valid].sum(axis=0, dtype=np.float64)
-            raw_log_return[output_day, :, horizon_index] = row.astype(np.float32)
-            raw_valid[output_day, :, horizon_index] = base_valid
-            raw_midrank[output_day, :, horizon_index] = _rank_row(row, base_valid)
-
-            usable_sigma = np.isfinite(sigma[day]) & (sigma[day] > 1e-8)
-            target_valid = base_valid & usable_sigma
-            if not target_valid.any():
-                continue
-            median_return = float(np.median(row[base_valid]))
-            normalized = (row[target_valid] - median_return) / (
-                sigma[day, target_valid] * np.sqrt(horizon)
-            )
-            normalized = np.clip(normalized, -winsor_limit, winsor_limit)
-            normalized_residual[output_day, target_valid, horizon_index] = (
-                normalized.astype(np.float32)
-            )
-            primary[output_day, target_valid, horizon_index] = midrank_unit_interval(
-                normalized
-            )
-            primary_valid[output_day, target_valid, horizon_index] = True
 
 
 def build_to_close_target(
