@@ -1,8 +1,28 @@
+from dataclasses import replace
 from datetime import date, timedelta
 
 import numpy as np
 
-from brazil_rv.execution.stateful_ledger import LedgerConfig, simulate_stateful_ledger
+from brazil_rv.execution.stateful_ledger import (
+    LedgerConfig,
+    StatefulLedgerResult,
+    simulate_stateful_ledger,
+)
+from brazil_rv.v2.corporate_actions import AlignedActionTerms
+
+
+def _config(**changes: object) -> LedgerConfig:
+    return replace(
+        LedgerConfig(
+            k_per_side=1,
+            buffer_per_side=1,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+            planned_absolute_net_cap=1.10,
+            planned_name_weight_cap=1.10,
+        ),
+        **changes,
+    )
 
 
 def _run(
@@ -11,195 +31,487 @@ def _run(
     *,
     config: LedgerConfig | None = None,
     active: np.ndarray | None = None,
-    events: np.ndarray | None = None,
-    median: np.ndarray | None = None,
-) -> object:
+    fill_fraction: np.ndarray | None = None,
+    actions: AlignedActionTerms | None = None,
+    payment_session: np.ndarray | None = None,
+    cdi: np.ndarray | None = None,
+) -> StatefulLedgerResult:
     days, names = close.shape
     dates = tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(days))
     mask = np.ones((days, names), dtype=np.bool_)
-    membership = mask if active is None else active
-    event = np.zeros_like(mask) if events is None else events
-    medians = np.zeros(days) if median is None else median
+    no_actions = AlignedActionTerms(
+        shares_per_prior_share=np.ones_like(close),
+        cash_per_prior_share=np.zeros_like(close),
+        session_resolved=mask.copy(),
+        has_action=np.zeros_like(mask),
+        successor_index=np.broadcast_to(
+            np.arange(names, dtype=np.int64), close.shape
+        ).copy(),
+    )
     return simulate_stateful_ledger(
         dates=dates,
         scores=scores,
         score_mask=mask,
-        active=membership,
-        adjusted_close=close,
-        neutralized_log_return=np.zeros_like(close),
-        neutralized_log_return_valid=mask,
-        return_neutralized_event_mask=event,
-        cross_sectional_median_log_return=medians,
-        cdi_returns=np.zeros(days),
-        config=config
-        or LedgerConfig(
-            k_per_side=1,
-            buffer_per_side=1,
-            cost_bps_per_side=0,
-            annual_borrow_rate=0,
+        active=mask if active is None else active,
+        raw_close=close,
+        cdi_returns=np.zeros(days) if cdi is None else cdi,
+        fill_fraction=fill_fraction,
+        action_terms=no_actions if actions is None else actions,
+        action_payment_session=(
+            np.full(close.shape, -1, dtype=np.int64)
+            if payment_session is None
+            else payment_session
         ),
+        security_ids=tuple(f"SEC-{index}" for index in range(names)),
+        config=_config() if config is None else config,
     )
 
 
-def test_fixed_book_books_large_move_and_neutral_flow_without_dropping_day() -> None:
-    close = np.asarray([[100.0, 100.0], [80.0, 100.0], [80.0, 100.0]])
-    scores = np.asarray([[1.0, -1.0], [1.0, -1.0], [1.0, -1.0]])
-    raw = _run(close, scores)
-    np.testing.assert_allclose(raw.gross_pnl_bps, [0.0, -2_000.0, 0.0])
-    assert np.isfinite(raw.nav).all()
-
-    events = np.zeros_like(close, dtype=np.bool_)
-    events[1, 0] = True
-    neutral = _run(close, scores, events=events)
-    np.testing.assert_allclose(neutral.daily_net_return, [0.0, 0.0, 0.0])
-    assert neutral.neutral_marked_name_days.sum() == 1
-
-
-def test_rank_buffer_is_stateful_and_zero_buffer_flips() -> None:
-    close = np.full((3, 2), 100.0)
-    scores = np.asarray([[1.0, -1.0], [-1.0, 1.0], [-1.0, 1.0]])
-    buffered = _run(close, scores)
-    assert buffered.position_sign[0].tolist() == [1, -1]
-    assert buffered.position_sign[1].tolist() == [1, -1]
-    exact = _run(
-        close,
-        scores,
-        config=LedgerConfig(
-            k_per_side=1,
-            buffer_per_side=0,
-            cost_bps_per_side=0,
-            annual_borrow_rate=0,
-        ),
+def _action_terms(
+    shape: tuple[int, int],
+    *,
+    day: int,
+    q: float = 1.0,
+    d: float = 0.0,
+) -> AlignedActionTerms:
+    share_factor = np.ones(shape, dtype=np.float64)
+    cash = np.zeros(shape, dtype=np.float64)
+    has_action = np.zeros(shape, dtype=np.bool_)
+    share_factor[day] = q
+    cash[day] = d
+    has_action[day] = True
+    return AlignedActionTerms(
+        shares_per_prior_share=share_factor,
+        cash_per_prior_share=cash,
+        session_resolved=np.ones(shape, dtype=np.bool_),
+        has_action=has_action,
+        successor_index=np.broadcast_to(
+            np.arange(shape[1], dtype=np.int64), shape
+        ).copy(),
     )
-    assert exact.position_sign[1].tolist() == [-1, 1]
 
 
-def test_missing_exit_waits_then_exits_or_forces_with_haircut() -> None:
-    close = np.full((5, 2), 100.0)
-    close[1, 0] = np.nan
-    scores = np.asarray(
-        [[1.0, -1.0], [-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0]]
-    )
-    waited = _run(
-        close,
-        scores,
-        config=LedgerConfig(
-            k_per_side=1,
-            buffer_per_side=0,
-            cost_bps_per_side=0,
-            annual_borrow_rate=0,
-        ),
-    )
-    assert waited.stale_mark_name_days[1] == 1
-    assert waited.forced_liquidation_count.sum() == 0
-    assert waited.position_sign[1, 0] == 1
-    assert waited.position_sign[2, 0] == -1
-
-    missing = np.full((4, 2), 100.0)
-    missing[1:, 0] = np.nan
-    active = np.ones_like(missing, dtype=np.bool_)
-    forced = _run(
-        missing,
-        scores[:4],
-        active=active,
-        config=LedgerConfig(
-            k_per_side=1,
-            buffer_per_side=0,
-            cost_bps_per_side=0,
-            annual_borrow_rate=0,
-            max_missing_sessions=2,
-            forced_liquidation_haircut=0.30,
-        ),
-    )
-    assert forced.forced_liquidation_count.sum() == 1
-    assert forced.gross_pnl_bps[2] == -3_000.0
-    no_haircut = _run(
-        missing,
-        scores[:4],
-        active=active,
-        config=LedgerConfig(
-            k_per_side=1,
-            buffer_per_side=0,
-            cost_bps_per_side=0,
-            annual_borrow_rate=0,
-            max_missing_sessions=2,
-            forced_liquidation_haircut=0.0,
-        ),
-    )
-    assert no_haircut.forced_liquidation_count.sum() == 1
-    assert no_haircut.gross_pnl_bps[2] == 0.0
-
-
-def test_turnover_financing_split_and_causality() -> None:
-    close = np.full((3, 2), 100.0)
-    scores = np.asarray([[1.0, -1.0], [1.0, -1.0], [1.0, -1.0]])
-    base = _run(close, scores)
-    np.testing.assert_allclose(base.turnover_fraction_nav, [2.0, 0.0, 2.0])
-    financed = _run(
-        close,
-        scores,
-        config=LedgerConfig(
-            k_per_side=1,
-            buffer_per_side=1,
-            cost_bps_per_side=0,
-            short_proceeds_remuneration=1.0,
-            annual_borrow_rate=0,
-        ),
-    )
-    np.testing.assert_allclose(base.interest_bps, 0.0)
-    np.testing.assert_allclose(financed.interest_bps, 0.0)
-
-    first = _run(close, scores)
+def test_intended_orders_use_prior_marks_and_ignore_current_future_print() -> None:
+    close = np.full((4, 3), 100.0)
+    scores = np.asarray([[3.0, 0.0, -3.0]] * 4)
+    missing = close.copy()
+    missing[1, 0] = np.nan
     changed = close.copy()
-    changed[2] = [1_000.0, 1.0]
+    changed[1, 0] = 250.0
+
+    first = _run(missing, scores)
     second = _run(changed, scores)
-    np.testing.assert_array_equal(first.position_sign[:2], second.position_sign[:2])
-
-
-def test_split_adjusted_share_units_create_no_artificial_pnl() -> None:
-    # A 2-for-1 raw split is already represented by unchanged adjusted closes;
-    # the ledger therefore needs no split flow or position rewrite.
-    adjusted_close = np.full((3, 2), 100.0)
-    scores = np.asarray([[1.0, -1.0]] * 3)
-    result = _run(adjusted_close, scores)
-    np.testing.assert_array_equal(result.gross_pnl_bps, np.zeros(3))
-
-
-def test_full_short_proceeds_earns_cdi_while_zero_fraction_does_not() -> None:
-    days = 3
-    close = np.full((days, 2), 100.0)
-    scores = np.asarray([[1.0, -1.0]] * days)
-    dates = tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(days))
-    common = dict(
-        dates=dates,
-        scores=scores,
-        score_mask=np.ones_like(close, dtype=np.bool_),
-        active=np.ones_like(close, dtype=np.bool_),
-        adjusted_close=close,
-        neutralized_log_return=np.zeros_like(close),
-        neutralized_log_return_valid=np.ones_like(close, dtype=np.bool_),
-        return_neutralized_event_mask=np.zeros_like(close, dtype=np.bool_),
-        cross_sectional_median_log_return=np.zeros(days),
-        cdi_returns=np.asarray([0.0, 0.001, 0.001]),
+    first_orders = [order for order in first.intended_orders if order.decision_session == 1]
+    second_orders = [order for order in second.intended_orders if order.decision_session == 1]
+    assert [
+        (order.security_index, order.side, order.quantity, order.reference_price)
+        for order in first_orders
+    ] == [
+        (order.security_index, order.side, order.quantity, order.reference_price)
+        for order in second_orders
+    ]
+    assert first_orders[0].reference_price == 100.0
+    assert first_orders[0].quantity == 0.01
+    assert not any(
+        fill.order_id == first_orders[0].order_id and fill.fill_session == 1
+        for fill in first.fills
     )
-    zero = simulate_stateful_ledger(
-        **common,
+    assert any(
+        fill.order_id == second_orders[0].order_id and fill.price == 250.0
+        for fill in second.fills
+    )
+
+
+def test_unfilled_top_entry_reserves_slot_and_is_not_replaced() -> None:
+    close = np.full((5, 3), 100.0)
+    close[1:4, 0] = np.nan
+    scores = np.asarray(
+        [
+            [3.0, 0.0, -3.0],
+            [3.0, 0.0, -3.0],
+            [0.0, 3.0, -3.0],
+            [0.0, 3.0, -3.0],
+            [0.0, 3.0, -3.0],
+        ]
+    )
+    result = _run(close, scores)
+
+    entries = [order for order in result.intended_orders if order.purpose == "entry"]
+    assert {(order.decision_session, order.security_index) for order in entries} == {
+        (1, 0),
+        (1, 2),
+    }
+    assert not any(order.security_index == 1 for order in entries)
+    assert result.pending_entry_count[1] == 1
+    assert result.cancelled_entry_count[3] == 1
+    assert result.cancellations[0].reason == "expired"
+
+
+def test_partial_entry_remains_pending_without_allocating_another_slot() -> None:
+    close = np.full((5, 3), 100.0)
+    scores = np.asarray([[3.0, 0.0, -3.0]] * 5)
+    fill_fraction = np.ones_like(close)
+    fill_fraction[1, 0] = 0.5
+    result = _run(close, scores, fill_fraction=fill_fraction)
+
+    long_entry = next(
+        order
+        for order in result.intended_orders
+        if order.purpose == "entry" and order.side == "buy"
+    )
+    long_fills = [fill for fill in result.fills if fill.order_id == long_entry.order_id]
+    assert [fill.fill_session for fill in long_fills] == [1, 2]
+    np.testing.assert_allclose(sum(fill.quantity for fill in long_fills), 0.01)
+    assert len(
+        [order for order in result.intended_orders if order.purpose == "entry"]
+    ) == 2
+
+
+def test_eligibility_loss_creates_pending_exit_until_first_later_print() -> None:
+    close = np.full((5, 2), 100.0)
+    close[2, 0] = np.nan
+    close[3, 0] = 80.0
+    scores = np.asarray([[1.0, -1.0]] * 5)
+    active = np.ones_like(close, dtype=np.bool_)
+    active[2:, 0] = False
+    result = _run(close, scores, active=active)
+
+    exit_order = next(
+        order
+        for order in result.intended_orders
+        if order.security_index == 0 and order.purpose == "exit"
+    )
+    assert exit_order.decision_session == 2
+    assert result.position_sign[2, 0] == 1
+    assert result.pending_exit_count[2] == 1
+    exit_fill = next(fill for fill in result.fills if fill.order_id == exit_order.order_id)
+    assert exit_fill.fill_session == 3
+    assert exit_fill.price == 80.0
+    assert result.position_sign[3, 0] == 0
+
+
+def test_t18_raw_share_cash_claim_and_fill_path_reconciles() -> None:
+    close = np.asarray(
+        [
+            [100.0, 100.0],
+            [100.0, 100.0],
+            [45.0, 45.0],
+            [45.0, 45.0],
+        ]
+    )
+    scores = np.asarray([[1.0, -1.0]] * 4)
+    actions = _action_terms(close.shape, day=2, q=2.0, d=10.0)
+    payment_session = np.full(close.shape, -1, dtype=np.int64)
+    payment_session[2] = 3
+    result = _run(
+        close,
+        scores,
+        actions=actions,
+        payment_session=payment_session,
+        config=_config(cost_bps_per_side=10.0),
+    )
+
+    np.testing.assert_allclose(result.signed_shares[1], [0.01, -0.01])
+    np.testing.assert_allclose(result.signed_shares[2], [0.02, -0.02])
+    assert result.receivables[2] == 0.1
+    assert result.payables[2] == 0.1
+    assert result.receivables[3] == 0.0
+    assert result.payables[3] == 0.0
+    np.testing.assert_allclose(
+        result.nav,
+        result.free_cash
+        + result.restricted_cash
+        + result.marked_signed_holdings
+        + result.receivables
+        - result.payables,
+    )
+    np.testing.assert_allclose(result.reconciliation_error, 0.0, atol=1e-15)
+    assert len(result.fills) == 4
+    assert np.isclose(sum(fill.cost for fill in result.fills), 0.0038)
+    assert np.isclose(result.nav[-1], 0.9962)
+
+
+def test_verified_share_conversion_moves_inventory_to_successor_once() -> None:
+    close = np.asarray(
+        [
+            [100.0, np.nan, 100.0],
+            [100.0, np.nan, 100.0],
+            [np.nan, 50.0, 100.0],
+            [np.nan, 50.0, 100.0],
+        ]
+    )
+    scores = np.asarray(
+        [
+            [3.0, 0.0, -3.0],
+            [3.0, 0.0, -3.0],
+            [0.0, 3.0, -3.0],
+            [0.0, 3.0, -3.0],
+        ]
+    )
+    active = np.ones_like(close, dtype=np.bool_)
+    active[2:, 0] = False
+    q = np.ones_like(close)
+    has_action = np.zeros_like(close, dtype=np.bool_)
+    successor = np.broadcast_to(
+        np.arange(close.shape[1], dtype=np.int64), close.shape
+    ).copy()
+    q[2, 0] = 2.0
+    has_action[2, 0] = True
+    successor[2, 0] = 1
+    actions = AlignedActionTerms(
+        shares_per_prior_share=q,
+        cash_per_prior_share=np.zeros_like(close),
+        session_resolved=np.ones_like(has_action),
+        has_action=has_action,
+        successor_index=successor,
+    )
+    result = _run(close, scores, active=active, actions=actions)
+
+    np.testing.assert_allclose(result.signed_shares[1], [0.01, 0.0, -0.01])
+    np.testing.assert_allclose(result.signed_shares[2], [0.0, 0.02, -0.01])
+    assert not any(
+        order.security_index == 1 and order.purpose == "entry"
+        for order in result.intended_orders
+    )
+    np.testing.assert_allclose(result.reconciliation_error, 0.0, atol=1e-15)
+
+
+def test_verified_cash_settlement_needs_no_trade_print_and_pays_once() -> None:
+    close = np.full((4, 2), 100.0)
+    close[2:, 0] = np.nan
+    scores = np.asarray([[1.0, -1.0]] * 4)
+    active = np.ones_like(close, dtype=np.bool_)
+    active[2:, 0] = False
+    q = np.ones_like(close)
+    d = np.zeros_like(close)
+    has_action = np.zeros_like(close, dtype=np.bool_)
+    q[2, 0] = 0.0
+    d[2, 0] = 80.0
+    has_action[2, 0] = True
+    actions = AlignedActionTerms(
+        shares_per_prior_share=q,
+        cash_per_prior_share=d,
+        session_resolved=np.ones_like(has_action),
+        has_action=has_action,
+        successor_index=np.broadcast_to(
+            np.arange(close.shape[1], dtype=np.int64), close.shape
+        ).copy(),
+    )
+    payment_session = np.full(close.shape, -1, dtype=np.int64)
+    payment_session[2, 0] = 3
+    result = _run(
+        close,
+        scores,
+        active=active,
+        actions=actions,
+        payment_session=payment_session,
+    )
+
+    assert result.signed_shares[2, 0] == 0.0
+    assert result.receivables[2] == 0.8
+    assert result.receivables[3] == 0.0
+    assert np.isclose(result.free_cash[3], 0.8)
+    assert np.isclose(result.nav[2], 0.8)
+    assert np.isclose(result.nav[3], 0.8)
+    assert result.unresolved_inventory_count == 0
+    np.testing.assert_allclose(result.reconciliation_error, 0.0, atol=1e-15)
+
+
+def test_payment_settles_only_its_claim_and_unknown_payment_stays_unresolved() -> None:
+    close = np.full((5, 2), 100.0)
+    scores = np.asarray([[1.0, -1.0]] * 5)
+    q = np.ones_like(close)
+    d = np.zeros_like(close)
+    has_action = np.zeros_like(close, dtype=np.bool_)
+    d[2, 0] = 10.0
+    d[3, 0] = 20.0
+    has_action[2:4, 0] = True
+    actions = AlignedActionTerms(
+        shares_per_prior_share=q,
+        cash_per_prior_share=d,
+        session_resolved=np.ones_like(has_action),
+        has_action=has_action,
+        successor_index=np.broadcast_to(
+            np.arange(close.shape[1], dtype=np.int64), close.shape
+        ).copy(),
+    )
+    payment_session = np.full(close.shape, -1, dtype=np.int64)
+    payment_session[2, 0] = 3
+    result = _run(
+        close,
+        scores,
+        actions=actions,
+        payment_session=payment_session,
+    )
+
+    np.testing.assert_allclose(result.receivables[2:], [0.1, 0.2, 0.2])
+    assert np.isclose(result.unresolved_receivable, 0.2)
+    assert result.economics_unresolved
+    np.testing.assert_allclose(result.reconciliation_error, 0.0, atol=1e-15)
+
+
+def test_terminal_missing_inventory_is_not_sold_and_has_scenario_views() -> None:
+    close = np.full((4, 2), 100.0)
+    close[-1, 0] = np.nan
+    scores = np.asarray([[1.0, -1.0]] * 4)
+    result = _run(
+        close,
+        scores,
+        config=_config(forced_liquidation_haircut=0.30),
+    )
+
+    long_terminal_exit = next(
+        order
+        for order in result.intended_orders
+        if order.security_index == 0 and order.purpose == "terminal_exit"
+    )
+    assert not any(fill.order_id == long_terminal_exit.order_id for fill in result.fills)
+    assert result.unresolved_inventory_count == 1
+    assert result.unresolved_inventory_notional == 1.0
+    assert result.signed_shares[-1, 0] == 0.01
+    assert result.free_cash[-1] == 0.0
+    assert result.nav[-1] == 1.0
+    assert result.haircut_scenario_nav[-1] == 0.7
+    assert result.unresolved_excluded_nav[-1] == 0.0
+    assert result.valuation_scenario_count.sum() == 1
+
+    short_missing = np.full((4, 2), 100.0)
+    short_missing[-1, 1] = np.nan
+    short_result = _run(
+        short_missing,
+        scores,
+        config=_config(forced_liquidation_haircut=0.30),
+    )
+    short_terminal_exit = next(
+        order
+        for order in short_result.intended_orders
+        if order.security_index == 1 and order.purpose == "terminal_exit"
+    )
+    assert not any(
+        fill.order_id == short_terminal_exit.order_id for fill in short_result.fills
+    )
+    assert short_result.signed_shares[-1, 1] == -0.01
+    assert short_result.free_cash[-1] == 1.0
+    assert short_result.restricted_cash[-1] == 1.0
+    assert short_result.nav[-1] == 1.0
+    assert short_result.haircut_scenario_nav[-1] == 0.7
+    assert short_result.unresolved_excluded_nav[-1] == 1.0
+
+
+def test_unresolved_action_coverage_blocks_fill_and_keeps_inventory() -> None:
+    close = np.full((4, 2), 100.0)
+    scores = np.asarray([[1.0, -1.0]] * 4)
+    resolved = np.ones_like(close, dtype=np.bool_)
+    resolved[2:, 0] = False
+    actions = AlignedActionTerms(
+        shares_per_prior_share=np.ones_like(close),
+        cash_per_prior_share=np.zeros_like(close),
+        session_resolved=resolved,
+        has_action=np.zeros_like(resolved),
+        successor_index=np.broadcast_to(
+            np.arange(close.shape[1], dtype=np.int64), close.shape
+        ).copy(),
+    )
+    result = _run(close, scores, actions=actions)
+
+    exit_order = next(
+        order
+        for order in result.intended_orders
+        if order.security_index == 0 and order.purpose == "exit"
+    )
+    assert not any(fill.order_id == exit_order.order_id for fill in result.fills)
+    assert result.pending_exit_count[-1] == 1
+    assert result.unresolved_action_name_days.sum() == 2
+    assert result.unresolved_inventory_count == 1
+    assert result.signed_shares[-1, 0] == 0.01
+    assert result.economics_unresolved
+
+
+def test_insolvency_stops_path_and_future_order_generation() -> None:
+    close = np.asarray(
+        [
+            [100.0, 100.0],
+            [100.0, 100.0],
+            [100.0, 250.0],
+            [100.0, 1.0],
+            [100.0, 1.0],
+        ]
+    )
+    scores = np.asarray([[1.0, -1.0]] * len(close))
+    result = _run(close, scores)
+
+    assert result.insolvent
+    assert result.insolvency_date == date(2024, 1, 4)
+    assert len(result.dates) == 3
+    assert result.nav[-1] == -0.5
+    assert max(order.decision_session for order in result.intended_orders) == 1
+    assert result.economics_unresolved
+
+
+def test_small_universe_empty_book_and_compounded_cash_guard() -> None:
+    close = np.full((4, 1), 100.0)
+    scores = np.ones_like(close)
+    cdi = np.asarray([0.001, 0.002, 0.003, 0.004])
+    result = _run(close, scores, cdi=cdi)
+
+    assert not result.intended_orders
+    assert not result.fills
+    assert result.entry_blocked_small_universe.all()
+    np.testing.assert_array_equal(result.retention_width, 0)
+    np.testing.assert_allclose(result.gross_fraction_nav, 0.0)
+    assert result.economics_unresolved
+    assert np.isclose(result.summary()["compounded_net_excess_vs_all_cash"], 0.0)
+    assert np.isfinite(result.nav).all()
+
+
+def test_retention_width_cannot_overlap_rank_bands() -> None:
+    close = np.full((4, 6), 100.0)
+    scores = np.broadcast_to(np.arange(6, dtype=np.float64), close.shape).copy()
+    result = _run(
+        close,
+        scores,
         config=LedgerConfig(
-            k_per_side=1,
-            buffer_per_side=1,
-            cost_bps_per_side=0,
-            annual_borrow_rate=0,
+            k_per_side=2,
+            buffer_per_side=4,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+            planned_name_weight_cap=0.60,
         ),
     )
-    full = simulate_stateful_ledger(
-        **common,
+    np.testing.assert_array_equal(result.retention_width, 3)
+    day_one_entries = [
+        order
+        for order in result.intended_orders
+        if order.decision_session == 1 and order.purpose == "entry"
+    ]
+    assert {order.security_index for order in day_one_entries if order.side == "buy"} == {
+        4,
+        5,
+    }
+    assert {order.security_index for order in day_one_entries if order.side == "sell"} == {
+        0,
+        1,
+    }
+
+
+def test_risk_caps_are_bound_to_prior_positive_nav() -> None:
+    close = np.full((4, 4), 100.0)
+    scores = np.broadcast_to(np.arange(4, dtype=np.float64), close.shape).copy()
+    result = _run(
+        close,
+        scores,
         config=LedgerConfig(
-            k_per_side=1,
-            buffer_per_side=1,
-            cost_bps_per_side=0,
-            short_proceeds_remuneration=1.0,
-            annual_borrow_rate=0,
+            k_per_side=2,
+            buffer_per_side=0,
+            gross_target=2.0,
+            planned_gross_cap=2.25,
+            planned_absolute_net_cap=0.10,
+            planned_name_weight_cap=0.50,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
         ),
     )
-    assert zero.interest_bps[1] == 0.0
-    assert full.interest_bps[1] > 0.0
+    assert result.planned_gross_fraction_nav[1] == 2.0
+    assert result.planned_net_fraction_nav[1] == 0.0
+    assert result.planned_name_weight_fraction_nav[1] == 0.5
+    assert not result.actual_risk_breach[1]
