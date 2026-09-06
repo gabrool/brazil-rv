@@ -235,3 +235,5 @@ the small exact score populations, the 5% name cap, and the 1.8 gross floor;
 none of those research rules was changed after observing this replay.
 Ruff and Python compilation passed on the final branch state, and the complete
 research suite passed all 824 tests in 380.76 seconds.
+Two provider inventory reads at 2026-09-06T19:40:23Z and 19:40:25Z each
+returned zero instances. There was therefore no paid instance to terminate.

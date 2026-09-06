@@ -843,3 +843,6 @@ surface. Any next research pass must preregister how sparse score populations
 interact with portfolio gross, rather than retrofitting the observed result.
 Final verification on the completed branch passed Ruff, Python compilation,
 and all 824 research tests in 380.76 seconds.
+Provider inventories at 2026-09-06T19:40:23Z and 19:40:25Z each returned zero
+instances, confirming that this continuation neither launched nor left paid
+compute running.
