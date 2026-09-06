@@ -1889,6 +1889,13 @@ def _verified_prior_acceptance(
     return source, manifest, inventory_payload
 
 
+def _assert_prior_store_build_identity(
+    prior: Mapping[str, object], *, expected_store_build_commit: str
+) -> None:
+    if prior.get("store_build_implementation_commit") != expected_store_build_commit:
+        raise ValueError("prior acceptance used a different sealed store build")
+
+
 def _load_prior_score_panel(
     *,
     source_root: Path,
@@ -2364,10 +2371,13 @@ def replay_classical_economics(
         store_manifest_sha256=actual_store_sha,
     )
     prior_code = prior.get("code")
-    if not isinstance(prior_code, Mapping) or (
-        prior_code.get("commit") != store_build_commit
+    if not isinstance(prior_code, Mapping) or not isinstance(
+        prior_code.get("commit"), str
     ):
-        raise ValueError("prior acceptance code does not match the sealed store build")
+        raise ValueError("prior acceptance code identity is malformed")
+    _assert_prior_store_build_identity(
+        prior, expected_store_build_commit=store_build_commit
+    )
     if output == source_root or output.is_relative_to(source_root):
         raise ValueError(
             "ledger replay output must be outside the prior immutable root"

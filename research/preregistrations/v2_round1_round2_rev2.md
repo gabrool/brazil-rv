@@ -133,6 +133,19 @@ unresolved action term; an unobserved session alone is not an unresolved claim. 
 advance expectation is that all 16 books pass the unchanged gross and stale-inventory
 bounds. On failure, the program stops without Round 1 or Round 2.
 
+Two score-free replay invocations at implementation commit `dab7c53` stopped before
+an output root was created and before a score panel was loaded. The first supplied the
+log-inclusive artifact-inventory hash where the CLI requires the sealed runner
+inventory hash (stderr SHA-256
+`c1f1e7e9fea4327e32090deb2c6a404ecebb767ba61a13852eaf88751e275baf`).
+The corrected binding then exposed a replay-chain provenance check that compared the
+prior replay's code commit with the store-build commit, although the manifest already
+records those as distinct identities (stderr SHA-256
+`ddc717b6e15081499c2de042a132986849fb19a4c72741fedbce8f870bf0fea4`).
+The bounded repair verifies `store_build_implementation_commit` against the sealed
+store and continues to bind the prior replay itself by its manifest and inventory
+hashes. It changes no score, panel, ledger rule, threshold, or gate.
+
 ## Round 1 — baseline floor and GBDT parent (CPU)
 
 **R1.1 baseline table.** Evaluate exactly reversal 5, reversal 21, momentum 12-1,

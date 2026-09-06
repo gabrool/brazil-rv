@@ -1130,6 +1130,21 @@ def test_ledger_replay_comparison_excludes_only_economics_and_schema() -> None:
     }
 
 
+def test_replay_chain_binds_recorded_store_build_not_prior_replay_code() -> None:
+    prior_replay = {
+        "code": {"commit": "later-ledger-replay"},
+        "store_build_implementation_commit": "sealed-store-build",
+    }
+
+    pipeline._assert_prior_store_build_identity(
+        prior_replay, expected_store_build_commit="sealed-store-build"
+    )
+    with pytest.raises(ValueError, match="different sealed store build"):
+        pipeline._assert_prior_store_build_identity(
+            prior_replay, expected_store_build_commit="other-store-build"
+        )
+
+
 def test_prior_score_replay_fails_loudly_on_hash_mismatch(tmp_path: Path) -> None:
     root = tmp_path.resolve()
     panel = root / "panel"
