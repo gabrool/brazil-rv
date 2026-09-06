@@ -13,9 +13,41 @@ import polars as pl
 from numpy.typing import NDArray
 
 
-ACTION_TYPES = frozenset(
-    {"split", "reverse_split", "bonus", "dividend", "jcp", "subscription_rights"}
+SCALAR_ACTION_TYPES = frozenset(
+    {
+        "split",
+        "reverse_split",
+        "bonus",
+        "simple_conversion",
+        "dividend",
+        "jcp",
+        "cash_distribution",
+        "cancellation",
+    }
 )
+COMPLEX_ACTION_TYPES = frozenset(
+    {"subscription_rights", "rights", "spinoff", "merger", "multi_claim_merger"}
+)
+ACTION_TYPES = SCALAR_ACTION_TYPES | COMPLEX_ACTION_TYPES
+VERIFIED_ACTION_SCHEMA = {
+    "action_type": pl.String,
+    "isin": pl.String,
+    "issuer_id": pl.String,
+    "effective_date": pl.Date,
+    "ex_date": pl.Date,
+    "payment_date": pl.Date,
+    "announced_at": pl.Datetime("us", "UTC"),
+    "available_at": pl.Datetime("us", "UTC"),
+    "shares_per_prior_share": pl.Float64,
+    "cash_per_prior_share": pl.Float64,
+    "currency": pl.String,
+    "source": pl.String,
+    "evidence": pl.String,
+    "coverage_status": pl.String,
+    "resulting_isin": pl.String,
+    "sequence": pl.Int32,
+    "resolved": pl.Boolean,
+}
 
 
 def _sha256(path: Path) -> str:
@@ -37,7 +69,11 @@ class AdjustmentResult:
 
 @dataclass(frozen=True)
 class DetectedActionResult:
-    """COTAHIST-only action classification on the aligned daily panel."""
+    """Audit-only COTAHIST action classification on the daily panel.
+
+    These realized price/quantity and DISMES diagnostics must never supply an
+    economic adjustment factor or a cash entitlement.
+    """
 
     event_candidate: NDArray[np.bool_]
     split_event: NDArray[np.bool_]
@@ -46,6 +82,426 @@ class DetectedActionResult:
     price_jump_anomaly_mask: NDArray[np.bool_]
     price_ratio: NDArray[np.float64]
     quantity_ratio: NDArray[np.float64]
+
+
+@dataclass(frozen=True)
+class VerifiedActionTerm:
+    """One evidenced contractual action, expressed in pre-event share units.
+
+    ``shares_per_prior_share`` (q) and ``cash_per_prior_share`` (d) apply once
+    on the ex/effective session.  ``sequence`` documents the order when more
+    than one action applies to the same claim on the same session.  A later
+    term's q and d are expressed per share produced by earlier terms.
+    """
+
+    action_type: str
+    isin: str
+    issuer_id: str | None
+    effective_date: date
+    ex_date: date
+    payment_date: date | None
+    announced_at: datetime | None
+    available_at: datetime
+    shares_per_prior_share: float
+    cash_per_prior_share: float
+    currency: str
+    source: str
+    evidence: str
+    coverage_status: str
+    resulting_isin: str | None = None
+    sequence: int = 0
+    resolved: bool = True
+
+    def __post_init__(self) -> None:
+        if self.action_type not in ACTION_TYPES:
+            raise ValueError(f"unsupported action type: {self.action_type}")
+        if not self.isin or not self.source or not self.evidence:
+            raise ValueError("verified actions require ISIN, source, and evidence")
+        if not self.currency or not self.coverage_status:
+            raise ValueError("verified actions require currency and coverage status")
+        if self.sequence < 0:
+            raise ValueError("action sequence must be non-negative")
+        _require_aware_timestamp(self.available_at, "available_at")
+        if self.announced_at is not None:
+            _require_aware_timestamp(self.announced_at, "announced_at")
+            if self.announced_at > self.available_at:
+                raise ValueError("announced_at cannot follow available_at")
+        if self.payment_date is not None and self.payment_date < self.ex_date:
+            raise ValueError("payment_date cannot precede ex_date")
+        q = float(self.shares_per_prior_share)
+        d = float(self.cash_per_prior_share)
+        if not np.isfinite(q) or q < 0.0 or not np.isfinite(d) or d < 0.0:
+            raise ValueError("q and d must be finite and non-negative")
+        if q == 0.0 and self.action_type != "cancellation":
+            raise ValueError("only a verified cancellation may have q=0")
+        if self.action_type in COMPLEX_ACTION_TYPES and self.resolved:
+            raise ValueError("complex actions require an explicit non-scalar mapping")
+        if self.resolved and self.action_type == "simple_conversion":
+            if not self.resulting_isin or self.resulting_isin == self.isin:
+                raise ValueError("simple conversions require a distinct resulting ISIN")
+        elif self.resulting_isin is not None:
+            raise ValueError("resulting_isin is valid only for a simple conversion")
+        if not self.resolved and (q != 1.0 or d != 0.0):
+            raise ValueError("unresolved actions cannot carry economic fallback terms")
+        if (
+            self.resolved
+            and q != 1.0
+            and d != 0.0
+            and self.effective_date != self.ex_date
+        ):
+            raise ValueError("combined q/d terms require one common event session")
+
+
+@dataclass(frozen=True)
+class AlignedActionTerms:
+    """Verified scalar terms aligned to an exchange-session/name grid."""
+
+    shares_per_prior_share: NDArray[np.float64]
+    cash_per_prior_share: NDArray[np.float64]
+    session_resolved: NDArray[np.bool_]
+    has_action: NDArray[np.bool_]
+    successor_index: NDArray[np.int64] | None = None
+
+
+@dataclass(frozen=True)
+class ShareholderWealthOHLC:
+    """Coherent reinvest-at-close wealth-index OHLC for volatility inputs."""
+
+    open: NDArray[np.float64]
+    high: NDArray[np.float64]
+    low: NDArray[np.float64]
+    close: NDArray[np.float64]
+    valid: NDArray[np.bool_]
+
+
+def _require_aware_timestamp(value: datetime, field: str) -> None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{field} must be timezone-aware")
+
+
+def validate_verified_action_terms(
+    terms: Sequence[VerifiedActionTerm],
+) -> tuple[VerifiedActionTerm, ...]:
+    """Validate ordering/uniqueness and return a deterministic action sequence."""
+
+    checked = tuple(
+        sorted(
+            terms,
+            key=lambda term: (
+                term.isin,
+                min(term.ex_date, term.effective_date),
+                term.sequence,
+                term.action_type,
+            ),
+        )
+    )
+    keys: set[tuple[str, date, int]] = set()
+    for term in checked:
+        event_date = (
+            term.effective_date
+            if term.shares_per_prior_share != 1.0
+            else term.ex_date
+        )
+        key = (term.isin, event_date, term.sequence)
+        if key in keys:
+            raise ValueError("action sequence must be unique per ISIN/event session")
+        keys.add(key)
+    return checked
+
+
+def verified_action_terms_to_table(
+    terms: Sequence[VerifiedActionTerm],
+) -> pl.DataFrame:
+    """Serialize verified terms without dropping evidence or timing fields."""
+
+    rows = [
+        {
+            "action_type": term.action_type,
+            "isin": term.isin,
+            "issuer_id": term.issuer_id,
+            "effective_date": term.effective_date,
+            "ex_date": term.ex_date,
+            "payment_date": term.payment_date,
+            "announced_at": (
+                term.announced_at.astimezone(timezone.utc)
+                if term.announced_at is not None
+                else None
+            ),
+            "available_at": term.available_at.astimezone(timezone.utc),
+            "shares_per_prior_share": term.shares_per_prior_share,
+            "cash_per_prior_share": term.cash_per_prior_share,
+            "currency": term.currency,
+            "source": term.source,
+            "evidence": term.evidence,
+            "coverage_status": term.coverage_status,
+            "resulting_isin": term.resulting_isin,
+            "sequence": term.sequence,
+            "resolved": term.resolved,
+        }
+        for term in validate_verified_action_terms(terms)
+    ]
+    return pl.DataFrame(rows, schema=VERIFIED_ACTION_SCHEMA)
+
+
+def verified_action_terms_from_table(
+    actions: pl.DataFrame,
+) -> tuple[VerifiedActionTerm, ...]:
+    """Load the complete canonical schema and re-run contractual validation."""
+
+    missing = set(VERIFIED_ACTION_SCHEMA) - set(actions.columns)
+    if missing:
+        raise ValueError(f"verified action columns missing: {sorted(missing)}")
+    checked = actions.select(list(VERIFIED_ACTION_SCHEMA)).cast(VERIFIED_ACTION_SCHEMA)
+    return validate_verified_action_terms(
+        tuple(VerifiedActionTerm(**row) for row in checked.iter_rows(named=True))
+    )
+
+
+def align_verified_action_terms(
+    terms: Sequence[VerifiedActionTerm],
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+    *,
+    coverage_resolved: NDArray[np.bool_],
+) -> AlignedActionTerms:
+    """Align contractual q/d terms without treating absent evidence as coverage.
+
+    ``coverage_resolved`` is mandatory: an empty action table alone does not
+    prove that a name/session had no action.  Multiple terms are applied in
+    their declared sequence and collapsed to q/d in the session's opening
+    share units.
+    """
+
+    normalized_dates = tuple(
+        value.astype(object) if isinstance(value, np.datetime64) else value
+        for value in dates
+    )
+    shape = (len(normalized_dates), len(isins))
+    resolved = np.asarray(coverage_resolved, dtype=np.bool_)
+    if resolved.shape != shape:
+        raise ValueError("coverage_resolved must align [date, name]")
+    resolved = resolved.copy()
+    date_lookup = {value: index for index, value in enumerate(normalized_dates)}
+    isin_lookup = {value: index for index, value in enumerate(isins)}
+    grouped: dict[
+        tuple[int, int], list[tuple[int, float, float, bool, int]]
+    ] = {}
+    has_action = np.zeros(shape, dtype=np.bool_)
+    for term in validate_verified_action_terms(terms):
+        name = isin_lookup.get(term.isin)
+        if name is None:
+            continue
+        successor = (
+            isin_lookup.get(term.resulting_isin)
+            if term.resulting_isin is not None
+            else name
+        )
+        if term.resulting_isin is not None and successor is None:
+            raise ValueError("a resolved conversion successor is outside the ISIN axis")
+        components: list[tuple[date, float, float, int]] = []
+        if (
+            term.shares_per_prior_share != 1.0
+            and term.cash_per_prior_share != 0.0
+        ):
+            components.append(
+                (
+                    term.ex_date,
+                    term.shares_per_prior_share,
+                    term.cash_per_prior_share,
+                    int(successor),
+                )
+            )
+        else:
+            if term.shares_per_prior_share != 1.0:
+                components.append(
+                    (
+                        term.effective_date,
+                        term.shares_per_prior_share,
+                        0.0,
+                        int(successor),
+                    )
+                )
+            if term.cash_per_prior_share != 0.0:
+                components.append(
+                    (term.ex_date, 1.0, term.cash_per_prior_share, name)
+                )
+            if not components:
+                components.append((term.ex_date, 1.0, 0.0, int(successor)))
+        for event_date, q, d, next_name in components:
+            day = date_lookup.get(event_date)
+            if day is None:
+                continue
+            has_action[day, name] = True
+            grouped.setdefault((day, name), []).append(
+                (term.sequence, float(q), float(d), term.resolved, next_name)
+            )
+
+    q_aligned = np.ones(shape, dtype=np.float64)
+    d_aligned = np.zeros(shape, dtype=np.float64)
+    successor_aligned = np.broadcast_to(
+        np.arange(len(isins), dtype=np.int64), shape
+    ).copy()
+    for (day, name), rows in grouped.items():
+        q_total = 1.0
+        d_total = 0.0
+        next_name = name
+        for _, q, d, row_resolved, row_successor in sorted(rows):
+            if not row_resolved:
+                resolved[day, name] = False
+                continue
+            if row_successor != name:
+                if next_name != name:
+                    raise ValueError("multiple same-session conversions are not scalar")
+                next_name = row_successor
+            d_total += q_total * d
+            q_total *= q
+        q_aligned[day, name] = q_total
+        d_aligned[day, name] = d_total
+        successor_aligned[day, name] = next_name
+    return AlignedActionTerms(
+        q_aligned, d_aligned, resolved, has_action, successor_aligned
+    )
+
+
+def apply_contractual_action(
+    shares: float | NDArray[np.floating],
+    cash: float | NDArray[np.floating],
+    *,
+    shares_per_prior_share: float | NDArray[np.floating],
+    cash_per_prior_share: float | NDArray[np.floating],
+) -> tuple[float | NDArray[np.float64], float | NDArray[np.float64]]:
+    """Apply one scalar action to signed holdings; payment later is a no-op.
+
+    Cash entitlement is computed from pre-action signed shares, so a short
+    position naturally incurs the corresponding distribution obligation.
+    """
+
+    share_array, cash_array, q, d = np.broadcast_arrays(
+        np.asarray(shares, dtype=np.float64),
+        np.asarray(cash, dtype=np.float64),
+        np.asarray(shares_per_prior_share, dtype=np.float64),
+        np.asarray(cash_per_prior_share, dtype=np.float64),
+    )
+    if (
+        not np.isfinite(share_array).all()
+        or not np.isfinite(cash_array).all()
+        or not np.isfinite(q).all()
+        or not np.isfinite(d).all()
+        or (q < 0.0).any()
+        or (d < 0.0).any()
+    ):
+        raise ValueError("action holdings and terms must be finite, with q/d non-negative")
+    new_cash = cash_array + share_array * d
+    new_shares = share_array * q
+    if new_shares.ndim == 0:
+        return float(new_shares), float(new_cash)
+    return new_shares, new_cash
+
+
+def build_shareholder_wealth_ohlc(
+    raw_open: NDArray[np.floating],
+    raw_high: NDArray[np.floating],
+    raw_low: NDArray[np.floating],
+    raw_close: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    actions: AlignedActionTerms,
+) -> ShareholderWealthOHLC:
+    """Construct economically coherent OHLC for Yang--Zhang inputs.
+
+    On session u the recurrence is
+    ``W_X,u = W_C,u-1 * (q_u * X_u + d_u) / P_C,u-1``.  A missing or
+    unresolved transition is left invalid rather than bridged; the index may
+    restart on a later ordinary session so subsequent local returns remain
+    usable.  The caller performs the single decision-time lag of the resulting
+    volatility estimate.
+    """
+
+    open_, high, low, close = (
+        np.asarray(value, dtype=np.float64)
+        for value in (raw_open, raw_high, raw_low, raw_close)
+    )
+    seen = np.asarray(observed, dtype=np.bool_)
+    shape = close.shape
+    action_arrays = (
+        actions.shares_per_prior_share,
+        actions.cash_per_prior_share,
+        actions.session_resolved,
+    )
+    if close.ndim != 2 or any(value.shape != shape for value in (open_, high, low, seen)):
+        raise ValueError("raw OHLC and observed must align [date, name]")
+    if any(np.asarray(value).shape != shape for value in action_arrays):
+        raise ValueError("aligned action arrays do not match OHLC")
+    q = np.asarray(actions.shares_per_prior_share, dtype=np.float64)
+    d = np.asarray(actions.cash_per_prior_share, dtype=np.float64)
+    resolved = np.asarray(actions.session_resolved, dtype=np.bool_)
+    successor = (
+        np.broadcast_to(np.arange(shape[1], dtype=np.int64), shape)
+        if actions.successor_index is None
+        else np.asarray(actions.successor_index, dtype=np.int64)
+    )
+    if successor.shape != shape or (successor < 0).any() or (successor >= shape[1]).any():
+        raise ValueError("action successor indices are invalid")
+    raw_valid = (
+        seen
+        & np.isfinite(open_)
+        & np.isfinite(high)
+        & np.isfinite(low)
+        & np.isfinite(close)
+        & (low > 0.0)
+        & (low <= open_)
+        & (low <= close)
+        & (high >= open_)
+        & (high >= close)
+    )
+    invalid_terms = resolved & (
+        ~np.isfinite(q) | ~np.isfinite(d) | (q < 0.0) | (d < 0.0)
+    )
+    if invalid_terms.any():
+        raise ValueError("resolved action terms must have finite non-negative q/d")
+
+    outputs = [np.full(shape, np.nan, dtype=np.float64) for _ in range(4)]
+    valid = np.zeros(shape, dtype=np.bool_)
+    nontrivial = (q != 1.0) | (d != 0.0)
+    for name in range(shape[1]):
+        claim = name
+        for day in range(shape[0]):
+            prior_claim = claim
+            if not resolved[day, prior_claim]:
+                continue
+            claim = int(successor[day, prior_claim])
+            if not raw_valid[day, claim]:
+                continue
+            if day == 0 or not valid[day - 1, name]:
+                if nontrivial[day, prior_claim] or claim != prior_claim:
+                    continue
+                for output, raw in zip(
+                    outputs, (open_, high, low, close), strict=True
+                ):
+                    output[day, name] = raw[day, claim]
+                valid[day, name] = True
+                continue
+            prior_price = close[day - 1, prior_claim]
+            prior_wealth = outputs[3][day - 1, name]
+            if not np.isfinite(prior_price) or prior_price <= 0.0:
+                continue
+            scale = prior_wealth / prior_price
+            candidates = []
+            for raw in (open_, high, low, close):
+                candidates.append(
+                    scale
+                    * (
+                        q[day, prior_claim] * raw[day, claim]
+                        + d[day, prior_claim]
+                    )
+                )
+            if not all(np.isfinite(value) and value > 0.0 for value in candidates):
+                continue
+            for output, raw in zip(outputs, (open_, high, low, close), strict=True):
+                output[day, name] = scale * (
+                    q[day, prior_claim] * raw[day, claim] + d[day, prior_claim]
+                )
+            valid[day, name] = True
+    return ShareholderWealthOHLC(*outputs, valid)
 
 
 def normalize_yfinance_actions(

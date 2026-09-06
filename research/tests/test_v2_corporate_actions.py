@@ -6,19 +6,192 @@ import polars as pl
 
 from brazil_rv.v2 import corporate_actions as actions_module
 from brazil_rv.v2.corporate_actions import (
+    AlignedActionTerms,
+    VerifiedActionTerm,
     _extract_yfinance_actions,
     acquire_yfinance_actions,
+    align_verified_action_terms,
     align_action_arrays,
+    apply_contractual_action,
     action_calendar_alignment_table,
     action_coverage_table,
     audit_m1_adjustment_status,
+    build_shareholder_wealth_ohlc,
     causal_price_adjustment_factor,
     detect_cotahist_actions,
     detect_distribution_changes,
     normalize_cached_action_schema,
     normalize_yfinance_actions,
     unadjust_yfinance_cash_distributions,
+    verified_action_terms_from_table,
+    verified_action_terms_to_table,
 )
+
+
+def _term(
+    action_type: str,
+    *,
+    ex_date: date,
+    q: float = 1.0,
+    d: float = 0.0,
+    sequence: int = 0,
+    payment_date: date | None = None,
+    resolved: bool = True,
+    resulting_isin: str | None = None,
+) -> VerifiedActionTerm:
+    return VerifiedActionTerm(
+        action_type=action_type,
+        isin="BRTESTACNOR1",
+        issuer_id="TEST",
+        effective_date=ex_date,
+        ex_date=ex_date,
+        payment_date=payment_date,
+        announced_at=datetime(2023, 12, 1, 12, tzinfo=timezone.utc),
+        available_at=datetime(2023, 12, 1, 13, tzinfo=timezone.utc),
+        shares_per_prior_share=q,
+        cash_per_prior_share=d,
+        currency="BRL",
+        source="issuer filing",
+        evidence="immutable filing sha256:abc",
+        coverage_status="verified",
+        resulting_isin=resulting_isin,
+        sequence=sequence,
+        resolved=resolved,
+    )
+
+
+def test_verified_terms_require_evidence_and_leave_complex_actions_unresolved() -> None:
+    with np.testing.assert_raises(ValueError):
+        _term("subscription_rights", ex_date=date(2024, 1, 3), resolved=True)
+    unresolved = _term(
+        "subscription_rights", ex_date=date(2024, 1, 3), resolved=False
+    )
+    assert not unresolved.resolved
+    with np.testing.assert_raises(ValueError):
+        VerifiedActionTerm(
+            action_type="dividend",
+            isin="BRTESTACNOR1",
+            issuer_id=None,
+            effective_date=date(2024, 1, 3),
+            ex_date=date(2024, 1, 3),
+            payment_date=None,
+            announced_at=None,
+            available_at=datetime(2023, 12, 1),
+            shares_per_prior_share=1.0,
+            cash_per_prior_share=1.0,
+            currency="BRL",
+            source="issuer filing",
+            evidence="filing",
+            coverage_status="verified",
+        )
+
+
+def test_verified_action_table_round_trip_preserves_full_contract() -> None:
+    term = _term(
+        "dividend",
+        ex_date=date(2024, 1, 3),
+        d=1.25,
+        payment_date=date(2024, 2, 1),
+    )
+    table = verified_action_terms_to_table([term])
+    assert {
+        "effective_date",
+        "ex_date",
+        "payment_date",
+        "announced_at",
+        "available_at",
+        "shares_per_prior_share",
+        "cash_per_prior_share",
+        "currency",
+        "source",
+        "evidence",
+        "coverage_status",
+    }.issubset(table.columns)
+    assert verified_action_terms_from_table(table) == (term,)
+
+
+def test_action_sequence_uses_common_units_and_signed_cash_obligation() -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3)]
+    aligned = align_verified_action_terms(
+        [
+            _term("split", ex_date=dates[1], q=2.0, sequence=0),
+            _term("dividend", ex_date=dates[1], d=1.0, sequence=1),
+        ],
+        dates,
+        ["BRTESTACNOR1"],
+        coverage_resolved=np.ones((2, 1), dtype=np.bool_),
+    )
+    # The later dividend is per post-split share: two cash units per opening share.
+    assert aligned.shares_per_prior_share[1, 0] == 2.0
+    assert aligned.cash_per_prior_share[1, 0] == 2.0
+    long_shares, long_cash = apply_contractual_action(
+        3.0,
+        5.0,
+        shares_per_prior_share=2.0,
+        cash_per_prior_share=1.0,
+    )
+    short_shares, short_cash = apply_contractual_action(
+        -3.0,
+        5.0,
+        shares_per_prior_share=2.0,
+        cash_per_prior_share=1.0,
+    )
+    assert (long_shares, long_cash) == (6.0, 8.0)
+    assert (short_shares, short_cash) == (-6.0, 2.0)
+
+
+def test_shareholder_wealth_ohlc_uses_contract_terms_and_no_payment_gain() -> None:
+    raw_open = np.asarray([[100.0], [54.0], [53.0]])
+    raw_high = np.asarray([[101.0], [56.0], [55.0]])
+    raw_low = np.asarray([[99.0], [53.0], [52.0]])
+    raw_close = np.asarray([[100.0], [55.0], [54.0]])
+    actions = AlignedActionTerms(
+        shares_per_prior_share=np.asarray([[1.0], [2.0], [1.0]]),
+        cash_per_prior_share=np.asarray([[0.0], [1.0], [0.0]]),
+        session_resolved=np.ones((3, 1), dtype=np.bool_),
+        has_action=np.asarray([[False], [True], [False]]),
+    )
+    wealth = build_shareholder_wealth_ohlc(
+        raw_open,
+        raw_high,
+        raw_low,
+        raw_close,
+        np.ones((3, 1), dtype=np.bool_),
+        actions,
+    )
+    assert wealth.valid.all()
+    # q=2,d=1 recognizes the entitlement once on the event session.
+    assert wealth.close[1, 0] == 111.0
+    # The following (possible payment) session has no second distribution gain.
+    np.testing.assert_allclose(wealth.close[2, 0], 111.0 * 54.0 / 55.0)
+
+
+def test_verified_simple_conversion_follows_the_successor_isin() -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    aligned = align_verified_action_terms(
+        [
+            _term(
+                "simple_conversion",
+                ex_date=dates[1],
+                resulting_isin="BRTESTACNPR0",
+            )
+        ],
+        dates,
+        ["BRTESTACNOR1", "BRTESTACNPR0"],
+        coverage_resolved=np.ones((3, 2), dtype=np.bool_),
+    )
+    assert aligned.successor_index is not None
+    assert aligned.successor_index[1, 0] == 1
+    raw_close = np.asarray([[100.0, np.nan], [np.nan, 105.0], [np.nan, 110.0]])
+    wealth = build_shareholder_wealth_ohlc(
+        raw_close.copy(),
+        raw_close.copy(),
+        raw_close.copy(),
+        raw_close,
+        np.isfinite(raw_close),
+        aligned,
+    )
+    np.testing.assert_array_equal(wealth.close[:, 0], [100.0, 105.0, 110.0])
 
 
 def test_cotahist_split_detection_and_provider_alignment_are_independent() -> None:
