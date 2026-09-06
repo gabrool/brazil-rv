@@ -258,14 +258,38 @@ def test_ambiguous_event_masks_only_affected_price_features() -> None:
     assert result.valid[261, 0, 22]
     assert result.valid[261, 0, 24]
     assert result.valid[261, 0, 17]
-    # The current adjusted price and every trailing price/return interval that
-    # crosses the ambiguous boundary are excluded.
-    assert not result.valid[261, 0, 25]
+    # Observed-history age is not a price path and remains valid. Every
+    # trailing cross-boundary price/return interval is excluded.
+    assert result.valid[261, 0, 25]
     assert result.valid[269, 0, 25]
     assert not result.valid[264, 0, 1]
     assert not result.valid[264, 0, 7]
     assert not result.valid[264, 0, 14]
     assert not result.valid[264, 0, 23]
+
+
+def test_history_age_is_not_listing_age_and_flat_close_location_is_valid() -> None:
+    days = 65
+    close = np.full((days, 2), 10.0)
+    seen = np.ones_like(close, dtype=bool)
+    seen[:10, 1] = False
+    dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(days)]
+    result = build_slow_features(
+        close,
+        close,
+        close,
+        close,
+        np.full_like(close, 3_000_000.0),
+        np.full_like(close, 100.0),
+        seen,
+        seen,
+        dates,
+        cluster_labels=np.zeros_like(close, dtype=np.int16),
+    )
+    assert result.valid[64, :, 24].all()
+    np.testing.assert_array_equal(result.values[64, :, 24], [0.5, 0.5])
+    np.testing.assert_array_equal(result.values[64, :, 25], [64.0, 54.0])
+    np.testing.assert_array_equal(result.values[64, :, 26], [1.0, 0.0])
 
 
 

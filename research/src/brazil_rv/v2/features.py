@@ -664,21 +664,29 @@ def build_slow_features(
         high, low, seen, 5, ambiguous
     )
     assign(23, range_5, range_5_valid)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        close_location = (close - low) / (high - low)
-    assign(24, close_location, seen & (high > low) & np.isfinite(close_location))
-    with np.errstate(divide="ignore", invalid="ignore"):
-        log_close = np.log(close)
-    assign(25, log_close, seen & (close > 0) & ~ambiguous)
-    listing_age = np.zeros(close.shape, dtype=np.float64)
-    listing_valid = np.zeros(close.shape, dtype=np.bool_)
+    close_location = np.full(close.shape, 0.5, dtype=np.float64)
+    nonzero_range = seen & (high > low)
+    close_location[nonzero_range] = (
+        (close[nonzero_range] - low[nonzero_range])
+        / (high[nonzero_range] - low[nonzero_range])
+    )
+    assign(
+        24,
+        close_location,
+        seen & (high >= low) & np.isfinite(close_location),
+    )
+    history_age = np.zeros(close.shape, dtype=np.float64)
+    history_left_censored = np.zeros(close.shape, dtype=np.float64)
+    history_valid = np.zeros(close.shape, dtype=np.bool_)
     for name in range(close.shape[1]):
         slots = np.flatnonzero(seen[:, name])
         if slots.size:
             indices = np.arange(slots[0], close.shape[0])
-            listing_age[indices, name] = np.log1p(indices - slots[0])
-            listing_valid[indices, name] = True
-    assign(26, listing_age, listing_valid)
+            history_age[indices, name] = indices - slots[0]
+            history_left_censored[indices, name] = float(slots[0] == 0)
+            history_valid[indices, name] = True
+    assign(25, history_age, history_valid)
+    assign(26, history_left_censored, history_valid)
 
     daily_residual = returns[1][0].copy()
     residual_valid = returns[1][1] & membership
