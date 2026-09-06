@@ -16,7 +16,8 @@ from .corporate_actions import (
     provider_split_detection_audit,
 )
 
-AUDIT_SCHEMA = "BRAZIL_RV_V2_CORPORATE_ACTION_RECLASSIFICATION_AUDIT_V1"
+AUDIT_SCHEMA = "BRAZIL_RV_V2_CORPORATE_ACTION_RECLASSIFICATION_AUDIT_V2"
+BREAKDOWN_SCHEMA = "BRAZIL_RV_V2_CORPORATE_ACTION_RECLASSIFICATION_BREAKDOWN_V1"
 
 
 def _finite(value: object) -> float | None:
@@ -56,6 +57,358 @@ def _audit_rows(table: pl.DataFrame) -> list[dict[str, object]]:
         }
         for row in table.to_dicts()
     ]
+
+
+def _nearest_offset(
+    mask: NDArray[np.bool_], date_index: int, name_index: int, radius: int
+) -> int | None:
+    """Return the nearest session offset, preferring the earlier row on ties."""
+
+    start = max(0, date_index - radius)
+    stop = min(mask.shape[0], date_index + radius + 1)
+    candidates = np.flatnonzero(mask[start:stop, name_index]) + start - date_index
+    if not candidates.size:
+        return None
+    return int(min(candidates.tolist(), key=lambda value: (abs(value), value)))
+
+
+def _provider_coverage_mask(
+    dates: NDArray[np.datetime64],
+    isins: Sequence[str],
+    provider_actions: pl.DataFrame,
+    acquisition_audit: pl.DataFrame,
+) -> NDArray[np.bool_]:
+    covered = np.zeros((dates.size, len(isins)), dtype=np.bool_)
+    lookup = {str(isin): index for index, isin in enumerate(isins)}
+    required = {"isin", "first_date", "last_date", "status"}
+    if not required.issubset(acquisition_audit.columns):
+        raise ValueError("corporate-action acquisition audit has wrong schema")
+    for row in acquisition_audit.filter(
+        pl.col("status") != "failed"
+    ).iter_rows(named=True):
+        name_index = lookup.get(str(row["isin"]))
+        if name_index is None:
+            continue
+        first = np.datetime64(row["first_date"], "D")
+        last = np.datetime64(row["last_date"], "D")
+        covered[:, name_index] |= (dates >= first) & (dates <= last)
+    if acquisition_audit.is_empty():
+        for isin in provider_actions.get_column("isin").unique().to_list():
+            name_index = lookup.get(str(isin))
+            if name_index is not None:
+                covered[:, name_index] = True
+    return covered
+
+
+def _matched_precision_recall(
+    actual: NDArray[np.bool_],
+    predicted: NDArray[np.bool_],
+    covered: NDArray[np.bool_],
+    *,
+    radius: int,
+) -> dict[str, object]:
+    actual_rows = np.argwhere(actual & covered)
+    predicted_rows = np.argwhere(predicted & covered)
+    matched_actual = sum(
+        _nearest_offset(predicted, int(day), int(name), radius) is not None
+        for day, name in actual_rows
+    )
+    matched_predicted = sum(
+        _nearest_offset(actual, int(day), int(name), radius) is not None
+        for day, name in predicted_rows
+    )
+    return {
+        "matching_tolerance_sessions": radius,
+        "provider_split_count": int(actual_rows.shape[0]),
+        "detected_split_count": int(predicted_rows.shape[0]),
+        "matched_provider_split_count": int(matched_actual),
+        "matched_detected_split_count": int(matched_predicted),
+        "recall": (
+            matched_actual / int(actual_rows.shape[0]) if actual_rows.size else None
+        ),
+        "precision": (
+            matched_predicted / int(predicted_rows.shape[0])
+            if predicted_rows.size
+            else None
+        ),
+    }
+
+
+def _ratio_bucket(log_factor: float) -> str:
+    magnitude = abs(log_factor)
+    if magnitude <= 0.04:
+        return "abs_log_factor_le_0p04"
+    if magnitude <= 0.08:
+        return "abs_log_factor_0p04_to_0p08"
+    if magnitude <= 0.30:
+        return "abs_log_factor_0p08_to_0p30"
+    return "abs_log_factor_gt_0p30"
+
+
+def _offset_counts(rows: Sequence[dict[str, object]], field: str) -> list[dict[str, object]]:
+    counts: dict[int | None, int] = {}
+    for row in rows:
+        value = row[field]
+        offset = None if value is None else int(value)
+        counts[offset] = counts.get(offset, 0) + 1
+    return [
+        {"offset_sessions": offset, "count": count}
+        for offset, count in sorted(
+            counts.items(), key=lambda item: (item[0] is None, item[0] or 0)
+        )
+    ]
+
+
+def _build_breakdown(
+    *,
+    dates: NDArray[np.datetime64],
+    isins: Sequence[str],
+    provider_actions: pl.DataFrame,
+    acquisition_audit: pl.DataFrame,
+    distribution_change: NDArray[np.bool_],
+    without_fallback: DetectedActionResult,
+    with_fallback: DetectedActionResult,
+) -> dict[str, Any]:
+    from .corporate_actions import align_action_arrays
+
+    provider_factor, _, _ = align_action_arrays(provider_actions, dates, isins)
+    provider_split = provider_factor != 1.0
+    covered = _provider_coverage_mask(
+        dates, isins, provider_actions, acquisition_audit
+    )
+    immediate_jump = np.isfinite(without_fallback.price_ratio) & (
+        np.abs(np.log(without_fallback.price_ratio)) >= 0.04
+    )
+    provider_rows: list[dict[str, object]] = []
+    for day, name in np.argwhere(provider_split & covered):
+        factor = float(provider_factor[day, name])
+        log_factor = float(np.log(factor))
+        price_ratio = float(without_fallback.price_ratio[day, name])
+        quantity_ratio = float(without_fallback.quantity_ratio[day, name])
+        log_price_ratio = (
+            float(np.log(price_ratio))
+            if np.isfinite(price_ratio) and price_ratio > 0.0
+            else None
+        )
+        log_quantity_ratio = (
+            float(np.log(quantity_ratio))
+            if np.isfinite(quantity_ratio) and quantity_ratio > 0.0
+            else None
+        )
+        dismes_offset = _nearest_offset(distribution_change, int(day), int(name), 3)
+        jump_offset = _nearest_offset(immediate_jump, int(day), int(name), 3)
+        dismes_day = None if dismes_offset is None else int(day + dismes_offset)
+        if dismes_day is None:
+            dismes_log_price = dismes_log_quantity = None
+        else:
+            dismes_price_ratio = float(
+                without_fallback.price_ratio[dismes_day, name]
+            )
+            dismes_quantity_ratio = float(
+                without_fallback.quantity_ratio[dismes_day, name]
+            )
+            dismes_log_price = (
+                float(np.log(dismes_price_ratio))
+                if np.isfinite(dismes_price_ratio) and dismes_price_ratio > 0.0
+                else None
+            )
+            dismes_log_quantity = (
+                float(np.log(dismes_quantity_ratio))
+                if np.isfinite(dismes_quantity_ratio)
+                and dismes_quantity_ratio > 0.0
+                else None
+            )
+        provider_rows.append(
+            {
+                "isin": str(isins[name]),
+                "provider_date": str(dates[day]),
+                "provider_factor": factor,
+                "log_provider_factor": log_factor,
+                "ratio_bucket": _ratio_bucket(log_factor),
+                "nearest_dismes_offset_sessions": dismes_offset,
+                "nearest_abs_log_return_ge_0p04_offset_sessions": jump_offset,
+                "provider_date_log_price_ratio": log_price_ratio,
+                "provider_date_log_quantity_ratio": log_quantity_ratio,
+                "provider_date_log_ratio_sum": _finite(
+                    log_price_ratio + log_quantity_ratio
+                    if log_price_ratio is not None and log_quantity_ratio is not None
+                    else None
+                ),
+                "dismes_date": (
+                    str(dates[dismes_day]) if dismes_day is not None else None
+                ),
+                "dismes_date_log_price_ratio": dismes_log_price,
+                "dismes_date_log_quantity_ratio": dismes_log_quantity,
+                "dismes_date_log_ratio_sum": (
+                    dismes_log_price + dismes_log_quantity
+                    if dismes_log_price is not None
+                    and dismes_log_quantity is not None
+                    else None
+                ),
+                "dismes_only_split_within_2_sessions": _nearest_offset(
+                    without_fallback.split_event, int(day), int(name), 2
+                )
+                is not None,
+                "fallback_split_within_2_sessions": _nearest_offset(
+                    with_fallback.split_event, int(day), int(name), 2
+                )
+                is not None,
+                "price_jump_precedes_dismes_by_1_or_2_sessions": (
+                    dismes_offset is not None
+                    and jump_offset is not None
+                    and jump_offset - dismes_offset in (-2, -1)
+                ),
+            }
+        )
+
+    detected_rows: list[dict[str, object]] = []
+    for day, name in np.argwhere(without_fallback.split_event & covered):
+        provider_offset = _nearest_offset(provider_split, int(day), int(name), 2)
+        price_ratio = float(without_fallback.price_ratio[day, name])
+        quantity_ratio = float(without_fallback.quantity_ratio[day, name])
+        log_price_ratio = (
+            float(np.log(price_ratio))
+            if np.isfinite(price_ratio) and price_ratio > 0.0
+            else None
+        )
+        log_quantity_ratio = (
+            float(np.log(quantity_ratio))
+            if np.isfinite(quantity_ratio) and quantity_ratio > 0.0
+            else None
+        )
+        detected_rows.append(
+            {
+                "isin": str(isins[name]),
+                "detected_date": str(dates[day]),
+                "nearest_provider_split_offset_sessions": provider_offset,
+                "log_price_ratio": log_price_ratio,
+                "log_quantity_ratio": log_quantity_ratio,
+                "abs_log_price_ratio": (
+                    abs(log_price_ratio) if log_price_ratio is not None else None
+                ),
+            }
+        )
+    unmatched = [
+        row for row in detected_rows if row["nearest_provider_split_offset_sessions"] is None
+    ]
+    unmatched.sort(
+        key=lambda row: float(row["abs_log_price_ratio"] or 0.0), reverse=True
+    )
+
+    bucket_rows: list[dict[str, object]] = []
+    for bucket in (
+        "abs_log_factor_le_0p04",
+        "abs_log_factor_0p04_to_0p08",
+        "abs_log_factor_0p08_to_0p30",
+        "abs_log_factor_gt_0p30",
+    ):
+        selected = [row for row in provider_rows if row["ratio_bucket"] == bucket]
+        bucket_rows.append(
+            {
+                "ratio_bucket": bucket,
+                "provider_split_count": len(selected),
+                "dismes_within_2_fraction": (
+                    sum(
+                        row["nearest_dismes_offset_sessions"] is not None
+                        and abs(int(row["nearest_dismes_offset_sessions"])) <= 2
+                        for row in selected
+                    )
+                    / len(selected)
+                    if selected
+                    else None
+                ),
+                "dismes_only_detection_within_2_fraction": (
+                    sum(bool(row["dismes_only_split_within_2_sessions"]) for row in selected)
+                    / len(selected)
+                    if selected
+                    else None
+                ),
+                "fallback_detection_within_2_fraction": (
+                    sum(bool(row["fallback_split_within_2_sessions"]) for row in selected)
+                    / len(selected)
+                    if selected
+                    else None
+                ),
+            }
+        )
+
+    low_rows = [row for row in provider_rows if abs(float(row["log_provider_factor"])) <= 0.08]
+    high_rows = [row for row in provider_rows if abs(float(row["log_provider_factor"])) > 0.08]
+    very_large = [row for row in provider_rows if abs(float(row["log_provider_factor"])) > 0.30]
+    low_dismes = (
+        sum(
+            row["nearest_dismes_offset_sessions"] is not None
+            and abs(int(row["nearest_dismes_offset_sessions"])) <= 2
+            for row in low_rows
+        )
+        / len(low_rows)
+        if low_rows
+        else None
+    )
+    high_detected = (
+        sum(bool(row["dismes_only_split_within_2_sessions"]) for row in high_rows)
+        / len(high_rows)
+        if high_rows
+        else None
+    )
+    lagged_large = (
+        sum(bool(row["price_jump_precedes_dismes_by_1_or_2_sessions"]) for row in very_large)
+        / len(very_large)
+        if very_large
+        else None
+    )
+    dimmes_metrics = _matched_precision_recall(
+        provider_split, without_fallback.split_event, covered, radius=2
+    )
+    fallback_metrics = _matched_precision_recall(
+        provider_split, with_fallback.split_event, covered, radius=2
+    )
+    stop_reasons: list[str] = []
+    if low_dismes is not None and low_dismes < 0.90:
+        stop_reasons.append("low_factor_provider_rows_lack_dismes_coverage")
+    legacy_enable_fallback = bool(lagged_large is not None and lagged_large >= 0.10)
+    selected_metrics = fallback_metrics if legacy_enable_fallback else dimmes_metrics
+    if selected_metrics["precision"] is None or float(selected_metrics["precision"]) < 0.70:
+        stop_reasons.append("plus_or_minus_2_precision_below_0p70")
+    return {
+        "schema": BREAKDOWN_SCHEMA,
+        "purpose": (
+            "coverage and timing audit only; realized-price ratios never authorize "
+            "canonical action units or economic adjustments"
+        ),
+        "provider_splits": provider_rows,
+        "dismes_only_detections": detected_rows,
+        "largest_unmatched_dismes_only_detections": unmatched[:30],
+        "ratio_bucket_summary": bucket_rows,
+        "dismes_offset_distribution": _offset_counts(
+            provider_rows, "nearest_dismes_offset_sessions"
+        ),
+        "price_jump_offset_distribution": _offset_counts(
+            provider_rows, "nearest_abs_log_return_ge_0p04_offset_sessions"
+        ),
+        "plus_or_minus_2_metrics": {
+            "dismes_only": dimmes_metrics,
+            "dismes_plus_strict_fallback": fallback_metrics,
+        },
+        "decision_inputs": {
+            "low_factor_count": len(low_rows),
+            "low_factor_dismes_within_2_fraction": low_dismes,
+            "above_0p08_count": len(high_rows),
+            "above_0p08_dismes_only_detection_within_2_fraction": high_detected,
+            "above_0p30_count": len(very_large),
+            "above_0p30_jump_precedes_dismes_fraction": lagged_large,
+        },
+        "decision": {
+            "legacy_strict_fallback_would_be_enabled": legacy_enable_fallback,
+            "legacy_classifier_stop_reasons": stop_reasons,
+            "legacy_classifier_gate_passed": not stop_reasons,
+            "canonical_price_ratio_adjustment_authorized": False,
+            "canonical_requirement": (
+                "verified contractual share and cash terms; otherwise affected "
+                "cross-boundary outcomes remain unresolved"
+            ),
+        },
+    }
 
 
 def build_reclassification_audit(
@@ -156,6 +509,15 @@ def build_reclassification_audit(
         )
         .sort("horizon_sessions")
     )
+    breakdown = _build_breakdown(
+        dates=np.asarray(dates, dtype="datetime64[D]"),
+        isins=isins,
+        provider_actions=provider_actions,
+        acquisition_audit=acquisition_audit,
+        distribution_change=old_distribution,
+        without_fallback=without_fallback,
+        with_fallback=with_fallback,
+    )
     return {
         "schema": AUDIT_SCHEMA,
         "research_claim": False,
@@ -171,9 +533,13 @@ def build_reclassification_audit(
             "precision_loss": precision_loss,
         },
         "decision": {
-            "undocumented_split_fallback": adopt_fallback,
-            "classifier": (
+            "legacy_undocumented_split_fallback": adopt_fallback,
+            "legacy_classifier": (
                 "dismes_plus_strict_fallback" if adopt_fallback else "dismes_only"
+            ),
+            "canonical_price_ratio_adjustment_authorized": False,
+            "canonical_action_contract": (
+                "verified contractual share/cash terms; unresolved otherwise"
             ),
         },
         "classification_counts_by_year": {
@@ -190,10 +556,17 @@ def build_reclassification_audit(
             ),
             "old_target_validity_by_horizon": target_totals.to_dicts(),
         },
+        "corporate_action_reclassification_breakdown": breakdown,
     }
 
 
-def audit_store(source_store: Path, output: Path) -> str:
+def audit_store(
+    source_store: Path,
+    output: Path,
+    *,
+    breakdown_output: Path | None = None,
+    implementation_commit: str | None = None,
+) -> str:
     root = source_store.resolve()
     required = (
         "date_index.npy",
@@ -268,6 +641,22 @@ def audit_store(source_store: Path, output: Path) -> str:
         "manifest_sha256": manifest_sha,
         "verified_input_sha256s": verified,
     }
+    payload["implementation_git_commit"] = implementation_commit
+    breakdown = payload["corporate_action_reclassification_breakdown"]
+    if not isinstance(breakdown, dict):
+        raise TypeError("corporate-action breakdown was not materialized")
+    breakdown["source_store"] = payload["source_store"]
+    breakdown["implementation_git_commit"] = implementation_commit
+    breakdown_path = (
+        output.with_name("corporate_action_reclassification_breakdown.json")
+        if breakdown_output is None
+        else breakdown_output
+    )
+    breakdown_sha256 = write_json_atomic(breakdown_path, breakdown)
+    payload["breakdown_artifact"] = {
+        "path": str(breakdown_path.resolve()),
+        "sha256": breakdown_sha256,
+    }
     return write_json_atomic(output, payload)
 
 
@@ -277,8 +666,15 @@ def main() -> None:
     )
     parser.add_argument("--source-store", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--breakdown-output", type=Path)
+    parser.add_argument("--implementation-commit", required=True)
     arguments = parser.parse_args()
-    audit_store(arguments.source_store, arguments.output)
+    audit_store(
+        arguments.source_store,
+        arguments.output,
+        breakdown_output=arguments.breakdown_output,
+        implementation_commit=arguments.implementation_commit,
+    )
 
 
 if __name__ == "__main__":

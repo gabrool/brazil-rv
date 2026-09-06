@@ -65,7 +65,8 @@ def test_reclassification_audit_applies_preregistered_fallback_rule() -> None:
         old_target_validity_by_year=target_validity,
     )
 
-    assert payload["decision"]["undocumented_split_fallback"] is True
+    assert payload["decision"]["legacy_undocumented_split_fallback"] is True
+    assert payload["decision"]["canonical_price_ratio_adjustment_authorized"] is False
     assert payload["provider_split_comparison"]["recall_gain"] == 0.5
     assert payload["provider_split_comparison"]["precision_loss"] == 0.0
     assert (
@@ -80,3 +81,11 @@ def test_reclassification_audit_applies_preregistered_fallback_rule() -> None:
             "validity_ratio": 0.8,
         }
     ]
+    breakdown = payload["corporate_action_reclassification_breakdown"]
+    assert breakdown["schema"].endswith("BREAKDOWN_V1")
+    assert len(breakdown["provider_splits"]) == 2
+    assert breakdown["plus_or_minus_2_metrics"]["dismes_only"]["recall"] == 0.5
+    assert breakdown["plus_or_minus_2_metrics"][
+        "dismes_plus_strict_fallback"
+    ]["recall"] == 1.0
+    assert not breakdown["decision"]["canonical_price_ratio_adjustment_authorized"]
