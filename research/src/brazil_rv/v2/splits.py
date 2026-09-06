@@ -31,6 +31,9 @@ TEST_FALLBACK_START = FALLBACK_TEST_START
 TEST_FALLBACK_END = ACCUMULATED_TEST_AFTER
 FIT_EMBARGO_SESSIONS = SELECTION_EMBARGO_SESSIONS
 BLOCK_PARITY_SESSIONS = 5
+FIT_TO_SELECTION_PURGE_SESSIONS = 10
+SELECTION_SESSIONS = 55
+SELECTION_TO_EVALUATION_PURGE_SESSIONS = 10
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 PREREGISTRATION_ROOT = PROJECT_ROOT / "research" / "preregistrations"
@@ -42,6 +45,12 @@ _SELECTION_WINDOWS = {
     "F2": (date(2024, 1, 2), date(2024, 6, 28)),
     "F3": (date(2024, 7, 1), date(2024, 12, 30)),
 }
+
+
+def development_evaluation_windows() -> dict[str, tuple[date, date]]:
+    """Return the registered development evaluation date bounds."""
+
+    return dict(_SELECTION_WINDOWS)
 
 
 def _sha256(path: Path) -> str:
@@ -244,10 +253,16 @@ def development_folds(calendar_dates: Sequence[date]) -> tuple[DevelopmentFold, 
             raise ValueError(f"{name} has too few pre-evaluation sessions")
         fit = before[:-FIT_EMBARGO_SESSIONS]
         heldout = before[-FIT_EMBARGO_SESSIONS:]
-        purge_before = heldout[:10]
-        selection = heldout[10:65]
-        purge_after = heldout[65:]
-        if len(selection) != 55 or len(purge_before) != 10 or len(purge_after) != 10:
+        selection_start = FIT_TO_SELECTION_PURGE_SESSIONS
+        selection_end = selection_start + SELECTION_SESSIONS
+        purge_before = heldout[:selection_start]
+        selection = heldout[selection_start:selection_end]
+        purge_after = heldout[selection_end:]
+        if (
+            len(selection) != SELECTION_SESSIONS
+            or len(purge_before) != FIT_TO_SELECTION_PURGE_SESSIONS
+            or len(purge_after) != SELECTION_TO_EVALUATION_PURGE_SESSIONS
+        ):
             raise ValueError(f"{name} chronological holdout has the wrong size")
         if position[fit[-1]] + max(HORIZONS) >= position[selection[0]]:
             raise ValueError(f"{name} fit target interval overlaps selection")

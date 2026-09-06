@@ -15,13 +15,15 @@ executable borrow.
 - The exact real-store manifest and the completed Section-C acceptance report are
   SHA-256-bound in the Round-1 frozen design. The store must have been built by the
   exact clean implementation used to freeze this registration.
-- Folds F1/F2/F3 are exactly those in `brazil_rv.v2.splits`: fit windows with the
-  75-session embargo and block-parity cross-fit inside selection windows. The sealed
-  2025/2026 windows remain untouched.
+- Folds F1/F2/F3 are exactly those in `brazil_rv.v2.splits`: chronological fit,
+  10 purge sessions, 55 selection sessions, 10 purge sessions, then one continuous
+  evaluation window. There is no cross-fit: each fold/seed has one selected model.
+  The sealed 2025/2026 windows remain untouched.
 - Daily row e is available only at decision e+1. Current-session intraday inputs retain
   the same-session decision clock and use only the open-gap boundary diagnostic.
-- Readouts for every candidate, per fold and pooled: residual IC over D in {1,2,3,5}
-  (primary statistical), per-horizon IC including D10, raw-return Rank-IC, persistence
+- Readouts for every candidate, per fold and pooled: median-adjusted,
+  volatility-scaled primary IC over D in {1,2,3,5}, per-horizon IC including D10,
+  raw-return Rank-IC, persistence
   at 1 and 5 sessions, decile spread in bps per holding session, and the swing-economics
   grid with 4 bps per side / 2% annual borrow as the headline cell. Daily series use a
   20-session moving-block bootstrap with 10,000 replications; blocks are sampled within
@@ -58,7 +60,7 @@ the equal rank-gauss reversal-5/momentum-12-1 blend, and inverse-volatility-20 o
 F1–F3 with the complete registered readouts and ledger.
 
 **R1.2 cumulative GBDT ladder.** Fit five-seed ensembles with early stopping on the
-selection parity:
+complete selection window:
 
 1. `a_slow`: the slow feature library;
 2. `b_intraday`: A plus intraday-derived daily features and availability flags;
@@ -66,19 +68,19 @@ selection parity:
 4. `d_all_sidecars`: C plus oddlot, options, rebalance, events, and fundamentals.
 
 Report paired rung-minus-previous deltas and gain/SHAP importance. A rung is dropped
-only if both its pooled residual-IC point delta and headline-net-excess point delta are
+only if both its pooled primary-IC point delta and headline-net-excess point delta are
 negative. Undefined economics cannot establish improvement or worsening. Other rungs
 are kept; intervals crossing zero are marked ambiguous. The parent is the kept rung
-with the largest pooled residual IC, then defined headline economics, then the earlier
+with the largest pooled primary IC, then defined headline economics, then the earlier
 rung on an exact tie.
 
 **R1.3 data-span preview.** On the selected parent feature set, compare fine-only,
 pretrain-plus-fine with uniform weights, and pretrain-plus-fine with a 756-session
 half-life. This preview is informational input to R2.1 and has no decision weight.
 
-GBDT pretraining rows use their date-t slow/sidecar fields, zero intraday fields,
-`fast_present=0`, and `days_since_last_slow_row=0`. Fine rows use lagged slow/sidecar
-fields and current-date intraday fields under the canonical sample builder.
+Every GBDT row is the canonical decision row. Pretraining rows have no intraday fields
+and set `fast_present=0`; fine rows use the same canonical decision-row contract with
+current-decision intraday fields. No additional consumer-side lag is applied.
 
 ## Round 2 — network data-span arms and parent comparison (GPU)
 
@@ -97,8 +99,8 @@ and F1/F2/F3:
   raw-Patience checkpoint and the 0.3 pretrained-parameter learning-rate multiplier.
 - Arm C: Stage J over both windows with 756-session time decay.
 
-Each seed is stitched by opposite five-session block parity, then the three stitched
-seed panels are tie-aware rank-averaged. Report B-A and C-A paired deltas. A long-history
+The three seed panels on each continuous evaluation window are tie-aware rank-averaged.
+Report B-A and C-A paired deltas. A long-history
 arm is eligible only when its headline economics are not below Arm A. If both long-arm
 IC improvements are at most 0.002 and both intervals include zero, select A. Otherwise
 select the eligible arm with the largest pooled IC; exact ties prefer A, B, then C.
@@ -119,3 +121,64 @@ Score-free operational failures may be repaired only in a new clean commit and f
 root when doing so does not change this contract. Any gate or first-smoke failure stops
 with evidence. The paid instance is terminated and its exact ID verified absent twice
 after artifacts and logs are secured. No deployment changes occur.
+
+## Machine-readable protocol
+
+<!-- BRAZIL_RV_V2_PROTOCOL_JSON_BEGIN -->
+```json
+{
+  "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V1",
+  "purge_sessions": {
+    "fit_to_selection": 10,
+    "selection_to_evaluation": 10
+  },
+  "selection_sessions": 55,
+  "evaluation_window_per_fold": {
+    "F1": {"start": "2023-07-03", "end": "2023-12-29"},
+    "F2": {"start": "2024-01-02", "end": "2024-06-28"},
+    "F3": {"start": "2024-07-01", "end": "2024-12-30"}
+  },
+  "cross_fit": "none",
+  "models_per_fold_seed": 1,
+  "primary_population_rule": {
+    "target": "median_adjusted_volatility_scaled_midrank",
+    "horizons_sessions": [1, 2, 3, 5],
+    "requirements": [
+      "active_at_entry",
+      "finite_target_scale_sigma_greater_than_1e-8",
+      "valid_and_finite_scaled_target_on_every_primary_horizon",
+      "valid_and_finite_score_on_every_primary_horizon"
+    ],
+    "minimum_cross_section_names": 20,
+    "per_horizon_metric": "tie_aware_spearman",
+    "daily_aggregation": "equal_mean_of_all_primary_horizons_when_all_defined"
+  },
+  "headline_cell": {
+    "signal": "tie_aware_rank_average_D1_D2_D3_D5",
+    "signal_horizons_sessions": [1, 2, 3, 5],
+    "ledger": {
+      "k_per_side": 30,
+      "buffer_per_side": 30,
+      "gross_target": 2.0,
+      "planned_gross_cap": 2.25,
+      "planned_absolute_net_cap": 0.1,
+      "planned_name_weight_cap": 0.05,
+      "cost_bps_per_side": 4.0,
+      "annual_borrow_rate": 0.02,
+      "annual_debit_spread": 0.0,
+      "short_proceeds_remuneration": 0.0,
+      "initial_capital_brl": 1.0,
+      "lot_size": null,
+      "entry_expiry_sessions": 3,
+      "forced_liquidation_haircut": 0.0,
+      "max_missing_sessions": 10,
+      "annual_sessions": 252
+    }
+  },
+  "source_tier_labels": {
+    "action_terms_source": "inferred_cotahist_dismes_v1",
+    "schedule_source": "reconstructed_v1"
+  }
+}
+```
+<!-- BRAZIL_RV_V2_PROTOCOL_JSON_END -->

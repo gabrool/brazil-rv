@@ -30,6 +30,7 @@ from brazil_rv.v2.research_rounds import (
     _window_target_mask,
     seal_root,
 )
+from brazil_rv.v2.splits import development_folds
 
 
 def test_rev2_registration_replaces_the_voided_research_entrypoints(
@@ -39,6 +40,43 @@ def test_rev2_registration_replaces_the_voided_research_entrypoints(
     assert research_rounds.PREREGISTRATION.is_file()
     with pytest.raises(FileNotFoundError):
         research_rounds.run_round1(output_root=tmp_path / "absent", num_threads=1)
+
+
+def test_rev2_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> None:
+    protocol = research_rounds.load_registration_protocol()
+    assert protocol == research_rounds.registration_protocol_from_code()
+
+    raw_dates = np.arange(
+        np.datetime64("2010-01-04"),
+        np.datetime64("2025-01-01"),
+        dtype="datetime64[D]",
+    )
+    dates = tuple(
+        raw_dates[np.is_busday(raw_dates)].astype("datetime64[D]").astype(object)
+    )
+    folds = development_folds(dates)
+    assert protocol["purge_sessions"] == {
+        "fit_to_selection": 10,
+        "selection_to_evaluation": 10,
+    }
+    assert protocol["selection_sessions"] == 55
+    assert protocol["cross_fit"] == "none"
+    assert protocol["models_per_fold_seed"] == 1
+    for fold in folds:
+        registered = protocol["evaluation_window_per_fold"][fold.name]
+        assert registered == {
+            "start": fold.evaluation_dates[0].isoformat(),
+            "end": fold.evaluation_dates[-1].isoformat(),
+        }
+    assert (
+        protocol["primary_population_rule"]
+        == research_rounds.primary_population_protocol()
+    )
+    assert protocol["headline_cell"] == research_rounds.headline_ledger_protocol()
+    assert protocol["source_tier_labels"] == {
+        "action_terms_source": "inferred_cotahist_dismes_v1",
+        "schedule_source": "reconstructed_v1",
+    }
 
 
 def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:

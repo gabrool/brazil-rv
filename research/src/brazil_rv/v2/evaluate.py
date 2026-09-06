@@ -38,6 +38,40 @@ EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V4"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
+def primary_population_protocol() -> dict[str, object]:
+    """Describe the exact population and aggregation used by the primary IC."""
+
+    return {
+        "target": "median_adjusted_volatility_scaled_midrank",
+        "horizons_sessions": list(PRIMARY_HORIZONS),
+        "requirements": [
+            "active_at_entry",
+            "finite_target_scale_sigma_greater_than_1e-8",
+            "valid_and_finite_scaled_target_on_every_primary_horizon",
+            "valid_and_finite_score_on_every_primary_horizon",
+        ],
+        "minimum_cross_section_names": MIN_CROSS_SECTION,
+        "per_horizon_metric": "tie_aware_spearman",
+        "daily_aggregation": "equal_mean_of_all_primary_horizons_when_all_defined",
+    }
+
+
+def headline_ledger_protocol() -> dict[str, object]:
+    """Return the exact registered headline signal and ledger configuration."""
+
+    config = LedgerConfig()
+    if (
+        config.cost_bps_per_side != ECONOMICS_HEADLINE[0]
+        or config.annual_borrow_rate != ECONOMICS_HEADLINE[1]
+    ):
+        raise RuntimeError("headline constants differ from the default ledger")
+    return {
+        "signal": "tie_aware_rank_average_D1_D2_D3_D5",
+        "signal_horizons_sessions": list(PRIMARY_HORIZONS),
+        "ledger": asdict(config),
+    }
+
+
 @dataclass(frozen=True)
 class EvaluationInputs:
     dates: tuple[date, ...]

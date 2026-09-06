@@ -4,14 +4,16 @@ import argparse
 import gc
 import hashlib
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Mapping, Sequence
 
 import numpy as np
@@ -332,32 +334,100 @@ def _route_decision_known_continuations(
     )
 
 
-def _build_resource_preflight() -> dict[str, object]:
+def _directory_size_bytes(root: Path) -> int:
+    source = root.resolve(strict=True)
+    if not source.is_dir():
+        raise NotADirectoryError(source)
+    return sum(path.stat().st_size for path in source.rglob("*") if path.is_file())
+
+
+def _is_windows_system_drive(path: Path) -> bool:
+    raw = str(path)
+    if PureWindowsPath(raw).drive.casefold() == "c:":
+        return True
+    return re.search(r"(?i)(?:^|[\\/])c:[\\/]", raw) is not None
+
+
+def _build_resource_preflight(
+    *, output_dir: Path, previous_store: Path
+) -> dict[str, object]:
     status = available_memory_status_bytes()
     available = int(status["available_build_memory_bytes"])
-    passed = available >= MINIMUM_BUILD_FREE_MEMORY_BYTES
+    output = output_dir.resolve()
+    output_parent = output.parent
+    if not output_parent.is_dir():
+        raise FileNotFoundError(
+            f"store output parent must exist before preflight: {output_parent}"
+        )
+    previous = previous_store.resolve(strict=True)
+    previous_size = _directory_size_bytes(previous)
+    if previous_size <= 0:
+        raise ValueError("previous immutable store is empty")
+    output_free = int(shutil.disk_usage(output_parent).free)
+    required_output_free = 3 * previous_size
+    process_temp = Path(tempfile.gettempdir()).resolve()
+    test_scratch_raw = os.environ.get("BRAZIL_RV_TEST_SCRATCH")
+    staging_roots = {
+        "process_temp_workspace": str(process_temp),
+        "array_workspace_parent": str(output_parent),
+        "atomic_store_staging_parent": str(output_parent),
+    }
+    if test_scratch_raw:
+        staging_roots["test_scratch_workspace"] = str(Path(test_scratch_raw).resolve())
+    system_drive_roots = [
+        name
+        for name, path in staging_roots.items()
+        if _is_windows_system_drive(Path(path))
+    ]
+    violations: list[str] = []
+    if available < MINIMUM_BUILD_FREE_MEMORY_BYTES:
+        violations.append("available_build_memory_below_10_gib")
+    if output_free < required_output_free:
+        violations.append("output_drive_free_below_three_times_previous_store")
+    if system_drive_roots:
+        violations.append("workspace_or_staging_root_on_windows_system_drive")
     preflight: dict[str, object] = {
         **status,
         "minimum_required_bytes": MINIMUM_BUILD_FREE_MEMORY_BYTES,
-        "passed": passed,
+        "output_directory": str(output),
+        "output_drive_free_bytes": output_free,
+        "previous_store": str(previous),
+        "previous_store_size_bytes": previous_size,
+        "minimum_output_drive_free_bytes": required_output_free,
+        "minimum_output_drive_free_multiple": 3,
+        "resolved_temporary_workspace": str(process_temp),
+        "staging_roots": staging_roots,
+        "windows_system_drive_staging_roots": system_drive_roots,
+        "violations": violations,
+        "passed": not violations,
     }
-    if passed:
-        return preflight
+    return preflight
 
-    physical = int(status["available_physical_memory_bytes"])
+
+def _require_build_resource_preflight(preflight: Mapping[str, object]) -> None:
+    if preflight.get("passed") is True:
+        return
+
+    physical = int(preflight["available_physical_memory_bytes"])
     details = f"physical {physical / 1024**3:.2f} GiB"
-    available_commit = status["available_commit_memory_bytes"]
-    commit_limit = status["commit_limit_bytes"]
+    available_commit = preflight["available_commit_memory_bytes"]
+    commit_limit = preflight["commit_limit_bytes"]
     if available_commit is not None and commit_limit is not None:
         details += (
             f", available commit {int(available_commit) / 1024**3:.2f} GiB"
             f", commit limit {int(commit_limit) / 1024**3:.2f} GiB"
         )
-    raise MemoryError(
-        "v2 store build refused before source loading: conservative available "
-        f"build memory is {available / 1024**3:.2f} GiB ({details}); at least "
-        f"{MINIMUM_BUILD_FREE_MEMORY_BYTES / 1024**3:.0f} GiB is required"
+    message = (
+        "v2 store build refused before source loading: "
+        f"violations={preflight['violations']}; conservative available build memory "
+        f"is {int(preflight['available_build_memory_bytes']) / 1024**3:.2f} GiB "
+        f"({details}); output free is "
+        f"{int(preflight['output_drive_free_bytes']) / 1024**3:.2f} GiB; required "
+        f"output free is {int(preflight['minimum_output_drive_free_bytes']) / 1024**3:.2f} GiB"
     )
+    if "available_build_memory_below_10_gib" in preflight["violations"]:
+        raise MemoryError(message)
+    raise OSError(message)
 
 
 def _workspace_array(
@@ -3303,6 +3373,12 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--implementation-commit", required=True)
     parser.add_argument("--actions", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--previous-store",
+        required=True,
+        type=Path,
+        help="Prior immutable v2 store used to enforce three-times disk headroom",
+    )
     parser.add_argument("--minute-npz", type=Path)
     parser.add_argument("--m1-assignments", required=True, type=Path)
     parser.add_argument(
@@ -3716,12 +3792,16 @@ def main(arguments: Sequence[str] | None = None) -> None:
         raise ValueError("--implementation-commit must be a full lowercase Git SHA")
     repository = Path(__file__).resolve().parents[4]
     _require_clean_implementation_commit(repository, args.implementation_commit)
-    resource_preflight = _build_resource_preflight()
+    resource_preflight = _build_resource_preflight(
+        output_dir=args.output_dir,
+        previous_store=args.previous_store,
+    )
     print(
         json.dumps({"resource_preflight": resource_preflight}, sort_keys=True),
         file=sys.stderr,
         flush=True,
     )
+    _require_build_resource_preflight(resource_preflight)
     raw_sources = tuple(
         (args.cotahist_raw_root / f"COTAHIST_A{year}.ZIP").resolve()
         for year in COTAHIST_YEARS

@@ -38,6 +38,8 @@ from .evaluate import (
     _spearman,
     _validate_paired_identity,
     evaluate_scores,
+    headline_ledger_protocol,
+    primary_population_protocol,
 )
 from .data import ScalarFeatureView, read_scalar_feature_view, scalar_feature_names
 from .gbdt import (
@@ -46,7 +48,13 @@ from .gbdt import (
     assemble_gbdt_scalar_view,
     gbdt_scalar_feature_names,
 )
-from .splits import development_folds
+from .splits import (
+    FIT_TO_SELECTION_PURGE_SESSIONS,
+    SELECTION_SESSIONS,
+    SELECTION_TO_EVALUATION_PURGE_SESSIONS,
+    development_evaluation_windows,
+    development_folds,
+)
 from .store import V2Store, open_store_for_samples
 from .train import rank_average_ensemble
 from .validate_pipeline import (
@@ -87,6 +95,12 @@ RESEARCH_FLAGS = {
     "deployment_changed": False,
     "transfer_chronology_clean": True,
 }
+DEVELOPMENT_SOURCE_TIER_LABELS = {
+    "action_terms_source": "inferred_cotahist_dismes_v1",
+    "schedule_source": "reconstructed_v1",
+}
+REGISTRATION_PROTOCOL_BEGIN = "<!-- BRAZIL_RV_V2_PROTOCOL_JSON_BEGIN -->"
+REGISTRATION_PROTOCOL_END = "<!-- BRAZIL_RV_V2_PROTOCOL_JSON_END -->"
 
 
 @dataclass(frozen=True)
@@ -128,18 +142,76 @@ def _read_json(path: Path) -> dict[str, object]:
     return payload
 
 
+def load_registration_protocol(path: Path = PREREGISTRATION) -> dict[str, object]:
+    """Parse the sole machine-readable protocol block from a registration."""
+
+    text = path.read_text(encoding="utf-8")
+    if (
+        text.count(REGISTRATION_PROTOCOL_BEGIN) != 1
+        or text.count(REGISTRATION_PROTOCOL_END) != 1
+    ):
+        raise ValueError("registration must contain exactly one protocol JSON block")
+    raw = (
+        text.split(REGISTRATION_PROTOCOL_BEGIN, 1)[1]
+        .split(REGISTRATION_PROTOCOL_END, 1)[0]
+        .strip()
+    )
+    if not raw.startswith("```json") or not raw.endswith("```"):
+        raise ValueError("registration protocol block must be a fenced JSON object")
+    payload = json.loads(raw[len("```json") : -len("```")].strip())
+    if not isinstance(payload, dict):
+        raise ValueError("registration protocol JSON must be an object")
+    return payload
+
+
+def registration_protocol_from_code() -> dict[str, object]:
+    """Build protocol facts that registration prose may not override."""
+
+    return {
+        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V1",
+        "purge_sessions": {
+            "fit_to_selection": FIT_TO_SELECTION_PURGE_SESSIONS,
+            "selection_to_evaluation": SELECTION_TO_EVALUATION_PURGE_SESSIONS,
+        },
+        "selection_sessions": SELECTION_SESSIONS,
+        "evaluation_window_per_fold": {
+            name: {"start": start.isoformat(), "end": end.isoformat()}
+            for name, (start, end) in development_evaluation_windows().items()
+        },
+        "cross_fit": "none",
+        "models_per_fold_seed": 1,
+        "primary_population_rule": primary_population_protocol(),
+        "headline_cell": headline_ledger_protocol(),
+        "source_tier_labels": dict(DEVELOPMENT_SOURCE_TIER_LABELS),
+    }
+
+
+def verify_registration_protocol(path: Path = PREREGISTRATION) -> dict[str, object]:
+    """Fail before a freeze when registration and executable policy differ."""
+
+    recorded = load_registration_protocol(path)
+    expected = registration_protocol_from_code()
+    if recorded != expected:
+        raise ValueError(
+            "machine-readable registration protocol differs from the executable "
+            "development-fold, evaluator, ledger, or source-tier contract"
+        )
+    return recorded
+
+
 def _source_tier_labels(store_manifest: Mapping[str, object]) -> dict[str, str]:
     metadata = store_manifest.get("metadata")
     if not isinstance(metadata, Mapping):
         raise ValueError("store manifest lacks source-tier metadata")
     action = metadata.get("action_terms_source")
     schedule = metadata.get("schedule_source")
-    if action != "inferred_cotahist_dismes_v1" or schedule != "reconstructed_v1":
+    labels = {"action_terms_source": action, "schedule_source": schedule}
+    if labels != DEVELOPMENT_SOURCE_TIER_LABELS:
         raise ValueError(
             "registered rev-2 research requires the labelled development-grade "
             "action and reconstructed schedule tiers"
         )
-    return {"action_terms_source": action, "schedule_source": schedule}
+    return dict(DEVELOPMENT_SOURCE_TIER_LABELS)
 
 
 def _assert_source_tier_labels(
@@ -1202,6 +1274,7 @@ def freeze_round1(
     output_root: Path,
     num_threads: int,
 ) -> str:
+    protocol = verify_registration_protocol()
     code = _git_identity()
     output = output_root.resolve()
     if output.exists():
@@ -1244,6 +1317,7 @@ def freeze_round1(
         "preregistration": {
             "path": str(PREREGISTRATION.resolve(strict=True)),
             "sha256": sha256_file(PREREGISTRATION),
+            "protocol": protocol,
         },
         "store": {
             "root": str(store),
