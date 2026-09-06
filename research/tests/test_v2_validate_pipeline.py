@@ -1179,7 +1179,62 @@ def test_prior_score_replay_fails_loudly_on_hash_mismatch(tmp_path: Path) -> Non
 
     with pytest.raises(ValueError, match="artifact hash mismatch"):
         pipeline._load_prior_score_panel(
-            source_root=root,
+            source_roots={root: pipeline._PRIOR_PIPELINE_SCHEMA},
+            record=record,
+            expected_indices=np.asarray([10, 11], dtype=np.int64),
+            expected_name_count=3,
+        )
+
+
+def test_prior_score_replay_allows_only_a_verified_ancestor_root(
+    tmp_path: Path,
+) -> None:
+    current = tmp_path / "current"
+    ancestor = tmp_path / "ancestor"
+    panel = ancestor / "panel"
+    current.mkdir()
+    panel.mkdir(parents=True)
+    scores = np.zeros((2, 3, len(HORIZONS)), dtype=np.float32)
+    score_mask = np.ones_like(scores, dtype=np.bool_)
+    np.save(panel / "scores.npy", scores, allow_pickle=False)
+    np.save(panel / "score_mask.npy", score_mask, allow_pickle=False)
+    manifest_path = panel / "validation_manifest.json"
+    manifest_sha = write_json_atomic(
+        manifest_path,
+        {
+            "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5",
+            "status": "completed",
+            **pipeline.PIPELINE_FLAGS,
+            "metadata": {"date_indices": [10, 11]},
+            "artifacts": {
+                name: {
+                    "bytes": (panel / name).stat().st_size,
+                    "sha256": sha256_file(panel / name),
+                }
+                for name in ("scores.npy", "score_mask.npy")
+            },
+        },
+    )
+    record = {
+        "score_manifest": str(manifest_path),
+        "score_manifest_sha256": manifest_sha,
+    }
+
+    loaded, loaded_mask, _ = pipeline._load_prior_score_panel(
+        source_roots={
+            current.resolve(): pipeline._PRIOR_PIPELINE_SCHEMA,
+            ancestor.resolve(): "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5",
+        },
+        record=record,
+        expected_indices=np.asarray([10, 11], dtype=np.int64),
+        expected_name_count=3,
+    )
+    np.testing.assert_array_equal(loaded, scores)
+    np.testing.assert_array_equal(loaded_mask, score_mask)
+
+    with pytest.raises(ValueError, match="every verified acceptance root"):
+        pipeline._load_prior_score_panel(
+            source_roots={current.resolve(): pipeline._PRIOR_PIPELINE_SCHEMA},
             record=record,
             expected_indices=np.asarray([10, 11], dtype=np.int64),
             expected_name_count=3,

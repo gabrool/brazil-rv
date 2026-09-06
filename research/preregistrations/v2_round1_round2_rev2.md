@@ -146,6 +146,17 @@ The bounded repair verifies `store_build_implementation_commit` against the seal
 store and continues to bind the prior replay itself by its manifest and inventory
 hashes. It changes no score, panel, ledger rule, threshold, or gate.
 
+That repair then reached the first score-panel path but stopped before loading its
+arrays or evaluating it: a chained replay's panel remains inside the original sealed
+acceptance root, not the immediately prior replay root. The empty failed root
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_pass4f_b4715da_20260906T234950Z`
+is retained. The follow-up provenance repair accepts that path only after verifying
+the ancestor root named in the already hash-bound prior manifest, including the
+ancestor manifest hash, complete inventory hash and every inventory row, store hash,
+implementation identity, access flags, and score-manifest hash. Arbitrary external
+score paths remain forbidden. This changes no score, panel, ledger rule, threshold,
+or gate.
+
 ## Round 1 — baseline floor and GBDT parent (CPU)
 
 **R1.1 baseline table.** Evaluate exactly reversal 5, reversal 21, momentum 12-1,

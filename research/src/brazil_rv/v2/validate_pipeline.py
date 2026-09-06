@@ -1896,9 +1896,68 @@ def _assert_prior_store_build_identity(
         raise ValueError("prior acceptance used a different sealed store build")
 
 
+def _verified_bound_acceptance_root(
+    binding: Mapping[str, object], *, store_manifest_sha256: str
+) -> tuple[Path, str]:
+    root_raw = binding.get("root")
+    expected_manifest_sha = binding.get("manifest_sha256")
+    expected_inventory_sha = binding.get("inventory_sha256")
+    expected_commit = binding.get("implementation_commit")
+    if not all(
+        isinstance(value, str)
+        for value in (
+            root_raw,
+            expected_manifest_sha,
+            expected_inventory_sha,
+            expected_commit,
+        )
+    ):
+        raise ValueError("bound acceptance source identity is malformed")
+    source = Path(root_raw).resolve(strict=True)
+    manifest_path = source / "pipeline_validation_manifest.json"
+    inventory_path = source / "inventory.json"
+    if sha256_file(manifest_path) != expected_manifest_sha:
+        raise ValueError("bound acceptance manifest SHA-256 mismatch")
+    if sha256_file(inventory_path) != expected_inventory_sha:
+        raise ValueError("bound acceptance inventory SHA-256 mismatch")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    inventory_payload = json.loads(inventory_path.read_text(encoding="utf-8"))
+    schema = manifest.get("schema") if isinstance(manifest, Mapping) else None
+    allowed_schemas = {
+        "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5",
+        _PRIOR_PIPELINE_SCHEMA,
+    }
+    if (
+        not isinstance(manifest, Mapping)
+        or not isinstance(inventory_payload, Mapping)
+        or schema not in allowed_schemas
+        or manifest.get("status") != "completed"
+        or manifest.get("pipeline_validation") is not True
+        or manifest.get("research_claim") is not False
+        or manifest.get("official_validation_accessed") is not False
+        or manifest.get("test_accessed") is not False
+        or manifest.get("transfer_chronology_clean") is not True
+        or inventory_payload.get("schema") != f"{schema}_INVENTORY"
+        or inventory_payload.get("status") != "completed"
+    ):
+        raise ValueError("bound acceptance source is stale or has invalid access")
+    code = manifest.get("code")
+    if not isinstance(code, Mapping) or code.get("commit") != expected_commit:
+        raise ValueError("bound acceptance implementation identity mismatch")
+    sources = manifest.get("sources")
+    store_source = sources.get("store") if isinstance(sources, Mapping) else None
+    if not isinstance(store_source, Mapping) or (
+        str(store_source.get("manifest_sha256", "")).casefold()
+        != store_manifest_sha256.casefold()
+    ):
+        raise ValueError("bound acceptance used a different immutable store")
+    _verify_bound_inventory_files(source, inventory_payload.get("files"))
+    return source, str(schema)
+
+
 def _load_prior_score_panel(
     *,
-    source_root: Path,
+    source_roots: Mapping[Path, str],
     record: Mapping[str, object],
     expected_indices: NDArray[np.int64],
     expected_name_count: int,
@@ -1908,13 +1967,19 @@ def _load_prior_score_panel(
     if not isinstance(manifest_raw, str) or not isinstance(expected_manifest_sha, str):
         raise ValueError("prior classical record lacks its score binding")
     manifest_path = Path(manifest_raw).resolve(strict=True)
-    if not manifest_path.is_relative_to(source_root):
-        raise ValueError("prior score panel is outside its immutable acceptance root")
+    matching_roots = [
+        (root, schema)
+        for root, schema in source_roots.items()
+        if manifest_path.is_relative_to(root)
+    ]
+    if not matching_roots:
+        raise ValueError("prior score panel is outside every verified acceptance root")
+    _, expected_schema = max(matching_roots, key=lambda row: len(row[0].parts))
     if sha256_file(manifest_path) != expected_manifest_sha:
         raise ValueError("prior score-panel manifest SHA-256 mismatch")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, Mapping) or (
-        manifest.get("schema") != _PRIOR_PIPELINE_SCHEMA
+        manifest.get("schema") != expected_schema
         or manifest.get("status") != "completed"
         or manifest.get("pipeline_validation") is not True
         or manifest.get("research_claim") is not False
@@ -2411,6 +2476,13 @@ def replay_classical_economics(
     prior_cdi = prior_sources.get("cdi") if isinstance(prior_sources, Mapping) else None
     if not isinstance(prior_cdi, Mapping):
         raise ValueError("prior acceptance CDI provenance is missing")
+    score_source_roots = {source_root: _PRIOR_PIPELINE_SCHEMA}
+    ancestor_binding = prior_sources.get("prior_classical_acceptance")
+    if isinstance(ancestor_binding, Mapping):
+        ancestor_root, ancestor_schema = _verified_bound_acceptance_root(
+            ancestor_binding, store_manifest_sha256=actual_store_sha
+        )
+        score_source_roots[ancestor_root] = ancestor_schema
     for key in ("development_extension", "experiment52_reference"):
         old = prior_cdi.get(key)
         new = cdi_provenance.get(key)
@@ -2489,7 +2561,7 @@ def replay_classical_economics(
         if indices is None:
             raise ValueError(f"prior score uses an unexpected fold: {fold}")
         scores, score_mask, score_manifest_sha = _load_prior_score_panel(
-            source_root=source_root,
+            source_roots=score_source_roots,
             record=record,
             expected_indices=indices,
             expected_name_count=len(store.isins),
