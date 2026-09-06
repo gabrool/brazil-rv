@@ -41,6 +41,7 @@ from .contract import (
     STORE_START,
     V1_READ_SEEDS,
 )
+from .data import collate_v2_daily
 from .losses import multi_horizon_loss
 from .model import DailyMultiHorizonModel
 from .normalization import average_ranks
@@ -520,14 +521,17 @@ def load_stage_checkpoint(
 def _model_forward(model: nn.Module, batch: Mapping[str, torch.Tensor]) -> torch.Tensor:
     return model(
         batch["slow_features"],
+        batch["slow_feature_mask"],
         batch["slow_history_mask"],
         batch["active_mask"],
-        batch.get("fast_patches"),
-        batch.get("fast_patch_mask"),
-        batch.get("fast_present"),
-        batch.get("days_since_last_slow_row"),
-        batch.get("fast_state_position"),
-        batch.get("v1_equity_slow"),
+        fast_patch_mask=batch.get("fast_patch_mask"),
+        fast_present=batch.get("fast_present"),
+        days_since_last_slow_row=batch.get("days_since_last_slow_row"),
+        fast_state_position=batch.get("fast_state_position"),
+        v1_equity_slow=batch.get("v1_equity_slow"),
+        fast_patch_values=batch.get("fast_patch_values"),
+        fast_patch_valid=batch.get("fast_patch_valid"),
+        fast_name_index=batch.get("fast_name_index"),
     )
 
 
@@ -539,10 +543,13 @@ def _to_device(
 ) -> dict[str, torch.Tensor]:
     names = {
         "slow_features",
+        "slow_feature_mask",
         "slow_history_mask",
         "active_mask",
-        "fast_patches",
+        "fast_patch_values",
+        "fast_patch_valid",
         "fast_patch_mask",
+        "fast_name_index",
         "fast_present",
         "days_since_last_slow_row",
         "fast_state_position",
@@ -554,8 +561,10 @@ def _to_device(
     }
     if omit_fast_stream:
         names -= {
-            "fast_patches",
+            "fast_patch_values",
+            "fast_patch_valid",
             "fast_patch_mask",
+            "fast_name_index",
             "fast_state_position",
             "v1_equity_slow",
         }
@@ -571,8 +580,10 @@ def _to_device(
         and not torch.any(present.bool())
     ):
         for name in (
-            "fast_patches",
+            "fast_patch_values",
+            "fast_patch_valid",
             "fast_patch_mask",
+            "fast_name_index",
             "fast_state_position",
             "v1_equity_slow",
         ):
@@ -583,30 +594,22 @@ def _to_device(
         raise ValueError("training batches require targets and target_mask")
     if targets.shape != target_mask.shape or targets.ndim != 3:
         raise ValueError("batched targets and target_mask are misaligned")
-    if targets.shape[-1] == 5:
-        to_close = transferred.pop("to_close_target", None)
-        to_close_mask = transferred.pop("to_close_mask", None)
-        if to_close is None:
-            to_close = torch.zeros_like(targets[..., :1])
-            to_close_mask = torch.zeros_like(target_mask[..., :1])
-        else:
-            if to_close.ndim == 2:
-                to_close = to_close[..., None]
-            if to_close_mask is None:
-                raise ValueError("to-close target and mask must be provided together")
-            if to_close_mask.ndim == 2:
-                to_close_mask = to_close_mask[..., None]
-            if (
-                to_close.shape != targets.shape[:-1] + (1,)
-                or to_close_mask.shape != to_close.shape
-            ):
-                raise ValueError("to-close target and mask are misaligned")
-        transferred["targets"] = torch.cat((targets, to_close), dim=-1)
-        transferred["target_mask"] = torch.cat(
-            (target_mask.bool(), to_close_mask.bool()), dim=-1
-        )
-    elif targets.shape[-1] != 6:
-        raise ValueError("v2 targets must contain five horizons plus optional to-close")
+    if targets.shape[-1] != 5:
+        raise ValueError("v2 primary targets must contain exactly five daily horizons")
+    to_close = transferred.get("to_close_target")
+    to_close_mask = transferred.get("to_close_mask")
+    if (to_close is None) != (to_close_mask is None):
+        raise ValueError("to-close target and mask must be provided together")
+    if to_close is not None and to_close_mask is not None:
+        if to_close.ndim == 2:
+            transferred["to_close_target"] = to_close = to_close[..., None]
+        if to_close_mask.ndim == 2:
+            transferred["to_close_mask"] = to_close_mask = to_close_mask[..., None]
+        if (
+            to_close.shape != targets.shape[:-1] + (1,)
+            or to_close_mask.shape != to_close.shape
+        ):
+            raise ValueError("to-close target and mask are misaligned")
     return transferred
 
 
@@ -836,7 +839,7 @@ def _loader_input_payload(
             )
             entry_alignment = (
                 segments[0]["entry_alignment"]
-                if len(segments) == 1
+                if len({segment["entry_alignment"] for segment in segments}) == 1
                 else "per_segment"
             )
             metadata = manifest.get("metadata", {})
@@ -925,7 +928,7 @@ def _model_input_segments(
         pretrain = selected <= np.datetime64(PRETRAIN_END)
         finetune = selected >= np.datetime64(FINETUNE_START)
         if pretrain.all():
-            name, alignment = "P", "through_t"
+            name, alignment = "P", "through_t_minus_1"
         elif finetune.all():
             name, alignment = "F", "through_t_minus_1"
         else:
@@ -1156,8 +1159,8 @@ def _validate_tracked_stage_inputs(
         raise ValueError("training and selection canonical split provenance differs")
     if stage == "P":
         if (
-            training.get("entry_alignment") != "through_t"
-            or selection.get("entry_alignment") != "through_t"
+            training.get("entry_alignment") != "through_t_minus_1"
+            or selection.get("entry_alignment") != "through_t_minus_1"
             or train_start_date < np.datetime64(STORE_START)
             or selection_end_date > np.datetime64(PRETRAIN_END)
         ):
@@ -1173,7 +1176,7 @@ def _validate_tracked_stage_inputs(
             )
         else:
             valid_alignment = (
-                training.get("entry_alignment") == "per_segment"
+                training.get("entry_alignment") == "through_t_minus_1"
                 and selection.get("entry_alignment") == "through_t_minus_1"
             )
         if (
@@ -1236,7 +1239,7 @@ def _validate_tracked_stage_inputs(
         ):
             raise ValueError("stage J canonical P provenance is malformed")
         if (
-            pretrain_segment.get("entry_alignment") != "through_t"
+            pretrain_segment.get("entry_alignment") != "through_t_minus_1"
             or fine_segment.get("entry_alignment") != "through_t_minus_1"
             or selection_segment.get("entry_alignment") != "through_t_minus_1"
             or pretrain_segment.get("first_date") != str(STORE_START)
@@ -1300,6 +1303,7 @@ def _validate_stage_batch(
 ) -> None:
     required = {
         "slow_features",
+        "slow_feature_mask",
         "slow_history_mask",
         "active_mask",
         "targets",
@@ -1311,6 +1315,15 @@ def _validate_stage_batch(
     slow_features = batch["slow_features"]
     if not isinstance(slow_features, torch.Tensor):
         raise TypeError("collated training arrays must be tensors")
+    slow_feature_mask = batch["slow_feature_mask"]
+    slow_history_mask = batch["slow_history_mask"]
+    if (
+        not isinstance(slow_feature_mask, torch.Tensor)
+        or slow_feature_mask.shape != slow_features.shape
+        or not isinstance(slow_history_mask, torch.Tensor)
+        or slow_history_mask.shape != slow_features.shape[:-1]
+    ):
+        raise ValueError("slow values and validity tensors are misaligned")
     if require_date_pairs and slow_features.shape[0] % 2:
         raise ValueError("training batches must contain complete adjacent date pairs")
     if expected_pairs is not None and slow_features.shape[0] != 2 * expected_pairs:
@@ -1327,38 +1340,65 @@ def _validate_stage_batch(
             pairs = date_index.reshape(-1, 2)
             if torch.any(pairs[:, 1] - pairs[:, 0] != 1):
                 raise ValueError("training date pairs must be adjacent sessions")
+    compact_names = (
+        "fast_patch_values",
+        "fast_patch_valid",
+        "fast_patch_mask",
+        "fast_name_index",
+        "fast_state_position",
+    )
+    compact_present = {name for name in compact_names if name in batch}
+    if compact_present and len(compact_present) != len(compact_names):
+        raise ValueError("compact fast tensors must be supplied together")
+    if compact_present:
+        values = batch["fast_patch_values"]
+        valid = batch["fast_patch_valid"]
+        patch_mask = batch["fast_patch_mask"]
+        name_index = batch["fast_name_index"]
+        state_position = batch["fast_state_position"]
+        if (
+            not isinstance(values, torch.Tensor)
+            or values.ndim != 4
+            or not isinstance(valid, torch.Tensor)
+            or valid.shape != values.shape
+            or not isinstance(patch_mask, torch.Tensor)
+            or patch_mask.shape != values.shape[:-1]
+            or not isinstance(name_index, torch.Tensor)
+            or name_index.shape != values.shape[:2]
+            or not isinstance(state_position, torch.Tensor)
+            or state_position.shape != values.shape[:2]
+        ):
+            raise ValueError("compact fast tensors are misaligned")
     if stage == "P":
         present = batch.get("fast_present")
-        if present is None and "fast_patches" in batch:
+        if present is None and compact_present:
             raise ValueError("stage P must explicitly mark every fast stream absent")
         if present is not None and (
             not isinstance(present, torch.Tensor) or torch.any(present.bool())
         ):
             raise ValueError("stage P cannot access a present fast stream")
+        if compact_present and batch["fast_patch_values"].shape[1] != 0:
+            raise ValueError("stage P compact fast allocation must have K=0")
         days = batch.get("days_since_last_slow_row")
         if days is not None and (
-            not isinstance(days, torch.Tensor) or torch.any(days != 0)
+            not isinstance(days, torch.Tensor) or torch.any(days != 1)
         ):
-            raise ValueError("stage P requires days_since_last_slow_row = 0")
+            raise ValueError("stage P requires days_since_last_slow_row = 1")
     else:
         present = batch.get("fast_present")
         days = batch.get("days_since_last_slow_row")
         if not isinstance(present, torch.Tensor) or not isinstance(days, torch.Tensor):
             raise ValueError("F/J batches require both stage-alignment flags")
-        if torch.any((days != 0) & (days != 1)):
-            raise ValueError("days_since_last_slow_row must be zero or one")
-        if stage == "F" and torch.any(days != 1):
-            raise ValueError("stage F requires days_since_last_slow_row = 1")
-        if torch.any((days == 0) & present.bool()):
-            raise ValueError("joint pretrain rows cannot expose the fast stream")
+        if torch.any(days != 1):
+            raise ValueError("all v2 stages require days_since_last_slow_row = 1")
         if torch.any(present.bool()) and (
-            "fast_patches" not in batch
+            "fast_patch_values" not in batch
+            or "fast_patch_valid" not in batch
             or "fast_patch_mask" not in batch
-            or "v1_equity_slow" not in batch
+            or "fast_name_index" not in batch
+            or "fast_state_position" not in batch
         ):
-            raise ValueError(
-                "present fast samples require patches, their mask, and v1 equity slow"
-            )
+            raise ValueError("present fast samples require compact values and metadata")
     to_close_mask = batch.get("to_close_mask")
     present = batch.get("fast_present")
     if isinstance(to_close_mask, torch.Tensor) and isinstance(present, torch.Tensor):
@@ -1412,6 +1452,13 @@ def train_stage(
         raise ValueError("maximum_epochs must be between one and twenty")
     if stage == "P" and pretrain_checkpoint is not None:
         raise ValueError("stage P cannot initialize itself from a pretrain checkpoint")
+    if (
+        model_config.fast_encoder_mode == "legacy_v1_contaminated"
+        and not model_config.fast_pretrained
+    ):
+        raise ValueError(
+            "training in contaminated legacy mode requires its declared v1 checkpoint"
+        )
     expected_decay = 756.0 if stage == "J" else None
     if model_config.time_decay_half_life_sessions != expected_decay:
         raise ValueError(
@@ -1551,9 +1598,33 @@ def train_stage(
                     enabled=model_config.use_bf16 and device.type == "cuda",
                 ):
                     flat_scores = _model_forward(forward_model, batch)
-                    scores = reshape_date_pair_batch(flat_scores)
+                    scores = reshape_date_pair_batch(flat_scores[..., :5])
                     targets = reshape_date_pair_batch(batch["targets"])
                     target_mask = reshape_date_pair_batch(batch["target_mask"])
+                    if model_config.to_close_weight:
+                        to_close = batch.get("to_close_target")
+                        to_close_mask = batch.get("to_close_mask")
+                        if to_close is None or to_close_mask is None:
+                            raise ValueError(
+                                "weighted to-close auxiliary requires its target and mask"
+                            )
+                        scores = torch.cat(
+                            (
+                                scores,
+                                reshape_date_pair_batch(flat_scores[..., 5:]),
+                            ),
+                            dim=-1,
+                        )
+                        targets = torch.cat(
+                            (targets, reshape_date_pair_batch(to_close)), dim=-1
+                        )
+                        target_mask = torch.cat(
+                            (
+                                target_mask,
+                                reshape_date_pair_batch(to_close_mask).bool(),
+                            ),
+                            dim=-1,
+                        )
                     active = reshape_date_pair_batch(batch["active_mask"])
                     return multi_horizon_loss(
                         scores,
@@ -1562,6 +1633,7 @@ def train_stage(
                         score_mask=active,
                         persistence_weight=model_config.lambda_persistence,
                         temperature=model_config.soft_rank_temperature,
+                        to_close_weight=model_config.to_close_weight,
                     )
 
             update = sam_step(
@@ -1607,6 +1679,7 @@ def train_stage(
             "model_state_dict": tracker.best_state_dict,
             "patience": tracker.metadata(),
             "input_contract": checkpoint_input_contract,
+            "fast_initialization_provenance": model.fast_initialization_provenance,
         },
     )
     _atomic_torch_save(
@@ -1619,6 +1692,7 @@ def train_stage(
             "model_state_dict": ema.cpu_state_dict(),
             "epoch": tracker.stopped_epoch,
             "input_contract": checkpoint_input_contract,
+            "fast_initialization_provenance": model.fast_initialization_provenance,
         },
     )
     history_sha256 = write_json_atomic(history_path, history)
@@ -1639,6 +1713,7 @@ def train_stage(
             "selected_epoch": tracker.selected_epoch,
             "model_config": model_config_payload,
             "fast_checkpoint_sha256": model.fast_checkpoint_sha256,
+            "fast_initialization_provenance": model.fast_initialization_provenance,
             "pretrain_checkpoint": (
                 None
                 if pretrain_checkpoint is None
@@ -1755,6 +1830,7 @@ def _train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--sidecar", action="append", default=[])
     parser.add_argument("--lambda-persistence", type=float, default=0.0)
+    parser.add_argument("--to-close-weight", type=float, choices=(0.0, 0.2), default=0.0)
     parser.add_argument(
         "--soft-rank-temperature", type=float, default=SOFT_RANK_TEMPERATURE
     )
@@ -1764,6 +1840,9 @@ def _train_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--fast-pretrained-checkpoint", type=Path)
     parser.add_argument("--fast-pretrained-sha256")
+    parser.add_argument(
+        "--allow-contaminated-v1-initialization", action="store_true"
+    )
     parser.add_argument("--pretrain-checkpoint", type=Path)
     parser.add_argument("--pretrain-sha256")
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
@@ -1815,21 +1894,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         train_dataset,
         batch_sampler=sampler,
         num_workers=arguments.num_workers,
+        collate_fn=collate_v2_daily,
     )
     selection_loader = DataLoader(
         selection_dataset,
         batch_size=arguments.selection_batch_size,
         shuffle=False,
         num_workers=arguments.num_workers,
+        collate_fn=collate_v2_daily,
     )
     fast_checkpoint = arguments.fast_pretrained_checkpoint
     model_config = ModelConfig(
         slow_feature_count=_cli_feature_count(store_root, sidecars),
         slow_lookback=arguments.lookback,
+        fast_encoder_mode=(
+            "legacy_v1_contaminated" if fast_checkpoint is not None else "native"
+        ),
         fast_pretrained=fast_checkpoint is not None,
         fast_pretrained_checkpoint=fast_checkpoint,
         fast_pretrained_sha256=arguments.fast_pretrained_sha256,
+        allow_contaminated_v1_initialization=(
+            arguments.allow_contaminated_v1_initialization
+        ),
         lambda_persistence=arguments.lambda_persistence,
+        to_close_weight=arguments.to_close_weight,
         soft_rank_temperature=arguments.soft_rank_temperature,
         use_bf16=arguments.use_bf16,
         compile_forward=arguments.compile_forward,
@@ -1866,6 +1954,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             batch_size=arguments.selection_batch_size,
             shuffle=False,
             num_workers=arguments.num_workers,
+            collate_fn=collate_v2_daily,
         )
         score_checkpoint_artifact(
             checkpoint=result.raw_patience_checkpoint,

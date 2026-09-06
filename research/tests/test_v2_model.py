@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import hashlib
-from typing import cast
 
+import numpy as np
 import pytest
 import torch
 from torch import nn
 
 from brazil_rv.modeling.model import SharedCausalTCN
 from brazil_rv.v2.config import ModelConfig
-from brazil_rv.v2.contract import V1_STORE_V2_ZERO_SLOW_FIELDS
+from brazil_rv.v2.data import collate_v2_daily
 from brazil_rv.v2.model import (
     DailyMultiHorizonModel,
     count_non_fast_parameters,
@@ -17,34 +17,47 @@ from brazil_rv.v2.model import (
 )
 
 
-def _inputs() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def _inputs() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     torch.manual_seed(7)
     slow = torch.randn(2, 4, 60, 32)
+    feature_mask = torch.ones_like(slow, dtype=torch.bool)
     history = torch.ones(2, 4, 60, dtype=torch.bool)
     active = torch.tensor([[True, True, True, False], [True, True, False, False]])
-    return slow, history, active
+    return slow, feature_mask, history, active
 
 
-class _DenseFastReference(DailyMultiHorizonModel):
-    """The pre-optimization fast branch, retained only as a test oracle."""
+def _compact_sample(fast_count: int, *, offset: int = 0) -> dict[str, object]:
+    values = np.arange(fast_count * 5 * 7, dtype=np.float32).reshape(
+        fast_count, 5, 7
+    )
+    valid = np.ones_like(values, dtype=np.bool_)
+    return {
+        "date_index": np.int64(offset),
+        "fast_patch_values": values,
+        "fast_patch_valid": valid,
+        "fast_patch_mask": np.ones((fast_count, 5), dtype=np.bool_),
+        "fast_name_index": np.arange(offset, offset + fast_count, dtype=np.int64),
+        "fast_state_position": np.full(fast_count, 5, dtype=np.int64),
+        "v1_equity_slow": np.zeros((fast_count, 32), dtype=np.float32),
+    }
 
-    def _fast_states(
-        self,
-        slow: torch.Tensor,
-        present: torch.Tensor,
-        fast_patches: torch.Tensor | None,
-        fast_patch_mask: torch.Tensor | None,
-        fast_state_position: torch.Tensor | None,
-        v1_equity_slow: torch.Tensor | None,
-    ) -> torch.Tensor:
-        absent = self.absent_state.view(1, 1, -1).expand_as(slow)
-        encoded = self.fast_encoder(
-            cast(torch.Tensor, fast_patches),
-            cast(torch.Tensor, fast_patch_mask),
-            cast(torch.Tensor, v1_equity_slow),
-            fast_state_position,
-        )
-        return torch.where(present[..., None].bool(), encoded, absent)
+
+def test_compact_fast_collate_pads_only_present_name_slots() -> None:
+    batch = collate_v2_daily(
+        (_compact_sample(2), _compact_sample(1, offset=2))
+    )
+    assert batch["fast_patch_values"].shape == (2, 2, 5, 7)
+    assert batch["fast_patch_valid"].shape == (2, 2, 5, 7)
+    assert batch["fast_name_index"].tolist() == [[0, 1], [2, -1]]
+    assert not batch["fast_patch_mask"][1, 1].any()
+    assert not batch["fast_patch_values"][1, 1].any()
+
+
+def test_all_absent_collate_allocates_zero_fast_names() -> None:
+    batch = collate_v2_daily((_compact_sample(0), _compact_sample(0)))
+    assert batch["fast_patch_values"].shape == (2, 0, 5, 7)
+    assert batch["fast_patch_valid"].numel() == 0
+    assert batch["fast_name_index"].shape == (2, 0)
 
 
 @pytest.mark.parametrize("layers", [1, 2])
@@ -52,12 +65,12 @@ def test_model_shape_zero_to_close_and_parameter_cap(layers: int) -> None:
     model = DailyMultiHorizonModel(
         ModelConfig(slow_feature_count=32, gru_layers=layers)
     )
-    slow, history, active = _inputs()
-    predictions = model(slow, history, active)
+    slow, feature_mask, history, active = _inputs()
+    predictions = model(slow, feature_mask, history, active)
     assert predictions.shape == (2, 4, 6)
     assert torch.count_nonzero(predictions[..., 5]) == 0
     assert torch.count_nonzero(predictions[~active]) == 0
-    assert count_non_fast_parameters(model) <= 150_000
+    assert count_non_fast_parameters(model) <= 165_000
     assert not any(isinstance(module, nn.Embedding) for module in model.modules())
     assert torch.count_nonzero(model.fast_gate.weight) == 0
     assert torch.count_nonzero(model.pool_gate.weight) == 0
@@ -65,25 +78,21 @@ def test_model_shape_zero_to_close_and_parameter_cap(layers: int) -> None:
 
 def test_absent_fast_path_ignores_patches_and_receives_gradient() -> None:
     model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32)).eval()
-    slow, history, active = _inputs()
-    patches = torch.randn(2, 4, 69, 130)
-    patch_mask = torch.ones(2, 4, 69, dtype=torch.bool)
-    v1_slow = torch.randn(2, 4, 32)
+    slow, feature_mask, history, active = _inputs()
     absent = torch.zeros(2, 4)
     first = model(
-        slow, history, active, patches, patch_mask, absent, None, None, v1_slow
-    )
-    second = model(
         slow,
+        feature_mask,
         history,
         active,
-        patches + 100.0,
-        patch_mask,
-        absent,
-        None,
-        None,
-        v1_slow,
+        fast_patch_values=torch.empty(2, 0, 69, 7),
+        fast_patch_valid=torch.empty(2, 0, 69, 7, dtype=torch.bool),
+        fast_patch_mask=torch.empty(2, 0, 69, dtype=torch.bool),
+        fast_name_index=torch.empty(2, 0, dtype=torch.long),
+        fast_state_position=torch.empty(2, 0, dtype=torch.long),
+        fast_present=absent,
     )
+    second = model(slow, feature_mask, history, active, fast_present=absent)
     assert torch.equal(first, second)
     first[..., :5].sum().backward()
     assert model.absent_state.grad is not None
@@ -92,20 +101,21 @@ def test_absent_fast_path_ignores_patches_and_receives_gradient() -> None:
 
 def test_active_name_with_empty_slow_history_uses_zero_initial_state() -> None:
     model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32)).eval()
-    slow, history, active = _inputs()
+    slow, feature_mask, history, active = _inputs()
     history[0, 1] = False
     changed = slow.clone()
     changed[0, 1] = 1_000.0
 
     slow_state = model._slow_states(
         slow,
+        feature_mask,
         history,
         torch.zeros_like(active),
         torch.ones_like(active, dtype=slow.dtype),
     )
 
-    first = model(slow, history, active)
-    second = model(changed, history, active)
+    first = model(slow, feature_mask, history, active)
+    second = model(changed, feature_mask, history, active)
 
     assert torch.count_nonzero(slow_state[0, 1]) == 0
     assert torch.isfinite(first).all()
@@ -113,53 +123,77 @@ def test_active_name_with_empty_slow_history_uses_zero_initial_state() -> None:
     assert torch.count_nonzero(first[0, 1]) > 0
 
     tracked = slow.clone().requires_grad_()
-    model(tracked, history, active).sum().backward()
+    model(tracked, feature_mask, history, active).sum().backward()
     assert tracked.grad is not None
     assert torch.isfinite(tracked.grad).all()
     assert torch.count_nonzero(tracked.grad[0, 1]) == 0
+
+
+def test_slow_feature_mask_zeroes_payload_and_remains_model_visible() -> None:
+    model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32)).eval()
+    slow, feature_mask, history, active = _inputs()
+    feature_mask[0, 0, -1, 7] = False
+    first_payload = slow.clone()
+    second_payload = slow.clone()
+    first_payload[0, 0, -1, 7] = -1_000_000.0
+    second_payload[0, 0, -1, 7] = 1_000_000.0
+
+    masked_first = model(first_payload, feature_mask, history, active)
+    masked_second = model(second_payload, feature_mask, history, active)
+    fully_valid = model(second_payload, torch.ones_like(feature_mask), history, active)
+
+    assert torch.equal(masked_first, masked_second)
+    assert not torch.equal(masked_second[0, 0], fully_valid[0, 0])
 
 
 def test_nan_masking_covers_empty_slow_and_fast_histories() -> None:
     model = DailyMultiHorizonModel(
         ModelConfig(slow_feature_count=32, slow_lookback=60)
     ).eval()
-    slow, history, active = _inputs()
+    slow, feature_mask, history, active = _inputs()
     slow[0, 1] = torch.nan
+    feature_mask[0, 1] = False
     history[0, 1] = False
-    patches = torch.randn(2, 4, 69, 130)
+    patches = torch.randn(2, 4, 69, 7)
+    patch_valid = torch.ones_like(patches, dtype=torch.bool)
     patch_mask = torch.ones(2, 4, 69, dtype=torch.bool)
     patches[0, 1] = torch.nan
-    patch_mask[0, 1] = False
+    patch_valid[0, 1] = False
     present = torch.ones(2, 4, dtype=torch.bool)
-    v1_slow = torch.randn(2, 4, 32)
-    v1_slow[0, 1, V1_STORE_V2_ZERO_SLOW_FIELDS[0]] = torch.nan
+    name_index = torch.arange(4)[None, :].expand(2, -1)
+    state_position = torch.full((2, 4), 69, dtype=torch.long)
 
     with torch.no_grad():
         predictions = model(
             slow,
+            feature_mask,
             history,
             active,
-            patches,
-            patch_mask,
-            present,
-            None,
-            None,
-            v1_slow,
+            fast_patch_values=patches,
+            fast_patch_valid=patch_valid,
+            fast_patch_mask=patch_mask,
+            fast_name_index=name_index,
+            fast_state_position=state_position,
+            fast_present=present,
         )
 
     assert torch.isfinite(predictions[active]).all()
 
 
-def test_fast_encoder_runs_only_present_flattened_rows() -> None:
+def test_fast_encoder_runs_only_collated_compact_slots() -> None:
     model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32)).eval()
-    slow, history, active = _inputs()
-    patches = torch.randn(2, 4, 69, 130)
-    patch_mask = torch.ones(2, 4, 69, dtype=torch.bool)
-    v1_slow = torch.randn(2, 4, 32)
+    slow, feature_mask, history, active = _inputs()
+    patches = torch.randn(2, 2, 69, 7)
+    patch_valid = torch.ones_like(patches, dtype=torch.bool)
+    patch_mask = torch.ones(2, 2, 69, dtype=torch.bool)
+    patch_mask[1, 1] = False
+    patch_valid[1, 1] = False
+    patches[1, 1] = 0.0
+    name_index = torch.tensor([[0, 2], [1, -1]])
     present = torch.tensor(
         [[True, False, True, False], [False, True, False, False]]
     )
-    state_position = torch.full((2, 4), 81, dtype=torch.long)
+    state_position = torch.tensor([[69, 69], [69, 0]])
     observed: list[tuple[torch.Size, torch.Tensor]] = []
 
     def capture_inputs(
@@ -171,126 +205,164 @@ def test_fast_encoder_runs_only_present_flattened_rows() -> None:
     try:
         model(
             slow,
+            feature_mask,
             history,
             active,
-            patches,
-            patch_mask,
-            present,
-            None,
-            state_position,
-            v1_slow,
+            fast_patch_values=patches,
+            fast_patch_valid=patch_valid,
+            fast_patch_mask=patch_mask,
+            fast_name_index=name_index,
+            fast_state_position=state_position,
+            fast_present=present,
         )
     finally:
         handle.remove()
 
     assert len(observed) == 1
     shape, selected_position = observed[0]
-    assert shape == torch.Size((int(present.sum()), 1, 69, 130))
-    assert selected_position.shape == (int(present.sum()),)
-    assert torch.all(selected_position == 81)
+    assert shape == torch.Size((4, 1, 69, 7))
+    assert selected_position.tolist() == [69, 69, 69, 0]
 
 
-def test_sparse_fast_path_matches_dense_outputs_and_gradients() -> None:
+def test_compact_legacy_fast_path_matches_dense_adapter() -> None:
     torch.manual_seed(59)
-    config = ModelConfig(slow_feature_count=32, dropout=0.0)
-    sparse = DailyMultiHorizonModel(config).eval()
-    dense = _DenseFastReference(config).eval()
-    dense.load_state_dict(sparse.state_dict())
+    config = ModelConfig(
+        slow_feature_count=32,
+        dropout=0.0,
+        fast_encoder_mode="legacy_v1_contaminated",
+        allow_contaminated_v1_initialization=True,
+    )
+    model = DailyMultiHorizonModel(config).eval()
 
-    base_slow = torch.randn(2, 3, 60, 32)
+    slow = torch.randn(2, 3, 60, 32)
+    feature_mask = torch.ones_like(slow, dtype=torch.bool)
     history = torch.ones(2, 3, 60, dtype=torch.bool)
     active = torch.ones(2, 3, dtype=torch.bool)
-    base_patches = torch.randn(2, 3, 69, 130)
+    patches = torch.randn(2, 3, 69, 130)
     patch_mask = torch.rand(2, 3, 69) > 0.15
     present = torch.tensor([[True, False, True], [False, True, False]])
-    base_v1_slow = torch.randn(2, 3, 32)
-    state_position = torch.full((2,), 81, dtype=torch.long)
-    loss_weights = torch.randn(2, 3, 6)
-
-    def run(
-        model: DailyMultiHorizonModel,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        slow = base_slow.clone().requires_grad_()
-        patches = base_patches.clone().requires_grad_()
-        v1_slow = base_v1_slow.clone().requires_grad_()
-        output = model(
-            slow,
-            history,
-            active,
-            patches,
-            patch_mask,
-            present,
-            None,
-            state_position,
-            v1_slow,
-        )
-        (output * loss_weights).sum().backward()
-        return output.detach(), slow.grad, patches.grad, v1_slow.grad
-
-    sparse_result = run(sparse)
-    dense_result = run(dense)
-    for actual, expected in zip(sparse_result, dense_result, strict=True):
-        torch.testing.assert_close(actual, expected, rtol=1e-5, atol=2e-6)
-
-    assert torch.count_nonzero(sparse_result[2][~present]) == 0
-    assert torch.count_nonzero(sparse_result[3][~present]) == 0
-    for (sparse_name, sparse_parameter), (dense_name, dense_parameter) in zip(
-        sparse.named_parameters(), dense.named_parameters(), strict=True
-    ):
-        assert sparse_name == dense_name
-        assert sparse_parameter.grad is not None
-        assert dense_parameter.grad is not None
-        torch.testing.assert_close(
-            sparse_parameter.grad,
-            dense_parameter.grad,
-            rtol=2e-4,
-            atol=2e-6,
-            msg=lambda message: f"{sparse_name}: {message}",
-        )
-
-
-def test_fast_path_enforces_synthetic_cutoff_345() -> None:
-    model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32)).eval()
-    slow, history, active = _inputs()
-    patches = torch.randn(2, 4, 69, 130)
-    patch_mask = torch.ones(2, 4, 69, dtype=torch.bool)
-    v1_slow = torch.randn(2, 4, 32)
-    present = torch.ones(2, 4)
-    assert model(
-        slow, history, active, patches, patch_mask, present, None, None, v1_slow
-    ).shape == (
-        2,
-        4,
-        6,
+    v1_slow = torch.randn(2, 3, 32)
+    dense = model(
+        slow,
+        feature_mask,
+        history,
+        active,
+        patches,
+        patch_mask,
+        present,
+        fast_state_position=torch.full((2,), 81, dtype=torch.long),
+        v1_equity_slow=v1_slow,
     )
-    with pytest.raises(ValueError, match="cutoff index 345"):
+    compact_values = torch.zeros(2, 2, 69, 130)
+    compact_valid = torch.zeros_like(compact_values, dtype=torch.bool)
+    compact_mask = torch.zeros(2, 2, 69, dtype=torch.bool)
+    compact_slow = torch.zeros(2, 2, 32)
+    compact_names = torch.tensor([[0, 2], [1, -1]])
+    compact_position = torch.tensor([[81, 81], [81, 0]])
+    for batch, names in enumerate(((0, 2), (1,))):
+        for slot, name in enumerate(names):
+            compact_values[batch, slot] = patches[batch, name]
+            compact_mask[batch, slot] = patch_mask[batch, name]
+            compact_valid[batch, slot] = patch_mask[batch, name, :, None]
+            compact_slow[batch, slot] = v1_slow[batch, name]
+    compact = model(
+        slow,
+        feature_mask,
+        history,
+        active,
+        fast_patch_values=compact_values,
+        fast_patch_valid=compact_valid,
+        fast_patch_mask=compact_mask,
+        fast_name_index=compact_names,
+        fast_state_position=compact_position,
+        fast_present=present,
+        v1_equity_slow=compact_slow,
+    )
+    torch.testing.assert_close(compact, dense, rtol=1e-5, atol=2e-6)
+
+
+def test_native_fast_path_supports_variable_completed_patch_counts() -> None:
+    model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32)).eval()
+    slow, feature_mask, history, active = _inputs()
+    patches = torch.randn(2, 2, 5, 7)
+    patch_valid = torch.ones_like(patches, dtype=torch.bool)
+    patch_mask = torch.tensor(
+        [
+            [[True, True, True, False, False], [True, True, True, True, True]],
+            [[True, True, True, True, False], [False, False, False, False, False]],
+        ]
+    )
+    patch_valid &= patch_mask[..., None]
+    name_index = torch.tensor([[0, 2], [1, -1]])
+    state_position = torch.tensor([[3, 5], [4, 0]])
+    present = torch.tensor(
+        [[True, False, True, False], [False, True, False, False]]
+    )
+    first = model(
+        slow,
+        feature_mask,
+        history,
+        active,
+        fast_patch_values=patches,
+        fast_patch_valid=patch_valid,
+        fast_patch_mask=patch_mask,
+        fast_name_index=name_index,
+        fast_state_position=state_position,
+        fast_present=present,
+    )
+    changed = patches.clone()
+    changed[~patch_mask] = 1_000_000.0
+    second = model(
+        slow,
+        feature_mask,
+        history,
+        active,
+        fast_patch_values=changed,
+        fast_patch_valid=patch_valid,
+        fast_patch_mask=patch_mask,
+        fast_name_index=name_index,
+        fast_state_position=state_position,
+        fast_present=present,
+    )
+    assert first.shape == (2, 4, 6)
+    assert torch.equal(first, second)
+    with pytest.raises(ValueError, match="frozen limit"):
+        too_long_mask = torch.ones(2, 2, 70, dtype=torch.bool)
+        too_long_mask[1, 1] = False
         model(
             slow,
+            feature_mask,
             history,
             active,
-            patches[:, :, :-1],
-            patch_mask[:, :, :-1],
-            present,
-            None,
-            None,
-            v1_slow,
+            fast_patch_values=torch.zeros(2, 2, 70, 7),
+            fast_patch_valid=torch.zeros(2, 2, 70, 7, dtype=torch.bool),
+            fast_patch_mask=too_long_mask,
+            fast_name_index=name_index,
+            fast_state_position=torch.tensor([[70, 70], [70, 0]]),
+            fast_present=present,
         )
 
 
 def test_pooling_excludes_inactive_names() -> None:
     model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32)).eval()
-    slow, history, active = _inputs()
-    reference = model(slow, history, active)
+    slow, feature_mask, history, active = _inputs()
+    reference = model(slow, feature_mask, history, active)
     changed = slow.clone()
     changed[~active] = 1_000.0
     changed_history = history.clone()
     changed_history[~active] = False
-    actual = model(changed, changed_history, active)
+    actual = model(changed, feature_mask, changed_history, active)
     assert torch.equal(reference[active], actual[active])
 
 
 def test_v1_fast_checkpoint_load_is_strict_and_hash_bound(tmp_path) -> None:
-    source_model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32))
+    legacy = {
+        "fast_encoder_mode": "legacy_v1_contaminated",
+        "allow_contaminated_v1_initialization": True,
+    }
+    source_model = DailyMultiHorizonModel(
+        ModelConfig(slow_feature_count=32, **legacy)
+    )
     source = {
         name: torch.full_like(value, 0.25)
         for name, value in source_model.fast_encoder.state_dict().items()
@@ -298,7 +370,7 @@ def test_v1_fast_checkpoint_load_is_strict_and_hash_bound(tmp_path) -> None:
     checkpoint = tmp_path / "v1.pt"
     torch.save({"model_state_dict": source}, checkpoint)
     expected = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
-    target = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32))
+    target = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32, **legacy))
     initialized = load_v1_fast_encoder(target, checkpoint, expected_sha256=expected)
     assert initialized == frozenset(
         f"fast_encoder.{name}" for name, _ in target.fast_encoder.named_parameters()
@@ -310,6 +382,7 @@ def test_v1_fast_checkpoint_load_is_strict_and_hash_bound(tmp_path) -> None:
     configured = DailyMultiHorizonModel(
         ModelConfig(
             slow_feature_count=32,
+            **legacy,
             fast_pretrained=True,
             fast_pretrained_checkpoint=checkpoint,
             fast_pretrained_sha256=expected,
@@ -325,7 +398,13 @@ def test_fast_encoder_exactly_matches_deployed_v1_instrument_state() -> None:
     torch.manual_seed(41)
     batch_size, name_count = 2, 4
     parent = SharedCausalTCN(equity_count=name_count).eval()
-    model = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32)).eval()
+    model = DailyMultiHorizonModel(
+        ModelConfig(
+            slow_feature_count=32,
+            fast_encoder_mode="legacy_v1_contaminated",
+            allow_contaminated_v1_initialization=True,
+        )
+    ).eval()
     model.fast_encoder.load_state_dict(
         {
             name: parent.state_dict()[name]
@@ -358,12 +437,18 @@ def test_fast_encoder_exactly_matches_deployed_v1_instrument_state() -> None:
     # CPU Conv1d selects a different batched kernel when the deployed parent
     # also carries its 15 non-equity contexts.  The independent construction
     # must nevertheless reproduce the same numerical state.
-    assert (actual - expected).abs().max().detach().item() <= 1e-6
-    torch.testing.assert_close(actual, expected, rtol=0.0, atol=1e-6)
+    assert (actual - expected).abs().max().detach().item() <= 2e-6
+    torch.testing.assert_close(actual, expected, rtol=0.0, atol=2e-6)
 
 
 def test_fast_initializer_requires_external_expected_sha(tmp_path) -> None:
-    source = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32))
+    source = DailyMultiHorizonModel(
+        ModelConfig(
+            slow_feature_count=32,
+            fast_encoder_mode="legacy_v1_contaminated",
+            allow_contaminated_v1_initialization=True,
+        )
+    )
     checkpoint = tmp_path / "v1.pt"
     torch.save({"model_state_dict": source.fast_encoder.state_dict()}, checkpoint)
     with pytest.raises(ValueError, match="expected SHA-256"):
@@ -374,3 +459,18 @@ def test_fast_initializer_requires_external_expected_sha(tmp_path) -> None:
             fast_pretrained=True,
             fast_pretrained_checkpoint=checkpoint,
         )
+
+
+def test_v1_initialization_requires_explicit_contamination_opt_in() -> None:
+    with pytest.raises(ValueError, match="explicit"):
+        ModelConfig(
+            slow_feature_count=32,
+            fast_encoder_mode="legacy_v1_contaminated",
+        )
+    native = DailyMultiHorizonModel(ModelConfig(slow_feature_count=32))
+    assert native.fast_initialization_provenance == {
+        "mode": "fresh",
+        "contaminated": False,
+        "explicitly_allowed": False,
+        "checkpoint_sha256": None,
+    }

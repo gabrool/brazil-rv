@@ -90,6 +90,33 @@ def test_multihead_objective_averages_each_horizon_separately() -> None:
     assert torch.allclose(components["total"], expected)
 
 
+def test_five_heads_are_primary_and_to_close_is_explicitly_opt_in() -> None:
+    torch.manual_seed(5)
+    scores = torch.randn(2, 5, 6)
+    targets = torch.randn(2, 5, 6)
+    mask = torch.ones_like(scores, dtype=torch.bool)
+    primary = multi_horizon_loss_components(
+        scores[..., :5], targets[..., :5], mask[..., :5]
+    )
+    default_with_aux_present = multi_horizon_loss_components(scores, targets, mask)
+    weighted = multi_horizon_loss_components(
+        scores, targets, mask, to_close_weight=0.2
+    )
+
+    assert torch.allclose(primary["total"], default_with_aux_present["total"])
+    assert torch.allclose(
+        weighted["total"],
+        weighted["horizon"] + 0.2 * weighted["to_close"],
+    )
+    with pytest.raises(ValueError, match="weighted to-close"):
+        multi_horizon_loss_components(
+            scores[..., :5],
+            targets[..., :5],
+            mask[..., :5],
+            to_close_weight=0.2,
+        )
+
+
 def test_persistence_uses_population_zscores_and_score_mask() -> None:
     scores = torch.zeros(1, 2, 4, 6)
     scores[0, 0, :3, 0] = torch.tensor([-1.0, 0.0, 1.0])
@@ -319,10 +346,32 @@ def test_fullgraph_compile_captures_gru_forward() -> None:
     compiled = compile_forward(model, backend="eager", mode=None)
     scores = compiled(
         torch.randn(2, 3, 20, 32),
+        torch.ones(2, 3, 20, 32, dtype=torch.bool),
         torch.ones(2, 3, 20, dtype=torch.bool),
         torch.ones(2, 3, dtype=torch.bool),
     )
     assert scores.shape == (2, 3, 6)
+    fast_values = torch.randn(2, 2, 5, 7)
+    fast_valid = torch.ones_like(fast_values, dtype=torch.bool)
+    fast_mask = torch.ones(2, 2, 5, dtype=torch.bool)
+    fast_mask[1, 1] = False
+    fast_valid[1, 1] = False
+    fast_values[1, 1] = 0.0
+    fast_scores = compiled(
+        torch.randn(2, 3, 20, 32),
+        torch.ones(2, 3, 20, 32, dtype=torch.bool),
+        torch.ones(2, 3, 20, dtype=torch.bool),
+        torch.ones(2, 3, dtype=torch.bool),
+        fast_patch_values=fast_values,
+        fast_patch_valid=fast_valid,
+        fast_patch_mask=fast_mask,
+        fast_name_index=torch.tensor([[0, 2], [1, -1]]),
+        fast_state_position=torch.tensor([[5, 5], [5, 0]]),
+        fast_present=torch.tensor(
+            [[True, False, True], [False, True, False]]
+        ),
+    )
+    assert fast_scores.shape == (2, 3, 6)
 
 
 def _tracked_pretrain_loaders(tmp_path):
@@ -428,6 +477,12 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
     assert manifest["official_validation_accessed"] is False
     assert manifest["test_accessed"] is False
     assert "allow_untracked_test_loaders" not in manifest
+    assert manifest["fast_initialization_provenance"] == {
+        "mode": "fresh",
+        "contaminated": False,
+        "explicitly_allowed": False,
+        "checkpoint_sha256": None,
+    }
     assert manifest["checkpoint_input_contract"]["training"] is not None
     assert manifest["checkpoint_input_contract"]["selection"] is not None
 
@@ -445,9 +500,13 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
         device=torch.device("cpu"),
     )
     assert result.history_path.read_bytes() == repeated.history_path.read_bytes()
-    first_state = torch.load(
+    raw_payload = torch.load(
         result.raw_patience_checkpoint, map_location="cpu", weights_only=False
-    )["model_state_dict"]
+    )
+    first_state = raw_payload["model_state_dict"]
+    assert raw_payload["fast_initialization_provenance"] == manifest[
+        "fast_initialization_provenance"
+    ]
     repeated_state = torch.load(
         repeated.raw_patience_checkpoint, map_location="cpu", weights_only=False
     )["model_state_dict"]
@@ -641,7 +700,7 @@ def test_stage_input_contract_rejects_wrong_p_embargo_and_boundaries() -> None:
         last_index=99,
         first_date="2010-01-04",
         last_date="2020-12-31",
-        alignment="through_t",
+        alignment="through_t_minus_1",
         canonical_splits=canonical,
     )
     selection = _tracked_input(
@@ -649,7 +708,7 @@ def test_stage_input_contract_rejects_wrong_p_embargo_and_boundaries() -> None:
         last_index=199,
         first_date="2021-01-04",
         last_date="2021-07-30",
-        alignment="through_t",
+        alignment="through_t_minus_1",
         canonical_splits=canonical,
     )
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
@@ -705,7 +764,7 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
     )
     assert [segment["name"] for segment in segments] == ["P", "F"]
     assert [segment["entry_alignment"] for segment in segments] == [
-        "through_t",
+        "through_t_minus_1",
         "through_t_minus_1",
     ]
     assert segments[0]["indices_sha256"] != segments[1]["indices_sha256"]
@@ -742,12 +801,12 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
         last_index=119,
         first_date="2010-01-04",
         last_date="2023-03-17",
-        alignment="per_segment",
+        alignment="through_t_minus_1",
         canonical_splits=canonical,
     )
     training["segments"] = [
         _joint_segment(
-            "P", "through_t", 0, 99, "2010-01-04", "2021-07-30"
+            "P", "through_t_minus_1", 0, 99, "2010-01-04", "2021-07-30"
         ),
         _joint_segment(
             "F",

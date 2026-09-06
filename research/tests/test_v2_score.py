@@ -133,6 +133,8 @@ def test_scoring_is_repeat_bit_identical_and_provenance_bound(tmp_path) -> None:
     assert manifest["checkpoint"]["kind"] == "V2_RAW_PATIENCE"
     assert manifest["checkpoint"]["seed"] == 29
     assert manifest["access_ledger"]["purpose"] == "evaluation"
+    assert manifest["fast_initialization_provenance"]["mode"] == "fresh"
+    assert manifest["fast_initialization_provenance"]["contaminated"] is False
     assert manifest["scoring_input"]["dates"]["first_date"] == "2024-01-21"
     assert len(manifest["scoring_input_sha256"]) == 64
     assert manifest["official_validation_accessed"] is False
@@ -245,13 +247,18 @@ def test_scoring_rejects_swapped_ordered_features_before_output(tmp_path) -> Non
 
 def test_scoring_restores_checkpoint_after_initializer_is_deleted(tmp_path) -> None:
     dataset, _, _, _ = _scoring_fixture(tmp_path / "fixture")
-    source = DailyMultiHorizonModel(ModelConfig(slow_feature_count=2))
+    legacy = {
+        "fast_encoder_mode": "legacy_v1_contaminated",
+        "allow_contaminated_v1_initialization": True,
+    }
+    source = DailyMultiHorizonModel(ModelConfig(slow_feature_count=2, **legacy))
     initializer = tmp_path / "v1_initializer.pt"
     torch.save({"model_state_dict": source.fast_encoder.state_dict()}, initializer)
     initializer_sha256 = hashlib.sha256(initializer.read_bytes()).hexdigest()
     config = ModelConfig(
         slow_feature_count=2,
         slow_lookback=20,
+        **legacy,
         fast_pretrained=True,
         fast_pretrained_checkpoint=initializer,
         fast_pretrained_sha256=initializer_sha256,

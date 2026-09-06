@@ -5,8 +5,9 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
+import torch
 from numpy.typing import NDArray
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, default_collate
 
 from .contract import (
     ALLOWED_LOOKBACKS,
@@ -24,6 +25,104 @@ from .splits import AccessPurpose, PREREGISTRATION_ROOT, authorize_dates
 
 Stage = Literal["pretrain", "finetune", "evaluation", "joint"]
 V1_STORE_V2_ZERO_DYNAMIC_CHANNELS = (9, 11, 14, 22, 24, 25)
+_NATIVE_FAST_CHANNELS = 7
+_LEGACY_FAST_PREFIX_PATCHES = 12
+_COMPACT_FAST_KEYS = frozenset(
+    {
+        "fast_patch_values",
+        "fast_patch_valid",
+        "fast_patch_mask",
+        "fast_name_index",
+        "fast_state_position",
+        "v1_equity_slow",
+    }
+)
+
+
+def collate_v2_daily(
+    samples: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Collate full daily panels while padding only the sparse fast-name axis."""
+
+    if not samples:
+        raise ValueError("cannot collate an empty v2 batch")
+    compact: list[dict[str, NDArray[np.generic]]] = []
+    patch_shape: tuple[int, int] | None = None
+    max_fast_names = 0
+    for sample in samples:
+        fields: dict[str, NDArray[np.generic]] = {}
+        missing = _COMPACT_FAST_KEYS - sample.keys()
+        if missing:
+            raise ValueError(f"v2 sample lacks compact fast fields: {sorted(missing)}")
+        for key in _COMPACT_FAST_KEYS:
+            value = sample[key]
+            if not isinstance(value, np.ndarray):
+                raise TypeError(f"{key} must be a NumPy array before collation")
+            fields[key] = value
+        values = fields["fast_patch_values"]
+        valid = fields["fast_patch_valid"]
+        mask = fields["fast_patch_mask"]
+        names = fields["fast_name_index"]
+        positions = fields["fast_state_position"]
+        legacy_slow = fields["v1_equity_slow"]
+        if values.ndim != 3:
+            raise ValueError("fast_patch_values must have shape [fast, patch, channel]")
+        fast_count, patch_count, channel_count = values.shape
+        if (
+            valid.shape != values.shape
+            or mask.shape != (fast_count, patch_count)
+            or names.shape != (fast_count,)
+            or positions.shape != (fast_count,)
+            or legacy_slow.shape != (fast_count, 32)
+        ):
+            raise ValueError("compact fast fields are misaligned")
+        current_patch_shape = (patch_count, channel_count)
+        if patch_shape is None:
+            patch_shape = current_patch_shape
+        elif patch_shape != current_patch_shape:
+            raise ValueError("one v2 batch cannot mix fast patch layouts")
+        compact.append(fields)
+        max_fast_names = max(max_fast_names, fast_count)
+
+    assert patch_shape is not None
+    patch_count, channel_count = patch_shape
+    padded: dict[str, list[torch.Tensor]] = {
+        key: [] for key in _COMPACT_FAST_KEYS
+    }
+    for fields in compact:
+        fast_count = fields["fast_name_index"].shape[0]
+        values = np.zeros(
+            (max_fast_names, patch_count, channel_count), dtype=np.float32
+        )
+        valid = np.zeros(values.shape, dtype=np.bool_)
+        mask = np.zeros((max_fast_names, patch_count), dtype=np.bool_)
+        names = np.full(max_fast_names, -1, dtype=np.int64)
+        positions = np.zeros(max_fast_names, dtype=np.int64)
+        legacy_slow = np.zeros((max_fast_names, 32), dtype=np.float32)
+        if fast_count:
+            values[:fast_count] = fields["fast_patch_values"]
+            valid[:fast_count] = fields["fast_patch_valid"]
+            mask[:fast_count] = fields["fast_patch_mask"]
+            names[:fast_count] = fields["fast_name_index"]
+            positions[:fast_count] = fields["fast_state_position"]
+            legacy_slow[:fast_count] = fields["v1_equity_slow"]
+        for key, value in (
+            ("fast_patch_values", values),
+            ("fast_patch_valid", valid),
+            ("fast_patch_mask", mask),
+            ("fast_name_index", names),
+            ("fast_state_position", positions),
+            ("v1_equity_slow", legacy_slow),
+        ):
+            padded[key].append(torch.from_numpy(value))
+
+    ordinary = [
+        {key: value for key, value in sample.items() if key not in _COMPACT_FAST_KEYS}
+        for sample in samples
+    ]
+    result = dict(default_collate(ordinary))
+    result.update({key: torch.stack(values) for key, values in padded.items()})
+    return result
 
 
 def _validate_stage_dates(
@@ -75,20 +174,12 @@ def pack_fast_patches(
     return patches, patch_valid
 
 
-def slow_row_index(
-    sample_date_index: int, stage: Stage, *, joint_pretrain: bool | None = None
-) -> int:
+def slow_row_index(sample_date_index: int, stage: Stage) -> int:
     if sample_date_index < 0:
         raise ValueError("sample date index must be non-negative")
-    if stage == "pretrain" or (stage == "joint" and bool(joint_pretrain)):
-        return sample_date_index
-    if stage in {"finetune", "evaluation"} or (
-        stage == "joint" and joint_pretrain is not None and not bool(joint_pretrain)
-    ):
-        return sample_date_index - 1
-    if stage == "joint":
-        raise ValueError("joint slow alignment requires the sample window")
-    raise ValueError(f"unknown v2 stage: {stage}")
+    if stage not in {"pretrain", "finetune", "evaluation", "joint"}:
+        raise ValueError(f"unknown v2 stage: {stage}")
+    return sample_date_index - 1
 
 
 def required_store_date_indices(
@@ -114,15 +205,7 @@ def required_store_date_indices(
     required = set(int(value) for value in indices)
     for date_index in indices:
         index = int(date_index)
-        joint_pretrain = bool(
-            stage == "joint"
-            and date_axis[index] <= np.datetime64(PRETRAIN_END)
-        )
-        end = slow_row_index(
-            index,
-            stage,
-            joint_pretrain=joint_pretrain if stage == "joint" else None,
-        )
+        end = slow_row_index(index, stage)
         if end >= 0:
             required.update(range(max(0, end - lookback + 1), end + 1))
     return np.asarray(sorted(required), dtype=np.int64)
@@ -130,29 +213,16 @@ def required_store_date_indices(
 
 def causal_history_end_offsets(
     date_indices: Sequence[int],
-    dates: NDArray[np.datetime64],
     *,
     stage: Stage,
 ) -> NDArray[np.int64]:
     """Return each sample's frozen slow-history endpoint relative to t."""
 
     indices = np.asarray(date_indices, dtype=np.int64)
-    date_axis = np.asarray(dates, dtype="datetime64[D]")
     offsets = np.empty(len(indices), dtype=np.int64)
     for row, date_index in enumerate(indices):
         index = int(date_index)
-        joint_pretrain = bool(
-            stage == "joint"
-            and date_axis[index] <= np.datetime64(PRETRAIN_END)
-        )
-        offsets[row] = (
-            slow_row_index(
-                index,
-                stage,
-                joint_pretrain=joint_pretrain if stage == "joint" else None,
-            )
-            - index
-        )
+        offsets[row] = slow_row_index(index, stage) - index
     return offsets
 
 
@@ -275,6 +345,10 @@ class V2DailyDataset(Dataset[dict[str, object]]):
                     "the open store was not authorized for every sample and "
                     "causal-history date"
                 )
+            if not self.store.authorized_for(self.target_window_indices):
+                raise PermissionError(
+                    "the open store was not authorized for the declared target window"
+                )
             selected_dates = self.store.dates[self.date_indices]
             _validate_stage_dates(selected_dates, stage)
             requested = tuple(
@@ -305,7 +379,6 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             _validate_stage_dates(date_axis[self.date_indices], stage)
             history_offsets = causal_history_end_offsets(
                 self.date_indices,
-                date_axis,
                 stage=stage,
             )
             self.store, access_ledger = open_store_for_samples(
@@ -314,6 +387,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
                 purpose=access_purpose,
                 history_lookbacks=lookback,
                 history_end_offsets=history_offsets,
+                target_window_indices=self.target_window_indices,
                 registration_path=registration_path,
                 preregistration_root=preregistration_root,
             )
@@ -325,6 +399,9 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         self._fast_date_mapping = np.full(self.store.dates.size, -1, dtype=np.int64)
         self._fast_v2_slots = np.empty(0, dtype=np.int64)
         self._fast_v1_slots = np.empty(0, dtype=np.int64)
+        self._native_fast_store_indices = np.empty(0, dtype=np.int64)
+        self._fast_patch_count = DECISION_MINUTE_INDEX // FAST_PATCH_MINUTES
+        self._fast_channel_count = _NATIVE_FAST_CHANNELS
         if np.any(
             (self.date_indices < 0) | (self.date_indices >= self.store.dates.size)
         ):
@@ -346,14 +423,52 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         for group in self.enabled_sidecars:
             self.store.array_shape(f"sidecar_{group}_values")
             self.store.array_shape(f"sidecar_{group}_valid")
-        configured_fast = fast_store or self.store.manifest.get("metadata", {}).get(
-            "v1_fast_store"
-        )
+        native_arrays = {
+            "fast_patch_values",
+            "fast_patch_valid",
+            "fast_patch_mask",
+        }
+        native_present = native_arrays.intersection(self.store.array_names)
+        if native_present and native_present != native_arrays:
+            raise ValueError("the native fast arrays must be stored together")
+        if native_present:
+            value_shape = self.store.array_shape("fast_patch_values")
+            if (
+                len(value_shape) != 4
+                or value_shape[0] != self.store.dates.size
+                or value_shape[-1] != _NATIVE_FAST_CHANNELS
+                or self.store.array_shape("fast_patch_valid") != value_shape
+                or self.store.array_shape("fast_patch_mask") != value_shape[:-1]
+            ):
+                raise ValueError("native fast arrays have the wrong contract")
+            mapping = self.store.read_table("native_fast_security_mapping").sort(
+                "fast_index"
+            )
+            self._native_fast_store_indices = mapping.get_column(
+                "store_name_index"
+            ).to_numpy().astype(np.int64)
+            if not np.array_equal(
+                mapping.get_column("fast_index").to_numpy(),
+                np.arange(value_shape[1], dtype=np.int64),
+            ):
+                raise ValueError("native fast indices must be contiguous")
+            if self._native_fast_store_indices.shape != (value_shape[1],):
+                raise ValueError("native fast mapping does not cover its array axis")
+            self._fast_patch_count = int(value_shape[2])
+            self._fast_channel_count = int(value_shape[3])
+        configured_fast = fast_store
+        if configured_fast is None and not native_present:
+            configured_fast = self.store.manifest.get("metadata", {}).get(
+                "v1_fast_store"
+            )
+        if configured_fast and native_present:
+            raise ValueError("native and legacy fast streams cannot be mixed")
         if configured_fast:
             self._open_external_fast(
                 None if fast_store is None else Path(configured_fast),
                 verify_fast_hashes,
             )
+            self._fast_channel_count = 26 * FAST_PATCH_MINUTES
 
     def _open_external_fast(self, root: Path | None, verify_hashes: bool) -> None:
         if not verify_hashes:
@@ -467,41 +582,95 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             np.logical_or.reduce(history_masks),
         )
 
-    def _fast(self, date_index: int) -> tuple[NDArray[np.float32], NDArray[np.bool_], NDArray[np.bool_]]:
+    def _empty_fast(
+        self,
+    ) -> tuple[
+        NDArray[np.float32],
+        NDArray[np.bool_],
+        NDArray[np.bool_],
+        NDArray[np.int64],
+        NDArray[np.int64],
+        NDArray[np.bool_],
+    ]:
+        return (
+            np.zeros(
+                (0, self._fast_patch_count, self._fast_channel_count),
+                dtype=np.float32,
+            ),
+            np.zeros(
+                (0, self._fast_patch_count, self._fast_channel_count),
+                dtype=np.bool_,
+            ),
+            np.zeros((0, self._fast_patch_count), dtype=np.bool_),
+            np.empty(0, dtype=np.int64),
+            np.empty(0, dtype=np.int64),
+            np.zeros(len(self.store.isins), dtype=np.bool_),
+        )
+
+    def _fast(
+        self, date_index: int
+    ) -> tuple[
+        NDArray[np.float32],
+        NDArray[np.bool_],
+        NDArray[np.bool_],
+        NDArray[np.int64],
+        NDArray[np.int64],
+        NDArray[np.bool_],
+    ]:
         name_count = len(self.store.isins)
         if self._sample_is_pretrain(date_index):
-            width = int(self.store.manifest.get("metadata", {}).get("fast_minute_feature_count", 26))
-            patches = np.zeros(
-                (name_count, DECISION_MINUTE_INDEX // FAST_PATCH_MINUTES, width * FAST_PATCH_MINUTES),
-                dtype=np.float32,
+            return self._empty_fast()
+        if self.store.has_array("fast_patch_values"):
+            values = np.asarray(
+                self.store.read("fast_patch_values", date_index), dtype=np.float32
             )
-            patch_mask = np.zeros(patches.shape[:2], dtype=np.bool_)
-            return patches, patch_mask, np.zeros(name_count, dtype=np.bool_)
-        if self.store.has_array("fast_minute_values"):
-            minute_values = self.store.read("fast_minute_values", date_index)
-            minute_valid = self.store.read("fast_minute_valid", date_index)
-            patches, patch_mask = pack_fast_patches(minute_values, minute_valid)
-            present = patch_mask.any(axis=1)
-            if self.store.has_array("fast_present"):
-                present &= np.asarray(
-                    self.store.read("fast_present", date_index), dtype=np.bool_
+            valid = np.asarray(
+                self.store.read("fast_patch_valid", date_index), dtype=np.bool_
+            )
+            patch_mask = np.asarray(
+                self.store.read("fast_patch_mask", date_index), dtype=np.bool_
+            )
+            if (
+                values.shape
+                != (
+                    self._native_fast_store_indices.size,
+                    self._fast_patch_count,
+                    self._fast_channel_count,
                 )
-            return patches, patch_mask, present
+                or valid.shape != values.shape
+                or patch_mask.shape != values.shape[:-1]
+            ):
+                raise ValueError("native fast row differs from its frozen axes")
+            if np.any(valid & ~patch_mask[..., None]):
+                raise ValueError("native fast validity escapes its patch mask")
+            state_position = patch_mask.sum(axis=1, dtype=np.int64)
+            expected_mask = (
+                np.arange(self._fast_patch_count, dtype=np.int64)[None, :]
+                < state_position[:, None]
+            )
+            if not np.array_equal(patch_mask, expected_mask):
+                raise ValueError("native fast patch masks must be contiguous prefixes")
+            selected = state_position > 0
+            if not selected.any():
+                return self._empty_fast()
+            compact_valid = valid[selected]
+            compact_values = _zero_invalid_values(
+                values[selected], compact_valid, name="fast_patch_values"
+            ).astype(np.float32, copy=False)
+            name_index = self._native_fast_store_indices[selected]
+            present = np.zeros(name_count, dtype=np.bool_)
+            present[name_index] = True
+            return (
+                compact_values,
+                compact_valid,
+                patch_mask[selected],
+                name_index,
+                state_position[selected],
+                present,
+            )
         source_date = int(self._fast_date_mapping[date_index])
         if self._external_fast_features is None or source_date < 0:
-            patches = np.zeros(
-                (
-                    name_count,
-                    DECISION_MINUTE_INDEX // FAST_PATCH_MINUTES,
-                    26 * FAST_PATCH_MINUTES,
-                ),
-                dtype=np.float32,
-            )
-            return (
-                patches,
-                np.zeros(patches.shape[:2], dtype=np.bool_),
-                np.zeros(name_count, dtype=np.bool_),
-            )
+            return self._empty_fast()
         source = np.asarray(
             self._external_fast_features[
                 source_date, self._fast_v1_slots, :DECISION_MINUTE_INDEX
@@ -524,54 +693,70 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             source_ready[:, None], source.shape[:2]
         )
         source_patches, source_patch_mask = pack_fast_patches(source, minute_valid)
-        patches = np.zeros((name_count, *source_patches.shape[1:]), dtype=np.float32)
-        patch_mask = np.zeros((name_count, source_patch_mask.shape[1]), dtype=np.bool_)
+        source_valid = np.broadcast_to(
+            source_patch_mask[..., None], source_patches.shape
+        ).copy()
+        selected = source_ready & source_patch_mask.any(axis=1)
+        if not selected.any():
+            return self._empty_fast()
+        name_index = self._fast_v2_slots[selected]
         present = np.zeros(name_count, dtype=np.bool_)
-        patches[self._fast_v2_slots] = source_patches
-        patch_mask[self._fast_v2_slots] = source_patch_mask
-        present[self._fast_v2_slots] = source_ready
-        return patches, patch_mask, present
+        present[name_index] = True
+        return (
+            source_patches[selected],
+            source_valid[selected],
+            source_patch_mask[selected],
+            name_index,
+            np.full(
+                selected.sum(),
+                _LEGACY_FAST_PREFIX_PATCHES + self._fast_patch_count,
+                dtype=np.int64,
+            ),
+            present,
+        )
 
     def _v1_equity_slow(
         self,
         date_index: int,
-        fast_present: NDArray[np.bool_],
+        fast_name_index: NDArray[np.int64],
     ) -> NDArray[np.float32]:
-        """Map the exact masked v1 slow row onto the sparse v2 ISIN axis."""
+        """Return the legacy slow context on the same compact fast-name axis."""
 
-        output = np.zeros((len(self.store.isins), 32), dtype=np.float32)
+        output = np.zeros((fast_name_index.size, 32), dtype=np.float32)
         if self._sample_is_pretrain(date_index) or self._external_fast_slow is None:
             return output
         source_date = int(self._fast_date_mapping[date_index])
-        if source_date < 0:
+        if source_date < 0 or not fast_name_index.size:
             return output
-        mapped_present = np.asarray(
-            fast_present[self._fast_v2_slots], dtype=np.bool_
-        )
-        if not mapped_present.any():
-            return output
+        v1_by_v2 = dict(zip(self._fast_v2_slots.tolist(), self._fast_v1_slots.tolist()))
+        try:
+            source_slots = np.asarray(
+                [v1_by_v2[int(index)] for index in fast_name_index], dtype=np.int64
+            )
+        except KeyError as error:
+            raise ValueError("compact legacy fast name lacks its v1 mapping") from error
         source = np.asarray(
-            self._external_fast_slow[source_date, self._fast_v1_slots],
+            self._external_fast_slow[source_date, source_slots],
             dtype=np.float32,
         ).copy()
         source[..., V1_STORE_V2_ZERO_SLOW_FIELDS] = 0.0
-        if not np.isfinite(source[mapped_present]).all():
+        if not np.isfinite(source).all():
             raise ValueError("present external v1 slow rows must be finite")
-        source[~mapped_present] = 0.0
-        output[self._fast_v2_slots] = source
-        return output
+        return source
 
     def __getitem__(self, item: int) -> dict[str, object]:
         date_index = int(self.date_indices[item])
-        is_pretrain = self._sample_is_pretrain(date_index)
-        slow_end = slow_row_index(
-            date_index,
-            self.stage,
-            joint_pretrain=is_pretrain if self.stage == "joint" else None,
-        )
+        slow_end = slow_row_index(date_index, self.stage)
         history, feature_mask, history_mask = self._slow_window(slow_end)
-        patches, patch_mask, fast_present = self._fast(date_index)
-        v1_equity_slow = self._v1_equity_slow(date_index, fast_present)
+        (
+            fast_values,
+            fast_valid,
+            patch_mask,
+            fast_name_index,
+            fast_state_position,
+            fast_present,
+        ) = self._fast(date_index)
+        v1_equity_slow = self._v1_equity_slow(date_index, fast_name_index)
         active = np.asarray(
             self.store.read("active", date_index), dtype=np.bool_
         )
@@ -581,50 +766,104 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             "slow_features": history,
             "slow_feature_mask": feature_mask,
             "slow_history_mask": history_mask,
-            "fast_patches": patches,
+            "fast_patch_values": fast_values,
+            "fast_patch_valid": fast_valid,
             "fast_patch_mask": patch_mask,
+            "fast_name_index": fast_name_index,
+            "fast_state_position": fast_state_position,
             "fast_present": fast_present,
             "v1_equity_slow": v1_equity_slow,
             "days_since_last_slow_row": np.full(
                 len(self.store.isins),
-                0.0 if is_pretrain else 1.0,
+                1.0,
                 dtype=np.float32,
             ),
             "active_mask": active,
         }
-        for source, destination in (
-            ("target_primary", "targets"),
-            ("target_valid", "target_mask"),
-            ("target_raw_midrank", "raw_targets"),
-            ("target_raw_valid", "raw_target_mask"),
-            ("target_raw_log_return", "raw_log_returns"),
-            ("target_to_close", "to_close_target"),
-            ("target_to_close_valid", "to_close_mask"),
-            ("intraday_values", "intraday_features"),
-            ("intraday_valid", "intraday_feature_mask"),
-        ):
-            if self.store.has_array(source):
-                sample[destination] = self.store.read(source, date_index)
-        for key in ("target_mask", "raw_target_mask"):
-            value = sample.get(key)
-            if not isinstance(value, np.ndarray):
+        target_pairs = (
+            ("target_primary", "target_valid", "targets", "target_mask"),
+            (
+                "target_shareholder_midrank",
+                "target_shareholder_valid",
+                "shareholder_targets",
+                "shareholder_target_mask",
+            ),
+            (
+                "target_shareholder_simple_return",
+                "target_shareholder_valid",
+                "shareholder_simple_returns",
+                "shareholder_target_mask",
+            ),
+            (
+                "target_terminal_wealth",
+                "target_shareholder_valid",
+                "terminal_wealth",
+                "shareholder_target_mask",
+            ),
+            (
+                "target_terminal_loss",
+                "target_shareholder_valid",
+                "terminal_loss",
+                "shareholder_target_mask",
+            ),
+            (
+                "target_price_midrank",
+                "target_price_valid",
+                "price_targets",
+                "price_target_mask",
+            ),
+            (
+                "target_price_simple_return",
+                "target_price_valid",
+                "price_simple_returns",
+                "price_target_mask",
+            ),
+        )
+        target_masks: dict[str, NDArray[np.bool_]] = {}
+        for _, mask_source, _, mask_destination in target_pairs:
+            if mask_destination in target_masks or not self.store.has_array(mask_source):
                 continue
-            clipped = np.asarray(value, dtype=np.bool_).copy()
+            clipped = np.asarray(
+                self.store.read(mask_source, date_index), dtype=np.bool_
+            ).copy()
             for horizon_index, horizon in enumerate(HORIZONS):
                 if any(
                     endpoint not in self._target_date_indices
                     for endpoint in range(date_index, date_index + horizon + 1)
                 ):
                     clipped[:, horizon_index] = False
-            sample[key] = clipped
+            target_masks[mask_destination] = clipped
+            sample[mask_destination] = clipped
+        # Authorize and clip each endpoint mask before requesting its numeric
+        # payload.  V2Store applies the same capability check at the mmap
+        # boundary; this ordering also prevents a caller from observing a
+        # value before its exact evaluation window has admitted the endpoint.
+        for value_source, _, value_destination, mask_destination in target_pairs:
+            mask = target_masks.get(mask_destination)
+            if mask is None or not self.store.has_array(value_source):
+                continue
+            if mask.any():
+                sample[value_destination] = self.store.read(value_source, date_index)
+            else:
+                sample[value_destination] = np.zeros(
+                    self.store.array_shape(value_source)[1:],
+                    dtype=self.store.array_dtype(value_source),
+                )
+        for source, destination in (
+            ("target_to_close_valid", "to_close_mask"),
+            ("target_to_close", "to_close_target"),
+            ("intraday_valid", "intraday_feature_mask"),
+            ("intraday_values", "intraday_features"),
+        ):
+            if self.store.has_array(source):
+                sample[destination] = self.store.read(source, date_index)
         if isinstance(sample.get("to_close_mask"), np.ndarray):
             sample["to_close_mask"] = np.asarray(
                 sample["to_close_mask"], dtype=np.bool_
             ) & np.asarray(fast_present, dtype=np.bool_)
         for value_key, mask_key in (
             ("slow_features", "slow_feature_mask"),
-            ("fast_patches", "fast_patch_mask"),
-            ("v1_equity_slow", "fast_present"),
+            ("fast_patch_values", "fast_patch_valid"),
             ("intraday_features", "intraday_feature_mask"),
             ("targets", "target_mask"),
             ("raw_targets", "raw_target_mask"),

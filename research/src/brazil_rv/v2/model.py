@@ -17,19 +17,28 @@ from .contract import (
     V1_STORE_V2_ZERO_SLOW_FIELDS,
 )
 
-_FAST_PATCH_WIDTH = TCN_ARCHITECTURE.patch_input_width
+_LEGACY_FAST_PATCH_WIDTH = TCN_ARCHITECTURE.patch_input_width
+_NATIVE_FAST_CHANNELS = 7
+_NATIVE_FAST_INPUT_WIDTH = 2 * _NATIVE_FAST_CHANNELS
 _FAST_HIDDEN_WIDTH = TCN_ARCHITECTURE.width
 _V1_EQUITY_PREFIX_PATCHES = 12
 _V1_ABSOLUTE_STATE_POSITION = _V1_EQUITY_PREFIX_PATCHES + FAST_REAL_PATCHES
 
 
 class FastTCNEncoder(nn.Module):
-    """The exact deployed store-v2 v1 per-equity state at the 15:45 cutoff."""
+    """Encode completed within-day patches, with an isolated legacy adapter."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, legacy_v1_context: bool = False) -> None:
         super().__init__()
+        self.legacy_v1_context = legacy_v1_context
         self.input_projection = nn.Linear(
-            _FAST_PATCH_WIDTH, _FAST_HIDDEN_WIDTH, bias=False
+            (
+                _LEGACY_FAST_PATCH_WIDTH
+                if legacy_v1_context
+                else _NATIVE_FAST_INPUT_WIDTH
+            ),
+            _FAST_HIDDEN_WIDTH,
+            bias=False,
         )
         self.blocks = nn.ModuleList(
             CausalTCNResidualBlock(
@@ -41,12 +50,15 @@ class FastTCNEncoder(nn.Module):
             )
             for dilation in TCN_ARCHITECTURE.dilations
         )
-        self.slow_projection = nn.Linear(
-            TCN_ARCHITECTURE.slow_width, _FAST_HIDDEN_WIDTH, bias=False
+        self.slow_projection = (
+            nn.Linear(TCN_ARCHITECTURE.slow_width, _FAST_HIDDEN_WIDTH, bias=False)
+            if legacy_v1_context
+            else None
         )
         self.state_norm = nn.LayerNorm(_FAST_HIDDEN_WIDTH)
         keep = torch.ones(TCN_ARCHITECTURE.slow_width, dtype=torch.float32)
-        keep[list(V1_STORE_V2_ZERO_SLOW_FIELDS)] = 0.0
+        if legacy_v1_context:
+            keep[list(V1_STORE_V2_ZERO_SLOW_FIELDS)] = 0.0
         self.register_buffer("slow_keep_mask", keep, persistent=False)
         self.apply(_initialize_module)
 
@@ -54,42 +66,68 @@ class FastTCNEncoder(nn.Module):
         self,
         patches: torch.Tensor,
         patch_mask: torch.Tensor,
-        v1_equity_slow: torch.Tensor,
+        v1_equity_slow: torch.Tensor | None = None,
         state_position: torch.Tensor | None = None,
+        *,
+        patch_valid: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if patches.ndim != 4:
             raise ValueError("patches must have shape [batch, name, patch, field]")
         if patch_mask.shape != patches.shape[:-1]:
             raise ValueError("patch_mask is misaligned with patches")
-        if patches.shape[-1] != _FAST_PATCH_WIDTH:
-            raise ValueError("patch width differs from the frozen fast encoder")
         batch_size, name_count, patch_count, _ = patches.shape
-        if patch_count != FAST_REAL_PATCHES:
-            raise ValueError("the fast stream must end at synthetic cutoff index 345")
-        if v1_equity_slow.shape != (
-            batch_size,
-            name_count,
-            TCN_ARCHITECTURE.slow_width,
-        ):
-            raise ValueError(
-                "v1_equity_slow must have shape [batch, name, 32]"
+        if self.legacy_v1_context:
+            if patches.shape[-1] != _LEGACY_FAST_PATCH_WIDTH:
+                raise ValueError("legacy fast patches must have width 130")
+            if patch_count != FAST_REAL_PATCHES:
+                raise ValueError("the legacy fast stream must have 69 real patches")
+            if patch_valid is not None and patch_valid.shape != patches.shape:
+                raise ValueError("legacy fast validity is misaligned with patches")
+            if v1_equity_slow is None or v1_equity_slow.shape != (
+                batch_size,
+                name_count,
+                TCN_ARCHITECTURE.slow_width,
+            ):
+                raise ValueError(
+                    "legacy v1 context requires shape [batch, name, 32]"
+                )
+            prefix = patches.new_zeros(
+                batch_size,
+                name_count,
+                _V1_EQUITY_PREFIX_PATCHES,
+                _LEGACY_FAST_PATCH_WIDTH,
             )
-        prefix = patches.new_zeros(
-            batch_size,
-            name_count,
-            _V1_EQUITY_PREFIX_PATCHES,
-            _FAST_PATCH_WIDTH,
-        )
-        prefix_mask = patch_mask.new_zeros(
-            batch_size, name_count, _V1_EQUITY_PREFIX_PATCHES
-        )
-        absolute_patches = torch.cat((prefix, patches), dim=2)
-        absolute_mask = torch.cat((prefix_mask, patch_mask), dim=2)
-        masked = torch.where(
-            absolute_mask[..., None],
-            absolute_patches,
-            torch.zeros_like(absolute_patches),
-        )
+            prefix_mask = patch_mask.new_zeros(
+                batch_size, name_count, _V1_EQUITY_PREFIX_PATCHES
+            )
+            absolute_patches = torch.cat((prefix, patches), dim=2)
+            absolute_mask = torch.cat((prefix_mask, patch_mask), dim=2)
+        else:
+            if patches.shape[-1] != _NATIVE_FAST_CHANNELS:
+                raise ValueError("native fast patches must have seven channels")
+            if not 0 < patch_count <= FAST_REAL_PATCHES:
+                raise ValueError("native fast patch count is outside the frozen limit")
+            if patch_valid is None or patch_valid.shape != patches.shape:
+                raise ValueError("native fast patches require per-channel validity")
+            absolute_patches = patches
+            absolute_mask = patch_mask
+        if self.legacy_v1_context:
+            masked = torch.where(
+                absolute_mask[..., None],
+                absolute_patches,
+                torch.zeros_like(absolute_patches),
+            )
+        else:
+            assert patch_valid is not None
+            effective_valid = patch_valid.bool() & patch_mask[..., None].bool()
+            clean = torch.where(
+                effective_valid, patches, torch.zeros_like(patches)
+            )
+            torch._assert_async(
+                torch.all(torch.isfinite(clean)),
+                "native fast values marked valid must be finite",
+            )
+            masked = torch.cat((clean, effective_valid.to(clean.dtype)), dim=-1)
         absolute_patch_count = masked.shape[2]
         hidden = (
             self.input_projection(masked)
@@ -108,7 +146,7 @@ class FastTCNEncoder(nn.Module):
         if state_position is None:
             last = torch.full(
                 (batch_size, name_count),
-                _V1_ABSOLUTE_STATE_POSITION - 1,
+                absolute_patch_count - 1,
                 device=patches.device,
                 dtype=torch.long,
             )
@@ -120,19 +158,43 @@ class FastTCNEncoder(nn.Module):
                 raise ValueError(
                     "state_position must have shape [batch] or [batch, name]"
                 )
-        torch._assert_async(
-            torch.all(last == _V1_ABSOLUTE_STATE_POSITION - 1),
-            "fast_state_position must identify absolute v1 position 81",
+        if self.legacy_v1_context:
+            torch._assert_async(
+                torch.all(
+                    (last == absolute_patch_count - 1)
+                    | ((last == -1) & ~absolute_mask.bool().any(dim=-1))
+                ),
+                "legacy fast_state_position must identify absolute position 81",
+            )
+        else:
+            expected_position = patch_mask.long().sum(dim=-1)
+            expected_mask = (
+                torch.arange(patch_count, device=patches.device)[None, None, :]
+                < expected_position[..., None]
+            )
+            torch._assert_async(
+                torch.all(
+                    (last + 1 == expected_position)
+                    & ((last >= 0) | (expected_position == 0))
+                    & torch.all(patch_mask.bool() == expected_mask, dim=-1)
+                ),
+                "native fast_state_position must identify its last present patch",
+            )
+        index = last.clamp_min(0)[..., None, None].expand(
+            -1, -1, 1, _FAST_HIDDEN_WIDTH
         )
-        index = last[..., None, None].expand(-1, -1, 1, _FAST_HIDDEN_WIDTH)
         raw = sequence.gather(2, index).squeeze(2)
-        slow_keep = self.slow_keep_mask.to(dtype=torch.bool)
-        neutralized_slow = torch.where(
-            slow_keep,
-            v1_equity_slow,
-            torch.zeros_like(v1_equity_slow),
-        )
-        return self.state_norm(raw + self.slow_projection(neutralized_slow))
+        if self.legacy_v1_context:
+            assert v1_equity_slow is not None
+            assert self.slow_projection is not None
+            slow_keep = self.slow_keep_mask.to(dtype=torch.bool)
+            neutralized_slow = torch.where(
+                slow_keep,
+                v1_equity_slow,
+                torch.zeros_like(v1_equity_slow),
+            )
+            raw = raw + self.slow_projection(neutralized_slow)
+        return self.state_norm(raw)
 
 
 class VectorSwiGLUResidualBlock(nn.Module):
@@ -159,17 +221,27 @@ class DailyMultiHorizonModel(nn.Module):
         self.pretrained_parameter_names: frozenset[str] = frozenset()
         self.fast_checkpoint_sha256: str | None = None
         self.pretrain_checkpoint_sha256: str | None = None
-        self.slow_input_norm = nn.LayerNorm(config.slow_feature_count)
+        legacy_fast = config.fast_encoder_mode == "legacy_v1_contaminated"
+        self.fast_initialization_provenance: dict[str, object] = {
+            "mode": (
+                "legacy_v1_architecture_uninitialized" if legacy_fast else "fresh"
+            ),
+            "contaminated": legacy_fast,
+            "explicitly_allowed": config.allow_contaminated_v1_initialization,
+            "checkpoint_sha256": None,
+        }
+        self.slow_input_projection = nn.Linear(
+            2 * config.slow_feature_count, config.hidden_width
+        )
+        self.slow_input_norm = nn.LayerNorm(config.hidden_width)
         self.slow_encoder = nn.GRU(
-            config.slow_feature_count + 2,
+            config.hidden_width + 2,
             config.hidden_width,
             num_layers=config.gru_layers,
             batch_first=True,
             dropout=config.dropout if config.gru_layers == 2 else 0.0,
         )
-        if config.hidden_width != _FAST_HIDDEN_WIDTH:
-            raise ValueError("The starter model requires width 64 for v1 fast transfer")
-        self.fast_encoder = FastTCNEncoder()
+        self.fast_encoder = FastTCNEncoder(legacy_v1_context=legacy_fast)
         self.absent_state = nn.Parameter(torch.zeros(_FAST_HIDDEN_WIDTH))
         self.fast_gate = nn.Linear(
             config.hidden_width + _FAST_HIDDEN_WIDTH,
@@ -221,12 +293,13 @@ class DailyMultiHorizonModel(nn.Module):
             for parameter in self.parameters()
             if parameter.requires_grad and id(parameter) not in fast_ids
         )
-        if non_fast_count > 150_000:
-            raise ValueError("starter-model non-fast parameter count exceeds 150k")
+        if non_fast_count > 165_000:
+            raise ValueError("starter-model non-fast parameter count exceeds 165k")
 
     def _slow_states(
         self,
         slow_features: torch.Tensor,
+        slow_feature_mask: torch.Tensor,
         slow_history_mask: torch.Tensor,
         fast_present: torch.Tensor,
         days_since_last_slow_row: torch.Tensor,
@@ -235,25 +308,35 @@ class DailyMultiHorizonModel(nn.Module):
             raise ValueError("slow_features must have shape [batch, name, date, field]")
         if slow_history_mask.shape != slow_features.shape[:-1]:
             raise ValueError("slow_history_mask is misaligned with slow_features")
+        if slow_feature_mask.shape != slow_features.shape:
+            raise ValueError("slow_feature_mask is misaligned with slow_features")
         if slow_features.shape[-1] != self.config.slow_feature_count:
             raise ValueError("slow feature width differs from the model configuration")
         batch_size, name_count, lookback, _ = slow_features.shape
         if lookback != self.config.slow_lookback:
             raise ValueError("slow lookback differs from the model configuration")
-        valid = slow_history_mask.bool()
+        feature_valid = slow_feature_mask.bool()
+        valid = slow_history_mask.bool() & feature_valid.any(dim=-1)
         clean = torch.where(
-            valid[..., None], slow_features, torch.zeros_like(slow_features)
+            feature_valid, slow_features, torch.zeros_like(slow_features)
         )
-        normalized = self.slow_input_norm(clean)
+        projected = self.slow_input_norm(
+            self.slow_input_projection(
+                torch.cat((clean, feature_valid.to(clean.dtype)), dim=-1)
+            )
+        )
+        projected = torch.where(
+            valid[..., None], projected, torch.zeros_like(projected)
+        )
         flags = torch.stack(
             (
-                fast_present.to(normalized.dtype),
-                days_since_last_slow_row.to(normalized.dtype),
+                fast_present.to(projected.dtype),
+                days_since_last_slow_row.to(projected.dtype),
             ),
             dim=-1,
         )
         flags = flags[:, :, None].expand(-1, -1, lookback, -1)
-        inputs = torch.cat((normalized, flags), dim=-1)
+        inputs = torch.cat((projected, flags), dim=-1)
         inputs = torch.where(valid[..., None], inputs, torch.zeros_like(inputs))
         sequence, _ = self.slow_encoder(
             inputs.reshape(batch_size * name_count, lookback, -1)
@@ -291,97 +374,200 @@ class DailyMultiHorizonModel(nn.Module):
         self,
         slow: torch.Tensor,
         present: torch.Tensor,
-        fast_patches: torch.Tensor | None,
+        fast_patch_values: torch.Tensor | None,
+        fast_patch_valid: torch.Tensor | None,
         fast_patch_mask: torch.Tensor | None,
+        fast_name_index: torch.Tensor | None,
         fast_state_position: torch.Tensor | None,
         v1_equity_slow: torch.Tensor | None,
     ) -> torch.Tensor:
         batch_size, name_count = slow.shape[:2]
-        absent = self.absent_state.view(1, 1, -1).expand_as(slow)
-        if fast_patches is None:
+        absent = self.absent_state.view(1, 1, -1).expand(
+            batch_size, name_count, -1
+        )
+        if fast_patch_values is None:
             if (
-                fast_patch_mask is not None
+                fast_patch_valid is not None
+                or fast_patch_mask is not None
+                or fast_name_index is not None
                 or fast_state_position is not None
                 or v1_equity_slow is not None
             ):
-                raise ValueError("fast metadata was supplied without fast patches")
+                raise ValueError("fast metadata was supplied without fast values")
             torch._assert_async(
                 torch.all(~present.bool()),
-                "fast_present cannot be true without the v1 fast stream",
+                "fast_present cannot be true without the fast stream",
             )
             return absent
-
-        if fast_patches.ndim != 4:
-            raise ValueError("patches must have shape [batch, name, patch, field]")
-        if fast_patches.shape[:2] != (batch_size, name_count):
-            raise ValueError("fast patches are misaligned with the model rows")
-        if fast_patch_mask is None:
-            raise ValueError("fast_patch_mask is required with fast patches")
-        if fast_patch_mask.shape != fast_patches.shape[:-1]:
-            raise ValueError("patch_mask is misaligned with patches")
-        if fast_patches.shape[2:] != (FAST_REAL_PATCHES, _FAST_PATCH_WIDTH):
-            if fast_patches.shape[-1] != _FAST_PATCH_WIDTH:
-                raise ValueError("patch width differs from the frozen fast encoder")
-            raise ValueError("the fast stream must end at synthetic cutoff index 345")
-        if v1_equity_slow is None:
-            raise ValueError("v1_equity_slow is required with fast patches")
-        if v1_equity_slow.shape != (
+        if fast_patch_values.ndim != 4:
+            raise ValueError("fast values must have shape [batch, fast, patch, channel]")
+        if fast_patch_values.shape[0] != batch_size:
+            raise ValueError("fast values are misaligned with the model batch")
+        fast_count, patch_count = fast_patch_values.shape[1:3]
+        if (
+            fast_patch_valid is None
+            or fast_patch_valid.shape != fast_patch_values.shape
+            or fast_patch_mask is None
+            or fast_patch_mask.shape != (batch_size, fast_count, patch_count)
+            or fast_name_index is None
+            or fast_name_index.shape != (batch_size, fast_count)
+            or fast_state_position is None
+            or fast_state_position.shape != (batch_size, fast_count)
+        ):
+            raise ValueError("compact fast values and metadata are misaligned")
+        if self.fast_encoder.legacy_v1_context:
+            if v1_equity_slow is None or v1_equity_slow.shape != (
+                batch_size,
+                fast_count,
+                TCN_ARCHITECTURE.slow_width,
+            ):
+                raise ValueError("legacy fast slots require compact v1 equity slow")
+        elif v1_equity_slow is not None and v1_equity_slow.shape != (
             batch_size,
-            name_count,
+            fast_count,
             TCN_ARCHITECTURE.slow_width,
         ):
-            raise ValueError("v1_equity_slow must have shape [batch, name, 32]")
+            raise ValueError("compact v1 equity slow is misaligned")
 
-        dense_state_position: torch.Tensor | None = None
-        if fast_state_position is not None:
-            dense_state_position = fast_state_position.to(
-                device=fast_patches.device, dtype=torch.long
-            )
-            if dense_state_position.ndim == 1:
-                dense_state_position = dense_state_position[:, None].expand(
-                    -1, name_count
-                )
-            if dense_state_position.shape != (batch_size, name_count):
-                raise ValueError(
-                    "state_position must have shape [batch] or [batch, name]"
-                )
+        real_slot = fast_name_index >= 0
+        if fast_count == 0:
             torch._assert_async(
-                torch.all(dense_state_position == _V1_ABSOLUTE_STATE_POSITION),
-                "fast_state_position must identify absolute v1 position 81",
+                torch.all(~present.bool()),
+                "fast_present cannot be true when every compact slot is padding",
             )
-
-        # The fast stream is available for only a small, dynamic PIT subset of
-        # the dense daily panel.  Flatten names into independent one-name rows
-        # so the TCN retains its exact per-instrument computation while avoiding
-        # activations for absent names.
-        flat_present = present.bool().reshape(-1)
-        present_indices = torch.nonzero(flat_present, as_tuple=False).squeeze(1)
-        selected_patches = fast_patches.reshape(
-            batch_size * name_count, FAST_REAL_PATCHES, _FAST_PATCH_WIDTH
-        ).index_select(0, present_indices)
-        selected_mask = fast_patch_mask.reshape(
-            batch_size * name_count, FAST_REAL_PATCHES
-        ).index_select(0, present_indices)
-        selected_slow = v1_equity_slow.reshape(
-            batch_size * name_count, TCN_ARCHITECTURE.slow_width
-        ).index_select(0, present_indices)
-        selected_position = (
-            None
-            if dense_state_position is None
-            else dense_state_position.reshape(-1).index_select(0, present_indices)
+            return absent
+        selected_names = fast_name_index.clamp_min(0).long()
+        torch._assert_async(
+            torch.all((~real_slot) | (selected_names < name_count)),
+            "compact fast name index is outside the broad store axis",
+        )
+        occupancy = torch.zeros(
+            batch_size,
+            name_count,
+            dtype=torch.long,
+            device=fast_name_index.device,
+        ).scatter_add(
+            1,
+            selected_names,
+            real_slot.long(),
+        )
+        torch._assert_async(
+            torch.all(occupancy <= 1),
+            "compact fast name indices must be unique within each date",
+        )
+        derived_present = occupancy.reshape(batch_size, name_count).bool()
+        torch._assert_async(
+            torch.all(derived_present == present.bool()),
+            "fast_present disagrees with compact fast name indices",
+        )
+        torch._assert_async(
+            torch.all(
+                real_slot
+                | (
+                    ~fast_patch_mask.bool().any(dim=-1)
+                    & ~fast_patch_valid.bool().any(dim=(-1, -2))
+                    & (fast_state_position == 0)
+                )
+            ),
+            "padded compact fast slots must contain only zero metadata",
         )
         encoded = self.fast_encoder(
-            selected_patches[:, None],
-            selected_mask[:, None],
-            selected_slow[:, None],
-            selected_position,
-        ).squeeze(1)
-        flat_fast = absent.reshape(batch_size * name_count, _FAST_HIDDEN_WIDTH)
-        return flat_fast.index_copy(0, present_indices, encoded).reshape_as(absent)
+            fast_patch_values.reshape(
+                batch_size * fast_count, 1, patch_count, -1
+            ),
+            fast_patch_mask.reshape(batch_size * fast_count, 1, patch_count),
+            (
+                None
+                if v1_equity_slow is None
+                else v1_equity_slow.reshape(
+                    batch_size * fast_count, 1, TCN_ARCHITECTURE.slow_width
+                )
+            ),
+            fast_state_position.reshape(batch_size * fast_count),
+            patch_valid=fast_patch_valid.reshape(
+                batch_size * fast_count, 1, patch_count, -1
+            ),
+        ).reshape(batch_size, fast_count, _FAST_HIDDEN_WIDTH)
+        encoded = torch.where(
+            real_slot[..., None], encoded, torch.zeros_like(encoded)
+        )
+        updates = torch.zeros_like(absent).scatter_add(
+            1,
+            selected_names[..., None].expand(-1, -1, _FAST_HIDDEN_WIDTH),
+            encoded,
+        )
+        return torch.where(derived_present[..., None], updates, absent)
+
+    def _legacy_dense_fast_states(
+        self,
+        slow: torch.Tensor,
+        present: torch.Tensor,
+        fast_patches: torch.Tensor,
+        fast_patch_mask: torch.Tensor | None,
+        fast_state_position: torch.Tensor | None,
+        v1_equity_slow: torch.Tensor | None,
+    ) -> torch.Tensor:
+        """Diagnostic-only adapter for the superseded dense v1 input layout."""
+
+        if not self.fast_encoder.legacy_v1_context:
+            raise ValueError("dense fast patches are accepted only in legacy v1 mode")
+        batch_size, name_count = slow.shape[:2]
+        if (
+            fast_patches.shape
+            != (
+                batch_size,
+                name_count,
+                FAST_REAL_PATCHES,
+                _LEGACY_FAST_PATCH_WIDTH,
+            )
+            or fast_patch_mask is None
+            or fast_patch_mask.shape != fast_patches.shape[:-1]
+            or v1_equity_slow is None
+            or v1_equity_slow.shape
+            != (batch_size, name_count, TCN_ARCHITECTURE.slow_width)
+        ):
+            raise ValueError("dense legacy fast inputs are misaligned")
+        if fast_state_position is None:
+            positions = fast_patches.new_full(
+                (batch_size, name_count),
+                _V1_ABSOLUTE_STATE_POSITION,
+                dtype=torch.long,
+            )
+        else:
+            positions = fast_state_position.to(device=fast_patches.device).long()
+            if positions.ndim == 1:
+                positions = positions[:, None].expand(-1, name_count)
+            if positions.shape != (batch_size, name_count):
+                raise ValueError("dense legacy state positions are misaligned")
+        compact_names = torch.arange(
+            name_count, device=fast_patches.device, dtype=torch.long
+        )[None, :].expand(batch_size, -1)
+        compact_names = torch.where(
+            present.bool(), compact_names, torch.full_like(compact_names, -1)
+        )
+        compact_mask = fast_patch_mask & present.bool()[..., None]
+        patch_valid = compact_mask[..., None].expand_as(fast_patches)
+        positions = torch.where(
+            present.bool(), positions, torch.zeros_like(positions)
+        )
+        compact_slow = torch.where(
+            present.bool()[..., None], v1_equity_slow, torch.zeros_like(v1_equity_slow)
+        )
+        return self._fast_states(
+            slow,
+            present,
+            fast_patches,
+            patch_valid,
+            compact_mask,
+            compact_names,
+            positions,
+            compact_slow,
+        )
 
     def forward(
         self,
         slow_features: torch.Tensor,
+        slow_feature_mask: torch.Tensor,
         slow_history_mask: torch.Tensor,
         active_mask: torch.Tensor,
         fast_patches: torch.Tensor | None = None,
@@ -390,23 +576,74 @@ class DailyMultiHorizonModel(nn.Module):
         days_since_last_slow_row: torch.Tensor | None = None,
         fast_state_position: torch.Tensor | None = None,
         v1_equity_slow: torch.Tensor | None = None,
+        *,
+        fast_patch_values: torch.Tensor | None = None,
+        fast_patch_valid: torch.Tensor | None = None,
+        fast_name_index: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if active_mask.shape != slow_features.shape[:2]:
             raise ValueError("active_mask is misaligned with the model rows")
-        inferred_present = 0.0 if fast_patches is None else 1.0
-        present = self._flags(slow_features, fast_present, inferred_present)
-        days = self._flags(slow_features, days_since_last_slow_row, 0.0)
+        if fast_patches is not None and fast_patch_values is not None:
+            raise ValueError("native compact and dense legacy fast inputs cannot be mixed")
+        if fast_patch_values is not None:
+            if (
+                fast_patch_values.ndim != 4
+                or fast_patch_values.shape[0] != slow_features.shape[0]
+                or fast_name_index is None
+                or fast_name_index.shape != fast_patch_values.shape[:2]
+            ):
+                raise ValueError("compact fast values and name indices are misaligned")
+            real = fast_name_index >= 0
+            names = fast_name_index.clamp_min(0).long()
+            torch._assert_async(
+                torch.all((~real) | (names < slow_features.shape[1])),
+                "compact fast name index is outside the broad store axis",
+            )
+            derived_present = torch.zeros(
+                slow_features.shape[:2],
+                dtype=torch.long,
+                device=slow_features.device,
+            ).scatter_add(1, names, real.long()) if names.shape[1] else torch.zeros(
+                slow_features.shape[:2],
+                dtype=torch.long,
+                device=slow_features.device,
+            )
+            torch._assert_async(
+                torch.all(derived_present <= 1),
+                "compact fast name indices must be unique within each date",
+            )
+            present = (
+                derived_present.to(slow_features.dtype)
+                if fast_present is None
+                else self._flags(slow_features, fast_present, 0.0)
+            )
+        else:
+            inferred_present = 0.0 if fast_patches is None else 1.0
+            present = self._flags(slow_features, fast_present, inferred_present)
+        days = self._flags(slow_features, days_since_last_slow_row, 1.0)
         slow = self._slow_states(
-            slow_features, slow_history_mask, present, days
+            slow_features, slow_feature_mask, slow_history_mask, present, days
         )
-        fast = self._fast_states(
-            slow,
-            present,
-            fast_patches,
-            fast_patch_mask,
-            fast_state_position,
-            v1_equity_slow,
-        )
+        if fast_patches is not None:
+            fast = self._legacy_dense_fast_states(
+                slow,
+                present,
+                fast_patches,
+                fast_patch_mask,
+                fast_state_position,
+                v1_equity_slow,
+            )
+        else:
+            fast = self._fast_states(
+                slow,
+                present,
+                fast_patch_values,
+                fast_patch_valid,
+                fast_patch_mask,
+                fast_name_index,
+                fast_state_position,
+                v1_equity_slow,
+            )
 
         weights = active_mask.bool()[..., None]
         count = weights.sum(dim=1).clamp_min(1)
@@ -466,6 +703,10 @@ def load_v1_fast_encoder(
     *,
     expected_sha256: str | None = None,
 ) -> frozenset[str]:
+    if model.config.fast_encoder_mode != "legacy_v1_contaminated":
+        raise ValueError("v1 checkpoints require the contaminated legacy fast mode")
+    if not model.config.allow_contaminated_v1_initialization:
+        raise ValueError("v1 initialization was not explicitly allowed")
     if expected_sha256 is None:
         raise ValueError("v1 fast initialization requires an expected SHA-256")
     payload_bytes = checkpoint_path.read_bytes()
@@ -498,4 +739,10 @@ def load_v1_fast_encoder(
     )
     model.pretrained_parameter_names |= initialized
     model.fast_checkpoint_sha256 = actual_sha256
+    model.fast_initialization_provenance = {
+        "mode": "contaminated_v1_checkpoint",
+        "contaminated": True,
+        "explicitly_allowed": True,
+        "checkpoint_sha256": actual_sha256,
+    }
     return initialized

@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from .artifacts import sha256_file, write_json_atomic
 from .config import ModelConfig
 from .contract import HORIZONS, V1_READ_SEEDS
-from .data import V2DailyDataset
+from .data import V2DailyDataset, collate_v2_daily
 from .model import DailyMultiHorizonModel
 from .train import (
     _canonical_payload_sha256,
@@ -71,10 +71,13 @@ def _model_batch(
 ) -> dict[str, torch.Tensor]:
     names = {
         "slow_features",
+        "slow_feature_mask",
         "slow_history_mask",
         "active_mask",
-        "fast_patches",
+        "fast_patch_values",
+        "fast_patch_valid",
         "fast_patch_mask",
+        "fast_name_index",
         "fast_present",
         "days_since_last_slow_row",
         "fast_state_position",
@@ -82,8 +85,10 @@ def _model_batch(
     }
     if omit_fast_stream:
         names -= {
-            "fast_patches",
+            "fast_patch_values",
+            "fast_patch_valid",
             "fast_patch_mask",
+            "fast_name_index",
             "fast_state_position",
             "v1_equity_slow",
         }
@@ -94,6 +99,7 @@ def _model_batch(
     }
     required = {
         "slow_features",
+        "slow_feature_mask",
         "slow_history_mask",
         "active_mask",
         "fast_present",
@@ -105,21 +111,23 @@ def _model_batch(
     any_fast_present = torch.any(result["fast_present"].bool())
     if not omit_fast_stream and not any_fast_present:
         for name in (
-            "fast_patches",
+            "fast_patch_values",
+            "fast_patch_valid",
             "fast_patch_mask",
+            "fast_name_index",
             "fast_state_position",
             "v1_equity_slow",
         ):
             result.pop(name, None)
     elif not omit_fast_stream:
         if (
-            "fast_patches" not in result
+            "fast_patch_values" not in result
+            or "fast_patch_valid" not in result
             or "fast_patch_mask" not in result
-            or "v1_equity_slow" not in result
+            or "fast_name_index" not in result
+            or "fast_state_position" not in result
         ):
-            raise ValueError(
-                "present fast samples require patches, their mask, and v1 equity slow"
-            )
+            raise ValueError("present fast samples require compact values and metadata")
     return result
 
 
@@ -128,14 +136,17 @@ def _forward(
 ) -> torch.Tensor:
     return model(
         batch["slow_features"],
+        batch["slow_feature_mask"],
         batch["slow_history_mask"],
         batch["active_mask"],
-        batch.get("fast_patches"),
-        batch.get("fast_patch_mask"),
-        batch.get("fast_present"),
-        batch.get("days_since_last_slow_row"),
-        batch.get("fast_state_position"),
-        batch.get("v1_equity_slow"),
+        fast_patch_mask=batch.get("fast_patch_mask"),
+        fast_present=batch.get("fast_present"),
+        days_since_last_slow_row=batch.get("days_since_last_slow_row"),
+        fast_state_position=batch.get("fast_state_position"),
+        v1_equity_slow=batch.get("v1_equity_slow"),
+        fast_patch_values=batch.get("fast_patch_values"),
+        fast_patch_valid=batch.get("fast_patch_valid"),
+        fast_name_index=batch.get("fast_name_index"),
     )
 
 
@@ -195,6 +206,29 @@ def score_checkpoint_artifact(
     checkpoint_contract = _verified_checkpoint_input_contract(checkpoint_payload)
     if checkpoint_contract.get("model_config") != model_config_contract(model_config):
         raise ValueError("scoring model config differs from the checkpoint contract")
+    raw_fast_provenance = checkpoint_payload.get("fast_initialization_provenance")
+    if raw_fast_provenance is None:
+        fast_provenance: dict[str, object] = {
+            "mode": (
+                "contaminated_v1_checkpoint"
+                if model_config.fast_encoder_mode == "legacy_v1_contaminated"
+                else "fresh"
+            ),
+            "contaminated": (
+                model_config.fast_encoder_mode == "legacy_v1_contaminated"
+            ),
+            "explicitly_allowed": model_config.allow_contaminated_v1_initialization,
+            "checkpoint_sha256": model_config.fast_pretrained_sha256,
+        }
+    elif isinstance(raw_fast_provenance, Mapping):
+        fast_provenance = dict(raw_fast_provenance)
+    else:
+        raise ValueError("checkpoint fast-initialization provenance is malformed")
+    expected_contamination = (
+        model_config.fast_encoder_mode == "legacy_v1_contaminated"
+    )
+    if bool(fast_provenance.get("contaminated")) != expected_contamination:
+        raise ValueError("checkpoint fast-initialization provenance contradicts config")
     recorded_commit = checkpoint_contract.get("implementation_commit")
     current_commit = _repository_commit_if_available()
     if recorded_commit is not None and current_commit != recorded_commit:
@@ -209,7 +243,7 @@ def score_checkpoint_artifact(
         checkpoint_selection
     ):
         raise ValueError("scoring dataset differs from the checkpoint input identity")
-    expected_alignment = "through_t" if stage == "P" else "through_t_minus_1"
+    expected_alignment = "through_t_minus_1"
     expected_dataset_stage = "pretrain" if stage == "P" else "evaluation"
     if (
         dataset.stage != expected_dataset_stage
@@ -319,6 +353,7 @@ def score_checkpoint_artifact(
                 "fold": str(fold),
             },
             "model_config": config_payload,
+            "fast_initialization_provenance": fast_provenance,
             "checkpoint_input_contract_sha256": checkpoint_contract["sha256"],
             "scoring_input": scoring_input_payload,
             "scoring_input_sha256": scoring_input_sha256,
@@ -434,6 +469,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         batch_size=arguments.batch_size,
         shuffle=False,
         num_workers=arguments.num_workers,
+        collate_fn=collate_v2_daily,
     )
     device = None if arguments.device == "auto" else torch.device(arguments.device)
     score_checkpoint_artifact(
