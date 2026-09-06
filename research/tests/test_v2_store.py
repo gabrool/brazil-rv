@@ -1,5 +1,5 @@
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,24 +12,23 @@ from torch.utils.data import DataLoader
 import brazil_rv.v2.build_store as build_store_module
 import brazil_rv.v2.store as store_module
 from brazil_rv.v2.build_store import (
-    EXPECTED_V1_DATES,
     MinutePanel,
-    V1_STORE_START,
     _external_feature_validity_by_survival_liquidity,
     _feature_validity_by_survival,
     _prior_adv20,
     _require_clean_implementation_commit,
-    _validate_v1_calendar,
     build_daily_store,
 )
 from brazil_rv.v2.corporate_actions import normalize_yfinance_actions
 from brazil_rv.v2.config import ModelConfig
-from brazil_rv.v2.contract import ACCUMULATED_TEST_AFTER, FINETUNE_START
+from brazil_rv.v2.contract import FINETUNE_START
 from brazil_rv.v2.data import (
     V1_STORE_V2_ZERO_DYNAMIC_CHANNELS,
     V1_STORE_V2_ZERO_SLOW_FIELDS,
     V2DailyDataset,
+    collate_v2_daily,
 )
+from brazil_rv.v2.decision_clock import SessionDefinition
 from brazil_rv.v2.model import DailyMultiHorizonModel
 from brazil_rv.v2.store import (
     V2Store,
@@ -38,6 +37,20 @@ from brazil_rv.v2.store import (
     sha256_file,
     write_store,
 )
+
+
+def _session_schedule(dates: list[date]) -> tuple[SessionDefinition, ...]:
+    return tuple(
+        SessionDefinition(
+            trade_date=value,
+            continuous_open=time(10, 0),
+            decision_time=time(15, 45),
+            continuous_close=time(16, 45),
+            auction_close=time(17, 0),
+            source="synthetic_test_schedule",
+        )
+        for value in dates
+    )
 
 
 def test_store_cli_requires_clean_worktree_before_binding_commit(
@@ -229,6 +242,7 @@ def _base_store(
     external_fast=None,
     stored_fast_present=None,
     extra_arrays=None,
+    extra_tables=None,
 ):
     days, names = 25, 3
     dates = [date(2024, 1, 1) + timedelta(days=index) for index in range(days)]
@@ -281,6 +295,7 @@ def _base_store(
     if stored_fast_present is not None:
         arrays["fast_present"] = np.asarray(stored_fast_present, dtype=bool)
     arrays.update(extra_arrays or {})
+    tables.update(extra_tables or {})
     path = write_store(
         tmp_path / "store",
         dates=dates,
@@ -365,6 +380,77 @@ def test_store_writer_selects_source_rows_one_array_at_a_time(tmp_path) -> None:
         )
 
 
+def test_current_store_rejects_superseded_arrays_and_unmapped_native_fast(
+    tmp_path: Path,
+) -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3)]
+    with pytest.raises(ValueError, match="superseded synthetic-adjustment"):
+        write_store(
+            tmp_path / "legacy_array",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays={"adjusted_close": np.ones((2, 1), dtype=np.float32)},
+        )
+    native = {
+        "fast_patch_values": np.zeros((2, 1, 1, 7), dtype=np.float32),
+        "fast_patch_valid": np.zeros((2, 1, 1, 7), dtype=np.bool_),
+        "fast_patch_mask": np.zeros((2, 1, 1), dtype=np.bool_),
+    }
+    with pytest.raises(ValueError, match="native_fast_security_mapping"):
+        write_store(
+            tmp_path / "unmapped_native",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays=native,
+        )
+    with pytest.raises(ValueError, match="disagree with the store axis"):
+        write_store(
+            tmp_path / "wrong_native_mapping",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays=native,
+            tables={
+                "native_fast_security_mapping": pl.DataFrame(
+                    {
+                        "fast_index": [0],
+                        "store_name_index": [0],
+                        "isin": ["BRWRONGACNOR1"],
+                    }
+                )
+            },
+        )
+
+
+def test_store_requires_complete_bounded_action_contract(tmp_path: Path) -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3)]
+    with pytest.raises(ValueError, match="one complete contract"):
+        write_store(
+            tmp_path / "partial_actions",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays={
+                "action_shares_per_prior_share": np.ones(
+                    (2, 1), dtype=np.float32
+                )
+            },
+        )
+    complete = {
+        "action_shares_per_prior_share": np.ones((2, 1), dtype=np.float32),
+        "action_cash_per_prior_share": np.zeros((2, 1), dtype=np.float32),
+        "action_session_resolved": np.ones((2, 1), dtype=np.bool_),
+        "action_has_action": np.zeros((2, 1), dtype=np.bool_),
+        "action_successor_index": np.zeros((2, 1), dtype=np.int32),
+        "action_payment_session": np.asarray([[-1], [3]], dtype=np.int32),
+    }
+    with pytest.raises(ValueError, match="payment sessions"):
+        write_store(
+            tmp_path / "late_payment",
+            dates=dates,
+            isins=["BRTESTACNOR1"],
+            arrays=complete,
+        )
+
+
 def test_store_writer_streams_a_contiguous_row_selection(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -424,19 +510,26 @@ def test_dataset_applies_slow_shift_and_external_sparse_fast_mapping(tmp_path) -
     assert sample["fast_present"].tolist() == [True, False, False]
     expected_slow = legacy_slow[0, 0].copy()
     expected_slow[list(V1_STORE_V2_ZERO_SLOW_FIELDS)] = 0.0
-    assert sample["v1_equity_slow"].shape == (3, 32)
+    assert sample["v1_equity_slow"].shape == (1, 32)
     np.testing.assert_array_equal(sample["v1_equity_slow"][0], expected_slow)
-    assert not sample["v1_equity_slow"][1:].any()
-    assert "fast_state_position" not in sample
-    patches = sample["fast_patches"]
-    assert patches.shape == (3, 69, 130)
+    assert sample["fast_name_index"].tolist() == [0]
+    patches = sample["fast_patch_values"]
+    assert patches.shape == (1, 69, 130)
     for channel in V1_STORE_V2_ZERO_DYNAMIC_CHANNELS:
         assert np.all(patches[0, :, channel::26] == 0.0)
     kept = set(range(26)) - set(V1_STORE_V2_ZERO_DYNAMIC_CHANNELS)
     assert all(np.all(patches[0, :, channel::26] == 1.0) for channel in kept)
-    assert np.all(patches[1:] == 0.0)
-    batch = next(iter(DataLoader(dataset, batch_size=1, shuffle=False)))
-    assert tuple(batch["v1_equity_slow"].shape) == (1, 3, 32)
+    batch = next(
+        iter(
+            DataLoader(
+                dataset,
+                batch_size=1,
+                shuffle=False,
+                collate_fn=collate_v2_daily,
+            )
+        )
+    )
+    assert tuple(batch["v1_equity_slow"].shape) == (1, 1, 32)
     np.testing.assert_array_equal(
         batch["v1_equity_slow"][0].numpy(), sample["v1_equity_slow"]
     )
@@ -504,9 +597,26 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
         "slow_valid": slow_valid,
         "target_primary": np.ones((days, names, 5), dtype=np.float32),
         "target_valid": np.ones((days, names, 5), dtype=np.bool_),
-        "target_raw_midrank": np.ones((days, names, 5), dtype=np.float32),
-        "target_raw_valid": np.ones((days, names, 5), dtype=np.bool_),
-        "target_raw_log_return": np.ones((days, names, 5), dtype=np.float32),
+        "target_shareholder_midrank": np.ones(
+            (days, names, 5), dtype=np.float32
+        ),
+        "target_shareholder_valid": np.ones(
+            (days, names, 5), dtype=np.bool_
+        ),
+        "target_shareholder_simple_return": np.ones(
+            (days, names, 5), dtype=np.float32
+        ),
+        "target_terminal_wealth": np.ones(
+            (days, names, 5), dtype=np.float32
+        ),
+        "target_terminal_loss": np.zeros(
+            (days, names, 5), dtype=np.bool_
+        ),
+        "target_price_midrank": np.ones((days, names, 5), dtype=np.float32),
+        "target_price_valid": np.ones((days, names, 5), dtype=np.bool_),
+        "target_price_simple_return": np.ones(
+            (days, names, 5), dtype=np.float32
+        ),
         "target_to_close": np.ones((days, names), dtype=np.float32),
         "target_to_close_valid": np.ones((days, names), dtype=np.bool_),
         "intraday_values": np.ones((days, names, 3), dtype=np.float32),
@@ -514,8 +624,11 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
     }
     masked_pairs = (
         ("target_primary", "target_valid"),
-        ("target_raw_midrank", "target_raw_valid"),
-        ("target_raw_log_return", "target_raw_valid"),
+        ("target_shareholder_midrank", "target_shareholder_valid"),
+        ("target_shareholder_simple_return", "target_shareholder_valid"),
+        ("target_terminal_wealth", "target_shareholder_valid"),
+        ("target_price_midrank", "target_price_valid"),
+        ("target_price_simple_return", "target_price_valid"),
         ("target_to_close", "target_to_close_valid"),
         ("intraday_values", "intraday_valid"),
     )
@@ -547,26 +660,41 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
             assert np.isfinite(value).all()
     assert not sample["slow_history_mask"][1].any()
     assert not sample["fast_present"][2]
-    assert not sample["fast_patch_mask"][2].any()
+    assert sample["fast_name_index"].tolist() == [0]
 
-    batch = next(iter(DataLoader(dataset, batch_size=1, shuffle=False)))
+    batch = next(
+        iter(
+            DataLoader(
+                dataset,
+                batch_size=1,
+                shuffle=False,
+                collate_fn=collate_v2_daily,
+            )
+        )
+    )
     model = DailyMultiHorizonModel(
         ModelConfig(
             slow_feature_count=int(sample["slow_features"].shape[-1]),
             slow_lookback=20,
+            fast_encoder_mode="legacy_v1_contaminated",
+            allow_contaminated_v1_initialization=True,
         )
     ).eval()
     with torch.no_grad():
         predictions = model(
             batch["slow_features"],
+            batch["slow_feature_mask"],
             batch["slow_history_mask"],
             batch["active_mask"],
-            batch["fast_patches"],
+            None,
             batch["fast_patch_mask"],
             batch["fast_present"],
             batch["days_since_last_slow_row"],
-            None,
+            batch["fast_state_position"],
             batch["v1_equity_slow"],
+            fast_patch_values=batch["fast_patch_values"],
+            fast_patch_valid=batch["fast_patch_valid"],
+            fast_name_index=batch["fast_name_index"],
         )
     assert torch.isfinite(predictions[batch["active_mask"]]).all()
 
@@ -614,12 +742,76 @@ def test_external_fast_ready_is_intersected_with_store_presence(tmp_path) -> Non
     sample = V2DailyDataset(path, [20], stage="finetune", lookback=20)[0]
     assert sample["fast_present"].tolist() == [True, False, False]
     assert sample["to_close_mask"].tolist() == [True, False, False]
-    assert not sample["fast_patch_mask"][2].any()
-    assert np.all(sample["fast_patches"][2] == 0.0)
+    assert sample["fast_name_index"].tolist() == [0]
+    assert sample["fast_patch_mask"].all()
+    patches = sample["fast_patch_values"]
+    for channel in V1_STORE_V2_ZERO_DYNAMIC_CHANNELS:
+        assert not patches[0, :, channel::26].any()
+    retained_dynamic = set(range(26)) - set(V1_STORE_V2_ZERO_DYNAMIC_CHANNELS)
+    assert all(
+        np.all(patches[0, :, channel::26] == 1.0)
+        for channel in retained_dynamic
+    )
     retained = sorted(set(range(32)) - set(V1_STORE_V2_ZERO_SLOW_FIELDS))
     assert np.all(sample["v1_equity_slow"][0, retained] == 7.0)
     assert not sample["v1_equity_slow"][0, V1_STORE_V2_ZERO_SLOW_FIELDS].any()
-    assert not sample["v1_equity_slow"][1:].any()
+    assert sample["v1_equity_slow"].shape == (1, 32)
+
+
+def test_native_fast_arrays_do_not_open_legacy_v1_context(tmp_path) -> None:
+    fast = tmp_path / "legacy_fast"
+    fast.mkdir()
+    np.save(
+        fast / "equity_features.npy",
+        np.ones((1, 2, 405, 26), dtype=np.float32),
+        allow_pickle=False,
+    )
+    np.save(
+        fast / "equity_slow.npy",
+        np.ones((1, 2, 32), dtype=np.float32),
+        allow_pickle=False,
+    )
+    np.save(
+        fast / "equity_data_ready.npy",
+        np.ones((1, 2), dtype=np.bool_),
+        allow_pickle=False,
+    )
+    path = _base_store(
+        tmp_path,
+        external_fast=fast,
+        extra_arrays={
+            "fast_patch_values": np.ones(
+                (25, 2, 69, 7), dtype=np.float32
+            ),
+            "fast_patch_valid": np.ones((25, 2, 69, 7), dtype=np.bool_),
+            "fast_patch_mask": np.ones((25, 2, 69), dtype=np.bool_),
+            "fast_last_price_age_minutes": np.zeros(
+                (25, 2, 69), dtype=np.float32
+            ),
+            "fast_last_price_age_valid": np.ones(
+                (25, 2, 69), dtype=np.bool_
+            ),
+        },
+        extra_tables={
+            "native_fast_security_mapping": pl.DataFrame(
+                {
+                    "fast_index": [0, 1],
+                    "store_name_index": [0, 2],
+                    "isin": ["BRTESTACNOR1", "BRTESTACNPR0"],
+                    "security_id": ["one", "two"],
+                }
+            )
+        },
+    )
+
+    dataset = V2DailyDataset(path, [20], stage="finetune", lookback=20)
+    sample = dataset[0]
+
+    assert dataset.external_artifact_resolutions == ()
+    assert sample["fast_present"].tolist() == [True, False, True]
+    assert sample["fast_patch_values"].shape == (2, 69, 7)
+    assert sample["fast_name_index"].tolist() == [0, 2]
+    assert not sample["v1_equity_slow"].any()
 
 
 def test_external_v1_slow_is_hash_bound(tmp_path) -> None:
@@ -666,8 +858,8 @@ def test_joint_dataset_uses_each_windows_entry_alignment(tmp_path) -> None:
     )
     dataset = V2DailyDataset(path, [24, 25], stage="joint", lookback=20)
     pretrain, finetune = dataset[0], dataset[1]
-    assert pretrain["slow_features"][0, -1, 0] == 24.0
-    assert pretrain["days_since_last_slow_row"][0] == 0.0
+    assert pretrain["slow_features"][0, -1, 0] == 23.0
+    assert pretrain["days_since_last_slow_row"][0] == 1.0
     assert finetune["slow_features"][0, -1, 0] == 24.0
     assert finetune["days_since_last_slow_row"][0] == 1.0
     assert not pretrain["v1_equity_slow"].any()
@@ -804,6 +996,7 @@ def test_causal_history_capability_allows_only_bounded_pre_sample_rows(
 
 def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
     tmp_path,
+    monkeypatch,
 ) -> None:
     dates = [
         value.astype(object)
@@ -813,8 +1006,9 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
     dates.append(date(2025, 1, 2))
     days = len(dates)
     target = np.full((days, 1, 5), 11.0, dtype=np.float32)
-    raw_target = np.full((days, 1, 5), 22.0, dtype=np.float32)
-    raw_return = np.full((days, 1, 5), 33.0, dtype=np.float32)
+    shareholder_target = np.full((days, 1, 5), 22.0, dtype=np.float32)
+    shareholder_return = np.full((days, 1, 5), 33.0, dtype=np.float32)
+    price_target = np.full((days, 1, 5), 55.0, dtype=np.float32)
     target_valid = np.ones_like(target, dtype=np.bool_)
     to_close = np.full((days, 1), 44.0, dtype=np.float32)
     to_close_valid = np.ones_like(to_close, dtype=np.bool_)
@@ -830,9 +1024,11 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
             "active": np.ones((days, 1), dtype=np.bool_),
             "target_primary": target,
             "target_valid": target_valid,
-            "target_raw_midrank": raw_target,
-            "target_raw_valid": target_valid,
-            "target_raw_log_return": raw_return,
+            "target_shareholder_midrank": shareholder_target,
+            "target_shareholder_valid": target_valid,
+            "target_shareholder_simple_return": shareholder_return,
+            "target_price_midrank": price_target,
+            "target_price_valid": target_valid,
             "target_to_close": to_close,
             "target_to_close_valid": to_close_valid,
         },
@@ -840,19 +1036,52 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
     dataset = V2DailyDataset(
         path, [days - 3, days - 2], stage="evaluation", lookback=20
     )
+    reads: list[str] = []
+    original_read = dataset.store.read
+    original_read_target = dataset.store.read_target
+
+    def tracked_read(name, selector):
+        reads.append(name)
+        return original_read(name, selector)
+
+    def tracked_read_target(name, selector, *, valid_mask):
+        reads.append(name)
+        return original_read_target(name, selector, valid_mask=valid_mask)
+
+    monkeypatch.setattr(dataset.store, "read", tracked_read)
+    monkeypatch.setattr(dataset.store, "read_target", tracked_read_target)
     first = dataset[0]
     second = dataset[1]
+    assert reads.index("target_valid") < reads.index("target_primary")
+    assert reads.index("target_shareholder_valid") < reads.index(
+        "target_shareholder_midrank"
+    )
+    assert reads.index("target_price_valid") < reads.index("target_price_midrank")
+    assert reads.index("target_to_close_valid") < reads.index("target_to_close")
     assert first["target_mask"].tolist() == [[True, False, False, False, False]]
-    assert first["raw_target_mask"].tolist() == [[True, False, False, False, False]]
+    assert first["shareholder_target_mask"].tolist() == [
+        [True, False, False, False, False]
+    ]
+    assert first["price_target_mask"].tolist() == [
+        [True, False, False, False, False]
+    ]
     assert first["targets"].tolist() == [[11.0, 0.0, 0.0, 0.0, 0.0]]
-    assert first["raw_targets"].tolist() == [[22.0, 0.0, 0.0, 0.0, 0.0]]
-    assert first["raw_log_returns"].tolist() == [[33.0, 0.0, 0.0, 0.0, 0.0]]
+    assert first["shareholder_targets"].tolist() == [
+        [22.0, 0.0, 0.0, 0.0, 0.0]
+    ]
+    assert first["shareholder_simple_returns"].tolist() == [
+        [33.0, 0.0, 0.0, 0.0, 0.0]
+    ]
+    assert first["price_targets"].tolist() == [
+        [55.0, 0.0, 0.0, 0.0, 0.0]
+    ]
     assert first["to_close_mask"].tolist() == [False]
     assert first["to_close_target"].tolist() == [0.0]
     assert second["target_mask"].tolist() == [[False] * 5]
     assert second["targets"].tolist() == [[0.0] * 5]
-    assert second["raw_targets"].tolist() == [[0.0] * 5]
-    assert second["raw_log_returns"].tolist() == [[0.0] * 5]
+    assert second["shareholder_targets"].tolist() == [[0.0] * 5]
+    assert second["shareholder_simple_returns"].tolist() == [[0.0] * 5]
+    assert second["price_targets"].tolist() == [[0.0] * 5]
     assert second["to_close_mask"].tolist() == [False]
     assert second["to_close_target"].tolist() == [0.0]
     direct_targets = dataset.store.read("target_primary", [days - 3, days - 2])
@@ -865,6 +1094,51 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
         [True, False, False, False, False],
         [False, False, False, False, False],
     ]
+
+    backing = dataset.store._arrays["target_primary"]
+    payload_reads: list[object] = []
+
+    class TargetReadGuard:
+        shape = backing.shape
+        dtype = backing.dtype
+
+        def __getitem__(self, key):
+            payload_reads.append(key)
+            if not isinstance(key, tuple):
+                raise AssertionError("target payload was read before endpoint masking")
+            return backing[key]
+
+    dataset.store._arrays["target_primary"] = TargetReadGuard()
+    payload_reads.clear()
+    guarded_sample = dataset[0]
+    assert guarded_sample["targets"].tolist() == [[11.0, 0.0, 0.0, 0.0, 0.0]]
+    assert len(payload_reads) == 1
+    assert np.asarray(payload_reads[0][-1]).tolist() == [0]
+    payload_reads.clear()
+    assert not dataset[1]["targets"].any()
+    assert payload_reads == []
+    guarded = dataset.store.read("target_primary", [days - 3, days - 2])
+    np.testing.assert_array_equal(guarded, direct_targets)
+    assert len(payload_reads) == 1
+    assert np.asarray(payload_reads[0][-1]).tolist() == [0]
+    payload_reads.clear()
+    local_mask = direct_mask.copy()
+    local_mask[0, 0, 0] = False
+    narrowed = dataset.store.read_target(
+        "target_primary",
+        [days - 3, days - 2],
+        valid_mask=local_mask,
+    )
+    assert not narrowed.any()
+    assert payload_reads == []
+    exceeding = direct_mask.copy()
+    exceeding[0, 0, 1] = True
+    with pytest.raises(PermissionError, match="exceeds the store capability"):
+        dataset.store.read_target(
+            "target_primary",
+            [days - 3, days - 2],
+            valid_mask=exceeding,
+        )
     gappy = V2DailyDataset(path, [days - 4, days - 2], stage="evaluation", lookback=20)
     assert gappy[0]["target_mask"].tolist() == [[False] * 5]
     with pytest.raises(PermissionError, match="authorization grant"):
@@ -893,17 +1167,6 @@ def test_dataset_rejects_dates_outside_its_stage_before_array_open(tmp_path) -> 
         V2DailyDataset(path, [1], stage="joint", lookback=20)
 
 
-def test_v1_calendar_includes_physical_warmup_before_finetune() -> None:
-    calendar = [
-        V1_STORE_START + timedelta(days=index) for index in range(EXPECTED_V1_DATES - 1)
-    ]
-    calendar.append(ACCUMULATED_TEST_AFTER)
-    _validate_v1_calendar(calendar)
-    assert V1_STORE_START < FINETUNE_START
-    with pytest.raises(ValueError, match="fixed axis"):
-        _validate_v1_calendar([FINETUNE_START, *calendar[1:]])
-
-
 def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
     days = 70
     names = ("BRTESTACNOR1", "BRTESTACNPR0")
@@ -930,6 +1193,8 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
                     "distribution_number": (
                         2 if name_index == 1 and day_index >= 63 else 1
                     ),
+                    "currency": "BRL",
+                    "quote_factor": 1.0,
                 }
             )
     minute = np.broadcast_to(
@@ -958,6 +1223,10 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
             "split_factor": [1.0, 1.0],
             "cash_distribution_brl": [0.5, 0.0],
             "unresolved": [False, True],
+            "fetched_at": [
+                datetime(2023, 4, 1, tzinfo=timezone.utc),
+                datetime(2023, 4, 1, tzinfo=timezone.utc),
+            ],
         },
         schema_overrides={"ex_date": pl.Date},
     )
@@ -980,7 +1249,8 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
         tmp_path / "daily_store",
         minute_panel=panel,
         action_acquisition_audit=successful_audit,
-        minimum_calendar_names=1,
+        session_schedule=_session_schedule(dates),
+        minimum_rank_names=1,
         store_start=None,
     )
     build_metadata = json.loads((root / "manifest.json").read_text())["metadata"]
@@ -991,50 +1261,65 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
         tmp_path / "daily_store_provider_empty",
         minute_panel=panel,
         action_acquisition_audit=failed_audit,
-        minimum_calendar_names=1,
+        session_schedule=_session_schedule(dates),
+        minimum_rank_names=1,
         store_start=None,
     )
-    assert {path.name: path.read_bytes() for path in root.glob("*.npy")} == {
-        path.name: path.read_bytes() for path in provider_empty_root.glob("*.npy")
-    }
+    assert not np.load(
+        provider_empty_root / "target_shareholder_valid.npy"
+    ).any()
     raw = np.load(root / "target_to_close_raw_log_return.npy")
     valid = np.load(root / "target_to_close_valid.npy")
     expected = np.log(cotahist_close / minute[64, 0, 345])
     assert raw.dtype == np.float32
-    assert raw[64, 0] == np.float32(expected)
+    np.testing.assert_allclose(raw[64, 0], expected, rtol=1e-5, atol=1e-8)
     assert valid[64].all()
     assert np.isnan(raw[65, 0])
     assert not valid[65].any()
     consistent = np.load(root / "m1_cotahist_close_consistent_mask.npy")
     assert not consistent[65].any()
     cash_event = np.load(root / "detected_cash_event_mask.npy")
-    neutralized_event = np.load(root / "return_neutralized_event_mask.npy")
     anomaly = np.load(root / "price_jump_anomaly_mask.npy")
     ambiguous = np.load(root / "ambiguous_action_mask.npy")
     assert cash_event[63, 1]
-    assert neutralized_event[63, 1]
     assert not anomaly.any()
     assert not ambiguous.any()
     slow_valid = np.load(root / "slow_valid.npy")
     assert slow_valid[63, 1, 3]
-    assert slow_valid[64, 0, 0]
+    assert not slow_valid[64, 0, 0]
+    assert slow_valid[64, 1, 0]
     assert slow_valid[64, 0, 25]
-    target_raw_valid = np.load(root / "target_raw_valid.npy")
-    assert target_raw_valid[61, 1, 0]
-    assert not target_raw_valid[62, 1, 0]
-    assert target_raw_valid[63, 1, 0]
+    shareholder_valid = np.load(root / "target_shareholder_valid.npy")
+    price_valid = np.load(root / "target_price_valid.npy")
+    assert not shareholder_valid[62, 0, 0]
+    assert shareholder_valid[63, 0, 0]
+    assert price_valid[62, 0, 0]
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     assert "cash_reinvestment_unavailable_count_foundation" not in manifest["metadata"]
-    assert manifest["metadata"]["future_total_return_variant"].startswith(
-        "registered but not implemented"
+    assert manifest["metadata"]["return_definition"]["synthetic_cash_distribution"] == (
+        "disabled"
     )
-    assert (
-        tuple(manifest["metadata"]["v1_store_v2_zero_slow_fields"])
-        == V1_STORE_V2_ZERO_SLOW_FIELDS
-    )
+    assert manifest["metadata"]["native_fast"] == {
+        "enabled": True,
+        "security_count": 2,
+        "channels": [
+            "adjacent_endpoint_log_return_over_s5",
+            "block_log_high_low_over_s5",
+            "signed_close_location",
+            "relative_same_clock_volume",
+            "observed_fraction",
+            "elapsed_fraction",
+            "last_price_age_fraction",
+        ],
+        "time_axis": (
+            "date-specific continuous-open to 15:45 decision prefix; "
+            "five-minute completed blocks"
+        ),
+        "legacy_v1_artifact_required": False,
+    }
     assert manifest["metadata"]["undocumented_split_fallback"] is False
     assert "cotahist_action_counts_by_year" in manifest["tables"]
-    assert "neutralized_return_coverage_by_year" in manifest["tables"]
+    assert "corporate_actions_verified_terms" in manifest["tables"]
 
 
 def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
@@ -1080,6 +1365,8 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
                     ),
                     "quantity": float(qty[day_index, name_index]),
                     "distribution_number": float(dismes[day_index, name_index]),
+                    "currency": "BRL",
+                    "quote_factor": 1.0,
                 }
                 for day_index, day in enumerate(dates)
                 for name_index, isin in enumerate(names)
@@ -1138,13 +1425,24 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
     mutated_close[cutoff + 1 :] *= 3.0
     mutated_quantity[cutoff + 1 :] *= 7.0
     mutated_distribution[cutoff + 1 :] += 5.0
+    acquisition_audit = pl.DataFrame(
+        {
+            "isin": list(names),
+            "first_date": [dates[0]] * len(names),
+            "last_date": [dates[-1]] * len(names),
+            "status": ["downloaded"] * len(names),
+            "action_rows": [0] * len(names),
+        }
+    )
     first = build_daily_store(
         daily_frame(close, quantity, distribution),
         actions,
         tmp_path / "causal_a",
         minute_panel=minute_panel(close),
         sidecar_arguments=(f"fundamentals={sidecar_a}",),
-        minimum_calendar_names=1,
+        action_acquisition_audit=acquisition_audit,
+        session_schedule=_session_schedule(dates),
+        minimum_rank_names=1,
         store_start=None,
     )
     second = build_daily_store(
@@ -1158,18 +1456,23 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
         tmp_path / "causal_b",
         minute_panel=minute_panel(close, future_scale=3.0),
         sidecar_arguments=(f"fundamentals={sidecar_b}",),
-        minimum_calendar_names=1,
+        action_acquisition_audit=acquisition_audit,
+        session_schedule=_session_schedule(dates),
+        minimum_rank_names=1,
         store_start=None,
     )
 
     exact_names = {
-        "adjusted_open",
-        "adjusted_high",
-        "adjusted_low",
-        "adjusted_close",
-        "price_adjustment_factor",
+        "raw_open",
+        "raw_high",
+        "raw_low",
+        "raw_close",
+        "shareholder_wealth_open",
+        "shareholder_wealth_high",
+        "shareholder_wealth_low",
+        "shareholder_wealth_close",
+        "shareholder_wealth_valid",
         "detected_split_mask",
-        "return_neutralized_event_mask",
         "active",
         "fast_present",
         "intraday_action_boundary_mask",

@@ -25,21 +25,53 @@ from .splits import (
     authorize_dates,
 )
 
-STORE_SCHEMA = "V2_DAILY_STORE_V1"
+STORE_SCHEMA = "BRAZIL_RV_V2_DAILY_STORE_V2"
+_SUPERSEDED_STORE_SCHEMAS = frozenset(("V2_DAILY_STORE_V1",))
 _SAFE_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 _WRITE_VERIFICATION = object()
 _MAX_CAUSAL_HISTORY_ROWS = max(*ALLOWED_LOOKBACKS, 253)
 _TARGET_VALUE_MASKS = {
     "target_primary": "target_valid",
     "target_normalized_residual": "target_valid",
-    "target_raw_midrank": "target_raw_valid",
-    "target_raw_log_return": "target_raw_valid",
+    "target_shareholder_midrank": "target_shareholder_valid",
+    "target_shareholder_simple_return": "target_shareholder_valid",
+    "target_terminal_wealth": "target_shareholder_valid",
+    "target_terminal_loss": "target_shareholder_valid",
+    "target_price_midrank": "target_price_valid",
+    "target_price_simple_return": "target_price_valid",
     "target_to_close": "target_to_close_valid",
     "target_to_close_normalized_residual": "target_to_close_valid",
     "target_to_close_raw_log_return": "target_to_close_valid",
 }
-_MULTI_HORIZON_TARGET_MASKS = frozenset(("target_valid", "target_raw_valid"))
-_DATE_ONLY_ARRAYS = frozenset(("cross_sectional_median_log_return",))
+_MULTI_HORIZON_TARGET_MASKS = frozenset(
+    ("target_valid", "target_shareholder_valid", "target_price_valid")
+)
+_DATE_ONLY_ARRAYS: frozenset[str] = frozenset()
+_DATE_HORIZON_ARRAYS = frozenset(("target_normalized_cross_section_valid",))
+_SPARSE_FAST_ARRAYS = frozenset(
+    {
+        "fast_patch_values",
+        "fast_patch_valid",
+        "fast_patch_mask",
+        "fast_last_price_age_minutes",
+        "fast_last_price_age_valid",
+    }
+)
+_FORBIDDEN_CURRENT_ARRAYS = frozenset(
+    {
+        "adjusted_open",
+        "adjusted_high",
+        "adjusted_low",
+        "adjusted_close",
+        "price_adjustment_factor",
+        "neutralized_log_return",
+        "neutralized_log_return_valid",
+        "return_neutralized_event_mask",
+        "target_raw_midrank",
+        "target_raw_valid",
+        "target_raw_log_return",
+    }
+)
 
 
 def peak_rss_bytes() -> int:
@@ -85,6 +117,36 @@ def peak_rss_bytes() -> int:
 
     peak = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     return peak if sys.platform == "darwin" else peak * 1024
+
+
+def available_physical_memory_bytes() -> int:
+    """Return currently available physical memory without a third-party probe."""
+
+    if sys.platform == "win32":
+        import ctypes
+
+        class MemoryStatusEx(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        status = MemoryStatusEx()
+        status.dwLength = ctypes.sizeof(status)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            raise OSError("GlobalMemoryStatusEx failed")
+        return int(status.ullAvailPhys)
+
+    page_size = int(os.sysconf("SC_PAGE_SIZE"))
+    available_pages = int(os.sysconf("SC_AVPHYS_PAGES"))
+    return page_size * available_pages
 
 
 _VERIFIED_HASHES: set[tuple[str, int, int, str]] = set()
@@ -152,10 +214,35 @@ def _validate_array_shapes(
     for name, raw in arrays.items():
         if not _SAFE_NAME.fullmatch(name):
             raise ValueError(f"unsafe array name: {name}")
+        if name in _FORBIDDEN_CURRENT_ARRAYS:
+            raise ValueError(
+                f"{name} belongs to the superseded synthetic-adjustment/target "
+                "contract and cannot be sealed under the current store schema"
+            )
         value = np.asarray(raw)
         if name in _DATE_ONLY_ARRAYS:
             if value.shape != (date_count,):
                 raise ValueError(f"{name} must have the [date] axis; got {value.shape}")
+            continue
+        if name in _DATE_HORIZON_ARRAYS:
+            if value.shape != (date_count, len(HORIZONS)):
+                raise ValueError(
+                    f"{name} must have the [date, horizon] axes; got {value.shape}"
+                )
+            if value.dtype != np.bool_:
+                raise ValueError(f"mask array must have boolean dtype: {name}")
+            continue
+        if name in _SPARSE_FAST_ARRAYS:
+            if value.ndim < 3 or value.shape[0] != date_count:
+                raise ValueError(
+                    f"{name} must begin with the [date, fast-security, patch] "
+                    f"axes; got {value.shape}"
+                )
+            if value.dtype == object:
+                raise ValueError(f"object array is forbidden: {name}")
+            if name.endswith("_valid") or name.endswith("_mask"):
+                if value.dtype != np.bool_:
+                    raise ValueError(f"mask array must have boolean dtype: {name}")
             continue
         if value.ndim < 2 or value.shape[:2] != (date_count, isin_count):
             raise ValueError(
@@ -171,6 +258,9 @@ def _validate_array_shapes(
                 "active",
                 "observed",
                 "fast_present",
+                "action_session_resolved",
+                "action_has_action",
+                "target_terminal_loss",
             }
         ):
             if value.dtype != np.bool_:
@@ -178,8 +268,10 @@ def _validate_array_shapes(
     paired = (
         ("slow_values", "slow_valid"),
         ("intraday_values", "intraday_valid"),
+        ("fast_patch_values", "fast_patch_valid"),
         ("target_primary", "target_valid"),
-        ("target_raw_midrank", "target_raw_valid"),
+        ("target_shareholder_midrank", "target_shareholder_valid"),
+        ("target_price_midrank", "target_price_valid"),
         ("target_to_close", "target_to_close_valid"),
     )
     for values_name, mask_name in paired:
@@ -190,6 +282,98 @@ def _validate_array_shapes(
             and arrays[values_name].shape != arrays[mask_name].shape
         ):
             raise ValueError(f"{values_name} and {mask_name} are misaligned")
+    if "fast_patch_values" in arrays:
+        fast_shape = arrays["fast_patch_values"].shape
+        if len(fast_shape) != 4 or fast_shape[-1] != 7:
+            raise ValueError("native fast values must have shape [date, fast, patch, 7]")
+        if "fast_patch_mask" not in arrays:
+            raise ValueError("native fast values require fast_patch_mask")
+        if arrays["fast_patch_mask"].shape != fast_shape[:-1]:
+            raise ValueError("native fast patch mask is misaligned")
+        for values_name, mask_name in (
+            ("fast_last_price_age_minutes", "fast_last_price_age_valid"),
+        ):
+            if (values_name in arrays) != (mask_name in arrays):
+                raise ValueError(f"{values_name} and {mask_name} must be stored together")
+            if values_name in arrays and arrays[values_name].shape != fast_shape[:-1]:
+                raise ValueError(f"{values_name} is misaligned with native fast patches")
+    for values_name, mask_name in (
+        ("target_shareholder_simple_return", "target_shareholder_valid"),
+        ("target_terminal_wealth", "target_shareholder_valid"),
+        ("target_terminal_loss", "target_shareholder_valid"),
+        ("target_price_simple_return", "target_price_valid"),
+    ):
+        if values_name not in arrays:
+            continue
+        if mask_name not in arrays:
+            raise ValueError(f"{values_name} requires {mask_name}")
+        if arrays[values_name].shape != arrays[mask_name].shape:
+            raise ValueError(f"{values_name} and {mask_name} are misaligned")
+    action_names = {
+        "action_shares_per_prior_share",
+        "action_cash_per_prior_share",
+        "action_session_resolved",
+        "action_has_action",
+        "action_successor_index",
+        "action_payment_session",
+    }
+    present_actions = action_names.intersection(arrays)
+    if present_actions and present_actions != action_names:
+        raise ValueError(
+            "the canonical action arrays must be stored as one complete contract"
+        )
+    if present_actions:
+        q = np.asarray(arrays["action_shares_per_prior_share"])
+        d = np.asarray(arrays["action_cash_per_prior_share"])
+        successor = np.asarray(arrays["action_successor_index"])
+        payment = np.asarray(arrays["action_payment_session"])
+        if (
+            not np.issubdtype(q.dtype, np.floating)
+            or not np.issubdtype(d.dtype, np.floating)
+            or not np.isfinite(q).all()
+            or not np.isfinite(d).all()
+            or (q < 0).any()
+            or (d < 0).any()
+        ):
+            raise ValueError("canonical action q/d arrays are invalid")
+        if not np.issubdtype(successor.dtype, np.integer) or (
+            (successor < 0).any() or (successor >= isin_count).any()
+        ):
+            raise ValueError("canonical action successor indices are invalid")
+        if (
+            not np.issubdtype(payment.dtype, np.integer)
+            or (payment < -1).any()
+            or (payment > date_count).any()
+        ):
+            raise ValueError("canonical action payment sessions are invalid")
+
+
+def _validate_native_fast_mapping(
+    frame: pl.DataFrame,
+    *,
+    fast_count: int,
+    isins: Sequence[str],
+) -> None:
+    required = {"fast_index", "store_name_index", "isin"}
+    if not required.issubset(frame.columns):
+        raise ValueError(
+            "native fast security mapping columns missing: "
+            f"{sorted(required - set(frame.columns))}"
+        )
+    ordered = frame.select(required).sort("fast_index")
+    fast_indices = ordered.get_column("fast_index").cast(pl.Int64).to_list()
+    store_indices = (
+        ordered.get_column("store_name_index").cast(pl.Int64).to_list()
+    )
+    mapped_isins = ordered.get_column("isin").cast(pl.String).to_list()
+    if fast_indices != list(range(fast_count)):
+        raise ValueError("native fast indices must be contiguous and complete")
+    if len(set(store_indices)) != fast_count or any(
+        index < 0 or index >= len(isins) for index in store_indices
+    ):
+        raise ValueError("native fast store-name mapping is not one-to-one")
+    if any(isins[index] != isin for index, isin in zip(store_indices, mapped_isins)):
+        raise ValueError("native fast ISIN identities disagree with the store axis")
 
 
 def close_memmap(array: NDArray[np.generic]) -> None:
@@ -259,6 +443,11 @@ class StoreStaging:
         valid_shape = (
             normalized_shape == (self.dates.size,)
             if name in _DATE_ONLY_ARRAYS
+            else normalized_shape == (self.dates.size, len(HORIZONS))
+            if name in _DATE_HORIZON_ARRAYS
+            else len(normalized_shape) >= 3
+            and normalized_shape[0] == self.dates.size
+            if name in _SPARSE_FAST_ARRAYS
             else len(normalized_shape) >= 2
             and normalized_shape[:2] == (self.dates.size, len(self.isins))
         )
@@ -296,6 +485,10 @@ class StoreStaging:
         valid_source = (
             source.ndim == 1
             if name in _DATE_ONLY_ARRAYS
+            else source.ndim == 2 and source.shape[1] == len(HORIZONS)
+            if name in _DATE_HORIZON_ARRAYS
+            else source.ndim >= 3
+            if name in _SPARSE_FAST_ARRAYS
             else source.ndim >= 2 and source.shape[1] == len(self.isins)
         )
         if not valid_source:
@@ -383,6 +576,17 @@ class StoreStaging:
         arrays = {name: self.open_array(name) for name in sorted(self._arrays)}
         try:
             _validate_array_shapes(arrays, self.dates.size, len(self.isins))
+            if "fast_patch_values" in arrays:
+                mapping = (tables or {}).get("native_fast_security_mapping")
+                if mapping is None:
+                    raise ValueError(
+                        "native fast arrays require native_fast_security_mapping"
+                    )
+                _validate_native_fast_mapping(
+                    mapping,
+                    fast_count=arrays["fast_patch_values"].shape[1],
+                    isins=self.isins,
+                )
         finally:
             for value in arrays.values():
                 close_memmap(value)
@@ -416,6 +620,33 @@ class StoreStaging:
                 "bytes": path.stat().st_size,
                 "sha256": sha256_file(path),
             }
+        ordered_feature_names = {
+            key: list(value) for key, value in (feature_names or {}).items()
+        }
+        metadata_payload = dict(metadata or {})
+        declared_feature_schema = metadata_payload.get("feature_schema")
+        declared_feature_sha = (
+            declared_feature_schema.get("sha256")
+            if isinstance(declared_feature_schema, Mapping)
+            else None
+        )
+        if declared_feature_sha is None:
+            feature_schema_sha256 = hashlib.sha256(
+                _json_bytes(ordered_feature_names)
+            ).hexdigest()
+            feature_schema_source = "ordered_feature_names_only"
+        elif (
+            not isinstance(declared_feature_sha, str)
+            or len(declared_feature_sha) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in declared_feature_sha
+            )
+        ):
+            raise ValueError("metadata feature-schema SHA-256 is malformed")
+        else:
+            feature_schema_sha256 = declared_feature_sha
+            feature_schema_source = "metadata_feature_specifications"
         manifest: dict[str, Any] = {
             "schema": STORE_SCHEMA,
             "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -434,11 +665,11 @@ class StoreStaging:
             "indices": index_inventory,
             "arrays": inventory,
             "tables": table_inventory,
-            "feature_names": {
-                key: list(value) for key, value in (feature_names or {}).items()
-            },
+            "feature_names": ordered_feature_names,
+            "feature_schema_sha256": feature_schema_sha256,
+            "feature_schema_source": feature_schema_source,
             "sources": [dict(value) for value in sources],
-            "metadata": dict(metadata or {}),
+            "metadata": metadata_payload,
             "official_validation_accessed": False,
             "test_accessed": False,
         }
@@ -475,7 +706,8 @@ def write_store(
     _validate_axes(date_axis, isin_axis)
     materialized = {name: np.asarray(value) for name, value in arrays.items()}
     if any(
-        value.ndim < (1 if name in _DATE_ONLY_ARRAYS else 2)
+        value.ndim
+        < (1 if name in _DATE_ONLY_ARRAYS else 2)
         for name, value in materialized.items()
     ):
         raise ValueError("store arrays must begin with their registered axes")
@@ -569,8 +801,15 @@ class V2Store:
             raise PermissionError("invalid v2 store access capability")
         manifest_path = path / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest.get("schema") != STORE_SCHEMA:
-            raise ValueError("not a v2 daily store")
+        schema = manifest.get("schema")
+        if schema in _SUPERSEDED_STORE_SCHEMAS:
+            raise ValueError(
+                "superseded v2 daily store: decision-row, action/return, feature-mask, "
+                "and native-fast semantics are incompatible; rebuild from immutable "
+                "raw sources under the current schema"
+            )
+        if schema != STORE_SCHEMA:
+            raise ValueError("not a current v2 daily store")
         sha_record = (path / "manifest.sha256").read_text(encoding="ascii").split()[0]
         if verify_hashes and not _matches_verified_file(
             manifest_path,
@@ -609,6 +848,18 @@ class V2Store:
             ):
                 raise ValueError(f"store table hash mismatch: {name}")
         _validate_array_shapes(arrays, dates.size, len(isins))
+        if "fast_patch_values" in arrays:
+            try:
+                mapping_record = manifest["tables"]["native_fast_security_mapping"]
+            except KeyError as error:
+                raise ValueError(
+                    "native fast arrays lack their security mapping"
+                ) from error
+            _validate_native_fast_mapping(
+                pl.read_parquet(path / mapping_record["path"]),
+                fast_count=arrays["fast_patch_values"].shape[1],
+                isins=isins,
+            )
         return cls(
             root=path,
             manifest=manifest,
@@ -725,24 +976,95 @@ class V2Store:
         except KeyError as error:
             raise KeyError(f"v2 store does not contain {name}") from error
         selector = self._checked_date_selector(date_selector)
-        result = np.asarray(array[selector]).copy()
         mask_name = _TARGET_VALUE_MASKS.get(name)
         if name in _MULTI_HORIZON_TARGET_MASKS:
             return self._target_mask(name, selector)
         if mask_name is None:
-            return result
+            return np.asarray(array[selector]).copy()
         if mask_name in _MULTI_HORIZON_TARGET_MASKS:
             valid = self._target_mask(mask_name, selector)
         else:
-            valid = np.asarray(self._arrays[mask_name][selector], dtype=np.bool_)
-        if result.shape != valid.shape:
-            raise ValueError(f"{name} and {mask_name} are misaligned")
-        return np.where(valid, result, 0).astype(result.dtype, copy=False)
+            valid = np.asarray(
+                self._arrays[mask_name][selector], dtype=np.bool_
+            ).copy()
+        return self._read_target_payload(name, array, selector, valid)
+
+    def read_target(
+        self,
+        name: str,
+        date_selector: (
+            int | np.integer | slice | range | Sequence[int] | NDArray[np.integer]
+        ),
+        *,
+        valid_mask: NDArray[np.bool_],
+    ) -> NDArray[np.generic]:
+        """Read only explicitly authorized target cells inside a local window.
+
+        A store capability can cover a union of fit, selection, and evaluation
+        dates.  A caller evaluating one window must therefore narrow the store's
+        endpoint-valid mask before any target payload is decoded.  The supplied
+        mask may only remove cells from the canonical capability mask.
+        """
+
+        mask_name = _TARGET_VALUE_MASKS.get(name)
+        if mask_name is None:
+            raise ValueError(f"{name} is not a masked target payload")
+        try:
+            array = self._arrays[name]
+        except KeyError as error:
+            raise KeyError(f"v2 store does not contain {name}") from error
+        selector = self._checked_date_selector(date_selector)
+        if mask_name in _MULTI_HORIZON_TARGET_MASKS:
+            canonical = self._target_mask(mask_name, selector)
+        else:
+            canonical = np.asarray(
+                self._arrays[mask_name][selector], dtype=np.bool_
+            ).copy()
+        requested = np.asarray(valid_mask)
+        if requested.dtype != np.bool_ or requested.shape != canonical.shape:
+            raise ValueError(
+                "local target validity mask must be boolean and match the "
+                "selected target payload"
+            )
+        if np.any(requested & ~canonical):
+            raise PermissionError(
+                "local target validity mask exceeds the store capability"
+            )
+        return self._read_target_payload(name, array, selector, requested)
+
+    def _read_target_payload(
+        self,
+        name: str,
+        array: NDArray[np.generic],
+        selector: int | NDArray[np.int64],
+        valid: NDArray[np.bool_],
+    ) -> NDArray[np.generic]:
+        expected_shape = array.shape[1:] if isinstance(selector, int) else (
+            selector.size,
+            *array.shape[1:],
+        )
+        if expected_shape != valid.shape:
+            raise ValueError(f"{name} and its validity mask are misaligned")
+        # Read the authorization/validity mask first, then index only permitted
+        # payload cells.  Reading a whole target row and zeroing it afterwards
+        # still decodes outcomes whose endpoint is outside this capability.
+        # That is an information-boundary violation even if the values are not
+        # returned to the caller.
+        result = np.zeros(valid.shape, dtype=array.dtype)
+        coordinates = np.nonzero(valid)
+        if not coordinates[0].size:
+            return result
+        if isinstance(selector, int):
+            source_coordinates = (selector, *coordinates)
+        else:
+            source_coordinates = (selector[coordinates[0]], *coordinates[1:])
+        result[coordinates] = array[source_coordinates]
+        return result
 
     def _target_mask(
         self, name: str, selector: int | slice | NDArray[np.int64]
     ) -> NDArray[np.bool_]:
-        """Clip multi-horizon targets to endpoints inside this exact grant."""
+        """Clip targets unless every session in (t, t+H] is in this grant."""
 
         raw = np.asarray(self._arrays[name][selector], dtype=np.bool_).copy()
         scalar = raw.ndim == 2
@@ -753,7 +1075,12 @@ class V2Store:
         granted = self._authorized_date_indices
         for row, date_index in enumerate(selected):
             for horizon_index, horizon in enumerate(HORIZONS):
-                if int(date_index) + horizon not in granted:
+                if any(
+                    endpoint not in granted
+                    for endpoint in range(
+                        int(date_index), int(date_index) + horizon + 1
+                    )
+                ):
                     masks[row, :, horizon_index] = False
         return masks[0] if scalar else masks
 
@@ -780,7 +1107,7 @@ class V2Store:
             record = self.manifest.get("tables", {})[name]
         except KeyError as error:
             raise KeyError(f"v2 store does not contain table {name}") from error
-        if name == "v1_fast_isin_mapping":
+        if name in {"v1_fast_isin_mapping", "native_fast_security_mapping"}:
             if date_selector is not None:
                 raise ValueError("the static ISIN mapping has no date selector")
             return pl.read_parquet(self.root / record["path"])
@@ -891,6 +1218,7 @@ def open_store_for_samples(
     purpose: AccessPurpose,
     history_lookbacks: int | Sequence[int],
     history_end_offsets: int | Sequence[int],
+    target_window_indices: Sequence[int] | None = None,
     registration_path: Path | None = None,
     preregistration_root: Path = PREREGISTRATION_ROOT,
     verify_hashes: bool = True,
@@ -907,7 +1235,12 @@ def open_store_for_samples(
     path = Path(root).resolve()
     dates = np.load(path / "date_index.npy", allow_pickle=False)
     indices = _validated_store_indices(dates, date_indices)
-    requested = tuple(sorted(dates[indices].astype(object).tolist()))
+    if target_window_indices is None:
+        target_indices = indices
+    else:
+        target_indices = _validated_store_indices(dates, target_window_indices)
+    requested_indices = np.unique(np.concatenate((indices, target_indices)))
+    requested = tuple(sorted(dates[requested_indices].astype(object).tolist()))
     ledger = authorize_dates(
         requested,
         purpose=purpose,
@@ -929,7 +1262,7 @@ def open_store_for_samples(
     ends = indices + offsets
     if np.any(ends < 0) or np.any(ends >= dates.size):
         raise ValueError("causal history endpoint is outside the store")
-    authorized = set(int(value) for value in indices)
+    authorized = set(int(value) for value in requested_indices)
     for end, lookback in zip(ends.tolist(), lookbacks.tolist(), strict=True):
         authorized.update(range(max(0, int(end) - int(lookback) + 1), int(end) + 1))
     grant = _StoreAccessGrant(

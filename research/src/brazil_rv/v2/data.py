@@ -842,13 +842,11 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             mask = target_masks.get(mask_destination)
             if mask is None or not self.store.has_array(value_source):
                 continue
-            if mask.any():
-                sample[value_destination] = self.store.read(value_source, date_index)
-            else:
-                sample[value_destination] = np.zeros(
-                    self.store.array_shape(value_source)[1:],
-                    dtype=self.store.array_dtype(value_source),
-                )
+            sample[value_destination] = self.store.read_target(
+                value_source,
+                date_index,
+                valid_mask=mask,
+            )
         for source, destination in (
             ("target_to_close_valid", "to_close_mask"),
             ("target_to_close", "to_close_target"),
