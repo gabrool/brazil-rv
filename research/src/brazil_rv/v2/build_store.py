@@ -404,8 +404,19 @@ def _build_resource_preflight(
     return preflight
 
 
-def _require_build_resource_preflight(preflight: Mapping[str, object]) -> None:
-    if preflight.get("passed") is True:
+def _require_build_resource_preflight(
+    preflight: Mapping[str, object], *, allow_low_memory: bool = False
+) -> None:
+    violations = list(preflight["violations"])
+    effective_violations = [
+        violation
+        for violation in violations
+        if not (
+            allow_low_memory
+            and violation == "available_build_memory_below_10_gib"
+        )
+    ]
+    if not effective_violations:
         return
 
     physical = int(preflight["available_physical_memory_bytes"])
@@ -419,13 +430,13 @@ def _require_build_resource_preflight(preflight: Mapping[str, object]) -> None:
         )
     message = (
         "v2 store build refused before source loading: "
-        f"violations={preflight['violations']}; conservative available build memory "
+        f"violations={effective_violations}; conservative available build memory "
         f"is {int(preflight['available_build_memory_bytes']) / 1024**3:.2f} GiB "
         f"({details}); output free is "
         f"{int(preflight['output_drive_free_bytes']) / 1024**3:.2f} GiB; required "
         f"output free is {int(preflight['minimum_output_drive_free_bytes']) / 1024**3:.2f} GiB"
     )
-    if "available_build_memory_below_10_gib" in preflight["violations"]:
+    if "available_build_memory_below_10_gib" in effective_violations:
         raise MemoryError(message)
     raise OSError(message)
 
@@ -3379,6 +3390,14 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="Prior immutable v2 store used to enforce three-times disk headroom",
     )
+    parser.add_argument(
+        "--i-understand-low-memory-risk",
+        action="store_true",
+        help=(
+            "Explicitly admit a build below the 10-GiB memory gate; disk and "
+            "staging-location gates remain mandatory"
+        ),
+    )
     parser.add_argument("--minute-npz", type=Path)
     parser.add_argument("--m1-assignments", required=True, type=Path)
     parser.add_argument(
@@ -3796,12 +3815,29 @@ def main(arguments: Sequence[str] | None = None) -> None:
         output_dir=args.output_dir,
         previous_store=args.previous_store,
     )
+    resource_preflight["low_memory_override_authorized"] = bool(
+        args.i_understand_low_memory_risk
+    )
+    resource_preflight["effective_violations"] = [
+        violation
+        for violation in resource_preflight["violations"]
+        if not (
+            args.i_understand_low_memory_risk
+            and violation == "available_build_memory_below_10_gib"
+        )
+    ]
+    resource_preflight["effective_passed"] = not resource_preflight[
+        "effective_violations"
+    ]
     print(
         json.dumps({"resource_preflight": resource_preflight}, sort_keys=True),
         file=sys.stderr,
         flush=True,
     )
-    _require_build_resource_preflight(resource_preflight)
+    _require_build_resource_preflight(
+        resource_preflight,
+        allow_low_memory=args.i_understand_low_memory_risk,
+    )
     raw_sources = tuple(
         (args.cotahist_raw_root / f"COTAHIST_A{year}.ZIP").resolve()
         for year in COTAHIST_YEARS

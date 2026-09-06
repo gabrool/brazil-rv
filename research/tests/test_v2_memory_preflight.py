@@ -94,6 +94,10 @@ def test_build_preflight_records_both_budgets_and_rejects_low_commit(
         )
         build_store_module._require_build_resource_preflight(report)
 
+    build_store_module._require_build_resource_preflight(
+        report, allow_low_memory=True
+    )
+
     memory_status["available_commit_memory_bytes"] = 12 * GIB
     memory_status["available_build_memory_bytes"] = 12 * GIB
     preflight = build_store_module._build_resource_preflight(
@@ -153,3 +157,7 @@ def test_build_preflight_rejects_system_drive_staging_and_low_disk(
     ]
     with pytest.raises(OSError, match="output_drive_free_below_three_times"):
         build_store_module._require_build_resource_preflight(preflight)
+    with pytest.raises(OSError, match="output_drive_free_below_three_times"):
+        build_store_module._require_build_resource_preflight(
+            preflight, allow_low_memory=True
+        )
