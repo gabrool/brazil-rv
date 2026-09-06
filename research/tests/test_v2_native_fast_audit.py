@@ -10,14 +10,14 @@ from brazil_rv.v2.native_fast_audit import _hand_compute
 
 
 def test_independent_native_fast_formulas_match_all_seven_channels() -> None:
-    days, names, minutes = 40, 3, 360
+    days, names, minutes = 40, 3, 412
     sessions = tuple(
         SessionDefinition(
             trade_date=date(2024, 1, 2) + timedelta(days=index),
-            continuous_open=time(10, 0),
+            continuous_open=time(10, 3),
             decision_time=time(15, 45),
-            continuous_close=time(16, 0),
-            auction_close=time(16, 5),
+            continuous_close=time(16, 55),
+            auction_close=time(17, 0),
             source="reconstructed_v1:test",
         )
         for index in range(days)
@@ -40,7 +40,7 @@ def test_independent_native_fast_formulas_match_all_seven_channels() -> None:
         supported,
         sigma,
         sessions,
-        max_patches=69,
+        max_patches=68,
     )
     canonical = build_native_fast_features(
         high,
@@ -52,7 +52,7 @@ def test_independent_native_fast_formulas_match_all_seven_channels() -> None:
         session_valid=supported,
         sigma_asof=sigma,
         sessions=sessions,
-        max_patches=69,
+        max_patches=68,
     )
 
     np.testing.assert_array_equal(independent[1], canonical.valid)

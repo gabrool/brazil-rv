@@ -98,7 +98,7 @@ def _clock_minutes(session: SessionDefinition) -> tuple[int, int, int]:
     close = session.continuous_close.hour * 60 + session.continuous_close.minute
     prefix = decision - opening
     continuous = close - opening
-    if prefix <= 0 or continuous <= prefix or prefix % 5:
+    if prefix <= 0 or continuous <= prefix:
         raise ValueError(f"invalid session clocks on {session.trade_date}")
     return opening, prefix, continuous
 
