@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 from dataclasses import asdict, dataclass, replace
@@ -186,11 +187,27 @@ def _read_store_header(root: Path) -> tuple[dict[str, object], NDArray[np.dateti
     if not isinstance(manifest, dict) or manifest.get("schema") != STORE_SCHEMA:
         raise ValueError("validation requires a real v2 daily store")
     metadata = manifest.get("metadata")
-    if not isinstance(metadata, Mapping) or (
-        metadata.get("v1_isin_subset_verified") is not True
-        or metadata.get("v1_calendar_verified") is not True
+    calendar_contract = (
+        metadata.get("calendar_contract") if isinstance(metadata, Mapping) else None
+    )
+    if (
+        not isinstance(calendar_contract, Mapping)
+        or calendar_contract.get("schema")
+        != "BRAZIL_RV_B3_EQUITY_SESSION_SCHEDULE_V1"
+        or calendar_contract.get("schedule_source") != metadata.get("schedule_source")
     ):
-        raise ValueError("store lacks the canonical v1 identity/calendar assertions")
+        raise ValueError("store lacks its explicit session-calendar contract")
+    tables = manifest.get("tables")
+    calendar_record = (
+        tables.get("calendar_completeness") if isinstance(tables, Mapping) else None
+    )
+    calendar_path = store_root / "calendar_completeness.parquet"
+    if not isinstance(calendar_record, Mapping) or (
+        int(calendar_record.get("rows", -1)) != 0
+        or int(calendar_record.get("bytes", -1)) != calendar_path.stat().st_size
+        or calendar_record.get("sha256") != sha256_file(calendar_path)
+    ):
+        raise ValueError("store calendar has missing or unexplained sessions")
     sources = manifest.get("sources")
     if not isinstance(sources, list) or not sources:
         raise ValueError("store has no immutable source identities")
@@ -207,15 +224,44 @@ def _read_store_header(root: Path) -> tuple[dict[str, object], NDArray[np.dateti
     if not isinstance(indices, Mapping):
         raise ValueError("store manifest lacks its immutable index inventory")
     date_record = indices.get("date_index.npy")
+    isin_record = indices.get("isin_index.npy")
     date_path = store_root / "date_index.npy"
-    if not isinstance(date_record, Mapping) or (
+    isin_path = store_root / "isin_index.npy"
+    if not isinstance(date_record, Mapping) or not isinstance(isin_record, Mapping) or (
         int(date_record.get("bytes", -1)) != date_path.stat().st_size
         or date_record.get("sha256") != sha256_file(date_path)
+        or int(isin_record.get("bytes", -1)) != isin_path.stat().st_size
+        or isin_record.get("sha256") != sha256_file(isin_path)
     ):
-        raise ValueError("store date index differs from its immutable manifest")
+        raise ValueError("store axes differ from their immutable manifest")
     dates = np.load(date_path, allow_pickle=False)
+    isins = np.load(isin_path, allow_pickle=False)
     if dates.dtype.kind != "M" or dates.ndim != 1:
         raise ValueError("store date index has the wrong contract")
+    if isins.dtype.kind not in "US" or isins.ndim != 1:
+        raise ValueError("store ISIN index has the wrong contract")
+    axes = manifest.get("axes")
+    date_identity = hashlib.sha256(
+        json.dumps(
+            [str(value) for value in dates],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    isin_identity = hashlib.sha256(
+        json.dumps(
+            [str(value) for value in isins],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if not isinstance(axes, Mapping) or (
+        int(axes.get("date_count", -1)) != dates.size
+        or int(axes.get("isin_count", -1)) != isins.size
+        or axes.get("date_identity_sha256") != date_identity
+        or axes.get("isin_identity_sha256") != isin_identity
+    ):
+        raise ValueError("store logical axis identities do not match the manifest")
     python_dates = tuple(dates.astype("datetime64[D]").astype(object).tolist())
     if (
         not python_dates

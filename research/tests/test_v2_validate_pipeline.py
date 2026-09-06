@@ -105,9 +105,17 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         },
         sources=[{"path": "fixture", "sha256": "a" * 64}],
         metadata={
-            "v1_isin_subset_verified": True,
-            "v1_calendar_verified": True,
+            "schedule_source": "explicit_versioned_schedule",
+            "calendar_contract": {
+                "schema": "BRAZIL_RV_B3_EQUITY_SESSION_SCHEDULE_V1",
+                "schedule_source": "explicit_versioned_schedule",
+            },
             "implementation_git_commit": "1" * 40,
+        },
+        tables={
+            "calendar_completeness": pl.DataFrame(
+                schema={"trade_date": pl.Date, "status": pl.String}
+            )
         },
     )
     development_dates = [value for value in dates if value >= FINETUNE_START]
@@ -992,6 +1000,20 @@ def test_store_header_rejects_stale_schema_before_index_access(
     )
 
     with pytest.raises(ValueError, match="real v2 daily store"):
+        pipeline._read_store_header(store_root)
+
+
+def test_store_header_requires_sealed_calendar_completeness(tmp_path: Path) -> None:
+    store_root, _, _, _, _ = _development_store(tmp_path)
+    manifest_path = store_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del manifest["tables"]["calendar_completeness"]
+    digest = write_json_atomic(manifest_path, manifest)
+    (store_root / "manifest.sha256").write_text(
+        f"{digest}  manifest.json\n", encoding="ascii"
+    )
+
+    with pytest.raises(ValueError, match="calendar has missing or unexplained"):
         pipeline._read_store_header(store_root)
 
 
