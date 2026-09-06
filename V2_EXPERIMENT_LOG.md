@@ -387,3 +387,91 @@ result. No paid Lambda instance was used for this pass.
 Two provider inventory reads at 2026-09-06T21:55:41Z each returned zero
 instances, confirming there was nothing to terminate and no adjacent instance
 was touched.
+
+## Pass-4e per-session action state and final acceptance stop (2026-09-06)
+
+The mandatory pre-change diagnostic used the sealed `8021e42` store and
+acceptance without rebuilding or changing the ledger. Across the 16 books it
+found 2,502 held unresolved/stale name-days, all carrying the old latched
+unresolved-action flag. Eighty-four name-days (3.3573%) traced to a flag origin
+followed by a later print. No held cell had a false retrospective action mask
+on an observed session; inferred-term, null-DISMES, and observed-OHLC-invalid
+causes were all absent. The evaluator had received the retrospective mask, not
+the decision-known feature mask. Coverage semantics therefore did not qualify
+for a rebuild under the frozen conditional rule.
+
+The canonical score-free diagnostic root is
+`D:\quant-data\b3\processed\model_runs\v2_pass4e_unresolved_diagnostic_24abe56_20260906T222757Z`.
+Its diagnostic-manifest, log-inclusive artifact-inventory, and access-audit
+SHA-256 values are
+`2801ea826df263525aec0247c9eeefcdd5975237e73dcab4807d20c68e623310`,
+`0f93b5e660c7701cfec392b3a92ff25fdb7eaccd212c270deffa91c0d07ed709`,
+and `9e02b999a1aa34e076c6940fcf3e87ed0845b01e62c83b1c455a124cc56d46ff`.
+An earlier pre-seal diagnostic directory at timestamp `20260906T222336Z` is
+retained as noncanonical evidence; no root was deleted.
+
+Commit `eca09d6851074e79d7ffb7f1d4e9a11c022c3a02` implements the bounded
+ledger correction. Action uncertainty is recomputed per session and cannot
+latch to a position. It gates new entries only; any observed positive close
+can fill ordinary exits, risk reductions, and terminal liquidations. The
+evaluator now asserts that accounting receives the store's retrospective
+outcome/action arrays. Daily output reports unresolved-claim inventory and
+stale-mark inventory separately while retaining their unchanged union gate.
+The required tests cover one-session uncertainty followed by an exit, a
+dividend receivable followed by an exit, terminal liquidation despite current
+uncertainty, and rejection of decision-known accounting alignment. Ruff and
+Python compilation passed; all 861 research tests passed in 392.66 seconds.
+
+The final replay hash-verified and reused all 16 sealed score panels. It fitted
+and scored no model, and all non-ledger fields were bit-identical. The immutable
+root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_pass4e_eca09d6_20260906T225238Z`.
+Pipeline-manifest, replay inventory, log-inclusive artifact-inventory, and
+access-audit SHA-256 values are
+`846d278d1a9bf9a038c7687406e570d77c968ccb7f7c5b13cfeba616a1c1de78`,
+`e90e2dbb6e83a078446d3403ef59fc1c0e411640afd940d99e73afdb23e164e5`,
+`49d6b2e0d7bbcbbdd4402b676a9e5891c81004f325928d440cd985c28cc1b534`,
+and `4edf9ca35b08e4c461d7bac77cb703ee2d8a308a73b013ae7e2ad7fefef5d3f9`.
+
+The predicted acceptance recovery did not occur. F1 momentum entered the
+gross band at `1.806721`, but F1/F2 inverse-volatility remained below it at
+`1.786278` and `1.741195`. The unresolved/stale gate still passed only 7 of 16
+books. Exact mean gross / mean unresolved-stale values were:
+
+| Book | Mean gross | Mean unresolved/stale | Gate failure |
+| --- | ---: | ---: | --- |
+| F1 inverse-volatility | 1.786278 | 0.035131 | gross, unresolved |
+| F1 momentum | 1.806721 | 0.019116 | none |
+| F1 reversal-21 | 1.970187 | 0.010521 | none |
+| F1 reversal-5 | 1.928655 | 0.013640 | none |
+| F1 blend | 1.971609 | 0.014209 | none |
+| F2 inverse-volatility | 1.741195 | 0.020533 | gross, unresolved |
+| F2 momentum | 1.828920 | 0.000000 | none |
+| F2 reversal-21 | 1.933180 | 0.012789 | none |
+| F2 reversal-5 | 1.916526 | 0.029282 | unresolved |
+| F2 blend | 1.943261 | 0.018603 | none |
+| F3 inverse-volatility | 1.888997 | 0.039003 | unresolved |
+| F3 momentum | 1.848432 | 0.104513 | unresolved |
+| F3 reversal-21 | 1.946001 | 0.040237 | unresolved |
+| F3 reversal-5 | 1.939774 | 0.056152 | unresolved |
+| F3 blend | 1.967017 | 0.109910 | unresolved |
+| F1 GBDT ensemble | 1.856964 | 0.024467 | unresolved |
+
+For every book the separately reported unresolved-claim and stale-mark means
+were equal to the union mean: the current inferred-tier false action cells on
+held inventory coincide with no-print sessions. The latch was real, but after
+removing it the binding exposure is still current stale/no-print inventory,
+not an exit blocked on a later observed print. The two low-turnover gross
+failures also retain stale inventory, so the contract's special no-frozen-
+inventory slot-occupancy branch does not apply; their mean pending-exit ages
+were 32.52 and 41.47 sessions.
+
+Engineering acceptance remains `unsupported`. The frozen stop rule prevented
+the conditional fast-forward to `main`, Round 1, Round 2, or any result-changing
+retry. Momentum's continuity-only pooled IC is recorded as `0.03985972` versus
+`0.056` on the former 34-name liquid subset; neither is a research result.
+Official-validation and test access remained false, transfer chronology was
+clean, `research_claim=false`, and no deployment changed.
+Provider inventories at `2026-09-06T22:57:42.9989658Z` and
+`2026-09-06T22:57:45.8155995Z` each returned zero instances. There was no paid
+instance to terminate and no adjacent instance was touched.

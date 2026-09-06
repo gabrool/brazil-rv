@@ -254,9 +254,10 @@ GitHub, and the instance, exact paid GH200 instance
 at 2026-09-04T20:09:32.7623726Z and 2026-09-04T20:09:57.4535979Z confirmed
 that exact ID absent and zero remaining instances.
 
-The pass-4d development-tier continuation is frozen on branch
+The pass-4e development-tier continuation is frozen on branch
 `fix/v2-development-grade-data` at implementation commit
-`8021e42ae658d3eb7bba19e39b58e2f9c8d65331`. Its current V3 store is
+`eca09d6851074e79d7ffb7f1d4e9a11c022c3a02`. It uses the V3 store built by
+`8021e42ae658d3eb7bba19e39b58e2f9c8d65331` at
 `D:\quant-data\b3\processed\v2_daily_store_8021e42_20260906T202315Z`, manifest
 SHA-256
 `deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b`.
@@ -284,6 +285,25 @@ unmerged, Round 1 and Round 2 remain unrun, no GH200 was launched, official
 validation/test remained unread, and no deployment changed. Any continuation
 requires a new pre-result contract rather than reinterpretation of these failed
 acceptance gates.
+
+Pass 4e confirmed that the ledger incorrectly latched a one-day unresolved
+action cell for the entire remaining position life. The bounded repair makes
+uncertainty per-session, blocks only entries, permits every printed exit/risk
+trim/terminal liquidation, separates current unresolved-claim notional from
+stale-mark notional, and asserts retrospective accounting alignment at the
+evaluator boundary. No store rebuild was warranted: the sealed diagnostic
+found no false retrospective action cell on an observed held name-day. All 861
+tests passed. The hash-reuse replay at
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_pass4e_eca09d6_20260906T225238Z`
+has pipeline-manifest and log-inclusive artifact-inventory SHA-256 values
+`846d278d1a9bf9a038c7687406e570d77c968ccb7f7c5b13cfeba616a1c1de78`
+and `49d6b2e0d7bbcbbdd4402b676a9e5891c81004f325928d440cd985c28cc1b534`.
+All non-ledger fields were bit-identical, but acceptance remains `unsupported`:
+9 of 16 books still exceed 2% mean daily stale/unresolved notional, while F1
+and F2 inverse-volatility remain below 1.8 gross. The separated measures are
+equal in these data because current false inferred-action cells coincide with
+no-print sessions. This is now a genuine stale-print/coverage limitation, not
+a persistent action latch. `main` remains unchanged and Round 1/2 remain unrun.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused

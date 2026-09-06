@@ -986,3 +986,59 @@ remains at the last accepted state. Official validation and test data were not
 read, no deployment changed, and no paid Lambda instance was required.
 Two direct provider inventories at 2026-09-06T21:55:41Z each returned zero
 instances.
+
+## 15. Pass-4e disposition: remove the latch, retain the failed gate
+
+Pass 4e's diagnosis-first ordering was implemented exactly. Before touching the
+ledger, the sealed `8021e42` store and acceptance were replayed only far enough
+to classify every held name-day in the unresolved/stale gate. The audit found
+2,502 such name-days and confirmed the proposed code mechanism: every row
+carried the old position-life `unresolved_action` latch. Eighty-four rows traced
+to a flag origin followed by a later print. It also ruled out the document's
+conditional data-rebuild triggers: no observed held session had a false
+retrospective action mask, no inferred-term/DISMES defect appeared on an
+observed cell, and the evaluator used the retrospective rather than the
+decision-known alignment. The store and coverage contract were therefore not
+rewritten. This choice follows the addendum's explicit conditional, avoids a
+result-equivalent rebuild, and preserves the sealed V3 source identity.
+
+The ledger change adopts the source document's accounting argument in full.
+Uncertainty is recomputed for the current session and no longer transfers or
+latches with a position. It can suppress only a new entry. A positive observed
+close fills an ordinary exit, risk trim, or terminal liquidation even if the
+current action term is unresolved. A booked cash receivable/payable remains an
+accounting claim but does not lock the associated shares. The evaluator now
+rejects anything except the manifest-labelled retrospective outcome/accounting
+arrays; the decision-known alignment remains confined to model features. The
+union exposure gate remains unchanged, with two new daily components exposing
+current unresolved-claim inventory and stale-mark inventory separately.
+
+The suggested rebuild was not implemented because its stated trigger did not
+fire. The suggested conditional merge and Round-1/Round-2 execution were also
+not implemented because their stated prerequisite did not pass. The replay
+reused all 16 sealed score panels and proved every non-ledger field bit-identical,
+but only F1 momentum newly entered the gross band. F1 and F2 inverse-volatility
+remained at `1.786278` and `1.741195`, and 9 of 16 books still exceeded the
+unchanged 2% daily unresolved/stale bound. F3 momentum and the F3 blend remained
+the largest failures at `10.4513%` and `10.9910%` of NAV. In every book the two
+new components equal the union: current inferred-action uncertainty on held
+inventory occurs on exactly the same no-print sessions as the stale mark. Thus
+the old latch was a genuine defect, but removing it demonstrates that the
+remaining gate failure is real stale/no-print exposure rather than an exit that
+was forbidden when a later print existed.
+
+The implementation is commit `eca09d6851074e79d7ffb7f1d4e9a11c022c3a02`.
+Ruff, compilation, and all 861 tests passed. The diagnostic and replay roots,
+respectively, are
+`D:\quant-data\b3\processed\model_runs\v2_pass4e_unresolved_diagnostic_24abe56_20260906T222757Z`
+and
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_pass4e_eca09d6_20260906T225238Z`.
+Their log-inclusive inventory SHA-256 values are
+`0f93b5e660c7701cfec392b3a92ff25fdb7eaccd212c270deffa91c0d07ed709`
+and `49d6b2e0d7bbcbbdd4402b676a9e5891c81004f325928d440cd985c28cc1b534`.
+No target, fold, seed, candidate roster, cost, gross/name/net cap, leakage rule,
+identity rule, or protected-access boundary changed. The branch remains the
+review surface; `main` and deployment intentionally remain unchanged.
+Two final provider reads at `2026-09-06T22:57:42.9989658Z` and
+`2026-09-06T22:57:45.8155995Z` both returned zero instances, confirming that
+the pass neither used nor left paid compute running.
