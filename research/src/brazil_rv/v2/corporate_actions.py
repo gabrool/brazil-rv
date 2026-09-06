@@ -257,6 +257,122 @@ def verified_action_terms_from_table(
     )
 
 
+def provider_actions_to_verified_terms(
+    actions: pl.DataFrame,
+) -> tuple[VerifiedActionTerm, ...]:
+    """Convert the sealed provider action rows into explicit contractual terms.
+
+    The historical acquisition archive does not contain announcement or payment
+    timestamps.  Its ``fetched_at`` field is an acquisition timestamp (stored by
+    the legacy writer as naive UTC), not evidence that the event was known at the
+    historical decision.  It is therefore preserved only as ``available_at``
+    provenance.  The terms may settle retrospective outcomes; they never rewrite
+    decision-time features before their recorded availability.
+
+    Scalar split/cash observations are usable as provider-evidenced terms.
+    Complex actions, cancellations, and conversions without a resulting claim
+    remain unresolved rather than being forced through a scalar formula.
+    """
+
+    checked = validate_action_table(actions)
+    terms: list[VerifiedActionTerm] = []
+    for sequence, row in enumerate(checked.iter_rows(named=True)):
+        fetched = row.get("fetched_at")
+        if not isinstance(fetched, datetime):
+            raise ValueError("provider action rows require fetched_at provenance")
+        if fetched.tzinfo is None or fetched.utcoffset() is None:
+            fetched = fetched.replace(tzinfo=timezone.utc)
+        else:
+            fetched = fetched.astimezone(timezone.utc)
+        action_type = str(row["action_type"])
+        unresolved = bool(row["unresolved"])
+        scalar_supported = action_type in {
+            "split",
+            "reverse_split",
+            "bonus",
+            "dividend",
+            "jcp",
+            "cash_distribution",
+        }
+        resolved = scalar_supported and not unresolved
+        q = (
+            float(row["split_factor"])
+            if resolved and action_type in {"split", "reverse_split", "bonus"}
+            else 1.0
+        )
+        d = (
+            float(row["cash_distribution_brl"])
+            if resolved and action_type in {"dividend", "jcp", "cash_distribution"}
+            else 0.0
+        )
+        source = str(row.get("source") or "sealed_provider_actions")
+        ticker = str(row.get("source_ticker") or "unknown")
+        ex_date = _as_date(row["ex_date"])
+        terms.append(
+            VerifiedActionTerm(
+                action_type=action_type,
+                isin=str(row["isin"]),
+                issuer_id=None,
+                effective_date=ex_date,
+                ex_date=ex_date,
+                payment_date=None,
+                announced_at=None,
+                available_at=fetched,
+                shares_per_prior_share=q,
+                cash_per_prior_share=d,
+                currency="BRL",
+                source=source,
+                evidence=f"sealed provider action row; source_ticker={ticker}",
+                coverage_status="provider_segment_observed",
+                sequence=sequence,
+                resolved=resolved,
+            )
+        )
+    return validate_verified_action_terms(terms)
+
+
+def action_coverage_resolved_mask(
+    acquisition_audit: pl.DataFrame,
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+) -> NDArray[np.bool_]:
+    """Map successfully observed provider segments onto the session/name grid.
+
+    Absence of an action row is evidence of no action only inside a successfully
+    acquired ticker segment.  Failed or overlapping contradictory acquisition
+    coverage remains unresolved.  This deliberately does not infer coverage
+    from price continuity or DISMES.
+    """
+
+    required = {"isin", "first_date", "last_date", "status"}
+    if not required.issubset(acquisition_audit.columns):
+        raise ValueError(
+            "action acquisition audit columns missing: "
+            f"{sorted(required - set(acquisition_audit.columns))}"
+        )
+    normalized_dates = np.asarray(dates, dtype="datetime64[D]")
+    if normalized_dates.ndim != 1:
+        raise ValueError("action coverage dates must be one-dimensional")
+    isin_lookup = {value: index for index, value in enumerate(isins)}
+    success = np.zeros((len(normalized_dates), len(isins)), dtype=np.bool_)
+    failure = np.zeros_like(success)
+    for row in acquisition_audit.iter_rows(named=True):
+        name = isin_lookup.get(str(row["isin"]))
+        if name is None:
+            continue
+        first = np.datetime64(_as_date(row["first_date"]), "D")
+        last = np.datetime64(_as_date(row["last_date"]), "D")
+        if last < first:
+            raise ValueError("action acquisition segment ends before it starts")
+        covered = (normalized_dates >= first) & (normalized_dates <= last)
+        is_failure = str(row["status"]).casefold() == "failed"
+        if is_failure:
+            failure[covered, name] = True
+        else:
+            success[covered, name] = True
+    return success & ~failure
+
+
 def align_verified_action_terms(
     terms: Sequence[VerifiedActionTerm],
     dates: Sequence[date | np.datetime64],

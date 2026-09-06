@@ -10,8 +10,9 @@ from brazil_rv.v2.corporate_actions import (
     VerifiedActionTerm,
     _extract_yfinance_actions,
     acquire_yfinance_actions,
-    align_verified_action_terms,
+    action_coverage_resolved_mask,
     align_action_arrays,
+    align_verified_action_terms,
     apply_contractual_action,
     action_calendar_alignment_table,
     action_coverage_table,
@@ -22,6 +23,7 @@ from brazil_rv.v2.corporate_actions import (
     detect_distribution_changes,
     normalize_cached_action_schema,
     normalize_yfinance_actions,
+    provider_actions_to_verified_terms,
     unadjust_yfinance_cash_distributions,
     verified_action_terms_from_table,
     verified_action_terms_to_table,
@@ -698,3 +700,54 @@ def test_m1_adjustment_audit_uses_pre_post_event_ratios() -> None:
         cash,
     )
     assert report[0, "status"] == "price_adjusted"
+
+
+def test_provider_actions_become_explicit_terms_without_invented_complex_terms() -> None:
+    fetched = datetime(2024, 7, 1, tzinfo=timezone.utc)
+    scalar = normalize_yfinance_actions(
+        pl.DataFrame(
+            {
+                "date": [date(2024, 6, 3)],
+                "dividends": [1.25],
+                "stock_splits": [2.0],
+            }
+        ),
+        isin="BRTESTACNOR1",
+        ticker="TEST3",
+        fetched_at=fetched,
+    )
+    complex_row = scalar.head(1).with_columns(
+        pl.lit("subscription_rights").alias("action_type"),
+        pl.lit(1.0).alias("split_factor"),
+        pl.lit(0.0).alias("cash_distribution_brl"),
+        pl.lit(True).alias("unresolved"),
+    )
+    terms = provider_actions_to_verified_terms(
+        pl.concat([scalar, complex_row], how="vertical_relaxed")
+    )
+    split = next(term for term in terms if term.action_type == "split")
+    dividend = next(term for term in terms if term.action_type == "dividend")
+    rights = next(term for term in terms if term.action_type == "subscription_rights")
+    assert split.shares_per_prior_share == 2.0
+    assert dividend.cash_per_prior_share == 1.25
+    assert split.available_at == fetched
+    assert split.announced_at is None and split.payment_date is None
+    assert not rights.resolved
+    assert (rights.shares_per_prior_share, rights.cash_per_prior_share) == (1.0, 0.0)
+
+
+def test_action_coverage_requires_success_and_rejects_conflicting_overlap() -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    audit = pl.DataFrame(
+        {
+            "isin": ["BRTESTACNOR1", "BRTESTACNOR1", "BRTESTACNPR0"],
+            "first_date": [dates[0], dates[1], dates[0]],
+            "last_date": [dates[-1], dates[1], dates[-1]],
+            "status": ["downloaded", "failed", "zero_actions"],
+        }
+    )
+    resolved = action_coverage_resolved_mask(
+        audit, dates, ["BRTESTACNOR1", "BRTESTACNPR0"]
+    )
+    assert resolved[:, 0].tolist() == [True, False, True]
+    assert resolved[:, 1].tolist() == [True, True, True]
