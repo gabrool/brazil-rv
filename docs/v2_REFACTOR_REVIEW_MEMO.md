@@ -541,10 +541,10 @@ Section D. No new experiment was run.
 
 - Final implementation commit:
   `f0cf568303715e8783e539a683568535e2232c7f`.
-- Documentation/evidence payload commit: recorded by the subsequent closeout
-  metadata commit after this payload is committed.
-- Main/GitHub synchronization: pending the final fast-forward/push; the
-  subsequent closeout metadata commit records the verified state.
+- Documentation/evidence payload commit:
+  `8c9121e3a0d909ea5336bdc491d1638d931cdab6`.
+- Main/GitHub synchronization: verified after the final push; local `main` and
+  `origin/main` resolve to the closeout commit containing this statement.
 - Ruff/compile/full-suite result: `uv run ruff check src tests` passed;
   `uv run python -m compileall -q src tests` passed; the research suite passed
   **810 tests in 372.11 seconds** with PowerShell

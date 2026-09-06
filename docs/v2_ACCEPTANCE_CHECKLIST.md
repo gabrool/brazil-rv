@@ -23,12 +23,12 @@ is claimed here.
 | Item | Bound value |
 |---|---|
 | Final implementation commit | `f0cf568303715e8783e539a683568535e2232c7f` |
-| Documentation/evidence payload commit | Recorded by the subsequent closeout metadata commit; this row is replaced with its exact identity after the payload is committed. |
+| Documentation/evidence payload commit | `8c9121e3a0d909ea5336bdc491d1638d931cdab6` |
 | Machine-readable report | `research/acceptance/v2_refactor_20260906.json` |
 | Machine-report SHA-256 | `d41d64825092ee4870a8cd9ff4e7eb4d9fd1f1ea583f5a8a06956e2b4e0522c6` |
 | Full Ruff/compile/test verification | `uv run ruff check src tests` passed; `uv run python -m compileall -q src tests` passed; PowerShell `$env:BRAZIL_RV_TEST_SCRATCH='D:\'; uv run pytest -q` passed **810** tests in **372.11 s**; collector `uv run --group dev pytest tests/test_parse_b3_cotahist.py -q` passed **4** tests in **0.18 s**. |
 | Final T23 resource measurements | In separate component-scale fixtures, production axes **4,348 × 933**, all families, bounded derivations at committed archive row counts, populated slow/target cells, and native 60-step collation/forward remained below the **8 GiB** asserted peak-RSS ceiling; all **5** dedicated tests passed in **213.00 s**. This was not one integrated large-source full builder, and exact peak bytes were not persisted. Build admission requires at least **10 GiB** available physical/commit headroom. |
-| Local `main` / GitHub synchronization | Pending the final fast-forward/push; the subsequent closeout metadata commit records the verified state. |
+| Local `main` / GitHub synchronization | Verified after the final push: local `main` and `origin/main` resolve to the closeout commit containing this row. |
 
 ## Phase disposition
 
