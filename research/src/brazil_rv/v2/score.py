@@ -142,9 +142,7 @@ def _model_batch(
     return result
 
 
-def _forward(
-    model: torch.nn.Module, batch: Mapping[str, torch.Tensor]
-) -> torch.Tensor:
+def _forward(model: torch.nn.Module, batch: Mapping[str, torch.Tensor]) -> torch.Tensor:
     return model(
         batch["slow_features"],
         batch["slow_feature_mask"],
@@ -201,9 +199,7 @@ def score_checkpoint_artifact(
         and prechecked_sha256 != expected_checkpoint_sha256
     ):
         raise ValueError("stage checkpoint SHA-256 differs from the manifest")
-    checkpoint_payload = torch.load(
-        checkpoint, map_location="cpu", weights_only=True
-    )
+    checkpoint_payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
     if not isinstance(checkpoint_payload, Mapping):
         raise ValueError("stage checkpoint payload is not a mapping")
     stage = checkpoint_payload.get("stage")
@@ -220,9 +216,7 @@ def score_checkpoint_artifact(
     checkpoint_contract = _verified_checkpoint_input_contract(checkpoint_payload)
     if checkpoint_contract.get("model_config") != model_config_contract(model_config):
         raise ValueError("scoring model config differs from the checkpoint contract")
-    transfer_chronology_clean = checkpoint_payload.get(
-        "transfer_chronology_clean"
-    )
+    transfer_chronology_clean = checkpoint_payload.get("transfer_chronology_clean")
     if type(transfer_chronology_clean) is not bool:
         raise ValueError("stage checkpoint lacks explicit transfer chronology")
     feature_schema_sha256 = checkpoint_payload.get("feature_schema_sha256")
@@ -246,9 +240,7 @@ def score_checkpoint_artifact(
         fast_provenance = dict(raw_fast_provenance)
     else:
         raise ValueError("checkpoint fast-initialization provenance is malformed")
-    expected_contamination = (
-        model_config.fast_encoder_mode == "legacy_v1_contaminated"
-    )
+    expected_contamination = model_config.fast_encoder_mode == "legacy_v1_contaminated"
     if bool(fast_provenance.get("contaminated")) != expected_contamination:
         raise ValueError("checkpoint fast-initialization provenance contradicts config")
     if expected_contamination and transfer_chronology_clean:
@@ -276,6 +268,15 @@ def score_checkpoint_artifact(
         or checkpoint_store.get("feature_schema_sha256") != feature_schema_sha256
     ):
         raise ValueError("scoring feature schema differs from the checkpoint")
+    action_terms_source = scoring_store.get("action_terms_source")
+    schedule_source = scoring_store.get("schedule_source")
+    if (
+        not isinstance(action_terms_source, str)
+        or not isinstance(schedule_source, str)
+        or checkpoint_payload.get("action_terms_source") != action_terms_source
+        or checkpoint_payload.get("schedule_source") != schedule_source
+    ):
+        raise ValueError("scoring source-tier labels differ from the checkpoint")
     if _input_static_identity(scoring_input) != _input_static_identity(
         checkpoint_selection
     ):
@@ -393,6 +394,8 @@ def score_checkpoint_artifact(
             "fast_initialization_provenance": fast_provenance,
             "transfer_chronology_clean": transfer_chronology_clean,
             "feature_schema_sha256": feature_schema_sha256,
+            "action_terms_source": action_terms_source,
+            "schedule_source": schedule_source,
             "checkpoint_input_contract_sha256": checkpoint_contract["sha256"],
             "scoring_input": scoring_input_payload,
             "scoring_input_sha256": scoring_input_sha256,

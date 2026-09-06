@@ -12,12 +12,14 @@ from numpy.typing import NDArray
 from .artifacts import sha256_file, write_json_atomic
 from .corporate_actions import (
     DetectedActionResult,
+    InferredActionResult,
     detect_cotahist_actions,
+    infer_cotahist_action_terms,
     provider_split_detection_audit,
 )
 
-AUDIT_SCHEMA = "BRAZIL_RV_V2_CORPORATE_ACTION_RECLASSIFICATION_AUDIT_V2"
-BREAKDOWN_SCHEMA = "BRAZIL_RV_V2_CORPORATE_ACTION_RECLASSIFICATION_BREAKDOWN_V1"
+AUDIT_SCHEMA = "BRAZIL_RV_V2_CORPORATE_ACTION_RECLASSIFICATION_AUDIT_V3"
+BREAKDOWN_SCHEMA = "BRAZIL_RV_V2_CORPORATE_ACTION_RECLASSIFICATION_BREAKDOWN_V2"
 
 
 def _finite(value: object) -> float | None:
@@ -83,9 +85,9 @@ def _provider_coverage_mask(
     required = {"isin", "first_date", "last_date", "status"}
     if not required.issubset(acquisition_audit.columns):
         raise ValueError("corporate-action acquisition audit has wrong schema")
-    for row in acquisition_audit.filter(
-        pl.col("status") != "failed"
-    ).iter_rows(named=True):
+    for row in acquisition_audit.filter(pl.col("status") != "failed").iter_rows(
+        named=True
+    ):
         name_index = lookup.get(str(row["isin"]))
         if name_index is None:
             continue
@@ -145,7 +147,9 @@ def _ratio_bucket(log_factor: float) -> str:
     return "abs_log_factor_gt_0p30"
 
 
-def _offset_counts(rows: Sequence[dict[str, object]], field: str) -> list[dict[str, object]]:
+def _offset_counts(
+    rows: Sequence[dict[str, object]], field: str
+) -> list[dict[str, object]]:
     counts: dict[int | None, int] = {}
     for row in rows:
         value = row[field]
@@ -168,16 +172,18 @@ def _build_breakdown(
     distribution_change: NDArray[np.bool_],
     without_fallback: DetectedActionResult,
     with_fallback: DetectedActionResult,
+    inferred: InferredActionResult,
 ) -> dict[str, Any]:
     from .corporate_actions import align_action_arrays
 
     provider_factor, _, _ = align_action_arrays(provider_actions, dates, isins)
     provider_split = provider_factor != 1.0
-    covered = _provider_coverage_mask(
-        dates, isins, provider_actions, acquisition_audit
-    )
+    covered = _provider_coverage_mask(dates, isins, provider_actions, acquisition_audit)
     immediate_jump = np.isfinite(without_fallback.price_ratio) & (
         np.abs(np.log(without_fallback.price_ratio)) >= 0.04
+    )
+    immediate_large_jump = np.isfinite(without_fallback.price_ratio) & (
+        np.abs(np.log(without_fallback.price_ratio)) >= 0.30
     )
     provider_rows: list[dict[str, object]] = []
     for day, name in np.argwhere(provider_split & covered):
@@ -201,9 +207,7 @@ def _build_breakdown(
         if dismes_day is None:
             dismes_log_price = dismes_log_quantity = None
         else:
-            dismes_price_ratio = float(
-                without_fallback.price_ratio[dismes_day, name]
-            )
+            dismes_price_ratio = float(without_fallback.price_ratio[dismes_day, name])
             dismes_quantity_ratio = float(
                 without_fallback.quantity_ratio[dismes_day, name]
             )
@@ -214,8 +218,7 @@ def _build_breakdown(
             )
             dismes_log_quantity = (
                 float(np.log(dismes_quantity_ratio))
-                if np.isfinite(dismes_quantity_ratio)
-                and dismes_quantity_ratio > 0.0
+                if np.isfinite(dismes_quantity_ratio) and dismes_quantity_ratio > 0.0
                 else None
             )
         provider_rows.append(
@@ -241,8 +244,7 @@ def _build_breakdown(
                 "dismes_date_log_quantity_ratio": dismes_log_quantity,
                 "dismes_date_log_ratio_sum": (
                     dismes_log_price + dismes_log_quantity
-                    if dismes_log_price is not None
-                    and dismes_log_quantity is not None
+                    if dismes_log_price is not None and dismes_log_quantity is not None
                     else None
                 ),
                 "dismes_only_split_within_2_sessions": _nearest_offset(
@@ -258,6 +260,22 @@ def _build_breakdown(
                     and jump_offset is not None
                     and jump_offset - dismes_offset in (-2, -1)
                 ),
+                "price_corroborated_abs_log_ge_0p30_within_2": _nearest_offset(
+                    immediate_large_jump, int(day), int(name), 2
+                )
+                is not None,
+                "dismes_within_2_of_provider_date": _nearest_offset(
+                    distribution_change, int(day), int(name), 2
+                )
+                is not None,
+                "u2_per_trade_hit_within_2": _nearest_offset(
+                    inferred.u2_per_trade_candidate, int(day), int(name), 2
+                )
+                is not None,
+                "u2_total_quantity_hit_within_2": _nearest_offset(
+                    inferred.u2_total_quantity_candidate, int(day), int(name), 2
+                )
+                is not None,
             }
         )
 
@@ -289,7 +307,9 @@ def _build_breakdown(
             }
         )
     unmatched = [
-        row for row in detected_rows if row["nearest_provider_split_offset_sessions"] is None
+        row
+        for row in detected_rows
+        if row["nearest_provider_split_offset_sessions"] is None
     ]
     unmatched.sort(
         key=lambda row: float(row["abs_log_price_ratio"] or 0.0), reverse=True
@@ -318,13 +338,19 @@ def _build_breakdown(
                     else None
                 ),
                 "dismes_only_detection_within_2_fraction": (
-                    sum(bool(row["dismes_only_split_within_2_sessions"]) for row in selected)
+                    sum(
+                        bool(row["dismes_only_split_within_2_sessions"])
+                        for row in selected
+                    )
                     / len(selected)
                     if selected
                     else None
                 ),
                 "fallback_detection_within_2_fraction": (
-                    sum(bool(row["fallback_split_within_2_sessions"]) for row in selected)
+                    sum(
+                        bool(row["fallback_split_within_2_sessions"])
+                        for row in selected
+                    )
                     / len(selected)
                     if selected
                     else None
@@ -332,9 +358,20 @@ def _build_breakdown(
             }
         )
 
-    low_rows = [row for row in provider_rows if abs(float(row["log_provider_factor"])) <= 0.08]
-    high_rows = [row for row in provider_rows if abs(float(row["log_provider_factor"])) > 0.08]
-    very_large = [row for row in provider_rows if abs(float(row["log_provider_factor"])) > 0.30]
+    low_rows = [
+        row for row in provider_rows if abs(float(row["log_provider_factor"])) <= 0.08
+    ]
+    high_rows = [
+        row for row in provider_rows if abs(float(row["log_provider_factor"])) > 0.08
+    ]
+    very_large = [
+        row for row in provider_rows if abs(float(row["log_provider_factor"])) > 0.30
+    ]
+    corroborated_very_large = [
+        row
+        for row in very_large
+        if bool(row["price_corroborated_abs_log_ge_0p30_within_2"])
+    ]
     low_dismes = (
         sum(
             row["nearest_dismes_offset_sessions"] is not None
@@ -352,7 +389,10 @@ def _build_breakdown(
         else None
     )
     lagged_large = (
-        sum(bool(row["price_jump_precedes_dismes_by_1_or_2_sessions"]) for row in very_large)
+        sum(
+            bool(row["price_jump_precedes_dismes_by_1_or_2_sessions"])
+            for row in very_large
+        )
         / len(very_large)
         if very_large
         else None
@@ -368,7 +408,10 @@ def _build_breakdown(
         stop_reasons.append("low_factor_provider_rows_lack_dismes_coverage")
     legacy_enable_fallback = bool(lagged_large is not None and lagged_large >= 0.10)
     selected_metrics = fallback_metrics if legacy_enable_fallback else dimmes_metrics
-    if selected_metrics["precision"] is None or float(selected_metrics["precision"]) < 0.70:
+    if (
+        selected_metrics["precision"] is None
+        or float(selected_metrics["precision"]) < 0.70
+    ):
         stop_reasons.append("plus_or_minus_2_precision_below_0p70")
     return {
         "schema": BREAKDOWN_SCHEMA,
@@ -398,11 +441,51 @@ def _build_breakdown(
             "above_0p30_count": len(very_large),
             "above_0p30_jump_precedes_dismes_fraction": lagged_large,
         },
+        "development_inference_quality": {
+            "audit_only_not_a_gate": True,
+            "provider_abs_log_factor_gt_0p30_count": len(very_large),
+            "price_corroborated_count": len(corroborated_very_large),
+            "price_corroborated_fraction": (
+                len(corroborated_very_large) / len(very_large) if very_large else None
+            ),
+            "provider_noise_excluded_from_recall_count": (
+                len(very_large) - len(corroborated_very_large)
+            ),
+            "corroborated_dismes_within_2_fraction": (
+                sum(
+                    bool(row["dismes_within_2_of_provider_date"])
+                    for row in corroborated_very_large
+                )
+                / len(corroborated_very_large)
+                if corroborated_very_large
+                else None
+            ),
+            "corroborated_u2_per_trade_hit_fraction": (
+                sum(
+                    bool(row["u2_per_trade_hit_within_2"])
+                    for row in corroborated_very_large
+                )
+                / len(corroborated_very_large)
+                if corroborated_very_large
+                else None
+            ),
+            "corroborated_u2_total_quantity_hit_fraction": (
+                sum(
+                    bool(row["u2_total_quantity_hit_within_2"])
+                    for row in corroborated_very_large
+                )
+                / len(corroborated_very_large)
+                if corroborated_very_large
+                else None
+            ),
+        },
         "decision": {
             "legacy_strict_fallback_would_be_enabled": legacy_enable_fallback,
             "legacy_classifier_stop_reasons": stop_reasons,
             "legacy_classifier_gate_passed": not stop_reasons,
             "canonical_price_ratio_adjustment_authorized": False,
+            "u2_development_inference_enabled": True,
+            "development_inference_quality_is_gate": False,
             "canonical_requirement": (
                 "verified contractual share and cash terms; otherwise affected "
                 "cross-boundary outcomes remain unresolved"
@@ -417,8 +500,10 @@ def build_reclassification_audit(
     isins: Sequence[str],
     raw_close: NDArray[np.floating],
     quantity: NDArray[np.floating],
+    trades: NDArray[np.floating],
     distribution_number: NDArray[np.floating],
     observed: NDArray[np.bool_],
+    active: NDArray[np.bool_],
     old_cash_event: NDArray[np.bool_],
     old_distribution_change: NDArray[np.bool_],
     provider_actions: pl.DataFrame,
@@ -440,6 +525,16 @@ def build_reclassification_audit(
         distribution_number,
         observed,
         undocumented_split_fallback=True,
+    )
+    inferred = infer_cotahist_action_terms(
+        dates,
+        isins,
+        raw_close,
+        quantity,
+        trades,
+        distribution_number,
+        observed,
+        active,
     )
     audits = {
         "dismes_only": provider_split_detection_audit(
@@ -503,8 +598,7 @@ def build_reclassification_audit(
         )
         .with_columns(
             (
-                pl.col("valid_target_name_days")
-                / pl.col("observed_member_name_days")
+                pl.col("valid_target_name_days") / pl.col("observed_member_name_days")
             ).alias("validity_ratio")
         )
         .sort("horizon_sessions")
@@ -517,7 +611,21 @@ def build_reclassification_audit(
         distribution_change=old_distribution,
         without_fallback=without_fallback,
         with_fallback=with_fallback,
+        inferred=inferred,
     )
+    years = np.asarray(dates, dtype="datetime64[Y]").astype(np.int64) + 1970
+    inferred_counts = [
+        {
+            "year": int(year),
+            "u1_count": int(inferred.u1_event[years == year].sum()),
+            "c1_count": int(inferred.c1_event[years == year].sum()),
+            "u2_count": int(inferred.u2_event[years == year].sum()),
+            "large_move_no_action_count": int(
+                inferred.large_move_no_action[years == year].sum()
+            ),
+        }
+        for year in sorted(set(years.tolist()))
+    ]
     return {
         "schema": AUDIT_SCHEMA,
         "research_claim": False,
@@ -544,10 +652,9 @@ def build_reclassification_audit(
         },
         "classification_counts_by_year": {
             "dismes_only": _classification_counts(dates, without_fallback),
-            "dismes_plus_strict_fallback": _classification_counts(
-                dates, with_fallback
-            ),
+            "dismes_plus_strict_fallback": _classification_counts(dates, with_fallback),
         },
+        "development_inferred_action_counts_by_year": inferred_counts,
         "defect_record": {
             "old_detected_cash_event_count": old_cash_count,
             "old_cash_events_without_dismes_change": undocumented_old_cash,
@@ -573,8 +680,10 @@ def audit_store(
         "isin_index.npy",
         "raw_close.npy",
         "quantity.npy",
+        "trade_count.npy",
         "distribution_number.npy",
         "observed.npy",
+        "active.npy",
         "detected_cash_event_mask.npy",
         "distribution_change_mask.npy",
         "corporate_actions.parquet",
@@ -589,9 +698,7 @@ def audit_store(
     if not manifest_path.is_file() or not manifest_sha_path.is_file():
         raise FileNotFoundError("accepted store lacks its immutable manifest binding")
     manifest_sha = sha256_file(manifest_path)
-    recorded_manifest_sha = manifest_sha_path.read_text(
-        encoding="ascii"
-    ).split()[0]
+    recorded_manifest_sha = manifest_sha_path.read_text(encoding="ascii").split()[0]
     if manifest_sha != recorded_manifest_sha:
         raise ValueError("accepted store manifest SHA-256 mismatch")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -618,13 +725,11 @@ def audit_store(
         isins=tuple(str(value) for value in np.load(root / "isin_index.npy")),
         raw_close=np.load(root / "raw_close.npy", mmap_mode="r"),
         quantity=np.load(root / "quantity.npy", mmap_mode="r"),
-        distribution_number=np.load(
-            root / "distribution_number.npy", mmap_mode="r"
-        ),
+        trades=np.load(root / "trade_count.npy", mmap_mode="r"),
+        distribution_number=np.load(root / "distribution_number.npy", mmap_mode="r"),
         observed=np.load(root / "observed.npy", mmap_mode="r"),
-        old_cash_event=np.load(
-            root / "detected_cash_event_mask.npy", mmap_mode="r"
-        ),
+        active=np.load(root / "active.npy", mmap_mode="r"),
+        old_cash_event=np.load(root / "detected_cash_event_mask.npy", mmap_mode="r"),
         old_distribution_change=np.load(
             root / "distribution_change_mask.npy", mmap_mode="r"
         ),

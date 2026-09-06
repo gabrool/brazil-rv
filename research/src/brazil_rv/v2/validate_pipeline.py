@@ -60,7 +60,7 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V2"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V3"
 PIPELINE_NETWORK_RESUME_SCHEMA = "BRAZIL_RV_V2_PIPELINE_NETWORK_RESUME_V2"
 PIPELINE_FLAGS: dict[str, bool] = {
     "pipeline_validation": True,
@@ -70,6 +70,16 @@ PIPELINE_FLAGS: dict[str, bool] = {
     "transfer_chronology_clean": True,
 }
 _MIN_WINDOW_SESSIONS = max(HORIZONS) + 2
+_BASELINE_SIGNAL_SIGNS = {
+    "reversal_5": -1.0,
+    "reversal_21": -1.0,
+    "momentum_12_1": 1.0,
+    "reversal_5_momentum_12_1_blend": None,
+    "inverse_volatility_20": -1.0,
+}
+_NAIVE_SIGNAL_BASELINES = tuple(
+    name for name in _BASELINE_SIGNAL_SIGNS if name != "inverse_volatility_20"
+)
 _REQUIRED_ARRAYS = frozenset(
     {
         "active",
@@ -601,6 +611,13 @@ def _evaluation_inputs(
         feature_names.get("slow"), list
     ):
         raise ValueError("store manifest lacks ordered slow-feature names")
+    metadata = store.manifest.get("metadata")
+    if not isinstance(metadata, Mapping):
+        raise ValueError("store manifest metadata is malformed")
+    action_terms_source = metadata.get("action_terms_source")
+    schedule_source = metadata.get("schedule_source")
+    if not isinstance(action_terms_source, str) or not isinstance(schedule_source, str):
+        raise ValueError("store lacks action and schedule source-tier labels")
     slow_names = tuple(str(value) for value in feature_names["slow"])
     diagnostic_names = (
         "yang_zhang_vol_20",
@@ -687,6 +704,8 @@ def _evaluation_inputs(
         prior_feature_values=prior_feature_values,
         cdi_returns=cdi,
         transfer_chronology_clean=transfer_chronology_clean,
+        action_terms_source=action_terms_source,
+        schedule_source=schedule_source,
         source_artifact_hashes=dict(source_hashes),
         history_age_sessions=history_age_sessions,
         source_archive_present=source_archive_present or None,
@@ -741,14 +760,201 @@ def _evaluation_summary(
         and row.get("cost_bps_per_side") == 4.0
         and row.get("annual_borrow_rate") == 0.02
     )
+    headline_report = economics["headline"]
+    assert isinstance(headline_report, Mapping)
     return {
         "report": str(report_path),
         "report_sha256": report_sha256,
         "mean_daily_primary_scaled_target_ic": result.report[
             "mean_daily_primary_scaled_target_ic"
         ],
-        "headline_economics": dict(headline),
+        "daily_primary_scaled_target_ic": [
+            _finite_or_none(value) for value in result.daily_primary_ic
+        ],
+        "headline_economics": {**dict(headline), **dict(headline_report)},
     }
+
+
+def _finite_or_none(value: float) -> float | None:
+    value = float(value)
+    return value if np.isfinite(value) else None
+
+
+def _development_acceptance(
+    *,
+    baseline_records: Sequence[Mapping[str, object]],
+    gbdt_records: Sequence[Mapping[str, object]],
+    action_terms_source: object,
+    schedule_source: object,
+    native_fast_audit_passed: bool = True,
+) -> dict[str, object]:
+    expected = {
+        (fold, name) for fold in ("F1", "F2", "F3") for name in _BASELINE_SIGNAL_SIGNS
+    }
+    received = {
+        (str(record.get("fold")), str(record.get("name")))
+        for record in baseline_records
+    }
+    violations: list[str] = []
+    if received != expected:
+        violations.append("baseline_roster_or_fold_coverage_mismatch")
+
+    pooled_ic: dict[str, float | None] = {}
+    for name in _NAIVE_SIGNAL_BASELINES:
+        values: list[float] = []
+        for record in baseline_records:
+            if record.get("name") != name:
+                continue
+            evaluation = record.get("evaluation")
+            if not isinstance(evaluation, Mapping):
+                continue
+            daily = evaluation.get("daily_primary_scaled_target_ic")
+            if not isinstance(daily, list):
+                continue
+            values.extend(float(value) for value in daily if value is not None)
+        point = float(np.mean(values)) if values else None
+        pooled_ic[name] = point
+        if point is None:
+            violations.append(f"{name}_pooled_ic_undefined")
+        elif abs(point) >= 0.10:
+            violations.append(f"{name}_absolute_pooled_ic_not_below_0_10")
+
+    reversal_records = [
+        record for record in baseline_records if record.get("name") == "reversal_5"
+    ]
+    reversal_definition_ok = bool(reversal_records) and all(
+        record.get("signal_definition_sign") == -1.0 for record in reversal_records
+    )
+    if not reversal_definition_ok:
+        violations.append("reversal_5_definition_is_not_negative_five_session_return")
+
+    economics_rows: list[dict[str, object]] = []
+    unresolved_fractions: list[float] = []
+    for record in (*baseline_records, *gbdt_records):
+        evaluation = record.get("evaluation")
+        if not isinstance(evaluation, Mapping):
+            violations.append("evaluation_summary_missing")
+            continue
+        headline = evaluation.get("headline_economics")
+        if not isinstance(headline, Mapping):
+            violations.append("headline_economics_missing")
+            continue
+        label = f"{record.get('engine')}:{record.get('fold')}:{record.get('name', 'ensemble')}"
+        gross_value = headline.get("mean_gross_fraction_nav")
+        unresolved_value = headline.get("terminal_unresolved_inventory_fraction_nav")
+        gross = None if gross_value is None else float(gross_value)
+        unresolved = None if unresolved_value is None else abs(float(unresolved_value))
+        economics_rows.append(
+            {
+                "evaluation": label,
+                "mean_deployed_gross_fraction_nav": gross,
+                "gross_target": 2.0,
+                "within_ten_percent_of_gross_target": (
+                    gross is not None and 1.8 <= gross <= 2.2
+                ),
+                "unresolved_inventory_count": headline.get(
+                    "unresolved_inventory_count"
+                ),
+                "unresolved_inventory_notional": headline.get(
+                    "unresolved_inventory_notional"
+                ),
+                "terminal_nav": headline.get("terminal_nav"),
+                "absolute_terminal_unresolved_inventory_fraction_nav": unresolved,
+            }
+        )
+        if gross is None or not 1.8 <= gross <= 2.2:
+            violations.append(f"{label}_deployed_gross_outside_ten_percent")
+        if unresolved is None:
+            violations.append(f"{label}_unresolved_inventory_fraction_missing")
+        else:
+            unresolved_fractions.append(unresolved)
+
+    mean_unresolved = (
+        float(np.mean(unresolved_fractions)) if unresolved_fractions else None
+    )
+    if mean_unresolved is None or mean_unresolved >= 0.02:
+        violations.append("mean_unresolved_inventory_fraction_not_below_0_02")
+    if action_terms_source != "inferred_cotahist_dismes_v1":
+        violations.append("action_terms_source_is_not_development_inference_tier")
+    if schedule_source != "reconstructed_v1":
+        violations.append("schedule_source_is_not_reconstructed_v1")
+    if not native_fast_audit_passed:
+        violations.append("independent_native_fast_20x20_audit_missing_or_failed")
+
+    return {
+        "status": (
+            "development_grade_inferred_actions" if not violations else "unsupported"
+        ),
+        "reasons": violations,
+        "labels": {
+            "action_terms_source": action_terms_source,
+            "schedule_source": schedule_source,
+            "economics_tier": "development_grade_close_proxy",
+        },
+        "sanity_bounds": {
+            "naive_absolute_pooled_ic_strictly_below": 0.10,
+            "reversal_5_definition_sign": -1.0,
+            "gross_target": 2.0,
+            "gross_relative_tolerance": 0.10,
+            "mean_absolute_terminal_unresolved_inventory_fraction_strictly_below": 0.02,
+        },
+        "naive_pooled_primary_scaled_target_ic": pooled_ic,
+        "reversal_5_definition_negative_signed": reversal_definition_ok,
+        "economics_by_evaluation": economics_rows,
+        "mean_absolute_terminal_unresolved_inventory_fraction_nav": mean_unresolved,
+        "unsupported_for_research_claims": [
+            "verified_contractual_action_terms",
+            "auction_execution_marks",
+            "historically_executable_borrow",
+        ],
+        "independent_native_fast_20x20_audit_passed": native_fast_audit_passed,
+    }
+
+
+def _verify_native_fast_audit(
+    path: Path | None,
+    *,
+    expected_sha256: str | None,
+    store_manifest_sha256: str,
+) -> dict[str, object] | None:
+    if path is None and expected_sha256 is None:
+        return None
+    if path is None or expected_sha256 is None:
+        raise ValueError("native-fast audit requires both path and SHA-256")
+    source = path.resolve(strict=True)
+    if sha256_file(source) != expected_sha256.casefold():
+        raise ValueError("native-fast audit SHA-256 mismatch")
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    store = payload.get("store") if isinstance(payload, Mapping) else None
+    comparison = payload.get("comparison") if isinstance(payload, Mapping) else None
+    if (
+        not isinstance(payload, Mapping)
+        or payload.get("schema") != "BRAZIL_RV_V2_NATIVE_FAST_RAW_AUDIT_V1"
+        or payload.get("status") != "passed"
+        or payload.get("research_claim") is not False
+        or payload.get("official_validation_accessed") is not False
+        or payload.get("test_accessed") is not False
+        or payload.get("action_terms_source") != "inferred_cotahist_dismes_v1"
+        or payload.get("schedule_source") != "reconstructed_v1"
+        or not isinstance(store, Mapping)
+        or store.get("manifest_sha256") != store_manifest_sha256
+        or not isinstance(comparison, Mapping)
+        or comparison.get("feature_mask_exact") is not True
+        or comparison.get("patch_mask_exact") is not True
+        or comparison.get("age_valid_exact") is not True
+        or comparison.get("independent_formula_implementation") is not True
+    ):
+        raise ValueError("native-fast audit is not a passing exact-store 20x20 audit")
+    selection = payload.get("selection")
+    if (
+        not isinstance(selection, Mapping)
+        or selection.get("name_count") != 20
+        or selection.get("session_count") != 20
+    ):
+        raise ValueError(
+            "native-fast audit does not cover exactly 20 names x 20 sessions"
+        )
+    return {"path": str(source), "sha256": expected_sha256.casefold()}
 
 
 def _slow_feature_count(store: V2Store, sidecars: Sequence[str]) -> int:
@@ -895,6 +1101,7 @@ def _run_baselines(
                     "engine": "naive_baseline",
                     "fold": fold,
                     "baseline": name,
+                    "signal_definition_sign": _BASELINE_SIGNAL_SIGNS[name],
                     "decision_source_max_session_offset": -1,
                     "date_indices": indices.tolist(),
                 },
@@ -917,6 +1124,7 @@ def _run_baselines(
                     "engine": "baseline",
                     "fold": fold,
                     "name": name,
+                    "signal_definition_sign": _BASELINE_SIGNAL_SIGNS[name],
                     "score_manifest": str(manifest_path),
                     "score_manifest_sha256": manifest_sha,
                     "evaluation": _evaluation_summary(
@@ -1588,6 +1796,8 @@ def run_pipeline_validation(
     output_root: Path,
     runtime: ValidationRuntime = ValidationRuntime(),
     enabled_sidecars: Sequence[str] = (),
+    native_fast_audit_path: Path | None = None,
+    native_fast_audit_sha256: str | None = None,
 ) -> PipelineValidationResult:
     """Run only the development-fold integration checks required by v2 section 11.
 
@@ -1650,6 +1860,11 @@ def run_pipeline_validation(
         experiment52_expected_sha256=experiment52_cdi_sha256,
     )
     store_manifest_sha = sha256_file(store_path / "manifest.json")
+    native_fast_audit = _verify_native_fast_audit(
+        native_fast_audit_path,
+        expected_sha256=native_fast_audit_sha256,
+        store_manifest_sha256=store_manifest_sha,
+    )
     requested_groups = (
         pretrain_fit,
         pretrain_selection,
@@ -1716,17 +1931,21 @@ def run_pipeline_validation(
             }
             for name in ("triage", "full")
         }
+        acceptance = _development_acceptance(
+            baseline_records=baseline_records,
+            gbdt_records=gbdt_records,
+            action_terms_source=store_metadata.get("action_terms_source"),
+            schedule_source=store_metadata.get("schedule_source"),
+            native_fast_audit_passed=native_fast_audit is not None,
+        )
         manifest_path = output / "pipeline_validation_manifest.json"
         manifest_sha = write_json_atomic(
             manifest_path,
             {
                 "schema": PIPELINE_SCHEMA,
                 "status": "completed",
-                "engineering_acceptance_status": "unsupported",
-                "engineering_acceptance_reasons": [
-                    "neural_network_validation_not_run",
-                    "corporate_action_economics_not_accepted",
-                ],
+                "engineering_acceptance_status": acceptance["status"],
+                "engineering_acceptance_reasons": acceptance["reasons"],
                 **PIPELINE_FLAGS,
                 "scope": (
                     "development-only integration validation; numbers are not "
@@ -1744,6 +1963,7 @@ def run_pipeline_validation(
                         "external_artifact_resolutions": external_resolutions,
                     },
                     "cdi": cdi_provenance,
+                    "native_fast_raw_audit": native_fast_audit,
                 },
                 "date_contract": {
                     "minimum_date": min(requested_dates).isoformat(),
@@ -1756,13 +1976,14 @@ def run_pipeline_validation(
                     "development_folds": fold_payload,
                 },
                 "results": {
+                    "development_acceptance": acceptance,
                     "baselines": baseline_records,
                     "gbdt_triage": gbdt_records,
                     "network_smokes": {
                         "status": "not_run",
                         "reason": (
-                            "local CPU validation is classical-only and cannot establish "
-                            "engineering acceptance"
+                            "not required for development-grade classical data acceptance; "
+                            "neural validation belongs to the frozen registered round"
                         ),
                     },
                 },
@@ -2048,6 +2269,8 @@ def _parser() -> argparse.ArgumentParser:
         help="Expected SHA-256 of the Experiment-52 CDI reference.",
     )
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--native-fast-audit", type=Path)
+    parser.add_argument("--native-fast-audit-sha256")
     parser.add_argument(
         "--store-manifest-sha256",
         help="Exact sealed-store manifest hash required for a network continuation.",
@@ -2136,6 +2359,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_root=arguments.output_root,
             runtime=runtime,
             enabled_sidecars=arguments.sidecar,
+            native_fast_audit_path=arguments.native_fast_audit,
+            native_fast_audit_sha256=arguments.native_fast_audit_sha256,
         )
     print(
         json.dumps(

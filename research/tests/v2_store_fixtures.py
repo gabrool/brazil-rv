@@ -53,7 +53,11 @@ def fixture_feature_schema(
             version="synthetic_fixture_1",
         )
         for family in (
-            *(key for key in ("slow", "intraday", "native_fast") if key in feature_names),
+            *(
+                key
+                for key in ("slow", "intraday", "native_fast")
+                if key in feature_names
+            ),
             *sorted(key for key in feature_names if key.startswith("sidecar_")),
         )
         for name in feature_names[family]
@@ -76,6 +80,8 @@ def write_fixture_store(
 ) -> Path:
     names = dict(feature_names or _inferred_feature_names(arrays))
     metadata_payload = dict(metadata or {})
+    metadata_payload.setdefault("action_terms_source", "verified_contractual_terms")
+    metadata_payload.setdefault("schedule_source", "explicit_versioned_schedule")
     metadata_payload["feature_schema"] = fixture_feature_schema(names)
     return write_store(
         output_dir,

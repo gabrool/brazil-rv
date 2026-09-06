@@ -9,8 +9,10 @@ from brazil_rv.v2.decision_clock import (
     assert_calendar_complete,
     decision_timestamp,
     load_session_schedule,
+    next_session_decision_cutoffs,
     next_session_for_date_only,
     publication_available_at_decision,
+    schedule_source_label,
 )
 
 
@@ -37,12 +39,8 @@ def test_publication_clock_compares_absolute_instants_and_precision() -> None:
 
 def test_date_only_publication_uses_next_exchange_session() -> None:
     sessions = [date(2024, 6, 28), date(2024, 7, 1), date(2024, 7, 2)]
-    assert next_session_for_date_only(date(2024, 6, 28), sessions) == date(
-        2024, 7, 1
-    )
-    assert next_session_for_date_only(date(2024, 6, 29), sessions) == date(
-        2024, 7, 1
-    )
+    assert next_session_for_date_only(date(2024, 6, 28), sessions) == date(2024, 7, 1)
+    assert next_session_for_date_only(date(2024, 6, 29), sessions) == date(2024, 7, 1)
 
 
 def test_authoritative_schedule_loader_and_completeness_gate(tmp_path) -> None:
@@ -76,3 +74,19 @@ def test_in_memory_schedule_cannot_bypass_canonical_decision_clock() -> None:
     )
     with pytest.raises(ValueError, match="15:45"):
         assert_calendar_complete(schedule, [date(2024, 1, 2)])
+
+
+def test_schedule_source_label_and_next_decision_cutoffs() -> None:
+    schedule = tuple(
+        SessionDefinition(
+            trade_date=value,
+            continuous_open=time(10),
+            decision_time=time(15, 45),
+            continuous_close=time(16, 55),
+            auction_close=time(17),
+            source=f"reconstructed_v1:fixture_{index}",
+        )
+        for index, value in enumerate((date(2024, 1, 2), date(2024, 1, 3)))
+    )
+    assert schedule_source_label(schedule) == "reconstructed_v1"
+    assert next_session_decision_cutoffs(schedule) == (schedule[1].decision_at, None)

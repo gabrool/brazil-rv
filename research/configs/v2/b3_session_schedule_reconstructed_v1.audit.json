@@ -1,0 +1,518 @@
+{
+  "cotahist_inputs": [
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2009\\equities_daily_2009.parquet",
+      "sha256": "8d6a0eca1ce38cc47c8db6039b1811907f20d89d69718f2da1005d3947200fc4"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2010\\equities_daily_2010.parquet",
+      "sha256": "f7c9276bf15a88ecf5d105a0d2bbabba8f89f578880b06d20f98a7c8bc0c4e07"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2011\\equities_daily_2011.parquet",
+      "sha256": "586a4c5b5739caeef3a94bf1e5f990eca92677cce6346ee1ba59ff6cd6a292dc"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2012\\equities_daily_2012.parquet",
+      "sha256": "bc623e4d6c4bc3aa3b1f3564ee66bc0d36f2750e9b37a721b3c2b8189ddbe032"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2013\\equities_daily_2013.parquet",
+      "sha256": "028d2139cf287d548cc9abe37e53b37cd1ca1879aa15323420fdd0da8e4ceadf"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2014\\equities_daily_2014.parquet",
+      "sha256": "70978d63650276b447eac0d5c08c01081a7ad1f3930921ebd36cbc22dd43c909"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2015\\equities_daily_2015.parquet",
+      "sha256": "f1a1cf31988b1b2031d45b8e4e37e979f95c92513c0a7dabd93065d13ef20f50"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2016\\equities_daily_2016.parquet",
+      "sha256": "ff36f77b78bb182026e044cfda08563ce3e4429b0257187aac2ddc34f623ce34"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2017\\equities_daily_2017.parquet",
+      "sha256": "0d7f66dfbe7a05f41184b1a75a6daa55e099002f3cba701917267a2ff9a32a08"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2018\\equities_daily_2018.parquet",
+      "sha256": "0d38569a792ac65eef674e521a2bc251bac96b1ffc74da0ff8418334bb13bedf"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2019\\equities_daily_2019.parquet",
+      "sha256": "c98a7f857a939475edb4da7c78b68a78c3f6e9400902a1b50d9e125de5ce9da2"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2020\\equities_daily_2020.parquet",
+      "sha256": "5d96e9ac7051ec5336edf81389e1f092ea5113518b0dec40b0ccc11fef3d3c77"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2021\\equities_daily_2021.parquet",
+      "sha256": "401bdaff4a4ad7551a658c5c3805564fbf53e5606a0b318138d50ed5fd63d5f6"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2022\\equities_daily_2022.parquet",
+      "sha256": "8a4ef2f8075d07a1d78f48340c55644e15fbedbce554dcb28f4ddbb8161e604c"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2023\\equities_daily_2023.parquet",
+      "sha256": "316da938541f24b30de95655286eb9334a0697c81ab2bf09e87316580f3eff60"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2024\\equities_daily_2024.parquet",
+      "sha256": "147533c4aae9d3405896129b85aa0d3fb158e12e9c9a490c0ec73ba5d255eab4"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2025\\equities_daily_2025.parquet",
+      "sha256": "a44abcaf736f2ad675948d0c67eedef8a57ec2d5b65868ef93dbe0fc4ddd3124"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\interim\\b3\\cotahist\\equities_v2_2009_2026_20260903T180500Z\\year=2026\\equities_daily_2026.parquet",
+      "sha256": "3d80af923269808f89482edcdeb83a5db7658dcd49bf8b0d019f0e7a67b2e55d"
+    }
+  ],
+  "created_at_utc": "2026-09-06T14:42:30.040540+00:00",
+  "dated_regimes": {
+    "path": "C:\\quant\\b3-quant\\research\\configs\\v2\\b3_session_clock_regimes_reconstructed_v1.csv",
+    "sha256": "5fbcf59d3bfbf84981987e96c3d672656ae155110c13dd29ece4f9f70f264d9b"
+  },
+  "exception_explanations": {
+    "path": "C:\\quant\\b3-quant\\research\\configs\\v2\\schedule_reconstruction_exceptions.csv",
+    "rows": [
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo state holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2009-07-09"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo exchange holiday before national-list coverage",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2009-11-20"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2009-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2009-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo municipal holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2010-01-25"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo state holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2010-07-09"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2010-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2010-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo municipal holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2011-01-25"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2011-12-30"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo municipal holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2012-01-25"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo state holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2012-07-09"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo exchange holiday before national-list coverage",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2012-11-20"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2012-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2012-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo municipal holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2013-01-25"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo state holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2013-07-09"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo exchange holiday before national-list coverage",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2013-11-20"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2013-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2013-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "one-off B3 closure; absent from complete annual COTAHIST",
+        "reason": "2014 FIFA World Cup opening-match exchange closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2014-06-12"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo state holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2014-07-09"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo exchange holiday before national-list coverage",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2014-11-20"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2014-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2014-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo state holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2015-07-09"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo exchange holiday before national-list coverage",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2015-11-20"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2015-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2015-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo municipal holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2016-01-25"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2016-12-30"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo municipal holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2017-01-25"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo exchange holiday before national-list coverage",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2017-11-20"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2017-12-29"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo municipal holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2018-01-25"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo state holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2018-07-09"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo exchange holiday before national-list coverage",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2018-11-20"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2018-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2018-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo municipal holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2019-01-25"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo state holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2019-07-09"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo exchange holiday before national-list coverage",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2019-11-20"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2019-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2019-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2020-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2020-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo municipal holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2021-01-25"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange location holiday; absent from complete annual COTAHIST",
+        "reason": "Sao Paulo state holiday",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2021-07-09"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2021-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2021-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2022-12-30"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2023-12-29"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2024-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2024-12-31"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2025-12-24"
+      },
+      {
+        "archive_record_count": 0,
+        "evidence": "exchange-specific year-end closure; absent from complete annual COTAHIST",
+        "reason": "B3 year-end or Christmas-eve closure",
+        "status": "weekday_nonholiday_without_archive_session",
+        "trade_date": "2025-12-31"
+      }
+    ],
+    "sha256": "894e9b7ddafa93d5f730a2945189aae31d2499a6d47aab35adfc463c435f1470",
+    "unexplained_count": 0
+  },
+  "first_session": "2009-01-02",
+  "holiday_crosscheck": {
+    "path": "C:\\quant\\b3-quant\\research\\configs\\v2\\anbima_market_holidays_2009_2026.csv",
+    "sha256": "fb0d0cd5337418f7632eac5c9803a35350b5b1af5b9673d24374fb1adc798fc4",
+    "source_archive_sha256": "e3070152bfbdd733a27977adc82b799e973d3ea003d2aa25b0e7e5bdae63aa17",
+    "source_fetch_date": "2026-09-06",
+    "source_urls": [
+      "https://www.anbima.com.br/feriados/",
+      "https://www.anbima.com.br/feriados/arqs/feriados_nacionais.xls",
+      "https://www.b3.com.br/data/files/48/F4/33/1F/CB847510A0B5C075790D8AA8/OC%20094-2016-DP%20-%20Novos%20Hor%C3%A1rios%20de%20Negocia%C3%A7%C3%A3o%20%E2%80%93%20Segmentos%20BOVESPA%20e%20BM_F.pdf",
+      "https://www.b3.com.br/pt_br/noticias/novos-horarios-de-negociacao.htm",
+      "https://www.b3.com.br/en_us/news/new-trading-hours-8AE490C86E13936B016E23EB3C4E67E4.htm"
+    ]
+  },
+  "last_session": "2026-07-17",
+  "m1_assignments": {
+    "accepted_name_count": 158,
+    "bounds_start": "2021-08-16",
+    "clock_exceptions": [
+      {
+        "first_clock": "10:03:00",
+        "first_support": 77,
+        "last_clock": "18:39:00",
+        "last_support": 51,
+        "reason": "modal M1 boundary outside supported regular-session ranges; dated regime used",
+        "trade_date": "2026-07-17"
+      }
+    ],
+    "method": "cross-name modal first/last minute; five-minute closing call",
+    "path": "C:\\quant-data\\b3\\interim\\m1_reconciliation\\accepted\\xp_v1_158_2026-07-18_200203709\\xp_accepted_source_assignments_v1.parquet",
+    "sha256": "5863738ba0e0ae3c21b3a9e8e6d809bcbe621f265345f136669e96f168ff9a98"
+  },
+  "minimum_cotahist_records": 50,
+  "schedule_path": "C:\\quant\\b3-quant\\research\\configs\\v2\\b3_session_schedule_reconstructed_v1.csv",
+  "schedule_sha256": "d22d0ff79457ddb85762b2c0faf6606b939714e373ba4ba1a05107915adc70a6",
+  "schedule_source": "reconstructed_v1",
+  "schema": "BRAZIL_RV_B3_SESSION_RECONSTRUCTION_V1",
+  "session_count": 4348
+}

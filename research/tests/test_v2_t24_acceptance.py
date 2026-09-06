@@ -39,7 +39,6 @@ from brazil_rv.v2.research_rounds import (
     RESEARCH_SCORE_SCHEMA,
     _evaluation_from_artifacts,
     _persist_scores,
-    resume_round1,
 )
 from brazil_rv.v2.run_many import load_plan
 from brazil_rv.v2.score import score_checkpoint_artifact
@@ -648,7 +647,12 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
     retained_manifest, _ = _persist_scores(
         retained_root,
         {"scores": scores, "score_mask": score_mask},
-        {"evaluation_date_indices": evaluation_indices.tolist(), "fold": "T24"},
+        {
+            "evaluation_date_indices": evaluation_indices.tolist(),
+            "fold": "T24",
+            "action_terms_source": "inferred_cotahist_dismes_v1",
+            "schedule_source": "reconstructed_v1",
+        },
     )
     assert (
         json.loads(retained_manifest.read_text(encoding="utf-8"))["schema"]
@@ -743,5 +747,3 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
     )
     with pytest.raises(ValueError, match="stale or lacks the current schema"):
         load_plan(stale_plan)
-    with pytest.raises(RuntimeError, match="registration was voided"):
-        resume_round1(output_root=stale_root, num_threads=1)

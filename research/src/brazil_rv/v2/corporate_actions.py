@@ -4,9 +4,10 @@ import argparse
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any, Sequence
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import polars as pl
@@ -73,6 +74,23 @@ class DetectedActionResult:
     price_jump_anomaly_mask: NDArray[np.bool_]
     price_ratio: NDArray[np.float64]
     quantity_ratio: NDArray[np.float64]
+
+
+@dataclass(frozen=True)
+class InferredActionResult:
+    """Development-grade COTAHIST terms and their complete audit masks."""
+
+    terms: tuple[VerifiedActionTerm, ...]
+    coverage_resolved: NDArray[np.bool_]
+    u1_event: NDArray[np.bool_]
+    c1_event: NDArray[np.bool_]
+    u2_event: NDArray[np.bool_]
+    u2_per_trade_event: NDArray[np.bool_]
+    u2_total_quantity_event: NDArray[np.bool_]
+    u2_per_trade_candidate: NDArray[np.bool_]
+    u2_total_quantity_candidate: NDArray[np.bool_]
+    large_move_no_action: NDArray[np.bool_]
+    insufficient_market_support: NDArray[np.bool_]
 
 
 @dataclass(frozen=True)
@@ -473,7 +491,7 @@ def align_decision_known_action_terms(
     isins: Sequence[str],
     *,
     coverage_resolved: NDArray[np.bool_],
-    decision_timestamps: Sequence[datetime],
+    decision_timestamps: Sequence[datetime | None],
 ) -> AlignedActionTerms:
     """Align only action components known by each historical decision.
 
@@ -487,10 +505,16 @@ def align_decision_known_action_terms(
     cutoffs = tuple(decision_timestamps)
     if len(cutoffs) != len(dates):
         raise ValueError("decision timestamps must align the action date axis")
-    for cutoff in cutoffs:
+    defined_cutoffs = tuple(cutoff for cutoff in cutoffs if cutoff is not None)
+    for cutoff in defined_cutoffs:
         _require_aware_timestamp(cutoff, "decision timestamp")
-    if any(left >= right for left, right in zip(cutoffs, cutoffs[1:], strict=False)):
+    if any(
+        left >= right
+        for left, right in zip(defined_cutoffs, defined_cutoffs[1:], strict=False)
+    ):
         raise ValueError("decision timestamps must be strictly chronological")
+    if any(cutoff is None for cutoff in cutoffs[:-1]):
+        raise ValueError("only the final daily row may lack a following decision")
     return _align_verified_action_terms(
         terms,
         dates,
@@ -506,7 +530,7 @@ def _align_verified_action_terms(
     isins: Sequence[str],
     *,
     coverage_resolved: NDArray[np.bool_],
-    decision_timestamps: Sequence[datetime] | None,
+    decision_timestamps: Sequence[datetime | None] | None,
 ) -> AlignedActionTerms:
 
     normalized_dates = tuple(
@@ -570,9 +594,9 @@ def _align_verified_action_terms(
             day = date_lookup.get(event_date)
             if day is None:
                 continue
-            if (
-                decision_timestamps is not None
-                and term.available_at > decision_timestamps[day]
+            if decision_timestamps is not None and (
+                decision_timestamps[day] is None
+                or term.available_at > decision_timestamps[day]
             ):
                 # The retrospective archive proves that an action affected this
                 # session, but its contractual terms were unavailable at the
@@ -1551,6 +1575,306 @@ def detect_distribution_changes(
                 changed[day, name] = True
             prior = float(current)
     return changed
+
+
+def infer_cotahist_action_terms(
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+    raw_close: NDArray[np.floating],
+    quantity: NDArray[np.floating],
+    trades: NDArray[np.floating],
+    distribution_number: NDArray[np.floating],
+    observed: NDArray[np.bool_],
+    active: NDArray[np.bool_],
+    *,
+    source: str = "inferred_cotahist_dismes_v1",
+) -> InferredActionResult:
+    """Infer one explicitly labelled development-grade action ledger.
+
+    The inference is causal and uniform across the complete COTAHIST panel.
+    Price and activity histories are maintained in running pre-action units so
+    an undocumented unit change cannot create a second artificial event when
+    ``DISMES`` changes one or two sessions later. Provider observations are not
+    accepted by this function and therefore cannot affect any returned term or
+    mask.
+    """
+
+    if source != "inferred_cotahist_dismes_v1":
+        raise ValueError("the inferred COTAHIST action source label is immutable")
+    calendar = tuple(
+        value.astype("datetime64[D]").astype(object)
+        if isinstance(value, np.datetime64)
+        else value
+        for value in dates
+    )
+    close = np.asarray(raw_close, dtype=np.float64)
+    qty = np.asarray(quantity, dtype=np.float64)
+    trade_count = np.asarray(trades, dtype=np.float64)
+    distribution = np.asarray(distribution_number, dtype=np.float64)
+    seen = np.asarray(observed, dtype=np.bool_)
+    membership = np.asarray(active, dtype=np.bool_)
+    shape = (len(calendar), len(isins))
+    if (
+        close.shape != shape
+        or qty.shape != shape
+        or trade_count.shape != shape
+        or distribution.shape != shape
+        or seen.shape != shape
+        or membership.shape != shape
+    ):
+        raise ValueError("inferred action inputs must align [date, name]")
+    if len(set(isins)) != len(isins):
+        raise ValueError("inferred action ISIN axis must be unique")
+    if any(not isinstance(value, date) for value in calendar):
+        raise TypeError("inferred action dates must be calendar dates")
+
+    changed = detect_distribution_changes(distribution, seen)
+    coverage = seen & np.isfinite(distribution)
+    u1 = np.zeros(shape, dtype=np.bool_)
+    c1 = np.zeros(shape, dtype=np.bool_)
+    u2 = np.zeros(shape, dtype=np.bool_)
+    u2_per_trade = np.zeros(shape, dtype=np.bool_)
+    u2_total = np.zeros(shape, dtype=np.bool_)
+    u2_per_trade_candidate = np.zeros(shape, dtype=np.bool_)
+    u2_total_candidate = np.zeros(shape, dtype=np.bool_)
+    large_no_action = np.zeros(shape, dtype=np.bool_)
+    insufficient_market = np.zeros(len(calendar), dtype=np.bool_)
+    cumulative_q = np.ones(len(isins), dtype=np.float64)
+    adjusted_close_history: list[list[float]] = [[] for _ in isins]
+    raw_close_history: list[list[float]] = [[] for _ in isins]
+    adjusted_trade_size_history: list[list[float]] = [[] for _ in isins]
+    adjusted_quantity_history: list[list[float]] = [[] for _ in isins]
+    terms: list[VerifiedActionTerm] = []
+    sao_paulo = ZoneInfo("America/Sao_Paulo")
+
+    def unit_action_type(q: float) -> str:
+        if q < 1.0:
+            return "reverse_split"
+        return "split" if q >= 1.5 else "bonus"
+
+    for day, event_date in enumerate(calendar):
+        current_adjusted = close[day] * cumulative_q
+        prior_adjusted = np.asarray(
+            [values[-1] if values else np.nan for values in adjusted_close_history],
+            dtype=np.float64,
+        )
+        ordinary = (
+            membership[day]
+            & seen[day]
+            & ~changed[day]
+            & np.isfinite(current_adjusted)
+            & (current_adjusted > 0.0)
+            & np.isfinite(prior_adjusted)
+            & (prior_adjusted > 0.0)
+        )
+        ordinary_returns = np.log(current_adjusted[ordinary] / prior_adjusted[ordinary])
+        market_return = (
+            float(np.median(ordinary_returns)) if ordinary_returns.size >= 20 else 0.0
+        )
+
+        for name, isin in enumerate(isins):
+            current_valid = bool(
+                seen[day, name]
+                and np.isfinite(close[day, name])
+                and close[day, name] > 0.0
+            )
+            if not current_valid:
+                continue
+            prior_prices = adjusted_close_history[name]
+            current_q = 1.0
+            rule: str | None = None
+            evidence_numbers: dict[str, object] = {}
+            if prior_prices:
+                reference = float(np.median(prior_prices[-3:]))
+                previous_adjusted = float(prior_prices[-1])
+                lp = float(np.log(current_adjusted[name] / reference))
+                immediate_lp = float(np.log(current_adjusted[name] / previous_adjusted))
+                if changed[day, name]:
+                    if abs(lp) > 0.08:
+                        rule = "U1"
+                        u1[day, name] = True
+                        current_q = reference / float(current_adjusted[name])
+                        action_type = unit_action_type(current_q)
+                        cash = 0.0
+                    else:
+                        rule = "C1"
+                        c1[day, name] = True
+                        action_type = "cash_distribution"
+                        previous_raw = raw_close_history[name][-1]
+                        cash = float(
+                            np.clip(
+                                previous_raw * np.exp(market_return) - close[day, name],
+                                0.0,
+                                0.08 * previous_raw,
+                            )
+                        )
+                        if ordinary_returns.size < 20:
+                            insufficient_market[day] = True
+                    evidence_numbers = {
+                        "ref_median_adjusted": reference,
+                        "close_e_adjusted_pre_action": float(current_adjusted[name]),
+                        "close_prev_raw": raw_close_history[name][-1],
+                        "lp": lp,
+                        "market_return": market_return,
+                        "market_support": int(ordinary_returns.size),
+                    }
+                elif abs(immediate_lp) >= 0.30:
+                    current_total = qty[day, name] / cumulative_q[name]
+                    prior_total = (
+                        float(np.median(adjusted_quantity_history[name][-3:]))
+                        if adjusted_quantity_history[name]
+                        else np.nan
+                    )
+                    total_lq = (
+                        float(np.log(current_total / prior_total))
+                        if np.isfinite(current_total)
+                        and current_total > 0.0
+                        and np.isfinite(prior_total)
+                        and prior_total > 0.0
+                        else np.nan
+                    )
+                    total_consistent = bool(
+                        np.isfinite(total_lq)
+                        and lp * total_lq < 0.0
+                        and abs(lp + total_lq) < 0.35
+                    )
+                    u2_total_candidate[day, name] = total_consistent
+                    per_trade_available = bool(
+                        np.isfinite(trade_count[day, name])
+                        and trade_count[day, name] > 0.0
+                        and adjusted_trade_size_history[name]
+                    )
+                    if per_trade_available:
+                        current_activity = (
+                            qty[day, name] / trade_count[day, name] / cumulative_q[name]
+                        )
+                        prior_activity = float(
+                            np.median(adjusted_trade_size_history[name][-3:])
+                        )
+                        activity_method = "per_trade"
+                    else:
+                        current_activity = current_total
+                        prior_activity = prior_total
+                        activity_method = "total_quantity"
+                    activity_valid = bool(
+                        np.isfinite(current_activity)
+                        and current_activity > 0.0
+                        and np.isfinite(prior_activity)
+                        and prior_activity > 0.0
+                    )
+                    lq = (
+                        float(np.log(current_activity / prior_activity))
+                        if activity_valid
+                        else np.nan
+                    )
+                    consistent = bool(
+                        np.isfinite(lq) and lp * lq < 0.0 and abs(lp + lq) < 0.35
+                    )
+                    if per_trade_available:
+                        u2_per_trade_candidate[day, name] = consistent
+                    if consistent:
+                        rule = "U2"
+                        u2[day, name] = True
+                        if activity_method == "per_trade":
+                            u2_per_trade[day, name] = True
+                        else:
+                            u2_total[day, name] = True
+                        current_q = reference / float(current_adjusted[name])
+                        action_type = unit_action_type(current_q)
+                        cash = 0.0
+                    else:
+                        large_no_action[day, name] = True
+                    evidence_numbers = {
+                        "ref_median_adjusted": reference,
+                        "close_e_adjusted_pre_action": float(current_adjusted[name]),
+                        "lp": lp,
+                        "immediate_lp": immediate_lp,
+                        "activity_method": activity_method,
+                        "activity_e_adjusted": (
+                            float(current_activity)
+                            if np.isfinite(current_activity)
+                            else None
+                        ),
+                        "activity_prior_median_adjusted": (
+                            float(prior_activity)
+                            if np.isfinite(prior_activity)
+                            else None
+                        ),
+                        "lq": float(lq) if np.isfinite(lq) else None,
+                        "total_quantity_lq": (
+                            float(total_lq) if np.isfinite(total_lq) else None
+                        ),
+                        "total_quantity_consistent": total_consistent,
+                    }
+
+            if rule is not None:
+                terms.append(
+                    VerifiedActionTerm(
+                        action_type=action_type,
+                        isin=str(isin),
+                        issuer_id=None,
+                        effective_date=event_date,
+                        ex_date=event_date,
+                        payment_date=event_date,
+                        announced_at=None,
+                        available_at=datetime.combine(
+                            event_date, time(23, 59, 59), tzinfo=sao_paulo
+                        ),
+                        shares_per_prior_share=float(current_q),
+                        cash_per_prior_share=float(cash),
+                        currency="BRL",
+                        source=source,
+                        evidence=(
+                            f"{rule}:"
+                            + json.dumps(
+                                evidence_numbers,
+                                sort_keys=True,
+                                separators=(",", ":"),
+                            )
+                        ),
+                        coverage_status="inferred",
+                        sequence=0,
+                        resolved=True,
+                    )
+                )
+            if current_q != 1.0:
+                cumulative_q[name] *= current_q
+            adjusted_close_history[name].append(
+                float(close[day, name] * cumulative_q[name])
+            )
+            raw_close_history[name].append(float(close[day, name]))
+            if np.isfinite(qty[day, name]) and qty[day, name] > 0.0:
+                adjusted_quantity_history[name].append(
+                    float(qty[day, name] / cumulative_q[name])
+                )
+                if np.isfinite(trade_count[day, name]) and trade_count[day, name] > 0.0:
+                    adjusted_trade_size_history[name].append(
+                        float(
+                            qty[day, name] / trade_count[day, name] / cumulative_q[name]
+                        )
+                    )
+            for history in (
+                adjusted_close_history[name],
+                raw_close_history[name],
+                adjusted_trade_size_history[name],
+                adjusted_quantity_history[name],
+            ):
+                if len(history) > 3:
+                    del history[0]
+
+    return InferredActionResult(
+        terms=validate_verified_action_terms(terms),
+        coverage_resolved=coverage,
+        u1_event=u1,
+        c1_event=c1,
+        u2_event=u2,
+        u2_per_trade_event=u2_per_trade,
+        u2_total_quantity_event=u2_total,
+        u2_per_trade_candidate=u2_per_trade_candidate,
+        u2_total_quantity_candidate=u2_total_candidate,
+        large_move_no_action=large_no_action,
+        insufficient_market_support=insufficient_market,
+    )
 
 
 def detect_cotahist_actions(

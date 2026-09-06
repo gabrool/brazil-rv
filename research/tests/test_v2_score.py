@@ -63,9 +63,7 @@ def _scoring_fixture(
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=np.bool_),
             "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
-            "slow_timestep_valid": np.ones(
-                (day_count, name_count), dtype=np.bool_
-            ),
+            "slow_timestep_valid": np.ones((day_count, name_count), dtype=np.bool_),
             "intraday_values": intraday,
             "intraday_valid": np.ones_like(intraday, dtype=np.bool_),
             "intraday_age_sessions": np.zeros_like(intraday, dtype=np.float32),
@@ -109,9 +107,11 @@ def _scoring_fixture(
             "model_state_dict": model.state_dict(),
             "input_contract": input_contract,
             "transfer_chronology_clean": True,
-            "feature_schema_sha256": dataset.store.manifest[
-                "feature_schema_sha256"
+            "feature_schema_sha256": dataset.store.manifest["feature_schema_sha256"],
+            "action_terms_source": dataset.store.manifest["metadata"][
+                "action_terms_source"
             ],
+            "schedule_source": dataset.store.manifest["metadata"]["schedule_source"],
         },
         checkpoint,
     )
@@ -219,9 +219,7 @@ def test_scoring_rejects_hash_mismatch_before_creating_artifact(tmp_path) -> Non
         score_checkpoint_artifact(
             checkpoint=checkpoint,
             model_config=config,
-            loader=DataLoader(
-                dataset, batch_size=2, collate_fn=_omit_absent_fast
-            ),
+            loader=DataLoader(dataset, batch_size=2, collate_fn=_omit_absent_fast),
             output_dir=tmp_path / "bad_hash",
             expected_checkpoint_sha256="0" * 64,
             device=torch.device("cpu"),
@@ -303,13 +301,13 @@ def test_scoring_restores_checkpoint_after_initializer_is_deleted(tmp_path) -> N
             "seed": 29,
             "fold": "F1",
             "model_state_dict": model.state_dict(),
-            "input_contract": build_checkpoint_input_contract(
-                config, loader, loader
-            ),
+            "input_contract": build_checkpoint_input_contract(config, loader, loader),
             "transfer_chronology_clean": False,
-            "feature_schema_sha256": dataset.store.manifest[
-                "feature_schema_sha256"
+            "feature_schema_sha256": dataset.store.manifest["feature_schema_sha256"],
+            "action_terms_source": dataset.store.manifest["metadata"][
+                "action_terms_source"
             ],
+            "schedule_source": dataset.store.manifest["metadata"]["schedule_source"],
         },
         checkpoint,
     )

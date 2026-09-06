@@ -10,7 +10,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import NoReturn
 
 import numpy as np
 from numpy.typing import NDArray
@@ -58,10 +57,12 @@ from .validate_pipeline import (
     _window_target_mask,
 )
 
-ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V2"
-ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V2"
-RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V2"
-PREREGISTRATION = PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2.md"
+ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V3"
+ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V3"
+RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V3"
+PREREGISTRATION = (
+    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev2.md"
+)
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
 BOOTSTRAP_SEED = 20260815
@@ -86,17 +87,6 @@ RESEARCH_FLAGS = {
     "deployment_changed": False,
     "transfer_chronology_clean": True,
 }
-
-VOIDED_REGISTRATION_MESSAGE = (
-    "v2 Round 1/Round 2 registration was voided before the canonical multi-day "
-    "refactor; research launch and result-finalization remain disabled until a "
-    "fresh engineering acceptance report passes and a revised preregistration "
-    "is committed"
-)
-
-
-def _refuse_voided_registration() -> NoReturn:
-    raise RuntimeError(VOIDED_REGISTRATION_MESSAGE)
 
 
 @dataclass(frozen=True)
@@ -138,6 +128,75 @@ def _read_json(path: Path) -> dict[str, object]:
     return payload
 
 
+def _source_tier_labels(store_manifest: Mapping[str, object]) -> dict[str, str]:
+    metadata = store_manifest.get("metadata")
+    if not isinstance(metadata, Mapping):
+        raise ValueError("store manifest lacks source-tier metadata")
+    action = metadata.get("action_terms_source")
+    schedule = metadata.get("schedule_source")
+    if action != "inferred_cotahist_dismes_v1" or schedule != "reconstructed_v1":
+        raise ValueError(
+            "registered rev-2 research requires the labelled development-grade "
+            "action and reconstructed schedule tiers"
+        )
+    return {"action_terms_source": action, "schedule_source": schedule}
+
+
+def _assert_source_tier_labels(
+    payload: Mapping[str, object], *, expected: Mapping[str, str], path: Path
+) -> None:
+    metadata = payload.get("metadata")
+    nested = metadata if isinstance(metadata, Mapping) else {}
+    for key, value in expected.items():
+        actual = payload.get(key, nested.get(key))
+        if actual != value:
+            raise ValueError(f"{path} has a different {key}: {actual!r}")
+
+
+def _verify_development_acceptance(
+    path: Path,
+    *,
+    expected_sha256: str,
+    store_manifest_sha256: str,
+    implementation: Mapping[str, object],
+    source_tiers: Mapping[str, str],
+) -> dict[str, object]:
+    source = Path(path).resolve(strict=True)
+    if sha256_file(source) != expected_sha256.casefold():
+        raise ValueError("development acceptance report SHA-256 mismatch")
+    report = _read_json(source)
+    if (
+        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V3"
+        or report.get("status") != "completed"
+        or report.get("engineering_acceptance_status")
+        != "development_grade_inferred_actions"
+        or report.get("research_claim") is not False
+    ):
+        raise ValueError("development acceptance report is not an accepted rev-2 gate")
+    _assert_false_access(report, path=source)
+    if report.get("code") != implementation:
+        raise ValueError("development acceptance implementation differs from rev-2")
+    sources = report.get("sources")
+    store = sources.get("store") if isinstance(sources, Mapping) else None
+    if (
+        not isinstance(store, Mapping)
+        or store.get("manifest_sha256") != store_manifest_sha256
+    ):
+        raise ValueError("development acceptance report binds a different store")
+    results = report.get("results")
+    acceptance = (
+        results.get("development_acceptance") if isinstance(results, Mapping) else None
+    )
+    labels = acceptance.get("labels") if isinstance(acceptance, Mapping) else None
+    if not isinstance(labels, Mapping) or any(
+        labels.get(key) != value for key, value in source_tiers.items()
+    ):
+        raise ValueError("development acceptance source tiers differ from the store")
+    if acceptance.get("reasons") != []:
+        raise ValueError("development acceptance retains failed sanity bounds")
+    return report
+
+
 def _assert_false_access(payload: Mapping[str, object], *, path: Path) -> None:
     if (
         payload.get("official_validation_accessed") is not False
@@ -164,6 +223,14 @@ def _assert_current_clean_training(
     feature_schema = payload.get("feature_schema_sha256")
     if not isinstance(feature_schema, str) or len(feature_schema) != 64:
         raise ValueError(f"trajectory lacks a canonical feature schema: {path}")
+    _assert_source_tier_labels(
+        payload,
+        expected={
+            "action_terms_source": "inferred_cotahist_dismes_v1",
+            "schedule_source": "reconstructed_v1",
+        },
+        path=path,
+    )
 
 
 def _array_record(path: Path, values: NDArray[np.generic]) -> dict[str, object]:
@@ -181,6 +248,10 @@ def _persist_scores(
     arrays: Mapping[str, NDArray[np.generic]],
     metadata: Mapping[str, object],
 ) -> tuple[Path, str]:
+    action_terms_source = metadata.get("action_terms_source")
+    schedule_source = metadata.get("schedule_source")
+    if not isinstance(action_terms_source, str) or not isinstance(schedule_source, str):
+        raise ValueError("research score metadata lacks source-tier labels")
     root.mkdir(parents=True, exist_ok=False)
     records: dict[str, dict[str, object]] = {}
     for label, raw in sorted(arrays.items()):
@@ -195,6 +266,8 @@ def _persist_scores(
             "schema": RESEARCH_SCORE_SCHEMA,
             "status": "completed",
             **RESEARCH_FLAGS,
+            "action_terms_source": action_terms_source,
+            "schedule_source": schedule_source,
             "metadata": dict(metadata),
             "artifacts": records,
         },
@@ -963,9 +1036,7 @@ def _gbdt_features(
             )
         )
     for group in RUNG_GROUPS[rung]:
-        sidecar = read_scalar_feature_view(
-            store, indices, (f"sidecar_{group}",)
-        )
+        sidecar = read_scalar_feature_view(store, indices, (f"sidecar_{group}",))
         parts.append(assemble_gbdt_scalar_view(sidecar, label=group))
     result = np.concatenate(parts, axis=-1, dtype=np.float32)
     if result.shape[-1] != len(_feature_names(store, rung)) or np.isinf(result).any():
@@ -978,9 +1049,12 @@ def _persist_model(
     root: Path,
     verification_features: NDArray[np.floating],
     verification_mask: NDArray[np.bool_],
+    *,
+    source_tiers: Mapping[str, str],
 ) -> dict[str, object]:
     manifest, digest = model.save(
-        root, metadata={"status": "completed", **RESEARCH_FLAGS}
+        root,
+        metadata={"status": "completed", **RESEARCH_FLAGS, **source_tiers},
     )
     restored = MultiHorizonGBDT.load(root, expected_manifest_sha256=digest)
     if not np.array_equal(
@@ -1070,6 +1144,7 @@ def _run_gbdt_candidate(
             root / "models" / fold,
             evaluation_x,
             score_mask,
+            source_tiers=_source_tier_labels(store.manifest),
         )
         fold_root = root / fold
         manifest, manifest_sha = _persist_scores(
@@ -1079,6 +1154,7 @@ def _run_gbdt_candidate(
                 "score_mask": score_mask,
             },
             {
+                **_source_tier_labels(store.manifest),
                 "engine": "lightgbm",
                 "rung": rung,
                 "fold": fold,
@@ -1121,16 +1197,32 @@ def freeze_round1(
     cdi_sha256: str,
     experiment52_cdi_path: Path,
     experiment52_cdi_sha256: str,
+    acceptance_path: Path,
+    acceptance_sha256: str,
     output_root: Path,
     num_threads: int,
 ) -> str:
-    _refuse_voided_registration()
     code = _git_identity()
     output = output_root.resolve()
     if output.exists():
         raise FileExistsError(output)
     store = store_root.resolve(strict=True)
     store_manifest, dates = _read_store_header(store)
+    store_manifest_sha256 = sha256_file(store / "manifest.json")
+    store_metadata = store_manifest.get("metadata")
+    if (
+        not isinstance(store_metadata, Mapping)
+        or store_metadata.get("implementation_git_commit") != code["commit"]
+    ):
+        raise ValueError("Round-1 store was not built by the frozen implementation")
+    source_tiers = _source_tier_labels(store_manifest)
+    _verify_development_acceptance(
+        acceptance_path,
+        expected_sha256=acceptance_sha256,
+        store_manifest_sha256=store_manifest_sha256,
+        implementation=code,
+        source_tiers=source_tiers,
+    )
     fit, selection, evaluation, _, folds = _fold_indices(dates)
     _load_development_cdi(
         dates=dates,
@@ -1148,14 +1240,20 @@ def freeze_round1(
         **RESEARCH_FLAGS,
         "frozen_at_utc": _utc_now(),
         "implementation": code,
+        **source_tiers,
         "preregistration": {
             "path": str(PREREGISTRATION.resolve(strict=True)),
             "sha256": sha256_file(PREREGISTRATION),
         },
         "store": {
             "root": str(store),
-            "manifest_sha256": sha256_file(store / "manifest.json"),
+            "manifest_sha256": store_manifest_sha256,
             "schema": store_manifest["schema"],
+        },
+        "development_acceptance": {
+            "path": str(acceptance_path.resolve(strict=True)),
+            "sha256": acceptance_sha256.casefold(),
+            "status": "development_grade_inferred_actions",
         },
         "cdi": {
             "development_extension": {
@@ -1185,6 +1283,11 @@ def freeze_round1(
             "seed": BOOTSTRAP_SEED,
             "fold_boundary_preserved": True,
         },
+        "economics_tier": {
+            "price_source": "close_proxy",
+            "terminal_inventory": "last_mark_with_haircut_sensitivity",
+            "executable_borrow": False,
+        },
     }
     return write_json_atomic(output / "frozen_design.json", design)
 
@@ -1194,7 +1297,6 @@ def run_round1(
     output_root: Path,
     num_threads: int,
 ) -> str:
-    _refuse_voided_registration()
     output = output_root.resolve(strict=True)
     design_path = output / "frozen_design.json"
     design = _read_json(design_path)
@@ -1214,6 +1316,19 @@ def run_round1(
     store_manifest, dates = _read_store_header(store_root)
     if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
         raise ValueError("Round-1 store manifest hash mismatch")
+    source_tiers = _source_tier_labels(store_manifest)
+    if any(design.get(key) != value for key, value in source_tiers.items()):
+        raise ValueError("Round-1 frozen source tiers differ from the store")
+    acceptance = design.get("development_acceptance")
+    if not isinstance(acceptance, Mapping):
+        raise ValueError("Round-1 frozen design lacks development acceptance")
+    _verify_development_acceptance(
+        Path(str(acceptance["path"])),
+        expected_sha256=str(acceptance["sha256"]),
+        store_manifest_sha256=str(design["store"]["manifest_sha256"]),
+        implementation=code,
+        source_tiers=source_tiers,
+    )
     fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
     pretrain = _pretrain_indices(dates)
     cdi_design = design["cdi"]
@@ -1264,6 +1379,7 @@ def run_round1(
                         "score_mask": panel.score_mask[local],
                     },
                     {
+                        **_source_tier_labels(store.manifest),
                         "engine": "naive_baseline",
                         "name": name,
                         "fold": fold,
@@ -1380,6 +1496,7 @@ def run_round1(
             "schema": ROUND1_SCHEMA,
             "status": "completed",
             **RESEARCH_FLAGS,
+            **source_tiers,
             "completed_at_utc": _utc_now(),
             "frozen_design": {
                 "path": str(design_path),
@@ -1429,6 +1546,14 @@ def _existing_score_and_evaluation_record(root: Path) -> dict[str, object]:
         raise PermissionError(
             f"registered score has contaminated transfer chronology: {root}"
         )
+    _assert_source_tier_labels(
+        manifest,
+        expected={
+            "action_terms_source": "inferred_cotahist_dismes_v1",
+            "schedule_source": "reconstructed_v1",
+        },
+        path=manifest_path,
+    )
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, Mapping):
         raise ValueError(f"score manifest lacks artifacts: {manifest_path}")
@@ -1463,7 +1588,6 @@ def _existing_score_and_evaluation_record(root: Path) -> dict[str, object]:
 
 def resume_round1(*, output_root: Path, num_threads: int) -> str:
     """Reuse complete candidates and score only registered candidates still absent."""
-    _refuse_voided_registration()
     output = output_root.resolve(strict=True)
     result_path = output / "round1_result.json"
     if result_path.exists():
@@ -1482,7 +1606,20 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     store_root = Path(str(design["store"]["root"]))
     if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
         raise ValueError("Round-1 store manifest hash mismatch")
-    _, dates = _read_store_header(store_root)
+    store_manifest, dates = _read_store_header(store_root)
+    source_tiers = _source_tier_labels(store_manifest)
+    if any(design.get(key) != value for key, value in source_tiers.items()):
+        raise ValueError("Round-1 frozen source tiers differ from the store")
+    acceptance = design.get("development_acceptance")
+    if not isinstance(acceptance, Mapping):
+        raise ValueError("Round-1 frozen design lacks development acceptance")
+    _verify_development_acceptance(
+        Path(str(acceptance["path"])),
+        expected_sha256=str(acceptance["sha256"]),
+        store_manifest_sha256=str(design["store"]["manifest_sha256"]),
+        implementation=design["implementation"],
+        source_tiers=source_tiers,
+    )
     fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
     pretrain = _pretrain_indices(dates)
     cdi_design = design["cdi"]
@@ -1657,6 +1794,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
         "schema": ROUND1_SCHEMA,
         "status": "completed",
         **RESEARCH_FLAGS,
+        **source_tiers,
         "completed_at_utc": _utc_now(),
         "frozen_design": {
             "path": str(design_path),
@@ -1756,7 +1894,6 @@ def freeze_round2(
     fast_checkpoint_sha256: str | None,
     max_parallel: int,
 ) -> str:
-    _refuse_voided_registration()
     code = _git_identity()
     if not 4 <= max_parallel <= 6:
         raise ValueError("Round 2 requires four to six concurrent trajectories")
@@ -1772,6 +1909,12 @@ def freeze_round2(
         raise FileExistsError(output)
     store = store_root.resolve(strict=True)
     store_manifest, dates = _read_store_header(store)
+    store_manifest_sha256 = sha256_file(store / "manifest.json")
+    source_tiers = _source_tier_labels(store_manifest)
+    if any(round1.get(key) != value for key, value in source_tiers.items()):
+        raise ValueError("Round 1 and Round 2 source tiers differ")
+    if store_manifest_sha256 != round1.get("sources", {}).get("v2_store_manifest"):
+        raise ValueError("Round 2 must use the exact Round-1 development store")
     _fold_indices(dates)
     _load_development_cdi(
         dates=dates,
@@ -1797,6 +1940,7 @@ def freeze_round2(
         **RESEARCH_FLAGS,
         "frozen_at_utc": _utc_now(),
         "implementation": code,
+        **source_tiers,
         "preregistration": {
             "path": str(PREREGISTRATION.resolve(strict=True)),
             "sha256": sha256_file(PREREGISTRATION),
@@ -1809,7 +1953,7 @@ def freeze_round2(
         },
         "store": {
             "root": str(store),
-            "manifest_sha256": sha256_file(store / "manifest.json"),
+            "manifest_sha256": store_manifest_sha256,
             "schema": store_manifest["schema"],
         },
         "cdi": {
@@ -1836,6 +1980,10 @@ def freeze_round2(
             "pretrained_learning_rate_multiplier": 0.3,
             "joint_time_decay_half_life_sessions": 756.0,
         },
+        "first_failure_stop": {
+            "required_smoke": "arm_A_F1_seed_11_one_epoch_no_scores",
+            "smoke_reused_by_registered_runs": False,
+        },
         "max_parallel_trajectories": max_parallel,
         "bootstrap": {
             "replications": BOOTSTRAP_REPLICATIONS,
@@ -1856,6 +2004,8 @@ def _training_command(
     fold: str | None = None,
     pretrain_checkpoint: Path | None = None,
     pretrain_sha256: str | None = None,
+    maximum_epochs: int = 20,
+    score_output: bool = True,
 ) -> list[str]:
     command = [
         sys.executable,
@@ -1865,14 +2015,12 @@ def _training_command(
         str(design["store"]["root"]),
         "--output-dir",
         str(output_dir),
-        "--score-output-dir",
-        str(output_dir / "scores"),
         "--stage",
         stage,
         "--seed",
         str(seed),
         "--maximum-epochs",
-        "20",
+        str(maximum_epochs),
         "--patience",
         "3",
         "--lookback",
@@ -1888,6 +2036,8 @@ def _training_command(
         "--device",
         "cuda",
     ]
+    if score_output:
+        command.extend(("--score-output-dir", str(output_dir / "scores")))
     if fold is not None:
         command.extend(("--fold", fold))
     for group in design["enabled_sidecars"]:
@@ -1922,6 +2072,7 @@ def _plan_job(
     run_dir: Path,
     command: Sequence[str],
     stage: str,
+    source_tiers: Mapping[str, str],
 ) -> dict[str, object]:
     return {
         "name": name,
@@ -1937,12 +2088,12 @@ def _plan_job(
             "official_validation_accessed": False,
             "test_accessed": False,
             "transfer_chronology_clean": True,
+            **source_tiers,
         },
     }
 
 
-def write_round2_plan_p(*, output_root: Path) -> str:
-    _refuse_voided_registration()
+def write_round2_plan_smoke(*, output_root: Path) -> str:
     root = output_root.resolve(strict=True)
     design = _read_json(root / "frozen_design.json")
     if (
@@ -1950,6 +2101,63 @@ def write_round2_plan_p(*, output_root: Path) -> str:
         or design.get("status") != "frozen_before_score"
     ):
         raise ValueError("Round-2 root is not frozen")
+    run_dir = root / "smoke" / "arm_A_F1_seed_11"
+    job = _plan_job(
+        name="smoke_arm_A_F1_seed_11",
+        seed=11,
+        fold="F1",
+        run_dir=run_dir,
+        command=_training_command(
+            design=design,
+            output_dir=run_dir,
+            stage="F",
+            seed=11,
+            fold="F1",
+            maximum_epochs=1,
+            score_output=False,
+        ),
+        stage="F",
+        source_tiers={
+            "action_terms_source": str(design["action_terms_source"]),
+            "schedule_source": str(design["schedule_source"]),
+        },
+    )
+    return write_json_atomic(
+        root / "round2_plan_smoke.json",
+        {
+            "schema": RUN_MANY_PLAN_SCHEMA,
+            "phase": "rev2_smoke",
+            "max_parallel": 1,
+            "first_failure_stop": True,
+            "research_candidate_score": False,
+            "reused_by_registered_runs": False,
+            "jobs": [job],
+        },
+    )
+
+
+def write_round2_plan_p(*, output_root: Path) -> str:
+    root = output_root.resolve(strict=True)
+    design = _read_json(root / "frozen_design.json")
+    if (
+        design.get("schema") != ROUND2_SCHEMA
+        or design.get("status") != "frozen_before_score"
+    ):
+        raise ValueError("Round-2 root is not frozen")
+    if not (root / "round2_plan_smoke.json").is_file():
+        raise FileNotFoundError("Round-2 smoke plan is absent")
+    smoke_root = root / "smoke" / "arm_A_F1_seed_11"
+    smoke_manifest_path = smoke_root / "run_manifest.json"
+    smoke = _read_json(smoke_manifest_path)
+    _assert_current_clean_training(smoke, path=smoke_manifest_path)
+    if (
+        smoke.get("stage") != "F"
+        or smoke.get("seed") != 11
+        or smoke.get("fold") != "F1"
+        or smoke.get("epochs_completed") != 1
+        or (smoke_root / "scores").exists()
+    ):
+        raise ValueError("Round-2 first-smoke contract did not pass exactly")
     jobs = []
     for seed in NETWORK_SEEDS:
         run_dir = root / "trajectories" / "arm_B" / "stage_P" / f"seed_{seed}"
@@ -1963,13 +2171,17 @@ def write_round2_plan_p(*, output_root: Path) -> str:
                     design=design, output_dir=run_dir, stage="P", seed=seed
                 ),
                 stage="P",
+                source_tiers={
+                    "action_terms_source": str(design["action_terms_source"]),
+                    "schedule_source": str(design["schedule_source"]),
+                },
             )
         )
     return write_json_atomic(
         root / "round2_plan_p.json",
         {
             "schema": RUN_MANY_PLAN_SCHEMA,
-            "phase": "stage_P",
+            "phase": "rev2_stage_P",
             "max_parallel": int(design["max_parallel_trajectories"]),
             "jobs": jobs,
         },
@@ -1977,7 +2189,6 @@ def write_round2_plan_p(*, output_root: Path) -> str:
 
 
 def write_round2_plan_main(*, output_root: Path) -> str:
-    _refuse_voided_registration()
     root = output_root.resolve(strict=True)
     design = _read_json(root / "frozen_design.json")
     if (
@@ -2026,13 +2237,17 @@ def write_round2_plan_main(*, output_root: Path) -> str:
                             pretrain_sha256=handoff_sha,
                         ),
                         stage=stage,
+                        source_tiers={
+                            "action_terms_source": str(design["action_terms_source"]),
+                            "schedule_source": str(design["schedule_source"]),
+                        },
                     )
                 )
     return write_json_atomic(
         root / "round2_plan_main.json",
         {
             "schema": RUN_MANY_PLAN_SCHEMA,
-            "phase": "registered_arms",
+            "phase": "rev2_registered_arms",
             "max_parallel": int(design["max_parallel_trajectories"]),
             "stage_p_handoffs": {
                 str(seed): {"path": str(path), "sha256": digest}
@@ -2063,6 +2278,14 @@ def _score_artifact(
         or manifest.get("status") != "completed"
     ):
         raise ValueError(f"incomplete score artifact: {root}")
+    _assert_source_tier_labels(
+        manifest,
+        expected={
+            "action_terms_source": "inferred_cotahist_dismes_v1",
+            "schedule_source": "reconstructed_v1",
+        },
+        path=manifest_path,
+    )
     if require_clean_transfer and manifest.get("transfer_chronology_clean") is not True:
         raise PermissionError(
             f"score artifact has contaminated transfer chronology: {root}"
@@ -2275,7 +2498,6 @@ def _evaluation_from_artifacts(
 
 
 def finalize_round2(*, output_root: Path) -> str:
-    _refuse_voided_registration()
     root = output_root.resolve(strict=True)
     design = _read_json(root / "frozen_design.json")
     if (
@@ -2336,6 +2558,7 @@ def finalize_round2(*, output_root: Path) -> str:
                     aggregate,
                     {"scores": scores, "score_mask": mask},
                     {
+                        **_source_tier_labels(store.manifest),
                         "engine": "starter_network",
                         "arm": arm,
                         "fold": fold,
@@ -2426,7 +2649,12 @@ def finalize_round2(*, output_root: Path) -> str:
             g_manifest, g_digest = _persist_scores(
                 gbdt_root,
                 {"scores": gbdt_scores, "score_mask": gbdt_mask},
-                {"engine": "round1_gbdt_parent", "parent_rung": parent, "fold": fold},
+                {
+                    **_source_tier_labels(store.manifest),
+                    "engine": "round1_gbdt_parent",
+                    "parent_rung": parent,
+                    "fold": fold,
+                },
             )
             g_eval = _evaluate(
                 store=store,
@@ -2454,6 +2682,7 @@ def finalize_round2(*, output_root: Path) -> str:
                 ensemble_root,
                 {"scores": ensemble_scores, "score_mask": network_mask},
                 {
+                    **_source_tier_labels(store.manifest),
                     "engine": "fixed_equal_weight_rank_average",
                     "members": ["network", "gbdt"],
                     "weights": [0.5, 0.5],
@@ -2528,6 +2757,7 @@ def finalize_round2(*, output_root: Path) -> str:
             "schema": ROUND2_SCHEMA,
             "status": "completed",
             **RESEARCH_FLAGS,
+            **_source_tier_labels(store.manifest),
             "completed_at_utc": _utc_now(),
             "frozen_design": {
                 "path": str(root / "frozen_design.json"),
@@ -2634,6 +2864,8 @@ def _parser() -> argparse.ArgumentParser:
     freeze.add_argument("--cdi-sha256", required=True)
     freeze.add_argument("--experiment52-cdi", type=Path, required=True)
     freeze.add_argument("--experiment52-cdi-sha256", required=True)
+    freeze.add_argument("--development-acceptance", type=Path, required=True)
+    freeze.add_argument("--development-acceptance-sha256", required=True)
     freeze.add_argument("--output-root", type=Path, required=True)
     freeze.add_argument("--num-threads", type=int, default=0)
     run = commands.add_parser("run-round1")
@@ -2662,6 +2894,8 @@ def _parser() -> argparse.ArgumentParser:
     freeze2.add_argument("--max-parallel", type=int, default=4)
     plan_p = commands.add_parser("write-round2-plan-p")
     plan_p.add_argument("--output-root", type=Path, required=True)
+    plan_smoke = commands.add_parser("write-round2-plan-smoke")
+    plan_smoke.add_argument("--output-root", type=Path, required=True)
     plan_main = commands.add_parser("write-round2-plan-main")
     plan_main.add_argument("--output-root", type=Path, required=True)
     finalize = commands.add_parser("finalize-round2")
@@ -2678,6 +2912,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             cdi_sha256=arguments.cdi_sha256,
             experiment52_cdi_path=arguments.experiment52_cdi,
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
+            acceptance_path=arguments.development_acceptance,
+            acceptance_sha256=arguments.development_acceptance_sha256,
             output_root=arguments.output_root,
             num_threads=arguments.num_threads,
         )
@@ -2706,6 +2942,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     elif arguments.command == "write-round2-plan-p":
         digest = write_round2_plan_p(output_root=arguments.output_root)
+    elif arguments.command == "write-round2-plan-smoke":
+        digest = write_round2_plan_smoke(output_root=arguments.output_root)
     elif arguments.command == "write-round2-plan-main":
         digest = write_round2_plan_main(output_root=arguments.output_root)
     elif arguments.command == "finalize-round2":

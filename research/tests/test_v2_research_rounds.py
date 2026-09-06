@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import json
-from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -33,46 +32,13 @@ from brazil_rv.v2.research_rounds import (
 )
 
 
-@pytest.mark.parametrize(
-    "call",
-    [
-        lambda root: research_rounds.freeze_round1(
-            store_root=root / "store",
-            cdi_path=root / "cdi",
-            cdi_sha256="0" * 64,
-            experiment52_cdi_path=root / "exp52-cdi",
-            experiment52_cdi_sha256="1" * 64,
-            output_root=root / "round1",
-            num_threads=1,
-        ),
-        lambda root: research_rounds.run_round1(
-            output_root=root / "round1", num_threads=1
-        ),
-        lambda root: research_rounds.resume_round1(
-            output_root=root / "round1", num_threads=1
-        ),
-        lambda root: research_rounds.freeze_round2(
-            round1_root=root / "round1",
-            store_root=root / "store",
-            cdi_path=root / "cdi",
-            cdi_sha256="0" * 64,
-            experiment52_cdi_path=root / "exp52-cdi",
-            experiment52_cdi_sha256="1" * 64,
-            output_root=root / "round2",
-            fast_checkpoint=None,
-            fast_checkpoint_sha256=None,
-            max_parallel=4,
-        ),
-        lambda root: research_rounds.write_round2_plan_p(output_root=root),
-        lambda root: research_rounds.write_round2_plan_main(output_root=root),
-        lambda root: research_rounds.finalize_round2(output_root=root),
-    ],
-)
-def test_voided_round1_round2_entrypoints_refuse_before_filesystem_access(
-    tmp_path: Path, call: Callable[[Path], object]
+def test_rev2_registration_replaces_the_voided_research_entrypoints(
+    tmp_path: Path,
 ) -> None:
-    with pytest.raises(RuntimeError, match="registration was voided"):
-        call(tmp_path)
+    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev2.md"
+    assert research_rounds.PREREGISTRATION.is_file()
+    with pytest.raises(FileNotFoundError):
+        research_rounds.run_round1(output_root=tmp_path / "absent", num_threads=1)
 
 
 def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
@@ -347,6 +313,10 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         manifest = {
             "axes": {"date_identity_sha256": inputs.calendar_identity_sha256},
             "feature_names": {"slow": list(SLOW_FEATURES)},
+            "metadata": {
+                "action_terms_source": inputs.action_terms_source,
+                "schedule_source": inputs.schedule_source,
+            },
         }
         dates = np.asarray(
             ["2024-01-01", *(value.isoformat() for value in inputs.dates)],
@@ -375,6 +345,8 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
                 "official_validation_accessed": False,
                 "test_accessed": False,
                 "transfer_chronology_clean": True,
+                "action_terms_source": "inferred_cotahist_dismes_v1",
+                "schedule_source": "reconstructed_v1",
                 "metadata": {"evaluation_date_indices": indices.tolist()},
                 "artifacts": {
                     "scores.npy": {
@@ -444,6 +416,8 @@ def test_score_artifact_rejects_stale_or_contaminated_manifest_before_arrays(
         "official_validation_accessed": False,
         "test_accessed": False,
         "transfer_chronology_clean": clean,
+        "action_terms_source": "inferred_cotahist_dismes_v1",
+        "schedule_source": "reconstructed_v1",
         "artifacts": {},
     }
     (tmp_path / "score_manifest.json").write_text(json.dumps(payload), encoding="utf-8")
@@ -507,6 +481,8 @@ def test_network_score_artifact_binds_date_security_and_feature_axes(
                 "official_validation_accessed": False,
                 "test_accessed": False,
                 "transfer_chronology_clean": True,
+                "action_terms_source": "inferred_cotahist_dismes_v1",
+                "schedule_source": "reconstructed_v1",
                 "feature_schema_sha256": "c" * 64,
                 "artifacts": records,
             }

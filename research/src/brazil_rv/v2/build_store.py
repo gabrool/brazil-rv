@@ -31,6 +31,7 @@ from .contract import (
 )
 from .corporate_actions import (
     DetectedActionResult,
+    InferredActionResult,
     VerifiedActionTerm,
     action_coverage_resolved_mask,
     action_calendar_alignment_table,
@@ -45,6 +46,7 @@ from .corporate_actions import (
     dividend_close_drop_audit,
     detect_cotahist_actions,
     detect_distribution_changes,
+    infer_cotahist_action_terms,
     m1_cotahist_mismatch_by_year,
     provider_actions_to_verified_terms,
     provider_split_detection_audit,
@@ -69,6 +71,8 @@ from .decision_clock import (
     assert_calendar_complete,
     calendar_completeness_table,
     load_session_schedule,
+    next_session_decision_cutoffs,
+    schedule_source_label,
     schedule_frame,
 )
 from .features import build_slow_features_into
@@ -137,7 +141,7 @@ class _DecisionContinuationInputs:
 def _action_alignment_role_table(
     terms: Sequence[VerifiedActionTerm],
     dates: NDArray[np.datetime64],
-    decision_timestamps: Sequence[datetime],
+    decision_timestamps: Sequence[datetime | None],
 ) -> pl.DataFrame:
     """Audit retrospective settlement versus historical feature availability."""
 
@@ -162,12 +166,12 @@ def _action_alignment_role_table(
                 "source": term.source,
                 "evidence": term.evidence,
                 "resolved_term": term.resolved,
-                "in_store_calendar": cutoff is not None,
-                "known_by_event_decision": (
+                "following_decision_in_store": cutoff is not None,
+                "known_by_following_decision": (
                     cutoff is not None and term.available_at <= cutoff
                 ),
                 "retrospective_role": "outcome_and_accounting",
-                "decision_time_role": "feature_input_if_known",
+                "decision_time_role": "daily_row_input_at_following_decision_if_known",
             }
         )
     return pl.DataFrame(
@@ -181,8 +185,8 @@ def _action_alignment_role_table(
             "source": pl.String,
             "evidence": pl.String,
             "resolved_term": pl.Boolean,
-            "in_store_calendar": pl.Boolean,
-            "known_by_event_decision": pl.Boolean,
+            "following_decision_in_store": pl.Boolean,
+            "known_by_following_decision": pl.Boolean,
             "retrospective_role": pl.String,
             "decision_time_role": pl.String,
         },
@@ -1162,6 +1166,63 @@ def _cotahist_action_counts_by_year(
     return pl.DataFrame(rows)
 
 
+def _inferred_action_counts_by_year(
+    dates: NDArray[np.datetime64], result: InferredActionResult | None
+) -> pl.DataFrame:
+    schema = {
+        "year": pl.Int32,
+        "u1_count": pl.Int64,
+        "c1_count": pl.Int64,
+        "u2_count": pl.Int64,
+        "u2_per_trade_count": pl.Int64,
+        "u2_total_quantity_count": pl.Int64,
+        "insufficient_market_support_session_count": pl.Int64,
+    }
+    if result is None:
+        return pl.DataFrame(schema=schema)
+    years = dates.astype("datetime64[Y]").astype(np.int64) + 1970
+    rows = []
+    for year in sorted(set(years.tolist())):
+        selected = years == year
+        rows.append(
+            {
+                "year": int(year),
+                "u1_count": int(result.u1_event[selected].sum()),
+                "c1_count": int(result.c1_event[selected].sum()),
+                "u2_count": int(result.u2_event[selected].sum()),
+                "u2_per_trade_count": int(result.u2_per_trade_event[selected].sum()),
+                "u2_total_quantity_count": int(
+                    result.u2_total_quantity_event[selected].sum()
+                ),
+                "insufficient_market_support_session_count": int(
+                    result.insufficient_market_support[selected].sum()
+                ),
+            }
+        )
+    return pl.DataFrame(rows, schema=schema)
+
+
+def _large_move_no_action_by_year(
+    dates: NDArray[np.datetime64], result: InferredActionResult | None
+) -> pl.DataFrame:
+    schema = {"year": pl.Int32, "large_move_no_action_count": pl.Int64}
+    if result is None:
+        return pl.DataFrame(schema=schema)
+    years = dates.astype("datetime64[Y]").astype(np.int64) + 1970
+    return pl.DataFrame(
+        [
+            {
+                "year": int(year),
+                "large_move_no_action_count": int(
+                    result.large_move_no_action[years == year].sum()
+                ),
+            }
+            for year in sorted(set(years.tolist()))
+        ],
+        schema=schema,
+    )
+
+
 def _feature_validity_by_survival(
     dates: NDArray[np.datetime64],
     active: NDArray[np.bool_],
@@ -1698,6 +1759,9 @@ def build_daily_store(
     minimum_rank_names: int = 20,
     store_start: date | None = STORE_START,
     resource_preflight: Mapping[str, object] | None = None,
+    action_terms_source: str = "verified_contractual_terms",
+    schedule_source: str | None = None,
+    schedule_reconstruction_audit: Mapping[str, object] | None = None,
 ) -> Path:
     """Build the immutable aligned daily store from already-acquired sources."""
 
@@ -1713,6 +1777,11 @@ def build_daily_store(
         raise ValueError("provide materialized or streamed sidecars, not both")
     if minimum_rank_names < 1:
         raise ValueError("minimum_rank_names must be positive")
+    if action_terms_source not in {
+        "verified_contractual_terms",
+        "inferred_cotahist_dismes_v1",
+    }:
+        raise ValueError("unsupported corporate-action source tier")
     has_intraday = (
         minute_panel is not None or streamed_intraday is not None or stream_intraday
     )
@@ -1758,6 +1827,10 @@ def build_daily_store(
         )
     continuation_isins = continuation_identity_axis(panel.isins, isin_successions)
     decision_timestamps = tuple(row.decision_at for row in session_schedule)
+    daily_action_cutoffs = next_session_decision_cutoffs(session_schedule)
+    resolved_schedule_source = schedule_source or schedule_source_label(
+        session_schedule
+    )
     keep = np.ones(len(panel.dates), dtype=np.bool_)
     if store_start is not None:
         keep &= panel.dates >= np.datetime64(store_start)
@@ -1780,15 +1853,42 @@ def build_daily_store(
     provider_split, provider_cash_distribution, _ = align_action_arrays(
         checked_actions, panel.dates, panel.isins
     )
-    provider_verified_action_terms = provider_actions_to_verified_terms(checked_actions)
     conversion_verified_action_terms = verified_conversion_terms_from_links(
         isin_successions
     )
+    inferred_actions: InferredActionResult | None = None
+    if action_terms_source == "inferred_cotahist_dismes_v1":
+        inference_universe = build_daily_universe(
+            panel.close_brl,
+            panel.volume_brl,
+            panel.observed,
+            trade_observed=panel.trade_observed,
+            activity_valid=panel.activity_valid,
+            source_session_complete=panel.source_session_complete,
+        )
+        inferred_actions = infer_cotahist_action_terms(
+            panel.dates,
+            panel.isins,
+            panel.close_brl,
+            panel.quantity,
+            panel.trades,
+            panel.distribution_number,
+            panel.observed,
+            inference_universe.active,
+        )
+        provider_verified_action_terms: tuple[VerifiedActionTerm, ...] = ()
+        source_action_terms = inferred_actions.terms
+        action_coverage_resolved = inferred_actions.coverage_resolved
+    else:
+        provider_verified_action_terms = provider_actions_to_verified_terms(
+            checked_actions
+        )
+        source_action_terms = provider_verified_action_terms
+        action_coverage_resolved = action_coverage_resolved_mask(
+            action_acquisition_audit, panel.dates, panel.isins
+        )
     verified_action_terms = validate_verified_action_terms(
-        (*provider_verified_action_terms, *conversion_verified_action_terms)
-    )
-    action_coverage_resolved = action_coverage_resolved_mask(
-        action_acquisition_audit, panel.dates, panel.isins
+        (*source_action_terms, *conversion_verified_action_terms)
     )
     retrospective_actions = align_verified_action_terms(
         verified_action_terms,
@@ -1801,7 +1901,7 @@ def build_daily_store(
         panel.dates,
         panel.isins,
         coverage_resolved=action_coverage_resolved,
-        decision_timestamps=decision_timestamps,
+        decision_timestamps=daily_action_cutoffs,
     )
     action_payment_session = align_action_payment_sessions(
         verified_action_terms, panel.dates, panel.isins
@@ -2121,7 +2221,7 @@ def build_daily_store(
         aligned = mask_action_boundaries(
             aligned,
             lagged_boundary=decision_action_boundary,
-            same_day_boundary=decision_action_boundary,
+            same_day_boundary=diagnostic_intraday_boundary_sameday,
             copy_buffers=False,
         )
         intraday_specs = feature_specs(
@@ -2267,7 +2367,7 @@ def build_daily_store(
         aligned = mask_action_boundaries(
             aligned,
             lagged_boundary=decision_action_boundary,
-            same_day_boundary=decision_action_boundary,
+            same_day_boundary=diagnostic_intraday_boundary_sameday,
             copy_buffers=False,
         )
         intraday_specs = feature_specs(
@@ -2463,6 +2563,17 @@ def build_daily_store(
         "intraday_boundary_sameday_mask": diagnostic_intraday_boundary_sameday,
         "decision_action_boundary_mask": decision_action_boundary,
     }
+    if inferred_actions is not None:
+        full_store_arrays.update(
+            {
+                "inferred_action_u1_mask": inferred_actions.u1_event,
+                "inferred_action_c1_mask": inferred_actions.c1_event,
+                "inferred_action_u2_mask": inferred_actions.u2_event,
+                "inferred_action_large_move_no_action_mask": (
+                    inferred_actions.large_move_no_action
+                ),
+            }
+        )
     arrays: dict[str, NDArray[np.generic]] = {
         name: _copy_selected_workspace_array(
             workspace,
@@ -2763,7 +2874,13 @@ def build_daily_store(
             verified_action_terms
         ),
         "corporate_action_alignment_roles": _action_alignment_role_table(
-            verified_action_terms, panel.dates, decision_timestamps
+            verified_action_terms, panel.dates, daily_action_cutoffs
+        ),
+        "inferred_action_counts_by_year": _inferred_action_counts_by_year(
+            panel.dates, inferred_actions
+        ),
+        "large_move_no_action_by_year": _large_move_no_action_by_year(
+            panel.dates, inferred_actions
         ),
         "sidecar_contemporaneity": pl.DataFrame(
             sidecar_contemporaneity_rows,
@@ -2897,15 +3014,29 @@ def build_daily_store(
             "legacy_v1_artifact_required": False,
         },
         "implementation_git_commit": implementation_commit,
+        "action_terms_source": action_terms_source,
+        "schedule_source": resolved_schedule_source,
+        "schedule_reconstruction_audit": (
+            dict(schedule_reconstruction_audit)
+            if schedule_reconstruction_audit is not None
+            else None
+        ),
         "isin_succession_candidate_count": proposed_isin_successions.height,
         "isin_succession_link_count": isin_successions.height,
-        "cotahist_action_detection_role": "diagnostic_only",
+        "cotahist_action_detection_role": (
+            "development_grade_inferred_terms"
+            if inferred_actions is not None
+            else "diagnostic_only"
+        ),
         "survival_identity": "permanent ISIN; only source-verified conversions may link",
         "eventual_survival_audit": (
             "future panel observation through the final store year; audit-only and "
             "never exposed to features, eligibility, normalization, or orders"
         ),
-        "verified_terminal_status": "unsupported by the accepted source archive",
+        "terminal_status": (
+            "reporting_only; unresolved inventory is retained and valued under "
+            "the declared last-mark and haircut scenarios"
+        ),
         "common_state_diagnostics": {
             "role": "audit_only_not_model_input",
             "feature_names": list(COMMON_STATE_DIAGNOSTICS),
@@ -2922,7 +3053,13 @@ def build_daily_store(
         ),
         "calendar_contract": {
             "schema": "BRAZIL_RV_B3_EQUITY_SESSION_SCHEDULE_V1",
-            "authority": "explicit versioned schedule; never inferred from archive coverage",
+            "schedule_source": resolved_schedule_source,
+            "authority": (
+                "reconstructed schedule cross-checked against committed holidays "
+                "with zero unexplained exceptions"
+                if resolved_schedule_source == "reconstructed_v1"
+                else "explicit versioned schedule"
+            ),
             "minimum_name_count_is_diagnostic_only": True,
         },
         "market_observation_masks": {
@@ -2983,12 +3120,12 @@ def build_daily_store(
                 "mid-ranked"
             ),
             "shareholder_family": (
-                "verified contractual quantity multipliers plus verified cash "
-                "entitlements held as cash; unresolved action coverage invalidates "
-                "every crossing interval"
+                "labelled action-tier quantity multipliers plus cash entitlements "
+                "held as cash; unresolved action coverage invalidates every crossing "
+                "interval"
             ),
             "price_family": (
-                "economic-share price return following verified q and successor "
+                "economic-share price return following action-tier q and successor "
                 "claims while excluding cash entitlements, with distinct masks; "
                 "never substituted for gross shareholder wealth"
             ),
@@ -2996,11 +3133,18 @@ def build_daily_store(
             "synthetic_cash_distribution": "disabled",
         },
         "corporate_action_contract": {
-            "provider_rows_are_contractual_terms_only": True,
-            "realized_price_ratios_and_dismes_are_diagnostics_only": True,
+            "action_terms_source": action_terms_source,
+            "coverage_status": (
+                "inferred" if inferred_actions is not None else "verified"
+            ),
+            "provider_rows_enter_model_arrays": inferred_actions is None,
+            "provider_rows_are_audit_only": inferred_actions is not None,
+            "inferred_terms_are_verified": False,
+            "legacy_realized_ratio_classifier_is_diagnostic_only": True,
             "stored_action_arrays": "retrospective outcome/accounting terms",
             "feature_action_alignment": (
-                "terms known by each historical 15:45 decision only"
+                "daily row e uses terms known by the next session's 15:45 decision; "
+                "same-day intraday boundaries use only the open-gap diagnostic"
             ),
             "currency": "BRL",
             "retrospective_coverage_resolved_fraction": float(
@@ -3009,7 +3153,11 @@ def build_daily_store(
             "decision_known_coverage_resolved_fraction": float(
                 decision_actions.session_resolved.mean()
             ),
-            "payment_date_modeling": "unsupported unless explicitly sourced",
+            "payment_date_modeling": (
+                "inferred ex-session payment under the development-grade tier"
+                if inferred_actions is not None
+                else "unsupported unless explicitly sourced"
+            ),
             "complex_or_unmapped_terms": "unresolved",
         },
         "cotahist_provenance": {
@@ -3138,6 +3286,12 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--cotahist-raw-root", required=True, type=Path)
     parser.add_argument("--cotahist-parse-audit", required=True, type=Path)
     parser.add_argument("--session-schedule", required=True, type=Path)
+    parser.add_argument("--session-schedule-audit", type=Path)
+    parser.add_argument(
+        "--action-terms-source",
+        choices=("verified_contractual_terms", "inferred_cotahist_dismes_v1"),
+        default="verified_contractual_terms",
+    )
     parser.add_argument(
         "--isin-links-allowlist",
         type=Path,
@@ -3579,6 +3733,29 @@ def main(arguments: Sequence[str] | None = None) -> None:
         raise FileNotFoundError(args.cotahist_parse_audit)
     _validate_cotahist_parse_audit(args.cotahist_parse_audit, raw_sources)
     schedule = load_session_schedule(args.session_schedule)
+    resolved_schedule_source = schedule_source_label(schedule)
+    schedule_reconstruction_audit: dict[str, object] | None = None
+    schedule_audit_path: Path | None = None
+    if resolved_schedule_source == "reconstructed_v1":
+        if args.session_schedule_audit is None:
+            raise ValueError("reconstructed_v1 requires --session-schedule-audit")
+        schedule_audit_path = args.session_schedule_audit.resolve()
+        schedule_reconstruction_audit = json.loads(
+            schedule_audit_path.read_text(encoding="utf-8")
+        )
+        exception_record = schedule_reconstruction_audit.get(
+            "exception_explanations", {}
+        )
+        if (
+            schedule_reconstruction_audit.get("schedule_source") != "reconstructed_v1"
+            or schedule_reconstruction_audit.get("schedule_sha256")
+            != source_records((args.session_schedule,))[0]["sha256"]
+            or not isinstance(exception_record, dict)
+            or exception_record.get("unexplained_count") != 0
+        ):
+            raise ValueError(
+                "reconstructed schedule audit does not bind a closed schedule"
+            )
     if args.m1_assignments.is_dir():
         assignment_path = (
             args.m1_assignments / "xp_accepted_source_assignments_v1.parquet"
@@ -3641,6 +3818,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
             *paths,
             assignment_path,
             args.session_schedule,
+            *((schedule_audit_path,) if schedule_audit_path is not None else ()),
             args.isin_links_allowlist,
             *action_sources,
             *((args.minute_npz,) if args.minute_npz else ()),
@@ -3652,6 +3830,9 @@ def main(arguments: Sequence[str] | None = None) -> None:
         session_schedule=schedule,
         isin_link_allowlist=args.isin_links_allowlist,
         resource_preflight=resource_preflight,
+        action_terms_source=args.action_terms_source,
+        schedule_source=resolved_schedule_source,
+        schedule_reconstruction_audit=schedule_reconstruction_audit,
     )
     print(json.dumps({"store": str(output)}, sort_keys=True))
 

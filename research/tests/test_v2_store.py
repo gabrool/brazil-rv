@@ -802,9 +802,7 @@ def test_dataset_reads_canonical_decision_row_and_external_sparse_fast_mapping(
     np.testing.assert_array_equal(slow_view.dates, dataset.store.dates[[20]])
     assert slow_view.isins == dataset.store.isins
     np.testing.assert_array_equal(slow_view.active[0], sample["active_mask"])
-    np.testing.assert_array_equal(
-        sample["slow_features"][:, -1], slow_view.values[0]
-    )
+    np.testing.assert_array_equal(sample["slow_features"][:, -1], slow_view.values[0])
     np.testing.assert_array_equal(
         sample["slow_feature_mask"][:, -1], slow_view.valid[0]
     )
@@ -812,9 +810,7 @@ def test_dataset_reads_canonical_decision_row_and_external_sparse_fast_mapping(
         sample["slow_feature_age_sessions"][:, -1], slow_view.age_sessions[0]
     )
     np.testing.assert_array_equal(sample["current_features"], current_view.values[0])
-    np.testing.assert_array_equal(
-        sample["current_feature_mask"], current_view.valid[0]
-    )
+    np.testing.assert_array_equal(sample["current_feature_mask"], current_view.valid[0])
     np.testing.assert_array_equal(
         sample["current_feature_age_sessions"], current_view.age_sessions[0]
     )
@@ -1593,6 +1589,37 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
         store_start=None,
     )
     assert not np.load(provider_empty_root / "target_shareholder_valid.npy").any()
+    inferred_full_root = build_daily_store(
+        pl.DataFrame(daily_rows),
+        actions,
+        tmp_path / "daily_store_inferred_full_provider_audit",
+        minute_panel=panel,
+        action_acquisition_audit=successful_audit,
+        session_schedule=_session_schedule(dates),
+        minimum_rank_names=1,
+        store_start=None,
+        action_terms_source="inferred_cotahist_dismes_v1",
+    )
+    inferred_empty_root = build_daily_store(
+        pl.DataFrame(daily_rows),
+        actions.head(0),
+        tmp_path / "daily_store_inferred_empty_provider_audit",
+        minute_panel=panel,
+        action_acquisition_audit=failed_audit,
+        session_schedule=_session_schedule(dates),
+        minimum_rank_names=1,
+        store_start=None,
+        action_terms_source="inferred_cotahist_dismes_v1",
+    )
+    full_manifest = json.loads(
+        (inferred_full_root / "manifest.json").read_text(encoding="utf-8")
+    )
+    empty_manifest = json.loads(
+        (inferred_empty_root / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert {
+        name: record["sha256"] for name, record in full_manifest["arrays"].items()
+    } == {name: record["sha256"] for name, record in empty_manifest["arrays"].items()}
     raw = np.load(root / "target_to_close_raw_log_return.npy")
     valid = np.load(root / "target_to_close_valid.npy")
     expected = np.log(cotahist_close / minute[64, 0, 345])

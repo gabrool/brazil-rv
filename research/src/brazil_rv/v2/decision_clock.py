@@ -26,15 +26,33 @@ class SessionDefinition:
 
     @property
     def decision_at(self) -> datetime:
-        return datetime.combine(
-            self.trade_date, self.decision_time, tzinfo=SAO_PAULO
-        )
+        return datetime.combine(self.trade_date, self.decision_time, tzinfo=SAO_PAULO)
 
 
 def decision_timestamp(trade_date: date) -> datetime:
     """Return the v2 decision instant in historical Sao Paulo time."""
 
     return datetime.combine(trade_date, DECISION_TIME, tzinfo=SAO_PAULO)
+
+
+def next_session_decision_cutoffs(
+    schedule: Sequence[SessionDefinition],
+) -> tuple[datetime | None, ...]:
+    """Map a completed daily row to the first decision that may consume it."""
+
+    validate_session_schedule(schedule)
+    decisions = tuple(row.decision_at for row in schedule)
+    return (*decisions[1:], None)
+
+
+def schedule_source_label(schedule: Sequence[SessionDefinition]) -> str:
+    """Return the one manifest label shared by an explicit session schedule."""
+
+    validate_session_schedule(schedule)
+    labels = {row.source.split(":", 1)[0] for row in schedule}
+    if len(labels) != 1:
+        raise ValueError(f"session schedule mixes source tiers: {sorted(labels)}")
+    return labels.pop()
 
 
 def normalize_publication_time(
@@ -202,9 +220,7 @@ def calendar_completeness_table(
         {"trade_date": value, "status": "archive_day_absent_from_schedule"}
         for value in sorted(archived - scheduled)
     )
-    return pl.DataFrame(
-        rows, schema={"trade_date": pl.Date, "status": pl.String}
-    )
+    return pl.DataFrame(rows, schema={"trade_date": pl.Date, "status": pl.String})
 
 
 def assert_calendar_complete(

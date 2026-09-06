@@ -22,6 +22,7 @@ from brazil_rv.v2.corporate_actions import (
     build_shareholder_wealth_ohlc,
     detect_cotahist_actions,
     detect_distribution_changes,
+    infer_cotahist_action_terms,
     normalize_cached_action_schema,
     normalize_yfinance_actions,
     provider_actions_to_verified_terms,
@@ -30,6 +31,7 @@ from brazil_rv.v2.corporate_actions import (
     verified_action_terms_from_table,
     verified_action_terms_to_table,
 )
+from brazil_rv.v2.decision_clock import SessionDefinition, next_session_decision_cutoffs
 
 
 def _term(
@@ -375,6 +377,147 @@ def test_decision_known_alignment_marks_later_acquired_action_unresolved() -> No
     assert not historical.has_action[1, 0]
     assert not historical.session_resolved[1, 0]
     assert empty_historical.session_resolved[1, 0]
+
+
+def test_end_of_session_inferred_term_is_consumed_only_at_next_decision() -> None:
+    dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    schedule = tuple(
+        SessionDefinition(
+            trade_date=value,
+            continuous_open=datetime.min.time().replace(hour=10),
+            decision_time=datetime.min.time().replace(hour=15, minute=45),
+            continuous_close=datetime.min.time().replace(hour=16, minute=55),
+            auction_close=datetime.min.time().replace(hour=17),
+            source="reconstructed_v1:fixture",
+        )
+        for value in dates
+    )
+    end_of_event = _term(
+        "split",
+        ex_date=dates[1],
+        q=2.0,
+        available_at=datetime.fromisoformat("2024-01-03T23:59:59-03:00"),
+    )
+    coverage = np.ones((3, 1), dtype=np.bool_)
+    same_session = align_decision_known_action_terms(
+        [end_of_event],
+        dates,
+        ["BRTESTACNOR1"],
+        coverage_resolved=coverage,
+        decision_timestamps=[row.decision_at for row in schedule],
+    )
+    following_session = align_decision_known_action_terms(
+        [end_of_event],
+        dates,
+        ["BRTESTACNOR1"],
+        coverage_resolved=coverage,
+        decision_timestamps=next_session_decision_cutoffs(schedule),
+    )
+    assert not same_session.has_action[1, 0]
+    assert not same_session.session_resolved[1, 0]
+    assert following_session.has_action[1, 0]
+    assert following_session.session_resolved[1, 0]
+    assert following_session.shares_per_prior_share[1, 0] == 2.0
+
+
+def test_inferred_actions_cover_readable_cells_and_apply_u1_c1_rules() -> None:
+    dates = np.arange("2024-01-02", "2024-01-05", dtype="datetime64[D]")
+    names = tuple(f"BRTEST{i:07d}" for i in range(21))
+    close = np.full((3, 21), 100.0)
+    close[1, 1:] = 101.0
+    close[1, 0] = 95.0
+    close[2, 0] = 47.5
+    quantity = np.full_like(close, 100.0)
+    trades = np.full_like(close, 10.0)
+    dismes = np.ones_like(close)
+    dismes[1:, 0] = 2.0
+    dismes[2, 0] = 3.0
+    observed = np.ones_like(close, dtype=np.bool_)
+    dismes[0, -1] = np.nan
+    result = infer_cotahist_action_terms(
+        dates,
+        names,
+        close,
+        quantity,
+        trades,
+        dismes,
+        observed,
+        np.ones_like(observed),
+    )
+    assert result.c1_event[1, 0]
+    c1 = next(term for term in result.terms if term.ex_date == date(2024, 1, 3))
+    np.testing.assert_allclose(c1.cash_per_prior_share, 6.0)
+    assert c1.coverage_status == "inferred"
+    assert result.u1_event[2, 0]
+    u1 = next(term for term in result.terms if term.ex_date == date(2024, 1, 4))
+    np.testing.assert_allclose(u1.shares_per_prior_share, 97.5 / 47.5)
+    assert result.coverage_resolved[0, :-1].all()
+    assert not result.coverage_resolved[0, -1]
+
+
+def test_u2_uses_trade_size_and_delayed_dismes_does_not_double_adjust() -> None:
+    dates = np.arange("2024-01-02", "2024-01-06", dtype="datetime64[D]")
+    close = np.asarray([[100.0], [100.0], [50.0], [51.0]])
+    quantity = np.asarray([[100.0], [100.0], [200.0], [190.0]])
+    trades = np.asarray([[10.0], [10.0], [10.0], [10.0]])
+    dismes = np.asarray([[1.0], [1.0], [1.0], [2.0]])
+    observed = np.ones_like(close, dtype=np.bool_)
+    result = infer_cotahist_action_terms(
+        dates,
+        ("BRTESTACNOR1",),
+        close,
+        quantity,
+        trades,
+        dismes,
+        observed,
+        observed,
+    )
+    assert result.u2_event[:, 0].tolist() == [False, False, True, False]
+    assert result.u2_per_trade_event[2, 0]
+    assert result.u2_per_trade_candidate[2, 0]
+    assert result.u2_total_quantity_candidate[2, 0]
+    assert result.c1_event[3, 0]
+    delayed = next(term for term in result.terms if term.ex_date == date(2024, 1, 5))
+    assert delayed.action_type == "cash_distribution"
+    assert delayed.cash_per_prior_share == 0.0
+
+
+def test_inferred_action_prefix_is_future_mutation_invariant() -> None:
+    dates = np.arange("2024-01-02", "2024-01-08", dtype="datetime64[D]")
+    close = np.asarray([[100.0], [100.0], [50.0], [51.0], [52.0], [53.0]])
+    quantity = np.asarray([[100.0], [100.0], [200.0], [190.0], [180.0], [170.0]])
+    trades = np.full_like(close, 10.0)
+    dismes = np.ones_like(close)
+    observed = np.ones_like(close, dtype=np.bool_)
+    baseline = infer_cotahist_action_terms(
+        dates,
+        ("BRTESTACNOR1",),
+        close,
+        quantity,
+        trades,
+        dismes,
+        observed,
+        observed,
+    )
+    mutated_close = close.copy()
+    mutated_close[4:] = 1_000.0
+    mutated = infer_cotahist_action_terms(
+        dates,
+        ("BRTESTACNOR1",),
+        mutated_close,
+        quantity,
+        trades,
+        dismes,
+        observed,
+        observed,
+    )
+    np.testing.assert_array_equal(baseline.u2_event[:4], mutated.u2_event[:4])
+    np.testing.assert_array_equal(
+        baseline.large_move_no_action[:4], mutated.large_move_no_action[:4]
+    )
+    assert [
+        term.evidence for term in baseline.terms if term.ex_date <= date(2024, 1, 5)
+    ] == [term.evidence for term in mutated.terms if term.ex_date <= date(2024, 1, 5)]
 
 
 def test_explicit_verified_term_resolves_event_outside_blanket_coverage() -> None:

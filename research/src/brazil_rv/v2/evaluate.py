@@ -65,6 +65,8 @@ class EvaluationInputs:
     prior_feature_values: Mapping[str, NDArray[np.floating]]
     cdi_returns: NDArray[np.floating]
     transfer_chronology_clean: bool
+    action_terms_source: str = "verified_contractual_terms"
+    schedule_source: str = "explicit_versioned_schedule"
     horizons: tuple[int, ...] = HORIZONS
     source_artifact_hashes: Mapping[str, str] | None = None
     history_age_sessions: NDArray[np.floating] | None = None
@@ -178,6 +180,8 @@ def _validate(inputs: EvaluationInputs) -> None:
         raise ValueError("evaluation horizon axis differs from the frozen v2 contract")
     if not isinstance(inputs.transfer_chronology_clean, bool):
         raise TypeError("transfer_chronology_clean must be an explicit Boolean")
+    if not inputs.action_terms_source or not inputs.schedule_source:
+        raise ValueError("evaluation requires action and schedule source-tier labels")
     scores = np.asarray(inputs.scores)
     active = np.asarray(inputs.active)
     if active.ndim != 2 or active.shape[0] != len(dates):
@@ -1252,6 +1256,12 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         "transfer_chronology_clean": _array_sha256(
             np.asarray(inputs.transfer_chronology_clean, dtype=np.bool_)
         ),
+        "action_terms_source": hashlib.sha256(
+            inputs.action_terms_source.encode("utf-8")
+        ).hexdigest(),
+        "schedule_source": hashlib.sha256(
+            inputs.schedule_source.encode("utf-8")
+        ).hexdigest(),
         "history_age_sessions": _array_sha256(
             np.asarray(
                 inputs.history_age_sessions
@@ -1293,7 +1303,7 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
     return result
 
 
-def _economics_contract() -> dict[str, object]:
+def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
     config = LedgerConfig()
     return {
         "signal_construction": (
@@ -1313,9 +1323,11 @@ def _economics_contract() -> dict[str, object]:
             "report a valuation scenario after 10 missing sessions"
         ),
         "marking_basis": "raw contractual close with explicit signed shares",
+        "action_terms_source": inputs.action_terms_source,
+        "schedule_source": inputs.schedule_source,
         "corporate_action_basis": (
-            "verified q/d terms create successor shares and cash claims; "
-            "each action's verified payment session settles its own claim"
+            "the explicitly labelled action tier supplies q/d terms, successor "
+            "shares, and cash claims; each declared payment session settles its claim"
         ),
         "short_proceeds_remuneration": config.short_proceeds_remuneration,
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
@@ -1714,6 +1726,8 @@ def evaluate_scores(
         "official_validation_accessed": ledger.official_validation_accessed,
         "test_accessed": ledger.test_accessed,
         "transfer_chronology_clean": inputs.transfer_chronology_clean,
+        "action_terms_source": inputs.action_terms_source,
+        "schedule_source": inputs.schedule_source,
         "horizons_sessions": list(HORIZONS),
         "primary_horizons_sessions": list(PRIMARY_HORIZONS),
         "metric_contract": {
@@ -1762,7 +1776,7 @@ def evaluate_scores(
         "daily_metric_table": metric_rows,
         "persistence_table": persistence_rows,
         "economics": {
-            "contract": _economics_contract(),
+            "contract": _economics_contract(inputs),
             "headline": {
                 "scenario": headline_name,
                 **{

@@ -416,10 +416,14 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
     assert manifest["test_accessed"] is False
     assert manifest["transfer_chronology_clean"] is True
     assert manifest["engineering_acceptance_status"] == "unsupported"
-    assert manifest["engineering_acceptance_reasons"] == [
-        "neural_network_validation_not_run",
-        "corporate_action_economics_not_accepted",
-    ]
+    assert (
+        "action_terms_source_is_not_development_inference_tier"
+        in manifest["engineering_acceptance_reasons"]
+    )
+    assert (
+        "schedule_source_is_not_reconstructed_v1"
+        in manifest["engineering_acceptance_reasons"]
+    )
     assert manifest["date_contract"]["maximum_date"] <= "2024-12-30"
     cdi_source = manifest["sources"]["cdi"]
     assert cdi_source["development_extension"] == {
@@ -1004,3 +1008,63 @@ def test_git_identity_refuses_untracked_files(monkeypatch: pytest.MonkeyPatch) -
     with pytest.raises(RuntimeError, match="clean"):
         pipeline._git_identity()
     assert calls[1][-1] == "--untracked-files=all"
+
+
+def test_development_acceptance_requires_registered_sanity_bounds() -> None:
+    economics = {
+        "mean_gross_fraction_nav": 2.0,
+        "unresolved_inventory_count": 1,
+        "unresolved_inventory_notional": 10_000.0,
+        "terminal_nav": 1_000_000.0,
+        "terminal_unresolved_inventory_fraction_nav": 0.01,
+    }
+    records = [
+        {
+            "engine": "baseline",
+            "fold": fold,
+            "name": name,
+            "signal_definition_sign": pipeline._BASELINE_SIGNAL_SIGNS[name],
+            "evaluation": {
+                "daily_primary_scaled_target_ic": [0.01, None, -0.005],
+                "headline_economics": economics,
+            },
+        }
+        for fold in ("F1", "F2", "F3")
+        for name in pipeline._BASELINE_SIGNAL_SIGNS
+    ]
+    gbdt = [
+        {
+            "engine": "gbdt",
+            "fold": "F1",
+            "evaluation": {
+                "daily_primary_scaled_target_ic": [0.01],
+                "headline_economics": economics,
+            },
+        }
+    ]
+    accepted = pipeline._development_acceptance(
+        baseline_records=records,
+        gbdt_records=gbdt,
+        action_terms_source="inferred_cotahist_dismes_v1",
+        schedule_source="reconstructed_v1",
+    )
+    assert accepted["status"] == "development_grade_inferred_actions"
+    assert accepted["reasons"] == []
+    assert accepted["reversal_5_definition_negative_signed"] is True
+
+    broken = [dict(record) for record in records]
+    broken[0] = {
+        **broken[0],
+        "evaluation": {
+            "daily_primary_scaled_target_ic": [0.11],
+            "headline_economics": {**economics, "mean_gross_fraction_nav": 1.7},
+        },
+    }
+    rejected = pipeline._development_acceptance(
+        baseline_records=broken,
+        gbdt_records=gbdt,
+        action_terms_source="inferred_cotahist_dismes_v1",
+        schedule_source="reconstructed_v1",
+    )
+    assert rejected["status"] == "unsupported"
+    assert any("deployed_gross" in value for value in rejected["reasons"])

@@ -298,9 +298,7 @@ def sam_accumulated_step(
         first_value = 0.0
         for closure in closures:
             first_loss = closure()
-            if first_loss.numel() != 1 or not bool(
-                torch.isfinite(first_loss.detach())
-            ):
+            if first_loss.numel() != 1 or not bool(torch.isfinite(first_loss.detach())):
                 raise FloatingPointError("SAM first-pass training loss is non-finite")
             first_loss.backward()
             first_value += float(first_loss.detach())
@@ -493,9 +491,7 @@ def load_pretrain_handoff(
     if contract.get("model_config") != model_config_contract(model.config):
         raise ValueError("stage-P model contract differs from stage F")
     if fine_tune_input_contract is not None:
-        if fine_tune_input_contract.get("model_config") != contract.get(
-            "model_config"
-        ):
+        if fine_tune_input_contract.get("model_config") != contract.get("model_config"):
             raise ValueError("stage-P and stage-F model contracts differ")
         pretrain_inputs = contract.get("training")
         fine_inputs = fine_tune_input_contract.get("training")
@@ -554,7 +550,9 @@ def load_stage_checkpoint(
     }:
         raise ValueError("file is not a v2 stage checkpoint")
     contract = _verified_checkpoint_input_contract(payload)
-    contract_config = model.config if expected_model_config is None else expected_model_config
+    contract_config = (
+        model.config if expected_model_config is None else expected_model_config
+    )
     if contract.get("model_config") != model_config_contract(contract_config):
         raise ValueError("stage checkpoint model config differs from the model")
     state = payload.get("model_state_dict")
@@ -626,11 +624,7 @@ def _to_device(
         if name in names and isinstance(value, torch.Tensor)
     }
     present = transferred.get("fast_present")
-    if (
-        not omit_fast_stream
-        and present is not None
-        and not torch.any(present.bool())
-    ):
+    if not omit_fast_stream and present is not None and not torch.any(present.bool()):
         for name in (
             "fast_patch_values",
             "fast_patch_valid",
@@ -738,9 +732,7 @@ def _common_primary_selection_score(
             continue
         correlations: list[float] = []
         for head in range(4):
-            left = average_ranks(
-                predictions[date, common, head].astype(np.float64)
-            )
+            left = average_ranks(predictions[date, common, head].astype(np.float64))
             right = average_ranks(targets[date, common, head].astype(np.float64))
             left -= left.mean()
             right -= right.mean()
@@ -954,14 +946,10 @@ def _loader_input_payload(
             ):
                 raise ValueError("store slow feature names are malformed")
             intraday_names = list(feature_names.get("intraday", ()))
-            if not all(
-                isinstance(value, str) and value for value in intraday_names
-            ):
+            if not all(isinstance(value, str) and value for value in intraday_names):
                 raise ValueError("store intraday feature names are malformed")
             native_fast_names = list(feature_names.get("native_fast", ()))
-            if not all(
-                isinstance(value, str) and value for value in native_fast_names
-            ):
+            if not all(isinstance(value, str) and value for value in native_fast_names):
                 raise ValueError("store native-fast feature names are malformed")
             selected_dates = np.asarray(dates[indices], dtype="datetime64[D]")
             date_strings = [str(value) for value in selected_dates]
@@ -974,9 +962,7 @@ def _loader_input_payload(
                 or np.any(np.diff(target_indices) <= 0)
             ):
                 raise ValueError("loader target window must be chronological")
-            target_dates = np.asarray(
-                dates[target_indices], dtype="datetime64[D]"
-            )
+            target_dates = np.asarray(dates[target_indices], dtype="datetime64[D]")
             stage = str(getattr(candidate, "stage", ""))
             segments = _model_input_segments(
                 np.asarray(dates, dtype="datetime64[D]"), indices, stage
@@ -995,11 +981,17 @@ def _loader_input_payload(
             decision_contract = metadata.get("slow_entry_alignment")
             if decision_contract != DECISION_FEATURE_CONTRACT:
                 raise ValueError("store decision-feature alignment is not canonical")
+            action_terms_source = metadata.get("action_terms_source")
+            schedule_source = metadata.get("schedule_source")
+            if not isinstance(action_terms_source, str) or not action_terms_source:
+                raise ValueError("store lacks its corporate-action source tier")
+            if not isinstance(schedule_source, str) or not schedule_source:
+                raise ValueError("store lacks its session-schedule source tier")
             fast_identity = {
                 "native_fast": metadata.get("native_fast"),
-                "native_fast_security_mapping": (
-                    manifest.get("tables", {}) or {}
-                ).get("native_fast_security_mapping"),
+                "native_fast_security_mapping": (manifest.get("tables", {}) or {}).get(
+                    "native_fast_security_mapping"
+                ),
             }
             external_resolutions = [
                 resolution.payload()
@@ -1016,6 +1008,8 @@ def _loader_input_payload(
                     "axes": manifest.get("axes"),
                     "fast_identity": fast_identity,
                     "external_artifact_resolutions": external_resolutions,
+                    "action_terms_source": action_terms_source,
+                    "schedule_source": schedule_source,
                 },
                 "features": {
                     "decision_sample_schema": DECISION_SAMPLE_SCHEMA,
@@ -1089,9 +1083,7 @@ def _model_input_segments(
             {
                 "name": name,
                 "entry_alignment": alignment,
-                "indices_sha256": hashlib.sha256(
-                    little_endian.tobytes()
-                ).hexdigest(),
+                "indices_sha256": hashlib.sha256(little_endian.tobytes()).hexdigest(),
                 "identity_sha256": hashlib.sha256(
                     json.dumps(date_strings, separators=(",", ":")).encode()
                 ).hexdigest(),
@@ -1108,9 +1100,7 @@ def _model_input_segments(
     return result
 
 
-def _date_span_payload(
-    dates: np.ndarray, indices: np.ndarray
-) -> dict[str, object]:
+def _date_span_payload(dates: np.ndarray, indices: np.ndarray) -> dict[str, object]:
     values = np.asarray(indices, dtype=np.int64)
     if values.ndim != 1 or not values.size:
         raise ValueError("canonical split dates must be nonempty")
@@ -1130,8 +1120,7 @@ def _canonical_split_payload(dates: object) -> dict[str, object]:
     axis = np.asarray(dates, dtype="datetime64[D]")
     result: dict[str, object] = {}
     pretrain = np.flatnonzero(
-        (axis >= np.datetime64(STORE_START))
-        & (axis <= np.datetime64(PRETRAIN_END))
+        (axis >= np.datetime64(STORE_START)) & (axis <= np.datetime64(PRETRAIN_END))
     ).astype(np.int64)
     if (
         pretrain.size
@@ -1287,7 +1276,10 @@ def _validate_tracked_stage_inputs(
     if not isinstance(ordered, list) or len(ordered) != model_config.slow_feature_count:
         raise ValueError("model slow width differs from ordered store feature names")
     current = features.get("ordered_intraday_names")
-    if not isinstance(current, list) or len(current) != model_config.current_feature_count:
+    if (
+        not isinstance(current, list)
+        or len(current) != model_config.current_feature_count
+    ):
         raise ValueError("model current width differs from ordered store feature names")
     if training.get("lookback_sessions") != model_config.slow_lookback:
         raise ValueError("model lookback differs from the input store contract")
@@ -1305,10 +1297,7 @@ def _validate_tracked_stage_inputs(
     selection_end_date = np.datetime64(str(selection_dates["last_date"]))
     training_splits = training.get("canonical_splits")
     selection_splits = selection.get("canonical_splits")
-    if (
-        not isinstance(training_splits, Mapping)
-        or training_splits != selection_splits
-    ):
+    if not isinstance(training_splits, Mapping) or training_splits != selection_splits:
         raise ValueError("training and selection canonical split provenance differs")
     if stage == "P":
         if (
@@ -1397,8 +1386,7 @@ def _validate_tracked_stage_inputs(
             or selection_segment.get("entry_alignment") != DECISION_FEATURE_ALIGNMENT
             or pretrain_segment.get("first_date") != str(STORE_START)
             or pretrain_segment.get("last_date") != str(PRETRAIN_END)
-            or pretrain_segment.get("first_index")
-            != pretrain_fit.get("first_index")
+            or pretrain_segment.get("first_index") != pretrain_fit.get("first_index")
             or pretrain_segment.get("last_index")
             != pretrain_selection.get("last_index")
             or pretrain_segment.get("count")
@@ -1411,8 +1399,7 @@ def _validate_tracked_stage_inputs(
             raise ValueError("stage J P/F segment boundary or alignment is invalid")
         for actual in (pretrain_segment, fine_segment, selection_segment):
             if any(
-                not isinstance(actual.get(field), str)
-                or len(str(actual[field])) != 64
+                not isinstance(actual.get(field), str) or len(str(actual[field])) != 64
                 for field in ("indices_sha256", "identity_sha256")
             ):
                 raise ValueError("stage J segment identity hashes are malformed")
@@ -1681,6 +1668,15 @@ def train_stage(
         or selection_store.get("feature_schema_sha256") != feature_schema_sha256
     ):
         raise ValueError("training and selection feature schemas differ")
+    action_terms_source = training_store.get("action_terms_source")
+    schedule_source = training_store.get("schedule_source")
+    if (
+        not isinstance(action_terms_source, str)
+        or not isinstance(schedule_source, str)
+        or selection_store.get("action_terms_source") != action_terms_source
+        or selection_store.get("schedule_source") != schedule_source
+    ):
+        raise ValueError("training and selection source-tier labels differ")
     _validate_tracked_stage_inputs(
         stage, fold, model_config, training_inputs, selection_inputs
     )
@@ -1695,9 +1691,7 @@ def train_stage(
     set_deterministic_seed(seed)
     model = DailyMultiHorizonModel(model_config)
     pretrain_provenance: dict[str, object] | None = None
-    transfer_chronology_clean = (
-        model_config.fast_encoder_mode == "native"
-    )
+    transfer_chronology_clean = model_config.fast_encoder_mode == "native"
     if pretrain_checkpoint is not None:
         load_pretrain_handoff(
             model,
@@ -1711,9 +1705,7 @@ def train_stage(
         )
         assert isinstance(pretrain_payload, Mapping)
         pretrain_contract = _verified_checkpoint_input_contract(pretrain_payload)
-        pretrain_transfer_clean = pretrain_payload.get(
-            "transfer_chronology_clean"
-        )
+        pretrain_transfer_clean = pretrain_payload.get("transfer_chronology_clean")
         if type(pretrain_transfer_clean) is not bool:
             raise ValueError("stage-P handoff lacks explicit transfer chronology")
         transfer_chronology_clean &= pretrain_transfer_clean
@@ -1778,9 +1770,7 @@ def train_stage(
                 cpu_batch,
                 expected_pairs=8,
             )
-            full_target_mask = reshape_date_pair_batch(
-                cpu_batch["target_mask"]
-            ).bool()
+            full_target_mask = reshape_date_pair_batch(cpu_batch["target_mask"]).bool()
             if model_config.to_close_weight:
                 full_to_close_mask = cpu_batch.get("to_close_mask")
                 if not isinstance(full_to_close_mask, torch.Tensor):
@@ -1865,9 +1855,7 @@ def train_stage(
 
             closures = tuple(
                 make_closure(microbatch)
-                for microbatch in _date_pair_microbatches(
-                    cpu_batch, microbatch_pairs
-                )
+                for microbatch in _date_pair_microbatches(cpu_batch, microbatch_pairs)
             )
             update = sam_accumulated_step(
                 model,
@@ -1915,6 +1903,8 @@ def train_stage(
             "fast_initialization_provenance": model.fast_initialization_provenance,
             "transfer_chronology_clean": transfer_chronology_clean,
             "feature_schema_sha256": feature_schema_sha256,
+            "action_terms_source": action_terms_source,
+            "schedule_source": schedule_source,
         },
     )
     _atomic_torch_save(
@@ -1930,6 +1920,8 @@ def train_stage(
             "fast_initialization_provenance": model.fast_initialization_provenance,
             "transfer_chronology_clean": transfer_chronology_clean,
             "feature_schema_sha256": feature_schema_sha256,
+            "action_terms_source": action_terms_source,
+            "schedule_source": schedule_source,
         },
     )
     history_sha256 = write_json_atomic(history_path, history)
@@ -1953,6 +1945,8 @@ def train_stage(
             "fast_initialization_provenance": model.fast_initialization_provenance,
             "transfer_chronology_clean": transfer_chronology_clean,
             "feature_schema_sha256": feature_schema_sha256,
+            "action_terms_source": action_terms_source,
+            "schedule_source": schedule_source,
             "pretrain_checkpoint": (
                 None
                 if pretrain_checkpoint is None
@@ -2083,19 +2077,21 @@ def _train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--sidecar", action="append", default=[])
     parser.add_argument("--lambda-persistence", type=float, default=0.0)
-    parser.add_argument("--to-close-weight", type=float, choices=(0.0, 0.2), default=0.0)
+    parser.add_argument(
+        "--to-close-weight", type=float, choices=(0.0, 0.2), default=0.0
+    )
     parser.add_argument(
         "--soft-rank-temperature", type=float, default=SOFT_RANK_TEMPERATURE
     )
-    parser.add_argument("--use-bf16", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--use-bf16", action=argparse.BooleanOptionalAction, default=False
+    )
     parser.add_argument(
         "--compile-forward", action=argparse.BooleanOptionalAction, default=True
     )
     parser.add_argument("--fast-pretrained-checkpoint", type=Path)
     parser.add_argument("--fast-pretrained-sha256")
-    parser.add_argument(
-        "--allow-contaminated-v1-initialization", action="store_true"
-    )
+    parser.add_argument("--allow-contaminated-v1-initialization", action="store_true")
     parser.add_argument("--pretrain-checkpoint", type=Path)
     parser.add_argument("--pretrain-sha256")
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")

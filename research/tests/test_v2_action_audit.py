@@ -54,8 +54,10 @@ def test_reclassification_audit_applies_preregistered_fallback_rule() -> None:
         isins=("BRTESTACNOR1",),
         raw_close=close,
         quantity=quantity,
+        trades=np.ones_like(quantity) * 10.0,
         distribution_number=distribution,
         observed=observed,
+        active=observed,
         old_cash_event=np.array(
             [[False], [False], [False], [True], [False], [False], [False]]
         ),
@@ -82,10 +84,13 @@ def test_reclassification_audit_applies_preregistered_fallback_rule() -> None:
         }
     ]
     breakdown = payload["corporate_action_reclassification_breakdown"]
-    assert breakdown["schema"].endswith("BREAKDOWN_V1")
+    assert breakdown["schema"].endswith("BREAKDOWN_V2")
     assert len(breakdown["provider_splits"]) == 2
     assert breakdown["plus_or_minus_2_metrics"]["dismes_only"]["recall"] == 0.5
-    assert breakdown["plus_or_minus_2_metrics"][
-        "dismes_plus_strict_fallback"
-    ]["recall"] == 1.0
+    assert (
+        breakdown["plus_or_minus_2_metrics"]["dismes_plus_strict_fallback"]["recall"]
+        == 1.0
+    )
     assert not breakdown["decision"]["canonical_price_ratio_adjustment_authorized"]
+    assert breakdown["decision"]["u2_development_inference_enabled"]
+    assert breakdown["development_inference_quality"]["audit_only_not_a_gate"] is True
