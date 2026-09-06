@@ -92,3 +92,24 @@ fallback. The old classifier labelled 114,604 cash events, of which 102,372
 (`89.3267%`) had no DISMES change. Old target validity fell from `51.9151%` at
 D1 to `30.1509%` at D10. The replacement is consequently DISMES-only, causal,
 and fixed before the rebuilt store.
+
+### Fix-pass-3 local rebuild stop (2026-09-05)
+
+The clean implementation was frozen and pushed at
+`555ef2e7d33cd289cd0030fad674c129f4490b5f`; Ruff, compile, all 634 research
+tests, and the production-axis 8-GiB memory guard passed before the real-data
+rebuild. The no-fallback rebuild then exhausted the 16-GiB Windows host while
+the `events` sidecar adapter executed
+`list(source.sort("isin", "available_date").iter_rows(named=True))` in
+`_raw_events_features`. This is an unbounded Python-row materialization of the
+real event archive, outside the family-output memmap invariant.
+
+The process stopped before atomic promotion: final root
+`v2_daily_store_555ef2e_20260905T232000Z` does not exist, no survivorship gate,
+acceptance score, or sealed-window read occurred, and no retry was made. The
+unpromoted staging directory
+`.v2_daily_store_555ef2e_20260905T232000Z.arrays-9sr0bjjz` is retained for
+inspection. Operational-log SHA-256 is
+`e0335ffec7049b50dda59072bfa34c49d100830f25bd1a727ab2f0193ffce97c`.
+Per the bounded-memory acceptance instruction, work stops here for an explicit
+decision before changing the sidecar adapter or attempting another rebuild.
