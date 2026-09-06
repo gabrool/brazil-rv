@@ -157,3 +157,37 @@ one passing authentic synthetic T24 raw-to-store-to-fit/score/ledger/report
 test. The T23 tests exercise populated production axes and actual archive row
 counts; T24 independently exercises semantic integration from deterministic
 raw fixtures. No paid Lambda instance was launched for this refactor.
+
+## Pass-4 development-grade acceptance stop (2026-09-06)
+
+After the user explicitly authorized bypassing only the 10-GiB admission
+check, the canonical source-tier store rebuilt at commit
+`12e6ae08eb67014c40160809d47212453a4f3f90`. The immutable root is
+`D:\quant-data\b3\processed\v2_daily_store_12e6ae0_20260906T173300Z` and its
+manifest SHA-256 is
+`2f537944ba857675265031da4f2f4327fdffd6d452b76d4de818d752f1272764`.
+Peak RSS was 7.802536 GiB; the unchanged 8-GiB measured-build invariant,
+calendar/identity audits, internal and target survivorship gates, external
+contemporaneity/composition checks, and access flags all passed. The matching
+raw-M1 native-fast audit also passed with exact equality for all seven channels
+and masks; audit SHA-256 is
+`f1c23ef1884b5bcf3f0224ee4db22533e0bfc6e67d62cae0b0cf701f9ebd7174`.
+
+The full local classical acceptance completed all 15 naive baseline cells and
+the 25-member F1 GBDT ensemble, then returned `unsupported` at the first
+unchanged research gate. Naive pooled primary IC magnitudes were below 0.10 and
+reversal-5 had the required negative sign. Mean absolute terminal unresolved
+inventory was `0.0179667` NAV, below 0.02. Deployed gross, however, ranged only
+from `0` to `0.947743` NAV across all 16 books, so every book missed the
+registered 1.8--2.2 band around gross target 2; the F1 GBDT value was
+`0.477454`.
+
+The immutable acceptance root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_12e6ae0_20260906T183511Z`.
+Its pipeline-manifest and log-inclusive inventory SHA-256 values are
+`34ac98f8646934cda82290826a1ad0fd12921393876d726a829cb53825669c38`
+and `8b011067471067c3ceafb2b78b2153b6331b18a66db4bd89ba6490da04207445`.
+Official-validation and test access were false, transfer chronology was clean,
+and no deployment changed. The frozen stop rule therefore prevented Round 1,
+Round 2, a merge to `main`, or a paid-instance launch. No scored candidate was
+retried and the gross gate was not relaxed after seeing the result.

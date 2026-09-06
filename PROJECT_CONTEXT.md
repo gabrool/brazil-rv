@@ -254,6 +254,33 @@ GitHub, and the instance, exact paid GH200 instance
 at 2026-09-04T20:09:32.7623726Z and 2026-09-04T20:09:57.4535979Z confirmed
 that exact ID absent and zero remaining instances.
 
+The later pass-4 development-tier continuation is frozen on branch
+`fix/v2-development-grade-data` at implementation commit
+`12e6ae08eb67014c40160809d47212453a4f3f90`; it is not merged to `main` because
+its first complete classical acceptance was unsupported. The matching store is
+`D:\quant-data\b3\processed\v2_daily_store_12e6ae0_20260906T173300Z`, manifest
+SHA-256
+`2f537944ba857675265031da4f2f4327fdffd6d452b76d4de818d752f1272764`.
+It passed the measured 8-GiB build ceiling at 7.802536 GiB RSS, all identity,
+calendar, feature/target survivorship, external contemporaneity/composition,
+and protected-access gates. The exact raw-M1 audit SHA-256 is
+`f1c23ef1884b5bcf3f0224ee4db22533e0bfc6e67d62cae0b0cf701f9ebd7174`.
+
+The immutable acceptance root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_12e6ae0_20260906T183511Z`;
+pipeline-manifest SHA-256 is
+`34ac98f8646934cda82290826a1ad0fd12921393876d726a829cb53825669c38`
+and its log-inclusive artifact-inventory SHA-256 is
+`8b011067471067c3ceafb2b78b2153b6331b18a66db4bd89ba6490da04207445`.
+The naive IC, reversal sign, native-fast, and average unresolved-inventory gates
+passed. All 16 evaluated books failed only the unchanged gross-utilization
+gate: mean deployed gross ranged from 0 to 0.947743 NAV rather than the required
+1.8--2.2, with F1 GBDT at 0.477454. Consequently registered Round 1 and Round 2
+remain unrun, no GH200 was launched, official validation/test remained unread,
+and no deployment changed. This result must not be bypassed or reinterpreted as
+research acceptance; any continuation requires a new diagnosis and explicit
+authorization or preregistration.
+
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused
 unconditionally by this code version. Target masks and corresponding numeric

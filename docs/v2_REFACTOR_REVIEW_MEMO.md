@@ -725,16 +725,61 @@ disk gate passed; only the unchanged 10-GiB memory gate failed. The log is:
 
 Its SHA-256 is
 `eb165ea2fb590dcdffa292a23392e258569588079abf522589c7b1c2120c173f`.
-The proposed store root was not created and no source was loaded. Although a
-manual bypass was suggested when the measurement came within roughly 0.22 GiB
-of the threshold, I retained the gate because the addendum explicitly says it
-is unchanged and the earlier low-memory run had already demonstrated the
-failure mode it prevents.
+The proposed store root was not created and no source was loaded. I initially
+stopped at this gate. The user then explicitly authorized bypassing only the
+10-GiB memory admission check. Commit
+`ba2d92785443729a6beabde01e27a015363b4b58` added a narrowly named, explicit
+acknowledgement flag: it leaves the D:-staging and three-times-store disk gates
+binding, records both raw and effective admission decisions, and changes no
+data, leakage, identity, target, simulator, accounting, or research gate.
 
-Accordingly, this continuation stops at its first required gate. No new store,
-development acceptance report, Round-1 score, Round-2 smoke or arm, official
-validation/test access, deployment change, merge to `main`, or paid instance
-occurred. The already-recorded pass-4 action audit remains diagnostic: 222 of
-272 large provider factors were price-corroborated, all 222 had a DISMES change
-within two sessions, and U2 hit rates were 1.80% per trade and 0.45% by total
-quantity.
+Two subsequent score-free integration defects were fixed before a result. The
+native-fast audit had incorrectly required the 10:03--15:45 raw prefix to be
+divisible by five even though production deliberately floors the leading
+partial bucket; commit `3a845d9` made the independent audit use that same
+flooring and added an exact regression for the real prefix. The validator then
+looked for obsolete v1 identity/calendar flags; commit
+`12e6ae08eb67014c40160809d47212453a4f3f90` instead verifies both current axis
+hashes and the sealed zero-row calendar-completeness audit. The exact
+builder/consumer commit guard was not weakened: an earlier-store validation
+attempt stopped before root creation, and the store was rebuilt at `12e6ae0`.
+Ruff and all **817** tests passed at that commit.
+
+The commit-matched store is
+`D:\quant-data\b3\processed\v2_daily_store_12e6ae0_20260906T173300Z`, manifest
+SHA-256
+`2f537944ba857675265031da4f2f4327fdffd6d452b76d4de818d752f1272764`.
+It peaked at 7.802536 GiB RSS, so it also satisfied the original 8-GiB measured
+build invariant despite the admission override. Calendar completeness was
+zero, both internal and target survivorship gaps passed, all external
+contemporaneity/composition checks passed, and protected access remained
+false/false. The matching 20-name-by-20-session native-fast audit is
+`D:\quant-data\b3\processed\model_runs\v2_native_fast_audit_12e6ae0_20260906T183448Z`;
+its audit SHA-256 is
+`f1c23ef1884b5bcf3f0224ee4db22533e0bfc6e67d62cae0b0cf701f9ebd7174`,
+with exact equality for every channel and mask.
+
+The first complete development-grade classical acceptance then stopped the
+program at its unchanged gross-utilization gate. Its root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_12e6ae0_20260906T183511Z`;
+pipeline-manifest SHA-256 is
+`34ac98f8646934cda82290826a1ad0fd12921393876d726a829cb53825669c38`,
+and the log-inclusive artifact-inventory SHA-256 is
+`8b011067471067c3ceafb2b78b2153b6331b18a66db4bd89ba6490da04207445`.
+All 15 baseline evaluations and the 25-member F1 GBDT ensemble completed. The
+naive pooled IC checks passed (`momentum=0.0564571`, `reversal21=-0.0193444`,
+`reversal5=-0.00774240`, `blend=0.0446152`), the reversal-5 sign check passed,
+the independent fast audit passed, and mean terminal unresolved inventory was
+0.0179667 NAV, below the 0.02 ceiling. However, mean deployed gross ranged from
+0 to 0.947743 NAV across the 16 evaluated books, versus the binding 1.8--2.2
+range around target gross 2. Every book therefore failed the same gate; the F1
+GBDT deployed only 0.477454 NAV gross. The report is correctly labelled
+`unsupported`, not accepted research.
+
+Per the registered stop rule, Round 1, Round 2 smoke, Round 2 arms, a merge to
+`main`, and any paid instance were not started. Official validation and the
+permanently spent test remained unread, and no deployment changed. Suggestions
+to relax or reinterpret gross utilization were not implemented because that
+would alter a binding preregistered acceptance rule after observing the first
+honest result. The branch remains the review surface; a future continuation
+must diagnose feasibility and be separately authorized or preregistered.
