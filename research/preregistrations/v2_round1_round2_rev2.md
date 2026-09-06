@@ -29,9 +29,11 @@ executable borrow.
   20-session moving-block bootstrap with 10,000 replications; blocks are sampled within
   folds and paired comparisons use the exact common population.
 - Economic outputs are development-grade under inferred action terms and a close-price
-  execution proxy. Terminal inventory uses last marking in the headline ledger and the
-  registered haircut sensitivity beside it. Unresolved inventory notional and counts
-  are mandatory reporting fields, not silently discarded observations.
+  execution proxy. A held name with ten consecutive sessions without a print is settled
+  at its last mark under the labelled `last_mark_after_10_sessions` convention; a
+  parallel 30% adverse-price settlement scenario is reported but never headline.
+  Unresolved inventory and settlement incidence are mandatory reporting fields, not
+  silently discarded observations.
 - The planned absolute-net cap is 20%. With 30 independently filled slots on each
   side, the former 10% cap treated ordinary asynchronous entry/exit imbalance as a
   liquidation event and prevented the light side from refilling. The wider cap remains
@@ -44,7 +46,7 @@ executable borrow.
 
 ## Pre-research acceptance and sanity bounds
 
-Before Round 1 can freeze, a completed `BRAZIL_RV_V2_PIPELINE_VALIDATION_V6` report
+Before Round 1 can freeze, a completed `BRAZIL_RV_V2_PIPELINE_VALIDATION_V7` report
 must bind the exact implementation and store and have status
 `development_grade_inferred_actions`, no failed reasons, and both sealed-window access
 flags false. It includes the survivorship gates, provider-invariance evidence, finite
@@ -104,6 +106,32 @@ changed.
 
 For continuity only, momentum's pooled IC moved from 0.056 on the prior 34-name liquid
 subset to 0.040 on the complete population. Neither value is a research result.
+
+The terminal-settlement convention was registered at `2026-09-06T23:30Z`, before
+the pass-4f ledger replay and before any Round-1 score. The sealed diagnosis at
+`D:\quant-data\b3\processed\model_runs\v2_pass4f_stale_diagnostic_64c5b76_20260906T232352Z`
+(diagnostic-manifest SHA-256
+`d6522ec1c20cf294fd8914e951c3d51f10bd662f7cf02d8d76b8a9e5f3ac391c`,
+log-inclusive inventory SHA-256
+`7d28de475e529cbd7aba7dccbac1dc14f1a05941d663a25b178570fe9cf794ee`)
+reconstructed 37 stale holding episodes across 14 ISINs and 2,490 stale name-days.
+No affected position printed again inside its evaluation holding window, so the
+predeclared fill-defect stop did not fire. Twenty-seven positions never printed again
+anywhere in the store; ten printed only outside the relevant holding window. None was
+an ISIN-succession candidate. The deterministic flat/premium path diagnostic classified
+zero as tender-like, so the data support terminal disappearance but do not support the
+stronger proposed tender-offer attribution.
+
+The headline convention settles long or short inventory at its last mark, with the
+ordinary per-side cost, on the tenth consecutive no-print session and permanently
+releases its slot. The prior position is never reopened if a later print appears; that
+event is counted. The parallel scenario settles longs 30% below and shorts 30% above
+the same mark. Cumulative settlement notional above 15% of contemporaneous NAV across
+an evaluation labels that book `economics_unresolved`. The unchanged 2% daily gate
+counts stale inventory during the grace period plus inventory exposed to an explicit
+unresolved action term; an unobserved session alone is not an unresolved claim. The
+advance expectation is that all 16 books pass the unchanged gross and stale-inventory
+bounds. On failure, the program stops without Round 1 or Round 2.
 
 ## Round 1 — baseline floor and GBDT parent (CPU)
 
@@ -222,8 +250,9 @@ after artifacts and logs are secured. No deployment changes occur.
       "initial_capital_brl": 1.0,
       "lot_size": null,
       "entry_expiry_sessions": 3,
-      "forced_liquidation_haircut": 0.0,
-      "max_missing_sessions": 10,
+      "settlement_grace_sessions": 10,
+      "settlement_haircut": 0.3,
+      "settlement_economics_unresolved_fraction_nav": 0.15,
       "annual_sessions": 252
     }
   },

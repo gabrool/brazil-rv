@@ -383,15 +383,24 @@ then later fill observations. A missing fill cannot cause a hindsight
 replacement. The persistent ledger carries signed shares, free/restricted
 cash, receivables/payables, pending orders, costs, financing, borrow, and
 valuation status. Eligibility loss requests an exit but does not fabricate a
-sale; unresolved inventory stays visible. Net performance is compared with
-compounded all-cash equity. Insolvency stops trading and remains in the report.
+sale. A held name that has no print for ten consecutive sessions is settled at
+its last mark on the tenth session under the explicitly labelled
+`last_mark_after_10_sessions` development convention; the ordinary cost is
+applied and the name is never reopened. A parallel 30% adverse settlement-price
+scenario is reported separately and never used as the headline result. Net
+performance is compared with compounded all-cash equity. Insolvency stops
+trading and remains in the report.
 
 Ledger utilization is gated per evaluation on mean daily marked notional in
-positions that are stale or action-unresolved, strictly below 2% of NAV.
-Terminal unresolved inventory count, notional, and the nonexclusive causes
-`no_terminal_print`, `max_missing_sessions`, `unresolved_action`, and
-`prior_pending_exit` remain mandatory diagnostics; the terminal snapshot is
-not itself the utilization gate.
+positions that are stale inside the settlement grace period or exposed to an
+explicit unresolved action term, strictly below 2% of NAV. An unobserved
+session alone is not an unresolved claim. Settlement count, notional,
+contemporaneous NAV share, and later-print count are mandatory per-book
+diagnostics. Cumulative settlement notional above 15% of contemporaneous NAV
+labels that book `economics_unresolved`. Any terminal unresolved inventory
+retains count, notional, and the nonexclusive causes `no_terminal_print`,
+`settlement_grace_sessions`, `unresolved_action`, and `prior_pending_exit`;
+the terminal snapshot is not itself the utilization gate.
 
 Undefined comparisons fail the not-worse guard. An all-cash result can be
 well-defined but is not evidence of deployment feasibility.

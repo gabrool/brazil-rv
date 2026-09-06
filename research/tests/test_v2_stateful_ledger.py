@@ -579,15 +579,11 @@ def test_payment_settles_only_its_claim_and_unknown_payment_stays_unresolved() -
     np.testing.assert_allclose(result.reconciliation_error, 0.0, atol=1e-15)
 
 
-def test_terminal_missing_inventory_is_not_sold_and_has_scenario_views() -> None:
+def test_terminal_missing_inventory_inside_grace_is_not_settled() -> None:
     close = np.full((4, 2), 100.0)
     close[-1, 0] = np.nan
     scores = np.asarray([[1.0, -1.0]] * 4)
-    result = _run(
-        close,
-        scores,
-        config=_config(forced_liquidation_haircut=0.30),
-    )
+    result = _run(close, scores)
 
     long_terminal_exit = next(
         order
@@ -602,17 +598,13 @@ def test_terminal_missing_inventory_is_not_sold_and_has_scenario_views() -> None
     assert result.signed_shares[-1, 0] == 0.01
     assert result.free_cash[-1] == 0.0
     assert result.nav[-1] == 1.0
-    assert result.haircut_scenario_nav[-1] == 0.7
+    assert result.settlement_haircut_scenario_nav[-1] == 1.0
     assert result.unresolved_excluded_nav[-1] == 0.0
     assert result.valuation_scenario_count.sum() == 1
 
     short_missing = np.full((4, 2), 100.0)
     short_missing[-1, 1] = np.nan
-    short_result = _run(
-        short_missing,
-        scores,
-        config=_config(forced_liquidation_haircut=0.30),
-    )
+    short_result = _run(short_missing, scores)
     short_terminal_exit = next(
         order
         for order in short_result.intended_orders
@@ -625,8 +617,134 @@ def test_terminal_missing_inventory_is_not_sold_and_has_scenario_views() -> None
     assert short_result.free_cash[-1] == 1.0
     assert short_result.restricted_cash[-1] == 1.0
     assert short_result.nav[-1] == 1.0
-    assert short_result.haircut_scenario_nav[-1] == 0.7
+    assert short_result.settlement_haircut_scenario_nav[-1] == 1.0
     assert short_result.unresolved_excluded_nav[-1] == 1.0
+
+
+def test_long_settles_at_last_mark_on_tenth_missing_session_with_cost() -> None:
+    close = np.full((12, 2), 100.0)
+    close[1:, 0] = np.nan
+    scores = np.asarray([[1.0, -1.0]] * len(close))
+    result = _run(
+        close,
+        scores,
+        initial_reference_price=np.full(2, 100.0),
+        config=_config(cost_bps_per_side=10.0),
+    )
+
+    settlement = next(
+        fill
+        for fill in result.fills
+        if fill.security_index == 0 and fill.purpose == "terminal_settlement"
+    )
+    assert settlement.fill_session == 10
+    assert settlement.side == "sell"
+    assert settlement.price == 100.0
+    assert np.isclose(settlement.cost, 0.001)
+    assert result.signed_shares[10, 0] == 0.0
+    assert result.terminal_settlement_count.sum() == 1
+    assert np.isclose(result.terminal_settlement_notional.sum(), 1.0)
+    assert not any(
+        order.security_index == 0
+        and order.purpose == "entry"
+        and order.decision_session > 10
+        for order in result.intended_orders
+    )
+
+
+def test_short_settles_at_last_mark_on_tenth_missing_session() -> None:
+    close = np.full((12, 2), 100.0)
+    close[1:, 1] = np.nan
+    scores = np.asarray([[1.0, -1.0]] * len(close))
+    result = _run(
+        close,
+        scores,
+        initial_reference_price=np.full(2, 100.0),
+    )
+
+    settlement = next(
+        fill
+        for fill in result.fills
+        if fill.security_index == 1 and fill.purpose == "terminal_settlement"
+    )
+    assert settlement.fill_session == 10
+    assert settlement.side == "buy"
+    assert settlement.price == 100.0
+    assert result.signed_shares[10, 1] == 0.0
+    assert result.restricted_cash[10] == 0.0
+
+
+def test_terminal_settlement_haircut_scenario_reconciles() -> None:
+    close = np.full((12, 2), 100.0)
+    close[1:, 0] = np.nan
+    scores = np.asarray([[1.0, -1.0]] * len(close))
+    result = _run(
+        close,
+        scores,
+        initial_reference_price=np.full(2, 100.0),
+    )
+
+    np.testing.assert_allclose(result.reconciliation_error, 0.0, atol=1e-15)
+    assert np.isclose(result.nav[10], 1.0)
+    assert np.isclose(result.settlement_haircut_scenario_nav[10], 0.7)
+    assert np.isclose(
+        result.summary()["compounded_net_excess_terminal_settlement_haircut_scenario"],
+        -0.3,
+    )
+
+
+def test_print_on_ninth_missing_session_prevents_terminal_settlement() -> None:
+    close = np.full((13, 2), 100.0)
+    close[1:10, 0] = np.nan
+    scores = np.asarray([[1.0, -1.0]] * len(close))
+    result = _run(
+        close,
+        scores,
+        initial_reference_price=np.full(2, 100.0),
+    )
+
+    assert not any(fill.purpose == "terminal_settlement" for fill in result.fills)
+    assert result.terminal_settlement_count.sum() == 0
+
+
+def test_settlement_incidence_above_fifteen_percent_marks_economics_unresolved() -> (
+    None
+):
+    close = np.full((12, 2), 100.0)
+    close[1:, 0] = np.nan
+    scores = np.asarray([[1.0, -1.0]] * len(close))
+    result = _run(
+        close,
+        scores,
+        initial_reference_price=np.full(2, 100.0),
+    )
+
+    summary = result.summary()
+    assert result.economics_unresolved
+    assert summary["terminal_settlement_economics_unresolved"] is True
+    assert summary["terminal_settlement_notional_fraction_nav"] > 0.15
+
+
+def test_print_after_terminal_settlement_is_counted_without_reopening() -> None:
+    close = np.full((13, 2), 100.0)
+    close[1:11, 0] = np.nan
+    scores = np.asarray([[1.0, -1.0]] * len(close))
+    result = _run(
+        close,
+        scores,
+        initial_reference_price=np.full(2, 100.0),
+    )
+
+    assert result.terminal_settlement_count.sum() == 1
+    assert result.settled_then_printed_count.sum() == 1
+    assert result.signed_shares[10, 0] == 0.0
+    assert result.signed_shares[11, 0] == 0.0
+    assert not any(
+        order.security_index == 0
+        and order.purpose == "entry"
+        and order.decision_session > 10
+        for order in result.intended_orders
+    )
 
 
 def test_unresolved_once_then_resolved_name_exits_on_next_instruction() -> None:
@@ -668,12 +786,12 @@ def test_unresolved_once_then_resolved_name_exits_on_next_instruction() -> None:
         fill.order_id == exit_order.order_id and fill.fill_session == 2
         for fill in result.fills
     )
-    assert result.unresolved_action_name_days[1] == 1
+    assert result.unresolved_action_name_days[1] == 0
     assert result.unresolved_action_name_days[2] == 0
-    assert result.unresolved_claim_inventory_fraction_nav[1] > 0.0
+    assert result.unresolved_claim_inventory_fraction_nav[1] == 0.0
     assert result.stale_mark_inventory_fraction_nav[1] == 0.0
     assert result.signed_shares[2, 0] == 0.0
-    assert result.economics_unresolved
+    assert not result.economics_unresolved
 
 
 def test_dividend_receivable_does_not_block_later_exit() -> None:

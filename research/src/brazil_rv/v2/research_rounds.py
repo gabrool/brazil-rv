@@ -238,7 +238,7 @@ def _verify_development_acceptance(
         raise ValueError("development acceptance report SHA-256 mismatch")
     report = _read_json(source)
     if (
-        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V6"
+        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V7"
         or report.get("status") != "completed"
         or report.get("engineering_acceptance_status")
         != "development_grade_inferred_actions"
@@ -1359,7 +1359,10 @@ def freeze_round1(
         },
         "economics_tier": {
             "price_source": "close_proxy",
-            "terminal_inventory": "last_mark_with_haircut_sensitivity",
+            "terminal_settlement_convention": "last_mark_after_10_sessions",
+            "settlement_grace_sessions": 10,
+            "settlement_haircut": 0.30,
+            "settlement_economics_unresolved_fraction_nav": 0.15,
             "executable_borrow": False,
         },
     }

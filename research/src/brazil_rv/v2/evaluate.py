@@ -13,6 +13,7 @@ from numpy.typing import NDArray
 from brazil_rv.execution.stateful_ledger import (
     LedgerConfig,
     StatefulLedgerResult,
+    TERMINAL_SETTLEMENT_CONVENTION,
     ledger_configurations,
     ledger_sensitivity_grid,
     simulate_stateful_ledger,
@@ -34,7 +35,7 @@ BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V7"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V8"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
@@ -761,6 +762,17 @@ def _ledger_rows(
                 result.unresolved_action_name_days[index]
             ),
             "valuation_scenario_count": int(result.valuation_scenario_count[index]),
+            "terminal_settlement_count": int(result.terminal_settlement_count[index]),
+            "terminal_settlement_notional": _finite_or_none(
+                result.terminal_settlement_notional[index]
+            ),
+            "terminal_settlement_notional_fraction_nav": _finite_or_none(
+                result.terminal_settlement_notional_fraction_nav[index]
+            ),
+            "settled_then_printed_count": int(result.settled_then_printed_count[index]),
+            "terminal_settlement_haircut_scenario_nav": _finite_or_none(
+                result.settlement_haircut_scenario_nav[index]
+            ),
             "planned_gross_fraction_nav": _finite_or_none(
                 result.planned_gross_fraction_nav[index]
             ),
@@ -1766,7 +1778,9 @@ def evaluate_scores(
                 "annual_borrow_rate": config.annual_borrow_rate,
                 "buffer_per_side": config.buffer_per_side,
                 "short_proceeds_remuneration": (config.short_proceeds_remuneration),
-                "forced_liquidation_haircut": (config.forced_liquidation_haircut),
+                "terminal_settlement_convention": TERMINAL_SETTLEMENT_CONVENTION,
+                "settlement_grace_sessions": config.settlement_grace_sessions,
+                "settlement_haircut": config.settlement_haircut,
                 "path_model_count": 1,
                 **{
                     key: _finite_or_none(value) if isinstance(value, float) else value

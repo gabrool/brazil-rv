@@ -3129,8 +3129,8 @@ def build_daily_store(
             "never exposed to features, eligibility, normalization, or orders"
         ),
         "terminal_status": (
-            "reporting_only; unresolved inventory is retained and valued under "
-            "the declared last-mark and haircut scenarios"
+            "verified source unavailable; the evaluation ledger may apply an "
+            "explicitly registered and labelled terminal-settlement convention"
         ),
         "common_state_diagnostics": {
             "role": "audit_only_not_model_input",

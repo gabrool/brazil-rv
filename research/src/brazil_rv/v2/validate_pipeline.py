@@ -61,8 +61,8 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V6"
-_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V7"
+_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V6"
 PIPELINE_NETWORK_RESUME_SCHEMA = "BRAZIL_RV_V2_PIPELINE_NETWORK_RESUME_V2"
 PIPELINE_FLAGS: dict[str, bool] = {
     "pipeline_validation": True,
@@ -959,8 +959,31 @@ def _development_acceptance(
                     "mean_pending_exit_age_sessions"
                 ),
                 "cancellations_by_reason": headline.get("cancellations_by_reason"),
+                "terminal_settlement_convention": headline.get(
+                    "terminal_settlement_convention"
+                ),
+                "settlement_grace_sessions": headline.get("settlement_grace_sessions"),
+                "settlement_haircut": headline.get("settlement_haircut"),
+                "terminal_settlement_count": headline.get("terminal_settlement_count"),
+                "terminal_settlement_notional": headline.get(
+                    "terminal_settlement_notional"
+                ),
+                "terminal_settlement_notional_fraction_nav": headline.get(
+                    "terminal_settlement_notional_fraction_nav"
+                ),
+                "settled_then_printed_count": headline.get(
+                    "settled_then_printed_count"
+                ),
+                "terminal_settlement_economics_unresolved": headline.get(
+                    "terminal_settlement_economics_unresolved"
+                ),
             }
         )
+        if (
+            headline.get("terminal_settlement_convention")
+            != "last_mark_after_10_sessions"
+        ):
+            violations.append(f"{label}_terminal_settlement_convention_missing")
         if gross is None or not 1.8 <= gross <= 2.2:
             violations.append(f"{label}_deployed_gross_outside_ten_percent")
         if unresolved_stale is None:
@@ -991,6 +1014,7 @@ def _development_acceptance(
             "action_terms_source": action_terms_source,
             "schedule_source": schedule_source,
             "economics_tier": "development_grade_close_proxy",
+            "terminal_settlement_convention": "last_mark_after_10_sessions",
         },
         "sanity_bounds": {
             "naive_absolute_pooled_ic_strictly_below": 0.10,
@@ -998,6 +1022,7 @@ def _development_acceptance(
             "gross_target": 2.0,
             "gross_relative_tolerance": 0.10,
             "per_evaluation_mean_unresolved_stale_inventory_fraction_strictly_below": 0.02,
+            "terminal_settlement_economics_unresolved_fraction_nav": 0.15,
         },
         "naive_pooled_primary_scaled_target_ic": pooled_ic,
         "reversal_5_definition_negative_signed": reversal_definition_ok,
@@ -2602,8 +2627,8 @@ def replay_classical_economics(
                 },
                 "ledger_replay_proof": {
                     "score_or_model_recomputation": False,
-                    "prior_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V6",
-                    "replayed_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V7",
+                    "prior_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V7",
+                    "replayed_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V8",
                     "schema_field_is_the_only_non_economics_exception": True,
                     "all_non_ledger_fields_bit_identical": all(
                         row["non_ledger_fields_bit_identical"] is True
