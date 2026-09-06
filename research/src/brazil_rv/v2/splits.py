@@ -391,20 +391,54 @@ def mask_targets_to_window(
     horizons: Sequence[int] = HORIZONS,
 ) -> NDArray[np.bool_]:
     """Restrict targets so every session from entry through exit stays in-window."""
+    endpoint_mask = target_window_endpoint_mask(
+        calendar_dates=calendar_dates,
+        window_dates=window_dates,
+        horizons=horizons,
+    )
+    mask = np.asarray(target_mask)
+    if mask.dtype != np.bool_:
+        raise TypeError("target mask must be a Boolean array")
+    if (
+        mask.ndim != 3
+        or mask.shape[0] != endpoint_mask.shape[0]
+        or mask.shape[2] != endpoint_mask.shape[1]
+    ):
+        raise ValueError("target mask shape differs from date/horizon axes")
+    return mask & endpoint_mask[:, None, :]
+
+
+def target_window_endpoint_mask(
+    *,
+    calendar_dates: Sequence[date],
+    window_dates: Sequence[date],
+    horizons: Sequence[int] = HORIZONS,
+) -> NDArray[np.bool_]:
+    """Authorize entry/horizon coordinates without touching target payloads.
+
+    Consumers must apply this date-only mask to target validity before reading
+    numeric target arrays.  In particular, F3 tail labels whose endpoints enter
+    the later sealed window remain unreadable rather than being decoded and then
+    zeroed.
+    """
+
     dates = _ordered_unique(calendar_dates)
     window = _ordered_unique(window_dates)
-    mask = np.asarray(target_mask, dtype=bool)
-    if mask.ndim != 3 or mask.shape[0] != len(dates) or mask.shape[2] != len(horizons):
-        raise ValueError("target mask shape differs from date/horizon axes")
+    horizon_values = tuple(int(value) for value in horizons)
+    if (
+        not horizon_values
+        or any(value <= 0 for value in horizon_values)
+        or len(set(horizon_values)) != len(horizon_values)
+    ):
+        raise ValueError("target horizons must be unique and positive")
     window_set = set(window)
     if not window_set.issubset(dates):
         raise ValueError("window dates are absent from the calendar")
     in_window = np.asarray([value in window_set for value in dates], dtype=bool)
-    result = mask.copy()
+    result = np.zeros((len(dates), len(horizon_values)), dtype=np.bool_)
     for day in range(len(dates)):
-        for horizon_index, horizon in enumerate(horizons):
-            stop = day + int(horizon)
+        for horizon_index, horizon in enumerate(horizon_values):
+            stop = day + horizon
             contained = stop < len(dates) and bool(in_window[day : stop + 1].all())
-            if not contained:
-                result[day, :, horizon_index] = False
+            result[day, horizon_index] = contained
     return result

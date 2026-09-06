@@ -23,7 +23,9 @@ def test_development_folds_have_chronological_selection_and_evaluation() -> None
     folds = splits.development_folds(calendar)
 
     assert [fold.name for fold in folds] == ["F1", "F2", "F3"]
-    assert [(fold.evaluation_dates[0], fold.evaluation_dates[-1]) for fold in folds] == [
+    assert [
+        (fold.evaluation_dates[0], fold.evaluation_dates[-1]) for fold in folds
+    ] == [
         (date(2023, 7, 3), date(2023, 12, 29)),
         (date(2024, 1, 2), date(2024, 6, 28)),
         (date(2024, 7, 1), date(2024, 12, 30)),
@@ -107,6 +109,22 @@ def test_target_masks_are_clipped_to_the_requested_window() -> None:
         else:
             assert not clipped[:, :, index].any()
     assert target_mask.all()
+
+
+def test_target_endpoint_authorization_excludes_f3_tail_before_payload_access() -> None:
+    calendar = _weekdays(date(2024, 12, 20), date(2025, 1, 10))
+    f3_dates = tuple(value for value in calendar if value <= date(2024, 12, 30))
+
+    authorized = splits.target_window_endpoint_mask(
+        calendar_dates=calendar,
+        window_dates=f3_dates,
+    )
+
+    positions = {value: index for index, value in enumerate(calendar)}
+    assert authorized[positions[date(2024, 12, 27)], 0]
+    assert not authorized[positions[date(2024, 12, 30)], 0]
+    assert not authorized[positions[date(2024, 12, 27)], 1]
+    assert not authorized[len(f3_dates) :].any()
 
 
 def test_official_window_requires_and_records_registration(tmp_path) -> None:

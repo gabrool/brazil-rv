@@ -15,23 +15,27 @@ from brazil_rv.execution.stateful_ledger import (
     StatefulLedgerResult,
     ledger_configurations,
     ledger_sensitivity_grid,
+    simulate_stateful_ledger,
 )
 from brazil_rv.modeling.metrics import average_ranks, moving_block_bootstrap
 
 from .artifacts import write_json_atomic
 from .config import FULL_PROTOCOL, ProtocolPreset
 from .contract import HORIZONS, PRIMARY_HORIZONS
+from .corporate_actions import AlignedActionTerms
 from .splits import (
     PREREGISTRATION_ROOT,
     authorize_dates,
     validate_contiguous_session_axis,
 )
 
-MIN_CROSS_SECTION = 30
+MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V3"
+PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V2"
 
 
 @dataclass(frozen=True)
@@ -41,20 +45,26 @@ class EvaluationInputs:
     calendar_identity_sha256: str
     scores: NDArray[np.floating]
     score_mask: NDArray[np.bool_]
-    median_residual_midrank_targets: NDArray[np.floating]
-    raw_midrank_targets: NDArray[np.floating]
-    raw_log_returns: NDArray[np.floating]
-    target_mask: NDArray[np.bool_]
-    raw_target_mask: NDArray[np.bool_]
+    scaled_midrank_targets: NDArray[np.floating]
+    scaled_target_mask: NDArray[np.bool_]
+    shareholder_midrank_targets: NDArray[np.floating]
+    shareholder_simple_returns: NDArray[np.floating]
+    shareholder_target_mask: NDArray[np.bool_]
+    price_midrank_targets: NDArray[np.floating]
+    price_target_mask: NDArray[np.bool_]
     active: NDArray[np.bool_]
-    adjusted_close: NDArray[np.floating]
-    neutralized_log_return: NDArray[np.floating]
-    neutralized_log_return_valid: NDArray[np.bool_]
-    return_neutralized_event: NDArray[np.bool_]
-    cross_sectional_median_log_return: NDArray[np.floating]
+    raw_close: NDArray[np.floating]
+    action_shares_per_prior_share: NDArray[np.floating]
+    action_cash_per_prior_share: NDArray[np.floating]
+    action_session_resolved: NDArray[np.bool_]
+    action_has_action: NDArray[np.bool_]
+    action_successor_index: NDArray[np.integer]
+    action_payment_session: NDArray[np.integer]
+    security_ids: tuple[str, ...]
     target_scale_sigma: NDArray[np.floating]
     prior_feature_values: Mapping[str, NDArray[np.floating]]
     cdi_returns: NDArray[np.floating]
+    transfer_chronology_clean: bool
     horizons: tuple[int, ...] = HORIZONS
     source_artifact_hashes: Mapping[str, str] | None = None
 
@@ -66,6 +76,10 @@ class EvaluationResult:
     daily_primary_ic: NDArray[np.float64]
     headline_economics_dates: tuple[date, ...]
     headline_net_excess_bps: NDArray[np.float64]
+    primary_scores: NDArray[np.float64]
+    primary_targets: NDArray[np.float64]
+    primary_outcome_mask: NDArray[np.bool_]
+    primary_score_mask: NDArray[np.bool_]
 
 
 def _array_sha256(values: NDArray[np.generic]) -> str:
@@ -91,6 +105,15 @@ def _dates_sha256(dates: Sequence[date]) -> str:
     return digest.hexdigest()
 
 
+def _strings_sha256(values: Sequence[str]) -> str:
+    digest = hashlib.sha256()
+    for value in values:
+        encoded = value.encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "little"))
+        digest.update(encoded)
+    return digest.hexdigest()
+
+
 def _finite_or_none(value: float) -> float | None:
     return float(value) if math.isfinite(float(value)) else None
 
@@ -101,27 +124,45 @@ def _finite_mean(values: NDArray[np.floating]) -> float:
     return float(finite.mean()) if finite.size else math.nan
 
 
+def _spearman_result(
+    left: NDArray[np.floating],
+    right: NDArray[np.floating],
+    mask: NDArray[np.bool_],
+) -> tuple[float, int, str | None]:
+    """Return a rank correlation with explicit support and failure reason."""
+
+    valid = np.asarray(mask, dtype=np.bool_).copy()
+    left_values = np.asarray(left, dtype=np.float64)
+    right_values = np.asarray(right, dtype=np.float64)
+    valid &= np.isfinite(left_values) & np.isfinite(right_values)
+    count = int(valid.sum())
+    if count < MIN_CROSS_SECTION:
+        return math.nan, count, "fewer_than_20_valid_names"
+    left_ranks = average_ranks(left_values[valid])
+    right_ranks = average_ranks(right_values[valid])
+    left_ranks -= left_ranks.mean()
+    right_ranks -= right_ranks.mean()
+    left_scale = float(np.square(left_ranks).sum())
+    right_scale = float(np.square(right_ranks).sum())
+    if left_scale == 0.0 and right_scale == 0.0:
+        return math.nan, count, "constant_score_and_target"
+    if left_scale == 0.0:
+        return math.nan, count, "constant_score"
+    if right_scale == 0.0:
+        return math.nan, count, "constant_target"
+    return (
+        float(np.dot(left_ranks, right_ranks) / np.sqrt(left_scale * right_scale)),
+        count,
+        None,
+    )
+
+
 def _spearman(
     left: NDArray[np.floating],
     right: NDArray[np.floating],
     mask: NDArray[np.bool_],
 ) -> float:
-    valid = np.asarray(mask, dtype=bool).copy()
-    left_values = np.asarray(left, dtype=np.float64)
-    right_values = np.asarray(right, dtype=np.float64)
-    valid &= np.isfinite(left_values) & np.isfinite(right_values)
-    if int(valid.sum()) < MIN_CROSS_SECTION:
-        return math.nan
-    left_ranks = average_ranks(left_values[valid])
-    right_ranks = average_ranks(right_values[valid])
-    left_ranks -= left_ranks.mean()
-    right_ranks -= right_ranks.mean()
-    denominator = float(
-        np.sqrt(np.square(left_ranks).sum() * np.square(right_ranks).sum())
-    )
-    if denominator == 0.0:
-        return math.nan
-    return float(np.dot(left_ranks, right_ranks) / denominator)
+    return _spearman_result(left, right, mask)[0]
 
 
 def _validate(inputs: EvaluationInputs) -> None:
@@ -130,6 +171,8 @@ def _validate(inputs: EvaluationInputs) -> None:
     _validate_sha256(inputs.calendar_identity_sha256, label="calendar_identity_sha256")
     if tuple(inputs.horizons) != HORIZONS:
         raise ValueError("evaluation horizon axis differs from the frozen v2 contract")
+    if not isinstance(inputs.transfer_chronology_clean, bool):
+        raise TypeError("transfer_chronology_clean must be an explicit Boolean")
     scores = np.asarray(inputs.scores)
     active = np.asarray(inputs.active)
     if active.ndim != 2 or active.shape[0] != len(dates):
@@ -137,48 +180,101 @@ def _validate(inputs: EvaluationInputs) -> None:
     expected = (len(dates), active.shape[1], len(HORIZONS))
     if scores.shape != expected:
         raise ValueError("scores must have date-by-name-by-horizon shape")
-    for name, values in (
-        ("score_mask", inputs.score_mask),
-        (
-            "median_residual_midrank_targets",
-            inputs.median_residual_midrank_targets,
-        ),
-        ("raw_midrank_targets", inputs.raw_midrank_targets),
-        ("raw_log_returns", inputs.raw_log_returns),
-        ("target_mask", inputs.target_mask),
-        ("raw_target_mask", inputs.raw_target_mask),
-    ):
-        if np.asarray(values).shape != expected:
-            raise ValueError(f"{name} shape differs from scores")
     matrix_shape = expected[:2]
     if active.shape != matrix_shape:
         raise ValueError("active mask shape differs from scores")
-    if np.asarray(inputs.adjusted_close).shape != matrix_shape:
-        raise ValueError("adjusted close shape differs from scores")
+    score_mask = np.asarray(inputs.score_mask)
+    if score_mask.shape != expected:
+        raise ValueError("score_mask shape differs from scores")
+    if score_mask.dtype != np.bool_:
+        raise TypeError("score_mask must be a Boolean array")
+    if active.dtype != np.bool_:
+        raise TypeError("active must be a Boolean array")
+
+    # Outcome masks are authorized and checked through their exact endpoint
+    # window before any numeric target payload is decoded.  This ordering is
+    # material at the F3 tail, whose later endpoints enter a sealed window.
+    target_masks = (
+        ("scaled_target_mask", inputs.scaled_target_mask),
+        ("shareholder_target_mask", inputs.shareholder_target_mask),
+        ("price_target_mask", inputs.price_target_mask),
+    )
+    for name, raw_values in target_masks:
+        values = np.asarray(raw_values)
+        if values.shape != expected:
+            raise ValueError(f"{name} shape differs from scores")
+        if values.dtype != np.bool_:
+            raise TypeError(f"{name} must be a Boolean array")
+        for horizon_index, horizon in enumerate(HORIZONS):
+            if values[-horizon:, :, horizon_index].any():
+                raise ValueError(
+                    f"{name} permits a horizon endpoint outside the window"
+                )
+
+    numeric_targets = (
+        ("scaled_midrank_targets", inputs.scaled_midrank_targets),
+        ("shareholder_midrank_targets", inputs.shareholder_midrank_targets),
+        ("shareholder_simple_returns", inputs.shareholder_simple_returns),
+        ("price_midrank_targets", inputs.price_midrank_targets),
+    )
+    for name, values in numeric_targets:
+        if getattr(values, "shape", None) != expected:
+            raise ValueError(f"{name} shape differs from scores")
+    scaled = np.asarray(inputs.scaled_midrank_targets)
+    shareholder_rank = np.asarray(inputs.shareholder_midrank_targets)
+    shareholder_return = np.asarray(inputs.shareholder_simple_returns)
+    price_rank = np.asarray(inputs.price_midrank_targets)
+    for name, values, mask in (
+        ("scaled_midrank_targets", scaled, inputs.scaled_target_mask),
+        (
+            "shareholder_midrank_targets",
+            shareholder_rank,
+            inputs.shareholder_target_mask,
+        ),
+        (
+            "shareholder_simple_returns",
+            shareholder_return,
+            inputs.shareholder_target_mask,
+        ),
+        ("price_midrank_targets", price_rank, inputs.price_target_mask),
+    ):
+        if not np.isfinite(values[np.asarray(mask, dtype=np.bool_)]).all():
+            raise ValueError(f"{name} contains a non-finite valid outcome")
     for name, values in (
-        ("neutralized_log_return", inputs.neutralized_log_return),
-        ("neutralized_log_return_valid", inputs.neutralized_log_return_valid),
-        ("return_neutralized_event", inputs.return_neutralized_event),
+        ("raw_close", inputs.raw_close),
+        (
+            "action_shares_per_prior_share",
+            inputs.action_shares_per_prior_share,
+        ),
+        ("action_cash_per_prior_share", inputs.action_cash_per_prior_share),
+        ("action_session_resolved", inputs.action_session_resolved),
+        ("action_has_action", inputs.action_has_action),
+        ("action_successor_index", inputs.action_successor_index),
+        ("action_payment_session", inputs.action_payment_session),
         ("target_scale_sigma", inputs.target_scale_sigma),
     ):
         if np.asarray(values).shape != matrix_shape:
             raise ValueError(f"{name} shape differs from scores")
-    if np.asarray(inputs.cross_sectional_median_log_return).shape != (len(dates),):
-        raise ValueError("cross-sectional median return axis differs from dates")
     if np.asarray(inputs.cdi_returns).shape != (len(dates),):
         raise ValueError("CDI return axis differs from evaluation dates")
-    if np.asarray(inputs.score_mask).dtype != np.bool_:
-        raise TypeError("score_mask must be a Boolean array")
-    if np.asarray(inputs.target_mask).dtype != np.bool_:
-        raise TypeError("target_mask must be a Boolean array")
-    if np.asarray(inputs.raw_target_mask).dtype != np.bool_:
-        raise TypeError("raw_target_mask must be a Boolean array")
-    if active.dtype != np.bool_:
-        raise TypeError("active must be a Boolean array")
-    if np.asarray(inputs.neutralized_log_return_valid).dtype != np.bool_:
-        raise TypeError("neutralized-log-return validity must be Boolean")
-    if np.asarray(inputs.return_neutralized_event).dtype != np.bool_:
-        raise TypeError("return-neutralized event mask must be Boolean")
+    for name, values in (
+        ("action_session_resolved", inputs.action_session_resolved),
+        ("action_has_action", inputs.action_has_action),
+    ):
+        if np.asarray(values).dtype != np.bool_:
+            raise TypeError(f"{name} must be Boolean")
+    for name, values in (
+        ("action_successor_index", inputs.action_successor_index),
+        ("action_payment_session", inputs.action_payment_session),
+    ):
+        if not np.issubdtype(np.asarray(values).dtype, np.integer):
+            raise TypeError(f"{name} must be integer")
+    if (
+        len(inputs.security_ids) != matrix_shape[1]
+        or len(set(inputs.security_ids)) != matrix_shape[1]
+        or any(not value for value in inputs.security_ids)
+    ):
+        raise ValueError("security_ids must be nonempty, unique, and align names")
     expected_features = {
         "yang_zhang_vol_20",
         "beta_60",
@@ -195,15 +291,6 @@ def _validate(inputs: EvaluationInputs) -> None:
         raise ValueError("evaluation prior-feature arrays are misaligned")
     if not np.isfinite(np.asarray(inputs.cdi_returns, dtype=np.float64)).all():
         raise ValueError("CDI returns must be finite")
-    for horizon_index, horizon in enumerate(HORIZONS):
-        if np.asarray(inputs.target_mask)[-horizon:, :, horizon_index].any():
-            raise ValueError(
-                "target mask permits a horizon endpoint outside the window"
-            )
-        if np.asarray(inputs.raw_target_mask)[-horizon:, :, horizon_index].any():
-            raise ValueError(
-                "raw target mask permits a horizon endpoint outside the window"
-            )
     if not inputs.source_artifact_hashes:
         raise ValueError("evaluation requires at least one source artifact identity")
     for name, digest in inputs.source_artifact_hashes.items():
@@ -219,87 +306,224 @@ def _validate_sha256(value: str, *, label: str) -> None:
         raise ValueError(f"{label} must be a lower-case SHA-256")
 
 
-def _daily_metrics(
+def _aligned_action_terms(inputs: EvaluationInputs) -> AlignedActionTerms:
+    return AlignedActionTerms(
+        shares_per_prior_share=np.asarray(
+            inputs.action_shares_per_prior_share, dtype=np.float64
+        ),
+        cash_per_prior_share=np.asarray(
+            inputs.action_cash_per_prior_share, dtype=np.float64
+        ),
+        session_resolved=np.asarray(inputs.action_session_resolved, dtype=np.bool_),
+        has_action=np.asarray(inputs.action_has_action, dtype=np.bool_),
+        successor_index=np.asarray(inputs.action_successor_index, dtype=np.int64),
+    )
+
+
+def _primary_population_components(
     inputs: EvaluationInputs,
 ) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.bool_],
+    NDArray[np.bool_],
+]:
+    indexes = [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS]
+    scores = np.asarray(inputs.scores, dtype=np.float64)[..., indexes]
+    targets = np.asarray(inputs.scaled_midrank_targets, dtype=np.float64)[..., indexes]
+    target_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)[..., indexes]
+    score_mask = np.asarray(inputs.score_mask, dtype=np.bool_)[..., indexes]
+    scale = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
+    outcome_population = (
+        np.asarray(inputs.active, dtype=np.bool_)
+        & np.isfinite(scale)
+        & (scale > 1e-8)
+        & target_mask.all(axis=-1)
+        & np.isfinite(targets).all(axis=-1)
+    )
+    score_population = score_mask.all(axis=-1) & np.isfinite(scores).all(axis=-1)
+    return scores, targets, outcome_population, score_population
+
+
+def _primary_daily_metrics(
+    scores: NDArray[np.float64],
+    targets: NDArray[np.float64],
+    outcome_population: NDArray[np.bool_],
+    score_population: NDArray[np.bool_],
+    dates: Sequence[date],
+) -> tuple[NDArray[np.float64], NDArray[np.float64], list[dict[str, object]]]:
+    head_ic = np.full((len(dates), len(PRIMARY_HORIZONS)), np.nan, dtype=np.float64)
+    daily_primary = np.full(len(dates), np.nan, dtype=np.float64)
+    rows: list[dict[str, object]] = []
+    for day, day_value in enumerate(dates):
+        outcome_count = int(outcome_population[day].sum())
+        population = outcome_population[day] & score_population[day]
+        common_count = int(population.sum())
+        reasons: list[str] = []
+        if outcome_count < MIN_CROSS_SECTION:
+            reasons.append("fewer_than_20_common_scaled_outcomes")
+        elif common_count < MIN_CROSS_SECTION:
+            reasons.append("fewer_than_20_common_scores")
+        else:
+            for horizon_index, horizon in enumerate(PRIMARY_HORIZONS):
+                value, _, reason = _spearman_result(
+                    scores[day, :, horizon_index],
+                    targets[day, :, horizon_index],
+                    population,
+                )
+                head_ic[day, horizon_index] = value
+                if reason is not None:
+                    reasons.append(f"D{horizon}:{reason}")
+        if not reasons:
+            # Every head is defined on this exact population; a plain mean is
+            # therefore the registered equal-four-head aggregation, not a
+            # missing-head nanmean.
+            daily_primary[day] = float(head_ic[day].mean())
+        rows.append(
+            {
+                "date": day_value.isoformat(),
+                "possible": outcome_count >= MIN_CROSS_SECTION,
+                "used": not reasons,
+                "common_scaled_outcome_name_count": outcome_count,
+                "common_score_and_outcome_name_count": common_count,
+                "score_support_loss_name_count": outcome_count - common_count,
+                "head_scaled_target_spearman_ic": {
+                    f"D{horizon}": _finite_or_none(head_ic[day, index])
+                    for index, horizon in enumerate(PRIMARY_HORIZONS)
+                },
+                "primary_scaled_target_ic": _finite_or_none(daily_primary[day]),
+                "undefined_reason": ";".join(reasons) if reasons else None,
+            }
+        )
+    return head_ic, daily_primary, rows
+
+
+def _daily_metrics(
+    inputs: EvaluationInputs,
+    primary_population: NDArray[np.bool_],
+) -> tuple[
+    NDArray[np.float64],
     NDArray[np.float64],
     NDArray[np.float64],
     NDArray[np.float64],
     list[dict[str, object]],
 ]:
     scores = np.asarray(inputs.scores, dtype=np.float64)
-    score_mask = np.asarray(inputs.score_mask, dtype=bool)
-    active = np.asarray(inputs.active, dtype=bool)
-    target_mask = np.asarray(inputs.target_mask, dtype=bool)
-    raw_target_mask = np.asarray(inputs.raw_target_mask, dtype=bool)
-    residual = np.asarray(inputs.median_residual_midrank_targets, dtype=np.float64)
-    raw_rank = np.asarray(inputs.raw_midrank_targets, dtype=np.float64)
-    raw_return = np.asarray(inputs.raw_log_returns, dtype=np.float64)
+    score_mask = np.asarray(inputs.score_mask, dtype=np.bool_)
+    active = np.asarray(inputs.active, dtype=np.bool_)
+    scaled_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
+    shareholder_mask = np.asarray(inputs.shareholder_target_mask, dtype=np.bool_)
+    price_mask = np.asarray(inputs.price_target_mask, dtype=np.bool_)
+    scaled = np.asarray(inputs.scaled_midrank_targets, dtype=np.float64)
+    shareholder_rank = np.asarray(inputs.shareholder_midrank_targets, dtype=np.float64)
+    shareholder_return = np.asarray(inputs.shareholder_simple_returns, dtype=np.float64)
+    price_rank = np.asarray(inputs.price_midrank_targets, dtype=np.float64)
+    scale = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
     days = len(inputs.dates)
     horizon_count = len(HORIZONS)
-    residual_ic = np.full((days, horizon_count), np.nan, dtype=np.float64)
-    raw_ic = np.full_like(residual_ic, np.nan)
-    decile_spread = np.full_like(residual_ic, np.nan)
+    scaled_ic = np.full((days, horizon_count), np.nan, dtype=np.float64)
+    shareholder_ic = np.full_like(scaled_ic, np.nan)
+    price_ic = np.full_like(scaled_ic, np.nan)
+    spread_total_bps = np.full_like(scaled_ic, np.nan)
     rows: list[dict[str, object]] = []
+    primary_indexes = {
+        HORIZONS.index(horizon): index for index, horizon in enumerate(PRIMARY_HORIZONS)
+    }
     for day, day_value in enumerate(inputs.dates):
         for horizon_index, horizon in enumerate(HORIZONS):
-            residual_valid = (
-                score_mask[day, :, horizon_index]
-                & target_mask[day, :, horizon_index]
-                & active[day]
-                & np.isfinite(scores[day, :, horizon_index])
-                & np.isfinite(residual[day, :, horizon_index])
-            )
-            residual_ic[day, horizon_index] = _spearman(
+            if horizon_index in primary_indexes:
+                scaled_valid = primary_population[day]
+                scaled_population = "common_D1_D2_D3_D5"
+            else:
+                scaled_valid = (
+                    active[day]
+                    & score_mask[day, :, horizon_index]
+                    & scaled_mask[day, :, horizon_index]
+                    & np.isfinite(scale[day])
+                    & (scale[day] > 1e-8)
+                    & np.isfinite(scores[day, :, horizon_index])
+                    & np.isfinite(scaled[day, :, horizon_index])
+                )
+                scaled_population = "per_horizon_D10"
+            scaled_value, scaled_count, scaled_reason = _spearman_result(
                 scores[day, :, horizon_index],
-                residual[day, :, horizon_index],
-                residual_valid,
+                scaled[day, :, horizon_index],
+                scaled_valid,
             )
-            raw_base_valid = (
-                score_mask[day, :, horizon_index]
-                & raw_target_mask[day, :, horizon_index]
-                & active[day]
+            scaled_ic[day, horizon_index] = scaled_value
+
+            shareholder_valid = (
+                active[day]
+                & score_mask[day, :, horizon_index]
+                & shareholder_mask[day, :, horizon_index]
                 & np.isfinite(scores[day, :, horizon_index])
+                & np.isfinite(shareholder_rank[day, :, horizon_index])
             )
-            raw_rank_valid = raw_base_valid & np.isfinite(
-                raw_rank[day, :, horizon_index]
-            )
-            raw_ic[day, horizon_index] = _spearman(
+            shareholder_value, shareholder_count, shareholder_reason = _spearman_result(
                 scores[day, :, horizon_index],
-                raw_rank[day, :, horizon_index],
-                raw_rank_valid,
+                shareholder_rank[day, :, horizon_index],
+                shareholder_valid,
             )
-            decile_valid = raw_base_valid & np.isfinite(
-                raw_return[day, :, horizon_index]
+            shareholder_ic[day, horizon_index] = shareholder_value
+
+            price_valid = (
+                active[day]
+                & score_mask[day, :, horizon_index]
+                & price_mask[day, :, horizon_index]
+                & np.isfinite(scores[day, :, horizon_index])
+                & np.isfinite(price_rank[day, :, horizon_index])
             )
-            names = np.flatnonzero(decile_valid)
-            if names.size >= MIN_CROSS_SECTION:
+            price_value, price_count, price_reason = _spearman_result(
+                scores[day, :, horizon_index],
+                price_rank[day, :, horizon_index],
+                price_valid,
+            )
+            price_ic[day, horizon_index] = price_value
+
+            spread_valid = shareholder_valid & np.isfinite(
+                shareholder_return[day, :, horizon_index]
+            )
+            names = np.flatnonzero(spread_valid)
+            spread_reason: str | None = None
+            if names.size < MIN_CROSS_SECTION:
+                spread_reason = "fewer_than_20_valid_names"
+            else:
                 decile_count = max(1, names.size // 10)
                 order = names[
                     np.argsort(scores[day, names, horizon_index], kind="stable")
                 ]
-                bottom = raw_return[day, order[:decile_count], horizon_index].mean()
-                top = raw_return[day, order[-decile_count:], horizon_index].mean()
-                decile_spread[day, horizon_index] = (
-                    float(top - bottom) * 10_000.0 / horizon
-                )
+                bottom = shareholder_return[
+                    day, order[:decile_count], horizon_index
+                ].mean()
+                top = shareholder_return[
+                    day, order[-decile_count:], horizon_index
+                ].mean()
+                spread_total_bps[day, horizon_index] = float(top - bottom) * 10_000.0
             rows.append(
                 {
                     "date": day_value.isoformat(),
                     "horizon_sessions": horizon,
-                    "median_residual_valid_name_count": int(residual_valid.sum()),
-                    "raw_rank_valid_name_count": int(raw_rank_valid.sum()),
-                    "decile_valid_name_count": int(decile_valid.sum()),
-                    "median_residual_spearman_ic": _finite_or_none(
-                        residual_ic[day, horizon_index]
+                    "scaled_target_population": scaled_population,
+                    "scaled_target_valid_name_count": scaled_count,
+                    "scaled_target_spearman_ic": _finite_or_none(scaled_value),
+                    "scaled_target_ic_undefined_reason": scaled_reason,
+                    "shareholder_rank_valid_name_count": shareholder_count,
+                    "shareholder_rank_ic": _finite_or_none(shareholder_value),
+                    "shareholder_rank_ic_undefined_reason": shareholder_reason,
+                    "price_return_rank_valid_name_count": price_count,
+                    "price_return_rank_ic": _finite_or_none(price_value),
+                    "price_return_rank_ic_undefined_reason": price_reason,
+                    "shareholder_return_spread_valid_name_count": int(names.size),
+                    "shareholder_return_spread_total_bps": _finite_or_none(
+                        spread_total_bps[day, horizon_index]
                     ),
-                    "raw_rank_ic": _finite_or_none(raw_ic[day, horizon_index]),
-                    "decile_spread_bps_per_holding_session": _finite_or_none(
-                        decile_spread[day, horizon_index]
+                    "shareholder_return_spread_bps_per_holding_session": (
+                        _finite_or_none(spread_total_bps[day, horizon_index] / horizon)
                     ),
+                    "shareholder_return_spread_undefined_reason": spread_reason,
                 }
             )
-    return residual_ic, raw_ic, decile_spread, rows
+    return scaled_ic, shareholder_ic, price_ic, spread_total_bps, rows
 
 
 def _persistence(
@@ -381,9 +605,8 @@ def _ledger_rows(
             "date": day.isoformat(),
             "cost_bps_per_side": cost_bps,
             "annual_borrow_rate": annual_borrow_rate,
-            "interval_valid": True,
+            "economics_resolved": not result.economics_unresolved,
             "gross_pnl_bps": _finite_or_none(result.gross_pnl_bps[index]),
-            "neutral_flow_bps": _finite_or_none(result.neutral_flow_bps[index]),
             "interest_bps": _finite_or_none(result.interest_bps[index]),
             "turnover_fraction_nav": _finite_or_none(
                 result.turnover_fraction_nav[index]
@@ -398,8 +621,22 @@ def _ledger_rows(
                 result.gross_fraction_nav[index]
             ),
             "stale_mark_name_days": int(result.stale_mark_name_days[index]),
-            "neutral_marked_name_days": int(result.neutral_marked_name_days[index]),
-            "forced_liquidation_count": int(result.forced_liquidation_count[index]),
+            "unresolved_action_name_days": int(
+                result.unresolved_action_name_days[index]
+            ),
+            "valuation_scenario_count": int(result.valuation_scenario_count[index]),
+            "planned_gross_fraction_nav": _finite_or_none(
+                result.planned_gross_fraction_nav[index]
+            ),
+            "planned_net_fraction_nav": _finite_or_none(
+                result.planned_net_fraction_nav[index]
+            ),
+            "planned_name_weight_fraction_nav": _finite_or_none(
+                result.planned_name_weight_fraction_nav[index]
+            ),
+            "actual_risk_breach": bool(result.actual_risk_breach[index]),
+            "pending_entry_count": int(result.pending_entry_count[index]),
+            "pending_exit_count": int(result.pending_exit_count[index]),
         }
         for index, day in enumerate(result.dates)
     ]
@@ -412,29 +649,47 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         "session_indices": _array_sha256(np.asarray(inputs.session_indices)),
         "scores": _array_sha256(np.asarray(inputs.scores)),
         "score_mask": _array_sha256(np.asarray(inputs.score_mask)),
-        "median_residual_midrank_targets": _array_sha256(
-            np.asarray(inputs.median_residual_midrank_targets)
+        "scaled_midrank_targets": _array_sha256(
+            np.asarray(inputs.scaled_midrank_targets)
         ),
-        "raw_midrank_targets": _array_sha256(np.asarray(inputs.raw_midrank_targets)),
-        "raw_log_returns": _array_sha256(np.asarray(inputs.raw_log_returns)),
-        "target_mask": _array_sha256(np.asarray(inputs.target_mask)),
-        "raw_target_mask": _array_sha256(np.asarray(inputs.raw_target_mask)),
+        "scaled_target_mask": _array_sha256(np.asarray(inputs.scaled_target_mask)),
+        "shareholder_midrank_targets": _array_sha256(
+            np.asarray(inputs.shareholder_midrank_targets)
+        ),
+        "shareholder_simple_returns": _array_sha256(
+            np.asarray(inputs.shareholder_simple_returns)
+        ),
+        "shareholder_target_mask": _array_sha256(
+            np.asarray(inputs.shareholder_target_mask)
+        ),
+        "price_midrank_targets": _array_sha256(
+            np.asarray(inputs.price_midrank_targets)
+        ),
+        "price_target_mask": _array_sha256(np.asarray(inputs.price_target_mask)),
         "active": _array_sha256(np.asarray(inputs.active)),
-        "adjusted_close": _array_sha256(np.asarray(inputs.adjusted_close)),
-        "neutralized_log_return": _array_sha256(
-            np.asarray(inputs.neutralized_log_return)
+        "raw_close": _array_sha256(np.asarray(inputs.raw_close)),
+        "action_shares_per_prior_share": _array_sha256(
+            np.asarray(inputs.action_shares_per_prior_share)
         ),
-        "neutralized_log_return_valid": _array_sha256(
-            np.asarray(inputs.neutralized_log_return_valid)
+        "action_cash_per_prior_share": _array_sha256(
+            np.asarray(inputs.action_cash_per_prior_share)
         ),
-        "return_neutralized_event": _array_sha256(
-            np.asarray(inputs.return_neutralized_event)
+        "action_session_resolved": _array_sha256(
+            np.asarray(inputs.action_session_resolved)
         ),
-        "cross_sectional_median_log_return": _array_sha256(
-            np.asarray(inputs.cross_sectional_median_log_return)
+        "action_has_action": _array_sha256(np.asarray(inputs.action_has_action)),
+        "action_successor_index": _array_sha256(
+            np.asarray(inputs.action_successor_index)
         ),
+        "action_payment_session": _array_sha256(
+            np.asarray(inputs.action_payment_session)
+        ),
+        "security_ids": _strings_sha256(inputs.security_ids),
         "target_scale_sigma": _array_sha256(np.asarray(inputs.target_scale_sigma)),
         "cdi_returns": _array_sha256(np.asarray(inputs.cdi_returns)),
+        "transfer_chronology_clean": _array_sha256(
+            np.asarray(inputs.transfer_chronology_clean, dtype=np.bool_)
+        ),
     }
     for name, values in sorted(inputs.prior_feature_values.items()):
         result[f"prior_feature_{name}"] = _array_sha256(np.asarray(values))
@@ -457,10 +712,14 @@ def _economics_contract() -> dict[str, object]:
         "terminal_liquidation": True,
         "stateful_policy": "buffered held inventory; no resizing or drift trades",
         "missing_print_policy": (
-            "stale mark until a print, then exit; force after 10 sessions or "
-            "inactive-without-print"
+            "stale mark while an exit is pending; fill at the first print and "
+            "report a valuation scenario after 10 missing sessions"
         ),
-        "event_marking": "neutralized market move with synthetic flow",
+        "marking_basis": "raw contractual close with explicit signed shares",
+        "corporate_action_basis": (
+            "verified q/d terms create successor shares and cash claims; "
+            "each action's verified payment session settles its own claim"
+        ),
         "short_proceeds_remuneration": config.short_proceeds_remuneration,
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
         "annual_borrow_rates": list(ECONOMICS_ANNUAL_BORROW_RATES),
@@ -475,8 +734,8 @@ def _diagnostics(inputs: EvaluationInputs) -> dict[str, object]:
     scores = np.asarray(inputs.scores, dtype=np.float64)
     masks = np.asarray(inputs.score_mask, dtype=np.bool_)
     active = np.asarray(inputs.active, dtype=np.bool_)
-    target_mask = np.asarray(inputs.target_mask, dtype=np.bool_)
-    residual = np.asarray(inputs.median_residual_midrank_targets, dtype=np.float64)
+    target_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
+    scaled = np.asarray(inputs.scaled_midrank_targets, dtype=np.float64)
     composite, composite_mask = _economics_signal(inputs)
     exposure_rows = []
     exposure_summary = []
@@ -505,58 +764,104 @@ def _diagnostics(inputs: EvaluationInputs) -> dict[str, object]:
         }
         if finite.size >= 20:
             interval = _bootstrap_payload(
-                finite, replications=10_000, block_length=min(20, len(finite))
+                daily, replications=10_000, block_length=min(20, len(daily))
             )
         exposure_summary.append({"feature": name, **interval})
 
     matched_rows = []
-    d10 = HORIZONS.index(10)
+    matched_daily_rows = []
+    sigma = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
+    all_horizon_outcome = (
+        active
+        & np.isfinite(sigma)
+        & (sigma > 1e-8)
+        & target_mask.all(axis=-1)
+        & np.isfinite(scaled).all(axis=-1)
+    )
+    all_horizon_population = (
+        all_horizon_outcome & masks.all(axis=-1) & np.isfinite(scores).all(axis=-1)
+    )
+    matched_values = np.full(
+        (len(inputs.dates), len(HORIZONS)), np.nan, dtype=np.float64
+    )
+    for day, day_value in enumerate(inputs.dates):
+        for horizon_index, horizon in enumerate(HORIZONS):
+            value, count, reason = _spearman_result(
+                scores[day, :, horizon_index],
+                scaled[day, :, horizon_index],
+                all_horizon_population[day],
+            )
+            matched_values[day, horizon_index] = value
+            matched_daily_rows.append(
+                {
+                    "date": day_value.isoformat(),
+                    "horizon_sessions": horizon,
+                    "all_five_common_outcome_name_count": int(
+                        all_horizon_outcome[day].sum()
+                    ),
+                    "all_five_common_score_and_outcome_name_count": count,
+                    "scaled_target_spearman_ic": _finite_or_none(value),
+                    "undefined_reason": reason,
+                }
+            )
     for horizon_index, horizon in enumerate(HORIZONS):
-        values = []
-        for day in range(len(inputs.dates)):
-            valid = (
-                masks[day, :, horizon_index]
-                & target_mask[day, :, horizon_index]
-                & target_mask[day, :, d10]
-                & active[day]
-            )
-            values.append(
-                _spearman(
-                    scores[day, :, horizon_index],
-                    residual[day, :, horizon_index],
-                    valid,
-                )
-            )
+        values = matched_values[:, horizon_index]
+        defined = np.isfinite(values)
         matched_rows.append(
             {
                 "horizon_sessions": horizon,
-                "mean_median_residual_ic": _finite_or_none(
-                    _finite_mean(np.asarray(values))
+                "population": "common_D1_D2_D3_D5_D10",
+                "possible_date_count": int(
+                    (all_horizon_outcome.sum(axis=1) >= MIN_CROSS_SECTION).sum()
+                ),
+                "used_date_count": int(defined.sum()),
+                "mean_scaled_target_ic": _finite_or_none(_finite_mean(values)),
+                "undefined_reason": (
+                    None
+                    if defined.any()
+                    else "no_date_has_a_defined_all_five_horizon_ic"
                 ),
             }
         )
 
-    neutral_returns = np.asarray(inputs.neutralized_log_return, dtype=np.float64)
-    neutral_valid = np.asarray(inputs.neutralized_log_return_valid, dtype=np.bool_)
-    sigma = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
+    shareholder_returns = np.asarray(
+        inputs.shareholder_simple_returns, dtype=np.float64
+    )
+    shareholder_valid = np.asarray(inputs.shareholder_target_mask, dtype=np.bool_)
     intervals = ((0, 1), (1, 3), (3, 5), (5, 10))
     incremental_rows = []
     for head_index, head_horizon in enumerate(HORIZONS):
         for start, stop in intervals:
+            stop_index = HORIZONS.index(stop)
+            start_index = HORIZONS.index(start) if start else None
             daily = []
             for day in range(len(inputs.dates)):
-                if day + stop >= len(inputs.dates):
-                    daily.append(np.nan)
-                    continue
-                path = neutral_returns[day + start + 1 : day + stop + 1]
-                path_valid = neutral_valid[day + start + 1 : day + stop + 1].all(axis=0)
-                realized = path.sum(axis=0, dtype=np.float64)
+                stop_wealth = 1.0 + shareholder_returns[day, :, stop_index]
+                if start_index is None:
+                    start_wealth = np.ones_like(stop_wealth)
+                    interval_valid = shareholder_valid[day, :, stop_index].copy()
+                else:
+                    start_wealth = 1.0 + shareholder_returns[day, :, start_index]
+                    interval_valid = (
+                        shareholder_valid[day, :, start_index]
+                        & shareholder_valid[day, :, stop_index]
+                    )
+                interval_valid &= (
+                    np.isfinite(start_wealth)
+                    & (start_wealth > 0.0)
+                    & np.isfinite(stop_wealth)
+                )
+                realized = np.full_like(stop_wealth, np.nan)
+                realized[interval_valid] = (
+                    stop_wealth[interval_valid] / start_wealth[interval_valid] - 1.0
+                )
                 valid = (
                     masks[day, :, head_index]
                     & active[day]
-                    & path_valid
+                    & interval_valid
                     & np.isfinite(sigma[day])
-                    & (sigma[day] > 0)
+                    & (sigma[day] > 1e-8)
+                    & np.isfinite(scores[day, :, head_index])
                 )
                 if valid.any():
                     realized[valid] = (realized[valid] - np.median(realized[valid])) / (
@@ -568,6 +873,8 @@ def _diagnostics(inputs: EvaluationInputs) -> dict[str, object]:
                     "head_horizon_sessions": head_horizon,
                     "increment_start_sessions": start,
                     "increment_end_sessions": stop,
+                    "return_basis": "shareholder_wealth_same_holding",
+                    "scale_basis": "fixed_decision_time_target_scale_sigma",
                     "mean_spearman_ic": _finite_or_none(
                         _finite_mean(np.asarray(daily))
                     ),
@@ -578,6 +885,7 @@ def _diagnostics(inputs: EvaluationInputs) -> dict[str, object]:
         "exposure_summary": exposure_summary,
         "incremental_horizon_ic": incremental_rows,
         "matched_universe_ic": matched_rows,
+        "matched_universe_daily": matched_daily_rows,
     }
 
 
@@ -595,49 +903,139 @@ def evaluate_scores(
         registration_path=registration_path,
         preregistration_root=preregistration_root,
     )
+    if ledger.official_validation_accessed and not inputs.transfer_chronology_clean:
+        raise PermissionError(
+            "official validation refuses an artifact with contaminated transfer "
+            "chronology"
+        )
     _validate(inputs)
     if not window_name:
         raise ValueError("window_name must be nonempty")
-    residual_ic, raw_ic, decile_spread, metric_rows = _daily_metrics(inputs)
-    persistence, persistence_rows = _persistence(inputs)
-    primary_indexes = [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS]
-    daily_primary = np.asarray(
-        [
-            _finite_mean(residual_ic[day, primary_indexes])
-            for day in range(len(inputs.dates))
-        ],
-        dtype=np.float64,
+    (
+        primary_scores,
+        primary_targets,
+        primary_outcome_mask,
+        primary_score_mask,
+    ) = _primary_population_components(inputs)
+    primary_population = primary_outcome_mask & primary_score_mask
+    _, daily_primary, primary_rows = _primary_daily_metrics(
+        primary_scores,
+        primary_targets,
+        primary_outcome_mask,
+        primary_score_mask,
+        inputs.dates,
     )
+    scaled_ic, shareholder_ic, price_ic, spread_total_bps, metric_rows = _daily_metrics(
+        inputs, primary_population
+    )
+    persistence, persistence_rows = _persistence(inputs)
     economics_score, economics_mask = _economics_signal(inputs)
+    action_terms = _aligned_action_terms(inputs)
     grid = ledger_sensitivity_grid(
         dates=inputs.dates,
         scores=economics_score,
         score_mask=economics_mask,
         active=np.asarray(inputs.active, dtype=np.bool_),
-        adjusted_close=inputs.adjusted_close,
-        neutralized_log_return=inputs.neutralized_log_return,
-        neutralized_log_return_valid=inputs.neutralized_log_return_valid,
-        return_neutralized_event_mask=inputs.return_neutralized_event,
-        cross_sectional_median_log_return=(inputs.cross_sectional_median_log_return),
+        raw_close=inputs.raw_close,
+        action_terms=action_terms,
+        action_payment_session=inputs.action_payment_session,
         cdi_returns=inputs.cdi_returns,
+        security_ids=inputs.security_ids,
     )
     configurations = ledger_configurations()
     headline_name = f"cost_{ECONOMICS_HEADLINE[0]:g}_borrow_{ECONOMICS_HEADLINE[1]:g}"
     headline = grid[headline_name]
+    d5_index = HORIZONS.index(5)
+    d5_score = np.asarray(inputs.scores, dtype=np.float64)[..., d5_index]
+    d5_score_mask = (
+        np.asarray(inputs.score_mask, dtype=np.bool_)[..., d5_index]
+        & np.asarray(inputs.active, dtype=np.bool_)
+        & np.isfinite(d5_score)
+    )
+    d5_only = simulate_stateful_ledger(
+        dates=inputs.dates,
+        scores=d5_score,
+        score_mask=d5_score_mask,
+        active=np.asarray(inputs.active, dtype=np.bool_),
+        raw_close=inputs.raw_close,
+        action_terms=action_terms,
+        action_payment_session=inputs.action_payment_session,
+        cdi_returns=inputs.cdi_returns,
+        security_ids=inputs.security_ids,
+        config=LedgerConfig(),
+    )
+    active = np.asarray(inputs.active, dtype=np.bool_)
+    scaled_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
+    shareholder_mask = np.asarray(inputs.shareholder_target_mask, dtype=np.bool_)
+    price_mask = np.asarray(inputs.price_target_mask, dtype=np.bool_)
+    scale = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
     horizon_rows: list[dict[str, object]] = []
     for horizon_index, horizon in enumerate(HORIZONS):
+        if horizon in PRIMARY_HORIZONS:
+            scaled_possible = primary_outcome_mask
+        else:
+            scaled_possible = (
+                active
+                & scaled_mask[..., horizon_index]
+                & np.isfinite(scale)
+                & (scale > 1e-8)
+                & np.isfinite(
+                    np.asarray(inputs.scaled_midrank_targets)[..., horizon_index]
+                )
+            )
+        shareholder_possible = (
+            active
+            & shareholder_mask[..., horizon_index]
+            & np.isfinite(
+                np.asarray(inputs.shareholder_midrank_targets)[..., horizon_index]
+            )
+        )
+        price_possible = (
+            active
+            & price_mask[..., horizon_index]
+            & np.isfinite(np.asarray(inputs.price_midrank_targets)[..., horizon_index])
+        )
         horizon_rows.append(
             {
                 "horizon_sessions": horizon,
                 "primary_horizon": horizon in PRIMARY_HORIZONS,
-                "mean_median_residual_spearman_ic": _finite_or_none(
-                    _finite_mean(residual_ic[:, horizon_index])
+                "mean_scaled_target_spearman_ic": _finite_or_none(
+                    _finite_mean(scaled_ic[:, horizon_index])
                 ),
-                "mean_raw_rank_ic": _finite_or_none(
-                    _finite_mean(raw_ic[:, horizon_index])
+                "scaled_target_possible_date_count": int(
+                    (scaled_possible.sum(axis=1) >= MIN_CROSS_SECTION).sum()
                 ),
-                "mean_decile_spread_bps_per_holding_session": _finite_or_none(
-                    _finite_mean(decile_spread[:, horizon_index])
+                "scaled_target_used_date_count": int(
+                    np.isfinite(scaled_ic[:, horizon_index]).sum()
+                ),
+                "scaled_target_possible_name_days": int(scaled_possible.sum()),
+                "mean_shareholder_rank_ic": _finite_or_none(
+                    _finite_mean(shareholder_ic[:, horizon_index])
+                ),
+                "shareholder_rank_possible_date_count": int(
+                    (shareholder_possible.sum(axis=1) >= MIN_CROSS_SECTION).sum()
+                ),
+                "shareholder_rank_used_date_count": int(
+                    np.isfinite(shareholder_ic[:, horizon_index]).sum()
+                ),
+                "shareholder_rank_possible_name_days": int(shareholder_possible.sum()),
+                "mean_price_return_rank_ic": _finite_or_none(
+                    _finite_mean(price_ic[:, horizon_index])
+                ),
+                "price_return_rank_possible_date_count": int(
+                    (price_possible.sum(axis=1) >= MIN_CROSS_SECTION).sum()
+                ),
+                "price_return_rank_used_date_count": int(
+                    np.isfinite(price_ic[:, horizon_index]).sum()
+                ),
+                "price_return_rank_possible_name_days": int(price_possible.sum()),
+                "mean_shareholder_return_spread_total_bps": _finite_or_none(
+                    _finite_mean(spread_total_bps[:, horizon_index])
+                ),
+                "mean_shareholder_return_spread_bps_per_holding_session": (
+                    _finite_or_none(
+                        _finite_mean(spread_total_bps[:, horizon_index]) / horizon
+                    )
                 ),
                 "mean_persistence_1_session": _finite_or_none(
                     _finite_mean(persistence[1][:, horizon_index])
@@ -658,7 +1056,6 @@ def evaluate_scores(
                 "annual_borrow_rate": config.annual_borrow_rate,
                 "buffer_per_side": config.buffer_per_side,
                 "short_proceeds_remuneration": (config.short_proceeds_remuneration),
-                "ex_date_marking": config.ex_date_marking,
                 "forced_liquidation_haircut": (config.forced_liquidation_haircut),
                 "path_model_count": 1,
                 **{
@@ -680,7 +1077,7 @@ def evaluate_scores(
                 )
             )
     report: dict[str, object] = {
-        "schema": "BRAZIL_RV_V2_EVALUATION_V2",
+        "schema": EVALUATION_SCHEMA,
         "window": {
             "name": window_name,
             "start": inputs.dates[0].isoformat(),
@@ -694,29 +1091,82 @@ def evaluate_scores(
         "access": ledger.payload(),
         "official_validation_accessed": ledger.official_validation_accessed,
         "test_accessed": ledger.test_accessed,
+        "transfer_chronology_clean": inputs.transfer_chronology_clean,
         "horizons_sessions": list(HORIZONS),
         "primary_horizons_sessions": list(PRIMARY_HORIZONS),
-        "pooled_primary_median_residual_ic": _finite_or_none(
-            _finite_mean(
-                np.asarray(
-                    [_finite_mean(residual_ic[:, index]) for index in primary_indexes]
-                )
-            )
+        "metric_contract": {
+            "primary_target": "median_adjusted_volatility_scaled_midrank",
+            "primary_population": (
+                "per date: active entry names with finite sigma>1e-8 and valid, "
+                "finite score and scaled outcome on every D1/D2/D3/D5 head"
+            ),
+            "minimum_names": MIN_CROSS_SECTION,
+            "daily_primary_aggregation": (
+                "equal mean of all four head Spearman correlations only when "
+                "every head is defined"
+            ),
+            "shareholder_return": "gross contractual holding simple return",
+            "price_return": "contractually unit-adjusted price-only return",
+        },
+        "mean_daily_primary_scaled_target_ic": _finite_or_none(
+            _finite_mean(daily_primary)
         ),
-        "daily_primary_ic": [
-            {
-                "date": value.isoformat(),
-                "mean_primary_horizon_ic": _finite_or_none(daily_primary[index]),
-            }
-            for index, value in enumerate(inputs.dates)
-        ],
+        "primary_support": {
+            "possible_date_count": int(
+                (primary_outcome_mask.sum(axis=1) >= MIN_CROSS_SECTION).sum()
+            ),
+            "used_date_count": int(np.isfinite(daily_primary).sum()),
+            "possible_name_days": int(primary_outcome_mask.sum()),
+            "used_name_days": int(primary_population.sum()),
+            "score_support_loss_name_days": int(
+                (primary_outcome_mask & ~primary_score_mask).sum()
+            ),
+            "undefined_reason": (
+                None
+                if np.isfinite(daily_primary).any()
+                else "no_date_has_a_defined_four_head_primary_ic"
+            ),
+        },
+        "daily_primary_ic": primary_rows,
         "horizon_readouts": horizon_rows,
         "daily_metric_table": metric_rows,
         "persistence_table": persistence_rows,
         "economics": {
             "contract": _economics_contract(),
+            "headline": {
+                "scenario": headline_name,
+                **{
+                    key: _finite_or_none(value) if isinstance(value, float) else value
+                    for key, value in headline.summary().items()
+                },
+            },
             "summaries": economics_summaries,
             "daily_table": economics_daily,
+            "d5_only_diagnostic": {
+                "horizon_sessions": 5,
+                "contract": "D5 score head with the exact headline ledger settings",
+                "summary": {
+                    key: _finite_or_none(value) if isinstance(value, float) else value
+                    for key, value in d5_only.summary().items()
+                },
+                "daily_table": _ledger_rows(
+                    d5_only,
+                    cost_bps=LedgerConfig().cost_bps_per_side,
+                    annual_borrow_rate=LedgerConfig().annual_borrow_rate,
+                ),
+            },
+            "coverage": {
+                "possible_date_count": len(inputs.dates),
+                "reported_date_count": len(headline.dates),
+                "finite_net_excess_date_count": int(
+                    np.isfinite(headline.net_excess_all_cash_bps).sum()
+                ),
+                "score_supported_date_count": int(economics_mask.any(axis=1).sum()),
+                "score_supported_name_days": int(economics_mask.sum()),
+                "deployed_date_count": int((headline.gross_fraction_nav > 0.0).sum()),
+                "all_cash_date_count": int((headline.gross_fraction_nav == 0.0).sum()),
+                "economics_unresolved": headline.economics_unresolved,
+            },
         },
         "diagnostics": _diagnostics(inputs),
         "input_hashes": _input_hashes(inputs),
@@ -724,19 +1174,36 @@ def evaluate_scores(
             sorted((inputs.source_artifact_hashes or {}).items())
         ),
         "mask_coverage": {
+            "active_name_days": int(active.sum()),
             "score_mask_true": int(np.asarray(inputs.score_mask).sum()),
-            "target_mask_true": int(np.asarray(inputs.target_mask).sum()),
-            "raw_target_mask_true": int(np.asarray(inputs.raw_target_mask).sum()),
+            "scaled_target_mask_true": int(scaled_mask.sum()),
+            "shareholder_target_mask_true": int(shareholder_mask.sum()),
+            "price_target_mask_true": int(price_mask.sum()),
+            "primary_common_outcome_name_days": int(primary_outcome_mask.sum()),
+            "primary_common_score_and_outcome_name_days": int(primary_population.sum()),
             "economics_score_mask_true": int(economics_mask.sum()),
             "economics_path_model_count": 1,
-            "return_neutralized_event_true": int(
-                np.asarray(inputs.return_neutralized_event, dtype=np.bool_).sum()
+            "raw_close_present_name_days": int(
+                np.isfinite(np.asarray(inputs.raw_close, dtype=np.float64)).sum()
             ),
-            "neutralized_log_return_valid_true": int(
-                np.asarray(inputs.neutralized_log_return_valid, dtype=np.bool_).sum()
+            "action_name_days": int(
+                np.asarray(inputs.action_has_action, dtype=np.bool_).sum()
+            ),
+            "unresolved_action_source_name_days": int(
+                (
+                    np.asarray(inputs.action_has_action, dtype=np.bool_)
+                    & ~np.asarray(inputs.action_session_resolved, dtype=np.bool_)
+                ).sum()
+            ),
+            "known_action_payment_name_days": int(
+                (np.asarray(inputs.action_payment_session) >= 0).sum()
             ),
             "stale_mark_name_days": int(headline.stale_mark_name_days.sum()),
-            "neutral_marked_name_days": int(headline.neutral_marked_name_days.sum()),
+            "unresolved_action_name_days": int(
+                headline.unresolved_action_name_days.sum()
+            ),
+            "valuation_scenario_count": int(headline.valuation_scenario_count.sum()),
+            "actual_risk_breach_dates": int(headline.actual_risk_breach.sum()),
         },
     }
     return EvaluationResult(
@@ -745,6 +1212,10 @@ def evaluate_scores(
         daily_primary_ic=daily_primary,
         headline_economics_dates=headline.dates,
         headline_net_excess_bps=headline.net_excess_all_cash_bps,
+        primary_scores=primary_scores,
+        primary_targets=primary_targets,
+        primary_outcome_mask=primary_outcome_mask,
+        primary_score_mask=primary_score_mask,
     )
 
 
@@ -753,12 +1224,27 @@ def _bootstrap_payload(
     *,
     replications: int,
     block_length: int,
-) -> dict[str, float | None]:
+) -> dict[str, float | int | str | None]:
+    finite_count = int(np.isfinite(np.asarray(values, dtype=np.float64)).sum())
+    support = {
+        "possible_date_count": int(len(values)),
+        "defined_date_count": finite_count,
+    }
+    if finite_count == 0:
+        return {
+            "estimate": None,
+            "lower_95": None,
+            "upper_95": None,
+            **support,
+            "undefined_reason": "no_defined_daily_values",
+        }
     if replications == 0:
         return {
             "estimate": _finite_or_none(_finite_mean(values)),
             "lower_95": None,
             "upper_95": None,
+            **support,
+            "undefined_reason": None,
         }
     output = moving_block_bootstrap(
         values,
@@ -766,10 +1252,87 @@ def _bootstrap_payload(
         block_length=block_length,
         seed=BOOTSTRAP_SEED,
     )
-    return {
-        key: _finite_or_none(np.asarray(value).reshape(-1)[0])
-        for key, value in output.items()
-    }
+    return (
+        {
+            key: _finite_or_none(np.asarray(value).reshape(-1)[0])
+            for key, value in output.items()
+        }
+        | support
+        | {"undefined_reason": None}
+    )
+
+
+def _paired_primary_daily(
+    candidate: EvaluationResult,
+    baseline: EvaluationResult,
+) -> tuple[NDArray[np.float64], list[dict[str, object]]]:
+    expected_scores = (
+        len(candidate.dates),
+        candidate.primary_outcome_mask.shape[1],
+        len(PRIMARY_HORIZONS),
+    )
+    for label, result in (("candidate", candidate), ("baseline", baseline)):
+        if result.primary_scores.shape != expected_scores:
+            raise ValueError(f"{label} retained primary scores are misaligned")
+        if result.primary_targets.shape != expected_scores:
+            raise ValueError(f"{label} retained primary targets are misaligned")
+        if result.primary_outcome_mask.shape != expected_scores[:2]:
+            raise ValueError(f"{label} retained outcome population is misaligned")
+        if result.primary_score_mask.shape != expected_scores[:2]:
+            raise ValueError(f"{label} retained score population is misaligned")
+    common_outcome = candidate.primary_outcome_mask & baseline.primary_outcome_mask
+    common_score = candidate.primary_score_mask & baseline.primary_score_mask
+    candidate_heads, candidate_daily, candidate_rows = _primary_daily_metrics(
+        candidate.primary_scores,
+        candidate.primary_targets,
+        common_outcome,
+        common_score,
+        candidate.dates,
+    )
+    baseline_heads, baseline_daily, baseline_rows = _primary_daily_metrics(
+        baseline.primary_scores,
+        baseline.primary_targets,
+        common_outcome,
+        common_score,
+        baseline.dates,
+    )
+    delta = candidate_daily - baseline_daily
+    rows: list[dict[str, object]] = []
+    for day, day_value in enumerate(candidate.dates):
+        candidate_reason = candidate_rows[day]["undefined_reason"]
+        baseline_reason = baseline_rows[day]["undefined_reason"]
+        reason = None
+        if candidate_reason is not None or baseline_reason is not None:
+            reason = (
+                f"candidate={candidate_reason or 'defined'};"
+                f"baseline={baseline_reason or 'defined'}"
+            )
+        rows.append(
+            {
+                "date": day_value.isoformat(),
+                "common_outcome_name_count": int(common_outcome[day].sum()),
+                "common_candidate_baseline_name_count": int(
+                    (common_outcome[day] & common_score[day]).sum()
+                ),
+                "candidate_head_scaled_target_spearman_ic": {
+                    f"D{horizon}": _finite_or_none(candidate_heads[day, index])
+                    for index, horizon in enumerate(PRIMARY_HORIZONS)
+                },
+                "baseline_head_scaled_target_spearman_ic": {
+                    f"D{horizon}": _finite_or_none(baseline_heads[day, index])
+                    for index, horizon in enumerate(PRIMARY_HORIZONS)
+                },
+                "candidate_primary_scaled_target_ic": _finite_or_none(
+                    candidate_daily[day]
+                ),
+                "baseline_primary_scaled_target_ic": _finite_or_none(
+                    baseline_daily[day]
+                ),
+                "delta": _finite_or_none(delta[day]),
+                "undefined_reason": reason,
+            }
+        )
+    return delta, rows
 
 
 def paired_comparison(
@@ -787,25 +1350,44 @@ def paired_comparison(
         registration_path=registration_path,
         preregistration_root=preregistration_root,
     )
+    if ledger.official_validation_accessed:
+        for label, result in (("candidate", candidate), ("baseline", baseline)):
+            if result.report.get("transfer_chronology_clean") is not True:
+                raise PermissionError(
+                    "official validation refuses a paired comparison whose "
+                    f"{label} has contaminated transfer chronology"
+                )
     if candidate.dates != baseline.dates:
         raise ValueError("paired IC comparison requires identical date axes")
     if candidate.headline_economics_dates != baseline.headline_economics_dates:
         raise ValueError("paired economics comparison requires identical date axes")
     _validate_paired_identity(candidate.report, baseline.report)
-    if candidate.daily_primary_ic.shape != (len(candidate.dates),) or (
-        baseline.daily_primary_ic.shape != (len(baseline.dates),)
-    ):
-        raise ValueError("paired primary-IC arrays differ from their date axes")
     if candidate.headline_net_excess_bps.shape != (
         len(candidate.headline_economics_dates),
     ) or baseline.headline_net_excess_bps.shape != (
         len(baseline.headline_economics_dates),
     ):
         raise ValueError("paired economics arrays differ from their date axes")
-    ic_delta = candidate.daily_primary_ic - baseline.daily_primary_ic
-    economics_delta = (
-        candidate.headline_net_excess_bps - baseline.headline_net_excess_bps
-    )
+    ic_delta, paired_population_rows = _paired_primary_daily(candidate, baseline)
+    candidate_unresolved = _headline_economics_unresolved(candidate.report)
+    baseline_unresolved = _headline_economics_unresolved(baseline.report)
+    economics_undefined_reason = None
+    if candidate_unresolved or baseline_unresolved:
+        economics_delta = np.full(
+            len(candidate.headline_economics_dates), np.nan, dtype=np.float64
+        )
+        labels = []
+        if candidate_unresolved:
+            labels.append("candidate")
+        if baseline_unresolved:
+            labels.append("baseline")
+        economics_undefined_reason = (
+            f"{'_and_'.join(labels)}_headline_economics_unresolved"
+        )
+    else:
+        economics_delta = (
+            candidate.headline_net_excess_bps - baseline.headline_net_excess_bps
+        )
     if (
         protocol.bootstrap_replications > 0
         and min(len(ic_delta), len(economics_delta)) < protocol.bootstrap_block_length
@@ -814,7 +1396,7 @@ def paired_comparison(
             "paired comparison requires at least the preset bootstrap block length"
         )
     return {
-        "schema": "BRAZIL_RV_V2_PAIRED_COMPARISON_V1",
+        "schema": PAIRED_COMPARISON_SCHEMA,
         "access": ledger.payload(),
         "official_validation_accessed": ledger.official_validation_accessed,
         "test_accessed": ledger.test_accessed,
@@ -828,44 +1410,68 @@ def paired_comparison(
             replications=protocol.bootstrap_replications,
             block_length=protocol.bootstrap_block_length,
         ),
+        "primary_population": {
+            "definition": (
+                "per-date intersection of candidate and baseline finite score "
+                "support with active, sigma-valid outcomes on D1/D2/D3/D5"
+            ),
+            "minimum_names": MIN_CROSS_SECTION,
+            "possible_date_count": len(candidate.dates),
+            "used_date_count": int(np.isfinite(ic_delta).sum()),
+        },
         "daily_headline_net_excess_bps_delta": _bootstrap_payload(
             economics_delta,
             replications=protocol.bootstrap_replications,
             block_length=protocol.bootstrap_block_length,
         ),
-        "daily_primary_ic_delta_table": [
-            {
-                "date": value.isoformat(),
-                "delta": _finite_or_none(ic_delta[index]),
-            }
-            for index, value in enumerate(candidate.dates)
-        ],
+        "economics_comparison_undefined_reason": economics_undefined_reason,
+        "daily_primary_ic_delta_table": paired_population_rows,
         "daily_headline_net_excess_bps_delta_table": [
             {
                 "date": value.isoformat(),
                 "delta": _finite_or_none(economics_delta[index]),
+                "undefined_reason": economics_undefined_reason,
             }
             for index, value in enumerate(candidate.headline_economics_dates)
         ],
     }
 
 
+def _headline_economics_unresolved(report: Mapping[str, object]) -> bool:
+    economics = report.get("economics")
+    if not isinstance(economics, Mapping):
+        raise ValueError("evaluation report lacks economics")
+    headline = economics.get("headline")
+    if not isinstance(headline, Mapping):
+        raise ValueError("evaluation report lacks headline economics")
+    value = headline.get("economics_unresolved")
+    if not isinstance(value, bool):
+        raise ValueError(
+            "evaluation report lacks an explicit economics resolution flag"
+        )
+    return value
+
+
 _PAIRED_INPUT_KEYS = (
     "dates",
     "canonical_calendar",
     "session_indices",
-    "score_mask",
-    "median_residual_midrank_targets",
-    "raw_midrank_targets",
-    "raw_log_returns",
-    "target_mask",
-    "raw_target_mask",
+    "scaled_midrank_targets",
+    "scaled_target_mask",
+    "shareholder_midrank_targets",
+    "shareholder_simple_returns",
+    "shareholder_target_mask",
+    "price_midrank_targets",
+    "price_target_mask",
     "active",
-    "adjusted_close",
-    "neutralized_log_return",
-    "neutralized_log_return_valid",
-    "return_neutralized_event",
-    "cross_sectional_median_log_return",
+    "raw_close",
+    "action_shares_per_prior_share",
+    "action_cash_per_prior_share",
+    "action_session_resolved",
+    "action_has_action",
+    "action_successor_index",
+    "action_payment_session",
+    "security_ids",
     "target_scale_sigma",
     "cdi_returns",
     "prior_feature_beta_60",
@@ -885,8 +1491,11 @@ def _validate_paired_identity(
         ("candidate", candidate_report),
         ("baseline", baseline_report),
     ):
-        if report.get("schema") != "BRAZIL_RV_V2_EVALUATION_V2":
-            raise ValueError(f"{label} is not a v2 evaluation report")
+        if report.get("schema") != EVALUATION_SCHEMA:
+            raise ValueError(
+                f"{label} evaluation report is stale or incompatible; "
+                f"expected {EVALUATION_SCHEMA}"
+            )
         input_hashes = report.get("input_hashes")
         if not isinstance(input_hashes, Mapping) or any(
             not isinstance(input_hashes.get(key), str) for key in _PAIRED_INPUT_KEYS
@@ -923,8 +1532,9 @@ def _validate_paired_identity(
     ]
     if mismatched:
         raise ValueError(
-            "paired comparison requires identical dates, targets, masks, adjusted "
-            "close, neutralized returns, event marks, target scales, and CDI inputs; "
+            "paired comparison requires identical dates, outcome targets/masks, "
+            "raw closes, contractual actions/payment sessions, security identities, "
+            "target scales, and CDI inputs; "
             "mismatched identities: "
             f"{mismatched}"
         )
