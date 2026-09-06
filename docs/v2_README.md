@@ -102,6 +102,12 @@ This index uses a declared reinvest-at-close convention for features and risk.
 The holding target and ledger instead retain distributions as cash or claims;
 the conventions are named separately.
 
+Shareholder-wealth history is never bridged across a missing interval. A
+return whose endpoint interval spans a wealth-chain restart is invalid by
+construction. Each store manifest reports
+`wealth_chain_restarts_active_name_days` by calendar year so this latent data
+quality condition is visible without inventing observations.
+
 ## Point-in-time universe
 
 A name is eligible on decision session `t` using only information available
@@ -120,7 +126,7 @@ outcome availability never changes the universe or an order formed at `t`.
 
 ## Immutable daily store
 
-The current store schema is `BRAZIL_RV_V2_DAILY_STORE_V2`. A build writes to
+The current store schema is `BRAZIL_RV_V2_DAILY_STORE_V3`. A build writes to
 a new staging root, validates it, and promotes only a complete store. Arrays
 are uncompressed and memory-mappable. The manifest binds the date, security,
 slow/current/fast and horizon axes; source paths and hashes; clock and calendar;
@@ -379,6 +385,13 @@ cash, receivables/payables, pending orders, costs, financing, borrow, and
 valuation status. Eligibility loss requests an exit but does not fabricate a
 sale; unresolved inventory stays visible. Net performance is compared with
 compounded all-cash equity. Insolvency stops trading and remains in the report.
+
+Ledger utilization is gated per evaluation on mean daily marked notional in
+positions that are stale or action-unresolved, strictly below 2% of NAV.
+Terminal unresolved inventory count, notional, and the nonexclusive causes
+`no_terminal_print`, `max_missing_sessions`, `unresolved_action`, and
+`prior_pending_exit` remain mandatory diagnostics; the terminal snapshot is
+not itself the utilization gate.
 
 Undefined comparisons fail the not-worse guard. An all-cash result can be
 well-defined but is not evidence of deployment feasibility.

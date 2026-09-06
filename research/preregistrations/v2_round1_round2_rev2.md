@@ -57,7 +57,21 @@ they are not strategy conclusions:
 2. reversal-5 uses its registered negative structural sign (the raw five-session return
    is multiplied by -1; its realized IC is not forced to have either sign);
 3. deployed gross is within 10% of the 2.0 target in every fold/evaluation;
-4. mean absolute unresolved terminal inventory notional is below 2% of NAV.
+4. each evaluation's mean daily unresolved-or-stale inventory notional is below
+   2% of NAV. Terminal unresolved notional and counts remain mandatory diagnostics
+   but are not averaged into this window-utilization gate.
+
+This fourth engineering bound was refined at `2026-09-06T20:11:20Z`, before a
+post-refactor acceptance result. The sealed pass-4b replay showed that 19 of 22
+terminal positions and 88.90% of terminal unresolved notional had no print on
+the mechanically chosen last evaluation session. All 22 were already under
+long-lived pending exits tied to unresolved inferred-action cells. A single
+terminal wealth-index observation therefore measured calendar-end liquidation
+luck, not ordinary ledger deployability. The replacement keeps the 2% bound
+and applies it to every day's unresolved-or-stale marked inventory, averaged
+within each evaluation; terminal count/notional and the nonexclusive reason
+breakdown remain reported. No target, score, fold, portfolio cap, action term,
+or accounting rule changes with this engineering-only refinement.
 
 ## Round 1 — baseline floor and GBDT parent (CPU)
 

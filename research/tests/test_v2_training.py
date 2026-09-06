@@ -824,7 +824,7 @@ def _tracked_input(
     return {
         "schema": "BRAZIL_RV_V2_MODEL_INPUT_V2",
         "store": {
-            "schema": "BRAZIL_RV_V2_DAILY_STORE_V2",
+            "schema": "BRAZIL_RV_V2_DAILY_STORE_V3",
             "manifest_sha256": "a" * 64,
             "axes": {"date_count": 1_000, "isin_count": 4},
             "fast_identity": {},

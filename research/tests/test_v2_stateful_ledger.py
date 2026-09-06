@@ -689,6 +689,60 @@ def test_small_universe_empty_book_and_compounded_cash_guard() -> None:
     assert np.isfinite(result.nav).all()
 
 
+def test_small_universe_uses_effective_two_sided_k_without_rescaling_slots() -> None:
+    close = np.full((4, 10), 100.0)
+    scores = np.broadcast_to(np.arange(10, dtype=np.float64), close.shape).copy()
+    result = _run(
+        close,
+        scores,
+        config=LedgerConfig(
+            k_per_side=30,
+            buffer_per_side=30,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+        ),
+    )
+
+    entries = [order for order in result.intended_orders if order.purpose == "entry"]
+    assert sum(order.side == "buy" for order in entries) == 5
+    assert sum(order.side == "sell" for order in entries) == 5
+    assert all(order.quantity == 1.0 / 3000.0 for order in entries)
+    assert not result.entry_blocked_small_universe.any()
+    np.testing.assert_array_equal(result.retention_width, 5)
+
+
+def test_same_close_exit_frees_slot_and_failed_exit_is_trimmed_next_day() -> None:
+    close = np.full((5, 4), 100.0)
+    scores = np.asarray(
+        [
+            [-3.0, -1.0, 1.0, 3.0],
+            [-3.0, -1.0, 1.0, 3.0],
+            [-2.0, -3.0, 3.0, 2.0],
+            [-2.0, -3.0, 3.0, 2.0],
+            [-2.0, -3.0, 3.0, 2.0],
+        ]
+    )
+    fill_fraction = np.ones_like(close)
+    fill_fraction[2, 3] = 0.0
+    result = _run(
+        close,
+        scores,
+        fill_fraction=fill_fraction,
+        config=_config(buffer_per_side=0, planned_gross_cap=2.25),
+    )
+
+    replacement_entries = [
+        order
+        for order in result.intended_orders
+        if order.decision_session == 2 and order.purpose == "entry"
+    ]
+    assert {order.security_index for order in replacement_entries} == {1, 2}
+    assert result.same_close_replacement_count[2] == 2
+    assert result.actual_risk_breach[2]
+    assert result.risk_trim_gross_notional[3] > 0.0
+    assert result.summary()["mean_daily_exits_per_side"] > 0.0
+
+
 def test_retention_width_cannot_overlap_rank_bands() -> None:
     close = np.full((4, 6), 100.0)
     scores = np.broadcast_to(np.arange(6, dtype=np.float64), close.shape).copy()
@@ -780,7 +834,7 @@ def test_sixty_slot_book_refills_while_three_names_per_side_rotate() -> None:
     assert np.all(result.gross_fraction_nav[1:-1] <= 2.2 + 1e-12)
 
 
-def test_asymmetric_exit_fills_trim_only_the_heavy_side() -> None:
+def test_same_close_replacements_avoid_artificial_net_trim() -> None:
     days, names = 6, 250
     base = np.arange(names, dtype=np.float64)
     scores = np.tile(base, (days, 1))
@@ -802,15 +856,9 @@ def test_asymmetric_exit_fills_trim_only_the_heavy_side() -> None:
         initial_reference_price=np.full(names, 100.0),
     )
 
-    risk_orders = [
-        order
-        for order in result.intended_orders
-        if order.decision_session == 2 and order.purpose == "risk_exit"
-    ]
-    assert risk_orders
-    assert all(order.side == "buy" for order in risk_orders)
-    assert len(risk_orders) < 29
-    assert result.risk_trim_net_notional[2] > 0.0
+    assert result.same_close_replacement_count[1] == 4
+    assert not result.actual_risk_breach.any()
+    assert result.risk_trim_net_notional[2] == 0.0
     assert result.risk_trim_gross_notional[2] == 0.0
     assert result.gross_fraction_nav[2] > 1.8
 

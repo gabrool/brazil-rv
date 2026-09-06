@@ -22,7 +22,7 @@ rename, copy, or reinterpret an old artifact to make it load.
 Superseded adjusted and synthetic-return fields such as
 `adjusted_{open,high,low,close}`, `price_adjustment_factor`,
 `neutralized_log_return*`, and `target_raw_*` are not part of
-`BRAZIL_RV_V2_DAILY_STORE_V2`. Their nearest current arrays are not
+`BRAZIL_RV_V2_DAILY_STORE_V3`. Their nearest current arrays are not
 byte-compatible replacements: raw OHLC, shareholder-wealth OHLC,
 contractual-action arrays, `target_primary*`, `target_shareholder_*`, and
 `target_price_*` have different meanings and masks.
@@ -33,7 +33,7 @@ There is no in-place data migration:
 
 1. Keep old stores, checkpoints, scores, and experiment roots immutable as
    historical evidence.
-2. Build a new `BRAZIL_RV_V2_DAILY_STORE_V2` store from immutable raw sources
+2. Build a new `BRAZIL_RV_V2_DAILY_STORE_V3` store from immutable raw sources
    with the current clock/calendar, FeatureSpec, identity links, contractual
    actions, M1 assignments, and source hashes.
 3. Run the engineering acceptance checks on that sealed store.

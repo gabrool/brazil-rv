@@ -61,8 +61,8 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V4"
-_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V3"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5"
+_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V4"
 PIPELINE_NETWORK_RESUME_SCHEMA = "BRAZIL_RV_V2_PIPELINE_NETWORK_RESUME_V2"
 PIPELINE_FLAGS: dict[str, bool] = {
     "pipeline_validation": True,
@@ -93,7 +93,7 @@ _LEDGER_MASK_COVERAGE_FIELDS = frozenset(
 _REQUIRED_ARRAYS = frozenset(
     {
         "active",
-        "decision_action_boundary_mask",
+        "intraday_unit_or_unresolved_boundary_mask",
         "observed",
         "shareholder_wealth_close",
         "shareholder_wealth_valid",
@@ -884,7 +884,7 @@ def _development_acceptance(
         violations.append("reversal_5_definition_is_not_negative_five_session_return")
 
     economics_rows: list[dict[str, object]] = []
-    unresolved_fractions: list[float] = []
+    unresolved_stale_fractions: list[float] = []
     for record in (*baseline_records, *gbdt_records):
         evaluation = record.get("evaluation")
         if not isinstance(evaluation, Mapping):
@@ -896,9 +896,15 @@ def _development_acceptance(
             continue
         label = f"{record.get('engine')}:{record.get('fold')}:{record.get('name', 'ensemble')}"
         gross_value = headline.get("mean_gross_fraction_nav")
-        unresolved_value = headline.get("terminal_unresolved_inventory_fraction_nav")
+        unresolved_stale_value = headline.get(
+            "mean_unresolved_stale_inventory_fraction_nav"
+        )
         gross = None if gross_value is None else float(gross_value)
-        unresolved = None if unresolved_value is None else abs(float(unresolved_value))
+        unresolved_stale = (
+            None
+            if unresolved_stale_value is None
+            else abs(float(unresolved_stale_value))
+        )
         economics_rows.append(
             {
                 "evaluation": label,
@@ -920,7 +926,13 @@ def _development_acceptance(
                     "unresolved_inventory_notional"
                 ),
                 "terminal_nav": headline.get("terminal_nav"),
-                "absolute_terminal_unresolved_inventory_fraction_nav": unresolved,
+                "mean_unresolved_stale_inventory_fraction_nav": unresolved_stale,
+                "terminal_unresolved_inventory_fraction_nav": headline.get(
+                    "terminal_unresolved_inventory_fraction_nav"
+                ),
+                "terminal_unresolved_reason_breakdown": headline.get(
+                    "terminal_unresolved_reason_breakdown"
+                ),
                 "zero_entry_days_by_cause": headline.get("zero_entry_days_by_cause"),
                 "blocked_entry_candidates_by_cause": headline.get(
                     "blocked_entry_candidates_by_cause"
@@ -939,16 +951,20 @@ def _development_acceptance(
         )
         if gross is None or not 1.8 <= gross <= 2.2:
             violations.append(f"{label}_deployed_gross_outside_ten_percent")
-        if unresolved is None:
-            violations.append(f"{label}_unresolved_inventory_fraction_missing")
+        if unresolved_stale is None:
+            violations.append(f"{label}_unresolved_stale_fraction_missing")
+        elif unresolved_stale >= 0.02:
+            violations.append(
+                f"{label}_mean_unresolved_stale_fraction_not_below_0_02"
+            )
         else:
-            unresolved_fractions.append(unresolved)
+            unresolved_stale_fractions.append(unresolved_stale)
 
-    mean_unresolved = (
-        float(np.mean(unresolved_fractions)) if unresolved_fractions else None
+    mean_unresolved_stale = (
+        float(np.mean(unresolved_stale_fractions))
+        if unresolved_stale_fractions
+        else None
     )
-    if mean_unresolved is None or mean_unresolved >= 0.02:
-        violations.append("mean_unresolved_inventory_fraction_not_below_0_02")
     if action_terms_source != "inferred_cotahist_dismes_v1":
         violations.append("action_terms_source_is_not_development_inference_tier")
     if schedule_source != "reconstructed_v1":
@@ -971,12 +987,14 @@ def _development_acceptance(
             "reversal_5_definition_sign": -1.0,
             "gross_target": 2.0,
             "gross_relative_tolerance": 0.10,
-            "mean_absolute_terminal_unresolved_inventory_fraction_strictly_below": 0.02,
+            "per_evaluation_mean_unresolved_stale_inventory_fraction_strictly_below": 0.02,
         },
         "naive_pooled_primary_scaled_target_ic": pooled_ic,
         "reversal_5_definition_negative_signed": reversal_definition_ok,
         "economics_by_evaluation": economics_rows,
-        "mean_absolute_terminal_unresolved_inventory_fraction_nav": mean_unresolved,
+        "mean_unresolved_stale_inventory_fraction_nav_across_evaluations": (
+            mean_unresolved_stale
+        ),
         "unsupported_for_research_claims": [
             "verified_contractual_action_terms",
             "auction_execution_marks",

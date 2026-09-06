@@ -77,7 +77,7 @@ from .decision_clock import (
     schedule_source_label,
     schedule_frame,
 )
-from .features import build_slow_features_into
+from .features import build_slow_features_into, wealth_chain_restart_mask
 from .feature_spec import (
     FeatureSpec,
     feature_schema_sha256,
@@ -2012,8 +2012,13 @@ def build_daily_store(
     diagnostic_intraday_boundary_sameday = detect_open_gap_boundaries(
         panel.open_brl, panel.close_brl, panel.observed
     )
-    decision_action_boundary = (
-        decision_actions.has_action | ~decision_actions.session_resolved
+    identity_successor = np.broadcast_to(
+        np.arange(len(panel.isins), dtype=np.int64), panel.observed.shape
+    )
+    intraday_unit_or_unresolved_boundary = (
+        ~decision_actions.session_resolved
+        | ~np.isclose(decision_actions.shares_per_prior_share, 1.0)
+        | (decision_actions.successor_index != identity_successor)
     )
     wealth_paths = {
         name: workspace / f"{name}.npy"
@@ -2301,8 +2306,8 @@ def build_daily_store(
         )
         aligned = mask_action_boundaries(
             aligned,
-            lagged_boundary=decision_action_boundary,
-            same_day_boundary=diagnostic_intraday_boundary_sameday,
+            lagged_boundary=intraday_unit_or_unresolved_boundary,
+            same_day_boundary=intraday_unit_or_unresolved_boundary,
             copy_buffers=False,
         )
         intraday_specs = feature_specs(
@@ -2447,8 +2452,8 @@ def build_daily_store(
         )
         aligned = mask_action_boundaries(
             aligned,
-            lagged_boundary=decision_action_boundary,
-            same_day_boundary=diagnostic_intraday_boundary_sameday,
+            lagged_boundary=intraday_unit_or_unresolved_boundary,
+            same_day_boundary=intraday_unit_or_unresolved_boundary,
             copy_buffers=False,
         )
         intraday_specs = feature_specs(
@@ -2642,7 +2647,9 @@ def build_daily_store(
         "price_jump_anomaly_mask": detected_actions.price_jump_anomaly_mask,
         "intraday_boundary_lagged_mask": diagnostic_intraday_boundary_lagged,
         "intraday_boundary_sameday_mask": diagnostic_intraday_boundary_sameday,
-        "decision_action_boundary_mask": decision_action_boundary,
+        "intraday_unit_or_unresolved_boundary_mask": (
+            intraday_unit_or_unresolved_boundary
+        ),
     }
     if inferred_actions is not None:
         full_store_arrays.update(
@@ -3076,6 +3083,13 @@ def build_daily_store(
     tables["feature_validity_by_survival"] = pl.concat(
         [base_feature_survival, *sidecar_survival_frames]
     )
+    wealth_restarts = wealth_chain_restart_mask(shareholder_wealth_valid)[keep]
+    active_wealth_restarts = wealth_restarts & universe.active[keep]
+    calendar_year = kept_dates.astype("datetime64[Y]").astype(np.int64) + 1970
+    wealth_restarts_by_year = {
+        str(year): int(active_wealth_restarts[calendar_year == year].sum())
+        for year in sorted(set(calendar_year.tolist()))
+    }
     build_peak_rss = peak_rss_bytes()
     metadata = {
         "store_start": str(kept_dates[0]),
@@ -3251,6 +3265,7 @@ def build_daily_store(
         },
         "build_peak_rss_bytes": build_peak_rss,
         "build_peak_rss_gib": build_peak_rss / (1024**3),
+        "wealth_chain_restarts_active_name_days": wealth_restarts_by_year,
         "resource_preflight": dict(resource_preflight or {}),
     }
     options_composition = tables["external_feature_validity_by_survival_adv20_quartile"]

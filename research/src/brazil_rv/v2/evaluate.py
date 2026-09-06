@@ -34,7 +34,7 @@ BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V5"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V6"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
@@ -723,6 +723,9 @@ def _ledger_rows(
             "turnover_fraction_nav": _finite_or_none(
                 result.turnover_fraction_nav[index]
             ),
+            "unresolved_stale_inventory_fraction_nav": _finite_or_none(
+                result.unresolved_stale_inventory_fraction_nav[index]
+            ),
             "turnover_cost_bps": _finite_or_none(result.cost_bps[index]),
             "borrow_cost_bps": _finite_or_none(result.borrow_bps[index]),
             "net_return": _finite_or_none(result.daily_net_return[index]),
@@ -761,6 +764,10 @@ def _ledger_rows(
             "pending_exit_count": int(result.pending_exit_count[index]),
             "cancelled_entry_count": int(result.cancelled_entry_count[index]),
             "submitted_entry_count": int(result.submitted_entry_count[index]),
+            "submitted_exit_count": int(result.submitted_exit_count[index]),
+            "same_close_replacement_count": int(
+                result.same_close_replacement_count[index]
+            ),
             "blocked_entry_no_reference_count": int(
                 result.blocked_entry_no_reference_count[index]
             ),
@@ -1377,6 +1384,7 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         ),
         "signal_horizons_sessions": list(PRIMARY_HORIZONS),
         "k_per_side": config.k_per_side,
+        "effective_k_per_side": "min(k_per_side, floor(eligible_names / 2))",
         "buffer_per_side": config.buffer_per_side,
         "gross_target": config.gross_target,
         "planned_gross_cap": config.planned_gross_cap,
@@ -1389,8 +1397,14 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         "annual_sessions": config.annual_sessions,
         "terminal_liquidation": True,
         "stateful_policy": (
-            "buffered held inventory; independent side refills; partial lowest-"
-            "conviction gross/net/name risk trims; no discretionary drift trades"
+            "buffered held inventory; same-close exits free same-decision entry "
+            "slots while older pending exits remain occupied; independent side "
+            "refills; partial lowest-conviction gross/net/name risk trims; no "
+            "discretionary drift trades"
+        ),
+        "unresolved_stale_gate": (
+            "each evaluation mean daily unresolved-or-stale marked inventory "
+            "notional is strictly below 2% of NAV"
         ),
         "missing_print_policy": (
             "stale mark while an exit is pending; fill at the first print and "

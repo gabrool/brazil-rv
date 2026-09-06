@@ -61,7 +61,7 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
             "shareholder_wealth_valid": np.ones(
                 (day_count, name_count), dtype=np.bool_
             ),
-            "decision_action_boundary_mask": np.zeros(
+            "intraday_unit_or_unresolved_boundary_mask": np.zeros(
                 (day_count, name_count), dtype=np.bool_
             ),
             "slow_values": slow,
@@ -1035,6 +1035,7 @@ def test_git_identity_refuses_untracked_files(monkeypatch: pytest.MonkeyPatch) -
 def test_development_acceptance_requires_registered_sanity_bounds() -> None:
     economics = {
         "mean_gross_fraction_nav": 2.0,
+        "mean_unresolved_stale_inventory_fraction_nav": 0.01,
         "unresolved_inventory_count": 1,
         "unresolved_inventory_notional": 10_000.0,
         "terminal_nav": 1_000_000.0,

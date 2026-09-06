@@ -20,7 +20,7 @@ def _build(
     wealth_close: np.ndarray,
     wealth_valid: np.ndarray,
     active: np.ndarray,
-    ambiguous: np.ndarray,
+    unresolved: np.ndarray,
 ):
     volatility = np.broadcast_to(
         np.asarray([0.03, 0.02, 0.01]), wealth_close.shape
@@ -29,7 +29,7 @@ def _build(
         wealth_close,
         wealth_valid,
         active,
-        ambiguous,
+        unresolved,
         volatility,
     )
 
@@ -85,7 +85,7 @@ def test_store_baseline_adapter_uses_shared_decision_axis() -> None:
     wealth_close, wealth_valid = _shareholder_wealth()
     active = np.ones_like(wealth_valid)
     active[260, 0] = False
-    boundary = np.zeros_like(wealth_valid)
+    resolved = np.ones_like(wealth_valid)
     sigma = np.broadcast_to(
         np.asarray([0.03, 0.02, 0.01]), wealth_close.shape
     ).copy()
@@ -93,7 +93,7 @@ def test_store_baseline_adapter_uses_shared_decision_axis() -> None:
         "active": active,
         "shareholder_wealth_close": wealth_close,
         "shareholder_wealth_valid": wealth_valid,
-        "decision_action_boundary_mask": boundary,
+        "action_session_resolved": resolved,
         "target_scale_sigma": sigma,
     }
 
@@ -108,7 +108,9 @@ def test_store_baseline_adapter_uses_shared_decision_axis() -> None:
 
     indices = np.arange(270, dtype=np.int64)
     actual = build_store_baselines(Store(), indices)
-    expected = build_baselines(wealth_close, wealth_valid, active, boundary, sigma)
+    expected = build_baselines(
+        wealth_close, wealth_valid, active, ~resolved, sigma
+    )
 
     for name in expected:
         np.testing.assert_array_equal(actual[name].scores, expected[name].scores)
@@ -136,7 +138,7 @@ def test_baselines_are_causal_and_keep_missing_endpoint_masked() -> None:
     assert not missing["reversal_5"].score_mask[260, 0].any()
 
 
-def test_baselines_mask_returns_crossing_decision_known_action_boundaries() -> None:
+def test_baselines_mask_only_returns_crossing_unresolved_actions() -> None:
     wealth_close, wealth_valid = _shareholder_wealth()
     active = np.ones_like(wealth_valid)
     action_boundary = np.zeros_like(wealth_valid)
@@ -156,3 +158,24 @@ def test_baselines_mask_returns_crossing_decision_known_action_boundaries() -> N
     action_boundary[100, 1] = True
     crossed = _build(wealth_close, wealth_valid, active, action_boundary)
     assert not crossed["momentum_12_1"].score_mask[260, 1].any()
+
+
+def test_resolved_dividend_does_not_invalidate_wealth_baseline() -> None:
+    wealth_close, wealth_valid = _shareholder_wealth()
+    active = np.ones_like(wealth_valid)
+    unresolved = np.zeros_like(wealth_valid)
+
+    panel = _build(wealth_close, wealth_valid, active, unresolved)
+
+    assert panel["reversal_5"].score_mask[260, 0].all()
+
+
+def test_wealth_chain_restart_invalidates_baseline_interval() -> None:
+    wealth_close, wealth_valid = _shareholder_wealth()
+    active = np.ones_like(wealth_valid)
+    unresolved = np.zeros_like(wealth_valid)
+    wealth_valid[256, 0] = False
+
+    panel = _build(wealth_close, wealth_valid, active, unresolved)
+
+    assert not panel["reversal_5"].score_mask[260, 0].any()

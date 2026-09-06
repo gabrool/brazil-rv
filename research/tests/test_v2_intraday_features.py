@@ -321,13 +321,13 @@ def test_action_boundaries_use_distinct_causal_clocks() -> None:
     assert masked.valid[21, 1, 0]
     assert masked.valid[21, 1, 6]
 
-    # On the next decision the detected boundary is historical: lag-one fields
-    # and every rolling feature whose history contains row 20 are invalid.
-    lagged_features = {2, 3, 4, 5, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19}
+    # On the next decision the boundary affects only lag-one full-session
+    # summaries. Same-session scale-free rolling fields do not cross units.
+    lagged_features = {8, 9, 10}
     for feature in range(result.values.shape[-1]):
         assert masked.valid[21, 0, feature] == (feature not in lagged_features)
     assert masked.valid[22, 0, 8]
-    assert not masked.valid[24, 0, 2]
+    assert masked.valid[24, 0, 2]
     assert np.all(masked.values[~masked.valid] == 0.0)
 
 
@@ -431,8 +431,37 @@ def test_post_decision_split_classification_cannot_change_same_day_features() ->
 
     np.testing.assert_array_equal(masked_92.values[20], masked_93.values[20])
     np.testing.assert_array_equal(masked_92.valid[20], masked_93.valid[20])
-    assert not masked_92.valid[21, 0, 2]
+    assert masked_92.valid[21, 0, 2]
     assert masked_93.valid[21, 0, 2]
+
+
+def test_resolved_cash_action_does_not_mask_but_unit_change_does() -> None:
+    raw = build_legacy_fixed_intraday_daily_features(*_minutes())
+    result = replace(
+        raw,
+        values=np.ones_like(raw.values),
+        valid=np.ones_like(raw.valid),
+    )
+    cash_only_boundary = np.zeros(result.values.shape[:2], dtype=np.bool_)
+    unit_boundary = cash_only_boundary.copy()
+    unit_boundary[20, 0] = True
+
+    dividend = mask_action_boundaries(
+        result,
+        lagged_boundary=cash_only_boundary,
+        same_day_boundary=cash_only_boundary,
+    )
+    split = mask_action_boundaries(
+        result,
+        lagged_boundary=unit_boundary,
+        same_day_boundary=unit_boundary,
+    )
+
+    assert dividend.valid[20, 0].all()
+    assert split.valid[20, 0, 1]
+    assert not split.valid[20, 0, 0]
+    assert not split.valid[21, 0, 2]
+    assert not split.valid[21, 0, 8]
 
 
 def test_fast_presence_ignores_every_entry_bar_field() -> None:

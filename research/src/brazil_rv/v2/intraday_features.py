@@ -443,20 +443,9 @@ _SAME_DAY_BOUNDARY_WINDOWS = {
 # detected action on row t is classified with row-t closing data, so row t
 # itself must never consult that bit.  It may first affect row t+1.
 _LAGGED_BOUNDARY_LOOKBACKS = {
-    2: 4,
-    3: 19,
-    4: 4,
-    5: 19,
-    7: 19,
     8: 1,
     9: 1,
     10: 1,
-    13: 4,
-    14: 19,
-    15: 19,
-    16: 19,
-    17: 19,
-    19: 20,
 }
 
 
@@ -467,13 +456,14 @@ def mask_action_boundaries(
     same_day_boundary: NDArray[np.bool_],
     copy_buffers: bool = True,
 ) -> IntradayDailyResult:
-    """Mask current and historical action boundaries on their causal clocks.
+    """Mask unit-changing or unresolved intervals on their causal clocks.
 
     ``same_day_boundary[t]`` is decision-known at the open and governs row-t
     cross-session features plus their exact trailing dependants.
     ``lagged_boundary[t]`` may use the close of t, so it is consulted only by
-    later rows whose historical dependency includes t. This preserves the
-    current decision row when an ex-post action classification changes.
+    later lag-one full-session rows whose historical dependency includes t.
+    Same-session scale-free rolling fields do not cross a unit boundary and
+    therefore are not masked by a prior resolved cash-only action.
     """
 
     lagged = np.asarray(lagged_boundary, dtype=np.bool_)

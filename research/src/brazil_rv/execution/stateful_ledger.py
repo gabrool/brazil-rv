@@ -176,6 +176,7 @@ class StatefulLedgerResult:
     borrow_bps: NDArray[np.float64]
     gross_fraction_nav: NDArray[np.float64]
     turnover_fraction_nav: NDArray[np.float64]
+    unresolved_stale_inventory_fraction_nav: NDArray[np.float64]
     stale_mark_name_days: NDArray[np.int64]
     unresolved_action_name_days: NDArray[np.int64]
     valuation_scenario_count: NDArray[np.int64]
@@ -199,6 +200,8 @@ class StatefulLedgerResult:
     blocked_entry_net_cap_count: NDArray[np.int64]
     blocked_entry_name_cap_count: NDArray[np.int64]
     submitted_entry_count: NDArray[np.int64]
+    submitted_exit_count: NDArray[np.int64]
+    same_close_replacement_count: NDArray[np.int64]
     zero_entry_small_universe: NDArray[np.bool_]
     zero_entry_gross_cap: NDArray[np.bool_]
     zero_entry_net_cap: NDArray[np.bool_]
@@ -220,6 +223,7 @@ class StatefulLedgerResult:
     cancellations: tuple[OrderCancellation, ...]
     unresolved_inventory_count: int
     unresolved_inventory_notional: float
+    terminal_unresolved_reason_breakdown: dict[str, dict[str, int | float]]
     unresolved_receivable: float
     unresolved_payable: float
     insolvent: bool
@@ -285,6 +289,12 @@ class StatefulLedgerResult:
             "minimum_gross_fraction_nav": minimum_gross,
             "maximum_gross_fraction_nav": maximum_gross,
             "mean_turnover_fraction_nav": mean_turnover,
+            "mean_unresolved_stale_inventory_fraction_nav": float(
+                np.mean(self.unresolved_stale_inventory_fraction_nav)
+            ),
+            "maximum_unresolved_stale_inventory_fraction_nav": float(
+                np.max(self.unresolved_stale_inventory_fraction_nav)
+            ),
             "average_holding_sessions_approximation": (
                 2.0 * mean_gross / mean_turnover if mean_turnover > 0 else 0.0
             ),
@@ -316,6 +326,10 @@ class StatefulLedgerResult:
                 "name": float(self.risk_trim_name_notional.sum()),
             },
             "intended_entry_count": len(entry_orders),
+            "mean_daily_exits_per_side": float(
+                np.mean(self.submitted_exit_count) / 2.0
+            ),
+            "same_close_replacements": int(self.same_close_replacement_count.sum()),
             "intended_entry_fill_rate": (
                 filled_entry_quantity / intended_entry_quantity
                 if intended_entry_quantity > 0.0
@@ -329,6 +343,15 @@ class StatefulLedgerResult:
             "fill_count": len(self.fills),
             "unresolved_inventory_count": self.unresolved_inventory_count,
             "unresolved_inventory_notional": self.unresolved_inventory_notional,
+            "terminal_unresolved_reason_breakdown": (
+                self.terminal_unresolved_reason_breakdown
+            ),
+            "terminal_no_print_dominates": (
+                self.terminal_unresolved_reason_breakdown["no_terminal_print"][
+                    "notional"
+                ]
+                > 0.5 * self.unresolved_inventory_notional
+            ),
             "unresolved_receivable": self.unresolved_receivable,
             "unresolved_payable": self.unresolved_payable,
             "terminal_nav": float(self.nav[-1]),
@@ -628,6 +651,7 @@ def simulate_stateful_ledger(
     borrow_rows: list[float] = []
     gross_rows: list[float] = []
     turnover_rows: list[float] = []
+    unresolved_stale_fraction_rows: list[float] = []
     stale_rows: list[int] = []
     unresolved_action_rows: list[int] = []
     scenario_count_rows: list[int] = []
@@ -651,6 +675,8 @@ def simulate_stateful_ledger(
     blocked_net_rows: list[int] = []
     blocked_name_rows: list[int] = []
     submitted_entry_rows: list[int] = []
+    submitted_exit_rows: list[int] = []
+    same_close_replacement_rows: list[int] = []
     zero_entry_small_rows: list[bool] = []
     zero_entry_gross_rows: list[bool] = []
     zero_entry_net_rows: list[bool] = []
@@ -670,6 +696,8 @@ def simulate_stateful_ledger(
     insolvent = False
     insolvency_date: date | None = None
     action_uncertainty_seen = False
+    terminal_printed = np.zeros(name_count, dtype=np.bool_)
+    terminal_prior_pending_exit = np.zeros(name_count, dtype=np.bool_)
 
     def submit_order(
         day: int,
@@ -744,6 +772,14 @@ def simulate_stateful_ledger(
 
     for day in range(day_count):
         cancelled_today = 0
+        if day == day_count - 1:
+            prior_pending_names = [
+                name
+                for name, pending in pending_exits.items()
+                if pending.order.decision_session < day
+            ]
+            if prior_pending_names:
+                terminal_prior_pending_exit[prior_pending_names] = True
         start_nav = previous_nav
         if start_nav <= 0.0:
             raise RuntimeError("insolvent ledger attempted to continue")
@@ -905,7 +941,8 @@ def simulate_stateful_ledger(
             len(order) // 2,
         )
         retention_rows.append(retention)
-        small_universe = len(order) < 2 * config.k_per_side
+        k_eff = min(config.k_per_side, len(order) // 2)
+        small_universe = k_eff == 0
         small_universe_rows.append(small_universe)
 
         signed_values = np.zeros(name_count, dtype=np.float64)
@@ -976,6 +1013,19 @@ def simulate_stateful_ledger(
                 )
             return projected
 
+        def risk_projected_signed_values() -> NDArray[np.float64]:
+            """Project risk without assuming any still-pending exit will fill."""
+
+            projected = signed_values.copy()
+            for name, pending in pending_entries.items():
+                direction = 1.0 if pending.order.side == "buy" else -1.0
+                projected[name] += (
+                    direction
+                    * pending.remaining_quantity
+                    * pending.order.reference_price
+                )
+            return projected
+
         risk_exit_quantity: dict[int, float] = {}
         risk_trim_gross = 0.0
         risk_trim_net = 0.0
@@ -1034,14 +1084,14 @@ def simulate_stateful_ledger(
             return reduced
 
         if risk_breach and day < day_count - 1:
-            projected = projected_signed_values()
+            projected = risk_projected_signed_values()
 
             name_limit = config.planned_name_weight_cap * start_nav
             for name in np.flatnonzero(np.abs(projected) > name_limit + 1e-12):
                 name = int(name)
                 if name in pending_entries:
                     cancelled_today += int(cancel_entry(name, day, "risk_name_cap"))
-                    projected = projected_signed_values()
+                    projected = risk_projected_signed_values()
                     for risk_name, quantity in risk_exit_quantity.items():
                         direction = -1.0 if shares[risk_name] > 0.0 else 1.0
                         projected[risk_name] += direction * quantity * marks[risk_name]
@@ -1095,7 +1145,7 @@ def simulate_stateful_ledger(
                     if abs(projected_net) <= target_net + 1e-12:
                         break
                     cancelled_today += int(cancel_entry(name, day, "risk_net_cap"))
-                    projected = projected_signed_values()
+                    projected = risk_projected_signed_values()
                     for risk_name, quantity in risk_exit_quantity.items():
                         direction = -1.0 if shares[risk_name] > 0.0 else 1.0
                         projected[risk_name] += direction * quantity * marks[risk_name]
@@ -1126,29 +1176,49 @@ def simulate_stateful_ledger(
         blocked_net = 0
         blocked_name = 0
         submitted_entries = 0
+        same_close_replacements = 0
         if day < day_count - 1 and not small_universe:
             slot_notional = start_nav * config.gross_target / (2 * config.k_per_side)
-            occupied = set(np.flatnonzero(shares != 0.0).tolist()) | set(
+            same_day_exit_names = {
+                name
+                for name, pending in pending_exits.items()
+                if pending.order.decision_session == day
+                and pending.remaining_quantity
+                >= abs(float(shares[name])) - max(1e-12, abs(float(shares[name])) * 1e-12)
+            }
+            unavailable = set(np.flatnonzero(shares != 0.0).tolist()) | set(
                 pending_entries
             )
-            long_occupied = {int(name) for name in np.flatnonzero(shares > 0.0)} | {
+            long_occupied = {
+                int(name)
+                for name in np.flatnonzero(shares > 0.0)
+                if int(name) not in same_day_exit_names
+            } | {
                 name
                 for name, pending in pending_entries.items()
                 if pending.order.side == "buy"
             }
-            short_occupied = {int(name) for name in np.flatnonzero(shares < 0.0)} | {
+            short_occupied = {
+                int(name)
+                for name in np.flatnonzero(shares < 0.0)
+                if int(name) not in same_day_exit_names
+            } | {
                 name
                 for name, pending in pending_entries.items()
                 if pending.order.side == "sell"
             }
-            long_slots = max(config.k_per_side - len(long_occupied), 0)
-            short_slots = max(config.k_per_side - len(short_occupied), 0)
-            long_band = [int(name) for name in order[-config.k_per_side :][::-1]]
-            short_band = [int(name) for name in order[: config.k_per_side]]
+            long_slots = max(k_eff - len(long_occupied), 0)
+            short_slots = max(k_eff - len(short_occupied), 0)
+            long_band = [int(name) for name in order[-k_eff:][::-1]]
+            short_band = [int(name) for name in order[:k_eff]]
             if set(long_band) & set(short_band):
                 raise RuntimeError("long and short entry bands overlap")
-            long_candidates = [name for name in long_band if name not in occupied]
-            short_candidates = [name for name in short_band if name not in occupied]
+            long_candidates = [name for name in long_band if name not in unavailable]
+            short_candidates = [name for name in short_band if name not in unavailable]
+            replacement_capacity = {
+                "buy": sum(shares[name] > 0.0 for name in same_day_exit_names),
+                "sell": sum(shares[name] < 0.0 for name in same_day_exit_names),
+            }
             planned_values = projected_signed_values()
             candidates_by_side = {
                 "buy": long_candidates,
@@ -1216,6 +1286,9 @@ def simulate_stateful_ledger(
                 )
                 remaining_slots[current_side] -= 1
                 submitted_entries += 1
+                if replacement_capacity[current_side] > 0:
+                    same_close_replacements += 1
+                    replacement_capacity[current_side] -= 1
                 planned_values = proposed
                 current_side = "sell" if current_side == "buy" else "buy"
         blocked_reference_rows.append(blocked_reference)
@@ -1223,6 +1296,13 @@ def simulate_stateful_ledger(
         blocked_net_rows.append(blocked_net)
         blocked_name_rows.append(blocked_name)
         submitted_entry_rows.append(submitted_entries)
+        submitted_exit_rows.append(
+            sum(
+                order_.decision_session == day and order_.purpose != "entry"
+                for order_ in orders
+            )
+        )
+        same_close_replacement_rows.append(same_close_replacements)
         zero_entry_small_rows.append(submitted_entries == 0 and small_universe)
         zero_entry_gross_rows.append(submitted_entries == 0 and blocked_gross > 0)
         zero_entry_net_rows.append(submitted_entries == 0 and blocked_net > 0)
@@ -1237,6 +1317,8 @@ def simulate_stateful_ledger(
         # Only now may current-session prints affect the result. This makes the
         # immutable intended-order set invariant to those later observations.
         printed = np.isfinite(inputs.raw_close[day]) & (inputs.raw_close[day] > 0.0)
+        if day == day_count - 1:
+            terminal_printed = printed.copy()
         traded_notional = 0.0
         costs = 0.0
         cost_rate = config.cost_bps_per_side / 10_000.0
@@ -1366,6 +1448,16 @@ def simulate_stateful_ledger(
         signed_values = np.zeros(name_count, dtype=np.float64)
         signed_values[held_now] = shares[held_now] * marks[held_now]
         gross, net, name_weight = _risk(signed_values, current_nav)
+        unresolved_stale = held_now & (
+            ~printed
+            | unresolved_action
+            | (missing_sessions >= config.max_missing_sessions)
+        )
+        unresolved_stale_fraction = (
+            float(np.abs(signed_values[unresolved_stale]).sum() / current_nav)
+            if current_nav != 0.0
+            else np.nan
+        )
         end_risk_breach = (
             gross > config.planned_gross_cap + 1e-12
             or abs(net) > config.planned_absolute_net_cap + 1e-12
@@ -1390,6 +1482,7 @@ def simulate_stateful_ledger(
         borrow_rows.append(10_000.0 * borrow / start_nav)
         gross_rows.append(gross if np.isfinite(gross) else np.nan)
         turnover_rows.append(traded_notional / start_nav)
+        unresolved_stale_fraction_rows.append(unresolved_stale_fraction)
         stale_rows.append(stale)
         unresolved_action_rows.append(int(unresolved_action.sum()))
         scenario_count_rows.append(int(newly_scenario.sum()))
@@ -1450,6 +1543,27 @@ def simulate_stateful_ledger(
             final_shares[unresolved_inventory] * final_marks[unresolved_inventory]
         ).sum()
     )
+    terminal_reason_masks = {
+        "no_terminal_print": unresolved_inventory & ~terminal_printed,
+        "max_missing_sessions": unresolved_inventory
+        & (missing_sessions >= config.max_missing_sessions),
+        "unresolved_action": unresolved_inventory & unresolved_action,
+        "prior_pending_exit": unresolved_inventory & terminal_prior_pending_exit,
+    }
+    terminal_reason_breakdown: dict[str, dict[str, int | float]] = {}
+    for reason, reason_mask in terminal_reason_masks.items():
+        terminal_reason_breakdown[reason] = {
+            "count": int(reason_mask.sum()),
+            "notional": float(
+                np.abs(final_shares[reason_mask] * final_marks[reason_mask]).sum()
+            ),
+        }
+    classified = np.logical_or.reduce(tuple(terminal_reason_masks.values()))
+    other = unresolved_inventory & ~classified
+    terminal_reason_breakdown["other"] = {
+        "count": int(other.sum()),
+        "notional": float(np.abs(final_shares[other] * final_marks[other]).sum()),
+    }
     gross_array = np.asarray(gross_rows, dtype=np.float64)
     finite_gross = gross_array[np.isfinite(gross_array)]
     mean_gross = float(np.mean(finite_gross)) if finite_gross.size else 0.0
@@ -1472,6 +1586,9 @@ def simulate_stateful_ledger(
         borrow_bps=np.asarray(borrow_rows, dtype=np.float64),
         gross_fraction_nav=gross_array,
         turnover_fraction_nav=np.asarray(turnover_rows, dtype=np.float64),
+        unresolved_stale_inventory_fraction_nav=np.asarray(
+            unresolved_stale_fraction_rows, dtype=np.float64
+        ),
         stale_mark_name_days=np.asarray(stale_rows, dtype=np.int64),
         unresolved_action_name_days=np.asarray(unresolved_action_rows, dtype=np.int64),
         valuation_scenario_count=np.asarray(scenario_count_rows, dtype=np.int64),
@@ -1504,6 +1621,12 @@ def simulate_stateful_ledger(
         ),
         submitted_entry_count=np.asarray(
             submitted_entry_rows[:completed_days], dtype=np.int64
+        ),
+        submitted_exit_count=np.asarray(
+            submitted_exit_rows[:completed_days], dtype=np.int64
+        ),
+        same_close_replacement_count=np.asarray(
+            same_close_replacement_rows[:completed_days], dtype=np.int64
         ),
         zero_entry_small_universe=np.asarray(
             zero_entry_small_rows[:completed_days], dtype=np.bool_
@@ -1548,6 +1671,7 @@ def simulate_stateful_ledger(
         cancellations=tuple(cancellations),
         unresolved_inventory_count=unresolved_count,
         unresolved_inventory_notional=unresolved_notional,
+        terminal_unresolved_reason_breakdown=terminal_reason_breakdown,
         unresolved_receivable=float(receivable_by_name.sum()),
         unresolved_payable=float(payable_by_name.sum()),
         insolvent=insolvent,

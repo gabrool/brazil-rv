@@ -37,6 +37,22 @@ def test_exact_return_invalidates_lookbacks_crossing_ambiguous_action() -> None:
     assert np.isnan(values[:5, 0]).all()
 
 
+def test_exact_return_invalidates_a_wealth_chain_restart() -> None:
+    close = np.arange(1.0, 9.0)[:, None]
+    wealth_valid = np.ones_like(close, dtype=np.bool_)
+    wealth_valid[3, 0] = False
+
+    _, valid = exact_log_return(
+        close,
+        5,
+        shareholder_wealth_valid=wealth_valid,
+    )
+
+    assert not valid[5, 0]
+    assert not valid[6, 0]
+    assert not valid[7, 0]
+
+
 def test_yang_zhang_matches_hand_computed_fixture() -> None:
     close = np.array([[100.0], [102.0], [101.0], [104.0]])
     open_ = np.array([[100.0], [101.0], [103.0], [102.0]])

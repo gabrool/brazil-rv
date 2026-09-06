@@ -880,3 +880,49 @@ acceptance rerun, merge, Round 1/2 run, or instance launch was performed.
 Proceeding now requires a corrected pre-result instruction that authorizes the
 resolved-action baseline-mask repair and independently decides whether the
 wealth recurrence should still be changed as a latent data-quality fix.
+
+## 13. Pass-4d disposition: consumer-specific interval guards and auction slots
+
+Pass 4d supplied that corrected pre-result contract. The wealth-bridging idea
+was withdrawn because the pass-4c audit found no evaluation loss from
+raw-series restarts. We did not add a synthetic bridge or manufacture missing
+wealth observations. Instead, the canonical store now measures active-name-day
+restarts by year, and any return spanning one remains invalid by construction.
+
+The central design choice was to remove the overloaded
+`decision_action_boundary_mask`. A single mask cannot correctly serve
+shareholder-wealth returns, raw-price cross-session fields, targets, and
+execution. Wealth features and baselines now share one exact validity path and
+reject only unresolved actions, missing endpoints, or a raw-series restart.
+Raw-price cross-session intraday fields reject unresolved actions and unit
+changes, including successor conversions, but accept resolved cash actions.
+Same-session scale-free intraday fields need no corporate-action guard.
+Targets and the ledger keep their existing aligned economic terms. This is a
+semantic schema break, so the store/evaluation/acceptance schemas were advanced
+instead of preserving a compatibility shim.
+
+The current-store audit justified rebuilding for this change: corrected
+intraday coverage improved by up to 24.471996 percentage points, with 24
+feature/fold cells above the preregistered 10-point trigger. The immutable
+audit root is
+`D:\quant-data\b3\processed\model_runs\v2_pass4d_intraday_guard_audit_5e500a4_20260906T200144Z`;
+manifest and result SHA-256 values are
+`ffb537f0cf05515a355e42f9cb6833baae46f208aadbda5f005b89dec87564da`
+and `0822c3ac5629d893edcb5dade4d6a37a9e948d0e71e69045b53a2c1ad42fab9b`.
+
+For the ledger, a complete close-proxy exit and replacement entry are treated
+as the same auction: the submitted exit releases its slot immediately, older
+pending exits do not, and a failed exit plus filled replacement is handled by
+the existing subsequent risk trim. Small universes use
+`min(K, floor(N/2))` slots per side without changing configured slot notional.
+We retained risk accounting that does not presume an exit filled, because
+doing otherwise would hide the exact temporary over-allocation the repair must
+surface.
+
+Finally, the terminal-unresolved bound was changed only after a pre-result
+reason audit. Missing terminal prints represented 88.8999% of unresolved
+terminal notional (19 of 22 positions), so a point-in-time terminal liquidation
+test was mostly a data-end artifact. The gate now measures every evaluation's
+mean daily unresolved-or-stale inventory below 2% of NAV; terminal count,
+notional, and reasons remain visible. No gross, name, net, target, fold, seed,
+roster, cost, leakage, identity, or protected-access rule was changed.

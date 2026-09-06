@@ -47,10 +47,66 @@ def _ambiguous_interval_clear(
     return clear
 
 
+def wealth_chain_restart_mask(
+    shareholder_wealth_valid: NDArray[np.bool_],
+) -> NDArray[np.bool_]:
+    """Mark a valid wealth row that resumes after a missing row.
+
+    The first observed row starts a chain; it is not a restart.  A return may
+    use two endpoints only when no restart lies in its open/closed interval.
+    """
+
+    valid = np.asarray(shareholder_wealth_valid, dtype=np.bool_)
+    if valid.ndim != 2:
+        raise ValueError("shareholder_wealth_valid must be [date, name]")
+    restart = np.zeros(valid.shape, dtype=np.bool_)
+    if valid.shape[0] > 1:
+        prior_seen = np.maximum.accumulate(valid[:-1], axis=0)
+        restart[1:] = valid[1:] & ~valid[:-1] & prior_seen
+    return restart
+
+
+def wealth_return_validity(
+    shareholder_wealth_close: NDArray[np.floating],
+    shareholder_wealth_valid: NDArray[np.bool_],
+    horizon: int,
+    ambiguous_action: NDArray[np.bool_] | None = None,
+) -> NDArray[np.bool_]:
+    """Return exact endpoint validity on one uninterrupted wealth chain."""
+
+    close = np.asarray(shareholder_wealth_close, dtype=np.float64)
+    valid_source = np.asarray(shareholder_wealth_valid, dtype=np.bool_)
+    if close.ndim != 2 or valid_source.shape != close.shape or horizon <= 0:
+        raise ValueError(
+            "shareholder wealth must align [date, name] and horizon be positive"
+        )
+    valid = np.zeros(close.shape, dtype=np.bool_)
+    endpoints = (
+        valid_source[horizon:]
+        & valid_source[:-horizon]
+        & np.isfinite(close[horizon:])
+        & np.isfinite(close[:-horizon])
+        & (close[horizon:] > 0.0)
+        & (close[:-horizon] > 0.0)
+    )
+    boundaries = wealth_chain_restart_mask(valid_source)
+    if ambiguous_action is not None:
+        ambiguous = np.asarray(ambiguous_action, dtype=np.bool_)
+        if ambiguous.shape != close.shape:
+            raise ValueError("ambiguous_action must align with close")
+        boundaries |= ambiguous
+    valid[horizon:] = endpoints & _ambiguous_interval_clear(
+        boundaries, horizon
+    )[horizon:]
+    return valid
+
+
 def exact_log_return(
     close: NDArray[np.floating],
     horizon: int,
     ambiguous_action: NDArray[np.bool_] | None = None,
+    *,
+    shareholder_wealth_valid: NDArray[np.bool_] | None = None,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
     values = np.asarray(close, dtype=np.float64)
     if values.ndim != 2 or horizon <= 0:
@@ -59,19 +115,14 @@ def exact_log_return(
     valid = np.zeros(values.shape, dtype=np.bool_)
     with np.errstate(divide="ignore", invalid="ignore"):
         candidate = np.log(values[horizon:] / values[:-horizon])
-    mask = (
-        np.isfinite(candidate)
-        & np.isfinite(values[horizon:])
-        & np.isfinite(values[:-horizon])
-        & (values[horizon:] > 0)
-        & (values[:-horizon] > 0)
+    source_valid = (
+        np.isfinite(values) & (values > 0.0)
+        if shareholder_wealth_valid is None
+        else np.asarray(shareholder_wealth_valid, dtype=np.bool_)
     )
-    if ambiguous_action is not None:
-        ambiguous = np.asarray(ambiguous_action, dtype=np.bool_)
-        if ambiguous.shape != values.shape:
-            raise ValueError("ambiguous_action must align with close")
-        # For a return ending at t, exclude events in (t-horizon, t].
-        mask &= _ambiguous_interval_clear(ambiguous, horizon)[horizon:]
+    mask = np.isfinite(candidate) & wealth_return_validity(
+        values, source_valid, horizon, ambiguous_action
+    )[horizon:]
     output[horizon:] = np.where(mask, candidate, np.nan)
     valid[horizon:] = mask
     return output, valid
@@ -598,7 +649,12 @@ def build_slow_features_into(
 
     retained_returns: dict[int, tuple[NDArray[np.float64], NDArray[np.bool_]]] = {}
     for index, horizon in enumerate((1, 5, 21, 63, 126, 252)):
-        result = exact_log_return(close, horizon, ambiguous)
+        result = exact_log_return(
+            close,
+            horizon,
+            ambiguous,
+            shareholder_wealth_valid=wealth_seen,
+        )
         assign(index, *result)
         if horizon in {1, 5, 21, 252}:
             retained_returns[horizon] = result

@@ -26,9 +26,13 @@ from .splits import (
     authorize_dates,
 )
 
-STORE_SCHEMA = "BRAZIL_RV_V2_DAILY_STORE_V2"
+STORE_SCHEMA = "BRAZIL_RV_V2_DAILY_STORE_V3"
 _SUPERSEDED_STORE_SCHEMAS = frozenset(
-    ("V2_DAILY_STORE_V1", "BRAZIL_RV_V2_DAILY_STORE_V1")
+    (
+        "V2_DAILY_STORE_V1",
+        "BRAZIL_RV_V2_DAILY_STORE_V1",
+        "BRAZIL_RV_V2_DAILY_STORE_V2",
+    )
 )
 _SAFE_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 _WRITE_VERIFICATION = object()

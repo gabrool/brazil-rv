@@ -1572,6 +1572,7 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
     )
     build_metadata = json.loads((root / "manifest.json").read_text())["metadata"]
     assert 0 < build_metadata["build_peak_rss_bytes"] < 8 * 1024**3
+    assert "wealth_chain_restarts_active_name_days" in build_metadata
     np.testing.assert_array_equal(
         np.load(root / "trade_observed.npy"),
         np.load(root / "observed.npy"),
@@ -1985,6 +1986,7 @@ def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:
         "fast_present",
         "intraday_boundary_lagged_mask",
         "intraday_boundary_sameday_mask",
+        "intraday_unit_or_unresolved_boundary_mask",
     }
     exact_names.update(
         path.stem

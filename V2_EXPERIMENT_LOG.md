@@ -259,3 +259,62 @@ Official-validation and test access remained false, and no score was written.
 Per pass 4c section 1.1, work stopped before the proposed recurrence rebuild.
 No ledger or acceptance change, merge, experiment, paid-instance launch, or
 deployment change occurred.
+
+## Pass-4d pre-result interval and ledger repair (2026-09-06)
+
+Pass 4d accepted the pass-4c diagnosis and withdrew wealth-chain bridging.
+The implementation now gives slow wealth features and naive baselines one
+shared validity function: both exact endpoints must exist, the interval may
+not cross a raw-series restart, and only an unresolved corporate action breaks
+the shareholder-wealth return. Resolved dividends, splits, and conversions are
+already represented by the wealth index and therefore do not mask it. The next
+store records `wealth_chain_restarts_active_name_days` by calendar year; no
+restart is bridged.
+
+The complete old-mask consumer inventory was: `build_store.py` constructed and
+stored `decision_action_boundary_mask`, `baselines.py` used it as its interval
+guard, and `validate_pipeline.py` required its presence. No other model,
+target, or ledger calculation consumed it. The two old intraday boundary masks
+were constructed in `build_store.py`, supplied to the intraday validity-clock
+helpers, stored for diagnostics, and inspected by store tests. The replacement
+guards are deliberately consumer-specific:
+
+- wealth features and baselines use unresolved actions plus exact-endpoint and
+  restart validity;
+- raw-price cross-session fields `overnight_return`,
+  `overnight_return_sum_5`, `overnight_return_sum_20`,
+  `overnight_minus_intraday`, `overnight_minus_intraday_mean_20`,
+  `corwin_schultz_spread_20`, and all three `_lag1` full-session summaries use
+  unresolved actions or unit changes, including successor conversions;
+- same-session scale-free fields have no action guard; and
+- targets and ledger action handling are unchanged.
+
+The immutable current-store coverage audit is
+`D:\quant-data\b3\processed\model_runs\v2_pass4d_intraday_guard_audit_5e500a4_20260906T200144Z`.
+Its manifest, diagnostic JSON, and parquet table SHA-256 values are
+`ffb537f0cf05515a355e42f9cb6833baae46f208aadbda5f005b89dec87564da`,
+`0822c3ac5629d893edcb5dade4d6a37a9e948d0e71e69045b53a2c1ad42fab9b`,
+and `3ed00f7712a41f9479c1c694fc823ee37bde1fd4f3de27cf1562ab1dd851c389`.
+Among active, fast-present evaluation name-days the corrected guard recovers
+as much as 24.471996 percentage points, and 24 feature/fold cells exceed the
+registered 10-point trigger. A clean-commit store rebuild is therefore
+mandatory; this decision was recorded before the new acceptance result.
+
+The prior sealed ledger replay's terminal unresolved inventory was also
+classified before changing its gate. Nineteen of 22 terminal positions had no
+terminal print and they represented 88.8999% of terminal unresolved notional;
+all 22 also had unresolved actions and prior pending exits. Terminal non-print
+therefore dominates. At `2026-09-06T20:11:20Z`, before rerunning, the
+engineering registration was updated exactly as pass 4d permits: mean daily
+unresolved-or-stale marked notional must be below 2% of NAV in every
+evaluation, while terminal count/notional and a non-exclusive reason breakdown
+remain reported diagnostics.
+
+The ledger now lets a fully submitted same-close exit release that side's slot
+for a same-auction entry, while an older pending exit continues to occupy it.
+If the exit fails and the replacement fills, the existing next-day risk trim
+handles the temporary over-allocation. Each side uses
+`K_eff = min(K, floor(N/2))` at the unchanged configured slot notional, and
+reports mean daily exits per side and same-close replacements. Gross target,
+gross/name/net caps, targets, folds, seeds, roster, costs, and protected-data
+rules remain unchanged.

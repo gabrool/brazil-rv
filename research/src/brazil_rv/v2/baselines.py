@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .data import read_scalar_feature_view
+from .features import wealth_return_validity
 from .normalization import average_ranks, rank_gauss_panel
 from .store import V2Store
 
@@ -33,28 +34,34 @@ def _lagged_return(
     shareholder_wealth_close: NDArray[np.floating],
     shareholder_wealth_valid: NDArray[np.bool_],
     active: NDArray[np.bool_],
-    decision_action_boundary: NDArray[np.bool_],
+    unresolved_action: NDArray[np.bool_],
     *,
     recent_lag: int,
     distant_lag: int,
     sign: float,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
-    action_boundary = np.asarray(decision_action_boundary, dtype=np.bool_)
+    ambiguous = np.asarray(unresolved_action, dtype=np.bool_)
     if (
         shareholder_wealth_close.ndim != 2
         or shareholder_wealth_valid.shape != shareholder_wealth_close.shape
         or active.shape != shareholder_wealth_close.shape
-        or action_boundary.shape != shareholder_wealth_close.shape
+        or ambiguous.shape != shareholder_wealth_close.shape
     ):
         raise ValueError(
-            "shareholder wealth, validity, active, and decision_action_boundary "
+            "shareholder wealth, validity, active, and unresolved_action "
             "must have shape [date, name]"
         )
     if not 0 <= recent_lag < distant_lag:
         raise ValueError("baseline lags must satisfy 0 <= recent < distant")
     values = np.zeros(shareholder_wealth_close.shape, dtype=np.float64)
     mask = np.zeros(shareholder_wealth_close.shape, dtype=bool)
-    cumulative = np.cumsum(action_boundary, axis=0, dtype=np.int32)
+    span = distant_lag - recent_lag
+    endpoint_validity = wealth_return_validity(
+        shareholder_wealth_close,
+        shareholder_wealth_valid,
+        span,
+        ambiguous,
+    )
     for date in range(distant_lag, shareholder_wealth_close.shape[0]):
         recent = date - recent_lag
         distant = date - distant_lag
@@ -65,7 +72,7 @@ def _lagged_return(
             & np.isfinite(shareholder_wealth_close[recent])
             & np.isfinite(shareholder_wealth_close[distant])
             & (shareholder_wealth_close[distant] > 0)
-            & (cumulative[recent] - cumulative[distant] == 0)
+            & endpoint_validity[recent]
         )
         values[date, valid] = sign * (
             shareholder_wealth_close[recent, valid]
@@ -91,7 +98,7 @@ def build_baselines(
     shareholder_wealth_close: NDArray[np.floating],
     shareholder_wealth_valid: NDArray[np.bool_],
     active: NDArray[np.bool_],
-    decision_action_boundary: NDArray[np.bool_],
+    unresolved_action: NDArray[np.bool_],
     target_scale_sigma: NDArray[np.floating],
 ) -> dict[str, BaselinePanel]:
     """Build decision-time baseline ranks from canonical raw inputs.
@@ -106,7 +113,7 @@ def build_baselines(
     wealth_values = np.asarray(shareholder_wealth_close, dtype=np.float64)
     wealth_valid = np.asarray(shareholder_wealth_valid, dtype=bool)
     active_mask = np.asarray(active, dtype=bool)
-    action_boundary = np.asarray(decision_action_boundary, dtype=np.bool_)
+    ambiguous = np.asarray(unresolved_action, dtype=np.bool_)
     volatility = np.asarray(target_scale_sigma, dtype=np.float64)
     if volatility.shape != wealth_values.shape:
         raise ValueError("target_scale_sigma must have shape [date, name]")
@@ -114,7 +121,7 @@ def build_baselines(
         wealth_values,
         wealth_valid,
         active_mask,
-        action_boundary,
+        ambiguous,
         recent_lag=source_lag,
         distant_lag=5 + source_lag,
         sign=-1.0,
@@ -123,7 +130,7 @@ def build_baselines(
         wealth_values,
         wealth_valid,
         active_mask,
-        action_boundary,
+        ambiguous,
         recent_lag=source_lag,
         distant_lag=21 + source_lag,
         sign=-1.0,
@@ -132,7 +139,7 @@ def build_baselines(
         wealth_values,
         wealth_valid,
         active_mask,
-        action_boundary,
+        ambiguous,
         recent_lag=21 + source_lag,
         distant_lag=252 + source_lag,
         sign=1.0,
@@ -176,6 +183,6 @@ def build_store_baselines(
         store.read("shareholder_wealth_close", indices),
         store.read("shareholder_wealth_valid", indices),
         view.active,
-        store.read("decision_action_boundary_mask", indices),
+        ~store.read("action_session_resolved", indices),
         store.read("target_scale_sigma", indices),
     )
