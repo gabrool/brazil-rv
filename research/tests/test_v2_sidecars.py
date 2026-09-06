@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import polars as pl
@@ -13,32 +14,6 @@ from brazil_rv.v2.sidecars import (
     materialize_sidecar,
     rebuild_publication_lag_validity,
 )
-
-
-def _event_row_reference(source: pl.DataFrame, days: list[date]) -> pl.DataFrame:
-    """Small oracle for the historical event-state contract."""
-
-    rows = list(source.sort("isin", "available_date").iter_rows(named=True))
-    prior_recent: dict[str, bool] = {}
-    last_event: dict[str, date] = {}
-    positions = {day: index for index, day in enumerate(days)}
-    for row in rows:
-        isin = str(row["isin"])
-        current_date = row["available_date"]
-        value = row["event_itr_dfp_recent_5s"]
-        recent = value is not None and float(value) > 0.5
-        mask_ok = row["event_itr_dfp_recent_5s_mask"] is not False
-        if mask_ok and recent and not prior_recent.get(isin, False):
-            last_event[isin] = current_date
-        event_date = last_event.get(isin)
-        valid = current_date in positions and event_date in positions
-        row["sessions_since_earnings"] = (
-            float(positions[current_date] - positions[event_date]) if valid else 0.0
-        )
-        row["sessions_since_earnings_mask"] = valid
-        if mask_ok:
-            prior_recent[isin] = recent
-    return pl.DataFrame(rows, infer_schema_length=None)
 
 
 def _oddlot_row_reference(source: pl.DataFrame, days: list[date]) -> pl.DataFrame:
@@ -84,40 +59,30 @@ def _oddlot_row_reference(source: pl.DataFrame, days: list[date]) -> pl.DataFram
     return pl.DataFrame(rows).sort("isin", "available_date", "source_trade_date")
 
 
-def test_reversible_lending_rate_archive_is_inverted() -> None:
-    raw_rate = 0.125
+def test_raw_annual_lending_rate_and_exact_change_are_supported() -> None:
+    days = [date(2024, 1, 1) + timedelta(days=index) for index in range(7)]
+    raw_rates = [0.10, 0.11, 0.12, 0.13, 0.14, 0.25]
     source = pl.DataFrame(
         {
-            "available_date": [date(2024, 1, 2)],
-            "source_trade_date": [date(2024, 1, 1)],
-            "isin": ["BRTESTACNOR1"],
-            "lending_taker_fee_level_log_tanh": [
-                np.tanh(np.log1p(raw_rate) / 2.0)
-            ],
-            "lending_taker_fee_level_log_tanh_mask": [True],
+            "available_date": days[1:],
+            "source_trade_date": days[:-1],
+            "isin": ["BRTESTACNOR1"] * 6,
+            "loan_rate_annual_decimal": raw_rates,
+            "loan_rate_annual_decimal_mask": [True] * 6,
         }
     )
-    mapping = available_archive_mapping("lending", source.columns)
-    assert mapping["loan_balance_to_volume_20"] is None
-    assert mapping["loan_rate"] == "lending_taker_fee_level_log_tanh"
     derived = derive_known_archive_features(
-        source,
-        [date(2024, 1, 1), date(2024, 1, 2)],
-        ["BRTESTACNOR1"],
-        group="lending",
-        daily_volume_brl=np.ones((2, 1)),
+        source, days, ["BRTESTACNOR1"], group="lending",
+        daily_volume_brl=np.ones((7, 1)),
     )
-    result = materialize_known_archive(
-        derived,
-        [date(2024, 1, 1), date(2024, 1, 2)],
-        ["BRTESTACNOR1"],
-        group="lending",
-    )
-    assert result.values[1, 0, 3] == pytest.approx(raw_rate)
-    assert result.valid[1, 0, 3]
+    result = materialize_known_archive(derived, days, ["BRTESTACNOR1"], group="lending")
+    assert result.feature_names == ("loan_rate", "loan_rate_change_5")
+    assert result.values[1, 0, 0] == pytest.approx(0.10)
+    assert result.values[6, 0, 1] == pytest.approx(0.15)
+    assert result.valid[6, 0].all()
 
 
-def test_reversible_option_fields_are_available_and_leverage_is_exact() -> None:
+def test_legacy_transformed_options_and_clipped_leverage_are_disabled() -> None:
     options = available_archive_mapping(
         "options",
         [
@@ -127,37 +92,18 @@ def test_reversible_option_fields_are_available_and_leverage_is_exact() -> None:
             "options_put_skew_tanh",
         ],
     )
-    assert options == {
-        "put_call_oi_ratio": "options_put_call_oi_log_ratio_tanh",
-        "delta_oi_to_volume_1": "options_oi_change_to_stock_adv20_tanh",
-        "atm_iv_to_median_20": None,
-        "put_skew": "options_put_skew_tanh",
-    }
-    fundamentals = available_archive_mapping(
-        "fundamentals", ["fund_leverage"]
-    )
-    assert fundamentals["leverage"] == "fund_leverage"
-    assert sum(source is not None for source in fundamentals.values()) == 1
+    assert options == {}
+    assert available_archive_mapping("fundamentals", ["fund_leverage"]) == {}
 
 
-def test_reversible_option_transforms_are_inverted() -> None:
-    put_call_ratio = 2.5
-    delta = -0.75
-    skew = 0.12
+def test_raw_options_counts_use_registered_smoothed_log_ratio() -> None:
     source = pl.DataFrame(
         {
             "available_date": [date(2024, 1, 2)],
             "isin": ["BRTESTACNOR1"],
-            "options_put_call_oi_log_ratio_tanh": [
-                np.tanh(np.log(put_call_ratio) / 3.0)
-            ],
-            "options_put_call_oi_log_ratio_tanh_mask": [True],
-            "options_oi_change_to_stock_adv20_tanh": [
-                np.tanh(np.sign(delta) * np.log1p(abs(delta)) / 3.0)
-            ],
-            "options_oi_change_to_stock_adv20_tanh_mask": [True],
-            "options_put_skew_tanh": [np.tanh(skew / 0.25)],
-            "options_put_skew_tanh_mask": [True],
+            "put_oi": [2],
+            "call_oi": [1],
+            "oi_snapshot_complete": [True],
         }
     )
     derived = derive_known_archive_features(
@@ -166,62 +112,105 @@ def test_reversible_option_transforms_are_inverted() -> None:
     result = materialize_known_archive(
         derived, [date(2024, 1, 2)], ["BRTESTACNOR1"], group="options"
     )
-    assert result.values[0, 0, 0] == pytest.approx(put_call_ratio)
-    assert result.values[0, 0, 1] == pytest.approx(delta)
-    assert result.values[0, 0, 3] == pytest.approx(skew)
-    assert result.valid[0, 0].tolist() == [True, True, False, True]
+    assert result.feature_names == ("put_call_log_oi_ratio",)
+    assert result.values[0, 0, 0] == pytest.approx(np.log(1.5))
+    assert result.valid[0, 0, 0]
+    assert result.source_missing_candidates == (
+        "delta_oi_to_volume_1", "atm_iv_to_median_20", "put_skew"
+    )
 
 
-def test_events_sidecar_derives_only_causal_earnings_age() -> None:
-    days = [date(2024, 1, 2) + timedelta(days=index) for index in range(8)]
-    isin = "BRTESTACNOR1"
+def test_options_known_zero_counts_do_not_create_sentiment() -> None:
+    day = date(2024, 1, 2)
     source = pl.DataFrame(
         {
-            "available_date": days,
-            "isin": [isin] * len(days),
-            "event_itr_dfp_recent_5s": [0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            "event_itr_dfp_recent_5s_mask": [True] * len(days),
+            "available_date": [day],
+            "isin": ["BRTESTACNOR1"],
+            "put_open_interest": [0],
+            "call_open_interest": [0],
+            "open_interest_snapshot_complete": [True],
+        }
+    )
+    derived = derive_known_archive_features(source, [day], ["BRTESTACNOR1"], group="options")
+    result = materialize_known_archive(
+        derived, [day], ["BRTESTACNOR1"], group="options"
+    )
+    assert result.feature_names == ("put_call_log_oi_ratio",)
+    assert not result.valid.any()
+    assert result.values[0, 0, 0] == 0.0
+
+
+def test_raw_compatible_liabilities_to_assets_is_not_clipped() -> None:
+    day = date(2024, 1, 2)
+    source = pl.DataFrame(
+        {
+            "available_date": [day],
+            "isin": ["BRTESTACNOR1"],
+            "total_liabilities_brl": [350.0],
+            "total_assets_brl": [100.0],
+        }
+    )
+    derived = derive_known_archive_features(
+        source, [day], ["BRTESTACNOR1"], group="fundamentals"
+    )
+    result = materialize_known_archive(
+        derived, [day], ["BRTESTACNOR1"], group="fundamentals"
+    )
+    assert result.feature_names == ("liabilities_to_assets",)
+    assert result.values[0, 0, 0] == pytest.approx(3.5)
+    assert result.valid[0, 0, 0]
+
+
+def test_overlapping_financial_filings_reset_exact_session_age() -> None:
+    days = [date(2024, 1, 2) + timedelta(days=index) for index in range(4)]
+    isin = "BRTESTACNOR1"
+    b3 = ZoneInfo("America/Sao_Paulo")
+    source = pl.DataFrame(
+        {
+            "isin": [isin, isin],
+            "filing_receipt_timestamp": [
+                datetime(2024, 1, 2, 15, 0, tzinfo=b3),
+                datetime(2024, 1, 3, 15, 46, tzinfo=b3),
+            ],
         }
     )
     derived = derive_known_archive_features(source, days, [isin], group="events")
     result = materialize_known_archive(derived, days, [isin], group="events")
-    assert result.values[1, 0, 1] == 0.0
-    assert result.values[5, 0, 1] == 4.0
-    assert not result.valid[..., 0].any()
-    assert not result.valid[..., 2].any()
+    assert result.feature_names == ("sessions_since_financial_filing",)
+    assert result.values[:, 0, 0].tolist() == [0.0, 1.0, 0.0, 1.0]
+    assert result.valid[:, 0, 0].all()
 
 
-def test_vectorized_events_match_randomized_row_oracle() -> None:
-    rng = np.random.default_rng(20260905)
-    sessions = [date(2024, 1, 2) + timedelta(days=index) for index in range(30)]
-    # Off-calendar rows exercise the exact invalid-age behavior without making
-    # the publication state itself disappear.
-    archive_days = [sessions[0] - timedelta(days=1), *sessions]
-    rows: list[dict[str, object]] = []
-    for name_index in range(5):
-        recent = rng.choice([0.0, 1.0, None], size=len(archive_days)).tolist()
-        masks = rng.choice([True, False, None], size=len(archive_days)).tolist()
-        # Explicit first-row event and consecutive true states cover both edge
-        # cases even if the random draw misses them.
-        recent[:3] = [1.0, 1.0, 0.0]
-        masks[:3] = [True, True, True]
-        rows.extend(
-            {
-                "available_date": day,
-                "isin": f"BRTEST{name_index:02d}",
-                "event_itr_dfp_recent_5s": value,
-                "event_itr_dfp_recent_5s_mask": mask,
-            }
-            for day, value, mask in zip(archive_days, recent, masks, strict=True)
+def test_financial_filing_adapter_requires_typed_timestamps() -> None:
+    source = pl.DataFrame(
+        {
+            "isin": ["BRTESTACNOR1"],
+            "filing_receipt_timestamp": ["2024-01-02T15:00:00-03:00"],
+        }
+    )
+    with pytest.raises(ValueError, match="Datetime dtype"):
+        derive_known_archive_features(
+            source,
+            [date(2024, 1, 2)],
+            ["BRTESTACNOR1"],
+            group="events",
         )
-    source = pl.DataFrame(rows, infer_schema_length=None).sample(
-        fraction=1.0, shuffle=True, seed=47
+
+
+def test_event_age_requires_a_timestamp_not_a_recent_flag() -> None:
+    source = pl.DataFrame({
+        "available_date": [date(2024, 1, 2)],
+        "isin": ["BRTESTACNOR1"],
+        "event_itr_dfp_recent_5s": [1.0],
+    })
+    result = materialize_known_archive(
+        derive_known_archive_features(source, [date(2024, 1, 2)], ["BRTESTACNOR1"], group="events"),
+        [date(2024, 1, 2)], ["BRTESTACNOR1"], group="events"
     )
-    expected = _event_row_reference(source, sessions)
-    actual = derive_known_archive_features(
-        source, sessions, sorted(source.get_column("isin").unique()), group="events"
+    assert result.feature_names == ()
+    assert result.source_missing_candidates == (
+        "sessions_since_financial_filing", "standardized_unexpected_earnings"
     )
-    assert_frame_equal(actual, expected, check_exact=True)
 
 
 def test_sidecar_timestamps_compare_absolute_instants_to_b3_decision() -> None:
@@ -264,25 +253,21 @@ def test_sidecar_timestamps_compare_absolute_instants_to_b3_decision() -> None:
     assert not rejected.valid.any()
 
 
-def test_event_projection_does_not_duplicate_an_explicit_mask(tmp_path) -> None:
-    days = [date(2024, 1, 2), date(2024, 1, 3)]
-    source = tmp_path / "events.parquet"
-    pl.DataFrame(
+def test_enabled_features_are_an_ordered_supported_subset() -> None:
+    day = date(2024, 1, 2)
+    source = pl.DataFrame(
         {
-            "available_date": days,
-            "isin": ["BRTESTACNOR1"] * 2,
-            "event_itr_dfp_recent_5s": [0.0, 1.0],
-            "event_itr_dfp_recent_5s_mask": [True, True],
+            "available_date": [day],
+            "isin": ["BRTESTACNOR1"],
+            "oddlot_volume_share_change_5": [0.2],
         }
-    ).write_parquet(source)
-    parsed = _parse_sidecars(
-        [f"events={source}"],
-        days,
-        ["BRTESTACNOR1"],
-        None,
     )
-    assert parsed["events"].values.shape == (2, 1, 3)
-    assert parsed["events"].valid[1, 0, 1]
+    result = materialize_known_archive(
+        source, [day], ["BRTESTACNOR1"], group="oddlot"
+    )
+    assert result.feature_names == ("oddlot_volume_share_change_5",)
+    assert result.values.shape == (1, 1, 1)
+    assert result.source_missing_candidates == ("oddlot_volume_share",)
 
 
 def test_raw_lending_formulas_use_source_date_volume_and_d_plus_one() -> None:
@@ -401,7 +386,7 @@ def test_lending_volume_window_does_not_invent_prelisting_zeroes() -> None:
     assert result.values[30, 0, 0] == pytest.approx(2.0)
 
 
-def test_parser_combines_balance_and_reversible_rate_archives(tmp_path) -> None:
+def test_balance_and_raw_rate_archives_combine_without_legacy_inversion() -> None:
     days = [date(2024, 1, 1) + timedelta(days=index) for index in range(127)]
     isin = "BRTESTACNOR1"
     security_id = "security-one"
@@ -414,39 +399,35 @@ def test_parser_combines_balance_and_reversible_rate_archives(tmp_path) -> None:
         }
     )
     rates = [0.10, 0.11, 0.12, 0.13, 0.14, 0.25, 0.30]
-    strong = pl.DataFrame(
+    raw_rate = pl.DataFrame(
         {
             # Leave more than Polars' default 100-row inference window before
             # the first non-null rate value, matching the combined archives.
             "source_trade_date": days[119:126],
             "available_date": days[120:127],
             "security_id": [security_id] * 7,
-            "lending_taker_fee_level_log_tanh": [
-                np.tanh(np.log1p(value) / 2.0) for value in rates
-            ],
-            "lending_taker_fee_level_log_tanh_mask": [True] * 7,
-            "lending_taker_fee_change_5_tanh": [0.0] * 7,
-            "lending_taker_fee_change_5_tanh_mask": [False] * 5 + [True] * 2,
+            "loan_rate_annual_decimal": rates,
+            "loan_rate_annual_decimal_mask": [True] * 7,
         }
     )
-    balance_path = tmp_path / "balance.parquet"
-    strong_path = tmp_path / "strong.parquet"
-    balance.write_parquet(balance_path)
-    strong.write_parquet(strong_path)
-    result = _parse_sidecars(
-        [f"lending={balance_path}", f"lending={strong_path}"],
-        days,
-        [isin],
-        pl.DataFrame({"security_id": [security_id], "isin": [isin]}),
-        np.full((len(days), 1), 100.0),
-    )["lending"]
+    combined = pl.concat([balance, raw_rate], how="diagonal_relaxed").with_columns(
+        pl.lit(isin).alias("isin")
+    ).drop("security_id")
+    value_columns = [
+        column for column in combined.columns if column not in {"available_date", "isin"}
+    ]
+    combined = combined.group_by("available_date", "isin", maintain_order=True).agg(
+        pl.col(column).drop_nulls().last().alias(column) for column in value_columns
+    )
+    derived = derive_known_archive_features(
+        combined, days, [isin], group="lending",
+        daily_volume_brl=np.full((len(days), 1), 100.0),
+    )
+    result = materialize_known_archive(derived, days, [isin], group="lending")
     assert result.values[120, 0, 0] == pytest.approx(2.0)
     assert result.values[120, 0, 3] == pytest.approx(0.10)
     assert result.values[125, 0, 4] == pytest.approx(0.15)
     assert result.valid[125, 0].tolist() == [True, True, True, True, True]
-    assert result.publication_lag_reproduced
-    assert result.publication_lag_valid_cells == int(result.valid.sum())
-    assert result.publication_lag_source_rows > 0
 
 
 def test_raw_oddlot_share_and_exact_session_lag_change() -> None:
@@ -608,7 +589,7 @@ def test_unknown_same_day_availability_is_rejected_and_latest_snapshot_wins() ->
     assert not rejected.valid.any()
 
 
-def test_intraday_archive_is_collapsed_to_latest_snapshot(tmp_path) -> None:
+def test_legacy_clipped_fundamental_is_source_missing(tmp_path) -> None:
     days = [date(2024, 1, 2), date(2024, 1, 3)]
     source = pl.DataFrame(
         {
@@ -627,5 +608,9 @@ def test_intraday_archive_is_collapsed_to_latest_snapshot(tmp_path) -> None:
     result = _parse_sidecars(
         [f"fundamentals={path}"], days, ["BRTESTACNOR1"], assignments
     )["fundamentals"]
-    assert result.valid[:, 0, 3].all()
-    assert result.values[:, 0, 3].tolist() == [54.0, 54.0]
+    assert result.feature_names == ()
+    assert result.values.shape == (2, 1, 0)
+    assert result.source_missing_candidates == (
+        "log_market_cap", "book_to_market", "gross_profitability",
+        "liabilities_to_assets",
+    )

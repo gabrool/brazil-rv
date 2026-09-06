@@ -129,12 +129,11 @@ SIDECAR_FEATURES: Final[dict[str, tuple[str, ...]]] = {
         "loan_rate_change_5",
     ),
     "events": (
-        "sessions_until_announced_earnings",
-        "sessions_since_earnings",
+        "sessions_since_financial_filing",
         "standardized_unexpected_earnings",
     ),
     "options": (
-        "put_call_oi_ratio",
+        "put_call_log_oi_ratio",
         "delta_oi_to_volume_1",
         "atm_iv_to_median_20",
         "put_skew",
@@ -160,7 +159,7 @@ SIDECAR_FEATURES: Final[dict[str, tuple[str, ...]]] = {
         "log_market_cap",
         "book_to_market",
         "gross_profitability",
-        "leverage",
+        "liabilities_to_assets",
     ),
 }
 
@@ -173,7 +172,11 @@ class StoreSchema:
     decision_minute_index: int = DECISION_MINUTE_INDEX
 
     def __post_init__(self) -> None:
-        if len(self.slow_features) != 32:
-            raise ValueError("The v2 slow feature contract must contain exactly 32 fields")
-        if len(self.intraday_daily_features) != 20:
-            raise ValueError("The v2 intraday-derived contract must contain exactly 20 fields")
+        if not self.slow_features or not self.intraday_daily_features:
+            raise ValueError("store feature families must be nonempty")
+        if len(set(self.slow_features)) != len(self.slow_features) or len(
+            set(self.intraday_daily_features)
+        ) != len(self.intraday_daily_features):
+            raise ValueError("store feature names must be unique within each family")
+        if self.decision_minute_index <= 0:
+            raise ValueError("decision minute index must be positive")

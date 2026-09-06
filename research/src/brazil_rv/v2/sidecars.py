@@ -25,23 +25,20 @@ ARCHIVE_COLUMN_MAP: dict[str, dict[str, str | None]] = {
         "loan_balance_to_volume_20": "loan_balance_to_volume_20",
         "loan_balance_change_1": "loan_balance_change_1",
         "loan_balance_change_5": "loan_balance_change_5",
-        # The archived transforms are one-to-one.  They are inverted below
-        # before the canonical v2 fields are rank-normalized.
-        "loan_rate": "lending_taker_fee_level_log_tanh",
-        "loan_rate_change_5": "lending_taker_fee_change_5_tanh",
+        # These columns are emitted only by the raw annual-decimal adapter.
+        # Saturated legacy tanh fields are deliberately not inverted.
+        "loan_rate": "loan_rate",
+        "loan_rate_change_5": "loan_rate_change_5",
     },
     "events": {
-        "sessions_until_announced_earnings": None,
-        "sessions_since_earnings": None,
+        "sessions_since_financial_filing": "sessions_since_financial_filing",
         "standardized_unexpected_earnings": None,
     },
     "options": {
-        "put_call_oi_ratio": "options_put_call_oi_log_ratio_tanh",
-        # This is the archived one-session OI change divided by trailing
-        # stock ADV20, behind a reversible signed-log/tanh transform.
-        "delta_oi_to_volume_1": "options_oi_change_to_stock_adv20_tanh",
+        "put_call_log_oi_ratio": "put_call_log_oi_ratio",
+        "delta_oi_to_volume_1": None,
         "atm_iv_to_median_20": None,
-        "put_skew": "options_put_skew_tanh",
+        "put_skew": None,
     },
     "oddlot": {
         "oddlot_volume_share": "oddlot_volume_share",
@@ -52,7 +49,7 @@ ARCHIVE_COLUMN_MAP: dict[str, dict[str, str | None]] = {
         "log_market_cap": None,
         "book_to_market": None,
         "gross_profitability": None,
-        "leverage": "fund_leverage",
+        "liabilities_to_assets": "liabilities_to_assets",
     },
 }
 
@@ -65,6 +62,7 @@ class SidecarResult:
     valid: NDArray[np.bool_]
     coverage_by_year: tuple[dict[str, object], ...]
     archive_semantics_available: tuple[str, ...] = ()
+    source_missing_candidates: tuple[str, ...] = ()
     publication_lag_reproduced: bool = False
     publication_lag_valid_cells: int = 0
     publication_lag_source_rows: int = 0
@@ -153,10 +151,19 @@ def materialize_sidecar(
     identity = "isin" if "isin" in source.columns else "security_id"
     if identity not in source.columns or "available_date" not in source.columns:
         raise ValueError("sidecar source needs identity and available_date")
-    names = SIDECAR_FEATURES[group]
-    columns = dict(feature_columns or {name: name for name in names})
-    if set(columns) != set(names):
-        raise ValueError("feature mapping must cover the exact frozen group")
+    candidates = SIDECAR_FEATURES[group]
+    columns = dict(
+        feature_columns
+        if feature_columns is not None
+        else available_archive_mapping(group, source.columns)
+    )
+    unknown = set(columns) - set(candidates)
+    if unknown:
+        raise ValueError(f"unknown sidecar features for {group}: {sorted(unknown)}")
+    names = tuple(
+        name for name in candidates if columns.get(name) is not None
+    )
+    columns = {name: columns[name] for name in names}
     absent = sorted(
         column
         for column in set(columns.values()) - {None}
@@ -232,6 +239,9 @@ def materialize_sidecar(
         archive_semantics_available=tuple(
             name for name in names if columns[name] is not None
         ),
+        source_missing_candidates=tuple(
+            name for name in candidates if name not in names
+        ),
     )
 
 
@@ -258,10 +268,17 @@ def rebuild_publication_lag_validity(
     identity = "isin" if "isin" in source.columns else "security_id"
     if identity not in source.columns or "available_date" not in source.columns:
         raise ValueError("sidecar source needs identity and available_date")
-    names = SIDECAR_FEATURES[group]
-    columns = dict(feature_columns or {name: name for name in names})
-    if set(columns) != set(names):
-        raise ValueError("feature mapping must cover the exact frozen group")
+    candidates = SIDECAR_FEATURES[group]
+    columns = dict(
+        feature_columns
+        if feature_columns is not None
+        else available_archive_mapping(group, source.columns)
+    )
+    unknown = set(columns) - set(candidates)
+    if unknown:
+        raise ValueError(f"unknown sidecar features for {group}: {sorted(unknown)}")
+    names = tuple(name for name in candidates if columns.get(name) is not None)
+    columns = {name: columns[name] for name in names}
     normalized_dates = tuple(_as_date(value) for value in dates)
     date_lookup = {value: index for index, value in enumerate(normalized_dates)}
     isin_lookup = {str(value): index for index, value in enumerate(isins)}
@@ -444,10 +461,17 @@ def _raw_lending_features(
         "source_position_date",
         "lending_balance_brl",
     }.issubset(source.columns)
-    has_rate = {
-        "source_trade_date",
-        "lending_taker_fee_level_log_tanh",
-    }.issubset(source.columns)
+    raw_rate_columns = tuple(
+        column
+        for column in (
+            "loan_rate_annual_decimal",
+            "lending_taker_fee_annual_decimal",
+        )
+        if column in source.columns
+    )
+    if len(raw_rate_columns) > 1:
+        raise ValueError("lending archive has multiple raw annual-rate columns")
+    has_rate = "source_trade_date" in source.columns and bool(raw_rate_columns)
     if not has_balance and not has_rate:
         return source
     calendar = tuple(_as_date(value) for value in dates)
@@ -601,24 +625,24 @@ def _raw_lending_features(
     if has_rate:
         _reject_ambiguous_vintages(output, "source_trade_date")
         rate = output.filter(pl.col("source_trade_date").is_not_null())
-        transformed = (
-            rate.get_column("lending_taker_fee_level_log_tanh")
+        raw_column = raw_rate_columns[0]
+        raw_rate = (
+            rate.get_column(raw_column)
             .cast(pl.Float64)
             .fill_null(np.nan)
             .to_numpy()
+            .copy()
         )
-        if "lending_taker_fee_level_log_tanh_mask" in rate.columns:
+        raw_mask_column = f"{raw_column}_mask"
+        if raw_mask_column in rate.columns:
             rate_mask = (
-                rate.get_column("lending_taker_fee_level_log_tanh_mask")
-                .fill_null(True)
+                rate.get_column(raw_mask_column)
+                .fill_null(False)
                 .to_numpy()
             )
         else:
             rate_mask = np.ones(rate.height, dtype=np.bool_)
-        rate_valid = rate_mask & np.isfinite(transformed) & (np.abs(transformed) < 1.0)
-        raw_rate = np.zeros(rate.height, dtype=np.float64)
-        raw_rate[rate_valid] = np.expm1(2.0 * np.arctanh(transformed[rate_valid]))
-        rate_valid &= np.isfinite(raw_rate) & (raw_rate >= 0.0)
+        rate_valid = rate_mask & np.isfinite(raw_rate) & (raw_rate >= 0.0)
         raw_rate[~rate_valid] = 0.0
         rate = rate.with_columns(
             pl.Series("loan_rate", raw_rate),
@@ -674,156 +698,196 @@ def _raw_lending_features(
 
 
 def _raw_options_features(source: pl.DataFrame) -> pl.DataFrame:
-    """Invert archive transforms whose raw v2 quantity is recoverable."""
+    """Derive the canonical put/call signal only from complete raw OI counts."""
 
-    output = source
-    transforms = (
-        (
-            "options_put_call_oi_log_ratio_tanh",
-            "put_call_oi_ratio",
-            3.0,
-            False,
-        ),
-        (
-            "options_oi_change_to_stock_adv20_tanh",
-            "delta_oi_to_volume_1",
-            3.0,
-            True,
-        ),
-        ("options_put_skew_tanh", "put_skew", 0.25, False),
+    count_pairs = (
+        ("put_open_interest", "call_open_interest"),
+        ("put_oi", "call_oi"),
     )
-    for archived, feature, scale, signed_log in transforms:
-        if archived not in output.columns:
-            continue
-        archived_mask = f"{archived}_mask"
-        values = output.get_column(archived).cast(pl.Float64).fill_null(0.0).to_numpy()
-        valid = np.isfinite(values) & (np.abs(values) < 1.0)
-        if archived_mask in output.columns:
-            valid &= output.get_column(archived_mask).fill_null(False).to_numpy()
-        inverse = np.zeros(len(values), dtype=np.float64)
-        latent = scale * np.arctanh(np.where(valid, values, 0.0))
-        if signed_log:
-            inverse[valid] = np.sign(latent[valid]) * np.expm1(np.abs(latent[valid]))
-        elif feature == "put_call_oi_ratio":
-            inverse[valid] = np.exp(latent[valid])
-        else:
-            inverse[valid] = latent[valid]
-        valid &= np.isfinite(inverse)
-        inverse[~valid] = 0.0
-        output = output.with_columns(
-            pl.Series(feature, inverse),
-            pl.Series(f"{feature}_mask", valid),
-        )
-    return output
+    pairs = tuple(pair for pair in count_pairs if set(pair).issubset(source.columns))
+    if not pairs:
+        return source
+    if len(pairs) > 1:
+        raise ValueError("options archive has multiple raw put/call OI column pairs")
+    completeness_columns = tuple(
+        column
+        for column in ("oi_snapshot_complete", "open_interest_snapshot_complete")
+        if column in source.columns
+    )
+    if len(completeness_columns) != 1:
+        # Absence is not evidence that a missing side count means a known zero.
+        return source
+    put_column, call_column = pairs[0]
+    put = source.get_column(put_column).cast(pl.Float64).fill_null(np.nan).to_numpy()
+    call = source.get_column(call_column).cast(pl.Float64).fill_null(np.nan).to_numpy()
+    complete = (
+        source.get_column(completeness_columns[0])
+        .cast(pl.Boolean)
+        .fill_null(False)
+        .to_numpy()
+    )
+    valid = (
+        complete
+        & np.isfinite(put)
+        & np.isfinite(call)
+        & (put >= 0.0)
+        & (call >= 0.0)
+        & (np.floor(put) == put)
+        & (np.floor(call) == call)
+        & ((put + call) > 0.0)
+    )
+    ratio = np.zeros(source.height, dtype=np.float64)
+    ratio[valid] = np.log((put[valid] + 1.0) / (call[valid] + 1.0))
+    valid &= np.isfinite(ratio)
+    ratio[~valid] = 0.0
+    return source.with_columns(
+        pl.Series("put_call_log_oi_ratio", ratio),
+        pl.Series("put_call_log_oi_ratio_mask", valid),
+    )
 
 
 def _raw_events_features(
     source: pl.DataFrame, dates: Sequence[date | np.datetime64]
 ) -> pl.DataFrame:
-    """Derive causal sessions since the latest observable RAD earnings event."""
+    """Derive exact filing age from timestamped financial-filing events."""
 
-    required = {"available_date", "isin", "event_itr_dfp_recent_5s"}
-    if not required.issubset(source.columns):
+    timestamp_columns = (
+        ("filing_receipt_timestamp",)
+        if "filing_receipt_timestamp" in source.columns
+        else (
+            ("available_timestamp",)
+            if {"available_timestamp", "event_type"}.issubset(source.columns)
+            else ()
+        )
+    )
+    if "isin" not in source.columns or not timestamp_columns:
         return source
-    output = _canonical_publication_frame(source)
-    ambiguous = (
-        output.group_by("isin", _PUBLICATION_ORDER_COLUMN)
-        .len()
-        .filter(pl.col("len") > 1)
-    )
-    if not ambiguous.is_empty():
-        raise ValueError(
-            "ambiguous event states at one publication coordinate: "
-            f"{ambiguous.head(10).to_dicts()}"
+    if len(timestamp_columns) > 1:
+        raise ValueError("event archive has multiple filing timestamp columns")
+    timestamp_column = timestamp_columns[0]
+    dtype = source.schema[timestamp_column]
+    if not isinstance(dtype, pl.Datetime):
+        raise ValueError(f"{timestamp_column} must have a Datetime dtype")
+
+    events = source.filter(pl.col(timestamp_column).is_not_null())
+    if timestamp_column == "available_timestamp":
+        events = events.filter(
+            pl.col("event_type")
+            .cast(pl.String)
+            .str.to_uppercase()
+            .is_in(["ITR", "DFP", "FINANCIAL_FILING"])
         )
-    recent = (
-        pl.col("event_itr_dfp_recent_5s").cast(pl.Float64).fill_null(0.0) > 0.5
-    )
-    if "event_itr_dfp_recent_5s_mask" in output.columns:
-        # Historical event-state archives treated a null mask as an update;
-        # only explicit false freezes the prior state.
-        mask_ok = pl.col("event_itr_dfp_recent_5s_mask").fill_null(True)
-    else:
-        mask_ok = pl.lit(True)
-    output = (
-        output.with_columns(
-            recent.alias("__recent"),
-            mask_ok.alias("__mask_ok"),
-        )
-        .with_columns(
-            pl.when(pl.col("__mask_ok"))
-            .then(pl.col("__recent"))
-            .otherwise(None)
-            .alias("__masked_recent")
-        )
-        .with_columns(
-            pl.col("__masked_recent")
-            .forward_fill()
-            .shift(1)
-            .over("isin")
-            .alias("__prior_recent")
-        )
-        .with_columns(
-            (
-                pl.col("__mask_ok")
-                & pl.col("__recent")
-                & ~pl.col("__prior_recent").fill_null(False)
-            ).alias("__event")
-        )
-        .with_columns(
-            pl.when(pl.col("__event"))
-            .then(pl.col("available_date").cast(pl.Date))
-            .otherwise(None)
-            .forward_fill()
-            .over("isin")
-            .alias("__last_event_date")
-        )
-    )
+    timestamp = pl.col(timestamp_column)
+    if dtype.time_zone is None:
+        timestamp = timestamp.dt.replace_time_zone(str(B3_TIMEZONE))
+    publication_us = timestamp.dt.convert_time_zone("UTC").dt.epoch("us")
+    events = events.with_columns(publication_us.alias("__filing_publication_us"))
+
     calendar = tuple(_as_date(value) for value in dates)
-    current_positions = pl.DataFrame(
+    decision_instants = pl.DataFrame(
         {
             "available_date": calendar,
-            "__current_session_position": np.arange(len(calendar), dtype=np.int32),
+            "__session_position": np.arange(len(calendar), dtype=np.int32),
         },
         schema_overrides={"available_date": pl.Date},
+    ).with_columns(
+        pl.col("available_date")
+        .cast(pl.Datetime("us"))
+        .dt.replace_time_zone(str(B3_TIMEZONE))
+        .dt.offset_by("15h45m")
+        .dt.convert_time_zone("UTC")
+        .dt.epoch("us")
+        .alias("__decision_us")
     )
-    event_positions = current_positions.rename(
-        {
-            "available_date": "__last_event_date",
-            "__current_session_position": "__event_session_position",
-        }
-    )
-    output = output.join(current_positions, on="available_date", how="left").join(
-        event_positions, on="__last_event_date", how="left"
-    )
-    valid = pl.col("__current_session_position").is_not_null() & pl.col(
-        "__event_session_position"
-    ).is_not_null()
-    return (
-        output.with_columns(
-            pl.when(valid)
-            .then(
-                pl.col("__current_session_position")
-                - pl.col("__event_session_position")
-            )
-            .otherwise(0.0)
-            .cast(pl.Float64)
-            .alias("sessions_since_earnings"),
-            valid.alias("sessions_since_earnings_mask"),
+    effective = (
+        events.sort("__filing_publication_us")
+        .join_asof(
+            decision_instants.sort("__decision_us"),
+            left_on="__filing_publication_us",
+            right_on="__decision_us",
+            strategy="forward",
         )
-        .sort(_ROW_INDEX_COLUMN)
-        .drop(
-            _ROW_INDEX_COLUMN,
-            _PUBLICATION_ORDER_COLUMN,
-            "__recent",
-            "__mask_ok",
-            "__masked_recent",
-            "__prior_recent",
-            "__event",
-            "__last_event_date",
-            "__current_session_position",
-            "__event_session_position",
+        .filter(pl.col("__session_position").is_not_null())
+        .sort("isin", "__session_position", "__filing_publication_us")
+        .group_by("isin", "__session_position", maintain_order=True)
+        .agg(
+            pl.col("__filing_publication_us").last(),
+            pl.col(timestamp_column).last(),
         )
+        .rename({"__session_position": "__event_session_position"})
+    )
+    if effective.is_empty():
+        return pl.DataFrame(schema={"available_date": pl.Date, "isin": pl.String})
+    names = effective.select("isin").unique()
+    states = (
+        names.join(decision_instants, how="cross")
+        .sort("isin", "__session_position")
+        .join_asof(
+            effective.sort("isin", "__event_session_position"),
+            left_on="__session_position",
+            right_on="__event_session_position",
+            by="isin",
+            strategy="backward",
+            check_sortedness=False,
+        )
+    )
+    valid = pl.col("__filing_publication_us").is_not_null()
+    return states.select(
+        "available_date",
+        "isin",
+        pl.col(timestamp_column).alias("available_timestamp"),
+        pl.when(valid)
+        .then(
+            pl.col("__session_position")
+            - pl.col("__event_session_position")
+        )
+        .otherwise(0.0)
+        .cast(pl.Float64)
+        .alias("sessions_since_financial_filing"),
+        valid.alias("sessions_since_financial_filing_mask"),
+    )
+
+
+def _raw_fundamental_features(source: pl.DataFrame) -> pl.DataFrame:
+    """Derive liabilities/assets from compatible raw values on the same filing row."""
+
+    pairs = tuple(
+        pair
+        for pair in (
+            ("total_liabilities_brl", "total_assets_brl"),
+            ("liabilities_brl", "assets_brl"),
+        )
+        if set(pair).issubset(source.columns)
+    )
+    if not pairs:
+        return source
+    if len(pairs) > 1:
+        raise ValueError("fundamental archive has multiple raw liability/asset pairs")
+    liabilities_column, assets_column = pairs[0]
+    liabilities = (
+        source.get_column(liabilities_column)
+        .cast(pl.Float64)
+        .fill_null(np.nan)
+        .to_numpy()
+    )
+    assets = (
+        source.get_column(assets_column)
+        .cast(pl.Float64)
+        .fill_null(np.nan)
+        .to_numpy()
+    )
+    valid = np.isfinite(liabilities) & np.isfinite(assets) & (assets > 0.0)
+    for column in (liabilities_column, assets_column):
+        mask_column = f"{column}_mask"
+        if mask_column in source.columns:
+            valid &= source.get_column(mask_column).fill_null(False).to_numpy()
+    ratio = np.zeros(source.height, dtype=np.float64)
+    ratio[valid] = liabilities[valid] / assets[valid]
+    valid &= np.isfinite(ratio)
+    ratio[~valid] = 0.0
+    return source.with_columns(
+        pl.Series("liabilities_to_assets", ratio),
+        pl.Series("liabilities_to_assets_mask", valid),
     )
 
 
@@ -930,6 +994,8 @@ def derive_known_archive_features(
         return _raw_options_features(source)
     if group == "events":
         return _raw_events_features(source, dates)
+    if group == "fundamentals":
+        return _raw_fundamental_features(source)
     return source
 
 
@@ -954,16 +1020,15 @@ def bind_sidecar_isins(source: pl.DataFrame, assignments: pl.DataFrame) -> pl.Da
 def available_archive_mapping(
     group: str, columns: Sequence[str]
 ) -> dict[str, str | None]:
-    """Map every frozen feature, using ``None`` for unavailable archive fields."""
+    """Map the ordered candidate subset supported by exact source semantics."""
 
     if group not in ARCHIVE_COLUMN_MAP:
         raise ValueError(f"unknown sidecar group: {group}")
     available = set(columns)
     return {
-        feature: (
-            feature if feature in available else source if source in available else None
-        )
+        feature: feature if feature in available else source
         for feature, source in ARCHIVE_COLUMN_MAP[group].items()
+        if feature in available or (source is not None and source in available)
     }
 
 
@@ -975,12 +1040,12 @@ def materialize_known_archive(
     group: str,
     decision_time: time = time(15, 45),
 ) -> SidecarResult:
-    """Materialize all fields available in a known v1 archive.
+    """Materialize only fields whose source semantics match the canonical contract.
 
     The v1 archive ``available_date`` is already source-lagged (including D+1
     where required), so a matching date is authoritative before the decision.
-    Missing frozen fields remain exactly zero with a false validity mask and are
-    reported as zero coverage rather than rejected.
+    Missing candidates are reported in ``source_missing_candidates`` and do not
+    consume enabled feature-array columns.
     """
 
     return materialize_sidecar(
