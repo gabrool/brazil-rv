@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,7 +18,18 @@ from .artifacts import inventory, sha256_file, verify_inventory, write_json_atom
 from .baselines import BaselinePanel, build_baselines
 from .config import PROJECT_ROOT
 from .contract import GBDT_SEEDS, HORIZONS, PRETRAIN_END, PRIMARY_HORIZONS, STORE_START
-from .evaluate import EvaluationResult, evaluate_scores
+from .evaluate import (
+    EVALUATION_SCHEMA,
+    EvaluationInputs,
+    EvaluationResult,
+    _input_hashes,
+    _paired_primary_daily,
+    _primary_daily_metrics,
+    _primary_population_components,
+    _spearman,
+    _validate_paired_identity,
+    evaluate_scores,
+)
 from .gbdt import GBDTConfig, MultiHorizonGBDT
 from .splits import development_folds
 from .store import V2Store, open_store_for_samples
@@ -31,14 +42,12 @@ from .validate_pipeline import (
     _window_target_mask,
 )
 
-ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_REV2_V1"
-ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_REV2_V1"
-PREREGISTRATION = (
-    PROJECT_ROOT
-    / "research"
-    / "preregistrations"
-    / "v2_round1_round2_rev2.md"
-)
+ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V1"
+ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V1"
+RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V2"
+TRAINING_STAGE_SCHEMA = "BRAZIL_RV_V2_TRAINING_STAGE_V1"
+SCORE_ARTIFACT_SCHEMA = "BRAZIL_RV_V2_SCORE_ARTIFACT_V1"
+PREREGISTRATION = PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2.md"
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
 BOOTSTRAP_SEED = 20260815
@@ -61,7 +70,14 @@ RESEARCH_FLAGS = {
     "official_validation_accessed": False,
     "test_accessed": False,
     "deployment_changed": False,
+    "transfer_chronology_clean": True,
 }
+
+
+@dataclass(frozen=True)
+class _ResearchEvaluation:
+    result: EvaluationResult
+    inputs: EvaluationInputs
 
 
 def _utc_now() -> str:
@@ -103,6 +119,26 @@ def _assert_false_access(payload: Mapping[str, object], *, path: Path) -> None:
         or payload.get("test_accessed") is not False
     ):
         raise PermissionError(f"sealed-window access recorded in {path}")
+    if not isinstance(payload.get("transfer_chronology_clean"), bool):
+        raise ValueError(f"transfer chronology status is absent from {path}")
+
+
+def _assert_current_clean_training(
+    payload: Mapping[str, object], *, path: Path
+) -> None:
+    _assert_false_access(payload, path=path)
+    if (
+        payload.get("schema") != TRAINING_STAGE_SCHEMA
+        or payload.get("status") != "completed"
+    ):
+        raise ValueError(f"trajectory uses a stale or incomplete run schema: {path}")
+    if payload.get("transfer_chronology_clean") is not True:
+        raise PermissionError(
+            f"trajectory has contaminated transfer chronology: {path}"
+        )
+    feature_schema = payload.get("feature_schema_sha256")
+    if not isinstance(feature_schema, str) or len(feature_schema) != 64:
+        raise ValueError(f"trajectory lacks a canonical feature schema: {path}")
 
 
 def _array_record(path: Path, values: NDArray[np.generic]) -> dict[str, object]:
@@ -131,7 +167,7 @@ def _persist_scores(
     digest = write_json_atomic(
         manifest,
         {
-            "schema": "BRAZIL_RV_V2_RESEARCH_SCORE_V1",
+            "schema": RESEARCH_SCORE_SCHEMA,
             "status": "completed",
             **RESEARCH_FLAGS,
             "metadata": dict(metadata),
@@ -147,6 +183,7 @@ def _fold_indices(
     dict[str, NDArray[np.int64]],
     dict[str, NDArray[np.int64]],
     dict[str, NDArray[np.int64]],
+    dict[str, NDArray[np.int64]],
     dict[str, object],
 ]:
     python_dates = tuple(dates.astype("datetime64[D]").astype(object).tolist())
@@ -154,15 +191,19 @@ def _fold_indices(
     fit: dict[str, NDArray[np.int64]] = {}
     selection: dict[str, NDArray[np.int64]] = {}
     evaluation: dict[str, NDArray[np.int64]] = {}
+    fit_target_window: dict[str, NDArray[np.int64]] = {}
     payload: dict[str, object] = {}
     for fold in folds:
         fit[fold.name] = _date_indices(dates, fold.fit_dates)
         selection[fold.name] = _date_indices(dates, fold.selection_dates)
         evaluation[fold.name] = _date_indices(dates, fold.evaluation_dates)
+        fit_target_window[fold.name] = _date_indices(
+            dates, (*fold.fit_dates, *fold.purge_before_dates)
+        )
         payload[fold.name] = fold.payload()
     if tuple(fit) != ("F1", "F2", "F3"):
         raise ValueError("development fold roster differs from the registration")
-    return fit, selection, evaluation, payload
+    return fit, selection, evaluation, fit_target_window, payload
 
 
 def _pretrain_indices(dates: NDArray[np.datetime64]) -> NDArray[np.int64]:
@@ -171,7 +212,12 @@ def _pretrain_indices(dates: NDArray[np.datetime64]) -> NDArray[np.int64]:
     ).astype(np.int64)
     if not full.size or np.any(np.diff(full) != 1):
         raise ValueError("pretrain axis is incomplete")
-    return full
+    # Every model sample consumes the preceding slow row.  The first store row
+    # has no causal predecessor and therefore is context, never a sample.
+    samples = full[full > 0]
+    if not samples.size:
+        raise ValueError("pretrain axis has no sample with prior slow history")
+    return samples
 
 
 def _open_round_store(
@@ -179,6 +225,7 @@ def _open_round_store(
     fit: Mapping[str, NDArray[np.int64]],
     selection: Mapping[str, NDArray[np.int64]],
     evaluation: Mapping[str, NDArray[np.int64]],
+    fit_target_window: Mapping[str, NDArray[np.int64]],
     pretrain: NDArray[np.int64],
 ) -> tuple[V2Store, dict[str, object]]:
     requested = np.unique(
@@ -196,7 +243,17 @@ def _open_round_store(
         requested,
         purpose="evaluation",
         history_lookbacks=253,
-        history_end_offsets=0,
+        history_end_offsets=np.where(requested == 0, 0, -1),
+        target_window_indices=np.unique(
+            np.concatenate(
+                (
+                    pretrain,
+                    *(fit_target_window[name] for name in ("F1", "F2", "F3")),
+                    *(selection[name] for name in ("F1", "F2", "F3")),
+                    *(evaluation[name] for name in ("F1", "F2", "F3")),
+                )
+            )
+        ),
     )
     return store, ledger.payload()
 
@@ -211,7 +268,7 @@ def _evaluate(
     source_hashes: Mapping[str, str],
     fold: str,
     output: Path,
-) -> EvaluationResult:
+) -> _ResearchEvaluation:
     inputs = _evaluation_inputs(
         store,
         indices,
@@ -219,62 +276,139 @@ def _evaluate(
         score_mask,
         cdi,
         source_hashes,
+        transfer_chronology_clean=True,
     )
     result = evaluate_scores(inputs, window_name=fold)
     result.report.update(RESEARCH_FLAGS)
     write_json_atomic(output, result.report)
+    return _ResearchEvaluation(result=result, inputs=inputs)
+
+
+def _single_family_ic_series(
+    inputs: EvaluationInputs,
+    *,
+    targets: str,
+    target_mask: str,
+) -> NDArray[np.float64]:
+    indexes = np.asarray(
+        [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS], dtype=np.int64
+    )
+    scores = np.asarray(inputs.scores, dtype=np.float64)[..., indexes]
+    outcomes = np.asarray(getattr(inputs, targets), dtype=np.float64)[..., indexes]
+    population = (
+        np.asarray(inputs.active, dtype=np.bool_)
+        & np.asarray(getattr(inputs, target_mask), dtype=np.bool_)[..., indexes].all(
+            axis=-1
+        )
+        & np.isfinite(outcomes).all(axis=-1)
+        & np.asarray(inputs.score_mask, dtype=np.bool_)[..., indexes].all(axis=-1)
+        & np.isfinite(scores).all(axis=-1)
+    )
+    result = np.full(len(inputs.dates), np.nan, dtype=np.float64)
+    for day in range(len(inputs.dates)):
+        if int(population[day].sum()) < 20:
+            continue
+        values = np.asarray(
+            [
+                _spearman(scores[day, :, head], outcomes[day, :, head], population[day])
+                for head in range(len(PRIMARY_HORIZONS))
+            ]
+        )
+        if np.isfinite(values).all():
+            result[day] = float(values.mean())
     return result
 
 
-def _daily_series(report: Mapping[str, object]) -> dict[str, NDArray[np.float64]]:
-    primary = set(PRIMARY_HORIZONS)
+def _single_spread_series(inputs: EvaluationInputs) -> NDArray[np.float64]:
+    indexes = np.asarray(
+        [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS], dtype=np.int64
+    )
+    scores = np.asarray(inputs.scores, dtype=np.float64)[..., indexes]
+    returns = np.asarray(inputs.shareholder_simple_returns, dtype=np.float64)[
+        ..., indexes
+    ]
+    population = (
+        np.asarray(inputs.active, dtype=np.bool_)
+        & np.asarray(inputs.shareholder_target_mask, dtype=np.bool_)[..., indexes].all(
+            axis=-1
+        )
+        & np.isfinite(returns).all(axis=-1)
+        & np.asarray(inputs.score_mask, dtype=np.bool_)[..., indexes].all(axis=-1)
+        & np.isfinite(scores).all(axis=-1)
+    )
+    result = np.full(len(inputs.dates), np.nan, dtype=np.float64)
+    for day in range(len(inputs.dates)):
+        names = np.flatnonzero(population[day])
+        if names.size < 20:
+            continue
+        decile_count = max(1, names.size // 10)
+        values = []
+        for head, horizon in enumerate(PRIMARY_HORIZONS):
+            order = names[np.argsort(scores[day, names, head], kind="stable")]
+            spread = (
+                returns[day, order[-decile_count:], head].mean()
+                - returns[day, order[:decile_count], head].mean()
+            )
+            values.append(float(spread) * 10_000.0 / horizon)
+        result[day] = float(np.mean(values))
+    return result
+
+
+def _single_persistence_series(
+    inputs: EvaluationInputs, *, lag: int
+) -> NDArray[np.float64]:
+    indexes = np.asarray(
+        [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS], dtype=np.int64
+    )
+    scores = np.asarray(inputs.scores, dtype=np.float64)[..., indexes]
+    score_mask = np.asarray(inputs.score_mask, dtype=np.bool_)[..., indexes]
+    active = np.asarray(inputs.active, dtype=np.bool_)
+    result = np.full(len(inputs.dates), np.nan, dtype=np.float64)
+    for day in range(lag, len(inputs.dates)):
+        population = (
+            active[day]
+            & active[day - lag]
+            & score_mask[day].all(axis=-1)
+            & score_mask[day - lag].all(axis=-1)
+            & np.isfinite(scores[day]).all(axis=-1)
+            & np.isfinite(scores[day - lag]).all(axis=-1)
+        )
+        if int(population.sum()) < 20:
+            continue
+        values = np.asarray(
+            [
+                _spearman(scores[day, :, head], scores[day - lag, :, head], population)
+                for head in range(len(PRIMARY_HORIZONS))
+            ]
+        )
+        if np.isfinite(values).all():
+            result[day] = float(values.mean())
+    return result
+
+
+def _daily_series(
+    evaluation: _ResearchEvaluation,
+) -> dict[str, NDArray[np.float64]]:
+    report = evaluation.result.report
     daily_primary = report.get("daily_primary_ic")
-    metrics = report.get("daily_metric_table")
-    persistence = report.get("persistence_table")
     economics = report.get("economics")
     if (
         not isinstance(daily_primary, list)
-        or not isinstance(metrics, list)
-        or not isinstance(persistence, list)
         or not isinstance(economics, Mapping)
         or not isinstance(economics.get("daily_table"), list)
     ):
         raise ValueError("evaluation report lacks registered daily readouts")
 
-    def average_rows(
-        rows: list[object], value_key: str, *, lag: int | None = None
-    ) -> NDArray[np.float64]:
-        by_date: dict[str, list[float]] = {}
-        for raw in rows:
-            if not isinstance(raw, Mapping):
-                raise ValueError("daily readout row is malformed")
-            if int(raw.get("horizon_sessions", -1)) not in primary:
-                continue
-            if lag is not None and int(raw.get("lag_sessions", -1)) != lag:
-                continue
-            key = str(raw["date"])
-            value = raw.get(value_key)
-            by_date.setdefault(key, []).append(
-                np.nan if value is None else float(value)
-            )
-        return np.asarray(
-            [
-                np.nanmean(values) if np.isfinite(values).any() else np.nan
-                for values in by_date.values()
-            ],
-            dtype=np.float64,
-        )
+    ordered_dates = tuple(value.isoformat() for value in evaluation.result.dates)
+    if (
+        tuple(str(row.get("date")) for row in daily_primary if isinstance(row, Mapping))
+        != ordered_dates
+    ):
+        raise ValueError("evaluation primary table differs from its retained date axis")
 
-    primary_values = np.asarray(
-        [
-            np.nan
-            if not isinstance(row, Mapping)
-            or row.get("mean_primary_horizon_ic") is None
-            else float(row["mean_primary_horizon_ic"])
-            for row in daily_primary
-        ],
-        dtype=np.float64,
-    )
+    primary_values = np.asarray(evaluation.result.daily_primary_ic, dtype=np.float64)
+    if primary_values.shape != (len(ordered_dates),):
+        raise ValueError("retained primary IC series differs from its date axis")
     headline = [
         row
         for row in economics["daily_table"]
@@ -282,23 +416,42 @@ def _daily_series(report: Mapping[str, object]) -> dict[str, NDArray[np.float64]
         and float(row.get("cost_bps_per_side", -1.0)) == 4.0
         and float(row.get("annual_borrow_rate", -1.0)) == 0.02
     ]
+    headline_by_date: dict[str, float] = {}
+    for row in headline:
+        day = str(row.get("date"))
+        if day in headline_by_date:
+            raise ValueError("headline economics contains duplicate dates")
+        value = row.get("net_excess_all_cash_bps")
+        headline_by_date[day] = np.nan if value is None else float(value)
+    headline_summary = economics.get("headline")
+    if not isinstance(headline_summary, Mapping) or not isinstance(
+        headline_summary.get("economics_unresolved"), bool
+    ):
+        raise ValueError("evaluation report lacks economics resolution status")
+    economics_values = np.asarray(
+        [headline_by_date.get(day, np.nan) for day in ordered_dates],
+        dtype=np.float64,
+    )
+    if headline_summary["economics_unresolved"]:
+        economics_values.fill(np.nan)
     return {
-        "median_residual_ic": primary_values,
-        "raw_rank_ic": average_rows(metrics, "raw_rank_ic"),
-        "persistence_1": average_rows(persistence, "spearman", lag=1),
-        "persistence_5": average_rows(persistence, "spearman", lag=5),
-        "decile_spread_bps_per_holding_session": average_rows(
-            metrics, "decile_spread_bps_per_holding_session"
+        "primary_scaled_target_ic": primary_values,
+        "shareholder_rank_ic": _single_family_ic_series(
+            evaluation.inputs,
+            targets="shareholder_midrank_targets",
+            target_mask="shareholder_target_mask",
         ),
-        "headline_net_excess_bps": np.asarray(
-            [
-                np.nan
-                if row.get("net_excess_all_cash_bps") is None
-                else float(row["net_excess_all_cash_bps"])
-                for row in headline
-            ],
-            dtype=np.float64,
+        "price_return_rank_ic": _single_family_ic_series(
+            evaluation.inputs,
+            targets="price_midrank_targets",
+            target_mask="price_target_mask",
         ),
+        "persistence_1": _single_persistence_series(evaluation.inputs, lag=1),
+        "persistence_5": _single_persistence_series(evaluation.inputs, lag=5),
+        "shareholder_return_spread_bps_per_holding_session": _single_spread_series(
+            evaluation.inputs
+        ),
+        "headline_net_excess_bps": economics_values,
     }
 
 
@@ -307,20 +460,23 @@ def _folded_bootstrap(
     *,
     replications: int = BOOTSTRAP_REPLICATIONS,
     seed: int = BOOTSTRAP_SEED,
-) -> dict[str, float | int | None]:
+) -> dict[str, object]:
     arrays = tuple(np.asarray(value, dtype=np.float64) for value in values)
     if not arrays or any(
         value.ndim != 1 or len(value) < BOOTSTRAP_BLOCK for value in arrays
     ):
         raise ValueError("each fold needs at least one bootstrap block")
     finite = np.concatenate(arrays)
+    possible_observations = int(sum(len(value) for value in arrays))
     finite_observations = int(np.isfinite(finite).sum())
     if finite_observations == 0:
         return {
             "estimate": None,
             "lower_95": None,
             "upper_95": None,
+            "possible_observations": possible_observations,
             "finite_observations": 0,
+            "undefined_reason": "no_defined_daily_values",
             "replications": replications,
             "block_length_sessions": BOOTSTRAP_BLOCK,
             "fold_boundary_preserved": True,
@@ -347,7 +503,9 @@ def _folded_bootstrap(
         "estimate": estimate,
         "lower_95": float(np.nanquantile(draws, 0.025)),
         "upper_95": float(np.nanquantile(draws, 0.975)),
+        "possible_observations": possible_observations,
         "finite_observations": finite_observations,
+        "undefined_reason": None,
         "replications": replications,
         "block_length_sessions": BOOTSTRAP_BLOCK,
         "fold_boundary_preserved": True,
@@ -394,10 +552,14 @@ def _small_interval_spanning_zero(readout: Mapping[str, object]) -> bool:
     )
 
 
-def _pooled_readouts(reports: Mapping[str, Mapping[str, object]]) -> dict[str, object]:
-    if tuple(reports) != ("F1", "F2", "F3"):
+def _pooled_readouts(
+    evaluations: Mapping[str, _ResearchEvaluation],
+) -> dict[str, object]:
+    if tuple(evaluations) != ("F1", "F2", "F3"):
         raise ValueError("pooled report roster must be F1/F2/F3")
-    series = {fold: _daily_series(report) for fold, report in reports.items()}
+    series = {
+        fold: _daily_series(evaluation) for fold, evaluation in evaluations.items()
+    }
     labels = tuple(series["F1"])
     return {
         "folds": {
@@ -410,45 +572,301 @@ def _pooled_readouts(reports: Mapping[str, Mapping[str, object]]) -> dict[str, o
             )
             for label in labels
         },
-        "horizons": {fold: reports[fold]["horizon_readouts"] for fold in reports},
+        "horizons": {
+            fold: evaluation.result.report["horizon_readouts"]
+            for fold, evaluation in evaluations.items()
+        },
         "economics_grid": {
-            fold: reports[fold]["economics"]["summaries"] for fold in reports
+            fold: evaluation.result.report["economics"]["summaries"]
+            for fold, evaluation in evaluations.items()
+        },
+        "coverage": {
+            fold: {
+                "primary": evaluation.result.report["primary_support"],
+                "economics": evaluation.result.report["economics"]["coverage"],
+            }
+            for fold, evaluation in evaluations.items()
         },
     }
 
 
-def _paired_readouts(
-    candidate: Mapping[str, Mapping[str, object]],
-    baseline: Mapping[str, Mapping[str, object]],
-) -> dict[str, object]:
-    candidate_series = {fold: _daily_series(candidate[fold]) for fold in candidate}
-    baseline_series = {fold: _daily_series(baseline[fold]) for fold in baseline}
-    labels = tuple(candidate_series["F1"])
-    deltas: dict[str, dict[str, NDArray[np.float64]]] = {}
-    for fold in ("F1", "F2", "F3"):
-        left_report = candidate[fold]
-        right_report = baseline[fold]
-        if left_report.get("input_hashes") != right_report.get("input_hashes"):
-            differing = {
-                key
-                for key in set(left_report.get("input_hashes", {}))
-                if left_report["input_hashes"].get(key)
-                != right_report["input_hashes"].get(key)
-                and key != "scores"
-            }
-            if differing:
-                raise ValueError(
-                    f"paired inputs differ for {fold}: {sorted(differing)}"
+def _common_family_ic_delta(
+    candidate: EvaluationInputs,
+    baseline: EvaluationInputs,
+    *,
+    targets: str,
+    target_mask: str,
+) -> tuple[NDArray[np.float64], list[dict[str, object]]]:
+    indexes = np.asarray(
+        [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS], dtype=np.int64
+    )
+    candidate_scores = np.asarray(candidate.scores, dtype=np.float64)[..., indexes]
+    baseline_scores = np.asarray(baseline.scores, dtype=np.float64)[..., indexes]
+    outcomes = np.asarray(getattr(candidate, targets), dtype=np.float64)[..., indexes]
+    outcome_mask = np.asarray(getattr(candidate, target_mask), dtype=np.bool_)[
+        ..., indexes
+    ]
+    population = (
+        np.asarray(candidate.active, dtype=np.bool_)
+        & outcome_mask.all(axis=-1)
+        & np.isfinite(outcomes).all(axis=-1)
+        & np.asarray(candidate.score_mask, dtype=np.bool_)[..., indexes].all(axis=-1)
+        & np.asarray(baseline.score_mask, dtype=np.bool_)[..., indexes].all(axis=-1)
+        & np.isfinite(candidate_scores).all(axis=-1)
+        & np.isfinite(baseline_scores).all(axis=-1)
+    )
+    result = np.full(len(candidate.dates), np.nan, dtype=np.float64)
+    for day in range(len(candidate.dates)):
+        if int(population[day].sum()) < 20:
+            continue
+        left = np.asarray(
+            [
+                _spearman(
+                    candidate_scores[day, :, head],
+                    outcomes[day, :, head],
+                    population[day],
                 )
-        deltas[fold] = {}
-        for label in labels:
-            left = candidate_series[fold][label]
-            right = baseline_series[fold][label]
-            if left.shape != right.shape:
-                raise ValueError(f"paired {label} axes differ for {fold}")
-            deltas[fold][label] = left - right
+                for head in range(len(PRIMARY_HORIZONS))
+            ]
+        )
+        right = np.asarray(
+            [
+                _spearman(
+                    baseline_scores[day, :, head],
+                    outcomes[day, :, head],
+                    population[day],
+                )
+                for head in range(len(PRIMARY_HORIZONS))
+            ]
+        )
+        if np.isfinite(left).all() and np.isfinite(right).all():
+            result[day] = float(left.mean() - right.mean())
+    return result, _paired_population_rows(candidate.dates, population, result)
+
+
+def _common_spread_delta(
+    candidate: EvaluationInputs,
+    baseline: EvaluationInputs,
+) -> tuple[NDArray[np.float64], list[dict[str, object]]]:
+    indexes = np.asarray(
+        [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS], dtype=np.int64
+    )
+    candidate_scores = np.asarray(candidate.scores, dtype=np.float64)[..., indexes]
+    baseline_scores = np.asarray(baseline.scores, dtype=np.float64)[..., indexes]
+    returns = np.asarray(candidate.shareholder_simple_returns, dtype=np.float64)[
+        ..., indexes
+    ]
+    outcome_mask = np.asarray(candidate.shareholder_target_mask, dtype=np.bool_)[
+        ..., indexes
+    ]
+    population = (
+        np.asarray(candidate.active, dtype=np.bool_)
+        & outcome_mask.all(axis=-1)
+        & np.isfinite(returns).all(axis=-1)
+        & np.asarray(candidate.score_mask, dtype=np.bool_)[..., indexes].all(axis=-1)
+        & np.asarray(baseline.score_mask, dtype=np.bool_)[..., indexes].all(axis=-1)
+        & np.isfinite(candidate_scores).all(axis=-1)
+        & np.isfinite(baseline_scores).all(axis=-1)
+    )
+    result = np.full(len(candidate.dates), np.nan, dtype=np.float64)
+    for day in range(len(candidate.dates)):
+        names = np.flatnonzero(population[day])
+        if names.size < 20:
+            continue
+        decile_count = max(1, names.size // 10)
+        deltas = []
+        for head, horizon in enumerate(PRIMARY_HORIZONS):
+            spreads = []
+            for scores in (candidate_scores, baseline_scores):
+                order = names[np.argsort(scores[day, names, head], kind="stable")]
+                spread = (
+                    returns[day, order[-decile_count:], head].mean()
+                    - returns[day, order[:decile_count], head].mean()
+                )
+                spreads.append(float(spread) * 10_000.0 / horizon)
+            deltas.append(spreads[0] - spreads[1])
+        result[day] = float(np.mean(deltas))
+    return result, _paired_population_rows(candidate.dates, population, result)
+
+
+def _common_persistence_delta(
+    candidate: EvaluationInputs,
+    baseline: EvaluationInputs,
+    *,
+    lag: int,
+) -> tuple[NDArray[np.float64], list[dict[str, object]]]:
+    indexes = np.asarray(
+        [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS], dtype=np.int64
+    )
+    candidate_scores = np.asarray(candidate.scores, dtype=np.float64)[..., indexes]
+    baseline_scores = np.asarray(baseline.scores, dtype=np.float64)[..., indexes]
+    candidate_mask = np.asarray(candidate.score_mask, dtype=np.bool_)[..., indexes]
+    baseline_mask = np.asarray(baseline.score_mask, dtype=np.bool_)[..., indexes]
+    active = np.asarray(candidate.active, dtype=np.bool_)
+    result = np.full(len(candidate.dates), np.nan, dtype=np.float64)
+    populations = np.zeros_like(active)
+    for day in range(lag, len(candidate.dates)):
+        population = (
+            active[day]
+            & active[day - lag]
+            & candidate_mask[day].all(axis=-1)
+            & candidate_mask[day - lag].all(axis=-1)
+            & baseline_mask[day].all(axis=-1)
+            & baseline_mask[day - lag].all(axis=-1)
+            & np.isfinite(candidate_scores[day]).all(axis=-1)
+            & np.isfinite(candidate_scores[day - lag]).all(axis=-1)
+            & np.isfinite(baseline_scores[day]).all(axis=-1)
+            & np.isfinite(baseline_scores[day - lag]).all(axis=-1)
+        )
+        populations[day] = population
+        if int(population.sum()) < 20:
+            continue
+        left = np.asarray(
+            [
+                _spearman(
+                    candidate_scores[day, :, head],
+                    candidate_scores[day - lag, :, head],
+                    population,
+                )
+                for head in range(len(PRIMARY_HORIZONS))
+            ]
+        )
+        right = np.asarray(
+            [
+                _spearman(
+                    baseline_scores[day, :, head],
+                    baseline_scores[day - lag, :, head],
+                    population,
+                )
+                for head in range(len(PRIMARY_HORIZONS))
+            ]
+        )
+        if np.isfinite(left).all() and np.isfinite(right).all():
+            result[day] = float(left.mean() - right.mean())
+    return result, _paired_population_rows(
+        candidate.dates, populations, result, unavailable_before=lag
+    )
+
+
+def _paired_population_rows(
+    dates: Sequence[object],
+    population: NDArray[np.bool_],
+    values: NDArray[np.float64],
+    *,
+    unavailable_before: int = 0,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for day, day_value in enumerate(dates):
+        count = int(population[day].sum())
+        value = values[day]
+        reason = None
+        if day < unavailable_before:
+            reason = "lag_precedes_window"
+        elif count < 20:
+            reason = "fewer_than_20_common_names"
+        elif not np.isfinite(value):
+            reason = "undefined_on_common_population"
+        rows.append(
+            {
+                "date": day_value.isoformat(),
+                "common_candidate_baseline_name_count": count,
+                "delta": None if not np.isfinite(value) else float(value),
+                "undefined_reason": reason,
+            }
+        )
+    return rows
+
+
+def _paired_readouts(
+    candidate: Mapping[str, _ResearchEvaluation],
+    baseline: Mapping[str, _ResearchEvaluation],
+) -> dict[str, object]:
+    if tuple(candidate) != ("F1", "F2", "F3") or tuple(baseline) != (
+        "F1",
+        "F2",
+        "F3",
+    ):
+        raise ValueError("paired report roster must be F1/F2/F3")
+    deltas: dict[str, dict[str, NDArray[np.float64]]] = {}
+    population_audit: dict[str, dict[str, list[dict[str, object]]]] = {}
+    for fold in ("F1", "F2", "F3"):
+        left = candidate[fold]
+        right = baseline[fold]
+        if left.result.dates != right.result.dates:
+            raise ValueError(f"paired date axes differ for {fold}")
+        _validate_paired_identity(left.result.report, right.result.report)
+        primary_delta, primary_rows = _paired_primary_daily(left.result, right.result)
+        shareholder_delta, shareholder_rows = _common_family_ic_delta(
+            left.inputs,
+            right.inputs,
+            targets="shareholder_midrank_targets",
+            target_mask="shareholder_target_mask",
+        )
+        price_delta, price_rows = _common_family_ic_delta(
+            left.inputs,
+            right.inputs,
+            targets="price_midrank_targets",
+            target_mask="price_target_mask",
+        )
+        persistence_1, persistence_1_rows = _common_persistence_delta(
+            left.inputs, right.inputs, lag=1
+        )
+        persistence_5, persistence_5_rows = _common_persistence_delta(
+            left.inputs, right.inputs, lag=5
+        )
+        spread_delta, spread_rows = _common_spread_delta(left.inputs, right.inputs)
+        candidate_series = _daily_series(left)
+        baseline_series = _daily_series(right)
+        if (
+            left.result.report["economics"]["headline"]["economics_unresolved"]
+            or right.result.report["economics"]["headline"]["economics_unresolved"]
+        ):
+            economics_delta = np.full(len(left.result.dates), np.nan)
+        else:
+            economics_delta = (
+                candidate_series["headline_net_excess_bps"]
+                - baseline_series["headline_net_excess_bps"]
+            )
+        economics_rows = [
+            {
+                "date": day.isoformat(),
+                "delta": None if not np.isfinite(value) else float(value),
+                "undefined_reason": (
+                    "economics_unresolved"
+                    if (
+                        left.result.report["economics"]["headline"][
+                            "economics_unresolved"
+                        ]
+                        or right.result.report["economics"]["headline"][
+                            "economics_unresolved"
+                        ]
+                    )
+                    else (None if np.isfinite(value) else "missing_daily_economics")
+                ),
+            }
+            for day, value in zip(left.result.dates, economics_delta, strict=True)
+        ]
+        deltas[fold] = {
+            "primary_scaled_target_ic": primary_delta,
+            "shareholder_rank_ic": shareholder_delta,
+            "price_return_rank_ic": price_delta,
+            "persistence_1": persistence_1,
+            "persistence_5": persistence_5,
+            "shareholder_return_spread_bps_per_holding_session": spread_delta,
+            "headline_net_excess_bps": economics_delta,
+        }
+        population_audit[fold] = {
+            "primary_scaled_target_ic": primary_rows,
+            "shareholder_rank_ic": shareholder_rows,
+            "price_return_rank_ic": price_rows,
+            "persistence_1": persistence_1_rows,
+            "persistence_5": persistence_5_rows,
+            "shareholder_return_spread_bps_per_holding_session": spread_rows,
+            "headline_net_excess_bps": economics_rows,
+        }
+    labels = tuple(deltas["F1"])
     return {
-        "schema": "BRAZIL_RV_V2_POOLED_PAIRED_READOUTS_V1",
+        "schema": "BRAZIL_RV_V2_POOLED_PAIRED_READOUTS_V2",
         "folds": {
             fold: {label: _folded_bootstrap((deltas[fold][label],)) for label in labels}
             for fold in deltas
@@ -459,6 +877,7 @@ def _paired_readouts(
             )
             for label in labels
         },
+        "population_audit": population_audit,
         "bootstrap_seed": BOOTSTRAP_SEED,
     }
 
@@ -492,30 +911,40 @@ def _gbdt_features(
     )
     if pretrain.shape != (len(indices),):
         raise ValueError("pretrain row mask is misaligned")
-    slow_indices = indices - (~pretrain).astype(np.int64)
+    slow_indices = indices - 1
     if np.any(slow_indices < 0):
         raise ValueError("GBDT slow history precedes the store")
-    parts = [np.asarray(store.read("slow_values", slow_indices), dtype=np.float32)]
+    slow = np.asarray(store.read("slow_values", slow_indices), dtype=np.float32)
+    slow_valid = np.asarray(store.read("slow_valid", slow_indices), dtype=np.bool_)
+    if not np.isfinite(slow[slow_valid]).all() or np.isinf(slow).any():
+        raise ValueError("GBDT slow features violate their validity contract")
+    parts = [np.where(slow_valid, slow, np.nan)]
     if rung != "a_slow":
         intraday = np.asarray(store.read("intraday_values", indices), dtype=np.float32)
-        intraday[pretrain] = 0.0
+        intraday_valid = np.asarray(
+            store.read("intraday_valid", indices), dtype=np.bool_
+        )
+        if not np.isfinite(intraday[intraday_valid]).all() or np.isinf(intraday).any():
+            raise ValueError("GBDT intraday features violate their validity contract")
+        intraday_valid[pretrain] = False
+        intraday = np.where(intraday_valid, intraday, np.nan)
         present = np.asarray(store.read("fast_present", indices), dtype=np.float32)
         present[pretrain] = 0.0
         days = np.ones_like(present, dtype=np.float32)
         days[pretrain] = 0.0
         parts.extend((intraday, present[..., None], days[..., None]))
     for group in RUNG_GROUPS[rung]:
-        parts.append(
-            np.asarray(
-                store.read(f"sidecar_{group}_values", slow_indices),
-                dtype=np.float32,
-            )
+        values = np.asarray(
+            store.read(f"sidecar_{group}_values", slow_indices), dtype=np.float32
         )
+        valid = np.asarray(
+            store.read(f"sidecar_{group}_valid", slow_indices), dtype=np.bool_
+        )
+        if not np.isfinite(values[valid]).all() or np.isinf(values).any():
+            raise ValueError(f"GBDT {group} features violate their validity contract")
+        parts.append(np.where(valid, values, np.nan))
     result = np.concatenate(parts, axis=-1, dtype=np.float32)
-    if (
-        result.shape[-1] != len(_feature_names(store, rung))
-        or not np.isfinite(result).all()
-    ):
+    if result.shape[-1] != len(_feature_names(store, rung)) or np.isinf(result).any():
         raise ValueError("GBDT feature panel violates its frozen contract")
     return result
 
@@ -543,6 +972,7 @@ def _run_gbdt_candidate(
     store: V2Store,
     rung: str,
     fit: Mapping[str, NDArray[np.int64]],
+    fit_target_window: Mapping[str, NDArray[np.int64]],
     selection: Mapping[str, NDArray[np.int64]],
     evaluation: Mapping[str, NDArray[np.int64]],
     pretrain: NDArray[np.int64] | None,
@@ -551,10 +981,10 @@ def _run_gbdt_candidate(
     source_hashes: Mapping[str, str],
     root: Path,
     num_threads: int,
-) -> tuple[dict[str, dict[str, object]], dict[str, object]]:
+) -> tuple[dict[str, _ResearchEvaluation], dict[str, object]]:
     config = GBDTConfig(seeds=GBDT_SEEDS, num_threads=num_threads)
     feature_names = _feature_names(store, rung)
-    reports: dict[str, dict[str, object]] = {}
+    reports: dict[str, _ResearchEvaluation] = {}
     records: dict[str, object] = {}
     for fold in ("F1", "F2", "F3"):
         fine = fit[fold]
@@ -569,13 +999,26 @@ def _run_gbdt_candidate(
         )
         selection_x = _gbdt_features(store, selection_indices, rung)
         evaluation_x = _gbdt_features(store, evaluation_indices, rung)
-        train_y = np.asarray(store.read("target_primary", train_indices))
-        train_mask = np.asarray(
-            store.read("target_valid", train_indices), dtype=np.bool_
+        train_window = (
+            fit_target_window[fold]
+            if pretrain is None
+            else np.concatenate((pretrain, fit_target_window[fold]))
         )
-        selection_y = np.asarray(store.read("target_primary", selection_indices))
+        train_mask = _window_target_mask(
+            store.read("target_valid", train_indices),
+            train_indices,
+            target_window_indices=train_window,
+        )
+        train_y = np.asarray(
+            store.read_target("target_primary", train_indices, valid_mask=train_mask)
+        )
         selection_mask = _window_target_mask(
             store.read("target_valid", selection_indices), selection_indices
+        )
+        selection_y = np.asarray(
+            store.read_target(
+                "target_primary", selection_indices, valid_mask=selection_mask
+            )
         )
         active = np.asarray(store.read("active", evaluation_indices), dtype=np.bool_)
         score_mask = np.repeat(active[..., None], len(HORIZONS), axis=-1)
@@ -597,9 +1040,7 @@ def _run_gbdt_candidate(
         )
         predictions = model.predict_ranks(evaluation_x, score_mask)
         raw_importance = model.feature_importance(evaluation_x)
-        importance = {
-            name: values.tolist() for name, values in raw_importance.items()
-        }
+        importance = {name: values.tolist() for name, values in raw_importance.items()}
         model_record = _persist_model(
             model,
             root / "models" / fold,
@@ -638,7 +1079,7 @@ def _run_gbdt_candidate(
             fold=fold,
             output=fold_root / "evaluation.json",
         )
-        reports[fold] = evaluated.report
+        reports[fold] = evaluated
         records[fold] = {
             "score_manifest": str(manifest),
             "score_manifest_sha256": manifest_sha,
@@ -665,7 +1106,7 @@ def freeze_round1(
         raise FileExistsError(output)
     store = store_root.resolve(strict=True)
     store_manifest, dates = _read_store_header(store)
-    fit, selection, evaluation, folds = _fold_indices(dates)
+    fit, selection, evaluation, _, folds = _fold_indices(dates)
     _load_development_cdi(
         dates=dates,
         cdi_path=cdi_path,
@@ -747,7 +1188,7 @@ def run_round1(
     store_manifest, dates = _read_store_header(store_root)
     if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
         raise ValueError("Round-1 store manifest hash mismatch")
-    fit, selection, evaluation, _ = _fold_indices(dates)
+    fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
     pretrain = _pretrain_indices(dates)
     cdi_design = design["cdi"]
     cdi, cdi_provenance = _load_development_cdi(
@@ -760,7 +1201,7 @@ def run_round1(
         ),
     )
     store, access = _open_round_store(
-        store_root, fit, selection, evaluation, pretrain
+        store_root, fit, selection, evaluation, fit_target_window, pretrain
     )
     source_hashes = {
         "v2_store_manifest": str(design["store"]["manifest_sha256"]),
@@ -782,7 +1223,7 @@ def run_round1(
         slow_names = tuple(store.manifest["feature_names"]["slow"])
         volatility_index = slow_names.index("yang_zhang_vol_20")
         panels = build_baselines(
-            store.read("adjusted_close", baseline_axis),
+            store.read("raw_close", baseline_axis),
             store.read("observed", baseline_axis),
             store.read("active", baseline_axis),
             store.read("ambiguous_action_mask", baseline_axis),
@@ -790,7 +1231,7 @@ def run_round1(
             store.read("slow_valid", baseline_axis)[..., volatility_index],
             slow_lag=1,
         )
-        baseline_reports: dict[str, dict[str, dict[str, object]]] = {
+        baseline_reports: dict[str, dict[str, _ResearchEvaluation]] = {
             name: {} for name in panels
         }
         baseline_records: dict[str, dict[str, object]] = {name: {} for name in panels}
@@ -806,7 +1247,12 @@ def run_round1(
                         "scores": panel.scores[local],
                         "score_mask": panel.score_mask[local],
                     },
-                    {"engine": "naive_baseline", "name": name, "fold": fold},
+                    {
+                        "engine": "naive_baseline",
+                        "name": name,
+                        "fold": fold,
+                        "evaluation_date_indices": indices.tolist(),
+                    },
                 )
                 result = _evaluate(
                     store=store,
@@ -818,7 +1264,7 @@ def run_round1(
                     fold=fold,
                     output=root / "evaluation.json",
                 )
-                baseline_reports[name][fold] = result.report
+                baseline_reports[name][fold] = result
                 baseline_records[name][fold] = {
                     "score_manifest": str(manifest),
                     "score_manifest_sha256": manifest_sha,
@@ -831,7 +1277,7 @@ def run_round1(
         }
         events.append({"event": "baselines_completed", "at_utc": _utc_now()})
 
-        rung_reports: dict[str, dict[str, dict[str, object]]] = {}
+        rung_reports: dict[str, dict[str, _ResearchEvaluation]] = {}
         rung_records: dict[str, object] = {}
         rung_summaries: dict[str, object] = {}
         rung_comparisons: dict[str, object] = {}
@@ -842,6 +1288,7 @@ def run_round1(
                 store=store,
                 rung=rung,
                 fit=fit,
+                fit_target_window=fit_target_window,
                 selection=selection,
                 evaluation=evaluation,
                 pretrain=None,
@@ -861,7 +1308,7 @@ def run_round1(
                 rung_comparisons[f"{rung}_minus_{previous}"] = paired
                 pooled = paired["pooled"]
                 if not (
-                    _point_is_negative(pooled["median_residual_ic"])
+                    _point_is_negative(pooled["primary_scaled_target_ic"])
                     and _point_is_negative(pooled["headline_net_excess_bps"])
                 ):
                     kept.append(rung)
@@ -871,7 +1318,7 @@ def run_round1(
             kept,
             key=lambda rung: (
                 _ranking_point(
-                    rung_summaries[rung]["pooled"]["median_residual_ic"]
+                    rung_summaries[rung]["pooled"]["primary_scaled_target_ic"]
                 ),
                 _ranking_point(
                     rung_summaries[rung]["pooled"]["headline_net_excess_bps"]
@@ -880,7 +1327,7 @@ def run_round1(
             ),
         )
 
-        span_reports: dict[str, dict[str, dict[str, object]]] = {
+        span_reports: dict[str, dict[str, _ResearchEvaluation]] = {
             "fine_only": rung_reports[parent]
         }
         span_records: dict[str, object] = {"fine_only": rung_records[parent]}
@@ -889,6 +1336,7 @@ def run_round1(
                 store=store,
                 rung=parent,
                 fit=fit,
+                fit_target_window=fit_target_window,
                 selection=selection,
                 evaluation=evaluation,
                 pretrain=pretrain,
@@ -957,10 +1405,14 @@ def _existing_score_and_evaluation_record(root: Path) -> dict[str, object]:
     manifest = _read_json(manifest_path)
     _assert_false_access(manifest, path=manifest_path)
     if (
-        manifest.get("schema") != "BRAZIL_RV_V2_RESEARCH_SCORE_V1"
+        manifest.get("schema") != RESEARCH_SCORE_SCHEMA
         or manifest.get("status") != "completed"
     ):
         raise ValueError(f"incomplete registered score artifact: {root}")
+    if manifest.get("transfer_chronology_clean") is not True:
+        raise PermissionError(
+            f"registered score has contaminated transfer chronology: {root}"
+        )
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, Mapping):
         raise ValueError(f"score manifest lacks artifacts: {manifest_path}")
@@ -1014,7 +1466,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
         raise ValueError("Round-1 store manifest hash mismatch")
     _, dates = _read_store_header(store_root)
-    fit, selection, evaluation, _ = _fold_indices(dates)
+    fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
     pretrain = _pretrain_indices(dates)
     cdi_design = design["cdi"]
     cdi, cdi_provenance = _load_development_cdi(
@@ -1027,7 +1479,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
         ),
     )
     store, access = _open_round_store(
-        store_root, fit, selection, evaluation, pretrain
+        store_root, fit, selection, evaluation, fit_target_window, pretrain
     )
     source_hashes = {
         "v2_store_manifest": str(design["store"]["manifest_sha256"]),
@@ -1042,7 +1494,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     reused_candidates = ["all_naive_baselines"]
     scored_candidates: list[str] = []
 
-    baseline_reports: dict[str, dict[str, dict[str, object]]] = {}
+    baseline_reports: dict[str, dict[str, _ResearchEvaluation]] = {}
     baseline_records: dict[str, dict[str, object]] = {}
     for raw_name in design["baseline_roster"]:
         name = str(raw_name)
@@ -1050,15 +1502,18 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
         baseline_records[name] = {}
         for fold in ("F1", "F2", "F3"):
             root = output / "baselines" / name / fold
-            baseline_reports[name][fold] = _evaluation_from_path(
-                root / "evaluation.json"
+            baseline_reports[name][fold] = _evaluation_from_artifacts(
+                root / "evaluation.json",
+                store=store,
+                indices=evaluation[fold],
+                cdi=cdi,
             )
             baseline_records[name][fold] = _existing_score_and_evaluation_record(root)
     baseline_summary = {
         name: _pooled_readouts(reports) for name, reports in baseline_reports.items()
     }
 
-    rung_reports: dict[str, dict[str, dict[str, object]]] = {}
+    rung_reports: dict[str, dict[str, _ResearchEvaluation]] = {}
     rung_records: dict[str, object] = {}
     rung_summaries: dict[str, object] = {}
     rung_comparisons: dict[str, object] = {}
@@ -1075,7 +1530,12 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             records = {}
             for fold in ("F1", "F2", "F3"):
                 root = candidate_root / fold
-                reports[fold] = _evaluation_from_path(root / "evaluation.json")
+                reports[fold] = _evaluation_from_artifacts(
+                    root / "evaluation.json",
+                    store=store,
+                    indices=evaluation[fold],
+                    cdi=cdi,
+                )
                 records[fold] = _existing_score_and_evaluation_record(root)
             reused_candidates.append(f"gbdt_ladder/{rung}")
         elif any(completed) or candidate_root.exists():
@@ -1085,6 +1545,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 store=store,
                 rung=rung,
                 fit=fit,
+                fit_target_window=fit_target_window,
                 selection=selection,
                 evaluation=evaluation,
                 pretrain=None,
@@ -1105,7 +1566,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             rung_comparisons[f"{rung}_minus_{previous}"] = paired
             pooled = paired["pooled"]
             if not (
-                _point_is_negative(pooled["median_residual_ic"])
+                _point_is_negative(pooled["primary_scaled_target_ic"])
                 and _point_is_negative(pooled["headline_net_excess_bps"])
             ):
                 kept.append(rung)
@@ -1113,15 +1574,13 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     parent = max(
         kept,
         key=lambda rung: (
-            _ranking_point(
-                rung_summaries[rung]["pooled"]["median_residual_ic"]
-            ),
+            _ranking_point(rung_summaries[rung]["pooled"]["primary_scaled_target_ic"]),
             _ranking_point(rung_summaries[rung]["pooled"]["headline_net_excess_bps"]),
             -list(RUNG_GROUPS).index(rung),
         ),
     )
 
-    span_reports: dict[str, dict[str, dict[str, object]]] = {
+    span_reports: dict[str, dict[str, _ResearchEvaluation]] = {
         "fine_only": rung_reports[parent]
     }
     span_records: dict[str, object] = {"fine_only": rung_records[parent]}
@@ -1136,7 +1595,12 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             records = {}
             for fold in ("F1", "F2", "F3"):
                 root = candidate_root / fold
-                reports[fold] = _evaluation_from_path(root / "evaluation.json")
+                reports[fold] = _evaluation_from_artifacts(
+                    root / "evaluation.json",
+                    store=store,
+                    indices=evaluation[fold],
+                    cdi=cdi,
+                )
                 records[fold] = _existing_score_and_evaluation_record(root)
             reused_candidates.append(f"gbdt_data_span/{arm}")
         elif any(completed) or candidate_root.exists():
@@ -1149,6 +1613,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 store=store,
                 rung=parent,
                 fit=fit,
+                fit_target_window=fit_target_window,
                 selection=selection,
                 evaluation=evaluation,
                 pretrain=pretrain,
@@ -1254,6 +1719,10 @@ def _verify_sealed_root(root: Path, *, expected_schema: str) -> dict[str, object
     if result.get("schema") != expected_schema or result.get("status") != "completed":
         raise ValueError("source research result is incomplete")
     _assert_false_access(result, path=source / result_name)
+    if result.get("transfer_chronology_clean") is not True:
+        raise PermissionError(
+            "canonical research rounds refuse contaminated transfer chronology"
+        )
     return result
 
 
@@ -1293,17 +1762,16 @@ def freeze_round2(
         experiment52_cdi_path=experiment52_cdi_path,
         experiment52_expected_sha256=experiment52_cdi_sha256,
     )
-    if (fast_checkpoint is None) != (fast_checkpoint_sha256 is None):
-        raise ValueError("v1 fast checkpoint and SHA-256 must be set together")
-    fast: dict[str, object]
-    if fast_checkpoint is None:
-        fast = {"used": False, "reason": "no compatible checkpoint bound before freeze"}
-    else:
-        checkpoint = fast_checkpoint.resolve(strict=True)
-        actual = sha256_file(checkpoint)
-        if actual != fast_checkpoint_sha256:
-            raise ValueError("v1 fast checkpoint SHA-256 mismatch")
-        fast = {"used": True, "path": str(checkpoint), "sha256": actual}
+    if fast_checkpoint is not None or fast_checkpoint_sha256 is not None:
+        raise ValueError(
+            "canonical Round 2 requires the native fresh fast encoder; legacy v1 "
+            "checkpoint transfer has contaminated chronology and belongs in a "
+            "separately labelled development-only ablation"
+        )
+    fast: dict[str, object] = {
+        "mode": "native_fresh",
+        "transfer_chronology_clean": True,
+    }
     output.mkdir(parents=True, exist_ok=False)
     design = {
         "schema": ROUND2_SCHEMA,
@@ -1337,7 +1805,7 @@ def freeze_round2(
             },
         },
         "enabled_sidecars": list(RUNG_GROUPS[parent]),
-        "v1_fast_initialization": fast,
+        "fast_initialization": fast,
         "network": {
             "seeds": list(NETWORK_SEEDS),
             "folds": ["F1", "F2", "F3"],
@@ -1406,15 +1874,13 @@ def _training_command(
         command.extend(("--fold", fold))
     for group in design["enabled_sidecars"]:
         command.extend(("--sidecar", str(group)))
-    fast = design["v1_fast_initialization"]
-    if fast["used"]:
-        command.extend(
-            (
-                "--fast-pretrained-checkpoint",
-                str(fast["path"]),
-                "--fast-pretrained-sha256",
-                str(fast["sha256"]),
-            )
+    fast = design.get("fast_initialization")
+    if not isinstance(fast, Mapping) or fast != {
+        "mode": "native_fresh",
+        "transfer_chronology_clean": True,
+    }:
+        raise ValueError(
+            "Round-2 design lacks the canonical native fast initialization"
         )
     if pretrain_checkpoint is not None:
         if pretrain_sha256 is None:
@@ -1447,9 +1913,12 @@ def _plan_job(
         "cwd": str(PROJECT_ROOT),
         "command": list(command),
         "expected_manifest": {
+            "schema": TRAINING_STAGE_SCHEMA,
+            "status": "completed",
             "stage": stage,
             "official_validation_accessed": False,
             "test_accessed": False,
+            "transfer_chronology_clean": True,
         },
     }
 
@@ -1491,18 +1960,19 @@ def write_round2_plan_p(*, output_root: Path) -> str:
 def write_round2_plan_main(*, output_root: Path) -> str:
     root = output_root.resolve(strict=True)
     design = _read_json(root / "frozen_design.json")
+    if (
+        design.get("schema") != ROUND2_SCHEMA
+        or design.get("status") != "frozen_before_score"
+    ):
+        raise ValueError("Round-2 root is not frozen under the current schema")
     if not (root / "round2_plan_p.json").is_file():
         raise FileNotFoundError("Stage-P plan is absent")
     handoffs: dict[int, tuple[Path, str]] = {}
     for seed in NETWORK_SEEDS:
         p_root = root / "trajectories" / "arm_B" / "stage_P" / f"seed_{seed}"
         manifest = _read_json(p_root / "run_manifest.json")
-        _assert_false_access(manifest, path=p_root / "run_manifest.json")
-        if (
-            manifest.get("status") != "completed"
-            or manifest.get("stage") != "P"
-            or manifest.get("seed") != seed
-        ):
+        _assert_current_clean_training(manifest, path=p_root / "run_manifest.json")
+        if manifest.get("stage") != "P" or manifest.get("seed") != seed:
             raise ValueError(f"Stage-P trajectory is incomplete for seed {seed}")
         checkpoint = p_root / "raw_patience.pt"
         digest = sha256_file(checkpoint)
@@ -1519,9 +1989,7 @@ def write_round2_plan_main(*, output_root: Path) -> str:
         for fold in ("F1", "F2", "F3"):
             for seed in NETWORK_SEEDS:
                 run_dir = root / "trajectories" / arm / f"{fold}_seed_{seed}"
-                handoff, handoff_sha = (
-                    handoffs[seed] if uses_handoff else (None, None)
-                )
+                handoff, handoff_sha = handoffs[seed] if uses_handoff else (None, None)
                 jobs.append(
                     _plan_job(
                         name=f"{arm}_{fold}_seed_{seed}",
@@ -1555,24 +2023,67 @@ def write_round2_plan_main(*, output_root: Path) -> str:
     )
 
 
-def _score_artifact(root: Path) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
+def _score_artifact(
+    root: Path,
+    *,
+    require_clean_transfer: bool = False,
+    expected_dates: NDArray[np.datetime64] | None = None,
+    expected_isins: Sequence[str] | None = None,
+    expected_feature_schema_sha256: str | None = None,
+) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
     manifest_path = root / "score_manifest.json"
     manifest = _read_json(manifest_path)
     _assert_false_access(manifest, path=manifest_path)
     if (
-        manifest.get("schema") != "BRAZIL_RV_V2_SCORE_ARTIFACT_V1"
+        manifest.get("schema")
+        not in {
+            SCORE_ARTIFACT_SCHEMA,
+            RESEARCH_SCORE_SCHEMA,
+        }
         or manifest.get("status") != "completed"
     ):
         raise ValueError(f"incomplete score artifact: {root}")
+    if require_clean_transfer and manifest.get("transfer_chronology_clean") is not True:
+        raise PermissionError(
+            f"score artifact has contaminated transfer chronology: {root}"
+        )
     scores_path = root / "scores.npy"
     mask_path = root / "score_mask.npy"
-    for path in (scores_path, mask_path):
-        record = manifest["artifacts"][path.name]
+    paths = [scores_path, mask_path]
+    if manifest["schema"] == SCORE_ARTIFACT_SCHEMA:
+        paths.extend((root / "date_index.npy", root / "isin_index.npy"))
+    records = manifest.get("artifacts")
+    if not isinstance(records, Mapping):
+        raise ValueError(f"score artifact lacks its inventory: {root}")
+    for path in paths:
+        record = records.get(path.name)
+        if not isinstance(record, Mapping):
+            raise ValueError(f"score artifact omits {path.name}: {root}")
         if (
             path.stat().st_size != int(record["bytes"])
             or sha256_file(path) != record["sha256"]
         ):
             raise ValueError(f"score artifact hash mismatch: {path}")
+    if manifest["schema"] == SCORE_ARTIFACT_SCHEMA:
+        if (
+            expected_feature_schema_sha256 is None
+            or manifest.get("feature_schema_sha256") != expected_feature_schema_sha256
+        ):
+            raise ValueError("network score feature schema differs from the store")
+        dates = np.asarray(
+            np.load(root / "date_index.npy", allow_pickle=False),
+            dtype="datetime64[D]",
+        )
+        isins = tuple(
+            str(value)
+            for value in np.load(root / "isin_index.npy", allow_pickle=False).tolist()
+        )
+        if expected_dates is None or expected_isins is None:
+            raise ValueError("canonical network scores require expected immutable axes")
+        if not np.array_equal(dates, np.asarray(expected_dates, dtype="datetime64[D]")):
+            raise ValueError("network score date axis differs from its registered fold")
+        if isins != tuple(str(value) for value in expected_isins):
+            raise ValueError("network score security axis differs from the store")
     return (
         np.load(scores_path, allow_pickle=False),
         np.load(mask_path, allow_pickle=False),
@@ -1580,21 +2091,29 @@ def _score_artifact(root: Path) -> tuple[NDArray[np.float32], NDArray[np.bool_]]
 
 
 def _aggregate_network_fold(
-    root: Path, arm: str, fold: str
+    root: Path,
+    arm: str,
+    fold: str,
+    *,
+    expected_dates: NDArray[np.datetime64],
+    expected_isins: Sequence[str],
+    expected_feature_schema_sha256: str,
 ) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
     members = []
     reference_mask: NDArray[np.bool_] | None = None
     for seed in NETWORK_SEEDS:
         run = root / "trajectories" / arm / f"{fold}_seed_{seed}"
         manifest = _read_json(run / "run_manifest.json")
-        _assert_false_access(manifest, path=run / "run_manifest.json")
-        if (
-            manifest.get("status") != "completed"
-            or manifest.get("seed") != seed
-            or manifest.get("fold") != fold
-        ):
+        _assert_current_clean_training(manifest, path=run / "run_manifest.json")
+        if manifest.get("seed") != seed or manifest.get("fold") != fold:
             raise ValueError(f"trajectory is incomplete: {run}")
-        scores, mask = _score_artifact(run / "scores")
+        scores, mask = _score_artifact(
+            run / "scores",
+            require_clean_transfer=True,
+            expected_dates=expected_dates,
+            expected_isins=expected_isins,
+            expected_feature_schema_sha256=expected_feature_schema_sha256,
+        )
         if reference_mask is None:
             reference_mask = mask
         elif not np.array_equal(reference_mask, mask):
@@ -1606,30 +2125,133 @@ def _aggregate_network_fold(
 
 
 def _load_round1_parent_fold(
-    round1_root: Path, parent: str, fold: str
+    round1_root: Path,
+    parent: str,
+    fold: str,
+    *,
+    expected_indices: NDArray[np.int64],
 ) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
     root = round1_root / "gbdt_ladder" / parent / fold
     manifest = _read_json(root / "score_manifest.json")
     _assert_false_access(manifest, path=root / "score_manifest.json")
-    arrays = {}
-    for label in ("scores", "score_mask"):
-        path = root / f"{label}.npy"
-        record = manifest["artifacts"][path.name]
-        if (
-            path.stat().st_size != int(record["bytes"])
-            or sha256_file(path) != record["sha256"]
-        ):
-            raise ValueError(f"Round-1 parent score hash mismatch: {path}")
-        arrays[label] = np.load(path, allow_pickle=False)
-    return arrays["scores"], arrays["score_mask"]
+    if manifest.get("schema") != RESEARCH_SCORE_SCHEMA:
+        raise ValueError("Round-1 parent score schema is stale")
+    metadata = manifest.get("metadata")
+    if not isinstance(metadata, Mapping) or (
+        metadata.get("fold") != fold
+        or metadata.get("evaluation_date_indices") != expected_indices.tolist()
+    ):
+        raise ValueError("Round-1 parent score axis differs from its registered fold")
+    return _score_artifact(root, require_clean_transfer=True)
 
 
 def _evaluation_from_path(path: Path) -> dict[str, object]:
     payload = _read_json(path)
     _assert_false_access(payload, path=path)
-    if payload.get("schema") != "BRAZIL_RV_V2_EVALUATION_V2":
+    if payload.get("schema") != EVALUATION_SCHEMA:
         raise ValueError(f"not a v2 evaluation: {path}")
     return payload
+
+
+def _evaluation_from_artifacts(
+    path: Path,
+    *,
+    store: V2Store,
+    indices: NDArray[np.int64],
+    cdi: NDArray[np.float64],
+) -> _ResearchEvaluation:
+    """Rebuild retained comparison inputs from hash-bound score/store artifacts."""
+
+    report = _evaluation_from_path(path)
+    transfer_chronology_clean = report.get("transfer_chronology_clean")
+    if transfer_chronology_clean is not True:
+        raise PermissionError(
+            f"evaluation has contaminated or unknown transfer chronology: {path}"
+        )
+    scores, score_mask = _score_artifact(path.parent, require_clean_transfer=True)
+    score_manifest = _read_json(path.parent / "score_manifest.json")
+    if score_manifest.get("transfer_chronology_clean") is not True:
+        raise ValueError(f"score/evaluation transfer chronology differs: {path}")
+    metadata = score_manifest.get("metadata")
+    if not isinstance(metadata, Mapping) or (
+        metadata.get("evaluation_date_indices") != indices.tolist()
+    ):
+        raise ValueError(f"score artifact axis differs from the evaluation: {path}")
+    source_hashes = report.get("source_artifact_hashes")
+    if not isinstance(source_hashes, Mapping) or not source_hashes:
+        raise ValueError(f"evaluation lacks source artifact hashes: {path}")
+    inputs = _evaluation_inputs(
+        store,
+        indices,
+        scores,
+        score_mask,
+        cdi,
+        {str(key): str(value) for key, value in source_hashes.items()},
+        transfer_chronology_clean=True,
+    )
+    recorded_hashes = report.get("input_hashes")
+    rebuilt_hashes = _input_hashes(inputs)
+    if recorded_hashes != rebuilt_hashes:
+        recorded = recorded_hashes if isinstance(recorded_hashes, Mapping) else {}
+        differing = sorted(
+            key
+            for key in set(recorded) | set(rebuilt_hashes)
+            if recorded.get(key) != rebuilt_hashes.get(key)
+        )
+        raise ValueError(
+            "evaluation inputs no longer match score/store artifacts: "
+            f"{path}; differing identities: {differing}"
+        )
+    (
+        primary_scores,
+        primary_targets,
+        primary_outcome_mask,
+        primary_score_mask,
+    ) = _primary_population_components(inputs)
+    _, daily_primary, _ = _primary_daily_metrics(
+        primary_scores,
+        primary_targets,
+        primary_outcome_mask,
+        primary_score_mask,
+        inputs.dates,
+    )
+    economics = report.get("economics")
+    if not isinstance(economics, Mapping) or not isinstance(
+        economics.get("daily_table"), list
+    ):
+        raise ValueError(f"evaluation lacks headline economics: {path}")
+    rows = [
+        row
+        for row in economics["daily_table"]
+        if isinstance(row, Mapping)
+        and float(row.get("cost_bps_per_side", -1.0)) == 4.0
+        and float(row.get("annual_borrow_rate", -1.0)) == 0.02
+    ]
+    by_date: dict[str, float] = {}
+    for row in rows:
+        key = str(row.get("date"))
+        if key in by_date:
+            raise ValueError(
+                f"evaluation has duplicate headline economics dates: {path}"
+            )
+        value = row.get("net_excess_all_cash_bps")
+        by_date[key] = np.nan if value is None else float(value)
+    headline = np.asarray(
+        [by_date.get(value.isoformat(), np.nan) for value in inputs.dates],
+        dtype=np.float64,
+    )
+    retained = EvaluationResult(
+        report=report,
+        dates=inputs.dates,
+        daily_primary_ic=daily_primary,
+        headline_economics_dates=inputs.dates,
+        headline_net_excess_bps=headline,
+        primary_scores=primary_scores,
+        primary_targets=primary_targets,
+        primary_outcome_mask=primary_outcome_mask,
+        primary_score_mask=primary_score_mask,
+    )
+    return _ResearchEvaluation(result=retained, inputs=inputs)
 
 
 def finalize_round2(*, output_root: Path) -> str:
@@ -1647,10 +2269,10 @@ def finalize_round2(*, output_root: Path) -> str:
     parent = str(design["round1"]["gbdt_parent_rung"])
     store_root = Path(str(design["store"]["root"]))
     store_manifest, dates = _read_store_header(store_root)
-    fit, selection, evaluation, _ = _fold_indices(dates)
+    fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
     pretrain = _pretrain_indices(dates)
     store, access = _open_round_store(
-        store_root, fit, selection, evaluation, pretrain
+        store_root, fit, selection, evaluation, fit_target_window, pretrain
     )
     cdi_design = design["cdi"]
     cdi, provenance = _load_development_cdi(
@@ -1671,14 +2293,23 @@ def finalize_round2(*, output_root: Path) -> str:
         "preregistration": str(design["preregistration"]["sha256"]),
         "round1_result": str(design["round1"]["result_sha256"]),
     }
-    arm_reports: dict[str, dict[str, dict[str, object]]] = {}
+    arm_reports: dict[str, dict[str, _ResearchEvaluation]] = {}
     arm_artifacts: dict[str, object] = {}
     try:
         for arm in ("arm_A", "arm_B", "arm_C"):
             arm_reports[arm] = {}
             arm_artifacts[arm] = {}
             for fold in ("F1", "F2", "F3"):
-                scores, mask = _aggregate_network_fold(root, arm, fold)
+                scores, mask = _aggregate_network_fold(
+                    root,
+                    arm,
+                    fold,
+                    expected_dates=store.dates[evaluation[fold]],
+                    expected_isins=store.isins,
+                    expected_feature_schema_sha256=str(
+                        store.manifest["feature_schema_sha256"]
+                    ),
+                )
                 aggregate = root / "aggregates" / arm / fold
                 manifest, digest = _persist_scores(
                     aggregate,
@@ -1701,7 +2332,7 @@ def finalize_round2(*, output_root: Path) -> str:
                     fold=fold,
                     output=aggregate / "evaluation.json",
                 )
-                arm_reports[arm][fold] = evaluated.report
+                arm_reports[arm][fold] = evaluated
                 arm_artifacts[arm][fold] = {
                     "score_manifest": str(manifest),
                     "score_manifest_sha256": digest,
@@ -1725,7 +2356,7 @@ def finalize_round2(*, output_root: Path) -> str:
                 eligible.append(arm)
         long_small_and_uncertain = all(
             _small_interval_spanning_zero(
-                arm_deltas[label]["pooled"]["median_residual_ic"]
+                arm_deltas[label]["pooled"]["primary_scaled_target_ic"]
             )
             for label in ("B_minus_A", "C_minus_A")
         )
@@ -1737,7 +2368,7 @@ def finalize_round2(*, output_root: Path) -> str:
                 eligible,
                 key=lambda arm: (
                     _ranking_point(
-                        arm_readouts[arm]["pooled"]["median_residual_ic"]
+                        arm_readouts[arm]["pooled"]["primary_scaled_target_ic"]
                     ),
                     _ranking_point(
                         arm_readouts[arm]["pooled"]["headline_net_excess_bps"]
@@ -1747,7 +2378,7 @@ def finalize_round2(*, output_root: Path) -> str:
             )
         )
 
-        comparator_reports: dict[str, dict[str, dict[str, object]]] = {
+        comparator_reports: dict[str, dict[str, _ResearchEvaluation]] = {
             "network": arm_reports[chosen_arm],
             "gbdt": {},
             "ensemble": {},
@@ -1758,16 +2389,15 @@ def finalize_round2(*, output_root: Path) -> str:
             "ensemble": {},
         }
         for fold in ("F1", "F2", "F3"):
-            network_scores = np.load(
-                root / "aggregates" / chosen_arm / fold / "scores.npy",
-                allow_pickle=False,
-            )
-            network_mask = np.load(
-                root / "aggregates" / chosen_arm / fold / "score_mask.npy",
-                allow_pickle=False,
+            network_scores, network_mask = _score_artifact(
+                root / "aggregates" / chosen_arm / fold,
+                require_clean_transfer=True,
             )
             gbdt_scores, gbdt_mask = _load_round1_parent_fold(
-                round1_root, parent, fold
+                round1_root,
+                parent,
+                fold,
+                expected_indices=evaluation[fold],
             )
             if not np.array_equal(network_mask, gbdt_mask):
                 raise ValueError("network and GBDT score masks differ")
@@ -1787,7 +2417,7 @@ def finalize_round2(*, output_root: Path) -> str:
                 fold=fold,
                 output=gbdt_root / "evaluation.json",
             )
-            comparator_reports["gbdt"][fold] = g_eval.report
+            comparator_reports["gbdt"][fold] = g_eval
             comparator_artifacts["gbdt"][fold] = {
                 "score_manifest": str(g_manifest),
                 "score_manifest_sha256": g_digest,
@@ -1819,7 +2449,7 @@ def finalize_round2(*, output_root: Path) -> str:
                 fold=fold,
                 output=ensemble_root / "evaluation.json",
             )
-            comparator_reports["ensemble"][fold] = e_eval.report
+            comparator_reports["ensemble"][fold] = e_eval
             comparator_artifacts["ensemble"][fold] = {
                 "score_manifest": str(e_manifest),
                 "score_manifest_sha256": e_digest,
@@ -1846,7 +2476,7 @@ def finalize_round2(*, output_root: Path) -> str:
             comparator_readouts,
             key=lambda name: (
                 _ranking_point(
-                    comparator_readouts[name]["pooled"]["median_residual_ic"]
+                    comparator_readouts[name]["pooled"]["primary_scaled_target_ic"]
                 ),
                 _ranking_point(
                     comparator_readouts[name]["pooled"]["headline_net_excess_bps"]
@@ -1857,9 +2487,11 @@ def finalize_round2(*, output_root: Path) -> str:
         stage_p = {}
         for seed in NETWORK_SEEDS:
             p_root = root / "trajectories" / "arm_B" / "stage_P" / f"seed_{seed}"
-            history = _read_json(p_root / "history.json")
             manifest = _read_json(p_root / "run_manifest.json")
-            _assert_false_access(manifest, path=p_root / "run_manifest.json")
+            _assert_current_clean_training(manifest, path=p_root / "run_manifest.json")
+            if manifest.get("stage") != "P" or manifest.get("seed") != seed:
+                raise ValueError(f"Stage-P trajectory identity differs for seed {seed}")
+            history = _read_json(p_root / "history.json")
             stage_p[str(seed)] = {
                 "history": str(p_root / "history.json"),
                 "history_sha256": sha256_file(p_root / "history.json"),
@@ -1931,12 +2563,20 @@ def seal_root(
         if path.name not in {"artifact_inventory.json", "access_audit.json"}
     ]
     flagged = []
+    transfer_flags: list[bool] = []
     for path in json_paths:
         payload = _read_json(path)
         if "official_validation_accessed" in payload or "test_accessed" in payload:
             _assert_false_access(payload, path=path)
             flagged.append(path.relative_to(output).as_posix())
-    access_flags = {**RESEARCH_FLAGS, "research_claim": research_claim}
+            transfer = payload["transfer_chronology_clean"]
+            assert isinstance(transfer, bool)
+            transfer_flags.append(transfer)
+    access_flags = {
+        **RESEARCH_FLAGS,
+        "research_claim": research_claim,
+        "transfer_chronology_clean": all(transfer_flags),
+    }
     audit = {
         "schema": "BRAZIL_RV_V2_RESEARCH_ACCESS_AUDIT_V1",
         "status": "passed",

@@ -1,74 +1,143 @@
 from __future__ import annotations
 
+import copy
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import pytest
 
+from brazil_rv.v2.artifacts import sha256_file
+from brazil_rv.v2.contract import HORIZONS, SLOW_FEATURES
+from brazil_rv.v2.evaluate import EvaluationInputs, _input_hashes, evaluate_scores
 from brazil_rv.v2.research_rounds import (
+    RESEARCH_SCORE_SCHEMA,
     RUNG_GROUPS,
+    _ResearchEvaluation,
     _economics_not_worse,
+    _evaluation_from_artifacts,
+    _fold_indices,
     _folded_bootstrap,
     _paired_readouts,
     _point_is_negative,
-    seal_root,
+    _pretrain_indices,
+    _score_artifact,
     _small_interval_spanning_zero,
+    _window_target_mask,
+    seal_root,
 )
 
 
-def _report(offset: float) -> dict[str, object]:
-    dates = [f"2024-01-{day:02d}" for day in range(1, 26)]
-    metrics = []
-    persistence = []
-    for index, value in enumerate(dates):
-        for horizon in (1, 2, 3, 5, 10):
-            metrics.append(
-                {
-                    "date": value,
-                    "horizon_sessions": horizon,
-                    "raw_rank_ic": offset + index / 100.0,
-                    "decile_spread_bps_per_holding_session": offset + index,
-                }
-            )
-            for lag in (1, 5):
-                persistence.append(
-                    {
-                        "date": value,
-                        "horizon_sessions": horizon,
-                        "lag_sessions": lag,
-                        "spearman": offset + index / 1000.0,
-                    }
-                )
-    return {
-        "daily_primary_ic": [
-            {"date": value, "mean_primary_horizon_ic": offset + index / 10.0}
-            for index, value in enumerate(dates)
-        ],
-        "daily_metric_table": metrics,
-        "persistence_table": persistence,
-        "economics": {
-            "daily_table": [
-                {
-                    "exit_date": value,
-                    "cost_bps_per_side": 4.0,
-                    "annual_borrow_rate": 0.02,
-                    "net_excess_all_cash_bps": offset + index,
-                }
-                for index, value in enumerate(dates)
-            ]
-        },
-        "input_hashes": {"scores": str(offset), "targets": "same"},
-    }
-
-
-def test_folded_bootstrap_never_crosses_fold_boundaries() -> None:
-    result = _folded_bootstrap(
-        (np.arange(25, dtype=np.float64), np.arange(25, 50, dtype=np.float64)),
-        replications=100,
+def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
+    day_count = 25
+    name_count = 80
+    raw_dates = np.busday_offset(
+        np.datetime64("2024-01-02"), np.arange(day_count), roll="forward"
     )
+    dates = tuple(raw_dates.astype("datetime64[D]").astype(object).tolist())
+    name_rank = np.arange(name_count, dtype=np.float64)[None, :, None]
+    horizon_shift = np.arange(len(HORIZONS), dtype=np.float64)[None, None, :]
+    targets = np.broadcast_to(
+        name_rank + 0.01 * horizon_shift,
+        (day_count, name_count, len(HORIZONS)),
+    ).copy()
+    target_mask = np.ones_like(targets, dtype=np.bool_)
+    for index, horizon in enumerate(HORIZONS):
+        target_mask[-horizon:, :, index] = False
+    active = np.ones((day_count, name_count), dtype=np.bool_)
+    raw_close = (
+        100.0
+        + np.arange(day_count, dtype=np.float64)[:, None] * 0.01
+        + np.arange(name_count, dtype=np.float64)[None, :] * 0.1
+    )
+    identity_successor = np.broadcast_to(
+        np.arange(name_count, dtype=np.int64)[None, :],
+        (day_count, name_count),
+    ).copy()
+    common = {
+        "dates": dates,
+        "session_indices": np.arange(1, 1 + day_count, dtype=np.int64),
+        "calendar_identity_sha256": "a" * 64,
+        "scaled_midrank_targets": targets,
+        "scaled_target_mask": target_mask,
+        "shareholder_midrank_targets": targets.copy(),
+        "shareholder_simple_returns": targets * 0.0001,
+        "shareholder_target_mask": target_mask.copy(),
+        "price_midrank_targets": targets.copy(),
+        "price_target_mask": target_mask.copy(),
+        "active": active,
+        "raw_close": raw_close,
+        "action_shares_per_prior_share": np.ones_like(raw_close),
+        "action_cash_per_prior_share": np.zeros_like(raw_close),
+        "action_session_resolved": np.ones_like(active),
+        "action_has_action": np.zeros_like(active),
+        "action_successor_index": identity_successor,
+        "action_payment_session": np.full_like(identity_successor, -1),
+        "security_ids": tuple(f"BRTEST{index:04d}" for index in range(name_count)),
+        "target_scale_sigma": np.full_like(raw_close, 0.02),
+        "prior_feature_values": {
+            name: np.zeros_like(raw_close, dtype=np.float32)
+            for name in (
+                "yang_zhang_vol_20",
+                "beta_60",
+                "log_volume_mean_20",
+                "momentum_12_1",
+                "log_return_5",
+            )
+        },
+        "cdi_returns": np.zeros(day_count, dtype=np.float64),
+        "source_artifact_hashes": {"fixture": "b" * 64},
+    }
+    for key in (
+        "scaled_midrank_targets",
+        "shareholder_midrank_targets",
+        "shareholder_simple_returns",
+        "price_midrank_targets",
+    ):
+        common[key] = np.where(target_mask, common[key], 0.0)
+    base_scores = targets.copy()
+    candidate_mask = np.ones_like(target_mask)
+    baseline_mask = np.ones_like(target_mask)
+    candidate_mask[:, :5] = False
+    baseline_mask[:, -5:] = False
+    candidate_inputs = EvaluationInputs(
+        scores=base_scores,
+        score_mask=candidate_mask,
+        transfer_chronology_clean=True,
+        **common,
+    )
+    baseline_inputs = EvaluationInputs(
+        scores=-base_scores,
+        score_mask=baseline_mask,
+        # Cleanliness is not a paired-population identity key for labelled
+        # development diagnostics. Official evaluation rejects this input.
+        transfer_chronology_clean=False,
+        **common,
+    )
+    candidate = _ResearchEvaluation(
+        result=evaluate_scores(candidate_inputs, window_name="fixture"),
+        inputs=candidate_inputs,
+    )
+    baseline = _ResearchEvaluation(
+        result=evaluate_scores(baseline_inputs, window_name="fixture"),
+        inputs=baseline_inputs,
+    )
+    return candidate, baseline
+
+
+def test_folded_bootstrap_never_crosses_fold_boundaries_or_drops_dates() -> None:
+    left = np.arange(25, dtype=np.float64)
+    right = np.arange(25, 50, dtype=np.float64)
+    right[::2] = np.nan
+    result = _folded_bootstrap((left, right), replications=100)
     assert result["fold_boundary_preserved"] is True
-    assert result["estimate"] == 24.5
-    assert result["finite_observations"] == 50
+    assert result["possible_observations"] == 50
+    assert result["finite_observations"] == 37
+    assert result["estimate"] == pytest.approx(
+        np.nanmean(np.concatenate((left, right)))
+    )
+    assert result["undefined_reason"] is None
 
 
 def test_folded_bootstrap_records_undefined_readout_as_null() -> None:
@@ -79,7 +148,9 @@ def test_folded_bootstrap_records_undefined_readout_as_null() -> None:
     assert result["estimate"] is None
     assert result["lower_95"] is None
     assert result["upper_95"] is None
+    assert result["possible_observations"] == 50
     assert result["finite_observations"] == 0
+    assert result["undefined_reason"] == "no_defined_daily_values"
 
 
 def test_undefined_economics_cannot_establish_not_worse() -> None:
@@ -91,19 +162,315 @@ def test_undefined_economics_cannot_establish_not_worse() -> None:
     assert _small_interval_spanning_zero(undefined) is False
 
 
-def test_paired_readouts_cover_all_registered_families() -> None:
-    baseline = {fold: _report(0.0) for fold in ("F1", "F2", "F3")}
-    candidate = {fold: _report(1.0) for fold in ("F1", "F2", "F3")}
-    paired = _paired_readouts(candidate, baseline)
+def test_paired_readouts_use_the_exact_common_four_head_population() -> None:
+    candidate, baseline = _evaluation_pair()
+    candidate_folds = {fold: candidate for fold in ("F1", "F2", "F3")}
+    baseline_folds = {fold: baseline for fold in ("F1", "F2", "F3")}
+
+    paired = _paired_readouts(candidate_folds, baseline_folds)
+
     assert set(paired["pooled"]) == {
-        "median_residual_ic",
-        "raw_rank_ic",
+        "primary_scaled_target_ic",
+        "shareholder_rank_ic",
+        "price_return_rank_ic",
         "persistence_1",
         "persistence_5",
-        "decile_spread_bps_per_holding_session",
+        "shareholder_return_spread_bps_per_holding_session",
         "headline_net_excess_bps",
     }
-    assert all(value["estimate"] == 1.0 for value in paired["pooled"].values())
+    primary = paired["pooled"]["primary_scaled_target_ic"]
+    assert primary["estimate"] == pytest.approx(2.0)
+    assert primary["possible_observations"] == 75
+    assert primary["finite_observations"] == 60
+    assert paired["pooled"]["shareholder_rank_ic"]["estimate"] == pytest.approx(2.0)
+    assert paired["pooled"]["price_return_rank_ic"]["estimate"] == pytest.approx(2.0)
+    assert paired["pooled"]["persistence_1"]["estimate"] == pytest.approx(0.0)
+    first = paired["population_audit"]["F1"]["primary_scaled_target_ic"][0]
+    assert first["common_candidate_baseline_name_count"] == 70
+    assert first["delta"] == pytest.approx(2.0)
+    assert first["undefined_reason"] is None
+
+
+def test_pretrain_samples_exclude_first_store_row_without_prior_history() -> None:
+    dates = np.asarray(
+        ["2010-01-04", "2010-01-05", "2010-01-06"], dtype="datetime64[D]"
+    )
+    assert _pretrain_indices(dates).tolist() == [1, 2]
+
+
+def test_round_fit_targets_may_end_in_registered_purge_before() -> None:
+    dates = np.arange(
+        np.datetime64("2010-01-04"),
+        np.datetime64("2025-01-01"),
+        dtype="datetime64[D]",
+    )
+    dates = dates[np.is_busday(dates)]
+    fit, _, _, fit_target_window, _ = _fold_indices(dates)
+    values = np.ones((len(fit["F1"]), 1, len(HORIZONS)), dtype=np.bool_)
+
+    fit_only = _window_target_mask(values, fit["F1"])
+    registered = _window_target_mask(
+        values,
+        fit["F1"],
+        target_window_indices=fit_target_window["F1"],
+    )
+
+    assert not fit_only[-1].any()
+    assert registered[-1, 0, HORIZONS.index(10)]
+
+
+def test_paired_economics_is_entirely_undefined_if_either_fold_is_unresolved() -> None:
+    candidate, baseline = _evaluation_pair()
+    report = copy.deepcopy(candidate.result.report)
+    report["economics"]["headline"]["economics_unresolved"] = True
+    unresolved = _ResearchEvaluation(
+        result=replace(candidate.result, report=report),
+        inputs=candidate.inputs,
+    )
+
+    paired = _paired_readouts(
+        {fold: unresolved for fold in ("F1", "F2", "F3")},
+        {fold: baseline for fold in ("F1", "F2", "F3")},
+    )
+
+    economics = paired["pooled"]["headline_net_excess_bps"]
+    assert economics["estimate"] is None
+    assert economics["finite_observations"] == 0
+    assert economics["possible_observations"] == 75
+
+
+def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
+    tmp_path: Path,
+) -> None:
+    candidate, _ = _evaluation_pair()
+    inputs = candidate.inputs
+    indices = np.asarray(inputs.session_indices, dtype=np.int64)
+    day_count, name_count = np.asarray(inputs.active).shape
+
+    def prefixed(values: np.ndarray) -> np.ndarray:
+        return np.concatenate((np.zeros_like(values[:1]), values), axis=0)
+
+    arrays = {
+        "target_valid": prefixed(np.asarray(inputs.scaled_target_mask)),
+        "target_shareholder_valid": prefixed(
+            np.asarray(inputs.shareholder_target_mask)
+        ),
+        "target_price_valid": prefixed(np.asarray(inputs.price_target_mask)),
+        "target_primary": prefixed(np.asarray(inputs.scaled_midrank_targets)),
+        "target_shareholder_midrank": prefixed(
+            np.asarray(inputs.shareholder_midrank_targets)
+        ),
+        "target_shareholder_simple_return": prefixed(
+            np.asarray(inputs.shareholder_simple_returns)
+        ),
+        "target_price_midrank": prefixed(np.asarray(inputs.price_midrank_targets)),
+        "active": prefixed(np.asarray(inputs.active)),
+        "raw_close": prefixed(np.asarray(inputs.raw_close)),
+        "action_shares_per_prior_share": prefixed(
+            np.asarray(inputs.action_shares_per_prior_share)
+        ),
+        "action_cash_per_prior_share": prefixed(
+            np.asarray(inputs.action_cash_per_prior_share)
+        ),
+        "action_session_resolved": prefixed(np.asarray(inputs.action_session_resolved)),
+        "action_has_action": prefixed(np.asarray(inputs.action_has_action)),
+        "action_successor_index": prefixed(np.asarray(inputs.action_successor_index)),
+        "action_payment_session": prefixed(np.asarray(inputs.action_payment_session)),
+        "target_scale_sigma": prefixed(np.asarray(inputs.target_scale_sigma)),
+        "slow_values": np.zeros(
+            (day_count + 1, name_count, len(SLOW_FEATURES)), dtype=np.float32
+        ),
+    }
+
+    class FixtureStore:
+        manifest = {
+            "axes": {"date_identity_sha256": inputs.calendar_identity_sha256},
+            "feature_names": {"slow": list(SLOW_FEATURES)},
+        }
+        dates = np.asarray(
+            ["2024-01-01", *(value.isoformat() for value in inputs.dates)],
+            dtype="datetime64[D]",
+        )
+        isins = inputs.security_ids
+
+        def read(self, name: str, selector: np.ndarray) -> np.ndarray:
+            return np.asarray(arrays[name][selector]).copy()
+
+        def read_target(
+            self, name: str, selector: np.ndarray, *, valid_mask: np.ndarray
+        ) -> np.ndarray:
+            values = self.read(name, selector)
+            return np.where(valid_mask, values, 0.0)
+
+    scores_path = tmp_path / "scores.npy"
+    mask_path = tmp_path / "score_mask.npy"
+    np.save(scores_path, inputs.scores, allow_pickle=False)
+    np.save(mask_path, inputs.score_mask, allow_pickle=False)
+    (tmp_path / "score_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema": RESEARCH_SCORE_SCHEMA,
+                "status": "completed",
+                "official_validation_accessed": False,
+                "test_accessed": False,
+                "transfer_chronology_clean": True,
+                "metadata": {"evaluation_date_indices": indices.tolist()},
+                "artifacts": {
+                    "scores.npy": {
+                        "bytes": scores_path.stat().st_size,
+                        "sha256": sha256_file(scores_path),
+                    },
+                    "score_mask.npy": {
+                        "bytes": mask_path.stat().st_size,
+                        "sha256": sha256_file(mask_path),
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    path = tmp_path / "evaluation.json"
+    path.write_text(json.dumps(candidate.result.report), encoding="utf-8")
+    cdi = np.zeros(day_count + 1, dtype=np.float64)
+
+    reconstructed = _evaluation_from_artifacts(
+        path,
+        store=FixtureStore(),
+        indices=indices,
+        cdi=cdi,
+    )
+
+    assert _input_hashes(reconstructed.inputs) == _input_hashes(inputs)
+    assert np.array_equal(
+        reconstructed.result.primary_score_mask,
+        candidate.result.primary_score_mask,
+    )
+    assert np.allclose(
+        reconstructed.result.daily_primary_ic,
+        candidate.result.daily_primary_ic,
+        equal_nan=True,
+    )
+
+
+@pytest.mark.parametrize(
+    ("schema", "clean", "error", "message"),
+    (
+        (
+            "BRAZIL_RV_V2_RESEARCH_SCORE_V1",
+            True,
+            ValueError,
+            "incomplete score artifact",
+        ),
+        (
+            RESEARCH_SCORE_SCHEMA,
+            False,
+            PermissionError,
+            "contaminated transfer chronology",
+        ),
+    ),
+)
+def test_score_artifact_rejects_stale_or_contaminated_manifest_before_arrays(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    schema: str,
+    clean: bool,
+    error: type[Exception],
+    message: str,
+) -> None:
+    payload = {
+        "schema": schema,
+        "status": "completed",
+        "official_validation_accessed": False,
+        "test_accessed": False,
+        "transfer_chronology_clean": clean,
+        "artifacts": {},
+    }
+    (tmp_path / "score_manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(
+        np,
+        "load",
+        lambda *args, **kwargs: pytest.fail("score array was opened"),
+    )
+
+    with pytest.raises(error, match=message):
+        _score_artifact(tmp_path, require_clean_transfer=True)
+
+
+def test_evaluation_rejects_contaminated_report_before_score_array_access(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate, _ = _evaluation_pair()
+    report = copy.deepcopy(candidate.result.report)
+    report["transfer_chronology_clean"] = False
+    path = tmp_path / "evaluation.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+    monkeypatch.setattr(
+        np,
+        "load",
+        lambda *args, **kwargs: pytest.fail("score or store payload was opened"),
+    )
+
+    with pytest.raises(PermissionError, match="contaminated or unknown"):
+        _evaluation_from_artifacts(
+            path,
+            store=object(),
+            indices=np.asarray([1], dtype=np.int64),
+            cdi=np.zeros(2, dtype=np.float64),
+        )
+
+
+def test_network_score_artifact_binds_date_security_and_feature_axes(
+    tmp_path: Path,
+) -> None:
+    arrays = {
+        "scores.npy": np.zeros((2, 3, len(HORIZONS)), dtype=np.float32),
+        "score_mask.npy": np.ones((2, 3, len(HORIZONS)), dtype=np.bool_),
+        "date_index.npy": np.asarray(
+            ["2024-01-02", "2024-01-03"], dtype="datetime64[D]"
+        ),
+        "isin_index.npy": np.asarray(["BR1", "BR2", "BR3"]),
+    }
+    records = {}
+    for name, values in arrays.items():
+        path = tmp_path / name
+        np.save(path, values, allow_pickle=False)
+        records[name] = {
+            "bytes": path.stat().st_size,
+            "sha256": sha256_file(path),
+        }
+    (tmp_path / "score_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V1",
+                "status": "completed",
+                "official_validation_accessed": False,
+                "test_accessed": False,
+                "transfer_chronology_clean": True,
+                "feature_schema_sha256": "c" * 64,
+                "artifacts": records,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    scores, mask = _score_artifact(
+        tmp_path,
+        require_clean_transfer=True,
+        expected_dates=arrays["date_index.npy"],
+        expected_isins=("BR1", "BR2", "BR3"),
+        expected_feature_schema_sha256="c" * 64,
+    )
+    assert scores.shape == mask.shape == (2, 3, len(HORIZONS))
+    with pytest.raises(ValueError, match="date axis"):
+        _score_artifact(
+            tmp_path,
+            require_clean_transfer=True,
+            expected_dates=np.asarray(
+                ["2024-01-03", "2024-01-04"], dtype="datetime64[D]"
+            ),
+            expected_isins=("BR1", "BR2", "BR3"),
+            expected_feature_schema_sha256="c" * 64,
+        )
 
 
 def test_registered_gbdt_ladder_is_exact_and_cumulative() -> None:
@@ -124,7 +491,9 @@ def test_registered_gbdt_ladder_is_exact_and_cumulative() -> None:
     )
 
 
-def test_superseded_root_seals_without_a_research_claim(tmp_path: Path) -> None:
+def test_superseded_root_seals_literal_contaminated_chronology(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "superseded.json").write_text(
         json.dumps(
             {
@@ -132,6 +501,7 @@ def test_superseded_root_seals_without_a_research_claim(tmp_path: Path) -> None:
                 "research_claim": False,
                 "official_validation_accessed": False,
                 "test_accessed": False,
+                "transfer_chronology_clean": False,
             }
         ),
         encoding="utf-8",
@@ -142,4 +512,6 @@ def test_superseded_root_seals_without_a_research_claim(tmp_path: Path) -> None:
         (tmp_path / "artifact_inventory.json").read_text(encoding="utf-8")
     )
     assert access["research_claim"] is False
+    assert access["transfer_chronology_clean"] is False
     assert inventory["research_claim"] is False
+    assert inventory["transfer_chronology_clean"] is False

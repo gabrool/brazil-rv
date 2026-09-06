@@ -34,9 +34,9 @@ from .contract import (
     PRETRAIN_END,
     STORE_START,
 )
-from .data import V2DailyDataset
+from .data import V2DailyDataset, collate_v2_daily
 from .data_roots import resolve_external_files
-from .evaluate import EvaluationInputs, EvaluationResult, _spearman, evaluate_scores
+from .evaluate import EvaluationInputs, EvaluationResult, evaluate_scores
 from .gbdt import GBDTConfig, MultiHorizonGBDT, assemble_gbdt_features
 from .score import ScoreArtifact, score_checkpoint_artifact
 from .splits import AccessPurpose, development_folds
@@ -48,13 +48,14 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V1"
-PIPELINE_NETWORK_RESUME_SCHEMA = "BRAZIL_RV_V2_PIPELINE_NETWORK_RESUME_V1"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V2"
+PIPELINE_NETWORK_RESUME_SCHEMA = "BRAZIL_RV_V2_PIPELINE_NETWORK_RESUME_V2"
 PIPELINE_FLAGS: dict[str, bool] = {
     "pipeline_validation": True,
     "research_claim": False,
     "official_validation_accessed": False,
     "test_accessed": False,
+    "transfer_chronology_clean": True,
 }
 _MIN_WINDOW_SESSIONS = max(HORIZONS) + 2
 _REQUIRED_ARRAYS = frozenset(
@@ -69,14 +70,18 @@ _REQUIRED_ARRAYS = frozenset(
         "fast_present",
         "target_primary",
         "target_valid",
-        "target_raw_midrank",
-        "target_raw_valid",
-        "target_raw_log_return",
-        "adjusted_close",
-        "neutralized_log_return",
-        "neutralized_log_return_valid",
-        "return_neutralized_event_mask",
-        "cross_sectional_median_log_return",
+        "target_shareholder_midrank",
+        "target_shareholder_simple_return",
+        "target_shareholder_valid",
+        "target_price_midrank",
+        "target_price_valid",
+        "raw_close",
+        "action_shares_per_prior_share",
+        "action_cash_per_prior_share",
+        "action_session_resolved",
+        "action_has_action",
+        "action_successor_index",
+        "action_payment_session",
         "target_scale_sigma",
     }
 )
@@ -221,7 +226,9 @@ def _assert_overrides_outside_store(
             continue
         override = Path(str(configured)).resolve(strict=True)
         if override == store_root or override.is_relative_to(store_root):
-            raise ValueError("data-root override must remain outside the immutable store")
+            raise ValueError(
+                "data-root override must remain outside the immutable store"
+            )
 
 
 def _bounded(
@@ -329,12 +336,18 @@ def _training_loaders(
         drop_last=True,
     )
     return (
-        DataLoader(fit, batch_sampler=sampler, num_workers=0),
+        DataLoader(
+            fit,
+            batch_sampler=sampler,
+            num_workers=0,
+            collate_fn=collate_v2_daily,
+        ),
         DataLoader(
             selection,
             batch_size=runtime.evaluation_batch_size,
             shuffle=False,
             num_workers=0,
+            collate_fn=collate_v2_daily,
         ),
     )
 
@@ -359,6 +372,7 @@ def _score_loader(
         batch_size=runtime.evaluation_batch_size,
         shuffle=False,
         num_workers=0,
+        collate_fn=collate_v2_daily,
     )
 
 
@@ -407,12 +421,95 @@ def _mark_pipeline_manifest(path: Path) -> str:
         or payload.get("test_accessed") is not False
     ):
         raise PermissionError(f"pipeline artifact touched sealed data: {path}")
+    if payload.get("transfer_chronology_clean") is not True:
+        raise PermissionError(
+            f"pipeline artifact has contaminated or unknown transfer chronology: {path}"
+        )
     payload.update(PIPELINE_FLAGS)
     return write_json_atomic(path, payload)
 
 
+def _load_score_arrays(
+    artifact: ScoreArtifact,
+    *,
+    expected_dates: NDArray[np.datetime64] | None = None,
+    expected_isins: Sequence[str] | None = None,
+    expected_feature_schema_sha256: str | None = None,
+) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
+    """Verify chronology/access provenance before opening score payload arrays."""
+
+    manifest = json.loads(artifact.manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, Mapping):
+        raise ValueError("score manifest must be an object")
+    if (
+        manifest.get("schema") != "BRAZIL_RV_V2_SCORE_ARTIFACT_V1"
+        or manifest.get("status") != "completed"
+    ):
+        raise ValueError("score artifact is stale or incomplete")
+    if (
+        manifest.get("official_validation_accessed") is not False
+        or manifest.get("test_accessed") is not False
+        or manifest.get("transfer_chronology_clean") is not True
+    ):
+        raise PermissionError(
+            "score artifact has sealed-window access or contaminated chronology"
+        )
+    if (
+        expected_feature_schema_sha256 is not None
+        and manifest.get("feature_schema_sha256") != expected_feature_schema_sha256
+    ):
+        raise ValueError("score feature schema differs from the canonical store")
+    records = manifest.get("artifacts")
+    if not isinstance(records, Mapping):
+        raise ValueError("score manifest lacks its artifact inventory")
+    if sha256_file(artifact.manifest_path) != artifact.manifest_sha256:
+        raise ValueError("score artifact manifest identity is stale")
+    for path in (
+        artifact.scores_path,
+        artifact.score_mask_path,
+        artifact.date_index_path,
+        artifact.isin_index_path,
+    ):
+        record = records.get(path.name)
+        if not isinstance(record, Mapping) or (
+            path.stat().st_size != int(record.get("bytes", -1))
+            or sha256_file(path) != record.get("sha256")
+        ):
+            raise ValueError(f"score artifact hash mismatch: {path}")
+    dates = np.asarray(
+        np.load(artifact.date_index_path, allow_pickle=False), dtype="datetime64[D]"
+    )
+    isins = tuple(
+        str(value)
+        for value in np.load(artifact.isin_index_path, allow_pickle=False).tolist()
+    )
+    if expected_dates is not None and not np.array_equal(
+        dates, np.asarray(expected_dates, dtype="datetime64[D]")
+    ):
+        raise ValueError("score date axis differs from the requested evaluation window")
+    if expected_isins is not None and isins != tuple(
+        str(value) for value in expected_isins
+    ):
+        raise ValueError("score security axis differs from the canonical store")
+    scores = np.asarray(
+        np.load(artifact.scores_path, allow_pickle=False), dtype=np.float32
+    )
+    score_mask = np.asarray(
+        np.load(artifact.score_mask_path, allow_pickle=False), dtype=np.bool_
+    )
+    if scores.shape != score_mask.shape or scores.shape[:2] != (
+        len(dates),
+        len(isins),
+    ):
+        raise ValueError("score payload and immutable axes are misaligned")
+    return scores, score_mask
+
+
 def _window_target_mask(
-    values: NDArray[np.bool_], indices: NDArray[np.int64]
+    values: NDArray[np.bool_],
+    indices: NDArray[np.int64],
+    *,
+    target_window_indices: NDArray[np.int64] | None = None,
 ) -> NDArray[np.bool_]:
     mask = np.asarray(values, dtype=np.bool_).copy()
     if (
@@ -421,7 +518,8 @@ def _window_target_mask(
         or mask.shape[-1] != len(HORIZONS)
     ):
         raise ValueError("window target mask has the wrong shape")
-    index_set = frozenset(int(value) for value in indices)
+    window = indices if target_window_indices is None else target_window_indices
+    index_set = frozenset(int(value) for value in window)
     for row, date_index in enumerate(indices):
         for horizon_index, horizon in enumerate(HORIZONS):
             if int(date_index) + horizon not in index_set:
@@ -436,19 +534,43 @@ def _evaluation_inputs(
     score_mask: NDArray[np.bool_],
     cdi_by_index: NDArray[np.float64],
     source_hashes: Mapping[str, str],
+    *,
+    transfer_chronology_clean: bool,
 ) -> EvaluationInputs:
-    targets = store.read("target_primary", indices)
-    raw_targets = store.read("target_raw_midrank", indices)
-    raw_returns = store.read("target_raw_log_return", indices)
-    target_mask = _window_target_mask(
+    if transfer_chronology_clean is not True:
+        raise PermissionError(
+            "pipeline validation refuses contaminated or unknown transfer chronology"
+        )
+    indices = np.asarray(indices, dtype=np.int64)
+    if (
+        indices.ndim != 1
+        or not indices.size
+        or (indices.size > 1 and np.any(np.diff(indices) != 1))
+    ):
+        raise ValueError("evaluation indices must be one nonempty contiguous window")
+    scaled_target_mask = _window_target_mask(
         store.read("target_valid", indices), indices
     )
-    raw_target_mask = _window_target_mask(
-        store.read("target_raw_valid", indices), indices
+    shareholder_target_mask = _window_target_mask(
+        store.read("target_shareholder_valid", indices), indices
     )
-    targets = np.where(target_mask, targets, 0.0)
-    raw_targets = np.where(raw_target_mask, raw_targets, 0.0)
-    raw_returns = np.where(raw_target_mask, raw_returns, 0.0)
+    price_target_mask = _window_target_mask(
+        store.read("target_price_valid", indices), indices
+    )
+    scaled_targets = store.read_target(
+        "target_primary", indices, valid_mask=scaled_target_mask
+    )
+    shareholder_targets = store.read_target(
+        "target_shareholder_midrank", indices, valid_mask=shareholder_target_mask
+    )
+    shareholder_returns = store.read_target(
+        "target_shareholder_simple_return",
+        indices,
+        valid_mask=shareholder_target_mask,
+    )
+    price_targets = store.read_target(
+        "target_price_midrank", indices, valid_mask=price_target_mask
+    )
     axes = store.manifest.get("axes")
     if not isinstance(axes, Mapping):
         raise ValueError("store manifest lacks its canonical axes")
@@ -477,32 +599,45 @@ def _evaluation_inputs(
     prior_feature_values = {
         name: slow_prior[..., slow_names.index(name)] for name in diagnostic_names
     }
+    action_payment_session = np.asarray(
+        store.read("action_payment_session", indices), dtype=np.int64
+    )
+    known_payment = action_payment_session >= 0
+    action_payment_session[known_payment] -= int(indices[0])
     return EvaluationInputs(
         dates=_dates_for_indices(store.dates, indices),
         session_indices=indices.copy(),
         calendar_identity_sha256=calendar_sha,
         scores=np.asarray(scores),
         score_mask=np.asarray(score_mask, dtype=np.bool_),
-        median_residual_midrank_targets=targets,
-        raw_midrank_targets=raw_targets,
-        raw_log_returns=raw_returns,
-        target_mask=target_mask,
-        raw_target_mask=raw_target_mask,
+        scaled_midrank_targets=scaled_targets,
+        scaled_target_mask=scaled_target_mask,
+        shareholder_midrank_targets=shareholder_targets,
+        shareholder_simple_returns=shareholder_returns,
+        shareholder_target_mask=shareholder_target_mask,
+        price_midrank_targets=price_targets,
+        price_target_mask=price_target_mask,
         active=np.asarray(store.read("active", indices), dtype=np.bool_),
-        adjusted_close=store.read("adjusted_close", indices),
-        neutralized_log_return=store.read("neutralized_log_return", indices),
-        neutralized_log_return_valid=np.asarray(
-            store.read("neutralized_log_return_valid", indices), dtype=np.bool_
+        raw_close=store.read("raw_close", indices),
+        action_shares_per_prior_share=store.read(
+            "action_shares_per_prior_share", indices
         ),
-        return_neutralized_event=np.asarray(
-            store.read("return_neutralized_event_mask", indices), dtype=np.bool_
+        action_cash_per_prior_share=store.read("action_cash_per_prior_share", indices),
+        action_session_resolved=np.asarray(
+            store.read("action_session_resolved", indices), dtype=np.bool_
         ),
-        cross_sectional_median_log_return=store.read(
-            "cross_sectional_median_log_return", indices
+        action_has_action=np.asarray(
+            store.read("action_has_action", indices), dtype=np.bool_
         ),
+        action_successor_index=np.asarray(
+            store.read("action_successor_index", indices), dtype=np.int64
+        ),
+        action_payment_session=action_payment_session,
+        security_ids=store.isins,
         target_scale_sigma=store.read("target_scale_sigma", indices),
         prior_feature_values=prior_feature_values,
         cdi_returns=cdi,
+        transfer_chronology_clean=transfer_chronology_clean,
         source_artifact_hashes=dict(source_hashes),
     )
 
@@ -517,6 +652,7 @@ def _evaluate_and_write(
     source_hashes: Mapping[str, str],
     window_name: str,
     path: Path,
+    transfer_chronology_clean: bool = True,
 ) -> tuple[EvaluationResult, str]:
     result = evaluate_scores(
         _evaluation_inputs(
@@ -526,6 +662,7 @@ def _evaluate_and_write(
             score_mask,
             cdi_by_index,
             source_hashes,
+            transfer_chronology_clean=transfer_chronology_clean,
         ),
         window_name=window_name,
     )
@@ -550,8 +687,8 @@ def _evaluation_summary(
     return {
         "report": str(report_path),
         "report_sha256": report_sha256,
-        "pooled_primary_median_residual_ic": result.report[
-            "pooled_primary_median_residual_ic"
+        "mean_daily_primary_scaled_target_ic": result.report[
+            "mean_daily_primary_scaled_target_ic"
         ],
         "headline_economics": dict(headline),
     }
@@ -573,15 +710,30 @@ def _gbdt_features(
     if np.any(indices <= 0):
         raise ValueError("fine-tune GBDT rows require a prior slow session")
     slow_parts = [store.read("slow_values", indices - 1)]
+    slow_valid_parts = [
+        np.asarray(store.read("slow_valid", indices - 1), dtype=np.bool_)
+    ]
     slow_parts.extend(
-        store.read(f"sidecar_{group}_values", indices - 1)
+        store.read(f"sidecar_{group}_values", indices - 1) for group in sidecars
+    )
+    slow_valid_parts.extend(
+        np.asarray(store.read(f"sidecar_{group}_valid", indices - 1), dtype=np.bool_)
         for group in sidecars
     )
     slow = np.concatenate(slow_parts, axis=-1)[:, :, None, :]
+    slow_valid = np.concatenate(slow_valid_parts, axis=-1)[:, :, None, :]
     intraday = store.read("intraday_values", indices)
+    intraday_valid = np.asarray(store.read("intraday_valid", indices), dtype=np.bool_)
     fast_present = np.asarray(store.read("fast_present", indices), dtype=np.bool_)
     days = np.ones(fast_present.shape, dtype=np.float32)
-    return assemble_gbdt_features(slow, intraday, fast_present, days)
+    return assemble_gbdt_features(
+        slow,
+        intraday,
+        fast_present,
+        days,
+        slow_feature_mask=slow_valid,
+        intraday_feature_mask=intraday_valid,
+    )
 
 
 def _gbdt_feature_names(store: V2Store, sidecars: Sequence[str]) -> tuple[str, ...]:
@@ -661,8 +813,8 @@ def _score_once(
         expected_checkpoint_sha256=sha256_file(checkpoint),
         device=None if runtime.device is None else torch.device(runtime.device),
     )
-    _mark_pipeline_manifest(result.manifest_path)
-    return result
+    manifest_sha256 = _mark_pipeline_manifest(result.manifest_path)
+    return replace(result, manifest_sha256=manifest_sha256)
 
 
 def _run_baselines(
@@ -676,16 +828,10 @@ def _run_baselines(
     first_index = min(int(indices[0]) for indices in fold_indices.values())
     last_index = max(int(indices[-1]) for indices in fold_indices.values())
     baseline_start = max(0, first_index - 253)
-    baseline_indices = np.arange(
-        baseline_start, last_index + 1, dtype=np.int64
-    )
-    close = store.read("adjusted_close", baseline_indices)
-    observed = np.asarray(
-        store.read("observed", baseline_indices), dtype=np.bool_
-    )
-    active = np.asarray(
-        store.read("active", baseline_indices), dtype=np.bool_
-    )
+    baseline_indices = np.arange(baseline_start, last_index + 1, dtype=np.int64)
+    close = store.read("raw_close", baseline_indices)
+    observed = np.asarray(store.read("observed", baseline_indices), dtype=np.bool_)
+    active = np.asarray(store.read("active", baseline_indices), dtype=np.bool_)
     ambiguous = np.asarray(
         store.read("ambiguous_action_mask", baseline_indices), dtype=np.bool_
     )
@@ -748,141 +894,11 @@ def _run_baselines(
     return records
 
 
-def _baseline_ic_table(
-    *,
-    store: V2Store,
-    fold_indices: Mapping[str, NDArray[np.int64]],
-) -> dict[tuple[str, str, int], dict[str, object]]:
-    """Compute IC-only baseline diagnostics without invoking an economics ledger."""
-
-    names = tuple(store.manifest["feature_names"]["slow"])
-    volatility_index = names.index("yang_zhang_vol_20")
-    rows: dict[tuple[str, str, int], dict[str, object]] = {}
-    for fold, indices in sorted(fold_indices.items()):
-        baseline_start = max(0, int(indices[0]) - 253)
-        baseline_indices = np.arange(
-            baseline_start, int(indices[-1]) + 1, dtype=np.int64
-        )
-        panels = build_baselines(
-            store.read("adjusted_close", baseline_indices),
-            np.asarray(store.read("observed", baseline_indices), dtype=np.bool_),
-            np.asarray(store.read("active", baseline_indices), dtype=np.bool_),
-            np.asarray(
-                store.read("ambiguous_action_mask", baseline_indices), dtype=np.bool_
-            ),
-            store.read("slow_values", baseline_indices)[..., volatility_index],
-            store.read("slow_valid", baseline_indices)[..., volatility_index],
-            slow_lag=1,
-        )
-        local_indices = indices - baseline_start
-        target = np.asarray(store.read("target_primary", indices), dtype=np.float64)
-        target_mask = np.asarray(store.read("target_valid", indices), dtype=np.bool_)
-        active = np.asarray(store.read("active", indices), dtype=np.bool_)
-        for baseline, panel in sorted(panels.items()):
-            for horizon_index, horizon in enumerate(HORIZONS):
-                daily = np.asarray(
-                    [
-                        _spearman(
-                            panel.scores[local, :, horizon_index],
-                            target[day, :, horizon_index],
-                            panel.score_mask[local, :, horizon_index]
-                            & target_mask[day, :, horizon_index]
-                            & active[day],
-                        )
-                        for day, local in enumerate(local_indices.tolist())
-                    ],
-                    dtype=np.float64,
-                )
-                finite = daily[np.isfinite(daily)]
-                rows[(fold, baseline, horizon)] = {
-                    "mean_daily_spearman_ic": (
-                        None if finite.size == 0 else float(finite.mean())
-                    ),
-                    "finite_date_count": int(finite.size),
-                    "evaluation_date_count": int(len(indices)),
-                }
-    return rows
-
-
-def _old_new_baseline_ic_comparison(
-    *,
-    old_store_root: Path,
-    new_store: V2Store,
-    fold_indices: Mapping[str, NDArray[np.int64]],
-) -> tuple[list[dict[str, object]], dict[str, object]]:
-    old_root = Path(old_store_root).resolve(strict=True)
-    old_manifest_path = old_root / "manifest.json"
-    old_manifest_sha = sha256_file(old_manifest_path)
-    old_manifest = json.loads(old_manifest_path.read_text(encoding="utf-8"))
-    if old_manifest.get("schema") != STORE_SCHEMA:
-        raise ValueError("baseline comparison requires an immutable v2 old store")
-    required = {
-        "active",
-        "ambiguous_action_mask",
-        "observed",
-        "slow_values",
-        "slow_valid",
-        "target_primary",
-        "target_valid",
-        "adjusted_close",
-    }
-    if not required.issubset(old_manifest.get("arrays", {})):
-        raise ValueError("old store lacks arrays required for the IC-only diagnostic")
-    old_dates = np.load(old_root / "date_index.npy", allow_pickle=False)
-    old_isins = np.load(old_root / "isin_index.npy", allow_pickle=False)
-    if not np.array_equal(old_dates, np.asarray(new_store.dates)) or tuple(
-        str(value) for value in old_isins.tolist()
-    ) != new_store.isins:
-        raise ValueError("old/new store axes differ; baseline ICs are not paired")
-    samples = np.unique(np.concatenate(tuple(fold_indices.values()))).astype(
-        np.int64, copy=False
-    )
-    old_store, old_access = open_store_for_samples(
-        old_root,
-        samples,
-        purpose="evaluation",
-        history_lookbacks=253,
-        history_end_offsets=-1,
-    )
-    try:
-        old_rows = _baseline_ic_table(store=old_store, fold_indices=fold_indices)
-        new_rows = _baseline_ic_table(store=new_store, fold_indices=fold_indices)
-    finally:
-        old_store.close()
-    if old_rows.keys() != new_rows.keys():
-        raise AssertionError("old/new baseline IC tables do not share one exact grid")
-    comparison: list[dict[str, object]] = []
-    for fold, baseline, horizon in sorted(old_rows):
-        old = old_rows[(fold, baseline, horizon)]
-        new = new_rows[(fold, baseline, horizon)]
-        old_ic = old["mean_daily_spearman_ic"]
-        new_ic = new["mean_daily_spearman_ic"]
-        comparison.append(
-            {
-                "fold": fold,
-                "baseline": baseline,
-                "horizon_sessions": horizon,
-                "old_store": old,
-                "new_store": new,
-                "new_minus_old_mean_daily_spearman_ic": (
-                    None
-                    if old_ic is None or new_ic is None
-                    else float(new_ic) - float(old_ic)
-                ),
-            }
-        )
-    return comparison, {
-        "root": str(old_root),
-        "manifest_sha256": old_manifest_sha,
-        "access_ledger": old_access.payload(),
-        "scope": "IC only; the superseded economics evaluator was not invoked",
-    }
-
-
 def _run_gbdt(
     *,
     store: V2Store,
     fit_indices: Mapping[str, NDArray[np.int64]],
+    fit_target_window_indices: Mapping[str, NDArray[np.int64]],
     selection_indices: Mapping[str, NDArray[np.int64]],
     evaluation_indices: Mapping[str, NDArray[np.int64]],
     cdi_by_index: NDArray[np.float64],
@@ -907,18 +923,22 @@ def _run_gbdt(
         evaluation_features = _gbdt_features(store, evaluation_rows, sidecars)
         if train_features.shape[-1] != len(feature_names):
             raise ValueError("GBDT feature names differ from the assembled width")
-        train_targets = store.read("target_primary", train_indices)
-        train_mask = np.asarray(
-            store.read("target_valid", train_indices), dtype=np.bool_
+        train_mask = _window_target_mask(
+            store.read("target_valid", train_indices),
+            train_indices,
+            target_window_indices=fit_target_window_indices[fold],
         )
-        selection_targets = store.read("target_primary", selection_rows)
+        train_targets = store.read_target(
+            "target_primary", train_indices, valid_mask=train_mask
+        )
         selection_mask = _window_target_mask(
             store.read("target_valid", selection_rows),
             selection_rows,
         )
-        active = np.asarray(
-            store.read("active", evaluation_rows), dtype=np.bool_
+        selection_targets = store.read_target(
+            "target_primary", selection_rows, valid_mask=selection_mask
         )
+        active = np.asarray(store.read("active", evaluation_rows), dtype=np.bool_)
         score_mask = np.repeat(active[..., None], len(HORIZONS), axis=-1)
         model = MultiHorizonGBDT(config, feature_names=feature_names)
         model.fit(
@@ -931,14 +951,12 @@ def _run_gbdt(
             train_dates=train_indices,
             validation_dates=selection_rows,
         )
-        predictions = model.predict_ranks(
-            evaluation_features, score_mask
-        ).astype(np.float32, copy=False)
+        predictions = model.predict_ranks(evaluation_features, score_mask).astype(
+            np.float32, copy=False
+        )
         importance = {
             name: values.tolist()
-            for name, values in model.feature_importance(
-                evaluation_features
-            ).items()
+            for name, values in model.feature_importance(evaluation_features).items()
         }
         model_artifact = _persist_gbdt_models(
             model,
@@ -1005,9 +1023,7 @@ def _persist_gbdt_models(
         root,
         metadata={"status": "completed", **PIPELINE_FLAGS},
     )
-    reloaded = type(model).load(
-        root, expected_manifest_sha256=manifest_sha
-    )
+    reloaded = type(model).load(root, expected_manifest_sha256=manifest_sha)
     before_raw = model.predict_raw(verification_features)
     after_raw = reloaded.predict_raw(verification_features)
     before_rank = model.predict_ranks(verification_features, verification_mask)
@@ -1069,8 +1085,12 @@ def _run_network_smokes(
         runtime=runtime,
         sidecars=sidecars,
     )
-    scratch_values = np.load(scratch_score.scores_path, allow_pickle=False)
-    scratch_mask = np.load(scratch_score.score_mask_path, allow_pickle=False)
+    scratch_values, scratch_mask = _load_score_arrays(
+        scratch_score,
+        expected_dates=store.dates[evaluation_indices],
+        expected_isins=store.isins,
+        expected_feature_schema_sha256=str(store.manifest["feature_schema_sha256"]),
+    )
     evaluated, report_sha = _evaluate_and_write(
         store=store,
         indices=evaluation_indices,
@@ -1109,11 +1129,11 @@ def _run_network_smokes(
         runtime=runtime,
         sidecars=sidecars,
     )
-    persistence_values = np.load(
-        persistence_score.scores_path, allow_pickle=False
-    )
-    persistence_mask = np.load(
-        persistence_score.score_mask_path, allow_pickle=False
+    persistence_values, persistence_mask = _load_score_arrays(
+        persistence_score,
+        expected_dates=store.dates[evaluation_indices],
+        expected_isins=store.isins,
+        expected_feature_schema_sha256=str(store.manifest["feature_schema_sha256"]),
     )
     persistence_evaluated, persistence_report_sha = _evaluate_and_write(
         store=store,
@@ -1179,9 +1199,7 @@ def _run_network_smokes(
             "epochs_cap": 1,
             "training_manifest": str(persistence.manifest_path),
             "score_manifest": str(persistence_score.manifest_path),
-            "score_manifest_sha256": sha256_file(
-                persistence_score.manifest_path
-            ),
+            "score_manifest_sha256": sha256_file(persistence_score.manifest_path),
             "evaluation": _evaluation_summary(
                 persistence_evaluated,
                 root / "persistence_lambda_0_1" / "evaluation.json",
@@ -1325,7 +1343,10 @@ def _load_development_cdi(
     columns = ["trade_date", "daily_cdi_rate"]
     extension = pl.read_parquet(resolved).select(columns).sort("trade_date")
     reference = pl.read_parquet(reference_resolved).select(columns).sort("trade_date")
-    for label, rows in (("development extension", extension), ("Experiment-52", reference)):
+    for label, rows in (
+        ("development extension", extension),
+        ("Experiment-52", reference),
+    ):
         if rows.is_empty():
             raise ValueError(f"{label} CDI series is empty")
         if rows["trade_date"].dtype != pl.Date:
@@ -1359,8 +1380,7 @@ def _load_development_cdi(
             "development CDI extension does not contain every Experiment-52 date"
         )
     exact_byte_match = reference.schema == overlap.schema and all(
-        reference[column].to_numpy().tobytes()
-        == overlap[column].to_numpy().tobytes()
+        reference[column].to_numpy().tobytes() == overlap[column].to_numpy().tobytes()
         for column in columns
     )
     if not exact_byte_match:
@@ -1368,8 +1388,7 @@ def _load_development_cdi(
             "development CDI extension differs from the Experiment-52 reference"
         )
     rate_difference = np.abs(
-        overlap["daily_cdi_rate"].to_numpy()
-        - reference["daily_cdi_rate"].to_numpy()
+        overlap["daily_cdi_rate"].to_numpy() - reference["daily_cdi_rate"].to_numpy()
     )
     maximum_absolute_difference = float(rate_difference.max())
     if maximum_absolute_difference != 0.0:
@@ -1453,18 +1472,23 @@ def _verified_classical_source(
         or access.get("test_accessed") is not False
         or access.get("all_registrations_null") is not True
         or access.get("json_sidecars_verified") is not True
+        or access.get("transfer_chronology_clean") is not True
     ):
         raise ValueError("completed classical source records invalid access state")
     completed = failure.get("completed_before_failure")
     not_started = failure.get("not_started")
-    if not isinstance(completed, Mapping) or not isinstance(not_started, Mapping) or (
-        completed.get("baseline_evaluations") != 12
-        or completed.get("gbdt_evaluations") != 2
-        or completed.get("gbdt_head_models") != 100
-        or completed.get("gbdt_model_manifests") != 4
-        or not_started.get("checkpoint_count") != 0
-        or not_started.get("network_artifact_count") != 0
-        or not_started.get("neural_history_count") != 0
+    if (
+        not isinstance(completed, Mapping)
+        or not isinstance(not_started, Mapping)
+        or (
+            completed.get("baseline_evaluations") != 12
+            or completed.get("gbdt_evaluations") != 2
+            or completed.get("gbdt_head_models") != 100
+            or completed.get("gbdt_model_manifests") != 4
+            or not_started.get("checkpoint_count") != 0
+            or not_started.get("network_artifact_count") != 0
+            or not_started.get("neural_history_count") != 0
+        )
     ):
         raise ValueError("completed classical failure boundary is not score-free")
     excluded_raw = inventory_payload.get("excluded_self")
@@ -1478,7 +1502,9 @@ def _verified_classical_source(
         raise ValueError("completed classical inventory is malformed")
     _verify_inventory_rows(source, rows, excluded=set(excluded_raw))
     if (source / "network_smokes").exists():
-        raise ValueError("completed classical source unexpectedly contains neural output")
+        raise ValueError(
+            "completed classical source unexpectedly contains neural output"
+        )
     baseline_evaluations = list((source / "baselines").rglob("evaluation.json"))
     gbdt_evaluations = list((source / "gbdt_triage").rglob("evaluation.json"))
     gbdt_models = list((source / "gbdt_triage").rglob("*.txt"))
@@ -1490,6 +1516,16 @@ def _verified_classical_source(
         or len(gbdt_manifests) != 4
     ):
         raise ValueError("completed classical source has the wrong artifact grid")
+    for path in (*baseline_evaluations, *gbdt_evaluations, *gbdt_manifests):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, Mapping) or (
+            payload.get("official_validation_accessed") is not False
+            or payload.get("test_accessed") is not False
+            or payload.get("transfer_chronology_clean") is not True
+        ):
+            raise PermissionError(
+                f"completed classical artifact has invalid chronology/access: {path}"
+            )
     return {
         "root": str(source),
         "inventory": str(inventory_path),
@@ -1508,7 +1544,6 @@ def _verified_classical_source(
 def run_pipeline_validation(
     *,
     store_root: Path,
-    old_store_root: Path,
     cdi_path: Path,
     cdi_sha256: str,
     experiment52_cdi_path: Path,
@@ -1526,7 +1561,6 @@ def run_pipeline_validation(
     """
 
     store_path = Path(store_root).resolve(strict=True)
-    old_store_path = Path(old_store_root).resolve(strict=True)
     output = Path(output_root).resolve()
     if output.exists():
         raise FileExistsError(output)
@@ -1534,7 +1568,7 @@ def run_pipeline_validation(
         output == source
         or output.is_relative_to(source)
         or source.is_relative_to(output)
-        for source in (store_path, old_store_path)
+        for source in (store_path,)
     ):
         raise ValueError("validation output and immutable input store must be disjoint")
     code = _git_identity()
@@ -1596,12 +1630,8 @@ def run_pipeline_validation(
     history_lookbacks = np.full(
         len(requested_indices), runtime.slow_lookback, dtype=np.int64
     )
-    baseline_samples = np.concatenate(
-        [evaluation_indices[name] for name in full.folds]
-    )
-    history_lookbacks[
-        np.isin(requested_indices, baseline_samples)
-    ] = 253
+    baseline_samples = np.concatenate([evaluation_indices[name] for name in full.folds])
+    history_lookbacks[np.isin(requested_indices, baseline_samples)] = 253
     history_end_offsets = np.where(
         dates[requested_indices] <= np.datetime64(PRETRAIN_END), 0, -1
     ).astype(np.int64)
@@ -1630,18 +1660,10 @@ def run_pipeline_validation(
             root=output / "baselines",
             source_hashes=source_hashes,
         )
-        baseline_ic_comparison, old_store_source = (
-            _old_new_baseline_ic_comparison(
-                old_store_root=old_store_path,
-                new_store=store,
-                fold_indices={
-                    name: evaluation_indices[name] for name in full.folds
-                },
-            )
-        )
         gbdt_records = _run_gbdt(
             store=store,
             fit_indices={"F1": fit_indices["F1"]},
+            fit_target_window_indices={"F1": fit_target_window_indices["F1"]},
             selection_indices={"F1": selection_indices["F1"]},
             evaluation_indices={"F1": evaluation_indices["F1"]},
             cdi_by_index=cdi_by_index,
@@ -1679,7 +1701,6 @@ def run_pipeline_validation(
                         "access_ledger": source_access.payload(),
                         "external_artifact_resolutions": external_resolutions,
                     },
-                    "superseded_old_store": old_store_source,
                     "cdi": cdi_provenance,
                 },
                 "date_contract": {
@@ -1694,7 +1715,6 @@ def run_pipeline_validation(
                 },
                 "results": {
                     "baselines": baseline_records,
-                    "old_new_baseline_ic_comparison": baseline_ic_comparison,
                     "gbdt_triage": gbdt_records,
                     "network_smokes": {
                         "status": "not_run",
@@ -1806,7 +1826,11 @@ def resume_network_validation(
         dates, runtime
     )
     triage = protocol_preset("triage")
-    if triage.seeds != (11,) or "F1" not in fit_indices or "F1" not in selection_indices:
+    if (
+        triage.seeds != (11,)
+        or "F1" not in fit_indices
+        or "F1" not in selection_indices
+    ):
         raise ValueError("F1 seed protocol differs from the continuation contract")
     cdi_by_index, cdi_provenance = _load_development_cdi(
         dates=dates,
@@ -1957,14 +1981,6 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--store-root", type=Path, required=True)
     parser.add_argument(
-        "--old-store-root",
-        type=Path,
-        help=(
-            "Accepted superseded v2 store used only for the paired naive-baseline "
-            "IC diagnostic. Required unless resuming the legacy GPU validation."
-        ),
-    )
-    parser.add_argument(
         "--cdi-path",
         type=Path,
         required=True,
@@ -2066,11 +2082,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             enabled_sidecars=arguments.sidecar,
         )
     else:
-        if arguments.old_store_root is None:
-            raise ValueError("classical acceptance requires --old-store-root")
         result = run_pipeline_validation(
             store_root=arguments.store_root,
-            old_store_root=arguments.old_store_root,
             cdi_path=arguments.cdi_path,
             cdi_sha256=arguments.cdi_sha256,
             experiment52_cdi_path=arguments.experiment52_cdi_path,

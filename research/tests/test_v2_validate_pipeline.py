@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -39,6 +40,12 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         + np.arange(day_count, dtype=np.float64)[:, None] * 0.01
         + np.arange(name_count, dtype=np.float64)[None, :]
     )
+    action_cash = np.zeros((day_count, name_count), dtype=np.float64)
+    action_has_action = np.zeros((day_count, name_count), dtype=np.bool_)
+    action_payment_session = np.full((day_count, name_count), -1, dtype=np.int64)
+    action_cash[-3, 0] = 1.0
+    action_has_action[-3, 0] = True
+    action_payment_session[-3, 0] = day_count - 1
     store_root = write_store(
         tmp_path / "store",
         dates=dates,
@@ -46,32 +53,32 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         arrays={
             "active": np.ones((day_count, name_count), dtype=np.bool_),
             "observed": np.ones((day_count, name_count), dtype=np.bool_),
-            "return_neutralized_event_mask": np.zeros(
-                (day_count, name_count), dtype=np.bool_
-            ),
-            "ambiguous_action_mask": np.zeros(
-                (day_count, name_count), dtype=np.bool_
-            ),
+            "ambiguous_action_mask": np.zeros((day_count, name_count), dtype=np.bool_),
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=np.bool_),
+            "slow_timestep_valid": np.ones((day_count, name_count), dtype=np.bool_),
             "intraday_values": intraday,
             "intraday_valid": np.ones_like(intraday, dtype=np.bool_),
             "fast_present": np.zeros((day_count, name_count), dtype=np.bool_),
             "target_primary": targets,
             "target_valid": np.ones_like(targets, dtype=np.bool_),
-            "target_raw_midrank": targets.copy(),
-            "target_raw_valid": np.ones_like(targets, dtype=np.bool_),
-            "target_raw_log_return": targets.astype(np.float64) * 0.0001,
-            "adjusted_close": close,
-            "neutralized_log_return": np.zeros(
-                (day_count, name_count), dtype=np.float32
+            "target_shareholder_midrank": targets.copy(),
+            "target_shareholder_valid": np.ones_like(targets, dtype=np.bool_),
+            "target_shareholder_simple_return": (targets.astype(np.float32) * 0.0001),
+            "target_price_midrank": targets.copy(),
+            "target_price_valid": np.ones_like(targets, dtype=np.bool_),
+            "raw_close": close,
+            "action_shares_per_prior_share": np.ones(
+                (day_count, name_count), dtype=np.float64
             ),
-            "neutralized_log_return_valid": np.ones(
-                (day_count, name_count), dtype=np.bool_
-            ),
-            "cross_sectional_median_log_return": np.zeros(
-                day_count, dtype=np.float32
-            ),
+            "action_cash_per_prior_share": action_cash,
+            "action_session_resolved": np.ones((day_count, name_count), dtype=np.bool_),
+            "action_has_action": action_has_action,
+            "action_successor_index": np.broadcast_to(
+                np.arange(name_count, dtype=np.int64)[None, :],
+                (day_count, name_count),
+            ).copy(),
+            "action_payment_session": action_payment_session,
             "target_scale_sigma": np.full(
                 (day_count, name_count), 0.02, dtype=np.float32
             ),
@@ -195,8 +202,8 @@ class _FakeBooster:
 def test_pipeline_rejects_store_built_by_a_different_commit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    store_root, cdi_path, cdi_sha, reference_path, reference_sha = (
-        _development_store(tmp_path)
+    store_root, cdi_path, cdi_sha, reference_path, reference_sha = _development_store(
+        tmp_path
     )
     monkeypatch.setattr(
         pipeline,
@@ -206,7 +213,6 @@ def test_pipeline_rejects_store_built_by_a_different_commit(
     with pytest.raises(ValueError, match="store implementation commit differs"):
         pipeline.run_pipeline_validation(
             store_root=store_root,
-            old_store_root=store_root,
             cdi_path=cdi_path,
             cdi_sha256=cdi_sha,
             experiment52_cdi_path=reference_path,
@@ -252,6 +258,7 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
                 ),
                 "official_validation_accessed": False,
                 "test_accessed": False,
+                "transfer_chronology_clean": True,
             },
         )
         return StageTrainingResult(
@@ -300,6 +307,17 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
                 "status": "completed",
                 "official_validation_accessed": False,
                 "test_accessed": False,
+                "transfer_chronology_clean": True,
+                "artifacts": {
+                    "scores.npy": {
+                        "bytes": scores_path.stat().st_size,
+                        "sha256": sha256_file(scores_path),
+                    },
+                    "score_mask.npy": {
+                        "bytes": mask_path.stat().st_size,
+                        "sha256": sha256_file(mask_path),
+                    },
+                },
             },
         )
         checkpoint = Path(kwargs["checkpoint"])
@@ -341,7 +359,6 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
     )
     result = pipeline.run_pipeline_validation(
         store_root=store_root,
-        old_store_root=store_root,
         cdi_path=cdi_path,
         cdi_sha256=cdi_sha,
         experiment52_cdi_path=experiment52_cdi_path,
@@ -355,6 +372,7 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
     assert manifest["research_claim"] is False
     assert manifest["official_validation_accessed"] is False
     assert manifest["test_accessed"] is False
+    assert manifest["transfer_chronology_clean"] is True
     assert manifest["date_contract"]["maximum_date"] <= "2024-12-30"
     cdi_source = manifest["sources"]["cdi"]
     assert cdi_source["development_extension"] == {
@@ -377,15 +395,8 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         "exact_byte_match": True,
     }
     assert len(manifest["results"]["baselines"]) == 15
-    comparison = manifest["results"]["old_new_baseline_ic_comparison"]
-    assert len(comparison) == 75
-    assert all(
-        row["new_minus_old_mean_daily_spearman_ic"] in (0.0, None)
-        for row in comparison
-    )
-    assert manifest["sources"]["superseded_old_store"]["scope"] == (
-        "IC only; the superseded economics evaluator was not invoked"
-    )
+    assert "old_new_baseline_ic_comparison" not in manifest["results"]
+    assert "superseded_old_store" not in manifest["sources"]
     assert len(manifest["results"]["gbdt_triage"]) == 1
     assert len(_FakeGBDT.fit_calls) == 1
     assert all(
@@ -403,6 +414,7 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
             assert payload["research_claim"] is False, path
             assert payload["official_validation_accessed"] is False, path
             assert payload["test_accessed"] is False, path
+            assert payload["transfer_chronology_clean"] is True, path
     inventory_payload = json.loads(result.inventory_path.read_text(encoding="utf-8"))
     for row in inventory_payload["files"]:
         artifact = result.root / row["path"]
@@ -414,7 +426,6 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
     with pytest.raises(FileExistsError):
         pipeline.run_pipeline_validation(
             store_root=store_root,
-            old_store_root=store_root,
             cdi_path=cdi_path,
             cdi_sha256=cdi_sha,
             experiment52_cdi_path=experiment52_cdi_path,
@@ -438,12 +449,20 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
     for index in range(12):
         write_json_atomic(
             classical / "baselines" / f"run_{index}" / "evaluation.json",
-            {"official_validation_accessed": False, "test_accessed": False},
+            {
+                "official_validation_accessed": False,
+                "test_accessed": False,
+                "transfer_chronology_clean": True,
+            },
         )
     for index in range(2):
         write_json_atomic(
             classical / "gbdt_triage" / f"run_{index}" / "evaluation.json",
-            {"official_validation_accessed": False, "test_accessed": False},
+            {
+                "official_validation_accessed": False,
+                "test_accessed": False,
+                "transfer_chronology_clean": True,
+            },
         )
     for index in range(100):
         model = classical / "gbdt_triage" / "models" / f"head_{index}.txt"
@@ -456,7 +475,11 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
             / "models"
             / f"parity_{index}"
             / "model_manifest.json",
-            {"official_validation_accessed": False, "test_accessed": False},
+            {
+                "official_validation_accessed": False,
+                "test_accessed": False,
+                "transfer_chronology_clean": True,
+            },
         )
     failure_sha = write_json_atomic(
         classical / "failure_record.json",
@@ -469,6 +492,7 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
                 "research_claim": False,
                 "official_validation_accessed": False,
                 "test_accessed": False,
+                "transfer_chronology_clean": True,
                 "all_registrations_null": True,
                 "json_sidecars_verified": True,
             },
@@ -543,6 +567,27 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
     assert source["failure_record_sha256"] == failure_sha
     assert source["baseline_evaluation_count"] == 12
     assert source["gbdt_model_count"] == 100
+
+    contaminated_path = classical / "baselines" / "run_0" / "evaluation.json"
+    contaminated = json.loads(contaminated_path.read_text(encoding="utf-8"))
+    contaminated["transfer_chronology_clean"] = False
+    write_json_atomic(contaminated_path, contaminated)
+    contaminated_rows = pipeline.inventory(classical, exclude=excluded)
+    contaminated_inventory_sha = write_json_atomic(
+        classical / "artifact_inventory.json",
+        {
+            "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_FAILURE_INVENTORY_V1",
+            "status": "failed",
+            "excluded_self": sorted(excluded),
+            "files": contaminated_rows,
+        },
+    )
+    with pytest.raises(PermissionError, match="invalid chronology/access"):
+        pipeline._verified_classical_source(
+            root=classical,
+            expected_inventory_sha256=contaminated_inventory_sha,
+            expected_failure_sha256=failure_sha,
+        )
 
 
 def test_development_cdi_requires_exact_experiment52_overlap(tmp_path: Path) -> None:
@@ -685,17 +730,210 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
             np.ones(score_shape, dtype=np.bool_),
             np.full(len(dates), 0.0004, dtype=np.float64),
             {},
+            transfer_chronology_clean=True,
         )
     finally:
         store.close()
 
-    assert not inputs.target_mask[-1].any()
-    assert not inputs.raw_target_mask[-1].any()
-    assert np.all(
-        inputs.median_residual_midrank_targets[~inputs.target_mask] == 0.0
+    for mask in (
+        inputs.scaled_target_mask,
+        inputs.shareholder_target_mask,
+        inputs.price_target_mask,
+    ):
+        assert not mask[-1].any()
+    for values, mask in (
+        (inputs.scaled_midrank_targets, inputs.scaled_target_mask),
+        (inputs.shareholder_midrank_targets, inputs.shareholder_target_mask),
+        (inputs.shareholder_simple_returns, inputs.shareholder_target_mask),
+        (inputs.price_midrank_targets, inputs.price_target_mask),
+    ):
+        assert np.all(values[~mask] == 0.0)
+    assert inputs.action_payment_session[0, 0] == len(indices)
+    assert np.all(inputs.action_payment_session[:, 1:] == -1)
+    assert inputs.security_ids == store.isins
+
+
+def test_score_manifest_rejects_contaminated_transfer_before_payload_access(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "scores"
+    root.mkdir()
+    scores_path = root / "scores.npy"
+    mask_path = root / "score_mask.npy"
+    write_json_atomic(
+        root / "score_manifest.json",
+        {
+            "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V1",
+            "status": "completed",
+            "official_validation_accessed": False,
+            "test_accessed": False,
+            "transfer_chronology_clean": False,
+            "artifacts": {},
+        },
     )
-    assert np.all(inputs.raw_midrank_targets[~inputs.raw_target_mask] == 0.0)
-    assert np.all(inputs.raw_log_returns[~inputs.raw_target_mask] == 0.0)
+    artifact = ScoreArtifact(
+        root=root,
+        scores_path=scores_path,
+        score_mask_path=mask_path,
+        date_index_path=root / "date_index.npy",
+        isin_index_path=root / "isin_index.npy",
+        manifest_path=root / "score_manifest.json",
+        manifest_sha256=sha256_file(root / "score_manifest.json"),
+        checkpoint_sha256="a" * 64,
+    )
+    monkeypatch.setattr(
+        pipeline.np,
+        "load",
+        lambda *args, **kwargs: pytest.fail("score payload was opened"),
+    )
+
+    with pytest.raises(PermissionError, match="contaminated chronology"):
+        pipeline._load_score_arrays(artifact)
+
+
+def test_score_loader_verifies_manifest_identity_and_both_axes(tmp_path: Path) -> None:
+    root = tmp_path / "scores"
+    root.mkdir()
+    arrays = {
+        "scores.npy": np.zeros((2, 2, len(HORIZONS)), dtype=np.float32),
+        "score_mask.npy": np.ones((2, 2, len(HORIZONS)), dtype=np.bool_),
+        "date_index.npy": np.asarray(
+            ["2024-01-02", "2024-01-03"], dtype="datetime64[D]"
+        ),
+        "isin_index.npy": np.asarray(["BR1", "BR2"]),
+    }
+    records = {}
+    for name, values in arrays.items():
+        path = root / name
+        np.save(path, values, allow_pickle=False)
+        records[name] = {
+            "bytes": path.stat().st_size,
+            "sha256": sha256_file(path),
+        }
+    manifest_sha = write_json_atomic(
+        root / "score_manifest.json",
+        {
+            "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V1",
+            "status": "completed",
+            "official_validation_accessed": False,
+            "test_accessed": False,
+            "transfer_chronology_clean": True,
+            "feature_schema_sha256": "a" * 64,
+            "artifacts": records,
+        },
+    )
+    artifact = ScoreArtifact(
+        root=root,
+        scores_path=root / "scores.npy",
+        score_mask_path=root / "score_mask.npy",
+        date_index_path=root / "date_index.npy",
+        isin_index_path=root / "isin_index.npy",
+        manifest_path=root / "score_manifest.json",
+        manifest_sha256=manifest_sha,
+        checkpoint_sha256="b" * 64,
+    )
+
+    scores, mask = pipeline._load_score_arrays(
+        artifact,
+        expected_dates=arrays["date_index.npy"],
+        expected_isins=("BR1", "BR2"),
+        expected_feature_schema_sha256="a" * 64,
+    )
+    assert scores.shape == mask.shape == (2, 2, len(HORIZONS))
+    with pytest.raises(ValueError, match="date axis"):
+        pipeline._load_score_arrays(
+            artifact,
+            expected_dates=np.asarray(
+                ["2024-01-03", "2024-01-04"], dtype="datetime64[D]"
+            ),
+            expected_isins=("BR1", "BR2"),
+            expected_feature_schema_sha256="a" * 64,
+        )
+    with pytest.raises(ValueError, match="manifest identity"):
+        pipeline._load_score_arrays(replace(artifact, manifest_sha256="0" * 64))
+
+
+def test_score_once_returns_the_rewritten_manifest_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checkpoint = tmp_path / "checkpoint.pt"
+    checkpoint.write_bytes(b"checkpoint")
+    score_root = tmp_path / "scores"
+    score_root.mkdir()
+    manifest = score_root / "score_manifest.json"
+    original_sha = write_json_atomic(
+        manifest,
+        {
+            "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V1",
+            "status": "completed",
+            "official_validation_accessed": False,
+            "test_accessed": False,
+            "transfer_chronology_clean": True,
+        },
+    )
+    original = ScoreArtifact(
+        root=score_root,
+        scores_path=score_root / "scores.npy",
+        score_mask_path=score_root / "score_mask.npy",
+        date_index_path=score_root / "date_index.npy",
+        isin_index_path=score_root / "isin_index.npy",
+        manifest_path=manifest,
+        manifest_sha256=original_sha,
+        checkpoint_sha256=sha256_file(checkpoint),
+    )
+    monkeypatch.setattr(pipeline, "_score_loader", lambda *args, **kwargs: object())
+    monkeypatch.setattr(
+        pipeline, "score_checkpoint_artifact", lambda **kwargs: original
+    )
+
+    result = pipeline._score_once(
+        store=object(),
+        indices=np.asarray([1], dtype=np.int64),
+        checkpoint=checkpoint,
+        model_config=pipeline.ModelConfig(
+            slow_feature_count=len(SLOW_FEATURES), current_feature_count=1
+        ),
+        output_dir=score_root,
+        runtime=pipeline.ValidationRuntime(device="cpu"),
+        sidecars=(),
+    )
+
+    assert result.manifest_sha256 == sha256_file(manifest)
+    assert result.manifest_sha256 != original_sha
+
+
+def test_evaluation_payment_remap_requires_a_contiguous_window() -> None:
+    with pytest.raises(ValueError, match="contiguous window"):
+        pipeline._evaluation_inputs(
+            object(),
+            np.asarray([1, 3], dtype=np.int64),
+            np.zeros((2, 1, len(HORIZONS)), dtype=np.float32),
+            np.ones((2, 1, len(HORIZONS)), dtype=np.bool_),
+            np.zeros(4, dtype=np.float64),
+            {},
+            transfer_chronology_clean=True,
+        )
+
+
+def test_store_header_rejects_stale_schema_before_index_access(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store_root, _, _, _, _ = _development_store(tmp_path)
+    manifest_path = store_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["schema"] = "V2_DAILY_STORE_V1"
+    digest = write_json_atomic(manifest_path, manifest)
+    (store_root / "manifest.sha256").write_text(
+        f"{digest}  manifest.json\n", encoding="ascii"
+    )
+    monkeypatch.setattr(
+        pipeline.np,
+        "load",
+        lambda *args, **kwargs: pytest.fail("store index was opened"),
+    )
+
+    with pytest.raises(ValueError, match="real v2 daily store"):
+        pipeline._read_store_header(store_root)
 
 
 def test_git_identity_refuses_untracked_files(monkeypatch: pytest.MonkeyPatch) -> None:
