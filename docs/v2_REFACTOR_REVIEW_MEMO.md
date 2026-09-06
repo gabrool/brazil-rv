@@ -565,7 +565,9 @@ Section D. No new experiment was run.
 - Machine-readable acceptance report:
   `research/acceptance/v2_refactor_20260906.json`, status `unsupported`,
   SHA-256
-  `d41d64825092ee4870a8cd9ff4e7eb4d9fd1f1ea583f5a8a06956e2b4e0522c6`.
+  `38393706d8736c08deafe9eda22074a2b4518ab3e06e6e2c63f61b1b7523250e`;
+  finalized at 2026-09-06 10:47:28 `America/Sao_Paulo`, after both provider
+  observations.
 - Paid-compute hygiene: no instance was launched for this refactor. Two fresh
   provider inventories at 2026-09-06 10:36:04 and 10:38:27
   `America/Sao_Paulo` each returned zero instances; the earlier exact instance
