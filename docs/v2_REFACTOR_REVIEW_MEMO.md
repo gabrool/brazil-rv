@@ -661,3 +661,80 @@ real-data economic acceptance remains `unsupported` until the missing calendar
 and action/status evidence exists. That distinction is intentional and is the
 main safeguard against turning repaired plumbing into an unsupported research
 claim.
+
+## 10. Pass-4 addendum: host admission and executable registration binding
+
+The addendum exposed four prose contradictions in the unexecuted revision-2
+registration. They are now corrected to the implementation that already
+existed: chronological fit, 10 purge sessions, 55 selection sessions, 10 purge
+sessions, and one continuous evaluation path; one selected model per fold and
+seed; GBDT early stopping on the complete selection window; canonical decision
+rows for both pretraining and fine data, with pretraining intraday fields absent
+and `fast_present=0`; and tie-aware rank averaging of the three seed panels on
+the evaluation window. The obsolete parity stitching, selection-parity,
+consumer-side lag, and nonexistent age-field descriptions were removed. The
+statistical headline is named once as the median-adjusted,
+volatility-scaled primary IC over D1/D2/D3/D5.
+
+The registration now ends with one machine-readable JSON protocol. Its purge
+and selection lengths are sourced from the same constants used by
+`development_folds`; its evaluation bounds come from the registered fold
+windows; its primary population comes from the evaluator contract; its
+headline signal and complete ledger configuration come from the actual default
+ledger; and its source labels come from the development-tier constants.
+`freeze_round1` parses and compares this block before reading Git identity or
+hashing the registration, so prose/code drift stops before an immutable root is
+created. The dedicated test also constructs the folds and checks their realized
+evaluation endpoints, population, headline ledger, and tier labels.
+
+The host preflight is now similarly executable. Before source loading it
+records physical and commit memory, the resolved process temp and all known
+store staging parents, the output-drive free bytes, and the exact prior-store
+size. It rejects any Windows C:-drive staging path, retains the 10-GiB
+conservative memory requirement, and requires output free space at least three
+times the prior immutable store. `--previous-store` is mandatory, so the disk
+test cannot silently use a guessed size. The report is printed before admission
+is enforced, which preserves the reason even for a score-free refusal.
+
+I deliberately corrected and committed the registration before rebuilding,
+rather than following section 3's literal “rebuild, then commit registration”
+ordering. The existing acceptance and Round-1 gates require the store,
+acceptance report, and current clean Git identity to match exactly. A
+registration commit after the build would therefore make the accepted store
+unfreezable. The conservative coherent order is: finish and commit the
+registration guard, rebuild and accept at that exact commit, fast-forward
+`main` to the same commit, then freeze Round 1. This changes no research rule;
+it preserves the addendum's exact-identity rule.
+
+The code-bearing addendum commit is
+`23ff904967af699b9d1a682bc597ffcb0fc22e61`, pushed on
+`fix/v2-development-grade-data`. Ruff and compile passed; the complete research
+suite passed **816 tests in 320.79 seconds**, followed by **31** focused
+registration, split, and preflight tests. The prior store is 2,578,928,232
+bytes (2.402 GiB), so the three-times output requirement is 7,736,784,696
+bytes (7.205 GiB).
+
+The actual clean-commit preflight ran with `TMP`, `TEMP`, and
+`BRAZIL_RV_TEST_SCRATCH` on D:. It recorded 10,502,467,584 bytes (9.78 GiB)
+of free physical/build memory, 12,054,888,448 bytes (11.23 GiB) of free commit,
+a 21,059,461,120-byte (19.61-GiB) commit limit, and 278,246,088,704 bytes
+(259.14 GiB) free on D:. Every workspace/staging path resolved off C:, and the
+disk gate passed; only the unchanged 10-GiB memory gate failed. The log is:
+
+    D:\quant-data\b3\processed\model_runs\v2_store_build_preflights\preflight_23ff904_20260906T130537.log
+
+Its SHA-256 is
+`eb165ea2fb590dcdffa292a23392e258569588079abf522589c7b1c2120c173f`.
+The proposed store root was not created and no source was loaded. Although a
+manual bypass was suggested when the measurement came within roughly 0.22 GiB
+of the threshold, I retained the gate because the addendum explicitly says it
+is unchanged and the earlier low-memory run had already demonstrated the
+failure mode it prevents.
+
+Accordingly, this continuation stops at its first required gate. No new store,
+development acceptance report, Round-1 score, Round-2 smoke or arm, official
+validation/test access, deployment change, merge to `main`, or paid instance
+occurred. The already-recorded pass-4 action audit remains diagnostic: 222 of
+272 large provider factors were price-corroborated, all 222 had a DISMES change
+within two sessions, and U2 hit rates were 1.80% per trade and 0.45% by total
+quantity.
