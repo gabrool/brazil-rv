@@ -237,3 +237,25 @@ Ruff and Python compilation passed on the final branch state, and the complete
 research suite passed all 824 tests in 380.76 seconds.
 Two provider inventory reads at 2026-09-06T19:40:23Z and 19:40:25Z each
 returned zero instances. There was therefore no paid instance to terminate.
+
+## Pass-4c pre-rebuild diagnostic stop (2026-09-06)
+
+The mandatory no-rebuild `momentum_12_1` waterfall contradicted pass 4c's
+causal premise. On the sealed `12e6ae0` store, slow-feature momentum covers
+98.97%/98.65%/98.22% of active F1/F2/F3 name-days, and a restart-after-missing
+scan removes zero additional evaluation name-days in all three folds. The
+required missing-print-restart dominance condition therefore failed.
+
+The audit found the source of the 15--46-name naive baseline panels instead:
+the baseline interval guard currently excludes every resolved corporate
+action. It retains only 14.35%/14.43%/11.15% of active name-days, whereas the
+specified unresolved-action-only guard would retain
+99.09%/98.68%/98.37%. The score-free diagnostic root is
+`D:\quant-data\b3\processed\model_runs\v2_pass4c_prechange_waterfall_19a9dbe_20260906T195326Z`;
+manifest SHA-256 is
+`8343c4c98619dae5b3cbbd53d75ec28834f9435ace70c6570d202c8d5f34d4de`.
+Official-validation and test access remained false, and no score was written.
+
+Per pass 4c section 1.1, work stopped before the proposed recurrence rebuild.
+No ledger or acceptance change, merge, experiment, paid-instance launch, or
+deployment change occurred.

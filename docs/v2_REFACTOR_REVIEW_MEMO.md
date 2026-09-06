@@ -846,3 +846,37 @@ and all 824 research tests in 380.76 seconds.
 Provider inventories at 2026-09-06T19:40:23Z and 19:40:25Z each returned zero
 instances, confirming that this continuation neither launched nor left paid
 compute running.
+
+## 12. Pass-4c pre-rebuild diagnosis: the registered premise did not hold
+
+Pass 4c correctly required a no-rebuild validity waterfall before changing
+the shareholder-wealth recurrence, and explicitly said to stop if
+missing-print restarts were not the dominant cause of sparse 12-1 momentum.
+That stop condition fired.  On the sealed `12e6ae0` store, the slow-feature
+`momentum_12_1` mask covers 98.97%, 98.65%, and 98.22% of active name-days in
+F1/F2/F3; its minimum daily coverage is 98.06%, 97.87%, and 96.69%.
+After requiring both wealth endpoints and excluding unresolved actions, the
+specified restart scan removes exactly zero additional evaluation name-days
+in every fold.  A missing-print restart therefore cannot explain the observed
+15--46-name baseline panels.
+
+The same audit isolated the actual mask collapse.  The naive baseline uses
+`decision_action_boundary_mask`, which includes every resolved corporate
+action as well as unresolved actions.  Over its 12-1 interval this removes
+20,844, 19,855, and 20,113 otherwise-valid name-days in F1/F2/F3, leaving only
+14.35%, 14.43%, and 11.15% coverage.  Applying the pass-4c-described
+unresolved-action-only guard instead would leave 99.09%, 98.68%, and 98.37%.
+This is a separate baseline interval-mask defect, not evidence for the proposed
+wealth-index rebuild.
+
+The immutable score-free diagnostic root is
+`D:\quant-data\b3\processed\model_runs\v2_pass4c_prechange_waterfall_19a9dbe_20260906T195326Z`.
+Its manifest and diagnostic-result SHA-256 values are
+`8343c4c98619dae5b3cbbd53d75ec28834f9435ace70c6570d202c8d5f34d4de`
+and `f83bf1c53abdcf862ca89ebb6d495761d966605a54840872beb3592c62d2b491`.
+Protected access remained false/false and no score was written.  In accordance
+with the document's first explicit gate, no store rebuild, ledger change,
+acceptance rerun, merge, Round 1/2 run, or instance launch was performed.
+Proceeding now requires a corrected pre-result instruction that authorizes the
+resolved-action baseline-mask repair and independently decides whether the
+wealth recurrence should still be changed as a latent data-quality fix.
