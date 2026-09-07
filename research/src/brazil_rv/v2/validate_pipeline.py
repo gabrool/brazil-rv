@@ -1833,6 +1833,30 @@ def _git_identity() -> dict[str, object]:
     return {"commit": commit, "tracked_worktree_clean": True}
 
 
+def _store_build_commit(store_manifest: Mapping[str, object]) -> str:
+    """Return the immutable store's own build provenance.
+
+    A sealed store and the code that later evaluates it are independently
+    versioned artifacts.  Requiring their commits to be equal would make every
+    registered evaluator change require an otherwise forbidden store rebuild.
+    The manifest hash binds the store; this field records which code built it.
+    """
+
+    metadata = store_manifest.get("metadata")
+    commit = (
+        metadata.get("implementation_git_commit")
+        if isinstance(metadata, Mapping)
+        else None
+    )
+    if (
+        not isinstance(commit, str)
+        or len(commit) != 40
+        or any(character not in "0123456789abcdef" for character in commit)
+    ):
+        raise ValueError("v2 store lacks a valid build implementation commit")
+    return commit
+
+
 def _validate_sidecars(
     store_manifest: Mapping[str, object], sidecars: Sequence[str]
 ) -> tuple[str, ...]:
@@ -2444,13 +2468,9 @@ def run_pipeline_validation(
     code = _git_identity()
     store_manifest, dates = _read_store_header(store_path)
     store_metadata = store_manifest.get("metadata")
-    if (
-        not isinstance(store_metadata, Mapping)
-        or store_metadata.get("implementation_git_commit") != code["commit"]
-    ):
-        raise ValueError(
-            "v2 store implementation commit differs from the validation code"
-        )
+    if not isinstance(store_metadata, Mapping):
+        raise ValueError("v2 store metadata is malformed")
+    store_build_commit = _store_build_commit(store_manifest)
     sidecars = _validate_sidecars(store_manifest, enabled_sidecars)
     external_resolutions = _external_artifact_resolutions(store_manifest)
     _assert_overrides_outside_store(store_path, external_resolutions)
@@ -2592,6 +2612,7 @@ def run_pipeline_validation(
                     "research claims"
                 ),
                 "code": code,
+                "store_build_implementation_commit": store_build_commit,
                 "runtime": asdict(runtime),
                 "protocols": protocol_hashes,
                 "enabled_sidecars": list(sidecars),

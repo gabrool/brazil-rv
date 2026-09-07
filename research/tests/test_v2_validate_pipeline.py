@@ -259,25 +259,18 @@ class _FakeBooster:
         )
 
 
-def test_pipeline_rejects_store_built_by_a_different_commit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_store_build_commit_is_provenance_not_evaluator_identity() -> None:
+    manifest = {"metadata": {"implementation_git_commit": "1" * 40}}
+    assert pipeline._store_build_commit(manifest) == "1" * 40
+
+
+@pytest.mark.parametrize("commit", [None, "1" * 39, "G" * 40])
+def test_store_build_commit_rejects_missing_or_invalid_identity(
+    commit: str | None,
 ) -> None:
-    store_root, cdi_path, cdi_sha, reference_path, reference_sha = _development_store(
-        tmp_path
-    )
-    monkeypatch.setattr(
-        pipeline,
-        "_git_identity",
-        lambda: {"commit": "2" * 40, "tracked_worktree_clean": True},
-    )
-    with pytest.raises(ValueError, match="store implementation commit differs"):
-        pipeline.run_pipeline_validation(
-            store_root=store_root,
-            cdi_path=cdi_path,
-            cdi_sha256=cdi_sha,
-            experiment52_cdi_path=reference_path,
-            experiment52_cdi_sha256=reference_sha,
-            output_root=tmp_path / "validation",
+    with pytest.raises(ValueError, match="valid build implementation commit"):
+        pipeline._store_build_commit(
+            {"metadata": {"implementation_git_commit": commit}}
         )
 
 
