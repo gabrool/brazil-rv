@@ -2120,8 +2120,14 @@ def freeze_round2(
         raise ValueError("Round 2 requires four to six concurrent trajectories")
     round1_path = round1_root.resolve(strict=True)
     round1 = _verify_sealed_root(round1_path, expected_schema=ROUND1_SCHEMA)
-    if round1.get("implementation") != code:
-        raise ValueError("Round 1 and Round 2 must use the same frozen implementation")
+    round1_implementation = round1.get("implementation")
+    if (
+        not isinstance(round1_implementation, Mapping)
+        or not isinstance(round1_implementation.get("commit"), str)
+        or len(round1_implementation["commit"]) != 40
+        or round1_implementation.get("tracked_worktree_clean") is not True
+    ):
+        raise ValueError("sealed Round 1 lacks a clean commit-bound implementation")
     parent = round1["gbdt_ladder"]["parent_rung"]
     if parent not in RUNG_GROUPS:
         raise ValueError("Round-1 GBDT parent is not a registered rung")
@@ -2171,6 +2177,7 @@ def freeze_round2(
             "result_sha256": sha256_file(round1_path / "round1_result.json"),
             "inventory_sha256": sha256_file(round1_path / "artifact_inventory.json"),
             "gbdt_parent_rung": parent,
+            "implementation": dict(round1_implementation),
         },
         "store": {
             "root": str(store),
@@ -2309,6 +2316,7 @@ def _plan_job(
             "official_validation_accessed": False,
             "test_accessed": False,
             "transfer_chronology_clean": True,
+            "compiled_graph_count": 1,
             **source_tiers,
         },
     }
@@ -2376,6 +2384,7 @@ def write_round2_plan_p(*, output_root: Path) -> str:
         or smoke.get("seed") != 11
         or smoke.get("fold") != "F1"
         or smoke.get("epochs_completed") != 1
+        or smoke.get("compiled_graph_count") != 1
         or (smoke_root / "scores").exists()
     ):
         raise ValueError("Round-2 first-smoke contract did not pass exactly")

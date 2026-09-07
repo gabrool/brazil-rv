@@ -528,6 +528,28 @@ def test_fullgraph_compile_captures_gru_forward() -> None:
     assert fast_scores.shape == (2, 3, 6)
 
 
+def test_fullgraph_compile_reuses_one_graph_across_date_batch_widths() -> None:
+    config = ModelConfig(slow_feature_count=32, slow_lookback=20)
+    model = DailyMultiHorizonModel(config).eval()
+    compiled = compile_forward(model, backend="eager", mode=None)
+    before = int(torch._dynamo.utils.counters["stats"]["unique_graphs"])
+
+    for batch_size in (16, 1):
+        current = torch.randn(batch_size, 3, config.current_feature_count)
+        compiled(
+            torch.randn(batch_size, 3, 20, 32),
+            torch.ones(batch_size, 3, 20, 32, dtype=torch.bool),
+            torch.ones(batch_size, 3, 20, dtype=torch.bool),
+            torch.ones(batch_size, 3, dtype=torch.bool),
+            current_features=current,
+            current_feature_mask=torch.ones_like(current, dtype=torch.bool),
+            slow_feature_age_sessions=torch.zeros(batch_size, 3, 20, 32),
+            current_feature_age_sessions=torch.zeros_like(current),
+        )
+
+    assert int(torch._dynamo.utils.counters["stats"]["unique_graphs"]) - before == 1
+
+
 def test_fixed_fast_padding_matches_eager_and_compiled_cpu() -> None:
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
     model = DailyMultiHorizonModel(config).eval()
@@ -739,6 +761,7 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["seed"] == 29
     assert manifest["fold"] == "pretrain_internal"
+    assert manifest["compiled_graph_count"] == 0
     assert manifest["official_validation_accessed"] is False
     assert manifest["test_accessed"] is False
     assert "allow_untracked_test_loaders" not in manifest

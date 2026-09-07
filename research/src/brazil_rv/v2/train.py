@@ -831,11 +831,21 @@ def compile_forward(
     options: dict[str, object] = {
         "backend": backend,
         "fullgraph": True,
-        "dynamic": False,
+        # Training microbatches and chronological selection batches have
+        # different leading widths.  Keep that date axis symbolic while the
+        # dataset's fixed stage-wide name padding prevents name-axis
+        # recompilation.
+        "dynamic": True,
     }
     if mode is not None:
         options["mode"] = mode
     return torch.compile(model, **options)
+
+
+def _unique_compiled_graphs() -> int:
+    """Return Dynamo's process-local count of successfully compiled graphs."""
+
+    return int(torch._dynamo.utils.counters["stats"]["unique_graphs"])
 
 
 def _atomic_torch_save(path: Path, payload: object) -> None:
@@ -1765,6 +1775,7 @@ def train_stage(
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, schedule)
     ema = ModelEMA(model, 0.995)
     tracker = PatienceTracker(patience=patience, maximum_epochs=maximum_epochs)
+    compiled_graphs_before = _unique_compiled_graphs()
     forward_model = compile_forward(model) if model_config.compile_forward else model
     history: list[dict[str, float | int]] = []
     for epoch in range(1, maximum_epochs + 1):
@@ -1893,6 +1904,11 @@ def train_stage(
             break
     if tracker.best_state_dict is None or tracker.stopped_epoch is None:
         raise RuntimeError("training ended without a selected Patience state")
+    compiled_graph_count = _unique_compiled_graphs() - compiled_graphs_before
+    if model_config.compile_forward and compiled_graph_count < 1:
+        raise RuntimeError("compiled training produced no Dynamo graph")
+    if not model_config.compile_forward and compiled_graph_count != 0:
+        raise RuntimeError("eager training unexpectedly compiled a Dynamo graph")
     raw_path = output_dir / "raw_patience.pt"
     ema_path = output_dir / "final_ema.pt"
     history_path = output_dir / "history.json"
@@ -1948,6 +1964,7 @@ def train_stage(
             "epochs_completed": tracker.stopped_epoch,
             "selected_epoch": tracker.selected_epoch,
             "model_config": model_config_payload,
+            "compiled_graph_count": compiled_graph_count,
             "fast_checkpoint_sha256": model.fast_checkpoint_sha256,
             "fast_initialization_provenance": model.fast_initialization_provenance,
             "transfer_chronology_clean": transfer_chronology_clean,
