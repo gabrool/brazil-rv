@@ -347,6 +347,9 @@ largest shortfall source was sizing mark drift (`0.107124`), not occupancy.
 Therefore no conditional gate rewrite was made, `main` remains unchanged, and
 Round 1/2 remain unrun. Official validation/test stayed unread, no deployment
 changed, and no paid instance was launched.
+Direct provider inventory reads at `2026-09-07T01:39:39.9369263Z` and
+`2026-09-07T01:39:45.5250149Z` each returned zero instances; there was no paid
+host to terminate and no adjacent instance was touched.
 
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused

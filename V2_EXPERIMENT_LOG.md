@@ -651,4 +651,7 @@ were zero in all books. Accordingly, the conditional Section 5 gate rewrite
 was not implemented, `main` was not fast-forwarded, no Round-1 root was frozen
 or run, and no paid instance was launched. The result is a labelled defect
 signature requiring a new pre-result contract; it is not an acceptance or
-research claim.
+research claim. Direct provider inventory reads at
+`2026-09-07T01:39:39.9369263Z` and `2026-09-07T01:39:45.5250149Z` each
+returned zero instances. There was no paid host to terminate, and no adjacent
+instance was touched.
