@@ -1088,12 +1088,47 @@ def _feature_names(store: V2Store, rung: str) -> tuple[str, ...]:
         intraday_names = scalar_feature_names(store, ("intraday",))
         output.extend(gbdt_scalar_feature_names(intraday_names))
         output.append("fast_present")
-    for group in RUNG_GROUPS[rung]:
+    for group in _resolved_sidecar_groups(store, RUNG_GROUPS[rung]):
         group_names = scalar_feature_names(store, (f"sidecar_{group}",))
         output.extend(gbdt_scalar_feature_names(group_names))
     if len(output) != len(set(output)):
         raise ValueError("GBDT feature names are not unique")
     return tuple(str(value) for value in output)
+
+
+def _resolved_sidecar_groups(
+    store: V2Store, groups: Sequence[str]
+) -> tuple[str, ...]:
+    manifest_names = store.manifest.get("feature_names")
+    metadata = store.manifest.get("metadata")
+    capabilities = (
+        metadata.get("sidecar_capabilities")
+        if isinstance(metadata, Mapping)
+        else None
+    )
+    if not isinstance(manifest_names, Mapping):
+        raise ValueError("store manifest lacks ordered feature names")
+    resolved: list[str] = []
+    for group in groups:
+        names = manifest_names.get(f"sidecar_{group}")
+        if isinstance(names, list) and names:
+            resolved.append(group)
+            continue
+        capability = (
+            capabilities.get(group) if isinstance(capabilities, Mapping) else None
+        )
+        enabled = capability.get("enabled") if isinstance(capability, Mapping) else None
+        missing = (
+            capability.get("source_missing")
+            if isinstance(capability, Mapping)
+            else None
+        )
+        if enabled != [] or not isinstance(missing, list) or not missing:
+            raise ValueError(
+                "store lacks both materialized and explicitly source-missing "
+                f"sidecar capability: {group}"
+            )
+    return tuple(resolved)
 
 
 def _gbdt_features(
@@ -1138,7 +1173,7 @@ def _gbdt_features(
                 present[..., None],
             )
         )
-    for group in RUNG_GROUPS[rung]:
+    for group in _resolved_sidecar_groups(store, RUNG_GROUPS[rung]):
         sidecar = read_scalar_feature_view(store, indices, (f"sidecar_{group}",))
         parts.append(assemble_gbdt_scalar_view(sidecar, label=group))
     result = np.concatenate(parts, axis=-1, dtype=np.float32)

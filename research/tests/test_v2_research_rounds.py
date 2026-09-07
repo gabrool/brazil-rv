@@ -25,6 +25,7 @@ from brazil_rv.v2.research_rounds import (
     _paired_readouts,
     _point_is_negative,
     _pretrain_indices,
+    _resolved_sidecar_groups,
     _score_artifact,
     _small_interval_spanning_zero,
     _store_build_implementation_commit,
@@ -682,6 +683,54 @@ def test_registered_gbdt_ladder_is_exact_and_cumulative() -> None:
         "lending_a",
         "lending_a__age_sessions",
     )
+
+
+def test_all_sidecars_resolves_materialized_and_explicitly_missing_capabilities() -> None:
+    store = type(
+        "Store",
+        (),
+        {
+            "manifest": {
+                "feature_names": {
+                    "slow": ["slow_a"],
+                    "intraday": ["intraday_a"],
+                    "sidecar_lending": ["lending_a"],
+                    "sidecar_oddlot": ["oddlot_a"],
+                },
+                "metadata": {
+                    "sidecar_capabilities": {
+                        "options": {"enabled": [], "source_missing": ["option_a"]},
+                        "rebalance": {
+                            "enabled": [],
+                            "source_missing": ["rebalance_a"],
+                        },
+                        "events": {"enabled": [], "source_missing": ["event_a"]},
+                        "fundamentals": {
+                            "enabled": [],
+                            "source_missing": ["fundamental_a"],
+                        },
+                    }
+                },
+            }
+        },
+    )()
+
+    assert _resolved_sidecar_groups(store, RUNG_GROUPS["d_all_sidecars"]) == (
+        "lending",
+        "oddlot",
+    )
+    assert _feature_names(store, "d_all_sidecars")[-4:] == (
+        "lending_a",
+        "lending_a__age_sessions",
+        "oddlot_a",
+        "oddlot_a__age_sessions",
+    )
+
+    missing_without_provenance = copy.deepcopy(store.manifest)
+    del missing_without_provenance["metadata"]["sidecar_capabilities"]["options"]
+    invalid = type("InvalidStore", (), {"manifest": missing_without_provenance})()
+    with pytest.raises(ValueError, match="source-missing sidecar capability: options"):
+        _resolved_sidecar_groups(invalid, RUNG_GROUPS["d_all_sidecars"])
 
 
 def test_round_gbdt_adapter_uses_shared_views_and_preserves_frozen_order() -> None:
