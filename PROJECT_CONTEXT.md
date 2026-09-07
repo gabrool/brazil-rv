@@ -1710,27 +1710,48 @@ instance present.
 
 ## Current v2 rev3 evaluation state (2026-09-07)
 
-The characteristic-neutral rev3 evaluation contract is implemented through
-commit `924b4fc4c8ecf11c2a9c403c505c16e06e0d5418`. It is an evaluation-time
-virtual target over the immutable V3 store, not a physical store rebuild.
-Executable borrow uses the store-manifest-hashed D+1 lending archive for exact
-rate recovery and the existing store lending balance/age for shortability;
-realized beta is diagnostic only. Compiled training batches use a fixed
-stage-level name width rounded to 16.
+The characteristic-neutral rev3 evaluation contract is implemented over the
+immutable V3 store. Commit `f567e0f6def33bfd49e5f02b4dfab953a94fb589`
+repairs only the legacy diagnostic population: D1/D2/D3/D5 use the exact rev2
+common active/score/sigma/all-primary-target-valid population, D10 remains
+per-horizon, and the neutral path additionally intersects characteristic
+validity. Training continues to consume only `target_primary_neutral`; the
+legacy scaled target is readout-only. Executable borrow, realized-beta
+diagnostics, fixed-width compiled batches, ledger rules, clocks, identities,
+and the preregistration are unchanged. Ruff, compileall, and all 866 tests
+passed before scoring.
 
-The sealed classical acceptance root is
-`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev3_924b4fc_20260907T165511Z`.
+Fresh acceptance is sealed at
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev3_f567e0f_20260907T173213Z`.
 Pipeline-manifest/inventory SHA-256 values are
-`4fd087f6b442a82ac7e1fed4f7274513e50c5d98987f870a79a85438847d20fa`
-and `9e56b56128ade40fb3b19b197553b00efc7e0a86631e20586855951e3933c1c0`.
-Neutrality, ledger, chronology, native-fast, and protected-access checks
-passed, including inverse-volatility absolute neutral IC below 0.02 in all
-three folds. Acceptance nevertheless stopped as `unsupported` because 15 of
-75 sealed Round-1 legacy baseline/horizon summaries failed exact identity.
-The scaled-target data are unchanged: D5 and D10 match exactly; D1/D2/D3 were
-accidentally summarized on per-horizon validity instead of Round 1's common
-D1--D5 population. Do not interpret the rev3 ICs as accepted research results
-or proceed to rev3 Round 1/2 until that reporting-population defect is repaired
-pre-score, tested, and accepted from a fresh root. Official validation, the
-permanently spent test, and deployment remain untouched. No paid instance is
-active for this work.
+`dacef39764492213599fb9fb696b716583432511d1d8b8b1bfa239f824f1d7fc`
+and `22ebbfaeec8306f039a7aadc42b72fd8d1c08f992c3fc7ac334b22ceead8830d`.
+All 75 legacy comparisons pass exactly with zero mismatches;
+inverse-volatility neutral IC is 0.0041771/0.0067263/0.0046084 in F1/F2/F3,
+strictly below the 0.02 engineering bound. Ledger, chronology, native-fast,
+entry-defect, and protected-access checks pass. The data tier remains
+`development_grade_inferred_actions`; verified action terms, auction execution
+marks, and historically executable borrow are still unsupported claims.
+
+Rev3 Round 1 is completed and sealed at
+`D:\quant-data\b3\processed\model_runs\v2_round1_rev3_f567e0f_20260907T173815Z`.
+Frozen-design/result/access-audit/inventory SHA-256 values are
+`6ad0d9b5de9fce20e3b5fa952b9fbfc48fffbf49a903f0bff3dc1bc073e37f16`,
+`e51a46e1ddfed7730c178268c083da2f375ed92a660bbbeac4bb3f2619264daf`,
+`a2336328dd0a7e85bce1c710724abf2e287806daad335e252bb2fafbde114708`,
+and `32eb364d391319d833cd649e628c541e42c5953fc0b5d188029f377658cac35f`.
+The 657-artifact audit passes with transfer chronology clean,
+official-validation/test access false/false, and no deployment change.
+
+The ladder keeps A/B/D, drops C, and designates `b_intraday` as the Round-2
+parent. B has pooled neutral IC 0.0216976 [0.0139469, 0.0327263], exact legacy
+IC 0.0319429 [0.0213486, 0.0484990], and headline net excess 1.3382 bps/day
+[-6.3396, 12.3077]. C worsens both registered metrics versus B. D improves
+over C on its registered F1/F2 support and is kept, but its pooled neutral IC
+0.0136093 does not displace B. Parent-B realized beta is directional in F1/F3
+(-0.3588/-0.5659) and beta-neutral only in F2 (-0.2450); F3 shortability is
+coverage-limited at 0.1127 of active name-days. The informational fine-only,
+756-decay, and uniform-pretrain neutral ICs are
+0.0216976/0.0219637/0.0212408. The registration stopped before Round 2.
+Protected data and deployment remain untouched, and no paid instance was used
+for this CPU execution.

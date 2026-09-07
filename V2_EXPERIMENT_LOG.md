@@ -1670,3 +1670,75 @@ population for those primary horizons. The manifest therefore records
 first-failure rule, no rev3 Round 1 or Round 2 run was started and no result was
 retried. Protected data and deployment remain untouched, and no paid instance
 was launched.
+
+## Rev3 legacy-readout repair, accepted replay, and Round 1 (2026-09-07)
+
+Commit `f567e0f6def33bfd49e5f02b4dfab953a94fb589` restores the exact
+rev2 legacy scoring population without changing the rev3 neutral target. The
+primary D1/D2/D3/D5 legacy rows now share the original active, finite-score,
+positive-sigma, all-four-primary-target-valid population; D10 remains
+per-horizon. The neutral path starts from that same rev2 population and then
+intersects characteristic validity. The horizon audit records possible and
+used date/name-day counts for both populations. Ruff, compileall, and all 866
+tests passed before scoring.
+
+The fresh from-scratch acceptance root is:
+
+    D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev3_f567e0f_20260907T173213Z
+
+Its pipeline-manifest and inventory SHA-256 values are
+`dacef39764492213599fb9fb696b716583432511d1d8b8b1bfa239f824f1d7fc`
+and `22ebbfaeec8306f039a7aadc42b72fd8d1c08f992c3fc7ac334b22ceead8830d`.
+All 75 sealed legacy baseline/horizon comparisons are exactly identical with
+zero mismatches. Inverse-volatility neutral IC is 0.0041771, 0.0067263, and
+0.0046084 in F1/F2/F3, below the registered absolute 0.02 engineering bound.
+All 15 baselines and the F1 GBDT integration leg completed, every entry-defect
+signature is zero, hard ledger/gross bounds passed, transfer chronology is
+clean, and official-validation/test access is false/false. The accepted status
+remains explicitly `development_grade_inferred_actions`; verified action terms,
+auction execution marks, and historically executable borrow remain unsupported
+research claims.
+
+Rev3 Round 1 is completed and sealed at:
+
+    D:\quant-data\b3\processed\model_runs\v2_round1_rev3_f567e0f_20260907T173815Z
+
+Frozen-design, result, access-audit, and complete inventory SHA-256 values are
+`6ad0d9b5de9fce20e3b5fa952b9fbfc48fffbf49a903f0bff3dc1bc073e37f16`,
+`e51a46e1ddfed7730c178268c083da2f375ed92a660bbbeac4bb3f2619264daf`,
+`a2336328dd0a7e85bce1c710724abf2e287806daad335e252bb2fafbde114708`,
+and `32eb364d391319d833cd649e628c541e42c5953fc0b5d188029f377658cac35f`.
+The audit covers 657 artifacts and passes with clean chronology, protected
+access false/false, and no deployment change. The exact registered execution
+contains 15 baseline evaluations; A/B/C on F1/F2/F3; rung D only on F1/F2;
+and all six data-span preview evaluations. No D/F3 result exists.
+
+The ladder keeps A, B, and D, drops C, and designates `b_intraday` as the
+Round-2 parent. Pooled neutral ICs for A/B/C/D are
+0.0200034/0.0216976/0.0184769/0.0136093; D is an F1/F2-only readout. B's
+neutral IC interval is [0.0139469, 0.0327263], its exact legacy IC is 0.0319429
+[0.0213486, 0.0484990], and headline net excess is 1.3382 bps/day
+[-6.3396, 12.3077] over 375 finite observations. C versus B worsens neutral IC
+by -0.0032207 [-0.0071478, -0.0009433] and economics by -2.2929 bps/day, so C
+is dropped. D versus C improves neutral IC by 0.0045720
+[0.0010613, 0.0089978] and economics by 2.0140 bps/day on its registered
+F1/F2 support, so D is kept, but B remains the best kept pooled neutral-IC
+parent. The inverse-volatility control has neutral IC 0.0051659, legacy IC
+0.0622560, and net excess 4.3574 bps/day; it is not an eligible ladder parent.
+
+For parent B, the neutral exposure diagnostics are dominated by positive
+12-to-1 momentum rank correlation (0.4611/0.4928/0.4135 across F1/F2/F3),
+with beta-60 exposure -0.1532/-0.1341/-0.1830. Realized market-beta slopes are
+-0.3588 (`directional`), -0.2450 (`beta_neutral`), and -0.5659
+(`directional`), so the diagnostic does not support realized beta neutrality
+in two of three folds. Headline net excess by fold is
+3.5125/-2.4082/2.8731 bps/day. Active-name prior-20 lending-rate coverage is
+0.6446/0.6929/0.7198, while active shortability is
+0.6118/0.6929/0.1127; F3 shortability is therefore coverage-limited.
+
+The data-span preview remains informational. Fine-only, 756-session decay,
+and uniform-pretrain neutral ICs are 0.0216976/0.0219637/0.0212408. Decay
+minus fine-only is +0.0002661 [-0.0078523, 0.0065975] neutral IC and
++2.7928 bps/day [-4.0730, 7.4039], while uniform minus fine-only is
+-0.0004568 [-0.0081245, 0.0067001] and -1.3548 bps/day. Per the registration,
+execution stopped before Round 2. No paid instance was used for this CPU run.
