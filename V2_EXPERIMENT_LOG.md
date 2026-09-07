@@ -655,3 +655,150 @@ research claim. Direct provider inventory reads at
 `2026-09-07T01:39:39.9369263Z` and `2026-09-07T01:39:45.5250149Z` each
 returned zero instances. There was no paid host to terminate, and no adjacent
 instance was touched.
+
+## Pass-4h eligibility hysteresis, accepted replay, and Round 1 (2026-09-07)
+
+Commit `f8986a4e1bccd672a692ac7a184bf2a4dad4bf53` implements the registered
+five-session hold-through rule for a held name whose eligibility is temporarily
+absent. Eligibility or closure resets the streak; session six submits an
+`ineligible_hold_exhausted` exit, while the existing ten-session no-print
+settlement path retains precedence. Entries remain eligible-only. Setting the
+new field to zero is bit-identical to the pre-4h ledger. Commit
+`384fd8142d6fd4c3cbd63ce1656b998854cfbf53` completes chained ancestor
+verification for the acceptance replay. Ruff, compilation, the protocol guard,
+and the full test suite passed before the replay.
+
+The immutable accepted replay is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_pass4h_384fd81_20260907T021757Z`.
+Its pipeline manifest, sealed access audit, log-inclusive artifact inventory,
+and 16-book CSV SHA-256 values are respectively
+`97a1ed757e87e1e19f2c46999437b31f436470f2dae49d2ce0c5782635607f8f`,
+`422df9edf2c6138e761cf14e907414ad1e60f8c15b9c2f9d06ad9755c73f8f0e`,
+`94ac863f997f53769434dfa73a503bb89074973f2bea8ffc4d405bfc2d69c4a4`,
+and `54e293cd10c6752c083d6d32e3f0566564670b62f6f5f6ac9d218e76fe734fbf`.
+The result is `development_grade_inferred_actions` with no reasons. Every
+non-ledger field is bit-identical to the sealed ancestor, D1--D5 are zero in
+all books, all mean gross values are within 1.5--2.25, every mean stale or
+unresolved fraction is below 2%, and protected access is false/false. The
+single gross label is F2 inverse-volatility, `gross_underdeployed` at 1.725810.
+
+The full before/after headline table is:
+
+| Book | Gross 4g→4h | Label | Ineligible exits 4g→4h | Turnover 4g→4h | Net bps/day 4g→4h | Settlements 4g→4h | Stale mean 4h |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| F1 inverse-volatility | 1.800173→1.849769 | within | 35→28 | .071012→.067294 | 6.671→4.291 | 3→4 | .006682 |
+| F1 momentum | 1.804345→1.802461 | within | 29→21 | .069464→.064802 | 6.766→5.725 | 2→3 | .005003 |
+| F1 reversal-21 | 1.973163→1.964108 | within | 37→22 | .303311→.287610 | -13.325→-11.807 | 1→2 | .003055 |
+| F1 reversal-5 | 1.931453→1.940747 | within | 24→12 | .868498→.859234 | -6.317→-6.878 | 2→3 | .005293 |
+| F1 blend | 1.972213→1.983837 | within | 33→20 | .561452→.541686 | -6.099→-6.890 | 2→2 | .004179 |
+| F2 inverse-volatility | 1.755766→1.725810 | under | 19→14 | .060188→.057059 | 9.852→10.962 | 2→2 | .002682 |
+| F2 momentum | 1.828920→1.826791 | within | 15→11 | .067997→.064582 | 1.570→2.647 | 0→0 | .000000 |
+| F2 reversal-21 | 1.952331→1.949948 | within | 22→16 | .282340→.272580 | -8.646→-7.873 | 1→1 | .001116 |
+| F2 reversal-5 | 1.937269→1.945585 | within | 13→9 | .852630→.847550 | -11.961→-13.862 | 2→2 | .004287 |
+| F2 blend | 1.958096→1.958106 | within | 22→16 | .512286→.505945 | -5.366→-4.244 | 1→1 | .001585 |
+| F3 inverse-volatility | 1.888777→1.948083 | within | 22→13 | .077747→.089709 | 4.241→-2.091 | 3→3 | .006670 |
+| F3 momentum | 1.848185→1.900454 | within | 28→13 | .066913→.066915 | 15.153→12.612 | 5→5 | .011474 |
+| F3 reversal-21 | 1.964110→1.966923 | within | 24→19 | .297032→.293829 | -9.295→-7.572 | 3→3 | .006362 |
+| F3 reversal-5 | 1.947440→1.962103 | within | 28→18 | .864234→.851757 | -5.589→-7.290 | 3→4 | .009013 |
+| F3 blend | 1.973285→1.972861 | within | 24→15 | .546419→.533259 | 7.388→9.075 | 6→6 | .013596 |
+| F1 GBDT integration ensemble | 1.840379→1.858859 | within | 11→5 | .158602→.151960 | 4.977→3.817 | 1→1 | .002475 |
+
+Several preregistered expectations missed without triggering a stop: the largest
+gross move was 0.059306, F3 inverse-volatility turnover rose 0.011962, and five
+books gained a terminal settlement. These are reported outcomes, not defects;
+the exhaustive engineering gates all passed.
+
+Round 1 was frozen only after that acceptance. Commit
+`81fe0cb824f79b7605920068d01442f5fa48fae3` separates and binds the store-build,
+acceptance, and freeze implementations. The frozen root is
+`D:\quant-data\b3\processed\model_runs\v2_round1_81fe0cb_20260907T023339Z`,
+with frozen-design SHA-256
+`b7d5fcccd2b7109f2a0a8892942023d387e1d33d4c8d08c04bf3f6c76320dc84`.
+It binds store build `8021e42ae658d3eb7bba19e39b58e2f9c8d65331`, store-manifest
+`deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b`,
+and the accepted replay above.
+
+The first run completed all baselines and rungs A/B/C, then stopped before
+writing a rung-D artifact because the adapter requested an options column from
+a store that explicitly records options, rebalance, events, and fundamentals
+as source-missing. Its logs and `failure_record.json` are retained. Commit
+`cb6a0a5c4de202fe046dba48d9fd6c5af168dbfd` consumes only materialized
+sidecar families (lending and oddlot here) while requiring every omitted family
+to be explicitly source-missing. It does not invent values or change the
+registered rung. All 852 tests passed in 376.53 seconds. The recovery hash-
+verified and reused every completed candidate and scored only rung D and the
+two absent span candidates; no completed candidate was retried.
+
+The completed Round-1 result SHA-256 is
+`ca39f11340f13956dca11da7fb6b3a8fa0a38f8a79cb558387d81aff26bf57a0`.
+The sealed access audit and complete inventory SHA-256 values are
+`7ea5772e253785264d4b724277d0d8376918cde674e09bcceb2920546a09f180`
+and `b5084c817fc478c2759d962af12e282c292cade6f8e715aebed290ba5500ce08`.
+The audit covers 696 files / 505,196,221 bytes and all 88 JSON artifacts carrying
+access flags; official-validation/test access is false/false, transfer
+chronology is clean, and deployment is unchanged. Independent verification
+also passed for all 86 hash sidecars, all 33 score manifests / 66 array
+payloads, and all 18 model manifests / 450 LightGBM model files.
+
+Pooled Round-1 readouts are:
+
+| Kind | Candidate | Primary IC [95%] | P1 / P5 | Spread bps/holding session | Net excess bps/day | Finite net days |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| naive | inverse-volatility-20 | .062256 [.029096,.098948] | .9940 / .9654 | 14.306 | 4.357 | 251 |
+| naive | momentum-12-1 | .039860 [.022785,.060148] | .9935 / .9708 | 20.082 | 4.186 | 248 |
+| naive | reversal-21 | -.018160 [-.039885,-.010381] | .9375 / .7313 | -2.491 | -9.072 | 375 |
+| naive | reversal-5 | -.007037 [-.021975,.001454] | .7507 / .0109 | -3.299 | -9.327 | 375 |
+| naive | blend | .023663 [.010381,.033518] | .8576 / .4352 | 5.249 | -5.567 | 248 |
+| rung | A slow | .052871 [.026554,.084610] | .8884 / .8003 | 18.046 | 6.435 | 375 |
+| rung | B intraday | .055264 [.027897,.087070] | .8785 / .7974 | 15.558 | 5.430 | 375 |
+| rung | C lending | .053795 [.026543,.086484] | .8914 / .8199 | 14.321 | 5.364 | 375 |
+| rung | D all available sidecars | .032725 [.005171,.059129] | .8484 / .7589 | 9.850 | 1.866 | 375 |
+| span | fine only | .055264 [.027897,.087070] | .8785 / .7974 | 15.558 | 5.430 | 375 |
+| span | pretrain decay 756 | .053459 [.032198,.080393] | .8516 / .7641 | 15.424 | 5.341 | 375 |
+| span | pretrain uniform | .053680 [.029956,.082135] | .8314 / .7626 | 15.624 | 7.590 | 375 |
+
+Per-fold GBDT ladder readouts (headline 4-bps/2%-borrow ledger) are:
+
+| Rung/fold | IC [95%] | P1/P5 | Spread | Net | Gross (label) | Settlements / notional NAV | Econ unresolved | Stale mean |
+| --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: |
+| A/F1 | .060022 [-.004792,.128546] | .9133/.8334 | 14.936 | 6.080 | 1.8504 (within) | 2 / .0442 | no | .0032 |
+| A/F2 | .040432 [-.003467,.079738] | .8391/.7241 | 19.724 | 5.486 | 1.8641 (within) | 1 / .0202 | no | .0015 |
+| A/F3 | .058028 [.025935,.105279] | .9121/.8422 | 19.442 | 7.709 | 1.8760 (within) | 4 / .1189 | no | .0086 |
+| B/F1 | .057424 [-.007850,.126421] | .9027/.8304 | 13.892 | 6.512 | 1.8444 (within) | 2 / .0449 | no | .0033 |
+| B/F2 | .045056 [-.000020,.081549] | .8294/.7251 | 13.115 | 6.911 | 1.8732 (within) | 1 / .0201 | no | .0015 |
+| B/F3 | .063113 [.030185,.114925] | .9029/.8357 | 19.567 | 2.927 | 1.9001 (within) | 4 / .1222 | no | .0088 |
+| C/F1 | .052741 [-.010798,.123072] | .9027/.8351 | 15.707 | 6.206 | 1.8076 (within) | 2 / .0528 | no | .0039 |
+| C/F2 | .048702 [.000871,.088222] | .8755/.8006 | 13.580 | 7.870 | 1.7759 (under) | 1 / .0194 | no | .0015 |
+| C/F3 | .059792 [.026978,.109782] | .8959/.8239 | 13.691 | 2.095 | 1.9012 (within) | 4 / .1134 | no | .0082 |
+| D/F1 | .052268 [-.011935,.119748] | .8946/.8241 | 15.611 | 1.873 | 1.9078 (within) | 1 / .0342 | no | .0025 |
+| D/F2 | .050332 [.000598,.090665] | .8849/.8175 | 14.380 | 9.311 | 1.7511 (under) | 1 / .0191 | no | .0014 |
+| D/F3 | -.003512 [-.022342,.014170] | .7678/.6382 | -.187 | -5.410 | 1.9751 (within) | 3 / .0900 | no | .0064 |
+
+Every row above has D1--D5 equal to zero. The naive floor has the same clean
+signature and hard-bound/stale passes. Its only gross label is F2 inverse-
+volatility; economics are unresolved for F1 inverse-volatility, F3 momentum,
+and the F3 blend. The span preview has one gross label, uniform-pretrain F1 at
+1.7569; all other span cells are within-band and resolved.
+
+Registered paired pooled deltas are:
+
+| Comparison | Δ primary IC [95%] | Δ P1 / P5 | Δ spread | Δ net [95%] bps/day |
+| --- | ---: | ---: | ---: | ---: |
+| B−A | .002393 [-.001660,.005711] | -.009869 / -.002832 | -2.488 | -1.006 [-7.101,3.310] |
+| C−B | -.001468 [-.003293,.000971] | .012880 / .022480 | -1.238 | -.066 [-2.649,3.362] |
+| D−C | -.021071 [-.040851,-.007148] | -.042946 / -.060974 | -4.471 | -3.498 [-12.680,2.483] |
+| decay−fine | -.001804 [-.009564,.007663] | -.026872 / -.033301 | -.134 | -.089 [-3.281,3.597] |
+| uniform−fine | -.001584 [-.008156,.005319] | -.047138 / -.034835 | .066 | 2.160 [-1.077,7.401] |
+
+The rung rule keeps A and B, drops C and D because each step's primary-IC and
+headline-net point deltas are both negative, and designates `b_intraday` as
+the Round-2 GBDT parent. The naive inverse-volatility control has the highest
+pooled IC, but it is a registered floor/control rather than a ladder parent.
+The data-span preview remains informational: neither long-history arm improves
+pooled IC over fine-only, while uniform pretraining has the better point
+economics with an interval spanning zero.
+
+Round 2 was not frozen or run. No paid instance was launched for Pass 4h or
+Round 1. The next authorized operation, after Gabriel's explicit go-ahead, is
+the disposable one-epoch Arm-A/F1/seed-11 smoke with no score directory,
+followed only on success by the three registered Stage-P seeds.

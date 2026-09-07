@@ -1064,3 +1064,133 @@ decomposition is present, D1--D5 are zero, and mean gross stays inside the hard
 1.5--2.25 interval. A signature or hard-bound breach still stops. The 2%
 stale/unresolved bound and 15% settlement-incidence label are unchanged. This
 contract was registered before its replay and before any Round-1 score.
+
+## 17. Final disposition for the proposing reviewers
+
+This section is the compact explanation to feed back to the LLMs that proposed
+the refactors. Sections 1--16 above retain the evidence and decisions made before
+the usage reset; this section consolidates them with Pass 4h and Round 1.
+
+### What was implemented
+
+| Area | Final choice | Why |
+| --- | --- | --- |
+| Identity | Permanent security identity, dated ticker attributes, audited same-ticker ISIN succession, and no filename-wide identity assignment | This preserves history without merging unrelated listings and makes every transition inspectable. |
+| Information clock | Consumer-specific clocks and masks: publication-lagged sidecars, decision rows, target/outcome accounting, and execution each use their own causal boundary | The former all-purpose action mask silently mixed feature availability, economic truth, and execution. |
+| Economic returns | Shareholder wealth uses observed endpoints and explicit action terms; raw-price cross-session fields also reject unit changes; same-session scale-free fields do not inherit an unnecessary action guard | This keeps splits and resolved actions economically meaningful without double masking. |
+| Store | Family-at-a-time float32 memmaps, float64 only within bounded computation, row-wise rank-gauss, streamed targets, and one adjusted-OHLC memmap | This removed the full-panel peak-memory failure without changing values at research precision. The accepted store peaked at 7.138950 GiB. |
+| Sidecars | Unconditional contemporaneity reconstruction, name-clustered liquidity-stratified coverage audit, and explicit source-missing capabilities | Leakage is guarded by reproducible availability. Composition is reported with support-aware inference. Missing archives never become zero-valued observations. |
+| Model boundary | Every tensor reaching the model is finite; invalid cells are zeroed under masks; masked reductions use `where`; zero-history and empty-fast-patch cases are structural cases | This fixes NaN propagation at the loader/model contract instead of dropping failed predictions in the evaluator. |
+| Ledger | Stateful pending orders and fills, partial risk trims, 20% absolute-net cap, same-auction slot reuse after a complete exit order, `K_eff` for small universes, current-session action uncertainty, ten-session labelled terminal settlement, and five-session transient-ineligibility hold | Each rule followed a sealed diagnosis and addresses a distinct accounting or churn defect without changing scores or inventing fills. |
+| Acceptance | D1--D5 exact defect signatures; hard mean-gross interval 1.5--2.25; 1.8--2.2 as a label; mean stale/unresolved below 2%; settlement incidence separately labelled | The decomposition showed that modest gross drift can be a truthful consequence of fixed entry sizing, while signature breaches remain real engineering failures. |
+| Research hygiene | Fresh immutable roots, hash-bound provenance, separate build/acceptance/freeze identities, no completed-candidate retry, false protected-access flags, and no deployment change | Operational recovery remains distinguishable from a result-changing retry. |
+
+### Suggestions deliberately not implemented in full
+
+- Verified corporate-action terms and a verified auction schedule were not
+  claimed because those archives do not exist in the available development
+  data. The pipeline accepts only the explicit
+  `inferred_cotahist_dismes_v1` / `reconstructed_v1` tier and propagates those
+  labels to every artifact. This is the shortest honest route to a number, not
+  a substitute for later source acquisition.
+- The proposed wealth-index bridge across raw-series restarts was rejected.
+  The pre-change audit found zero F1/F2/F3 evaluation loss from those restarts;
+  a bridge would manufacture unobserved continuity. Exact endpoints remain
+  required, and restart incidence is recorded.
+- Universe hysteresis, resize-to-target, routine rebalancing, altered K/buffer,
+  and entry reach-down were deferred. The signed gross decomposition and D1--D4
+  tests did not justify them, and adding them would change the registered
+  strategy rather than repair a defect.
+- The old position-life unresolved-action latch was removed, but the store was
+  not rebuilt for that pass. The sealed diagnosis proved the current
+  retrospective accounting arrays were already correct and only the ledger
+  consumer was wrong.
+- The legacy v1 fast checkpoint is not a canonical Round-2 input. Under the rev-2
+  chronology audit it represents contaminated transfer history. Round 2 is
+  registered with fresh native fast weights for every arm; no compatibility
+  fallback remains.
+- Options, rebalance, events, and fundamentals were not fabricated merely to
+  make rung D rectangular. The sealed store explicitly records them as source-
+  missing. Rung D consumed the materialized lending and oddlot groups and
+  retained the unavailable capabilities as zero-dimensional absences. This is
+  different from imputing a missing observation and is enforced by the store
+  capability manifest.
+- The official-validation and permanently spent test windows were not opened.
+  The current claims are development-window claims only.
+- Round 2 was not started. Pass 4h explicitly requires a user go-ahead after
+  Round 1 and a disposable one-job smoke before any registered GPU trajectory.
+
+### Pass-4h and Round-1 evidence
+
+Pass 4h passed all exhaustive acceptance conditions. The accepted replay at
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_pass4h_384fd81_20260907T021757Z`
+has manifest SHA-256
+`97a1ed757e87e1e19f2c46999437b31f436470f2dae49d2ce0c5782635607f8f`.
+All 16 reused score panels kept non-ledger fields bit-identical; D1--D5 were
+zero; every mean gross lay inside 1.5--2.25; every stale/unresolved mean was
+below 2%; and protected access was false/false. F2 inverse-volatility is
+properly labelled underdeployed rather than silently rescaled.
+
+Round 1 is sealed at
+`D:\quant-data\b3\processed\model_runs\v2_round1_81fe0cb_20260907T023339Z`.
+Result and complete-inventory SHA-256 values are
+`ca39f11340f13956dca11da7fb6b3a8fa0a38f8a79cb558387d81aff26bf57a0`
+and `b5084c817fc478c2759d962af12e282c292cade6f8e715aebed290ba5500ce08`.
+The complete audit verifies 696 files, 33 score manifests with 66 array
+payloads, 18 model manifests with 450 LightGBM models, and all 88 access-flagged
+JSONs.
+
+The GBDT ladder's pooled primary ICs were A/B/C/D =
+0.052871/0.055264/0.053795/0.032725; headline net excess was
+6.435/5.430/5.364/1.866 bps/day. The fixed preference rule keeps A and B,
+drops C and D because each later step has both a negative IC point delta and a
+negative economics point delta, and designates `b_intraday` as the Round-2
+parent. The naive inverse-volatility floor has higher IC (0.062256) but is a
+control, not a ladder candidate. The data-span preview is intentionally
+non-binding: fine/decay/uniform ICs were 0.055264/0.053459/0.053680.
+
+### Prepared Round-2 handoff; not executed
+
+Before a future freeze, the exact sealed Round-1 root and the 4.531-GiB V3
+store must be copied byte-for-byte to the `brazil-rv-east3` NFS namespace and
+their result/inventory/store hashes reverified. No legacy fast checkpoint is
+passed. On an explicitly authorized GH200, with a clean checkout at the then-
+current commit, the prepared sequence is:
+
+```bash
+cd /home/ubuntu/Brazil-RV/quant/b3-quant
+export BRAZIL_RV_DATA_ROOTS=/home/ubuntu/Brazil-RV/quant/b3-quant/research/configs/v2/data_roots.lambda_us_east_3.json
+ROUND2_ROOT=/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round2_<commit>_<utc>
+
+uv run --project research python -m brazil_rv.v2.research_rounds freeze-round2 \
+  --round1-root /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round1_81fe0cb_20260907T023339Z \
+  --store /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/v2_daily_store_8021e42_20260906T202315Z \
+  --cdi /lambda/nfs/brazil-rv-east3/quant-data/b3/interim/external/cdi_sgs12_v2_development_20260903T190000Z/daily_cdi.parquet \
+  --cdi-sha256 a60147d598ffabea13a64228e3ec3f18beee7956b8ddca9e0d725cdc63250d23 \
+  --experiment52-cdi /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/execution_c0_52_e380cd7_20260827T164738Z/cdi/daily_cdi.parquet \
+  --experiment52-cdi-sha256 38d7934ebb6849b1e20310a81130f6faa68f4618c8edb0d046185067c83da2ea \
+  --output-root "$ROUND2_ROOT" --max-parallel 4
+
+uv run --project research python -m brazil_rv.v2.research_rounds write-round2-plan-smoke --output-root "$ROUND2_ROOT"
+uv run --project research python -m brazil_rv.v2.run_many \
+  --plan "$ROUND2_ROOT/round2_plan_smoke.json" \
+  --manifest "$ROUND2_ROOT/round2_smoke_launcher_manifest.json"
+```
+
+That generated plan is exactly Arm A, F1, seed 11, one epoch, maximum one
+process, and no score output directory. Only after its completed manifest is
+finite and the root still contains no smoke `scores/` directory may the three
+Stage-P inputs be materialized:
+
+```bash
+uv run --project research python -m brazil_rv.v2.research_rounds write-round2-plan-p --output-root "$ROUND2_ROOT"
+uv run --project research python -m brazil_rv.v2.run_many \
+  --plan "$ROUND2_ROOT/round2_plan_p.json" \
+  --manifest "$ROUND2_ROOT/round2_stage_p_launcher_manifest.json"
+```
+
+The Stage-P plan contains seeds 11/29/47, native fresh fast weights, no external
+sidecars because the designated parent is `b_intraday`, at most three active
+jobs under the registered max-parallel four, and the exact 20-epoch/patience-3,
+lookback-60, eight-pair, lambda-zero contract. No plan or Round-2 root was
+created during Pass 4h.

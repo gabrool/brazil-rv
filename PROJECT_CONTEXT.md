@@ -1638,3 +1638,55 @@ Its cleanup-plan, delete-list, and cleanup-result SHA-256 values are
 and `ccd1368d2f98a4c77fdc43d193a145680bdf83dd32f27e0bada464ccbc296e89`.
 The final deterministic bucket path-and-size inventory SHA-256 is
 `a0fa1167e4d731fdc91870d04b9f800fa6ff717d540baf1c709bf92619994b5df`.
+
+## v2 development acceptance and Round-1 parent (2026-09-07)
+
+The current v2 development store remains the V3 store at
+`D:\quant-data\b3\processed\v2_daily_store_8021e42_20260906T202315Z`,
+manifest SHA-256
+`deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b`.
+Its source tier is explicitly development-grade:
+`action_terms_source=inferred_cotahist_dismes_v1` and
+`schedule_source=reconstructed_v1`. It does not support verified corporate-
+action, auction-mark, or executable-borrow claims.
+
+Pass 4h added a five-session hold-through rule for transient eligibility loss
+and replaced the 1.8--2.2 gross stop with a labelled report inside the hard
+1.5--2.25 interval. The accepted replay is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_pass4h_384fd81_20260907T021757Z`,
+pipeline-manifest SHA-256
+`97a1ed757e87e1e19f2c46999437b31f436470f2dae49d2ce0c5782635607f8f`.
+It passed with no reasons: all 16 sealed score panels were reused, every non-
+ledger field was bit-identical, every D1--D5 signature was zero, all mean gross
+values were inside the hard interval, all stale/unresolved means were below
+2%, and protected access remained false/false. F2 inverse-volatility is
+reported, not repaired, as `gross_underdeployed` at 1.725810.
+
+Round 1 is completed and sealed at
+`D:\quant-data\b3\processed\model_runs\v2_round1_81fe0cb_20260907T023339Z`.
+Its result and complete inventory SHA-256 values are
+`ca39f11340f13956dca11da7fb6b3a8fa0a38f8a79cb558387d81aff26bf57a0`
+and `b5084c817fc478c2759d962af12e282c292cade6f8e715aebed290ba5500ce08`.
+The access audit covers all 88 JSON artifacts with access flags and passes
+official-validation/test false/false with clean transfer chronology. The
+sealed store materializes lending and oddlot; options, rebalance, events, and
+fundamentals remain explicitly source-missing and are never imputed or
+fabricated.
+
+The registered ladder keeps `a_slow` and `b_intraday`, drops `c_lending` and
+`d_all_sidecars`, and designates `b_intraday` as the Round-2 GBDT parent. Its
+pooled primary IC is 0.055264 with block-bootstrap interval
+[0.027897, 0.087070], persistence is 0.8785/0.7974 at one/five sessions,
+spread is 15.558 bps per holding session, and headline net excess is 5.430
+bps/day over 375 finite development days. The inverse-volatility naive floor
+has pooled IC 0.062256 and net excess 4.357 bps/day; it is a control, not an
+eligible ladder parent. The data-span preview is informational: fine-only,
+756-session decay, and uniform-pretrain ICs are
+0.055264/0.053459/0.053680.
+
+Round 2 has not been frozen or run, and no paid instance exists. Its next step
+requires explicit user authorization: freeze a fresh NFS root under the then-
+current clean commit, run exactly one disposable Arm-A/F1/seed-11 epoch with
+no score artifact, and only if that succeeds write the three-seed Stage-P
+plan. Official validation, the permanently spent test, and deployment remain
+untouched.
