@@ -5,7 +5,9 @@ import hashlib
 import json
 import math
 import os
+import platform
 import random
+import shutil
 import subprocess
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
@@ -813,6 +815,17 @@ def _selection_score(
     return _common_primary_selection_score(predictions, targets, mask, active)
 
 
+def _configure_inductor_compiler() -> None:
+    if platform.machine() != "aarch64":
+        return
+    compiler = shutil.which("g++-12")
+    if compiler is None:
+        raise RuntimeError(
+            "Arm64 Inductor requires g++-12 for the GH200 Armv9 target"
+        )
+    torch._inductor.config.cpp.cxx = (compiler,)
+
+
 def compile_forward(
     model: nn.Module,
     *,
@@ -822,6 +835,7 @@ def compile_forward(
     # PyTorch requires the RNN opt-in before Dynamo will capture nn.GRU.
     torch._dynamo.config.allow_rnn = True
     if backend == "inductor":
+        _configure_inductor_compiler()
         # The sparse fast path has a data-dependent present-name count.  CUDA
         # graph capture can reuse a stale dynamic buffer when the whole GRU +
         # sparse TCN graph is composed, even though every compiled subgraph is

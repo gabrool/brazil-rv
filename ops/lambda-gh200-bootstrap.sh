@@ -104,6 +104,15 @@ main() {
     export UV_CACHE_DIR="$HOME/.cache/uv"
     export TORCHINDUCTOR_CACHE_DIR="$HOME/.cache/torchinductor"
 
+    # PyTorch's GH200 Inductor target emits Armv9 flags that Ubuntu 22.04's
+    # default GCC 11 cannot parse.  Install the distro's supported GCC 12
+    # compiler explicitly; train.py binds Inductor to this exact executable.
+    if ! command -v g++-12 >/dev/null 2>&1; then
+        sudo apt-get update
+        sudo apt-get install -y g++-12
+    fi
+    g++-12 --version | head -n 1
+
     cd "$repository/research"
     uv sync --frozen --no-default-groups
     uv run --frozen --no-default-groups python -c 'import brazil_rv, torch; print(torch.cuda.get_device_name(0))'

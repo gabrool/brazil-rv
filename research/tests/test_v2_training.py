@@ -44,6 +44,7 @@ from brazil_rv.v2.train import (
     stitch_block_parity_predictions,
     train_stage,
     _common_primary_selection_score,
+    _configure_inductor_compiler,
     _date_pair_microbatches,
     _input_static_identity,
     _loader_input_payload,
@@ -526,6 +527,28 @@ def test_fullgraph_compile_captures_gru_forward() -> None:
         current_feature_age_sessions=current_feature_age_sessions,
     )
     assert fast_scores.shape == (2, 3, 6)
+
+
+def test_arm64_inductor_binds_the_gh200_capable_compiler(monkeypatch) -> None:
+    original = torch._inductor.config.cpp.cxx
+    monkeypatch.setattr("brazil_rv.v2.train.platform.machine", lambda: "aarch64")
+    monkeypatch.setattr(
+        "brazil_rv.v2.train.shutil.which",
+        lambda name: "/usr/bin/g++-12" if name == "g++-12" else None,
+    )
+    try:
+        _configure_inductor_compiler()
+        assert torch._inductor.config.cpp.cxx == ("/usr/bin/g++-12",)
+    finally:
+        torch._inductor.config.cpp.cxx = original
+
+
+def test_arm64_inductor_fails_before_compile_without_gxx12(monkeypatch) -> None:
+    monkeypatch.setattr("brazil_rv.v2.train.platform.machine", lambda: "aarch64")
+    monkeypatch.setattr("brazil_rv.v2.train.shutil.which", lambda name: None)
+
+    with pytest.raises(RuntimeError, match=r"requires g\+\+-12"):
+        _configure_inductor_compiler()
 
 
 def test_fullgraph_compile_reuses_one_graph_across_date_batch_widths() -> None:
