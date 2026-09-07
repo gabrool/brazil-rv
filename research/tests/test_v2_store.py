@@ -454,8 +454,10 @@ def test_collate_uses_registered_fixed_fast_name_width() -> None:
     assert not batch["fast_patch_mask"][0, 3:].any()
     assert batch["fast_name_index"][0, 3:].eq(-1).all()
     assert not batch["fast_patch_valid"][1, 7:].any()
-    with pytest.raises(ValueError, match="positive multiple of 16"):
+    with pytest.raises(ValueError, match="zero or a multiple of 16"):
         collate_v2_daily([sample(1)], fixed_fast_name_count=15)
+    with pytest.raises(ValueError, match="exceeds"):
+        collate_v2_daily([sample(1)], fixed_fast_name_count=0)
     with pytest.raises(ValueError, match="exceeds"):
         collate_v2_daily([sample(17)], fixed_fast_name_count=16)
 

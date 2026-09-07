@@ -98,7 +98,7 @@ def test_pretraining_dataset_never_allocates_fast_name_rows(tmp_path) -> None:
         _native_fast_store(tmp_path), [1], stage="pretrain", lookback=20
     )
     sample = dataset[0]
-    batch = collate_v2_daily((sample, sample))
+    batch = collate_v2_daily((sample, sample), fixed_fast_name_count=0)
 
     assert sample["fast_patch_values"].shape == (0, 5, 7)
     assert sample["fast_name_index"].shape == (0,)

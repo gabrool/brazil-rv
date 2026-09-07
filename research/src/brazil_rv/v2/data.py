@@ -211,8 +211,8 @@ def collate_v2_daily(
         max_fast_names = max(max_fast_names, fast_count)
 
     if fixed_fast_name_count is not None:
-        if fixed_fast_name_count <= 0 or fixed_fast_name_count % 16:
-            raise ValueError("fixed fast-name count must be a positive multiple of 16")
+        if fixed_fast_name_count < 0 or fixed_fast_name_count % 16:
+            raise ValueError("fixed fast-name count must be zero or a multiple of 16")
         if max_fast_names > fixed_fast_name_count:
             raise ValueError(
                 "batch fast-name count exceeds the registered stage padding width"

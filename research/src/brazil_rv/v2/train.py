@@ -2196,7 +2196,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         time_decay_half_life=decay,
         drop_last=True,
     )
-    fixed_fast_name_count = stage_fast_name_count(train_dataset, selection_dataset)
+    fixed_fast_name_count = (
+        0
+        if stage == "P"
+        else stage_fast_name_count(train_dataset, selection_dataset)
+    )
     stage_collate = partial(
         collate_v2_daily, fixed_fast_name_count=fixed_fast_name_count
     )
@@ -2268,9 +2272,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             num_workers=arguments.num_workers,
             collate_fn=partial(
                 collate_v2_daily,
-                fixed_fast_name_count=max(
-                    fixed_fast_name_count,
-                    stage_fast_name_count(score_dataset),
+                fixed_fast_name_count=(
+                    0
+                    if stage == "P"
+                    else max(
+                        fixed_fast_name_count,
+                        stage_fast_name_count(score_dataset),
+                    )
                 ),
             ),
         )
