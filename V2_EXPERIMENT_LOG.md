@@ -805,3 +805,769 @@ followed only on success by the three registered Stage-P seeds. Direct Lambda
 provider inventories at `2026-09-07T04:51:39.2629896Z` and
 `2026-09-07T04:51:42.8034166Z` both returned zero instances; there was no paid
 host to terminate and no adjacent instance was touched.
+
+## Round-1 readout detail
+
+Sealed result SHA-256: `ca39f11340f13956dca11da7fb6b3a8fa0a38f8a79cb558387d81aff26bf57a0`. Sealed inventory SHA-256: `b5084c817fc478c2759d962af12e282c292cade6f8e715aebed290ba5500ce08`. Machine-readable artifact: `round1_readout_detail.json` (SHA-256 `e2e02dc8f99b4f0f33748e9f9b7e9e6b9c6733491b44e6a194fe34c248b89de2`). No score or model was recomputed; only 2023–2024 development sessions were read; official-validation/test access remained false/false.
+
+### Persisted pooled headline fields
+
+| Candidate | Primary IC | 95% interval | Shareholder IC | Price IC | Spread bps/holding session | Net excess bps/day |
+|---|---:|---:|---:|---:|---:|---:|
+| rung_a | 0.052871 | [0.026554, 0.084610] | 0.055257 | 0.050284 | 18.045883 | 6.435485 |
+| rung_b | 0.055264 | [0.027897, 0.087070] | 0.057656 | 0.052482 | 15.558374 | 5.429892 |
+| inverse_volatility_control | 0.062256 | [0.029096, 0.098948] | 0.063783 | 0.058843 | 14.305564 | 4.357358 |
+| momentum_control | 0.039860 | [0.022785, 0.060148] | 0.044495 | 0.041714 | 20.082323 | 4.186160 |
+
+### Per-horizon readouts
+
+| Candidate | Fold | H | Scaled target IC | Shareholder rank IC | Price rank IC | Shareholder spread bps/holding session |
+|---|---|---:|---:|---:|---:|---:|
+| rung_a | F1 | D1 | 0.042591 | 0.042720 | 0.040102 | 13.930751 |
+| rung_a | F1 | D2 | 0.053889 | 0.053446 | 0.048731 | 11.906216 |
+| rung_a | F1 | D3 | 0.071109 | 0.070389 | 0.064819 | 16.775000 |
+| rung_a | F1 | D5 | 0.072497 | 0.069699 | 0.063467 | 14.158697 |
+| rung_a | F1 | D10 | 0.091637 | 0.081455 | 0.071144 | 7.275807 |
+| rung_a | F2 | D1 | 0.036557 | 0.039884 | 0.038463 | 22.176343 |
+| rung_a | F2 | D2 | 0.040914 | 0.041661 | 0.037772 | 15.454825 |
+| rung_a | F2 | D3 | 0.037330 | 0.039717 | 0.034088 | 18.421271 |
+| rung_a | F2 | D5 | 0.046929 | 0.047917 | 0.040492 | 19.618995 |
+| rung_a | F2 | D10 | 0.098055 | 0.097915 | 0.085328 | 25.000011 |
+| rung_a | F3 | D1 | 0.047166 | 0.053602 | 0.050729 | 22.835314 |
+| rung_a | F3 | D2 | 0.049071 | 0.056492 | 0.051664 | 19.575545 |
+| rung_a | F3 | D3 | 0.056778 | 0.065058 | 0.059086 | 16.524651 |
+| rung_a | F3 | D5 | 0.079098 | 0.085750 | 0.077180 | 22.124281 |
+| rung_a | F3 | D10 | 0.119690 | 0.126599 | 0.115782 | 14.018617 |
+| rung_b | F1 | D1 | 0.042681 | 0.042707 | 0.039839 | 10.319986 |
+| rung_b | F1 | D2 | 0.049057 | 0.048088 | 0.045098 | 12.021883 |
+| rung_b | F1 | D3 | 0.061983 | 0.061841 | 0.056953 | 10.812444 |
+| rung_b | F1 | D5 | 0.075974 | 0.074725 | 0.067361 | 19.420623 |
+| rung_b | F1 | D10 | 0.092037 | 0.082342 | 0.071187 | 11.262685 |
+| rung_b | F2 | D1 | 0.041894 | 0.044106 | 0.041685 | 11.765706 |
+| rung_b | F2 | D2 | 0.042302 | 0.042149 | 0.038130 | 13.927313 |
+| rung_b | F2 | D3 | 0.043830 | 0.043967 | 0.037369 | 15.538734 |
+| rung_b | F2 | D5 | 0.052199 | 0.055534 | 0.049119 | 6.137282 |
+| rung_b | F2 | D10 | 0.096545 | 0.096904 | 0.084004 | 15.432067 |
+| rung_b | F3 | D1 | 0.042191 | 0.049095 | 0.045851 | 18.389361 |
+| rung_b | F3 | D2 | 0.054886 | 0.061915 | 0.056837 | 22.319286 |
+| rung_b | F3 | D3 | 0.068570 | 0.075964 | 0.068336 | 16.943519 |
+| rung_b | F3 | D5 | 0.086806 | 0.092495 | 0.083512 | 24.405735 |
+| rung_b | F3 | D10 | 0.136057 | 0.140172 | 0.128070 | 18.574803 |
+| inverse_volatility_control | F1 | D1 | 0.040141 | 0.041269 | 0.038901 | 19.149994 |
+| inverse_volatility_control | F1 | D2 | 0.053785 | 0.053504 | 0.050202 | 18.642269 |
+| inverse_volatility_control | F1 | D3 | 0.065127 | 0.064167 | 0.060271 | 19.995783 |
+| inverse_volatility_control | F1 | D5 | 0.081530 | 0.077383 | 0.071820 | 18.903757 |
+| inverse_volatility_control | F1 | D10 | 0.112514 | 0.103042 | 0.094324 | 13.280097 |
+| inverse_volatility_control | F2 | D1 | 0.046689 | 0.049214 | 0.046582 | 18.246667 |
+| inverse_volatility_control | F2 | D2 | 0.057633 | 0.056966 | 0.051710 | 15.185155 |
+| inverse_volatility_control | F2 | D3 | 0.064751 | 0.068430 | 0.061783 | 15.330469 |
+| inverse_volatility_control | F2 | D5 | 0.079570 | 0.080888 | 0.072356 | 16.591549 |
+| inverse_volatility_control | F2 | D10 | 0.115216 | 0.114242 | 0.101295 | 21.672737 |
+| inverse_volatility_control | F3 | D1 | 0.041248 | 0.048680 | 0.045901 | 5.372896 |
+| inverse_volatility_control | F3 | D2 | 0.051925 | 0.058925 | 0.054122 | 3.993646 |
+| inverse_volatility_control | F3 | D3 | 0.069758 | 0.075382 | 0.069299 | 6.019446 |
+| inverse_volatility_control | F3 | D5 | 0.094699 | 0.096789 | 0.088221 | 10.193072 |
+| inverse_volatility_control | F3 | D10 | 0.140788 | 0.140889 | 0.128987 | 12.286752 |
+| momentum_control | F1 | D1 | 0.027003 | 0.026869 | 0.025598 | 8.105349 |
+| momentum_control | F1 | D2 | 0.032803 | 0.034686 | 0.032900 | 11.116940 |
+| momentum_control | F1 | D3 | 0.037389 | 0.042967 | 0.040375 | 12.300189 |
+| momentum_control | F1 | D5 | 0.041534 | 0.047451 | 0.043790 | 12.683741 |
+| momentum_control | F1 | D10 | 0.050721 | 0.053968 | 0.047782 | 12.530458 |
+| momentum_control | F2 | D1 | 0.011621 | 0.017291 | 0.016082 | 11.994850 |
+| momentum_control | F2 | D2 | 0.016236 | 0.019907 | 0.017632 | 12.359435 |
+| momentum_control | F2 | D3 | 0.022548 | 0.027237 | 0.025005 | 13.816713 |
+| momentum_control | F2 | D5 | 0.029823 | 0.035071 | 0.032000 | 13.932958 |
+| momentum_control | F2 | D10 | 0.029303 | 0.040782 | 0.035452 | 15.309216 |
+| momentum_control | F3 | D1 | 0.044251 | 0.048781 | 0.047204 | 33.588448 |
+| momentum_control | F3 | D2 | 0.055081 | 0.062364 | 0.059161 | 33.449386 |
+| momentum_control | F3 | D3 | 0.068907 | 0.074709 | 0.070402 | 32.813681 |
+| momentum_control | F3 | D5 | 0.088663 | 0.092594 | 0.086385 | 34.686590 |
+| momentum_control | F3 | D10 | 0.138000 | 0.144445 | 0.135471 | 35.344350 |
+
+### Incremental-horizon ICs
+
+| Candidate | Fold | Head | Increment | Mean IC |
+|---|---|---:|---|---:|
+| rung_a | F1 | D1 | 0→1 | 0.041145 |
+| rung_a | F1 | D1 | 1→3 | 0.051974 |
+| rung_a | F1 | D1 | 3→5 | 0.048405 |
+| rung_a | F1 | D1 | 5→10 | 0.056586 |
+| rung_a | F1 | D2 | 0→1 | 0.041996 |
+| rung_a | F1 | D2 | 1→3 | 0.052772 |
+| rung_a | F1 | D2 | 3→5 | 0.054597 |
+| rung_a | F1 | D2 | 5→10 | 0.063807 |
+| rung_a | F1 | D3 | 0→1 | 0.047674 |
+| rung_a | F1 | D3 | 1→3 | 0.056142 |
+| rung_a | F1 | D3 | 3→5 | 0.051127 |
+| rung_a | F1 | D3 | 5→10 | 0.057080 |
+| rung_a | F1 | D5 | 0→1 | 0.039064 |
+| rung_a | F1 | D5 | 1→3 | 0.049409 |
+| rung_a | F1 | D5 | 3→5 | 0.044820 |
+| rung_a | F1 | D5 | 5→10 | 0.050856 |
+| rung_a | F1 | D10 | 0→1 | 0.039000 |
+| rung_a | F1 | D10 | 1→3 | 0.052975 |
+| rung_a | F1 | D10 | 3→5 | 0.048978 |
+| rung_a | F1 | D10 | 5→10 | 0.053770 |
+| rung_a | F2 | D1 | 0→1 | 0.037853 |
+| rung_a | F2 | D1 | 1→3 | 0.028286 |
+| rung_a | F2 | D1 | 3→5 | 0.038603 |
+| rung_a | F2 | D1 | 5→10 | 0.055375 |
+| rung_a | F2 | D2 | 0→1 | 0.036818 |
+| rung_a | F2 | D2 | 1→3 | 0.032749 |
+| rung_a | F2 | D2 | 3→5 | 0.037217 |
+| rung_a | F2 | D2 | 5→10 | 0.063035 |
+| rung_a | F2 | D3 | 0→1 | 0.034547 |
+| rung_a | F2 | D3 | 1→3 | 0.020575 |
+| rung_a | F2 | D3 | 3→5 | 0.027782 |
+| rung_a | F2 | D3 | 5→10 | 0.052008 |
+| rung_a | F2 | D5 | 0→1 | 0.030292 |
+| rung_a | F2 | D5 | 1→3 | 0.022764 |
+| rung_a | F2 | D5 | 3→5 | 0.029229 |
+| rung_a | F2 | D5 | 5→10 | 0.055068 |
+| rung_a | F2 | D10 | 0→1 | 0.041034 |
+| rung_a | F2 | D10 | 1→3 | 0.039563 |
+| rung_a | F2 | D10 | 3→5 | 0.040288 |
+| rung_a | F2 | D10 | 5→10 | 0.073753 |
+| rung_a | F3 | D1 | 0→1 | 0.049421 |
+| rung_a | F3 | D1 | 1→3 | 0.048655 |
+| rung_a | F3 | D1 | 3→5 | 0.064388 |
+| rung_a | F3 | D1 | 5→10 | 0.104047 |
+| rung_a | F3 | D2 | 0→1 | 0.043481 |
+| rung_a | F3 | D2 | 1→3 | 0.047928 |
+| rung_a | F3 | D2 | 3→5 | 0.055666 |
+| rung_a | F3 | D2 | 5→10 | 0.099482 |
+| rung_a | F3 | D3 | 0→1 | 0.038382 |
+| rung_a | F3 | D3 | 1→3 | 0.045807 |
+| rung_a | F3 | D3 | 3→5 | 0.052260 |
+| rung_a | F3 | D3 | 5→10 | 0.095450 |
+| rung_a | F3 | D5 | 0→1 | 0.040429 |
+| rung_a | F3 | D5 | 1→3 | 0.045760 |
+| rung_a | F3 | D5 | 3→5 | 0.056937 |
+| rung_a | F3 | D5 | 5→10 | 0.095240 |
+| rung_a | F3 | D10 | 0→1 | 0.042673 |
+| rung_a | F3 | D10 | 1→3 | 0.047877 |
+| rung_a | F3 | D10 | 3→5 | 0.052605 |
+| rung_a | F3 | D10 | 5→10 | 0.093072 |
+| rung_b | F1 | D1 | 0→1 | 0.040603 |
+| rung_b | F1 | D1 | 1→3 | 0.048727 |
+| rung_b | F1 | D1 | 3→5 | 0.047542 |
+| rung_b | F1 | D1 | 5→10 | 0.054406 |
+| rung_b | F1 | D2 | 0→1 | 0.035366 |
+| rung_b | F1 | D2 | 1→3 | 0.047896 |
+| rung_b | F1 | D2 | 3→5 | 0.042865 |
+| rung_b | F1 | D2 | 5→10 | 0.057036 |
+| rung_b | F1 | D3 | 0→1 | 0.038439 |
+| rung_b | F1 | D3 | 1→3 | 0.051957 |
+| rung_b | F1 | D3 | 3→5 | 0.045629 |
+| rung_b | F1 | D3 | 5→10 | 0.059820 |
+| rung_b | F1 | D5 | 0→1 | 0.043180 |
+| rung_b | F1 | D5 | 1→3 | 0.049930 |
+| rung_b | F1 | D5 | 3→5 | 0.044673 |
+| rung_b | F1 | D5 | 5→10 | 0.049888 |
+| rung_b | F1 | D10 | 0→1 | 0.035756 |
+| rung_b | F1 | D10 | 1→3 | 0.047086 |
+| rung_b | F1 | D10 | 3→5 | 0.043658 |
+| rung_b | F1 | D10 | 5→10 | 0.057341 |
+| rung_b | F2 | D1 | 0→1 | 0.042455 |
+| rung_b | F2 | D1 | 1→3 | 0.024620 |
+| rung_b | F2 | D1 | 3→5 | 0.029651 |
+| rung_b | F2 | D1 | 5→10 | 0.046609 |
+| rung_b | F2 | D2 | 0→1 | 0.038257 |
+| rung_b | F2 | D2 | 1→3 | 0.032404 |
+| rung_b | F2 | D2 | 3→5 | 0.037843 |
+| rung_b | F2 | D2 | 5→10 | 0.062966 |
+| rung_b | F2 | D3 | 0→1 | 0.036473 |
+| rung_b | F2 | D3 | 1→3 | 0.027805 |
+| rung_b | F2 | D3 | 3→5 | 0.030830 |
+| rung_b | F2 | D3 | 5→10 | 0.051754 |
+| rung_b | F2 | D5 | 0→1 | 0.032974 |
+| rung_b | F2 | D5 | 1→3 | 0.030484 |
+| rung_b | F2 | D5 | 3→5 | 0.030671 |
+| rung_b | F2 | D5 | 5→10 | 0.056701 |
+| rung_b | F2 | D10 | 0→1 | 0.043415 |
+| rung_b | F2 | D10 | 1→3 | 0.043542 |
+| rung_b | F2 | D10 | 3→5 | 0.042620 |
+| rung_b | F2 | D10 | 5→10 | 0.068248 |
+| rung_b | F3 | D1 | 0→1 | 0.044715 |
+| rung_b | F3 | D1 | 1→3 | 0.051858 |
+| rung_b | F3 | D1 | 3→5 | 0.065252 |
+| rung_b | F3 | D1 | 5→10 | 0.103904 |
+| rung_b | F3 | D2 | 0→1 | 0.046403 |
+| rung_b | F3 | D2 | 1→3 | 0.055849 |
+| rung_b | F3 | D2 | 3→5 | 0.060995 |
+| rung_b | F3 | D2 | 5→10 | 0.105160 |
+| rung_b | F3 | D3 | 0→1 | 0.045331 |
+| rung_b | F3 | D3 | 1→3 | 0.054911 |
+| rung_b | F3 | D3 | 3→5 | 0.060933 |
+| rung_b | F3 | D3 | 5→10 | 0.104771 |
+| rung_b | F3 | D5 | 0→1 | 0.043421 |
+| rung_b | F3 | D5 | 1→3 | 0.051878 |
+| rung_b | F3 | D5 | 3→5 | 0.060580 |
+| rung_b | F3 | D5 | 5→10 | 0.101669 |
+| rung_b | F3 | D10 | 0→1 | 0.044477 |
+| rung_b | F3 | D10 | 1→3 | 0.052271 |
+| rung_b | F3 | D10 | 3→5 | 0.061361 |
+| rung_b | F3 | D10 | 5→10 | 0.105645 |
+| inverse_volatility_control | F1 | D1 | 0→1 | 0.039124 |
+| inverse_volatility_control | F1 | D1 | 1→3 | 0.056273 |
+| inverse_volatility_control | F1 | D1 | 3→5 | 0.055861 |
+| inverse_volatility_control | F1 | D1 | 5→10 | 0.074318 |
+| inverse_volatility_control | F1 | D2 | 0→1 | 0.039124 |
+| inverse_volatility_control | F1 | D2 | 1→3 | 0.056273 |
+| inverse_volatility_control | F1 | D2 | 3→5 | 0.055861 |
+| inverse_volatility_control | F1 | D2 | 5→10 | 0.074318 |
+| inverse_volatility_control | F1 | D3 | 0→1 | 0.039124 |
+| inverse_volatility_control | F1 | D3 | 1→3 | 0.056273 |
+| inverse_volatility_control | F1 | D3 | 3→5 | 0.055861 |
+| inverse_volatility_control | F1 | D3 | 5→10 | 0.074318 |
+| inverse_volatility_control | F1 | D5 | 0→1 | 0.039124 |
+| inverse_volatility_control | F1 | D5 | 1→3 | 0.056273 |
+| inverse_volatility_control | F1 | D5 | 3→5 | 0.055861 |
+| inverse_volatility_control | F1 | D5 | 5→10 | 0.074318 |
+| inverse_volatility_control | F1 | D10 | 0→1 | 0.039124 |
+| inverse_volatility_control | F1 | D10 | 1→3 | 0.056273 |
+| inverse_volatility_control | F1 | D10 | 3→5 | 0.055861 |
+| inverse_volatility_control | F1 | D10 | 5→10 | 0.074318 |
+| inverse_volatility_control | F2 | D1 | 0→1 | 0.047911 |
+| inverse_volatility_control | F2 | D1 | 1→3 | 0.049775 |
+| inverse_volatility_control | F2 | D1 | 3→5 | 0.050304 |
+| inverse_volatility_control | F2 | D1 | 5→10 | 0.081522 |
+| inverse_volatility_control | F2 | D2 | 0→1 | 0.047911 |
+| inverse_volatility_control | F2 | D2 | 1→3 | 0.049775 |
+| inverse_volatility_control | F2 | D2 | 3→5 | 0.050304 |
+| inverse_volatility_control | F2 | D2 | 5→10 | 0.081522 |
+| inverse_volatility_control | F2 | D3 | 0→1 | 0.047911 |
+| inverse_volatility_control | F2 | D3 | 1→3 | 0.049775 |
+| inverse_volatility_control | F2 | D3 | 3→5 | 0.050304 |
+| inverse_volatility_control | F2 | D3 | 5→10 | 0.081522 |
+| inverse_volatility_control | F2 | D5 | 0→1 | 0.047911 |
+| inverse_volatility_control | F2 | D5 | 1→3 | 0.049775 |
+| inverse_volatility_control | F2 | D5 | 3→5 | 0.050304 |
+| inverse_volatility_control | F2 | D5 | 5→10 | 0.081522 |
+| inverse_volatility_control | F2 | D10 | 0→1 | 0.047911 |
+| inverse_volatility_control | F2 | D10 | 1→3 | 0.049775 |
+| inverse_volatility_control | F2 | D10 | 3→5 | 0.050304 |
+| inverse_volatility_control | F2 | D10 | 5→10 | 0.081522 |
+| inverse_volatility_control | F3 | D1 | 0→1 | 0.044295 |
+| inverse_volatility_control | F3 | D1 | 1→3 | 0.055754 |
+| inverse_volatility_control | F3 | D1 | 3→5 | 0.064523 |
+| inverse_volatility_control | F3 | D1 | 5→10 | 0.102899 |
+| inverse_volatility_control | F3 | D2 | 0→1 | 0.044295 |
+| inverse_volatility_control | F3 | D2 | 1→3 | 0.055754 |
+| inverse_volatility_control | F3 | D2 | 3→5 | 0.064523 |
+| inverse_volatility_control | F3 | D2 | 5→10 | 0.102899 |
+| inverse_volatility_control | F3 | D3 | 0→1 | 0.044295 |
+| inverse_volatility_control | F3 | D3 | 1→3 | 0.055754 |
+| inverse_volatility_control | F3 | D3 | 3→5 | 0.064523 |
+| inverse_volatility_control | F3 | D3 | 5→10 | 0.102899 |
+| inverse_volatility_control | F3 | D5 | 0→1 | 0.044295 |
+| inverse_volatility_control | F3 | D5 | 1→3 | 0.055754 |
+| inverse_volatility_control | F3 | D5 | 3→5 | 0.064523 |
+| inverse_volatility_control | F3 | D5 | 5→10 | 0.102899 |
+| inverse_volatility_control | F3 | D10 | 0→1 | 0.044295 |
+| inverse_volatility_control | F3 | D10 | 1→3 | 0.055754 |
+| inverse_volatility_control | F3 | D10 | 3→5 | 0.064523 |
+| inverse_volatility_control | F3 | D10 | 5→10 | 0.102899 |
+| momentum_control | F1 | D1 | 0→1 | 0.022992 |
+| momentum_control | F1 | D1 | 1→3 | 0.030723 |
+| momentum_control | F1 | D1 | 3→5 | 0.029349 |
+| momentum_control | F1 | D1 | 5→10 | 0.031052 |
+| momentum_control | F1 | D2 | 0→1 | 0.022992 |
+| momentum_control | F1 | D2 | 1→3 | 0.030723 |
+| momentum_control | F1 | D2 | 3→5 | 0.029349 |
+| momentum_control | F1 | D2 | 5→10 | 0.031052 |
+| momentum_control | F1 | D3 | 0→1 | 0.022992 |
+| momentum_control | F1 | D3 | 1→3 | 0.030723 |
+| momentum_control | F1 | D3 | 3→5 | 0.029349 |
+| momentum_control | F1 | D3 | 5→10 | 0.031052 |
+| momentum_control | F1 | D5 | 0→1 | 0.022992 |
+| momentum_control | F1 | D5 | 1→3 | 0.030723 |
+| momentum_control | F1 | D5 | 3→5 | 0.029349 |
+| momentum_control | F1 | D5 | 5→10 | 0.031052 |
+| momentum_control | F1 | D10 | 0→1 | 0.022992 |
+| momentum_control | F1 | D10 | 1→3 | 0.030723 |
+| momentum_control | F1 | D10 | 3→5 | 0.029349 |
+| momentum_control | F1 | D10 | 5→10 | 0.031052 |
+| momentum_control | F2 | D1 | 0→1 | 0.014589 |
+| momentum_control | F2 | D1 | 1→3 | 0.015868 |
+| momentum_control | F2 | D1 | 3→5 | 0.018298 |
+| momentum_control | F2 | D1 | 5→10 | 0.020100 |
+| momentum_control | F2 | D2 | 0→1 | 0.014589 |
+| momentum_control | F2 | D2 | 1→3 | 0.015868 |
+| momentum_control | F2 | D2 | 3→5 | 0.018298 |
+| momentum_control | F2 | D2 | 5→10 | 0.020100 |
+| momentum_control | F2 | D3 | 0→1 | 0.014589 |
+| momentum_control | F2 | D3 | 1→3 | 0.015868 |
+| momentum_control | F2 | D3 | 3→5 | 0.018298 |
+| momentum_control | F2 | D3 | 5→10 | 0.020100 |
+| momentum_control | F2 | D5 | 0→1 | 0.014589 |
+| momentum_control | F2 | D5 | 1→3 | 0.015868 |
+| momentum_control | F2 | D5 | 3→5 | 0.018298 |
+| momentum_control | F2 | D5 | 5→10 | 0.020100 |
+| momentum_control | F2 | D10 | 0→1 | 0.014589 |
+| momentum_control | F2 | D10 | 1→3 | 0.015868 |
+| momentum_control | F2 | D10 | 3→5 | 0.018298 |
+| momentum_control | F2 | D10 | 5→10 | 0.020100 |
+| momentum_control | F3 | D1 | 0→1 | 0.045551 |
+| momentum_control | F3 | D1 | 1→3 | 0.058744 |
+| momentum_control | F3 | D1 | 3→5 | 0.057476 |
+| momentum_control | F3 | D1 | 5→10 | 0.093288 |
+| momentum_control | F3 | D2 | 0→1 | 0.045551 |
+| momentum_control | F3 | D2 | 1→3 | 0.058744 |
+| momentum_control | F3 | D2 | 3→5 | 0.057476 |
+| momentum_control | F3 | D2 | 5→10 | 0.093288 |
+| momentum_control | F3 | D3 | 0→1 | 0.045551 |
+| momentum_control | F3 | D3 | 1→3 | 0.058744 |
+| momentum_control | F3 | D3 | 3→5 | 0.057476 |
+| momentum_control | F3 | D3 | 5→10 | 0.093288 |
+| momentum_control | F3 | D5 | 0→1 | 0.045551 |
+| momentum_control | F3 | D5 | 1→3 | 0.058744 |
+| momentum_control | F3 | D5 | 3→5 | 0.057476 |
+| momentum_control | F3 | D5 | 5→10 | 0.093288 |
+| momentum_control | F3 | D10 | 0→1 | 0.045551 |
+| momentum_control | F3 | D10 | 1→3 | 0.058744 |
+| momentum_control | F3 | D10 | 3→5 | 0.057476 |
+| momentum_control | F3 | D10 | 5→10 | 0.093288 |
+
+### Quality stratification
+
+| Candidate | Fold | Dimension | Stratum | Primary IC | Used name-days | Status |
+|---|---|---|---|---:|---:|---|
+| rung_a | F1 | calendar_year | 2023 | 0.060022 | 23551 | supported |
+| rung_a | F1 | causal_liquidity_quartile | Q1 | 0.064100 | 5877 | supported |
+| rung_a | F1 | causal_liquidity_quartile | Q2 | 0.041557 | 5861 | supported |
+| rung_a | F1 | causal_liquidity_quartile | Q3 | 0.061075 | 5901 | supported |
+| rung_a | F1 | causal_liquidity_quartile | Q4 | 0.079570 | 5912 | supported |
+| rung_a | F1 | history_age_sessions | 0_to_59 | NA | 2 | unsupported |
+| rung_a | F1 | history_age_sessions | 60_to_251 | NA | 204 | unsupported |
+| rung_a | F1 | history_age_sessions | 252_plus | 0.061052 | 23345 | supported |
+| rung_a | F1 | eventual_survival_audit_label | survives_to_final_year | 0.060897 | 19955 | supported |
+| rung_a | F1 | eventual_survival_audit_label | delisted_within_panel | 0.048998 | 3596 | supported |
+| rung_a | F2 | calendar_year | 2024 | 0.040432 | 22610 | supported |
+| rung_a | F2 | causal_liquidity_quartile | Q1 | 0.051623 | 5640 | supported |
+| rung_a | F2 | causal_liquidity_quartile | Q2 | 0.035606 | 5638 | supported |
+| rung_a | F2 | causal_liquidity_quartile | Q3 | 0.039009 | 5662 | supported |
+| rung_a | F2 | causal_liquidity_quartile | Q4 | 0.051133 | 5670 | supported |
+| rung_a | F2 | history_age_sessions | 0_to_59 | NA | 4 | unsupported |
+| rung_a | F2 | history_age_sessions | 60_to_251 | NA | 286 | unsupported |
+| rung_a | F2 | history_age_sessions | 252_plus | 0.038721 | 22320 | supported |
+| rung_a | F2 | eventual_survival_audit_label | survives_to_final_year | 0.047120 | 19713 | supported |
+| rung_a | F2 | eventual_survival_audit_label | delisted_within_panel | 0.020990 | 2897 | supported |
+| rung_a | F3 | calendar_year | 2024 | 0.058028 | 22041 | supported |
+| rung_a | F3 | causal_liquidity_quartile | Q1 | 0.074152 | 5505 | supported |
+| rung_a | F3 | causal_liquidity_quartile | Q2 | 0.058145 | 5513 | supported |
+| rung_a | F3 | causal_liquidity_quartile | Q3 | 0.044271 | 5497 | supported |
+| rung_a | F3 | causal_liquidity_quartile | Q4 | 0.045439 | 5526 | supported |
+| rung_a | F3 | history_age_sessions | 0_to_59 | NA | 4 | unsupported |
+| rung_a | F3 | history_age_sessions | 60_to_251 | NA | 290 | unsupported |
+| rung_a | F3 | history_age_sessions | 252_plus | 0.056449 | 21747 | supported |
+| rung_a | F3 | eventual_survival_audit_label | survives_to_final_year | 0.061538 | 19691 | supported |
+| rung_a | F3 | eventual_survival_audit_label | delisted_within_panel | 0.017056 | 2350 | supported |
+| rung_b | F1 | calendar_year | 2023 | 0.057424 | 23551 | supported |
+| rung_b | F1 | causal_liquidity_quartile | Q1 | 0.059795 | 5877 | supported |
+| rung_b | F1 | causal_liquidity_quartile | Q2 | 0.041491 | 5861 | supported |
+| rung_b | F1 | causal_liquidity_quartile | Q3 | 0.058409 | 5901 | supported |
+| rung_b | F1 | causal_liquidity_quartile | Q4 | 0.077853 | 5912 | supported |
+| rung_b | F1 | history_age_sessions | 0_to_59 | NA | 2 | unsupported |
+| rung_b | F1 | history_age_sessions | 60_to_251 | NA | 204 | unsupported |
+| rung_b | F1 | history_age_sessions | 252_plus | 0.058744 | 23345 | supported |
+| rung_b | F1 | eventual_survival_audit_label | survives_to_final_year | 0.059980 | 19955 | supported |
+| rung_b | F1 | eventual_survival_audit_label | delisted_within_panel | 0.046476 | 3596 | supported |
+| rung_b | F2 | calendar_year | 2024 | 0.045056 | 22610 | supported |
+| rung_b | F2 | causal_liquidity_quartile | Q1 | 0.050518 | 5640 | supported |
+| rung_b | F2 | causal_liquidity_quartile | Q2 | 0.027028 | 5638 | supported |
+| rung_b | F2 | causal_liquidity_quartile | Q3 | 0.045023 | 5662 | supported |
+| rung_b | F2 | causal_liquidity_quartile | Q4 | 0.065092 | 5670 | supported |
+| rung_b | F2 | history_age_sessions | 0_to_59 | NA | 4 | unsupported |
+| rung_b | F2 | history_age_sessions | 60_to_251 | NA | 286 | unsupported |
+| rung_b | F2 | history_age_sessions | 252_plus | 0.043626 | 22320 | supported |
+| rung_b | F2 | eventual_survival_audit_label | survives_to_final_year | 0.050836 | 19713 | supported |
+| rung_b | F2 | eventual_survival_audit_label | delisted_within_panel | 0.026061 | 2897 | supported |
+| rung_b | F3 | calendar_year | 2024 | 0.063113 | 22041 | supported |
+| rung_b | F3 | causal_liquidity_quartile | Q1 | 0.074781 | 5505 | supported |
+| rung_b | F3 | causal_liquidity_quartile | Q2 | 0.067619 | 5513 | supported |
+| rung_b | F3 | causal_liquidity_quartile | Q3 | 0.045467 | 5497 | supported |
+| rung_b | F3 | causal_liquidity_quartile | Q4 | 0.054216 | 5526 | supported |
+| rung_b | F3 | history_age_sessions | 0_to_59 | NA | 4 | unsupported |
+| rung_b | F3 | history_age_sessions | 60_to_251 | NA | 290 | unsupported |
+| rung_b | F3 | history_age_sessions | 252_plus | 0.061799 | 21747 | supported |
+| rung_b | F3 | eventual_survival_audit_label | survives_to_final_year | 0.067659 | 19691 | supported |
+| rung_b | F3 | eventual_survival_audit_label | delisted_within_panel | -0.000883 | 2350 | supported |
+| inverse_volatility_control | F1 | calendar_year | 2023 | 0.060146 | 23551 | supported |
+| inverse_volatility_control | F1 | causal_liquidity_quartile | Q1 | 0.057361 | 5877 | supported |
+| inverse_volatility_control | F1 | causal_liquidity_quartile | Q2 | 0.050374 | 5861 | supported |
+| inverse_volatility_control | F1 | causal_liquidity_quartile | Q3 | 0.052044 | 5901 | supported |
+| inverse_volatility_control | F1 | causal_liquidity_quartile | Q4 | 0.089776 | 5912 | supported |
+| inverse_volatility_control | F1 | history_age_sessions | 0_to_59 | NA | 2 | unsupported |
+| inverse_volatility_control | F1 | history_age_sessions | 60_to_251 | NA | 204 | unsupported |
+| inverse_volatility_control | F1 | history_age_sessions | 252_plus | 0.060864 | 23345 | supported |
+| inverse_volatility_control | F1 | eventual_survival_audit_label | survives_to_final_year | 0.055823 | 19955 | supported |
+| inverse_volatility_control | F1 | eventual_survival_audit_label | delisted_within_panel | 0.082960 | 3596 | supported |
+| inverse_volatility_control | F2 | calendar_year | 2024 | 0.062161 | 22610 | supported |
+| inverse_volatility_control | F2 | causal_liquidity_quartile | Q1 | 0.070483 | 5640 | supported |
+| inverse_volatility_control | F2 | causal_liquidity_quartile | Q2 | 0.054285 | 5638 | supported |
+| inverse_volatility_control | F2 | causal_liquidity_quartile | Q3 | 0.033796 | 5662 | supported |
+| inverse_volatility_control | F2 | causal_liquidity_quartile | Q4 | 0.073085 | 5670 | supported |
+| inverse_volatility_control | F2 | history_age_sessions | 0_to_59 | NA | 4 | unsupported |
+| inverse_volatility_control | F2 | history_age_sessions | 60_to_251 | NA | 286 | unsupported |
+| inverse_volatility_control | F2 | history_age_sessions | 252_plus | 0.061807 | 22320 | supported |
+| inverse_volatility_control | F2 | eventual_survival_audit_label | survives_to_final_year | 0.069245 | 19713 | supported |
+| inverse_volatility_control | F2 | eventual_survival_audit_label | delisted_within_panel | 0.032928 | 2897 | supported |
+| inverse_volatility_control | F3 | calendar_year | 2024 | 0.064407 | 22041 | supported |
+| inverse_volatility_control | F3 | causal_liquidity_quartile | Q1 | 0.072832 | 5505 | supported |
+| inverse_volatility_control | F3 | causal_liquidity_quartile | Q2 | 0.056606 | 5513 | supported |
+| inverse_volatility_control | F3 | causal_liquidity_quartile | Q3 | 0.051051 | 5497 | supported |
+| inverse_volatility_control | F3 | causal_liquidity_quartile | Q4 | 0.063266 | 5526 | supported |
+| inverse_volatility_control | F3 | history_age_sessions | 0_to_59 | NA | 4 | unsupported |
+| inverse_volatility_control | F3 | history_age_sessions | 60_to_251 | NA | 290 | unsupported |
+| inverse_volatility_control | F3 | history_age_sessions | 252_plus | 0.064073 | 21747 | supported |
+| inverse_volatility_control | F3 | eventual_survival_audit_label | survives_to_final_year | 0.068938 | 19691 | supported |
+| inverse_volatility_control | F3 | eventual_survival_audit_label | delisted_within_panel | -0.050084 | 2350 | supported |
+| momentum_control | F1 | calendar_year | 2023 | 0.034682 | 23342 | supported |
+| momentum_control | F1 | causal_liquidity_quartile | Q1 | 0.024489 | 5721 | supported |
+| momentum_control | F1 | causal_liquidity_quartile | Q2 | 0.030653 | 5816 | supported |
+| momentum_control | F1 | causal_liquidity_quartile | Q3 | 0.033745 | 5893 | supported |
+| momentum_control | F1 | causal_liquidity_quartile | Q4 | 0.056459 | 5912 | supported |
+| momentum_control | F1 | history_age_sessions | 0_to_59 | NA | 0 | unsupported |
+| momentum_control | F1 | history_age_sessions | 60_to_251 | NA | 0 | unsupported |
+| momentum_control | F1 | history_age_sessions | 252_plus | 0.034682 | 23342 | supported |
+| momentum_control | F1 | eventual_survival_audit_label | survives_to_final_year | 0.040404 | 19830 | supported |
+| momentum_control | F1 | eventual_survival_audit_label | delisted_within_panel | 0.002311 | 3512 | supported |
+| momentum_control | F2 | calendar_year | 2024 | 0.020057 | 22320 | supported |
+| momentum_control | F2 | causal_liquidity_quartile | Q1 | 0.013058 | 5607 | supported |
+| momentum_control | F2 | causal_liquidity_quartile | Q2 | 0.010715 | 5555 | supported |
+| momentum_control | F2 | causal_liquidity_quartile | Q3 | -0.009360 | 5521 | supported |
+| momentum_control | F2 | causal_liquidity_quartile | Q4 | 0.064534 | 5637 | supported |
+| momentum_control | F2 | history_age_sessions | 0_to_59 | NA | 0 | unsupported |
+| momentum_control | F2 | history_age_sessions | 60_to_251 | NA | 0 | unsupported |
+| momentum_control | F2 | history_age_sessions | 252_plus | 0.020057 | 22320 | supported |
+| momentum_control | F2 | eventual_survival_audit_label | survives_to_final_year | 0.016255 | 19500 | supported |
+| momentum_control | F2 | eventual_survival_audit_label | delisted_within_panel | 0.041161 | 2820 | supported |
+| momentum_control | F3 | calendar_year | 2024 | 0.064225 | 21686 | supported |
+| momentum_control | F3 | causal_liquidity_quartile | Q1 | 0.068068 | 5493 | supported |
+| momentum_control | F3 | causal_liquidity_quartile | Q2 | 0.038138 | 5316 | supported |
+| momentum_control | F3 | causal_liquidity_quartile | Q3 | 0.073302 | 5389 | supported |
+| momentum_control | F3 | causal_liquidity_quartile | Q4 | 0.069583 | 5488 | supported |
+| momentum_control | F3 | history_age_sessions | 0_to_59 | NA | 0 | unsupported |
+| momentum_control | F3 | history_age_sessions | 60_to_251 | NA | 0 | unsupported |
+| momentum_control | F3 | history_age_sessions | 252_plus | 0.064225 | 21686 | supported |
+| momentum_control | F3 | eventual_survival_audit_label | survives_to_final_year | 0.056789 | 19447 | supported |
+| momentum_control | F3 | eventual_survival_audit_label | delisted_within_panel | -0.019334 | 2239 | supported |
+
+### Exposure summary
+
+| Candidate | Fold | Feature | Spearman | 95% interval | Defined dates |
+|---|---|---|---:|---:|---:|
+| rung_a | F1 | beta_60 | -0.665035 | [-0.684215, -0.642258] | 124 |
+| rung_a | F1 | log_return_5 | 0.018342 | [-0.061816, 0.123442] | 124 |
+| rung_a | F1 | log_volume_mean_20 | 0.128396 | [0.088376, 0.169578] | 124 |
+| rung_a | F1 | momentum_12_1 | 0.403159 | [0.381298, 0.445303] | 124 |
+| rung_a | F1 | yang_zhang_vol_20 | -0.810151 | [-0.827689, -0.801176] | 124 |
+| rung_a | F2 | beta_60 | -0.487451 | [-0.527964, -0.452240] | 124 |
+| rung_a | F2 | log_return_5 | -0.086593 | [-0.128679, -0.053686] | 124 |
+| rung_a | F2 | log_volume_mean_20 | -0.109795 | [-0.139270, -0.081556] | 124 |
+| rung_a | F2 | momentum_12_1 | 0.288566 | [0.227521, 0.322340] | 124 |
+| rung_a | F2 | yang_zhang_vol_20 | -0.627951 | [-0.676062, -0.587409] | 124 |
+| rung_a | F3 | beta_60 | -0.597697 | [-0.622968, -0.570342] | 127 |
+| rung_a | F3 | log_return_5 | 0.004699 | [-0.042802, 0.064982] | 127 |
+| rung_a | F3 | log_volume_mean_20 | 0.092312 | [0.052123, 0.133394] | 127 |
+| rung_a | F3 | momentum_12_1 | 0.462551 | [0.425728, 0.485782] | 127 |
+| rung_a | F3 | yang_zhang_vol_20 | -0.788980 | [-0.825344, -0.755069] | 127 |
+| rung_b | F1 | beta_60 | -0.674199 | [-0.703049, -0.648551] | 124 |
+| rung_b | F1 | log_return_5 | 0.019186 | [-0.061255, 0.123558] | 124 |
+| rung_b | F1 | log_volume_mean_20 | 0.126699 | [0.095435, 0.159725] | 124 |
+| rung_b | F1 | momentum_12_1 | 0.407355 | [0.386539, 0.448484] | 124 |
+| rung_b | F1 | yang_zhang_vol_20 | -0.799393 | [-0.809041, -0.793566] | 124 |
+| rung_b | F2 | beta_60 | -0.491631 | [-0.536701, -0.463459] | 124 |
+| rung_b | F2 | log_return_5 | -0.082865 | [-0.129243, -0.048529] | 124 |
+| rung_b | F2 | log_volume_mean_20 | -0.059195 | [-0.085133, -0.037099] | 124 |
+| rung_b | F2 | momentum_12_1 | 0.271328 | [0.213932, 0.303963] | 124 |
+| rung_b | F2 | yang_zhang_vol_20 | -0.631831 | [-0.671945, -0.603021] | 124 |
+| rung_b | F3 | beta_60 | -0.598495 | [-0.620906, -0.573366] | 127 |
+| rung_b | F3 | log_return_5 | 0.012867 | [-0.037953, 0.078563] | 127 |
+| rung_b | F3 | log_volume_mean_20 | 0.105282 | [0.064291, 0.144206] | 127 |
+| rung_b | F3 | momentum_12_1 | 0.466311 | [0.437219, 0.486679] | 127 |
+| rung_b | F3 | yang_zhang_vol_20 | -0.792170 | [-0.827194, -0.755859] | 127 |
+| inverse_volatility_control | F1 | beta_60 | -0.702494 | [-0.721042, -0.673981] | 124 |
+| inverse_volatility_control | F1 | log_return_5 | 0.049760 | [-0.023623, 0.149984] | 124 |
+| inverse_volatility_control | F1 | log_volume_mean_20 | 0.282766 | [0.249059, 0.331104] | 124 |
+| inverse_volatility_control | F1 | momentum_12_1 | 0.224426 | [0.201383, 0.273411] | 124 |
+| inverse_volatility_control | F1 | yang_zhang_vol_20 | -1.000000 | [-1.000000, -1.000000] | 124 |
+| inverse_volatility_control | F2 | beta_60 | -0.692458 | [-0.717484, -0.662055] | 124 |
+| inverse_volatility_control | F2 | log_return_5 | 0.084167 | [-0.006831, 0.142977] | 124 |
+| inverse_volatility_control | F2 | log_volume_mean_20 | 0.242124 | [0.214205, 0.253873] | 124 |
+| inverse_volatility_control | F2 | momentum_12_1 | 0.087469 | [0.011313, 0.125294] | 124 |
+| inverse_volatility_control | F2 | yang_zhang_vol_20 | -1.000000 | [-1.000000, -1.000000] | 124 |
+| inverse_volatility_control | F3 | beta_60 | -0.705853 | [-0.709321, -0.698000] | 127 |
+| inverse_volatility_control | F3 | log_return_5 | 0.067113 | [0.004844, 0.142413] | 127 |
+| inverse_volatility_control | F3 | log_volume_mean_20 | 0.239775 | [0.220566, 0.257374] | 127 |
+| inverse_volatility_control | F3 | momentum_12_1 | 0.364823 | [0.315279, 0.396642] | 127 |
+| inverse_volatility_control | F3 | yang_zhang_vol_20 | -1.000000 | [-1.000000, -1.000000] | 127 |
+| momentum_control | F1 | beta_60 | -0.272813 | [-0.310982, -0.258980] | 124 |
+| momentum_control | F1 | log_return_5 | 0.049122 | [-0.000862, 0.097800] | 124 |
+| momentum_control | F1 | log_volume_mean_20 | -0.078077 | [-0.091283, -0.065614] | 124 |
+| momentum_control | F1 | momentum_12_1 | 0.999501 | [0.998973, 0.999833] | 124 |
+| momentum_control | F1 | yang_zhang_vol_20 | -0.225489 | [-0.273987, -0.202745] | 124 |
+| momentum_control | F2 | beta_60 | -0.157840 | [-0.199117, -0.090349] | 124 |
+| momentum_control | F2 | log_return_5 | 0.041822 | [0.011967, 0.073468] | 124 |
+| momentum_control | F2 | log_volume_mean_20 | -0.048840 | [-0.086053, -0.016251] | 124 |
+| momentum_control | F2 | momentum_12_1 | 0.999945 | [0.999883, 1.000000] | 124 |
+| momentum_control | F2 | yang_zhang_vol_20 | -0.088495 | [-0.126372, -0.012130] | 124 |
+| momentum_control | F3 | beta_60 | -0.437687 | [-0.502421, -0.365844] | 127 |
+| momentum_control | F3 | log_return_5 | 0.091022 | [0.049222, 0.150645] | 127 |
+| momentum_control | F3 | log_volume_mean_20 | 0.134036 | [0.101918, 0.185006] | 127 |
+| momentum_control | F3 | momentum_12_1 | 0.998861 | [0.997115, 0.999850] | 127 |
+| momentum_control | F3 | yang_zhang_vol_20 | -0.366950 | [-0.398550, -0.316786] | 127 |
+
+### GBDT importance: top 15 by mean absolute TreeSHAP
+
+| Candidate | Fold | Rank | Feature | Mean absolute TreeSHAP |
+|---|---|---:|---|---:|
+| rung_a | F1 | 1 | yang_zhang_vol_60 | 0.002641 |
+| rung_a | F1 | 2 | idiosyncratic_vol_60 | 0.000964 |
+| rung_a | F1 | 3 | max_return_21 | 0.000950 |
+| rung_a | F1 | 4 | distance_52_week_high | 0.000800 |
+| rung_a | F1 | 5 | cluster_dispersion | 0.000762 |
+| rung_a | F1 | 6 | momentum_12_1 | 0.000702 |
+| rung_a | F1 | 7 | amihud_20 | 0.000531 |
+| rung_a | F1 | 8 | cluster_mean_return_5 | 0.000505 |
+| rung_a | F1 | 9 | log_return_252 | 0.000428 |
+| rung_a | F1 | 10 | log_return_21 | 0.000425 |
+| rung_a | F1 | 11 | beta_60 | 0.000413 |
+| rung_a | F1 | 12 | cluster_mean_return_21 | 0.000383 |
+| rung_a | F1 | 13 | vol_of_vol_60 | 0.000356 |
+| rung_a | F1 | 14 | yang_zhang_vol_20 | 0.000306 |
+| rung_a | F1 | 15 | realized_skew_60 | 0.000296 |
+| rung_a | F2 | 1 | max_return_21 | 0.017765 |
+| rung_a | F2 | 2 | amihud_20 | 0.014649 |
+| rung_a | F2 | 3 | log_return_21 | 0.013366 |
+| rung_a | F2 | 4 | yang_zhang_vol_60 | 0.012005 |
+| rung_a | F2 | 5 | momentum_12_1 | 0.010614 |
+| rung_a | F2 | 6 | beta_60 | 0.009869 |
+| rung_a | F2 | 7 | distance_52_week_high | 0.008698 |
+| rung_a | F2 | 8 | log_return_63 | 0.007199 |
+| rung_a | F2 | 9 | realized_kurtosis_60 | 0.006967 |
+| rung_a | F2 | 10 | vol_of_vol_60 | 0.006583 |
+| rung_a | F2 | 11 | realized_skew_60 | 0.005643 |
+| rung_a | F2 | 12 | idiosyncratic_vol_60 | 0.005017 |
+| rung_a | F2 | 13 | log_return_252 | 0.004397 |
+| rung_a | F2 | 14 | high_low_range_5 | 0.004045 |
+| rung_a | F2 | 15 | cluster_mean_return_21 | 0.003925 |
+| rung_a | F3 | 1 | yang_zhang_vol_60 | 0.011589 |
+| rung_a | F3 | 2 | distance_52_week_high | 0.007459 |
+| rung_a | F3 | 3 | momentum_12_1 | 0.004683 |
+| rung_a | F3 | 4 | beta_60 | 0.004027 |
+| rung_a | F3 | 5 | log_return_252 | 0.003965 |
+| rung_a | F3 | 6 | idiosyncratic_vol_60 | 0.003506 |
+| rung_a | F3 | 7 | amihud_20 | 0.003099 |
+| rung_a | F3 | 8 | log_return_21 | 0.002471 |
+| rung_a | F3 | 9 | max_return_21 | 0.002404 |
+| rung_a | F3 | 10 | vol_of_vol_60 | 0.002277 |
+| rung_a | F3 | 11 | yang_zhang_vol_20 | 0.002220 |
+| rung_a | F3 | 12 | log_return_63 | 0.001953 |
+| rung_a | F3 | 13 | log_return_126 | 0.001601 |
+| rung_a | F3 | 14 | cluster_mean_return_21 | 0.001577 |
+| rung_a | F3 | 15 | cluster_dispersion | 0.001443 |
+| rung_b | F1 | 1 | log_return_21 | 0.007466 |
+| rung_b | F1 | 2 | yang_zhang_vol_60 | 0.006373 |
+| rung_b | F1 | 3 | max_return_21 | 0.005863 |
+| rung_b | F1 | 4 | idiosyncratic_vol_60 | 0.005542 |
+| rung_b | F1 | 5 | amihud_20 | 0.005035 |
+| rung_b | F1 | 6 | observed_history_age_sessions | 0.004491 |
+| rung_b | F1 | 7 | beta_60 | 0.004360 |
+| rung_b | F1 | 8 | vol_of_vol_60 | 0.003001 |
+| rung_b | F1 | 9 | distance_52_week_high | 0.002831 |
+| rung_b | F1 | 10 | log_return_63 | 0.002666 |
+| rung_b | F1 | 11 | cluster_mean_return_5 | 0.002240 |
+| rung_b | F1 | 12 | momentum_12_1 | 0.002198 |
+| rung_b | F1 | 13 | log_return_252 | 0.002071 |
+| rung_b | F1 | 14 | realized_skew_5m_20 | 0.001792 |
+| rung_b | F1 | 15 | observed_history_left_censored | 0.001646 |
+| rung_b | F2 | 1 | max_return_21 | 0.016833 |
+| rung_b | F2 | 2 | amihud_20 | 0.014691 |
+| rung_b | F2 | 3 | log_return_21 | 0.014589 |
+| rung_b | F2 | 4 | beta_60 | 0.010935 |
+| rung_b | F2 | 5 | distance_52_week_high | 0.010270 |
+| rung_b | F2 | 6 | yang_zhang_vol_60 | 0.009526 |
+| rung_b | F2 | 7 | momentum_12_1 | 0.007488 |
+| rung_b | F2 | 8 | vol_of_vol_60 | 0.005493 |
+| rung_b | F2 | 9 | idiosyncratic_vol_60 | 0.005456 |
+| rung_b | F2 | 10 | log_return_252 | 0.005395 |
+| rung_b | F2 | 11 | observed_history_age_sessions | 0.005354 |
+| rung_b | F2 | 12 | log_return_63 | 0.005183 |
+| rung_b | F2 | 13 | realized_kurtosis_60 | 0.004934 |
+| rung_b | F2 | 14 | realized_skew_60 | 0.004221 |
+| rung_b | F2 | 15 | high_low_range_5 | 0.004133 |
+| rung_b | F3 | 1 | yang_zhang_vol_60 | 0.014091 |
+| rung_b | F3 | 2 | distance_52_week_high | 0.008186 |
+| rung_b | F3 | 3 | momentum_12_1 | 0.007544 |
+| rung_b | F3 | 4 | beta_60 | 0.005427 |
+| rung_b | F3 | 5 | idiosyncratic_vol_60 | 0.005093 |
+| rung_b | F3 | 6 | max_return_21 | 0.004956 |
+| rung_b | F3 | 7 | amihud_20 | 0.004864 |
+| rung_b | F3 | 8 | log_return_252 | 0.004263 |
+| rung_b | F3 | 9 | log_return_21 | 0.003840 |
+| rung_b | F3 | 10 | yang_zhang_vol_20 | 0.002869 |
+| rung_b | F3 | 11 | vol_of_vol_60 | 0.002593 |
+| rung_b | F3 | 12 | cluster_mean_return_21 | 0.002287 |
+| rung_b | F3 | 13 | cluster_dispersion | 0.002174 |
+| rung_b | F3 | 14 | log_return_63 | 0.002109 |
+| rung_b | F3 | 15 | log_return_126 | 0.002096 |
+
+### Rung-B intraday-derived feature ranks
+
+These are exactly the persisted rung-B features absent from rung A, including their age channels and `fast_present`.
+
+| Fold | Feature | TreeSHAP rank | TreeSHAP | Gain rank | Gain |
+|---|---|---:|---:|---:|---:|
+| F1 | overnight_return | 92 | 0.000000 | 92 | 0.000000 |
+| F1 | intraday_return_1545 | 27 | 0.000834 | 34 | 323.260187 |
+| F1 | overnight_return_sum_5 | 95 | 0.000000 | 95 | 0.000000 |
+| F1 | overnight_return_sum_20 | 93 | 0.000000 | 93 | 0.000000 |
+| F1 | intraday_return_sum_5 | 51 | 0.000268 | 45 | 155.155162 |
+| F1 | intraday_return_sum_20 | 79 | 0.000000 | 79 | 0.000000 |
+| F1 | overnight_minus_intraday | 89 | 0.000000 | 89 | 0.000000 |
+| F1 | overnight_minus_intraday_mean_20 | 90 | 0.000000 | 90 | 0.000000 |
+| F1 | last_30_minute_return_share_lag1 | 80 | 0.000000 | 80 | 0.000000 |
+| F1 | last_hour_volume_share_lag1 | 46 | 0.000313 | 46 | 152.364149 |
+| F1 | close_vwap_deviation_lag1 | 73 | 0.000000 | 73 | 0.000000 |
+| F1 | vwap_deviation_1545 | 55 | 0.000212 | 50 | 128.682860 |
+| F1 | realized_vol_5m_1 | 48 | 0.000312 | 39 | 285.529018 |
+| F1 | realized_vol_5m_5 | 42 | 0.000409 | 30 | 391.262213 |
+| F1 | realized_vol_5m_20 | 31 | 0.000686 | 24 | 607.932551 |
+| F1 | realized_skew_5m_20 | 14 | 0.001792 | 21 | 643.587445 |
+| F1 | roll_spread_20 | 39 | 0.000501 | 25 | 582.398489 |
+| F1 | corwin_schultz_spread_20 | 23 | 0.001027 | 22 | 628.692727 |
+| F1 | intraday_range_1545 | 40 | 0.000479 | 36 | 291.926573 |
+| F1 | volume_1545_relative_median_20 | 101 | 0.000000 | 101 | 0.000000 |
+| F1 | overnight_return__age_sessions | 62 | 0.000081 | 61 | 18.235996 |
+| F1 | intraday_return_1545__age_sessions | 56 | 0.000208 | 56 | 44.809429 |
+| F1 | overnight_return_sum_5__age_sessions | 61 | 0.000115 | 58 | 31.895329 |
+| F1 | overnight_return_sum_20__age_sessions | 94 | 0.000000 | 94 | 0.000000 |
+| F1 | intraday_return_sum_5__age_sessions | 30 | 0.000757 | 26 | 579.280282 |
+| F1 | intraday_return_sum_20__age_sessions | 33 | 0.000639 | 23 | 625.299477 |
+| F1 | overnight_minus_intraday__age_sessions | 66 | 0.000028 | 65 | 4.724472 |
+| F1 | overnight_minus_intraday_mean_20__age_sessions | 91 | 0.000000 | 91 | 0.000000 |
+| F1 | last_30_minute_return_share_lag1__age_sessions | 65 | 0.000029 | 62 | 13.750499 |
+| F1 | last_hour_volume_share_lag1__age_sessions | 38 | 0.000510 | 40 | 280.382067 |
+| F1 | close_vwap_deviation_lag1__age_sessions | 63 | 0.000072 | 57 | 36.866114 |
+| F1 | vwap_deviation_1545__age_sessions | 37 | 0.000515 | 44 | 218.647336 |
+| F1 | realized_vol_5m_1__age_sessions | 54 | 0.000221 | 55 | 60.518030 |
+| F1 | realized_vol_5m_5__age_sessions | 44 | 0.000370 | 47 | 141.930133 |
+| F1 | realized_vol_5m_20__age_sessions | 52 | 0.000266 | 42 | 276.740539 |
+| F1 | realized_skew_5m_20__age_sessions | 53 | 0.000249 | 48 | 131.783112 |
+| F1 | roll_spread_20__age_sessions | 34 | 0.000613 | 35 | 314.794123 |
+| F1 | corwin_schultz_spread_20__age_sessions | 57 | 0.000187 | 51 | 115.997125 |
+| F1 | intraday_range_1545__age_sessions | 58 | 0.000152 | 60 | 23.977750 |
+| F1 | volume_1545_relative_median_20__age_sessions | 47 | 0.000313 | 52 | 104.890745 |
+| F1 | fast_present | 75 | 0.000000 | 75 | 0.000000 |
+| F2 | overnight_return | 92 | 0.000000 | 92 | 0.000000 |
+| F2 | intraday_return_1545 | 35 | 0.001018 | 35 | 783.673868 |
+| F2 | overnight_return_sum_5 | 95 | 0.000000 | 95 | 0.000000 |
+| F2 | overnight_return_sum_20 | 93 | 0.000000 | 93 | 0.000000 |
+| F2 | intraday_return_sum_5 | 51 | 0.000584 | 43 | 517.649620 |
+| F2 | intraday_return_sum_20 | 78 | 0.000000 | 78 | 0.000000 |
+| F2 | overnight_minus_intraday | 89 | 0.000000 | 89 | 0.000000 |
+| F2 | overnight_minus_intraday_mean_20 | 90 | 0.000000 | 90 | 0.000000 |
+| F2 | last_30_minute_return_share_lag1 | 79 | 0.000000 | 79 | 0.000000 |
+| F2 | last_hour_volume_share_lag1 | 47 | 0.000753 | 46 | 438.607228 |
+| F2 | close_vwap_deviation_lag1 | 74 | 0.000000 | 74 | 0.000000 |
+| F2 | vwap_deviation_1545 | 53 | 0.000468 | 47 | 412.914291 |
+| F2 | realized_vol_5m_1 | 43 | 0.000786 | 37 | 735.170988 |
+| F2 | realized_vol_5m_5 | 32 | 0.001146 | 32 | 888.922597 |
+| F2 | realized_vol_5m_20 | 40 | 0.000843 | 30 | 975.535750 |
+| F2 | realized_skew_5m_20 | 27 | 0.001508 | 22 | 1281.589605 |
+| F2 | roll_spread_20 | 37 | 0.000945 | 28 | 1041.320465 |
+| F2 | corwin_schultz_spread_20 | 26 | 0.001798 | 26 | 1130.876174 |
+| F2 | intraday_range_1545 | 36 | 0.000994 | 36 | 766.684469 |
+| F2 | volume_1545_relative_median_20 | 101 | 0.000000 | 101 | 0.000000 |
+| F2 | overnight_return__age_sessions | 62 | 0.000112 | 61 | 37.171221 |
+| F2 | intraday_return_1545__age_sessions | 58 | 0.000233 | 58 | 86.248540 |
+| F2 | overnight_return_sum_5__age_sessions | 56 | 0.000279 | 57 | 86.505595 |
+| F2 | overnight_return_sum_20__age_sessions | 94 | 0.000000 | 94 | 0.000000 |
+| F2 | intraday_return_sum_5__age_sessions | 41 | 0.000818 | 33 | 832.988881 |
+| F2 | intraday_return_sum_20__age_sessions | 30 | 0.001213 | 24 | 1201.100247 |
+| F2 | overnight_minus_intraday__age_sessions | 67 | 0.000019 | 65 | 6.450860 |
+| F2 | overnight_minus_intraday_mean_20__age_sessions | 91 | 0.000000 | 91 | 0.000000 |
+| F2 | last_30_minute_return_share_lag1__age_sessions | 63 | 0.000077 | 62 | 21.376173 |
+| F2 | last_hour_volume_share_lag1__age_sessions | 45 | 0.000768 | 42 | 548.904472 |
+| F2 | close_vwap_deviation_lag1__age_sessions | 55 | 0.000300 | 56 | 112.950284 |
+| F2 | vwap_deviation_1545__age_sessions | 48 | 0.000698 | 45 | 454.737828 |
+| F2 | realized_vol_5m_1__age_sessions | 57 | 0.000263 | 55 | 116.103565 |
+| F2 | realized_vol_5m_5__age_sessions | 54 | 0.000336 | 49 | 204.826775 |
+| F2 | realized_vol_5m_20__age_sessions | 31 | 0.001194 | 41 | 650.906801 |
+| F2 | realized_skew_5m_20__age_sessions | 46 | 0.000754 | 48 | 217.803761 |
+| F2 | roll_spread_20__age_sessions | 42 | 0.000801 | 44 | 461.471886 |
+| F2 | corwin_schultz_spread_20__age_sessions | 50 | 0.000616 | 50 | 204.667645 |
+| F2 | intraday_range_1545__age_sessions | 61 | 0.000134 | 60 | 42.156233 |
+| F2 | volume_1545_relative_median_20__age_sessions | 52 | 0.000553 | 52 | 178.932768 |
+| F2 | fast_present | 68 | 0.000006 | 69 | 1.674831 |
+| F3 | overnight_return | 92 | 0.000000 | 92 | 0.000000 |
+| F3 | intraday_return_1545 | 55 | 0.000148 | 44 | 163.050481 |
+| F3 | overnight_return_sum_5 | 95 | 0.000000 | 95 | 0.000000 |
+| F3 | overnight_return_sum_20 | 93 | 0.000000 | 93 | 0.000000 |
+| F3 | intraday_return_sum_5 | 54 | 0.000159 | 48 | 146.486611 |
+| F3 | intraday_return_sum_20 | 79 | 0.000000 | 79 | 0.000000 |
+| F3 | overnight_minus_intraday | 89 | 0.000000 | 89 | 0.000000 |
+| F3 | overnight_minus_intraday_mean_20 | 90 | 0.000000 | 90 | 0.000000 |
+| F3 | last_30_minute_return_share_lag1 | 80 | 0.000000 | 80 | 0.000000 |
+| F3 | last_hour_volume_share_lag1 | 56 | 0.000121 | 55 | 65.207506 |
+| F3 | close_vwap_deviation_lag1 | 74 | 0.000000 | 74 | 0.000000 |
+| F3 | vwap_deviation_1545 | 57 | 0.000090 | 51 | 97.437217 |
+| F3 | realized_vol_5m_1 | 41 | 0.000382 | 40 | 203.599348 |
+| F3 | realized_vol_5m_5 | 44 | 0.000355 | 34 | 282.009528 |
+| F3 | realized_vol_5m_20 | 32 | 0.000577 | 21 | 649.128705 |
+| F3 | realized_skew_5m_20 | 21 | 0.001110 | 23 | 602.046398 |
+| F3 | roll_spread_20 | 33 | 0.000550 | 26 | 507.152824 |
+| F3 | corwin_schultz_spread_20 | 28 | 0.000729 | 25 | 514.254204 |
+| F3 | intraday_range_1545 | 30 | 0.000657 | 39 | 205.741899 |
+| F3 | volume_1545_relative_median_20 | 101 | 0.000000 | 101 | 0.000000 |
+| F3 | overnight_return__age_sessions | 62 | 0.000016 | 61 | 11.174937 |
+| F3 | intraday_return_1545__age_sessions | 59 | 0.000057 | 58 | 18.306473 |
+| F3 | overnight_return_sum_5__age_sessions | 50 | 0.000210 | 53 | 85.407936 |
+| F3 | overnight_return_sum_20__age_sessions | 94 | 0.000000 | 94 | 0.000000 |
+| F3 | intraday_return_sum_5__age_sessions | 42 | 0.000356 | 31 | 345.834808 |
+| F3 | intraday_return_sum_20__age_sessions | 20 | 0.001148 | 8 | 1302.770292 |
+| F3 | overnight_minus_intraday__age_sessions | 65 | 0.000009 | 64 | 4.655178 |
+| F3 | overnight_minus_intraday_mean_20__age_sessions | 91 | 0.000000 | 91 | 0.000000 |
+| F3 | last_30_minute_return_share_lag1__age_sessions | 63 | 0.000011 | 63 | 5.378600 |
+| F3 | last_hour_volume_share_lag1__age_sessions | 47 | 0.000255 | 33 | 312.970187 |
+| F3 | close_vwap_deviation_lag1__age_sessions | 58 | 0.000082 | 56 | 38.421316 |
+| F3 | vwap_deviation_1545__age_sessions | 40 | 0.000388 | 37 | 238.731776 |
+| F3 | realized_vol_5m_1__age_sessions | 51 | 0.000198 | 43 | 177.875468 |
+| F3 | realized_vol_5m_5__age_sessions | 48 | 0.000245 | 38 | 220.175403 |
+| F3 | realized_vol_5m_20__age_sessions | 35 | 0.000495 | 27 | 440.503097 |
+| F3 | realized_skew_5m_20__age_sessions | 39 | 0.000394 | 45 | 156.074366 |
+| F3 | roll_spread_20__age_sessions | 31 | 0.000589 | 28 | 414.036576 |
+| F3 | corwin_schultz_spread_20__age_sessions | 49 | 0.000226 | 49 | 144.677801 |
+| F3 | intraday_range_1545__age_sessions | 61 | 0.000021 | 60 | 11.914786 |
+| F3 | volume_1545_relative_median_20__age_sessions | 38 | 0.000397 | 36 | 263.225595 |
+| F3 | fast_present | 75 | 0.000000 | 75 | 0.000000 |
+
+### Diagnostic-only realized market-beta proxy
+
+OLS includes an intercept. The market proxy is the equal-weight D1 shareholder return of names active at t−1, aligned to the book ledger return at t. It was not used for selection.
+
+| Candidate | Fold | Slope | t-stat | R² | Observations |
+|---|---|---:|---:|---:|---:|
+| rung_b | F1 | -0.737266 | -11.194547 | 0.506708 | 124 |
+| rung_b | F2 | -0.694404 | -11.607279 | 0.524791 | 124 |
+| rung_b | F3 | -0.912572 | -12.503744 | 0.555703 | 127 |
+| inverse_volatility_control | F1 | -0.921385 | -11.958934 | 0.539651 | 124 |
+| inverse_volatility_control | F2 | -0.913068 | -13.122840 | 0.585329 | 124 |
+| inverse_volatility_control | F3 | -1.025159 | -13.093836 | 0.578342 | 127 |
+| momentum_control | F1 | -0.368295 | -5.901614 | 0.222083 | 124 |
+| momentum_control | F2 | -0.111374 | -1.642384 | 0.021632 | 124 |
+| momentum_control | F3 | -0.763192 | -10.738612 | 0.479855 | 127 |
+
+### Oddlot source coverage in rung D
+
+No monthly source-coverage rows were persisted, so the available fold summaries are reported.
+
+| Fold | Active name-days | Present name-days | Present fraction | Valid fraction conditional on present | Status |
+|---|---:|---:|---:|---:|---|
+| F1 | 24598 | 24565 | 0.998658 | 1.000000 | supported |
+| F2 | 23568 | 23555 | 0.999448 | 1.000000 | supported |
+| F3 | 23059 | 0 | 0.000000 | NA | unsupported |
+
+Interpretation: oddlot was essentially complete in F1/F2 but absent in F3, matching the registered rung-D collapse as a source-coverage regime break rather than evidence for a stable sidecar improvement.
