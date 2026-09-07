@@ -214,6 +214,20 @@ def _source_tier_labels(store_manifest: Mapping[str, object]) -> dict[str, str]:
     return dict(DEVELOPMENT_SOURCE_TIER_LABELS)
 
 
+def _store_build_implementation_commit(
+    store_manifest: Mapping[str, object],
+) -> str:
+    metadata = store_manifest.get("metadata")
+    commit = (
+        metadata.get("implementation_git_commit")
+        if isinstance(metadata, Mapping)
+        else None
+    )
+    if not isinstance(commit, str) or len(commit) != 40:
+        raise ValueError("store manifest lacks its build implementation commit")
+    return commit
+
+
 def _assert_source_tier_labels(
     payload: Mapping[str, object], *, expected: Mapping[str, str], path: Path
 ) -> None:
@@ -230,7 +244,8 @@ def _verify_development_acceptance(
     *,
     expected_sha256: str,
     store_manifest_sha256: str,
-    implementation: Mapping[str, object],
+    expected_implementation: Mapping[str, object] | None,
+    store_build_implementation_commit: str,
     source_tiers: Mapping[str, str],
 ) -> dict[str, object]:
     source = Path(path).resolve(strict=True)
@@ -246,8 +261,24 @@ def _verify_development_acceptance(
     ):
         raise ValueError("development acceptance report is not an accepted rev-2 gate")
     _assert_false_access(report, path=source)
-    if report.get("code") != implementation:
+    implementation = report.get("code")
+    if (
+        not isinstance(implementation, Mapping)
+        or not isinstance(implementation.get("commit"), str)
+        or len(str(implementation["commit"])) != 40
+        or implementation.get("tracked_worktree_clean") is not True
+    ):
+        raise ValueError("development acceptance lacks a clean implementation identity")
+    if (
+        expected_implementation is not None
+        and implementation != expected_implementation
+    ):
         raise ValueError("development acceptance implementation differs from rev-2")
+    if (
+        report.get("store_build_implementation_commit")
+        != store_build_implementation_commit
+    ):
+        raise ValueError("development acceptance store-build provenance mismatch")
     sources = report.get("sources")
     store = sources.get("store") if isinstance(sources, Mapping) else None
     if (
@@ -1282,18 +1313,14 @@ def freeze_round1(
     store = store_root.resolve(strict=True)
     store_manifest, dates = _read_store_header(store)
     store_manifest_sha256 = sha256_file(store / "manifest.json")
-    store_metadata = store_manifest.get("metadata")
-    if (
-        not isinstance(store_metadata, Mapping)
-        or store_metadata.get("implementation_git_commit") != code["commit"]
-    ):
-        raise ValueError("Round-1 store was not built by the frozen implementation")
+    store_build_commit = _store_build_implementation_commit(store_manifest)
     source_tiers = _source_tier_labels(store_manifest)
-    _verify_development_acceptance(
+    acceptance_report = _verify_development_acceptance(
         acceptance_path,
         expected_sha256=acceptance_sha256,
         store_manifest_sha256=store_manifest_sha256,
-        implementation=code,
+        expected_implementation=None,
+        store_build_implementation_commit=store_build_commit,
         source_tiers=source_tiers,
     )
     fit, selection, evaluation, _, folds = _fold_indices(dates)
@@ -1323,11 +1350,13 @@ def freeze_round1(
             "root": str(store),
             "manifest_sha256": store_manifest_sha256,
             "schema": store_manifest["schema"],
+            "build_implementation_commit": store_build_commit,
         },
         "development_acceptance": {
             "path": str(acceptance_path.resolve(strict=True)),
             "sha256": acceptance_sha256.casefold(),
             "status": "development_grade_inferred_actions",
+            "implementation": dict(acceptance_report["code"]),
         },
         "cdi": {
             "development_extension": {
@@ -1394,17 +1423,24 @@ def run_round1(
     store_manifest, dates = _read_store_header(store_root)
     if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
         raise ValueError("Round-1 store manifest hash mismatch")
+    store_build_commit = _store_build_implementation_commit(store_manifest)
+    if design["store"].get("build_implementation_commit") != store_build_commit:
+        raise ValueError("Round-1 frozen store-build provenance mismatch")
     source_tiers = _source_tier_labels(store_manifest)
     if any(design.get(key) != value for key, value in source_tiers.items()):
         raise ValueError("Round-1 frozen source tiers differ from the store")
     acceptance = design.get("development_acceptance")
     if not isinstance(acceptance, Mapping):
         raise ValueError("Round-1 frozen design lacks development acceptance")
+    acceptance_implementation = acceptance.get("implementation")
+    if not isinstance(acceptance_implementation, Mapping):
+        raise ValueError("Round-1 frozen design lacks acceptance implementation")
     _verify_development_acceptance(
         Path(str(acceptance["path"])),
         expected_sha256=str(acceptance["sha256"]),
         store_manifest_sha256=str(design["store"]["manifest_sha256"]),
-        implementation=code,
+        expected_implementation=acceptance_implementation,
+        store_build_implementation_commit=store_build_commit,
         source_tiers=source_tiers,
     )
     fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
@@ -1685,17 +1721,24 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
         raise ValueError("Round-1 store manifest hash mismatch")
     store_manifest, dates = _read_store_header(store_root)
+    store_build_commit = _store_build_implementation_commit(store_manifest)
+    if design["store"].get("build_implementation_commit") != store_build_commit:
+        raise ValueError("Round-1 frozen store-build provenance mismatch")
     source_tiers = _source_tier_labels(store_manifest)
     if any(design.get(key) != value for key, value in source_tiers.items()):
         raise ValueError("Round-1 frozen source tiers differ from the store")
     acceptance = design.get("development_acceptance")
     if not isinstance(acceptance, Mapping):
         raise ValueError("Round-1 frozen design lacks development acceptance")
+    acceptance_implementation = acceptance.get("implementation")
+    if not isinstance(acceptance_implementation, Mapping):
+        raise ValueError("Round-1 frozen design lacks acceptance implementation")
     _verify_development_acceptance(
         Path(str(acceptance["path"])),
         expected_sha256=str(acceptance["sha256"]),
         store_manifest_sha256=str(design["store"]["manifest_sha256"]),
-        implementation=design["implementation"],
+        expected_implementation=acceptance_implementation,
+        store_build_implementation_commit=store_build_commit,
         source_tiers=source_tiers,
     )
     fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)

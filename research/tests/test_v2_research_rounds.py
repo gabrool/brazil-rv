@@ -27,6 +27,8 @@ from brazil_rv.v2.research_rounds import (
     _pretrain_indices,
     _score_artifact,
     _small_interval_spanning_zero,
+    _store_build_implementation_commit,
+    _verify_development_acceptance,
     _window_target_mask,
     seal_root,
 )
@@ -97,6 +99,61 @@ def test_registration_protocol_requires_ineligible_hold_sessions(
         ]
         == 5
     )
+
+
+def test_acceptance_binds_store_hash_and_store_build_separately_from_freeze(
+    tmp_path: Path,
+) -> None:
+    store_build_commit = "a" * 40
+    store_manifest = {
+        "metadata": {"implementation_git_commit": store_build_commit}
+    }
+    acceptance_implementation = {
+        "commit": "b" * 40,
+        "tracked_worktree_clean": True,
+    }
+    source_tiers = {
+        "action_terms_source": "inferred_cotahist_dismes_v1",
+        "schedule_source": "reconstructed_v1",
+    }
+    report = {
+        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V8",
+        "status": "completed",
+        "engineering_acceptance_status": "development_grade_inferred_actions",
+        "research_claim": False,
+        "official_validation_accessed": False,
+        "test_accessed": False,
+        "transfer_chronology_clean": True,
+        "code": acceptance_implementation,
+        "store_build_implementation_commit": store_build_commit,
+        "sources": {"store": {"manifest_sha256": "c" * 64}},
+        "results": {
+            "development_acceptance": {"labels": source_tiers, "reasons": []}
+        },
+    }
+    path = tmp_path / "acceptance.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert _store_build_implementation_commit(store_manifest) == store_build_commit
+    verified = _verify_development_acceptance(
+        path,
+        expected_sha256=sha256_file(path),
+        store_manifest_sha256="c" * 64,
+        expected_implementation=acceptance_implementation,
+        store_build_implementation_commit=store_build_commit,
+        source_tiers=source_tiers,
+    )
+    assert verified["code"] == acceptance_implementation
+
+    with pytest.raises(ValueError, match="store-build provenance"):
+        _verify_development_acceptance(
+            path,
+            expected_sha256=sha256_file(path),
+            store_manifest_sha256="c" * 64,
+            expected_implementation=acceptance_implementation,
+            store_build_implementation_commit="d" * 40,
+            source_tiers=source_tiers,
+        )
 
 
 def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
