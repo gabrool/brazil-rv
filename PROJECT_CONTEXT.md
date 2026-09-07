@@ -331,6 +331,23 @@ and test remained unread, no deployment changed, and no paid instance was used.
 Two direct provider inventory reads after sealing returned zero instances; the
 old local Lambda state file is stale and does not represent a billable host.
 
+Pass 4g registered its gross-shortfall disposition before diagnostics and then
+hash-verified/replayed all 16 sealed Pass-4f panels with append-only ledger
+instrumentation. All prior headlines were bit-identical and direct
+entry/fill/cap defect counters D1--D4 were zero in every book. The immutable
+diagnostic root is
+`D:\quant-data\b3\processed\model_runs\v2_pass4g_occupancy_diagnostic_fa5c8af_20260907T013518Z`;
+diagnostic-manifest and log-inclusive artifact-inventory SHA-256 values are
+`2085ed71008821b983f61a8f2ad2667de8a4a74977f7b6079e5def98f9a377d9`
+and `1663e488cdad3ca0187cfe31491d91ff3067aa0079c3277f4cdeffddbb010feb`.
+The preregistered P0 stop fired because eligibility-flicker exit share D5 was
+`0.103448` for F3 inverse-volatility and `0.148936` for F3 momentum, both above
+`0.10`. F2 inverse-volatility's occupancy share was only `0.059435`; its
+largest shortfall source was sizing mark drift (`0.107124`), not occupancy.
+Therefore no conditional gate rewrite was made, `main` remains unchanged, and
+Round 1/2 remain unrun. Official validation/test stayed unread, no deployment
+changed, and no paid instance was launched.
+
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused
 unconditionally by this code version. Target masks and corresponding numeric

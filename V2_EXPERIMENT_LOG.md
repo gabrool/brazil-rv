@@ -569,3 +569,86 @@ Direct provider inventory reads at `2026-09-07T00:03:31.2895930Z` and
 `2026-09-07T00:03:36.9256438Z` each returned zero instances, confirming that
 the stale local state file did not represent a billable host and no adjacent
 instance was touched.
+
+## Pass-4g gross-occupancy disposition and P0 stop (2026-09-07)
+
+The disposition was registered before diagnostics in commit
+`a3f1059a42b0ead8cb25a8a1bca77d923fd91583`. The append-only diagnostic
+instrumentation in commit `fb027809c6199990c2673dfc95d550f16bed733c`
+records exact gross-shortfall decomposition, per-side occupancy and entry
+state, entry/exit defect signatures, and per-name band/holding counts without
+changing any order, fill, position, cost, settlement, or accounting result.
+Two bounded reporting repairs followed: commit
+`6991abb7c4290848bb74362610b26c79f3369cb8` fixed a missing per-name slice in
+one band diagnostic, and commit
+`fa5c8afb37bb20b0baac70de93928e32a58fc902` converted NumPy scalar counts to
+portable JSON integers. Repository-wide Ruff, compilation, and all 844 tests
+passed after each repair; the final suite completed in 348.60 seconds.
+
+Both score-free failed roots are retained. Root
+`D:\quant-data\b3\processed\model_runs\v2_pass4g_occupancy_diagnostic_fb02780_20260907T011842Z`
+stopped on the diagnostic indexing error after one book's sealed headline
+identity passed; its corrected failure-record and inventory SHA-256 values are
+`f153c6b576224531f9f4fc2be8e62d00cb1da997e3848665f545732703a66e55`
+and `31f5b2e297bd181b7f7674c2406662c848fc2b357b8a7eb584fc3a397596150f`.
+Root
+`D:\quant-data\b3\processed\model_runs\v2_pass4g_occupancy_diagnostic_6991abb_20260907T012721Z`
+reproduced all 16 headlines and stopped only while serializing the final
+manifest; its failure-record and inventory SHA-256 values are
+`b0af887501e8124e317bee169628da783238e56f4c7ecb8a280fb699b930c587`
+and `5197668eed9e063c5fef31ab9e9611a3df12b3ef17c1705b3b903f4bbcd6f844`.
+Neither failure wrote a disposition or recomputed a model/score.
+
+The canonical immutable diagnostic root is
+`D:\quant-data\b3\processed\model_runs\v2_pass4g_occupancy_diagnostic_fa5c8af_20260907T013518Z`.
+Its diagnostic-manifest, log-inclusive artifact-inventory, and access-audit
+SHA-256 values are respectively
+`2085ed71008821b983f61a8f2ad2667de8a4a74977f7b6079e5def98f9a377d9`,
+`1663e488cdad3ca0187cfe31491d91ff3067aa0079c3277f4cdeffddbb010feb`,
+and `ae47dcc237755949476f76344e9bd0b8938cc97899e146a34f310fc304f68974`.
+It hash-verified and replayed all 16 sealed Pass-4f score panels. Every
+pre-existing headline field was bit-identical, official-validation/test access
+was false, transfer chronology was clean, `research_claim=false`, and no
+deployment changed.
+
+The complete disposition table is below. `D1--D4` is zero in every row.
+Occupancy share is the registered occupancy-component sum divided by total
+gross shortfall; it can exceed one when signed sizing components offset it.
+
+| Fold/book | Mean gross | Shortfall | Occupancy share | Largest occupancy term | Largest sizing term | D1--D4 | D5 |
+| --- | ---: | ---: | ---: | --- | --- | ---: | ---: |
+| F1 inverse-volatility | 1.800173 | 0.199827 | 0.076679 | exit gap 0.016667 | NAV drift 0.155072 | 0 | 0.054054 |
+| F1 momentum | 1.804345 | 0.195655 | 0.071445 | exit gap 0.016398 | NAV drift 0.159350 | 0 | 0.056338 |
+| F1 reversal-21 | 1.973163 | 0.026837 | 0.801337 | exit gap 0.016398 | mark drift 0.028642 | 0 | 0.018557 |
+| F1 reversal-5 | 1.931453 | 0.068547 | 0.929426 | band exhausted 0.047849 | fill 0.004120 | 0 | 0.003327 |
+| F1 blend | 1.972213 | 0.027787 | 1.170576 | band exhausted 0.016935 | mark drift -0.015916 | 0 | 0.007307 |
+| F2 inverse-volatility | 1.755766 | 0.244234 | 0.059435 | exit gap 0.016667 | mark drift 0.107124 | 0 | 0.048387 |
+| F2 momentum | 1.828920 | 0.171080 | 0.094278 | exit gap 0.016129 | mark drift 0.071675 | 0 | 0.013514 |
+| F2 reversal-21 | 1.952331 | 0.047669 | 0.428584 | exit gap 0.016398 | mark drift 0.028647 | 0 | 0.004367 |
+| F2 reversal-5 | 1.937269 | 0.062731 | 0.827052 | band exhausted 0.036290 | fill 0.010426 | 0 | 0.000000 |
+| F2 blend | 1.958096 | 0.041904 | 0.545282 | exit gap 0.016398 | fill 0.013762 | 0 | 0.002247 |
+| F3 inverse-volatility | 1.888777 | 0.111223 | 0.120351 | exit gap 0.016273 | fill 0.145001 | 0 | **0.103448** |
+| F3 momentum | 1.848185 | 0.151815 | 0.207463 | band exhausted 0.019685 | fill 0.112098 | 0 | **0.148936** |
+| F3 reversal-21 | 1.964110 | 0.035890 | 0.511920 | exit gap 0.016535 | mark drift 0.020057 | 0 | 0.008032 |
+| F3 reversal-5 | 1.947440 | 0.052560 | 0.853919 | band exhausted 0.029921 | fill 0.010717 | 0 | 0.001281 |
+| F3 blend | 1.973285 | 0.026715 | 0.707380 | exit gap 0.017323 | NAV drift 0.010383 | 0 | 0.003052 |
+| F1 GBDT ensemble | 1.840379 | 0.159621 | 0.114518 | exit gap 0.016398 | NAV drift 0.085670 | 0 | 0.013453 |
+
+For the binding F2 inverse-volatility gross failure, occupancy explains only
+`0.059435` of shortfall. The largest occupancy term is exit gap (`0.016667`),
+whereas mark drift is the largest sizing term (`0.107124`). Its ten most
+frequent raw-band names that were never held were `BRCOGNACNOR2` (68 band
+sessions), `BRSUZBACNOR0` (57), `BRPTBLACNOR8` (55), `BREQTLACNOR0` (39),
+`BRARMLACNOR1` (38), `BRCSEDACNOR9` (36), `BRYDUQACNOR3` (31),
+`BRCMIGACNPR3` (25), `BRGRNDACNOR3` (24), and `BRMDIAACNOR7` (24). Every one
+printed in all 124 evaluation sessions, had no missing-prior-print or
+unresolved-action band session, and received zero entry submissions: these
+are raw-band appearances while capacity was occupied, not unfillable orders.
+
+The predeclared P0 stop fired because D5 exceeded `0.10` for F3
+inverse-volatility (`0.103448`) and F3 momentum (`0.148936`). D1 through D4
+were zero in all books. Accordingly, the conditional Section 5 gate rewrite
+was not implemented, `main` was not fast-forwarded, no Round-1 root was frozen
+or run, and no paid instance was launched. The result is a labelled defect
+signature requiring a new pre-result contract; it is not an acceptance or
+research claim.
