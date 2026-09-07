@@ -412,11 +412,11 @@ def test_primary_uses_one_four_head_population_and_twenty_name_minimum() -> None
     inputs = _fixture()
     target_mask = np.asarray(inputs.neutral_target_mask).copy()
     target_mask[0, :, :4] = False
-    target_mask[0, :20, :4] = True
-    # Each head has ten additional names, but those head-specific names must
-    # not enter any of the four primary correlations.
+    target_mask[0, 1:21, :4] = True
+    # Additional head-specific names must not enter any of the four primary
+    # correlations.
     for head in range(4):
-        target_mask[0, 20 + 10 * head : 30 + 10 * head, head] = True
+        target_mask[0, 21 + 9 * head : 30 + 9 * head, head] = True
 
     report = evaluate_scores(
         replace(inputs, neutral_target_mask=target_mask), window_name="F2"
@@ -455,7 +455,7 @@ def test_primary_reports_insufficient_common_support() -> None:
     inputs = _fixture()
     target_mask = np.asarray(inputs.neutral_target_mask).copy()
     target_mask[0, :, :4] = False
-    target_mask[0, :19, :4] = True
+    target_mask[0, 1:20, :4] = True
 
     report = evaluate_scores(
         replace(inputs, neutral_target_mask=target_mask), window_name="F2"
@@ -465,6 +465,36 @@ def test_primary_reports_insufficient_common_support() -> None:
     assert first["common_neutral_outcome_name_count"] == 19
     assert first["primary_neutral_target_ic"] is None
     assert first["undefined_reason"] == "fewer_than_20_common_neutral_outcomes"
+
+
+def test_legacy_primary_readout_uses_rev2_population_without_characteristics() -> None:
+    inputs = _fixture()
+    neutral_mask = np.asarray(inputs.neutral_target_mask).copy()
+    neutral_mask[0, :5, :4] = False
+
+    report = evaluate_scores(
+        replace(inputs, neutral_target_mask=neutral_mask), window_name="F2"
+    ).report
+    date_rows = [
+        row
+        for row in report["daily_metric_table"]
+        if row["date"] == inputs.dates[0].isoformat()
+        and row["horizon_sessions"] in (1, 2, 3, 5)
+    ]
+
+    assert {row["neutral_target_valid_name_count"] for row in date_rows} == {55}
+    assert {row["legacy_scaled_target_valid_name_count"] for row in date_rows} == {
+        59
+    }
+    assert {row["legacy_scaled_target_population"] for row in date_rows} == {
+        "common_D1_D2_D3_D5"
+    }
+    horizon_rows = {
+        row["horizon_sessions"]: row for row in report["horizon_readouts"]
+    }
+    assert horizon_rows[1]["neutral_target_possible_name_days"] == 1_176
+    assert horizon_rows[1]["legacy_scaled_target_possible_name_days"] == 1_180
+    assert horizon_rows[10]["legacy_scaled_target_population"] == "per_horizon_D10"
 
 
 def test_all_five_horizon_diagnostic_intersects_d10_score_and_outcome() -> None:

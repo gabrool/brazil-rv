@@ -436,6 +436,27 @@ def _aligned_action_terms(inputs: EvaluationInputs) -> AlignedActionTerms:
     )
 
 
+def _rev2_primary_population_components(
+    inputs: EvaluationInputs,
+) -> tuple[NDArray[np.bool_], NDArray[np.bool_]]:
+    """Return the exact common D1--D5 outcome and score populations from rev 2."""
+    indexes = [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS]
+    scores = np.asarray(inputs.scores, dtype=np.float64)[..., indexes]
+    targets = np.asarray(inputs.scaled_midrank_targets, dtype=np.float64)[..., indexes]
+    target_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)[..., indexes]
+    score_mask = np.asarray(inputs.score_mask, dtype=np.bool_)[..., indexes]
+    scale = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
+    outcome_population = (
+        np.asarray(inputs.active, dtype=np.bool_)
+        & np.isfinite(scale)
+        & (scale > 1e-8)
+        & target_mask.all(axis=-1)
+        & np.isfinite(targets).all(axis=-1)
+    )
+    score_population = score_mask.all(axis=-1) & np.isfinite(scores).all(axis=-1)
+    return outcome_population, score_population
+
+
 def _primary_population_components(
     inputs: EvaluationInputs,
 ) -> tuple[
@@ -447,17 +468,14 @@ def _primary_population_components(
     indexes = [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS]
     scores = np.asarray(inputs.scores, dtype=np.float64)[..., indexes]
     targets = np.asarray(inputs.neutral_midrank_targets, dtype=np.float64)[..., indexes]
-    target_mask = np.asarray(inputs.neutral_target_mask, dtype=np.bool_)[..., indexes]
-    score_mask = np.asarray(inputs.score_mask, dtype=np.bool_)[..., indexes]
-    scale = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
-    outcome_population = (
-        np.asarray(inputs.active, dtype=np.bool_)
-        & np.isfinite(scale)
-        & (scale > 1e-8)
-        & target_mask.all(axis=-1)
+    characteristic_population = (
+        np.asarray(inputs.neutral_target_mask, dtype=np.bool_)[..., indexes].all(axis=-1)
         & np.isfinite(targets).all(axis=-1)
     )
-    score_population = score_mask.all(axis=-1) & np.isfinite(scores).all(axis=-1)
+    rev2_outcome_population, score_population = (
+        _rev2_primary_population_components(inputs)
+    )
+    outcome_population = rev2_outcome_population & characteristic_population
     return scores, targets, outcome_population, score_population
 
 
@@ -517,6 +535,7 @@ def _primary_daily_metrics(
 def _daily_metrics(
     inputs: EvaluationInputs,
     primary_population: NDArray[np.bool_],
+    legacy_primary_population: NDArray[np.bool_],
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
@@ -554,6 +573,8 @@ def _daily_metrics(
             if horizon_index in primary_indexes:
                 neutral_valid = primary_population[day]
                 neutral_population = "common_D1_D2_D3_D5"
+                legacy_valid = legacy_primary_population[day]
+                legacy_population = "common_D1_D2_D3_D5"
             else:
                 neutral_valid = (
                     active[day]
@@ -563,21 +584,22 @@ def _daily_metrics(
                     & np.isfinite(neutral[day, :, horizon_index])
                 )
                 neutral_population = "per_horizon_D10"
+                legacy_valid = (
+                    active[day]
+                    & score_mask[day, :, horizon_index]
+                    & scaled_mask[day, :, horizon_index]
+                    & np.isfinite(scale[day])
+                    & (scale[day] > 1e-8)
+                    & np.isfinite(scores[day, :, horizon_index])
+                    & np.isfinite(scaled[day, :, horizon_index])
+                )
+                legacy_population = "per_horizon_D10"
             neutral_value, neutral_count, neutral_reason = _spearman_result(
                 scores[day, :, horizon_index],
                 neutral[day, :, horizon_index],
                 neutral_valid,
             )
             neutral_ic[day, horizon_index] = neutral_value
-            legacy_valid = (
-                active[day]
-                & score_mask[day, :, horizon_index]
-                & scaled_mask[day, :, horizon_index]
-                & np.isfinite(scale[day])
-                & (scale[day] > 1e-8)
-                & np.isfinite(scores[day, :, horizon_index])
-                & np.isfinite(scaled[day, :, horizon_index])
-            )
             legacy_value, legacy_count, legacy_reason = _spearman_result(
                 scores[day, :, horizon_index],
                 scaled[day, :, horizon_index],
@@ -640,6 +662,7 @@ def _daily_metrics(
                     "neutral_target_valid_name_count": neutral_count,
                     "neutral_target_spearman_ic": _finite_or_none(neutral_value),
                     "neutral_target_ic_undefined_reason": neutral_reason,
+                    "legacy_scaled_target_population": legacy_population,
                     "legacy_scaled_target_valid_name_count": legacy_count,
                     "legacy_scaled_target_ic": _finite_or_none(legacy_value),
                     "legacy_scaled_target_ic_undefined_reason": legacy_reason,
@@ -1788,6 +1811,12 @@ def evaluate_scores(
         primary_score_mask,
     ) = _primary_population_components(inputs)
     primary_population = primary_outcome_mask & primary_score_mask
+    legacy_primary_outcome_mask, legacy_primary_score_mask = (
+        _rev2_primary_population_components(inputs)
+    )
+    legacy_primary_population = (
+        legacy_primary_outcome_mask & legacy_primary_score_mask
+    )
     _, daily_primary, primary_rows = _primary_daily_metrics(
         primary_scores,
         primary_targets,
@@ -1802,7 +1831,7 @@ def evaluate_scores(
         price_ic,
         spread_total_bps,
         metric_rows,
-    ) = _daily_metrics(inputs, primary_population)
+    ) = _daily_metrics(inputs, primary_population, legacy_primary_population)
     persistence, persistence_rows = _persistence(inputs)
     economics_score, economics_mask = _economics_signal(inputs)
     action_terms = _aligned_action_terms(inputs)
@@ -1846,20 +1875,33 @@ def evaluate_scores(
     active = np.asarray(inputs.active, dtype=np.bool_)
     scaled_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
     neutral_mask = np.asarray(inputs.neutral_target_mask, dtype=np.bool_)
+    target_scale = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
     shareholder_mask = np.asarray(inputs.shareholder_target_mask, dtype=np.bool_)
     price_mask = np.asarray(inputs.price_target_mask, dtype=np.bool_)
     horizon_rows: list[dict[str, object]] = []
     for horizon_index, horizon in enumerate(HORIZONS):
         if horizon in PRIMARY_HORIZONS:
-            scaled_possible = primary_outcome_mask
+            neutral_possible = primary_outcome_mask
+            legacy_possible = legacy_primary_outcome_mask
+            legacy_population_name = "common_D1_D2_D3_D5"
         else:
-            scaled_possible = (
+            neutral_possible = (
                 active
                 & neutral_mask[..., horizon_index]
                 & np.isfinite(
                     np.asarray(inputs.neutral_midrank_targets)[..., horizon_index]
                 )
             )
+            legacy_possible = (
+                active
+                & np.isfinite(target_scale)
+                & (target_scale > 1e-8)
+                & scaled_mask[..., horizon_index]
+                & np.isfinite(
+                    np.asarray(inputs.scaled_midrank_targets)[..., horizon_index]
+                )
+            )
+            legacy_population_name = "per_horizon_D10"
         shareholder_possible = (
             active
             & shareholder_mask[..., horizon_index]
@@ -1880,14 +1922,24 @@ def evaluate_scores(
                     _finite_mean(neutral_ic[:, horizon_index])
                 ),
                 "neutral_target_possible_date_count": int(
-                    (scaled_possible.sum(axis=1) >= MIN_CROSS_SECTION).sum()
+                    (neutral_possible.sum(axis=1) >= MIN_CROSS_SECTION).sum()
                 ),
                 "neutral_target_used_date_count": int(
                     np.isfinite(neutral_ic[:, horizon_index]).sum()
                 ),
-                "neutral_target_possible_name_days": int(scaled_possible.sum()),
+                "neutral_target_possible_name_days": int(neutral_possible.sum()),
+                "legacy_scaled_target_population": legacy_population_name,
                 "legacy_scaled_target_ic": _finite_or_none(
                     _finite_mean(legacy_scaled_ic[:, horizon_index])
+                ),
+                "legacy_scaled_target_possible_date_count": int(
+                    (legacy_possible.sum(axis=1) >= MIN_CROSS_SECTION).sum()
+                ),
+                "legacy_scaled_target_used_date_count": int(
+                    np.isfinite(legacy_scaled_ic[:, horizon_index]).sum()
+                ),
+                "legacy_scaled_target_possible_name_days": int(
+                    legacy_possible.sum()
                 ),
                 "mean_shareholder_rank_ic": _finite_or_none(
                     _finite_mean(shareholder_ic[:, horizon_index])
@@ -2129,6 +2181,12 @@ def evaluate_scores(
             "price_target_mask_true": int(price_mask.sum()),
             "primary_common_outcome_name_days": int(primary_outcome_mask.sum()),
             "primary_common_score_and_outcome_name_days": int(primary_population.sum()),
+            "legacy_primary_common_outcome_name_days": int(
+                legacy_primary_outcome_mask.sum()
+            ),
+            "legacy_primary_common_score_and_outcome_name_days": int(
+                legacy_primary_population.sum()
+            ),
             "economics_score_mask_true": int(economics_mask.sum()),
             "economics_path_model_count": 1,
             "raw_close_present_name_days": int(
