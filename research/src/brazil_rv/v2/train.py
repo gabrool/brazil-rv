@@ -9,6 +9,7 @@ import random
 import subprocess
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -50,7 +51,7 @@ from .contract import (
     TRAINING_STAGE_SCHEMA,
     V1_READ_SEEDS,
 )
-from .data import collate_v2_daily
+from .data import collate_v2_daily, stage_fast_name_count
 from .losses import multi_horizon_loss, multi_horizon_loss_normalizers
 from .model import DailyMultiHorizonModel
 from .normalization import average_ranks
@@ -1021,6 +1022,12 @@ def _loader_input_payload(
                     "ordered_intraday_names": intraday_names,
                     "ordered_native_fast_names": native_fast_names,
                 },
+                "target": {
+                    "value_array": str(getattr(candidate, "primary_target_name", "")),
+                    "validity_array": str(
+                        getattr(candidate, "primary_target_mask_name", "")
+                    ),
+                },
                 "lookback_sessions": int(getattr(candidate, "lookback", 0)),
                 "entry_alignment": entry_alignment,
                 "segments": segments,
@@ -1595,7 +1602,7 @@ def train_stage(
     if stage not in {"P", "F", "J"}:
         raise ValueError("stage must be P, F, or J")
     if selection_parity is not None:
-        raise ValueError("v2 rev2 research stages do not accept selection parity")
+        raise ValueError("v2 rev3 research stages do not accept selection parity")
     if seed not in V1_READ_SEEDS:
         raise ValueError("seed differs from the accepted v1 read roster")
     if not fold:
@@ -2139,18 +2146,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         time_decay_half_life=decay,
         drop_last=True,
     )
+    fixed_fast_name_count = stage_fast_name_count(train_dataset, selection_dataset)
+    stage_collate = partial(
+        collate_v2_daily, fixed_fast_name_count=fixed_fast_name_count
+    )
     train_loader = DataLoader(
         train_dataset,
         batch_sampler=sampler,
         num_workers=arguments.num_workers,
-        collate_fn=collate_v2_daily,
+        collate_fn=stage_collate,
     )
     selection_loader = DataLoader(
         selection_dataset,
         batch_size=arguments.selection_batch_size,
         shuffle=False,
         num_workers=arguments.num_workers,
-        collate_fn=collate_v2_daily,
+        collate_fn=stage_collate,
     )
     fast_checkpoint = arguments.fast_pretrained_checkpoint
     model_config = ModelConfig(
@@ -2205,7 +2216,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             batch_size=arguments.selection_batch_size,
             shuffle=False,
             num_workers=arguments.num_workers,
-            collate_fn=collate_v2_daily,
+            collate_fn=partial(
+                collate_v2_daily,
+                fixed_fast_name_count=max(
+                    fixed_fast_name_count,
+                    stage_fast_name_count(score_dataset),
+                ),
+            ),
         )
         score_checkpoint_artifact(
             checkpoint=result.raw_patience_checkpoint,

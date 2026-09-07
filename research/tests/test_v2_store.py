@@ -22,7 +22,11 @@ from brazil_rv.v2.build_store import (
 )
 from brazil_rv.v2.corporate_actions import normalize_yfinance_actions
 from brazil_rv.v2.config import ModelConfig
-from brazil_rv.v2.contract import FINETUNE_START, INTRADAY_DAILY_FEATURES
+from brazil_rv.v2.contract import (
+    FINETUNE_START,
+    INTRADAY_DAILY_FEATURES,
+    TARGET_NEUTRALIZATION_FEATURES,
+)
 from brazil_rv.v2.data import (
     V1_STORE_V2_ZERO_DYNAMIC_CHANNELS,
     V1_STORE_V2_ZERO_SLOW_FIELDS,
@@ -35,6 +39,7 @@ from brazil_rv.v2.decision_clock import SessionDefinition
 from brazil_rv.v2.model import DailyMultiHorizonModel
 from brazil_rv.v2.store import (
     V2Store,
+    characteristic_neutral_targets,
     open_store_for_dates,
     open_store_for_samples,
     sha256_file,
@@ -382,6 +387,77 @@ def _sample_support_arrays(
 
 def _feature_age(valid: np.ndarray) -> np.ndarray:
     return np.where(valid, 0.0, -1.0).astype(np.float32)
+
+
+def test_characteristic_neutral_target_removes_exact_linear_risk() -> None:
+    names = 32
+    z0 = np.linspace(-2.0, 2.0, names)
+    z1 = np.tile(np.asarray([-1.0, 1.0]), names // 2)
+    z2 = np.linspace(1.5, -1.5, names)
+    characteristics = np.column_stack((z0, z1, z2))[None]
+    linear = 0.4 + 1.2 * z0 - 0.7 * z1 + 0.25 * z2
+    returns = np.stack(
+        [linear * np.sqrt(horizon) for horizon in (1, 2, 3, 5, 10)], axis=-1
+    )[None]
+    valid = np.ones_like(returns, dtype=np.bool_)
+    output, output_valid = characteristic_neutral_targets(
+        returns,
+        valid,
+        np.ones((1, names)),
+        characteristics,
+        np.ones((1, names), dtype=np.bool_),
+    )
+    assert output_valid.all()
+    np.testing.assert_array_equal(output, np.full_like(output, 0.5))
+
+
+def test_characteristic_neutral_target_retains_orthogonal_signal() -> None:
+    names = 40
+    pair_risk = np.linspace(-1.0, 1.0, names // 2)
+    z0 = np.repeat(pair_risk, 2)
+    z1 = np.zeros(names)
+    z2 = np.zeros(names)
+    magnitudes = np.linspace(0.1, 2.0, names // 2)
+    orthogonal = np.column_stack((magnitudes, -magnitudes)).reshape(-1)
+    sigma = np.exp(z0)
+    returns = np.stack(
+        [orthogonal * sigma * np.sqrt(horizon) for horizon in (1, 2, 3, 5, 10)],
+        axis=-1,
+    )[None]
+    output, output_valid = characteristic_neutral_targets(
+        returns,
+        np.ones_like(returns, dtype=np.bool_),
+        sigma[None],
+        np.column_stack((z0, z1, z2))[None],
+        np.ones((1, names), dtype=np.bool_),
+    )
+    assert output_valid.all()
+    expected = store_module.midrank_unit_interval(orthogonal)
+    np.testing.assert_allclose(output[0, :, 0], expected, atol=1e-6)
+    assert abs(np.corrcoef(output[0, :, 0], 1.0 / sigma)[0, 1]) < 1e-7
+
+
+def test_collate_uses_registered_fixed_fast_name_width() -> None:
+    def sample(count: int) -> dict[str, object]:
+        return {
+            "sample_index": np.asarray(1, dtype=np.int64),
+            "fast_patch_values": np.ones((count, 2, 3), dtype=np.float32),
+            "fast_patch_valid": np.ones((count, 2, 3), dtype=np.bool_),
+            "fast_patch_mask": np.ones((count, 2), dtype=np.bool_),
+            "fast_name_index": np.arange(count, dtype=np.int64),
+            "fast_state_position": np.full(count, 2, dtype=np.int64),
+            "v1_equity_slow": np.ones((count, 32), dtype=np.float32),
+        }
+
+    batch = collate_v2_daily([sample(3), sample(7)], fixed_fast_name_count=16)
+    assert tuple(batch["fast_patch_values"].shape) == (2, 16, 2, 3)
+    assert not batch["fast_patch_mask"][0, 3:].any()
+    assert batch["fast_name_index"][0, 3:].eq(-1).all()
+    assert not batch["fast_patch_valid"][1, 7:].any()
+    with pytest.raises(ValueError, match="positive multiple of 16"):
+        collate_v2_daily([sample(1)], fixed_fast_name_count=15)
+    with pytest.raises(ValueError, match="exceeds"):
+        collate_v2_daily([sample(17)], fixed_fast_name_count=16)
 
 
 def test_lazy_slow_window_preserves_source_age_and_left_padding() -> None:
@@ -881,7 +957,7 @@ def test_finetune_dataset_keeps_first_active_day_with_empty_slow_history(
     assert not sample["slow_history_mask"][1].any()
     assert not sample["slow_features"][1].any()
     assert np.all(sample["slow_feature_age_sessions"][1] == -1.0)
-    assert sample["target_mask"][1].tolist() == [True, True, True, False, False]
+    assert "target_mask" not in sample
 
 
 def test_dataset_boundary_cleans_every_masked_array_before_model_use(
@@ -1229,6 +1305,54 @@ def test_authorized_store_never_exposes_whole_or_ungranted_array_rows(
         store.read("active", -1)
 
 
+def test_neutral_target_view_is_reproducible_and_date_authorized(tmp_path) -> None:
+    development = [
+        value.astype(object)
+        for value in np.arange(np.datetime64("2024-10-01"), np.datetime64("2024-12-01"))
+        if np.is_busday(value)
+    ]
+    dates = [*development, date(2025, 1, 2)]
+    days, names = len(dates), 24
+    generator = np.random.default_rng(47)
+    returns = generator.normal(0.0, 0.02, (days, names, 5)).astype(np.float32)
+    slow = generator.normal(
+        0.0, 1.0, (days, names, len(TARGET_NEUTRALIZATION_FEATURES))
+    ).astype(np.float32)
+    valid = np.ones_like(returns, dtype=np.bool_)
+    path = write_store(
+        tmp_path / "neutral_capability",
+        dates=dates,
+        isins=[f"BRTEST{index:02d}NOR1" for index in range(names)],
+        arrays={
+            "active": np.ones((days, names), dtype=np.bool_),
+            "slow_values": slow,
+            "slow_valid": np.ones_like(slow, dtype=np.bool_),
+            "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
+            **_sample_support_arrays(days, names),
+            "target_primary": returns,
+            "target_valid": valid,
+            "target_scale_sigma": np.full((days, names), 0.02, dtype=np.float32),
+            "target_shareholder_midrank": returns,
+            "target_shareholder_simple_return": returns,
+            "target_shareholder_valid": valid,
+        },
+        feature_names={
+            "slow": TARGET_NEUTRALIZATION_FEATURES,
+            "intraday": INTRADAY_DAILY_FEATURES,
+        },
+    )
+    index = 20
+    store, _ = open_store_for_dates(path, [index], purpose="training")
+    first_mask = store.read("target_primary_neutral_valid", index)
+    first = store.read_target("target_primary_neutral", index, valid_mask=first_mask)
+    second_mask = store.read("target_primary_neutral_valid", index)
+    second = store.read_target("target_primary_neutral", index, valid_mask=second_mask)
+    np.testing.assert_array_equal(first_mask, second_mask)
+    np.testing.assert_array_equal(first, second)
+    with pytest.raises(PermissionError, match="authorization grant"):
+        store.read("target_primary_neutral_valid", len(dates) - 1)
+
+
 def test_authorized_store_exposes_only_bounded_runtime_tables(tmp_path) -> None:
     dates = [date(2024, 12, 30), date(2025, 1, 2)]
     path = write_store(
@@ -1331,7 +1455,7 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
     to_close = np.full((days, 1), 44.0, dtype=np.float32)
     to_close_valid = np.ones_like(to_close, dtype=np.bool_)
     to_close_valid[-3, 0] = False
-    slow = np.zeros((days, 1, 1), dtype=np.float32)
+    slow = np.zeros((days, 1, len(TARGET_NEUTRALIZATION_FEATURES)), dtype=np.float32)
     path = write_store(
         tmp_path / "target_endpoint",
         dates=dates,
@@ -1344,6 +1468,7 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
             "active": np.ones((days, 1), dtype=np.bool_),
             "target_primary": target,
             "target_valid": target_valid,
+            "target_scale_sigma": np.ones((days, 1), dtype=np.float32),
             "target_shareholder_midrank": shareholder_target,
             "target_shareholder_valid": target_valid,
             "target_shareholder_simple_return": shareholder_return,
@@ -1351,6 +1476,10 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
             "target_price_valid": target_valid,
             "target_to_close": to_close,
             "target_to_close_valid": to_close_valid,
+        },
+        feature_names={
+            "slow": TARGET_NEUTRALIZATION_FEATURES,
+            "intraday": INTRADAY_DAILY_FEATURES,
         },
     )
     dataset = V2DailyDataset(
@@ -1372,25 +1501,20 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
     monkeypatch.setattr(dataset.store, "read_target", tracked_read_target)
     first = dataset[0]
     second = dataset[1]
-    assert reads.index("target_valid") < reads.index("target_primary")
     assert reads.index("target_shareholder_valid") < reads.index(
         "target_shareholder_midrank"
     )
     assert reads.index("target_price_valid") < reads.index("target_price_midrank")
     assert reads.index("target_to_close_valid") < reads.index("target_to_close")
-    assert first["target_mask"].tolist() == [[True, False, False, False, False]]
     assert first["shareholder_target_mask"].tolist() == [
         [True, False, False, False, False]
     ]
     assert first["price_target_mask"].tolist() == [[True, False, False, False, False]]
-    assert first["targets"].tolist() == [[11.0, 0.0, 0.0, 0.0, 0.0]]
     assert first["shareholder_targets"].tolist() == [[22.0, 0.0, 0.0, 0.0, 0.0]]
     assert first["shareholder_simple_returns"].tolist() == [[33.0, 0.0, 0.0, 0.0, 0.0]]
     assert first["price_targets"].tolist() == [[55.0, 0.0, 0.0, 0.0, 0.0]]
     assert first["to_close_mask"].tolist() == [False]
     assert first["to_close_target"].tolist() == [0.0]
-    assert second["target_mask"].tolist() == [[False] * 5]
-    assert second["targets"].tolist() == [[0.0] * 5]
     assert second["shareholder_targets"].tolist() == [[0.0] * 5]
     assert second["shareholder_simple_returns"].tolist() == [[0.0] * 5]
     assert second["price_targets"].tolist() == [[0.0] * 5]
@@ -1422,13 +1546,15 @@ def test_dataset_clips_f3_tail_and_sealed_target_endpoints(
 
     dataset.store._arrays["target_primary"] = TargetReadGuard()
     payload_reads.clear()
-    guarded_sample = dataset[0]
-    assert guarded_sample["targets"].tolist() == [[11.0, 0.0, 0.0, 0.0, 0.0]]
+    guarded = dataset.store.read_target(
+        "target_primary",
+        days - 3,
+        valid_mask=np.asarray([[True, False, False, False, False]]),
+    )
+    assert guarded.tolist() == [[11.0, 0.0, 0.0, 0.0, 0.0]]
     assert len(payload_reads) == 1
     assert np.asarray(payload_reads[0][-1]).tolist() == [0]
     payload_reads.clear()
-    assert not dataset[1]["targets"].any()
-    assert payload_reads == []
     guarded = dataset.store.read("target_primary", [days - 3, days - 2])
     np.testing.assert_array_equal(guarded, direct_targets)
     assert len(payload_reads) == 1

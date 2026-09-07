@@ -2,6 +2,7 @@ from dataclasses import replace
 from datetime import date, timedelta
 
 import numpy as np
+import pytest
 
 from brazil_rv.execution.stateful_ledger import (
     LedgerConfig,
@@ -37,6 +38,8 @@ def _run(
     payment_session: np.ndarray | None = None,
     cdi: np.ndarray | None = None,
     initial_reference_price: np.ndarray | None = None,
+    annual_borrow_rate_by_name: np.ndarray | None = None,
+    shortable: np.ndarray | None = None,
 ) -> StatefulLedgerResult:
     days, names = close.shape
     dates = tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(days))
@@ -66,6 +69,8 @@ def _run(
         ),
         security_ids=tuple(f"SEC-{index}" for index in range(names)),
         initial_reference_price=initial_reference_price,
+        annual_borrow_rate_by_name=annual_borrow_rate_by_name,
+        shortable=shortable,
         config=_config() if config is None else config,
     )
 
@@ -127,6 +132,82 @@ def test_intended_orders_use_prior_marks_and_ignore_current_future_print() -> No
         fill.order_id == second_orders[0].order_id and fill.price == 250.0
         for fill in second.fills
     )
+
+
+def test_lending_borrow_charges_observed_annual_rate_with_two_percent_floor() -> None:
+    close = np.full((5, 3), 100.0)
+    scores = np.asarray([[3.0, 0.0, -3.0]] * 5)
+    initial = np.full(3, 100.0)
+    uniform = _run(
+        close,
+        scores,
+        config=_config(annual_borrow_rate=0.02),
+        initial_reference_price=initial,
+    )
+    lending = _run(
+        close,
+        scores,
+        config=_config(annual_borrow_rate=0.02, borrow_source="lending_sidecar_v1"),
+        initial_reference_price=initial,
+        annual_borrow_rate_by_name=np.full_like(close, 0.40),
+        shortable=np.ones_like(close, dtype=np.bool_),
+    )
+    charged = uniform.borrow_bps > 0.0
+    assert charged.any()
+    first_charged = int(np.flatnonzero(charged)[0])
+    assert lending.borrow_bps[first_charged] == pytest.approx(
+        20.0 * uniform.borrow_bps[first_charged]
+    )
+    np.testing.assert_allclose(
+        lending.held_short_weighted_annual_borrow_rate[charged], 0.40
+    )
+
+
+def test_lending_unshortable_entry_advances_to_next_candidate() -> None:
+    close = np.full((4, 4), 100.0)
+    scores = np.asarray([[4.0, 2.0, -4.0, -2.0]] * 4)
+    shortable = np.ones_like(close, dtype=np.bool_)
+    shortable[:, 2] = False
+    result = _run(
+        close,
+        scores,
+        config=_config(borrow_source="lending_sidecar_v1"),
+        initial_reference_price=np.full(4, 100.0),
+        annual_borrow_rate_by_name=np.full_like(close, 0.02),
+        shortable=shortable,
+    )
+    first_sells = [
+        order
+        for order in result.intended_orders
+        if order.decision_session == 0 and order.side == "sell"
+    ]
+    assert [order.security_index for order in first_sells] == [3]
+    assert result.excluded_short_entry_candidate_count[0] == 1
+
+
+def test_explicit_uniform_borrow_source_is_bit_identical_to_default() -> None:
+    close = np.full((4, 3), 100.0)
+    scores = np.asarray([[3.0, 0.0, -3.0]] * 4)
+    initial = np.full(3, 100.0)
+    default = _run(close, scores, initial_reference_price=initial)
+    explicit = _run(
+        close,
+        scores,
+        config=_config(borrow_source="uniform"),
+        initial_reference_price=initial,
+        annual_borrow_rate_by_name=np.full_like(close, 0.75),
+        shortable=np.zeros_like(close, dtype=np.bool_),
+    )
+    for field in (
+        "nav",
+        "daily_net_return",
+        "gross_pnl_bps",
+        "interest_bps",
+        "cost_bps",
+        "borrow_bps",
+        "signed_shares",
+    ):
+        np.testing.assert_array_equal(getattr(default, field), getattr(explicit, field))
 
 
 def test_first_evaluation_decision_uses_explicit_pre_window_reference() -> None:

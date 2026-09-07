@@ -6,6 +6,7 @@ import json
 import subprocess
 from dataclasses import asdict, dataclass, replace
 from datetime import date
+from functools import partial
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -33,6 +34,8 @@ from .contract import (
     HORIZONS,
     OFFICIAL_START,
     PRETRAIN_END,
+    REGISTERED_PRIMARY_TARGET,
+    REGISTERED_PRIMARY_TARGET_MASK,
     SCORE_ARTIFACT_SCHEMA,
     SIDECAR_FEATURES,
     STORE_START,
@@ -42,6 +45,7 @@ from .data import (
     collate_v2_daily,
     read_scalar_feature_view,
     scalar_feature_names,
+    stage_fast_name_count,
 )
 from .data_roots import resolve_external_files
 from .evaluate import (
@@ -66,8 +70,8 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V8"
-_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V7"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V9"
+_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V8"
 _ACCEPTANCE_ANCESTOR_SCHEMAS = frozenset(
     {
         "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5",
@@ -430,19 +434,23 @@ def _training_loaders(
         time_decay_half_life=time_decay_half_life,
         drop_last=True,
     )
+    fixed_fast_name_count = stage_fast_name_count(fit, selection)
+    stage_collate = partial(
+        collate_v2_daily, fixed_fast_name_count=fixed_fast_name_count
+    )
     return (
         DataLoader(
             fit,
             batch_sampler=sampler,
             num_workers=0,
-            collate_fn=collate_v2_daily,
+            collate_fn=stage_collate,
         ),
         DataLoader(
             selection,
             batch_size=runtime.evaluation_batch_size,
             shuffle=False,
             num_workers=0,
-            collate_fn=collate_v2_daily,
+            collate_fn=stage_collate,
         ),
     )
 
@@ -462,12 +470,15 @@ def _score_loader(
         lookback=runtime.slow_lookback,
         sidecars=sidecars,
     )
+    fixed_fast_name_count = stage_fast_name_count(dataset)
     return DataLoader(
         dataset,
         batch_size=runtime.evaluation_batch_size,
         shuffle=False,
         num_workers=0,
-        collate_fn=collate_v2_daily,
+        collate_fn=partial(
+            collate_v2_daily, fixed_fast_name_count=fixed_fast_name_count
+        ),
     )
 
 
@@ -646,6 +657,9 @@ def _evaluation_inputs(
     scaled_target_mask = _window_target_mask(
         store.read("target_valid", indices), indices
     )
+    neutral_target_mask = _window_target_mask(
+        store.read(REGISTERED_PRIMARY_TARGET_MASK, indices), indices
+    )
     shareholder_target_mask = _window_target_mask(
         store.read("target_shareholder_valid", indices), indices
     )
@@ -654,6 +668,9 @@ def _evaluation_inputs(
     )
     scaled_targets = store.read_target(
         "target_primary", indices, valid_mask=scaled_target_mask
+    )
+    neutral_targets = store.read_target(
+        REGISTERED_PRIMARY_TARGET, indices, valid_mask=neutral_target_mask
     )
     shareholder_targets = store.read_target(
         "target_shareholder_midrank", indices, valid_mask=shareholder_target_mask
@@ -736,6 +753,41 @@ def _evaluation_inputs(
         )
         source_archive_present[group] = np.any(ages >= 0.0, axis=-1)
         source_feature_valid[group] = np.any(valid, axis=-1)
+    lending_names = feature_names.get("sidecar_lending")
+    if not isinstance(lending_names, list) or "loan_rate" not in lending_names:
+        raise ValueError("store lacks the lending borrow source fields")
+    lending_values = np.asarray(
+        store.read("sidecar_lending_values", indices), dtype=np.float64
+    )
+    lending_valid = np.asarray(
+        store.read("sidecar_lending_valid", indices), dtype=np.bool_
+    )
+    lending_age = np.asarray(
+        store.read("sidecar_lending_age_sessions", indices), dtype=np.float64
+    )
+    rate_index = lending_names.index("loan_rate")
+    rate_recent = (
+        lending_valid[..., rate_index]
+        & (lending_age[..., rate_index] >= 0.0)
+        & (lending_age[..., rate_index] <= 20.0)
+    )
+    annual_borrow_rate_by_name = np.where(
+        rate_recent,
+        0.01 * np.sinh(lending_values[..., rate_index]),
+        np.nan,
+    )
+    balance_indexes = [
+        index
+        for index, name in enumerate(lending_names)
+        if str(name).startswith("loan_balance")
+    ]
+    balance_recent = np.any(
+        lending_valid[..., balance_indexes]
+        & (lending_age[..., balance_indexes] >= 0.0)
+        & (lending_age[..., balance_indexes] <= 20.0),
+        axis=-1,
+    )
+    shortable = rate_recent | balance_recent
     initial_reference_price = np.asarray(
         store.read("prior_reference_close", np.asarray([indices[0]], dtype=np.int64))[
             0
@@ -755,6 +807,8 @@ def _evaluation_inputs(
         score_mask=np.asarray(score_mask, dtype=np.bool_),
         scaled_midrank_targets=scaled_targets,
         scaled_target_mask=scaled_target_mask,
+        neutral_midrank_targets=neutral_targets,
+        neutral_target_mask=neutral_target_mask,
         shareholder_midrank_targets=shareholder_targets,
         shareholder_simple_returns=shareholder_returns,
         shareholder_target_mask=shareholder_target_mask,
@@ -793,6 +847,8 @@ def _evaluation_inputs(
             dtype=np.bool_,
         ),
         action_alignment="retrospective",
+        annual_borrow_rate_by_name=annual_borrow_rate_by_name,
+        shortable=shortable,
     )
 
 
@@ -837,18 +893,23 @@ def _evaluation_summary(
         if isinstance(row, Mapping)
         and row.get("cost_bps_per_side") == 4.0
         and row.get("annual_borrow_rate") == 0.02
+        and row.get("borrow_source") == "uniform"
     )
     headline_report = economics["headline"]
     assert isinstance(headline_report, Mapping)
     return {
         "report": str(report_path),
         "report_sha256": report_sha256,
-        "mean_daily_primary_scaled_target_ic": result.report[
-            "mean_daily_primary_scaled_target_ic"
+        "mean_daily_primary_neutral_target_ic": result.report[
+            "mean_daily_primary_neutral_target_ic"
         ],
-        "daily_primary_scaled_target_ic": [
+        "daily_primary_neutral_target_ic": [
             _finite_or_none(value) for value in result.daily_primary_ic
         ],
+        "legacy_scaled_target_ic": {
+            f"D{row['horizon_sessions']}": row["legacy_scaled_target_ic"]
+            for row in result.report["horizon_readouts"]
+        },
         "headline_economics": {**dict(headline), **dict(headline_report)},
     }
 
@@ -858,6 +919,66 @@ def _finite_or_none(value: float) -> float | None:
     return value if np.isfinite(value) else None
 
 
+def _legacy_round1_baseline_identity(
+    baseline_records: Sequence[Mapping[str, object]],
+    *,
+    prior_root: Path,
+    prior_result_sha256: str,
+    prior_inventory_sha256: str,
+) -> dict[str, object]:
+    """Compare every legacy naive IC with the hash-bound rev-2 Round-1 artifact."""
+
+    root = prior_root.resolve(strict=True)
+    result_path = root / "round1_result.json"
+    inventory_path = root / "artifact_inventory.json"
+    if sha256_file(result_path) != prior_result_sha256.casefold():
+        raise ValueError("legacy Round-1 result SHA-256 mismatch")
+    if sha256_file(inventory_path) != prior_inventory_sha256.casefold():
+        raise ValueError("legacy Round-1 inventory SHA-256 mismatch")
+    mismatches: list[str] = []
+    compared = 0
+    for record in baseline_records:
+        name = str(record.get("name"))
+        fold = str(record.get("fold"))
+        evaluation = record.get("evaluation")
+        current = (
+            evaluation.get("legacy_scaled_target_ic")
+            if isinstance(evaluation, Mapping)
+            else None
+        )
+        path = root / "baselines" / name / fold / "evaluation.json"
+        if not path.is_file() or not isinstance(current, Mapping):
+            mismatches.append(f"{name}:{fold}:missing")
+            continue
+        prior = json.loads(path.read_text(encoding="utf-8"))
+        if (
+            prior.get("official_validation_accessed") is not False
+            or prior.get("test_accessed") is not False
+        ):
+            raise PermissionError("legacy Round-1 baseline has protected access")
+        rows = prior.get("horizon_readouts")
+        if not isinstance(rows, list):
+            mismatches.append(f"{name}:{fold}:horizon_rows_missing")
+            continue
+        expected = {
+            f"D{row['horizon_sessions']}": row.get("mean_scaled_target_spearman_ic")
+            for row in rows
+            if isinstance(row, Mapping) and "horizon_sessions" in row
+        }
+        compared += len(expected)
+        if dict(current) != expected:
+            mismatches.append(f"{name}:{fold}:legacy_ic_differs")
+    return {
+        "passed": not mismatches and compared == 15 * len(HORIZONS),
+        "comparison_count": compared,
+        "expected_comparison_count": 15 * len(HORIZONS),
+        "mismatches": mismatches,
+        "prior_root": str(root),
+        "prior_result_sha256": prior_result_sha256.casefold(),
+        "prior_inventory_sha256": prior_inventory_sha256.casefold(),
+    }
+
+
 def _development_acceptance(
     *,
     baseline_records: Sequence[Mapping[str, object]],
@@ -865,6 +986,7 @@ def _development_acceptance(
     action_terms_source: object,
     schedule_source: object,
     native_fast_audit_passed: bool = True,
+    legacy_round1_identity: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     expected = {
         (fold, name) for fold in ("F1", "F2", "F3") for name in _BASELINE_SIGNAL_SIGNS
@@ -886,7 +1008,7 @@ def _development_acceptance(
             evaluation = record.get("evaluation")
             if not isinstance(evaluation, Mapping):
                 continue
-            daily = evaluation.get("daily_primary_scaled_target_ic")
+            daily = evaluation.get("daily_primary_neutral_target_ic")
             if not isinstance(daily, list):
                 continue
             values.extend(float(value) for value in daily if value is not None)
@@ -896,6 +1018,30 @@ def _development_acceptance(
             violations.append(f"{name}_pooled_ic_undefined")
         elif abs(point) >= 0.10:
             violations.append(f"{name}_absolute_pooled_ic_not_below_0_10")
+
+    inverse_volatility_by_fold: dict[str, float | None] = {}
+    for fold in ("F1", "F2", "F3"):
+        values: list[float] = []
+        for record in baseline_records:
+            if (
+                record.get("name") != "inverse_volatility_20"
+                or record.get("fold") != fold
+            ):
+                continue
+            evaluation = record.get("evaluation")
+            daily = (
+                evaluation.get("daily_primary_neutral_target_ic")
+                if isinstance(evaluation, Mapping)
+                else None
+            )
+            if isinstance(daily, list):
+                values.extend(float(value) for value in daily if value is not None)
+        point = float(np.mean(values)) if values else None
+        inverse_volatility_by_fold[fold] = point
+        if point is None or abs(point) >= 0.02:
+            violations.append(
+                f"inverse_volatility_20_{fold}_absolute_neutral_ic_not_below_0_02"
+            )
 
     reversal_records = [
         record for record in baseline_records if record.get("name") == "reversal_5"
@@ -1057,6 +1203,11 @@ def _development_acceptance(
         violations.append("schedule_source_is_not_reconstructed_v1")
     if not native_fast_audit_passed:
         violations.append("independent_native_fast_20x20_audit_missing_or_failed")
+    if (
+        legacy_round1_identity is not None
+        and legacy_round1_identity.get("passed") is not True
+    ):
+        violations.append("legacy_scaled_target_ic_differs_from_round1")
 
     return {
         "status": (
@@ -1086,7 +1237,9 @@ def _development_acceptance(
             "per_evaluation_mean_unresolved_stale_inventory_fraction_strictly_below": 0.02,
             "terminal_settlement_economics_unresolved_fraction_nav": 0.15,
         },
-        "naive_pooled_primary_scaled_target_ic": pooled_ic,
+        "naive_pooled_primary_neutral_target_ic": pooled_ic,
+        "inverse_volatility_neutral_ic_by_fold": inverse_volatility_by_fold,
+        "inverse_volatility_absolute_neutral_ic_strictly_below": 0.02,
         "reversal_5_definition_negative_signed": reversal_definition_ok,
         "economics_by_evaluation": economics_rows,
         "mean_unresolved_stale_inventory_fraction_nav_across_evaluations": (
@@ -1098,6 +1251,9 @@ def _development_acceptance(
             "historically_executable_borrow",
         ],
         "independent_native_fast_20x20_audit_passed": native_fast_audit_passed,
+        "legacy_round1_baseline_identity": (
+            None if legacy_round1_identity is None else dict(legacy_round1_identity)
+        ),
     }
 
 
@@ -1355,19 +1511,19 @@ def _run_gbdt(
         if train_features.shape[-1] != len(feature_names):
             raise ValueError("GBDT feature names differ from the assembled width")
         train_mask = _window_target_mask(
-            store.read("target_valid", train_indices),
+            store.read(REGISTERED_PRIMARY_TARGET_MASK, train_indices),
             train_indices,
             target_window_indices=fit_target_window_indices[fold],
         )
         train_targets = store.read_target(
-            "target_primary", train_indices, valid_mask=train_mask
+            REGISTERED_PRIMARY_TARGET, train_indices, valid_mask=train_mask
         )
         selection_mask = _window_target_mask(
-            store.read("target_valid", selection_rows),
+            store.read(REGISTERED_PRIMARY_TARGET_MASK, selection_rows),
             selection_rows,
         )
         selection_targets = store.read_target(
-            "target_primary", selection_rows, valid_mask=selection_mask
+            REGISTERED_PRIMARY_TARGET, selection_rows, valid_mask=selection_mask
         )
         active = np.asarray(store.read("active", evaluation_rows), dtype=np.bool_)
         score_mask = np.repeat(active[..., None], len(HORIZONS), axis=-1)
@@ -1414,6 +1570,8 @@ def _run_gbdt(
                 "fit_date_indices": train_indices.tolist(),
                 "selection_date_indices": selection_rows.tolist(),
                 "evaluation_date_indices": evaluation_rows.tolist(),
+                "target_value_array": REGISTERED_PRIMARY_TARGET,
+                "target_validity_array": REGISTERED_PRIMARY_TARGET_MASK,
             },
         )
         result, report_sha = _evaluate_and_write(
@@ -2260,6 +2418,9 @@ def run_pipeline_validation(
     enabled_sidecars: Sequence[str] = (),
     native_fast_audit_path: Path | None = None,
     native_fast_audit_sha256: str | None = None,
+    legacy_round1_root: Path | None = None,
+    legacy_round1_result_sha256: str | None = None,
+    legacy_round1_inventory_sha256: str | None = None,
 ) -> PipelineValidationResult:
     """Run only the development-fold integration checks required by v2 section 11.
 
@@ -2386,6 +2547,22 @@ def run_pipeline_validation(
             runtime=runtime,
             sidecars=sidecars,
         )
+        legacy_bindings = (
+            legacy_round1_root,
+            legacy_round1_result_sha256,
+            legacy_round1_inventory_sha256,
+        )
+        if any(value is not None for value in legacy_bindings):
+            if any(value is None for value in legacy_bindings):
+                raise ValueError("legacy Round-1 identity requires all three bindings")
+            legacy_identity = _legacy_round1_baseline_identity(
+                baseline_records,
+                prior_root=legacy_round1_root,
+                prior_result_sha256=legacy_round1_result_sha256,
+                prior_inventory_sha256=legacy_round1_inventory_sha256,
+            )
+        else:
+            legacy_identity = None
         protocol_hashes = {
             name: {
                 "path": str(PROTOCOL_CONFIG_ROOT / f"{name}.json"),
@@ -2399,6 +2576,7 @@ def run_pipeline_validation(
             action_terms_source=store_metadata.get("action_terms_source"),
             schedule_source=store_metadata.get("schedule_source"),
             native_fast_audit_passed=native_fast_audit is not None,
+            legacy_round1_identity=legacy_identity,
         )
         manifest_path = output / "pipeline_validation_manifest.json"
         manifest_sha = write_json_atomic(
@@ -2426,6 +2604,7 @@ def run_pipeline_validation(
                     },
                     "cdi": cdi_provenance,
                     "native_fast_raw_audit": native_fast_audit,
+                    "legacy_round1_baseline_reference": legacy_identity,
                 },
                 "date_contract": {
                     "minimum_date": min(requested_dates).isoformat(),
@@ -3102,6 +3281,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--native-fast-audit", type=Path)
     parser.add_argument("--native-fast-audit-sha256")
+    parser.add_argument("--legacy-round1-root", type=Path)
+    parser.add_argument("--legacy-round1-result-sha256")
+    parser.add_argument("--legacy-round1-inventory-sha256")
     parser.add_argument(
         "--store-manifest-sha256",
         help="Exact sealed-store manifest hash required for a network continuation.",
@@ -3227,6 +3409,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             enabled_sidecars=arguments.sidecar,
             native_fast_audit_path=arguments.native_fast_audit,
             native_fast_audit_sha256=arguments.native_fast_audit_sha256,
+            legacy_round1_root=arguments.legacy_round1_root,
+            legacy_round1_result_sha256=arguments.legacy_round1_result_sha256,
+            legacy_round1_inventory_sha256=(arguments.legacy_round1_inventory_sha256),
         )
     print(
         json.dumps(

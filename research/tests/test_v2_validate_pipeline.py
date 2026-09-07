@@ -72,6 +72,15 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
             "intraday_valid": np.ones_like(intraday, dtype=np.bool_),
             "intraday_age_sessions": np.zeros_like(intraday, dtype=np.float32),
             "fast_present": np.zeros((day_count, name_count), dtype=np.bool_),
+            "sidecar_lending_values": np.full(
+                (day_count, name_count, 1), np.arcsinh(2.0), dtype=np.float32
+            ),
+            "sidecar_lending_valid": np.ones(
+                (day_count, name_count, 1), dtype=np.bool_
+            ),
+            "sidecar_lending_age_sessions": np.zeros(
+                (day_count, name_count, 1), dtype=np.float32
+            ),
             "target_primary": targets,
             "target_valid": np.ones_like(targets, dtype=np.bool_),
             "target_shareholder_midrank": targets.copy(),
@@ -102,6 +111,7 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         feature_names={
             "slow": list(SLOW_FEATURES),
             "intraday": [f"intraday_{index}" for index in range(20)],
+            "sidecar_lending": ["loan_rate"],
         },
         sources=[{"path": "fixture", "sha256": "a" * 64}],
         metadata={
@@ -1065,7 +1075,7 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
             "name": name,
             "signal_definition_sign": pipeline._BASELINE_SIGNAL_SIGNS[name],
             "evaluation": {
-                "daily_primary_scaled_target_ic": [0.01, None, -0.005],
+                "daily_primary_neutral_target_ic": [0.01, None, -0.005],
                 "headline_economics": economics,
             },
         }
@@ -1077,7 +1087,7 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
             "engine": "gbdt",
             "fold": "F1",
             "evaluation": {
-                "daily_primary_scaled_target_ic": [0.01],
+                "daily_primary_neutral_target_ic": [0.01],
                 "headline_economics": economics,
             },
         }
@@ -1096,7 +1106,7 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
     labelled[0] = {
         **labelled[0],
         "evaluation": {
-            "daily_primary_scaled_target_ic": [0.01],
+            "daily_primary_neutral_target_ic": [0.01],
             "headline_economics": {**economics, "mean_gross_fraction_nav": 1.7},
         },
     }
@@ -1117,7 +1127,7 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
     broken[0] = {
         **broken[0],
         "evaluation": {
-            "daily_primary_scaled_target_ic": [0.01],
+            "daily_primary_neutral_target_ic": [0.01],
             "headline_economics": {**economics, "mean_gross_fraction_nav": 1.4},
         },
     }
@@ -1136,7 +1146,7 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
     breached[0] = {
         **breached[0],
         "evaluation": {
-            "daily_primary_scaled_target_ic": [0.01],
+            "daily_primary_neutral_target_ic": [0.01],
             "headline_economics": {
                 **economics,
                 "entry_defect_signatures": breached_signatures,
@@ -1151,6 +1161,65 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
     )
     assert signature_rejected["status"] == "unsupported"
     assert any("deployed_gross" in value for value in signature_rejected["reasons"])
+
+
+def test_legacy_round1_baseline_identity_is_hash_bound_and_exact(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "round1"
+    root.mkdir()
+    result = root / "round1_result.json"
+    inventory = root / "artifact_inventory.json"
+    result.write_text("{}", encoding="utf-8")
+    inventory.write_text("{}", encoding="utf-8")
+    records = []
+    expected = {f"D{horizon}": 0.001 * horizon for horizon in HORIZONS}
+    for fold in ("F1", "F2", "F3"):
+        for name in pipeline._BASELINE_SIGNAL_SIGNS:
+            path = root / "baselines" / name / fold / "evaluation.json"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                json.dumps(
+                    {
+                        "official_validation_accessed": False,
+                        "test_accessed": False,
+                        "horizon_readouts": [
+                            {
+                                "horizon_sessions": horizon,
+                                "mean_scaled_target_spearman_ic": expected[
+                                    f"D{horizon}"
+                                ],
+                            }
+                            for horizon in HORIZONS
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            records.append(
+                {
+                    "name": name,
+                    "fold": fold,
+                    "evaluation": {"legacy_scaled_target_ic": expected},
+                }
+            )
+    identity = pipeline._legacy_round1_baseline_identity(
+        records,
+        prior_root=root,
+        prior_result_sha256=sha256_file(result),
+        prior_inventory_sha256=sha256_file(inventory),
+    )
+    assert identity["passed"] is True
+    assert identity["comparison_count"] == 15 * len(HORIZONS)
+    records[0]["evaluation"] = {"legacy_scaled_target_ic": {**expected, "D1": 0.5}}
+    changed = pipeline._legacy_round1_baseline_identity(
+        records,
+        prior_root=root,
+        prior_result_sha256=sha256_file(result),
+        prior_inventory_sha256=sha256_file(inventory),
+    )
+    assert changed["passed"] is False
+    assert changed["mismatches"] == ["reversal_5:F1:legacy_ic_differs"]
 
 
 def test_ledger_replay_comparison_excludes_only_economics_and_schema() -> None:

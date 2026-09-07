@@ -18,6 +18,8 @@ from .contract import (
     FINETUNE_START,
     HORIZONS,
     PRETRAIN_END,
+    REGISTERED_PRIMARY_TARGET,
+    REGISTERED_PRIMARY_TARGET_MASK,
     STORE_START,
     V1_STORE_V2_ZERO_SLOW_FIELDS,
 )
@@ -55,21 +57,19 @@ class ScalarFeatureView:
     age_sessions: NDArray[np.float32]
 
 
-def scalar_feature_names(
-    store: V2Store, families: Sequence[str]
-) -> tuple[str, ...]:
+def scalar_feature_names(store: V2Store, families: Sequence[str]) -> tuple[str, ...]:
     """Resolve requested scalar families in canonical FeatureSpec order."""
 
     requested = set(families)
     if len(requested) != len(families):
         raise ValueError("scalar feature families must be unique")
     allowed = {"slow", "intraday"} | {
-        key
-        for key in requested
-        if isinstance(key, str) and key.startswith("sidecar_")
+        key for key in requested if isinstance(key, str) and key.startswith("sidecar_")
     }
     if requested - allowed:
-        raise ValueError(f"unsupported scalar feature families: {sorted(requested - allowed)}")
+        raise ValueError(
+            f"unsupported scalar feature families: {sorted(requested - allowed)}"
+        )
     ordered = tuple(
         family for family in ("slow", "intraday") if family in requested
     ) + tuple(sorted(family for family in requested if family.startswith("sidecar_")))
@@ -127,9 +127,10 @@ def read_scalar_feature_view(
             or family_age.shape != family_values.shape
         ):
             raise ValueError(f"{family} scalar feature arrays are misaligned")
-        if np.isinf(family_values).any() or not np.isfinite(
-            family_values[family_valid]
-        ).all():
+        if (
+            np.isinf(family_values).any()
+            or not np.isfinite(family_values[family_valid]).all()
+        ):
             raise ValueError(f"{family} has non-finite values marked available")
         if (
             not np.isfinite(family_age).all()
@@ -164,8 +165,10 @@ def read_scalar_feature_view(
 
 def collate_v2_daily(
     samples: Sequence[Mapping[str, object]],
+    *,
+    fixed_fast_name_count: int | None = None,
 ) -> dict[str, object]:
-    """Collate full daily panels while padding only the sparse fast-name axis."""
+    """Collate daily panels on one stage-fixed sparse fast-name axis."""
 
     if not samples:
         raise ValueError("cannot collate an empty v2 batch")
@@ -207,11 +210,18 @@ def collate_v2_daily(
         compact.append(fields)
         max_fast_names = max(max_fast_names, fast_count)
 
+    if fixed_fast_name_count is not None:
+        if fixed_fast_name_count <= 0 or fixed_fast_name_count % 16:
+            raise ValueError("fixed fast-name count must be a positive multiple of 16")
+        if max_fast_names > fixed_fast_name_count:
+            raise ValueError(
+                "batch fast-name count exceeds the registered stage padding width"
+            )
+        max_fast_names = fixed_fast_name_count
+
     assert patch_shape is not None
     patch_count, channel_count = patch_shape
-    padded: dict[str, list[torch.Tensor]] = {
-        key: [] for key in _COMPACT_FAST_KEYS
-    }
+    padded: dict[str, list[torch.Tensor]] = {key: [] for key in _COMPACT_FAST_KEYS}
     for fields in compact:
         fast_count = fields["fast_name_index"].shape[0]
         values = np.zeros(
@@ -248,9 +258,23 @@ def collate_v2_daily(
     return result
 
 
-def _validate_stage_dates(
-    selected_dates: NDArray[np.datetime64], stage: Stage
-) -> None:
+def stage_fast_name_count(*datasets: "V2DailyDataset") -> int:
+    """Return the fixed stage name width: maximum active names rounded to 16."""
+
+    if not datasets:
+        raise ValueError("at least one dataset is required")
+    maximum = 0
+    for dataset in datasets:
+        active = np.asarray(
+            dataset.store.read("active", dataset.date_indices), dtype=np.bool_
+        )
+        maximum = max(maximum, int(active.sum(axis=1).max(initial=0)))
+    if maximum <= 0:
+        raise ValueError("stage contains no active names")
+    return ((maximum + 15) // 16) * 16
+
+
+def _validate_stage_dates(selected_dates: NDArray[np.datetime64], stage: Stage) -> None:
     dates = np.asarray(selected_dates, dtype="datetime64[D]")
     pretrain = (dates >= np.datetime64(STORE_START)) & (
         dates <= np.datetime64(PRETRAIN_END)
@@ -398,7 +422,9 @@ def lazy_slow_window(
     if end_index >= source.shape[0]:
         raise IndexError("slow end index exceeds store")
     start = max(0, end_index - lookback + 1)
-    sample = np.asarray(source[start : end_index + 1], dtype=np.float32).transpose(1, 0, 2)
+    sample = np.asarray(source[start : end_index + 1], dtype=np.float32).transpose(
+        1, 0, 2
+    )
     sample_valid = mask[start : end_index + 1].transpose(1, 0, 2)
     sample_timesteps = timesteps[start : end_index + 1].transpose(1, 0)
     sample_age = ages[start : end_index + 1].transpose(1, 0, 2)
@@ -406,9 +432,7 @@ def lazy_slow_window(
     output[:, offset:] = np.where(sample_valid, sample, 0.0)
     output_valid[:, offset:] = sample_valid
     history_mask[:, offset:] = sample_timesteps
-    output_age[:, offset:] = np.where(
-        sample_timesteps[..., None], sample_age, -1.0
-    )
+    output_age[:, offset:] = np.where(sample_timesteps[..., None], sample_age, -1.0)
     return output, output_valid, history_mask, output_age
 
 
@@ -455,6 +479,8 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         self.date_indices = np.asarray(date_indices, dtype=np.int64)
         self.stage = stage
         self.lookback = lookback
+        self.primary_target_name = REGISTERED_PRIMARY_TARGET
+        self.primary_target_mask_name = REGISTERED_PRIMARY_TARGET_MASK
         if len(set(enabled_sidecars)) != len(enabled_sidecars):
             raise ValueError("enabled sidecar groups must be unique")
         self.enabled_sidecars = tuple(sorted(enabled_sidecars))
@@ -465,9 +491,8 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         )
         if target_indices.ndim != 1 or not target_indices.size:
             raise ValueError("target window indices must be a nonempty vector")
-        if (
-            np.unique(target_indices).size != target_indices.size
-            or np.any(np.diff(target_indices) <= 0)
+        if np.unique(target_indices).size != target_indices.size or np.any(
+            np.diff(target_indices) <= 0
         ):
             raise ValueError(
                 "target window indices must be strictly ordered and unique"
@@ -486,8 +511,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         if isinstance(store, V2Store):
             self.store = store
             if np.any(
-                (self.date_indices < 0)
-                | (self.date_indices >= self.store.dates.size)
+                (self.date_indices < 0) | (self.date_indices >= self.store.dates.size)
             ):
                 raise ValueError("date indices are outside the store")
             required_indices = required_store_date_indices(
@@ -507,9 +531,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
                 )
             selected_dates = self.store.dates[self.date_indices]
             _validate_stage_dates(selected_dates, stage)
-            requested = tuple(
-                sorted(selected_dates.astype(object).tolist())
-            )
+            requested = tuple(sorted(selected_dates.astype(object).tolist()))
             token_path = registration_path
             if (
                 token_path is None
@@ -528,9 +550,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             date_axis = np.load(
                 store_path / "date_index.npy", allow_pickle=False
             ).astype("datetime64[D]", copy=False)
-            if np.any(
-                (self.date_indices < 0) | (self.date_indices >= date_axis.size)
-            ):
+            if np.any((self.date_indices < 0) | (self.date_indices >= date_axis.size)):
                 raise ValueError("date indices are outside the store")
             _validate_stage_dates(date_axis[self.date_indices], stage)
             history_offsets = causal_history_end_offsets(
@@ -567,9 +587,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             | (self.target_window_indices >= self.store.dates.size)
         ):
             raise ValueError("target window indices are outside the store")
-        if not set(self.date_indices.tolist()).issubset(
-            self._target_date_indices
-        ):
+        if not set(self.date_indices.tolist()).issubset(self._target_date_indices):
             raise ValueError("every sample date must be inside its target window")
         self.store.array_shape("slow_values")
         self.store.array_shape("slow_valid")
@@ -623,9 +641,9 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             mapping = self.store.read_table("native_fast_security_mapping").sort(
                 "fast_index"
             )
-            self._native_fast_store_indices = mapping.get_column(
-                "store_name_index"
-            ).to_numpy().astype(np.int64)
+            self._native_fast_store_indices = (
+                mapping.get_column("store_name_index").to_numpy().astype(np.int64)
+            )
             if not np.array_equal(
                 mapping.get_column("fast_index").to_numpy(),
                 np.arange(value_shape[1], dtype=np.int64),
@@ -688,24 +706,25 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             or ready.dtype != np.bool_
         ):
             raise ValueError("external v1 fast arrays have the wrong contract")
-        date_mapping = self.store.read_table(
-            "v1_fast_date_mapping", self.date_indices
-        )
+        date_mapping = self.store.read_table("v1_fast_date_mapping", self.date_indices)
         isin_mapping = self.store.read_table("v1_fast_isin_mapping")
         for target, source in date_mapping.select(
             "v2_date_index", "v1_date_index"
         ).iter_rows():
-            if not 0 <= target < self.store.dates.size or not 0 <= source < features.shape[0]:
+            if (
+                not 0 <= target < self.store.dates.size
+                or not 0 <= source < features.shape[0]
+            ):
                 raise ValueError("external v1 date mapping is outside its axes")
             if self._fast_date_mapping[target] >= 0:
                 raise ValueError("external v1 date mapping is not one-to-one")
             self._fast_date_mapping[target] = source
-        self._fast_v2_slots = isin_mapping.get_column(
-            "v2_isin_index"
-        ).to_numpy().astype(np.int64)
-        self._fast_v1_slots = isin_mapping.get_column(
-            "v1_equity_slot"
-        ).to_numpy().astype(np.int64)
+        self._fast_v2_slots = (
+            isin_mapping.get_column("v2_isin_index").to_numpy().astype(np.int64)
+        )
+        self._fast_v1_slots = (
+            isin_mapping.get_column("v1_equity_slot").to_numpy().astype(np.int64)
+        )
         if (
             len(set(self._fast_v2_slots.tolist())) != self._fast_v2_slots.size
             or len(set(self._fast_v1_slots.tolist())) != self._fast_v1_slots.size
@@ -871,9 +890,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
                 dtype=np.bool_,
             )
             source_ready &= stored_present
-        minute_valid = np.broadcast_to(
-            source_ready[:, None], source.shape[:2]
-        )
+        minute_valid = np.broadcast_to(source_ready[:, None], source.shape[:2])
         source_patches, source_patch_mask = pack_fast_patches(source, minute_valid)
         source_valid = np.broadcast_to(
             source_patch_mask[..., None], source_patches.shape
@@ -939,9 +956,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             fast_present,
         ) = self._fast(date_index)
         v1_equity_slow = self._v1_equity_slow(date_index, fast_name_index)
-        active = np.asarray(
-            self.store.read("active", date_index), dtype=np.bool_
-        )
+        active = np.asarray(self.store.read("active", date_index), dtype=np.bool_)
         current_view = read_scalar_feature_view(
             self.store, np.asarray([date_index], dtype=np.int64), ("intraday",)
         )
@@ -966,7 +981,12 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             "current_feature_age_sessions": current_view.age_sessions[0],
         }
         target_pairs = (
-            ("target_primary", "target_valid", "targets", "target_mask"),
+            (
+                REGISTERED_PRIMARY_TARGET,
+                REGISTERED_PRIMARY_TARGET_MASK,
+                "targets",
+                "target_mask",
+            ),
             (
                 "target_shareholder_midrank",
                 "target_shareholder_valid",
@@ -1006,7 +1026,9 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         )
         target_masks: dict[str, NDArray[np.bool_]] = {}
         for _, mask_source, _, mask_destination in target_pairs:
-            if mask_destination in target_masks or not self.store.has_array(mask_source):
+            if mask_destination in target_masks or not self.store.has_array(
+                mask_source
+            ):
                 continue
             clipped = np.asarray(
                 self.store.read(mask_source, date_index), dtype=np.bool_

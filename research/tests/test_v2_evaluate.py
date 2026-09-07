@@ -66,6 +66,8 @@ def _fixture() -> EvaluationInputs:
         score_mask=score_mask,
         scaled_midrank_targets=scaled_rank,
         scaled_target_mask=target_mask,
+        neutral_midrank_targets=scaled_rank.copy(),
+        neutral_target_mask=target_mask.copy(),
         shareholder_midrank_targets=shareholder_rank,
         shareholder_simple_returns=shareholder_return,
         shareholder_target_mask=target_mask.copy(),
@@ -93,15 +95,17 @@ def _fixture() -> EvaluationInputs:
         cdi_returns=np.zeros(len(dates)),
         transfer_chronology_clean=True,
         source_artifact_hashes={"store_manifest": "a" * 64},
+        annual_borrow_rate_by_name=np.full(matrix_shape, 0.02),
+        shortable=np.ones(matrix_shape, dtype=np.bool_),
     )
 
 
 def test_harness_metrics_are_nontrivial_on_rotating_fixture() -> None:
     report = evaluate_scores(_fixture(), window_name="F2").report
 
-    assert 0.0 < report["mean_daily_primary_scaled_target_ic"] < 1.0
+    assert 0.0 < report["mean_daily_primary_neutral_target_ic"] < 1.0
     for row in report["horizon_readouts"]:
-        assert 0.0 < abs(row["mean_scaled_target_spearman_ic"]) < 1.0
+        assert 0.0 < abs(row["mean_neutral_target_spearman_ic"]) < 1.0
         assert 0.0 < abs(row["mean_shareholder_rank_ic"]) < 1.0
         assert 0.0 < abs(row["mean_price_return_rank_ic"]) < 1.0
         assert row["mean_shareholder_return_spread_total_bps"] != 0.0
@@ -136,10 +140,12 @@ def test_target_mask_never_becomes_the_economics_score_mask() -> None:
     after = evaluate_scores(changed, window_name="F2").report
 
     assert (
-        before["mean_daily_primary_scaled_target_ic"]
-        == after["mean_daily_primary_scaled_target_ic"]
+        before["mean_daily_primary_neutral_target_ic"]
+        == after["mean_daily_primary_neutral_target_ic"]
     )
-    assert before["horizon_readouts"] == after["horizon_readouts"]
+    assert [
+        row["mean_neutral_target_spearman_ic"] for row in before["horizon_readouts"]
+    ] == [row["mean_neutral_target_spearman_ic"] for row in after["horizon_readouts"]]
     assert before["economics"] == after["economics"]
     assert before["mask_coverage"]["economics_score_mask_true"] == 25 * 60
 
@@ -161,7 +167,7 @@ def test_return_family_ics_use_their_own_target_masks() -> None:
     ).report
     first = report["daily_metric_table"][0]
 
-    assert first["scaled_target_valid_name_count"] == 59
+    assert first["neutral_target_valid_name_count"] == 59
     assert first["shareholder_rank_valid_name_count"] == 60
     assert first["price_return_rank_valid_name_count"] == 59
     assert first["shareholder_return_spread_valid_name_count"] == 60
@@ -389,7 +395,9 @@ def test_ledger_reports_every_evaluation_day_with_a_paid_cash_action() -> None:
     headline = [
         row
         for row in report["economics"]["daily_table"]
-        if row["cost_bps_per_side"] == 4.0 and row["annual_borrow_rate"] == 0.02
+        if row["cost_bps_per_side"] == 4.0
+        and row["annual_borrow_rate"] == 0.02
+        and row["borrow_source"] == "uniform"
     ]
     assert len(headline) == len(inputs.dates)
     assert {row["economics_resolved"] for row in headline} == {
@@ -402,7 +410,7 @@ def test_ledger_reports_every_evaluation_day_with_a_paid_cash_action() -> None:
 
 def test_primary_uses_one_four_head_population_and_twenty_name_minimum() -> None:
     inputs = _fixture()
-    target_mask = np.asarray(inputs.scaled_target_mask).copy()
+    target_mask = np.asarray(inputs.neutral_target_mask).copy()
     target_mask[0, :, :4] = False
     target_mask[0, :20, :4] = True
     # Each head has ten additional names, but those head-specific names must
@@ -411,7 +419,7 @@ def test_primary_uses_one_four_head_population_and_twenty_name_minimum() -> None
         target_mask[0, 20 + 10 * head : 30 + 10 * head, head] = True
 
     report = evaluate_scores(
-        replace(inputs, scaled_target_mask=target_mask), window_name="F2"
+        replace(inputs, neutral_target_mask=target_mask), window_name="F2"
     ).report
     primary = report["daily_primary_ic"][0]
     primary_rows = [
@@ -421,11 +429,11 @@ def test_primary_uses_one_four_head_population_and_twenty_name_minimum() -> None
         and row["horizon_sessions"] in (1, 2, 3, 5)
     ]
 
-    assert primary["common_scaled_outcome_name_count"] == 20
+    assert primary["common_neutral_outcome_name_count"] == 20
     assert primary["common_score_and_outcome_name_count"] == 20
     assert primary["used"] is True
     assert primary["undefined_reason"] is None
-    assert {row["scaled_target_valid_name_count"] for row in primary_rows} == {20}
+    assert {row["neutral_target_valid_name_count"] for row in primary_rows} == {20}
 
 
 def test_primary_reports_why_a_day_is_undefined_instead_of_averaging_heads() -> None:
@@ -436,27 +444,27 @@ def test_primary_reports_why_a_day_is_undefined_instead_of_averaging_heads() -> 
     report = evaluate_scores(replace(inputs, scores=scores), window_name="F2").report
     first = report["daily_primary_ic"][0]
 
-    assert first["primary_scaled_target_ic"] is None
+    assert first["primary_neutral_target_ic"] is None
     assert first["used"] is False
     assert first["undefined_reason"] == "D3:constant_score"
-    assert first["head_scaled_target_spearman_ic"]["D1"] is not None
-    assert first["head_scaled_target_spearman_ic"]["D3"] is None
+    assert first["head_neutral_target_spearman_ic"]["D1"] is not None
+    assert first["head_neutral_target_spearman_ic"]["D3"] is None
 
 
 def test_primary_reports_insufficient_common_support() -> None:
     inputs = _fixture()
-    target_mask = np.asarray(inputs.scaled_target_mask).copy()
+    target_mask = np.asarray(inputs.neutral_target_mask).copy()
     target_mask[0, :, :4] = False
     target_mask[0, :19, :4] = True
 
     report = evaluate_scores(
-        replace(inputs, scaled_target_mask=target_mask), window_name="F2"
+        replace(inputs, neutral_target_mask=target_mask), window_name="F2"
     ).report
     first = report["daily_primary_ic"][0]
 
-    assert first["common_scaled_outcome_name_count"] == 19
-    assert first["primary_scaled_target_ic"] is None
-    assert first["undefined_reason"] == "fewer_than_20_common_scaled_outcomes"
+    assert first["common_neutral_outcome_name_count"] == 19
+    assert first["primary_neutral_target_ic"] is None
+    assert first["undefined_reason"] == "fewer_than_20_common_neutral_outcomes"
 
 
 def test_all_five_horizon_diagnostic_intersects_d10_score_and_outcome() -> None:
@@ -515,7 +523,8 @@ def test_scaled_shareholder_and_price_rank_ics_are_separate() -> None:
     ).report
     first = report["daily_metric_table"][0]
 
-    assert first["scaled_target_spearman_ic"] > 0.0
+    assert first["neutral_target_spearman_ic"] > 0.0
+    assert first["legacy_scaled_target_ic"] > 0.0
     assert first["shareholder_rank_ic"] < 0.0
     assert first["price_return_rank_ic"] is None
     assert first["price_return_rank_ic_undefined_reason"] == "constant_target"

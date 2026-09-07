@@ -19,6 +19,7 @@ from brazil_rv.v2.contract import (
     FEATURE_AGE_CONTRACT,
     PRETRAIN_END,
     STORE_START,
+    TARGET_NEUTRALIZATION_FEATURES,
 )
 from brazil_rv.v2.data import V2DailyDataset
 from brazil_rv.v2.losses import (
@@ -111,9 +112,7 @@ def test_five_heads_are_primary_and_to_close_is_explicitly_opt_in() -> None:
         scores[..., :5], targets[..., :5], mask[..., :5]
     )
     default_with_aux_present = multi_horizon_loss_components(scores, targets, mask)
-    weighted = multi_horizon_loss_components(
-        scores, targets, mask, to_close_weight=0.2
-    )
+    weighted = multi_horizon_loss_components(scores, targets, mask, to_close_weight=0.2)
 
     assert torch.allclose(primary["total"], default_with_aux_present["total"])
     assert torch.allclose(
@@ -188,9 +187,7 @@ def test_microbatch_loss_and_gradients_match_full_effective_batch() -> None:
     micro_loss.backward()
 
     assert torch.allclose(micro_loss, full_loss, rtol=2e-6, atol=2e-6)
-    assert torch.allclose(
-        micro_scores.grad, full_scores.grad, rtol=3e-5, atol=3e-6
-    )
+    assert torch.allclose(micro_scores.grad, full_scores.grad, rtol=3e-5, atol=3e-6)
 
 
 def test_selection_uses_one_supported_population_for_all_primary_heads() -> None:
@@ -199,9 +196,9 @@ def test_selection_uses_one_supported_population_for_all_primary_heads() -> None
     targets = predictions.copy()
     mask = np.ones_like(predictions, dtype=bool)
     active = np.ones((1, 24), dtype=bool)
-    assert _common_primary_selection_score(predictions, targets, mask, active) == pytest.approx(
-        1.0
-    )
+    assert _common_primary_selection_score(
+        predictions, targets, mask, active
+    ) == pytest.approx(1.0)
 
     mask[0, :5, 3] = False
     with pytest.raises(ValueError, match="common four-head population"):
@@ -414,9 +411,7 @@ def test_accumulated_sam_matches_full_batch_update_and_advances_once() -> None:
     inputs = torch.randn(16, 3)
     targets = torch.randn(16, 2)
     full_optimizer = torch.optim.AdamW(full_model.parameters(), lr=1e-3)
-    accumulated_optimizer = torch.optim.AdamW(
-        accumulated_model.parameters(), lr=1e-3
-    )
+    accumulated_optimizer = torch.optim.AdamW(accumulated_model.parameters(), lr=1e-3)
     full_scheduler = torch.optim.lr_scheduler.StepLR(full_optimizer, step_size=1)
     accumulated_scheduler = torch.optim.lr_scheduler.StepLR(
         accumulated_optimizer, step_size=1
@@ -431,11 +426,11 @@ def test_accumulated_sam_matches_full_batch_update_and_advances_once() -> None:
     closures = tuple(
         (
             lambda start=start, stop=stop: (
-                accumulated_model(inputs[start:stop]) - targets[start:stop]
+                (accumulated_model(inputs[start:stop]) - targets[start:stop])
+                .square()
+                .sum()
+                / denominator
             )
-            .square()
-            .sum()
-            / denominator
         )
         for start, stop in ((0, 4), (4, 10), (10, 16))
     )
@@ -472,7 +467,9 @@ def test_accumulated_sam_matches_full_batch_update_and_advances_once() -> None:
 def test_sam_rejects_each_nonfinite_training_loss(failing_pass: int) -> None:
     model = nn.Linear(2, 1)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
-    before = {name: value.detach().clone() for name, value in model.state_dict().items()}
+    before = {
+        name: value.detach().clone() for name, value in model.state_dict().items()
+    }
     calls = 0
 
     def closure() -> torch.Tensor:
@@ -522,15 +519,73 @@ def test_fullgraph_compile_captures_gru_forward() -> None:
         fast_patch_mask=fast_mask,
         fast_name_index=torch.tensor([[0, 2], [1, -1]]),
         fast_state_position=torch.tensor([[5, 5], [5, 0]]),
-        fast_present=torch.tensor(
-            [[True, False, True], [False, True, False]]
-        ),
+        fast_present=torch.tensor([[True, False, True], [False, True, False]]),
         current_features=current_features,
         current_feature_mask=current_feature_mask,
         slow_feature_age_sessions=slow_feature_age_sessions,
         current_feature_age_sessions=current_feature_age_sessions,
     )
     assert fast_scores.shape == (2, 3, 6)
+
+
+def test_fixed_fast_padding_matches_eager_and_compiled_cpu() -> None:
+    config = ModelConfig(slow_feature_count=32, slow_lookback=20)
+    model = DailyMultiHorizonModel(config).eval()
+    batch_size, names, fast_width = 2, 3, 16
+    slow = torch.randn(batch_size, names, 20, 32)
+    slow_mask = torch.ones_like(slow, dtype=torch.bool)
+    timestep_mask = torch.ones(batch_size, names, 20, dtype=torch.bool)
+    active = torch.ones(batch_size, names, dtype=torch.bool)
+    current = torch.randn(batch_size, names, config.current_feature_count)
+    current_mask = torch.ones_like(current, dtype=torch.bool)
+    fast_values = torch.zeros(batch_size, fast_width, 5, 7)
+    fast_valid = torch.zeros_like(fast_values, dtype=torch.bool)
+    fast_mask = torch.zeros(batch_size, fast_width, 5, dtype=torch.bool)
+    fast_name_index = torch.full((batch_size, fast_width), -1, dtype=torch.int64)
+    fast_state_position = torch.zeros(batch_size, fast_width, dtype=torch.int64)
+    fast_present = torch.zeros(batch_size, names, dtype=torch.bool)
+    fast_values[:, :2] = torch.randn(batch_size, 2, 5, 7)
+    fast_valid[:, :2] = True
+    fast_mask[:, :2] = True
+    fast_name_index[:, :2] = torch.tensor([[0, 2], [1, 2]])
+    fast_state_position[:, :2] = 5
+    fast_present[0, [0, 2]] = True
+    fast_present[1, [1, 2]] = True
+    kwargs = {
+        "fast_patch_values": fast_values,
+        "fast_patch_valid": fast_valid,
+        "fast_patch_mask": fast_mask,
+        "fast_name_index": fast_name_index,
+        "fast_state_position": fast_state_position,
+        "fast_present": fast_present,
+        "current_features": current,
+        "current_feature_mask": current_mask,
+        "slow_feature_age_sessions": torch.zeros_like(slow),
+        "current_feature_age_sessions": torch.zeros_like(current),
+    }
+    with torch.no_grad():
+        eager = model(slow, slow_mask, timestep_mask, active, **kwargs)
+        unpadded_kwargs = {
+            **kwargs,
+            "fast_patch_values": fast_values[:, :2],
+            "fast_patch_valid": fast_valid[:, :2],
+            "fast_patch_mask": fast_mask[:, :2],
+            "fast_name_index": fast_name_index[:, :2],
+            "fast_state_position": fast_state_position[:, :2],
+        }
+        unpadded = model(slow, slow_mask, timestep_mask, active, **unpadded_kwargs)
+        compiled = compile_forward(model, backend="eager", mode=None)(
+            slow, slow_mask, timestep_mask, active, **kwargs
+        )
+    assert eager.shape == (batch_size, names, 6)
+    assert torch.isfinite(eager.square().mean())
+    torch.testing.assert_close(eager, unpadded, rtol=1e-5, atol=1e-6)
+    torch.testing.assert_close(compiled, eager)
+    targets = torch.rand(batch_size, names, 5)
+    target_mask = torch.ones_like(targets, dtype=torch.bool)
+    padded_loss = multi_horizon_loss(eager[..., :5], targets, target_mask)
+    unpadded_loss = multi_horizon_loss(unpadded[..., :5], targets, target_mask)
+    torch.testing.assert_close(padded_loss, unpadded_loss, rtol=1e-6, atol=1e-7)
 
 
 def _tracked_pretrain_loaders(tmp_path):
@@ -543,12 +598,8 @@ def _tracked_pretrain_loaders(tmp_path):
     fit, _, selection = pretrain_internal_split(np.arange(dates.size))
     generator = np.random.default_rng(19)
     name_count = 24
-    slow = generator.standard_normal((dates.size, name_count, 32)).astype(
-        np.float32
-    )
-    targets = generator.standard_normal((dates.size, name_count, 5)).astype(
-        np.float32
-    )
+    slow = generator.standard_normal((dates.size, name_count, 32)).astype(np.float32)
+    targets = generator.standard_normal((dates.size, name_count, 5)).astype(np.float32)
     intraday = generator.standard_normal(
         (dates.size, name_count, len(INTRADAY_DAILY_FEATURES))
     ).astype(np.float32)
@@ -560,18 +611,23 @@ def _tracked_pretrain_loaders(tmp_path):
             "slow_values": slow,
             "slow_valid": np.ones_like(slow, dtype=np.bool_),
             "slow_age_sessions": np.zeros_like(slow, dtype=np.float32),
-            "slow_timestep_valid": np.ones(
-                (dates.size, name_count), dtype=np.bool_
-            ),
+            "slow_timestep_valid": np.ones((dates.size, name_count), dtype=np.bool_),
             "intraday_values": intraday,
             "intraday_valid": np.ones_like(intraday, dtype=np.bool_),
             "intraday_age_sessions": np.zeros_like(intraday, dtype=np.float32),
             "active": np.ones((dates.size, name_count), dtype=np.bool_),
             "target_primary": targets,
             "target_valid": np.ones_like(targets, dtype=np.bool_),
+            "target_shareholder_midrank": targets,
+            "target_shareholder_simple_return": targets,
+            "target_shareholder_valid": np.ones_like(targets, dtype=np.bool_),
+            "target_scale_sigma": np.ones((dates.size, name_count), dtype=np.float32),
         },
         feature_names={
-            "slow": [f"slow_{index}" for index in range(32)],
+            "slow": [
+                *TARGET_NEUTRALIZATION_FEATURES,
+                *(f"slow_{index}" for index in range(3, 32)),
+            ],
             "intraday": list(INTRADAY_DAILY_FEATURES),
         },
         metadata={
@@ -623,6 +679,10 @@ def test_model_input_identity_requires_canonical_row_and_feature_age_contract(
     payload = _loader_input_payload(loader)
     assert payload is not None
     features = payload["features"]
+    assert payload["target"] == {
+        "value_array": "target_primary_neutral",
+        "validity_array": "target_primary_neutral_valid",
+    }
     assert features["decision_sample_schema"] == "BRAZIL_RV_V2_DECISION_SAMPLE_V2"
     assert features["decision_feature_contract"] == DECISION_FEATURE_CONTRACT
     assert features["feature_age_contract"] == FEATURE_AGE_CONTRACT
@@ -711,13 +771,12 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
         result.raw_patience_checkpoint, map_location="cpu", weights_only=False
     )
     first_state = raw_payload["model_state_dict"]
-    assert raw_payload["fast_initialization_provenance"] == manifest[
-        "fast_initialization_provenance"
-    ]
+    assert (
+        raw_payload["fast_initialization_provenance"]
+        == manifest["fast_initialization_provenance"]
+    )
     assert raw_payload["transfer_chronology_clean"] is True
-    assert raw_payload["feature_schema_sha256"] == manifest[
-        "feature_schema_sha256"
-    ]
+    assert raw_payload["feature_schema_sha256"] == manifest["feature_schema_sha256"]
     repeated_state = torch.load(
         repeated.raw_patience_checkpoint, map_location="cpu", weights_only=False
     )["model_state_dict"]
@@ -874,27 +933,21 @@ def test_stage_input_contract_rejects_overlap_and_wrong_f_purge() -> None:
         canonical_splits=canonical,
     )
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
-    _validate_tracked_stage_inputs(
-        "F", "F1", config, training, valid_selection
-    )
+    _validate_tracked_stage_inputs("F", "F1", config, training, valid_selection)
     overlap = dict(valid_selection)
     overlap["dates"] = {
         **valid_selection["dates"],
         "first_index": 9,
     }
     with pytest.raises(ValueError, match="ordered and disjoint"):
-        _validate_tracked_stage_inputs(
-            "F", "F1", config, training, overlap
-        )
+        _validate_tracked_stage_inputs("F", "F1", config, training, overlap)
     short_embargo = dict(valid_selection)
     short_embargo["dates"] = {
         **valid_selection["dates"],
         "first_index": 19,
     }
     with pytest.raises(ValueError, match="10-session purge"):
-        _validate_tracked_stage_inputs(
-            "F", "F1", config, training, short_embargo
-        )
+        _validate_tracked_stage_inputs("F", "F1", config, training, short_embargo)
 
 
 def test_stage_input_contract_rejects_wrong_p_embargo_and_boundaries() -> None:
@@ -1005,7 +1058,7 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
             },
             "purge_after": {"first_index": 185, "last_index": 194},
             "evaluation": {"first_index": 195, "last_index": 200},
-        }
+        },
     }
     training = _tracked_input(
         first_index=0,
@@ -1047,12 +1100,8 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
         )
     ]
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
-    _validate_tracked_stage_inputs(
-        "J", "F1", config, training, selection
-    )
+    _validate_tracked_stage_inputs("J", "F1", config, training, selection)
 
     training["segments"] = list(reversed(training["segments"]))
     with pytest.raises(ValueError, match="ordered P/F training"):
-        _validate_tracked_stage_inputs(
-            "J", "F1", config, training, selection
-        )
+        _validate_tracked_stage_inputs("J", "F1", config, training, selection)

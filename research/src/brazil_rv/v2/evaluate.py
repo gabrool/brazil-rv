@@ -22,7 +22,11 @@ from brazil_rv.modeling.metrics import average_ranks, moving_block_bootstrap
 
 from .artifacts import write_json_atomic
 from .config import FULL_PROTOCOL, ProtocolPreset
-from .contract import HORIZONS, PRIMARY_HORIZONS
+from .contract import (
+    HORIZONS,
+    PRIMARY_HORIZONS,
+    REGISTERED_PRIMARY_TARGET,
+)
 from .corporate_actions import AlignedActionTerms
 from .splits import (
     PREREGISTRATION_ROOT,
@@ -35,7 +39,7 @@ BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V9"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V10"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
@@ -43,12 +47,13 @@ def primary_population_protocol() -> dict[str, object]:
     """Describe the exact population and aggregation used by the primary IC."""
 
     return {
-        "target": "median_adjusted_volatility_scaled_midrank",
+        "target": REGISTERED_PRIMARY_TARGET,
         "horizons_sessions": list(PRIMARY_HORIZONS),
         "requirements": [
             "active_at_entry",
             "finite_target_scale_sigma_greater_than_1e-8",
-            "valid_and_finite_scaled_target_on_every_primary_horizon",
+            "valid_and_finite_neutral_target_on_every_primary_horizon",
+            "valid_and_finite_neutralization_characteristics",
             "valid_and_finite_score_on_every_primary_horizon",
         ],
         "minimum_cross_section_names": MIN_CROSS_SECTION,
@@ -82,6 +87,8 @@ class EvaluationInputs:
     score_mask: NDArray[np.bool_]
     scaled_midrank_targets: NDArray[np.floating]
     scaled_target_mask: NDArray[np.bool_]
+    neutral_midrank_targets: NDArray[np.floating]
+    neutral_target_mask: NDArray[np.bool_]
     shareholder_midrank_targets: NDArray[np.floating]
     shareholder_simple_returns: NDArray[np.floating]
     shareholder_target_mask: NDArray[np.bool_]
@@ -110,6 +117,8 @@ class EvaluationInputs:
     initial_reference_price: NDArray[np.floating] | None = None
     eventual_survives_to_final_year: NDArray[np.bool_] | None = None
     action_alignment: str = "retrospective"
+    annual_borrow_rate_by_name: NDArray[np.floating] | None = None
+    shortable: NDArray[np.bool_] | None = None
 
 
 @dataclass(frozen=True)
@@ -244,6 +253,7 @@ def _validate(inputs: EvaluationInputs) -> None:
     # window before any numeric target payload is decoded.  This ordering is
     # material at the F3 tail, whose later endpoints enter a sealed window.
     target_masks = (
+        ("neutral_target_mask", inputs.neutral_target_mask),
         ("scaled_target_mask", inputs.scaled_target_mask),
         ("shareholder_target_mask", inputs.shareholder_target_mask),
         ("price_target_mask", inputs.price_target_mask),
@@ -261,6 +271,7 @@ def _validate(inputs: EvaluationInputs) -> None:
                 )
 
     numeric_targets = (
+        ("neutral_midrank_targets", inputs.neutral_midrank_targets),
         ("scaled_midrank_targets", inputs.scaled_midrank_targets),
         ("shareholder_midrank_targets", inputs.shareholder_midrank_targets),
         ("shareholder_simple_returns", inputs.shareholder_simple_returns),
@@ -270,10 +281,12 @@ def _validate(inputs: EvaluationInputs) -> None:
         if getattr(values, "shape", None) != expected:
             raise ValueError(f"{name} shape differs from scores")
     scaled = np.asarray(inputs.scaled_midrank_targets)
+    neutral = np.asarray(inputs.neutral_midrank_targets)
     shareholder_rank = np.asarray(inputs.shareholder_midrank_targets)
     shareholder_return = np.asarray(inputs.shareholder_simple_returns)
     price_rank = np.asarray(inputs.price_midrank_targets)
     for name, values, mask in (
+        ("neutral_midrank_targets", neutral, inputs.neutral_target_mask),
         ("scaled_midrank_targets", scaled, inputs.scaled_target_mask),
         (
             "shareholder_midrank_targets",
@@ -314,6 +327,14 @@ def _validate(inputs: EvaluationInputs) -> None:
             reference[np.isfinite(reference)] <= 0.0
         ):
             raise ValueError("initial reference prices must be positive or missing")
+    if inputs.annual_borrow_rate_by_name is not None:
+        rates = np.asarray(inputs.annual_borrow_rate_by_name, dtype=np.float64)
+        if rates.shape != matrix_shape or np.isinf(rates).any():
+            raise ValueError("lending borrow rates are misaligned or infinite")
+    if inputs.shortable is not None:
+        shortable = np.asarray(inputs.shortable)
+        if shortable.shape != matrix_shape or shortable.dtype != np.bool_:
+            raise ValueError("shortable mask must be Boolean and align names")
     for name, values in (
         ("action_session_resolved", inputs.action_session_resolved),
         ("action_has_action", inputs.action_has_action),
@@ -425,8 +446,8 @@ def _primary_population_components(
 ]:
     indexes = [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS]
     scores = np.asarray(inputs.scores, dtype=np.float64)[..., indexes]
-    targets = np.asarray(inputs.scaled_midrank_targets, dtype=np.float64)[..., indexes]
-    target_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)[..., indexes]
+    targets = np.asarray(inputs.neutral_midrank_targets, dtype=np.float64)[..., indexes]
+    target_mask = np.asarray(inputs.neutral_target_mask, dtype=np.bool_)[..., indexes]
     score_mask = np.asarray(inputs.score_mask, dtype=np.bool_)[..., indexes]
     scale = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
     outcome_population = (
@@ -456,7 +477,7 @@ def _primary_daily_metrics(
         common_count = int(population.sum())
         reasons: list[str] = []
         if outcome_count < MIN_CROSS_SECTION:
-            reasons.append("fewer_than_20_common_scaled_outcomes")
+            reasons.append("fewer_than_20_common_neutral_outcomes")
         elif common_count < MIN_CROSS_SECTION:
             reasons.append("fewer_than_20_common_scores")
         else:
@@ -479,14 +500,14 @@ def _primary_daily_metrics(
                 "date": day_value.isoformat(),
                 "possible": outcome_count >= MIN_CROSS_SECTION,
                 "used": not reasons,
-                "common_scaled_outcome_name_count": outcome_count,
+                "common_neutral_outcome_name_count": outcome_count,
                 "common_score_and_outcome_name_count": common_count,
                 "score_support_loss_name_count": outcome_count - common_count,
-                "head_scaled_target_spearman_ic": {
+                "head_neutral_target_spearman_ic": {
                     f"D{horizon}": _finite_or_none(head_ic[day, index])
                     for index, horizon in enumerate(PRIMARY_HORIZONS)
                 },
-                "primary_scaled_target_ic": _finite_or_none(daily_primary[day]),
+                "primary_neutral_target_ic": _finite_or_none(daily_primary[day]),
                 "undefined_reason": ";".join(reasons) if reasons else None,
             }
         )
@@ -501,25 +522,29 @@ def _daily_metrics(
     NDArray[np.float64],
     NDArray[np.float64],
     NDArray[np.float64],
+    NDArray[np.float64],
     list[dict[str, object]],
 ]:
     scores = np.asarray(inputs.scores, dtype=np.float64)
     score_mask = np.asarray(inputs.score_mask, dtype=np.bool_)
     active = np.asarray(inputs.active, dtype=np.bool_)
     scaled_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
+    neutral_mask = np.asarray(inputs.neutral_target_mask, dtype=np.bool_)
     shareholder_mask = np.asarray(inputs.shareholder_target_mask, dtype=np.bool_)
     price_mask = np.asarray(inputs.price_target_mask, dtype=np.bool_)
     scaled = np.asarray(inputs.scaled_midrank_targets, dtype=np.float64)
+    neutral = np.asarray(inputs.neutral_midrank_targets, dtype=np.float64)
     shareholder_rank = np.asarray(inputs.shareholder_midrank_targets, dtype=np.float64)
     shareholder_return = np.asarray(inputs.shareholder_simple_returns, dtype=np.float64)
     price_rank = np.asarray(inputs.price_midrank_targets, dtype=np.float64)
     scale = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
     days = len(inputs.dates)
     horizon_count = len(HORIZONS)
-    scaled_ic = np.full((days, horizon_count), np.nan, dtype=np.float64)
-    shareholder_ic = np.full_like(scaled_ic, np.nan)
-    price_ic = np.full_like(scaled_ic, np.nan)
-    spread_total_bps = np.full_like(scaled_ic, np.nan)
+    neutral_ic = np.full((days, horizon_count), np.nan, dtype=np.float64)
+    legacy_scaled_ic = np.full_like(neutral_ic, np.nan)
+    shareholder_ic = np.full_like(neutral_ic, np.nan)
+    price_ic = np.full_like(neutral_ic, np.nan)
+    spread_total_bps = np.full_like(neutral_ic, np.nan)
     rows: list[dict[str, object]] = []
     primary_indexes = {
         HORIZONS.index(horizon): index for index, horizon in enumerate(PRIMARY_HORIZONS)
@@ -527,25 +552,38 @@ def _daily_metrics(
     for day, day_value in enumerate(inputs.dates):
         for horizon_index, horizon in enumerate(HORIZONS):
             if horizon_index in primary_indexes:
-                scaled_valid = primary_population[day]
-                scaled_population = "common_D1_D2_D3_D5"
+                neutral_valid = primary_population[day]
+                neutral_population = "common_D1_D2_D3_D5"
             else:
-                scaled_valid = (
+                neutral_valid = (
                     active[day]
                     & score_mask[day, :, horizon_index]
-                    & scaled_mask[day, :, horizon_index]
-                    & np.isfinite(scale[day])
-                    & (scale[day] > 1e-8)
+                    & neutral_mask[day, :, horizon_index]
                     & np.isfinite(scores[day, :, horizon_index])
-                    & np.isfinite(scaled[day, :, horizon_index])
+                    & np.isfinite(neutral[day, :, horizon_index])
                 )
-                scaled_population = "per_horizon_D10"
-            scaled_value, scaled_count, scaled_reason = _spearman_result(
+                neutral_population = "per_horizon_D10"
+            neutral_value, neutral_count, neutral_reason = _spearman_result(
+                scores[day, :, horizon_index],
+                neutral[day, :, horizon_index],
+                neutral_valid,
+            )
+            neutral_ic[day, horizon_index] = neutral_value
+            legacy_valid = (
+                active[day]
+                & score_mask[day, :, horizon_index]
+                & scaled_mask[day, :, horizon_index]
+                & np.isfinite(scale[day])
+                & (scale[day] > 1e-8)
+                & np.isfinite(scores[day, :, horizon_index])
+                & np.isfinite(scaled[day, :, horizon_index])
+            )
+            legacy_value, legacy_count, legacy_reason = _spearman_result(
                 scores[day, :, horizon_index],
                 scaled[day, :, horizon_index],
-                scaled_valid,
+                legacy_valid,
             )
-            scaled_ic[day, horizon_index] = scaled_value
+            legacy_scaled_ic[day, horizon_index] = legacy_value
 
             shareholder_valid = (
                 active[day]
@@ -598,10 +636,13 @@ def _daily_metrics(
                 {
                     "date": day_value.isoformat(),
                     "horizon_sessions": horizon,
-                    "scaled_target_population": scaled_population,
-                    "scaled_target_valid_name_count": scaled_count,
-                    "scaled_target_spearman_ic": _finite_or_none(scaled_value),
-                    "scaled_target_ic_undefined_reason": scaled_reason,
+                    "neutral_target_population": neutral_population,
+                    "neutral_target_valid_name_count": neutral_count,
+                    "neutral_target_spearman_ic": _finite_or_none(neutral_value),
+                    "neutral_target_ic_undefined_reason": neutral_reason,
+                    "legacy_scaled_target_valid_name_count": legacy_count,
+                    "legacy_scaled_target_ic": _finite_or_none(legacy_value),
+                    "legacy_scaled_target_ic_undefined_reason": legacy_reason,
                     "shareholder_rank_valid_name_count": shareholder_count,
                     "shareholder_rank_ic": _finite_or_none(shareholder_value),
                     "shareholder_rank_ic_undefined_reason": shareholder_reason,
@@ -618,7 +659,14 @@ def _daily_metrics(
                     "shareholder_return_spread_undefined_reason": spread_reason,
                 }
             )
-    return scaled_ic, shareholder_ic, price_ic, spread_total_bps, rows
+    return (
+        neutral_ic,
+        legacy_scaled_ic,
+        shareholder_ic,
+        price_ic,
+        spread_total_bps,
+        rows,
+    )
 
 
 def _persistence(
@@ -723,6 +771,7 @@ def _ledger_rows(
             "date": day.isoformat(),
             "cost_bps_per_side": cost_bps,
             "annual_borrow_rate": annual_borrow_rate,
+            "borrow_source": result.borrow_source,
             "economics_resolved": not result.economics_unresolved,
             "gross_pnl_bps": _finite_or_none(result.gross_pnl_bps[index]),
             "interest_bps": _finite_or_none(result.interest_bps[index]),
@@ -740,6 +789,12 @@ def _ledger_rows(
             ),
             "turnover_cost_bps": _finite_or_none(result.cost_bps[index]),
             "borrow_cost_bps": _finite_or_none(result.borrow_bps[index]),
+            "held_short_weighted_annual_borrow_rate": _finite_or_none(
+                result.held_short_weighted_annual_borrow_rate[index]
+            ),
+            "excluded_short_entry_candidate_count": int(
+                result.excluded_short_entry_candidate_count[index]
+            ),
             "net_return": _finite_or_none(result.daily_net_return[index]),
             "net_excess_all_cash_bps": _finite_or_none(
                 result.net_excess_all_cash_bps[index]
@@ -1105,7 +1160,7 @@ def _quality_stratification(
                 "used_date_count": int(np.isfinite(daily).sum()),
                 "possible_name_days": int(outcome.sum()),
                 "used_name_days": int((outcome & score).sum()),
-                "mean_daily_primary_scaled_target_ic": _finite_or_none(
+                "mean_daily_primary_neutral_target_ic": _finite_or_none(
                     _finite_mean(daily)
                 ),
                 "status": "supported" if np.isfinite(daily).any() else "unsupported",
@@ -1138,7 +1193,7 @@ def _quality_stratification(
                 "used_date_count": 0,
                 "possible_name_days": 0,
                 "used_name_days": 0,
-                "mean_daily_primary_scaled_target_ic": None,
+                "mean_daily_primary_neutral_target_ic": None,
                 "status": "unsupported",
                 "undefined_reason": "history_age_not_supplied_by_evaluation_source",
             }
@@ -1162,7 +1217,7 @@ def _quality_stratification(
                 "used_date_count": 0,
                 "possible_name_days": 0,
                 "used_name_days": 0,
-                "mean_daily_primary_scaled_target_ic": None,
+                "mean_daily_primary_neutral_target_ic": None,
                 "status": "unsupported",
                 "undefined_reason": "eventual_survival_audit_label_not_supplied",
             }
@@ -1179,7 +1234,7 @@ def _quality_stratification(
             "used_date_count": 0,
             "possible_name_days": 0,
             "used_name_days": 0,
-            "mean_daily_primary_scaled_target_ic": None,
+            "mean_daily_primary_neutral_target_ic": None,
             "status": "unsupported",
             "undefined_reason": (
                 "no verified terminal-settlement roster is supplied; final-window "
@@ -1252,7 +1307,7 @@ def _quality_stratification(
 
 def _declared_subperiod_readouts(
     inputs: EvaluationInputs,
-    scaled_ic: NDArray[np.float64],
+    neutral_ic: NDArray[np.float64],
     shareholder_ic: NDArray[np.float64],
     price_ic: NDArray[np.float64],
     spread_total_bps: NDArray[np.float64],
@@ -1270,11 +1325,11 @@ def _declared_subperiod_readouts(
                     "subperiod": str(int(year)),
                     "horizon_sessions": horizon,
                     "calendar_date_count": int(selected.sum()),
-                    "scaled_target_used_date_count": int(
-                        np.isfinite(scaled_ic[selected, horizon_index]).sum()
+                    "neutral_target_used_date_count": int(
+                        np.isfinite(neutral_ic[selected, horizon_index]).sum()
                     ),
-                    "mean_scaled_target_spearman_ic": _finite_or_none(
-                        _finite_mean(scaled_ic[selected, horizon_index])
+                    "mean_neutral_target_spearman_ic": _finite_or_none(
+                        _finite_mean(neutral_ic[selected, horizon_index])
                     ),
                     "shareholder_rank_used_date_count": int(
                         np.isfinite(shareholder_ic[selected, horizon_index]).sum()
@@ -1309,6 +1364,10 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         "session_indices": _array_sha256(np.asarray(inputs.session_indices)),
         "scores": _array_sha256(np.asarray(inputs.scores)),
         "score_mask": _array_sha256(np.asarray(inputs.score_mask)),
+        "neutral_midrank_targets": _array_sha256(
+            np.asarray(inputs.neutral_midrank_targets)
+        ),
+        "neutral_target_mask": _array_sha256(np.asarray(inputs.neutral_target_mask)),
         "scaled_midrank_targets": _array_sha256(
             np.asarray(inputs.scaled_midrank_targets)
         ),
@@ -1450,7 +1509,92 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
     }
 
 
-def _diagnostics(inputs: EvaluationInputs) -> dict[str, object]:
+def _realized_beta_diagnostic(
+    inputs: EvaluationInputs, headline: StatefulLedgerResult
+) -> dict[str, object]:
+    d1 = HORIZONS.index(1)
+    returns = np.asarray(inputs.shareholder_simple_returns, dtype=np.float64)
+    valid = np.asarray(inputs.shareholder_target_mask, dtype=np.bool_)
+    active = np.asarray(inputs.active, dtype=np.bool_)
+    market = np.full(len(inputs.dates), np.nan, dtype=np.float64)
+    for ledger_day in range(1, len(inputs.dates)):
+        source_day = ledger_day - 1
+        names = (
+            active[source_day]
+            & valid[source_day, :, d1]
+            & np.isfinite(returns[source_day, :, d1])
+        )
+        if names.any():
+            market[ledger_day] = float(returns[source_day, names, d1].mean())
+    book = np.full(len(inputs.dates), np.nan, dtype=np.float64)
+    book[: len(headline.daily_net_return)] = headline.daily_net_return
+    used = np.isfinite(market) & np.isfinite(book)
+    if int(used.sum()) < 3 or float(np.var(market[used])) == 0.0:
+        return {
+            "status": "unsupported",
+            "observation_count": int(used.sum()),
+            "intercept_daily": None,
+            "slope_beta": None,
+            "r_squared": None,
+            "classification": "unsupported",
+        }
+    design = np.column_stack((np.ones(int(used.sum()), dtype=np.float64), market[used]))
+    coefficients, *_ = np.linalg.lstsq(design, book[used], rcond=None)
+    fitted = design @ coefficients
+    residual = book[used] - fitted
+    total = book[used] - float(book[used].mean())
+    total_ss = float(np.dot(total, total))
+    r_squared = 1.0 - float(np.dot(residual, residual)) / total_ss if total_ss else 0.0
+    beta = float(coefficients[1])
+    return {
+        "status": "supported",
+        "observation_count": int(used.sum()),
+        "intercept_daily": float(coefficients[0]),
+        "slope_beta": beta,
+        "r_squared": r_squared,
+        "classification": "directional" if abs(beta) > 0.30 else "beta_neutral",
+        "directional_threshold_absolute_beta": 0.30,
+        "alignment": "ledger_day_t versus equal_weight_active_D1_from_t_minus_1",
+    }
+
+
+def _lending_coverage(inputs: EvaluationInputs) -> dict[str, object]:
+    if inputs.shortable is None or inputs.annual_borrow_rate_by_name is None:
+        return {"status": "unsupported"}
+    shortable = np.asarray(inputs.shortable, dtype=np.bool_)
+    rate_present = np.isfinite(
+        np.asarray(inputs.annual_borrow_rate_by_name, dtype=np.float64)
+    )
+    active = np.asarray(inputs.active, dtype=np.bool_)
+    volatility = np.asarray(
+        inputs.prior_feature_values["yang_zhang_vol_20"], dtype=np.float64
+    )
+    high_vol = np.zeros(active.shape, dtype=np.bool_)
+    for day in range(len(inputs.dates)):
+        names = np.flatnonzero(active[day] & np.isfinite(volatility[day]))
+        if names.size:
+            cutoff = float(np.quantile(volatility[day, names], 0.75))
+            high_vol[day, names] = volatility[day, names] >= cutoff
+
+    def fraction(values: NDArray[np.bool_], mask: NDArray[np.bool_]) -> float | None:
+        return float(values[mask].mean()) if mask.any() else None
+
+    return {
+        "status": "supported",
+        "active_name_days": int(active.sum()),
+        "active_rate_observed_prior_20_fraction": fraction(rate_present, active),
+        "active_shortable_fraction": fraction(shortable, active),
+        "high_volatility_quartile_name_days": int(high_vol.sum()),
+        "high_volatility_quartile_rate_observed_prior_20_fraction": fraction(
+            rate_present, high_vol
+        ),
+        "high_volatility_quartile_shortable_fraction": fraction(shortable, high_vol),
+    }
+
+
+def _diagnostics(
+    inputs: EvaluationInputs, headline: StatefulLedgerResult | None = None
+) -> dict[str, object]:
     scores = np.asarray(inputs.scores, dtype=np.float64)
     masks = np.asarray(inputs.score_mask, dtype=np.bool_)
     active = np.asarray(inputs.active, dtype=np.bool_)
@@ -1606,6 +1750,12 @@ def _diagnostics(inputs: EvaluationInputs) -> dict[str, object]:
         "incremental_horizon_ic": incremental_rows,
         "matched_universe_ic": matched_rows,
         "matched_universe_daily": matched_daily_rows,
+        "realized_beta": (
+            _realized_beta_diagnostic(inputs, headline)
+            if headline is not None
+            else {"status": "unsupported", "classification": "unsupported"}
+        ),
+        "lending_coverage": _lending_coverage(inputs),
     }
 
 
@@ -1645,9 +1795,14 @@ def evaluate_scores(
         primary_score_mask,
         inputs.dates,
     )
-    scaled_ic, shareholder_ic, price_ic, spread_total_bps, metric_rows = _daily_metrics(
-        inputs, primary_population
-    )
+    (
+        neutral_ic,
+        legacy_scaled_ic,
+        shareholder_ic,
+        price_ic,
+        spread_total_bps,
+        metric_rows,
+    ) = _daily_metrics(inputs, primary_population)
     persistence, persistence_rows = _persistence(inputs)
     economics_score, economics_mask = _economics_signal(inputs)
     action_terms = _aligned_action_terms(inputs)
@@ -1662,6 +1817,8 @@ def evaluate_scores(
         cdi_returns=inputs.cdi_returns,
         security_ids=inputs.security_ids,
         initial_reference_price=inputs.initial_reference_price,
+        annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
+        shortable=inputs.shortable,
     )
     configurations = ledger_configurations()
     headline_name = f"cost_{ECONOMICS_HEADLINE[0]:g}_borrow_{ECONOMICS_HEADLINE[1]:g}"
@@ -1688,9 +1845,9 @@ def evaluate_scores(
     )
     active = np.asarray(inputs.active, dtype=np.bool_)
     scaled_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
+    neutral_mask = np.asarray(inputs.neutral_target_mask, dtype=np.bool_)
     shareholder_mask = np.asarray(inputs.shareholder_target_mask, dtype=np.bool_)
     price_mask = np.asarray(inputs.price_target_mask, dtype=np.bool_)
-    scale = np.asarray(inputs.target_scale_sigma, dtype=np.float64)
     horizon_rows: list[dict[str, object]] = []
     for horizon_index, horizon in enumerate(HORIZONS):
         if horizon in PRIMARY_HORIZONS:
@@ -1698,11 +1855,9 @@ def evaluate_scores(
         else:
             scaled_possible = (
                 active
-                & scaled_mask[..., horizon_index]
-                & np.isfinite(scale)
-                & (scale > 1e-8)
+                & neutral_mask[..., horizon_index]
                 & np.isfinite(
-                    np.asarray(inputs.scaled_midrank_targets)[..., horizon_index]
+                    np.asarray(inputs.neutral_midrank_targets)[..., horizon_index]
                 )
             )
         shareholder_possible = (
@@ -1721,16 +1876,19 @@ def evaluate_scores(
             {
                 "horizon_sessions": horizon,
                 "primary_horizon": horizon in PRIMARY_HORIZONS,
-                "mean_scaled_target_spearman_ic": _finite_or_none(
-                    _finite_mean(scaled_ic[:, horizon_index])
+                "mean_neutral_target_spearman_ic": _finite_or_none(
+                    _finite_mean(neutral_ic[:, horizon_index])
                 ),
-                "scaled_target_possible_date_count": int(
+                "neutral_target_possible_date_count": int(
                     (scaled_possible.sum(axis=1) >= MIN_CROSS_SECTION).sum()
                 ),
-                "scaled_target_used_date_count": int(
-                    np.isfinite(scaled_ic[:, horizon_index]).sum()
+                "neutral_target_used_date_count": int(
+                    np.isfinite(neutral_ic[:, horizon_index]).sum()
                 ),
-                "scaled_target_possible_name_days": int(scaled_possible.sum()),
+                "neutral_target_possible_name_days": int(scaled_possible.sum()),
+                "legacy_scaled_target_ic": _finite_or_none(
+                    _finite_mean(legacy_scaled_ic[:, horizon_index])
+                ),
                 "mean_shareholder_rank_ic": _finite_or_none(
                     _finite_mean(shareholder_ic[:, horizon_index])
                 ),
@@ -1776,6 +1934,7 @@ def evaluate_scores(
                 "scenario": scenario,
                 "cost_bps_per_side": config.cost_bps_per_side,
                 "annual_borrow_rate": config.annual_borrow_rate,
+                "borrow_source": config.borrow_source,
                 "buffer_per_side": config.buffer_per_side,
                 "short_proceeds_remuneration": (config.short_proceeds_remuneration),
                 "terminal_settlement_convention": TERMINAL_SETTLEMENT_CONVENTION,
@@ -1844,10 +2003,10 @@ def evaluate_scores(
         "horizons_sessions": list(HORIZONS),
         "primary_horizons_sessions": list(PRIMARY_HORIZONS),
         "metric_contract": {
-            "primary_target": "median_adjusted_volatility_scaled_midrank",
+            "primary_target": REGISTERED_PRIMARY_TARGET,
             "primary_population": (
                 "per date: active entry names with finite sigma>1e-8 and valid, "
-                "finite score and scaled outcome on every D1/D2/D3/D5 head"
+                "finite score and neutral outcome on every D1/D2/D3/D5 head"
             ),
             "minimum_names": MIN_CROSS_SECTION,
             "daily_primary_aggregation": (
@@ -1857,8 +2016,20 @@ def evaluate_scores(
             "shareholder_return": "gross contractual holding simple return",
             "price_return": "contractually unit-adjusted price-only return",
         },
-        "mean_daily_primary_scaled_target_ic": _finite_or_none(
+        "mean_daily_primary_neutral_target_ic": _finite_or_none(
             _finite_mean(daily_primary)
+        ),
+        "annual_borrow_rate_by_name": _array_sha256(
+            np.asarray(
+                inputs.annual_borrow_rate_by_name
+                if inputs.annual_borrow_rate_by_name is not None
+                else "unsupported"
+            )
+        ),
+        "shortable": _array_sha256(
+            np.asarray(
+                inputs.shortable if inputs.shortable is not None else "unsupported"
+            )
         ),
         "primary_support": {
             "possible_date_count": int(
@@ -1880,7 +2051,7 @@ def evaluate_scores(
         "horizon_readouts": horizon_rows,
         "declared_subperiod_readouts": _declared_subperiod_readouts(
             inputs,
-            scaled_ic,
+            neutral_ic,
             shareholder_ic,
             price_ic,
             spread_total_bps,
@@ -1943,7 +2114,7 @@ def evaluate_scores(
                 "economics_unresolved": headline.economics_unresolved,
             },
         },
-        "diagnostics": _diagnostics(inputs),
+        "diagnostics": _diagnostics(inputs, headline),
         "quality_and_coverage_stratification": quality_stratification,
         "input_hashes": _input_hashes(inputs),
         "source_artifact_hashes": dict(
@@ -1952,7 +2123,8 @@ def evaluate_scores(
         "mask_coverage": {
             "active_name_days": int(active.sum()),
             "score_mask_true": int(np.asarray(inputs.score_mask).sum()),
-            "scaled_target_mask_true": int(scaled_mask.sum()),
+            "neutral_target_mask_true": int(neutral_mask.sum()),
+            "legacy_scaled_target_mask_true": int(scaled_mask.sum()),
             "shareholder_target_mask_true": int(shareholder_mask.sum()),
             "price_target_mask_true": int(price_mask.sum()),
             "primary_common_outcome_name_days": int(primary_outcome_mask.sum()),
@@ -2090,18 +2262,18 @@ def _paired_primary_daily(
                 "common_candidate_baseline_name_count": int(
                     (common_outcome[day] & common_score[day]).sum()
                 ),
-                "candidate_head_scaled_target_spearman_ic": {
+                "candidate_head_neutral_target_spearman_ic": {
                     f"D{horizon}": _finite_or_none(candidate_heads[day, index])
                     for index, horizon in enumerate(PRIMARY_HORIZONS)
                 },
-                "baseline_head_scaled_target_spearman_ic": {
+                "baseline_head_neutral_target_spearman_ic": {
                     f"D{horizon}": _finite_or_none(baseline_heads[day, index])
                     for index, horizon in enumerate(PRIMARY_HORIZONS)
                 },
-                "candidate_primary_scaled_target_ic": _finite_or_none(
+                "candidate_primary_neutral_target_ic": _finite_or_none(
                     candidate_daily[day]
                 ),
-                "baseline_primary_scaled_target_ic": _finite_or_none(
+                "baseline_primary_neutral_target_ic": _finite_or_none(
                     baseline_daily[day]
                 ),
                 "delta": _finite_or_none(delta[day]),

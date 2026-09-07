@@ -24,6 +24,7 @@ from brazil_rv.v2.contract import (
     INTRADAY_DAILY_FEATURES,
     RAW_PATIENCE_SCHEMA,
     SCORE_ARTIFACT_SCHEMA,
+    SIDECAR_FEATURES,
     SLOW_FEATURES,
 )
 from brazil_rv.v2.corporate_actions import normalize_yfinance_actions
@@ -42,6 +43,7 @@ from brazil_rv.v2.research_rounds import (
 )
 from brazil_rv.v2.run_many import load_plan
 from brazil_rv.v2.score import score_checkpoint_artifact
+from brazil_rv.v2.sidecars import SidecarResult
 from brazil_rv.v2.splits import development_folds
 from brazil_rv.v2.store import STORE_SCHEMA
 from brazil_rv.v2.train import DatePairBatchSampler, train_stage
@@ -386,11 +388,32 @@ def _build_fixture_store(root: Path, *, mutate_post_decision: bool = False) -> P
         ticker="T0003",
         fetched_at=datetime(2025, 1, 2, tzinfo=timezone.utc),
     )
+    lending_names = SIDECAR_FEATURES["lending"]
+    lending_values = np.zeros(
+        (_DAY_COUNT, _NAME_COUNT, len(lending_names)), dtype=np.float32
+    )
+    lending_values[..., lending_names.index("loan_balance_to_volume_20")] = 0.1
+    lending_values[..., lending_names.index("loan_rate")] = 0.02
+    lending = SidecarResult(
+        group="lending",
+        feature_names=lending_names,
+        values=lending_values,
+        valid=np.ones_like(lending_values, dtype=np.bool_),
+        age_sessions=np.zeros_like(lending_values, dtype=np.float32),
+        coverage_by_year=(),
+        archive_semantics_available=lending_names,
+        publication_lag_reproduced=True,
+        publication_lag_valid_cells=int(lending_values.size),
+        publication_lag_source_rows=_DAY_COUNT * _NAME_COUNT,
+        d_plus_one_rows_checked=_DAY_COUNT * _NAME_COUNT,
+        d_plus_one_violations=0,
+    )
     store = build_daily_store(
         daily,
         actions,
         root,
         stream_intraday=True,
+        sidecars={"lending": lending},
         action_acquisition_audit=audit,
         m1_assignments=assignments,
         source_paths=(*parsed_paths, assignment_path),

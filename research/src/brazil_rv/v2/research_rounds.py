@@ -22,6 +22,8 @@ from .contract import (
     HORIZONS,
     PRETRAIN_END,
     PRIMARY_HORIZONS,
+    REGISTERED_PRIMARY_TARGET,
+    REGISTERED_PRIMARY_TARGET_MASK,
     RUN_MANY_PLAN_SCHEMA,
     SCORE_ARTIFACT_SCHEMA,
     STORE_START,
@@ -65,11 +67,11 @@ from .validate_pipeline import (
     _window_target_mask,
 )
 
-ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V3"
-ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V3"
-RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V3"
+ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4"
+ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4"
+RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4"
 PREREGISTRATION = (
-    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev2.md"
+    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev3.md"
 )
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
@@ -181,7 +183,23 @@ def registration_protocol_from_code() -> dict[str, object]:
         "cross_fit": "none",
         "models_per_fold_seed": 1,
         "primary_population_rule": primary_population_protocol(),
+        "target_neutralization": {
+            "target_value_array": REGISTERED_PRIMARY_TARGET,
+            "target_validity_array": REGISTERED_PRIMARY_TARGET_MASK,
+            "characteristics": [
+                "yang_zhang_vol_20",
+                "beta_60",
+                "log_volume_mean_20",
+            ],
+            "method": "rank_gauss_ols_with_intercept",
+            "clip": 5.0,
+            "minimum_names": 20,
+        },
         "headline_cell": headline_ledger_protocol(),
+        "borrow_cells": ["uniform", "lending_sidecar_v1"],
+        "realized_beta_label_threshold": 0.30,
+        "rung_d_evaluation_folds": ["F1", "F2"],
+        "inverse_volatility_neutral_ic_absolute_bound": 0.02,
         "source_tier_labels": dict(DEVELOPMENT_SOURCE_TIER_LABELS),
     }
 
@@ -208,7 +226,7 @@ def _source_tier_labels(store_manifest: Mapping[str, object]) -> dict[str, str]:
     labels = {"action_terms_source": action, "schedule_source": schedule}
     if labels != DEVELOPMENT_SOURCE_TIER_LABELS:
         raise ValueError(
-            "registered rev-2 research requires the labelled development-grade "
+            "registered rev-3 research requires the labelled development-grade "
             "action and reconstructed schedule tiers"
         )
     return dict(DEVELOPMENT_SOURCE_TIER_LABELS)
@@ -253,13 +271,13 @@ def _verify_development_acceptance(
         raise ValueError("development acceptance report SHA-256 mismatch")
     report = _read_json(source)
     if (
-        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V8"
+        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V9"
         or report.get("status") != "completed"
         or report.get("engineering_acceptance_status")
         != "development_grade_inferred_actions"
         or report.get("research_claim") is not False
     ):
-        raise ValueError("development acceptance report is not an accepted rev-2 gate")
+        raise ValueError("development acceptance report is not an accepted rev-3 gate")
     _assert_false_access(report, path=source)
     implementation = report.get("code")
     if (
@@ -273,7 +291,7 @@ def _verify_development_acceptance(
         expected_implementation is not None
         and implementation != expected_implementation
     ):
-        raise ValueError("development acceptance implementation differs from rev-2")
+        raise ValueError("development acceptance implementation differs from rev-3")
     if (
         report.get("store_build_implementation_commit")
         != store_build_implementation_commit
@@ -614,6 +632,7 @@ def _daily_series(
         if isinstance(row, Mapping)
         and float(row.get("cost_bps_per_side", -1.0)) == 4.0
         and float(row.get("annual_borrow_rate", -1.0)) == 0.02
+        and row.get("borrow_source") == "uniform"
     ]
     headline_by_date: dict[str, float] = {}
     for row in headline:
@@ -633,8 +652,31 @@ def _daily_series(
     )
     if headline_summary["economics_unresolved"]:
         economics_values.fill(np.nan)
+    legacy_by_date: dict[str, list[float]] = {day: [] for day in ordered_dates}
+    metric_rows = report.get("daily_metric_table")
+    if not isinstance(metric_rows, list):
+        raise ValueError("evaluation report lacks the daily metric table")
+    for row in metric_rows:
+        if (
+            isinstance(row, Mapping)
+            and row.get("horizon_sessions") in PRIMARY_HORIZONS
+            and row.get("legacy_scaled_target_ic") is not None
+        ):
+            legacy_by_date[str(row["date"])].append(
+                float(row["legacy_scaled_target_ic"])
+            )
+    legacy_values = np.asarray(
+        [
+            float(np.mean(legacy_by_date[day]))
+            if len(legacy_by_date[day]) == len(PRIMARY_HORIZONS)
+            else np.nan
+            for day in ordered_dates
+        ],
+        dtype=np.float64,
+    )
     return {
-        "primary_scaled_target_ic": primary_values,
+        "primary_neutral_target_ic": primary_values,
+        "legacy_scaled_target_ic": legacy_values,
         "shareholder_rank_ic": _single_family_ic_series(
             evaluation.inputs,
             targets="shareholder_midrank_targets",
@@ -754,21 +796,20 @@ def _small_interval_spanning_zero(readout: Mapping[str, object]) -> bool:
 def _pooled_readouts(
     evaluations: Mapping[str, _ResearchEvaluation],
 ) -> dict[str, object]:
-    if tuple(evaluations) != ("F1", "F2", "F3"):
-        raise ValueError("pooled report roster must be F1/F2/F3")
+    folds = tuple(evaluations)
+    if not folds or any(fold not in ("F1", "F2", "F3") for fold in folds):
+        raise ValueError("pooled report roster must be an ordered fold subset")
     series = {
         fold: _daily_series(evaluation) for fold, evaluation in evaluations.items()
     }
-    labels = tuple(series["F1"])
+    labels = tuple(series[folds[0]])
     return {
         "folds": {
             fold: {label: _folded_bootstrap((values[label],)) for label in labels}
             for fold, values in series.items()
         },
         "pooled": {
-            label: _folded_bootstrap(
-                tuple(series[fold][label] for fold in ("F1", "F2", "F3"))
-            )
+            label: _folded_bootstrap(tuple(series[fold][label] for fold in folds))
             for label in labels
         },
         "horizons": {
@@ -980,15 +1021,12 @@ def _paired_readouts(
     candidate: Mapping[str, _ResearchEvaluation],
     baseline: Mapping[str, _ResearchEvaluation],
 ) -> dict[str, object]:
-    if tuple(candidate) != ("F1", "F2", "F3") or tuple(baseline) != (
-        "F1",
-        "F2",
-        "F3",
-    ):
-        raise ValueError("paired report roster must be F1/F2/F3")
+    folds = tuple(candidate)
+    if not folds or any(fold not in baseline for fold in folds):
+        raise ValueError("paired reports require a nonempty common fold roster")
     deltas: dict[str, dict[str, NDArray[np.float64]]] = {}
     population_audit: dict[str, dict[str, list[dict[str, object]]]] = {}
-    for fold in ("F1", "F2", "F3"):
+    for fold in folds:
         left = candidate[fold]
         right = baseline[fold]
         if left.result.dates != right.result.dates:
@@ -1046,7 +1084,7 @@ def _paired_readouts(
             for day, value in zip(left.result.dates, economics_delta, strict=True)
         ]
         deltas[fold] = {
-            "primary_scaled_target_ic": primary_delta,
+            "primary_neutral_target_ic": primary_delta,
             "shareholder_rank_ic": shareholder_delta,
             "price_return_rank_ic": price_delta,
             "persistence_1": persistence_1,
@@ -1055,7 +1093,7 @@ def _paired_readouts(
             "headline_net_excess_bps": economics_delta,
         }
         population_audit[fold] = {
-            "primary_scaled_target_ic": primary_rows,
+            "primary_neutral_target_ic": primary_rows,
             "shareholder_rank_ic": shareholder_rows,
             "price_return_rank_ic": price_rows,
             "persistence_1": persistence_1_rows,
@@ -1071,9 +1109,7 @@ def _paired_readouts(
             for fold in deltas
         },
         "pooled": {
-            label: _folded_bootstrap(
-                tuple(deltas[fold][label] for fold in ("F1", "F2", "F3"))
-            )
+            label: _folded_bootstrap(tuple(deltas[fold][label] for fold in folds))
             for label in labels
         },
         "population_audit": population_audit,
@@ -1096,15 +1132,11 @@ def _feature_names(store: V2Store, rung: str) -> tuple[str, ...]:
     return tuple(str(value) for value in output)
 
 
-def _resolved_sidecar_groups(
-    store: V2Store, groups: Sequence[str]
-) -> tuple[str, ...]:
+def _resolved_sidecar_groups(store: V2Store, groups: Sequence[str]) -> tuple[str, ...]:
     manifest_names = store.manifest.get("feature_names")
     metadata = store.manifest.get("metadata")
     capabilities = (
-        metadata.get("sidecar_capabilities")
-        if isinstance(metadata, Mapping)
-        else None
+        metadata.get("sidecar_capabilities") if isinstance(metadata, Mapping) else None
     )
     if not isinstance(manifest_names, Mapping):
         raise ValueError("store manifest lacks ordered feature names")
@@ -1222,7 +1254,14 @@ def _run_gbdt_candidate(
     feature_names = _feature_names(store, rung)
     reports: dict[str, _ResearchEvaluation] = {}
     records: dict[str, object] = {}
-    for fold in ("F1", "F2", "F3"):
+    folds = ("F1", "F2") if rung == "d_all_sidecars" else ("F1", "F2", "F3")
+    if rung == "d_all_sidecars":
+        records["F3"] = {
+            "status": "source_unsupported",
+            "source": "oddlot",
+            "reason": "oddlot_archive_ends_before_F3",
+        }
+    for fold in folds:
         fine = fit[fold]
         train_indices = fine if pretrain is None else np.concatenate((pretrain, fine))
         train_pretrain = np.zeros(len(train_indices), dtype=np.bool_)
@@ -1241,19 +1280,24 @@ def _run_gbdt_candidate(
             else np.concatenate((pretrain, fit_target_window[fold]))
         )
         train_mask = _window_target_mask(
-            store.read("target_valid", train_indices),
+            store.read(REGISTERED_PRIMARY_TARGET_MASK, train_indices),
             train_indices,
             target_window_indices=train_window,
         )
         train_y = np.asarray(
-            store.read_target("target_primary", train_indices, valid_mask=train_mask)
+            store.read_target(
+                REGISTERED_PRIMARY_TARGET, train_indices, valid_mask=train_mask
+            )
         )
         selection_mask = _window_target_mask(
-            store.read("target_valid", selection_indices), selection_indices
+            store.read(REGISTERED_PRIMARY_TARGET_MASK, selection_indices),
+            selection_indices,
         )
         selection_y = np.asarray(
             store.read_target(
-                "target_primary", selection_indices, valid_mask=selection_mask
+                REGISTERED_PRIMARY_TARGET,
+                selection_indices,
+                valid_mask=selection_mask,
             )
         )
         active = np.asarray(store.read("active", evaluation_indices), dtype=np.bool_)
@@ -1300,6 +1344,8 @@ def _run_gbdt_candidate(
                 "config": asdict(config),
                 "pretrain_included": pretrain is not None,
                 "time_decay_half_life_sessions": decay_half_life,
+                "target_value_array": REGISTERED_PRIMARY_TARGET,
+                "target_validity_array": REGISTERED_PRIMARY_TARGET_MASK,
                 "fit_date_indices": train_indices.tolist(),
                 "selection_date_indices": selection_indices.tolist(),
                 "evaluation_date_indices": evaluation_indices.tolist(),
@@ -1428,7 +1474,8 @@ def freeze_round1(
             "settlement_grace_sessions": 10,
             "settlement_haircut": 0.30,
             "settlement_economics_unresolved_fraction_nav": 0.15,
-            "executable_borrow": False,
+            "headline_uses_executable_borrow": False,
+            "lending_sidecar_readout_present": True,
         },
     }
     return write_json_atomic(output / "frozen_design.json", design)
@@ -1589,7 +1636,7 @@ def run_round1(
                 rung_comparisons[f"{rung}_minus_{previous}"] = paired
                 pooled = paired["pooled"]
                 if not (
-                    _point_is_negative(pooled["primary_scaled_target_ic"])
+                    _point_is_negative(pooled["primary_neutral_target_ic"])
                     and _point_is_negative(pooled["headline_net_excess_bps"])
                 ):
                     kept.append(rung)
@@ -1599,7 +1646,7 @@ def run_round1(
             kept,
             key=lambda rung: (
                 _ranking_point(
-                    rung_summaries[rung]["pooled"]["primary_scaled_target_ic"]
+                    rung_summaries[rung]["pooled"]["primary_neutral_target_ic"]
                 ),
                 _ranking_point(
                     rung_summaries[rung]["pooled"]["headline_net_excess_bps"]
@@ -1831,14 +1878,17 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     previous: str | None = None
     for rung in RUNG_GROUPS:
         candidate_root = output / "gbdt_ladder" / rung
+        candidate_folds = (
+            ("F1", "F2") if rung == "d_all_sidecars" else ("F1", "F2", "F3")
+        )
         completed = tuple(
             (candidate_root / fold / "evaluation.json").is_file()
-            for fold in ("F1", "F2", "F3")
+            for fold in candidate_folds
         )
         if all(completed):
             reports = {}
             records = {}
-            for fold in ("F1", "F2", "F3"):
+            for fold in candidate_folds:
                 root = candidate_root / fold
                 reports[fold] = _evaluation_from_artifacts(
                     root / "evaluation.json",
@@ -1847,6 +1897,12 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                     cdi=cdi,
                 )
                 records[fold] = _existing_score_and_evaluation_record(root)
+            if rung == "d_all_sidecars":
+                records["F3"] = {
+                    "status": "source_unsupported",
+                    "source": "oddlot",
+                    "reason": "oddlot_archive_ends_before_F3",
+                }
             reused_candidates.append(f"gbdt_ladder/{rung}")
         elif any(completed) or candidate_root.exists():
             raise ValueError(f"refusing to resume partial registered candidate: {rung}")
@@ -1876,7 +1932,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             rung_comparisons[f"{rung}_minus_{previous}"] = paired
             pooled = paired["pooled"]
             if not (
-                _point_is_negative(pooled["primary_scaled_target_ic"])
+                _point_is_negative(pooled["primary_neutral_target_ic"])
                 and _point_is_negative(pooled["headline_net_excess_bps"])
             ):
                 kept.append(rung)
@@ -1884,7 +1940,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     parent = max(
         kept,
         key=lambda rung: (
-            _ranking_point(rung_summaries[rung]["pooled"]["primary_scaled_target_ic"]),
+            _ranking_point(rung_summaries[rung]["pooled"]["primary_neutral_target_ic"]),
             _ranking_point(rung_summaries[rung]["pooled"]["headline_net_excess_bps"]),
             -list(RUNG_GROUPS).index(rung),
         ),
@@ -1896,14 +1952,17 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     span_records: dict[str, object] = {"fine_only": rung_records[parent]}
     for arm in ("pretrain_uniform", "pretrain_decay_756"):
         candidate_root = output / "gbdt_data_span" / arm
+        candidate_folds = (
+            ("F1", "F2") if parent == "d_all_sidecars" else ("F1", "F2", "F3")
+        )
         completed = tuple(
             (candidate_root / fold / "evaluation.json").is_file()
-            for fold in ("F1", "F2", "F3")
+            for fold in candidate_folds
         )
         if all(completed):
             reports = {}
             records = {}
-            for fold in ("F1", "F2", "F3"):
+            for fold in candidate_folds:
                 root = candidate_root / fold
                 reports[fold] = _evaluation_from_artifacts(
                     root / "evaluation.json",
@@ -1912,6 +1971,12 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                     cdi=cdi,
                 )
                 records[fold] = _existing_score_and_evaluation_record(root)
+            if parent == "d_all_sidecars":
+                records["F3"] = {
+                    "status": "source_unsupported",
+                    "source": "oddlot",
+                    "reason": "oddlot_archive_ends_before_F3",
+                }
             reused_candidates.append(f"gbdt_data_span/{arm}")
         elif any(completed) or candidate_root.exists():
             raise ValueError(
@@ -2282,7 +2347,7 @@ def write_round2_plan_smoke(*, output_root: Path) -> str:
         root / "round2_plan_smoke.json",
         {
             "schema": RUN_MANY_PLAN_SCHEMA,
-            "phase": "rev2_smoke",
+            "phase": "rev3_smoke",
             "max_parallel": 1,
             "first_failure_stop": True,
             "research_candidate_score": False,
@@ -2337,7 +2402,7 @@ def write_round2_plan_p(*, output_root: Path) -> str:
         root / "round2_plan_p.json",
         {
             "schema": RUN_MANY_PLAN_SCHEMA,
-            "phase": "rev2_stage_P",
+            "phase": "rev3_stage_P",
             "max_parallel": int(design["max_parallel_trajectories"]),
             "jobs": jobs,
         },
@@ -2403,7 +2468,7 @@ def write_round2_plan_main(*, output_root: Path) -> str:
         root / "round2_plan_main.json",
         {
             "schema": RUN_MANY_PLAN_SCHEMA,
-            "phase": "rev2_registered_arms",
+            "phase": "rev3_registered_arms",
             "max_parallel": int(design["max_parallel_trajectories"]),
             "stage_p_handoffs": {
                 str(seed): {"path": str(path), "sha256": digest}
@@ -2625,6 +2690,7 @@ def _evaluation_from_artifacts(
         if isinstance(row, Mapping)
         and float(row.get("cost_bps_per_side", -1.0)) == 4.0
         and float(row.get("annual_borrow_rate", -1.0)) == 0.02
+        and row.get("borrow_source") == "uniform"
     ]
     by_date: dict[str, float] = {}
     for row in rows:
@@ -2756,7 +2822,7 @@ def finalize_round2(*, output_root: Path) -> str:
                 eligible.append(arm)
         long_small_and_uncertain = all(
             _small_interval_spanning_zero(
-                arm_deltas[label]["pooled"]["primary_scaled_target_ic"]
+                arm_deltas[label]["pooled"]["primary_neutral_target_ic"]
             )
             for label in ("B_minus_A", "C_minus_A")
         )
@@ -2768,7 +2834,7 @@ def finalize_round2(*, output_root: Path) -> str:
                 eligible,
                 key=lambda arm: (
                     _ranking_point(
-                        arm_readouts[arm]["pooled"]["primary_scaled_target_ic"]
+                        arm_readouts[arm]["pooled"]["primary_neutral_target_ic"]
                     ),
                     _ranking_point(
                         arm_readouts[arm]["pooled"]["headline_net_excess_bps"]
@@ -2882,7 +2948,7 @@ def finalize_round2(*, output_root: Path) -> str:
             comparator_readouts,
             key=lambda name: (
                 _ranking_point(
-                    comparator_readouts[name]["pooled"]["primary_scaled_target_ic"]
+                    comparator_readouts[name]["pooled"]["primary_neutral_target_ic"]
                 ),
                 _ranking_point(
                     comparator_readouts[name]["pooled"]["headline_net_excess_bps"]

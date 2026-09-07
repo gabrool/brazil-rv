@@ -11,6 +11,7 @@ from brazil_rv.v2.corporate_actions import AlignedActionTerms, apply_contractual
 
 
 OrderSide = Literal["buy", "sell"]
+BorrowSource = Literal["uniform", "lending_sidecar_v1"]
 OrderPurpose = Literal[
     "entry", "exit", "risk_exit", "terminal_exit", "terminal_settlement"
 ]
@@ -67,6 +68,7 @@ class LedgerConfig:
     planned_name_weight_cap: float = 0.05
     cost_bps_per_side: float = 4.0
     annual_borrow_rate: float = 0.02
+    borrow_source: BorrowSource = "uniform"
     annual_debit_spread: float = 0.0
     short_proceeds_remuneration: float = 0.0
     initial_capital_brl: float = 1.0
@@ -95,6 +97,8 @@ class LedgerConfig:
             or self.annual_sessions <= 0
         ):
             raise ValueError("ledger financing controls are invalid")
+        if self.borrow_source not in {"uniform", "lending_sidecar_v1"}:
+            raise ValueError("borrow source must be uniform or lending_sidecar_v1")
         if not 0 <= self.short_proceeds_remuneration <= 1:
             raise ValueError("short-proceeds remuneration must be in [0, 1]")
         if self.initial_capital_brl <= 0 or not np.isfinite(self.initial_capital_brl):
@@ -186,6 +190,8 @@ class _ValidatedInputs:
     action_payment_session: NDArray[np.int64]
     securities: tuple[str, ...]
     initial_reference_price: NDArray[np.float64]
+    annual_borrow_rate_by_name: NDArray[np.float64]
+    shortable: NDArray[np.bool_]
 
 
 @dataclass(frozen=True)
@@ -198,6 +204,9 @@ class StatefulLedgerResult:
     interest_bps: NDArray[np.float64]
     cost_bps: NDArray[np.float64]
     borrow_bps: NDArray[np.float64]
+    held_short_weighted_annual_borrow_rate: NDArray[np.float64]
+    held_short_notional_at_open: NDArray[np.float64]
+    excluded_short_entry_candidate_count: NDArray[np.int64]
     gross_fraction_nav: NDArray[np.float64]
     turnover_fraction_nav: NDArray[np.float64]
     unresolved_stale_inventory_fraction_nav: NDArray[np.float64]
@@ -322,6 +331,7 @@ class StatefulLedgerResult:
     share_sizing_mode: Literal[
         "fractional_notional_research_proxy", "round_lot_close_proxy"
     ]
+    borrow_source: BorrowSource
 
     def summary(self) -> dict[str, object]:
         excess = self.net_excess_all_cash_bps
@@ -434,6 +444,36 @@ class StatefulLedgerResult:
             "minimum_gross_fraction_nav": minimum_gross,
             "maximum_gross_fraction_nav": maximum_gross,
             "mean_turnover_fraction_nav": mean_turnover,
+            "borrow_source": self.borrow_source,
+            "short_notional_weighted_borrow_rate": (
+                float(
+                    np.sum(
+                        self.held_short_weighted_annual_borrow_rate
+                        * self.held_short_notional_at_open
+                    )
+                    / np.sum(self.held_short_notional_at_open)
+                )
+                if np.sum(self.held_short_notional_at_open) > 0.0
+                else 0.0
+            ),
+            "excluded_short_entry_candidate_count": int(
+                self.excluded_short_entry_candidate_count.sum()
+            ),
+            "short_side_unshortable_candidate_share": (
+                float(
+                    self.excluded_short_entry_candidate_count.sum()
+                    / (
+                        self.excluded_short_entry_candidate_count.sum()
+                        + self.band_candidates_short.sum()
+                    )
+                )
+                if (
+                    self.excluded_short_entry_candidate_count.sum()
+                    + self.band_candidates_short.sum()
+                )
+                > 0
+                else 0.0
+            ),
             "mean_unresolved_stale_inventory_fraction_nav": float(
                 np.mean(self.unresolved_stale_inventory_fraction_nav)
             ),
@@ -586,6 +626,9 @@ def _validate_inputs(
     action_payment_session: NDArray[np.integer],
     security_ids: Sequence[str] | None,
     initial_reference_price: NDArray[np.floating] | None,
+    annual_borrow_rate_by_name: NDArray[np.floating] | None,
+    shortable: NDArray[np.bool_] | None,
+    borrow_source: BorrowSource,
 ) -> _ValidatedInputs:
     if not isinstance(action_terms, AlignedActionTerms):
         raise TypeError("action_terms must be explicit AlignedActionTerms")
@@ -610,6 +653,22 @@ def _validate_inputs(
         raise ValueError("ledger CDI return axis is misaligned")
     if not np.isfinite(cdi).all() or (cdi <= -1.0).any():
         raise ValueError("ledger CDI returns must be finite and greater than -1")
+
+    if borrow_source == "lending_sidecar_v1":
+        if annual_borrow_rate_by_name is None or shortable is None:
+            raise ValueError("lending borrow requires rate and shortable panels")
+        borrow_rate = np.asarray(annual_borrow_rate_by_name, dtype=np.float64)
+        shortable_mask = np.asarray(shortable, dtype=np.bool_)
+        if borrow_rate.shape != matrix_shape or shortable_mask.shape != matrix_shape:
+            raise ValueError("lending borrow panels must align [date, name]")
+        if (
+            np.isinf(borrow_rate).any()
+            or (borrow_rate[np.isfinite(borrow_rate)] < 0).any()
+        ):
+            raise ValueError("lending borrow rates must be non-negative or missing")
+    else:
+        borrow_rate = np.full(matrix_shape, np.nan, dtype=np.float64)
+        shortable_mask = np.ones(matrix_shape, dtype=np.bool_)
 
     if np.isinf(close).any():
         raise ValueError("raw_close may be missing but cannot contain infinities")
@@ -708,6 +767,8 @@ def _validate_inputs(
         action_payment_session=payment,
         securities=securities,
         initial_reference_price=initial_reference,
+        annual_borrow_rate_by_name=borrow_rate,
+        shortable=shortable_mask,
     )
 
 
@@ -804,6 +865,8 @@ def simulate_stateful_ledger(
     fill_fraction: NDArray[np.floating] | None = None,
     security_ids: Sequence[str] | None = None,
     initial_reference_price: NDArray[np.floating] | None = None,
+    annual_borrow_rate_by_name: NDArray[np.floating] | None = None,
+    shortable: NDArray[np.bool_] | None = None,
 ) -> StatefulLedgerResult:
     """Run causal close-proxy orders, fills, and a raw signed-share ledger."""
 
@@ -819,6 +882,9 @@ def simulate_stateful_ledger(
         action_payment_session=action_payment_session,
         security_ids=security_ids,
         initial_reference_price=initial_reference_price,
+        annual_borrow_rate_by_name=annual_borrow_rate_by_name,
+        shortable=shortable,
+        borrow_source=config.borrow_source,
     )
     day_count, name_count = inputs.score.shape
     shares = np.zeros(name_count, dtype=np.float64)
@@ -866,6 +932,9 @@ def simulate_stateful_ledger(
     interest_rows: list[float] = []
     cost_rows: list[float] = []
     borrow_rows: list[float] = []
+    held_short_borrow_rate_rows: list[float] = []
+    held_short_notional_rows: list[float] = []
+    excluded_short_candidate_rows: list[int] = []
     gross_rows: list[float] = []
     turnover_rows: list[float] = []
     unresolved_stale_fraction_rows: list[float] = []
@@ -1226,9 +1295,28 @@ def simulate_stateful_ledger(
             + min(free_cash, 0.0) * debit_rate
             + restricted_by_name.sum() * cash_rate * config.short_proceeds_remuneration
         )
-        borrow = (
-            config.annual_borrow_rate / config.annual_sessions * short_value_at_open
-        )
+        if config.borrow_source == "lending_sidecar_v1" and short_at_open.any():
+            short_values = np.abs(shares[short_at_open] * marks[short_at_open])
+            raw_rates = inputs.annual_borrow_rate_by_name[day, short_at_open]
+            effective_rates = np.maximum(
+                np.where(np.isfinite(raw_rates), raw_rates, 0.0),
+                config.annual_borrow_rate,
+            )
+            borrow = float(
+                np.sum(short_values * effective_rates) / config.annual_sessions
+            )
+            weighted_borrow_rate = float(
+                np.sum(short_values * effective_rates) / short_value_at_open
+            )
+        else:
+            borrow = (
+                config.annual_borrow_rate / config.annual_sessions * short_value_at_open
+            )
+            weighted_borrow_rate = (
+                config.annual_borrow_rate if short_value_at_open > 0.0 else 0.0
+            )
+        held_short_borrow_rate_rows.append(weighted_borrow_rate)
+        held_short_notional_rows.append(short_value_at_open)
         free_cash += interest - borrow
         settlement_scenario_adjustment *= 1.0 + cash_rate
 
@@ -1542,6 +1630,7 @@ def simulate_stateful_ledger(
         band_exhausted_short = 0
         blocked_open_long = 0
         blocked_open_short = 0
+        excluded_short_candidates = 0
         if day < day_count - 1 and not small_universe:
             slot_notional = start_nav * config.gross_target / (2 * config.k_per_side)
             same_day_exit_names = {
@@ -1579,6 +1668,11 @@ def simulate_stateful_ledger(
             short_band = [int(name) for name in order[:k_eff]]
             if set(long_band) & set(short_band):
                 raise RuntimeError("long and short entry bands overlap")
+            short_entry_band = (
+                [int(name) for name in order[: len(order) // 2]]
+                if config.borrow_source == "lending_sidecar_v1"
+                else short_band
+            )
             long_candidates = [
                 name
                 for name in long_band
@@ -1588,11 +1682,19 @@ def simulate_stateful_ledger(
             ]
             short_candidates = [
                 name
-                for name in short_band
+                for name in short_entry_band
                 if name not in unavailable
                 and not unresolved_action[name]
                 and not settled_names[name]
+                and inputs.shortable[day, name]
             ]
+            excluded_short_candidates = sum(
+                name not in unavailable
+                and not unresolved_action[name]
+                and not settled_names[name]
+                and not inputs.shortable[day, name]
+                for name in short_entry_band
+            )
             band_candidates_long = len(long_candidates)
             band_candidates_short = len(short_candidates)
             band_excluded_unresolved_long = sum(
@@ -1767,6 +1869,7 @@ def simulate_stateful_ledger(
         open_after_submission_short_rows.append(open_after_submission_short)
         band_candidates_long_rows.append(band_candidates_long)
         band_candidates_short_rows.append(band_candidates_short)
+        excluded_short_candidate_rows.append(excluded_short_candidates)
         band_excluded_unresolved_long_rows.append(band_excluded_unresolved_long)
         band_excluded_unresolved_short_rows.append(band_excluded_unresolved_short)
         band_excluded_settled_long_rows.append(band_excluded_settled_long)
@@ -2321,6 +2424,15 @@ def simulate_stateful_ledger(
         interest_bps=np.asarray(interest_rows, dtype=np.float64),
         cost_bps=np.asarray(cost_rows, dtype=np.float64),
         borrow_bps=np.asarray(borrow_rows, dtype=np.float64),
+        held_short_weighted_annual_borrow_rate=np.asarray(
+            held_short_borrow_rate_rows, dtype=np.float64
+        ),
+        held_short_notional_at_open=np.asarray(
+            held_short_notional_rows, dtype=np.float64
+        ),
+        excluded_short_entry_candidate_count=np.asarray(
+            excluded_short_candidate_rows, dtype=np.int64
+        ),
         gross_fraction_nav=gross_array,
         turnover_fraction_nav=np.asarray(turnover_rows, dtype=np.float64),
         unresolved_stale_inventory_fraction_nav=np.asarray(
@@ -2573,6 +2685,7 @@ def simulate_stateful_ledger(
             if config.lot_size is None
             else "round_lot_close_proxy"
         ),
+        borrow_source=config.borrow_source,
     )
 
 
@@ -2604,6 +2717,9 @@ def ledger_configurations() -> dict[str, LedgerConfig]:
             ),
             "sensitivity_short_proceeds_full": replace(
                 headline, short_proceeds_remuneration=1.0
+            ),
+            "cost_4_borrow_lending_v1": replace(
+                headline, borrow_source="lending_sidecar_v1"
             ),
         }
     )

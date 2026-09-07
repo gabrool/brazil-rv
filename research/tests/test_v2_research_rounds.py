@@ -36,16 +36,16 @@ from brazil_rv.v2.research_rounds import (
 from brazil_rv.v2.splits import development_folds
 
 
-def test_rev2_registration_replaces_the_voided_research_entrypoints(
+def test_rev3_registration_replaces_the_voided_research_entrypoints(
     tmp_path: Path,
 ) -> None:
-    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev2.md"
+    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev3.md"
     assert research_rounds.PREREGISTRATION.is_file()
     with pytest.raises(FileNotFoundError):
         research_rounds.run_round1(output_root=tmp_path / "absent", num_threads=1)
 
 
-def test_rev2_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> None:
+def test_rev3_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> None:
     protocol = research_rounds.load_registration_protocol()
     assert protocol == research_rounds.registration_protocol_from_code()
 
@@ -106,9 +106,7 @@ def test_acceptance_binds_store_hash_and_store_build_separately_from_freeze(
     tmp_path: Path,
 ) -> None:
     store_build_commit = "a" * 40
-    store_manifest = {
-        "metadata": {"implementation_git_commit": store_build_commit}
-    }
+    store_manifest = {"metadata": {"implementation_git_commit": store_build_commit}}
     acceptance_implementation = {
         "commit": "b" * 40,
         "tracked_worktree_clean": True,
@@ -118,7 +116,7 @@ def test_acceptance_binds_store_hash_and_store_build_separately_from_freeze(
         "schedule_source": "reconstructed_v1",
     }
     report = {
-        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V8",
+        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V9",
         "status": "completed",
         "engineering_acceptance_status": "development_grade_inferred_actions",
         "research_claim": False,
@@ -128,9 +126,7 @@ def test_acceptance_binds_store_hash_and_store_build_separately_from_freeze(
         "code": acceptance_implementation,
         "store_build_implementation_commit": store_build_commit,
         "sources": {"store": {"manifest_sha256": "c" * 64}},
-        "results": {
-            "development_acceptance": {"labels": source_tiers, "reasons": []}
-        },
+        "results": {"development_acceptance": {"labels": source_tiers, "reasons": []}},
     }
     path = tmp_path / "acceptance.json"
     path.write_text(json.dumps(report), encoding="utf-8")
@@ -189,6 +185,8 @@ def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
         "calendar_identity_sha256": "a" * 64,
         "scaled_midrank_targets": targets,
         "scaled_target_mask": target_mask,
+        "neutral_midrank_targets": targets.copy(),
+        "neutral_target_mask": target_mask.copy(),
         "shareholder_midrank_targets": targets.copy(),
         "shareholder_simple_returns": targets * 0.0001,
         "shareholder_target_mask": target_mask.copy(),
@@ -222,14 +220,20 @@ def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
         },
         "cdi_returns": np.zeros(day_count, dtype=np.float64),
         "source_artifact_hashes": {"fixture": "b" * 64},
+        "source_archive_present": {"lending": np.ones_like(active)},
+        "source_feature_valid": {"lending": np.ones_like(active)},
+        "annual_borrow_rate_by_name": np.full_like(raw_close, 0.02),
+        "shortable": np.ones_like(active),
     }
     for key in (
         "scaled_midrank_targets",
+        "neutral_midrank_targets",
         "shareholder_midrank_targets",
         "shareholder_simple_returns",
         "price_midrank_targets",
     ):
         common[key] = np.where(target_mask, common[key], 0.0)
+    common["neutral_target_mask"] = target_mask.copy()
     base_scores = targets.copy()
     candidate_mask = np.ones_like(target_mask)
     baseline_mask = np.ones_like(target_mask)
@@ -304,7 +308,7 @@ def test_paired_readouts_use_the_exact_common_four_head_population() -> None:
     paired = _paired_readouts(candidate_folds, baseline_folds)
 
     assert set(paired["pooled"]) == {
-        "primary_scaled_target_ic",
+        "primary_neutral_target_ic",
         "shareholder_rank_ic",
         "price_return_rank_ic",
         "persistence_1",
@@ -312,14 +316,14 @@ def test_paired_readouts_use_the_exact_common_four_head_population() -> None:
         "shareholder_return_spread_bps_per_holding_session",
         "headline_net_excess_bps",
     }
-    primary = paired["pooled"]["primary_scaled_target_ic"]
+    primary = paired["pooled"]["primary_neutral_target_ic"]
     assert primary["estimate"] == pytest.approx(2.0)
     assert primary["possible_observations"] == 75
     assert primary["finite_observations"] == 60
     assert paired["pooled"]["shareholder_rank_ic"]["estimate"] == pytest.approx(2.0)
     assert paired["pooled"]["price_return_rank_ic"]["estimate"] == pytest.approx(2.0)
     assert paired["pooled"]["persistence_1"]["estimate"] == pytest.approx(0.0)
-    first = paired["population_audit"]["F1"]["primary_scaled_target_ic"][0]
+    first = paired["population_audit"]["F1"]["primary_neutral_target_ic"][0]
     assert first["common_candidate_baseline_name_count"] == 70
     assert first["delta"] == pytest.approx(2.0)
     assert first["undefined_reason"] is None
@@ -386,11 +390,15 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
 
     arrays = {
         "target_valid": prefixed(np.asarray(inputs.scaled_target_mask)),
+        "target_primary_neutral_valid": prefixed(
+            np.asarray(inputs.neutral_target_mask)
+        ),
         "target_shareholder_valid": prefixed(
             np.asarray(inputs.shareholder_target_mask)
         ),
         "target_price_valid": prefixed(np.asarray(inputs.price_target_mask)),
         "target_primary": prefixed(np.asarray(inputs.scaled_midrank_targets)),
+        "target_primary_neutral": prefixed(np.asarray(inputs.neutral_midrank_targets)),
         "target_shareholder_midrank": prefixed(
             np.asarray(inputs.shareholder_midrank_targets)
         ),
@@ -423,21 +431,31 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         "slow_valid": np.ones(
             (day_count + 1, name_count, len(SLOW_FEATURES)), dtype=np.bool_
         ),
+        "sidecar_lending_values": np.full(
+            (day_count + 1, name_count, 1), np.arcsinh(2.0), dtype=np.float32
+        ),
+        "sidecar_lending_valid": np.ones(
+            (day_count + 1, name_count, 1), dtype=np.bool_
+        ),
+        "sidecar_lending_age_sessions": np.zeros(
+            (day_count + 1, name_count, 1), dtype=np.float32
+        ),
     }
 
     class FixtureStore:
         manifest = {
             "axes": {"date_identity_sha256": inputs.calendar_identity_sha256},
-            "feature_names": {"slow": list(SLOW_FEATURES)},
-                "metadata": {
-                    "action_terms_source": inputs.action_terms_source,
-                    "schedule_source": inputs.schedule_source,
-                    "corporate_action_contract": {
-                        "stored_action_arrays": (
-                            "retrospective outcome/accounting terms"
-                        )
-                    },
+            "feature_names": {
+                "slow": list(SLOW_FEATURES),
+                "sidecar_lending": ["loan_rate"],
+            },
+            "metadata": {
+                "action_terms_source": inputs.action_terms_source,
+                "schedule_source": inputs.schedule_source,
+                "corporate_action_contract": {
+                    "stored_action_arrays": ("retrospective outcome/accounting terms")
                 },
+            },
         }
         dates = np.asarray(
             ["2024-01-01", *(value.isoformat() for value in inputs.dates)],
@@ -685,7 +703,9 @@ def test_registered_gbdt_ladder_is_exact_and_cumulative() -> None:
     )
 
 
-def test_all_sidecars_resolves_materialized_and_explicitly_missing_capabilities() -> None:
+def test_all_sidecars_resolves_materialized_and_explicitly_missing_capabilities() -> (
+    None
+):
     store = type(
         "Store",
         (),

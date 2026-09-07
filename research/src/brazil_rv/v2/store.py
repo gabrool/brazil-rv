@@ -17,8 +17,16 @@ import numpy as np
 import polars as pl
 from numpy.typing import NDArray
 
-from .contract import ALLOWED_LOOKBACKS, DECISION_MINUTE_INDEX, HORIZONS
+from .contract import (
+    ALLOWED_LOOKBACKS,
+    DECISION_MINUTE_INDEX,
+    HORIZONS,
+    REGISTERED_PRIMARY_TARGET,
+    REGISTERED_PRIMARY_TARGET_MASK,
+    TARGET_NEUTRALIZATION_FEATURES,
+)
 from .feature_spec import FeatureSpec, feature_schema_sha256
+from .normalization import midrank_unit_interval
 from .splits import (
     PREREGISTRATION_ROOT,
     AccessLedger,
@@ -50,6 +58,12 @@ _TARGET_VALUE_MASKS = {
     "target_to_close_normalized_residual": "target_to_close_valid",
     "target_to_close_raw_log_return": "target_to_close_valid",
 }
+_VIRTUAL_TARGET_VALUE_MASKS = {
+    REGISTERED_PRIMARY_TARGET: REGISTERED_PRIMARY_TARGET_MASK,
+}
+_VIRTUAL_TARGETS = frozenset(
+    (*_VIRTUAL_TARGET_VALUE_MASKS, *_VIRTUAL_TARGET_VALUE_MASKS.values())
+)
 _MULTI_HORIZON_TARGET_MASKS = frozenset(
     ("target_valid", "target_shareholder_valid", "target_price_valid")
 )
@@ -87,6 +101,76 @@ _NON_MODEL_FEATURE_NAME_GROUPS = frozenset(("common_state_diagnostic", "horizons
 _PRIMARY_MODEL_FEATURE_GROUPS = ("slow", "intraday", "native_fast")
 
 
+def characteristic_neutral_targets(
+    simple_returns: NDArray[np.floating],
+    scaled_target_valid: NDArray[np.bool_],
+    sigma_asof: NDArray[np.floating],
+    characteristics: NDArray[np.floating],
+    characteristic_valid: NDArray[np.bool_],
+    *,
+    horizons: Sequence[int] = HORIZONS,
+    clip: float = 5.0,
+    minimum_names: int = 20,
+) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
+    """Residualize the scaled return target against the three rev-3 risks.
+
+    ``characteristics`` are the store's already rank-Gaussianized decision-row
+    values for lagged volatility, beta, and log ADV.  Work is deliberately
+    row-wise so the virtual view never materializes another full-store panel.
+    """
+
+    returns = np.asarray(simple_returns, dtype=np.float64)
+    target_valid = np.asarray(scaled_target_valid, dtype=np.bool_)
+    sigma = np.asarray(sigma_asof, dtype=np.float64)
+    z = np.asarray(characteristics, dtype=np.float64)
+    z_valid = np.asarray(characteristic_valid, dtype=np.bool_)
+    if returns.ndim != 3 or target_valid.shape != returns.shape:
+        raise ValueError("neutral-target returns and validity must align")
+    if sigma.shape != returns.shape[:2] or z.shape != (*returns.shape[:2], 3):
+        raise ValueError("neutral-target risk characteristics are misaligned")
+    if z_valid.shape != returns.shape[:2]:
+        raise ValueError("neutral-target characteristic validity is misaligned")
+    if returns.shape[-1] != len(horizons):
+        raise ValueError("neutral-target horizon axis is misaligned")
+    if clip <= 0.0 or not np.isfinite(clip) or minimum_names < 1:
+        raise ValueError("neutral-target clip and minimum support must be positive")
+
+    output = np.zeros(returns.shape, dtype=np.float32)
+    output_valid = np.zeros(returns.shape, dtype=np.bool_)
+    for day in range(returns.shape[0]):
+        for horizon_index, horizon in enumerate(horizons):
+            population = (
+                target_valid[day, :, horizon_index]
+                & z_valid[day]
+                & np.isfinite(returns[day, :, horizon_index])
+                & np.isfinite(sigma[day])
+                & (sigma[day] > 1e-8)
+            )
+            if int(population.sum()) < minimum_names:
+                continue
+            names = np.flatnonzero(population)
+            realized = returns[day, names, horizon_index]
+            y = np.clip(
+                (realized - np.median(realized))
+                / (sigma[day, names] * np.sqrt(float(horizon))),
+                -clip,
+                clip,
+            )
+            design = np.column_stack((np.ones(names.size), z[day, names]))
+            coefficients = np.linalg.lstsq(design, y, rcond=None)[0]
+            residual = y - design @ coefficients
+            tolerance = (
+                128.0
+                * np.finfo(np.float64).eps
+                * max(1.0, float(np.max(np.abs(y), initial=0.0)))
+            )
+            if float(np.max(np.abs(residual), initial=0.0)) <= tolerance:
+                residual.fill(0.0)
+            output[day, names, horizon_index] = midrank_unit_interval(residual)
+            output_valid[day, names, horizon_index] = True
+    return output, output_valid
+
+
 def _validated_feature_schema_sha256(
     metadata: Mapping[str, object],
     feature_names: Mapping[str, Sequence[str]],
@@ -99,10 +183,7 @@ def _validated_feature_schema_sha256(
     if not isinstance(schema, Mapping):
         raise ValueError("current v2 stores require metadata.feature_schema")
     raw_specs = schema.get("specifications")
-    if (
-        not isinstance(raw_specs, Sequence)
-        or isinstance(raw_specs, (str, bytes))
-    ):
+    if not isinstance(raw_specs, Sequence) or isinstance(raw_specs, (str, bytes)):
         raise ValueError("current v2 stores require FeatureSpec specifications")
     specs: list[FeatureSpec] = []
     for raw_spec in raw_specs:
@@ -114,9 +195,11 @@ def _validated_feature_schema_sha256(
             raise ValueError("invalid FeatureSpec specification") from error
 
     declared_model_groups = set(feature_names) - _NON_MODEL_FEATURE_NAME_GROUPS
-    unknown_groups = declared_model_groups - set(_PRIMARY_MODEL_FEATURE_GROUPS) - {
-        key for key in declared_model_groups if key.startswith("sidecar_")
-    }
+    unknown_groups = (
+        declared_model_groups
+        - set(_PRIMARY_MODEL_FEATURE_GROUPS)
+        - {key for key in declared_model_groups if key.startswith("sidecar_")}
+    )
     if unknown_groups:
         raise ValueError(f"unregistered feature groups: {sorted(unknown_groups)}")
     model_groups = tuple(
@@ -347,8 +430,7 @@ def _validate_array_shapes(
         if name in _DATE_COMMON_STATE_ARRAYS:
             if value.ndim != 2 or value.shape[0] != date_count:
                 raise ValueError(
-                    f"{name} must have the [date, common-state] axes; got "
-                    f"{value.shape}"
+                    f"{name} must have the [date, common-state] axes; got {value.shape}"
                 )
             expected_dtype = (
                 np.bool_ if name.endswith("_valid") else np.dtype(np.float32)
@@ -413,15 +495,19 @@ def _validate_array_shapes(
     ):
         raise ValueError("common-state diagnostic values and validity are misaligned")
     declared_feature_arrays = {
-        array_name
-        for family in feature_families
-        for array_name in family
+        array_name for family in feature_families for array_name in family
     }
     orphan_feature_arrays = {
         name
         for name in arrays
         if (
-            name in {"slow_valid", "slow_age_sessions", "intraday_valid", "intraday_age_sessions"}
+            name
+            in {
+                "slow_valid",
+                "slow_age_sessions",
+                "intraday_valid",
+                "intraday_age_sessions",
+            }
             or (
                 name.startswith("sidecar_")
                 and (name.endswith("_valid") or name.endswith("_age_sessions"))
@@ -491,7 +577,9 @@ def _validate_array_shapes(
     if "fast_patch_values" in arrays:
         fast_shape = arrays["fast_patch_values"].shape
         if len(fast_shape) != 4 or fast_shape[-1] != 7:
-            raise ValueError("native fast values must have shape [date, fast, patch, 7]")
+            raise ValueError(
+                "native fast values must have shape [date, fast, patch, 7]"
+            )
         if "fast_patch_mask" not in arrays:
             raise ValueError("native fast values require fast_patch_mask")
         if arrays["fast_patch_mask"].shape != fast_shape[:-1]:
@@ -500,9 +588,13 @@ def _validate_array_shapes(
             ("fast_last_price_age_minutes", "fast_last_price_age_valid"),
         ):
             if (values_name in arrays) != (mask_name in arrays):
-                raise ValueError(f"{values_name} and {mask_name} must be stored together")
+                raise ValueError(
+                    f"{values_name} and {mask_name} must be stored together"
+                )
             if values_name in arrays and arrays[values_name].shape != fast_shape[:-1]:
-                raise ValueError(f"{values_name} is misaligned with native fast patches")
+                raise ValueError(
+                    f"{values_name} is misaligned with native fast patches"
+                )
     for values_name, mask_name in (
         ("target_shareholder_simple_return", "target_shareholder_valid"),
         ("target_terminal_wealth", "target_shareholder_valid"),
@@ -588,13 +680,9 @@ def _validate_array_shapes(
                 "prior_reference_close must contain positive prices or NaN"
             )
     if "audit_eventual_survives_to_final_year" in arrays:
-        eventual_survival = np.asarray(
-            arrays["audit_eventual_survives_to_final_year"]
-        )
+        eventual_survival = np.asarray(arrays["audit_eventual_survives_to_final_year"])
         if eventual_survival.dtype != np.bool_:
-            raise ValueError(
-                "audit_eventual_survives_to_final_year must be boolean"
-            )
+            raise ValueError("audit_eventual_survives_to_final_year must be boolean")
 
 
 def _validate_native_fast_mapping(
@@ -611,9 +699,7 @@ def _validate_native_fast_mapping(
         )
     ordered = frame.select(required).sort("fast_index")
     fast_indices = ordered.get_column("fast_index").cast(pl.Int64).to_list()
-    store_indices = (
-        ordered.get_column("store_name_index").cast(pl.Int64).to_list()
-    )
+    store_indices = ordered.get_column("store_name_index").cast(pl.Int64).to_list()
     mapped_isins = ordered.get_column("isin").cast(pl.String).to_list()
     if fast_indices != list(range(fast_count)):
         raise ValueError("native fast indices must be contiguous and complete")
@@ -704,8 +790,7 @@ class StoreStaging:
             and normalized_shape[0] == self.dates.size
             and normalized_shape[1] > 0
             if name in _DATE_COMMON_STATE_ARRAYS
-            else len(normalized_shape) >= 3
-            and normalized_shape[0] == self.dates.size
+            else len(normalized_shape) >= 3 and normalized_shape[0] == self.dates.size
             if name in _SPARSE_FAST_ARRAYS
             else len(normalized_shape) >= 2
             and normalized_shape[:2] == (self.dates.size, len(self.isins))
@@ -947,8 +1032,7 @@ def write_store(
     _validate_axes(date_axis, isin_axis)
     materialized = {name: np.asarray(value) for name, value in arrays.items()}
     if any(
-        value.ndim
-        < (1 if name in _DATE_ONLY_ARRAYS else 2)
+        value.ndim < (1 if name in _DATE_ONLY_ARRAYS else 2)
         for name, value in materialized.items()
     ):
         raise ValueError("store arrays must begin with their registered axes")
@@ -1135,14 +1219,30 @@ class V2Store:
     def array_names(self) -> frozenset[str]:
         """Names present in the immutable store, without exposing array handles."""
 
-        return frozenset(self._arrays)
+        virtual = _VIRTUAL_TARGETS if self._neutral_target_available() else ()
+        return frozenset((*self._arrays, *virtual))
 
     def has_array(self, name: str) -> bool:
-        return name in self._arrays
+        return name in self._arrays or (
+            name in _VIRTUAL_TARGETS and self._neutral_target_available()
+        )
+
+    def _neutral_target_available(self) -> bool:
+        required = {
+            "target_valid",
+            "target_shareholder_valid",
+            "target_shareholder_simple_return",
+            "target_scale_sigma",
+            "slow_values",
+            "slow_valid",
+        }
+        return required.issubset(self._arrays)
 
     def array_shape(self, name: str) -> tuple[int, ...]:
         """Return immutable shape metadata without returning the backing mmap."""
 
+        if name in _VIRTUAL_TARGETS:
+            name = "target_valid"
         try:
             shape = self.manifest["arrays"][name]["shape"]
         except KeyError as error:
@@ -1152,6 +1252,10 @@ class V2Store:
     def array_dtype(self, name: str) -> np.dtype[np.generic]:
         """Return immutable dtype metadata without returning the backing mmap."""
 
+        if name == REGISTERED_PRIMARY_TARGET:
+            return np.dtype(np.float32)
+        if name == REGISTERED_PRIMARY_TARGET_MASK:
+            return np.dtype(np.bool_)
         try:
             dtype = self.manifest["arrays"][name]["dtype"]
         except KeyError as error:
@@ -1221,11 +1325,14 @@ class V2Store:
     ) -> NDArray[np.generic]:
         """Copy authorized date rows without exposing the backing whole-store mmap."""
 
+        selector = self._checked_date_selector(date_selector)
+        if name in _VIRTUAL_TARGETS:
+            values, valid = self._neutral_primary_view(selector)
+            return valid if name == REGISTERED_PRIMARY_TARGET_MASK else values
         try:
             array = self._arrays[name]
         except KeyError as error:
             raise KeyError(f"v2 store does not contain {name}") from error
-        selector = self._checked_date_selector(date_selector)
         mask_name = _TARGET_VALUE_MASKS.get(name)
         if name in _MULTI_HORIZON_TARGET_MASKS:
             return self._target_mask(name, selector)
@@ -1234,9 +1341,7 @@ class V2Store:
         if mask_name in _MULTI_HORIZON_TARGET_MASKS:
             valid = self._target_mask(mask_name, selector)
         else:
-            valid = np.asarray(
-                self._arrays[mask_name][selector], dtype=np.bool_
-            ).copy()
+            valid = np.asarray(self._arrays[mask_name][selector], dtype=np.bool_).copy()
         return self._read_target_payload(name, array, selector, valid)
 
     def read_target(
@@ -1256,6 +1361,20 @@ class V2Store:
         mask may only remove cells from the canonical capability mask.
         """
 
+        selector = self._checked_date_selector(date_selector)
+        if name == REGISTERED_PRIMARY_TARGET:
+            values, canonical = self._neutral_primary_view(selector)
+            requested = np.asarray(valid_mask)
+            if requested.dtype != np.bool_ or requested.shape != canonical.shape:
+                raise ValueError(
+                    "local target validity mask must be boolean and match the "
+                    "selected target payload"
+                )
+            if np.any(requested & ~canonical):
+                raise PermissionError(
+                    "local target validity mask exceeds the store capability"
+                )
+            return np.where(requested, values, 0.0).astype(np.float32, copy=False)
         mask_name = _TARGET_VALUE_MASKS.get(name)
         if mask_name is None:
             raise ValueError(f"{name} is not a masked target payload")
@@ -1263,7 +1382,6 @@ class V2Store:
             array = self._arrays[name]
         except KeyError as error:
             raise KeyError(f"v2 store does not contain {name}") from error
-        selector = self._checked_date_selector(date_selector)
         if mask_name in _MULTI_HORIZON_TARGET_MASKS:
             canonical = self._target_mask(mask_name, selector)
         else:
@@ -1282,6 +1400,56 @@ class V2Store:
             )
         return self._read_target_payload(name, array, selector, requested)
 
+    def _neutral_primary_view(
+        self, selector: int | NDArray[np.int64]
+    ) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
+        """Build the rev-3 characteristic-neutral target on authorized rows."""
+
+        scalar = isinstance(selector, int)
+        indices = (
+            np.asarray([selector], dtype=np.int64)
+            if scalar
+            else np.asarray(selector, dtype=np.int64)
+        )
+        canonical = self._target_mask("target_valid", indices)
+        shareholder_valid = self._target_mask("target_shareholder_valid", indices)
+        if np.any(canonical & ~shareholder_valid):
+            raise ValueError(
+                "scaled-target validity exceeds shareholder-return validity"
+            )
+        returns = self._read_target_payload(
+            "target_shareholder_simple_return",
+            self._arrays["target_shareholder_simple_return"],
+            indices,
+            canonical,
+        )
+        sigma = np.asarray(
+            self._arrays["target_scale_sigma"][indices], dtype=np.float64
+        )
+        slow = np.asarray(self._arrays["slow_values"][indices], dtype=np.float64)
+        slow_valid = np.asarray(self._arrays["slow_valid"][indices], dtype=np.bool_)
+        feature_names = self.manifest.get("feature_names", {}).get("slow")
+        if not isinstance(feature_names, list):
+            raise ValueError("store lacks ordered slow-feature names")
+        try:
+            feature_indices = [
+                feature_names.index(name) for name in TARGET_NEUTRALIZATION_FEATURES
+            ]
+        except ValueError as error:
+            raise ValueError("store lacks a neutral-target characteristic") from error
+        characteristics = slow[..., feature_indices]
+        characteristic_valid = slow_valid[..., feature_indices].all(axis=-1)
+        characteristic_valid &= np.isfinite(characteristics).all(axis=-1)
+        output, valid = characteristic_neutral_targets(
+            returns,
+            canonical,
+            sigma,
+            characteristics,
+            characteristic_valid,
+            horizons=HORIZONS,
+        )
+        return (output[0], valid[0]) if scalar else (output, valid)
+
     def _read_target_payload(
         self,
         name: str,
@@ -1289,9 +1457,13 @@ class V2Store:
         selector: int | NDArray[np.int64],
         valid: NDArray[np.bool_],
     ) -> NDArray[np.generic]:
-        expected_shape = array.shape[1:] if isinstance(selector, int) else (
-            selector.size,
-            *array.shape[1:],
+        expected_shape = (
+            array.shape[1:]
+            if isinstance(selector, int)
+            else (
+                selector.size,
+                *array.shape[1:],
+            )
         )
         if expected_shape != valid.shape:
             raise ValueError(f"{name} and its validity mask are misaligned")
