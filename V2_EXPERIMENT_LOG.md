@@ -1571,3 +1571,45 @@ No monthly source-coverage rows were persisted, so the available fold summaries 
 | F3 | 23059 | 0 | 0.000000 | NA | unsupported |
 
 Interpretation: oddlot was essentially complete in F1/F2 but absent in F3, matching the registered rung-D collapse as a source-coverage regime break rather than evidence for a stable sidecar improvement.
+
+## Round 2 required smoke — first-failure stop (2026-09-07)
+
+Round 2 was authorized after the detailed Round-1 readout. The exact sealed
+Round-1 root and V3 store were copied to `brazil-rv-east3` NFS and reverified:
+all 696 Round-1 inventory entries (505,196,221 bytes), the complete V3 store,
+and both CDI inputs matched their registered SHA-256 values. On Linux, Ruff,
+compileall, and all 852 tests passed; the production-axis memory test also
+passed its 8-GiB gate. The two test-only Linux portability corrections are on
+main at `e868e927eecc70e2d4d9701ba1a1b19ad1569cf4`.
+
+The initial freeze attempt correctly refused current-main commit identity
+because sealed Round 1 records implementation `cb6a0a5c4de202fe046dba48d9fd6c5af168dbfd`.
+The entire `research/src` tree is byte-identical between that commit and main,
+so the canonical Round-2 root was frozen from a clean detached checkout of the
+exact Round-1 implementation:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round2_cb6a0a5_20260907T143327Z
+
+Its frozen-design SHA-256 is
+`30b75d1b5bd126222ed4d318b8edccb242f84734deeb9222299b3dee55e65d8e`.
+The design binds parent `b_intraday`, no external sidecars, native fresh fast
+weights, no legacy checkpoint, maximum parallelism four, and protected access
+false/false.
+
+The mandatory disposable Arm-A/F1/seed-11 one-epoch smoke failed before any
+epoch history, checkpoint, completed training manifest, score directory, or
+registered trajectory was written. `torch.compile(fullgraph=True)` exhausted
+Dynamo's recompile limit of eight as the active-name dimension changed; the
+last guard mismatch was `v1_equity_slow` dimension 1, expected 128 versus
+actual 137. The failure is therefore a dynamic-shape compilation defect, not a
+research result. Per the first-failure rule, there was no retry, Stage P and
+the registered A/B/C grid were not started, and no R2.1 or R2.2 selection was
+made.
+
+The failure-record and complete failed-root inventory SHA-256 values are
+`d830cbb6a139b2c7c18b64a9adef6593095a89954cf3ba7aef5c4f9b2aaacf23`
+and `f0c61411b729b9f3aeaff1cab4f133e14e02928994a0b1725bc598c0d0deeb07`.
+The traceback SHA-256 is
+`a2e611bcb61d677709bc36da7706fb1a8b14f95ebc08d5f221526b0a81e9341d`.
+All operational logs are hash-secured in the failed root. Official validation,
+the permanently spent test, and deployment remain untouched.

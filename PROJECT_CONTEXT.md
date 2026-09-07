@@ -1684,10 +1684,22 @@ eligible ladder parent. The data-span preview is informational: fine-only,
 756-session decay, and uniform-pretrain ICs are
 0.055264/0.053459/0.053680.
 
-Round 2 has not been frozen or run, and no paid instance exists. Its next step
-requires explicit user authorization: freeze a fresh NFS root under the then-
-current clean commit, run exactly one disposable Arm-A/F1/seed-11 epoch with
-no score artifact, and only if that succeeds write the three-seed Stage-P
-plan. Official validation, the permanently spent test, and deployment remain
-untouched. Direct provider reads at `2026-09-07T04:51:39.2629896Z` and
-`2026-09-07T04:51:42.8034166Z` both returned zero instances.
+Round 2 was authorized and frozen at the exact Round-1 implementation commit
+`cb6a0a5c4de202fe046dba48d9fd6c5af168dbfd` in:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round2_cb6a0a5_20260907T143327Z
+
+Its frozen-design SHA-256 is
+`30b75d1b5bd126222ed4d318b8edccb242f84734deeb9222299b3dee55e65d8e`.
+The required no-score Arm-A/F1/seed-11 smoke stopped at the first failure:
+`torch.compile(fullgraph=True)` exceeded Dynamo's eight-graph recompile limit
+when the dynamic active-name axis changed (last guard: 128 to 137 names). No
+epoch history, checkpoint, completed training manifest, score, Stage-P run,
+registered A/B/C trajectory, or R2 selection exists. Failure-record and
+complete failed-root inventory SHA-256 values are
+`d830cbb6a139b2c7c18b64a9adef6593095a89954cf3ba7aef5c4f9b2aaacf23`
+and `f0c61411b729b9f3aeaff1cab4f133e14e02928994a0b1725bc598c0d0deeb07`.
+Official validation, the permanently spent test, and deployment remain
+untouched. The next Round-2 attempt requires a bounded dynamic-shape compiler
+repair, tests, a new clean commit, and a fresh root; the failed smoke must not
+be reused as a registered result.
