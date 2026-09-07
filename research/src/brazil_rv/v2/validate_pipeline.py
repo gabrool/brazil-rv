@@ -912,6 +912,16 @@ def _development_acceptance(
             "mean_unresolved_stale_inventory_fraction_nav"
         )
         gross = None if gross_value is None else float(gross_value)
+        within_gross_band = gross is not None and 1.8 <= gross <= 2.2
+        gross_deployment_label = (
+            None
+            if gross is None
+            else "within_band"
+            if within_gross_band
+            else "gross_underdeployed"
+            if gross < 1.8
+            else "gross_overdeployed"
+        )
         unresolved_stale = (
             None
             if unresolved_stale_value is None
@@ -928,9 +938,12 @@ def _development_acceptance(
                     "maximum_gross_fraction_nav"
                 ),
                 "gross_target": 2.0,
-                "within_ten_percent_of_gross_target": (
-                    gross is not None and 1.8 <= gross <= 2.2
+                "within_ten_percent_of_gross_target": within_gross_band,
+                "gross_deployment_label": gross_deployment_label,
+                "gross_shortfall_decomposition": headline.get(
+                    "gross_shortfall_decomposition"
                 ),
+                "entry_defect_signatures": headline.get("entry_defect_signatures"),
                 "unresolved_inventory_count": headline.get(
                     "unresolved_inventory_count"
                 ),
@@ -963,6 +976,7 @@ def _development_acceptance(
                     "terminal_settlement_convention"
                 ),
                 "settlement_grace_sessions": headline.get("settlement_grace_sessions"),
+                "ineligible_hold_sessions": headline.get("ineligible_hold_sessions"),
                 "settlement_haircut": headline.get("settlement_haircut"),
                 "terminal_settlement_count": headline.get("terminal_settlement_count"),
                 "terminal_settlement_notional": headline.get(
@@ -977,6 +991,15 @@ def _development_acceptance(
                 "terminal_settlement_economics_unresolved": headline.get(
                     "terminal_settlement_economics_unresolved"
                 ),
+                "exit_instructions_by_cause": headline.get(
+                    "exit_instructions_by_cause"
+                ),
+                "ineligible_held_sessions_by_cause": headline.get(
+                    "ineligible_held_sessions_by_cause"
+                ),
+                "ineligible_exit_reeligible_within_10_sessions_share": headline.get(
+                    "ineligible_exit_reeligible_within_10_sessions_share"
+                ),
             }
         )
         if (
@@ -984,8 +1007,27 @@ def _development_acceptance(
             != "last_mark_after_10_sessions"
         ):
             violations.append(f"{label}_terminal_settlement_convention_missing")
-        if gross is None or not 1.8 <= gross <= 2.2:
-            violations.append(f"{label}_deployed_gross_outside_ten_percent")
+        if headline.get("ineligible_hold_sessions") != 5:
+            violations.append(f"{label}_ineligible_hold_sessions_not_five")
+        signatures = headline.get("entry_defect_signatures")
+        decomposition = headline.get("gross_shortfall_decomposition")
+        signature_limits = {
+            "D1_entry_pending_printed_unblocked_unfilled": 0,
+            "D2_entry_fill_quantity_short": 0,
+            "D3_blocked_open_slots": 0,
+            "D4_cap_block_defects": 0,
+            "D5_ineligible_exit_within_hold_window": 0,
+        }
+        signatures_pass = isinstance(signatures, Mapping) and all(
+            signatures.get(name) == limit for name, limit in signature_limits.items()
+        )
+        if (
+            gross is None
+            or not 1.5 <= gross <= 2.25
+            or not signatures_pass
+            or not isinstance(decomposition, Mapping)
+        ):
+            violations.append(f"{label}_deployed_gross_defect_or_outside_hard_bounds")
         if unresolved_stale is None:
             violations.append(f"{label}_unresolved_stale_fraction_missing")
         elif unresolved_stale >= 0.02:
@@ -1021,6 +1063,15 @@ def _development_acceptance(
             "reversal_5_definition_sign": -1.0,
             "gross_target": 2.0,
             "gross_relative_tolerance": 0.10,
+            "gross_hard_floor": 1.5,
+            "gross_hard_ceiling": 2.25,
+            "entry_defect_signature_limits": {
+                "D1_entry_pending_printed_unblocked_unfilled": 0,
+                "D2_entry_fill_quantity_short": 0,
+                "D3_blocked_open_slots": 0,
+                "D4_cap_block_defects": 0,
+                "D5_ineligible_exit_within_hold_window": 0,
+            },
             "per_evaluation_mean_unresolved_stale_inventory_fraction_strictly_below": 0.02,
             "terminal_settlement_economics_unresolved_fraction_nav": 0.15,
         },

@@ -382,8 +382,10 @@ Economics uses immutable intended orders created from the decision snapshot,
 then later fill observations. A missing fill cannot cause a hindsight
 replacement. The persistent ledger carries signed shares, free/restricted
 cash, receivables/payables, pending orders, costs, financing, borrow, and
-valuation status. Eligibility loss requests an exit but does not fabricate a
-sale. A held name that has no print for ten consecutive sessions is settled at
+valuation status. A held name remains held through at most five consecutive
+ineligible decision sessions; eligibility resets the streak, while the sixth
+session requests an `ineligible_hold_exhausted` exit without fabricating a sale.
+Entries remain eligible-only. A held name that has no print for ten consecutive sessions is settled at
 its last mark on the tenth session under the explicitly labelled
 `last_mark_after_10_sessions` development convention; the ordinary cost is
 applied and the name is never reopened. A parallel 30% adverse settlement-price
@@ -401,6 +403,14 @@ labels that book `economics_unresolved`. Any terminal unresolved inventory
 retains count, notional, and the nonexclusive causes `no_terminal_print`,
 `settlement_grace_sessions`, `unresolved_action`, and `prior_pending_exit`;
 the terminal snapshot is not itself the utilization gate.
+
+Mean gross remains targeted at 2.0 and the 1.8--2.2 band is always reported.
+Books outside that band are labelled `gross_underdeployed` or
+`gross_overdeployed`; the label is not a violation when the exact
+gross-shortfall decomposition is present, all D1--D5 ledger signatures are
+zero, and mean gross remains inside the hard 1.5--2.25 interval. A signature
+breach or hard-bound breach stops acceptance. Labelled books retain their IC,
+persistence, spread, and achieved-gross economics readouts.
 
 Undefined comparisons fail the not-worse guard. An all-cash result can be
 well-defined but is not evidence of deployment feasibility.

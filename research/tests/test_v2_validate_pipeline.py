@@ -1037,6 +1037,7 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
         "mean_gross_fraction_nav": 2.0,
         "mean_unresolved_stale_inventory_fraction_nav": 0.01,
         "terminal_settlement_convention": "last_mark_after_10_sessions",
+        "ineligible_hold_sessions": 5,
         "settlement_grace_sessions": 10,
         "settlement_haircut": 0.30,
         "terminal_settlement_count": 0,
@@ -1048,6 +1049,14 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
         "unresolved_inventory_notional": 10_000.0,
         "terminal_nav": 1_000_000.0,
         "terminal_unresolved_inventory_fraction_nav": 0.01,
+        "gross_shortfall_decomposition": {"total": 0.0},
+        "entry_defect_signatures": {
+            "D1_entry_pending_printed_unblocked_unfilled": 0,
+            "D2_entry_fill_quantity_short": 0,
+            "D3_blocked_open_slots": 0,
+            "D4_cap_block_defects": 0,
+            "D5_ineligible_exit_within_hold_window": 0,
+        },
     }
     records = [
         {
@@ -1083,12 +1092,33 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
     assert accepted["reasons"] == []
     assert accepted["reversal_5_definition_negative_signed"] is True
 
+    labelled = [dict(record) for record in records]
+    labelled[0] = {
+        **labelled[0],
+        "evaluation": {
+            "daily_primary_scaled_target_ic": [0.01],
+            "headline_economics": {**economics, "mean_gross_fraction_nav": 1.7},
+        },
+    }
+    accepted_with_label = pipeline._development_acceptance(
+        baseline_records=labelled,
+        gbdt_records=gbdt,
+        action_terms_source="inferred_cotahist_dismes_v1",
+        schedule_source="reconstructed_v1",
+    )
+    assert accepted_with_label["status"] == "development_grade_inferred_actions"
+    assert accepted_with_label["reasons"] == []
+    assert (
+        accepted_with_label["economics_by_evaluation"][0]["gross_deployment_label"]
+        == "gross_underdeployed"
+    )
+
     broken = [dict(record) for record in records]
     broken[0] = {
         **broken[0],
         "evaluation": {
-            "daily_primary_scaled_target_ic": [0.11],
-            "headline_economics": {**economics, "mean_gross_fraction_nav": 1.7},
+            "daily_primary_scaled_target_ic": [0.01],
+            "headline_economics": {**economics, "mean_gross_fraction_nav": 1.4},
         },
     }
     rejected = pipeline._development_acceptance(
@@ -1099,6 +1129,28 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
     )
     assert rejected["status"] == "unsupported"
     assert any("deployed_gross" in value for value in rejected["reasons"])
+
+    breached = [dict(record) for record in records]
+    breached_signatures = dict(economics["entry_defect_signatures"])
+    breached_signatures["D5_ineligible_exit_within_hold_window"] = 1
+    breached[0] = {
+        **breached[0],
+        "evaluation": {
+            "daily_primary_scaled_target_ic": [0.01],
+            "headline_economics": {
+                **economics,
+                "entry_defect_signatures": breached_signatures,
+            },
+        },
+    }
+    signature_rejected = pipeline._development_acceptance(
+        baseline_records=breached,
+        gbdt_records=gbdt,
+        action_terms_source="inferred_cotahist_dismes_v1",
+        schedule_source="reconstructed_v1",
+    )
+    assert signature_rejected["status"] == "unsupported"
+    assert any("deployed_gross" in value for value in signature_rejected["reasons"])
 
 
 def test_ledger_replay_comparison_excludes_only_economics_and_schema() -> None:

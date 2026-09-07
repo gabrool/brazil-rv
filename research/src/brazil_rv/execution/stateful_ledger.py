@@ -15,7 +15,10 @@ OrderPurpose = Literal[
     "entry", "exit", "risk_exit", "terminal_exit", "terminal_settlement"
 ]
 ExitInstructionCause = Literal[
-    "ineligible", "settlement_grace", "rank_out_of_retention", "terminal"
+    "ineligible_hold_exhausted",
+    "settlement_grace",
+    "rank_out_of_retention",
+    "terminal",
 ]
 CancellationReason = Literal[
     "expired",
@@ -38,7 +41,7 @@ _CANCELLATION_REASONS: tuple[CancellationReason, ...] = (
 
 TERMINAL_SETTLEMENT_CONVENTION = "last_mark_after_10_sessions"
 EXIT_INSTRUCTION_CAUSE_CODES: dict[ExitInstructionCause, int] = {
-    "ineligible": 1,
+    "ineligible_hold_exhausted": 1,
     "settlement_grace": 2,
     "rank_out_of_retention": 3,
     "terminal": 4,
@@ -69,6 +72,7 @@ class LedgerConfig:
     initial_capital_brl: float = 1.0
     lot_size: int | None = None
     entry_expiry_sessions: int = 3
+    ineligible_hold_sessions: int = 5
     settlement_grace_sessions: int = 10
     settlement_haircut: float = 0.30
     settlement_economics_unresolved_fraction_nav: float = 0.15
@@ -99,6 +103,8 @@ class LedgerConfig:
             raise ValueError("lot size must be positive when supplied")
         if self.entry_expiry_sessions < 1:
             raise ValueError("entry expiry must be at least one session")
+        if self.ineligible_hold_sessions < 0:
+            raise ValueError("ineligible hold must be non-negative")
         if self.settlement_grace_sessions < 1:
             raise ValueError("settlement grace must be at least one session")
         if not 0 <= self.settlement_haircut < 1:
@@ -269,12 +275,17 @@ class StatefulLedgerResult:
     pending_entries_without_print_today_short: NDArray[np.int64]
     slots_freed_by_exit_fill_today_long: NDArray[np.int64]
     slots_freed_by_exit_fill_today_short: NDArray[np.int64]
-    exit_instructions_ineligible: NDArray[np.int64]
+    exit_instructions_ineligible_hold_exhausted: NDArray[np.int64]
     exit_instructions_settlement_grace: NDArray[np.int64]
     exit_instructions_rank_out_of_retention: NDArray[np.int64]
     exit_instructions_terminal: NDArray[np.int64]
     exit_instruction_cause: NDArray[np.int8]
     exit_instruction_side: NDArray[np.int8]
+    ineligible_streak: NDArray[np.int64]
+    ineligible_held_sessions_score_invalid: NDArray[np.int64]
+    ineligible_held_sessions_membership_invalid: NDArray[np.int64]
+    ineligible_held_sessions_score_nonfinite: NDArray[np.int64]
+    ineligible_exit_within_hold_window: NDArray[np.int64]
     net_cap_block_with_balanced_book: NDArray[np.int64]
     gross_cap_block_below_target: NDArray[np.int64]
     name_cap_block_on_fresh_entry: NDArray[np.int64]
@@ -291,7 +302,7 @@ class StatefulLedgerResult:
     gross_shortfall_sizing_fill: NDArray[np.float64]
     gross_shortfall_sizing_mark_drift: NDArray[np.float64]
     gross_shortfall_sizing_nav_drift: NDArray[np.float64]
-    eligibility_flicker_exit_share: float
+    ineligible_exit_reeligible_within_10_sessions_share: float
     intended_orders: tuple[IntendedOrder, ...]
     fills: tuple[Fill, ...]
     cancellations: tuple[OrderCancellation, ...]
@@ -304,6 +315,7 @@ class StatefulLedgerResult:
     insolvency_date: date | None
     economics_unresolved: bool
     gross_target: float
+    ineligible_hold_sessions: int
     settlement_grace_sessions: int
     settlement_haircut: float
     settlement_economics_unresolved_fraction_nav: float
@@ -400,7 +412,9 @@ class StatefulLedgerResult:
                 + self.name_cap_block_on_fresh_entry.sum()
                 + self.net_cap_block_with_balanced_book.sum()
             ),
-            "D5_eligibility_flicker_exit_share": (self.eligibility_flicker_exit_share),
+            "D5_ineligible_exit_within_hold_window": int(
+                self.ineligible_exit_within_hold_window.sum()
+            ),
         }
         return {
             "mean_net_excess_bps_per_day": (
@@ -445,6 +459,7 @@ class StatefulLedgerResult:
             "unresolved_action_name_days": int(self.unresolved_action_name_days.sum()),
             "valuation_scenario_count": int(self.valuation_scenario_count.sum()),
             "terminal_settlement_convention": TERMINAL_SETTLEMENT_CONVENTION,
+            "ineligible_hold_sessions": self.ineligible_hold_sessions,
             "settlement_grace_sessions": self.settlement_grace_sessions,
             "settlement_haircut": self.settlement_haircut,
             "terminal_settlement_count": int(self.terminal_settlement_count.sum()),
@@ -458,13 +473,29 @@ class StatefulLedgerResult:
             "gross_shortfall_decomposition": decomposition,
             "entry_defect_signatures": defect_signatures,
             "exit_instructions_by_cause": {
-                "ineligible": int(self.exit_instructions_ineligible.sum()),
+                "ineligible_hold_exhausted": int(
+                    self.exit_instructions_ineligible_hold_exhausted.sum()
+                ),
                 "settlement_grace": int(self.exit_instructions_settlement_grace.sum()),
                 "rank_out_of_retention": int(
                     self.exit_instructions_rank_out_of_retention.sum()
                 ),
                 "terminal": int(self.exit_instructions_terminal.sum()),
             },
+            "ineligible_held_sessions_by_cause": {
+                "score_valid_false": int(
+                    self.ineligible_held_sessions_score_invalid.sum()
+                ),
+                "membership_false": int(
+                    self.ineligible_held_sessions_membership_invalid.sum()
+                ),
+                "score_nonfinite": int(
+                    self.ineligible_held_sessions_score_nonfinite.sum()
+                ),
+            },
+            "ineligible_exit_reeligible_within_10_sessions_share": (
+                self.ineligible_exit_reeligible_within_10_sessions_share
+            ),
             "terminal_settlement_economics_unresolved": bool(
                 self.terminal_settlement_notional_fraction_nav.sum()
                 > self.settlement_economics_unresolved_fraction_nav
@@ -809,6 +840,7 @@ def simulate_stateful_ledger(
     unresolved_action = np.zeros(name_count, dtype=np.bool_)
     explicit_unresolved_action = np.zeros(name_count, dtype=np.bool_)
     missing_sessions = np.zeros(name_count, dtype=np.int64)
+    ineligible_streak = np.zeros(name_count, dtype=np.int64)
     entry_session = np.full(name_count, -1, dtype=np.int64)
     entry_cost_basis = np.zeros(name_count, dtype=np.float64)
     submission_nav = np.zeros(name_count, dtype=np.float64)
@@ -911,12 +943,17 @@ def simulate_stateful_ledger(
     pending_without_print_short_rows: list[int] = []
     exit_fill_long_rows: list[int] = []
     exit_fill_short_rows: list[int] = []
-    exit_ineligible_rows: list[int] = []
+    exit_ineligible_hold_exhausted_rows: list[int] = []
     exit_settlement_rows: list[int] = []
     exit_rank_rows: list[int] = []
     exit_terminal_rows: list[int] = []
     exit_cause_rows: list[NDArray[np.int8]] = []
     exit_side_rows: list[NDArray[np.int8]] = []
+    ineligible_streak_rows: list[NDArray[np.int64]] = []
+    ineligible_score_invalid_rows: list[int] = []
+    ineligible_membership_invalid_rows: list[int] = []
+    ineligible_score_nonfinite_rows: list[int] = []
+    ineligible_exit_within_hold_rows: list[int] = []
     net_cap_balanced_rows: list[int] = []
     gross_cap_below_target_rows: list[int] = []
     name_cap_fresh_rows: list[int] = []
@@ -1110,6 +1147,7 @@ def simulate_stateful_ledger(
                 marks[name] = converted_mark if shares[name] != 0.0 else np.nan
                 last_observed[name] = converted_reference
                 if shares[name] == 0.0:
+                    ineligible_streak[name] = 0
                     entry_cost_basis[name] = 0.0
                     submission_nav[name] = 0.0
             else:
@@ -1139,6 +1177,8 @@ def simulate_stateful_ledger(
                 explicit_unresolved_action[name] = False
                 entry_session[successor] = entry_session[name]
                 entry_session[name] = -1
+                ineligible_streak[successor] = ineligible_streak[name]
+                ineligible_streak[name] = 0
                 entry_cost_basis[successor] = entry_cost_basis[name]
                 submission_nav[successor] = submission_nav[name]
                 entry_cost_basis[name] = 0.0
@@ -1153,6 +1193,7 @@ def simulate_stateful_ledger(
             if q == 0.0 and restricted_by_name[name] != 0.0:
                 free_cash += restricted_by_name[name]
                 restricted_by_name[name] = 0.0
+                ineligible_streak[name] = 0
                 entry_session[name] = -1
                 entry_cost_basis[name] = 0.0
                 submission_nav[name] = 0.0
@@ -1216,6 +1257,17 @@ def simulate_stateful_ledger(
 
         signed_values = np.zeros(name_count, dtype=np.float64)
         held = shares != 0.0
+        ineligible_streak[~held | eligible] = 0
+        ineligible_streak[held & ~eligible] += 1
+        ineligible_score_invalid_rows.append(
+            int((held & ~inputs.score_valid[day]).sum())
+        )
+        ineligible_membership_invalid_rows.append(
+            int((held & ~inputs.membership[day]).sum())
+        )
+        ineligible_score_nonfinite_rows.append(
+            int((held & ~np.isfinite(inputs.score[day])).sum())
+        )
         signed_values[held] = shares[held] * marks[held]
         actual_gross, actual_net, actual_name = _risk(signed_values, start_nav)
         risk_breach = (
@@ -1227,23 +1279,29 @@ def simulate_stateful_ledger(
         exit_required: set[int] = set()
         exit_cause_by_name: dict[int, ExitInstructionCause] = {}
         for name in np.flatnonzero(held):
-            kept = (
-                eligible[name]
-                and retention > 0
-                and missing_sessions[name] < config.settlement_grace_sessions
-                and (
-                    ranks[name] >= len(order) - retention
-                    if shares[name] > 0.0
-                    else ranks[name] < retention
+            if not eligible[name]:
+                kept = (
+                    retention > 0
+                    and missing_sessions[name] < config.settlement_grace_sessions
+                    and ineligible_streak[name] <= config.ineligible_hold_sessions
                 )
-            )
+            else:
+                kept = (
+                    retention > 0
+                    and missing_sessions[name] < config.settlement_grace_sessions
+                    and (
+                        ranks[name] >= len(order) - retention
+                        if shares[name] > 0.0
+                        else ranks[name] < retention
+                    )
+                )
             if not kept:
                 integer_name = int(name)
                 exit_required.add(integer_name)
-                if not eligible[name]:
-                    exit_cause_by_name[integer_name] = "ineligible"
-                elif missing_sessions[name] >= config.settlement_grace_sessions:
+                if missing_sessions[name] >= config.settlement_grace_sessions:
                     exit_cause_by_name[integer_name] = "settlement_grace"
+                elif not eligible[name]:
+                    exit_cause_by_name[integer_name] = "ineligible_hold_exhausted"
                 else:
                     exit_cause_by_name[integer_name] = "rank_out_of_retention"
         if day == day_count - 1:
@@ -1255,6 +1313,7 @@ def simulate_stateful_ledger(
 
         exit_cause_today = np.zeros(name_count, dtype=np.int8)
         exit_side_today = np.zeros(name_count, dtype=np.int8)
+        ineligible_exit_within_hold_today = 0
         for name in sorted(exit_required):
             if name in pending_exits or shares[name] == 0.0:
                 continue
@@ -1265,6 +1324,11 @@ def simulate_stateful_ledger(
             else:
                 purpose = "exit"
                 cause = exit_cause_by_name[name]
+            if (
+                cause == "ineligible_hold_exhausted"
+                and ineligible_streak[name] <= config.ineligible_hold_sessions
+            ):
+                ineligible_exit_within_hold_today += 1
             exit_cause_today[name] = EXIT_INSTRUCTION_CAUSE_CODES[cause]
             exit_side_today[name] = 1 if shares[name] > 0.0 else -1
             pending_exits[name] = submit_order(
@@ -1713,12 +1777,13 @@ def simulate_stateful_ledger(
         band_exhausted_short_rows.append(band_exhausted_short)
         blocked_open_long_rows.append(blocked_open_long)
         blocked_open_short_rows.append(blocked_open_short)
-        exit_ineligible_rows.append(int((exit_cause_today == 1).sum()))
+        exit_ineligible_hold_exhausted_rows.append(int((exit_cause_today == 1).sum()))
         exit_settlement_rows.append(int((exit_cause_today == 2).sum()))
         exit_rank_rows.append(int((exit_cause_today == 3).sum()))
         exit_terminal_rows.append(int((exit_cause_today == 4).sum()))
         exit_cause_rows.append(exit_cause_today)
         exit_side_rows.append(exit_side_today)
+        ineligible_exit_within_hold_rows.append(ineligible_exit_within_hold_today)
         net_cap_balanced_rows.append(net_cap_balanced)
         gross_cap_below_target_rows.append(gross_cap_below_target)
         name_cap_fresh_rows.append(name_cap_fresh)
@@ -1768,6 +1833,7 @@ def simulate_stateful_ledger(
                     )
                 elif before != 0.0 and abs(after) < abs(before):
                     if after == 0.0:
+                        ineligible_streak[name] = 0
                         entry_cost_basis[name] = 0.0
                         submission_nav[name] = 0.0
                         exit_fill_long_today += int(before > 0.0)
@@ -1938,6 +2004,7 @@ def simulate_stateful_ledger(
             settlement_notional += notional
             settled_names[name] = True
             entry_session[name] = -1
+            ineligible_streak[name] = 0
             missing_sessions[name] = 0
             unresolved_action[name] = False
             explicit_unresolved_action[name] = False
@@ -2120,6 +2187,7 @@ def simulate_stateful_ledger(
         held_with_age = held_now & (entry_session >= 0)
         ages[held_with_age] = day - entry_session[held_with_age] + 1
         age_rows.append(ages)
+        ineligible_streak_rows.append(ineligible_streak.copy())
         settlement_count_rows.append(settlement_count)
         settlement_notional_rows.append(settlement_notional)
         settlement_fraction_rows.append(settlement_notional / start_nav)
@@ -2205,11 +2273,11 @@ def simulate_stateful_ledger(
     nonterminal_exit_count = int(
         ((exit_cause_array >= 1) & (exit_cause_array <= 3)).sum()
     )
-    eligibility_flicker_count = 0
+    reeligible_within_ten_count = 0
     for exit_day, name in np.argwhere(exit_cause_array == 1):
         side = int(exit_side_array[exit_day, name])
         for later_day in range(
-            int(exit_day) + 1, min(int(exit_day) + 4, completed_days)
+            int(exit_day) + 1, min(int(exit_day) + 11, completed_days)
         ):
             later_eligible = (
                 inputs.score_valid[later_day]
@@ -2237,10 +2305,10 @@ def simulate_stateful_ledger(
                 else later_rank < later_retention
             )
             if inside_retention:
-                eligibility_flicker_count += 1
+                reeligible_within_ten_count += 1
                 break
-    eligibility_flicker_share = (
-        eligibility_flicker_count / nonterminal_exit_count
+    reeligible_within_ten_share = (
+        reeligible_within_ten_count / nonterminal_exit_count
         if nonterminal_exit_count
         else 0.0
     )
@@ -2414,7 +2482,9 @@ def simulate_stateful_ledger(
         slots_freed_by_exit_fill_today_short=np.asarray(
             exit_fill_short_rows, dtype=np.int64
         ),
-        exit_instructions_ineligible=np.asarray(exit_ineligible_rows, dtype=np.int64),
+        exit_instructions_ineligible_hold_exhausted=np.asarray(
+            exit_ineligible_hold_exhausted_rows, dtype=np.int64
+        ),
         exit_instructions_settlement_grace=np.asarray(
             exit_settlement_rows, dtype=np.int64
         ),
@@ -2424,6 +2494,19 @@ def simulate_stateful_ledger(
         exit_instructions_terminal=np.asarray(exit_terminal_rows, dtype=np.int64),
         exit_instruction_cause=exit_cause_array,
         exit_instruction_side=exit_side_array,
+        ineligible_streak=np.stack(ineligible_streak_rows),
+        ineligible_held_sessions_score_invalid=np.asarray(
+            ineligible_score_invalid_rows, dtype=np.int64
+        ),
+        ineligible_held_sessions_membership_invalid=np.asarray(
+            ineligible_membership_invalid_rows, dtype=np.int64
+        ),
+        ineligible_held_sessions_score_nonfinite=np.asarray(
+            ineligible_score_nonfinite_rows, dtype=np.int64
+        ),
+        ineligible_exit_within_hold_window=np.asarray(
+            ineligible_exit_within_hold_rows, dtype=np.int64
+        ),
         net_cap_block_with_balanced_book=np.asarray(
             net_cap_balanced_rows, dtype=np.int64
         ),
@@ -2464,7 +2547,9 @@ def simulate_stateful_ledger(
         gross_shortfall_sizing_nav_drift=np.asarray(
             shortfall_sizing_nav_rows, dtype=np.float64
         ),
-        eligibility_flicker_exit_share=eligibility_flicker_share,
+        ineligible_exit_reeligible_within_10_sessions_share=(
+            reeligible_within_ten_share
+        ),
         intended_orders=tuple(orders),
         fills=tuple(fills),
         cancellations=tuple(cancellations),
@@ -2477,6 +2562,7 @@ def simulate_stateful_ledger(
         insolvency_date=insolvency_date,
         economics_unresolved=economics_unresolved,
         gross_target=config.gross_target,
+        ineligible_hold_sessions=config.ineligible_hold_sessions,
         settlement_grace_sessions=config.settlement_grace_sessions,
         settlement_haircut=config.settlement_haircut,
         settlement_economics_unresolved_fraction_nav=(

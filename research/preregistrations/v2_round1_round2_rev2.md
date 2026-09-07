@@ -58,7 +58,12 @@ they are not strategy conclusions:
 1. every naive signal has absolute pooled daily IC below 0.10;
 2. reversal-5 uses its registered negative structural sign (the raw five-session return
    is multiplied by -1; its realized IC is not forced to have either sign);
-3. deployed gross is within 10% of the 2.0 target in every fold/evaluation;
+3. deployed gross remains targeted at 2.0 and the 1.8--2.2 band is reported.
+   A book outside that band is labelled `gross_underdeployed` or
+   `gross_overdeployed`, rather than failed, when all entry-defect signatures
+   are zero and mean gross is within the hard interval 1.5--2.25. The label,
+   decomposition, and signatures accompany economics at achieved gross. A
+   signature breach or mean gross outside the hard interval stops the program;
 4. each evaluation's mean daily unresolved-or-stale inventory notional is below
    2% of NAV. Terminal unresolved notional and counts remain mandatory diagnostics
    but are not averaged into this window-utilization gate.
@@ -231,6 +236,56 @@ Any signature breach or mean gross outside 1.5--2.25 stops the program. IC,
 persistence, and spread readouts remain valid for labelled books. Existing F3
 `economics_unresolved` labels remain unchanged.
 
+## Pass-4h transient-eligibility hold registered before replay
+
+This rule and its advance expectations were fixed at `2026-09-07T01:53:41Z`,
+before the pass-4h ledger replay and before any Round-1 score. Pass 4g established
+that D1--D4 were zero in all 16 books and that F2 inverse-volatility's gross
+shortfall was sizing-dominated: occupancy explained `0.059435`, while mark drift
+was the largest sizing term at `0.107124`. Its low gross is therefore carried as
+`gross_underdeployed`, not repaired. The pass-4g P0 signature arose only because
+held names were exited on a transient loss of eligibility and often returned to
+their side's retention band.
+
+The headline ledger now sets `ineligible_hold_sessions=5`. A held name that is
+ineligible remains held while its retention width is positive, its prior
+no-print streak remains below the ten-session settlement grace, and its
+ineligible streak is at most five sessions. Eligibility resets the streak to
+zero. The position also resets it on close or settlement. On session six of
+continuous ineligibility the ordinary exit is instructed with cause
+`ineligible_hold_exhausted`; the next print remains the only possible market
+fill. An ineligible name with no print still follows the unchanged Pass-4f
+settlement path. Entries remain eligible-only. K, buffer, caps, expiry, sizing,
+trims, same-close reuse, settlement, costs, and borrow do not change. Setting
+`ineligible_hold_sessions=0` reproduces the pre-Pass-4h ledger path.
+
+The current D5 signature is `D5_ineligible_exit_within_hold_window`: an
+`ineligible_hold_exhausted` instruction issued with streak at most five. It must
+be exactly zero, as must D1--D4. The former data diagnostic is retained only as
+the threshold-free report
+`ineligible_exit_reeligible_within_10_sessions_share`, applied to
+`ineligible_hold_exhausted` exits with a ten-session look-ahead. Counts of held
+ineligible sessions attributable to `score_valid=false`, `membership=false`,
+and a non-finite score are also reported without thresholds.
+
+The registered gross-deployment acceptance from Pass 4g now applies: the
+1.8--2.2 band produces `within_band`, `gross_underdeployed`, or
+`gross_overdeployed`; only a D1--D5 signature breach or mean gross outside
+1.5--2.25 is a gross stop. IC, persistence, and spread readouts remain intact,
+and economics remain reported at achieved gross. The independent per-evaluation
+2% stale/unresolved bound and 15% settlement-incidence label remain unchanged.
+
+Advance replay expectations, recorded without decision weight, are: D1--D4 and
+the new D5 invariant are zero in all 16 books; `ineligible_hold_exhausted` exits
+fall well below the Pass-4g `ineligible` counts in every book; mean turnover falls
+for F3 inverse-volatility and F3 momentum; mean gross is unchanged or slightly
+higher in every book and moves by no more than 0.05; settlement counts and stale
+means are unchanged or lower; and net excess moves modestly in either direction
+for the highest-flicker books. Missing an expectation is reported but does not
+stop. Any signature breach, hard-gross breach, stale-bound breach, non-ledger
+replay change, protected-window need, or paid-instance appearance stops before
+merge or Round 1.
+
 ## Round 1 — baseline floor and GBDT parent (CPU)
 
 **R1.1 baseline table.** Evaluate exactly reversal 5, reversal 21, momentum 12-1,
@@ -348,6 +403,7 @@ after artifacts and logs are secured. No deployment changes occur.
       "initial_capital_brl": 1.0,
       "lot_size": null,
       "entry_expiry_sessions": 3,
+      "ineligible_hold_sessions": 5,
       "settlement_grace_sessions": 10,
       "settlement_haircut": 0.3,
       "settlement_economics_unresolved_fraction_nav": 0.15,

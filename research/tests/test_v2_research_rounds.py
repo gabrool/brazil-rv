@@ -79,6 +79,26 @@ def test_rev2_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> N
     }
 
 
+def test_registration_protocol_requires_ineligible_hold_sessions(
+    tmp_path: Path,
+) -> None:
+    registered = research_rounds.PREREGISTRATION.read_text(encoding="utf-8")
+    stale = tmp_path / "stale_registration.md"
+    stale.write_text(
+        registered.replace('      "ineligible_hold_sessions": 5,\n', "", 1),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="machine-readable registration protocol"):
+        research_rounds.verify_registration_protocol(stale)
+    assert (
+        research_rounds.verify_registration_protocol()["headline_cell"]["ledger"][
+            "ineligible_hold_sessions"
+        ]
+        == 5
+    )
+
+
 def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
     day_count = 25
     name_count = 80

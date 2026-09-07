@@ -31,6 +31,7 @@ def _run(
     *,
     config: LedgerConfig | None = None,
     active: np.ndarray | None = None,
+    score_mask: np.ndarray | None = None,
     fill_fraction: np.ndarray | None = None,
     actions: AlignedActionTerms | None = None,
     payment_session: np.ndarray | None = None,
@@ -52,7 +53,7 @@ def _run(
     return simulate_stateful_ledger(
         dates=dates,
         scores=scores,
-        score_mask=mask,
+        score_mask=mask if score_mask is None else score_mask,
         active=mask if active is None else active,
         raw_close=close,
         cdi_returns=np.zeros(days) if cdi is None else cdi,
@@ -230,14 +231,19 @@ def test_partial_entry_remains_pending_without_allocating_another_slot() -> None
     )
 
 
-def test_eligibility_loss_creates_pending_exit_until_first_later_print() -> None:
+def test_zero_ineligible_hold_reproduces_pass4g_pending_exit_path() -> None:
     close = np.full((5, 2), 100.0)
     close[2, 0] = np.nan
     close[3, 0] = 80.0
     scores = np.asarray([[1.0, -1.0]] * 5)
     active = np.ones_like(close, dtype=np.bool_)
     active[2:, 0] = False
-    result = _run(close, scores, active=active)
+    result = _run(
+        close,
+        scores,
+        active=active,
+        config=_config(ineligible_hold_sessions=0),
+    )
 
     exit_order = next(
         order
@@ -253,6 +259,141 @@ def test_eligibility_loss_creates_pending_exit_until_first_later_print() -> None
     assert exit_fill.fill_session == 3
     assert exit_fill.price == 80.0
     assert result.position_sign[3, 0] == 0
+    assert result.exit_instructions_ineligible_hold_exhausted.tolist() == [
+        0,
+        0,
+        1,
+        0,
+        0,
+    ]
+
+
+def test_held_long_survives_five_ineligible_sessions_and_resets_on_return() -> None:
+    close = np.full((8, 3), 100.0)
+    scores = np.asarray([[3.0, 0.0, -3.0]] * 8)
+    active = np.ones_like(close, dtype=np.bool_)
+    active[1:6, 0] = False
+    result = _run(
+        close,
+        scores,
+        active=active,
+        initial_reference_price=np.full(3, 100.0),
+    )
+
+    assert not any(
+        order.security_index == 0 and order.purpose == "exit"
+        for order in result.intended_orders
+    )
+    np.testing.assert_array_equal(result.position_sign[:7, 0], 1)
+    np.testing.assert_array_equal(result.ineligible_streak[1:6, 0], [1, 2, 3, 4, 5])
+    assert result.ineligible_streak[6, 0] == 0
+    np.testing.assert_allclose(result.mark_price[:7, 0], 100.0)
+    assert result.summary()["ineligible_held_sessions_by_cause"] == {
+        "score_valid_false": 0,
+        "membership_false": 5,
+        "score_nonfinite": 0,
+    }
+
+
+def test_held_short_exits_on_sixth_ineligible_session() -> None:
+    close = np.full((9, 3), 100.0)
+    scores = np.asarray([[3.0, 0.0, -3.0]] * 9)
+    active = np.ones_like(close, dtype=np.bool_)
+    active[1:, 2] = False
+    result = _run(
+        close,
+        scores,
+        active=active,
+        initial_reference_price=np.full(3, 100.0),
+    )
+
+    exit_order = next(
+        order
+        for order in result.intended_orders
+        if order.security_index == 2 and order.purpose == "exit"
+    )
+    assert exit_order.decision_session == 6
+    assert result.exit_instruction_cause[6, 2] == 1
+    assert result.exit_instructions_ineligible_hold_exhausted[6] == 1
+    assert result.ineligible_exit_within_hold_window.sum() == 0
+    exit_fill = next(
+        fill for fill in result.fills if fill.order_id == exit_order.order_id
+    )
+    assert exit_fill.fill_session == 6
+    assert result.position_sign[6, 2] == 0
+
+
+def test_ineligible_nonprinter_stays_held_until_unchanged_settlement_path() -> None:
+    close = np.full((13, 3), 100.0)
+    close[1:11, 0] = np.nan
+    scores = np.asarray([[3.0, 0.0, -3.0]] * 13)
+    active = np.ones_like(close, dtype=np.bool_)
+    active[1:, 0] = False
+    result = _run(
+        close,
+        scores,
+        active=active,
+        initial_reference_price=np.full(3, 100.0),
+    )
+
+    np.testing.assert_array_equal(result.position_sign[:10, 0], 1)
+    assert result.position_sign[10, 0] == 0
+    assert result.terminal_settlement_count[10] == 1
+    assert not any(
+        fill.security_index == 0 and fill.purpose == "exit" for fill in result.fills
+    )
+    assert any(
+        fill.security_index == 0 and fill.purpose == "terminal_settlement"
+        for fill in result.fills
+    )
+
+
+def test_ineligible_streak_resets_after_rank_exit_and_reentry() -> None:
+    close = np.full((6, 5), 100.0)
+    scores = np.asarray(
+        [
+            [5.0, 4.0, 0.0, -4.0, -5.0],
+            [0.0, 5.0, 4.0, -4.0, -5.0],
+            [5.0, 0.0, 4.0, -4.0, -5.0],
+            [5.0, 0.0, 4.0, -4.0, -5.0],
+            [5.0, 0.0, 4.0, -4.0, -5.0],
+            [5.0, 0.0, 4.0, -4.0, -5.0],
+        ]
+    )
+    active = np.ones_like(close, dtype=np.bool_)
+    active[3, 0] = False
+    result = _run(
+        close,
+        scores,
+        active=active,
+        initial_reference_price=np.full(5, 100.0),
+    )
+
+    assert result.position_sign[0, 0] == 1
+    assert result.position_sign[1, 0] == 0
+    assert result.position_sign[2, 0] == 1
+    assert result.ineligible_streak[3, 0] == 1
+
+
+def test_ineligible_held_session_diagnostic_splits_each_input_cause() -> None:
+    close = np.full((3, 5), 100.0)
+    scores = np.asarray([[5.0, 4.0, 0.0, -4.0, -5.0]] * 3)
+    scores[1, 4] = np.nan
+    score_mask = np.ones_like(close, dtype=np.bool_)
+    score_mask[1, 0] = False
+    result = _run(
+        close,
+        scores,
+        active=np.ones_like(close, dtype=np.bool_),
+        score_mask=score_mask,
+        initial_reference_price=np.full(5, 100.0),
+    )
+
+    assert result.summary()["ineligible_held_sessions_by_cause"] == {
+        "score_valid_false": 1,
+        "membership_false": 0,
+        "score_nonfinite": 1,
+    }
 
 
 def test_t18_raw_share_cash_claim_and_fill_path_reconciles() -> None:
@@ -389,6 +530,7 @@ def test_corporate_action_cancels_and_reissues_pending_exit_in_new_units() -> No
         active=active,
         actions=actions,
         initial_reference_price=np.full(3, 100.0),
+        config=_config(ineligible_hold_sessions=0),
     )
 
     original = next(
@@ -1206,7 +1348,7 @@ def test_pass4g_shortfall_decomposition_and_defect_counters() -> None:
         "D2_entry_fill_quantity_short": 0,
         "D3_blocked_open_slots": 0,
         "D4_cap_block_defects": 0,
-        "D5_eligibility_flicker_exit_share": 0.0,
+        "D5_ineligible_exit_within_hold_window": 0,
     }
 
 

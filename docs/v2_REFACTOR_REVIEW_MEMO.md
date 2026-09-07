@@ -1042,3 +1042,25 @@ review surface; `main` and deployment intentionally remain unchanged.
 Two final provider reads at `2026-09-06T22:57:42.9989658Z` and
 `2026-09-06T22:57:45.8155995Z` both returned zero instances, confirming that
 the pass neither used nor left paid compute running.
+
+## 16. Pass-4h registered continuation: eligibility hysteresis and gross labels
+
+Pass 4g subsequently proved all direct entry, fill, slot-consumption, and cap
+signatures D1--D4 clean. F2 inverse-volatility's shortfall was 94% sizing and
+only 6% occupancy, so its low gross is not repaired: it becomes the explicit
+`gross_underdeployed` label. The only P0 signature was transient eligibility
+loss followed by prompt re-eligibility inside the retention band.
+
+Pass 4h therefore adds one bounded policy rule: an existing position holds
+through at most five consecutive ineligible sessions, resetting on eligibility
+or closure. Session six instructs `ineligible_hold_exhausted`; entries remain
+eligible-only, and the ten-session no-print settlement path retains precedence.
+No K, buffer, cap, expiry, sizing, trim, cost, borrow, settlement, clock,
+identity, or leakage rule changes.
+
+The 1.8--2.2 gross band is now a reporting label rather than a standalone stop.
+Departures are `gross_underdeployed` or `gross_overdeployed` when the exact
+decomposition is present, D1--D5 are zero, and mean gross stays inside the hard
+1.5--2.25 interval. A signature or hard-bound breach still stops. The 2%
+stale/unresolved bound and 15% settlement-incidence label are unchanged. This
+contract was registered before its replay and before any Round-1 score.

@@ -1360,6 +1360,7 @@ def freeze_round1(
         "economics_tier": {
             "price_source": "close_proxy",
             "terminal_settlement_convention": "last_mark_after_10_sessions",
+            "ineligible_hold_sessions": 5,
             "settlement_grace_sessions": 10,
             "settlement_haircut": 0.30,
             "settlement_economics_unresolved_fraction_nav": 0.15,
