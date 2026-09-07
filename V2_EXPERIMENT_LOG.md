@@ -1617,3 +1617,56 @@ GH200 instance `c484c5fd446149f0a7994e9f6d4a0d32` was terminated after the
 evidence was secured. Provider inventories at
 `2026-09-07T14:57:53.2767470Z` and `2026-09-07T14:57:58.6356783Z` both
 confirmed that exact ID absent and contained no adjacent instance.
+
+## Registration rev3 neutral evaluation — acceptance stop (2026-09-07)
+
+Registration rev3 was implemented without rebuilding or mutating the sealed
+V3 store. The evaluation layer now constructs the characteristic-neutral
+target as a deterministic row-wise float64 OLS virtual view, keeps the prior
+scaled target as a named legacy diagnostic, reports realized market beta, and
+uses fixed 16-name compact padding for compiled training paths. Executable
+borrow accounting is bound to the store-manifest-hashed D+1 lending archive:
+the recorded `tanh(log1p(rate_percent)/2)` values are inverted exactly for
+rates, while store-materialized lending balance/age determines shortability.
+Missing or stale rates retain the registered uniform-floor charge. These
+changes are on main through
+`924b4fc4c8ecf11c2a9c403c505c16e06e0d5418`; Ruff, compile, and the complete
+865-test set pass (the last fixture-only correction was rechecked in its
+affected suite).
+
+The first acceptance freeze at `ef5b893` stopped before root creation because
+an obsolete guard equated the immutable store-build commit with the evaluator
+commit. Commit `fc953504abe84e885880546c4250dee5480eb865` replaced that with
+the correct store-manifest hash binding. Its fresh attempt is retained at
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev3_fc95350_20260907T163429Z`;
+it wrote only the first deterministic score panel and stopped before an
+evaluation when the materialized lending feature roster did not contain a
+loan-rate field. No result was inferred from that partial root.
+
+The complete classical acceptance run is sealed at:
+
+    D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev3_924b4fc_20260907T165511Z
+
+Its pipeline-manifest and inventory SHA-256 values are
+`4fd087f6b442a82ac7e1fed4f7274513e50c5d98987f870a79a85438847d20fa`
+and `9e56b56128ade40fb3b19b197553b00efc7e0a86631e20586855951e3933c1c0`.
+All 15 registered baseline evaluations and the F1 GBDT integration leg are
+complete, transfer chronology is clean, and official-validation/test access
+is false/false. The inverse-volatility neutral IC is 0.0041771, 0.0067263,
+and 0.0046084 in F1/F2/F3, each strictly below the registered absolute 0.02
+engineering bound. Pooled neutral ICs for momentum, reversal-21, reversal-5,
+and their registered blend are 0.0227477, -0.0126254, -0.0030471, and
+0.0156703. These are integration diagnostics only because acceptance is
+unsupported.
+
+The registered legacy-identity gate compared all 75 baseline/horizon values
+against sealed Round 1 and found 15 baseline-fold summary mismatches. The
+underlying scaled-target payload did not change: D5 and D10 are exactly
+identical. The mismatch is a readout-population defect—rev3 used per-horizon
+validity for D1/D2/D3, while sealed Round 1 used the common D1--D5 validity
+population for those primary horizons. The manifest therefore records
+`engineering_acceptance_status=unsupported` with the sole reason
+`legacy_scaled_target_ic_differs_from_round1`. Per the registration's
+first-failure rule, no rev3 Round 1 or Round 2 run was started and no result was
+retried. Protected data and deployment remain untouched, and no paid instance
+was launched.

@@ -1707,3 +1707,30 @@ be reused as a registered result. Exact paid instance
 was secured; provider inventories at `2026-09-07T14:57:53.2767470Z` and
 `2026-09-07T14:57:58.6356783Z` both confirmed it absent, with no adjacent
 instance present.
+
+## Current v2 rev3 evaluation state (2026-09-07)
+
+The characteristic-neutral rev3 evaluation contract is implemented through
+commit `924b4fc4c8ecf11c2a9c403c505c16e06e0d5418`. It is an evaluation-time
+virtual target over the immutable V3 store, not a physical store rebuild.
+Executable borrow uses the store-manifest-hashed D+1 lending archive for exact
+rate recovery and the existing store lending balance/age for shortability;
+realized beta is diagnostic only. Compiled training batches use a fixed
+stage-level name width rounded to 16.
+
+The sealed classical acceptance root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev3_924b4fc_20260907T165511Z`.
+Pipeline-manifest/inventory SHA-256 values are
+`4fd087f6b442a82ac7e1fed4f7274513e50c5d98987f870a79a85438847d20fa`
+and `9e56b56128ade40fb3b19b197553b00efc7e0a86631e20586855951e3933c1c0`.
+Neutrality, ledger, chronology, native-fast, and protected-access checks
+passed, including inverse-volatility absolute neutral IC below 0.02 in all
+three folds. Acceptance nevertheless stopped as `unsupported` because 15 of
+75 sealed Round-1 legacy baseline/horizon summaries failed exact identity.
+The scaled-target data are unchanged: D5 and D10 match exactly; D1/D2/D3 were
+accidentally summarized on per-horizon validity instead of Round 1's common
+D1--D5 population. Do not interpret the rev3 ICs as accepted research results
+or proceed to rev3 Round 1/2 until that reporting-population defect is repaired
+pre-score, tested, and accepted from a fresh root. Official validation, the
+permanently spent test, and deployment remain untouched. No paid instance is
+active for this work.
