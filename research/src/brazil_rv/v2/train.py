@@ -1791,6 +1791,8 @@ def train_stage(
     tracker = PatienceTracker(patience=patience, maximum_epochs=maximum_epochs)
     compiled_graphs_before = _unique_compiled_graphs()
     forward_model = compile_forward(model) if model_config.compile_forward else model
+    training_compiled_graph_count = 0
+    selection_compiled_graph_count = 0
     history: list[dict[str, float | int]] = []
     for epoch in range(1, maximum_epochs + 1):
         _set_loader_epoch(train_loader, epoch - 1)
@@ -1889,6 +1891,7 @@ def train_stage(
                 make_closure(microbatch)
                 for microbatch in _date_pair_microbatches(cpu_batch, microbatch_pairs)
             )
+            compiled_before_update = _unique_compiled_graphs()
             update = sam_accumulated_step(
                 model,
                 optimizer,
@@ -1897,15 +1900,22 @@ def train_stage(
                 scheduler=scheduler,
                 ema=ema,
             )
+            training_compiled_graph_count += (
+                _unique_compiled_graphs() - compiled_before_update
+            )
             losses.append(update.first_loss)
         if not losses:
             raise ValueError("training loader produced no date pairs")
+        compiled_before_selection = _unique_compiled_graphs()
         selection_score = _selection_score(
             forward_model,
             selection_loader,
             device,
             stage=stage,
             use_bf16=model_config.use_bf16,
+        )
+        selection_compiled_graph_count += (
+            _unique_compiled_graphs() - compiled_before_selection
         )
         history.append(
             {
@@ -1919,6 +1929,10 @@ def train_stage(
     if tracker.best_state_dict is None or tracker.stopped_epoch is None:
         raise RuntimeError("training ended without a selected Patience state")
     compiled_graph_count = _unique_compiled_graphs() - compiled_graphs_before
+    if compiled_graph_count != (
+        training_compiled_graph_count + selection_compiled_graph_count
+    ):
+        raise RuntimeError("compiled graph attribution is incomplete")
     if model_config.compile_forward and compiled_graph_count < 1:
         raise RuntimeError("compiled training produced no Dynamo graph")
     if not model_config.compile_forward and compiled_graph_count != 0:
@@ -1979,6 +1993,11 @@ def train_stage(
             "selected_epoch": tracker.selected_epoch,
             "model_config": model_config_payload,
             "compiled_graph_count": compiled_graph_count,
+            "compiled_graphs": {
+                "training": training_compiled_graph_count,
+                "selection": selection_compiled_graph_count,
+                "total": compiled_graph_count,
+            },
             "fast_checkpoint_sha256": model.fast_checkpoint_sha256,
             "fast_initialization_provenance": model.fast_initialization_provenance,
             "transfer_chronology_clean": transfer_chronology_clean,

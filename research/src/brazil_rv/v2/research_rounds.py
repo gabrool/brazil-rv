@@ -2316,7 +2316,8 @@ def _plan_job(
             "official_validation_accessed": False,
             "test_accessed": False,
             "transfer_chronology_clean": True,
-            "compiled_graph_count": 1,
+            "compiled_graph_count": 2,
+            "compiled_graphs": {"training": 1, "selection": 1, "total": 2},
             **source_tiers,
         },
     }
@@ -2384,7 +2385,9 @@ def write_round2_plan_p(*, output_root: Path) -> str:
         or smoke.get("seed") != 11
         or smoke.get("fold") != "F1"
         or smoke.get("epochs_completed") != 1
-        or smoke.get("compiled_graph_count") != 1
+        or smoke.get("compiled_graph_count") != 2
+        or smoke.get("compiled_graphs")
+        != {"training": 1, "selection": 1, "total": 2}
         or (smoke_root / "scores").exists()
     ):
         raise ValueError("Round-2 first-smoke contract did not pass exactly")

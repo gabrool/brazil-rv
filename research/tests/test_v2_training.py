@@ -573,6 +573,26 @@ def test_fullgraph_compile_reuses_one_graph_across_date_batch_widths() -> None:
     assert int(torch._dynamo.utils.counters["stats"]["unique_graphs"]) - before == 1
 
 
+def test_compiler_keeps_one_specialization_per_required_module_mode() -> None:
+    class ModeSensitive(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.dropout = nn.Dropout(0.1)
+
+        def forward(self, values: torch.Tensor) -> torch.Tensor:
+            return self.dropout(values)
+
+    model = ModeSensitive()
+    compiled = compile_forward(model, backend="eager", mode=None)
+    before = int(torch._dynamo.utils.counters["stats"]["unique_graphs"])
+    model.train()
+    compiled(torch.ones(16, 3))
+    model.eval()
+    compiled(torch.ones(1, 3))
+
+    assert int(torch._dynamo.utils.counters["stats"]["unique_graphs"]) - before == 2
+
+
 def test_fixed_fast_padding_matches_eager_and_compiled_cpu() -> None:
     config = ModelConfig(slow_feature_count=32, slow_lookback=20)
     model = DailyMultiHorizonModel(config).eval()
@@ -785,6 +805,11 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
     assert manifest["seed"] == 29
     assert manifest["fold"] == "pretrain_internal"
     assert manifest["compiled_graph_count"] == 0
+    assert manifest["compiled_graphs"] == {
+        "training": 0,
+        "selection": 0,
+        "total": 0,
+    }
     assert manifest["official_validation_accessed"] is False
     assert manifest["test_accessed"] is False
     assert "allow_untracked_test_loaders" not in manifest
