@@ -1702,4 +1702,8 @@ and `f0c61411b729b9f3aeaff1cab4f133e14e02928994a0b1725bc598c0d0deeb07`.
 Official validation, the permanently spent test, and deployment remain
 untouched. The next Round-2 attempt requires a bounded dynamic-shape compiler
 repair, tests, a new clean commit, and a fresh root; the failed smoke must not
-be reused as a registered result.
+be reused as a registered result. Exact paid instance
+`c484c5fd446149f0a7994e9f6d4a0d32` was terminated after all failure evidence
+was secured; provider inventories at `2026-09-07T14:57:53.2767470Z` and
+`2026-09-07T14:57:58.6356783Z` both confirmed it absent, with no adjacent
+instance present.

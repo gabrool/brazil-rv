@@ -1612,4 +1612,8 @@ and `f0c61411b729b9f3aeaff1cab4f133e14e02928994a0b1725bc598c0d0deeb07`.
 The traceback SHA-256 is
 `a2e611bcb61d677709bc36da7706fb1a8b14f95ebc08d5f221526b0a81e9341d`.
 All operational logs are hash-secured in the failed root. Official validation,
-the permanently spent test, and deployment remain untouched.
+the permanently spent test, and deployment remain untouched. The exact paid
+GH200 instance `c484c5fd446149f0a7994e9f6d4a0d32` was terminated after the
+evidence was secured. Provider inventories at
+`2026-09-07T14:57:53.2767470Z` and `2026-09-07T14:57:58.6356783Z` both
+confirmed that exact ID absent and contained no adjacent instance.
