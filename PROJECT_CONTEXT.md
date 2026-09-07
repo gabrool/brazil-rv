@@ -305,6 +305,32 @@ equal in these data because current false inferred-action cells coincide with
 no-print sessions. This is now a genuine stale-print/coverage limitation, not
 a persistent action latch. `main` remains unchanged and Round 1/2 remain unrun.
 
+Pass 4f closes that stale-holding policy gap with the labelled development
+convention `last_mark_after_10_sessions`. The pre-change sealed diagnosis found
+37 stale holding episodes / 2,490 name-days and no later print inside an
+evaluation holding window, so it found no fill defect; it also found no
+succession candidate and no tender-like path under the predeclared heuristic.
+Commit `36a868c6455fd1b58f128b94d03112588b9899c7` settles a held long or short at
+the last mark with ordinary costs after ten no-print sessions, permanently
+releases the slot, reports a separate 30% adverse settlement scenario, counts
+later prints, and marks economics unresolved above 15% cumulative settlement
+notional/NAV. All 869 tests passed before the final replay.
+
+The hash-reuse Pass-4f acceptance root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_pass4f_36a868c_20260906T235841Z`;
+its pipeline-manifest and log-inclusive artifact-inventory SHA-256 values are
+`6a137bb00b447a04d52462b28f20e76c1465a981deb2cfa07485387abb064409`
+and `1139ef305f94ecb941a50b795fb158203990513615f3262f5ef8a7d187d1d414`.
+All non-ledger fields were bit-identical and all 16 books passed the unchanged
+2% stale/unresolved bound. Fifteen passed the unchanged gross band, but F2
+inverse-volatility remained below it at mean gross `1.755766`; acceptance is
+therefore still `unsupported`. F3 momentum and F3 blend also exceed the new
+15% settlement-incidence resolution bound and are labelled accordingly. The
+registered stop kept `main` unchanged and Round 1/2 unrun. Official validation
+and test remained unread, no deployment changed, and no paid instance was used.
+Two direct provider inventory reads after sealing returned zero instances; the
+old local Lambda state file is stale and does not represent a billable host.
+
 V2 development folds end on 2024-12-30. Official validation (2025-01-02 through
 2025-12-30) requires a hash-bound registration token, and test dates are refused
 unconditionally by this code version. Target masks and corresponding numeric

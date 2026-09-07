@@ -475,3 +475,97 @@ clean, `research_claim=false`, and no deployment changed.
 Provider inventories at `2026-09-06T22:57:42.9989658Z` and
 `2026-09-06T22:57:45.8155995Z` each returned zero instances. There was no paid
 instance to terminate and no adjacent instance was touched.
+
+## Pass-4f labelled terminal settlement and acceptance stop (2026-09-07)
+
+The required pre-change diagnosis was sealed before the ledger convention was
+implemented. It reconstructed every stale holding in the Pass-4e replay: 37
+holding episodes, 14 ISINs, and 2,490 stale name-days across 16 books. Zero
+stale name-days came from a position that printed again inside its evaluation
+holding window, so the predeclared fill-defect stop did not fire. Twenty-seven
+episodes never printed again anywhere in the store; ten printed only outside
+the relevant evaluation window. There were no ISIN-succession candidates. The
+predeclared deterministic flat/premium heuristic classified zero episodes as
+tender-like, so the evidence supports terminal disappearance but not the
+stronger proposed tender-offer attribution.
+
+The immutable diagnostic root is
+`D:\quant-data\b3\processed\model_runs\v2_pass4f_stale_diagnostic_64c5b76_20260906T232352Z`.
+Its diagnostic-manifest, log-inclusive artifact-inventory, and access-audit
+SHA-256 values are
+`d6522ec1c20cf294fd8914e951c3d51f10bd662f7cf02d8d76b8a9e5f3ac391c`,
+`7d28de475e529cbd7aba7dccbac1dc14f1a05941d663a25b178570fe9cf794ee`,
+and `ae8d0edfa9ea15adfc3571770459ba4e4e8baa0ea4c66cb02c90f1ea5b51ba55`.
+
+Final pre-score implementation commit
+`36a868c6455fd1b58f128b94d03112588b9899c7` adds the explicitly labelled
+`last_mark_after_10_sessions` development convention. A held long or short
+with ten consecutive no-print sessions settles at its last mark with the
+ordinary cost, releases its slot, and can never reopen. A parallel 30% adverse
+settlement-price path is reported but is never headline. Later prints are
+counted. Cumulative settlement notional above 15% of contemporaneous NAV makes
+economics unresolved. The unchanged 2% utilization gate now counts stale held
+inventory inside the grace period plus explicit unresolved action exposure;
+an unobserved session alone is not an unresolved claim. Ledger identities,
+long/short settlement, costs, the scenario, grace reset, permanent no-reopen,
+later-print counting, and the 15% consequence have regression coverage.
+Repository-wide Ruff and Python compilation passed, and all 869 tests passed
+in 377.29 seconds before the accepted replay.
+
+Three score-free operational starts are preserved. Two stopped before creating
+a root (an incorrect inventory-hash CLI binding, then a chained replay/store-
+build identity check). The third retained empty root at
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_pass4f_b4715da_20260906T234950Z`
+stopped after selecting, but before loading, the first ancestor score panel.
+The bounded provenance repairs verify the prior replay and original ancestor
+through their manifests, complete inventories and every inventory row, store
+hash, code identity, access flags, and score-manifest hash. No score or model
+was recomputed during those failures.
+
+The final replay hash-verified and reused all 16 sealed score panels. It
+recomputed ledger economics only; every non-ledger field was bit-identical.
+The immutable root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_pass4f_36a868c_20260906T235841Z`.
+Pipeline-manifest, replay-inventory, log-inclusive artifact-inventory,
+acceptance-table, and access-audit SHA-256 values are respectively
+`6a137bb00b447a04d52462b28f20e76c1465a981deb2cfa07485387abb064409`,
+`2b1cf5a0d84986c42890ccedeb6316d238dfb46238f0540ed626a188fdf7ed8f`,
+`1139ef305f94ecb941a50b795fb158203990513615f3262f5ef8a7d187d1d414`,
+`9f1f523005a37e624b4b86a332f75846dbeb2701188ce5393707c2279a1f4094`,
+and `5ab13dc1c7ce9f3b1b9f565b12abea8669345023d0bab25d6fe62ff274657580`.
+Official-validation/test access is false, transfer chronology is clean,
+`research_claim=false`, and no deployment changed.
+
+The 2% stale/unresolved bound passed all 16 books, and 15 of 16 passed the
+unchanged 1.8--2.2 mean-gross band. Exact per-book incidence is:
+
+| Book | Mean gross | Mean stale/unresolved | Settlements | Settlement notional/NAV | Later prints | Econ unresolved | Gate failure |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| F1 inverse-volatility | 1.800173 | 0.005877 | 3 | 0.069501 | 0 | no | none |
+| F1 momentum | 1.804345 | 0.004074 | 2 | 0.057348 | 0 | no | none |
+| F1 reversal-21 | 1.973163 | 0.002003 | 1 | 0.028131 | 0 | no | none |
+| F1 reversal-5 | 1.931453 | 0.004142 | 2 | 0.057507 | 0 | no | none |
+| F1 blend | 1.972213 | 0.004259 | 2 | 0.059517 | 0 | no | none |
+| F2 inverse-volatility | 1.755766 | 0.002713 | 2 | 0.036755 | 1 | no | gross |
+| F2 momentum | 1.828920 | 0.000000 | 0 | 0.000000 | 0 | no | none |
+| F2 reversal-21 | 1.952331 | 0.001106 | 1 | 0.015400 | 0 | no | none |
+| F2 reversal-5 | 1.937269 | 0.004297 | 2 | 0.058664 | 1 | no | none |
+| F2 blend | 1.958096 | 0.001585 | 1 | 0.021677 | 0 | no | none |
+| F3 inverse-volatility | 1.888777 | 0.006381 | 3 | 0.087638 | 0 | no | none |
+| F3 momentum | 1.848185 | 0.011440 | 5 | 0.160227 | 0 | yes | none |
+| F3 reversal-21 | 1.964110 | 0.006373 | 3 | 0.089967 | 0 | no | none |
+| F3 reversal-5 | 1.947440 | 0.006853 | 3 | 0.095979 | 0 | no | none |
+| F3 blend | 1.973285 | 0.013590 | 6 | 0.191541 | 0 | yes | none |
+| F1 GBDT ensemble | 1.840379 | 0.002448 | 1 | 0.033729 | 0 | no | none |
+
+Engineering acceptance is still `unsupported` solely because F2 inverse-
+volatility's mean gross is `1.755766`, below the immutable `1.8` floor. The
+predeclared stop therefore prevented fast-forwarding `main`, Round 1, Round 2,
+or any result-changing retry. The two F3 books whose settlement incidence
+exceeds 15% are also transparently labelled `economics_unresolved`, with the
+existing downstream consequence that their economics cannot support a paired
+research decision. No paid Lambda instance was used or launched for Pass 4f.
+Direct provider inventory reads at `2026-09-07T00:03:31.2895930Z` and
+`2026-09-07T00:03:36.9256438Z` each returned zero instances, confirming that
+the stale local state file did not represent a billable host and no adjacent
+instance was touched.
