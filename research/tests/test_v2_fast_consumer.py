@@ -10,7 +10,7 @@ from brazil_rv.v2.contract import INTRADAY_DAILY_FEATURES
 from v2_store_fixtures import write_fixture_store as write_store
 
 
-def _native_fast_store(tmp_path):
+def _native_fast_store(tmp_path, *, fast_present_on_decision: bool = True):
     dates = [date(2021, 7, 1) + timedelta(days=index) for index in range(21)]
     dates.append(date(2021, 8, 16))
     name_count = 3
@@ -23,7 +23,7 @@ def _native_fast_store(tmp_path):
     valid[-1, 0, 1, 4] = False
     values[-1, 0, 1, 4] = np.nan
     fast_present = np.zeros((len(dates), name_count), dtype=np.bool_)
-    fast_present[-1, 2] = True
+    fast_present[-1, 2] = fast_present_on_decision
     return write_store(
         tmp_path / "native_fast",
         dates=dates,
@@ -85,11 +85,7 @@ def test_dataset_compacts_native_fast_slots_and_zeroes_invalid_payload(tmp_path)
 
 
 def test_native_fast_uses_stored_presence_not_merely_scheduled_patches(tmp_path) -> None:
-    path = _native_fast_store(tmp_path)
-    present = np.load(path / "fast_present.npy", mmap_mode="r+")
-    present[-1, 2] = False
-    present.flush()
-    del present
+    path = _native_fast_store(tmp_path, fast_present_on_decision=False)
 
     sample = V2DailyDataset(path, [21], stage="finetune", lookback=20)[0]
 

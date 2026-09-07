@@ -377,6 +377,7 @@ print(json.dumps({
         Path(value)
         for value in (
             os.environ.get("BRAZIL_RV_TEST_SCRATCH"),
+            tmp_path,
             tmp_path.anchor,
             *(f"{letter}:\\" for letter in "DEFGHIJKLMNOPQRSTUVWXYZ"),
         )
