@@ -356,6 +356,7 @@ def _write_timestamped_m1(
 def _build_fixture_store(root: Path, *, mutate_post_decision: bool = False) -> Path:
     source_root = root.with_name(f"{root.name}_sources")
     source_root.mkdir(parents=True)
+    dates = _fixture_dates()
     market, isins, tickers, schedule, audit = _fixture_market(
         mutate_post_decision=mutate_post_decision
     )
@@ -408,6 +409,30 @@ def _build_fixture_store(root: Path, *, mutate_post_decision: bool = False) -> P
         d_plus_one_rows_checked=_DAY_COUNT * _NAME_COUNT,
         d_plus_one_violations=0,
     )
+    lending_rate_path = source_root / "bdi_lending_strong.parquet"
+    lending_rate_encoded = np.tanh(np.log1p(2.0) / 2.0)
+    pl.DataFrame(
+        {
+            "source_trade_date": pl.Series(
+                np.repeat(dates[:-1], _NAME_COUNT).tolist(), dtype=pl.Date
+            ),
+            "available_date": pl.Series(
+                np.repeat(dates[1:], _NAME_COUNT).tolist(), dtype=pl.Date
+            ),
+            "security_id": np.tile(
+                [f"ISIN:{isin}" for isin in isins], _DAY_COUNT - 1
+            ),
+            "lending_taker_fee_level_log_tanh": np.full(
+                (_DAY_COUNT - 1) * _NAME_COUNT,
+                lending_rate_encoded,
+                dtype=np.float64,
+            ),
+            "lending_taker_fee_level_log_tanh_mask": np.ones(
+                (_DAY_COUNT - 1) * _NAME_COUNT, dtype=np.bool_
+            ),
+        }
+    ).write_parquet(lending_rate_path)
+    immutable_hashes[lending_rate_path] = sha256_file(lending_rate_path)
     store = build_daily_store(
         daily,
         actions,
@@ -416,7 +441,7 @@ def _build_fixture_store(root: Path, *, mutate_post_decision: bool = False) -> P
         sidecars={"lending": lending},
         action_acquisition_audit=audit,
         m1_assignments=assignments,
-        source_paths=(*parsed_paths, assignment_path),
+        source_paths=(*parsed_paths, assignment_path, lending_rate_path),
         cotahist_raw_sources=raw_archives,
         cotahist_parse_audit=parse_audit_path,
         session_schedule=schedule,

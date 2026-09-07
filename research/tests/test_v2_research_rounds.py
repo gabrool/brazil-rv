@@ -3,9 +3,11 @@ from __future__ import annotations
 import copy
 import json
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 
 import numpy as np
+import polars as pl
 import pytest
 
 import brazil_rv.v2.research_rounds as research_rounds
@@ -442,6 +444,29 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         ),
     }
 
+    fixture_dates = [date(2024, 1, 1), *inputs.dates]
+    lending_rate_path = tmp_path / "bdi_lending_strong.parquet"
+    lending_rate_encoded = np.tanh(np.log1p(2.0) / 2.0)
+    pl.DataFrame(
+        {
+            "source_trade_date": pl.Series(
+                np.repeat(fixture_dates[:-1], name_count).tolist(), dtype=pl.Date
+            ),
+            "available_date": pl.Series(
+                np.repeat(fixture_dates[1:], name_count).tolist(), dtype=pl.Date
+            ),
+            "security_id": np.tile(
+                [f"ISIN:{isin}" for isin in inputs.security_ids], day_count
+            ),
+            "lending_taker_fee_level_log_tanh": np.full(
+                day_count * name_count, lending_rate_encoded, dtype=np.float64
+            ),
+            "lending_taker_fee_level_log_tanh_mask": np.ones(
+                day_count * name_count, dtype=np.bool_
+            ),
+        }
+    ).write_parquet(lending_rate_path)
+
     class FixtureStore:
         manifest = {
             "axes": {"date_identity_sha256": inputs.calendar_identity_sha256},
@@ -456,11 +481,15 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
                     "stored_action_arrays": ("retrospective outcome/accounting terms")
                 },
             },
+            "sources": [
+                {
+                    "path": str(lending_rate_path),
+                    "bytes": lending_rate_path.stat().st_size,
+                    "sha256": sha256_file(lending_rate_path),
+                }
+            ],
         }
-        dates = np.asarray(
-            ["2024-01-01", *(value.isoformat() for value in inputs.dates)],
-            dtype="datetime64[D]",
-        )
+        dates = np.asarray(fixture_dates, dtype="datetime64[D]")
         isins = inputs.security_ids
 
         def read(self, name: str, selector: np.ndarray) -> np.ndarray:

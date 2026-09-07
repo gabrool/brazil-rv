@@ -50,10 +50,32 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
     action_cash[-3, 0] = 1.0
     action_has_action[-3, 0] = True
     action_payment_session[-3, 0] = day_count - 1
+    isins = [f"BRTEST{index:02d}NOR1" for index in range(name_count)]
+    lending_rate_path = tmp_path / "bdi_lending_strong.parquet"
+    lending_rate_encoded = np.tanh(np.log1p(2.0) / 2.0)
+    pl.DataFrame(
+        {
+            "source_trade_date": pl.Series(
+                np.repeat(dates[:-1], name_count).tolist(), dtype=pl.Date
+            ),
+            "available_date": pl.Series(
+                np.repeat(dates[1:], name_count).tolist(), dtype=pl.Date
+            ),
+            "security_id": np.tile([f"ISIN:{isin}" for isin in isins], day_count - 1),
+            "lending_taker_fee_level_log_tanh": np.full(
+                (day_count - 1) * name_count,
+                lending_rate_encoded,
+                dtype=np.float64,
+            ),
+            "lending_taker_fee_level_log_tanh_mask": np.ones(
+                (day_count - 1) * name_count, dtype=np.bool_
+            ),
+        }
+    ).write_parquet(lending_rate_path)
     store_root = write_store(
         tmp_path / "store",
         dates=dates,
-        isins=[f"BRTEST{index:02d}NOR1" for index in range(name_count)],
+        isins=isins,
         arrays={
             "active": np.ones((day_count, name_count), dtype=np.bool_),
             "observed": np.ones((day_count, name_count), dtype=np.bool_),
@@ -113,7 +135,14 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
             "intraday": [f"intraday_{index}" for index in range(20)],
             "sidecar_lending": ["loan_rate"],
         },
-        sources=[{"path": "fixture", "sha256": "a" * 64}],
+        sources=[
+            {"path": "fixture", "sha256": "a" * 64},
+            {
+                "path": str(lending_rate_path),
+                "bytes": lending_rate_path.stat().st_size,
+                "sha256": sha256_file(lending_rate_path),
+            },
+        ],
         metadata={
             "schedule_source": "explicit_versioned_schedule",
             "calendar_contract": {
@@ -149,6 +178,27 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         sha256_file(cdi_path),
         experiment52_cdi_path,
         sha256_file(experiment52_cdi_path),
+    )
+
+
+def test_lending_rate_history_inverts_sealed_percent_transform(
+    tmp_path: Path,
+) -> None:
+    store_root, *_ = _development_store(tmp_path)
+    manifest = json.loads((store_root / "manifest.json").read_text(encoding="utf-8"))
+    dates = np.load(store_root / "date_index.npy", allow_pickle=False)
+    isins = np.load(store_root / "isin_index.npy", allow_pickle=False).astype(str)
+    indices = np.asarray([1, 20], dtype=np.int64)
+    rates, recent, resolution = pipeline._lending_rate_history(
+        store_manifest=manifest,
+        dates=dates,
+        isins=isins,
+        indices=indices,
+    )
+    np.testing.assert_array_equal(recent, np.ones(recent.shape, dtype=np.bool_))
+    np.testing.assert_allclose(rates, 0.02, rtol=0.0, atol=2e-17)
+    assert resolution["sha256"] == sha256_file(
+        tmp_path / "bdi_lending_strong.parquet"
     )
 
 

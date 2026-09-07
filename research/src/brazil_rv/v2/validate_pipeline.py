@@ -47,7 +47,7 @@ from .data import (
     scalar_feature_names,
     stage_fast_name_count,
 )
-from .data_roots import resolve_external_files
+from .data_roots import portable_name, resolve_external_file, resolve_external_files
 from .evaluate import (
     EVALUATION_SCHEMA,
     EvaluationInputs,
@@ -314,6 +314,126 @@ def _external_artifact_resolutions(
         raise ValueError("external v1 fast artifact records are malformed")
     _, resolutions = resolve_external_files(records, _V1_FAST_FILES)
     return [resolution.payload() for resolution in resolutions]
+
+
+def _lending_rate_source(
+    store_manifest: Mapping[str, object],
+) -> tuple[Path, dict[str, object]]:
+    """Resolve the sealed, D+1-available lending-rate archive."""
+
+    records = store_manifest.get("sources")
+    if not isinstance(records, list) or any(
+        not isinstance(record, Mapping) for record in records
+    ):
+        raise ValueError("store manifest source records are malformed")
+    matches = [
+        record
+        for record in records
+        if portable_name(str(record.get("path", ""))) == "bdi_lending_strong.parquet"
+    ]
+    if len(matches) != 1:
+        raise ValueError("store does not bind exactly one lending-rate archive")
+    path, resolution = resolve_external_file(matches[0])
+    return path, resolution.payload()
+
+
+def _lending_rate_history(
+    *,
+    store_manifest: Mapping[str, object],
+    dates: NDArray[np.datetime64],
+    isins: Sequence[str],
+    indices: NDArray[np.int64],
+) -> tuple[NDArray[np.float64], NDArray[np.bool_], dict[str, object]]:
+    """Recover as-of annual decimal rates from the sealed v1 transform.
+
+    The archive stores ``tanh(log1p(rate_percent) / 2)`` in float64.  This is
+    one-to-one for every finite recorded value in the sealed source, so the
+    inverse recovers the observed taker rate without approximation, look-ahead,
+    or a store rebuild.  Availability is still the archive's D+1 date.
+    """
+
+    selected = np.asarray(indices, dtype=np.int64)
+    if (
+        selected.ndim != 1
+        or not selected.size
+        or np.any(selected < 0)
+        or np.any(selected >= len(dates))
+        or (selected.size > 1 and np.any(np.diff(selected) <= 0))
+    ):
+        raise ValueError("lending-rate indices must be increasing store rows")
+    path, resolution = _lending_rate_source(store_manifest)
+    value_column = "lending_taker_fee_level_log_tanh"
+    mask_column = f"{value_column}_mask"
+    required = {
+        "source_trade_date",
+        "available_date",
+        "security_id",
+        value_column,
+        mask_column,
+    }
+    frame = pl.read_parquet(path, columns=sorted(required))
+    if set(frame.columns) != required:
+        raise ValueError("lending-rate archive schema is incomplete")
+    frame = frame.filter(pl.col(mask_column)).sort(
+        "available_date", "source_trade_date", "security_id"
+    )
+    if frame.select(
+        pl.struct("available_date", "security_id").is_duplicated().any()
+    ).item():
+        raise ValueError("lending-rate archive has ambiguous as-of rows")
+
+    encoded = frame.get_column(value_column).to_numpy().astype(np.float64, copy=False)
+    if (
+        not np.isfinite(encoded).all()
+        or (encoded < 0.0).any()
+        or (encoded >= 1.0).any()
+    ):
+        raise ValueError("lending-rate transform is outside its invertible domain")
+    rate_percent = np.expm1(2.0 * np.arctanh(encoded))
+    roundtrip = np.tanh(np.log1p(rate_percent) / 2.0)
+    if not np.allclose(roundtrip, encoded, rtol=0.0, atol=2e-15):
+        raise ValueError("lending-rate transform does not invert exactly")
+    annual_decimal = 0.01 * rate_percent
+
+    calendar = np.asarray(dates, dtype="datetime64[D]")
+    calendar_positions = {
+        value: index for index, value in enumerate(calendar.astype(object).tolist())
+    }
+    name_positions = {str(value): index for index, value in enumerate(isins)}
+    available = frame.get_column("available_date").to_list()
+    source_dates = frame.get_column("source_trade_date").to_list()
+    security_ids = [
+        str(value).removeprefix("ISIN:")
+        for value in frame.get_column("security_id").to_list()
+    ]
+    source_sessions = np.asarray(
+        [calendar_positions.get(value, -1) for value in source_dates], dtype=np.int64
+    )
+    if np.any(source_sessions < 0):
+        raise ValueError("lending-rate source date is outside the store calendar")
+
+    name_count = len(isins)
+    rates = np.full((selected.size, name_count), np.nan, dtype=np.float64)
+    recent = np.zeros((selected.size, name_count), dtype=np.bool_)
+    last_rate = np.full(name_count, np.nan, dtype=np.float64)
+    last_source_session = np.full(name_count, -1, dtype=np.int64)
+    cursor = 0
+    for row, date_index in enumerate(selected):
+        decision_date = calendar[int(date_index)].astype(object)
+        while cursor < frame.height and available[cursor] <= decision_date:
+            name_index = name_positions.get(security_ids[cursor])
+            if name_index is not None:
+                if source_sessions[cursor] >= int(date_index):
+                    raise ValueError(
+                        "lending rate is not publication-lagged before the decision"
+                    )
+                last_rate[name_index] = annual_decimal[cursor]
+                last_source_session[name_index] = source_sessions[cursor]
+            cursor += 1
+        rates[row] = last_rate
+        age = int(date_index) - last_source_session
+        recent[row] = np.isfinite(last_rate) & (age >= 0) & (age <= 20)
+    return rates, recent, resolution
 
 
 def _assert_overrides_outside_store(
@@ -754,27 +874,23 @@ def _evaluation_inputs(
         source_archive_present[group] = np.any(ages >= 0.0, axis=-1)
         source_feature_valid[group] = np.any(valid, axis=-1)
     lending_names = feature_names.get("sidecar_lending")
-    if not isinstance(lending_names, list) or "loan_rate" not in lending_names:
-        raise ValueError("store lacks the lending borrow source fields")
-    lending_values = np.asarray(
-        store.read("sidecar_lending_values", indices), dtype=np.float64
-    )
+    if not isinstance(lending_names, list):
+        raise ValueError("store lacks the lending sidecar")
     lending_valid = np.asarray(
         store.read("sidecar_lending_valid", indices), dtype=np.bool_
     )
     lending_age = np.asarray(
         store.read("sidecar_lending_age_sessions", indices), dtype=np.float64
     )
-    rate_index = lending_names.index("loan_rate")
-    rate_recent = (
-        lending_valid[..., rate_index]
-        & (lending_age[..., rate_index] >= 0.0)
-        & (lending_age[..., rate_index] <= 20.0)
-    )
-    annual_borrow_rate_by_name = np.where(
+    (
+        annual_borrow_rate_by_name,
         rate_recent,
-        0.01 * np.sinh(lending_values[..., rate_index]),
-        np.nan,
+        lending_rate_resolution,
+    ) = _lending_rate_history(
+        store_manifest=store.manifest,
+        dates=store.dates,
+        isins=store.isins,
+        indices=indices,
     )
     balance_indexes = [
         index
@@ -837,7 +953,10 @@ def _evaluation_inputs(
         transfer_chronology_clean=transfer_chronology_clean,
         action_terms_source=action_terms_source,
         schedule_source=schedule_source,
-        source_artifact_hashes=dict(source_hashes),
+        source_artifact_hashes={
+            **source_hashes,
+            "lending_borrow_rate_archive": str(lending_rate_resolution["sha256"]),
+        },
         history_age_sessions=history_age_sessions,
         source_archive_present=source_archive_present or None,
         source_feature_valid=source_feature_valid or None,
@@ -2474,6 +2593,7 @@ def run_pipeline_validation(
     sidecars = _validate_sidecars(store_manifest, enabled_sidecars)
     external_resolutions = _external_artifact_resolutions(store_manifest)
     _assert_overrides_outside_store(store_path, external_resolutions)
+    _, lending_rate_resolution = _lending_rate_source(store_manifest)
     (
         fit_indices,
         fit_target_window_indices,
@@ -2625,6 +2745,7 @@ def run_pipeline_validation(
                     },
                     "cdi": cdi_provenance,
                     "native_fast_raw_audit": native_fast_audit,
+                    "lending_borrow_rate_archive": lending_rate_resolution,
                     "legacy_round1_baseline_reference": legacy_identity,
                 },
                 "date_contract": {
