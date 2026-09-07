@@ -14,6 +14,9 @@ OrderSide = Literal["buy", "sell"]
 OrderPurpose = Literal[
     "entry", "exit", "risk_exit", "terminal_exit", "terminal_settlement"
 ]
+ExitInstructionCause = Literal[
+    "ineligible", "settlement_grace", "rank_out_of_retention", "terminal"
+]
 CancellationReason = Literal[
     "expired",
     "evaluation_end",
@@ -34,6 +37,12 @@ _CANCELLATION_REASONS: tuple[CancellationReason, ...] = (
 )
 
 TERMINAL_SETTLEMENT_CONVENTION = "last_mark_after_10_sessions"
+EXIT_INSTRUCTION_CAUSE_CODES: dict[ExitInstructionCause, int] = {
+    "ineligible": 1,
+    "settlement_grace": 2,
+    "rank_out_of_retention": 3,
+    "terminal": 4,
+}
 
 
 @dataclass(frozen=True)
@@ -233,6 +242,56 @@ class StatefulLedgerResult:
     terminal_settlement_notional: NDArray[np.float64]
     terminal_settlement_notional_fraction_nav: NDArray[np.float64]
     settled_then_printed_count: NDArray[np.int64]
+    k_eff_per_side: NDArray[np.int64]
+    held_count_start_of_day_long: NDArray[np.int64]
+    held_count_start_of_day_short: NDArray[np.int64]
+    held_count_end_of_day_long: NDArray[np.int64]
+    held_count_end_of_day_short: NDArray[np.int64]
+    occupied_after_submission_long: NDArray[np.int64]
+    occupied_after_submission_short: NDArray[np.int64]
+    open_slots_after_submission_long: NDArray[np.int64]
+    open_slots_after_submission_short: NDArray[np.int64]
+    band_candidates_long: NDArray[np.int64]
+    band_candidates_short: NDArray[np.int64]
+    band_excluded_unresolved_long: NDArray[np.int64]
+    band_excluded_unresolved_short: NDArray[np.int64]
+    band_excluded_settled_long: NDArray[np.int64]
+    band_excluded_settled_short: NDArray[np.int64]
+    band_candidates_without_prior_session_print_long: NDArray[np.int64]
+    band_candidates_without_prior_session_print_short: NDArray[np.int64]
+    band_exhausted_open_slots_long: NDArray[np.int64]
+    band_exhausted_open_slots_short: NDArray[np.int64]
+    blocked_open_slots_long: NDArray[np.int64]
+    blocked_open_slots_short: NDArray[np.int64]
+    pending_entries_end_of_day_long: NDArray[np.int64]
+    pending_entries_end_of_day_short: NDArray[np.int64]
+    pending_entries_without_print_today_long: NDArray[np.int64]
+    pending_entries_without_print_today_short: NDArray[np.int64]
+    slots_freed_by_exit_fill_today_long: NDArray[np.int64]
+    slots_freed_by_exit_fill_today_short: NDArray[np.int64]
+    exit_instructions_ineligible: NDArray[np.int64]
+    exit_instructions_settlement_grace: NDArray[np.int64]
+    exit_instructions_rank_out_of_retention: NDArray[np.int64]
+    exit_instructions_terminal: NDArray[np.int64]
+    exit_instruction_cause: NDArray[np.int8]
+    exit_instruction_side: NDArray[np.int8]
+    net_cap_block_with_balanced_book: NDArray[np.int64]
+    gross_cap_block_below_target: NDArray[np.int64]
+    name_cap_block_on_fresh_entry: NDArray[np.int64]
+    entry_pending_printed_unblocked_unfilled: NDArray[np.int64]
+    entry_fill_quantity_short: NDArray[np.int64]
+    entry_cost_basis: NDArray[np.float64]
+    submission_nav: NDArray[np.float64]
+    gross_shortfall_small_universe: NDArray[np.float64]
+    gross_shortfall_occupancy_pending: NDArray[np.float64]
+    gross_shortfall_occupancy_band_exhausted: NDArray[np.float64]
+    gross_shortfall_occupancy_blocked: NDArray[np.float64]
+    gross_shortfall_occupancy_exit_gap: NDArray[np.float64]
+    gross_shortfall_occupancy_other: NDArray[np.float64]
+    gross_shortfall_sizing_fill: NDArray[np.float64]
+    gross_shortfall_sizing_mark_drift: NDArray[np.float64]
+    gross_shortfall_sizing_nav_drift: NDArray[np.float64]
+    eligibility_flicker_exit_share: float
     intended_orders: tuple[IntendedOrder, ...]
     fills: tuple[Fill, ...]
     cancellations: tuple[OrderCancellation, ...]
@@ -289,6 +348,60 @@ class StatefulLedgerResult:
             )
             for reason in _CANCELLATION_REASONS
         }
+        decomposition_arrays = {
+            "small_universe": self.gross_shortfall_small_universe,
+            "occupancy_pending": self.gross_shortfall_occupancy_pending,
+            "occupancy_band_exhausted": (self.gross_shortfall_occupancy_band_exhausted),
+            "occupancy_blocked": self.gross_shortfall_occupancy_blocked,
+            "occupancy_exit_gap": self.gross_shortfall_occupancy_exit_gap,
+            "occupancy_other": self.gross_shortfall_occupancy_other,
+            "sizing_fill": self.gross_shortfall_sizing_fill,
+            "sizing_mark_drift": self.gross_shortfall_sizing_mark_drift,
+            "sizing_nav_drift": self.gross_shortfall_sizing_nav_drift,
+        }
+        decomposition = {
+            name: float(np.mean(values)) if values.size else 0.0
+            for name, values in decomposition_arrays.items()
+        }
+        decomposition["total"] = self.gross_target - mean_gross
+        occupancy_total = decomposition["small_universe"] + sum(
+            decomposition[name]
+            for name in (
+                "occupancy_pending",
+                "occupancy_band_exhausted",
+                "occupancy_blocked",
+                "occupancy_exit_gap",
+                "occupancy_other",
+            )
+        )
+        decomposition["occupancy_share"] = (
+            occupancy_total / decomposition["total"]
+            if decomposition["total"] > 0.0
+            else 0.0
+        )
+        decomposition_sum = sum(decomposition[name] for name in decomposition_arrays)
+        if not np.isclose(
+            decomposition_sum,
+            decomposition["total"],
+            rtol=0.0,
+            atol=1e-9,
+        ):
+            raise RuntimeError("gross shortfall decomposition does not reconcile")
+        defect_signatures = {
+            "D1_entry_pending_printed_unblocked_unfilled": int(
+                self.entry_pending_printed_unblocked_unfilled.sum()
+            ),
+            "D2_entry_fill_quantity_short": int(self.entry_fill_quantity_short.sum()),
+            "D3_blocked_open_slots": int(
+                self.blocked_open_slots_long.sum() + self.blocked_open_slots_short.sum()
+            ),
+            "D4_cap_block_defects": int(
+                self.gross_cap_block_below_target.sum()
+                + self.name_cap_block_on_fresh_entry.sum()
+                + self.net_cap_block_with_balanced_book.sum()
+            ),
+            "D5_eligibility_flicker_exit_share": (self.eligibility_flicker_exit_share),
+        }
         return {
             "mean_net_excess_bps_per_day": (
                 float(np.mean(finite_excess)) if finite_excess.size else 0.0
@@ -342,6 +455,16 @@ class StatefulLedgerResult:
                 self.terminal_settlement_notional_fraction_nav.sum()
             ),
             "settled_then_printed_count": int(self.settled_then_printed_count.sum()),
+            "gross_shortfall_decomposition": decomposition,
+            "entry_defect_signatures": defect_signatures,
+            "exit_instructions_by_cause": {
+                "ineligible": int(self.exit_instructions_ineligible.sum()),
+                "settlement_grace": int(self.exit_instructions_settlement_grace.sum()),
+                "rank_out_of_retention": int(
+                    self.exit_instructions_rank_out_of_retention.sum()
+                ),
+                "terminal": int(self.exit_instructions_terminal.sum()),
+            },
             "terminal_settlement_economics_unresolved": bool(
                 self.terminal_settlement_notional_fraction_nav.sum()
                 > self.settlement_economics_unresolved_fraction_nav
@@ -674,6 +797,12 @@ def simulate_stateful_ledger(
     # form inside a longer continuous ledger, without reading that session's
     # later fill print.
     last_observed = inputs.initial_reference_price.copy()
+    last_print_session = np.where(
+        np.isfinite(inputs.initial_reference_price)
+        & (inputs.initial_reference_price > 0.0),
+        -1,
+        -2,
+    ).astype(np.int64)
     restricted_by_name = np.zeros(name_count, dtype=np.float64)
     receivable_by_name = np.zeros(name_count, dtype=np.float64)
     payable_by_name = np.zeros(name_count, dtype=np.float64)
@@ -681,6 +810,8 @@ def simulate_stateful_ledger(
     explicit_unresolved_action = np.zeros(name_count, dtype=np.bool_)
     missing_sessions = np.zeros(name_count, dtype=np.int64)
     entry_session = np.full(name_count, -1, dtype=np.int64)
+    entry_cost_basis = np.zeros(name_count, dtype=np.float64)
+    submission_nav = np.zeros(name_count, dtype=np.float64)
     scenario_seen = np.zeros(name_count, dtype=np.bool_)
     settled_names = np.zeros(name_count, dtype=np.bool_)
     settled_then_printed_seen = np.zeros(name_count, dtype=np.bool_)
@@ -753,6 +884,55 @@ def simulate_stateful_ledger(
     settlement_notional_rows: list[float] = []
     settlement_fraction_rows: list[float] = []
     settled_then_printed_rows: list[int] = []
+    k_eff_rows: list[int] = []
+    held_start_long_rows: list[int] = []
+    held_start_short_rows: list[int] = []
+    held_end_long_rows: list[int] = []
+    held_end_short_rows: list[int] = []
+    occupied_after_submission_long_rows: list[int] = []
+    occupied_after_submission_short_rows: list[int] = []
+    open_after_submission_long_rows: list[int] = []
+    open_after_submission_short_rows: list[int] = []
+    band_candidates_long_rows: list[int] = []
+    band_candidates_short_rows: list[int] = []
+    band_excluded_unresolved_long_rows: list[int] = []
+    band_excluded_unresolved_short_rows: list[int] = []
+    band_excluded_settled_long_rows: list[int] = []
+    band_excluded_settled_short_rows: list[int] = []
+    band_without_prior_print_long_rows: list[int] = []
+    band_without_prior_print_short_rows: list[int] = []
+    band_exhausted_long_rows: list[int] = []
+    band_exhausted_short_rows: list[int] = []
+    blocked_open_long_rows: list[int] = []
+    blocked_open_short_rows: list[int] = []
+    pending_end_long_rows: list[int] = []
+    pending_end_short_rows: list[int] = []
+    pending_without_print_long_rows: list[int] = []
+    pending_without_print_short_rows: list[int] = []
+    exit_fill_long_rows: list[int] = []
+    exit_fill_short_rows: list[int] = []
+    exit_ineligible_rows: list[int] = []
+    exit_settlement_rows: list[int] = []
+    exit_rank_rows: list[int] = []
+    exit_terminal_rows: list[int] = []
+    exit_cause_rows: list[NDArray[np.int8]] = []
+    exit_side_rows: list[NDArray[np.int8]] = []
+    net_cap_balanced_rows: list[int] = []
+    gross_cap_below_target_rows: list[int] = []
+    name_cap_fresh_rows: list[int] = []
+    pending_printed_unfilled_rows: list[int] = []
+    entry_fill_short_rows: list[int] = []
+    entry_cost_basis_rows: list[NDArray[np.float64]] = []
+    submission_nav_rows: list[NDArray[np.float64]] = []
+    shortfall_small_rows: list[float] = []
+    shortfall_pending_rows: list[float] = []
+    shortfall_band_exhausted_rows: list[float] = []
+    shortfall_blocked_rows: list[float] = []
+    shortfall_exit_gap_rows: list[float] = []
+    shortfall_other_rows: list[float] = []
+    shortfall_sizing_fill_rows: list[float] = []
+    shortfall_sizing_mark_rows: list[float] = []
+    shortfall_sizing_nav_rows: list[float] = []
     insolvent = False
     insolvency_date: date | None = None
     action_uncertainty_seen = False
@@ -811,6 +991,9 @@ def simulate_stateful_ledger(
                 reason="corporate_action",
             )
         )
+        if pending.order.purpose == "entry" and shares[name] == 0.0:
+            entry_cost_basis[name] = 0.0
+            submission_nav[name] = 0.0
         return pending.order.purpose == "entry"
 
     def cancel_entry(name: int, day: int, reason: CancellationReason) -> bool:
@@ -828,6 +1011,9 @@ def simulate_stateful_ledger(
                 reason=reason,
             )
         )
+        if shares[name] == 0.0:
+            entry_cost_basis[name] = 0.0
+            submission_nav[name] = 0.0
         return True
 
     for day in range(day_count):
@@ -853,6 +1039,8 @@ def simulate_stateful_ledger(
         )
         if not np.isclose(start_identity, start_nav, rtol=1e-12, atol=1e-12):
             raise RuntimeError("opening ledger identity does not reconcile")
+        held_start_long_rows.append(int((shares > 0.0).sum()))
+        held_start_short_rows.append(int((shares < 0.0).sum()))
 
         # Action-term uncertainty is a property of this session's claim, not
         # of the position for the rest of its life. A later resolved cell
@@ -921,6 +1109,9 @@ def simulate_stateful_ledger(
                 shares[name] = float(new_shares)
                 marks[name] = converted_mark if shares[name] != 0.0 else np.nan
                 last_observed[name] = converted_reference
+                if shares[name] == 0.0:
+                    entry_cost_basis[name] = 0.0
+                    submission_nav[name] = 0.0
             else:
                 if shares[successor] != 0.0:
                     raise ValueError(
@@ -948,6 +1139,10 @@ def simulate_stateful_ledger(
                 explicit_unresolved_action[name] = False
                 entry_session[successor] = entry_session[name]
                 entry_session[name] = -1
+                entry_cost_basis[successor] = entry_cost_basis[name]
+                submission_nav[successor] = submission_nav[name]
+                entry_cost_basis[name] = 0.0
+                submission_nav[name] = 0.0
             if (
                 successor == name
                 and np.isfinite(converted_mark)
@@ -959,6 +1154,8 @@ def simulate_stateful_ledger(
                 free_cash += restricted_by_name[name]
                 restricted_by_name[name] = 0.0
                 entry_session[name] = -1
+                entry_cost_basis[name] = 0.0
+                submission_nav[name] = 0.0
 
         unpaid_claims: list[_PendingClaim] = []
         for claim in pending_claims:
@@ -1013,6 +1210,7 @@ def simulate_stateful_ledger(
         )
         retention_rows.append(retention)
         k_eff = min(config.k_per_side, len(order) // 2)
+        k_eff_rows.append(k_eff)
         small_universe = k_eff == 0
         small_universe_rows.append(small_universe)
 
@@ -1027,6 +1225,7 @@ def simulate_stateful_ledger(
         )
 
         exit_required: set[int] = set()
+        exit_cause_by_name: dict[int, ExitInstructionCause] = {}
         for name in np.flatnonzero(held):
             kept = (
                 eligible[name]
@@ -1039,7 +1238,14 @@ def simulate_stateful_ledger(
                 )
             )
             if not kept:
-                exit_required.add(int(name))
+                integer_name = int(name)
+                exit_required.add(integer_name)
+                if not eligible[name]:
+                    exit_cause_by_name[integer_name] = "ineligible"
+                elif missing_sessions[name] >= config.settlement_grace_sessions:
+                    exit_cause_by_name[integer_name] = "settlement_grace"
+                else:
+                    exit_cause_by_name[integer_name] = "rank_out_of_retention"
         if day == day_count - 1:
             exit_required.update(int(name) for name in np.flatnonzero(held))
 
@@ -1047,14 +1253,20 @@ def simulate_stateful_ledger(
         for name in sorted(entries_to_cancel):
             cancelled_today += int(cancel_entry(name, day, "exit_instruction"))
 
+        exit_cause_today = np.zeros(name_count, dtype=np.int8)
+        exit_side_today = np.zeros(name_count, dtype=np.int8)
         for name in sorted(exit_required):
             if name in pending_exits or shares[name] == 0.0:
                 continue
             purpose: OrderPurpose
             if day == day_count - 1:
                 purpose = "terminal_exit"
+                cause: ExitInstructionCause = "terminal"
             else:
                 purpose = "exit"
+                cause = exit_cause_by_name[name]
+            exit_cause_today[name] = EXIT_INSTRUCTION_CAUSE_CODES[cause]
+            exit_side_today[name] = 1 if shares[name] > 0.0 else -1
             pending_exits[name] = submit_order(
                 day,
                 name,
@@ -1245,8 +1457,27 @@ def simulate_stateful_ledger(
         blocked_gross = 0
         blocked_net = 0
         blocked_name = 0
+        net_cap_balanced = 0
+        gross_cap_below_target = 0
+        name_cap_fresh = 0
         submitted_entries = 0
         same_close_replacements = 0
+        occupied_after_submission_long = min(int((shares > 0.0).sum()), k_eff)
+        occupied_after_submission_short = min(int((shares < 0.0).sum()), k_eff)
+        open_after_submission_long = max(k_eff - occupied_after_submission_long, 0)
+        open_after_submission_short = max(k_eff - occupied_after_submission_short, 0)
+        band_candidates_long = 0
+        band_candidates_short = 0
+        band_excluded_unresolved_long = 0
+        band_excluded_unresolved_short = 0
+        band_excluded_settled_long = 0
+        band_excluded_settled_short = 0
+        band_without_prior_print_long = 0
+        band_without_prior_print_short = 0
+        band_exhausted_long = 0
+        band_exhausted_short = 0
+        blocked_open_long = 0
+        blocked_open_short = 0
         if day < day_count - 1 and not small_universe:
             slot_notional = start_nav * config.gross_target / (2 * config.k_per_side)
             same_day_exit_names = {
@@ -1298,6 +1529,34 @@ def simulate_stateful_ledger(
                 and not unresolved_action[name]
                 and not settled_names[name]
             ]
+            band_candidates_long = len(long_candidates)
+            band_candidates_short = len(short_candidates)
+            band_excluded_unresolved_long = sum(
+                name not in unavailable and bool(unresolved_action[name])
+                for name in long_band
+            )
+            band_excluded_unresolved_short = sum(
+                name not in unavailable and bool(unresolved_action[name])
+                for name in short_band
+            )
+            band_excluded_settled_long = sum(
+                name not in unavailable
+                and not unresolved_action[name]
+                and bool(settled_names[name])
+                for name in long_band
+            )
+            band_excluded_settled_short = sum(
+                name not in unavailable
+                and not unresolved_action[name]
+                and bool(settled_names[name])
+                for name in short_band
+            )
+            band_without_prior_print_long = sum(
+                last_print_session[name] < day - 1 for name in long_candidates
+            )
+            band_without_prior_print_short = sum(
+                last_print_session[name] < day - 1 for name in short_candidates
+            )
             replacement_capacity = {
                 "buy": sum(shares[name] > 0.0 for name in same_day_exit_names),
                 "sell": sum(shares[name] < 0.0 for name in same_day_exit_names),
@@ -1345,6 +1604,7 @@ def simulate_stateful_ledger(
                     if current_side == "buy"
                     else -quantity * reference
                 )
+                gross_before, net_before, _ = _risk(planned_values, start_nav)
                 planned_gross, planned_net, planned_name = _risk(proposed, start_nav)
                 violates_gross = planned_gross > config.planned_gross_cap + 1e-12
                 violates_net = (
@@ -1354,10 +1614,27 @@ def simulate_stateful_ledger(
                 blocked_gross += int(violates_gross)
                 blocked_net += int(violates_net)
                 blocked_name += int(violates_name)
+                gross_cap_below_target += int(
+                    violates_gross and gross_before < config.gross_target
+                )
+                net_cap_balanced += int(
+                    violates_net
+                    and abs(net_before)
+                    <= config.planned_absolute_net_cap
+                    - slot_notional / start_nav
+                    - 1e-9
+                )
+                name_cap_fresh += int(
+                    violates_name
+                    and shares[name] == 0.0
+                    and name not in pending_entries
+                )
                 if violates_gross or violates_net or violates_name:
                     current_side = "sell" if current_side == "buy" else "buy"
                     continue
                 expiry = day + config.entry_expiry_sessions - 1
+                submission_nav[name] = start_nav
+                entry_cost_basis[name] = 0.0
                 pending_entries[name] = submit_order(
                     day,
                     name,
@@ -1374,6 +1651,30 @@ def simulate_stateful_ledger(
                     replacement_capacity[current_side] -= 1
                 planned_values = proposed
                 current_side = "sell" if current_side == "buy" else "buy"
+            occupied_after_submission_long = k_eff - remaining_slots["buy"]
+            occupied_after_submission_short = k_eff - remaining_slots["sell"]
+            open_after_submission_long = remaining_slots["buy"]
+            open_after_submission_short = remaining_slots["sell"]
+            band_exhausted_long = (
+                remaining_slots["buy"]
+                if candidate_index["buy"] == len(long_candidates)
+                else 0
+            )
+            band_exhausted_short = (
+                remaining_slots["sell"]
+                if candidate_index["sell"] == len(short_candidates)
+                else 0
+            )
+            blocked_open_long = (
+                remaining_slots["buy"]
+                if candidate_index["buy"] < len(long_candidates)
+                else 0
+            )
+            blocked_open_short = (
+                remaining_slots["sell"]
+                if candidate_index["sell"] < len(short_candidates)
+                else 0
+            )
         blocked_reference_rows.append(blocked_reference)
         blocked_gross_rows.append(blocked_gross)
         blocked_net_rows.append(blocked_net)
@@ -1396,6 +1697,31 @@ def simulate_stateful_ledger(
         risk_trim_gross_rows.append(risk_trim_gross)
         risk_trim_net_rows.append(risk_trim_net)
         risk_trim_name_rows.append(risk_trim_name)
+        occupied_after_submission_long_rows.append(occupied_after_submission_long)
+        occupied_after_submission_short_rows.append(occupied_after_submission_short)
+        open_after_submission_long_rows.append(open_after_submission_long)
+        open_after_submission_short_rows.append(open_after_submission_short)
+        band_candidates_long_rows.append(band_candidates_long)
+        band_candidates_short_rows.append(band_candidates_short)
+        band_excluded_unresolved_long_rows.append(band_excluded_unresolved_long)
+        band_excluded_unresolved_short_rows.append(band_excluded_unresolved_short)
+        band_excluded_settled_long_rows.append(band_excluded_settled_long)
+        band_excluded_settled_short_rows.append(band_excluded_settled_short)
+        band_without_prior_print_long_rows.append(band_without_prior_print_long)
+        band_without_prior_print_short_rows.append(band_without_prior_print_short)
+        band_exhausted_long_rows.append(band_exhausted_long)
+        band_exhausted_short_rows.append(band_exhausted_short)
+        blocked_open_long_rows.append(blocked_open_long)
+        blocked_open_short_rows.append(blocked_open_short)
+        exit_ineligible_rows.append(int((exit_cause_today == 1).sum()))
+        exit_settlement_rows.append(int((exit_cause_today == 2).sum()))
+        exit_rank_rows.append(int((exit_cause_today == 3).sum()))
+        exit_terminal_rows.append(int((exit_cause_today == 4).sum()))
+        exit_cause_rows.append(exit_cause_today)
+        exit_side_rows.append(exit_side_today)
+        net_cap_balanced_rows.append(net_cap_balanced)
+        gross_cap_below_target_rows.append(gross_cap_below_target)
+        name_cap_fresh_rows.append(name_cap_fresh)
 
         # Only now may current-session prints affect the result. This makes the
         # immutable intended-order set invariant to those later observations.
@@ -1404,6 +1730,9 @@ def simulate_stateful_ledger(
             terminal_printed = printed.copy()
         traded_notional = 0.0
         costs = 0.0
+        entry_fill_short_today = 0
+        exit_fill_long_today = 0
+        exit_fill_short_today = 0
         cost_rate = config.cost_bps_per_side / 10_000.0
         for pending_map in (pending_exits, pending_entries):
             entries = pending_map is pending_entries
@@ -1413,7 +1742,8 @@ def simulate_stateful_ledger(
                 if not printed[name] or (entries and unresolved_action[name]):
                     continue
                 fraction = float(inputs.fill_fraction[day, name])
-                quantity = pending.remaining_quantity * fraction
+                remaining_before_fill = pending.remaining_quantity
+                quantity = remaining_before_fill * fraction
                 if quantity <= 0.0:
                     continue
                 before = float(shares[name])
@@ -1428,6 +1758,22 @@ def simulate_stateful_ledger(
                     free_cash=free_cash,
                     cost_rate=cost_rate,
                 )
+                after = float(shares[name])
+                if entries:
+                    entry_cost_basis[name] += notional
+                    entry_fill_short_today += int(
+                        quantity
+                        < remaining_before_fill
+                        - max(1e-12, pending.order.quantity * 1e-12)
+                    )
+                elif before != 0.0 and abs(after) < abs(before):
+                    if after == 0.0:
+                        entry_cost_basis[name] = 0.0
+                        submission_nav[name] = 0.0
+                        exit_fill_long_today += int(before > 0.0)
+                        exit_fill_short_today += int(before < 0.0)
+                    else:
+                        entry_cost_basis[name] *= abs(after) / abs(before)
                 if before == 0.0 and shares[name] != 0.0:
                     entry_session[name] = day
                 if before != 0.0 and shares[name] == 0.0:
@@ -1471,6 +1817,28 @@ def simulate_stateful_ledger(
                 )
                 del pending_entries[name]
                 cancelled_today += 1
+                if shares[name] == 0.0:
+                    entry_cost_basis[name] = 0.0
+                    submission_nav[name] = 0.0
+
+        pending_printed_unfilled_today = sum(
+            bool(printed[name] and not unresolved_action[name])
+            for name in pending_entries
+        )
+        pending_end_long = sum(
+            pending.order.side == "buy" for pending in pending_entries.values()
+        )
+        pending_end_short = sum(
+            pending.order.side == "sell" for pending in pending_entries.values()
+        )
+        pending_without_print_long = sum(
+            pending.order.side == "buy" and not printed[name]
+            for name, pending in pending_entries.items()
+        )
+        pending_without_print_short = sum(
+            pending.order.side == "sell" and not printed[name]
+            for name, pending in pending_entries.items()
+        )
 
         newly_reprinted = printed & settled_names & ~settled_then_printed_seen
         settled_then_printed_seen |= newly_reprinted
@@ -1478,6 +1846,7 @@ def simulate_stateful_ledger(
 
         for name in range(name_count):
             if printed[name]:
+                last_print_session[name] = day
                 last_observed[name] = inputs.raw_close[day, name]
                 if shares[name] != 0.0:
                     marks[name] = inputs.raw_close[day, name]
@@ -1543,6 +1912,10 @@ def simulate_stateful_ledger(
                 free_cash=free_cash,
                 cost_rate=cost_rate,
             )
+            exit_fill_long_today += int(before > 0.0)
+            exit_fill_short_today += int(before < 0.0)
+            entry_cost_basis[name] = 0.0
+            submission_nav[name] = 0.0
             fill_cost = cost_rate * notional
             fills.append(
                 Fill(
@@ -1646,6 +2019,52 @@ def simulate_stateful_ledger(
             )
         planned_gross, planned_net, planned_name = _risk(planned_values, start_nav)
 
+        held_end_long = int((shares > 0.0).sum())
+        held_end_short = int((shares < 0.0).sum())
+        target_per_slot = config.gross_target / (2.0 * config.k_per_side)
+        small_universe_shortfall = (
+            config.gross_target * (config.k_per_side - k_eff) / config.k_per_side
+        )
+        occupancy_slot_count = 2 * k_eff - int(held_now.sum())
+        empty_pending_count = sum(shares[name] == 0.0 for name in pending_entries)
+        occupancy_pending_count = min(max(occupancy_slot_count, 0), empty_pending_count)
+        unclassified_occupancy = occupancy_slot_count - occupancy_pending_count
+        occupancy_band_exhausted_count = min(
+            max(unclassified_occupancy, 0),
+            band_exhausted_long + band_exhausted_short,
+        )
+        unclassified_occupancy -= occupancy_band_exhausted_count
+        occupancy_blocked_count = min(
+            max(unclassified_occupancy, 0), blocked_open_long + blocked_open_short
+        )
+        unclassified_occupancy -= occupancy_blocked_count
+        occupancy_exit_gap_count = min(
+            max(unclassified_occupancy, 0),
+            exit_fill_long_today + exit_fill_short_today,
+        )
+        unclassified_occupancy -= occupancy_exit_gap_count
+        sizing_fill = float(
+            np.sum(
+                submission_nav[held_now] * target_per_slot - entry_cost_basis[held_now],
+                dtype=np.float64,
+            )
+            / current_nav
+        )
+        sizing_mark = float(
+            np.sum(
+                entry_cost_basis[held_now] - np.abs(signed_values[held_now]),
+                dtype=np.float64,
+            )
+            / current_nav
+        )
+        sizing_nav = float(
+            np.sum(
+                target_per_slot * (current_nav - submission_nav[held_now]),
+                dtype=np.float64,
+            )
+            / current_nav
+        )
+
         economic_pnl = current_nav - start_nav - interest + borrow + costs
         daily_return = current_nav / start_nav - 1.0
         nav_rows.append(current_nav)
@@ -1705,6 +2124,29 @@ def simulate_stateful_ledger(
         settlement_notional_rows.append(settlement_notional)
         settlement_fraction_rows.append(settlement_notional / start_nav)
         settled_then_printed_rows.append(settled_then_printed_today)
+        held_end_long_rows.append(held_end_long)
+        held_end_short_rows.append(held_end_short)
+        pending_end_long_rows.append(pending_end_long)
+        pending_end_short_rows.append(pending_end_short)
+        pending_without_print_long_rows.append(pending_without_print_long)
+        pending_without_print_short_rows.append(pending_without_print_short)
+        exit_fill_long_rows.append(exit_fill_long_today)
+        exit_fill_short_rows.append(exit_fill_short_today)
+        pending_printed_unfilled_rows.append(pending_printed_unfilled_today)
+        entry_fill_short_rows.append(entry_fill_short_today)
+        entry_cost_basis_rows.append(entry_cost_basis.copy())
+        submission_nav_rows.append(submission_nav.copy())
+        shortfall_small_rows.append(small_universe_shortfall)
+        shortfall_pending_rows.append(occupancy_pending_count * target_per_slot)
+        shortfall_band_exhausted_rows.append(
+            occupancy_band_exhausted_count * target_per_slot
+        )
+        shortfall_blocked_rows.append(occupancy_blocked_count * target_per_slot)
+        shortfall_exit_gap_rows.append(occupancy_exit_gap_count * target_per_slot)
+        shortfall_other_rows.append(unclassified_occupancy * target_per_slot)
+        shortfall_sizing_fill_rows.append(sizing_fill)
+        shortfall_sizing_mark_rows.append(sizing_mark)
+        shortfall_sizing_nav_rows.append(sizing_nav)
 
         previous_nav = current_nav
         if not np.isfinite(current_nav):
@@ -1757,6 +2199,50 @@ def simulate_stateful_ledger(
         or payable_by_name.any()
         or settlement_fraction > config.settlement_economics_unresolved_fraction_nav
         or mean_gross < 0.5 * config.gross_target
+    )
+    exit_cause_array = np.stack(exit_cause_rows).astype(np.int8, copy=False)
+    exit_side_array = np.stack(exit_side_rows).astype(np.int8, copy=False)
+    nonterminal_exit_count = int(
+        ((exit_cause_array >= 1) & (exit_cause_array <= 3)).sum()
+    )
+    eligibility_flicker_count = 0
+    for exit_day, name in np.argwhere(exit_cause_array == 1):
+        side = int(exit_side_array[exit_day, name])
+        for later_day in range(
+            int(exit_day) + 1, min(int(exit_day) + 4, completed_days)
+        ):
+            later_eligible = (
+                inputs.score_valid[later_day]
+                & inputs.membership[later_day]
+                & np.isfinite(inputs.score[later_day])
+            )
+            later_names = np.flatnonzero(later_eligible)
+            later_order = (
+                later_names[
+                    np.argsort(inputs.score[later_day, later_names], kind="stable")
+                ]
+                if later_names.size
+                else later_names
+            )
+            later_retention = min(
+                config.k_per_side + config.buffer_per_side,
+                len(later_order) // 2,
+            )
+            if not later_eligible[name] or later_retention == 0:
+                continue
+            later_rank = int(np.flatnonzero(later_order == name)[0])
+            inside_retention = (
+                later_rank >= len(later_order) - later_retention
+                if side > 0
+                else later_rank < later_retention
+            )
+            if inside_retention:
+                eligibility_flicker_count += 1
+                break
+    eligibility_flicker_share = (
+        eligibility_flicker_count / nonterminal_exit_count
+        if nonterminal_exit_count
+        else 0.0
     )
     return StatefulLedgerResult(
         dates=inputs.dates[:completed_days],
@@ -1865,6 +2351,120 @@ def simulate_stateful_ledger(
         settled_then_printed_count=np.asarray(
             settled_then_printed_rows, dtype=np.int64
         ),
+        k_eff_per_side=np.asarray(k_eff_rows, dtype=np.int64),
+        held_count_start_of_day_long=np.asarray(held_start_long_rows, dtype=np.int64),
+        held_count_start_of_day_short=np.asarray(held_start_short_rows, dtype=np.int64),
+        held_count_end_of_day_long=np.asarray(held_end_long_rows, dtype=np.int64),
+        held_count_end_of_day_short=np.asarray(held_end_short_rows, dtype=np.int64),
+        occupied_after_submission_long=np.asarray(
+            occupied_after_submission_long_rows, dtype=np.int64
+        ),
+        occupied_after_submission_short=np.asarray(
+            occupied_after_submission_short_rows, dtype=np.int64
+        ),
+        open_slots_after_submission_long=np.asarray(
+            open_after_submission_long_rows, dtype=np.int64
+        ),
+        open_slots_after_submission_short=np.asarray(
+            open_after_submission_short_rows, dtype=np.int64
+        ),
+        band_candidates_long=np.asarray(band_candidates_long_rows, dtype=np.int64),
+        band_candidates_short=np.asarray(band_candidates_short_rows, dtype=np.int64),
+        band_excluded_unresolved_long=np.asarray(
+            band_excluded_unresolved_long_rows, dtype=np.int64
+        ),
+        band_excluded_unresolved_short=np.asarray(
+            band_excluded_unresolved_short_rows, dtype=np.int64
+        ),
+        band_excluded_settled_long=np.asarray(
+            band_excluded_settled_long_rows, dtype=np.int64
+        ),
+        band_excluded_settled_short=np.asarray(
+            band_excluded_settled_short_rows, dtype=np.int64
+        ),
+        band_candidates_without_prior_session_print_long=np.asarray(
+            band_without_prior_print_long_rows, dtype=np.int64
+        ),
+        band_candidates_without_prior_session_print_short=np.asarray(
+            band_without_prior_print_short_rows, dtype=np.int64
+        ),
+        band_exhausted_open_slots_long=np.asarray(
+            band_exhausted_long_rows, dtype=np.int64
+        ),
+        band_exhausted_open_slots_short=np.asarray(
+            band_exhausted_short_rows, dtype=np.int64
+        ),
+        blocked_open_slots_long=np.asarray(blocked_open_long_rows, dtype=np.int64),
+        blocked_open_slots_short=np.asarray(blocked_open_short_rows, dtype=np.int64),
+        pending_entries_end_of_day_long=np.asarray(
+            pending_end_long_rows, dtype=np.int64
+        ),
+        pending_entries_end_of_day_short=np.asarray(
+            pending_end_short_rows, dtype=np.int64
+        ),
+        pending_entries_without_print_today_long=np.asarray(
+            pending_without_print_long_rows, dtype=np.int64
+        ),
+        pending_entries_without_print_today_short=np.asarray(
+            pending_without_print_short_rows, dtype=np.int64
+        ),
+        slots_freed_by_exit_fill_today_long=np.asarray(
+            exit_fill_long_rows, dtype=np.int64
+        ),
+        slots_freed_by_exit_fill_today_short=np.asarray(
+            exit_fill_short_rows, dtype=np.int64
+        ),
+        exit_instructions_ineligible=np.asarray(exit_ineligible_rows, dtype=np.int64),
+        exit_instructions_settlement_grace=np.asarray(
+            exit_settlement_rows, dtype=np.int64
+        ),
+        exit_instructions_rank_out_of_retention=np.asarray(
+            exit_rank_rows, dtype=np.int64
+        ),
+        exit_instructions_terminal=np.asarray(exit_terminal_rows, dtype=np.int64),
+        exit_instruction_cause=exit_cause_array,
+        exit_instruction_side=exit_side_array,
+        net_cap_block_with_balanced_book=np.asarray(
+            net_cap_balanced_rows, dtype=np.int64
+        ),
+        gross_cap_block_below_target=np.asarray(
+            gross_cap_below_target_rows, dtype=np.int64
+        ),
+        name_cap_block_on_fresh_entry=np.asarray(name_cap_fresh_rows, dtype=np.int64),
+        entry_pending_printed_unblocked_unfilled=np.asarray(
+            pending_printed_unfilled_rows, dtype=np.int64
+        ),
+        entry_fill_quantity_short=np.asarray(entry_fill_short_rows, dtype=np.int64),
+        entry_cost_basis=np.stack(entry_cost_basis_rows),
+        submission_nav=np.stack(submission_nav_rows),
+        gross_shortfall_small_universe=np.asarray(
+            shortfall_small_rows, dtype=np.float64
+        ),
+        gross_shortfall_occupancy_pending=np.asarray(
+            shortfall_pending_rows, dtype=np.float64
+        ),
+        gross_shortfall_occupancy_band_exhausted=np.asarray(
+            shortfall_band_exhausted_rows, dtype=np.float64
+        ),
+        gross_shortfall_occupancy_blocked=np.asarray(
+            shortfall_blocked_rows, dtype=np.float64
+        ),
+        gross_shortfall_occupancy_exit_gap=np.asarray(
+            shortfall_exit_gap_rows, dtype=np.float64
+        ),
+        gross_shortfall_occupancy_other=np.asarray(
+            shortfall_other_rows, dtype=np.float64
+        ),
+        gross_shortfall_sizing_fill=np.asarray(
+            shortfall_sizing_fill_rows, dtype=np.float64
+        ),
+        gross_shortfall_sizing_mark_drift=np.asarray(
+            shortfall_sizing_mark_rows, dtype=np.float64
+        ),
+        gross_shortfall_sizing_nav_drift=np.asarray(
+            shortfall_sizing_nav_rows, dtype=np.float64
+        ),
+        eligibility_flicker_exit_share=eligibility_flicker_share,
         intended_orders=tuple(orders),
         fills=tuple(fills),
         cancellations=tuple(cancellations),

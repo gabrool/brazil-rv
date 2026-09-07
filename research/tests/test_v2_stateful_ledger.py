@@ -1167,3 +1167,108 @@ def test_full_long_side_does_not_block_empty_short_side() -> None:
         for order in result.intended_orders
         if order.decision_session == 1 and order.purpose == "entry"
     )
+
+
+def test_pass4g_shortfall_decomposition_and_defect_counters() -> None:
+    days, names = 8, 100
+    close = np.full((days, names), 100.0)
+    scores = np.tile(np.arange(names, dtype=np.float64), (days, 1))
+    result = _run(
+        close,
+        scores,
+        config=LedgerConfig(
+            k_per_side=30,
+            buffer_per_side=30,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+        ),
+        initial_reference_price=np.full(names, 100.0),
+    )
+
+    terms = (
+        result.gross_shortfall_small_universe
+        + result.gross_shortfall_occupancy_pending
+        + result.gross_shortfall_occupancy_band_exhausted
+        + result.gross_shortfall_occupancy_blocked
+        + result.gross_shortfall_occupancy_exit_gap
+        + result.gross_shortfall_occupancy_other
+        + result.gross_shortfall_sizing_fill
+        + result.gross_shortfall_sizing_mark_drift
+        + result.gross_shortfall_sizing_nav_drift
+    )
+    np.testing.assert_allclose(
+        terms, result.gross_target - result.gross_fraction_nav, atol=1e-12, rtol=0.0
+    )
+    np.testing.assert_allclose(result.gross_fraction_nav[:-1], 2.0, atol=1e-12)
+    summary = result.summary()
+    assert summary["entry_defect_signatures"] == {
+        "D1_entry_pending_printed_unblocked_unfilled": 0,
+        "D2_entry_fill_quantity_short": 0,
+        "D3_blocked_open_slots": 0,
+        "D4_cap_block_defects": 0,
+        "D5_eligibility_flicker_exit_share": 0.0,
+    }
+
+
+def test_pass4g_pending_nonprinters_are_explained_without_behavior_change() -> None:
+    days, names = 9, 100
+    close = np.full((days, names), 100.0)
+    close[:, 98:] = np.nan
+    scores = np.tile(np.arange(names, dtype=np.float64), (days, 1))
+    result = _run(
+        close,
+        scores,
+        config=LedgerConfig(
+            k_per_side=30,
+            buffer_per_side=30,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+        ),
+        initial_reference_price=np.full(names, 100.0),
+    )
+
+    np.testing.assert_array_equal(
+        result.pending_entries_without_print_today_long[:8],
+        np.asarray([2, 2, 0, 2, 2, 0, 2, 2]),
+    )
+    assert np.all(result.band_candidates_without_prior_session_print_long[1:8] <= 2)
+    assert result.entry_pending_printed_unblocked_unfilled.sum() == 0
+    terms = (
+        result.gross_shortfall_small_universe
+        + result.gross_shortfall_occupancy_pending
+        + result.gross_shortfall_occupancy_band_exhausted
+        + result.gross_shortfall_occupancy_blocked
+        + result.gross_shortfall_occupancy_exit_gap
+        + result.gross_shortfall_occupancy_other
+        + result.gross_shortfall_sizing_fill
+        + result.gross_shortfall_sizing_mark_drift
+        + result.gross_shortfall_sizing_nav_drift
+    )
+    np.testing.assert_allclose(
+        terms, result.gross_target - result.gross_fraction_nav, atol=1e-12, rtol=0.0
+    )
+
+
+def test_pass4g_sizing_decomposition_matches_hand_computed_mark_and_nav_drift() -> None:
+    close = np.full((3, 3), 100.0)
+    close[1, 2] = 110.0
+    scores = np.asarray([[-1.0, 0.0, 1.0]] * 3)
+    result = _run(
+        close,
+        scores,
+        initial_reference_price=np.full(3, 100.0),
+    )
+
+    expected_mark_drift = -0.1 / 1.1
+    expected_nav_drift = 2.0 * 0.1 / 1.1
+    np.testing.assert_allclose(result.gross_shortfall_sizing_fill[1], 0.0, atol=1e-12)
+    np.testing.assert_allclose(
+        result.gross_shortfall_sizing_mark_drift[1],
+        expected_mark_drift,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        result.gross_shortfall_sizing_nav_drift[1],
+        expected_nav_drift,
+        atol=1e-12,
+    )
