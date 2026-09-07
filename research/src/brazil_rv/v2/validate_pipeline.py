@@ -44,7 +44,12 @@ from .data import (
     scalar_feature_names,
 )
 from .data_roots import resolve_external_files
-from .evaluate import EvaluationInputs, EvaluationResult, evaluate_scores
+from .evaluate import (
+    EVALUATION_SCHEMA,
+    EvaluationInputs,
+    EvaluationResult,
+    evaluate_scores,
+)
 from .gbdt import (
     GBDTConfig,
     MultiHorizonGBDT,
@@ -61,8 +66,14 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V7"
-_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V6"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V8"
+_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V7"
+_ACCEPTANCE_ANCESTOR_SCHEMAS = frozenset(
+    {
+        "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5",
+        "BRAZIL_RV_V2_PIPELINE_VALIDATION_V6",
+    }
+)
 PIPELINE_NETWORK_RESUME_SCHEMA = "BRAZIL_RV_V2_PIPELINE_NETWORK_RESUME_V2"
 PIPELINE_FLAGS: dict[str, bool] = {
     "pipeline_validation": True,
@@ -1949,7 +1960,7 @@ def _assert_prior_store_build_identity(
 
 def _verified_bound_acceptance_root(
     binding: Mapping[str, object], *, store_manifest_sha256: str
-) -> tuple[Path, str]:
+) -> tuple[Path, str, Mapping[str, object]]:
     root_raw = binding.get("root")
     expected_manifest_sha = binding.get("manifest_sha256")
     expected_inventory_sha = binding.get("inventory_sha256")
@@ -1974,14 +1985,10 @@ def _verified_bound_acceptance_root(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     inventory_payload = json.loads(inventory_path.read_text(encoding="utf-8"))
     schema = manifest.get("schema") if isinstance(manifest, Mapping) else None
-    allowed_schemas = {
-        "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5",
-        _PRIOR_PIPELINE_SCHEMA,
-    }
     if (
         not isinstance(manifest, Mapping)
         or not isinstance(inventory_payload, Mapping)
-        or schema not in allowed_schemas
+        or schema not in _ACCEPTANCE_ANCESTOR_SCHEMAS
         or manifest.get("status") != "completed"
         or manifest.get("pipeline_validation") is not True
         or manifest.get("research_claim") is not False
@@ -2003,7 +2010,33 @@ def _verified_bound_acceptance_root(
     ):
         raise ValueError("bound acceptance used a different immutable store")
     _verify_bound_inventory_files(source, inventory_payload.get("files"))
-    return source, str(schema)
+    return source, str(schema), manifest
+
+
+def _verified_acceptance_ancestors(
+    prior: Mapping[str, object], *, store_manifest_sha256: str
+) -> dict[Path, str]:
+    roots: dict[Path, str] = {}
+    sources = prior.get("sources")
+    binding = (
+        sources.get("prior_classical_acceptance")
+        if isinstance(sources, Mapping)
+        else None
+    )
+    while isinstance(binding, Mapping):
+        root, schema, manifest = _verified_bound_acceptance_root(
+            binding, store_manifest_sha256=store_manifest_sha256
+        )
+        if root in roots:
+            raise ValueError("prior acceptance ancestry contains a cycle")
+        roots[root] = schema
+        sources = manifest.get("sources")
+        binding = (
+            sources.get("prior_classical_acceptance")
+            if isinstance(sources, Mapping)
+            else None
+        )
+    return roots
 
 
 def _load_prior_score_panel(
@@ -2527,13 +2560,10 @@ def replay_classical_economics(
     prior_cdi = prior_sources.get("cdi") if isinstance(prior_sources, Mapping) else None
     if not isinstance(prior_cdi, Mapping):
         raise ValueError("prior acceptance CDI provenance is missing")
-    score_source_roots = {source_root: _PRIOR_PIPELINE_SCHEMA}
-    ancestor_binding = prior_sources.get("prior_classical_acceptance")
-    if isinstance(ancestor_binding, Mapping):
-        ancestor_root, ancestor_schema = _verified_bound_acceptance_root(
-            ancestor_binding, store_manifest_sha256=actual_store_sha
-        )
-        score_source_roots[ancestor_root] = ancestor_schema
+    score_source_roots = {
+        source_root: _PRIOR_PIPELINE_SCHEMA,
+        **_verified_acceptance_ancestors(prior, store_manifest_sha256=actual_store_sha),
+    }
     for key in ("development_extension", "experiment52_reference"):
         old = prior_cdi.get(key)
         new = cdi_provenance.get(key)
@@ -2603,6 +2633,7 @@ def replay_classical_economics(
     output.mkdir(parents=True, exist_ok=False)
     comparison_rows: list[dict[str, object]] = []
     changed_paths: set[str] = set()
+    prior_evaluation_schemas: set[str] = set()
 
     def replay_record(
         record: Mapping[str, object], *, destination: Path
@@ -2630,6 +2661,10 @@ def replay_classical_economics(
         old_report = json.loads(old_path.read_text(encoding="utf-8"))
         if not isinstance(old_report, Mapping):
             raise ValueError("prior evaluation report is malformed")
+        old_schema = old_report.get("schema")
+        if not isinstance(old_schema, str):
+            raise ValueError("prior evaluation report schema is malformed")
+        prior_evaluation_schemas.add(old_schema)
         destination.mkdir(parents=True, exist_ok=False)
         new_result, new_sha = _evaluate_and_write(
             store=store,
@@ -2710,6 +2745,9 @@ def replay_classical_economics(
             schedule_source=store_metadata.get("schedule_source"),
             native_fast_audit_passed=native_fast_audit is not None,
         )
+        if len(prior_evaluation_schemas) != 1:
+            raise ValueError("prior evaluation reports do not share one schema")
+        prior_evaluation_schema = next(iter(prior_evaluation_schemas))
         protocol_hashes = {
             name: {
                 "path": str(PROTOCOL_CONFIG_ROOT / f"{name}.json"),
@@ -2760,8 +2798,8 @@ def replay_classical_economics(
                 },
                 "ledger_replay_proof": {
                     "score_or_model_recomputation": False,
-                    "prior_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V7",
-                    "replayed_evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V8",
+                    "prior_evaluation_schema": prior_evaluation_schema,
+                    "replayed_evaluation_schema": EVALUATION_SCHEMA,
                     "schema_field_is_the_only_non_economics_exception": True,
                     "all_non_ledger_fields_bit_identical": all(
                         row["non_ledger_fields_bit_identical"] is True

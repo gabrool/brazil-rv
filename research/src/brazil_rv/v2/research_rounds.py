@@ -238,7 +238,7 @@ def _verify_development_acceptance(
         raise ValueError("development acceptance report SHA-256 mismatch")
     report = _read_json(source)
     if (
-        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V7"
+        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V8"
         or report.get("status") != "completed"
         or report.get("engineering_acceptance_status")
         != "development_grade_inferred_actions"

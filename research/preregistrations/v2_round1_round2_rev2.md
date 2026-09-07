@@ -46,7 +46,7 @@ executable borrow.
 
 ## Pre-research acceptance and sanity bounds
 
-Before Round 1 can freeze, a completed `BRAZIL_RV_V2_PIPELINE_VALIDATION_V7` report
+Before Round 1 can freeze, a completed `BRAZIL_RV_V2_PIPELINE_VALIDATION_V8` report
 must bind the exact implementation and store and have status
 `development_grade_inferred_actions`, no failed reasons, and both sealed-window access
 flags false. It includes the survivorship gates, provider-invariance evidence, finite
