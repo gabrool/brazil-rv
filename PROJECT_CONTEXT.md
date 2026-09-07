@@ -1689,4 +1689,5 @@ requires explicit user authorization: freeze a fresh NFS root under the then-
 current clean commit, run exactly one disposable Arm-A/F1/seed-11 epoch with
 no score artifact, and only if that succeeds write the three-seed Stage-P
 plan. Official validation, the permanently spent test, and deployment remain
-untouched.
+untouched. Direct provider reads at `2026-09-07T04:51:39.2629896Z` and
+`2026-09-07T04:51:42.8034166Z` both returned zero instances.

@@ -801,4 +801,7 @@ economics with an interval spanning zero.
 Round 2 was not frozen or run. No paid instance was launched for Pass 4h or
 Round 1. The next authorized operation, after Gabriel's explicit go-ahead, is
 the disposable one-epoch Arm-A/F1/seed-11 smoke with no score directory,
-followed only on success by the three registered Stage-P seeds.
+followed only on success by the three registered Stage-P seeds. Direct Lambda
+provider inventories at `2026-09-07T04:51:39.2629896Z` and
+`2026-09-07T04:51:42.8034166Z` both returned zero instances; there was no paid
+host to terminate and no adjacent instance was touched.
