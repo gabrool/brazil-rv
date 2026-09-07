@@ -320,7 +320,10 @@ def _band_rows(
                     prior_stale[:, name].sum()
                 ),
                 "unresolved_action_sessions_while_in_band": int(
-                    (in_band[:, name] & ~inputs.action_session_resolved).sum()
+                    (
+                        in_band[:, name]
+                        & ~np.asarray(inputs.action_session_resolved)[:, name]
+                    ).sum()
                 ),
             }
         )
