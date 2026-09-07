@@ -157,6 +157,80 @@ implementation identity, access flags, and score-manifest hash. Arbitrary extern
 score paths remain forbidden. This changes no score, panel, ledger rule, threshold,
 or gate.
 
+## Pass-4g gross-band disposition registered before diagnosis
+
+This disposition was fixed at `2026-09-07T00:55:50Z`, before the pass-4g
+occupancy diagnostic and before any Round-1 score. It replaces the gross band
+as a standalone defect detector without relaxing the portfolio target or any
+leakage, identity, clock, accounting, stale-inventory, or access rule.
+
+For each evaluation session, with `K = 30`, end-of-day holdings, and
+`gross_t = gross_fraction_nav[t]`, the diagnostic must report the exact identity
+
+```text
+gross_target - gross_t
+  = 2 * (K - K_eff,t) / K
+  + (2 * K_eff,t - n_held,t) / K
+  + sum_held(1 / K - abs(shares * mark_t) / NAV_t).
+```
+
+The terms are labelled `small_universe`, `occupancy`, and `sizing`. Occupancy
+is split into pending-entry, band-exhausted, blocked, same-day exit-gap, and
+other terms. Sizing is split using each current holding episode's entry fill
+cost basis and first submission NAV:
+
+```text
+1 / K - abs(shares * mark_t) / NAV_t
+  = (submission_nav / K - fill_value) / NAV_t
+  + (fill_value - abs(shares * mark_t)) / NAV_t
+  + (1 / K) * (NAV_t - submission_nav) / NAV_t.
+```
+
+The session means of all terms must sum to `gross_target - mean_gross` within
+`1e-9`. The registered entry-defect signatures and limits are:
+
+- D1, a printed and unblocked pending entry left unfilled: exactly zero;
+- D2, an entry fill shorter than its pending quantity when fill fractions are
+  one: exactly zero;
+- D3, an open slot left with unconsumed candidates: exactly zero;
+- D4, the sum of gross-cap blocks below target, fresh-entry name-cap blocks,
+  and net-cap blocks while the book was balanced: exactly zero;
+- D5, ineligible exit instructions whose name becomes eligible again within
+  three sessions inside its side's retention band, divided by all non-terminal
+  exit instructions: at most `0.10`.
+
+The disposition is read from the F2 inverse-volatility-20 decomposition after
+all 16 sealed books reproduce every existing pass-4f headline field exactly:
+
+- P0: any D1--D4 breach or D5 above `0.10` in any book stops the program with
+  no rule change, merge, or Round-1 freeze.
+- P1: with no signature breach and F2 inverse-volatility occupancy share at
+  least `0.30`, add only the registered causal entry-liquidity screen and
+  15-rank per-side entry reach-down, then replay all 16 sealed score panels.
+- P2: with no signature breach and occupancy share below `0.30`, change no
+  ledger rule; apply the labelled gross-deployment acceptance rule and replay
+  the sealed panels only to carry the new report fields.
+
+Under P1, an entry candidate on session t must have printed on immediately
+preceding reconstructed session t-1, and the entry band may reach down by at
+most 15 ranks per side while retaining exactly K_eff slots and the unchanged
+retention exit edge. All other sizing, expiry, caps, trims, settlement, costs,
+borrow, stale-inventory, same-close reuse, and K_eff rules remain unchanged.
+The advance replay expectations are: all 16 books in the 1.8--2.2 band; mean
+turnover and the holding-session approximation change by less than 10% for
+each book; settlement counts do not rise; headline net excess may move in
+either direction and has no decision weight. Any residual underdeployment is
+labelled rather than prompting another rule change.
+
+Under either P1 or P2, deployed gross remains targeted at 2.0 and the 1.8--2.2
+band remains reported. A book outside it is labelled `gross_underdeployed` or
+`gross_overdeployed`, rather than failed, only when D1--D5 remain within their
+limits and mean gross is in the hard interval 1.5--2.25. The label,
+decomposition, and signatures accompany its economics at achieved gross.
+Any signature breach or mean gross outside 1.5--2.25 stops the program. IC,
+persistence, and spread readouts remain valid for labelled books. Existing F3
+`economics_unresolved` labels remain unchanged.
+
 ## Round 1 — baseline floor and GBDT parent (CPU)
 
 **R1.1 baseline table.** Evaluate exactly reversal 5, reversal 21, momentum 12-1,
