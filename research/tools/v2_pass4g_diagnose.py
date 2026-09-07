@@ -307,12 +307,14 @@ def _band_rows(
                 "sessions_in_long_band": int((bands[:, name] > 0).sum()),
                 "sessions_in_short_band": int((bands[:, name] < 0).sum()),
                 "sessions_held": int((result.position_sign[:, name] != 0).sum()),
-                "entries_submitted": sum(
-                    order.security_index == name for order in entry_orders
+                "entries_submitted": int(
+                    sum(order.security_index == name for order in entry_orders)
                 ),
-                "entry_fills": sum(fill.security_index == name for fill in entry_fills),
-                "expiry_cancellations": sum(
-                    cancellation.security_index == name for cancellation in expired
+                "entry_fills": int(
+                    sum(fill.security_index == name for fill in entry_fills)
+                ),
+                "expiry_cancellations": int(
+                    sum(cancellation.security_index == name for cancellation in expired)
                 ),
                 "sessions_printed_in_window": int(printed[:, name].sum()),
                 "sessions_in_window": len(inputs.dates),
