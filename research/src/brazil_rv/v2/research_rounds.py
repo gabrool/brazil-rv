@@ -71,6 +71,7 @@ from .validate_pipeline import (
     _date_indices,
     _evaluation_inputs,
     _load_development_cdi,
+    _non_ledger_report,
     _read_store_header,
     _window_target_mask,
 )
@@ -2573,12 +2574,8 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
 def _ledger_replay_non_ledger_projection(
     report: Mapping[str, object],
 ) -> dict[str, object]:
-    projection = {
-        key: value
-        for key, value in report.items()
-        if key not in {"schema", "economics", "diagnostics"}
-    }
-    diagnostics = report.get("diagnostics")
+    projection = _non_ledger_report(report)
+    diagnostics = projection.get("diagnostics")
     if not isinstance(diagnostics, Mapping):
         raise ValueError("evaluation lacks its diagnostics payload")
     projection["diagnostics"] = {

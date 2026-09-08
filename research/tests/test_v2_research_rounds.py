@@ -25,6 +25,7 @@ from brazil_rv.v2.research_rounds import (
     _folded_bootstrap,
     _feature_names,
     _gbdt_features,
+    _ledger_replay_non_ledger_projection,
     _paired_readouts,
     _point_is_negative,
     _pretrain_indices,
@@ -127,6 +128,26 @@ def test_rev4e_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> 
     assert protocol["source_tier_labels"] == {
         "action_terms_source": "inferred_cotahist_dismes_v1",
         "schedule_source": "reconstructed_v1",
+    }
+
+
+def test_rev4e_non_ledger_projection_excludes_only_ledger_owned_diagnostics() -> None:
+    report = {
+        "schema": "old",
+        "economics": {"headline": 1.0},
+        "diagnostics": {"realized_beta": {"slope": 0.1}, "scores": {"finite": True}},
+        "mask_coverage": {
+            "score_mask_true": 12,
+            "actual_risk_breach_dates": 3,
+            "stale_mark_name_days": 2,
+        },
+        "input_hashes": {"scores": "a" * 64},
+    }
+
+    assert _ledger_replay_non_ledger_projection(report) == {
+        "diagnostics": {"scores": {"finite": True}},
+        "mask_coverage": {"score_mask_true": 12},
+        "input_hashes": {"scores": "a" * 64},
     }
 
 
