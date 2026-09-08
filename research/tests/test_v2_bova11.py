@@ -120,5 +120,28 @@ def test_bova11_loader_rejects_dates_outside_canonical_calendar(tmp_path: Path) 
         load_bova11_series(
             output,
             expected_manifest_sha256=sha256_file(output / "manifest.json"),
-            canonical_dates=[date(2024, 1, 3)],
+            canonical_dates=[date(2024, 1, 1), date(2024, 1, 3)],
         )
+
+
+def test_bova11_loader_ignores_valid_history_before_consumer_calendar(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "COTAHIST_A2024.ZIP"
+    first = date(2024, 1, 2)
+    second = date(2024, 1, 3)
+    _archive(
+        source,
+        2024,
+        [_quote_line(first), _quote_line(second, close_cents=10_100)],
+    )
+    output = tmp_path / "bova"
+    build_bova11_series([source], output)
+
+    loaded = load_bova11_series(
+        output,
+        expected_manifest_sha256=sha256_file(output / "manifest.json"),
+        canonical_dates=[second],
+    )
+
+    np.testing.assert_allclose(loaded.close_by_session, [101.0])

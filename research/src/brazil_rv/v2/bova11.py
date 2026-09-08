@@ -226,13 +226,25 @@ def load_bova11_series(
     close = np.asarray(frame.get_column("close_brl"), dtype=np.float64)
     if np.any(~np.isfinite(close) | (close <= 0.0)):
         raise ValueError("BOVA11 close series contains invalid values")
-    date_index = {day: index for index, day in enumerate(canonical_dates)}
-    foreign = [day for day in source_dates if day not in date_index]
+    canonical = tuple(canonical_dates)
+    if not canonical or any(
+        left >= right for left, right in zip(canonical, canonical[1:], strict=False)
+    ):
+        raise ValueError("canonical calendar must be nonempty and strictly ordered")
+    date_index = {day: index for index, day in enumerate(canonical)}
+    first_canonical, last_canonical = canonical[0], canonical[-1]
+    foreign = [
+        day
+        for day in source_dates
+        if first_canonical <= day <= last_canonical and day not in date_index
+    ]
     if foreign:
         raise ValueError(f"BOVA11 rows are outside the canonical calendar: {foreign[:5]}")
-    aligned = np.full(len(canonical_dates), np.nan, dtype=np.float64)
+    aligned = np.full(len(canonical), np.nan, dtype=np.float64)
     for day, value in zip(source_dates, close, strict=True):
-        aligned[date_index[day]] = value
+        index = date_index.get(day)
+        if index is not None:
+            aligned[index] = value
     return Bova11Series(
         close_by_session=aligned,
         manifest_path=manifest_path,
