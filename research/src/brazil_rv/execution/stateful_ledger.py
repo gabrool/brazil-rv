@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import date
-from typing import Literal, Sequence
+from typing import Literal, Mapping, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,7 +11,7 @@ from brazil_rv.v2.corporate_actions import AlignedActionTerms, apply_contractual
 
 
 OrderSide = Literal["buy", "sell"]
-BorrowSource = Literal["uniform", "lending_sidecar_v1"]
+BorrowSource = Literal["uniform", "borrow_strict", "borrow_balance", "borrow_open"]
 OrderPurpose = Literal[
     "entry", "exit", "risk_exit", "terminal_exit", "terminal_settlement"
 ]
@@ -68,7 +68,8 @@ class LedgerConfig:
     planned_name_weight_cap: float = 0.05
     cost_bps_per_side: float = 4.0
     annual_borrow_rate: float = 0.02
-    borrow_source: BorrowSource = "lending_sidecar_v1"
+    borrow_source: BorrowSource = "borrow_balance"
+    borrow_registration_fee: float = 0.0025
     volatility_balanced_entries: bool = True
     volatility_group_count: int = 5
     beta_hedge: bool = True
@@ -103,8 +104,15 @@ class LedgerConfig:
             or self.annual_sessions <= 0
         ):
             raise ValueError("ledger financing controls are invalid")
-        if self.borrow_source not in {"uniform", "lending_sidecar_v1"}:
-            raise ValueError("borrow source must be uniform or lending_sidecar_v1")
+        if self.borrow_source not in {
+            "uniform",
+            "borrow_strict",
+            "borrow_balance",
+            "borrow_open",
+        }:
+            raise ValueError("borrow source is not a registered rev4b cell")
+        if self.borrow_registration_fee < 0.0:
+            raise ValueError("borrow registration fee must be non-negative")
         if self.volatility_group_count < 1:
             raise ValueError("volatility group count must be positive")
         if (
@@ -205,6 +213,7 @@ class _ValidatedInputs:
     securities: tuple[str, ...]
     initial_reference_price: NDArray[np.float64]
     annual_borrow_rate_by_name: NDArray[np.float64]
+    borrow_rate_imputed: NDArray[np.bool_]
     shortable: NDArray[np.bool_]
     selection_volatility: NDArray[np.float64]
     beta_60: NDArray[np.float64]
@@ -224,6 +233,7 @@ class StatefulLedgerResult:
     borrow_bps: NDArray[np.float64]
     held_short_weighted_annual_borrow_rate: NDArray[np.float64]
     held_short_notional_at_open: NDArray[np.float64]
+    held_short_imputed_notional_at_open: NDArray[np.float64]
     excluded_short_entry_candidate_count: NDArray[np.int64]
     gross_fraction_nav: NDArray[np.float64]
     turnover_fraction_nav: NDArray[np.float64]
@@ -355,6 +365,8 @@ class StatefulLedgerResult:
     volatility_quota: NDArray[np.int64]
     volatility_occupancy_long: NDArray[np.int64]
     volatility_occupancy_short: NDArray[np.int64]
+    volatility_spilled_entries_long: NDArray[np.int64]
+    volatility_spilled_entries_short: NDArray[np.int64]
     hedge_signed_shares: NDArray[np.float64]
     hedge_mark_price: NDArray[np.float64]
     hedge_signed_notional: NDArray[np.float64]
@@ -484,6 +496,14 @@ class StatefulLedgerResult:
                         self.held_short_weighted_annual_borrow_rate
                         * self.held_short_notional_at_open
                     )
+                    / np.sum(self.held_short_notional_at_open)
+                )
+                if np.sum(self.held_short_notional_at_open) > 0.0
+                else 0.0
+            ),
+            "imputed_rate_share_of_short_notional": (
+                float(
+                    np.sum(self.held_short_imputed_notional_at_open)
                     / np.sum(self.held_short_notional_at_open)
                 )
                 if np.sum(self.held_short_notional_at_open) > 0.0
@@ -660,6 +680,22 @@ class StatefulLedgerResult:
             "mean_volatility_occupancy_short_by_quintile": np.mean(
                 self.volatility_occupancy_short, axis=0
             ).tolist(),
+            "mean_absolute_volatility_occupancy_deviation_long": float(
+                np.mean(
+                    np.abs(self.volatility_occupancy_long - self.volatility_quota)
+                )
+            ),
+            "mean_absolute_volatility_occupancy_deviation_short": float(
+                np.mean(
+                    np.abs(self.volatility_occupancy_short - self.volatility_quota)
+                )
+            ),
+            "spilled_entries_long_by_quintile": np.sum(
+                self.volatility_spilled_entries_long, axis=0
+            ).tolist(),
+            "spilled_entries_short_by_quintile": np.sum(
+                self.volatility_spilled_entries_short, axis=0
+            ).tolist(),
             "terminal_hedge_signed_notional": float(self.hedge_signed_notional[-1]),
         }
 
@@ -678,6 +714,7 @@ def _validate_inputs(
     security_ids: Sequence[str] | None,
     initial_reference_price: NDArray[np.floating] | None,
     annual_borrow_rate_by_name: NDArray[np.floating] | None,
+    borrow_rate_imputed: NDArray[np.bool_] | None,
     shortable: NDArray[np.bool_] | None,
     selection_volatility: NDArray[np.floating] | None,
     beta_60: NDArray[np.floating] | None,
@@ -711,9 +748,9 @@ def _validate_inputs(
     if not np.isfinite(cdi).all() or (cdi <= -1.0).any():
         raise ValueError("ledger CDI returns must be finite and greater than -1")
 
-    if borrow_source == "lending_sidecar_v1":
+    if borrow_source != "uniform":
         if annual_borrow_rate_by_name is None or shortable is None:
-            raise ValueError("lending borrow requires rate and shortable panels")
+            raise ValueError("archive borrow requires rate and shortable panels")
         borrow_rate = np.asarray(annual_borrow_rate_by_name, dtype=np.float64)
         shortable_mask = np.asarray(shortable, dtype=np.bool_)
         if borrow_rate.shape != matrix_shape or shortable_mask.shape != matrix_shape:
@@ -723,9 +760,17 @@ def _validate_inputs(
             or (borrow_rate[np.isfinite(borrow_rate)] < 0).any()
         ):
             raise ValueError("lending borrow rates must be non-negative or missing")
+        if borrow_rate_imputed is None:
+            raise ValueError("archive borrow requires an imputed-rate mask")
+        imputed = np.asarray(borrow_rate_imputed)
+        if imputed.shape != matrix_shape or imputed.dtype != np.bool_:
+            raise ValueError("imputed-rate mask must be Boolean and align names")
+        if np.any(imputed & ~np.isfinite(borrow_rate)):
+            raise ValueError("an imputed borrow rate must be finite")
     else:
         borrow_rate = np.full(matrix_shape, np.nan, dtype=np.float64)
         shortable_mask = np.ones(matrix_shape, dtype=np.bool_)
+        imputed = np.zeros(matrix_shape, dtype=np.bool_)
 
     if volatility_balanced_entries:
         if selection_volatility is None:
@@ -862,6 +907,7 @@ def _validate_inputs(
         securities=securities,
         initial_reference_price=initial_reference,
         annual_borrow_rate_by_name=borrow_rate,
+        borrow_rate_imputed=imputed,
         shortable=shortable_mask,
         selection_volatility=volatility,
         beta_60=beta,
@@ -910,6 +956,17 @@ def _risk(signed_values: NDArray[np.float64], nav: float) -> tuple[float, float,
     )
 
 
+def _risk_with_hedge(
+    signed_values: NDArray[np.float64], hedge_notional: float, nav: float
+) -> tuple[float, float, float]:
+    """Whole-book gross/net risk with the hedge outside the equity name cap."""
+
+    gross, net, name = _risk(signed_values, nav)
+    if not np.isfinite(hedge_notional):
+        raise RuntimeError("held hedge has no finite marked notional")
+    return gross + abs(hedge_notional) / nav, net + hedge_notional / nav, name
+
+
 def _equal_count_groups(
     values: NDArray[np.float64], valid: NDArray[np.bool_], group_count: int
 ) -> NDArray[np.int64]:
@@ -933,6 +990,27 @@ def _balanced_quota(k_eff: int, group_count: int) -> NDArray[np.int64]:
     for group in middle_first[: k_eff % group_count]:
         quota[group] += 1
     return quota
+
+
+def _scaled_group_bands(
+    *,
+    k_eff: int,
+    buffer: int,
+    group_sizes: NDArray[np.integer],
+) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    """Scale quota and retention widths together in undersized quintiles."""
+
+    sizes = np.asarray(group_sizes, dtype=np.int64)
+    quota = _balanced_quota(k_eff, len(sizes))
+    retention_buffer = _balanced_quota(buffer, len(sizes))
+    for group, size in enumerate(sizes):
+        width = int(quota[group] + retention_buffer[group])
+        if width == 0 or int(size) >= 4 * width:
+            continue
+        scale = float(size) / float(4 * width)
+        quota[group] = int(np.floor(quota[group] * scale))
+        retention_buffer[group] = int(np.floor(retention_buffer[group] * scale))
+    return quota, retention_buffer
 
 
 def _book_fill(
@@ -989,6 +1067,7 @@ def simulate_stateful_ledger(
     security_ids: Sequence[str] | None = None,
     initial_reference_price: NDArray[np.floating] | None = None,
     annual_borrow_rate_by_name: NDArray[np.floating] | None = None,
+    borrow_rate_imputed: NDArray[np.bool_] | None = None,
     shortable: NDArray[np.bool_] | None = None,
     selection_volatility: NDArray[np.floating] | None = None,
     beta_60: NDArray[np.floating] | None = None,
@@ -1010,6 +1089,7 @@ def simulate_stateful_ledger(
         security_ids=security_ids,
         initial_reference_price=initial_reference_price,
         annual_borrow_rate_by_name=annual_borrow_rate_by_name,
+        borrow_rate_imputed=borrow_rate_imputed,
         shortable=shortable,
         selection_volatility=selection_volatility,
         beta_60=beta_60,
@@ -1071,6 +1151,7 @@ def simulate_stateful_ledger(
     borrow_rows: list[float] = []
     held_short_borrow_rate_rows: list[float] = []
     held_short_notional_rows: list[float] = []
+    held_short_imputed_notional_rows: list[float] = []
     excluded_short_candidate_rows: list[int] = []
     gross_rows: list[float] = []
     turnover_rows: list[float] = []
@@ -1179,6 +1260,8 @@ def simulate_stateful_ledger(
     volatility_quota_rows: list[NDArray[np.int64]] = []
     volatility_occupancy_long_rows: list[NDArray[np.int64]] = []
     volatility_occupancy_short_rows: list[NDArray[np.int64]] = []
+    volatility_spilled_long_rows: list[NDArray[np.int64]] = []
+    volatility_spilled_short_rows: list[NDArray[np.int64]] = []
     hedge_share_rows: list[float] = []
     hedge_mark_rows: list[float] = []
     hedge_notional_rows: list[float] = []
@@ -1451,18 +1534,21 @@ def simulate_stateful_ledger(
             * cash_rate
             * config.short_proceeds_remuneration
         )
-        if config.borrow_source == "lending_sidecar_v1" and short_at_open.any():
+        imputed_short_notional = 0.0
+        if config.borrow_source != "uniform" and short_at_open.any():
             short_values = np.abs(shares[short_at_open] * marks[short_at_open])
             raw_rates = inputs.annual_borrow_rate_by_name[day, short_at_open]
-            effective_rates = np.maximum(
-                np.where(np.isfinite(raw_rates), raw_rates, 0.0),
-                config.annual_borrow_rate,
-            )
+            if not np.isfinite(raw_rates).all():
+                raise RuntimeError("held archive-borrow short has no finite rate")
+            effective_rates = raw_rates + config.borrow_registration_fee
             borrow = float(
                 np.sum(short_values * effective_rates) / config.annual_sessions
             )
             weighted_borrow_rate = float(
                 np.sum(short_values * effective_rates) / short_value_at_open
+            )
+            imputed_short_notional = float(
+                np.sum(short_values[inputs.borrow_rate_imputed[day, short_at_open]])
             )
         else:
             borrow = (
@@ -1485,6 +1571,7 @@ def simulate_stateful_ledger(
             borrow += hedge_borrow
         held_short_borrow_rate_rows.append(weighted_borrow_rate)
         held_short_notional_rows.append(short_value_at_open)
+        held_short_imputed_notional_rows.append(imputed_short_notional)
         free_cash += interest - borrow
         settlement_scenario_adjustment *= 1.0 + cash_rate
 
@@ -1508,11 +1595,6 @@ def simulate_stateful_ledger(
         )
         ranks = np.full(name_count, -1, dtype=np.int64)
         ranks[order] = np.arange(order.size)
-        retention = min(
-            config.k_per_side + config.buffer_per_side,
-            len(order) // 2,
-        )
-        retention_rows.append(retention)
         entry_names = np.flatnonzero(entry_eligible)
         entry_order = (
             entry_names[np.argsort(inputs.score[day, entry_names], kind="stable")]
@@ -1524,15 +1606,57 @@ def simulate_stateful_ledger(
         small_universe = k_eff == 0
         small_universe_rows.append(small_universe)
         if config.volatility_balanced_entries:
+            group_eligible = eligible & np.isfinite(inputs.selection_volatility[day])
             volatility_groups = _equal_count_groups(
                 inputs.selection_volatility[day],
-                entry_eligible,
+                group_eligible,
                 config.volatility_group_count,
             )
-            volatility_quota = _balanced_quota(k_eff, config.volatility_group_count)
+            group_sizes = np.bincount(
+                volatility_groups[volatility_groups >= 0],
+                minlength=config.volatility_group_count,
+            )[: config.volatility_group_count]
+            volatility_quota, volatility_buffer = _scaled_group_bands(
+                k_eff=k_eff,
+                buffer=config.buffer_per_side,
+                group_sizes=group_sizes,
+            )
+            # An undersized stratum scales both its quota and buffer.  The
+            # resulting quota sum is therefore the contractual side size for
+            # this session; filling back to the unscaled k would undo the
+            # small-stratum rule through the global spill pass.
+            k_eff = int(volatility_quota.sum())
+            k_eff_rows[-1] = k_eff
+            small_universe = k_eff == 0
+            small_universe_rows[-1] = small_universe
+            group_orders: dict[int, NDArray[np.int64]] = {}
+            long_retention = np.zeros(name_count, dtype=np.bool_)
+            short_retention = np.zeros(name_count, dtype=np.bool_)
+            for group in range(config.volatility_group_count):
+                names = np.flatnonzero(volatility_groups == group)
+                group_order = names[
+                    np.argsort(inputs.score[day, names], kind="stable")
+                ]
+                group_orders[group] = group_order
+                width = int(volatility_quota[group] + volatility_buffer[group])
+                if width:
+                    short_retention[group_order[:width]] = True
+                    long_retention[group_order[-width:]] = True
+            if np.any(long_retention & short_retention):
+                raise RuntimeError("within-quintile long and short bands overlap")
+            retention = int(np.sum(volatility_quota + volatility_buffer))
         else:
             volatility_groups = np.full(name_count, -1, dtype=np.int64)
             volatility_quota = np.zeros(config.volatility_group_count, dtype=np.int64)
+            volatility_buffer = np.zeros(config.volatility_group_count, dtype=np.int64)
+            group_orders = {}
+            long_retention = np.zeros(name_count, dtype=np.bool_)
+            short_retention = np.zeros(name_count, dtype=np.bool_)
+            retention = min(
+                config.k_per_side + config.buffer_per_side,
+                len(order) // 2,
+            )
+        retention_rows.append(retention)
 
         signed_values = np.zeros(name_count, dtype=np.float64)
         held = shares != 0.0
@@ -1548,7 +1672,39 @@ def simulate_stateful_ledger(
             int((held & ~np.isfinite(inputs.score[day])).sum())
         )
         signed_values[held] = shares[held] * marks[held]
-        actual_gross, actual_net, actual_name = _risk(signed_values, start_nav)
+        current_hedge_notional = (
+            hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0
+        )
+        beta_values_for_risk = np.where(
+            np.isfinite(inputs.beta_60[day]), inputs.beta_60[day], last_beta
+        )
+
+        def prospective_hedge_notional(
+            equity_values: NDArray[np.float64], nav: float
+        ) -> float:
+            if not config.beta_hedge or day == day_count - 1:
+                return 0.0 if day == day_count - 1 else current_hedge_notional
+            required = equity_values != 0.0
+            if np.any(required & ~np.isfinite(beta_values_for_risk)):
+                raise ValueError("planned equity exposure has no causal beta_60")
+            target = -float(
+                np.sum(
+                    equity_values[required] * beta_values_for_risk[required],
+                    dtype=np.float64,
+                )
+            )
+            can_rebalance = np.isfinite(inputs.hedge_close[day])
+            return (
+                target
+                if can_rebalance
+                and abs(target - current_hedge_notional)
+                > config.hedge_rebalance_threshold_nav * nav
+                else current_hedge_notional
+            )
+
+        actual_gross, actual_net, actual_name = _risk_with_hedge(
+            signed_values, current_hedge_notional, start_nav
+        )
         risk_breach = (
             actual_gross > config.planned_gross_cap + 1e-12
             or abs(actual_net) > config.planned_absolute_net_cap + 1e-12
@@ -1569,9 +1725,17 @@ def simulate_stateful_ledger(
                     retention > 0
                     and missing_sessions[name] < config.settlement_grace_sessions
                     and (
-                        ranks[name] >= len(order) - retention
-                        if shares[name] > 0.0
-                        else ranks[name] < retention
+                        (
+                            long_retention[name]
+                            if shares[name] > 0.0
+                            else short_retention[name]
+                        )
+                        if config.volatility_balanced_entries
+                        else (
+                            ranks[name] >= len(order) - retention
+                            if shares[name] > 0.0
+                            else ranks[name] < retention
+                        )
                     )
                 )
             if not kept:
@@ -1724,7 +1888,9 @@ def simulate_stateful_ledger(
                 if excess > 1e-12:
                     risk_trim_name += trim_name(projected, name, excess)
 
-            projected_gross, _, _ = _risk(projected, start_nav)
+            projected_gross, _, _ = _risk_with_hedge(
+                projected, prospective_hedge_notional(projected, start_nav), start_nav
+            )
             if projected_gross > config.planned_gross_cap + 1e-12:
                 total_reduction = max(
                     (projected_gross - config.gross_target) * start_nav, 0.0
@@ -1750,7 +1916,9 @@ def simulate_stateful_ledger(
                 risk_trim_gross += trim_side(projected, "sell", long_reduction)
                 risk_trim_gross += trim_side(projected, "buy", short_reduction)
 
-            _, projected_net, _ = _risk(projected, start_nav)
+            _, projected_net, _ = _risk_with_hedge(
+                projected, prospective_hedge_notional(projected, start_nav), start_nav
+            )
             if abs(projected_net) > config.planned_absolute_net_cap + 1e-12:
                 heavy_side: OrderSide = "sell" if projected_net > 0.0 else "buy"
                 heavy_entries = [
@@ -1774,7 +1942,11 @@ def simulate_stateful_ledger(
                     for risk_name, quantity in risk_exit_quantity.items():
                         direction = -1.0 if shares[risk_name] > 0.0 else 1.0
                         projected[risk_name] += direction * quantity * marks[risk_name]
-                    _, projected_net, _ = _risk(projected, start_nav)
+                    _, projected_net, _ = _risk_with_hedge(
+                        projected,
+                        prospective_hedge_notional(projected, start_nav),
+                        start_nav,
+                    )
                 net_reduction = max((abs(projected_net) - target_net) * start_nav, 0.0)
                 risk_trim_net += trim_side(projected, heavy_side, net_reduction)
 
@@ -1822,6 +1994,10 @@ def simulate_stateful_ledger(
         blocked_open_long = 0
         blocked_open_short = 0
         excluded_short_candidates = 0
+        spilled_entries: dict[OrderSide, NDArray[np.int64]] = {
+            "buy": np.zeros(config.volatility_group_count, dtype=np.int64),
+            "sell": np.zeros(config.volatility_group_count, dtype=np.int64),
+        }
         if day < day_count - 1 and not small_universe:
             slot_notional = start_nav * config.gross_target / (2 * config.k_per_side)
             same_day_exit_names = {
@@ -1855,42 +2031,60 @@ def simulate_stateful_ledger(
             }
             long_slots = max(k_eff - len(long_occupied), 0)
             short_slots = max(k_eff - len(short_occupied), 0)
-            long_band = [int(name) for name in entry_order[-k_eff:][::-1]]
-            short_band = [int(name) for name in entry_order[:k_eff]]
+            if config.volatility_balanced_entries:
+                long_band = []
+                short_band = []
+                for group in range(config.volatility_group_count):
+                    width = int(volatility_quota[group] + volatility_buffer[group])
+                    if width == 0:
+                        continue
+                    group_order = group_orders[group]
+                    long_band.extend(int(name) for name in group_order[-width:][::-1])
+                    short_band.extend(int(name) for name in group_order[:width])
+            else:
+                long_band = [int(name) for name in entry_order[-k_eff:][::-1]]
+                short_band = [
+                    int(name)
+                    for name in entry_order[
+                        : (
+                            len(entry_order) // 2
+                            if config.borrow_source != "uniform"
+                            else k_eff
+                        )
+                    ]
+                ]
             if set(long_band) & set(short_band):
                 raise RuntimeError("long and short entry bands overlap")
-            long_entry_band = (
-                [int(name) for name in entry_order[len(entry_order) // 2 :][::-1]]
-                if config.volatility_balanced_entries
-                else long_band
-            )
-            short_entry_band = (
-                [int(name) for name in entry_order[: len(entry_order) // 2]]
-                if config.borrow_source == "lending_sidecar_v1"
-                or config.volatility_balanced_entries
-                else short_band
-            )
             long_candidates = [
                 name
-                for name in long_entry_band
+                for name in long_band
+                if entry_eligible[name]
                 if name not in unavailable
                 and not unresolved_action[name]
                 and not settled_names[name]
             ]
             short_candidates = [
                 name
-                for name in short_entry_band
+                for name in short_band
+                if entry_eligible[name]
                 if name not in unavailable
                 and not unresolved_action[name]
                 and not settled_names[name]
                 and inputs.shortable[day, name]
             ]
+            long_candidates.sort(
+                key=lambda name: (float(inputs.score[day, name]), name), reverse=True
+            )
+            short_candidates.sort(
+                key=lambda name: (float(inputs.score[day, name]), name)
+            )
             excluded_short_candidates = sum(
-                name not in unavailable
+                entry_eligible[name]
+                and name not in unavailable
                 and not unresolved_action[name]
                 and not settled_names[name]
                 and not inputs.shortable[day, name]
-                for name in short_entry_band
+                for name in short_band
             )
             band_candidates_long = len(long_candidates)
             band_candidates_short = len(short_candidates)
@@ -1955,7 +2149,7 @@ def simulate_stateful_ledger(
             else:
                 group_priority = []
 
-            def next_candidate(side: OrderSide) -> int | None:
+            def next_candidate(side: OrderSide) -> tuple[int, bool] | None:
                 candidates = candidates_by_side[side]
                 attempted = attempted_candidates[side]
                 if config.volatility_balanced_entries:
@@ -1967,11 +2161,21 @@ def simulate_stateful_ledger(
                                 candidate not in attempted
                                 and volatility_groups[candidate] == group
                             ):
-                                return candidate
-                return next(
+                                return candidate, False
+                    spill = next(
+                        (
+                            candidate
+                            for candidate in candidates
+                            if candidate not in attempted
+                        ),
+                        None,
+                    )
+                    return None if spill is None else (spill, True)
+                candidate = next(
                     (candidate for candidate in candidates if candidate not in attempted),
                     None,
                 )
+                return None if candidate is None else (candidate, False)
 
             if long_slots > short_slots:
                 current_side: OrderSide = "buy"
@@ -1981,26 +2185,26 @@ def simulate_stateful_ledger(
                 current_side = "buy"
             while True:
                 other_side: OrderSide = "sell" if current_side == "buy" else "buy"
-                candidate = (
+                candidate_row = (
                     next_candidate(current_side)
                     if remaining_slots[current_side] > 0
                     else None
                 )
-                other_candidate = (
+                other_candidate_row = (
                     next_candidate(other_side)
                     if remaining_slots[other_side] > 0
                     else None
                 )
-                available = candidate is not None
-                other_available = other_candidate is not None
+                available = candidate_row is not None
+                other_available = other_candidate_row is not None
                 if not available and not other_available:
                     break
                 if not available:
                     current_side = other_side
-                    candidate = other_candidate
-                if candidate is None:
+                    candidate_row = other_candidate_row
+                if candidate_row is None:
                     raise RuntimeError("entry scheduler lost an available candidate")
-                name = candidate
+                name, is_spill = candidate_row
                 attempted_candidates[current_side].add(name)
                 reference = float(last_observed[name])
                 if not np.isfinite(reference) or reference <= 0.0:
@@ -2018,8 +2222,16 @@ def simulate_stateful_ledger(
                     if current_side == "buy"
                     else -quantity * reference
                 )
-                gross_before, net_before, _ = _risk(planned_values, start_nav)
-                planned_gross, planned_net, planned_name = _risk(proposed, start_nav)
+                gross_before, net_before, _ = _risk_with_hedge(
+                    planned_values,
+                    prospective_hedge_notional(planned_values, start_nav),
+                    start_nav,
+                )
+                planned_gross, planned_net, planned_name = _risk_with_hedge(
+                    proposed,
+                    prospective_hedge_notional(proposed, start_nav),
+                    start_nav,
+                )
                 violates_gross = planned_gross > config.planned_gross_cap + 1e-12
                 violates_net = (
                     abs(planned_net) > config.planned_absolute_net_cap + 1e-12
@@ -2061,6 +2273,8 @@ def simulate_stateful_ledger(
                 remaining_slots[current_side] -= 1
                 if config.volatility_balanced_entries:
                     volatility_occupancy[current_side][volatility_groups[name]] += 1
+                    if is_spill:
+                        spilled_entries[current_side][volatility_groups[name]] += 1
                 submitted_entries += 1
                 if replacement_capacity[current_side] > 0:
                     same_close_replacements += 1
@@ -2383,7 +2597,12 @@ def simulate_stateful_ledger(
         if config.beta_hedge and np.any(beta_required & ~np.isfinite(beta_values)):
             raise ValueError("held or pending equity exposure has no causal beta_60")
         equity_beta_notional = (
-            float(np.sum(planned_equity * beta_values, dtype=np.float64))
+            float(
+                np.sum(
+                    planned_equity[beta_required] * beta_values[beta_required],
+                    dtype=np.float64,
+                )
+            )
             if config.beta_hedge
             else 0.0
         )
@@ -2510,8 +2729,9 @@ def simulate_stateful_ledger(
             else np.nan
         )
         end_risk_breach = (
-            gross > config.planned_gross_cap + 1e-12
-            or abs(net) > config.planned_absolute_net_cap + 1e-12
+            gross_including_hedge > config.planned_gross_cap + 1e-12
+            or abs(net + hedge_notional / current_nav)
+            > config.planned_absolute_net_cap + 1e-12
             or name_weight > config.planned_name_weight_cap + 1e-12
         )
         planned_values = signed_values.copy()
@@ -2520,7 +2740,9 @@ def simulate_stateful_ledger(
             planned_values[name] += (
                 sign * pending.remaining_quantity * pending.order.reference_price
             )
-        planned_gross, planned_net, planned_name = _risk(planned_values, start_nav)
+        planned_gross, planned_net, planned_name = _risk_with_hedge(
+            planned_values, hedge_notional, start_nav
+        )
 
         if config.volatility_balanced_entries:
             long_groups = volatility_groups[(shares > 0.0) & (volatility_groups >= 0)]
@@ -2602,6 +2824,8 @@ def simulate_stateful_ledger(
         volatility_quota_rows.append(volatility_quota.copy())
         volatility_occupancy_long_rows.append(long_volatility_occupancy)
         volatility_occupancy_short_rows.append(short_volatility_occupancy)
+        volatility_spilled_long_rows.append(spilled_entries["buy"])
+        volatility_spilled_short_rows.append(spilled_entries["sell"])
         hedge_share_rows.append(hedge_shares)
         hedge_mark_rows.append(hedge_mark)
         hedge_notional_rows.append(hedge_notional)
@@ -2761,18 +2985,61 @@ def simulate_stateful_ledger(
                 if later_names.size
                 else later_names
             )
-            later_retention = min(
-                config.k_per_side + config.buffer_per_side,
-                len(later_order) // 2,
-            )
-            if not later_eligible[name] or later_retention == 0:
-                continue
-            later_rank = int(np.flatnonzero(later_order == name)[0])
-            inside_retention = (
-                later_rank >= len(later_order) - later_retention
-                if side > 0
-                else later_rank < later_retention
-            )
+            if config.volatility_balanced_entries:
+                later_group_eligible = later_eligible & np.isfinite(
+                    inputs.selection_volatility[later_day]
+                )
+                later_entry_eligible = later_group_eligible.copy()
+                if config.beta_hedge:
+                    later_entry_eligible &= np.isfinite(inputs.beta_60[later_day])
+                later_k_eff = min(
+                    config.k_per_side, int(later_entry_eligible.sum()) // 2
+                )
+                later_groups = _equal_count_groups(
+                    inputs.selection_volatility[later_day],
+                    later_group_eligible,
+                    config.volatility_group_count,
+                )
+                later_sizes = np.bincount(
+                    later_groups[later_groups >= 0],
+                    minlength=config.volatility_group_count,
+                )[: config.volatility_group_count]
+                later_quota, later_buffer = _scaled_group_bands(
+                    k_eff=later_k_eff,
+                    buffer=config.buffer_per_side,
+                    group_sizes=later_sizes,
+                )
+                later_group = int(later_groups[name])
+                if later_group < 0:
+                    continue
+                group_names = np.flatnonzero(later_groups == later_group)
+                group_order = group_names[
+                    np.argsort(inputs.score[later_day, group_names], kind="stable")
+                ]
+                width = int(
+                    later_quota[later_group] + later_buffer[later_group]
+                )
+                inside_retention = bool(
+                    width
+                    and (
+                        name in group_order[-width:]
+                        if side > 0
+                        else name in group_order[:width]
+                    )
+                )
+            else:
+                later_retention = min(
+                    config.k_per_side + config.buffer_per_side,
+                    len(later_order) // 2,
+                )
+                if not later_eligible[name] or later_retention == 0:
+                    continue
+                later_rank = int(np.flatnonzero(later_order == name)[0])
+                inside_retention = (
+                    later_rank >= len(later_order) - later_retention
+                    if side > 0
+                    else later_rank < later_retention
+                )
             if inside_retention:
                 reeligible_within_ten_count += 1
                 break
@@ -2795,6 +3062,9 @@ def simulate_stateful_ledger(
         ),
         held_short_notional_at_open=np.asarray(
             held_short_notional_rows, dtype=np.float64
+        ),
+        held_short_imputed_notional_at_open=np.asarray(
+            held_short_imputed_notional_rows, dtype=np.float64
         ),
         excluded_short_entry_candidate_count=np.asarray(
             excluded_short_candidate_rows, dtype=np.int64
@@ -3057,6 +3327,8 @@ def simulate_stateful_ledger(
         volatility_quota=np.stack(volatility_quota_rows),
         volatility_occupancy_long=np.stack(volatility_occupancy_long_rows),
         volatility_occupancy_short=np.stack(volatility_occupancy_short_rows),
+        volatility_spilled_entries_long=np.stack(volatility_spilled_long_rows),
+        volatility_spilled_entries_short=np.stack(volatility_spilled_short_rows),
         hedge_signed_shares=np.asarray(hedge_share_rows, dtype=np.float64),
         hedge_mark_price=np.asarray(hedge_mark_rows, dtype=np.float64),
         hedge_signed_notional=np.asarray(hedge_notional_rows, dtype=np.float64),
@@ -3072,13 +3344,33 @@ def simulate_stateful_ledger(
     )
 
 
-def ledger_sensitivity_grid(**inputs: object) -> dict[str, StatefulLedgerResult]:
+def ledger_sensitivity_grid(
+    *,
+    shortable_by_borrow_source: Mapping[BorrowSource, NDArray[np.bool_]],
+    **inputs: object,
+) -> dict[str, StatefulLedgerResult]:
     """Run the registered financing/cost grid and structural sensitivities."""
 
-    return {
-        name: simulate_stateful_ledger(config=config, **inputs)  # type: ignore[arg-type]
-        for name, config in ledger_configurations().items()
+    required: set[BorrowSource] = {
+        "borrow_strict",
+        "borrow_balance",
+        "borrow_open",
     }
+    if not required.issubset(shortable_by_borrow_source):
+        raise ValueError("rev4b ledger grid requires all three borrow availability cells")
+    results = {}
+    for name, config in ledger_configurations().items():
+        shortable = (
+            np.ones_like(next(iter(shortable_by_borrow_source.values())))
+            if config.borrow_source == "uniform"
+            else shortable_by_borrow_source[config.borrow_source]
+        )
+        results[name] = simulate_stateful_ledger(  # type: ignore[arg-type]
+            config=config,
+            shortable=shortable,
+            **inputs,
+        )
+    return results
 
 
 def ledger_configurations() -> dict[str, LedgerConfig]:
@@ -3107,20 +3399,26 @@ def ledger_configurations() -> dict[str, LedgerConfig]:
             "sensitivity_short_proceeds_full": replace(
                 headline, short_proceeds_remuneration=1.0
             ),
-            "cost_4_borrow_lending_v1": replace(
+            "borrow_balance": replace(
                 headline,
                 cost_bps_per_side=4.0,
-                annual_borrow_rate=0.02,
+                borrow_source="borrow_balance",
             ),
-            "comparator_lending_unconstructed": replace(
+            "borrow_strict": replace(
                 headline,
-                volatility_balanced_entries=False,
-                beta_hedge=False,
+                cost_bps_per_side=4.0,
+                borrow_source="borrow_strict",
+            ),
+            "borrow_open": replace(
+                headline,
+                cost_bps_per_side=4.0,
+                borrow_source="borrow_open",
             ),
             "comparator_uniform_borrow": replace(
-                legacy,
+                headline,
                 cost_bps_per_side=4.0,
                 annual_borrow_rate=0.02,
+                borrow_source="uniform",
             ),
         }
     )

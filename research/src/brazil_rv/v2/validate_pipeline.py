@@ -21,6 +21,7 @@ from brazil_rv.execution.inputs import load_daily_cdi_rates
 from .artifacts import inventory, sha256_file, write_json_atomic
 from .baselines import BaselinePanel, build_store_baselines
 from .bova11 import load_bova11_series
+from .lending_archive import LendingBorrowPanels, load_lending_borrow_panels
 from .config import (
     PROJECT_ROOT,
     PROTOCOL_CONFIG_ROOT,
@@ -48,7 +49,7 @@ from .data import (
     scalar_feature_names,
     stage_fast_name_count,
 )
-from .data_roots import portable_name, resolve_external_file, resolve_external_files
+from .data_roots import resolve_external_files
 from .evaluate import (
     EVALUATION_SCHEMA,
     EvaluationInputs,
@@ -71,8 +72,8 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V10"
-_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V9"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V11"
+_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V10"
 _ACCEPTANCE_ANCESTOR_SCHEMAS = frozenset(
     {
         "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5",
@@ -141,6 +142,15 @@ _V1_FAST_FILES = (
     "equity_features.npy",
     "equity_slow.npy",
     "equity_data_ready.npy",
+)
+_LEGACY_ROUND1_ROOT = Path(
+    r"D:\quant-data\b3\processed\model_runs\v2_round1_81fe0cb_20260907T023339Z"
+)
+_LEGACY_ROUND1_RESULT_SHA256 = (
+    "ca39f11340f13956dca11da7fb6b3a8fa0a38f8a79cb558387d81aff26bf57a0"
+)
+_LEGACY_ROUND1_INVENTORY_SHA256 = (
+    "b5084c817fc478c2759d962af12e282c292cade6f8e715aebed290ba5500ce08"
 )
 
 
@@ -315,126 +325,6 @@ def _external_artifact_resolutions(
         raise ValueError("external v1 fast artifact records are malformed")
     _, resolutions = resolve_external_files(records, _V1_FAST_FILES)
     return [resolution.payload() for resolution in resolutions]
-
-
-def _lending_rate_source(
-    store_manifest: Mapping[str, object],
-) -> tuple[Path, dict[str, object]]:
-    """Resolve the sealed, D+1-available lending-rate archive."""
-
-    records = store_manifest.get("sources")
-    if not isinstance(records, list) or any(
-        not isinstance(record, Mapping) for record in records
-    ):
-        raise ValueError("store manifest source records are malformed")
-    matches = [
-        record
-        for record in records
-        if portable_name(str(record.get("path", ""))) == "bdi_lending_strong.parquet"
-    ]
-    if len(matches) != 1:
-        raise ValueError("store does not bind exactly one lending-rate archive")
-    path, resolution = resolve_external_file(matches[0])
-    return path, resolution.payload()
-
-
-def _lending_rate_history(
-    *,
-    store_manifest: Mapping[str, object],
-    dates: NDArray[np.datetime64],
-    isins: Sequence[str],
-    indices: NDArray[np.int64],
-) -> tuple[NDArray[np.float64], NDArray[np.bool_], dict[str, object]]:
-    """Recover as-of annual decimal rates from the sealed v1 transform.
-
-    The archive stores ``tanh(log1p(rate_percent) / 2)`` in float64.  This is
-    one-to-one for every finite recorded value in the sealed source, so the
-    inverse recovers the observed taker rate without approximation, look-ahead,
-    or a store rebuild.  Availability is still the archive's D+1 date.
-    """
-
-    selected = np.asarray(indices, dtype=np.int64)
-    if (
-        selected.ndim != 1
-        or not selected.size
-        or np.any(selected < 0)
-        or np.any(selected >= len(dates))
-        or (selected.size > 1 and np.any(np.diff(selected) <= 0))
-    ):
-        raise ValueError("lending-rate indices must be increasing store rows")
-    path, resolution = _lending_rate_source(store_manifest)
-    value_column = "lending_taker_fee_level_log_tanh"
-    mask_column = f"{value_column}_mask"
-    required = {
-        "source_trade_date",
-        "available_date",
-        "security_id",
-        value_column,
-        mask_column,
-    }
-    frame = pl.read_parquet(path, columns=sorted(required))
-    if set(frame.columns) != required:
-        raise ValueError("lending-rate archive schema is incomplete")
-    frame = frame.filter(pl.col(mask_column)).sort(
-        "available_date", "source_trade_date", "security_id"
-    )
-    if frame.select(
-        pl.struct("available_date", "security_id").is_duplicated().any()
-    ).item():
-        raise ValueError("lending-rate archive has ambiguous as-of rows")
-
-    encoded = frame.get_column(value_column).to_numpy().astype(np.float64, copy=False)
-    if (
-        not np.isfinite(encoded).all()
-        or (encoded < 0.0).any()
-        or (encoded >= 1.0).any()
-    ):
-        raise ValueError("lending-rate transform is outside its invertible domain")
-    rate_percent = np.expm1(2.0 * np.arctanh(encoded))
-    roundtrip = np.tanh(np.log1p(rate_percent) / 2.0)
-    if not np.allclose(roundtrip, encoded, rtol=0.0, atol=2e-15):
-        raise ValueError("lending-rate transform does not invert exactly")
-    annual_decimal = 0.01 * rate_percent
-
-    calendar = np.asarray(dates, dtype="datetime64[D]")
-    calendar_positions = {
-        value: index for index, value in enumerate(calendar.astype(object).tolist())
-    }
-    name_positions = {str(value): index for index, value in enumerate(isins)}
-    available = frame.get_column("available_date").to_list()
-    source_dates = frame.get_column("source_trade_date").to_list()
-    security_ids = [
-        str(value).removeprefix("ISIN:")
-        for value in frame.get_column("security_id").to_list()
-    ]
-    source_sessions = np.asarray(
-        [calendar_positions.get(value, -1) for value in source_dates], dtype=np.int64
-    )
-    if np.any(source_sessions < 0):
-        raise ValueError("lending-rate source date is outside the store calendar")
-
-    name_count = len(isins)
-    rates = np.full((selected.size, name_count), np.nan, dtype=np.float64)
-    recent = np.zeros((selected.size, name_count), dtype=np.bool_)
-    last_rate = np.full(name_count, np.nan, dtype=np.float64)
-    last_source_session = np.full(name_count, -1, dtype=np.int64)
-    cursor = 0
-    for row, date_index in enumerate(selected):
-        decision_date = calendar[int(date_index)].astype(object)
-        while cursor < frame.height and available[cursor] <= decision_date:
-            name_index = name_positions.get(security_ids[cursor])
-            if name_index is not None:
-                if source_sessions[cursor] >= int(date_index):
-                    raise ValueError(
-                        "lending rate is not publication-lagged before the decision"
-                    )
-                last_rate[name_index] = annual_decimal[cursor]
-                last_source_session[name_index] = source_sessions[cursor]
-            cursor += 1
-        rates[row] = last_rate
-        age = int(date_index) - last_source_session
-        recent[row] = np.isfinite(last_rate) & (age >= 0) & (age <= 20)
-    return rates, recent, resolution
 
 
 def _assert_overrides_outside_store(
@@ -762,6 +652,7 @@ def _evaluation_inputs(
     cdi_by_index: NDArray[np.float64],
     bova11_close_by_index: NDArray[np.float64],
     bova11_binding: Mapping[str, str],
+    lending_borrow: LendingBorrowPanels,
     source_hashes: Mapping[str, str],
     *,
     transfer_chronology_clean: bool,
@@ -876,37 +767,6 @@ def _evaluation_inputs(
         )
         source_archive_present[group] = np.any(ages >= 0.0, axis=-1)
         source_feature_valid[group] = np.any(valid, axis=-1)
-    lending_names = feature_names.get("sidecar_lending")
-    if not isinstance(lending_names, list):
-        raise ValueError("store lacks the lending sidecar")
-    lending_valid = np.asarray(
-        store.read("sidecar_lending_valid", indices), dtype=np.bool_
-    )
-    lending_age = np.asarray(
-        store.read("sidecar_lending_age_sessions", indices), dtype=np.float64
-    )
-    (
-        annual_borrow_rate_by_name,
-        rate_recent,
-        lending_rate_resolution,
-    ) = _lending_rate_history(
-        store_manifest=store.manifest,
-        dates=store.dates,
-        isins=store.isins,
-        indices=indices,
-    )
-    balance_indexes = [
-        index
-        for index, name in enumerate(lending_names)
-        if str(name).startswith("loan_balance")
-    ]
-    balance_recent = np.any(
-        lending_valid[..., balance_indexes]
-        & (lending_age[..., balance_indexes] >= 0.0)
-        & (lending_age[..., balance_indexes] <= 20.0),
-        axis=-1,
-    )
-    shortable = rate_recent | balance_recent
     initial_reference_price = np.asarray(
         store.read("prior_reference_close", np.asarray([indices[0]], dtype=np.int64))[
             0
@@ -958,7 +818,9 @@ def _evaluation_inputs(
         schedule_source=schedule_source,
         source_artifact_hashes={
             **source_hashes,
-            "lending_borrow_rate_archive": str(lending_rate_resolution["sha256"]),
+            "lending_archive_manifest": lending_borrow.manifest_sha256,
+            "lending_archive_balances": lending_borrow.balance_sha256,
+            "lending_archive_rates": lending_borrow.rate_sha256,
         },
         history_age_sessions=history_age_sessions,
         source_archive_present=source_archive_present or None,
@@ -969,8 +831,17 @@ def _evaluation_inputs(
             dtype=np.bool_,
         ),
         action_alignment="retrospective",
-        annual_borrow_rate_by_name=annual_borrow_rate_by_name,
-        shortable=shortable,
+        annual_borrow_rate_by_name=np.asarray(
+            lending_borrow.annual_taker_rate[indices], dtype=np.float64
+        ),
+        borrow_rate_imputed=np.asarray(
+            lending_borrow.rate_imputed[indices], dtype=np.bool_
+        ),
+        shortable_by_borrow_source={
+            name: np.asarray(values[indices], dtype=np.bool_)
+            for name, values in lending_borrow.availability.items()
+        },
+        borrow_source_label=lending_borrow.source_label,
         bova11_close=np.asarray(bova11_close_by_index[indices], dtype=np.float64),
         bova11_manifest_sha256=bova11_binding["manifest_sha256"],
         bova11_data_sha256=bova11_binding["data_sha256"],
@@ -987,6 +858,7 @@ def _evaluate_and_write(
     cdi_by_index: NDArray[np.float64],
     bova11_close_by_index: NDArray[np.float64],
     bova11_binding: Mapping[str, str],
+    lending_borrow: LendingBorrowPanels,
     source_hashes: Mapping[str, str],
     window_name: str,
     path: Path,
@@ -1001,6 +873,7 @@ def _evaluate_and_write(
             cdi_by_index,
             bova11_close_by_index,
             bova11_binding,
+            lending_borrow,
             source_hashes,
             transfer_chronology_clean=transfer_chronology_clean,
         ),
@@ -1023,7 +896,7 @@ def _evaluation_summary(
         if isinstance(row, Mapping)
         and row.get("cost_bps_per_side") == 4.0
         and row.get("annual_borrow_rate") == 0.02
-        and row.get("borrow_source") == "lending_sidecar_v1"
+        and row.get("borrow_source") == "borrow_balance"
         and row.get("volatility_balanced_entries") is True
         and row.get("beta_hedge") is True
     )
@@ -1306,6 +1179,21 @@ def _development_acceptance(
                 "mean_volatility_occupancy_short_by_quintile": headline.get(
                     "mean_volatility_occupancy_short_by_quintile"
                 ),
+                "mean_absolute_volatility_occupancy_deviation_long": headline.get(
+                    "mean_absolute_volatility_occupancy_deviation_long"
+                ),
+                "mean_absolute_volatility_occupancy_deviation_short": headline.get(
+                    "mean_absolute_volatility_occupancy_deviation_short"
+                ),
+                "spilled_entries_long_by_quintile": headline.get(
+                    "spilled_entries_long_by_quintile"
+                ),
+                "spilled_entries_short_by_quintile": headline.get(
+                    "spilled_entries_short_by_quintile"
+                ),
+                "imputed_rate_share_of_short_notional": headline.get(
+                    "imputed_rate_share_of_short_notional"
+                ),
             }
         )
         if (
@@ -1350,14 +1238,11 @@ def _development_acceptance(
         ):
             violations.append(f"{label}_volatility_occupancy_missing")
         else:
-            for side, occupancy in (
-                ("long", long_occupancy),
-                ("short", short_occupancy),
-            ):
-                if any(
-                    abs(float(actual) - float(target)) > 2.0
-                    for actual, target in zip(occupancy, quota, strict=True)
-                ):
+            for side in ("long", "short"):
+                raw_deviation = headline.get(
+                    f"mean_absolute_volatility_occupancy_deviation_{side}"
+                )
+                if raw_deviation is None or float(raw_deviation) > 2.0:
                     violations.append(
                         f"{label}_{side}_mean_volatility_quintile_occupancy_outside_2"
                     )
@@ -1621,6 +1506,7 @@ def _run_baselines(
     cdi_by_index: NDArray[np.float64],
     bova11_close_by_index: NDArray[np.float64],
     bova11_binding: Mapping[str, str],
+    lending_borrow: LendingBorrowPanels,
     root: Path,
     source_hashes: Mapping[str, str],
 ) -> list[dict[str, object]]:
@@ -1658,6 +1544,7 @@ def _run_baselines(
                 cdi_by_index=cdi_by_index,
                 bova11_close_by_index=bova11_close_by_index,
                 bova11_binding=bova11_binding,
+                lending_borrow=lending_borrow,
                 source_hashes={
                     **source_hashes,
                     "score_manifest": manifest_sha,
@@ -1691,6 +1578,7 @@ def _run_gbdt(
     cdi_by_index: NDArray[np.float64],
     bova11_close_by_index: NDArray[np.float64],
     bova11_binding: Mapping[str, str],
+    lending_borrow: LendingBorrowPanels,
     root: Path,
     source_hashes: Mapping[str, str],
     runtime: ValidationRuntime,
@@ -1784,6 +1672,7 @@ def _run_gbdt(
             cdi_by_index=cdi_by_index,
             bova11_close_by_index=bova11_close_by_index,
             bova11_binding=bova11_binding,
+            lending_borrow=lending_borrow,
             source_hashes={**source_hashes, "score_manifest": manifest_sha},
             window_name=fold,
             path=artifact_root / "evaluation.json",
@@ -1845,6 +1734,7 @@ def _run_network_smokes(
     cdi_by_index: NDArray[np.float64],
     bova11_close_by_index: NDArray[np.float64],
     bova11_binding: Mapping[str, str],
+    lending_borrow: LendingBorrowPanels,
     root: Path,
     source_hashes: Mapping[str, str],
     runtime: ValidationRuntime,
@@ -1894,6 +1784,7 @@ def _run_network_smokes(
         cdi_by_index=cdi_by_index,
         bova11_close_by_index=bova11_close_by_index,
         bova11_binding=bova11_binding,
+        lending_borrow=lending_borrow,
         source_hashes={
             **source_hashes,
             "score_manifest": sha256_file(scratch_score.manifest_path),
@@ -1940,6 +1831,7 @@ def _run_network_smokes(
         cdi_by_index=cdi_by_index,
         bova11_close_by_index=bova11_close_by_index,
         bova11_binding=bova11_binding,
+        lending_borrow=lending_borrow,
         source_hashes={
             **source_hashes,
             "score_manifest": sha256_file(persistence_score.manifest_path),
@@ -2649,14 +2541,13 @@ def run_pipeline_validation(
     experiment52_cdi_sha256: str,
     bova11_root: Path,
     bova11_manifest_sha256: str,
+    lending_archive_root: Path,
+    lending_archive_manifest_sha256: str,
     output_root: Path,
     runtime: ValidationRuntime = ValidationRuntime(),
     enabled_sidecars: Sequence[str] = (),
     native_fast_audit_path: Path | None = None,
     native_fast_audit_sha256: str | None = None,
-    legacy_round1_root: Path | None = None,
-    legacy_round1_result_sha256: str | None = None,
-    legacy_round1_inventory_sha256: str | None = None,
 ) -> PipelineValidationResult:
     """Run only the development-fold integration checks required by v2 section 11.
 
@@ -2686,7 +2577,6 @@ def run_pipeline_validation(
     sidecars = _validate_sidecars(store_manifest, enabled_sidecars)
     external_resolutions = _external_artifact_resolutions(store_manifest)
     _assert_overrides_outside_store(store_path, external_resolutions)
-    _, lending_rate_resolution = _lending_rate_source(store_manifest)
     (
         fit_indices,
         fit_target_window_indices,
@@ -2725,6 +2615,15 @@ def run_pipeline_validation(
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
+    lending_borrow = load_lending_borrow_panels(
+        lending_archive_root,
+        expected_manifest_sha256=lending_archive_manifest_sha256,
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+        canonical_isins=[
+            str(value)
+            for value in np.load(store_path / "isin_index.npy", allow_pickle=False)
+        ],
+    )
     store_manifest_sha = sha256_file(store_path / "manifest.json")
     native_fast_audit = _verify_native_fast_audit(
         native_fast_audit_path,
@@ -2779,6 +2678,7 @@ def run_pipeline_validation(
             cdi_by_index=cdi_by_index,
             bova11_close_by_index=bova11.close_by_session,
             bova11_binding=bova11_binding,
+            lending_borrow=lending_borrow,
             root=output / "baselines",
             source_hashes=source_hashes,
         )
@@ -2791,27 +2691,18 @@ def run_pipeline_validation(
             cdi_by_index=cdi_by_index,
             bova11_close_by_index=bova11.close_by_session,
             bova11_binding=bova11_binding,
+            lending_borrow=lending_borrow,
             root=output / "gbdt_triage",
             source_hashes=source_hashes,
             runtime=runtime,
             sidecars=sidecars,
         )
-        legacy_bindings = (
-            legacy_round1_root,
-            legacy_round1_result_sha256,
-            legacy_round1_inventory_sha256,
+        legacy_identity = _legacy_round1_baseline_identity(
+            baseline_records,
+            prior_root=_LEGACY_ROUND1_ROOT,
+            prior_result_sha256=_LEGACY_ROUND1_RESULT_SHA256,
+            prior_inventory_sha256=_LEGACY_ROUND1_INVENTORY_SHA256,
         )
-        if any(value is not None for value in legacy_bindings):
-            if any(value is None for value in legacy_bindings):
-                raise ValueError("legacy Round-1 identity requires all three bindings")
-            legacy_identity = _legacy_round1_baseline_identity(
-                baseline_records,
-                prior_root=legacy_round1_root,
-                prior_result_sha256=legacy_round1_result_sha256,
-                prior_inventory_sha256=legacy_round1_inventory_sha256,
-            )
-        else:
-            legacy_identity = None
         protocol_hashes = {
             name: {
                 "path": str(PROTOCOL_CONFIG_ROOT / f"{name}.json"),
@@ -2855,7 +2746,17 @@ def run_pipeline_validation(
                     "cdi": cdi_provenance,
                     "bova11": bova11_binding,
                     "native_fast_raw_audit": native_fast_audit,
-                    "lending_borrow_rate_archive": lending_rate_resolution,
+                    "lending_archive": {
+                        "root": str(Path(lending_archive_root).resolve(strict=True)),
+                        "manifest_sha256": lending_borrow.manifest_sha256,
+                        "balances_sha256": lending_borrow.balance_sha256,
+                        "rates_sha256": lending_borrow.rate_sha256,
+                        "source_label": lending_borrow.source_label,
+                        "source_unavailable_dates": [
+                            value.isoformat()
+                            for value in lending_borrow.source_unavailable_dates
+                        ],
+                    },
                     "legacy_round1_baseline_reference": legacy_identity,
                 },
                 "date_contract": {
@@ -2917,6 +2818,8 @@ def replay_classical_economics(
     experiment52_cdi_sha256: str,
     bova11_root: Path,
     bova11_manifest_sha256: str,
+    lending_archive_root: Path,
+    lending_archive_manifest_sha256: str,
     prior_classical_root: Path,
     prior_classical_manifest_sha256: str,
     prior_classical_inventory_sha256: str,
@@ -2955,6 +2858,15 @@ def replay_classical_economics(
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
+    lending_borrow = load_lending_borrow_panels(
+        lending_archive_root,
+        expected_manifest_sha256=lending_archive_manifest_sha256,
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+        canonical_isins=[
+            str(value)
+            for value in np.load(store_path / "isin_index.npy", allow_pickle=False)
+        ],
+    )
 
     source_root, prior, _ = _verified_prior_acceptance(
         root=prior_classical_root,
@@ -3119,6 +3031,7 @@ def replay_classical_economics(
             cdi_by_index=cdi_by_index,
             bova11_close_by_index=bova11.close_by_session,
             bova11_binding=bova11_binding,
+            lending_borrow=lending_borrow,
             source_hashes={**source_hashes, "score_manifest": score_manifest_sha},
             window_name=fold,
             path=destination / "evaluation.json",
@@ -3303,6 +3216,8 @@ def resume_network_validation(
     experiment52_cdi_sha256: str,
     bova11_root: Path,
     bova11_manifest_sha256: str,
+    lending_archive_root: Path,
+    lending_archive_manifest_sha256: str,
     completed_classical_root: Path,
     completed_classical_inventory_sha256: str,
     completed_classical_failure_sha256: str,
@@ -3396,6 +3311,15 @@ def resume_network_validation(
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
+    lending_borrow = load_lending_borrow_panels(
+        lending_archive_root,
+        expected_manifest_sha256=lending_archive_manifest_sha256,
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+        canonical_isins=[
+            str(value)
+            for value in np.load(store_path / "isin_index.npy", allow_pickle=False)
+        ],
+    )
     requested_indices = np.unique(
         np.concatenate(
             (
@@ -3450,6 +3374,7 @@ def resume_network_validation(
             cdi_by_index=cdi_by_index,
             bova11_close_by_index=bova11.close_by_session,
             bova11_binding=bova11_binding,
+            lending_borrow=lending_borrow,
             root=output / "network_smokes",
             source_hashes=source_hashes,
             runtime=runtime,
@@ -3571,12 +3496,16 @@ def _parser() -> argparse.ArgumentParser:
         help="Immutable development-only exact-identity BOVA11 close artifact.",
     )
     parser.add_argument("--bova11-manifest-sha256", required=True)
+    parser.add_argument(
+        "--lending-archive-root",
+        type=Path,
+        required=True,
+        help="Immutable rev4b direct lending archive.",
+    )
+    parser.add_argument("--lending-archive-manifest-sha256", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--native-fast-audit", type=Path)
     parser.add_argument("--native-fast-audit-sha256")
-    parser.add_argument("--legacy-round1-root", type=Path)
-    parser.add_argument("--legacy-round1-result-sha256")
-    parser.add_argument("--legacy-round1-inventory-sha256")
     parser.add_argument(
         "--store-manifest-sha256",
         help="Exact sealed-store manifest hash required for a network continuation.",
@@ -3664,6 +3593,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
+            lending_archive_root=arguments.lending_archive_root,
+            lending_archive_manifest_sha256=(
+                arguments.lending_archive_manifest_sha256
+            ),
             prior_classical_root=arguments.prior_classical_root,
             prior_classical_manifest_sha256=(arguments.prior_classical_manifest_sha256),
             prior_classical_inventory_sha256=(
@@ -3683,6 +3616,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
+            lending_archive_root=arguments.lending_archive_root,
+            lending_archive_manifest_sha256=(
+                arguments.lending_archive_manifest_sha256
+            ),
             completed_classical_root=arguments.completed_classical_root,
             completed_classical_inventory_sha256=(
                 arguments.completed_classical_inventory_sha256
@@ -3703,14 +3640,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
+            lending_archive_root=arguments.lending_archive_root,
+            lending_archive_manifest_sha256=(
+                arguments.lending_archive_manifest_sha256
+            ),
             output_root=arguments.output_root,
             runtime=runtime,
             enabled_sidecars=arguments.sidecar,
             native_fast_audit_path=arguments.native_fast_audit,
             native_fast_audit_sha256=arguments.native_fast_audit_sha256,
-            legacy_round1_root=arguments.legacy_round1_root,
-            legacy_round1_result_sha256=arguments.legacy_round1_result_sha256,
-            legacy_round1_inventory_sha256=(arguments.legacy_round1_inventory_sha256),
         )
     print(
         json.dumps(

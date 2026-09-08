@@ -7,6 +7,8 @@ import pytest
 from brazil_rv.execution.stateful_ledger import (
     LedgerConfig,
     StatefulLedgerResult,
+    _scaled_group_bands,
+    ledger_configurations,
     simulate_stateful_ledger,
 )
 from brazil_rv.v2.corporate_actions import AlignedActionTerms
@@ -42,6 +44,7 @@ def _run(
     cdi: np.ndarray | None = None,
     initial_reference_price: np.ndarray | None = None,
     annual_borrow_rate_by_name: np.ndarray | None = None,
+    borrow_rate_imputed: np.ndarray | None = None,
     shortable: np.ndarray | None = None,
     selection_volatility: np.ndarray | None = None,
     beta_60: np.ndarray | None = None,
@@ -77,6 +80,7 @@ def _run(
         security_ids=tuple(f"SEC-{index}" for index in range(names)),
         initial_reference_price=initial_reference_price,
         annual_borrow_rate_by_name=annual_borrow_rate_by_name,
+        borrow_rate_imputed=borrow_rate_imputed,
         shortable=shortable,
         selection_volatility=selection_volatility,
         beta_60=beta_60,
@@ -89,6 +93,7 @@ def _run(
 def _constructed_inputs(days: int, names: int) -> dict[str, np.ndarray]:
     return {
         "annual_borrow_rate_by_name": np.full((days, names), 0.02),
+        "borrow_rate_imputed": np.zeros((days, names), dtype=np.bool_),
         "shortable": np.ones((days, names), dtype=np.bool_),
         "selection_volatility": np.broadcast_to(
             np.arange(names, dtype=np.float64), (days, names)
@@ -157,7 +162,7 @@ def test_intended_orders_use_prior_marks_and_ignore_current_future_print() -> No
     )
 
 
-def test_lending_borrow_charges_observed_annual_rate_with_two_percent_floor() -> None:
+def test_lending_borrow_charges_observed_rate_plus_registration_fee_without_floor() -> None:
     close = np.full((5, 3), 100.0)
     scores = np.asarray([[3.0, 0.0, -3.0]] * 5)
     initial = np.full(3, 100.0)
@@ -170,19 +175,20 @@ def test_lending_borrow_charges_observed_annual_rate_with_two_percent_floor() ->
     lending = _run(
         close,
         scores,
-        config=_config(annual_borrow_rate=0.02, borrow_source="lending_sidecar_v1"),
+        config=_config(annual_borrow_rate=0.02, borrow_source="borrow_balance"),
         initial_reference_price=initial,
         annual_borrow_rate_by_name=np.full_like(close, 0.40),
+        borrow_rate_imputed=np.zeros_like(close, dtype=np.bool_),
         shortable=np.ones_like(close, dtype=np.bool_),
     )
     charged = uniform.borrow_bps > 0.0
     assert charged.any()
     first_charged = int(np.flatnonzero(charged)[0])
     assert lending.borrow_bps[first_charged] == pytest.approx(
-        20.0 * uniform.borrow_bps[first_charged]
+        (0.4025 / 0.02) * uniform.borrow_bps[first_charged]
     )
     np.testing.assert_allclose(
-        lending.held_short_weighted_annual_borrow_rate[charged], 0.40
+        lending.held_short_weighted_annual_borrow_rate[charged], 0.4025
     )
 
 
@@ -194,9 +200,14 @@ def test_lending_unshortable_entry_advances_to_next_candidate() -> None:
     result = _run(
         close,
         scores,
-        config=_config(borrow_source="lending_sidecar_v1"),
+        config=replace(
+            _config(borrow_source="borrow_balance"),
+            volatility_balanced_entries=False,
+            beta_hedge=False,
+        ),
         initial_reference_price=np.full(4, 100.0),
         annual_borrow_rate_by_name=np.full_like(close, 0.02),
+        borrow_rate_imputed=np.zeros_like(close, dtype=np.bool_),
         shortable=shortable,
     )
     first_sells = [
@@ -1522,23 +1533,27 @@ def test_pass4g_sizing_decomposition_matches_hand_computed_mark_and_nav_drift() 
 
 def test_rev4_defaults_bind_lending_volatility_balance_and_beta_hedge() -> None:
     config = LedgerConfig()
-    assert config.borrow_source == "lending_sidecar_v1"
+    assert config.borrow_source == "borrow_balance"
     assert config.volatility_balanced_entries
     assert config.beta_hedge
     assert config.hedge_rebalance_threshold_nav == 0.05
     assert config.hedge_cost_bps_per_side == 4.0
+    uniform = ledger_configurations()["comparator_uniform_borrow"]
+    assert uniform.borrow_source == "uniform"
+    assert uniform.volatility_balanced_entries
+    assert uniform.beta_hedge
 
 
 def test_rev4_entry_scheduler_fills_equal_volatility_quotas() -> None:
-    days, names = 4, 100
+    days, names = 4, 300
     score_order = np.asarray(
-        [group * 20 + within for within in range(20) for group in range(5)]
+        [group * 60 + within for within in range(60) for group in range(5)]
     )
     score = np.empty(names, dtype=np.float64)
     score[score_order] = np.arange(names, dtype=np.float64)
     scores = np.broadcast_to(score, (days, names)).copy()
     volatility = np.broadcast_to(
-        np.repeat(np.arange(5, dtype=np.float64), 20), (days, names)
+        np.repeat(np.arange(5, dtype=np.float64), 60), (days, names)
     ).copy()
     inputs = _constructed_inputs(days, names)
     inputs["selection_volatility"] = volatility
@@ -1564,21 +1579,111 @@ def test_rev4_entry_scheduler_fills_equal_volatility_quotas() -> None:
     )
 
 
-def test_rev4_unavailable_short_quota_spills_to_best_remaining_names() -> None:
+def test_rev4_monotone_negative_volatility_score_fills_both_sides_per_quintile() -> (
+    None
+):
+    days, names = 4, 300
+    volatility = np.broadcast_to(
+        np.arange(names, dtype=np.float64), (days, names)
+    ).copy()
+    inputs = _constructed_inputs(days, names)
+    inputs["selection_volatility"] = volatility
+    result = _run(
+        np.full((days, names), 100.0),
+        -volatility,
+        config=replace(LedgerConfig(), beta_hedge=False, cost_bps_per_side=0.0),
+        initial_reference_price=np.full(names, 100.0),
+        **inputs,
+    )
+
+    np.testing.assert_array_equal(result.volatility_quota[0], [6, 6, 6, 6, 6])
+    np.testing.assert_array_equal(
+        result.volatility_occupancy_long[0], [6, 6, 6, 6, 6]
+    )
+    np.testing.assert_array_equal(
+        result.volatility_occupancy_short[0], [6, 6, 6, 6, 6]
+    )
+
+
+def test_rev4_retention_uses_the_names_current_volatility_quintile() -> None:
     days, names = 4, 100
+    initial_volatility = np.repeat(np.arange(5, dtype=np.float64), 20)
+    moved_volatility = initial_volatility.copy()
+    moved_volatility[[0, 80]] = moved_volatility[[80, 0]]
+    volatility = np.stack(
+        [initial_volatility, initial_volatility, moved_volatility, moved_volatility]
+    )
+    scores = np.broadcast_to(np.arange(names, dtype=np.float64), (days, names)).copy()
+    scores[:2, 0] = 1_000.0
+    scores[2:, 1:20] = np.arange(81.0, 100.0)
+    scores[2:, 80] = 100.0
+    scores[2:, 81:100] = np.arange(19.0)
+    scores[2:, 0] = 50.0
+    inputs = _constructed_inputs(days, names)
+    inputs["selection_volatility"] = volatility
+    config = replace(
+        LedgerConfig(),
+        k_per_side=5,
+        buffer_per_side=5,
+        beta_hedge=False,
+        planned_gross_cap=3.0,
+        planned_absolute_net_cap=0.5,
+        planned_name_weight_cap=0.25,
+        cost_bps_per_side=0.0,
+    )
+    moved = _run(
+        np.full((days, names), 100.0),
+        scores,
+        config=config,
+        initial_reference_price=np.full(names, 100.0),
+        **inputs,
+    )
+    inputs["selection_volatility"] = np.broadcast_to(
+        initial_volatility, (days, names)
+    ).copy()
+    stayed = _run(
+        np.full((days, names), 100.0),
+        scores,
+        config=config,
+        initial_reference_price=np.full(names, 100.0),
+        **inputs,
+    )
+
+    assert moved.position_sign[1, 0] == 1
+    assert moved.exit_instruction_cause[2, 0] == 0
+    assert stayed.exit_instruction_cause[2, 0] == 3
+
+
+def test_rev4_small_stratum_scales_quota_and_buffer_without_band_overlap() -> None:
+    quota, buffer = _scaled_group_bands(
+        k_eff=30,
+        buffer=30,
+        group_sizes=np.asarray([60, 60, 8, 60, 60]),
+    )
+
+    assert quota[2] == 1
+    assert buffer[2] == 1
+    assert 2 * (quota[2] + buffer[2]) <= 8
+
+
+def test_rev4_unavailable_short_quota_spills_to_best_remaining_names() -> None:
+    days, names = 4, 300
     score_order = np.asarray(
-        [group * 20 + within for within in range(20) for group in range(5)]
+        [group * 60 + within for within in range(60) for group in range(5)]
     )
     score = np.empty(names, dtype=np.float64)
     score[score_order] = np.arange(names, dtype=np.float64)
     scores = np.broadcast_to(score, (days, names)).copy()
     volatility = np.broadcast_to(
-        np.repeat(np.arange(5, dtype=np.float64), 20), (days, names)
+        np.repeat(np.arange(5, dtype=np.float64), 60), (days, names)
     ).copy()
     inputs = _constructed_inputs(days, names)
     inputs["selection_volatility"] = volatility
     shortable = inputs["shortable"]
-    shortable[:, :20] = False
+    q5_names = np.arange(240, 300)
+    q5_score_order = q5_names[np.argsort(score[q5_names], kind="stable")]
+    shortable[:, q5_names] = False
+    shortable[:, q5_score_order[:3]] = True
     result = _run(
         np.full((days, names), 100.0),
         scores,
@@ -1587,7 +1692,7 @@ def test_rev4_unavailable_short_quota_spills_to_best_remaining_names() -> None:
         **inputs,
     )
 
-    assert result.volatility_occupancy_short[0, 0] == 0
+    assert result.volatility_occupancy_short[0, 4] == 3
     assert result.volatility_occupancy_short[0].sum() == 30
     assert result.volatility_occupancy_short[0].max() > 6
 
@@ -1610,18 +1715,20 @@ def test_rev4_beta_hedge_is_separate_rebalances_and_carries_missing_print() -> N
             k_per_side=1,
             buffer_per_side=1,
             volatility_balanced_entries=False,
+            planned_gross_cap=4.0,
             planned_absolute_net_cap=1.1,
             planned_name_weight_cap=1.1,
             cost_bps_per_side=0.0,
         ),
         initial_reference_price=np.full(names, 100.0),
         annual_borrow_rate_by_name=rates,
+        borrow_rate_imputed=np.zeros_like(shortable),
         shortable=shortable,
         beta_60=beta,
         hedge_close=np.asarray([100.0, np.nan, 110.0, 110.0]),
     )
 
-    assert result.hedge_signed_notional[0] < 0.0
+    assert result.hedge_signed_notional[0] != 0.0
     assert result.hedge_turnover_fraction_nav[0] > 0.0
     assert result.hedge_signed_shares[1] == result.hedge_signed_shares[0]
     assert result.hedge_mark_price[1] == result.hedge_mark_price[0]
@@ -1629,6 +1736,8 @@ def test_rev4_beta_hedge_is_separate_rebalances_and_carries_missing_print() -> N
     assert result.hedge_borrow_bps[1] > 0.0
     assert result.hedge_signed_notional[-1] == 0.0
     assert np.all(result.gross_fraction_nav_including_hedge >= result.gross_fraction_nav)
+    assert np.all(result.planned_gross_fraction_nav <= 4.0 + 1e-12)
+    assert np.all(np.abs(result.planned_net_fraction_nav) <= 1.1 + 1e-12)
 
 
 def test_rev4_uniform_comparator_is_exact_legacy_ledger() -> None:

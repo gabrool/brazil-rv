@@ -39,7 +39,7 @@ BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V11"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V12"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
@@ -118,7 +118,9 @@ class EvaluationInputs:
     eventual_survives_to_final_year: NDArray[np.bool_] | None = None
     action_alignment: str = "retrospective"
     annual_borrow_rate_by_name: NDArray[np.floating] | None = None
-    shortable: NDArray[np.bool_] | None = None
+    borrow_rate_imputed: NDArray[np.bool_] | None = None
+    shortable_by_borrow_source: Mapping[str, NDArray[np.bool_]] | None = None
+    borrow_source_label: str | None = None
     bova11_close: NDArray[np.floating] | None = None
     bova11_manifest_sha256: str | None = None
     bova11_data_sha256: str | None = None
@@ -331,14 +333,26 @@ def _validate(inputs: EvaluationInputs) -> None:
             reference[np.isfinite(reference)] <= 0.0
         ):
             raise ValueError("initial reference prices must be positive or missing")
-    if inputs.annual_borrow_rate_by_name is not None:
-        rates = np.asarray(inputs.annual_borrow_rate_by_name, dtype=np.float64)
-        if rates.shape != matrix_shape or np.isinf(rates).any():
-            raise ValueError("lending borrow rates are misaligned or infinite")
-    if inputs.shortable is not None:
-        shortable = np.asarray(inputs.shortable)
+    if inputs.annual_borrow_rate_by_name is None:
+        raise ValueError("constructed-book evaluation requires lending borrow rates")
+    rates = np.asarray(inputs.annual_borrow_rate_by_name, dtype=np.float64)
+    if rates.shape != matrix_shape or np.isinf(rates).any():
+        raise ValueError("lending borrow rates are misaligned or infinite")
+    if inputs.borrow_rate_imputed is None:
+        raise ValueError("constructed-book evaluation requires imputed-rate flags")
+    imputed = np.asarray(inputs.borrow_rate_imputed)
+    if imputed.shape != matrix_shape or imputed.dtype != np.bool_:
+        raise ValueError("imputed-rate flags must be Boolean and align names")
+    shortable_cells = inputs.shortable_by_borrow_source
+    required_cells = {"borrow_strict", "borrow_balance", "borrow_open"}
+    if shortable_cells is None or set(shortable_cells) != required_cells:
+        raise ValueError("evaluation requires the exact three rev4b borrow cells")
+    for name, raw_shortable in shortable_cells.items():
+        shortable = np.asarray(raw_shortable)
         if shortable.shape != matrix_shape or shortable.dtype != np.bool_:
-            raise ValueError("shortable mask must be Boolean and align names")
+            raise ValueError(f"{name} mask must be Boolean and align names")
+    if not inputs.borrow_source_label:
+        raise ValueError("constructed-book evaluation requires a borrow source label")
     if inputs.bova11_close is None:
         raise ValueError("constructed-book evaluation requires the BOVA11 close series")
     bova11_close = np.asarray(inputs.bova11_close, dtype=np.float64)
@@ -839,6 +853,9 @@ def _ledger_rows(
             "held_short_weighted_annual_borrow_rate": _finite_or_none(
                 result.held_short_weighted_annual_borrow_rate[index]
             ),
+            "held_short_imputed_notional_at_open": _finite_or_none(
+                result.held_short_imputed_notional_at_open[index]
+            ),
             "excluded_short_entry_candidate_count": int(
                 result.excluded_short_entry_candidate_count[index]
             ),
@@ -876,6 +893,12 @@ def _ledger_rows(
             ),
             "volatility_occupancy_short": (
                 result.volatility_occupancy_short[index].tolist()
+            ),
+            "volatility_spilled_entries_long": (
+                result.volatility_spilled_entries_long[index].tolist()
+            ),
+            "volatility_spilled_entries_short": (
+                result.volatility_spilled_entries_short[index].tolist()
             ),
             "nav": _finite_or_none(result.nav[index]),
             "free_cash": _finite_or_none(result.free_cash[index]),
@@ -1590,6 +1613,7 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
             "cost_bps_per_side": ECONOMICS_HEADLINE[0],
             "annual_borrow_rate": ECONOMICS_HEADLINE[1],
             "borrow_source": config.borrow_source,
+            "borrow_registration_fee": config.borrow_registration_fee,
             "volatility_balanced_entries": config.volatility_balanced_entries,
             "beta_hedge": config.beta_hedge,
             "hedge_instrument": "BOVA11 exact ISIN BRBOVACTF003",
@@ -1648,12 +1672,19 @@ def _realized_beta_diagnostic(
 
 
 def _lending_coverage(inputs: EvaluationInputs) -> dict[str, object]:
-    if inputs.shortable is None or inputs.annual_borrow_rate_by_name is None:
+    if (
+        inputs.shortable_by_borrow_source is None
+        or inputs.annual_borrow_rate_by_name is None
+        or inputs.borrow_rate_imputed is None
+    ):
         return {"status": "unsupported"}
-    shortable = np.asarray(inputs.shortable, dtype=np.bool_)
-    rate_present = np.isfinite(
+    rate_finite = np.isfinite(
         np.asarray(inputs.annual_borrow_rate_by_name, dtype=np.float64)
     )
+    rate_observed = rate_finite & ~np.asarray(
+        inputs.borrow_rate_imputed, dtype=np.bool_
+    )
+    rate_available_by_date = rate_finite.any(axis=1)
     active = np.asarray(inputs.active, dtype=np.bool_)
     volatility = np.asarray(
         inputs.prior_feature_values["yang_zhang_vol_20"], dtype=np.float64
@@ -1668,16 +1699,58 @@ def _lending_coverage(inputs: EvaluationInputs) -> dict[str, object]:
     def fraction(values: NDArray[np.bool_], mask: NDArray[np.bool_]) -> float | None:
         return float(values[mask].mean()) if mask.any() else None
 
+    liquidity = _liquidity_quartiles(inputs)
+    by_liquidity = []
+    for quartile in range(4):
+        stratum = active & (liquidity == quartile)
+        by_liquidity.append(
+            {
+                "quartile": quartile + 1,
+                "active_name_days": int(stratum.sum()),
+                "observed_rate_fraction": fraction(rate_observed, stratum),
+                "imputed_rate_fraction": fraction(
+                    np.asarray(inputs.borrow_rate_imputed, dtype=np.bool_), stratum
+                ),
+                "shortable_fraction_by_cell": {
+                    name: fraction(np.asarray(values, dtype=np.bool_), stratum)
+                    for name, values in sorted(
+                        inputs.shortable_by_borrow_source.items()
+                    )
+                },
+            }
+        )
+
     return {
         "status": "supported",
+        "borrow_source": inputs.borrow_source_label,
+        "coverage_limited": bool(np.any(~rate_available_by_date)),
+        "source_available_date_count": int(rate_available_by_date.sum()),
+        "source_unavailable_dates": [
+            value.isoformat()
+            for value, available in zip(inputs.dates, rate_available_by_date)
+            if not available
+        ],
         "active_name_days": int(active.sum()),
-        "active_rate_observed_prior_20_fraction": fraction(rate_present, active),
-        "active_shortable_fraction": fraction(shortable, active),
-        "high_volatility_quartile_name_days": int(high_vol.sum()),
-        "high_volatility_quartile_rate_observed_prior_20_fraction": fraction(
-            rate_present, high_vol
+        "active_rate_observed_prior_60_fraction": fraction(rate_observed, active),
+        "active_rate_imputed_fraction": fraction(
+            np.asarray(inputs.borrow_rate_imputed, dtype=np.bool_), active
         ),
-        "high_volatility_quartile_shortable_fraction": fraction(shortable, high_vol),
+        "active_shortable_fraction_by_cell": {
+            name: fraction(np.asarray(values, dtype=np.bool_), active)
+            for name, values in sorted(inputs.shortable_by_borrow_source.items())
+        },
+        "high_volatility_quartile_name_days": int(high_vol.sum()),
+        "high_volatility_quartile_rate_observed_prior_60_fraction": fraction(
+            rate_observed, high_vol
+        ),
+        "high_volatility_quartile_rate_imputed_fraction": fraction(
+            np.asarray(inputs.borrow_rate_imputed, dtype=np.bool_), high_vol
+        ),
+        "high_volatility_quartile_shortable_fraction_by_cell": {
+            name: fraction(np.asarray(values, dtype=np.bool_), high_vol)
+            for name, values in sorted(inputs.shortable_by_borrow_source.items())
+        },
+        "by_liquidity_quartile": by_liquidity,
     }
 
 
@@ -1913,13 +1986,14 @@ def evaluate_scores(
         security_ids=inputs.security_ids,
         initial_reference_price=inputs.initial_reference_price,
         annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
-        shortable=inputs.shortable,
+        borrow_rate_imputed=inputs.borrow_rate_imputed,
+        shortable_by_borrow_source=inputs.shortable_by_borrow_source,
         selection_volatility=inputs.prior_feature_values["yang_zhang_vol_20"],
         beta_60=inputs.prior_feature_values["beta_60"],
         hedge_close=inputs.bova11_close,
     )
     configurations = ledger_configurations()
-    headline_name = "cost_4_borrow_lending_v1"
+    headline_name = "borrow_balance"
     headline = grid[headline_name]
     d5_index = HORIZONS.index(5)
     d5_score = np.asarray(inputs.scores, dtype=np.float64)[..., d5_index]
@@ -1941,7 +2015,8 @@ def evaluate_scores(
         config=LedgerConfig(),
         initial_reference_price=inputs.initial_reference_price,
         annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
-        shortable=inputs.shortable,
+        borrow_rate_imputed=inputs.borrow_rate_imputed,
+        shortable=inputs.shortable_by_borrow_source["borrow_balance"],
         selection_volatility=inputs.prior_feature_values["yang_zhang_vol_20"],
         beta_60=inputs.prior_feature_values["beta_60"],
         hedge_close=inputs.bova11_close,
@@ -2073,7 +2148,7 @@ def evaluate_scores(
                 },
             }
         )
-        if scenario.startswith(("cost_", "comparator_")):
+        if scenario.startswith(("cost_", "borrow_", "comparator_")):
             economics_daily.extend(
                 {
                     **row,
@@ -2152,11 +2227,14 @@ def evaluate_scores(
                 else "unsupported"
             )
         ),
-        "shortable": _array_sha256(
-            np.asarray(
-                inputs.shortable if inputs.shortable is not None else "unsupported"
-            )
+        "borrow_rate_imputed": _array_sha256(
+            np.asarray(inputs.borrow_rate_imputed, dtype=np.bool_)
         ),
+        "shortable_by_borrow_source": {
+            name: _array_sha256(np.asarray(values, dtype=np.bool_))
+            for name, values in sorted(inputs.shortable_by_borrow_source.items())
+        },
+        "borrow_source_label": inputs.borrow_source_label,
         "primary_support": {
             "possible_date_count": int(
                 (primary_outcome_mask.sum(axis=1) >= MIN_CROSS_SECTION).sum()

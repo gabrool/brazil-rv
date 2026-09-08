@@ -14,6 +14,7 @@ import brazil_rv.v2.research_rounds as research_rounds
 from brazil_rv.v2.artifacts import sha256_file
 from brazil_rv.v2.contract import HORIZONS, SLOW_FEATURES
 from brazil_rv.v2.evaluate import EvaluationInputs, _input_hashes, evaluate_scores
+from brazil_rv.v2.lending_archive import LendingBorrowPanels
 from brazil_rv.v2.research_rounds import (
     RESEARCH_SCORE_SCHEMA,
     RUNG_GROUPS,
@@ -38,10 +39,44 @@ from brazil_rv.v2.research_rounds import (
 from brazil_rv.v2.splits import development_folds
 
 
+def _lending_panels(inputs: EvaluationInputs) -> LendingBorrowPanels:
+    availability = inputs.shortable_by_borrow_source
+    indices = np.asarray(inputs.session_indices, dtype=np.int64)
+    shape = (int(indices.max()) + 1, np.asarray(inputs.active).shape[1])
+    rates = np.full(shape, np.nan, dtype=np.float64)
+    imputed = np.zeros(shape, dtype=np.bool_)
+    strict = np.zeros(shape, dtype=np.bool_)
+    balance = np.zeros(shape, dtype=np.bool_)
+    open_cell = np.zeros(shape, dtype=np.bool_)
+    rates[indices] = np.asarray(inputs.annual_borrow_rate_by_name)
+    imputed[indices] = np.asarray(inputs.borrow_rate_imputed)
+    strict[indices] = np.asarray(availability["borrow_strict"])
+    balance[indices] = np.asarray(availability["borrow_balance"])
+    open_cell[indices] = np.asarray(availability["borrow_open"])
+    return LendingBorrowPanels(
+        annual_taker_rate=rates,
+        rate_imputed=imputed,
+        shortable_strict=strict,
+        shortable_balance=balance,
+        shortable_open=open_cell,
+        manifest_sha256=str(
+            inputs.source_artifact_hashes.get("lending_archive_manifest", "e" * 64)
+        ),
+        balance_sha256=str(
+            inputs.source_artifact_hashes.get("lending_archive_balances", "f" * 64)
+        ),
+        rate_sha256=str(
+            inputs.source_artifact_hashes.get("lending_archive_rates", "0" * 64)
+        ),
+        source_label=inputs.borrow_source_label,
+        source_unavailable_dates=(),
+    )
+
+
 def test_rev4_registration_replaces_the_voided_research_entrypoints(
     tmp_path: Path,
 ) -> None:
-    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4.md"
+    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4b.md"
     assert research_rounds.PREREGISTRATION.is_file()
     with pytest.raises(FileNotFoundError):
         research_rounds.run_round1(output_root=tmp_path / "absent", num_threads=1)
@@ -118,7 +153,7 @@ def test_acceptance_binds_store_hash_and_store_build_separately_from_freeze(
         "schedule_source": "reconstructed_v1",
     }
     report = {
-        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V10",
+        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V11",
         "status": "completed",
         "engineering_acceptance_status": "development_grade_inferred_actions",
         "research_claim": False,
@@ -221,11 +256,21 @@ def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
             )
         },
         "cdi_returns": np.zeros(day_count, dtype=np.float64),
-        "source_artifact_hashes": {"fixture": "b" * 64},
+        "source_artifact_hashes": {
+            "fixture": "b" * 64,
+            "lending_archive_manifest": "e" * 64,
+            "lending_archive_balances": "f" * 64,
+            "lending_archive_rates": "0" * 64,
+        },
         "source_archive_present": {"lending": np.ones_like(active)},
         "source_feature_valid": {"lending": np.ones_like(active)},
         "annual_borrow_rate_by_name": np.full_like(raw_close, 0.02),
-        "shortable": np.ones_like(active),
+        "borrow_rate_imputed": np.zeros_like(active),
+        "shortable_by_borrow_source": {
+            name: np.ones_like(active)
+            for name in ("borrow_strict", "borrow_balance", "borrow_open")
+        },
+        "borrow_source_label": "lending_archive_v2_2009_202412",
         "bova11_close": np.full(day_count, 100.0),
         "bova11_manifest_sha256": "c" * 64,
         "bova11_data_sha256": "d" * 64,
@@ -718,6 +763,7 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         cdi=cdi,
         bova11_close_by_index=bova11,
         bova11_binding=bova11_binding,
+        lending_borrow=_lending_panels(inputs),
     )
 
     assert _input_hashes(reconstructed.inputs) == _input_hashes(inputs)
@@ -743,6 +789,7 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
             cdi=cdi,
             bova11_close_by_index=bova11,
             bova11_binding=bova11_binding,
+            lending_borrow=_lending_panels(inputs),
         )
     recovered = _evaluation_from_artifacts(
         path,
@@ -751,6 +798,7 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         cdi=cdi,
         bova11_close_by_index=bova11,
         bova11_binding=bova11_binding,
+        lending_borrow=_lending_panels(inputs),
         allow_legacy_missing_indices=True,
         expected_fold="F1",
     )
@@ -763,6 +811,7 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
             cdi=cdi,
             bova11_close_by_index=bova11,
             bova11_binding=bova11_binding,
+            lending_borrow=_lending_panels(inputs),
             allow_legacy_missing_indices=True,
             expected_fold="F2",
         )
@@ -839,6 +888,7 @@ def test_evaluation_rejects_contaminated_report_before_score_array_access(
                 "manifest_sha256": "c" * 64,
                 "data_sha256": "d" * 64,
             },
+            lending_borrow=object(),
         )
 
 

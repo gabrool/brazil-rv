@@ -32,7 +32,10 @@ LEGACY_URL = (
 NUMBER = r"[0-9][0-9.,]*"
 PERCENT = rf"{NUMBER}%"
 REGISTERED_ROW = re.compile(
-    rf"^\s*(?P<day>\d{{2}}/\d{{2}}/20\d{{2}})\s+"
+    # Newer BDI layout extraction may concatenate the fixed-width date and
+    # ticker columns.  The date width is exact, so optional whitespace here is
+    # unambiguous and preserves the remaining row contract.
+    rf"^\s*(?P<day>\d{{2}}/\d{{2}}/20\d{{2}})\s*"
     rf"(?P<ticker>[A-Z0-9]{{4,12}})\s+"
     rf"(?P<isin>[A-Z]{{2}}[A-Z0-9]{{9}}[0-9])\s+.*?\s+"
     rf"(?P<contracts>{NUMBER})\s+(?P<quantity>{NUMBER})\s+"

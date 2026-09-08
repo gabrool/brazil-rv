@@ -96,7 +96,12 @@ def _fixture() -> EvaluationInputs:
         transfer_chronology_clean=True,
         source_artifact_hashes={"store_manifest": "a" * 64},
         annual_borrow_rate_by_name=np.full(matrix_shape, 0.02),
-        shortable=np.ones(matrix_shape, dtype=np.bool_),
+        borrow_rate_imputed=np.zeros(matrix_shape, dtype=np.bool_),
+        shortable_by_borrow_source={
+            name: np.ones(matrix_shape, dtype=np.bool_)
+            for name in ("borrow_strict", "borrow_balance", "borrow_open")
+        },
+        borrow_source_label="lending_archive_v2_2009_202412",
         bova11_close=np.full(len(dates), 100.0),
         bova11_manifest_sha256="c" * 64,
         bova11_data_sha256="d" * 64,
@@ -275,13 +280,17 @@ def test_gappy_session_axis_is_rejected() -> None:
 
 def test_paired_bootstrap_uses_daily_primary_and_headline_deltas() -> None:
     evaluated = evaluate_scores(_fixture(), window_name="F2")
+    resolved_report = copy.deepcopy(evaluated.report)
+    resolved_report["economics"]["headline"]["economics_unresolved"] = False
     baseline = replace(
         evaluated,
+        report=resolved_report,
         primary_scores=-evaluated.primary_targets,
         headline_net_excess_bps=np.zeros(25),
     )
     candidate = replace(
         evaluated,
+        report=copy.deepcopy(resolved_report),
         primary_scores=evaluated.primary_targets.copy(),
         headline_net_excess_bps=np.full(25, 3.0),
     )
@@ -398,7 +407,7 @@ def test_ledger_reports_every_evaluation_day_with_a_paid_cash_action() -> None:
     headline = [
         row
         for row in report["economics"]["daily_table"]
-        if row["scenario"] == "cost_4_borrow_lending_v1"
+        if row["scenario"] == "borrow_balance"
     ]
     assert len(headline) == len(inputs.dates)
     assert {row["economics_resolved"] for row in headline} == {

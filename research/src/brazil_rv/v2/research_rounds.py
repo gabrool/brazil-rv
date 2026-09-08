@@ -51,6 +51,7 @@ from .gbdt import (
     assemble_gbdt_scalar_view,
     gbdt_scalar_feature_names,
 )
+from .lending_archive import LendingBorrowPanels, load_lending_borrow_panels
 from .splits import (
     FIT_TO_SELECTION_PURGE_SESSIONS,
     SELECTION_SESSIONS,
@@ -61,6 +62,9 @@ from .splits import (
 from .store import V2Store, open_store_for_samples
 from .train import rank_average_ensemble
 from .validate_pipeline import (
+    _LEGACY_ROUND1_INVENTORY_SHA256,
+    _LEGACY_ROUND1_RESULT_SHA256,
+    _LEGACY_ROUND1_ROOT,
     _date_indices,
     _evaluation_inputs,
     _load_development_cdi,
@@ -68,11 +72,11 @@ from .validate_pipeline import (
     _window_target_mask,
 )
 
-ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4"
-ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4"
-RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4"
+ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4B"
+ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4B"
+RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4B"
 PREREGISTRATION = (
-    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4.md"
+    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4b.md"
 )
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
@@ -178,7 +182,7 @@ def registration_protocol_from_code() -> dict[str, object]:
     """Build protocol facts that registration prose may not override."""
 
     return {
-        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V2",
+        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V3",
         "purge_sessions": {
             "fit_to_selection": FIT_TO_SELECTION_PURGE_SESSIONS,
             "selection_to_evaluation": SELECTION_TO_EVALUATION_PURGE_SESSIONS,
@@ -202,9 +206,10 @@ def registration_protocol_from_code() -> dict[str, object]:
             "fallback_below_40_names": "rev3_intercept_plus_three_linear_risks",
         },
         "headline_cell": headline_ledger_protocol(),
-        "headline_cell_name": "cost_4_borrow_lending_v1",
+        "headline_cell_name": "borrow_balance",
         "comparators": [
-            "comparator_lending_unconstructed",
+            "borrow_strict",
+            "borrow_open",
             "comparator_uniform_borrow",
         ],
         "candidate_decision_rule": {
@@ -217,7 +222,50 @@ def registration_protocol_from_code() -> dict[str, object]:
                 "interval_includes_zero"
             ),
         },
-        "borrow_cells": ["uniform", "lending_sidecar_v1"],
+        "borrow_cells": [
+            "borrow_strict",
+            "borrow_balance",
+            "borrow_open",
+            "uniform",
+        ],
+        "borrow_rate": {
+            "observed_rate_lookback_sessions": 60,
+            "missing_rate_imputation": (
+                "same_day_cross_sectional_observed_rate_75th_percentile"
+            ),
+            "registration_fee_annual": 0.0025,
+            "equity_rate_floor": None,
+            "hedge_short_rate_floor": 0.02,
+        },
+        "borrow_availability": {
+            "borrow_strict": "lending_trade_observed_in_prior_20_sessions",
+            "borrow_balance": (
+                "positive_published_open_balance_or_lending_trade_observed_in_"
+                "prior_60_sessions"
+            ),
+            "borrow_open": "all_names_when_a_causal_cross_sectional_rate_exists",
+            "pre_first_causal_rate": "unavailable_without_future_backfill",
+        },
+        "lending_archive": {
+            "source_label": "lending_archive_v2_2009_202412",
+            "last_source_session": "2024-12-30",
+            "availability_lag_sessions": 1,
+            "store_lending_feature_rebuilt": False,
+        },
+        "acceptance_legacy_identity": {
+            "root": str(_LEGACY_ROUND1_ROOT),
+            "result_sha256": _LEGACY_ROUND1_RESULT_SHA256,
+            "inventory_sha256": _LEGACY_ROUND1_INVENTORY_SHA256,
+        },
+        "construction": {
+            "volatility_strata": "five_equal_count_yang_zhang_vol_20_quintiles",
+            "rank_within_stratum": True,
+            "quota_remainder_order": [3, 2, 4, 1, 5],
+            "small_stratum_scaling_threshold_multiple": 4,
+            "fill_order": "within_quintile_then_global_band_spill",
+            "retention_uses_current_quintile": True,
+            "occupancy_mean_absolute_deviation_limit_slots": 2.0,
+        },
         "realized_beta_label_threshold": 0.30,
         "inverse_volatility_neutral_ic_absolute_bound": 0.02,
         "round1": {
@@ -314,7 +362,7 @@ def _verify_development_acceptance(
         raise ValueError("development acceptance report SHA-256 mismatch")
     report = _read_json(source)
     if (
-        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V10"
+        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V11"
         or report.get("status") != "completed"
         or report.get("engineering_acceptance_status")
         != "development_grade_inferred_actions"
@@ -518,6 +566,33 @@ def _open_round_store(
     return store, ledger.payload()
 
 
+def _load_frozen_lending(
+    design: Mapping[str, object],
+    *,
+    store_root: Path,
+    dates: NDArray[np.datetime64],
+) -> LendingBorrowPanels:
+    record = design.get("lending_archive")
+    if not isinstance(record, Mapping):
+        raise ValueError("frozen design lacks the direct lending archive")
+    panels = load_lending_borrow_panels(
+        Path(str(record["root"])),
+        expected_manifest_sha256=str(record["manifest_sha256"]),
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+        canonical_isins=[
+            str(value)
+            for value in np.load(store_root / "isin_index.npy", allow_pickle=False)
+        ],
+    )
+    if (
+        panels.balance_sha256 != record.get("balances_sha256")
+        or panels.rate_sha256 != record.get("rates_sha256")
+        or panels.source_label != record.get("source_label")
+    ):
+        raise ValueError("lending artifacts differ from their frozen identities")
+    return panels
+
+
 def _evaluate(
     *,
     store: V2Store,
@@ -527,6 +602,7 @@ def _evaluate(
     cdi: NDArray[np.float64],
     bova11_close_by_index: NDArray[np.float64],
     bova11_binding: Mapping[str, str],
+    lending_borrow: LendingBorrowPanels,
     source_hashes: Mapping[str, str],
     fold: str,
     output: Path,
@@ -539,6 +615,7 @@ def _evaluate(
         cdi,
         bova11_close_by_index,
         bova11_binding,
+        lending_borrow,
         source_hashes,
         transfer_chronology_clean=True,
     )
@@ -677,7 +754,7 @@ def _daily_series(
         row
         for row in economics["daily_table"]
         if isinstance(row, Mapping)
-        and row.get("scenario") == "cost_4_borrow_lending_v1"
+        and row.get("scenario") == "borrow_balance"
     ]
     headline_by_date: dict[str, float] = {}
     for row in headline:
@@ -1404,6 +1481,7 @@ def _run_gbdt_candidate(
     cdi: NDArray[np.float64],
     bova11_close_by_index: NDArray[np.float64],
     bova11_binding: Mapping[str, str],
+    lending_borrow: LendingBorrowPanels,
     source_hashes: Mapping[str, str],
     root: Path,
     num_threads: int,
@@ -1519,6 +1597,7 @@ def _run_gbdt_candidate(
             cdi=cdi,
             bova11_close_by_index=bova11_close_by_index,
             bova11_binding=bova11_binding,
+            lending_borrow=lending_borrow,
             source_hashes=source_hashes,
             fold=fold,
             output=fold_root / "evaluation.json",
@@ -1543,6 +1622,8 @@ def freeze_round1(
     experiment52_cdi_sha256: str,
     bova11_root: Path,
     bova11_manifest_sha256: str,
+    lending_archive_root: Path,
+    lending_archive_manifest_sha256: str,
     acceptance_path: Path,
     acceptance_sha256: str,
     output_root: Path,
@@ -1580,6 +1661,15 @@ def freeze_round1(
         bova11_root,
         expected_manifest_sha256=bova11_manifest_sha256,
         canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+    )
+    lending_borrow = load_lending_borrow_panels(
+        lending_archive_root,
+        expected_manifest_sha256=lending_archive_manifest_sha256,
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+        canonical_isins=[
+            str(value)
+            for value in np.load(store / "isin_index.npy", allow_pickle=False)
+        ],
     )
     if num_threads < 0:
         raise ValueError("num_threads must be non-negative")
@@ -1623,6 +1713,16 @@ def freeze_round1(
             "manifest_sha256": bova11.manifest_sha256,
             "data_sha256": bova11.data_sha256,
         },
+        "lending_archive": {
+            "root": str(Path(lending_archive_root).resolve(strict=True)),
+            "manifest_sha256": lending_borrow.manifest_sha256,
+            "balances_sha256": lending_borrow.balance_sha256,
+            "rates_sha256": lending_borrow.rate_sha256,
+            "source_label": lending_borrow.source_label,
+            "source_unavailable_dates": [
+                value.isoformat() for value in lending_borrow.source_unavailable_dates
+            ],
+        },
         "folds": folds,
         "baseline_roster": list(_BASELINE_SIGNAL_NAMES),
         "gbdt_rungs": {"b_intraday": []},
@@ -1643,7 +1743,7 @@ def freeze_round1(
             "settlement_haircut": 0.30,
             "settlement_economics_unresolved_fraction_nav": 0.15,
             "headline_uses_executable_borrow": True,
-            "lending_sidecar_readout_present": True,
+            "direct_lending_archive_readout_present": True,
             "volatility_balanced_entries": True,
             "beta_hedge": True,
         },
@@ -1719,6 +1819,24 @@ def run_round1(
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
+    lending_design = design.get("lending_archive")
+    if not isinstance(lending_design, Mapping):
+        raise ValueError("Round-1 frozen design lacks the lending archive")
+    lending_borrow = load_lending_borrow_panels(
+        Path(str(lending_design["root"])),
+        expected_manifest_sha256=str(lending_design["manifest_sha256"]),
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+        canonical_isins=[
+            str(value)
+            for value in np.load(store_root / "isin_index.npy", allow_pickle=False)
+        ],
+    )
+    if (
+        lending_borrow.balance_sha256 != lending_design.get("balances_sha256")
+        or lending_borrow.rate_sha256 != lending_design.get("rates_sha256")
+        or lending_borrow.source_label != lending_design.get("source_label")
+    ):
+        raise ValueError("Round-1 lending artifacts differ from the frozen design")
     store, access = _open_round_store(
         store_root, fit, selection, evaluation, fit_target_window, pretrain
     )
@@ -1732,6 +1850,9 @@ def run_round1(
         ),
         "bova11_manifest": bova11.manifest_sha256,
         "bova11_data": bova11.data_sha256,
+        "lending_archive_manifest": lending_borrow.manifest_sha256,
+        "lending_archive_balances": lending_borrow.balance_sha256,
+        "lending_archive_rates": lending_borrow.rate_sha256,
         "preregistration": str(design["preregistration"]["sha256"]),
     }
     events: list[dict[str, object]] = [
@@ -1774,6 +1895,7 @@ def run_round1(
                     cdi=cdi,
                     bova11_close_by_index=bova11.close_by_session,
                     bova11_binding=bova11_binding,
+                    lending_borrow=lending_borrow,
                     source_hashes=source_hashes,
                     fold=fold,
                     output=root / "evaluation.json",
@@ -1810,6 +1932,7 @@ def run_round1(
                 cdi=cdi,
                 bova11_close_by_index=bova11.close_by_session,
                 bova11_binding=bova11_binding,
+                lending_borrow=lending_borrow,
                 source_hashes=source_hashes,
                 root=output / "gbdt_ladder" / rung,
                 num_threads=num_threads,
@@ -2022,8 +2145,14 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
+    lending_borrow = _load_frozen_lending(
+        design, store_root=store_root, dates=dates
+    )
     source_hashes["bova11_manifest"] = bova11.manifest_sha256
     source_hashes["bova11_data"] = bova11.data_sha256
+    source_hashes["lending_archive_manifest"] = lending_borrow.manifest_sha256
+    source_hashes["lending_archive_balances"] = lending_borrow.balance_sha256
+    source_hashes["lending_archive_rates"] = lending_borrow.rate_sha256
     reused_candidates = ["all_naive_baselines"]
     scored_candidates: list[str] = []
 
@@ -2042,6 +2171,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 cdi=cdi,
                 bova11_close_by_index=bova11.close_by_session,
                 bova11_binding=bova11_binding,
+                lending_borrow=lending_borrow,
             )
             baseline_records[name][fold] = _existing_score_and_evaluation_record(root)
     baseline_summary = {
@@ -2075,6 +2205,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                     cdi=cdi,
                     bova11_close_by_index=bova11.close_by_session,
                     bova11_binding=bova11_binding,
+                    lending_borrow=lending_borrow,
                 )
                 records[fold] = _existing_score_and_evaluation_record(root)
             if rung == "d_all_sidecars":
@@ -2099,6 +2230,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 cdi=cdi,
                 bova11_close_by_index=bova11.close_by_session,
                 bova11_binding=bova11_binding,
+                lending_borrow=lending_borrow,
                 source_hashes=source_hashes,
                 root=candidate_root,
                 num_threads=num_threads,
@@ -2155,6 +2287,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                     cdi=cdi,
                     bova11_close_by_index=bova11.close_by_session,
                     bova11_binding=bova11_binding,
+                    lending_borrow=lending_borrow,
                 )
                 records[fold] = _existing_score_and_evaluation_record(root)
             if parent == "d_all_sidecars":
@@ -2182,6 +2315,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 cdi=cdi,
                 bova11_close_by_index=bova11.close_by_session,
                 bova11_binding=bova11_binding,
+                lending_borrow=lending_borrow,
                 source_hashes=source_hashes,
                 root=candidate_root,
                 num_threads=num_threads,
@@ -2297,6 +2431,8 @@ def freeze_round2(
     experiment52_cdi_sha256: str,
     bova11_root: Path,
     bova11_manifest_sha256: str,
+    lending_archive_root: Path,
+    lending_archive_manifest_sha256: str,
     output_root: Path,
     fast_checkpoint: Path | None,
     fast_checkpoint_sha256: str | None,
@@ -2342,6 +2478,21 @@ def freeze_round2(
         expected_manifest_sha256=bova11_manifest_sha256,
         canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
     )
+    lending_borrow = load_lending_borrow_panels(
+        lending_archive_root,
+        expected_manifest_sha256=lending_archive_manifest_sha256,
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+        canonical_isins=[
+            str(value)
+            for value in np.load(store / "isin_index.npy", allow_pickle=False)
+        ],
+    )
+    round1_sources = round1.get("sources")
+    if not isinstance(round1_sources, Mapping) or (
+        round1_sources.get("lending_archive_manifest")
+        != lending_borrow.manifest_sha256
+    ):
+        raise ValueError("Round 2 must use the exact Round-1 lending archive")
     if fast_checkpoint is not None or fast_checkpoint_sha256 is not None:
         raise ValueError(
             "canonical Round 2 requires the native fresh fast encoder; legacy v1 "
@@ -2390,6 +2541,13 @@ def freeze_round2(
             "root": str(Path(bova11_root).resolve(strict=True)),
             "manifest_sha256": bova11.manifest_sha256,
             "data_sha256": bova11.data_sha256,
+        },
+        "lending_archive": {
+            "root": str(Path(lending_archive_root).resolve(strict=True)),
+            "manifest_sha256": lending_borrow.manifest_sha256,
+            "balances_sha256": lending_borrow.balance_sha256,
+            "rates_sha256": lending_borrow.rate_sha256,
+            "source_label": lending_borrow.source_label,
         },
         "enabled_sidecars": list(RUNG_GROUPS[parent]),
         "fast_initialization": fast,
@@ -2841,6 +2999,7 @@ def _evaluation_from_artifacts(
     cdi: NDArray[np.float64],
     bova11_close_by_index: NDArray[np.float64],
     bova11_binding: Mapping[str, str],
+    lending_borrow: LendingBorrowPanels,
     allow_legacy_missing_indices: bool = False,
     expected_fold: str | None = None,
 ) -> _ResearchEvaluation:
@@ -2877,6 +3036,7 @@ def _evaluation_from_artifacts(
         cdi,
         bova11_close_by_index,
         bova11_binding,
+        lending_borrow,
         {str(key): str(value) for key, value in source_hashes.items()},
         transfer_chronology_clean=True,
     )
@@ -2915,7 +3075,7 @@ def _evaluation_from_artifacts(
         row
         for row in economics["daily_table"]
         if isinstance(row, Mapping)
-        and row.get("scenario") == "cost_4_borrow_lending_v1"
+        and row.get("scenario") == "borrow_balance"
     ]
     by_date: dict[str, float] = {}
     for row in rows:
@@ -3114,6 +3274,9 @@ def finalize_round2(*, output_root: Path) -> str:
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
+    lending_borrow = _load_frozen_lending(
+        design, store_root=store_root, dates=dates
+    )
     source_hashes = {
         "v2_store_manifest": str(design["store"]["manifest_sha256"]),
         "cdi_development_extension": str(provenance["development_extension"]["sha256"]),
@@ -3122,6 +3285,9 @@ def finalize_round2(*, output_root: Path) -> str:
         ),
         "bova11_manifest": bova11.manifest_sha256,
         "bova11_data": bova11.data_sha256,
+        "lending_archive_manifest": lending_borrow.manifest_sha256,
+        "lending_archive_balances": lending_borrow.balance_sha256,
+        "lending_archive_rates": lending_borrow.rate_sha256,
         "preregistration": str(design["preregistration"]["sha256"]),
         "round1_result": str(design["round1"]["result_sha256"]),
     }
@@ -3164,6 +3330,7 @@ def finalize_round2(*, output_root: Path) -> str:
                     cdi=cdi,
                     bova11_close_by_index=bova11.close_by_session,
                     bova11_binding=bova11_binding,
+                    lending_borrow=lending_borrow,
                     source_hashes=source_hashes,
                     fold=fold,
                     output=aggregate / "evaluation.json",
@@ -3220,6 +3387,7 @@ def finalize_round2(*, output_root: Path) -> str:
                 cdi=cdi,
                 bova11_close_by_index=bova11.close_by_session,
                 bova11_binding=bova11_binding,
+                lending_borrow=lending_borrow,
                 source_hashes=source_hashes,
                 fold=fold,
                 output=gbdt_root / "evaluation.json",
@@ -3256,6 +3424,7 @@ def finalize_round2(*, output_root: Path) -> str:
                 cdi=cdi,
                 bova11_close_by_index=bova11.close_by_session,
                 bova11_binding=bova11_binding,
+                lending_borrow=lending_borrow,
                 source_hashes=source_hashes,
                 fold=fold,
                 output=ensemble_root / "evaluation.json",
@@ -3341,6 +3510,9 @@ def recover_round2_result(*, output_root: Path) -> str:
             "manifest_sha256": bova11.manifest_sha256,
             "data_sha256": bova11.data_sha256,
         }
+        lending_borrow = _load_frozen_lending(
+            design, store_root=store_root, dates=dates
+        )
         source_hashes = {
             "v2_store_manifest": str(design["store"]["manifest_sha256"]),
             "cdi_development_extension": str(
@@ -3351,6 +3523,9 @@ def recover_round2_result(*, output_root: Path) -> str:
             ),
             "bova11_manifest": bova11.manifest_sha256,
             "bova11_data": bova11.data_sha256,
+            "lending_archive_manifest": lending_borrow.manifest_sha256,
+            "lending_archive_balances": lending_borrow.balance_sha256,
+            "lending_archive_rates": lending_borrow.rate_sha256,
             "preregistration": str(design["preregistration"]["sha256"]),
             "round1_result": str(design["round1"]["result_sha256"]),
         }
@@ -3388,6 +3563,7 @@ def recover_round2_result(*, output_root: Path) -> str:
                     cdi=cdi,
                     bova11_close_by_index=bova11.close_by_session,
                     bova11_binding=bova11_binding,
+                    lending_borrow=lending_borrow,
                     allow_legacy_missing_indices=True,
                     expected_fold=fold,
                 )
@@ -3416,6 +3592,7 @@ def recover_round2_result(*, output_root: Path) -> str:
                     cdi=cdi,
                     bova11_close_by_index=bova11.close_by_session,
                     bova11_binding=bova11_binding,
+                    lending_borrow=lending_borrow,
                     allow_legacy_missing_indices=True,
                     expected_fold=fold,
                 )
@@ -3528,6 +3705,8 @@ def _parser() -> argparse.ArgumentParser:
     freeze.add_argument("--experiment52-cdi-sha256", required=True)
     freeze.add_argument("--bova11-root", type=Path, required=True)
     freeze.add_argument("--bova11-manifest-sha256", required=True)
+    freeze.add_argument("--lending-archive-root", type=Path, required=True)
+    freeze.add_argument("--lending-archive-manifest-sha256", required=True)
     freeze.add_argument("--development-acceptance", type=Path, required=True)
     freeze.add_argument("--development-acceptance-sha256", required=True)
     freeze.add_argument("--output-root", type=Path, required=True)
@@ -3554,6 +3733,8 @@ def _parser() -> argparse.ArgumentParser:
     freeze2.add_argument("--experiment52-cdi-sha256", required=True)
     freeze2.add_argument("--bova11-root", type=Path, required=True)
     freeze2.add_argument("--bova11-manifest-sha256", required=True)
+    freeze2.add_argument("--lending-archive-root", type=Path, required=True)
+    freeze2.add_argument("--lending-archive-manifest-sha256", required=True)
     freeze2.add_argument("--output-root", type=Path, required=True)
     freeze2.add_argument("--fast-checkpoint", type=Path)
     freeze2.add_argument("--fast-checkpoint-sha256")
@@ -3582,6 +3763,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
+            lending_archive_root=arguments.lending_archive_root,
+            lending_archive_manifest_sha256=(
+                arguments.lending_archive_manifest_sha256
+            ),
             acceptance_path=arguments.development_acceptance,
             acceptance_sha256=arguments.development_acceptance_sha256,
             output_root=arguments.output_root,
@@ -3607,6 +3792,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
+            lending_archive_root=arguments.lending_archive_root,
+            lending_archive_manifest_sha256=(
+                arguments.lending_archive_manifest_sha256
+            ),
             output_root=arguments.output_root,
             fast_checkpoint=arguments.fast_checkpoint,
             fast_checkpoint_sha256=arguments.fast_checkpoint_sha256,

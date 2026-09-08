@@ -12,6 +12,7 @@ import pytest
 from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
 from brazil_rv.v2.contract import FINETUNE_START, HORIZONS, SLOW_FEATURES
 from brazil_rv.v2.score import ScoreArtifact
+from brazil_rv.v2.lending_archive import LendingBorrowPanels
 from brazil_rv.v2.store import V2Store, open_store_for_samples
 from brazil_rv.v2.train import StageTrainingResult
 from brazil_rv.v2 import validate_pipeline as pipeline
@@ -47,6 +48,79 @@ def _bova11_fixture(tmp_path: Path, store_root: Path) -> tuple[Path, str]:
         "data_sha256": sha256_file(data),
     }
     return root, write_json_atomic(root / "manifest.json", manifest)
+
+
+def _lending_fixture(tmp_path: Path, store_root: Path) -> tuple[Path, str]:
+    dates = np.load(store_root / "date_index.npy", allow_pickle=False).astype(
+        "datetime64[D]"
+    ).astype(object)
+    isins = np.load(store_root / "isin_index.npy", allow_pickle=False).astype(str)
+    root = tmp_path / "lending_archive"
+    root.mkdir()
+    balances = root / "lending_balances.parquet"
+    rates = root / "lending_rates.parquet"
+    rows = (len(dates) - 1) * len(isins)
+    pl.DataFrame(
+        {
+            "source_position_date": pl.Series(
+                np.repeat(dates[:-1], len(isins)).tolist(), dtype=pl.Date
+            ),
+            "source_report_date": pl.Series(
+                np.repeat(dates[:-1], len(isins)).tolist(), dtype=pl.Date
+            ),
+            "available_date": pl.Series(
+                np.repeat(dates[1:], len(isins)).tolist(), dtype=pl.Date
+            ),
+            "security_id": np.tile([f"ISIN:{value}" for value in isins], len(dates) - 1),
+            "source_identity_method": np.full(rows, "fixture"),
+            "lending_balance_quantity": np.ones(rows, dtype=np.int64),
+            "lending_balance_brl": np.ones(rows, dtype=np.float64),
+        }
+    ).write_parquet(balances)
+    pl.DataFrame(
+        {
+            "source_trade_date": pl.Series(
+                np.repeat(dates[:-1], len(isins)).tolist(), dtype=pl.Date
+            ),
+            "available_date": pl.Series(
+                np.repeat(dates[1:], len(isins)).tolist(), dtype=pl.Date
+            ),
+            "security_id": np.tile([f"ISIN:{value}" for value in isins], len(dates) - 1),
+            "registered_contracts": np.ones(rows, dtype=np.int64),
+            "registered_quantity": np.ones(rows, dtype=np.int64),
+            "annual_taker_rate": np.full(rows, 0.02),
+        }
+    ).write_parquet(rates)
+    artifacts = {
+        path.name: {"bytes": path.stat().st_size, "sha256": sha256_file(path)}
+        for path in (balances, rates)
+    }
+    manifest = {
+        "schema": "BRAZIL_RV_V2_LENDING_ARCHIVE_V2",
+        "source_label": "lending_archive_v2_2009_202412",
+        "status": "complete",
+        "artifacts": artifacts,
+        "official_validation_accessed": False,
+        "test_accessed": False,
+    }
+    return root, write_json_atomic(root / "manifest.json", manifest)
+
+
+def _borrow_panels(day_count: int, name_count: int) -> LendingBorrowPanels:
+    shape = (day_count, name_count)
+    available = np.ones(shape, dtype=np.bool_)
+    return LendingBorrowPanels(
+        annual_taker_rate=np.full(shape, 0.02),
+        rate_imputed=np.zeros(shape, dtype=np.bool_),
+        shortable_strict=available.copy(),
+        shortable_balance=available.copy(),
+        shortable_open=available.copy(),
+        manifest_sha256="e" * 64,
+        balance_sha256="f" * 64,
+        rate_sha256="0" * 64,
+        source_label="lending_archive_v2_2009_202412",
+        source_unavailable_dates=(),
+    )
 
 
 def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
@@ -209,27 +283,6 @@ def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
         sha256_file(cdi_path),
         experiment52_cdi_path,
         sha256_file(experiment52_cdi_path),
-    )
-
-
-def test_lending_rate_history_inverts_sealed_percent_transform(
-    tmp_path: Path,
-) -> None:
-    store_root, *_ = _development_store(tmp_path)
-    manifest = json.loads((store_root / "manifest.json").read_text(encoding="utf-8"))
-    dates = np.load(store_root / "date_index.npy", allow_pickle=False)
-    isins = np.load(store_root / "isin_index.npy", allow_pickle=False).astype(str)
-    indices = np.asarray([1, 20], dtype=np.int64)
-    rates, recent, resolution = pipeline._lending_rate_history(
-        store_manifest=manifest,
-        dates=dates,
-        isins=isins,
-        indices=indices,
-    )
-    np.testing.assert_array_equal(recent, np.ones(recent.shape, dtype=np.bool_))
-    np.testing.assert_allclose(rates, 0.02, rtol=0.0, atol=2e-17)
-    assert resolution["sha256"] == sha256_file(
-        tmp_path / "bdi_lending_strong.parquet"
     )
 
 
@@ -492,6 +545,7 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         device="cpu",
     )
     bova11_root, bova11_sha = _bova11_fixture(tmp_path, store_root)
+    lending_root, lending_sha = _lending_fixture(tmp_path, store_root)
     result = pipeline.run_pipeline_validation(
         store_root=store_root,
         cdi_path=cdi_path,
@@ -502,6 +556,8 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         runtime=runtime,
         bova11_root=bova11_root,
         bova11_manifest_sha256=bova11_sha,
+        lending_archive_root=lending_root,
+        lending_archive_manifest_sha256=lending_sha,
     )
 
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
@@ -580,6 +636,8 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
             runtime=runtime,
             bova11_root=bova11_root,
             bova11_manifest_sha256=bova11_sha,
+            lending_archive_root=lending_root,
+            lending_archive_manifest_sha256=lending_sha,
         )
 
 
@@ -692,6 +750,7 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
     )
 
     bova11_root, bova11_sha = _bova11_fixture(tmp_path, store_root)
+    lending_root, lending_sha = _lending_fixture(tmp_path, store_root)
     result = pipeline.resume_network_validation(
         store_root=store_root,
         store_manifest_sha256=sha256_file(store_root / "manifest.json"),
@@ -706,6 +765,8 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
         runtime=pipeline.ValidationRuntime(device="cuda"),
         bova11_root=bova11_root,
         bova11_manifest_sha256=bova11_sha,
+        lending_archive_root=lending_root,
+        lending_archive_manifest_sha256=lending_sha,
     )
 
     assert len(calls) == 1
@@ -882,6 +943,7 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
             np.full(len(dates), 0.0004, dtype=np.float64),
             np.full(len(dates), 100.0, dtype=np.float64),
             {"manifest_sha256": "a" * 64, "data_sha256": "b" * 64},
+            _borrow_panels(len(dates), len(store.isins)),
             {},
             transfer_chronology_clean=True,
         )
@@ -1073,6 +1135,7 @@ def test_evaluation_payment_remap_requires_a_contiguous_window() -> None:
             np.zeros(4, dtype=np.float64),
             np.full(4, 100.0, dtype=np.float64),
             {"manifest_sha256": "a" * 64, "data_sha256": "b" * 64},
+            _borrow_panels(4, 1),
             {},
             transfer_chronology_clean=True,
         )
@@ -1149,6 +1212,8 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
         "mean_volatility_quota_by_quintile": [6.0] * 5,
         "mean_volatility_occupancy_long_by_quintile": [6.0] * 5,
         "mean_volatility_occupancy_short_by_quintile": [6.0] * 5,
+        "mean_absolute_volatility_occupancy_deviation_long": 0.0,
+        "mean_absolute_volatility_occupancy_deviation_short": 0.0,
         "entry_defect_signatures": {
             "D1_entry_pending_printed_unblocked_unfilled": 0,
             "D2_entry_fill_quantity_short": 0,

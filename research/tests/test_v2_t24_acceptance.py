@@ -36,6 +36,7 @@ from brazil_rv.v2.evaluate import (
     write_evaluation_report,
 )
 from brazil_rv.v2.intraday_features import NATIVE_FAST_FEATURES
+from brazil_rv.v2.lending_archive import LendingBorrowPanels
 from brazil_rv.v2.research_rounds import (
     RESEARCH_SCORE_SCHEMA,
     _evaluation_from_artifacts,
@@ -663,6 +664,18 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
         "manifest_sha256": "a" * 64,
         "data_sha256": "b" * 64,
     }
+    lending_borrow = LendingBorrowPanels(
+        annual_taker_rate=np.full((_DAY_COUNT, _NAME_COUNT), 0.02),
+        rate_imputed=np.zeros((_DAY_COUNT, _NAME_COUNT), dtype=np.bool_),
+        shortable_strict=np.ones((_DAY_COUNT, _NAME_COUNT), dtype=np.bool_),
+        shortable_balance=np.ones((_DAY_COUNT, _NAME_COUNT), dtype=np.bool_),
+        shortable_open=np.ones((_DAY_COUNT, _NAME_COUNT), dtype=np.bool_),
+        manifest_sha256="c" * 64,
+        balance_sha256="d" * 64,
+        rate_sha256="e" * 64,
+        source_label="lending_archive_v2_2009_202412",
+        source_unavailable_dates=(),
+    )
     inputs = _evaluation_inputs(
         scoring_loader.dataset.store,
         evaluation_indices,
@@ -671,6 +684,7 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
         cdi,
         bova11_close,
         bova11_binding,
+        lending_borrow,
         source_hashes,
         transfer_chronology_clean=True,
     )
@@ -766,6 +780,7 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
         cdi=cdi,
         bova11_close_by_index=bova11_close,
         bova11_binding=bova11_binding,
+        lending_borrow=lending_borrow,
     )
     np.testing.assert_array_equal(
         rebuilt.result.daily_primary_ic, result.daily_primary_ic
@@ -790,6 +805,7 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
             cdi=cdi,
             bova11_close_by_index=bova11_close,
             bova11_binding=bova11_binding,
+            lending_borrow=lending_borrow,
         )
 
     stale_plan = tmp_path / "stale_plan.json"
