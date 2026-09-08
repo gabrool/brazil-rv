@@ -2805,10 +2805,13 @@ def _round2_stage_p(root: Path) -> dict[str, object]:
         _assert_current_clean_training(manifest, path=p_root / "run_manifest.json")
         if manifest.get("stage") != "P" or manifest.get("seed") != seed:
             raise ValueError(f"Stage-P trajectory identity differs for seed {seed}")
-        history = _read_json(p_root / "history.json")
+        history_path = p_root / "history.json"
+        history = json.loads(history_path.read_text(encoding="utf-8"))
+        if not isinstance(history, list):
+            raise ValueError(f"Stage-P history must be a JSON array: {history_path}")
         stage_p[str(seed)] = {
-            "history": str(p_root / "history.json"),
-            "history_sha256": sha256_file(p_root / "history.json"),
+            "history": str(history_path),
+            "history_sha256": sha256_file(history_path),
             "raw_patience_checkpoint_sha256": sha256_file(p_root / "raw_patience.pt"),
             "final_ema_checkpoint_sha256": sha256_file(p_root / "final_ema.pt"),
             "selected_epoch": manifest.get("selected_epoch"),

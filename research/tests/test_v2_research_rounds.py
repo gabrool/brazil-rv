@@ -333,6 +333,41 @@ def test_round2_joint_plan_expects_both_training_graphs() -> None:
     assert fine["expected_manifest"]["compiled_graphs"]["training"] == 1
 
 
+def test_round2_stage_p_accepts_canonical_history_array(tmp_path: Path) -> None:
+    for seed in research_rounds.NETWORK_SEEDS:
+        root = tmp_path / "trajectories" / "arm_B" / "stage_P" / f"seed_{seed}"
+        root.mkdir(parents=True)
+        (root / "run_manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema": research_rounds.TRAINING_STAGE_SCHEMA,
+                    "status": "completed",
+                    "stage": "P",
+                    "seed": seed,
+                    "official_validation_accessed": False,
+                    "test_accessed": False,
+                    "transfer_chronology_clean": True,
+                    "feature_schema_sha256": "a" * 64,
+                    "action_terms_source": "inferred_cotahist_dismes_v1",
+                    "schedule_source": "reconstructed_v1",
+                    "selected_epoch": 1,
+                    "stopped_epoch": 2,
+                }
+            ),
+            encoding="utf-8",
+        )
+        (root / "history.json").write_text(
+            json.dumps([{"epoch": 1}, {"epoch": 2}]), encoding="utf-8"
+        )
+        (root / "raw_patience.pt").write_bytes(b"raw")
+        (root / "final_ema.pt").write_bytes(b"ema")
+
+    stage_p = research_rounds._round2_stage_p(tmp_path)
+
+    assert set(stage_p) == {"11", "29", "47"}
+    assert stage_p["11"]["holdout_history"] == [{"epoch": 1}, {"epoch": 2}]
+
+
 def test_undefined_economics_cannot_establish_not_worse() -> None:
     undefined = {"estimate": None, "lower_95": None, "upper_95": None}
     positive = {"estimate": 1.0, "lower_95": 0.5, "upper_95": 1.5}
