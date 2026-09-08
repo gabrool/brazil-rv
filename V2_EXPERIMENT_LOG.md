@@ -2524,3 +2524,48 @@ is requested before amending the list and restarting in a fresh root.
 The user explicitly approved that exact six-field amendment and continuation.
 The executable list and registration were amended before a fresh freeze; the
 stopped root and its inventory remain unchanged.
+
+## Rev4f Round 1 completed; Round 2 input-identity stop (2026-09-08)
+
+The approved amendment was committed as `a25ae450b37d9e3b669197d488d97de5c27692f8`,
+with 27 targeted research-round tests passing before replay. The fresh Round-1
+root `D:\quant-data\b3\processed\model_runs\v2_round1_rev4f_a25ae45_20260908T233251Z`
+completed all 18 panels without score/model recomputation. All protected report
+fields remain bit-identical. D1-D5 are zero across reported scenarios; every
+headline gross, stale/unresolved and occupancy gate passes. Result SHA-256:
+`415aae05aed3df1a21f20d87fbe2b06827df0fec317af58b4bf0f8a84ae35839`;
+inventory `9940b01076677f19ea8dbf1cca0af2991e2899494e491c92d666d0ceb0c7aafb`.
+
+Across the 18 headline books, cap sessions fell 336 to 7, mean absolute hedge
+notional fell at least half in 11 panels, and BOVA11 realized beta is inside
+±0.15 in 15 panels. The expected F1 decline occurred in 4/6 panels; the F2/F3
+increase occurred in 10/12. These are expectations, not gates. Momentum pooled
+net moves 1.665 to 3.219 bps/day and b_intraday moves -1.007 to 0.076; both
+intervals span zero. Neutral IC remains .0214729 and .0199906 respectively.
+The two pre-existing F3 economics_unresolved labels (inverse volatility and
+the reversal/momentum blend) remain and exclude those folds from pooled
+economics. The pre-existing zero-buffer stress underdeployment is disclosed
+separately. Full before/after tables, diagnostics and hashes are in
+`docs/v2_PASS5_REBASELINE.md` and `docs/v2_pass5_rebaseline_evidence.json`.
+
+Round 2 froze in
+`D:\quant-data\b3\processed\model_runs\v2_round2_rev4f_a25ae45_20260908T233834Z`
+and stopped at arm_A/F1 before any new ledger evaluation: decoded
+`history_age_sessions` has an unregistered input-hash difference. A bounded
+input-only reconstruction of all 12 panels finds this is the sole unexpected
+input hash; all quality-stratification fields, including age populations and
+ICs, remain bit-identical. Numerical portability of the unchanged inverse-log
+formula is suspected; the original decoded arrays are not persisted, so
+element-level differences are not claimed. No model/score was recomputed.
+
+The stopped root is sealed with research_claim=false. Frozen design,
+investigation, access audit and inventory hashes are respectively
+`c90cf848b93aa168951eb3e036f69ca9327901397bf970958156a69f1c301798`,
+`9b5ba90504efdaf68911937e75e1f8774938ae6bde59ecb1eb1aa1ede74ca6b6`,
+`87f7474f81c55f8d2733d7bae4b26021ce527ac2a8dfdf0768fcfdf6dde421a2`,
+`9d90d85129368f571eb6daf43185eb35aad945e90e1e46f63df36248898d7ef6`.
+`docs/v2_PASS5_ROUND2_STOP.md` proposes adding only history_age_sessions to
+recomputed_input_hashes, keeping all diagnostic/score-derived identity checks.
+It is not applied without separate approval under the user's pass-5 §6 stop.
+Round-2 rev4f conclusions, execution sweep, coverage repair, rebuild, acceptance
+and Round 1' remain unrun. No protected-date payload or paid instance was accessed.

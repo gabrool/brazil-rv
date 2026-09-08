@@ -1,0 +1,1056 @@
+{
+  "deployment_changed": false,
+  "implementation_commit": {
+    "commit": "a25ae450b37d9e3b669197d488d97de5c27692f8",
+    "tracked_worktree_clean": true
+  },
+  "interpretation": "Unchanged inverse log1p history-age formula produces different decoded-array hashes on this host. Platform numerical portability is suspected; sealed decoded arrays were not persisted, so element-level differences are not yet established. Full quality-stratification readouts are compared without running an economic replay.",
+  "ledger_evaluations_performed": 0,
+  "numpy_version": "2.5.1",
+  "official_validation_accessed": false,
+  "panels": [
+    {
+      "candidate": "arm_A",
+      "fold": "F1",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 2,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 2
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 204,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 204
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.005121109947588394,
+          "possible_date_count": 119,
+          "possible_name_days": 23345,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 23345
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 2,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 2
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 204,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 204
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.005121109947588394,
+          "possible_date_count": 119,
+          "possible_name_days": 23345,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 23345
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\aggregates\\arm_A\\F1\\evaluation.json",
+      "source_evaluation_sha256": "acb80c945a06fb6e405f728370c9b57702653baa3d47d07e493168af53566e2d",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "ee3db7b9ea2188912418b96f406107ec31fb736862642c6d70dda85a955878b1",
+          "sealed": "1fd83a52eaae80a03c30716edac17cdc907f7cb79efdaae5c9a06d9563356411"
+        }
+      }
+    },
+    {
+      "candidate": "arm_A",
+      "fold": "F2",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 286,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 286
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.021012047951575963,
+          "possible_date_count": 119,
+          "possible_name_days": 22320,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 22320
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 286,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 286
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.021012047951575963,
+          "possible_date_count": 119,
+          "possible_name_days": 22320,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 22320
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\aggregates\\arm_A\\F2\\evaluation.json",
+      "source_evaluation_sha256": "4edc29a5f5c339a2fa311507d5c3ba57e8843f155950121d0a8eda62cc7a5df8",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "85e549f58305093cd2fb9c9dbc2cf5d3e3b631eb670b248d3fa634f624d5deab",
+          "sealed": "b39666f41506291758daa83ab17f4fd481220f6c8dd8c60d354ab04b19ac514e"
+        }
+      }
+    },
+    {
+      "candidate": "arm_A",
+      "fold": "F3",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 250,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 250
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.03296720079255281,
+          "possible_date_count": 122,
+          "possible_name_days": 21747,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 122,
+          "used_name_days": 21747
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 250,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 250
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.03296720079255281,
+          "possible_date_count": 122,
+          "possible_name_days": 21747,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 122,
+          "used_name_days": 21747
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\aggregates\\arm_A\\F3\\evaluation.json",
+      "source_evaluation_sha256": "1f38363c9c0a1618c99905e64db75b87fd61829ac8f91916677e7b359c223666",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "4bfbbf10901dd83887f74590ac6a311ac27a5780fe27c24ddb5a25dfd5cc85dd",
+          "sealed": "c2540a7a12cc2ccf489fea75ad70bc6a92e2be7c8c4b2f9424e9d8b9fc05b53f"
+        }
+      }
+    },
+    {
+      "candidate": "arm_B",
+      "fold": "F1",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 2,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 2
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 204,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 204
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.018132623254593385,
+          "possible_date_count": 119,
+          "possible_name_days": 23345,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 23345
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 2,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 2
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 204,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 204
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.018132623254593385,
+          "possible_date_count": 119,
+          "possible_name_days": 23345,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 23345
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\aggregates\\arm_B\\F1\\evaluation.json",
+      "source_evaluation_sha256": "87e94d911f367272b001517ecc4090af937728574b83fb0fa35930fa6cd6a51b",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "ee3db7b9ea2188912418b96f406107ec31fb736862642c6d70dda85a955878b1",
+          "sealed": "1fd83a52eaae80a03c30716edac17cdc907f7cb79efdaae5c9a06d9563356411"
+        }
+      }
+    },
+    {
+      "candidate": "arm_B",
+      "fold": "F2",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 286,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 286
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.021469172384553276,
+          "possible_date_count": 119,
+          "possible_name_days": 22320,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 22320
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 286,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 286
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.021469172384553276,
+          "possible_date_count": 119,
+          "possible_name_days": 22320,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 22320
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\aggregates\\arm_B\\F2\\evaluation.json",
+      "source_evaluation_sha256": "6670c750d20e111e01826c9da1b39330cd73d709f2ecb7b04aa4c91f5576b2df",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "85e549f58305093cd2fb9c9dbc2cf5d3e3b631eb670b248d3fa634f624d5deab",
+          "sealed": "b39666f41506291758daa83ab17f4fd481220f6c8dd8c60d354ab04b19ac514e"
+        }
+      }
+    },
+    {
+      "candidate": "arm_B",
+      "fold": "F3",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 250,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 250
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.03559483544192563,
+          "possible_date_count": 122,
+          "possible_name_days": 21747,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 122,
+          "used_name_days": 21747
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 250,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 250
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.03559483544192563,
+          "possible_date_count": 122,
+          "possible_name_days": 21747,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 122,
+          "used_name_days": 21747
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\aggregates\\arm_B\\F3\\evaluation.json",
+      "source_evaluation_sha256": "b0b9d83778407e99350f6e6b641e6cd2fc3ae2b9fe71e9a53a538ce64445df81",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "4bfbbf10901dd83887f74590ac6a311ac27a5780fe27c24ddb5a25dfd5cc85dd",
+          "sealed": "c2540a7a12cc2ccf489fea75ad70bc6a92e2be7c8c4b2f9424e9d8b9fc05b53f"
+        }
+      }
+    },
+    {
+      "candidate": "gbdt",
+      "fold": "F1",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 2,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 2
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 204,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 204
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.01245519374804936,
+          "possible_date_count": 119,
+          "possible_name_days": 23345,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 23345
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 2,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 2
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 204,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 204
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.01245519374804936,
+          "possible_date_count": 119,
+          "possible_name_days": 23345,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 23345
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\comparators\\gbdt\\F1\\evaluation.json",
+      "source_evaluation_sha256": "7a4f54bfac32f19e6899105426099a6d1e56248f1ebeb41f7a0a42658d740810",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "ee3db7b9ea2188912418b96f406107ec31fb736862642c6d70dda85a955878b1",
+          "sealed": "1fd83a52eaae80a03c30716edac17cdc907f7cb79efdaae5c9a06d9563356411"
+        }
+      }
+    },
+    {
+      "candidate": "gbdt",
+      "fold": "F2",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 286,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 286
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.008465653578040785,
+          "possible_date_count": 119,
+          "possible_name_days": 22320,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 22320
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 286,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 286
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.008465653578040785,
+          "possible_date_count": 119,
+          "possible_name_days": 22320,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 22320
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\comparators\\gbdt\\F2\\evaluation.json",
+      "source_evaluation_sha256": "9571cfc8bbd2f8966d90df38ce6f94ff4920b4f67379b01362abd3c8e748e60a",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "85e549f58305093cd2fb9c9dbc2cf5d3e3b631eb670b248d3fa634f624d5deab",
+          "sealed": "b39666f41506291758daa83ab17f4fd481220f6c8dd8c60d354ab04b19ac514e"
+        }
+      }
+    },
+    {
+      "candidate": "gbdt",
+      "fold": "F3",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 250,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 250
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.0388578483919808,
+          "possible_date_count": 122,
+          "possible_name_days": 21747,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 122,
+          "used_name_days": 21747
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 250,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 250
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.0388578483919808,
+          "possible_date_count": 122,
+          "possible_name_days": 21747,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 122,
+          "used_name_days": 21747
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\comparators\\gbdt\\F3\\evaluation.json",
+      "source_evaluation_sha256": "fd076c62c9532dc8b16351a9bb8fd67109e7b7583b51346d46d733a0c7922cfc",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "4bfbbf10901dd83887f74590ac6a311ac27a5780fe27c24ddb5a25dfd5cc85dd",
+          "sealed": "c2540a7a12cc2ccf489fea75ad70bc6a92e2be7c8c4b2f9424e9d8b9fc05b53f"
+        }
+      }
+    },
+    {
+      "candidate": "ensemble",
+      "fold": "F1",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 2,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 2
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 204,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 204
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.018103601688184572,
+          "possible_date_count": 119,
+          "possible_name_days": 23345,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 23345
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 2,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 2
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 204,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 204
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.018103601688184572,
+          "possible_date_count": 119,
+          "possible_name_days": 23345,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 23345
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\comparators\\ensemble\\F1\\evaluation.json",
+      "source_evaluation_sha256": "e2f38f32a3cb063c06fe284c472d8fea2812ce68b2eef184afcb6e927bdd5291",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "ee3db7b9ea2188912418b96f406107ec31fb736862642c6d70dda85a955878b1",
+          "sealed": "1fd83a52eaae80a03c30716edac17cdc907f7cb79efdaae5c9a06d9563356411"
+        }
+      }
+    },
+    {
+      "candidate": "ensemble",
+      "fold": "F2",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 286,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 286
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.016607298157405314,
+          "possible_date_count": 119,
+          "possible_name_days": 22320,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 22320
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 286,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 286
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.016607298157405314,
+          "possible_date_count": 119,
+          "possible_name_days": 22320,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 119,
+          "used_name_days": 22320
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\comparators\\ensemble\\F2\\evaluation.json",
+      "source_evaluation_sha256": "cf65faffc6cd7f89dfde764932c7f32c7806a460933b108eb67ed26d193d067d",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "85e549f58305093cd2fb9c9dbc2cf5d3e3b631eb670b248d3fa634f624d5deab",
+          "sealed": "b39666f41506291758daa83ab17f4fd481220f6c8dd8c60d354ab04b19ac514e"
+        }
+      }
+    },
+    {
+      "candidate": "ensemble",
+      "fold": "F3",
+      "history_age_strata_reconstructed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 250,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 250
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.04517858379629319,
+          "possible_date_count": 122,
+          "possible_name_days": 21747,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 122,
+          "used_name_days": 21747
+        }
+      ],
+      "history_age_strata_sealed": [
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 4,
+          "status": "unsupported",
+          "stratum": "0_to_59",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 4
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": null,
+          "possible_date_count": 0,
+          "possible_name_days": 250,
+          "status": "unsupported",
+          "stratum": "60_to_251",
+          "undefined_reason": "no_date_has_20_names_with_four_defined_heads",
+          "used_date_count": 0,
+          "used_name_days": 250
+        },
+        {
+          "dimension": "history_age_sessions",
+          "mean_daily_primary_neutral_target_ic": 0.04517858379629319,
+          "possible_date_count": 122,
+          "possible_name_days": 21747,
+          "status": "supported",
+          "stratum": "252_plus",
+          "undefined_reason": null,
+          "used_date_count": 122,
+          "used_name_days": 21747
+        }
+      ],
+      "protected_input_hashes_match_except_history_age": true,
+      "quality_stratification_bit_identical": true,
+      "quality_stratification_changed_fields": [],
+      "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z\\comparators\\ensemble\\F3\\evaluation.json",
+      "source_evaluation_sha256": "32ee3d237cfeb725e47abc14a6752fa575f08ac41242efbb9b4026fc13fbd78f",
+      "unexpected_input_hash_differences": {
+        "history_age_sessions": {
+          "host_reconstruction": "4bfbbf10901dd83887f74590ac6a311ac27a5780fe27c24ddb5a25dfd5cc85dd",
+          "sealed": "c2540a7a12cc2ccf489fea75ad70bc6a92e2be7c8c4b2f9424e9d8b9fc05b53f"
+        }
+      }
+    }
+  ],
+  "proposed_registration_amendment": {
+    "add_to_recomputed_input_hashes": [
+      "history_age_sessions"
+    ],
+    "continuation": "new clean-commit frozen Round-2 replay root; preserve this stopped root; retain completed Round-1 replay",
+    "no_change_to_recomputed_diagnostics": true,
+    "remaining_protected_projection_must_stay_bit_identical": true,
+    "status": "not_applied_pending_explicit_approval"
+  },
+  "research_claim": false,
+  "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4f_a25ae45_20260908T233834Z",
+  "root_hashes": {
+    "access_audit.json": "87f7474f81c55f8d2733d7bae4b26021ce527ac2a8dfdf0768fcfdf6dde421a2",
+    "artifact_inventory.json": "9d90d85129368f571eb6daf43185eb35aad945e90e1e46f63df36248898d7ef6",
+    "failure_record.json": "38767a46136669d6f7fa7b892842ec36469f6dab14ffcb3bb2d6ee7ccfdc5b30",
+    "frozen_design.json": "c90cf848b93aa168951eb3e036f69ca9327901397bf970958156a69f1c301798",
+    "input_identity_investigation.json": "9b5ba90504efdaf68911937e75e1f8774938ae6bde59ecb1eb1aa1ede74ca6b6"
+  },
+  "scores_or_models_recomputed": false,
+  "source_store_manifest_sha256": "deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b",
+  "status": "input_identity_stop_investigated",
+  "test_accessed": false,
+  "transfer_chronology_clean": true
+}

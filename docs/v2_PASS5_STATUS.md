@@ -1,8 +1,13 @@
 # Pass-5 implementation status
 
-The implementation is committed; the **first rev4f replay stopped at its declared diagnostic-identity gate**.
-See [the stop report and proposed amendment](v2_PASS5_REPLAY_STOP.md).
-It is not a re-baseline result or authorization to start Round 3.
+The approved six-field amendment is committed as `a25ae45`. **Round 1 completed:
+18 panels, protected fields bit-identical, headline gates passed.**
+See [the full before/after report](v2_PASS5_REBASELINE.md).
+Round 2 stopped before its first new evaluation on the unregistered decoded
+`history_age_sessions` input hash. All 12 panels' quality-stratification fields
+still match exactly. [The proposed one-field provenance amendment](v2_PASS5_ROUND2_STOP.md)
+is documented but not applied; pass-5 section 6 requires explicit approval.
+The original six-field stop remains [immutable historical evidence](v2_PASS5_REPLAY_STOP.md).
 
 The prior cleanup is committed separately as `fb6fc92`; the initial rev-4f
 registration was committed as `0302b27` before new derived beta output.
@@ -66,7 +71,7 @@ are in [0.5, 1.5]. The 5th/95th percentiles are 0.57235/1.93712.
 are copied into Git for review. This is input-only evidence, not a measured
 change in model edge. The canonical store and sealed results were not rewritten.
 
-## Clarifications implemented; first replay stopped
+## Clarifications implemented; Round 1 complete, Round 2 stopped
 
 The joined inferred-action builder -> evaluator -> ledger causality test passes:
 changing only the event-day close changes inferred cash terms but no event-day
@@ -86,12 +91,18 @@ fixed-share economics when the fill price differs from the reference price.
 
 Round 2 is recovered locally and fully hash-verified; see
 [v2_round2_host_copy_evidence.json](v2_round2_host_copy_evidence.json).
-No paid instance was required. Remaining sequence: commit, rev4f replays and report,
-CPU execution sweep, intraday coverage repair, one development-only store build,
-16-book acceptance, Round 1' CPU, then stop for the user's go before paid Round 3.
-The first reversal_5/F1 replay was evaluated and stopped on six unregistered
-high-volatility lending-coverage fields. No completed rebaseline, Round-2 replay,
-sweep, new store or new fit has run. The user approved the exact six-field amendment; it is registered before a fresh replay.
+No paid instance was required. The first reversal_5/F1 replay stopped on six
+unregistered high-volatility lending-coverage fields. The user approved that exact
+amendment, and a fresh Round-1 replay completed under it. Its result SHA-256 is
+`415aae05aed3df1a21f20d87fbe2b06827df0fec317af58b4bf0f8a84ae35839`;
+inventory `9940b01076677f19ea8dbf1cca0af2991e2899494e491c92d666d0ceb0c7aafb`.
+Round 2 was frozen under the same commit and stopped at its input-identity check,
+before any new evaluation. The stopped inventory is
+`9d90d85129368f571eb6daf43185eb35aad945e90e1e46f63df36248898d7ef6`.
+After resolving this registered stop, the remaining sequence is Round-2 replay
+and combined conclusions, CPU execution sweep, intraday coverage repair, one
+development-only store build, 16-book acceptance, Round 1' CPU, then stop for
+the user's go before paid Round 3. No sweep, new store or new fit has run.
 
 Validation before replay: Ruff and compilation pass; the full research suite passed
 908 tests in 467.91 seconds. The final focused run passed 100 tests, including

@@ -14,10 +14,12 @@ It is explicitly development-grade: the calendar is reconstructed and the
 corporate-action terms are inferred from COTAHIST `DISMES`, not independently
 verified contractual terms.
 
-Rev4e Round 1 and Round 2 are the current completed development-fold program.
-Round 1 designated `b_intraday` as the GBDT parent after a ledger-only replay
-that credits CDI on short proceeds and applies the registered bounded borrower
-fee. Round 2 selected the uniform-pretrain Arm B, with pooled characteristic-
+Round 1 is now re-baselined under rev4f on the 18 sealed score panels, with
+every protected field bit-identical and headline gates passed. The `b_intraday`
+GBDT retains neutral IC `0.0199906`; corrected net excess is `0.0763` bps/day.
+Momentum retains IC `0.0214729`; corrected net excess is `3.2190` bps/day.
+Both economics intervals span zero. See [the full before/after report](docs/v2_PASS5_REBASELINE.md).
+Round 2 remains a completed **rev4e** historical result. It selected the uniform-pretrain Arm B, with pooled characteristic-
 neutral IC `0.0247766` and headline net excess `2.4040` bps/day. The registered
 network/GBDT equal-rank ensemble has the highest pooled neutral IC, `0.0265307`,
 and is the Round-2 research designation; its net excess is `1.2261` bps/day
@@ -26,11 +28,13 @@ a production or deployment decision. Official validation and the permanently
 spent test remained sealed, and deployment did not change. Earlier Rev3 results
 remain immutable historical evidence under their own registration.
 
-The [multiday pipeline audit](docs/v2_MULTIDAY_AUDIT.md) identifies unresolved
-economic-beta and execution-timing defects in that ledger: normalized `beta_60`
+The [multiday pipeline audit](docs/v2_MULTIDAY_AUDIT.md) identified
+economic-beta and execution-timing defects in the rev4e ledger: normalized `beta_60`
 is used as an economic coefficient, hedge sizing consumes same-close outcomes,
-and retrospective inferred actions can alter decision-time orders. The reported
-economics have not been corrected for these findings. An input-only 2024 check
+and retrospective inferred actions can alter decision-time orders. Round-1 rev4f
+economics now correct these findings. The Round-2 replay stopped before its first
+new evaluation on the decoded history-age provenance hash; its economics remain
+uncorrected until that registered stop is resolved. An input-only 2024 check
 also found eight of twenty intraday scalar features entirely invalid; M1/COTAHIST
 price-unit consistency never reaches the required twenty active names per day.
 Repair these contracts before making new economics claims or interpreting
