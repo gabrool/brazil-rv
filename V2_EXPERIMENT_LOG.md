@@ -2520,3 +2520,7 @@ are in `docs/v2_PASS5_REPLAY_STOP.md` and `docs/v2_pass5_replay_stop_evidence.js
 No remaining Round-1 panel was replayed, and Round-2 replay, execution sweep,
 store rebuild, retraining and protected-date access were not started. Confirmation
 is requested before amending the list and restarting in a fresh root.
+
+The user explicitly approved that exact six-field amendment and continuation.
+The executable list and registration were amended before a fresh freeze; the
+stopped root and its inventory remain unchanged.

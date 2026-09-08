@@ -8,7 +8,7 @@ The slow-valid-masked Yang-Zhang feature also defines the high-volatility stratu
 inside lending coverage. The six fields below were missing from the declared
 recomputation list. The verifier rejected these differences as required by pass 5
 section 6. The proposed amendment adds exactly these paths under
-`diagnostics.lending_coverage`; it has not been applied pending confirmation.
+`diagnostics.lending_coverage`; the user subsequently approved this exact amendment, now applied before a fresh replay.
 
 | Field | Rev4e | Stopped rev4f attempt |
 | --- | ---: | ---: |

@@ -193,6 +193,12 @@ RECOMPUTED_DIAGNOSTICS = (
     "diagnostics.exposure_summary",
     "diagnostics.realized_beta",
     "diagnostics.realized_beta_bova11",
+    "diagnostics.lending_coverage.high_volatility_quartile_name_days",
+    "diagnostics.lending_coverage.high_volatility_quartile_rate_imputed_fraction",
+    "diagnostics.lending_coverage.high_volatility_quartile_rate_observed_prior_60_fraction",
+    "diagnostics.lending_coverage.high_volatility_quartile_rate_placeholder_fraction",
+    "diagnostics.lending_coverage.high_volatility_quartile_shortable_fraction_by_cell.borrow_balance",
+    "diagnostics.lending_coverage.high_volatility_quartile_shortable_fraction_by_cell.borrow_strict",
     "mask_coverage.stale_mark_name_days",
     "mask_coverage.unresolved_action_name_days",
     "mask_coverage.valuation_scenario_count",
@@ -2646,7 +2652,7 @@ def _ledger_replay_non_ledger_projection(
         parent, _, key = path.rpartition(".")
         node = projection
         for part in parent.split(".") if parent else ():
-            node = node[part]
+            node = node.get(part, {})
         if require_recomputed and key not in node:
             raise ValueError(f"replay lacks registered recomputed field: {path}")
         node.pop(key, None)

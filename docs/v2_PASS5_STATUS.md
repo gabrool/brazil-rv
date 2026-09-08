@@ -91,7 +91,7 @@ CPU execution sweep, intraday coverage repair, one development-only store build,
 16-book acceptance, Round 1' CPU, then stop for the user's go before paid Round 3.
 The first reversal_5/F1 replay was evaluated and stopped on six unregistered
 high-volatility lending-coverage fields. No completed rebaseline, Round-2 replay,
-sweep, new store or new fit has run. The exact six-field amendment awaits confirmation.
+sweep, new store or new fit has run. The user approved the exact six-field amendment; it is registered before a fresh replay.
 
 Validation before replay: Ruff and compilation pass; the full research suite passed
 908 tests in 467.91 seconds. The final focused run passed 100 tests, including
