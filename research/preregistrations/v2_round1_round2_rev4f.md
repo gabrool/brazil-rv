@@ -68,21 +68,58 @@ Test (same-day future mutation): hold everything fixed and change only a later e
 close; every intended order including the hedge must be bit-identical; only fills and
 marks may change.
 
-### 1.3 Decision-known actions for decisions, retrospective actions for accounting
+### 1.3 §1.3 restated: the decision path knows nothing about a same-day action
 
-Split the action path. **Decision path** (order construction, reference prices, entry
-eligibility, cap checks): uses the decision-known alignment — an inferred action dated
-session t is unknown at 15:45 of t; the name is `unresolved_action` for new entries on t
-(already the 4e state), pending entries for it are cancelled, exits of held positions
-remain allowed, reference prices are not converted. **Accounting path** (shares, marks,
-claims, settlement): the retrospective conversion for held positions is booked after the
-session's fills, exactly as the terms are realized, never before. Report the count of
-sessions on which the two alignments differ for a held or pending name.
+You are right that blocking entries on session t because `has_action[t]` is true uses
+retrospective knowledge to decide, which is itself a leak. At 15:45 on t the decision
+knows only what is knowable from sessions ≤ t−1. The causal rule is therefore:
 
-Test (joined builder → evaluator → ledger): change only the event-day close so that the
-inferred cash term changes; every intended order dated that day must be bit-identical;
-the held position's converted shares/marks after the close may change. Keep the existing
-4e tests (uncertainty blocks entries, exits fill on any print, terminal liquidation).
+**Decision path (15:45 on t).** No use of `has_action[t]`, `action_q[t]`, `action_d[t]`
+or `action_successor[t]` anywhere: no cancellations for a same-day action, no conversion
+of `last_observed` or marks before order construction, no reference-price adjustment.
+The only action state a decision may use is the decision-known one: a name whose action
+dated ≤ t−1 has unresolved terms is `unresolved_action` for new entries (the existing 4e
+rule), and that flag is computed from sessions ≤ t−1 only.
+
+**Order representation.** Entries are **notional** orders: `IntendedOrder` carries the
+planned notional (slot notional, or the σ-scaled notional under the R3.1 sizing cell)
+and the decision-time reference price used for planned-risk checks; the fill quantity
+is `notional / fill close` at the close. Exits, risk trims and terminal liquidations are
+**position-fraction** orders (1.0 for a full exit; the trim fraction for a trim); the
+fill quantity is the fraction of the position *as it stands at the close after any
+conversion*. The hedge order stays a notional order as implemented. This is the natural
+close-proxy convention: the decision fixes how much to buy or what fraction to sell, the
+auction fixes the price and therefore the share count.
+
+**Accounting path (at the close of t).** In this order: (1) apply the retrospective
+terms dated t to positions held from before the session — share conversion, mark
+conversion, cash claims and successor mapping, exactly as today but after the decision
+block and before fills; (2) fill orders at the observed close: entries at `notional /
+close_t` (a same-day split therefore buys the right notional in post-action shares; a
+same-day cash term is simply reflected in the close), exits and trims as fractions of
+the converted position; (3) marks, settlement, hedge fill, cash, borrow, interest as
+today. Nothing about the *realized* economics is hidden: a name that splits on t while
+a notional entry is pending is filled post-split at the post-split price.
+
+**Retrospective arrays.** They remain the accounting inputs (the evaluator's assertion
+stays). The decision-known alignment is derived from them by shifting the knowledge
+date: an action dated t contributes to `unresolved_action` from t+1 onward until its
+terms are resolved; on t itself it contributes nothing to decisions.
+
+Tests: (i) joined builder → evaluator → ledger: mutate only the event-day close so the
+inferred cash term changes; every `IntendedOrder` dated t is bit-identical (notional,
+fraction, reference, side); fills, conversions and marks may change. (ii) Unknown split
+on t with a pending notional entry: the fill acquires `notional / close_post` shares
+and the position's value equals the notional; a position held from t−1 is converted at
+the close and its value is unchanged by the conversion. (iii) A full exit on the split
+day sells the converted quantity, leaving zero shares. (iv) The 4e tests (uncertainty
+from a prior-day unresolved action blocks entries; exits fill on any print; terminal
+liquidation) still pass. (v) With actions absent, the new order representation
+reproduces the rev-4f fixtures bit-for-bit.
+
+Report the count of sessions on which a held or pending name had a same-day action, so
+the size of the formerly leaked set is known.
+
 
 ### 1.4 Pending entries follow the signal
 
@@ -102,32 +139,47 @@ strict, open} on the constructed, hedged book; keep one labelled `legacy_strateg
 comparator` if it is still useful for continuity, else drop it.
 
 
-### Arithmetic correction and unresolved interpretation
+### Arithmetic and order-contract interpretation
 
 The specified Blume formula gives -0.134 NAV, not -0.194, for a short
 notional of 1 at beta 1.0 and a long notional of 1 at beta 1.2. The formula governs.
 
-The retrospective inferred event flag itself can depend on the later close.
-The requested decision-known action path must pass event-classification as well as
-cash-term mutation tests. No replay proceeds until the decision-time uncertainty
-contract is resolved and the joined test passes. Existing verified-action accounting
-fixtures remain required. No later-close action terms may resize an intended order.
+Entries and ordinary hedge rebalances fix NOTIONAL, not share count. Exits,
+risk trims, last-mark settlements and the final hedge liquidation fix POSITION
+FRACTION. The final hedge exit must close all shares even when its auction price
+moves. Partial exit fractions are rebased onto the remaining inventory; a split
+changes inventory units without changing the intention. Terminal liquidation
+supersedes an unfinished partial trim. Round-lot sizing is removed.
 
-Masking diagnostic slow features changes exposure diagnostics and their input hashes.
-That requested correction conflicts with literal equality of every non-ledger field.
-Any replay must expose this conflict and stop rather than silently exempt changed fields.
+The prior code used fixed shares even for the hedge. Consequently the requested
+identity of every no-action economic fixture is impossible when reference and
+fill prices differ. The explicit notional contract takes precedence; constant-
+price fixtures retain their economic values and variable-price fills are checked
+against the requested notional. Score/outcome identity is unaffected.
 
-All expectations in section 1.6 of the pass-5 response are reported expectations,
-not tuning targets. 2025/2026 data and paid GPU work remain out of scope for this stage.
+### Declared replay identity
 
+The executable block below names every `recomputed_diagnostics` field, including
+its daily exposure rows and all economics (hedge orders, fills, cancellations,
+costs, borrow, realized beta, occupancy and D1/D5 audits). These fields must be
+present in every replay. Each before/after comparison records their values;
+the full economics audit remains in the SHA-256-bound original and replayed
+reports, while the comparison contains its contract, headline, summaries and
+coverage. The new BOVA11 realized-beta field has no old counterpart.
 
-## Rev-4f executable hedge, borrow and retention protocol
+`recomputed_input_hashes` explicitly names the five slow-valid-masked feature
+inputs, the new beta sidecar/arrays/history, prior hedge reference and prior
+unresolved-action boundary. All other hashes and report fields must match
+exactly: scores, masks, targets, populations, neutral and legacy IC, persistence,
+spreads, horizon readouts and source provenance. No score or model is recomputed.
 
-This block freezes the implemented portions. The action-path clarification and joined
-causality gate above are still pending; this is not clearance for a replay.
+All expectations in pass 5 section 1.6 are reported expectations, not tuning
+targets. This registration does not authorize 2025/2026 access or paid GPU work.
+
+## Rev-4f executable protocol
 
 <!-- BRAZIL_RV_V2_REV4F_PROTOCOL_JSON_BEGIN -->
 ```json
-{"acceptance_legacy_identity":{"inventory_sha256":"b5084c817fc478c2759d962af12e282c292cade6f8e715aebed290ba5500ce08","result_sha256":"ca39f11340f13956dca11da7fb6b3a8fa0a38f8a79cb558387d81aff26bf57a0","root":"D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_81fe0cb_20260907T023339Z"},"borrow_availability":{"borrow_balance":"positive_published_open_balance_or_lending_trade_observed_in_prior_60_sessions","borrow_open":"all_names_when_a_causal_cross_sectional_rate_exists","borrow_strict":"lending_trade_observed_in_prior_20_sessions","pre_first_rate_borrow":"placeholder_0.02"},"borrow_cells":["borrow_strict","borrow_balance","borrow_open","uniform"],"borrow_daily_accrual":"expm1(log1p(annual_rate)/252); fee separately","borrow_rate":{"equity_rate_floor":null,"hedge_short_rate_floor":0.02,"missing_rate_imputation":"same_day_cross_sectional_observed_rate_75th_percentile","observed_rate_lookback_sessions":60,"registration_fee":{"annual_cap":0.007,"annual_floor":0.00025,"fraction_of_contract_rate":0.2}},"bova11":{"bdi_code":"14","cost_bps_per_side":4.0,"hedge_notional_cap_nav":0.6,"isin":"BRBOVACTF003","market_type":10,"rebalance_threshold_fraction_nav":0.05,"security_spec":"CI","short_borrow_floor":0.02,"supplied_bdi_02_corrected_from_raw_cotahist":true,"ticker":"BOVA11"},"candidate_decision_rule":{"economics_override":"paired_constructed_economics_interval_above_zero_and_paired_ic_interval_includes_zero","ineligible":"constructed_headline_net_excess_negative_with_95_interval_below_zero","primary":"pooled_primary_neutral_target_ic"},"comparators":["borrow_strict","borrow_open","comparator_sterile_proceeds","comparator_uniform_borrow"],"construction":{"caps_scope":"equity_only","fill_order":"within_quintile_then_global_band_spill","occupancy_mean_absolute_deviation_limit_slots":2.0,"quota_remainder_order":[3,2,4,1,5],"rank_within_stratum":true,"retention_uses_current_quintile":true,"small_stratum_scaling_threshold_multiple":2,"volatility_strata":"five_equal_count_yang_zhang_vol_20_quintiles"},"cost_grid":{"borrow":["balance","strict","open"],"construction":"headline","cost_bps":[2,4,7]},"cross_fit":"none","evaluation_window_per_fold":{"F1":{"end":"2023-12-29","start":"2023-07-03"},"F2":{"end":"2024-06-28","start":"2024-01-02"},"F3":{"end":"2024-12-30","start":"2024-07-01"}},"headline_cell":{"ledger":{"annual_borrow_rate":0.02,"annual_debit_spread":0.0,"annual_sessions":252,"beta_hedge":true,"borrow_registration_fee_cap":0.007,"borrow_registration_fee_floor":0.00025,"borrow_registration_fee_fraction":0.2,"borrow_source":"borrow_balance","buffer_per_side":30,"cancel_pending_outside_retention":true,"cost_bps_per_side":4.0,"entry_expiry_sessions":3,"gross_target":2.0,"hedge_annual_borrow_rate":0.02,"hedge_cost_bps_per_side":4.0,"hedge_notional_cap_nav":0.6,"hedge_rebalance_threshold_nav":0.05,"ineligible_hold_sessions":5,"initial_capital_brl":1.0,"k_per_side":30,"lot_size":null,"planned_absolute_net_cap":0.2,"planned_gross_cap":2.25,"planned_name_weight_cap":0.05,"settlement_economics_unresolved_fraction_nav":0.15,"settlement_grace_sessions":10,"settlement_haircut":0.3,"short_proceeds_remuneration":1.0,"small_stratum_scaling_threshold_multiple":2,"volatility_balanced_entries":true,"volatility_group_count":5},"signal":"tie_aware_rank_average_D1_D2_D3_D5","signal_horizons_sessions":[1,2,3,5]},"headline_cell_name":"borrow_balance","hedge_beta":{"blume":[0.67,0.33],"clip":[-1.0,3.0],"fallback_default":1.0,"fallback_max_age":20,"last_endpoint":"t-1","lookback":60,"minimum_pairs":40},"hedge_decision":"15:45; fixed quantity from prior BOVA11 close and prior NAV","inverse_volatility_neutral_ic_absolute_bound":0.02,"lending_archive":{"availability_lag_sessions":1,"last_source_session":"2024-12-30","source_label":"lending_archive_v2_2009_202412","store_lending_feature_rebuilt":false},"models_per_fold_seed":1,"primary_population_rule":{"daily_aggregation":"equal_mean_of_all_primary_horizons_when_all_defined","horizons_sessions":[1,2,3,5],"minimum_cross_section_names":20,"per_horizon_metric":"tie_aware_spearman","requirements":["active_at_entry","finite_target_scale_sigma_greater_than_1e-8","valid_and_finite_neutral_target_on_every_primary_horizon","valid_and_finite_neutralization_characteristics","valid_and_finite_score_on_every_primary_horizon"],"target":"target_primary_neutral"},"purge_sessions":{"fit_to_selection":10,"selection_to_evaluation":10},"realized_beta_label_threshold":0.3,"round1":{"controls":["reversal_5","reversal_21","momentum_12_1","reversal_5_momentum_12_1_blend","inverse_volatility_20"],"cpu_only":true,"data_span_preview":false,"gbdt_rungs":["b_intraday"]},"round2":{"arms":["A_fine_only","B_pretrain_finetune"],"dropped_arm":"C_joint_decay_756","parent_comparison_network_arm":"B_pretrain_finetune","requires_explicit_go_after_round1":true},"schema":"BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V4F","selection_sessions":55,"source_tier_labels":{"action_terms_source":"inferred_cotahist_dismes_v1","schedule_source":"reconstructed_v1"},"target_neutralization":{"clip":5.0,"fallback_below_40_names":"rev3_intercept_plus_three_linear_risks","intercept":"absorbed_by_full_dummy_blocks","method":"ols_10_vol_dummies_5_beta_dummies_linear_rank_gauss_log_adv","minimum_names":20,"nonlinear_minimum_names":40,"target_validity_array":"target_primary_neutral_valid","target_value_array":"target_primary_neutral"}}
+{"acceptance_legacy_identity":{"inventory_sha256":"b5084c817fc478c2759d962af12e282c292cade6f8e715aebed290ba5500ce08","result_sha256":"ca39f11340f13956dca11da7fb6b3a8fa0a38f8a79cb558387d81aff26bf57a0","root":"D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_81fe0cb_20260907T023339Z"},"borrow_availability":{"borrow_balance":"positive_published_open_balance_or_lending_trade_observed_in_prior_60_sessions","borrow_open":"all_names_when_a_causal_cross_sectional_rate_exists","borrow_strict":"lending_trade_observed_in_prior_20_sessions","pre_first_rate_borrow":"placeholder_0.02"},"borrow_cells":["borrow_strict","borrow_balance","borrow_open","uniform"],"borrow_daily_accrual":"expm1(log1p(annual_rate)/252); fee separately","borrow_rate":{"equity_rate_floor":null,"hedge_short_rate_floor":0.02,"missing_rate_imputation":"same_day_cross_sectional_observed_rate_75th_percentile","observed_rate_lookback_sessions":60,"registration_fee":{"annual_cap":0.007,"annual_floor":0.00025,"fraction_of_contract_rate":0.2}},"bova11":{"bdi_code":"14","cost_bps_per_side":4.0,"hedge_notional_cap_nav":0.6,"isin":"BRBOVACTF003","market_type":10,"rebalance_threshold_fraction_nav":0.05,"security_spec":"CI","short_borrow_floor":0.02,"supplied_bdi_02_corrected_from_raw_cotahist":true,"ticker":"BOVA11"},"candidate_decision_rule":{"economics_override":"paired_constructed_economics_interval_above_zero_and_paired_ic_interval_includes_zero","ineligible":"constructed_headline_net_excess_negative_with_95_interval_below_zero","primary":"pooled_primary_neutral_target_ic"},"comparators":["borrow_strict","borrow_open","comparator_sterile_proceeds","comparator_uniform_borrow"],"construction":{"caps_scope":"equity_only","fill_order":"within_quintile_then_global_band_spill","occupancy_mean_absolute_deviation_limit_slots":2.0,"quota_remainder_order":[3,2,4,1,5],"rank_within_stratum":true,"retention_uses_current_quintile":true,"small_stratum_scaling_threshold_multiple":2,"volatility_strata":"five_equal_count_yang_zhang_vol_20_quintiles"},"cost_grid":{"borrow":["balance","strict","open"],"construction":"headline","cost_bps":[2,4,7]},"cross_fit":"none","evaluation_window_per_fold":{"F1":{"end":"2023-12-29","start":"2023-07-03"},"F2":{"end":"2024-06-28","start":"2024-01-02"},"F3":{"end":"2024-12-30","start":"2024-07-01"}},"headline_cell":{"ledger":{"annual_borrow_rate":0.02,"annual_debit_spread":0.0,"annual_sessions":252,"beta_hedge":true,"borrow_registration_fee_cap":0.007,"borrow_registration_fee_floor":0.00025,"borrow_registration_fee_fraction":0.2,"borrow_source":"borrow_balance","buffer_per_side":30,"cancel_pending_outside_retention":true,"cost_bps_per_side":4.0,"entry_expiry_sessions":3,"gross_target":2.0,"hedge_annual_borrow_rate":0.02,"hedge_cost_bps_per_side":4.0,"hedge_notional_cap_nav":0.6,"hedge_rebalance_threshold_nav":0.05,"ineligible_hold_sessions":5,"initial_capital_brl":1.0,"k_per_side":30,"planned_absolute_net_cap":0.2,"planned_gross_cap":2.25,"planned_name_weight_cap":0.05,"settlement_economics_unresolved_fraction_nav":0.15,"settlement_grace_sessions":10,"settlement_haircut":0.3,"short_proceeds_remuneration":1.0,"small_stratum_scaling_threshold_multiple":2,"volatility_balanced_entries":true,"volatility_group_count":5},"signal":"tie_aware_rank_average_D1_D2_D3_D5","signal_horizons_sessions":[1,2,3,5]},"headline_cell_name":"borrow_balance","hedge_beta":{"blume":[0.67,0.33],"clip":[-1.0,3.0],"fallback_default":1.0,"fallback_max_age":20,"last_endpoint":"t-1","lookback":60,"minimum_pairs":40},"hedge_decision":"15:45; delta notional from prior marks and NAV; final close is a full position-fraction exit","inverse_volatility_neutral_ic_absolute_bound":0.02,"lending_archive":{"availability_lag_sessions":1,"last_source_session":"2024-12-30","source_label":"lending_archive_v2_2009_202412","store_lending_feature_rebuilt":false},"models_per_fold_seed":1,"order_representation":{"actions":"decisions use only t-1 or earlier; retrospective accounting after decisions before fills","entry":"planned_notional / observed_close","exit_risk_terminal":"position_fraction * converted_opening_inventory","partial_exit":"remaining fraction rebased onto remaining inventory"},"primary_population_rule":{"daily_aggregation":"equal_mean_of_all_primary_horizons_when_all_defined","horizons_sessions":[1,2,3,5],"minimum_cross_section_names":20,"per_horizon_metric":"tie_aware_spearman","requirements":["active_at_entry","finite_target_scale_sigma_greater_than_1e-8","valid_and_finite_neutral_target_on_every_primary_horizon","valid_and_finite_neutralization_characteristics","valid_and_finite_score_on_every_primary_horizon"],"target":"target_primary_neutral"},"purge_sessions":{"fit_to_selection":10,"selection_to_evaluation":10},"realized_beta_label_threshold":0.3,"recomputed_diagnostics":["economics","diagnostics.exposure_daily","diagnostics.exposure_summary","diagnostics.realized_beta","diagnostics.realized_beta_bova11","mask_coverage.stale_mark_name_days","mask_coverage.unresolved_action_name_days","mask_coverage.valuation_scenario_count","mask_coverage.actual_risk_breach_dates"],"recomputed_input_hashes":["prior_feature_beta_60","prior_feature_log_return_5","prior_feature_log_volume_mean_20","prior_feature_momentum_12_1","prior_feature_yang_zhang_vol_20","hedge_beta","hedge_beta_valid","hedge_beta_manifest","hedge_beta_history_values","hedge_beta_history_valid","initial_hedge_reference_price","initial_unresolved_action"],"round1":{"controls":["reversal_5","reversal_21","momentum_12_1","reversal_5_momentum_12_1_blend","inverse_volatility_20"],"cpu_only":true,"data_span_preview":false,"gbdt_rungs":["b_intraday"]},"round2":{"arms":["A_fine_only","B_pretrain_finetune"],"dropped_arm":"C_joint_decay_756","parent_comparison_network_arm":"B_pretrain_finetune","requires_explicit_go_after_round1":true},"schema":"BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V4F","selection_sessions":55,"source_tier_labels":{"action_terms_source":"inferred_cotahist_dismes_v1","schedule_source":"reconstructed_v1"},"target_neutralization":{"clip":5.0,"fallback_below_40_names":"rev3_intercept_plus_three_linear_risks","intercept":"absorbed_by_full_dummy_blocks","method":"ols_10_vol_dummies_5_beta_dummies_linear_rank_gauss_log_adv","minimum_names":20,"nonlinear_minimum_names":40,"target_validity_array":"target_primary_neutral_valid","target_value_array":"target_primary_neutral"}}
 ```
 <!-- BRAZIL_RV_V2_REV4F_PROTOCOL_JSON_END -->

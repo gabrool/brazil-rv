@@ -27,7 +27,8 @@ CancellationReason = Literal[
     "expired",
     "evaluation_end",
     "exit_instruction",
-    "corporate_action",
+    "prior_action_unresolved",
+    "position_closed",
     "risk_net_cap",
     "risk_name_cap",
     "terminal_settlement",
@@ -37,7 +38,8 @@ _CANCELLATION_REASONS: tuple[CancellationReason, ...] = (
     "expired",
     "evaluation_end",
     "exit_instruction",
-    "corporate_action",
+    "prior_action_unresolved",
+    "position_closed",
     "risk_net_cap",
     "risk_name_cap",
     "terminal_settlement",
@@ -86,7 +88,6 @@ class LedgerConfig:
     annual_debit_spread: float = 0.0
     short_proceeds_remuneration: float = 1.0
     initial_capital_brl: float = 1.0
-    lot_size: int | None = None
     entry_expiry_sessions: int = 3
     cancel_pending_outside_retention: bool = True
     ineligible_hold_sessions: int = 5
@@ -140,8 +141,6 @@ class LedgerConfig:
             raise ValueError("short-proceeds remuneration must be in [0, 1]")
         if self.initial_capital_brl <= 0 or not np.isfinite(self.initial_capital_brl):
             raise ValueError("initial capital must be positive and finite")
-        if self.lot_size is not None and self.lot_size <= 0:
-            raise ValueError("lot size must be positive when supplied")
         if self.entry_expiry_sessions < 1:
             raise ValueError("entry expiry must be at least one session")
         if self.ineligible_hold_sessions < 0:
@@ -178,7 +177,8 @@ class IntendedOrder:
     decision_date: date
     decision_session: int
     side: OrderSide
-    quantity: float
+    planned_notional: float | None
+    position_fraction: float | None
     reference_price: float
     order_type: Literal["close_proxy"]
     limit_price: float | None
@@ -209,14 +209,35 @@ class OrderCancellation:
     security_index: int
     cancellation_date: date
     cancellation_session: int
-    unfilled_quantity: float
+    unfilled_notional: float | None
+    unfilled_position_fraction: float | None
     reason: CancellationReason
 
 
 @dataclass
 class _PendingOrder:
     order: IntendedOrder
-    remaining_quantity: float
+    # Notional for entries/hedge; fraction of the CURRENT inventory for exits.
+    # A partial exit rebases this fraction onto the inventory left after its fill.
+    remaining_size: float
+
+    def cancellation(
+        self, day: int, day_date: date, reason: CancellationReason
+    ) -> OrderCancellation:
+        return OrderCancellation(
+            order_id=self.order.order_id,
+            security=self.order.security,
+            security_index=self.order.security_index,
+            cancellation_date=day_date,
+            cancellation_session=day,
+            unfilled_notional=self.remaining_size
+            if self.order.planned_notional is not None
+            else None,
+            unfilled_position_fraction=self.remaining_size
+            if self.order.position_fraction is not None
+            else None,
+            reason=reason,
+        )
 
 
 @dataclass(frozen=True)
@@ -284,6 +305,7 @@ class StatefulLedgerResult:
     unresolved_claim_inventory_fraction_nav: NDArray[np.float64]
     stale_mark_inventory_fraction_nav: NDArray[np.float64]
     stale_mark_name_days: NDArray[np.int64]
+    same_day_action_sessions: NDArray[np.bool_]
     unresolved_action_name_days: NDArray[np.int64]
     valuation_scenario_count: NDArray[np.int64]
     position_sign: NDArray[np.int8]
@@ -453,9 +475,11 @@ class StatefulLedgerResult:
         entry_orders = [
             order for order in self.intended_orders if order.purpose == "entry"
         ]
-        intended_entry_quantity = float(sum(order.quantity for order in entry_orders))
-        filled_entry_quantity = float(
-            sum(fill.quantity for fill in self.fills if fill.purpose == "entry")
+        intended_entry_notional = float(
+            sum(order.planned_notional for order in entry_orders)
+        )
+        filled_entry_notional = float(
+            sum(fill.gross_notional for fill in self.fills if fill.purpose == "entry")
         )
         pending_exit_age = self.pending_exit_mean_age_sessions[
             np.isfinite(self.pending_exit_mean_age_sessions)
@@ -612,6 +636,7 @@ class StatefulLedgerResult:
                 2.0 * mean_gross / mean_turnover if mean_turnover > 0 else 0.0
             ),
             "stale_mark_name_days": int(self.stale_mark_name_days.sum()),
+            "same_day_action_sessions": int(self.same_day_action_sessions.sum()),
             "unresolved_action_name_days": int(self.unresolved_action_name_days.sum()),
             "valuation_scenario_count": int(self.valuation_scenario_count.sum()),
             "terminal_settlement_convention": TERMINAL_SETTLEMENT_CONVENTION,
@@ -689,8 +714,8 @@ class StatefulLedgerResult:
             ),
             "same_close_replacements": int(self.same_close_replacement_count.sum()),
             "intended_entry_fill_rate": (
-                filled_entry_quantity / intended_entry_quantity
-                if intended_entry_quantity > 0.0
+                filled_entry_notional / intended_entry_notional
+                if intended_entry_notional > 0.0
                 else 0.0
             ),
             "mean_pending_exit_age_sessions": (
@@ -1047,15 +1072,6 @@ def _equity(
     )
 
 
-def _quantity(
-    slot_notional: float, reference_price: float, lot_size: int | None
-) -> float:
-    quantity = slot_notional / reference_price
-    if lot_size is not None:
-        quantity = np.floor(quantity / lot_size) * lot_size
-    return float(quantity)
-
-
 def _risk(signed_values: NDArray[np.float64], nav: float) -> tuple[float, float, float]:
     if nav <= 0:
         return np.inf, np.inf, np.inf
@@ -1179,6 +1195,7 @@ def simulate_stateful_ledger(
     hedge_beta_history: tuple[NDArray[np.floating], NDArray[np.bool_]] | None = None,
     hedge_close: NDArray[np.floating] | None = None,
     initial_hedge_reference_price: float = np.nan,
+    initial_unresolved_action: NDArray[np.bool_] | None = None,
     hedge_annual_borrow_rate: NDArray[np.floating] | None = None,
 ) -> StatefulLedgerResult:
     """Run causal close-proxy orders, fills, and a raw signed-share ledger."""
@@ -1210,6 +1227,13 @@ def simulate_stateful_ledger(
         beta_hedge=config.beta_hedge,
     )
     day_count, name_count = inputs.score.shape
+    initial_unresolved_action = (
+        np.zeros(name_count, dtype=np.bool_)
+        if initial_unresolved_action is None
+        else np.asarray(initial_unresolved_action, dtype=np.bool_)
+    )
+    if initial_unresolved_action.shape != (name_count,):
+        raise ValueError("initial action uncertainty must match the security axis")
     shares = np.zeros(name_count, dtype=np.float64)
     marks = np.full(name_count, np.nan, dtype=np.float64)
     hedge_shares = 0.0
@@ -1286,6 +1310,7 @@ def simulate_stateful_ledger(
     stale_mark_fraction_rows: list[float] = []
     stale_rows: list[int] = []
     unresolved_action_rows: list[int] = []
+    same_day_action_rows: list[bool] = []
     scenario_count_rows: list[int] = []
     position_rows: list[NDArray[np.int8]] = []
     share_rows: list[NDArray[np.float64]] = []
@@ -1416,10 +1441,12 @@ def simulate_stateful_ledger(
         day: int,
         name: int,
         side: OrderSide,
-        quantity: float,
+        size: float,
         reference_price: float,
         purpose: OrderPurpose,
         expiry_session: int | None,
+        *,
+        position_fraction: bool = False,
     ) -> _PendingOrder:
         nonlocal next_order_id
         order = IntendedOrder(
@@ -1429,7 +1456,8 @@ def simulate_stateful_ledger(
             decision_date=inputs.dates[day],
             decision_session=day,
             side=side,
-            quantity=quantity,
+            planned_notional=None if position_fraction else size,
+            position_fraction=size if position_fraction else None,
             reference_price=reference_price,
             order_type="close_proxy",
             limit_price=None,
@@ -1443,47 +1471,13 @@ def simulate_stateful_ledger(
         )
         next_order_id += 1
         orders.append(order)
-        return _PendingOrder(order=order, remaining_quantity=quantity)
-
-    def cancel_for_action(
-        pending_map: dict[int, _PendingOrder], name: int, day: int
-    ) -> bool:
-        """Cancel an unfilled order before its security units/claim can change."""
-
-        pending = pending_map.pop(name, None)
-        if pending is None:
-            return False
-        cancellations.append(
-            OrderCancellation(
-                order_id=pending.order.order_id,
-                security=pending.order.security,
-                security_index=pending.order.security_index,
-                cancellation_date=inputs.dates[day],
-                cancellation_session=day,
-                unfilled_quantity=pending.remaining_quantity,
-                reason="corporate_action",
-            )
-        )
-        if pending.order.purpose == "entry" and shares[name] == 0.0:
-            entry_cost_basis[name] = 0.0
-            submission_nav[name] = 0.0
-        return pending.order.purpose == "entry"
+        return _PendingOrder(order=order, remaining_size=size)
 
     def cancel_entry(name: int, day: int, reason: CancellationReason) -> bool:
         pending = pending_entries.pop(name, None)
         if pending is None:
             return False
-        cancellations.append(
-            OrderCancellation(
-                order_id=pending.order.order_id,
-                security=pending.order.security,
-                security_index=name,
-                cancellation_date=inputs.dates[day],
-                cancellation_session=day,
-                unfilled_quantity=pending.remaining_quantity,
-                reason=reason,
-            )
-        )
+        cancellations.append(pending.cancellation(day, inputs.dates[day], reason))
         if shares[name] == 0.0:
             entry_cost_basis[name] = 0.0
             submission_nav[name] = 0.0
@@ -1518,234 +1512,20 @@ def simulate_stateful_ledger(
             raise RuntimeError("opening ledger identity does not reconcile")
         held_start_long_rows.append(int((shares > 0.0).sum()))
         held_start_short_rows.append(int((shares < 0.0).sum()))
+        action_exposed = shares != 0.0
+        for name in pending_entries.keys() | pending_exits.keys():
+            action_exposed[name] = True
 
-        # Action-term uncertainty is a property of this session's claim, not
-        # of the position for the rest of its life. A later resolved cell
-        # clears the condition without requiring a fill.
-        unresolved_action = ~inputs.action_resolved[day].copy()
-        explicit_unresolved_action = inputs.has_action[day] & unresolved_action
-        action_uncertainty_seen |= bool(
-            ((shares != 0.0) & explicit_unresolved_action).any()
+        # Only completed sessions can inform entry uncertainty. Current action
+        # terms (including the inferred event flag) are accounting-only below.
+        decision_unresolved = (
+            ~inputs.action_resolved[day - 1] if day else initial_unresolved_action
         )
-        # Apply contractual terms to shares held before the session. Cash terms
-        # become claims; only the later payment mask transfers them to cash.
-        for name in np.flatnonzero(inputs.has_action[day]):
-            successor = int(inputs.action_successor[day, name])
-            affected_orders = {int(name), successor}
-            for affected_name in sorted(affected_orders):
+        for name in tuple(pending_entries):
+            if decision_unresolved[name]:
                 cancelled_today += int(
-                    cancel_for_action(pending_entries, affected_name, day)
+                    cancel_entry(name, day, "prior_action_unresolved")
                 )
-                cancel_for_action(pending_exits, affected_name, day)
-            if not inputs.action_resolved[day, name]:
-                if (
-                    shares[name] != 0.0
-                    or receivable_by_name[name] != 0.0
-                    or payable_by_name[name] != 0.0
-                ):
-                    unresolved_action[name] = True
-                continue
-            q = float(inputs.action_q[day, name])
-            d = float(inputs.action_d[day, name])
-            old_shares = float(shares[name])
-            new_shares, signed_claim = apply_contractual_action(
-                old_shares,
-                0.0,
-                shares_per_prior_share=q,
-                cash_per_prior_share=d,
-            )
-            claim = float(signed_claim)
-            if claim >= 0.0:
-                receivable_by_name[name] += claim
-            else:
-                payable_by_name[name] -= claim
-            if claim != 0.0:
-                payment_session = int(inputs.action_payment_session[day, name])
-                pending_claims.append(
-                    _PendingClaim(
-                        security_index=name,
-                        signed_amount=claim,
-                        payment_session=(
-                            payment_session if payment_session >= 0 else None
-                        ),
-                    )
-                )
-            converted_mark = (
-                (marks[name] - d) / q
-                if old_shares != 0.0 and q > 0.0 and np.isfinite(marks[name])
-                else np.nan
-            )
-            converted_reference = (
-                (last_observed[name] - d) / q
-                if q > 0.0 and np.isfinite(last_observed[name])
-                else np.nan
-            )
-            if not np.isfinite(converted_reference) or converted_reference <= 0.0:
-                converted_reference = np.nan
-            if successor == name:
-                shares[name] = float(new_shares)
-                marks[name] = converted_mark if shares[name] != 0.0 else np.nan
-                last_observed[name] = converted_reference
-                if shares[name] == 0.0:
-                    ineligible_streak[name] = 0
-                    entry_cost_basis[name] = 0.0
-                    submission_nav[name] = 0.0
-            else:
-                if shares[successor] != 0.0:
-                    raise ValueError(
-                        "conversion successor already has ledger inventory"
-                    )
-                shares[name] = 0.0
-                marks[name] = np.nan
-                last_observed[name] = np.nan
-                shares[successor] = float(new_shares)
-                marks[successor] = converted_mark
-                # Reference marks belong to the tradable claim even when no
-                # inventory existed at the conversion.  Do not overwrite the
-                # causal predecessor-derived reference with the inventory-only
-                # converted mark (NaN in that case).
-                last_observed[successor] = converted_reference
-                restricted_by_name[successor] += restricted_by_name[name]
-                restricted_by_name[name] = 0.0
-                if np.isfinite(converted_mark) and converted_mark <= 0.0:
-                    unresolved_action[successor] = True
-                    explicit_unresolved_action[successor] = True
-                explicit_unresolved_action[successor] |= explicit_unresolved_action[
-                    name
-                ]
-                unresolved_action[name] = False
-                explicit_unresolved_action[name] = False
-                entry_session[successor] = entry_session[name]
-                entry_session[name] = -1
-                ineligible_streak[successor] = ineligible_streak[name]
-                ineligible_streak[name] = 0
-                entry_cost_basis[successor] = entry_cost_basis[name]
-                submission_nav[successor] = submission_nav[name]
-                entry_cost_basis[name] = 0.0
-                submission_nav[name] = 0.0
-            if (
-                successor == name
-                and np.isfinite(converted_mark)
-                and converted_mark <= 0.0
-            ):
-                unresolved_action[name] = True
-                explicit_unresolved_action[name] = True
-            if q == 0.0 and restricted_by_name[name] != 0.0:
-                free_cash += restricted_by_name[name]
-                restricted_by_name[name] = 0.0
-                ineligible_streak[name] = 0
-                entry_session[name] = -1
-                entry_cost_basis[name] = 0.0
-                submission_nav[name] = 0.0
-
-        unpaid_claims: list[_PendingClaim] = []
-        for claim in pending_claims:
-            if claim.payment_session != day:
-                unpaid_claims.append(claim)
-                continue
-            name = claim.security_index
-            free_cash += claim.signed_amount
-            if claim.signed_amount > 0.0:
-                receivable_by_name[name] -= claim.signed_amount
-                if abs(receivable_by_name[name]) <= 1e-12:
-                    receivable_by_name[name] = 0.0
-            else:
-                payable_by_name[name] += claim.signed_amount
-                if abs(payable_by_name[name]) <= 1e-12:
-                    payable_by_name[name] = 0.0
-        pending_claims = unpaid_claims
-
-        short_at_open = shares < 0.0
-        short_value_at_open = float(
-            np.abs(shares[short_at_open] * marks[short_at_open]).sum()
-        )
-        cash_rate = float(inputs.cdi[day])
-        debit_rate = cash_rate + config.annual_debit_spread / config.annual_sessions
-        free_cash_interest = (
-            max(free_cash, 0.0) * cash_rate + min(free_cash, 0.0) * debit_rate
-        )
-        short_proceeds_interest_base = float(
-            restricted_by_name.sum() + hedge_restricted_cash
-        )
-        short_proceeds_interest = (
-            short_proceeds_interest_base
-            * cash_rate
-            * config.short_proceeds_remuneration
-        )
-        interest = free_cash_interest + short_proceeds_interest
-        imputed_short_notional = 0.0
-        placeholder_short_notional = 0.0
-        if config.borrow_source != "uniform" and short_at_open.any():
-            short_values = np.abs(shares[short_at_open] * marks[short_at_open])
-            raw_rates = inputs.annual_borrow_rate_by_name[day, short_at_open]
-            if not np.isfinite(raw_rates).all():
-                raise RuntimeError("held archive-borrow short has no finite rate")
-            fee_rates = np.asarray(
-                equity_borrow_registration_fee(raw_rates, config=config),
-                dtype=np.float64,
-            )
-            effective_rates = raw_rates + fee_rates
-            equity_borrow_raw = float(
-                np.sum(
-                    short_values
-                    * np.expm1(np.log1p(raw_rates) / config.annual_sessions)
-                )
-            )
-            equity_borrow_fee = float(
-                np.sum(
-                    short_values
-                    * np.expm1(np.log1p(fee_rates) / config.annual_sessions)
-                )
-            )
-            borrow = equity_borrow_raw + equity_borrow_fee
-            weighted_borrow_rate = float(
-                np.sum(short_values * effective_rates) / short_value_at_open
-            )
-            imputed_short_notional = float(
-                np.sum(short_values[inputs.borrow_rate_imputed[day, short_at_open]])
-            )
-            placeholder_short_notional = float(
-                np.sum(short_values[inputs.borrow_rate_placeholder[day, short_at_open]])
-            )
-        else:
-            equity_borrow_raw = (
-                np.expm1(np.log1p(config.annual_borrow_rate) / config.annual_sessions)
-                * short_value_at_open
-            )
-            uniform_fee_rate = float(
-                equity_borrow_registration_fee(
-                    config.annual_borrow_rate,
-                    config=config,
-                )
-            )
-            equity_borrow_fee = (
-                np.expm1(np.log1p(uniform_fee_rate) / config.annual_sessions)
-                * short_value_at_open
-            )
-            borrow = equity_borrow_raw + equity_borrow_fee
-            weighted_borrow_rate = (
-                config.annual_borrow_rate + uniform_fee_rate
-                if short_value_at_open > 0.0
-                else 0.0
-            )
-        hedge_borrow = 0.0
-        if config.beta_hedge and hedge_shares < 0.0:
-            hedge_rate = max(
-                float(inputs.hedge_annual_borrow_rate[day])
-                if np.isfinite(inputs.hedge_annual_borrow_rate[day])
-                else 0.0,
-                config.hedge_annual_borrow_rate,
-            )
-            hedge_borrow = abs(hedge_shares * hedge_mark) * np.expm1(
-                np.log1p(hedge_rate) / config.annual_sessions
-            )
-            borrow += hedge_borrow
-        held_short_borrow_rate_rows.append(weighted_borrow_rate)
-        held_short_notional_rows.append(short_value_at_open)
-        held_short_imputed_notional_rows.append(imputed_short_notional)
-        held_short_placeholder_notional_rows.append(placeholder_short_notional)
-        free_cash += interest - borrow
-        settlement_scenario_adjustment *= 1.0 + cash_rate
 
         eligible = (
             inputs.score_valid[day]
@@ -1898,6 +1678,12 @@ def simulate_stateful_ledger(
                     exit_cause_by_name[integer_name] = "rank_out_of_retention"
         if day == day_count - 1:
             exit_required.update(int(name) for name in np.flatnonzero(held))
+            for name, pending in tuple(pending_exits.items()):
+                if pending.remaining_size < 1.0 - 1e-12:
+                    cancellations.append(
+                        pending.cancellation(day, inputs.dates[day], "evaluation_end")
+                    )
+                    del pending_exits[name]
 
         entries_to_cancel = exit_required & pending_entries.keys()
         for name in sorted(entries_to_cancel):
@@ -1927,28 +1713,20 @@ def simulate_stateful_ledger(
                 day,
                 name,
                 "sell" if shares[name] > 0.0 else "buy",
-                abs(float(shares[name])),
+                1.0,
                 float(marks[name]),
                 purpose,
                 None,
+                position_fraction=True,
             )
 
         def projected_signed_values() -> NDArray[np.float64]:
             projected = signed_values.copy()
             for name, pending in pending_exits.items():
-                direction = 1.0 if pending.order.side == "buy" else -1.0
-                projected[name] += (
-                    direction
-                    * pending.remaining_quantity
-                    * pending.order.reference_price
-                )
+                projected[name] -= pending.remaining_size * signed_values[name]
             for name, pending in pending_entries.items():
                 direction = 1.0 if pending.order.side == "buy" else -1.0
-                projected[name] += (
-                    direction
-                    * pending.remaining_quantity
-                    * pending.order.reference_price
-                )
+                projected[name] += direction * pending.remaining_size
             return projected
 
         def risk_projected_signed_values() -> NDArray[np.float64]:
@@ -1957,11 +1735,7 @@ def simulate_stateful_ledger(
             projected = signed_values.copy()
             for name, pending in pending_entries.items():
                 direction = 1.0 if pending.order.side == "buy" else -1.0
-                projected[name] += (
-                    direction
-                    * pending.remaining_quantity
-                    * pending.order.reference_price
-                )
+                projected[name] += direction * pending.remaining_size
             return projected
 
         risk_exit_quantity: dict[int, float] = {}
@@ -2099,10 +1873,11 @@ def simulate_stateful_ledger(
                     day,
                     name,
                     "sell" if shares[name] > 0.0 else "buy",
-                    quantity,
+                    quantity / abs(float(shares[name])),
                     float(marks[name]),
                     "risk_exit",
                     None,
+                    position_fraction=True,
                 )
 
         if day == day_count - 1:
@@ -2145,9 +1920,7 @@ def simulate_stateful_ledger(
                 name
                 for name, pending in pending_exits.items()
                 if pending.order.decision_session == day
-                and pending.remaining_quantity
-                >= abs(float(shares[name]))
-                - max(1e-12, abs(float(shares[name])) * 1e-12)
+                and pending.remaining_size >= 1.0 - 1e-12
             }
             unavailable = set(np.flatnonzero(shares != 0.0).tolist()) | set(
                 pending_entries
@@ -2201,7 +1974,7 @@ def simulate_stateful_ledger(
                 for name in long_band
                 if entry_eligible[name]
                 if name not in unavailable
-                and not unresolved_action[name]
+                and not decision_unresolved[name]
                 and not settled_names[name]
             ]
             short_candidates = [
@@ -2209,7 +1982,7 @@ def simulate_stateful_ledger(
                 for name in short_band
                 if entry_eligible[name]
                 if name not in unavailable
-                and not unresolved_action[name]
+                and not decision_unresolved[name]
                 and not settled_names[name]
                 and inputs.shortable[day, name]
             ]
@@ -2222,7 +1995,7 @@ def simulate_stateful_ledger(
             excluded_short_candidates = sum(
                 entry_eligible[name]
                 and name not in unavailable
-                and not unresolved_action[name]
+                and not decision_unresolved[name]
                 and not settled_names[name]
                 and not inputs.shortable[day, name]
                 for name in short_band
@@ -2230,22 +2003,22 @@ def simulate_stateful_ledger(
             band_candidates_long = len(long_candidates)
             band_candidates_short = len(short_candidates)
             band_excluded_unresolved_long = sum(
-                name not in unavailable and bool(unresolved_action[name])
+                name not in unavailable and bool(decision_unresolved[name])
                 for name in long_band
             )
             band_excluded_unresolved_short = sum(
-                name not in unavailable and bool(unresolved_action[name])
+                name not in unavailable and bool(decision_unresolved[name])
                 for name in short_band
             )
             band_excluded_settled_long = sum(
                 name not in unavailable
-                and not unresolved_action[name]
+                and not decision_unresolved[name]
                 and bool(settled_names[name])
                 for name in long_band
             )
             band_excluded_settled_short = sum(
                 name not in unavailable
-                and not unresolved_action[name]
+                and not decision_unresolved[name]
                 and bool(settled_names[name])
                 for name in short_band
             )
@@ -2356,16 +2129,9 @@ def simulate_stateful_ledger(
                     blocked_reference += 1
                     current_side = "sell" if current_side == "buy" else "buy"
                     continue
-                quantity = _quantity(slot_notional, reference, config.lot_size)
-                if quantity <= 0.0:
-                    blocked_reference += 1
-                    current_side = "sell" if current_side == "buy" else "buy"
-                    continue
                 proposed = planned_values.copy()
                 proposed[name] += (
-                    quantity * reference
-                    if current_side == "buy"
-                    else -quantity * reference
+                    slot_notional if current_side == "buy" else -slot_notional
                 )
                 gross_before, net_before, _ = _risk(planned_values, start_nav)
                 planned_gross, planned_net, planned_name = _risk(proposed, start_nav)
@@ -2402,7 +2168,7 @@ def simulate_stateful_ledger(
                     day,
                     name,
                     current_side,
-                    quantity,
+                    slot_notional,
                     reference,
                     "entry",
                     expiry,
@@ -2493,17 +2259,18 @@ def simulate_stateful_ledger(
         name_cap_fresh_rows.append(name_cap_fresh)
 
         # A last-mark settlement is conditional accounting, not an observed
-        # market execution. Freeze its quantity before the possible final print;
+        # market execution. Freeze its fraction before the possible final print;
         # expire the intention if a print makes the settlement unnecessary.
         settlement_orders = {
             int(name): submit_order(
                 day,
                 int(name),
                 "sell" if shares[name] > 0.0 else "buy",
-                abs(float(shares[name])),
+                1.0,
                 float(marks[name]),
                 "terminal_settlement",
                 day,
+                position_fraction=True,
             )
             for name in np.flatnonzero(
                 (shares != 0.0)
@@ -2518,12 +2285,9 @@ def simulate_stateful_ledger(
         planned_equity[held_for_hedge] = shares[held_for_hedge] * marks[held_for_hedge]
         for name, pending in pending_entries.items():
             direction = 1.0 if pending.order.side == "buy" else -1.0
-            planned_equity[name] += (
-                direction * pending.remaining_quantity * pending.order.reference_price
-            )
+            planned_equity[name] += direction * pending.remaining_size
         for name, pending in pending_exits.items():
-            direction = 1.0 if pending.order.side == "buy" else -1.0
-            planned_equity[name] += direction * pending.remaining_quantity * marks[name]
+            planned_equity[name] -= pending.remaining_size * shares[name] * marks[name]
         beta_required = held_for_hedge.copy()
         for name in pending_entries:
             beta_required[name] = True
@@ -2558,20 +2322,255 @@ def simulate_stateful_ledger(
         )
         hedge_order = None
         if rebalance_required and np.isfinite(hedge_mark):
-            change = hedge_target_notional / hedge_mark - hedge_shares
+            change = hedge_target_notional - hedge_notional_before
             if change != 0.0:
                 hedge_order = submit_order(
                     day,
                     name_count,
                     "buy" if change > 0 else "sell",
-                    abs(change),
+                    1.0 if day == day_count - 1 else abs(change),
                     hedge_mark,
                     "hedge",
                     day,
+                    position_fraction=day == day_count - 1,
                 )
         decision_hedge_notional = (
             hedge_target_notional if hedge_order is not None else hedge_notional_before
         )
+
+        for name in pending_entries.keys() | pending_exits.keys():
+            action_exposed[name] = True
+        same_day_action_rows.append(
+            bool(np.any(action_exposed & inputs.has_action[day]))
+        )
+
+        # Action-term uncertainty is a property of this session's claim, not
+        # of the position for the rest of its life. A later resolved cell
+        # clears the condition without requiring a fill.
+        unresolved_action = ~inputs.action_resolved[day].copy()
+        explicit_unresolved_action = inputs.has_action[day] & unresolved_action
+        action_uncertainty_seen |= bool(
+            ((shares != 0.0) & explicit_unresolved_action).any()
+        )
+        # Apply contractual terms to shares held before the session. Cash terms
+        # become claims; only the later payment mask transfers them to cash.
+        for name in np.flatnonzero(inputs.has_action[day]):
+            successor = int(inputs.action_successor[day, name])
+            if not inputs.action_resolved[day, name]:
+                if (
+                    shares[name] != 0.0
+                    or receivable_by_name[name] != 0.0
+                    or payable_by_name[name] != 0.0
+                ):
+                    unresolved_action[name] = True
+                continue
+            q = float(inputs.action_q[day, name])
+            d = float(inputs.action_d[day, name])
+            old_shares = float(shares[name])
+            new_shares, signed_claim = apply_contractual_action(
+                old_shares,
+                0.0,
+                shares_per_prior_share=q,
+                cash_per_prior_share=d,
+            )
+            claim = float(signed_claim)
+            if claim >= 0.0:
+                receivable_by_name[name] += claim
+            else:
+                payable_by_name[name] -= claim
+            if claim != 0.0:
+                payment_session = int(inputs.action_payment_session[day, name])
+                pending_claims.append(
+                    _PendingClaim(
+                        security_index=name,
+                        signed_amount=claim,
+                        payment_session=(
+                            payment_session if payment_session >= 0 else None
+                        ),
+                    )
+                )
+            converted_mark = (
+                (marks[name] - d) / q
+                if old_shares != 0.0 and q > 0.0 and np.isfinite(marks[name])
+                else np.nan
+            )
+            converted_reference = (
+                (last_observed[name] - d) / q
+                if q > 0.0 and np.isfinite(last_observed[name])
+                else np.nan
+            )
+            if not np.isfinite(converted_reference) or converted_reference <= 0.0:
+                converted_reference = np.nan
+            if successor == name:
+                shares[name] = float(new_shares)
+                marks[name] = converted_mark if shares[name] != 0.0 else np.nan
+                last_observed[name] = converted_reference
+                if shares[name] == 0.0:
+                    ineligible_streak[name] = 0
+                    entry_cost_basis[name] = 0.0
+                    submission_nav[name] = 0.0
+            else:
+                if shares[successor] != 0.0:
+                    raise ValueError(
+                        "conversion successor already has ledger inventory"
+                    )
+                shares[name] = 0.0
+                marks[name] = np.nan
+                last_observed[name] = np.nan
+                for pending_map in (pending_exits, settlement_orders):
+                    pending = pending_map.pop(int(name), None)
+                    if pending is not None:
+                        pending_map[successor] = pending
+                missing_sessions[successor] = missing_sessions[name]
+                missing_sessions[name] = 0
+                shares[successor] = float(new_shares)
+                marks[successor] = converted_mark
+                # Reference marks belong to the tradable claim even when no
+                # inventory existed at the conversion.  Do not overwrite the
+                # causal predecessor-derived reference with the inventory-only
+                # converted mark (NaN in that case).
+                last_observed[successor] = converted_reference
+                restricted_by_name[successor] += restricted_by_name[name]
+                restricted_by_name[name] = 0.0
+                if np.isfinite(converted_mark) and converted_mark <= 0.0:
+                    unresolved_action[successor] = True
+                    explicit_unresolved_action[successor] = True
+                explicit_unresolved_action[successor] |= explicit_unresolved_action[
+                    name
+                ]
+                unresolved_action[name] = False
+                explicit_unresolved_action[name] = False
+                entry_session[successor] = entry_session[name]
+                entry_session[name] = -1
+                ineligible_streak[successor] = ineligible_streak[name]
+                ineligible_streak[name] = 0
+                entry_cost_basis[successor] = entry_cost_basis[name]
+                submission_nav[successor] = submission_nav[name]
+                entry_cost_basis[name] = 0.0
+                submission_nav[name] = 0.0
+            if (
+                successor == name
+                and np.isfinite(converted_mark)
+                and converted_mark <= 0.0
+            ):
+                unresolved_action[name] = True
+                explicit_unresolved_action[name] = True
+            if q == 0.0 and restricted_by_name[name] != 0.0:
+                free_cash += restricted_by_name[name]
+                restricted_by_name[name] = 0.0
+                ineligible_streak[name] = 0
+                entry_session[name] = -1
+                entry_cost_basis[name] = 0.0
+                submission_nav[name] = 0.0
+
+        unpaid_claims: list[_PendingClaim] = []
+        for claim in pending_claims:
+            if claim.payment_session != day:
+                unpaid_claims.append(claim)
+                continue
+            name = claim.security_index
+            free_cash += claim.signed_amount
+            if claim.signed_amount > 0.0:
+                receivable_by_name[name] -= claim.signed_amount
+                if abs(receivable_by_name[name]) <= 1e-12:
+                    receivable_by_name[name] = 0.0
+            else:
+                payable_by_name[name] += claim.signed_amount
+                if abs(payable_by_name[name]) <= 1e-12:
+                    payable_by_name[name] = 0.0
+        pending_claims = unpaid_claims
+
+        short_at_open = shares < 0.0
+        short_value_at_open = float(
+            np.abs(shares[short_at_open] * marks[short_at_open]).sum()
+        )
+        cash_rate = float(inputs.cdi[day])
+        debit_rate = cash_rate + config.annual_debit_spread / config.annual_sessions
+        free_cash_interest = (
+            max(free_cash, 0.0) * cash_rate + min(free_cash, 0.0) * debit_rate
+        )
+        short_proceeds_interest_base = float(
+            restricted_by_name.sum() + hedge_restricted_cash
+        )
+        short_proceeds_interest = (
+            short_proceeds_interest_base
+            * cash_rate
+            * config.short_proceeds_remuneration
+        )
+        interest = free_cash_interest + short_proceeds_interest
+        imputed_short_notional = 0.0
+        placeholder_short_notional = 0.0
+        if config.borrow_source != "uniform" and short_at_open.any():
+            short_values = np.abs(shares[short_at_open] * marks[short_at_open])
+            raw_rates = inputs.annual_borrow_rate_by_name[day, short_at_open]
+            if not np.isfinite(raw_rates).all():
+                raise RuntimeError("held archive-borrow short has no finite rate")
+            fee_rates = np.asarray(
+                equity_borrow_registration_fee(raw_rates, config=config),
+                dtype=np.float64,
+            )
+            effective_rates = raw_rates + fee_rates
+            equity_borrow_raw = float(
+                np.sum(
+                    short_values
+                    * np.expm1(np.log1p(raw_rates) / config.annual_sessions)
+                )
+            )
+            equity_borrow_fee = float(
+                np.sum(
+                    short_values
+                    * np.expm1(np.log1p(fee_rates) / config.annual_sessions)
+                )
+            )
+            borrow = equity_borrow_raw + equity_borrow_fee
+            weighted_borrow_rate = float(
+                np.sum(short_values * effective_rates) / short_value_at_open
+            )
+            imputed_short_notional = float(
+                np.sum(short_values[inputs.borrow_rate_imputed[day, short_at_open]])
+            )
+            placeholder_short_notional = float(
+                np.sum(short_values[inputs.borrow_rate_placeholder[day, short_at_open]])
+            )
+        else:
+            equity_borrow_raw = (
+                np.expm1(np.log1p(config.annual_borrow_rate) / config.annual_sessions)
+                * short_value_at_open
+            )
+            uniform_fee_rate = float(
+                equity_borrow_registration_fee(
+                    config.annual_borrow_rate,
+                    config=config,
+                )
+            )
+            equity_borrow_fee = (
+                np.expm1(np.log1p(uniform_fee_rate) / config.annual_sessions)
+                * short_value_at_open
+            )
+            borrow = equity_borrow_raw + equity_borrow_fee
+            weighted_borrow_rate = (
+                config.annual_borrow_rate + uniform_fee_rate
+                if short_value_at_open > 0.0
+                else 0.0
+            )
+        hedge_borrow = 0.0
+        if config.beta_hedge and hedge_shares < 0.0:
+            hedge_rate = max(
+                float(inputs.hedge_annual_borrow_rate[day])
+                if np.isfinite(inputs.hedge_annual_borrow_rate[day])
+                else 0.0,
+                config.hedge_annual_borrow_rate,
+            )
+            hedge_borrow = abs(hedge_shares * hedge_mark) * np.expm1(
+                np.log1p(hedge_rate) / config.annual_sessions
+            )
+            borrow += hedge_borrow
+        held_short_borrow_rate_rows.append(weighted_borrow_rate)
+        held_short_notional_rows.append(short_value_at_open)
+        held_short_imputed_notional_rows.append(imputed_short_notional)
+        held_short_placeholder_notional_rows.append(placeholder_short_notional)
+        free_cash += interest - borrow
+        settlement_scenario_adjustment *= 1.0 + cash_rate
 
         # Only now may current-session prints affect the result. This makes the
         # immutable intended-order set invariant to those later observations.
@@ -2589,11 +2588,22 @@ def simulate_stateful_ledger(
             for name, pending in tuple(pending_map.items()):
                 # Uncertain action terms can block opening risk, but never a
                 # printed exit, risk reduction, or terminal liquidation.
-                if not printed[name] or (entries and unresolved_action[name]):
+                if not entries and shares[name] == 0.0:
+                    cancellations.append(
+                        pending.cancellation(day, inputs.dates[day], "position_closed")
+                    )
+                    del pending_map[name]
+                    continue
+                if not printed[name]:
                     continue
                 fraction = float(inputs.fill_fraction[day, name])
-                remaining_before_fill = pending.remaining_quantity
-                quantity = remaining_before_fill * fraction
+                remaining_before_fill = pending.remaining_size
+                used_size = remaining_before_fill * fraction
+                quantity = (
+                    used_size / inputs.raw_close[day, name]
+                    if entries
+                    else used_size * abs(float(shares[name]))
+                )
                 if quantity <= 0.0:
                     continue
                 before = float(shares[name])
@@ -2612,9 +2622,7 @@ def simulate_stateful_ledger(
                 if entries:
                     entry_cost_basis[name] += notional
                     entry_fill_short_today += int(
-                        quantity
-                        < remaining_before_fill
-                        - max(1e-12, pending.order.quantity * 1e-12)
+                        used_size < remaining_before_fill - 1e-12
                     )
                 elif before != 0.0 and abs(after) < abs(before):
                     if after == 0.0:
@@ -2647,24 +2655,20 @@ def simulate_stateful_ledger(
                 )
                 traded_notional += notional
                 costs += fill_cost
-                pending.remaining_quantity -= quantity
-                tolerance = max(1e-12, pending.order.quantity * 1e-12)
-                if pending.remaining_quantity <= tolerance:
+                remaining = remaining_before_fill - used_size
+                pending.remaining_size = (
+                    remaining
+                    if entries or after == 0.0
+                    else remaining / (1.0 - used_size)
+                )
+                if pending.remaining_size <= 1e-12:
                     del pending_map[name]
 
         for name, pending in tuple(pending_entries.items()):
             expiry = pending.order.expiry_session
             if expiry is not None and day >= expiry:
                 cancellations.append(
-                    OrderCancellation(
-                        order_id=pending.order.order_id,
-                        security=inputs.securities[name],
-                        security_index=name,
-                        cancellation_date=inputs.dates[day],
-                        cancellation_session=day,
-                        unfilled_quantity=pending.remaining_quantity,
-                        reason="expired",
-                    )
+                    pending.cancellation(day, inputs.dates[day], "expired")
                 )
                 del pending_entries[name]
                 cancelled_today += 1
@@ -2673,8 +2677,7 @@ def simulate_stateful_ledger(
                     submission_nav[name] = 0.0
 
         pending_printed_unfilled_today = sum(
-            bool(printed[name] and not unresolved_action[name])
-            for name in pending_entries
+            bool(printed[name]) for name in pending_entries
         )
         pending_end_long = sum(
             pending.order.side == "buy" for pending in pending_entries.values()
@@ -2716,29 +2719,13 @@ def simulate_stateful_ledger(
         for name, pending in settlement_orders.items():
             if not due_for_settlement[name]:
                 cancellations.append(
-                    OrderCancellation(
-                        order_id=pending.order.order_id,
-                        security=pending.order.security,
-                        security_index=name,
-                        cancellation_date=inputs.dates[day],
-                        cancellation_session=day,
-                        unfilled_quantity=pending.order.quantity,
-                        reason="expired",
-                    )
+                    pending.cancellation(day, inputs.dates[day], "expired")
                 )
         for name in np.flatnonzero(due_for_settlement):
             pending = pending_exits.pop(int(name), None)
             if pending is not None:
                 cancellations.append(
-                    OrderCancellation(
-                        order_id=pending.order.order_id,
-                        security=pending.order.security,
-                        security_index=int(name),
-                        cancellation_date=inputs.dates[day],
-                        cancellation_session=day,
-                        unfilled_quantity=pending.remaining_quantity,
-                        reason="terminal_settlement",
-                    )
+                    pending.cancellation(day, inputs.dates[day], "terminal_settlement")
                 )
             price = float(marks[name])
             if not np.isfinite(price) or price <= 0.0:
@@ -2818,10 +2805,15 @@ def simulate_stateful_ledger(
                 hedge_restricted_array = np.asarray(
                     [hedge_restricted_cash], dtype=np.float64
                 )
+                hedge_quantity = (
+                    abs(hedge_shares) * order.position_fraction
+                    if order.position_fraction is not None
+                    else order.planned_notional / current_hedge_close
+                )
                 free_cash, hedge_traded_notional = _book_fill(
                     name=0,
                     side=order.side,
-                    quantity=order.quantity,
+                    quantity=hedge_quantity,
                     price=current_hedge_close,
                     shares=hedge_share_array,
                     marks=hedge_mark_array,
@@ -2842,7 +2834,7 @@ def simulate_stateful_ledger(
                         fill_date=inputs.dates[day],
                         fill_session=day,
                         side=order.side,
-                        quantity=order.quantity,
+                        quantity=hedge_quantity,
                         price=current_hedge_close,
                         gross_notional=hedge_traded_notional,
                         cost=hedge_cost,
@@ -2851,14 +2843,10 @@ def simulate_stateful_ledger(
                 )
             else:
                 cancellations.append(
-                    OrderCancellation(
-                        order_id=order.order_id,
-                        security=order.security,
-                        security_index=order.security_index,
-                        cancellation_date=inputs.dates[day],
-                        cancellation_session=day,
-                        unfilled_quantity=order.quantity,
-                        reason="evaluation_end" if day == day_count - 1 else "expired",
+                    hedge_order.cancellation(
+                        day,
+                        inputs.dates[day],
+                        "evaluation_end" if day == day_count - 1 else "expired",
                     )
                 )
 
@@ -2945,9 +2933,7 @@ def simulate_stateful_ledger(
         planned_values = signed_values.copy()
         for name, pending in pending_entries.items():
             sign = 1.0 if pending.order.side == "buy" else -1.0
-            planned_values[name] += (
-                sign * pending.remaining_quantity * pending.order.reference_price
-            )
+            planned_values[name] += sign * pending.remaining_size
         planned_gross, planned_net, planned_name = _risk(planned_values, start_nav)
 
         if config.volatility_balanced_entries:
@@ -3321,6 +3307,7 @@ def simulate_stateful_ledger(
             stale_mark_fraction_rows, dtype=np.float64
         ),
         stale_mark_name_days=np.asarray(stale_rows, dtype=np.int64),
+        same_day_action_sessions=np.asarray(same_day_action_rows, dtype=np.bool_),
         unresolved_action_name_days=np.asarray(unresolved_action_rows, dtype=np.int64),
         valuation_scenario_count=np.asarray(scenario_count_rows, dtype=np.int64),
         position_sign=np.stack(position_rows),
@@ -3557,11 +3544,7 @@ def simulate_stateful_ledger(
         settlement_economics_unresolved_fraction_nav=(
             config.settlement_economics_unresolved_fraction_nav
         ),
-        share_sizing_mode=(
-            "fractional_notional_research_proxy"
-            if config.lot_size is None
-            else "round_lot_close_proxy"
-        ),
+        share_sizing_mode="notional_entries_position_fraction_exits",
         borrow_source=config.borrow_source,
         volatility_balanced_entries=config.volatility_balanced_entries,
         beta_hedge=config.beta_hedge,

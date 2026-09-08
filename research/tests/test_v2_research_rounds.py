@@ -133,7 +133,9 @@ def test_rev4e_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> 
     }
 
 
-def test_rev4e_non_ledger_projection_excludes_only_ledger_owned_diagnostics() -> None:
+def test_replay_projection_requires_declared_diagnostics_and_preserves_score_fields() -> (
+    None
+):
     report = {
         "schema": "old",
         "economics": {"headline": 1.0},
@@ -146,11 +148,30 @@ def test_rev4e_non_ledger_projection_excludes_only_ledger_owned_diagnostics() ->
         "input_hashes": {"scores": "a" * 64},
     }
 
-    assert _ledger_replay_non_ledger_projection(report) == {
+    with pytest.raises(ValueError, match="recomputed field"):
+        _ledger_replay_non_ledger_projection(report)
+    assert _ledger_replay_non_ledger_projection(report, require_recomputed=False) == {
         "diagnostics": {"scores": {"finite": True}},
         "mask_coverage": {"score_mask_true": 12},
         "input_hashes": {"scores": "a" * 64},
     }
+
+
+def test_replay_exemptions_cannot_hide_score_or_outcome_mutations() -> None:
+    candidate, _ = _evaluation_pair()
+    old = candidate.result.report
+    corrected = copy.deepcopy(old)
+    for key in research_rounds.RECOMPUTED_INPUT_HASHES:
+        corrected["input_hashes"][key] = "a" * 64
+    corrected["diagnostics"]["exposure_summary"] = [{"corrected_mask": True}]
+    original_projection = _ledger_replay_non_ledger_projection(
+        old, require_recomputed=False
+    )
+    assert _ledger_replay_non_ledger_projection(corrected) == original_projection
+    for key in ("scores", "score_mask", "neutral_midrank_targets", "active"):
+        changed = copy.deepcopy(corrected)
+        changed["input_hashes"][key] = "b" * 64
+        assert _ledger_replay_non_ledger_projection(changed) != original_projection
 
 
 def test_registration_protocol_requires_ineligible_hold_sessions(
@@ -765,6 +786,7 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
     inputs = replace(
         inputs,
         hedge_beta_manifest_sha256=beta_binding["hedge_beta_manifest_sha256"],
+        initial_unresolved_action=~arrays["action_session_resolved"][0],
         hedge_beta_history=(
             np.ones((1, name_count)),
             np.ones((1, name_count), dtype=bool),

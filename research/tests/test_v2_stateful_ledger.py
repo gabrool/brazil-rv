@@ -165,14 +165,26 @@ def test_intended_orders_use_prior_marks_and_ignore_current_future_print() -> No
         order for order in second.intended_orders if order.decision_session == 1
     ]
     assert [
-        (order.security_index, order.side, order.quantity, order.reference_price)
+        (
+            order.security_index,
+            order.side,
+            order.planned_notional,
+            order.position_fraction,
+            order.reference_price,
+        )
         for order in first_orders
     ] == [
-        (order.security_index, order.side, order.quantity, order.reference_price)
+        (
+            order.security_index,
+            order.side,
+            order.planned_notional,
+            order.position_fraction,
+            order.reference_price,
+        )
         for order in second_orders
     ]
     assert first_orders[0].reference_price == 100.0
-    assert first_orders[0].quantity == 0.01
+    assert first_orders[0].planned_notional == 1.0
     assert not any(
         fill.order_id == first_orders[0].order_id and fill.fill_session == 1
         for fill in first.fills
@@ -334,16 +346,28 @@ def test_first_evaluation_decision_uses_explicit_pre_window_reference() -> None:
         order for order in second.intended_orders if order.decision_session == 0
     ]
     assert [
-        (order.security_index, order.side, order.quantity, order.reference_price)
+        (
+            order.security_index,
+            order.side,
+            order.planned_notional,
+            order.position_fraction,
+            order.reference_price,
+        )
         for order in first_orders
     ] == [
-        (order.security_index, order.side, order.quantity, order.reference_price)
+        (
+            order.security_index,
+            order.side,
+            order.planned_notional,
+            order.position_fraction,
+            order.reference_price,
+        )
         for order in second_orders
     ]
     assert [order.reference_price for order in first_orders] == [80.0, 120.0]
 
 
-def test_current_unresolved_action_session_blocks_entry_only() -> None:
+def test_only_prior_unresolved_action_blocks_entries() -> None:
     close = np.full((3, 3), 100.0)
     scores = np.asarray([[3.0, 0.0, -3.0]] * 3)
     resolved = np.ones_like(close, dtype=np.bool_)
@@ -370,9 +394,13 @@ def test_current_unresolved_action_session_blocks_entry_only() -> None:
         (0, "buy"),
         (2, "sell"),
     }
-    assert {(order.security_index, order.side) for order in second_orders} == {
-        (2, "sell")
-    }
+    assert first_orders == second_orders
+    # With no pre-window reference, the first entry opportunity is session 1.
+    # The unresolved session-0 terms are then known and block opening this name.
+    delayed = _run(close, scores, actions=changed)
+    assert not any(
+        o.security_index == 0 and o.purpose == "entry" for o in delayed.intended_orders
+    )
 
 
 def test_pending_band_cancellation_off_preserves_old_slot_reservation() -> None:
@@ -652,7 +680,7 @@ def test_cash_action_without_ex_date_print_preserves_prior_equity() -> None:
     assert result.nav[2] == 1.0
 
 
-def test_corporate_action_cancels_pending_entries_before_unit_change() -> None:
+def test_split_preserves_pending_notional_entries_in_post_action_units() -> None:
     close = np.full((5, 3), 100.0)
     close[1, [0, 2]] = np.nan
     close[2, [0, 2]] = 50.0
@@ -681,20 +709,20 @@ def test_corporate_action_cancels_pending_entries_before_unit_change() -> None:
         for order in result.intended_orders
         if order.decision_session == 2 and order.purpose == "entry"
     ]
-    assert len(original) == len(replacement) == 2
-    assert {
-        cancellation.order_id
-        for cancellation in result.cancellations
-        if cancellation.reason == "corporate_action"
-    } == {order.order_id for order in original}
-    assert not any(
-        fill.order_id in {order.order_id for order in original} for fill in result.fills
-    )
-    assert {order.reference_price for order in replacement} == {50.0}
-    assert {order.quantity for order in replacement} == {0.02}
+    assert len(original) == 2
+    assert replacement == []
+    assert not result.cancellations
+    split_fills = [f for f in result.fills if f.fill_session == 2]
+    assert {f.order_id for f in split_fills} == {o.order_id for o in original}
+    assert {o.planned_notional for o in original} == {1.0}
+    assert {o.reference_price for o in original} == {100.0}
+    assert {f.quantity for f in split_fills} == {0.02}
+    assert {f.gross_notional for f in split_fills} == {1.0}
+    np.testing.assert_array_equal(result.signed_shares[2], [0.02, 0.0, -0.02])
+    assert result.same_day_action_sessions.sum() == 1
 
 
-def test_corporate_action_cancels_and_reissues_pending_exit_in_new_units() -> None:
+def test_pending_fraction_exit_sells_all_converted_split_shares() -> None:
     close = np.full((4, 3), 100.0)
     close[1, 0] = np.nan
     close[2:, 0] = 50.0
@@ -730,27 +758,56 @@ def test_corporate_action_cancels_and_reissues_pending_exit_in_new_units() -> No
         and order.security_index == 0
         and order.purpose == "exit"
     )
-    replacement = next(
-        order
-        for order in result.intended_orders
-        if order.decision_session == 2
-        and order.security_index == 0
-        and order.purpose == "exit"
-    )
-    cancellation = next(
-        row for row in result.cancellations if row.order_id == original.order_id
-    )
-    assert original.quantity == 0.01
+    assert original.position_fraction == 1.0
+    assert original.planned_notional is None
     assert original.reference_price == 100.0
-    assert cancellation.reason == "corporate_action"
-    assert cancellation.unfilled_quantity == 0.01
-    assert replacement.quantity == 0.02
-    assert replacement.reference_price == 50.0
-    assert any(fill.order_id == replacement.order_id for fill in result.fills)
-    assert not any(fill.order_id == original.order_id for fill in result.fills)
+    assert not any(
+        o.purpose == "exit" and o.decision_session == 2 for o in result.intended_orders
+    )
+    exit_fill = next(f for f in result.fills if f.order_id == original.order_id)
+    assert exit_fill.fill_session == 2
+    assert exit_fill.quantity == 0.02
+    assert exit_fill.gross_notional == 1.0
+    assert result.signed_shares[2, 0] == 0.0
 
 
-def test_no_inventory_conversion_transfers_causal_reference_to_successor() -> None:
+@pytest.mark.parametrize("split_day", [3, 4])
+def test_partial_trim_rebases_remaining_fraction_across_split(split_day) -> None:
+    close = np.full((5, 4), 100.0)
+    close[1:split_day] = 200.0
+    fractions = np.ones_like(close)
+    fractions[2:split_day] = 0.5
+    result = _run(
+        close,
+        np.tile([-2.0, -1.0, 1.0, 2.0], (5, 1)),
+        initial_reference_price=np.full(4, 100.0),
+        fill_fraction=fractions,
+        actions=_action_terms(close.shape, day=split_day, q=2.0),
+        config=_config(
+            k_per_side=2,
+            buffer_per_side=0,
+            planned_name_weight_cap=0.55,
+            planned_gross_cap=10.0,
+        ),
+    )
+    first = next(o for o in result.intended_orders if o.purpose == "risk_exit")
+    assert first.position_fraction == pytest.approx(0.45)
+    np.testing.assert_allclose(np.abs(result.signed_shares[2]), 0.005 * 0.775)
+    if split_day == 3:
+        # The remaining half of the 45% trim sells 0.225 * original shares,
+        # now doubled by the split, leaving exactly 55% of converted inventory.
+        np.testing.assert_allclose(np.abs(result.signed_shares[3]), 0.0055)
+    else:
+        # Final liquidation supersedes the still-partial trim before the split.
+        assert any(
+            o.purpose == "terminal_exit" and o.position_fraction == 1.0
+            for o in result.intended_orders
+            if o.decision_session == 4
+        )
+    np.testing.assert_array_equal(result.signed_shares[-1], 0.0)
+
+
+def test_successor_reference_becomes_available_only_after_conversion_session() -> None:
     close = np.asarray(
         [
             [np.nan, 45.0, 100.0],
@@ -783,13 +840,17 @@ def test_no_inventory_conversion_transfers_causal_reference_to_successor() -> No
         initial_reference_price=np.asarray([100.0, np.nan, 100.0]),
     )
 
+    assert not any(
+        o.decision_session == 0 and o.security_index == 1
+        for o in result.intended_orders
+    )
     successor_order = next(
-        order
-        for order in result.intended_orders
-        if order.decision_session == 0 and order.security_index == 1
+        o
+        for o in result.intended_orders
+        if o.decision_session == 1 and o.security_index == 1
     )
     assert successor_order.reference_price == 45.0
-    np.testing.assert_allclose(successor_order.quantity, 1.0 / 45.0)
+    assert successor_order.planned_notional == 1.0
 
 
 def test_verified_share_conversion_moves_inventory_to_successor_once() -> None:
@@ -1248,7 +1309,7 @@ def test_small_universe_uses_effective_two_sided_k_without_rescaling_slots() -> 
     entries = [order for order in result.intended_orders if order.purpose == "entry"]
     assert sum(order.side == "buy" for order in entries) == 5
     assert sum(order.side == "sell" for order in entries) == 5
-    assert all(order.quantity == 1.0 / 3000.0 for order in entries)
+    assert all(order.planned_notional == 1.0 / 30.0 for order in entries)
     assert not result.entry_blocked_small_universe.any()
     np.testing.assert_array_equal(result.retention_width, 5)
 
@@ -1428,12 +1489,16 @@ def test_adverse_fifteen_percent_rally_uses_proportional_gross_trims() -> None:
         if order.decision_session == 2 and order.purpose == "risk_exit"
     ]
     long_trim = sum(
-        order.quantity * order.reference_price
+        order.position_fraction
+        * abs(result.signed_shares[1, order.security_index])
+        * order.reference_price
         for order in risk_orders
         if order.side == "sell"
     )
     short_trim = sum(
-        order.quantity * order.reference_price
+        order.position_fraction
+        * abs(result.signed_shares[1, order.security_index])
+        * order.reference_price
         for order in risk_orders
         if order.side == "buy"
     )
@@ -1647,7 +1712,7 @@ def test_rev4f_all_orders_ignore_later_closes(changed_instrument: str) -> None:
     assert original_orders == changed_orders
     hedge = next(order for order in original_orders if order.purpose == "hedge")
     assert hedge.reference_price == 100.0
-    assert hedge.quantity == pytest.approx(0.134 / 100)
+    assert hedge.planned_notional == pytest.approx(0.134)
     assert original.hedge_target_notional[0] == pytest.approx(-0.134)
     assert [f for f in original.fills if f.fill_session == 0] != [
         f for f in changed.fills if f.fill_session == 0
@@ -1655,7 +1720,7 @@ def test_rev4f_all_orders_ignore_later_closes(changed_instrument: str) -> None:
     np.testing.assert_allclose(changed.reconciliation_error, 0.0, atol=1e-15)
 
 
-def test_rev4f_missing_hedge_print_cancels_and_reconciles_fixed_quantity() -> None:
+def test_rev4f_missing_hedge_print_cancels_and_reconciles_notional() -> None:
     scores = np.tile([-1.0, 1.0], (4, 1))
     result = _run(
         np.full((4, 2), 100.0),
@@ -1672,13 +1737,18 @@ def test_rev4f_missing_hedge_print_cancels_and_reconciles_fixed_quantity() -> No
     )
     assert cancellation.reason == "expired"
     for order in hedges:
-        filled = sum(f.quantity for f in result.fills if f.order_id == order.order_id)
+        if order.position_fraction is not None:
+            assert order.position_fraction == 1.0
+            continue
+        filled = sum(
+            f.gross_notional for f in result.fills if f.order_id == order.order_id
+        )
         cancelled = sum(
-            c.unfilled_quantity
+            c.unfilled_notional
             for c in result.cancellations
             if c.order_id == order.order_id
         )
-        assert filled + cancelled == pytest.approx(order.quantity)
+        assert filled + cancelled == pytest.approx(order.planned_notional)
     assert result.hedge_signed_shares[-1] == 0.0
 
 

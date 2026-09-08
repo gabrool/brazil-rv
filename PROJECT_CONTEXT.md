@@ -36,15 +36,22 @@ price-unit consistency never reaches the required twenty active names per day.
 Repair these contracts before making new economics claims or interpreting
 feature ablations. The audit's code cleanup does not change the frozen results.
 
-Pass 5 is partially implemented; [its status and remaining blockers](docs/v2_PASS5_STATUS.md)
-are the continuation contract. The ledger now requires a hash-bound economic BOVA11
-beta sidecar and fixes hedge intention timing, pending-entry retention and borrow
-accrual. The development-only sidecar is `v2_hedge_beta_rev4f_20260908T225248Z`,
-manifest `f5fa41536740ca412550cb81d2b44c9541e338dc060d674ab8ea270edd7be712`.
-The retrospective action decision path is still unrepaired. No rev4f score replay,
-execution sweep, store rebuild or retraining has run; the rev4e economics above
-remain historical and uncorrected. Resolve the action-availability and diagnostic
-identity conflicts in the pass-5 status before replaying or advancing the campaign.
+Pass 5 uses [the clarified rev4f registration](research/preregistrations/v2_round1_round2_rev4f.md).
+The ledger consumes economic BOVA11 beta, notional entries and hedge rebalances,
+and position-fraction exits/trims. Decisions use only action uncertainty known
+through t-1. Retrospective opening-inventory conversion occurs after all intentions
+and before fills. Replay exemptions enumerate only authorized diagnostic/provenance
+fields; scores, masks, targets, populations and score-derived readouts remain fixed.
+[Pass-5 status](docs/v2_PASS5_STATUS.md) records completed work. The beta sidecar is
+`v2_hedge_beta_rev4f_20260908T225248Z`, manifest
+`f5fa41536740ca412550cb81d2b44c9541e338dc060d674ab8ea270edd7be712`.
+
+Sealed rev4e Round 2 is now mirrored in
+`D:\quant-data\b3\processed\model_runs\v2_round2_rev4e_2b40b24_20260908T202100Z`.
+All 400 inventory files (333,714,344 bytes) and the exact file set are hash-verified.
+The only approved launcher remains `ops/lambda-gh200.ps1`. Every future GPU run
+must be sealed, copied to the host and hash-verified BEFORE terminating its exact
+recorded instance ID; verify that ID absent twice.
 
 The accepted v1 incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best

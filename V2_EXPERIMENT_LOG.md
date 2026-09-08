@@ -2474,3 +2474,27 @@ The positive network and ensemble economics point estimates both have
 intervals spanning zero; this is development research evidence, not a
 profitable-deployment claim. Round 3, 2025 data, store rebuilding, and any
 deployment change were not performed.
+
+## Pass-5 clarification and Round-2 host copy (2026-09-08)
+
+The clarified contract fixes notional entries/hedge rebalances and position-fraction
+exits. Retrospective actions now follow decisions and precede fills. The joined
+builder/evaluator/ledger fixture changes only an event-day close: inferred cash
+terms differ, but every event-day intention remains identical. Partial trim fractions
+survive splits; terminal liquidation supersedes an unfinished partial trim.
+
+Round 2 was copied through Lambda S3 directly to
+`D:\quant-data\b3\processed\model_runs\v2_round2_rev4e_2b40b24_20260908T202100Z`.
+No instance was launched. Object ETags failed MD5 comparison; the downloaded bytes
+were instead verified against the sealed SHA-256 inventory: all 400 files,
+333,714,344 bytes and the complete file set pass. Design/result/access/inventory
+hashes remain `0e5e7fa43e221d4ff51bd5ba353dfdad021540c8531fe86738b71bfe8e7ae788`,
+`c2549977e94ad2ca00a88642cfc61ab3b1ba98cadd5cb5b9bb2780788cb9ede4`,
+`6b5b821ad7d583137b9f9c93754e794d72641f3a564641cedc0ed60361416224`, and
+`7d32efb19a539c387c4085e25e660afa748dc230c09760457d1a7e6b850790cc`.
+See `docs/v2_round2_host_copy_evidence.json`. Credentials were supplied only to the
+copy processes, not persisted in files. No score/model was recomputed for this copy.
+
+Validation before replay: Ruff and compilation pass; the full research suite passed
+908 tests in 467.91 seconds. The final focused run passed 100 tests, including
+the added invariant-exemption check and the joined corporate-action causality test.

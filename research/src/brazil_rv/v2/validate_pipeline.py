@@ -842,6 +842,16 @@ def _evaluation_inputs(
         source_archive_present=source_archive_present or None,
         source_feature_valid=source_feature_valid or None,
         initial_reference_price=initial_reference_price,
+        initial_unresolved_action=(
+            ~np.asarray(
+                store.read(
+                    "action_session_resolved", np.asarray([int(indices[0]) - 1])
+                ),
+                dtype=np.bool_,
+            )[0]
+            if int(indices[0]) > 0
+            else np.zeros(len(store.isins), dtype=np.bool_)
+        ),
         eventual_survives_to_final_year=np.asarray(
             store.read("audit_eventual_survives_to_final_year", indices),
             dtype=np.bool_,

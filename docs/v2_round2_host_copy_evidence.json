@@ -1,0 +1,16 @@
+{
+  "source": "lambda:314d618f-cc0a-4586-8abc-55a68103d683/quant-data/b3/processed/model_runs/v2_round2_rev4e_2b40b24_20260908T202100Z",
+  "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4e_2b40b24_20260908T202100Z",
+  "transport": "S3 via rclone; object ETags not used as MD5; authoritative SHA-256 verification after download",
+  "hashes": {
+    "frozen_design.json": "0e5e7fa43e221d4ff51bd5ba353dfdad021540c8531fe86738b71bfe8e7ae788",
+    "round2_result.json": "c2549977e94ad2ca00a88642cfc61ab3b1ba98cadd5cb5b9bb2780788cb9ede4",
+    "access_audit.json": "6b5b821ad7d583137b9f9c93754e794d72641f3a564641cedc0ed60361416224",
+    "artifact_inventory.json": "7d32efb19a539c387c4085e25e660afa748dc230c09760457d1a7e6b850790cc"
+  },
+  "verified_inventory_rows": 400,
+  "verified_inventory_bytes": 333714344,
+  "all_inventory_rows_sha256_verified": true,
+  "exact_file_set_verified": true,
+  "gpu_instance_launched": false
+}

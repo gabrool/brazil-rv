@@ -476,3 +476,23 @@ Before registered research, the revised path must demonstrate:
 Unavailable source capability is reported as unsupported, not imputed into a
 passing result. Only after these checks and a fresh immutable build should
 development research be preregistered and run.
+
+
+## Run-many closing checklist
+
+1. Preserve logs and score/checkpoint/report artifacts on `brazil-rv-east3`;
+   seal the completed run and verify its inventory.
+2. Copy the complete sealed root to `D:\quant-data\b3\processed\model_runs\`.
+   Verify design, result, access audit and inventory identities, every inventory
+   row's bytes and SHA-256, and the exact file set. Do not terminate before this passes.
+3. Commit and push code/docs; verify recorded instance, local and GitHub commit
+   identities. Credentials never belong in Git or run artifacts.
+4. Terminate only the launcher's exact recorded instance ID; verify that ID absent
+   twice. Never terminate by name or touch adjacent instances.
+
+The only approved launch command, from the committed clean repository, is
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\ops\lambda-gh200.ps1 -Mode Launch -IUnderstandBilling`.
+Use at most one `brazil-rv-gh200` in `us-east-3` with `brazil-rv-east3` attached.
+Use the exact instance-specific SSH/known-hosts details printed by the launcher.
+It neither trains nor terminates. Paid work requires the user's go. Prefer
+available off-instance S3 copying, verified against sealed SHA-256 hashes.

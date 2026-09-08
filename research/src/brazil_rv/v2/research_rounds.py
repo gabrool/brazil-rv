@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import math
 import shutil
@@ -18,7 +19,7 @@ from brazil_rv.execution.stateful_ledger import TERMINAL_SETTLEMENT_CONVENTION
 
 from .artifacts import inventory, sha256_file, verify_inventory, write_json_atomic
 from .baselines import BaselinePanel, build_store_baselines
-from .bova11 import load_bova11_series
+from .bova11 import Bova11Series, load_bova11_series
 from .config import PROJECT_ROOT
 from .contract import (
     GBDT_SEEDS,
@@ -69,15 +70,16 @@ from .validate_pipeline import (
     _LEGACY_ROUND1_RESULT_SHA256,
     _LEGACY_ROUND1_ROOT,
     _date_indices,
+    _changed_field_paths,
     _evaluation_inputs,
     _load_development_cdi,
-    _non_ledger_report,
     _read_store_header,
     _window_target_mask,
 )
 
 PRIOR_ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4E"
 ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4F"
+PRIOR_ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4E"
 ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4F"
 RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4D"
 PREREGISTRATION = (
@@ -183,6 +185,35 @@ def load_registration_protocol(path: Path = PREREGISTRATION) -> dict[str, object
     return payload
 
 
+# Exact field paths authorized by the rev4f clarification. All other report
+# content, including outcome populations and every score-derived field, is fixed.
+RECOMPUTED_DIAGNOSTICS = (
+    "economics",
+    "diagnostics.exposure_daily",
+    "diagnostics.exposure_summary",
+    "diagnostics.realized_beta",
+    "diagnostics.realized_beta_bova11",
+    "mask_coverage.stale_mark_name_days",
+    "mask_coverage.unresolved_action_name_days",
+    "mask_coverage.valuation_scenario_count",
+    "mask_coverage.actual_risk_breach_dates",
+)
+RECOMPUTED_INPUT_HASHES = (
+    "prior_feature_beta_60",
+    "prior_feature_log_return_5",
+    "prior_feature_log_volume_mean_20",
+    "prior_feature_momentum_12_1",
+    "prior_feature_yang_zhang_vol_20",
+    "hedge_beta",
+    "hedge_beta_valid",
+    "hedge_beta_manifest",
+    "hedge_beta_history_values",
+    "hedge_beta_history_valid",
+    "initial_hedge_reference_price",
+    "initial_unresolved_action",
+)
+
+
 def registration_protocol_from_code() -> dict[str, object]:
     """Build protocol facts that registration prose may not override."""
 
@@ -197,7 +228,15 @@ def registration_protocol_from_code() -> dict[str, object]:
             "fallback_max_age": 20,
             "fallback_default": 1.0,
         },
-        "hedge_decision": "15:45; fixed quantity from prior BOVA11 close and prior NAV",
+        "hedge_decision": "15:45; delta notional from prior marks and NAV; final close is a full position-fraction exit",
+        "order_representation": {
+            "entry": "planned_notional / observed_close",
+            "exit_risk_terminal": "position_fraction * converted_opening_inventory",
+            "actions": "decisions use only t-1 or earlier; retrospective accounting after decisions before fills",
+            "partial_exit": "remaining fraction rebased onto remaining inventory",
+        },
+        "recomputed_diagnostics": list(RECOMPUTED_DIAGNOSTICS),
+        "recomputed_input_hashes": list(RECOMPUTED_INPUT_HASHES),
         "borrow_daily_accrual": "expm1(log1p(annual_rate)/252); fee separately",
         "cost_grid": {
             "cost_bps": [2, 4, 7],
@@ -2595,15 +2634,53 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
 
 def _ledger_replay_non_ledger_projection(
     report: Mapping[str, object],
+    *,
+    require_recomputed: bool = True,
 ) -> dict[str, object]:
-    projection = _non_ledger_report(report)
-    diagnostics = projection.get("diagnostics")
-    if not isinstance(diagnostics, Mapping):
-        raise ValueError("evaluation lacks its diagnostics payload")
-    projection["diagnostics"] = {
-        key: value for key, value in diagnostics.items() if key != "realized_beta"
-    }
+    projection = copy.deepcopy(dict(report))
+    projection.pop("schema", None)
+    for path in (
+        *RECOMPUTED_DIAGNOSTICS,
+        *(f"input_hashes.{key}" for key in RECOMPUTED_INPUT_HASHES),
+    ):
+        parent, _, key = path.rpartition(".")
+        node = projection
+        for part in parent.split(".") if parent else ():
+            node = node[part]
+        if require_recomputed and key not in node:
+            raise ValueError(f"replay lacks registered recomputed field: {path}")
+        node.pop(key, None)
     return projection
+
+
+def _replay_diagnostic_changes(
+    before: Mapping[str, object], after: Mapping[str, object]
+) -> dict[str, object]:
+    changes = {}
+    for path in RECOMPUTED_DIAGNOSTICS:
+        values = []
+        for report in (before, after):
+            value = report
+            for part in path.split("."):
+                value = value.get(part) if isinstance(value, Mapping) else None
+            if path == "economics" and isinstance(value, Mapping):
+                # Full daily/audit payloads remain in the hash-bound source and
+                # destination reports; keep the before/after comparison compact.
+                value = {
+                    key: value[key]
+                    for key in ("contract", "headline", "summaries", "coverage")
+                    if key in value
+                }
+            values.append(value)
+        changes[path] = {"before": values[0], "after": values[1]}
+    changes["input_hashes"] = {
+        key: {
+            "before": before["input_hashes"].get(key),
+            "after": after["input_hashes"].get(key),
+        }
+        for key in RECOMPUTED_INPUT_HASHES
+    }
+    return changes
 
 
 def freeze_round1_ledger_replay(
@@ -2673,6 +2750,138 @@ def freeze_round1_ledger_replay(
     return write_json_atomic(output / "frozen_design.json", design)
 
 
+@dataclass
+class _LedgerReplayContext:
+    store: V2Store
+    access: dict[str, object]
+    evaluation: Mapping[str, NDArray[np.int64]]
+    cdi: NDArray[np.float64]
+    cdi_provenance: Mapping[str, object]
+    bova11: Bova11Series
+    bova11_binding: Mapping[str, str]
+    lending_borrow: LendingBorrowPanels
+
+
+def _open_ledger_replay(design: Mapping[str, object]) -> _LedgerReplayContext:
+    store_root = Path(str(design["store"]["root"])).resolve(strict=True)
+    store_manifest, dates = _read_store_header(store_root)
+    if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
+        raise ValueError("rev4f replay store manifest hash mismatch")
+    _source_tier_labels(store_manifest)
+    fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
+    pretrain = _pretrain_indices(dates)
+    cdi_design = design["cdi"]
+    cdi, cdi_provenance = _load_development_cdi(
+        dates=dates,
+        cdi_path=Path(str(cdi_design["development_extension"]["path"])),
+        expected_sha256=str(cdi_design["development_extension"]["sha256"]),
+        experiment52_cdi_path=Path(str(cdi_design["experiment52_reference"]["path"])),
+        experiment52_expected_sha256=str(
+            cdi_design["experiment52_reference"]["sha256"]
+        ),
+    )
+    bova_design = design["bova11"]
+    bova11 = load_bova11_series(
+        Path(str(bova_design["root"])),
+        expected_manifest_sha256=str(bova_design["manifest_sha256"]),
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+    )
+    if bova11.data_sha256 != bova_design["data_sha256"]:
+        raise ValueError("rev4f replay BOVA11 data hash mismatch")
+    bova11_binding = {
+        **bova_design,
+        "manifest_sha256": bova11.manifest_sha256,
+        "data_sha256": bova11.data_sha256,
+    }
+    lending_borrow = _load_frozen_lending(design, store_root=store_root, dates=dates)
+    store, access = _open_round_store(
+        store_root, fit, selection, evaluation, fit_target_window, pretrain
+    )
+    return _LedgerReplayContext(
+        store,
+        access,
+        evaluation,
+        cdi,
+        cdi_provenance,
+        bova11,
+        bova11_binding,
+        lending_borrow,
+    )
+
+
+def _replay_one(
+    context: _LedgerReplayContext, source_path: Path, destination_path: Path, fold: str
+) -> tuple[_ResearchEvaluation, dict[str, object]]:
+    retained = _evaluation_from_artifacts(
+        source_path,
+        store=context.store,
+        indices=context.evaluation[fold],
+        cdi=context.cdi,
+        bova11_close_by_index=context.bova11.close_by_session,
+        bova11_binding=context.bova11_binding,
+        lending_borrow=context.lending_borrow,
+        expected_fold=fold,
+        expected_evaluation_schema=PRIOR_EVALUATION_SCHEMA,
+    )
+    replayed = evaluate_scores(retained.inputs, window_name=fold)
+    for key in ("research_claim", "deployment_changed"):
+        if key in retained.result.report:
+            replayed.report[key] = retained.result.report[key]
+    old_projection = _ledger_replay_non_ledger_projection(
+        retained.result.report, require_recomputed=False
+    )
+    new_projection = _ledger_replay_non_ledger_projection(replayed.report)
+    new_sha = write_json_atomic(destination_path, replayed.report)
+    if old_projection != new_projection:
+        changed = sorted(_changed_field_paths(old_projection, new_projection, "report"))
+        write_json_atomic(
+            destination_path.parent / "replay_stop.json",
+            {
+                "status": "stopped",
+                **RESEARCH_FLAGS,
+                "failed_gates": ["non_ledger_identity"],
+                "changed_fields": changed,
+                "source_evaluation_sha256": sha256_file(source_path),
+                "replayed_evaluation_sha256": new_sha,
+            },
+        )
+        raise RuntimeError(
+            f"non-ledger evaluation fields changed in rev4f replay: {source_path}: {changed}"
+        )
+    headline = replayed.report["economics"]["headline"]
+    failed = [
+        name for name, count in headline["entry_defect_signatures"].items() if count
+    ]
+    if not 1.5 <= headline["mean_gross_fraction_nav"] <= 2.25:
+        failed.append("mean_gross_outside_1.5_to_2.25")
+    if headline["mean_unresolved_stale_inventory_fraction_nav"] >= 0.02:
+        failed.append("mean_unresolved_stale_inventory_at_least_0.02")
+    if failed:
+        write_json_atomic(
+            destination_path.parent / "replay_stop.json",
+            {
+                "status": "stopped",
+                **RESEARCH_FLAGS,
+                "failed_gates": failed,
+                "source_evaluation_sha256": sha256_file(source_path),
+                "replayed_evaluation_sha256": new_sha,
+            },
+        )
+        raise RuntimeError(f"registered replay stop at {destination_path}: {failed}")
+    comparison = {
+        "source": str(source_path),
+        "source_sha256": sha256_file(source_path),
+        "replayed": str(destination_path),
+        "replayed_sha256": new_sha,
+        "score_or_model_recomputed": False,
+        "non_ledger_fields_bit_identical": True,
+        "recomputed_diagnostics": _replay_diagnostic_changes(
+            retained.result.report, replayed.report
+        ),
+    }
+    return _ResearchEvaluation(result=replayed, inputs=retained.inputs), comparison
+
+
 def run_round1_ledger_replay(*, output_root: Path) -> str:
     """Re-evaluate only the ledger over the sealed rev4e Round-1 score panels."""
 
@@ -2703,40 +2912,11 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
     ):
         if sha256_file(path) != source_binding.get(name):
             raise ValueError(f"sealed rev4e {name} differs from the frozen binding")
-    store_root = Path(str(design["store"]["root"])).resolve(strict=True)
-    store_manifest, dates = _read_store_header(store_root)
-    if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
-        raise ValueError("Round-1 rev4f store manifest hash mismatch")
-    source_tiers = _source_tier_labels(store_manifest)
-    fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
-    pretrain = _pretrain_indices(dates)
-    cdi_design = design["cdi"]
-    cdi, cdi_provenance = _load_development_cdi(
-        dates=dates,
-        cdi_path=Path(str(cdi_design["development_extension"]["path"])),
-        expected_sha256=str(cdi_design["development_extension"]["sha256"]),
-        experiment52_cdi_path=Path(str(cdi_design["experiment52_reference"]["path"])),
-        experiment52_expected_sha256=str(
-            cdi_design["experiment52_reference"]["sha256"]
-        ),
-    )
-    bova_design = design["bova11"]
-    bova11 = load_bova11_series(
-        Path(str(bova_design["root"])),
-        expected_manifest_sha256=str(bova_design["manifest_sha256"]),
-        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
-    )
-    if bova11.data_sha256 != bova_design["data_sha256"]:
-        raise ValueError("Round-1 rev4f BOVA11 data hash mismatch")
-    bova11_binding = {
-        **bova_design,
-        "manifest_sha256": bova11.manifest_sha256,
-        "data_sha256": bova11.data_sha256,
-    }
-    lending_borrow = _load_frozen_lending(design, store_root=store_root, dates=dates)
-    store, access = _open_round_store(
-        store_root, fit, selection, evaluation, fit_target_window, pretrain
-    )
+    context = _open_ledger_replay(design)
+    store, access = context.store, context.access
+    source_tiers = _source_tier_labels(store.manifest)
+    cdi_provenance = context.cdi_provenance
+    bova11, lending_borrow = context.bova11, context.lending_borrow
     shutil.copytree(source / "baselines", output / "baselines")
     shutil.copytree(source / "gbdt_ladder", output / "gbdt_ladder")
     comparison_rows: list[dict[str, object]] = []
@@ -2744,39 +2924,9 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
     def replay_one(
         source_path: Path, destination_path: Path, fold: str
     ) -> _ResearchEvaluation:
-        retained = _evaluation_from_artifacts(
-            source_path,
-            store=store,
-            indices=evaluation[fold],
-            cdi=cdi,
-            bova11_close_by_index=bova11.close_by_session,
-            bova11_binding=bova11_binding,
-            lending_borrow=lending_borrow,
-            expected_fold=fold,
-            expected_evaluation_schema=PRIOR_EVALUATION_SCHEMA,
-        )
-        replayed = evaluate_scores(retained.inputs, window_name=fold)
-        for key in ("research_claim", "deployment_changed"):
-            if key in retained.result.report:
-                replayed.report[key] = retained.result.report[key]
-        old_projection = _ledger_replay_non_ledger_projection(retained.result.report)
-        new_projection = _ledger_replay_non_ledger_projection(replayed.report)
-        if old_projection != new_projection:
-            raise RuntimeError(
-                f"non-ledger evaluation fields changed in rev4f replay: {source_path}"
-            )
-        new_sha = write_json_atomic(destination_path, replayed.report)
-        comparison_rows.append(
-            {
-                "source": str(source_path),
-                "source_sha256": sha256_file(source_path),
-                "replayed": str(destination_path),
-                "replayed_sha256": new_sha,
-                "score_or_model_recomputed": False,
-                "non_ledger_fields_bit_identical": True,
-            }
-        )
-        return _ResearchEvaluation(result=replayed, inputs=retained.inputs)
+        replayed, comparison = _replay_one(context, source_path, destination_path, fold)
+        comparison_rows.append(comparison)
+        return replayed
 
     baseline_reports: dict[str, dict[str, _ResearchEvaluation]] = {}
     baseline_records: dict[str, dict[str, object]] = {}
@@ -2915,6 +3065,150 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
         return write_json_atomic(result_path, result)
     finally:
         store.close()
+
+
+def freeze_round2_ledger_replay(
+    *,
+    source_round2_root: Path,
+    round1_replay_root: Path,
+    output_root: Path,
+) -> str:
+    """Bind sealed Round-2 panels to the verified host-side Round-1 inputs."""
+    protocol = verify_registration_protocol()
+    code = _git_identity()
+    source = source_round2_root.resolve(strict=True)
+    _verify_sealed_root(source, expected_schema=PRIOR_ROUND2_SCHEMA)
+    round1 = round1_replay_root.resolve(strict=True)
+    _verify_sealed_root(round1, expected_schema=ROUND1_SCHEMA)
+    original = _read_json(source / "frozen_design.json")
+    local = _read_json(round1 / "frozen_design.json")
+    for group, keys in (
+        ("store", ("manifest_sha256",)),
+        ("bova11", ("manifest_sha256", "data_sha256")),
+        ("lending_archive", ("manifest_sha256", "balances_sha256", "rates_sha256")),
+    ):
+        if any(original[group][key] != local[group][key] for key in keys):
+            raise ValueError(
+                f"Round-2 replay inputs differ from sealed source: {group}"
+            )
+    for key in ("development_extension", "experiment52_reference"):
+        if original["cdi"][key]["sha256"] != local["cdi"][key]["sha256"]:
+            raise ValueError("Round-2 replay CDI differs from its sealed source")
+    output = output_root.resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    design = {
+        "schema": ROUND2_SCHEMA,
+        "status": "frozen_before_score",
+        **RESEARCH_FLAGS,
+        "frozen_at_utc": _utc_now(),
+        "implementation": code,
+        "scope": "ledger_only_replay_of_hash_bound_rev4e_score_panels",
+        "preregistration": {
+            "path": str(PREREGISTRATION),
+            "sha256": sha256_file(PREREGISTRATION),
+            "protocol": protocol,
+        },
+        "prior_round2": {
+            "root": str(source),
+            "result_sha256": sha256_file(source / "round2_result.json"),
+            "inventory_sha256": sha256_file(source / "artifact_inventory.json"),
+            "frozen_design_sha256": sha256_file(source / "frozen_design.json"),
+        },
+        "round1_replay": {
+            "root": str(round1),
+            "result_sha256": sha256_file(round1 / "round1_result.json"),
+            "inventory_sha256": sha256_file(round1 / "artifact_inventory.json"),
+        },
+        **{
+            key: local[key]
+            for key in (
+                "store",
+                "cdi",
+                "bova11",
+                "lending_archive",
+                "folds",
+                "bootstrap",
+            )
+        },
+    }
+    return write_json_atomic(output / "frozen_design.json", design)
+
+
+def run_round2_ledger_replay(*, output_root: Path) -> str:
+    output = output_root.resolve(strict=True)
+    design = _read_json(output / "frozen_design.json")
+    if (
+        design.get("schema") != ROUND2_SCHEMA
+        or design.get("scope") != "ledger_only_replay_of_hash_bound_rev4e_score_panels"
+        or design.get("implementation") != _git_identity()
+    ):
+        raise ValueError("Round-2 replay differs from its frozen implementation")
+    if (output / "round2_result.json").exists():
+        raise FileExistsError(output / "round2_result.json")
+    binding = design["prior_round2"]
+    source = Path(binding["root"]).resolve(strict=True)
+    original = _verify_sealed_root(source, expected_schema=PRIOR_ROUND2_SCHEMA)
+    for key, filename in (
+        ("result_sha256", "round2_result.json"),
+        ("inventory_sha256", "artifact_inventory.json"),
+        ("frozen_design_sha256", "frozen_design.json"),
+    ):
+        if sha256_file(source / filename) != binding[key]:
+            raise ValueError(f"sealed Round-2 source differs from freeze: {filename}")
+    context = _open_ledger_replay(design)
+    comparisons = []
+    reports = {}
+    artifacts = {}
+    try:
+        for family, name in (
+            ("aggregates", "arm_A"),
+            ("aggregates", "arm_B"),
+            ("comparators", "gbdt"),
+            ("comparators", "ensemble"),
+        ):
+            reports[name], artifacts[name] = {}, {}
+            for fold in ("F1", "F2", "F3"):
+                src = source / family / name / fold
+                dst = output / family / name / fold
+                shutil.copytree(src, dst)
+                report, comparison = _replay_one(
+                    context, src / "evaluation.json", dst / "evaluation.json", fold
+                )
+                reports[name][fold] = report
+                comparisons.append(comparison)
+                artifacts[name][fold] = _existing_score_and_evaluation_record(dst)
+        _round2_result(
+            root=output,
+            design=design,
+            store=context.store,
+            access=context.access,
+            source_hashes=original["sources"],
+            arm_reports={name: reports[name] for name in ("arm_A", "arm_B")},
+            arm_artifacts={name: artifacts[name] for name in ("arm_A", "arm_B")},
+            comparator_reports={
+                "network": reports["arm_B"],
+                "gbdt": reports["gbdt"],
+                "ensemble": reports["ensemble"],
+            },
+            comparator_artifacts={
+                "network": artifacts["arm_B"],
+                "gbdt": artifacts["gbdt"],
+                "ensemble": artifacts["ensemble"],
+            },
+            retained_stage_p_root=source,
+        )
+        result = _read_json(output / "round2_result.json")
+        result["score_implementation"] = original["implementation"]
+        result["ledger_replay"] = {
+            "source_root": str(source),
+            "score_or_model_recomputation": False,
+            "evaluation_count": len(comparisons),
+            "all_non_ledger_fields_bit_identical": True,
+            "comparisons": comparisons,
+        }
+        return write_json_atomic(output / "round2_result.json", result)
+    finally:
+        context.store.close()
 
 
 def _verify_sealed_root(root: Path, *, expected_schema: str) -> dict[str, object]:
@@ -3579,8 +3873,15 @@ def _evaluation_from_artifacts(
     )
     recorded_hashes = report.get("input_hashes")
     rebuilt_hashes = _input_hashes(inputs)
-    if recorded_hashes != rebuilt_hashes:
-        recorded = recorded_hashes if isinstance(recorded_hashes, Mapping) else {}
+    recorded = recorded_hashes if isinstance(recorded_hashes, Mapping) else {}
+    allowed_changes = (
+        set(RECOMPUTED_INPUT_HASHES)
+        if expected_evaluation_schema == PRIOR_EVALUATION_SCHEMA
+        else set()
+    )
+    if {k: v for k, v in recorded.items() if k not in allowed_changes} != {
+        k: v for k, v in rebuilt_hashes.items() if k not in allowed_changes
+    }:
         differing = sorted(
             key
             for key in set(recorded) | set(rebuilt_hashes)
@@ -3697,6 +3998,7 @@ def _round2_result(
     comparator_reports: Mapping[str, Mapping[str, _ResearchEvaluation]],
     comparator_artifacts: Mapping[str, object],
     reporting_recovery: Mapping[str, object] | None = None,
+    retained_stage_p_root: Path | None = None,
 ) -> str:
     arm_readouts, arm_deltas, eligible, uncertain, chosen_arm = _round2_arm_decision(
         arm_reports
@@ -3735,7 +4037,7 @@ def _round2_result(
         "implementation": implementation,
         "store_access": dict(access),
         "sources": dict(source_hashes),
-        "stage_p_holdout": _round2_stage_p(root),
+        "stage_p_holdout": _round2_stage_p(retained_stage_p_root or root),
         "data_span_arms": {
             "artifacts": dict(arm_artifacts),
             "readouts": arm_readouts,
@@ -4267,6 +4569,12 @@ def _parser() -> argparse.ArgumentParser:
     seal.add_argument(
         "--research-claim", action=argparse.BooleanOptionalAction, default=True
     )
+    replay2_freeze = commands.add_parser("freeze-round2-ledger-replay")
+    replay2_freeze.add_argument("--source-round2-root", type=Path, required=True)
+    replay2_freeze.add_argument("--round1-replay-root", type=Path, required=True)
+    replay2_freeze.add_argument("--output-root", type=Path, required=True)
+    replay2_run = commands.add_parser("run-round2-ledger-replay")
+    replay2_run.add_argument("--output-root", type=Path, required=True)
     freeze2 = commands.add_parser("freeze-round2")
     freeze2.add_argument("--round1-root", type=Path, required=True)
     freeze2.add_argument("--store", type=Path, required=True)
@@ -4336,6 +4644,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     elif arguments.command == "run-round1-ledger-replay":
         digest = run_round1_ledger_replay(output_root=arguments.output_root)
+    elif arguments.command == "freeze-round2-ledger-replay":
+        digest = freeze_round2_ledger_replay(
+            source_round2_root=arguments.source_round2_root,
+            round1_replay_root=arguments.round1_replay_root,
+            output_root=arguments.output_root,
+        )
+    elif arguments.command == "run-round2-ledger-replay":
+        digest = run_round2_ledger_replay(output_root=arguments.output_root)
     elif arguments.command == "freeze-round2":
         digest = freeze_round2(
             round1_root=arguments.round1_root,

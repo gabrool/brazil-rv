@@ -129,6 +129,7 @@ class EvaluationInputs:
     hedge_beta_valid: NDArray[np.bool_] | None = None
     hedge_beta_history: tuple[NDArray[np.floating], NDArray[np.bool_]] | None = None
     hedge_beta_manifest_sha256: str | None = None
+    initial_unresolved_action: NDArray[np.bool_] | None = None
     initial_hedge_reference_price: float = np.nan
     neutral_target_fallback_flags: NDArray[np.bool_] | None = None
 
@@ -1596,6 +1597,13 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         "hedge_beta_manifest": str(inputs.hedge_beta_manifest_sha256),
         "hedge_beta": _array_sha256(np.asarray(inputs.hedge_beta)),
         "hedge_beta_valid": _array_sha256(np.asarray(inputs.hedge_beta_valid)),
+        "initial_unresolved_action": _array_sha256(
+            np.asarray(
+                inputs.initial_unresolved_action
+                if inputs.initial_unresolved_action is not None
+                else np.zeros(len(inputs.security_ids), dtype=np.bool_)
+            )
+        ),
         "initial_hedge_reference_price": _array_sha256(
             np.asarray(inputs.initial_hedge_reference_price)
         ),
@@ -1677,6 +1685,8 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
             "stale mark while an exit is pending; fill at the first print and "
             "report a valuation scenario after 10 missing sessions"
         ),
+        "order_representation": "notional entries and hedge rebalances; position-fraction exits and terminal hedge liquidation",
+        "action_timing": "only prior-session uncertainty affects decisions; retrospective conversion of opening inventory before fills",
         "marking_basis": "raw contractual close with explicit signed shares",
         "action_terms_source": inputs.action_terms_source,
         "schedule_source": inputs.schedule_source,
@@ -2095,6 +2105,7 @@ def evaluate_scores(
         cdi_returns=inputs.cdi_returns,
         security_ids=inputs.security_ids,
         initial_reference_price=inputs.initial_reference_price,
+        initial_unresolved_action=inputs.initial_unresolved_action,
         annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
         borrow_rate_imputed=inputs.borrow_rate_imputed,
         borrow_rate_placeholder=inputs.borrow_rate_placeholder,
@@ -2128,6 +2139,7 @@ def evaluate_scores(
         security_ids=inputs.security_ids,
         config=LedgerConfig(),
         initial_reference_price=inputs.initial_reference_price,
+        initial_unresolved_action=inputs.initial_unresolved_action,
         annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
         borrow_rate_imputed=inputs.borrow_rate_imputed,
         borrow_rate_placeholder=inputs.borrow_rate_placeholder,

@@ -1,13 +1,13 @@
 # Pass-5 implementation status
 
-This is a **partial implementation, stopped before the first rev-4f score replay**.
+This is the implementation checkpoint **before the first rev-4f score replay**.
 It is not a re-baseline result or authorization to start Round 3.
 
 The prior cleanup is committed separately as `fb6fc92`; the initial rev-4f
 registration was committed as `0302b27` before new derived beta output.
 The rev-4e registration is retained verbatim inside
 [the rev-4f amendment](../research/preregistrations/v2_round1_round2_rev4f.md).
-Its own rev-4f JSON block describes the implemented hedge/borrow/retention changes.
+Its rev-4f JSON block includes the clarified order, action and replay contracts.
 
 ## Implemented and exercised
 
@@ -21,9 +21,9 @@ Its own rev-4f JSON block describes the implemented hedge/borrow/retention chang
   argument. Fallback uses the last valid beta for at most 20 sessions, then 1.0.
   The adapter supplies the preceding 20 sessions at a fold boundary. Missing beta
   no longer excludes a name from entry selection. Fallback sessions are reported.
-- Hedge quantities are fixed before current-session prints. The target uses held
+- Hedge notionals are fixed before current-session prints. The target uses held
   prior marks, pending/planned entries and planned exits; threshold and cap use
-  prior NAV. BOVA11 prior close sets quantity. Hedge orders, fills and missed-print
+  prior NAV. BOVA11 prior close records the reference. Hedge orders, fills and missed-print
   cancellations are recorded. Execution imbalance is carried to the next decision.
 - Conditional last-mark settlement intentions are also fixed before a possible
   final print, then expire if a print makes settlement unnecessary. The ten-session
@@ -65,64 +65,31 @@ are in [0.5, 1.5]. The 5th/95th percentiles are 0.57235/1.93712.
 are copied into Git for review. This is input-only evidence, not a measured
 change in model edge. The canonical store and sealed results were not rewritten.
 
-## Required clarifications and remaining work
+## Clarifications implemented; execution pending
 
-**§1.3 is not implemented.** The existing retrospective-action decision path
-remains a known defect. The response asks both for a decision-known path and for
-new-entry blocking on the inferred event day. The current inferred event flag
-itself can depend on the later close. Blocking on that retrospective flag leaks
-event existence even if q/d are hidden. Clarification requested: use only
-evidence available at 15:45 for decision-time uncertainty, then account for
-retrospective entitlements and unit changes after the close. The joined
-builder/evaluator/ledger action mutation fixture remains required.
+The joined inferred-action builder -> evaluator -> ledger causality test passes:
+changing only the event-day close changes inferred cash terms but no event-day
+intention. Entries and ordinary hedge trades carry notionals. Exits, trims and
+terminal liquidations carry position fractions of converted opening inventory.
+Partial fractions rebase after fills and survive conversions. Terminal liquidation
+supersedes a still-partial trim. Same-day action cancellations and round-lot sizing
+are removed; only prior-session uncertainty may block or cancel entries.
 
-That repair must preserve opening-position entitlements when an event-day exit
-fills. Applying q/d indiscriminately to end-of-day holdings would drop cash owed
-to positions sold that day and could grant cash to new entries that were not
-entitled. A split also changes the relationship between decision-unit quantity
-and executed shares. Existing split, cash, successor, unresolved-entry,
-any-print exit and terminal tests remain the baseline for the correction.
+The adapter supplies the previous session's uncertainty at a fold boundary. The
+registration declares recomputed diagnostics/provenance, requires their presence,
+reports before/after and preserves all other identities. Round 1 and Round 2 have
+CPU replay commands that reuse sealed panels. Replays stop on invariant differences,
+D1-D5 defects, mean gross outside [1.5,2.25], or mean unresolved/stale inventory >=2%.
+The explicit notional rule supersedes the impossible requirement for unchanged
+fixed-share economics when the fill price differs from the reference price.
 
-**§1.6 literal non-ledger equality conflicts with §1.1.** Fixing slow diagnostic
-validity changes prior-feature hashes and can change exposure diagnostics. The
-new economic sidecar also adds explicit input provenance. The current replay
-identity checks remain strict and will refuse this difference; no broad
-projection exemption was added. Clarification requested: retain exact score,
-target, primary population and IC equality, and explicitly enumerate corrected
-diagnostic/provenance fields in the before/after report. Do not claim a successful
-literal bit-identical replay unless that is actually demonstrated.
+Round 2 is recovered locally and fully hash-verified; see
+[v2_round2_host_copy_evidence.json](v2_round2_host_copy_evidence.json).
+No paid instance was required. Remaining sequence: commit, rev4f replays and report,
+CPU execution sweep, intraday coverage repair, one development-only store build,
+16-book acceptance, Round 1' CPU, then stop for the user's go before paid Round 3.
+No replay, sweep, new store or new fit has yet run in this clarification pass.
 
-**The Round-2 sealed panels are not locally available.** The recorded root is
-`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round2_rev4e_2b40b24_20260908T202100Z`.
-A local mirror or accessible source is needed. No paid instance was launched
-to obtain it. A rev-4f Round-2 replay entrypoint and its conclusion table remain
-to be implemented after the replay contract is resolved.
-
-**The referenced Round-3 document was not located.** The attachment delegates
-its adoption rule, liquidity-screened readout and 2025 rule to that document.
-Its path or contents are required before those rules can be implemented faithfully.
-
-After resolving these items, preserve the specified order:
-action repair and joined test → sealed Round-1 and Round-2 replay/report →
-CPU execution sweep/report → M1 return-consistency coverage →
-one bounded store rebuild and 16-book acceptance → Round 1' →
-stop for Gabriel's GPU go.
-
-The intraday return-consistency repair, rolling-support/activity changes,
-lending/oddlot rebuild, execution sweep, Round 1', GPU gate/gradient logging,
-fast ablation and Round-3 runs have **not** been performed. No Round-4 hypothesis
-was started. No 2025/2026 feature or outcome payload was used and no deployment
-changed. New economics and designation conclusions are unavailable.
-
-## Verification
-
-Targeted ledger/beta/evaluator checks passed (115 tests), as did the pipeline
-fixtures (26 tests), research-round fixtures (26 tests), and the complete T24
-store/build/score/relocation/retained-replay acceptance fixture (61.50 seconds).
-The additional invalid-slow diagnostic adapter variants both passed.
-The full suite passed: **904 tests in 372.80 seconds**. After the final reporting-label
-cleanup and the additional invalid-slow fixture variant, six targeted evaluator,
-adapter and registration checks passed. Ruff, compileall, registration/code parity,
-and `git diff --check` passed. The real beta sidecar also passed the full reader
-hash/source/axis verification. These checks do not substitute for the still-pending
-joined action-causality test or a sealed-score re-baseline.
+Validation before replay: Ruff and compilation pass; the full research suite passed
+908 tests in 467.91 seconds. The final focused run passed 100 tests, including
+the added invariant-exemption check and the joined corporate-action causality test.
