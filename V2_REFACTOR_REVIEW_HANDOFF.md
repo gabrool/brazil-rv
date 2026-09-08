@@ -160,3 +160,51 @@ the unparsed B3 PDFs did not mutate the sealed lending source, and no protected
 period or deployment was accessed. The user explicitly withheld Round 2, so
 Stage P, A/B arms, R2.2, and GPU work were not started. There was no paid
 instance to terminate; two provider reads returned zero nonterminal instances.
+
+## Rev4e ledger and Round-2 decisions
+
+Rev4e implemented short-proceeds remuneration as an explicit ledger state,
+not as a score adjustment: the headline credits CDI on equity and BOVA11
+short proceeds, the comparator credits zero, equity borrow uses 20% of the
+contract rate subject to a 2.5--70 annual-bps band, and hedge borrow remains
+2%. All score, position, fill, clock, and construction inputs are reused and
+hash-bound. One sentence in the proposal asked the zero-remuneration
+comparator both to use the new fee schedule and to be bit-identical to the
+rev4d headline, which used a flat 25-bps fee. Those requirements cannot both
+hold. The implementation chose the registered rev4e fee schedule and made
+headline/comparator differ only in proceeds remuneration; it disclosed the
+resulting non-identity instead of disguising it.
+
+The final ledger replay reused all 18 sealed score panels without model or
+score recomputation. The strongest point estimate was momentum at +1.665
+bps/day, but its interval spans zero. `b_intraday` remained the only eligible
+GBDT parent. Two score-free attempts exposed provenance-classification bugs;
+they were retained with hashed evidence and repaired at fresh commits/roots.
+
+The GH200 preflight then found a foreign-root portability bypass and
+machine-epsilon tie drift in the characteristic-neutral residual on ARM.
+The first was routed through the existing hash-verifying override. The second
+was canonicalized only inside a 512-epsilon equality band, below float32 store
+precision; it does not alter economically distinct targets. Both changes were
+made before a Round-2 score and all 932 tests passed locally and on GH200.
+This is preferable to accepting host-dependent ranks or changing the target.
+
+A first Round-2 root was excluded because the disposable smoke command was
+given the frozen-design filename as its run-many manifest and overwrote it.
+It produced no score or registered trajectory; its failure record and logs
+remain available. The fresh root passed the exact smoke, completed all three
+Stage-P seeds and all 18 registered A/B trajectories, and sealed 400 files.
+
+Arm B was selected under the frozen IC-first rule: pooled neutral IC .024777
+versus .019564 for A, while the B-minus-A economics interval spans zero and
+does not activate an override. The equal-rank Arm-B-network/`b_intraday`-GBDT
+ensemble was designated because its pooled neutral IC .026531 is the highest
+of the eligible parents. Its headline net excess is +1.226 bps/day with a
+95% interval of [-1.691,8.364], so designation is a development research
+choice and not a profitability or deployment conclusion.
+
+The implementation deliberately stopped after the registered Round-2
+readout. It did not broaden into Round 3, access 2025/official validation/the
+spent test, rebuild the store, change a deployment, or invent stronger
+execution-grade evidence. Exact roots, hashes, fold tables, pairwise deltas,
+and the complete audit trail are in `V2_EXPERIMENT_LOG.md`.

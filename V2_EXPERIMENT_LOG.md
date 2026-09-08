@@ -2399,3 +2399,78 @@ only corrected provenance-field classification, were committed and pushed
 before a fresh freeze, and did not weaken comparison of true non-ledger
 fields. The final implementation is commit
 `962b9e0c141542bc141fb0df330ae7729178f5f0`.
+
+## Rev4e sealed Round 2 (2026-09-08)
+
+Before any registered GPU score, the Lambda checkout exposed two portability
+defects: a legacy `D:\quant-data` source bypassed the required data-root
+override, and ARM LAPACK left sub-float32 epsilon differences among
+mathematically tied neutral-target residuals. Commit
+`2b40b24a93fe173509ae3f99babb8aec9c4f970d` routes the source through the
+hash-verifying override and canonicalizes only neutral-target ties within
+`512 * epsilon`, far below the float32 store precision. Local and GH200 Ruff,
+compilation, and all 932 tests passed before scoring.
+
+The first operational Round-2 root,
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round2_rev4e_2b40b24_20260908T194800Z`,
+is excluded. A disposable compile-smoke invocation incorrectly used
+`frozen_design.json` as its run-many manifest and overwrote that file. The
+smoke itself completed one epoch and two compiled graphs, but no score or
+registered trajectory was written. Logs and a failure record (SHA-256
+`75e729ba98d7cafd741097fed3ec132ff88093e1a1e0cf6bf520ebaeedaf17a2`)
+were preserved before a fresh freeze.
+
+The successful immutable Round-2 root is:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round2_rev4e_2b40b24_20260908T202100Z
+
+Frozen-design, smoke-plan, Stage-P-plan, main-plan, result, access-audit, and
+artifact-inventory SHA-256 values are
+`0e5e7fa43e221d4ff51bd5ba353dfdad021540c8531fe86738b71bfe8e7ae788`,
+`2748fdec319d8f5749fe90ef3c8bf0733e845c8d975af7c605a00cfb178ab32a`,
+`42fc65ec8497bb1c2c441c7520637d17ae62a9626f6c497b2e0bc3932f348519`,
+`f2bb1c0148438e805fd91c9f7cc453624ea398de4642d21eb0a08484cba4bd21`,
+`c2549977e94ad2ca00a88642cfc61ab3b1ba98cadd5cb5b9bb2780788cb9ede4`,
+`6b5b821ad7d583137b9f9c93754e794d72641f3a564641cedc0ed60361416224`,
+and `7d32efb19a539c387c4085e25e660afa748dc230c09760457d1a7e6b850790cc`.
+The sealed inventory contains 400 files and 333,714,344 bytes.
+
+The disposable A/F1/seed-11 smoke passed exactly one epoch with two compiled
+graphs and no score directory. Stage P completed all three registered seeds;
+seeds 11/29/47 ran 8/5/7 epochs and selected epochs 5/2/4. Their raw handoff
+checkpoint SHA-256 values are respectively
+`d64423d36d5052db2eca54b47326cd210b143773e5301a9a77e6e2c94d7fbae9`,
+`85945271019180b0be4a6a9a964a1cf87e9fca021fd9925d6344d43bb1ac852d`,
+and `7275e712e1150c8f2f74285ab19a56e2b26c0edabf37bc6057b4311b76e7f56c`.
+The main plan then completed exactly 18 trajectories: A/B x F1/F2/F3 x
+seeds 11/29/47, with at most four training processes.
+
+| Candidate | Pooled neutral IC [95%] | Legacy IC | Shareholder/price rank | Spread bps/hold [95%] | Headline net bps/day [95%] | P1/P5 |
+| --- | --- | ---: | --- | --- | --- | --- |
+| Arm A | .019564 [.011607,.029864] | .049736 | .053137/.047504 | 15.461 [5.093,28.722] | 1.476 [-3.102,9.557] | .9566/.8875 |
+| Arm B | .024777 [.015940,.034967] | .053793 | .057805/.053700 | 22.296 [10.430,35.047] | 2.404 [-.521,9.039] | .8750/.7818 |
+| `b_intraday` GBDT | .019991 [.011608,.029269] | .028696 | .029164/.026342 | 8.715 [2.591,17.145] | -1.007 [-5.109,6.343] | .7783/.6287 |
+| Equal-rank network/GBDT | .026531 [.018022,.036904] | .048628 | .051117/.046980 | 17.069 [8.376,28.807] | 1.226 [-1.691,8.364] | .8308/.7247 |
+
+Arm B is selected by the registered IC-first rule. Its pooled neutral-IC
+delta over A is +.005212 [-.000195,.010310]; headline economics delta is
++.928 [-4.635,6.354] bps/day, so no economics override fired. Fold-level
+neutral IC / headline net bps/day for A was .003348/-3.725,
+.021309/+.861, and .033680/+7.154; for B it was .016891/+.700,
+.021353/-1.734, and .035807/+8.109.
+
+The equal-rank network/GBDT ensemble is the registered Round-2 designation
+because it has the highest pooled neutral IC. Relative to GBDT, its neutral-IC
+delta is +.006540 [.002281,.011748], economics delta +2.233
+[-2.336,7.707] bps/day, and spread delta +8.354 [1.797,15.255]
+bps/hold. Relative to the network, its neutral-IC delta is +.001754
+[-.003446,.006363], economics delta -1.178 [-5.685,4.085], and spread delta
+-5.228 [-11.208,3.111]. No supported positive economics override applied.
+
+The access audit covers 97 JSON artifacts and passes: chronology is clean,
+official-validation and permanently spent test access are false, and
+deployment is unchanged. Operational logs are inside the sealed inventory.
+The positive network and ensemble economics point estimates both have
+intervals spanning zero; this is development research evidence, not a
+profitable-deployment claim. Round 3, 2025 data, store rebuilding, and any
+deployment change were not performed.

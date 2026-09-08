@@ -14,15 +14,17 @@ It is explicitly development-grade: the calendar is reconstructed and the
 corporate-action terms are inferred from COTAHIST `DISMES`, not independently
 verified contractual terms.
 
-Rev3 Round 1 and Round 2 are complete on development folds only. Round 1
-designated `b_intraday` as the neural parent. Round 2 selected the uniform-
-pretrain Arm B, with pooled characteristic-neutral IC `0.0271682` and headline
-net excess `11.8610` bps/day. The registered network/GBDT rank ensemble has the
-highest pooled neutral IC, `0.0291273`, and is the Round-2 research designation;
-its net excess is `5.2052` bps/day with a 95% interval spanning zero. These are
-development research claims, not a production or deployment decision. Official
-validation and the permanently spent test remained sealed, and deployment did
-not change.
+Rev4e Round 1 and Round 2 are the current completed development-fold program.
+Round 1 designated `b_intraday` as the GBDT parent after a ledger-only replay
+that credits CDI on short proceeds and applies the registered bounded borrower
+fee. Round 2 selected the uniform-pretrain Arm B, with pooled characteristic-
+neutral IC `0.0247766` and headline net excess `2.4040` bps/day. The registered
+network/GBDT equal-rank ensemble has the highest pooled neutral IC, `0.0265307`,
+and is the Round-2 research designation; its net excess is `1.2261` bps/day
+with a 95% interval spanning zero. These are development research claims, not
+a production or deployment decision. Official validation and the permanently
+spent test remained sealed, and deployment did not change. Earlier Rev3 results
+remain immutable historical evidence under their own registration.
 
 The accepted incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
@@ -1913,5 +1915,21 @@ All non-ledger fields match exactly, no score/model was recomputed, protected
 access is false/false, chronology is clean, and deployment is unchanged.
 Pooled headline net excess is +1.665 bps/day for momentum and -1.007 for
 `b_intraday`, with both intervals spanning zero. `b_intraday` remains the
-Round-2 parent. Round 2 is authorized but not yet run; Round 3 and all 2025
-access remain forbidden.
+Round-2 parent. This replay was the input to the subsequently completed
+Round 2 below.
+
+Rev4e Round 2 is now completed and sealed at
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round2_rev4e_2b40b24_20260908T202100Z`.
+The frozen-design/result/access-audit/inventory SHA-256 values are
+`0e5e7fa43e221d4ff51bd5ba353dfdad021540c8531fe86738b71bfe8e7ae788`,
+`c2549977e94ad2ca00a88642cfc61ab3b1ba98cadd5cb5b9bb2780788cb9ede4`,
+`6b5b821ad7d583137b9f9c93754e794d72641f3a564641cedc0ed60361416224`,
+and `7d32efb19a539c387c4085e25e660afa748dc230c09760457d1a7e6b850790cc`.
+Exactly three Stage-P trajectories and 18 main A/B trajectories completed.
+Arm B was selected with pooled neutral IC .024777 and headline net excess
++2.404 bps/day [-.521,9.039]. The equal-rank Arm-B-network/`b_intraday`-GBDT
+ensemble is the Round-2 research designation with pooled neutral IC .026531
+and headline net excess +1.226 bps/day [-1.691,8.364]. No economics override
+fired. All artifact, chronology, and access audits pass; official validation
+and the spent test remain untouched, and deployment did not change. Round 3
+and 2025 access remain forbidden.
