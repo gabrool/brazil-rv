@@ -1799,3 +1799,37 @@ For future lending coverage, 127 official B3 BDI Chapter 05 PDFs covering
 with download-manifest SHA-256
 `f1754e98ad2cd890375a6038907670a4552e96f8c3c232c3bc3f136d7fcce03b`.
 They are not yet parsed and no lending sidecar or store was rebuilt.
+
+## Current v2 rev4b acceptance state (2026-09-08)
+
+Rev4b construction and direct-borrow engineering is frozen in commit
+`a2d9f6d737fe8ebd5451aca1159ba73e223051e8`. The entry contract now ranks
+within five causal volatility quintiles, retains names against their current
+quintile, scales small strata, and spills only from unused same-side band
+names. Direct borrow uses a separate D+1 lending archive and three registered
+availability cells; `borrow_balance` is headline, `borrow_strict` requires a
+recent observed trade, and `borrow_open` brackets unlimited supply. Rates are
+the last observed taker rate plus 25 bps/year, with no equity floor and a
+causal same-day 75th-percentile imputation when the prior-60 rate is absent.
+
+The sealed lending archive is
+`C:\quant-data\b3\interim\external\lending_archive_v2_2009_202412_a2d9f6d_20260908T125233Z`;
+its manifest SHA-256 is
+`5b4c83dd59796baf1cc4c5b2c441c1010b098966dbe72c80a7c7f025e1993e2b`.
+Old/new overlap identity passes, the archive contains no protected-period
+source row, and only 141 balances whose D+1 availability would fall after
+2024-12-30 were excluded. F3 headline balance shortability is 0.7225 of active
+name-days and is no longer coverage-limited.
+
+The sealed 16-book CPU acceptance is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev4b_a2d9f6d_20260908T131054Z`;
+manifest/inventory SHA-256 values are
+`23a1d513aa8981f40a28d2ea870d525b7c58aecf04ea57829de43739fed6edec`
+and `a894e2c096a697f47611bb469ccaee47a3870d21065178c9562bc3a7640ebe33`.
+All artifact hashes, chronology, legacy identity, occupancy, neutral-target,
+beta, and protected-access checks pass. Acceptance is still `unsupported`
+because all 16 books have equity-only mean gross below the fixed 1.50 floor
+(range 1.2083--1.4197) and nonzero D4 cap-block signatures (range 8--165).
+This is a scored stop, so it was not retried or repaired in place. No rev4b
+Round 1 or Round 2 was started, no deployment changed, and no paid instance
+was launched.

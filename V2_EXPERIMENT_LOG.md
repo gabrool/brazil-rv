@@ -2065,3 +2065,65 @@ The download-manifest SHA-256 is
 They have not been parsed and the lending sidecar/store has not been rebuilt;
 doing so would change the immutable data contract and belongs in the next
 explicitly registered round.
+
+## Rev4b construction-and-borrow acceptance stop (2026-09-08)
+
+Rev4b was preregistered and the implementation was frozen before scores in
+commit `a2d9f6d737fe8ebd5451aca1159ba73e223051e8`. It replaces the defective
+global-half entry path with within-`yang_zhang_vol_20`-quintile rank bands,
+current-quintile retention, proportional small-stratum quotas, and global
+side-band spill-over. Whole-book risk checks include the BOVA11 hedge while
+the engineering hard-gross measurement remains the registered equity-only
+quantity. It also introduces the direct, D+1 lending archive with observed
+taker rates plus 25 bps/year, no equity-rate floor, same-day 75th-percentile
+imputation, and `borrow_strict`/`borrow_balance`/`borrow_open` cells; the
+balance cell is the headline. The explicit rev4b test controls the otherwise
+ambiguous table wording: strict requires a recent lending trade, so a
+published positive balance without a trade is balance-shortable but not
+strict-shortable. Ruff, compileall, registration verification, and the final
+150 focused tests passed; the preceding full suite passed all 921 tests before
+the final narrowly covered clock/comparator adjustments.
+
+The clean-commit lending archive is sealed at
+`C:\quant-data\b3\interim\external\lending_archive_v2_2009_202412_a2d9f6d_20260908T125233Z`.
+Manifest/balance/rate/overlap SHA-256 values are
+`5b4c83dd59796baf1cc4c5b2c441c1010b098966dbe72c80a7c7f025e1993e2b`,
+`f60ae328010e093e1cc18aff35c37561d3492ad9713c68f54c97efe3ab75aff8`,
+`14b688452719e311544019c0f63f8700ce336aaf7ae9776a94bff8a9c4f2620f`,
+and `0c111474e82cb164bcfacc18ee06505b07a61d31542afcf701f06db831a7c065`.
+All 63,647 overlapping balance rows and 30,186 overlapping rate rows match the
+old archives exactly. The extension adds three previously unseen ISINs. It
+excludes 141 balance rows whose D+1 availability falls after the registered
+2024-12-30 consumer boundary and contains no 2025/2026 source row. Reloading
+against the real 4,102-by-933 store grid produced 379,731 priced/open cells,
+59,610 balance-shortable cells, and 51,015 strict-shortable cells; the first
+causal rate is available on 2023-07-11.
+
+The registered 16-book CPU acceptance is sealed at
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev4b_a2d9f6d_20260908T131054Z`.
+Pipeline-manifest and inventory SHA-256 values are
+`23a1d513aa8981f40a28d2ea870d525b7c58aecf04ea57829de43739fed6edec`
+and `a894e2c096a697f47611bb469ccaee47a3870d21065178c9562bc3a7640ebe33`.
+All 125 inventory entries hash-verify; all 16 evaluations have transfer
+chronology clean and official-validation/test access false/false through
+2024-12-30.
+
+The within-quintile repair worked: the largest long/short session-mean absolute
+occupancy deviation was 1.4694 slots, below the 2-slot bound. Every fixed
+control was inside the absolute 0.30 post-hedge beta bound in all three folds
+(largest absolute slope 0.1470), the inverse-volatility neutral-IC gate passed
+at -0.00004450/0.01093123/0.00229996, and all 75 fixed legacy comparisons
+matched the bound rev3 reference. F3 direct lending coverage is no longer
+limited: balance/strict/open active-name-day shortability is
+0.7225/0.7110/1.0000, and balance shortability by liquidity quartile is
+0.2793/0.7940/0.8960/0.9180. F1 remains honestly coverage-limited because its
+first seven sessions precede the first causal published rate; no future rate
+was backfilled.
+
+Engineering acceptance is nevertheless `unsupported`. Every one of the 16
+books violated the existing deployed-gross/D4 hard gate: equity-only mean
+gross ranged from 1.2083 to 1.4197 against the 1.50 floor, and every book
+recorded nonzero D4 cap-block signatures (8--165). These are scored results,
+not an operational failure, so no retry or post-score repair was made. Per the
+registered stop, no rev4b Round-1 root was created, Round 2/GPU was not run,
+no deployment changed, and no paid instance was launched.
