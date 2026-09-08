@@ -112,6 +112,7 @@ def _borrow_panels(day_count: int, name_count: int) -> LendingBorrowPanels:
     return LendingBorrowPanels(
         annual_taker_rate=np.full(shape, 0.02),
         rate_imputed=np.zeros(shape, dtype=np.bool_),
+        rate_placeholder=np.zeros(shape, dtype=np.bool_),
         shortable_strict=available.copy(),
         shortable_balance=available.copy(),
         shortable_open=available.copy(),
@@ -120,6 +121,7 @@ def _borrow_panels(day_count: int, name_count: int) -> LendingBorrowPanels:
         rate_sha256="0" * 64,
         source_label="lending_archive_v2_2009_202412",
         source_unavailable_dates=(),
+        source_placeholder_dates=(),
     )
 
 

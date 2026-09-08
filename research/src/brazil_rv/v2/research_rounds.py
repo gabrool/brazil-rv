@@ -72,11 +72,11 @@ from .validate_pipeline import (
     _window_target_mask,
 )
 
-ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4B"
-ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4B"
-RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4B"
+ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4C"
+ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4C"
+RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4C"
 PREREGISTRATION = (
-    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4b.md"
+    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4c.md"
 )
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
@@ -182,7 +182,7 @@ def registration_protocol_from_code() -> dict[str, object]:
     """Build protocol facts that registration prose may not override."""
 
     return {
-        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V3",
+        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V4",
         "purge_sessions": {
             "fit_to_selection": FIT_TO_SELECTION_PURGE_SESSIONS,
             "selection_to_evaluation": SELECTION_TO_EVALUATION_PURGE_SESSIONS,
@@ -244,7 +244,7 @@ def registration_protocol_from_code() -> dict[str, object]:
                 "prior_60_sessions"
             ),
             "borrow_open": "all_names_when_a_causal_cross_sectional_rate_exists",
-            "pre_first_causal_rate": "unavailable_without_future_backfill",
+            "pre_first_rate_borrow": "placeholder_0.02",
         },
         "lending_archive": {
             "source_label": "lending_archive_v2_2009_202412",
@@ -258,6 +258,7 @@ def registration_protocol_from_code() -> dict[str, object]:
             "inventory_sha256": _LEGACY_ROUND1_INVENTORY_SHA256,
         },
         "construction": {
+            "caps_scope": "equity_only",
             "volatility_strata": "five_equal_count_yang_zhang_vol_20_quintiles",
             "rank_within_stratum": True,
             "quota_remainder_order": [3, 2, 4, 1, 5],
@@ -288,6 +289,7 @@ def registration_protocol_from_code() -> dict[str, object]:
             "bdi_code": "14",
             "supplied_bdi_02_corrected_from_raw_cotahist": True,
             "rebalance_threshold_fraction_nav": 0.05,
+            "hedge_notional_cap_nav": 0.60,
             "cost_bps_per_side": 4.0,
             "short_borrow_floor": 0.02,
         },
@@ -362,13 +364,13 @@ def _verify_development_acceptance(
         raise ValueError("development acceptance report SHA-256 mismatch")
     report = _read_json(source)
     if (
-        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V11"
+        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V12"
         or report.get("status") != "completed"
         or report.get("engineering_acceptance_status")
         != "development_grade_inferred_actions"
         or report.get("research_claim") is not False
     ):
-        raise ValueError("development acceptance report is not an accepted rev-4 gate")
+        raise ValueError("development acceptance report is not an accepted rev-4c gate")
     _assert_false_access(report, path=source)
     implementation = report.get("code")
     if (
@@ -1721,6 +1723,9 @@ def freeze_round1(
             "source_label": lending_borrow.source_label,
             "source_unavailable_dates": [
                 value.isoformat() for value in lending_borrow.source_unavailable_dates
+            ],
+            "source_placeholder_dates": [
+                value.isoformat() for value in lending_borrow.source_placeholder_dates
             ],
         },
         "folds": folds,

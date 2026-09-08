@@ -45,6 +45,7 @@ def _run(
     initial_reference_price: np.ndarray | None = None,
     annual_borrow_rate_by_name: np.ndarray | None = None,
     borrow_rate_imputed: np.ndarray | None = None,
+    borrow_rate_placeholder: np.ndarray | None = None,
     shortable: np.ndarray | None = None,
     selection_volatility: np.ndarray | None = None,
     beta_60: np.ndarray | None = None,
@@ -81,6 +82,13 @@ def _run(
         initial_reference_price=initial_reference_price,
         annual_borrow_rate_by_name=annual_borrow_rate_by_name,
         borrow_rate_imputed=borrow_rate_imputed,
+        borrow_rate_placeholder=(
+            np.zeros_like(close, dtype=np.bool_)
+            if borrow_rate_placeholder is None
+            and config is not None
+            and config.borrow_source != "uniform"
+            else borrow_rate_placeholder
+        ),
         shortable=shortable,
         selection_volatility=selection_volatility,
         beta_60=beta_60,
@@ -94,6 +102,7 @@ def _constructed_inputs(days: int, names: int) -> dict[str, np.ndarray]:
     return {
         "annual_borrow_rate_by_name": np.full((days, names), 0.02),
         "borrow_rate_imputed": np.zeros((days, names), dtype=np.bool_),
+        "borrow_rate_placeholder": np.zeros((days, names), dtype=np.bool_),
         "shortable": np.ones((days, names), dtype=np.bool_),
         "selection_volatility": np.broadcast_to(
             np.arange(names, dtype=np.float64), (days, names)
@@ -179,6 +188,7 @@ def test_lending_borrow_charges_observed_rate_plus_registration_fee_without_floo
         initial_reference_price=initial,
         annual_borrow_rate_by_name=np.full_like(close, 0.40),
         borrow_rate_imputed=np.zeros_like(close, dtype=np.bool_),
+        borrow_rate_placeholder=np.zeros_like(close, dtype=np.bool_),
         shortable=np.ones_like(close, dtype=np.bool_),
     )
     charged = uniform.borrow_bps > 0.0
@@ -208,6 +218,7 @@ def test_lending_unshortable_entry_advances_to_next_candidate() -> None:
         initial_reference_price=np.full(4, 100.0),
         annual_borrow_rate_by_name=np.full_like(close, 0.02),
         borrow_rate_imputed=np.zeros_like(close, dtype=np.bool_),
+        borrow_rate_placeholder=np.zeros_like(close, dtype=np.bool_),
         shortable=shortable,
     )
     first_sells = [
@@ -1537,6 +1548,7 @@ def test_rev4_defaults_bind_lending_volatility_balance_and_beta_hedge() -> None:
     assert config.volatility_balanced_entries
     assert config.beta_hedge
     assert config.hedge_rebalance_threshold_nav == 0.05
+    assert config.hedge_notional_cap_nav == 0.60
     assert config.hedge_cost_bps_per_side == 4.0
     uniform = ledger_configurations()["comparator_uniform_borrow"]
     assert uniform.borrow_source == "uniform"
@@ -1723,6 +1735,7 @@ def test_rev4_beta_hedge_is_separate_rebalances_and_carries_missing_print() -> N
         initial_reference_price=np.full(names, 100.0),
         annual_borrow_rate_by_name=rates,
         borrow_rate_imputed=np.zeros_like(shortable),
+        borrow_rate_placeholder=np.zeros_like(shortable),
         shortable=shortable,
         beta_60=beta,
         hedge_close=np.asarray([100.0, np.nan, 110.0, 110.0]),
@@ -1732,12 +1745,97 @@ def test_rev4_beta_hedge_is_separate_rebalances_and_carries_missing_print() -> N
     assert result.hedge_turnover_fraction_nav[0] > 0.0
     assert result.hedge_signed_shares[1] == result.hedge_signed_shares[0]
     assert result.hedge_mark_price[1] == result.hedge_mark_price[0]
-    assert abs(result.ex_ante_beta_after_hedge[0]) < 1e-12
+    assert result.hedge_capped[0]
+    assert result.ex_ante_beta_after_hedge[0] == pytest.approx(0.40024)
+    assert abs(result.hedge_signed_notional[0]) / result.nav[0] <= 0.60 + 1e-12
     assert result.hedge_borrow_bps[1] > 0.0
     assert result.hedge_signed_notional[-1] == 0.0
     assert np.all(result.gross_fraction_nav_including_hedge >= result.gross_fraction_nav)
     assert np.all(result.planned_gross_fraction_nav <= 4.0 + 1e-12)
     assert np.all(np.abs(result.planned_net_fraction_nav) <= 1.1 + 1e-12)
+
+
+def test_rev4c_hedge_does_not_consume_equity_caps() -> None:
+    days, names = 4, 20
+    scores = np.broadcast_to(
+        np.arange(names, dtype=np.float64), (days, names)
+    ).copy()
+    inputs = _constructed_inputs(days, names)
+    inputs["beta_60"] = np.broadcast_to(
+        np.concatenate((np.zeros(10), np.full(10, 0.45))), (days, names)
+    ).copy()
+    result = _run(
+        np.full((days, names), 100.0),
+        scores,
+        config=replace(
+            LedgerConfig(),
+            k_per_side=10,
+            buffer_per_side=10,
+            volatility_balanced_entries=False,
+            cost_bps_per_side=0.0,
+            hedge_cost_bps_per_side=0.0,
+            planned_name_weight_cap=0.11,
+        ),
+        initial_reference_price=np.full(names, 100.0),
+        **inputs,
+    )
+
+    assert result.planned_gross_fraction_nav[0] == pytest.approx(2.0)
+    assert result.hedge_target_notional[0] == pytest.approx(-0.45)
+    assert result.summary()["entry_defect_signatures"]["D4_cap_block_defects"] == 0
+
+
+def test_rev4c_hedge_requirement_is_capped_and_labelled() -> None:
+    days, names = 4, 20
+    scores = np.broadcast_to(
+        np.arange(names, dtype=np.float64), (days, names)
+    ).copy()
+    inputs = _constructed_inputs(days, names)
+    inputs["beta_60"] = np.broadcast_to(
+        np.concatenate((np.zeros(10), np.full(10, 0.8))), (days, names)
+    ).copy()
+    result = _run(
+        np.full((days, names), 100.0),
+        scores,
+        config=replace(
+            LedgerConfig(),
+            k_per_side=10,
+            buffer_per_side=10,
+            volatility_balanced_entries=False,
+            cost_bps_per_side=0.0,
+            hedge_cost_bps_per_side=0.0,
+            planned_name_weight_cap=0.11,
+        ),
+        initial_reference_price=np.full(names, 100.0),
+        **inputs,
+    )
+
+    assert result.hedge_unconstrained_target_notional[0] == pytest.approx(-0.8)
+    assert result.hedge_target_notional[0] == pytest.approx(-0.6)
+    assert result.hedge_capped[0]
+    assert result.ex_ante_beta_after_hedge[0] == pytest.approx(0.2)
+
+
+def test_rev4c_cap_setting_is_bit_identical_when_hedge_is_disabled() -> None:
+    close = np.full((5, 6), 100.0)
+    scores = np.broadcast_to(np.arange(6, dtype=np.float64), close.shape).copy()
+    base = _run(
+        close,
+        scores,
+        config=replace(_config(), hedge_notional_cap_nav=0.60),
+        initial_reference_price=np.full(6, 100.0),
+    )
+    changed = _run(
+        close,
+        scores,
+        config=replace(_config(), hedge_notional_cap_nav=0.25),
+        initial_reference_price=np.full(6, 100.0),
+    )
+
+    np.testing.assert_array_equal(base.nav, changed.nav)
+    np.testing.assert_array_equal(base.signed_shares, changed.signed_shares)
+    assert base.intended_orders == changed.intended_orders
+    assert base.fills == changed.fills
 
 
 def test_rev4_uniform_comparator_is_exact_legacy_ledger() -> None:

@@ -24,6 +24,7 @@ from brazil_rv.preprocessing.bdi_lending_strong import (
 LENDING_ARCHIVE_SCHEMA = "BRAZIL_RV_V2_LENDING_ARCHIVE_V2"
 BORROW_SOURCE_LABEL = "lending_archive_v2_2009_202412"
 REGISTRATION_FEE_ANNUAL = 0.0025
+PRE_FIRST_CAUSAL_RATE_PLACEHOLDER = 0.02
 RATE_LOOKBACK_SESSIONS = 60
 STRICT_LOOKBACK_SESSIONS = 20
 SOURCE_END = date(2024, 12, 30)
@@ -33,6 +34,7 @@ SOURCE_END = date(2024, 12, 30)
 class LendingBorrowPanels:
     annual_taker_rate: NDArray[np.float64]
     rate_imputed: NDArray[np.bool_]
+    rate_placeholder: NDArray[np.bool_]
     shortable_strict: NDArray[np.bool_]
     shortable_balance: NDArray[np.bool_]
     shortable_open: NDArray[np.bool_]
@@ -41,6 +43,7 @@ class LendingBorrowPanels:
     rate_sha256: str
     source_label: str
     source_unavailable_dates: tuple[date, ...]
+    source_placeholder_dates: tuple[date, ...]
 
     @property
     def availability(self) -> dict[str, NDArray[np.bool_]]:
@@ -461,6 +464,7 @@ def load_lending_borrow_panels(
     shape = (len(dates), len(canonical_isins))
     annual_rate = np.full(shape, np.nan, dtype=np.float64)
     imputed = np.zeros(shape, dtype=np.bool_)
+    placeholder = np.zeros(shape, dtype=np.bool_)
     strict = np.zeros(shape, dtype=np.bool_)
     balance_cell = np.zeros(shape, dtype=np.bool_)
     open_cell = np.zeros(shape, dtype=np.bool_)
@@ -468,6 +472,10 @@ def load_lending_borrow_panels(
     last_rate = np.full(shape[1], np.nan, dtype=np.float64)
     last_rate_session = np.full(shape[1], -1, dtype=np.int64)
     unavailable_dates: list[date] = []
+    placeholder_dates: list[date] = []
+    first_causal_rate_session = min(rate_events, default=None)
+    if first_causal_rate_session is None:
+        raise ValueError("lending archive has no rate event on the canonical axes")
     for day in range(shape[0]):
         for name, _source, quantity in balance_events.get(day, ()):
             last_balance[name] = quantity
@@ -483,6 +491,14 @@ def load_lending_borrow_panels(
             float(np.quantile(observed, 0.75)) if observed.size else np.nan
         )
         if not np.isfinite(cross_sectional_rate):
+            if day < first_causal_rate_session:
+                annual_rate[day] = PRE_FIRST_CAUSAL_RATE_PLACEHOLDER
+                placeholder[day] = True
+                strict[day] = True
+                balance_cell[day] = True
+                open_cell[day] = True
+                placeholder_dates.append(dates[day])
+                continue
             unavailable_dates.append(dates[day])
             continue
         annual_rate[day] = np.where(rate_recent, last_rate, cross_sectional_rate)
@@ -500,6 +516,7 @@ def load_lending_borrow_panels(
     return LendingBorrowPanels(
         annual_taker_rate=annual_rate,
         rate_imputed=imputed,
+        rate_placeholder=placeholder,
         shortable_strict=strict,
         shortable_balance=balance_cell,
         shortable_open=open_cell,
@@ -508,6 +525,7 @@ def load_lending_borrow_panels(
         rate_sha256=str(artifacts["lending_rates.parquet"]["sha256"]),
         source_label=BORROW_SOURCE_LABEL,
         source_unavailable_dates=tuple(unavailable_dates),
+        source_placeholder_dates=tuple(placeholder_dates),
     )
 
 

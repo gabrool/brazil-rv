@@ -667,6 +667,7 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
     lending_borrow = LendingBorrowPanels(
         annual_taker_rate=np.full((_DAY_COUNT, _NAME_COUNT), 0.02),
         rate_imputed=np.zeros((_DAY_COUNT, _NAME_COUNT), dtype=np.bool_),
+        rate_placeholder=np.zeros((_DAY_COUNT, _NAME_COUNT), dtype=np.bool_),
         shortable_strict=np.ones((_DAY_COUNT, _NAME_COUNT), dtype=np.bool_),
         shortable_balance=np.ones((_DAY_COUNT, _NAME_COUNT), dtype=np.bool_),
         shortable_open=np.ones((_DAY_COUNT, _NAME_COUNT), dtype=np.bool_),
@@ -675,6 +676,7 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
         rate_sha256="e" * 64,
         source_label="lending_archive_v2_2009_202412",
         source_unavailable_dates=(),
+        source_placeholder_dates=(),
     )
     inputs = _evaluation_inputs(
         scoring_loader.dataset.store,

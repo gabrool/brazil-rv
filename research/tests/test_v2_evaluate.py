@@ -97,6 +97,7 @@ def _fixture() -> EvaluationInputs:
         source_artifact_hashes={"store_manifest": "a" * 64},
         annual_borrow_rate_by_name=np.full(matrix_shape, 0.02),
         borrow_rate_imputed=np.zeros(matrix_shape, dtype=np.bool_),
+        borrow_rate_placeholder=np.zeros(matrix_shape, dtype=np.bool_),
         shortable_by_borrow_source={
             name: np.ones(matrix_shape, dtype=np.bool_)
             for name in ("borrow_strict", "borrow_balance", "borrow_open")

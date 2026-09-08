@@ -72,8 +72,8 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V11"
-_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V10"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V12"
+_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V11"
 _ACCEPTANCE_ANCESTOR_SCHEMAS = frozenset(
     {
         "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5",
@@ -837,6 +837,9 @@ def _evaluation_inputs(
         borrow_rate_imputed=np.asarray(
             lending_borrow.rate_imputed[indices], dtype=np.bool_
         ),
+        borrow_rate_placeholder=np.asarray(
+            lending_borrow.rate_placeholder[indices], dtype=np.bool_
+        ),
         shortable_by_borrow_source={
             name: np.asarray(values[indices], dtype=np.bool_)
             for name, values in lending_borrow.availability.items()
@@ -921,6 +924,7 @@ def _evaluation_summary(
         },
         "headline_economics": {**dict(headline), **dict(headline_report)},
         "realized_beta_after_hedge": dict(realized_beta),
+        "lending_coverage": diagnostics["lending_coverage"],
     }
 
 
@@ -1104,6 +1108,15 @@ def _development_acceptance(
                 "maximum_deployed_gross_fraction_nav": headline.get(
                     "maximum_gross_fraction_nav"
                 ),
+                "mean_whole_book_gross_fraction_nav": headline.get(
+                    "mean_gross_fraction_nav_including_hedge"
+                ),
+                "mean_absolute_whole_book_net_fraction_nav": headline.get(
+                    "mean_absolute_net_fraction_nav_including_hedge"
+                ),
+                "terminal_whole_book_net_notional": headline.get(
+                    "terminal_net_notional_including_hedge"
+                ),
                 "gross_target": 2.0,
                 "within_ten_percent_of_gross_target": within_gross_band,
                 "gross_deployment_label": gross_deployment_label,
@@ -1194,6 +1207,20 @@ def _development_acceptance(
                 "imputed_rate_share_of_short_notional": headline.get(
                     "imputed_rate_share_of_short_notional"
                 ),
+                "placeholder_rate_share_of_short_notional": headline.get(
+                    "placeholder_rate_share_of_short_notional"
+                ),
+                "placeholder_priced_session_count": headline.get(
+                    "placeholder_priced_session_count"
+                ),
+                "hedge_notional_cap_nav": headline.get("hedge_notional_cap_nav"),
+                "hedge_capped_session_count": headline.get(
+                    "hedge_capped_session_count"
+                ),
+                "maximum_absolute_hedge_fraction_nav": headline.get(
+                    "maximum_absolute_hedge_fraction_nav"
+                ),
+                "lending_coverage": evaluation.get("lending_coverage"),
             }
         )
         if (
@@ -2755,6 +2782,10 @@ def run_pipeline_validation(
                         "source_unavailable_dates": [
                             value.isoformat()
                             for value in lending_borrow.source_unavailable_dates
+                        ],
+                        "source_placeholder_dates": [
+                            value.isoformat()
+                            for value in lending_borrow.source_placeholder_dates
                         ],
                     },
                     "legacy_round1_baseline_reference": legacy_identity,

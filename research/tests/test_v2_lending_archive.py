@@ -121,7 +121,13 @@ def test_balance_without_trade_is_balance_shortable_and_rate_is_imputed(
     assert panels.annual_taker_rate[1, 0] == pytest.approx(0.08)
     assert panels.shortable_strict[1, 1]
     assert not panels.rate_imputed[1, 1]
-    assert panels.source_unavailable_dates == (dates[0],)
+    assert panels.annual_taker_rate[0, 0] == pytest.approx(0.02)
+    assert panels.rate_placeholder[0].all()
+    assert panels.shortable_strict[0].all()
+    assert panels.shortable_balance[0].all()
+    assert panels.shortable_open[0].all()
+    assert panels.source_unavailable_dates == ()
+    assert panels.source_placeholder_dates == (dates[0],)
 
 
 def test_balance_publication_lag_is_measured_from_report_not_position_date(
@@ -138,7 +144,7 @@ def test_balance_publication_lag_is_measured_from_report_not_position_date(
             [100],
             report=[dates[1]],
         ),
-        rates=_rates([dates[1]], [dates[2]], ["ISIN:BRB"], [0.08]),
+        rates=_rates([dates[0]], [dates[1]], ["ISIN:BRB"], [0.08]),
     )
 
     panels = load_lending_borrow_panels(

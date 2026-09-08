@@ -74,6 +74,7 @@ class LedgerConfig:
     volatility_group_count: int = 5
     beta_hedge: bool = True
     hedge_rebalance_threshold_nav: float = 0.05
+    hedge_notional_cap_nav: float = 0.60
     hedge_cost_bps_per_side: float = 4.0
     hedge_annual_borrow_rate: float = 0.02
     annual_debit_spread: float = 0.0
@@ -117,6 +118,7 @@ class LedgerConfig:
             raise ValueError("volatility group count must be positive")
         if (
             self.hedge_rebalance_threshold_nav < 0.0
+            or self.hedge_notional_cap_nav <= 0.0
             or self.hedge_cost_bps_per_side < 0.0
             or self.hedge_annual_borrow_rate < 0.0
         ):
@@ -214,6 +216,7 @@ class _ValidatedInputs:
     initial_reference_price: NDArray[np.float64]
     annual_borrow_rate_by_name: NDArray[np.float64]
     borrow_rate_imputed: NDArray[np.bool_]
+    borrow_rate_placeholder: NDArray[np.bool_]
     shortable: NDArray[np.bool_]
     selection_volatility: NDArray[np.float64]
     beta_60: NDArray[np.float64]
@@ -234,6 +237,7 @@ class StatefulLedgerResult:
     held_short_weighted_annual_borrow_rate: NDArray[np.float64]
     held_short_notional_at_open: NDArray[np.float64]
     held_short_imputed_notional_at_open: NDArray[np.float64]
+    held_short_placeholder_notional_at_open: NDArray[np.float64]
     excluded_short_entry_candidate_count: NDArray[np.int64]
     gross_fraction_nav: NDArray[np.float64]
     turnover_fraction_nav: NDArray[np.float64]
@@ -362,6 +366,7 @@ class StatefulLedgerResult:
     borrow_source: BorrowSource
     volatility_balanced_entries: bool
     beta_hedge: bool
+    hedge_notional_cap_nav: float
     volatility_quota: NDArray[np.int64]
     volatility_occupancy_long: NDArray[np.int64]
     volatility_occupancy_short: NDArray[np.int64]
@@ -370,13 +375,17 @@ class StatefulLedgerResult:
     hedge_signed_shares: NDArray[np.float64]
     hedge_mark_price: NDArray[np.float64]
     hedge_signed_notional: NDArray[np.float64]
+    hedge_unconstrained_target_notional: NDArray[np.float64]
     hedge_target_notional: NDArray[np.float64]
+    hedge_capped: NDArray[np.bool_]
     hedge_turnover_fraction_nav: NDArray[np.float64]
     hedge_cost_bps: NDArray[np.float64]
     hedge_borrow_bps: NDArray[np.float64]
     ex_ante_beta_before_hedge: NDArray[np.float64]
     ex_ante_beta_after_hedge: NDArray[np.float64]
     gross_fraction_nav_including_hedge: NDArray[np.float64]
+    net_notional_including_hedge: NDArray[np.float64]
+    net_fraction_nav_including_hedge: NDArray[np.float64]
 
     def summary(self) -> dict[str, object]:
         excess = self.net_excess_all_cash_bps
@@ -508,6 +517,17 @@ class StatefulLedgerResult:
                 )
                 if np.sum(self.held_short_notional_at_open) > 0.0
                 else 0.0
+            ),
+            "placeholder_rate_share_of_short_notional": (
+                float(
+                    np.sum(self.held_short_placeholder_notional_at_open)
+                    / np.sum(self.held_short_notional_at_open)
+                )
+                if np.sum(self.held_short_notional_at_open) > 0.0
+                else 0.0
+            ),
+            "placeholder_priced_session_count": int(
+                (self.held_short_placeholder_notional_at_open > 0.0).sum()
             ),
             "excluded_short_entry_candidate_count": int(
                 self.excluded_short_entry_candidate_count.sum()
@@ -668,6 +688,24 @@ class StatefulLedgerResult:
             "mean_gross_fraction_nav_including_hedge": float(
                 np.mean(self.gross_fraction_nav_including_hedge)
             ),
+            "mean_absolute_net_fraction_nav_including_hedge": float(
+                np.mean(np.abs(self.net_fraction_nav_including_hedge))
+            ),
+            "terminal_net_notional_including_hedge": float(
+                self.net_notional_including_hedge[-1]
+            ),
+            "hedge_notional_cap_nav": self.hedge_notional_cap_nav,
+            "hedge_capped_session_count": int(self.hedge_capped.sum()),
+            "maximum_absolute_hedge_fraction_nav": float(
+                np.max(
+                    np.divide(
+                        np.abs(self.hedge_signed_notional),
+                        self.nav,
+                        out=np.zeros_like(self.hedge_signed_notional),
+                        where=self.nav > 0.0,
+                    )
+                )
+            ),
             "mean_absolute_ex_ante_beta_after_hedge": float(
                 np.mean(np.abs(self.ex_ante_beta_after_hedge))
             ),
@@ -715,6 +753,7 @@ def _validate_inputs(
     initial_reference_price: NDArray[np.floating] | None,
     annual_borrow_rate_by_name: NDArray[np.floating] | None,
     borrow_rate_imputed: NDArray[np.bool_] | None,
+    borrow_rate_placeholder: NDArray[np.bool_] | None,
     shortable: NDArray[np.bool_] | None,
     selection_volatility: NDArray[np.floating] | None,
     beta_60: NDArray[np.floating] | None,
@@ -767,10 +806,20 @@ def _validate_inputs(
             raise ValueError("imputed-rate mask must be Boolean and align names")
         if np.any(imputed & ~np.isfinite(borrow_rate)):
             raise ValueError("an imputed borrow rate must be finite")
+        if borrow_rate_placeholder is None:
+            raise ValueError("archive borrow requires a placeholder-rate mask")
+        placeholder = np.asarray(borrow_rate_placeholder)
+        if placeholder.shape != matrix_shape or placeholder.dtype != np.bool_:
+            raise ValueError("placeholder-rate mask must be Boolean and align names")
+        if np.any(placeholder & ~np.isfinite(borrow_rate)):
+            raise ValueError("a placeholder borrow rate must be finite")
+        if np.any(imputed & placeholder):
+            raise ValueError("borrow rates cannot be both imputed and placeholder")
     else:
         borrow_rate = np.full(matrix_shape, np.nan, dtype=np.float64)
         shortable_mask = np.ones(matrix_shape, dtype=np.bool_)
         imputed = np.zeros(matrix_shape, dtype=np.bool_)
+        placeholder = np.zeros(matrix_shape, dtype=np.bool_)
 
     if volatility_balanced_entries:
         if selection_volatility is None:
@@ -908,6 +957,7 @@ def _validate_inputs(
         initial_reference_price=initial_reference,
         annual_borrow_rate_by_name=borrow_rate,
         borrow_rate_imputed=imputed,
+        borrow_rate_placeholder=placeholder,
         shortable=shortable_mask,
         selection_volatility=volatility,
         beta_60=beta,
@@ -954,17 +1004,6 @@ def _risk(signed_values: NDArray[np.float64], nav: float) -> tuple[float, float,
         float(weights.sum()),
         float(np.max(np.abs(weights), initial=0.0)),
     )
-
-
-def _risk_with_hedge(
-    signed_values: NDArray[np.float64], hedge_notional: float, nav: float
-) -> tuple[float, float, float]:
-    """Whole-book gross/net risk with the hedge outside the equity name cap."""
-
-    gross, net, name = _risk(signed_values, nav)
-    if not np.isfinite(hedge_notional):
-        raise RuntimeError("held hedge has no finite marked notional")
-    return gross + abs(hedge_notional) / nav, net + hedge_notional / nav, name
 
 
 def _equal_count_groups(
@@ -1068,6 +1107,7 @@ def simulate_stateful_ledger(
     initial_reference_price: NDArray[np.floating] | None = None,
     annual_borrow_rate_by_name: NDArray[np.floating] | None = None,
     borrow_rate_imputed: NDArray[np.bool_] | None = None,
+    borrow_rate_placeholder: NDArray[np.bool_] | None = None,
     shortable: NDArray[np.bool_] | None = None,
     selection_volatility: NDArray[np.floating] | None = None,
     beta_60: NDArray[np.floating] | None = None,
@@ -1090,6 +1130,7 @@ def simulate_stateful_ledger(
         initial_reference_price=initial_reference_price,
         annual_borrow_rate_by_name=annual_borrow_rate_by_name,
         borrow_rate_imputed=borrow_rate_imputed,
+        borrow_rate_placeholder=borrow_rate_placeholder,
         shortable=shortable,
         selection_volatility=selection_volatility,
         beta_60=beta_60,
@@ -1152,6 +1193,7 @@ def simulate_stateful_ledger(
     held_short_borrow_rate_rows: list[float] = []
     held_short_notional_rows: list[float] = []
     held_short_imputed_notional_rows: list[float] = []
+    held_short_placeholder_notional_rows: list[float] = []
     excluded_short_candidate_rows: list[int] = []
     gross_rows: list[float] = []
     turnover_rows: list[float] = []
@@ -1265,13 +1307,17 @@ def simulate_stateful_ledger(
     hedge_share_rows: list[float] = []
     hedge_mark_rows: list[float] = []
     hedge_notional_rows: list[float] = []
+    hedge_unconstrained_target_rows: list[float] = []
     hedge_target_rows: list[float] = []
+    hedge_capped_rows: list[bool] = []
     hedge_turnover_rows: list[float] = []
     hedge_cost_rows: list[float] = []
     hedge_borrow_rows: list[float] = []
     ex_ante_beta_before_rows: list[float] = []
     ex_ante_beta_after_rows: list[float] = []
     gross_including_hedge_rows: list[float] = []
+    net_notional_including_hedge_rows: list[float] = []
+    net_including_hedge_rows: list[float] = []
     insolvent = False
     insolvency_date: date | None = None
     action_uncertainty_seen = False
@@ -1535,6 +1581,7 @@ def simulate_stateful_ledger(
             * config.short_proceeds_remuneration
         )
         imputed_short_notional = 0.0
+        placeholder_short_notional = 0.0
         if config.borrow_source != "uniform" and short_at_open.any():
             short_values = np.abs(shares[short_at_open] * marks[short_at_open])
             raw_rates = inputs.annual_borrow_rate_by_name[day, short_at_open]
@@ -1549,6 +1596,11 @@ def simulate_stateful_ledger(
             )
             imputed_short_notional = float(
                 np.sum(short_values[inputs.borrow_rate_imputed[day, short_at_open]])
+            )
+            placeholder_short_notional = float(
+                np.sum(
+                    short_values[inputs.borrow_rate_placeholder[day, short_at_open]]
+                )
             )
         else:
             borrow = (
@@ -1572,6 +1624,7 @@ def simulate_stateful_ledger(
         held_short_borrow_rate_rows.append(weighted_borrow_rate)
         held_short_notional_rows.append(short_value_at_open)
         held_short_imputed_notional_rows.append(imputed_short_notional)
+        held_short_placeholder_notional_rows.append(placeholder_short_notional)
         free_cash += interest - borrow
         settlement_scenario_adjustment *= 1.0 + cash_rate
 
@@ -1672,39 +1725,7 @@ def simulate_stateful_ledger(
             int((held & ~np.isfinite(inputs.score[day])).sum())
         )
         signed_values[held] = shares[held] * marks[held]
-        current_hedge_notional = (
-            hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0
-        )
-        beta_values_for_risk = np.where(
-            np.isfinite(inputs.beta_60[day]), inputs.beta_60[day], last_beta
-        )
-
-        def prospective_hedge_notional(
-            equity_values: NDArray[np.float64], nav: float
-        ) -> float:
-            if not config.beta_hedge or day == day_count - 1:
-                return 0.0 if day == day_count - 1 else current_hedge_notional
-            required = equity_values != 0.0
-            if np.any(required & ~np.isfinite(beta_values_for_risk)):
-                raise ValueError("planned equity exposure has no causal beta_60")
-            target = -float(
-                np.sum(
-                    equity_values[required] * beta_values_for_risk[required],
-                    dtype=np.float64,
-                )
-            )
-            can_rebalance = np.isfinite(inputs.hedge_close[day])
-            return (
-                target
-                if can_rebalance
-                and abs(target - current_hedge_notional)
-                > config.hedge_rebalance_threshold_nav * nav
-                else current_hedge_notional
-            )
-
-        actual_gross, actual_net, actual_name = _risk_with_hedge(
-            signed_values, current_hedge_notional, start_nav
-        )
+        actual_gross, actual_net, actual_name = _risk(signed_values, start_nav)
         risk_breach = (
             actual_gross > config.planned_gross_cap + 1e-12
             or abs(actual_net) > config.planned_absolute_net_cap + 1e-12
@@ -1888,9 +1909,7 @@ def simulate_stateful_ledger(
                 if excess > 1e-12:
                     risk_trim_name += trim_name(projected, name, excess)
 
-            projected_gross, _, _ = _risk_with_hedge(
-                projected, prospective_hedge_notional(projected, start_nav), start_nav
-            )
+            projected_gross, _, _ = _risk(projected, start_nav)
             if projected_gross > config.planned_gross_cap + 1e-12:
                 total_reduction = max(
                     (projected_gross - config.gross_target) * start_nav, 0.0
@@ -1916,9 +1935,7 @@ def simulate_stateful_ledger(
                 risk_trim_gross += trim_side(projected, "sell", long_reduction)
                 risk_trim_gross += trim_side(projected, "buy", short_reduction)
 
-            _, projected_net, _ = _risk_with_hedge(
-                projected, prospective_hedge_notional(projected, start_nav), start_nav
-            )
+            _, projected_net, _ = _risk(projected, start_nav)
             if abs(projected_net) > config.planned_absolute_net_cap + 1e-12:
                 heavy_side: OrderSide = "sell" if projected_net > 0.0 else "buy"
                 heavy_entries = [
@@ -1942,11 +1959,7 @@ def simulate_stateful_ledger(
                     for risk_name, quantity in risk_exit_quantity.items():
                         direction = -1.0 if shares[risk_name] > 0.0 else 1.0
                         projected[risk_name] += direction * quantity * marks[risk_name]
-                    _, projected_net, _ = _risk_with_hedge(
-                        projected,
-                        prospective_hedge_notional(projected, start_nav),
-                        start_nav,
-                    )
+                    _, projected_net, _ = _risk(projected, start_nav)
                 net_reduction = max((abs(projected_net) - target_net) * start_nav, 0.0)
                 risk_trim_net += trim_side(projected, heavy_side, net_reduction)
 
@@ -2222,16 +2235,8 @@ def simulate_stateful_ledger(
                     if current_side == "buy"
                     else -quantity * reference
                 )
-                gross_before, net_before, _ = _risk_with_hedge(
-                    planned_values,
-                    prospective_hedge_notional(planned_values, start_nav),
-                    start_nav,
-                )
-                planned_gross, planned_net, planned_name = _risk_with_hedge(
-                    proposed,
-                    prospective_hedge_notional(proposed, start_nav),
-                    start_nav,
-                )
+                gross_before, net_before, _ = _risk(planned_values, start_nav)
+                planned_gross, planned_net, planned_name = _risk(proposed, start_nav)
                 violates_gross = planned_gross > config.planned_gross_cap + 1e-12
                 violates_net = (
                     abs(planned_net) > config.planned_absolute_net_cap + 1e-12
@@ -2606,9 +2611,11 @@ def simulate_stateful_ledger(
             if config.beta_hedge
             else 0.0
         )
-        hedge_target_notional = -equity_beta_notional if config.beta_hedge else 0.0
+        hedge_unconstrained_target_notional = (
+            -equity_beta_notional if config.beta_hedge else 0.0
+        )
         if day == day_count - 1:
-            hedge_target_notional = 0.0
+            hedge_unconstrained_target_notional = 0.0
         hedge_notional_before = (
             hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0
         )
@@ -2620,12 +2627,32 @@ def simulate_stateful_ledger(
             receivable_by_name,
             payable_by_name,
         ) + hedge_restricted_cash + hedge_notional_before
+        hedge_cost_rate = config.hedge_cost_bps_per_side / 10_000.0
+        target_sign = float(np.sign(hedge_unconstrained_target_notional))
+        low = 0.0
+        high = abs(hedge_unconstrained_target_notional)
+        for _ in range(64):
+            midpoint = (low + high) / 2.0
+            signed_midpoint = target_sign * midpoint
+            post_cost_nav = prehedge_nav - hedge_cost_rate * abs(
+                signed_midpoint - hedge_notional_before
+            )
+            if midpoint <= config.hedge_notional_cap_nav * post_cost_nav:
+                low = midpoint
+            else:
+                high = midpoint
+        hedge_target_notional = target_sign * low
+        hedge_capped = bool(
+            abs(hedge_unconstrained_target_notional - hedge_target_notional) > 1e-12
+        )
+        hedge_limit = config.hedge_notional_cap_nav * prehedge_nav
         rebalance_required = (
             config.beta_hedge
             and bova_printed
             and (
                 abs(hedge_target_notional - hedge_notional_before)
                 > config.hedge_rebalance_threshold_nav * prehedge_nav
+                or abs(hedge_notional_before) > hedge_limit + 1e-12
                 or (day == day_count - 1 and hedge_shares != 0.0)
             )
         )
@@ -2638,7 +2665,6 @@ def simulate_stateful_ledger(
                 hedge_restricted_array = np.asarray(
                     [hedge_restricted_cash], dtype=np.float64
                 )
-                hedge_cost_rate = config.hedge_cost_bps_per_side / 10_000.0
                 free_cash, hedge_traded_notional = _book_fill(
                     name=0,
                     side="buy" if share_change > 0.0 else "sell",
@@ -2704,6 +2730,8 @@ def simulate_stateful_ledger(
         gross, net, name_weight = _risk(signed_values, current_nav)
         hedge_notional = hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0
         gross_including_hedge = gross + abs(hedge_notional) / current_nav
+        net_notional_including_hedge = float(signed_values.sum() + hedge_notional)
+        net_including_hedge = net_notional_including_hedge / current_nav
         ex_ante_before = equity_beta_notional / prehedge_nav
         ex_ante_after = (equity_beta_notional + hedge_notional) / current_nav
         unresolved_stale = held_now & (
@@ -2729,9 +2757,8 @@ def simulate_stateful_ledger(
             else np.nan
         )
         end_risk_breach = (
-            gross_including_hedge > config.planned_gross_cap + 1e-12
-            or abs(net + hedge_notional / current_nav)
-            > config.planned_absolute_net_cap + 1e-12
+            gross > config.planned_gross_cap + 1e-12
+            or abs(net) > config.planned_absolute_net_cap + 1e-12
             or name_weight > config.planned_name_weight_cap + 1e-12
         )
         planned_values = signed_values.copy()
@@ -2740,9 +2767,7 @@ def simulate_stateful_ledger(
             planned_values[name] += (
                 sign * pending.remaining_quantity * pending.order.reference_price
             )
-        planned_gross, planned_net, planned_name = _risk_with_hedge(
-            planned_values, hedge_notional, start_nav
-        )
+        planned_gross, planned_net, planned_name = _risk(planned_values, start_nav)
 
         if config.volatility_balanced_entries:
             long_groups = volatility_groups[(shares > 0.0) & (volatility_groups >= 0)]
@@ -2820,6 +2845,8 @@ def simulate_stateful_ledger(
         borrow_rows.append(10_000.0 * borrow / start_nav)
         gross_rows.append(gross if np.isfinite(gross) else np.nan)
         gross_including_hedge_rows.append(gross_including_hedge)
+        net_notional_including_hedge_rows.append(net_notional_including_hedge)
+        net_including_hedge_rows.append(net_including_hedge)
         turnover_rows.append(traded_notional / start_nav)
         volatility_quota_rows.append(volatility_quota.copy())
         volatility_occupancy_long_rows.append(long_volatility_occupancy)
@@ -2829,7 +2856,9 @@ def simulate_stateful_ledger(
         hedge_share_rows.append(hedge_shares)
         hedge_mark_rows.append(hedge_mark)
         hedge_notional_rows.append(hedge_notional)
+        hedge_unconstrained_target_rows.append(hedge_unconstrained_target_notional)
         hedge_target_rows.append(hedge_target_notional)
+        hedge_capped_rows.append(hedge_capped)
         hedge_turnover_rows.append(hedge_traded_notional / start_nav)
         hedge_cost_rows.append(10_000.0 * hedge_cost / start_nav)
         hedge_borrow_rows.append(10_000.0 * hedge_borrow / start_nav)
@@ -3065,6 +3094,9 @@ def simulate_stateful_ledger(
         ),
         held_short_imputed_notional_at_open=np.asarray(
             held_short_imputed_notional_rows, dtype=np.float64
+        ),
+        held_short_placeholder_notional_at_open=np.asarray(
+            held_short_placeholder_notional_rows, dtype=np.float64
         ),
         excluded_short_entry_candidate_count=np.asarray(
             excluded_short_candidate_rows, dtype=np.int64
@@ -3324,6 +3356,7 @@ def simulate_stateful_ledger(
         borrow_source=config.borrow_source,
         volatility_balanced_entries=config.volatility_balanced_entries,
         beta_hedge=config.beta_hedge,
+        hedge_notional_cap_nav=config.hedge_notional_cap_nav,
         volatility_quota=np.stack(volatility_quota_rows),
         volatility_occupancy_long=np.stack(volatility_occupancy_long_rows),
         volatility_occupancy_short=np.stack(volatility_occupancy_short_rows),
@@ -3332,7 +3365,11 @@ def simulate_stateful_ledger(
         hedge_signed_shares=np.asarray(hedge_share_rows, dtype=np.float64),
         hedge_mark_price=np.asarray(hedge_mark_rows, dtype=np.float64),
         hedge_signed_notional=np.asarray(hedge_notional_rows, dtype=np.float64),
+        hedge_unconstrained_target_notional=np.asarray(
+            hedge_unconstrained_target_rows, dtype=np.float64
+        ),
         hedge_target_notional=np.asarray(hedge_target_rows, dtype=np.float64),
+        hedge_capped=np.asarray(hedge_capped_rows, dtype=np.bool_),
         hedge_turnover_fraction_nav=np.asarray(hedge_turnover_rows, dtype=np.float64),
         hedge_cost_bps=np.asarray(hedge_cost_rows, dtype=np.float64),
         hedge_borrow_bps=np.asarray(hedge_borrow_rows, dtype=np.float64),
@@ -3340,6 +3377,12 @@ def simulate_stateful_ledger(
         ex_ante_beta_after_hedge=np.asarray(ex_ante_beta_after_rows, dtype=np.float64),
         gross_fraction_nav_including_hedge=np.asarray(
             gross_including_hedge_rows, dtype=np.float64
+        ),
+        net_notional_including_hedge=np.asarray(
+            net_notional_including_hedge_rows, dtype=np.float64
+        ),
+        net_fraction_nav_including_hedge=np.asarray(
+            net_including_hedge_rows, dtype=np.float64
         ),
     )
 

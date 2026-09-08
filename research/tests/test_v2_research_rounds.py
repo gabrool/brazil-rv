@@ -45,17 +45,20 @@ def _lending_panels(inputs: EvaluationInputs) -> LendingBorrowPanels:
     shape = (int(indices.max()) + 1, np.asarray(inputs.active).shape[1])
     rates = np.full(shape, np.nan, dtype=np.float64)
     imputed = np.zeros(shape, dtype=np.bool_)
+    placeholder = np.zeros(shape, dtype=np.bool_)
     strict = np.zeros(shape, dtype=np.bool_)
     balance = np.zeros(shape, dtype=np.bool_)
     open_cell = np.zeros(shape, dtype=np.bool_)
     rates[indices] = np.asarray(inputs.annual_borrow_rate_by_name)
     imputed[indices] = np.asarray(inputs.borrow_rate_imputed)
+    placeholder[indices] = np.asarray(inputs.borrow_rate_placeholder)
     strict[indices] = np.asarray(availability["borrow_strict"])
     balance[indices] = np.asarray(availability["borrow_balance"])
     open_cell[indices] = np.asarray(availability["borrow_open"])
     return LendingBorrowPanels(
         annual_taker_rate=rates,
         rate_imputed=imputed,
+        rate_placeholder=placeholder,
         shortable_strict=strict,
         shortable_balance=balance,
         shortable_open=open_cell,
@@ -70,13 +73,14 @@ def _lending_panels(inputs: EvaluationInputs) -> LendingBorrowPanels:
         ),
         source_label=inputs.borrow_source_label,
         source_unavailable_dates=(),
+        source_placeholder_dates=(),
     )
 
 
 def test_rev4_registration_replaces_the_voided_research_entrypoints(
     tmp_path: Path,
 ) -> None:
-    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4b.md"
+    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4c.md"
     assert research_rounds.PREREGISTRATION.is_file()
     with pytest.raises(FileNotFoundError):
         research_rounds.run_round1(output_root=tmp_path / "absent", num_threads=1)
@@ -153,7 +157,7 @@ def test_acceptance_binds_store_hash_and_store_build_separately_from_freeze(
         "schedule_source": "reconstructed_v1",
     }
     report = {
-        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V11",
+        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V12",
         "status": "completed",
         "engineering_acceptance_status": "development_grade_inferred_actions",
         "research_claim": False,
@@ -266,6 +270,7 @@ def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
         "source_feature_valid": {"lending": np.ones_like(active)},
         "annual_borrow_rate_by_name": np.full_like(raw_close, 0.02),
         "borrow_rate_imputed": np.zeros_like(active),
+        "borrow_rate_placeholder": np.zeros_like(active),
         "shortable_by_borrow_source": {
             name: np.ones_like(active)
             for name in ("borrow_strict", "borrow_balance", "borrow_open")
