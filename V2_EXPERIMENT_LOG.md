@@ -2352,3 +2352,50 @@ availability, clocks, targets, folds, scores, and candidate rules do not
 change. The replay command requires every non-ledger field to be bit-identical
 and records every source/replayed evaluation hash. Ruff, compilation, 126
 focused tests, and all 930 tests passed before the rev4e replay freeze.
+
+## Rev4e sealed Round 1 (2026-09-08)
+
+The ledger-only replay is completed and sealed at:
+
+    D:\quant-data\b3\processed\model_runs\v2_round1_rev4e_962b9e0_20260908T192330Z
+
+Frozen-design/result/access-audit/artifact-inventory/economics-detail SHA-256
+values are `8cc6d14f658af339c49f7a7cd419dabae6a386ef87a5a5902b0e7a14300a3491`,
+`19efdaf338e584ae84269c171c34a9a33013fce6d40ccde7cc8b59bb3f199f7a`,
+`e89c12934621e897c6884453f3f518fc5daac8ede1d1fccbe78bdd6bbefc7916`,
+`2860a82ec90d62bb2083677bd9289bf5eb7c907a441980efd5fa485c4e734261`,
+and `74eda616fea82c5d08438be943b3fd82c0c80476c06a5966a78b13498be09b03`.
+All 18 sealed score panels were reused without model or score recomputation.
+Every true non-ledger field is bit-identical; ledger-owned realized-beta and
+mask-coverage diagnostics are intentionally recomputed. Inventory and access
+audits pass, chronology is clean, protected access is false/false, and no
+deployment changed.
+
+| Candidate | Rev4e headline net bps/day [95%] | Sterile-proceeds comparator [95%] |
+| --- | --- | --- |
+| Inverse volatility | -8.534 [-14.440,-2.896] | -12.759 [-18.708,-7.100] |
+| Momentum 12-1 | 1.665 [-3.382,10.518] | -2.924 [-8.067,5.865] |
+| Reversal 21 | -4.290 [-14.689,-.803] | -9.648 [-20.074,-6.164] |
+| Reversal 5 | -6.410 [-12.646,-2.529] | -11.714 [-17.993,-7.947] |
+| Reversal/momentum blend | -2.010 [-8.405,4.888] | -6.496 [-12.903,.332] |
+| `b_intraday` | -1.007 [-5.109,6.343] | -5.578 [-9.709,1.868] |
+
+The new headline lifts every book by roughly the fold-weighted CDI effect and
+leaves ordering unchanged. Momentum is the only positive point estimate but
+its interval spans zero. `b_intraday` remains the sole eligible GBDT rung and
+the designated Round-2 parent; it is not evidence of a profitable deployable
+book. The comparator uses the rev4e scheduled equity fee and differs from the
+headline only in short-proceeds remuneration. Consequently it cannot also be
+bit-for-bit identical to the rev4d headline, whose fee convention was flat 25
+bps; that sentence in the external request combined two mutually inconsistent
+requirements, and the registered rev4e fee schedule was applied as specified.
+
+Two score-free replay attempts are retained with hashed logs and failure
+records. The first found that round-level `research_claim` and
+`deployment_changed` metadata were absent from raw evaluator output; the
+second found that `actual_risk_breach_dates` had been misclassified as
+non-ledger even though it is derived from the headline ledger. Both repairs
+only corrected provenance-field classification, were committed and pushed
+before a fresh freeze, and did not weaken comparison of true non-ledger
+fields. The final implementation is commit
+`962b9e0c141542bc141fb0df330ae7729178f5f0`.

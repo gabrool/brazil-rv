@@ -1890,3 +1890,28 @@ bps/day [-9.727,1.852]. The result is not a deployment claim. Round 2 remains
 unrun pending explicit authorization; official validation, the permanently
 spent test, and deployment remain untouched. Two provider reads confirmed
 zero nonterminal instances.
+
+## Current v2 rev4e state (2026-09-08)
+
+Rev4e changes only the constructed-book ledger: equity and BOVA11 short-
+proceeds collateral earn CDI in the headline, while equity borrower fees are
+20% of the contract rate with a 2.5-bps annual floor and 70-bps cap. The
+otherwise identical zero-remuneration comparator remains registered. Scores,
+models, construction, targets, clocks, folds, and candidate rules are
+unchanged. The final replay implementation is commit
+`962b9e0c141542bc141fb0df330ae7729178f5f0`.
+
+The 18-panel ledger replay is sealed at
+`D:\quant-data\b3\processed\model_runs\v2_round1_rev4e_962b9e0_20260908T192330Z`.
+Frozen-design/result/access-audit/inventory/economics-detail SHA-256 values are
+`8cc6d14f658af339c49f7a7cd419dabae6a386ef87a5a5902b0e7a14300a3491`,
+`19efdaf338e584ae84269c171c34a9a33013fce6d40ccde7cc8b59bb3f199f7a`,
+`e89c12934621e897c6884453f3f518fc5daac8ede1d1fccbe78bdd6bbefc7916`,
+`2860a82ec90d62bb2083677bd9289bf5eb7c907a441980efd5fa485c4e734261`,
+and `74eda616fea82c5d08438be943b3fd82c0c80476c06a5966a78b13498be09b03`.
+All non-ledger fields match exactly, no score/model was recomputed, protected
+access is false/false, chronology is clean, and deployment is unchanged.
+Pooled headline net excess is +1.665 bps/day for momentum and -1.007 for
+`b_intraday`, with both intervals spanning zero. `b_intraday` remains the
+Round-2 parent. Round 2 is authorized but not yet run; Round 3 and all 2025
+access remain forbidden.
