@@ -1762,7 +1762,7 @@ def test_rev4c_hedge_does_not_consume_equity_caps() -> None:
     ).copy()
     inputs = _constructed_inputs(days, names)
     inputs["beta_60"] = np.broadcast_to(
-        np.concatenate((np.zeros(10), np.full(10, 0.45))), (days, names)
+        np.concatenate((np.full(10, 0.45), np.zeros(10))), (days, names)
     ).copy()
     result = _run(
         np.full((days, names), 100.0),
@@ -1781,7 +1781,7 @@ def test_rev4c_hedge_does_not_consume_equity_caps() -> None:
     )
 
     assert result.planned_gross_fraction_nav[0] == pytest.approx(2.0)
-    assert result.hedge_target_notional[0] == pytest.approx(-0.45)
+    assert result.hedge_target_notional[0] == pytest.approx(0.45)
     assert result.summary()["entry_defect_signatures"]["D4_cap_block_defects"] == 0
 
 

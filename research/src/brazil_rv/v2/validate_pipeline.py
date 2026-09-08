@@ -923,6 +923,13 @@ def _evaluation_summary(
             for row in result.report["horizon_readouts"]
         },
         "headline_economics": {**dict(headline), **dict(headline_report)},
+        "borrow_cell_economics": [
+            dict(row)
+            for row in summaries
+            if isinstance(row, Mapping)
+            and row.get("scenario")
+            in {"borrow_strict", "borrow_balance", "borrow_open"}
+        ],
         "realized_beta_after_hedge": dict(realized_beta),
         "lending_coverage": diagnostics["lending_coverage"],
     }
@@ -1221,6 +1228,9 @@ def _development_acceptance(
                     "maximum_absolute_hedge_fraction_nav"
                 ),
                 "lending_coverage": evaluation.get("lending_coverage"),
+                "borrow_cell_economics": evaluation.get(
+                    "borrow_cell_economics"
+                ),
             }
         )
         if (
