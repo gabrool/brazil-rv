@@ -8,6 +8,7 @@ from brazil_rv.execution.stateful_ledger import (
     LedgerConfig,
     StatefulLedgerResult,
     _scaled_group_bands,
+    equity_borrow_registration_fee,
     ledger_configurations,
     simulate_stateful_ledger,
 )
@@ -22,6 +23,9 @@ def _config(**changes: object) -> LedgerConfig:
             cost_bps_per_side=0.0,
             annual_borrow_rate=0.0,
             borrow_source="uniform",
+            borrow_registration_fee_fraction=0.0,
+            borrow_registration_fee_floor=0.0,
+            borrow_registration_fee_cap=0.0,
             volatility_balanced_entries=False,
             beta_hedge=False,
             planned_absolute_net_cap=1.10,
@@ -171,20 +175,31 @@ def test_intended_orders_use_prior_marks_and_ignore_current_future_print() -> No
     )
 
 
-def test_lending_borrow_charges_observed_rate_plus_registration_fee_without_floor() -> None:
+def test_lending_borrow_charges_observed_rate_plus_registered_capped_fee() -> None:
     close = np.full((5, 3), 100.0)
     scores = np.asarray([[3.0, 0.0, -3.0]] * 5)
     initial = np.full(3, 100.0)
     uniform = _run(
         close,
         scores,
-        config=_config(annual_borrow_rate=0.02),
+        config=_config(
+            annual_borrow_rate=0.02,
+            borrow_registration_fee_fraction=0.20,
+            borrow_registration_fee_floor=0.00025,
+            borrow_registration_fee_cap=0.007,
+        ),
         initial_reference_price=initial,
     )
     lending = _run(
         close,
         scores,
-        config=_config(annual_borrow_rate=0.02, borrow_source="borrow_balance"),
+        config=_config(
+            annual_borrow_rate=0.02,
+            borrow_source="borrow_balance",
+            borrow_registration_fee_fraction=0.20,
+            borrow_registration_fee_floor=0.00025,
+            borrow_registration_fee_cap=0.007,
+        ),
         initial_reference_price=initial,
         annual_borrow_rate_by_name=np.full_like(close, 0.40),
         borrow_rate_imputed=np.zeros_like(close, dtype=np.bool_),
@@ -195,11 +210,49 @@ def test_lending_borrow_charges_observed_rate_plus_registration_fee_without_floo
     assert charged.any()
     first_charged = int(np.flatnonzero(charged)[0])
     assert lending.borrow_bps[first_charged] == pytest.approx(
-        (0.4025 / 0.02) * uniform.borrow_bps[first_charged]
+        (0.407 / 0.024) * uniform.borrow_bps[first_charged]
     )
     np.testing.assert_allclose(
-        lending.held_short_weighted_annual_borrow_rate[charged], 0.4025
+        lending.held_short_weighted_annual_borrow_rate[charged], 0.407
     )
+
+
+def test_equity_borrow_registration_fee_schedule_floors_and_caps() -> None:
+    config = LedgerConfig()
+    np.testing.assert_array_equal(
+        equity_borrow_registration_fee(np.asarray([0.0001, 0.01, 0.10]), config=config),
+        np.asarray([0.00025, 0.002, 0.007]),
+    )
+
+
+def test_full_short_proceeds_interest_equals_cdi_times_restricted_base() -> None:
+    close = np.full((5, 3), 100.0)
+    scores = np.asarray([[3.0, 0.0, -3.0]] * 5)
+    cdi = np.asarray([0.001, 0.002, 0.003, 0.004, 0.005])
+    result = _run(
+        close,
+        scores,
+        cdi=cdi,
+        config=_config(short_proceeds_remuneration=1.0),
+        initial_reference_price=np.full(3, 100.0),
+    )
+    expected = 10_000.0 * cdi * result.short_proceeds_interest_base / result.start_nav
+    np.testing.assert_allclose(
+        result.short_proceeds_interest_bps, expected, atol=1e-12, rtol=0.0
+    )
+    np.testing.assert_allclose(
+        result.interest_bps,
+        result.free_cash_interest_bps + result.short_proceeds_interest_bps,
+        atol=1e-12,
+        rtol=0.0,
+    )
+
+
+def test_sterile_comparator_removes_only_short_proceeds_interest_setting() -> None:
+    cells = ledger_configurations()
+    headline = cells["borrow_balance"]
+    sterile = cells["comparator_sterile_proceeds"]
+    assert sterile == replace(headline, short_proceeds_remuneration=0.0)
 
 
 def test_lending_unshortable_entry_advances_to_next_candidate() -> None:
@@ -1601,12 +1654,8 @@ def test_rev4_entry_scheduler_fills_equal_volatility_quotas() -> None:
         60,
         60,
     ]
-    np.testing.assert_array_equal(
-        result.volatility_occupancy_long[0], [6, 6, 6, 6, 6]
-    )
-    np.testing.assert_array_equal(
-        result.volatility_occupancy_short[0], [6, 6, 6, 6, 6]
-    )
+    np.testing.assert_array_equal(result.volatility_occupancy_long[0], [6, 6, 6, 6, 6])
+    np.testing.assert_array_equal(result.volatility_occupancy_short[0], [6, 6, 6, 6, 6])
 
 
 def test_rev4_monotone_negative_volatility_score_fills_both_sides_per_quintile() -> (
@@ -1627,12 +1676,8 @@ def test_rev4_monotone_negative_volatility_score_fills_both_sides_per_quintile()
     )
 
     np.testing.assert_array_equal(result.volatility_quota[0], [6, 6, 6, 6, 6])
-    np.testing.assert_array_equal(
-        result.volatility_occupancy_long[0], [6, 6, 6, 6, 6]
-    )
-    np.testing.assert_array_equal(
-        result.volatility_occupancy_short[0], [6, 6, 6, 6, 6]
-    )
+    np.testing.assert_array_equal(result.volatility_occupancy_long[0], [6, 6, 6, 6, 6])
+    np.testing.assert_array_equal(result.volatility_occupancy_short[0], [6, 6, 6, 6, 6])
 
 
 def test_rev4_retention_uses_the_names_current_volatility_quintile() -> None:
@@ -1764,12 +1809,8 @@ def test_rev4_unavailable_short_quota_spills_to_best_remaining_names() -> None:
 
 def test_rev4_beta_hedge_is_separate_rebalances_and_carries_missing_print() -> None:
     days, names = 4, 4
-    scores = np.broadcast_to(
-        np.asarray([-2.0, -1.0, 1.0, 2.0]), (days, names)
-    ).copy()
-    beta = np.broadcast_to(
-        np.asarray([0.5, 0.5, 1.5, 1.5]), (days, names)
-    ).copy()
+    scores = np.broadcast_to(np.asarray([-2.0, -1.0, 1.0, 2.0]), (days, names)).copy()
+    beta = np.broadcast_to(np.asarray([0.5, 0.5, 1.5, 1.5]), (days, names)).copy()
     rates = np.full((days, names), 0.02)
     shortable = np.ones((days, names), dtype=np.bool_)
     result = _run(
@@ -1803,16 +1844,16 @@ def test_rev4_beta_hedge_is_separate_rebalances_and_carries_missing_print() -> N
     assert abs(result.hedge_signed_notional[0]) / result.nav[0] <= 0.60 + 1e-12
     assert result.hedge_borrow_bps[1] > 0.0
     assert result.hedge_signed_notional[-1] == 0.0
-    assert np.all(result.gross_fraction_nav_including_hedge >= result.gross_fraction_nav)
+    assert np.all(
+        result.gross_fraction_nav_including_hedge >= result.gross_fraction_nav
+    )
     assert np.all(result.planned_gross_fraction_nav <= 4.0 + 1e-12)
     assert np.all(np.abs(result.planned_net_fraction_nav) <= 1.1 + 1e-12)
 
 
 def test_rev4c_hedge_does_not_consume_equity_caps() -> None:
     days, names = 4, 20
-    scores = np.broadcast_to(
-        np.arange(names, dtype=np.float64), (days, names)
-    ).copy()
+    scores = np.broadcast_to(np.arange(names, dtype=np.float64), (days, names)).copy()
     inputs = _constructed_inputs(days, names)
     inputs["beta_60"] = np.broadcast_to(
         np.concatenate((np.full(10, 0.45), np.zeros(10))), (days, names)
@@ -1840,9 +1881,7 @@ def test_rev4c_hedge_does_not_consume_equity_caps() -> None:
 
 def test_rev4c_hedge_requirement_is_capped_and_labelled() -> None:
     days, names = 4, 20
-    scores = np.broadcast_to(
-        np.arange(names, dtype=np.float64), (days, names)
-    ).copy()
+    scores = np.broadcast_to(np.arange(names, dtype=np.float64), (days, names)).copy()
     inputs = _constructed_inputs(days, names)
     inputs["beta_60"] = np.broadcast_to(
         np.concatenate((np.zeros(10), np.full(10, 0.8))), (days, names)
@@ -1906,6 +1945,9 @@ def test_rev4_uniform_comparator_is_exact_legacy_ledger() -> None:
             cost_bps_per_side=0.0,
             annual_borrow_rate=0.0,
             borrow_source="uniform",
+            borrow_registration_fee_fraction=0.0,
+            borrow_registration_fee_floor=0.0,
+            borrow_registration_fee_cap=0.0,
             volatility_balanced_entries=False,
             beta_hedge=False,
             planned_absolute_net_cap=1.10,

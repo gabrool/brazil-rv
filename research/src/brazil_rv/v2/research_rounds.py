@@ -14,6 +14,8 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
+from brazil_rv.execution.stateful_ledger import TERMINAL_SETTLEMENT_CONVENTION
+
 from .artifacts import inventory, sha256_file, verify_inventory, write_json_atomic
 from .baselines import BaselinePanel, build_store_baselines
 from .bova11 import load_bova11_series
@@ -32,6 +34,7 @@ from .contract import (
 )
 from .evaluate import (
     EVALUATION_SCHEMA,
+    PRIOR_EVALUATION_SCHEMA,
     EvaluationInputs,
     EvaluationResult,
     _input_hashes,
@@ -72,11 +75,12 @@ from .validate_pipeline import (
     _window_target_mask,
 )
 
-ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4D"
-ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4D"
+PRIOR_ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4D"
+ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4E"
+ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4E"
 RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4D"
 PREREGISTRATION = (
-    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4d.md"
+    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4e.md"
 )
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
@@ -182,7 +186,7 @@ def registration_protocol_from_code() -> dict[str, object]:
     """Build protocol facts that registration prose may not override."""
 
     return {
-        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V4",
+        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V4E",
         "purge_sessions": {
             "fit_to_selection": FIT_TO_SELECTION_PURGE_SESSIONS,
             "selection_to_evaluation": SELECTION_TO_EVALUATION_PURGE_SESSIONS,
@@ -210,6 +214,7 @@ def registration_protocol_from_code() -> dict[str, object]:
         "comparators": [
             "borrow_strict",
             "borrow_open",
+            "comparator_sterile_proceeds",
             "comparator_uniform_borrow",
         ],
         "candidate_decision_rule": {
@@ -233,7 +238,11 @@ def registration_protocol_from_code() -> dict[str, object]:
             "missing_rate_imputation": (
                 "same_day_cross_sectional_observed_rate_75th_percentile"
             ),
-            "registration_fee_annual": 0.0025,
+            "registration_fee": {
+                "fraction_of_contract_rate": 0.20,
+                "annual_floor": 0.00025,
+                "annual_cap": 0.0070,
+            },
             "equity_rate_floor": None,
             "hedge_short_rate_floor": 0.02,
         },
@@ -755,8 +764,7 @@ def _daily_series(
     headline = [
         row
         for row in economics["daily_table"]
-        if isinstance(row, Mapping)
-        and row.get("scenario") == "borrow_balance"
+        if isinstance(row, Mapping) and row.get("scenario") == "borrow_balance"
     ]
     headline_by_date: dict[str, float] = {}
     for row in headline:
@@ -935,9 +943,7 @@ def _interval_includes_zero(readout: Mapping[str, object]) -> bool:
     lower = readout.get("lower_95")
     upper = readout.get("upper_95")
     return (
-        lower is not None
-        and upper is not None
-        and float(lower) <= 0.0 <= float(upper)
+        lower is not None and upper is not None and float(lower) <= 0.0 <= float(upper)
     )
 
 
@@ -996,9 +1002,7 @@ def _weighted_candidate_designation(
         paired = _paired_readouts(reports[name], reports[ic_best])
         if _interval_is_positive(
             paired["pooled"]["headline_net_excess_bps"]
-        ) and _interval_includes_zero(
-            paired["pooled"]["primary_neutral_target_ic"]
-        ):
+        ) and _interval_includes_zero(paired["pooled"]["primary_neutral_target_ic"]):
             overrides.append((name, paired))
     chosen = (
         ic_best
@@ -1061,6 +1065,184 @@ def _pooled_readouts(
                 "economics": evaluation.result.report["economics"]["coverage"],
             }
             for fold, evaluation in evaluations.items()
+        },
+    }
+
+
+_ECONOMICS_DECOMPOSITION_FIELDS = (
+    "gross_long_short_spread_pnl_bps",
+    "hedge_gross_pnl_bps",
+    "free_cash_interest_bps",
+    "short_proceeds_interest_bps",
+    "equity_trading_cost_bps",
+    "hedge_cost_bps",
+    "equity_borrow_observed_rate_bps",
+    "equity_borrow_registration_fee_bps",
+    "hedge_borrow_bps",
+    "cdi_benchmark_bps",
+)
+
+
+def _scenario_daily_rows(
+    evaluation: _ResearchEvaluation, scenario: str
+) -> list[Mapping[str, object]]:
+    economics = evaluation.result.report.get("economics")
+    rows = economics.get("daily_table") if isinstance(economics, Mapping) else None
+    if not isinstance(rows, list):
+        raise ValueError("evaluation lacks its economics daily table")
+    selected = [
+        row
+        for row in rows
+        if isinstance(row, Mapping) and row.get("scenario") == scenario
+    ]
+    if len(selected) != len(evaluation.result.dates):
+        raise ValueError(f"economics scenario {scenario} has an incomplete date axis")
+    return selected
+
+
+def _economics_row_components(row: Mapping[str, object]) -> dict[str, float]:
+    equity_cost = (
+        float(row["turnover_cost_bps"]) - float(row["hedge_cost_bps"])
+        if row.get("turnover_cost_bps") is not None
+        and row.get("hedge_cost_bps") is not None
+        else math.nan
+    )
+    return {
+        name: (
+            equity_cost
+            if name == "equity_trading_cost_bps"
+            else math.nan
+            if row.get(name) is None
+            else float(row[name])
+        )
+        for name in _ECONOMICS_DECOMPOSITION_FIELDS
+    }
+
+
+def _economics_scenario_detail(
+    evaluations: Mapping[str, _ResearchEvaluation], scenario: str
+) -> dict[str, object]:
+    by_fold: dict[str, object] = {}
+    pooled_daily: list[NDArray[np.float64]] = []
+    pooled_components: dict[str, list[float]] = {
+        name: [] for name in _ECONOMICS_DECOMPOSITION_FIELDS
+    }
+    for fold, evaluation in evaluations.items():
+        rows = _scenario_daily_rows(evaluation, scenario)
+        net = np.asarray(
+            [
+                np.nan
+                if row.get("net_excess_all_cash_bps") is None
+                else float(row["net_excess_all_cash_bps"])
+                for row in rows
+            ],
+            dtype=np.float64,
+        )
+        pooled_daily.append(net)
+        component_rows = [_economics_row_components(row) for row in rows]
+        for values in component_rows:
+            for name, value in values.items():
+                if math.isfinite(value):
+                    pooled_components[name].append(value)
+        components = {
+            name: (float(np.mean(finite)) if finite else None)
+            for name in _ECONOMICS_DECOMPOSITION_FIELDS
+            for finite in [
+                [
+                    values[name]
+                    for values in component_rows
+                    if math.isfinite(values[name])
+                ]
+            ]
+        }
+        reconciliation = []
+        for row, values in zip(rows, component_rows, strict=True):
+            if row.get("net_excess_all_cash_bps") is None or not all(
+                math.isfinite(value) for value in values.values()
+            ):
+                continue
+            recomposed = (
+                values["gross_long_short_spread_pnl_bps"]
+                + values["hedge_gross_pnl_bps"]
+                + values["free_cash_interest_bps"]
+                + values["short_proceeds_interest_bps"]
+                - values["equity_trading_cost_bps"]
+                - values["hedge_cost_bps"]
+                - values["equity_borrow_observed_rate_bps"]
+                - values["equity_borrow_registration_fee_bps"]
+                - values["hedge_borrow_bps"]
+                - values["cdi_benchmark_bps"]
+            )
+            reconciliation.append(recomposed - float(row["net_excess_all_cash_bps"]))
+        economics = evaluation.result.report["economics"]
+        if not isinstance(economics, Mapping):
+            raise ValueError("evaluation economics payload is malformed")
+        summaries = economics.get("summaries")
+        if not isinstance(summaries, list):
+            raise ValueError("evaluation economics summaries are malformed")
+        summary = next(
+            row
+            for row in summaries
+            if isinstance(row, Mapping) and row.get("scenario") == scenario
+        )
+        readouts = _daily_series(evaluation)
+        by_fold[fold] = {
+            "net_excess_bps_per_day": _folded_bootstrap((net,)),
+            "annualized_net_excess_sharpe": summary.get("annualized_net_excess_sharpe"),
+            "mean_gross_fraction_nav": summary.get("mean_gross_fraction_nav"),
+            "mean_turnover_fraction_nav": summary.get("mean_turnover_fraction_nav"),
+            "average_holding_sessions_approximation": summary.get(
+                "average_holding_sessions_approximation"
+            ),
+            "persistence_1": _folded_bootstrap((readouts["persistence_1"],)),
+            "persistence_5": _folded_bootstrap((readouts["persistence_5"],)),
+            "gross_label": "equity gross excludes BOVA11 hedge notional",
+            "settlement_label": TERMINAL_SETTLEMENT_CONVENTION,
+            "mean_component_bps_per_day": components,
+            "maximum_absolute_daily_reconciliation_error_bps": max(
+                (abs(value) for value in reconciliation), default=0.0
+            ),
+        }
+    all_net = np.concatenate(pooled_daily)
+    finite_net = all_net[np.isfinite(all_net)]
+    standard_deviation = (
+        float(np.std(finite_net, ddof=1)) if finite_net.size > 1 else 0.0
+    )
+    return {
+        "folds": by_fold,
+        "pooled": {
+            "net_excess_bps_per_day": _folded_bootstrap(tuple(pooled_daily)),
+            "annualized_net_excess_sharpe": (
+                float(np.mean(finite_net) / standard_deviation * np.sqrt(252.0))
+                if standard_deviation > 0.0
+                else 0.0
+            ),
+            "mean_component_bps_per_day": {
+                name: float(np.mean(values)) if values else None
+                for name, values in pooled_components.items()
+            },
+            "gross_label": "equity gross excludes BOVA11 hedge notional",
+            "settlement_label": TERMINAL_SETTLEMENT_CONVENTION,
+        },
+    }
+
+
+def _round1_economics_detail(
+    candidates: Mapping[str, Mapping[str, _ResearchEvaluation]],
+) -> dict[str, object]:
+    return {
+        "schema": "BRAZIL_RV_V2_ROUND1_REV4E_ECONOMICS_DETAIL_V1",
+        **RESEARCH_FLAGS,
+        "headline_scenario": "borrow_balance",
+        "comparator_scenario": "comparator_sterile_proceeds",
+        "books": {
+            name: {
+                "headline": _economics_scenario_detail(evaluations, "borrow_balance"),
+                "sterile_comparator": _economics_scenario_detail(
+                    evaluations, "comparator_sterile_proceeds"
+                ),
+            }
+            for name, evaluations in candidates.items()
         },
     }
 
@@ -1658,7 +1840,6 @@ def freeze_round1(
         experiment52_expected_sha256=experiment52_cdi_sha256,
     )
 
-
     bova11 = load_bova11_series(
         bova11_root,
         expected_manifest_sha256=bova11_manifest_sha256,
@@ -1824,6 +2005,7 @@ def run_round1(
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
+
     lending_design = design.get("lending_archive")
     if not isinstance(lending_design, Mapping):
         raise ValueError("Round-1 frozen design lacks the lending archive")
@@ -2150,9 +2332,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
-    lending_borrow = _load_frozen_lending(
-        design, store_root=store_root, dates=dates
-    )
+    lending_borrow = _load_frozen_lending(design, store_root=store_root, dates=dates)
     source_hashes["bova11_manifest"] = bova11.manifest_sha256
     source_hashes["bova11_data"] = bova11.data_sha256
     source_hashes["lending_archive_manifest"] = lending_borrow.manifest_sha256
@@ -2390,6 +2570,323 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     return write_json_atomic(result_path, result)
 
 
+def _ledger_replay_non_ledger_projection(
+    report: Mapping[str, object],
+) -> dict[str, object]:
+    projection = {
+        key: value
+        for key, value in report.items()
+        if key not in {"schema", "economics", "diagnostics"}
+    }
+    diagnostics = report.get("diagnostics")
+    if not isinstance(diagnostics, Mapping):
+        raise ValueError("evaluation lacks its diagnostics payload")
+    projection["diagnostics"] = {
+        key: value for key, value in diagnostics.items() if key != "realized_beta"
+    }
+    return projection
+
+
+def freeze_round1_ledger_replay(*, source_round1_root: Path, output_root: Path) -> str:
+    """Freeze rev4e around the sealed rev4d scores before replaying the ledger."""
+
+    protocol = verify_registration_protocol()
+    code = _git_identity()
+    source = source_round1_root.resolve(strict=True)
+    source_result = _verify_sealed_root(source, expected_schema=PRIOR_ROUND1_SCHEMA)
+    if source_result.get("gbdt_ladder", {}).get("parent_rung") != "b_intraday":
+        raise ValueError("rev4e replay requires the sealed b_intraday parent")
+    source_design_path = source / "frozen_design.json"
+    source_design = _read_json(source_design_path)
+    if source_design.get("schema") != PRIOR_ROUND1_SCHEMA:
+        raise ValueError("rev4e replay source is not the sealed rev4d design")
+    output = output_root.resolve()
+    if output.exists():
+        raise FileExistsError(output)
+    output.mkdir(parents=True, exist_ok=False)
+    design = {
+        "schema": ROUND1_SCHEMA,
+        "status": "frozen_before_score",
+        **RESEARCH_FLAGS,
+        "frozen_at_utc": _utc_now(),
+        "scope": "ledger_only_replay_of_hash_bound_rev4d_score_panels",
+        "implementation": code,
+        "preregistration": {
+            "path": str(PREREGISTRATION.resolve(strict=True)),
+            "sha256": sha256_file(PREREGISTRATION),
+            "protocol": protocol,
+        },
+        "prior_round1": {
+            "root": str(source),
+            "schema": PRIOR_ROUND1_SCHEMA,
+            "result_sha256": sha256_file(source / "round1_result.json"),
+            "inventory_sha256": sha256_file(source / "artifact_inventory.json"),
+            "frozen_design_sha256": sha256_file(source_design_path),
+        },
+        "store": source_design["store"],
+        "development_acceptance": source_design["development_acceptance"],
+        "cdi": source_design["cdi"],
+        "bova11": source_design["bova11"],
+        "lending_archive": source_design["lending_archive"],
+        "folds": source_design["folds"],
+        "baseline_roster": list(_BASELINE_SIGNAL_NAMES),
+        "gbdt_rungs": {"b_intraday": []},
+        "gbdt_seeds": list(GBDT_SEEDS),
+        "bootstrap": source_design["bootstrap"],
+        "ledger_change": {
+            "headline_short_proceeds_remuneration": 1.0,
+            "sterile_comparator_short_proceeds_remuneration": 0.0,
+            "equity_borrow_registration_fee": {
+                "fraction_of_contract_rate": 0.20,
+                "annual_floor": 0.00025,
+                "annual_cap": 0.0070,
+            },
+            "hedge_short_borrow_changed": False,
+        },
+    }
+    return write_json_atomic(output / "frozen_design.json", design)
+
+
+def run_round1_ledger_replay(*, output_root: Path) -> str:
+    """Re-evaluate only the ledger over the sealed rev4d Round-1 score panels."""
+
+    output = output_root.resolve(strict=True)
+    design_path = output / "frozen_design.json"
+    design = _read_json(design_path)
+    if (
+        design.get("schema") != ROUND1_SCHEMA
+        or design.get("status") != "frozen_before_score"
+        or design.get("scope") != "ledger_only_replay_of_hash_bound_rev4d_score_panels"
+    ):
+        raise ValueError("Round-1 rev4e root is not its frozen ledger replay")
+    code = _git_identity()
+    if design.get("implementation") != code:
+        raise ValueError("Round-1 rev4e implementation differs from the freeze")
+    result_path = output / "round1_result.json"
+    if result_path.exists():
+        raise FileExistsError(result_path)
+    source_binding = design.get("prior_round1")
+    if not isinstance(source_binding, Mapping):
+        raise ValueError("Round-1 rev4e lacks its prior-root binding")
+    source = Path(str(source_binding["root"])).resolve(strict=True)
+    source_result = _verify_sealed_root(source, expected_schema=PRIOR_ROUND1_SCHEMA)
+    for name, path in (
+        ("result_sha256", source / "round1_result.json"),
+        ("inventory_sha256", source / "artifact_inventory.json"),
+        ("frozen_design_sha256", source / "frozen_design.json"),
+    ):
+        if sha256_file(path) != source_binding.get(name):
+            raise ValueError(f"sealed rev4d {name} differs from the frozen binding")
+    store_root = Path(str(design["store"]["root"])).resolve(strict=True)
+    store_manifest, dates = _read_store_header(store_root)
+    if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
+        raise ValueError("Round-1 rev4e store manifest hash mismatch")
+    source_tiers = _source_tier_labels(store_manifest)
+    fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
+    pretrain = _pretrain_indices(dates)
+    cdi_design = design["cdi"]
+    cdi, cdi_provenance = _load_development_cdi(
+        dates=dates,
+        cdi_path=Path(str(cdi_design["development_extension"]["path"])),
+        expected_sha256=str(cdi_design["development_extension"]["sha256"]),
+        experiment52_cdi_path=Path(str(cdi_design["experiment52_reference"]["path"])),
+        experiment52_expected_sha256=str(
+            cdi_design["experiment52_reference"]["sha256"]
+        ),
+    )
+    bova_design = design["bova11"]
+    bova11 = load_bova11_series(
+        Path(str(bova_design["root"])),
+        expected_manifest_sha256=str(bova_design["manifest_sha256"]),
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+    )
+    if bova11.data_sha256 != bova_design["data_sha256"]:
+        raise ValueError("Round-1 rev4e BOVA11 data hash mismatch")
+    bova11_binding = {
+        "manifest_sha256": bova11.manifest_sha256,
+        "data_sha256": bova11.data_sha256,
+    }
+    lending_borrow = _load_frozen_lending(design, store_root=store_root, dates=dates)
+    store, access = _open_round_store(
+        store_root, fit, selection, evaluation, fit_target_window, pretrain
+    )
+    shutil.copytree(source / "baselines", output / "baselines")
+    shutil.copytree(source / "gbdt_ladder", output / "gbdt_ladder")
+    comparison_rows: list[dict[str, object]] = []
+
+    def replay_one(
+        source_path: Path, destination_path: Path, fold: str
+    ) -> _ResearchEvaluation:
+        retained = _evaluation_from_artifacts(
+            source_path,
+            store=store,
+            indices=evaluation[fold],
+            cdi=cdi,
+            bova11_close_by_index=bova11.close_by_session,
+            bova11_binding=bova11_binding,
+            lending_borrow=lending_borrow,
+            expected_fold=fold,
+            expected_evaluation_schema=PRIOR_EVALUATION_SCHEMA,
+        )
+        replayed = evaluate_scores(retained.inputs, window_name=fold)
+        old_projection = _ledger_replay_non_ledger_projection(retained.result.report)
+        new_projection = _ledger_replay_non_ledger_projection(replayed.report)
+        if old_projection != new_projection:
+            raise RuntimeError(
+                f"non-ledger evaluation fields changed in rev4e replay: {source_path}"
+            )
+        new_sha = write_json_atomic(destination_path, replayed.report)
+        comparison_rows.append(
+            {
+                "source": str(source_path),
+                "source_sha256": sha256_file(source_path),
+                "replayed": str(destination_path),
+                "replayed_sha256": new_sha,
+                "score_or_model_recomputed": False,
+                "non_ledger_fields_bit_identical": True,
+            }
+        )
+        return _ResearchEvaluation(result=replayed, inputs=retained.inputs)
+
+    baseline_reports: dict[str, dict[str, _ResearchEvaluation]] = {}
+    baseline_records: dict[str, dict[str, object]] = {}
+    rung_reports: dict[str, dict[str, _ResearchEvaluation]] = {"b_intraday": {}}
+    rung_records: dict[str, dict[str, object]] = {"b_intraday": {}}
+    try:
+        for name in _BASELINE_SIGNAL_NAMES:
+            baseline_reports[name] = {}
+            baseline_records[name] = {}
+            for fold in ("F1", "F2", "F3"):
+                source_fold = source / "baselines" / name / fold
+                destination_fold = output / "baselines" / name / fold
+                replayed = replay_one(
+                    source_fold / "evaluation.json",
+                    destination_fold / "evaluation.json",
+                    fold,
+                )
+                baseline_reports[name][fold] = replayed
+                baseline_records[name][fold] = {
+                    "score_manifest": str(destination_fold / "score_manifest.json"),
+                    "score_manifest_sha256": sha256_file(
+                        destination_fold / "score_manifest.json"
+                    ),
+                    "evaluation": str(destination_fold / "evaluation.json"),
+                    "evaluation_sha256": sha256_file(
+                        destination_fold / "evaluation.json"
+                    ),
+                    "score_reused_without_recomputation": True,
+                }
+        for fold in ("F1", "F2", "F3"):
+            source_fold = source / "gbdt_ladder" / "b_intraday" / fold
+            destination_fold = output / "gbdt_ladder" / "b_intraday" / fold
+            replayed = replay_one(
+                source_fold / "evaluation.json",
+                destination_fold / "evaluation.json",
+                fold,
+            )
+            rung_reports["b_intraday"][fold] = replayed
+            rung_records["b_intraday"][fold] = {
+                "score_manifest": str(destination_fold / "score_manifest.json"),
+                "score_manifest_sha256": sha256_file(
+                    destination_fold / "score_manifest.json"
+                ),
+                "evaluation": str(destination_fold / "evaluation.json"),
+                "evaluation_sha256": sha256_file(destination_fold / "evaluation.json"),
+                "score_reused_without_recomputation": True,
+            }
+        baseline_summary = {
+            name: _pooled_readouts(reports)
+            for name, reports in baseline_reports.items()
+        }
+        rung_summary = {"b_intraday": _pooled_readouts(rung_reports["b_intraday"])}
+        designated, designation = _weighted_candidate_designation(
+            rung_reports, exact_tie_priority=("b_intraday",)
+        )
+        if designated not in {"b_intraday", None}:
+            raise RuntimeError("rev4e produced an impossible rung designation")
+        economics_detail = _round1_economics_detail(
+            {**baseline_reports, "b_intraday": rung_reports["b_intraday"]}
+        )
+        detail_path = output / "round1_rev4e_economics_detail.json"
+        detail_sha = write_json_atomic(detail_path, economics_detail)
+        source_hashes = {
+            "v2_store_manifest": str(design["store"]["manifest_sha256"]),
+            "cdi_development_extension": str(
+                cdi_provenance["development_extension"]["sha256"]
+            ),
+            "cdi_experiment52_reference": str(
+                cdi_provenance["experiment52_reference"]["sha256"]
+            ),
+            "bova11_manifest": bova11.manifest_sha256,
+            "bova11_data": bova11.data_sha256,
+            "lending_archive_manifest": lending_borrow.manifest_sha256,
+            "lending_archive_balances": lending_borrow.balance_sha256,
+            "lending_archive_rates": lending_borrow.rate_sha256,
+            "preregistration": str(design["preregistration"]["sha256"]),
+            "prior_round1_result": str(source_binding["result_sha256"]),
+            "prior_round1_inventory": str(source_binding["inventory_sha256"]),
+        }
+        result = {
+            "schema": ROUND1_SCHEMA,
+            "status": "completed",
+            **RESEARCH_FLAGS,
+            **source_tiers,
+            "completed_at_utc": _utc_now(),
+            "frozen_design": {
+                "path": str(design_path),
+                "sha256": sha256_file(design_path),
+            },
+            "implementation": code,
+            "score_implementation": source_result["implementation"],
+            "store_access": access,
+            "sources": source_hashes,
+            "ledger_replay": {
+                "source_root": str(source),
+                "score_or_model_recomputation": False,
+                "evaluation_count": len(comparison_rows),
+                "all_non_ledger_fields_bit_identical": all(
+                    row["non_ledger_fields_bit_identical"] is True
+                    for row in comparison_rows
+                ),
+                "comparisons": comparison_rows,
+            },
+            "economics_detail": {
+                "path": str(detail_path),
+                "sha256": detail_sha,
+            },
+            "baselines": {
+                "artifacts": baseline_records,
+                "readouts": baseline_summary,
+            },
+            "gbdt_ladder": {
+                "artifacts": rung_records,
+                "readouts": rung_summary,
+                "paired_deltas": {},
+                "kept_rungs": ["b_intraday"],
+                "parent_rung": "b_intraday",
+                "designated_rung": designated,
+                "designation": designation,
+                "preference_rule": designation["rule"],
+            },
+            "gbdt_data_span_preview": {
+                "status": "not_rerun_by_rev4e_ledger_only_replay",
+                "artifacts": {},
+                "readouts": {},
+                "paired_deltas": {},
+                "decision_weight": "informational_only",
+            },
+            "operational_events": [
+                {
+                    "event": "rev4e_ledger_only_replay_completed",
+                    "at_utc": _utc_now(),
+                }
+            ],
+        }
+        return write_json_atomic(result_path, result)
+    finally:
+        store.close()
+
+
 def _verify_sealed_root(root: Path, *, expected_schema: str) -> dict[str, object]:
     source = root.resolve(strict=True)
     inventory_path = source / "artifact_inventory.json"
@@ -2412,7 +2909,7 @@ def _verify_sealed_root(root: Path, *, expected_schema: str) -> dict[str, object
         raise ValueError("source research inventory no longer matches its files")
     result_name = (
         "round1_result.json"
-        if expected_schema == ROUND1_SCHEMA
+        if expected_schema in {ROUND1_SCHEMA, PRIOR_ROUND1_SCHEMA}
         else "round2_result.json"
     )
     result = _read_json(source / result_name)
@@ -2494,8 +2991,7 @@ def freeze_round2(
     )
     round1_sources = round1.get("sources")
     if not isinstance(round1_sources, Mapping) or (
-        round1_sources.get("lending_archive_manifest")
-        != lending_borrow.manifest_sha256
+        round1_sources.get("lending_archive_manifest") != lending_borrow.manifest_sha256
     ):
         raise ValueError("Round 2 must use the exact Round-1 lending archive")
     if fast_checkpoint is not None or fast_checkpoint_sha256 is not None:
@@ -2754,8 +3250,7 @@ def write_round2_plan_p(*, output_root: Path) -> str:
         or smoke.get("fold") != "F1"
         or smoke.get("epochs_completed") != 1
         or smoke.get("compiled_graph_count") != 2
-        or smoke.get("compiled_graphs")
-        != {"training": 1, "selection": 1, "total": 2}
+        or smoke.get("compiled_graphs") != {"training": 1, "selection": 1, "total": 2}
         or (smoke_root / "scores").exists()
     ):
         raise ValueError("Round-2 first-smoke contract did not pass exactly")
@@ -2988,10 +3483,12 @@ def _load_round1_parent_fold(
     return _score_artifact(root, require_clean_transfer=True)
 
 
-def _evaluation_from_path(path: Path) -> dict[str, object]:
+def _evaluation_from_path(
+    path: Path, *, expected_schema: str = EVALUATION_SCHEMA
+) -> dict[str, object]:
     payload = _read_json(path)
     _assert_false_access(payload, path=path)
-    if payload.get("schema") != EVALUATION_SCHEMA:
+    if payload.get("schema") != expected_schema:
         raise ValueError(f"not a v2 evaluation: {path}")
     return payload
 
@@ -3007,10 +3504,11 @@ def _evaluation_from_artifacts(
     lending_borrow: LendingBorrowPanels,
     allow_legacy_missing_indices: bool = False,
     expected_fold: str | None = None,
+    expected_evaluation_schema: str = EVALUATION_SCHEMA,
 ) -> _ResearchEvaluation:
     """Rebuild retained comparison inputs from hash-bound score/store artifacts."""
 
-    report = _evaluation_from_path(path)
+    report = _evaluation_from_path(path, expected_schema=expected_evaluation_schema)
     transfer_chronology_clean = report.get("transfer_chronology_clean")
     if transfer_chronology_clean is not True:
         raise PermissionError(
@@ -3079,8 +3577,7 @@ def _evaluation_from_artifacts(
     rows = [
         row
         for row in economics["daily_table"]
-        if isinstance(row, Mapping)
-        and row.get("scenario") == "borrow_balance"
+        if isinstance(row, Mapping) and row.get("scenario") == "borrow_balance"
     ]
     by_date: dict[str, float] = {}
     for row in rows:
@@ -3114,9 +3611,7 @@ def _round2_arm_decision(
 ) -> tuple[dict[str, object], dict[str, object], list[str], bool, str | None]:
     if tuple(arm_reports) != ("arm_A", "arm_B"):
         raise ValueError("rev-4 Round 2 requires exactly Arms A and B")
-    readouts = {
-        arm: _pooled_readouts(reports) for arm, reports in arm_reports.items()
-    }
+    readouts = {arm: _pooled_readouts(reports) for arm, reports in arm_reports.items()}
     deltas = {
         "B_minus_A": _paired_readouts(arm_reports["arm_B"], arm_reports["arm_A"]),
     }
@@ -3169,8 +3664,8 @@ def _round2_result(
     comparator_artifacts: Mapping[str, object],
     reporting_recovery: Mapping[str, object] | None = None,
 ) -> str:
-    arm_readouts, arm_deltas, eligible, uncertain, chosen_arm = (
-        _round2_arm_decision(arm_reports)
+    arm_readouts, arm_deltas, eligible, uncertain, chosen_arm = _round2_arm_decision(
+        arm_reports
     )
     if comparator_reports["network"] is not arm_reports["arm_B"]:
         raise ValueError("rev-4 parent comparison must use Arm B")
@@ -3279,9 +3774,7 @@ def finalize_round2(*, output_root: Path) -> str:
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
-    lending_borrow = _load_frozen_lending(
-        design, store_root=store_root, dates=dates
-    )
+    lending_borrow = _load_frozen_lending(design, store_root=store_root, dates=dates)
     source_hashes = {
         "v2_store_manifest": str(design["store"]["manifest_sha256"]),
         "cdi_development_extension": str(provenance["development_extension"]["sha256"]),
@@ -3722,6 +4215,11 @@ def _parser() -> argparse.ArgumentParser:
     resume = commands.add_parser("resume-round1")
     resume.add_argument("--output-root", type=Path, required=True)
     resume.add_argument("--num-threads", type=int, default=0)
+    freeze_replay = commands.add_parser("freeze-round1-ledger-replay")
+    freeze_replay.add_argument("--source-round1-root", type=Path, required=True)
+    freeze_replay.add_argument("--output-root", type=Path, required=True)
+    run_replay = commands.add_parser("run-round1-ledger-replay")
+    run_replay.add_argument("--output-root", type=Path, required=True)
     seal = commands.add_parser("seal-root")
     seal.add_argument("--root", type=Path, required=True)
     seal.add_argument("--stdout-log", type=Path)
@@ -3769,9 +4267,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
             lending_archive_root=arguments.lending_archive_root,
-            lending_archive_manifest_sha256=(
-                arguments.lending_archive_manifest_sha256
-            ),
+            lending_archive_manifest_sha256=(arguments.lending_archive_manifest_sha256),
             acceptance_path=arguments.development_acceptance,
             acceptance_sha256=arguments.development_acceptance_sha256,
             output_root=arguments.output_root,
@@ -3787,6 +4283,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_root=arguments.output_root,
             num_threads=arguments.num_threads,
         )
+    elif arguments.command == "freeze-round1-ledger-replay":
+        digest = freeze_round1_ledger_replay(
+            source_round1_root=arguments.source_round1_root,
+            output_root=arguments.output_root,
+        )
+    elif arguments.command == "run-round1-ledger-replay":
+        digest = run_round1_ledger_replay(output_root=arguments.output_root)
     elif arguments.command == "freeze-round2":
         digest = freeze_round2(
             round1_root=arguments.round1_root,
@@ -3798,9 +4301,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
             lending_archive_root=arguments.lending_archive_root,
-            lending_archive_manifest_sha256=(
-                arguments.lending_archive_manifest_sha256
-            ),
+            lending_archive_manifest_sha256=(arguments.lending_archive_manifest_sha256),
             output_root=arguments.output_root,
             fast_checkpoint=arguments.fast_checkpoint,
             fast_checkpoint_sha256=arguments.fast_checkpoint_sha256,

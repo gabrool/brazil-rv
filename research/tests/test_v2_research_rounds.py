@@ -77,16 +77,16 @@ def _lending_panels(inputs: EvaluationInputs) -> LendingBorrowPanels:
     )
 
 
-def test_rev4_registration_replaces_the_voided_research_entrypoints(
+def test_rev4e_registration_replaces_the_voided_research_entrypoints(
     tmp_path: Path,
 ) -> None:
-    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4d.md"
+    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4e.md"
     assert research_rounds.PREREGISTRATION.is_file()
     with pytest.raises(FileNotFoundError):
         research_rounds.run_round1(output_root=tmp_path / "absent", num_threads=1)
 
 
-def test_rev4_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> None:
+def test_rev4e_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> None:
     protocol = research_rounds.load_registration_protocol()
     assert protocol == research_rounds.registration_protocol_from_code()
 
@@ -117,6 +117,13 @@ def test_rev4_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> N
         == research_rounds.primary_population_protocol()
     )
     assert protocol["headline_cell"] == research_rounds.headline_ledger_protocol()
+    assert protocol["headline_cell"]["ledger"]["short_proceeds_remuneration"] == 1.0
+    assert "comparator_sterile_proceeds" in protocol["comparators"]
+    assert protocol["borrow_rate"]["registration_fee"] == {
+        "fraction_of_contract_rate": 0.20,
+        "annual_floor": 0.00025,
+        "annual_cap": 0.007,
+    }
     assert protocol["source_tier_labels"] == {
         "action_terms_source": "inferred_cotahist_dismes_v1",
         "schedule_source": "reconstructed_v1",
@@ -129,7 +136,7 @@ def test_registration_protocol_requires_ineligible_hold_sessions(
     registered = research_rounds.PREREGISTRATION.read_text(encoding="utf-8")
     stale = tmp_path / "stale_registration.md"
     stale.write_text(
-        registered.replace('      "ineligible_hold_sessions": 5,\n', "", 1),
+        registered.replace('"ineligible_hold_sessions":5,', "", 1),
         encoding="utf-8",
     )
 
@@ -716,9 +723,7 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
             values = self.read(name, selector)
             return np.where(valid_mask, values, 0.0)
 
-        def neutral_target_fallback_flags(
-            self, selector: np.ndarray
-        ) -> np.ndarray:
+        def neutral_target_fallback_flags(self, selector: np.ndarray) -> np.ndarray:
             return np.zeros((len(selector), len(HORIZONS)), dtype=np.bool_)
 
     scores_path = tmp_path / "scores.npy"
@@ -1134,9 +1139,7 @@ def test_round_gbdt_adapter_uses_shared_views_and_preserves_frozen_order() -> No
 def test_superseded_root_seals_literal_contaminated_chronology(
     tmp_path: Path,
 ) -> None:
-    (tmp_path / "history.json").write_text(
-        json.dumps([{"epoch": 1}]), encoding="utf-8"
-    )
+    (tmp_path / "history.json").write_text(json.dumps([{"epoch": 1}]), encoding="utf-8")
     (tmp_path / "superseded.json").write_text(
         json.dumps(
             {

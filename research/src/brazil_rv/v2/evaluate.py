@@ -39,7 +39,8 @@ BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V14"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
+PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V14"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
@@ -514,12 +515,11 @@ def _primary_population_components(
     indexes = [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS]
     scores = np.asarray(inputs.scores, dtype=np.float64)[..., indexes]
     targets = np.asarray(inputs.neutral_midrank_targets, dtype=np.float64)[..., indexes]
-    characteristic_population = (
-        np.asarray(inputs.neutral_target_mask, dtype=np.bool_)[..., indexes].all(axis=-1)
-        & np.isfinite(targets).all(axis=-1)
-    )
-    rev2_outcome_population, score_population = (
-        _rev2_primary_population_components(inputs)
+    characteristic_population = np.asarray(inputs.neutral_target_mask, dtype=np.bool_)[
+        ..., indexes
+    ].all(axis=-1) & np.isfinite(targets).all(axis=-1)
+    rev2_outcome_population, score_population = _rev2_primary_population_components(
+        inputs
     )
     outcome_population = rev2_outcome_population & characteristic_population
     return scores, targets, outcome_population, score_population
@@ -838,12 +838,26 @@ def _ledger_rows(
     return [
         {
             "date": day.isoformat(),
+            "start_nav": _finite_or_none(result.start_nav[index]),
             "cost_bps_per_side": cost_bps,
             "annual_borrow_rate": annual_borrow_rate,
             "borrow_source": result.borrow_source,
             "economics_resolved": not result.economics_unresolved,
             "gross_pnl_bps": _finite_or_none(result.gross_pnl_bps[index]),
+            "gross_long_short_spread_pnl_bps": _finite_or_none(
+                result.equity_gross_pnl_bps[index]
+            ),
+            "hedge_gross_pnl_bps": _finite_or_none(result.hedge_gross_pnl_bps[index]),
             "interest_bps": _finite_or_none(result.interest_bps[index]),
+            "free_cash_interest_bps": _finite_or_none(
+                result.free_cash_interest_bps[index]
+            ),
+            "short_proceeds_interest_bps": _finite_or_none(
+                result.short_proceeds_interest_bps[index]
+            ),
+            "short_proceeds_interest_base_brl": _finite_or_none(
+                result.short_proceeds_interest_base[index]
+            ),
             "turnover_fraction_nav": _finite_or_none(
                 result.turnover_fraction_nav[index]
             ),
@@ -858,6 +872,13 @@ def _ledger_rows(
             ),
             "turnover_cost_bps": _finite_or_none(result.cost_bps[index]),
             "borrow_cost_bps": _finite_or_none(result.borrow_bps[index]),
+            "equity_borrow_observed_rate_bps": _finite_or_none(
+                result.equity_borrow_raw_bps[index]
+            ),
+            "equity_borrow_registration_fee_bps": _finite_or_none(
+                result.equity_borrow_fee_bps[index]
+            ),
+            "cdi_benchmark_bps": _finite_or_none(result.cdi_benchmark_bps[index]),
             "held_short_weighted_annual_borrow_rate": _finite_or_none(
                 result.held_short_weighted_annual_borrow_rate[index]
             ),
@@ -910,9 +931,7 @@ def _ledger_rows(
             ),
             "volatility_quota": result.volatility_quota[index].tolist(),
             "volatility_group_size": result.volatility_group_size[index].tolist(),
-            "entry_eligible_name_count": int(
-                result.entry_eligible_name_count[index]
-            ),
+            "entry_eligible_name_count": int(result.entry_eligible_name_count[index]),
             "volatility_occupancy_long": (
                 result.volatility_occupancy_long[index].tolist()
             ),
@@ -928,6 +947,9 @@ def _ledger_rows(
             "nav": _finite_or_none(result.nav[index]),
             "free_cash": _finite_or_none(result.free_cash[index]),
             "restricted_cash": _finite_or_none(result.restricted_cash[index]),
+            "hedge_restricted_cash": _finite_or_none(
+                result.hedge_restricted_cash[index]
+            ),
             "receivables": _finite_or_none(result.receivables[index]),
             "payables": _finite_or_none(result.payables[index]),
             "marked_signed_holdings": _finite_or_none(
@@ -1648,7 +1670,11 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
             "cost_bps_per_side": ECONOMICS_HEADLINE[0],
             "annual_borrow_rate": ECONOMICS_HEADLINE[1],
             "borrow_source": config.borrow_source,
-            "borrow_registration_fee": config.borrow_registration_fee,
+            "borrow_registration_fee": {
+                "fraction_of_contract_rate": (config.borrow_registration_fee_fraction),
+                "annual_floor": config.borrow_registration_fee_floor,
+                "annual_cap": config.borrow_registration_fee_cap,
+            },
             "volatility_balanced_entries": config.volatility_balanced_entries,
             "beta_hedge": config.beta_hedge,
             "hedge_instrument": "BOVA11 exact ISIN BRBOVACTF003",
@@ -1746,9 +1772,7 @@ def _lending_coverage(inputs: EvaluationInputs) -> dict[str, object]:
                 "quartile": quartile + 1,
                 "active_name_days": int(stratum.sum()),
                 "observed_rate_fraction": fraction(rate_observed, stratum),
-                "imputed_rate_fraction": fraction(
-                    imputed, stratum
-                ),
+                "imputed_rate_fraction": fraction(imputed, stratum),
                 "placeholder_rate_fraction": fraction(placeholder, stratum),
                 "shortable_fraction_by_cell": {
                     name: fraction(np.asarray(values, dtype=np.bool_), stratum)
@@ -1777,9 +1801,7 @@ def _lending_coverage(inputs: EvaluationInputs) -> dict[str, object]:
         ],
         "active_name_days": int(active.sum()),
         "active_rate_observed_prior_60_fraction": fraction(rate_observed, active),
-        "active_rate_imputed_fraction": fraction(
-            imputed, active
-        ),
+        "active_rate_imputed_fraction": fraction(imputed, active),
         "active_rate_placeholder_fraction": fraction(placeholder, active),
         "active_shortable_fraction_by_cell": {
             name: fraction(np.asarray(values, dtype=np.bool_), active)
@@ -1789,9 +1811,7 @@ def _lending_coverage(inputs: EvaluationInputs) -> dict[str, object]:
         "high_volatility_quartile_rate_observed_prior_60_fraction": fraction(
             rate_observed, high_vol
         ),
-        "high_volatility_quartile_rate_imputed_fraction": fraction(
-            imputed, high_vol
-        ),
+        "high_volatility_quartile_rate_imputed_fraction": fraction(imputed, high_vol),
         "high_volatility_quartile_rate_placeholder_fraction": fraction(
             placeholder, high_vol
         ),
@@ -2002,9 +2022,7 @@ def evaluate_scores(
     legacy_primary_outcome_mask, legacy_primary_score_mask = (
         _rev2_primary_population_components(inputs)
     )
-    legacy_primary_population = (
-        legacy_primary_outcome_mask & legacy_primary_score_mask
-    )
+    legacy_primary_population = legacy_primary_outcome_mask & legacy_primary_score_mask
     _, daily_primary, primary_rows = _primary_daily_metrics(
         primary_scores,
         primary_targets,
@@ -2138,9 +2156,7 @@ def evaluate_scores(
                 "legacy_scaled_target_used_date_count": int(
                     np.isfinite(legacy_scaled_ic[:, horizon_index]).sum()
                 ),
-                "legacy_scaled_target_possible_name_days": int(
-                    legacy_possible.sum()
-                ),
+                "legacy_scaled_target_possible_name_days": int(legacy_possible.sum()),
                 "mean_shareholder_rank_ic": _finite_or_none(
                     _finite_mean(shareholder_ic[:, horizon_index])
                 ),
@@ -2189,6 +2205,11 @@ def evaluate_scores(
                 "borrow_source": config.borrow_source,
                 "buffer_per_side": config.buffer_per_side,
                 "short_proceeds_remuneration": (config.short_proceeds_remuneration),
+                "borrow_registration_fee_fraction": (
+                    config.borrow_registration_fee_fraction
+                ),
+                "borrow_registration_fee_floor": (config.borrow_registration_fee_floor),
+                "borrow_registration_fee_cap": config.borrow_registration_fee_cap,
                 "terminal_settlement_convention": TERMINAL_SETTLEMENT_CONVENTION,
                 "settlement_grace_sessions": config.settlement_grace_sessions,
                 "settlement_haircut": config.settlement_haircut,
@@ -2316,7 +2337,9 @@ def evaluate_scores(
                     np.asarray(
                         inputs.neutral_target_fallback_flags
                         if inputs.neutral_target_fallback_flags is not None
-                        else np.zeros((len(inputs.dates), len(HORIZONS)), dtype=np.bool_)
+                        else np.zeros(
+                            (len(inputs.dates), len(HORIZONS)), dtype=np.bool_
+                        )
                     )
                 )
             ],

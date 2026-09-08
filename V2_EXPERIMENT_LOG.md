@@ -2320,3 +2320,35 @@ were not started. No paid instance was launched. Provider inventories at
 `2026-09-08T18:19:02.7146460Z` and `2026-09-08T18:20:22.7628797Z` each found
 zero nonterminal instances, so there was nothing to terminate and no adjacent
 instance was touched.
+
+## Rev4e preregistration and sealed rev4d economics extraction (2026-09-08)
+
+Before changing the ledger, the sealed rev4d Round-1 inventory and all 18
+evaluation reports were hash-verified and read without recomputing a score or
+evaluation. The resulting `round1_rev4d_economics_detail.json` has SHA-256
+`fd911adc882254712eb33b6d572eff97b8379fa1c416ab81fa23770be8e12fc4`.
+It contains the full retained headline decomposition, turnover, approximate
+holding period, P1/P5, and fold/pooled tables. Rev4d retained only the point
+estimate and Sharpe for `sensitivity_short_proceeds_full`; its daily rows were
+not serialized, so scenario intervals and component decompositions are
+explicitly `null` rather than reconstructed or fabricated. Access remains
+false/false.
+
+| Book | Rev4d headline net bps/day [95%] | Retained full-proceeds point | Turnover | Hold | P1/P5 |
+| --- | --- | ---: | ---: | ---: | --- |
+| Inverse volatility | -12.874 [-18.864,-7.230] | -8.591 | .982 | 4.05 | .994/.965 |
+| Momentum 12-1 | -2.905 [-8.056,5.895] | 1.389 | .135 | 28.99 | .994/.971 |
+| Reversal 21 | -9.731 [-20.141,-6.256] | -4.037 | .467 | 8.53 | .938/.731 |
+| Reversal 5 | -11.626 [-17.897,-7.857] | -6.548 | 1.176 | 3.35 | .751/.011 |
+| Reversal/momentum blend | -6.460 [-12.876,.412] | -2.026 | .733 | 5.42 | .858/.435 |
+| `b_intraday` | -5.604 [-9.727,1.852] | -1.017 | .650 | 6.13 | .778/.629 |
+
+Rev4e is frozen before its ledger replay. It changes only the headline short-
+proceeds remuneration from zero to one and replaces the flat equity borrower
+fee with 20% of the contract rate, floored at 2.5 and capped at 70 annual basis
+points. The otherwise identical zero-remuneration cell is retained as
+`comparator_sterile_proceeds`; BOVA11 short borrow remains 2%. Construction,
+availability, clocks, targets, folds, scores, and candidate rules do not
+change. The replay command requires every non-ledger field to be bit-identical
+and records every source/replayed evaluation hash. Ruff, compilation, 126
+focused tests, and all 930 tests passed before the rev4e replay freeze.

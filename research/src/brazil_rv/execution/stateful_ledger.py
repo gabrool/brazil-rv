@@ -69,7 +69,9 @@ class LedgerConfig:
     cost_bps_per_side: float = 4.0
     annual_borrow_rate: float = 0.02
     borrow_source: BorrowSource = "borrow_balance"
-    borrow_registration_fee: float = 0.0025
+    borrow_registration_fee_fraction: float = 0.20
+    borrow_registration_fee_floor: float = 0.00025
+    borrow_registration_fee_cap: float = 0.0070
     volatility_balanced_entries: bool = True
     volatility_group_count: int = 5
     small_stratum_scaling_threshold_multiple: int = 2
@@ -79,7 +81,7 @@ class LedgerConfig:
     hedge_cost_bps_per_side: float = 4.0
     hedge_annual_borrow_rate: float = 0.02
     annual_debit_spread: float = 0.0
-    short_proceeds_remuneration: float = 0.0
+    short_proceeds_remuneration: float = 1.0
     initial_capital_brl: float = 1.0
     lot_size: int | None = None
     entry_expiry_sessions: int = 3
@@ -113,8 +115,12 @@ class LedgerConfig:
             "borrow_open",
         }:
             raise ValueError("borrow source is not a registered rev4b cell")
-        if self.borrow_registration_fee < 0.0:
-            raise ValueError("borrow registration fee must be non-negative")
+        if (
+            self.borrow_registration_fee_fraction < 0.0
+            or self.borrow_registration_fee_floor < 0.0
+            or self.borrow_registration_fee_cap < self.borrow_registration_fee_floor
+        ):
+            raise ValueError("borrow registration fee schedule is invalid")
         if self.volatility_group_count < 1:
             raise ValueError("volatility group count must be positive")
         if self.small_stratum_scaling_threshold_multiple < 2:
@@ -142,6 +148,22 @@ class LedgerConfig:
             raise ValueError("settlement haircut must be in [0, 1)")
         if self.settlement_economics_unresolved_fraction_nav <= 0:
             raise ValueError("settlement incidence bound must be positive")
+
+
+def equity_borrow_registration_fee(
+    annual_rate: NDArray[np.float64] | float,
+    *,
+    config: LedgerConfig,
+) -> NDArray[np.float64] | float:
+    """Return the registered B3 borrower fee for an annual lending rate."""
+
+    fee = np.clip(
+        np.asarray(annual_rate, dtype=np.float64)
+        * config.borrow_registration_fee_fraction,
+        config.borrow_registration_fee_floor,
+        config.borrow_registration_fee_cap,
+    )
+    return float(fee) if fee.ndim == 0 else fee
 
 
 @dataclass(frozen=True)
@@ -230,13 +252,22 @@ class _ValidatedInputs:
 @dataclass(frozen=True)
 class StatefulLedgerResult:
     dates: tuple[date, ...]
+    start_nav: NDArray[np.float64]
     nav: NDArray[np.float64]
     daily_net_return: NDArray[np.float64]
     net_excess_all_cash_bps: NDArray[np.float64]
     gross_pnl_bps: NDArray[np.float64]
+    equity_gross_pnl_bps: NDArray[np.float64]
+    hedge_gross_pnl_bps: NDArray[np.float64]
     interest_bps: NDArray[np.float64]
+    free_cash_interest_bps: NDArray[np.float64]
+    short_proceeds_interest_bps: NDArray[np.float64]
+    short_proceeds_interest_base: NDArray[np.float64]
     cost_bps: NDArray[np.float64]
     borrow_bps: NDArray[np.float64]
+    equity_borrow_raw_bps: NDArray[np.float64]
+    equity_borrow_fee_bps: NDArray[np.float64]
+    cdi_benchmark_bps: NDArray[np.float64]
     held_short_weighted_annual_borrow_rate: NDArray[np.float64]
     held_short_notional_at_open: NDArray[np.float64]
     held_short_imputed_notional_at_open: NDArray[np.float64]
@@ -255,6 +286,7 @@ class StatefulLedgerResult:
     mark_price: NDArray[np.float64]
     free_cash: NDArray[np.float64]
     restricted_cash: NDArray[np.float64]
+    hedge_restricted_cash: NDArray[np.float64]
     receivables: NDArray[np.float64]
     payables: NDArray[np.float64]
     marked_signed_holdings: NDArray[np.float64]
@@ -733,14 +765,10 @@ class StatefulLedgerResult:
                 self.volatility_occupancy_short, axis=0
             ).tolist(),
             "mean_absolute_volatility_occupancy_deviation_long": float(
-                np.mean(
-                    np.abs(self.volatility_occupancy_long - self.volatility_quota)
-                )
+                np.mean(np.abs(self.volatility_occupancy_long - self.volatility_quota))
             ),
             "mean_absolute_volatility_occupancy_deviation_short": float(
-                np.mean(
-                    np.abs(self.volatility_occupancy_short - self.volatility_quota)
-                )
+                np.mean(np.abs(self.volatility_occupancy_short - self.volatility_quota))
             ),
             "spilled_entries_long_by_quintile": np.sum(
                 self.volatility_spilled_entries_long, axis=0
@@ -840,7 +868,9 @@ def _validate_inputs(
             raise ValueError("volatility-balanced entries require a volatility panel")
         volatility = np.asarray(selection_volatility, dtype=np.float64)
         if volatility.shape != matrix_shape or np.isinf(volatility).any():
-            raise ValueError("selection volatility must align [date, name] without infinity")
+            raise ValueError(
+                "selection volatility must align [date, name] without infinity"
+            )
     else:
         volatility = np.full(matrix_shape, np.nan, dtype=np.float64)
 
@@ -1039,7 +1069,9 @@ def _equal_count_groups(
 def _balanced_quota(k_eff: int, group_count: int) -> NDArray[np.int64]:
     quota = np.full(group_count, k_eff // group_count, dtype=np.int64)
     centre = (group_count - 1) / 2.0
-    middle_first = sorted(range(group_count), key=lambda group: (abs(group - centre), group))
+    middle_first = sorted(
+        range(group_count), key=lambda group: (abs(group - centre), group)
+    )
     for group in middle_first[: k_eff % group_count]:
         quota[group] += 1
     return quota
@@ -1198,13 +1230,22 @@ def simulate_stateful_ledger(
     cancellations: list[OrderCancellation] = []
     next_order_id = 0
 
+    start_nav_rows: list[float] = []
     nav_rows: list[float] = []
     daily_rows: list[float] = []
     excess_rows: list[float] = []
     gross_pnl_rows: list[float] = []
+    equity_gross_pnl_rows: list[float] = []
+    hedge_gross_pnl_rows: list[float] = []
     interest_rows: list[float] = []
+    free_cash_interest_rows: list[float] = []
+    short_proceeds_interest_rows: list[float] = []
+    short_proceeds_interest_base_rows: list[float] = []
     cost_rows: list[float] = []
     borrow_rows: list[float] = []
+    equity_borrow_raw_rows: list[float] = []
+    equity_borrow_fee_rows: list[float] = []
+    cdi_benchmark_rows: list[float] = []
     held_short_borrow_rate_rows: list[float] = []
     held_short_notional_rows: list[float] = []
     held_short_imputed_notional_rows: list[float] = []
@@ -1223,6 +1264,7 @@ def simulate_stateful_ledger(
     mark_rows: list[NDArray[np.float64]] = []
     free_cash_rows: list[float] = []
     restricted_rows: list[float] = []
+    hedge_restricted_rows: list[float] = []
     receivable_rows: list[float] = []
     payable_rows: list[float] = []
     holding_value_rows: list[float] = []
@@ -1590,13 +1632,18 @@ def simulate_stateful_ledger(
         )
         cash_rate = float(inputs.cdi[day])
         debit_rate = cash_rate + config.annual_debit_spread / config.annual_sessions
-        interest = (
-            max(free_cash, 0.0) * cash_rate
-            + min(free_cash, 0.0) * debit_rate
-            + (restricted_by_name.sum() + hedge_restricted_cash)
+        free_cash_interest = (
+            max(free_cash, 0.0) * cash_rate + min(free_cash, 0.0) * debit_rate
+        )
+        short_proceeds_interest_base = float(
+            restricted_by_name.sum() + hedge_restricted_cash
+        )
+        short_proceeds_interest = (
+            short_proceeds_interest_base
             * cash_rate
             * config.short_proceeds_remuneration
         )
+        interest = free_cash_interest + short_proceeds_interest
         imputed_short_notional = 0.0
         placeholder_short_notional = 0.0
         if config.borrow_source != "uniform" and short_at_open.any():
@@ -1604,10 +1651,18 @@ def simulate_stateful_ledger(
             raw_rates = inputs.annual_borrow_rate_by_name[day, short_at_open]
             if not np.isfinite(raw_rates).all():
                 raise RuntimeError("held archive-borrow short has no finite rate")
-            effective_rates = raw_rates + config.borrow_registration_fee
-            borrow = float(
-                np.sum(short_values * effective_rates) / config.annual_sessions
+            fee_rates = np.asarray(
+                equity_borrow_registration_fee(raw_rates, config=config),
+                dtype=np.float64,
             )
+            effective_rates = raw_rates + fee_rates
+            equity_borrow_raw = float(
+                np.sum(short_values * raw_rates) / config.annual_sessions
+            )
+            equity_borrow_fee = float(
+                np.sum(short_values * fee_rates) / config.annual_sessions
+            )
+            borrow = equity_borrow_raw + equity_borrow_fee
             weighted_borrow_rate = float(
                 np.sum(short_values * effective_rates) / short_value_at_open
             )
@@ -1615,16 +1670,26 @@ def simulate_stateful_ledger(
                 np.sum(short_values[inputs.borrow_rate_imputed[day, short_at_open]])
             )
             placeholder_short_notional = float(
-                np.sum(
-                    short_values[inputs.borrow_rate_placeholder[day, short_at_open]]
-                )
+                np.sum(short_values[inputs.borrow_rate_placeholder[day, short_at_open]])
             )
         else:
-            borrow = (
+            equity_borrow_raw = (
                 config.annual_borrow_rate / config.annual_sessions * short_value_at_open
             )
+            uniform_fee_rate = float(
+                equity_borrow_registration_fee(
+                    config.annual_borrow_rate,
+                    config=config,
+                )
+            )
+            equity_borrow_fee = (
+                uniform_fee_rate / config.annual_sessions * short_value_at_open
+            )
+            borrow = equity_borrow_raw + equity_borrow_fee
             weighted_borrow_rate = (
-                config.annual_borrow_rate if short_value_at_open > 0.0 else 0.0
+                config.annual_borrow_rate + uniform_fee_rate
+                if short_value_at_open > 0.0
+                else 0.0
             )
         hedge_borrow = 0.0
         if config.beta_hedge and hedge_shares < 0.0:
@@ -1705,9 +1770,7 @@ def simulate_stateful_ledger(
             short_retention = np.zeros(name_count, dtype=np.bool_)
             for group in range(config.volatility_group_count):
                 names = np.flatnonzero(volatility_groups == group)
-                group_order = names[
-                    np.argsort(inputs.score[day, names], kind="stable")
-                ]
+                group_order = names[np.argsort(inputs.score[day, names], kind="stable")]
                 group_orders[group] = group_order
                 width = int(volatility_quota[group] + volatility_buffer[group])
                 if width:
@@ -2204,7 +2267,11 @@ def simulate_stateful_ledger(
                     )
                     return None if spill is None else (spill, True)
                 candidate = next(
-                    (candidate for candidate in candidates if candidate not in attempted),
+                    (
+                        candidate
+                        for candidate in candidates
+                        if candidate not in attempted
+                    ),
                     None,
                 )
                 return None if candidate is None else (candidate, False)
@@ -2603,10 +2670,12 @@ def simulate_stateful_ledger(
 
         hedge_traded_notional = 0.0
         hedge_cost = 0.0
+        hedge_gross_pnl = 0.0
         bova_printed = config.beta_hedge and np.isfinite(inputs.hedge_close[day])
         if bova_printed:
             current_hedge_close = float(inputs.hedge_close[day])
             if hedge_shares != 0.0:
+                hedge_gross_pnl = hedge_shares * (current_hedge_close - hedge_mark)
                 hedge_mark = current_hedge_close
         planned_equity = np.zeros(name_count, dtype=np.float64)
         held_for_hedge = shares != 0.0
@@ -2616,7 +2685,9 @@ def simulate_stateful_ledger(
             planned_equity[name] += (
                 direction * pending.remaining_quantity * pending.order.reference_price
             )
-        beta_values = np.where(np.isfinite(inputs.beta_60[day]), inputs.beta_60[day], last_beta)
+        beta_values = np.where(
+            np.isfinite(inputs.beta_60[day]), inputs.beta_60[day], last_beta
+        )
         beta_required = planned_equity != 0.0
         if config.beta_hedge and np.any(beta_required & ~np.isfinite(beta_values)):
             raise ValueError("held or pending equity exposure has no causal beta_60")
@@ -2638,14 +2709,18 @@ def simulate_stateful_ledger(
         hedge_notional_before = (
             hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0
         )
-        prehedge_nav = _equity(
-            free_cash,
-            restricted_by_name,
-            shares,
-            marks,
-            receivable_by_name,
-            payable_by_name,
-        ) + hedge_restricted_cash + hedge_notional_before
+        prehedge_nav = (
+            _equity(
+                free_cash,
+                restricted_by_name,
+                shares,
+                marks,
+                receivable_by_name,
+                payable_by_name,
+            )
+            + hedge_restricted_cash
+            + hedge_notional_before
+        )
         hedge_cost_rate = config.hedge_cost_bps_per_side / 10_000.0
         target_sign = float(np.sign(hedge_unconstrained_target_notional))
         low = 0.0
@@ -2704,15 +2779,17 @@ def simulate_stateful_ledger(
 
         held_now = shares != 0.0
         marked_holdings = float(np.sum(shares[held_now] * marks[held_now]))
-        current_nav = _equity(
-            free_cash,
-            restricted_by_name,
-            shares,
-            marks,
-            receivable_by_name,
-            payable_by_name,
-        ) + hedge_restricted_cash + (
-            hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0
+        current_nav = (
+            _equity(
+                free_cash,
+                restricted_by_name,
+                shares,
+                marks,
+                receivable_by_name,
+                payable_by_name,
+            )
+            + hedge_restricted_cash
+            + (hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0)
         )
         identity = (
             free_cash
@@ -2854,14 +2931,26 @@ def simulate_stateful_ledger(
         )
 
         economic_pnl = current_nav - start_nav - interest + borrow + costs
+        equity_gross_pnl = economic_pnl - hedge_gross_pnl
         daily_return = current_nav / start_nav - 1.0
+        start_nav_rows.append(start_nav)
         nav_rows.append(current_nav)
         daily_rows.append(daily_return)
         excess_rows.append(10_000.0 * (daily_return - inputs.cdi[day]))
         gross_pnl_rows.append(10_000.0 * economic_pnl / start_nav)
+        equity_gross_pnl_rows.append(10_000.0 * equity_gross_pnl / start_nav)
+        hedge_gross_pnl_rows.append(10_000.0 * hedge_gross_pnl / start_nav)
         interest_rows.append(10_000.0 * interest / start_nav)
+        free_cash_interest_rows.append(10_000.0 * free_cash_interest / start_nav)
+        short_proceeds_interest_rows.append(
+            10_000.0 * short_proceeds_interest / start_nav
+        )
+        short_proceeds_interest_base_rows.append(short_proceeds_interest_base)
         cost_rows.append(10_000.0 * costs / start_nav)
         borrow_rows.append(10_000.0 * borrow / start_nav)
+        equity_borrow_raw_rows.append(10_000.0 * equity_borrow_raw / start_nav)
+        equity_borrow_fee_rows.append(10_000.0 * equity_borrow_fee / start_nav)
+        cdi_benchmark_rows.append(10_000.0 * inputs.cdi[day])
         gross_rows.append(gross if np.isfinite(gross) else np.nan)
         gross_including_hedge_rows.append(gross_including_hedge)
         net_notional_including_hedge_rows.append(net_notional_including_hedge)
@@ -2899,6 +2988,7 @@ def simulate_stateful_ledger(
         mark_rows.append(marks.copy())
         free_cash_rows.append(free_cash)
         restricted_rows.append(float(restricted_by_name.sum()))
+        hedge_restricted_rows.append(hedge_restricted_cash)
         receivable_rows.append(float(receivable_by_name.sum()))
         payable_rows.append(float(payable_by_name.sum()))
         holding_value_rows.append(marked_holdings)
@@ -3069,9 +3159,7 @@ def simulate_stateful_ledger(
                 group_order = group_names[
                     np.argsort(inputs.score[later_day, group_names], kind="stable")
                 ]
-                width = int(
-                    later_quota[later_group] + later_buffer[later_group]
-                )
+                width = int(later_quota[later_group] + later_buffer[later_group])
                 inside_retention = bool(
                     width
                     and (
@@ -3103,13 +3191,26 @@ def simulate_stateful_ledger(
     )
     return StatefulLedgerResult(
         dates=inputs.dates[:completed_days],
+        start_nav=np.asarray(start_nav_rows, dtype=np.float64),
         nav=np.asarray(nav_rows, dtype=np.float64),
         daily_net_return=np.asarray(daily_rows, dtype=np.float64),
         net_excess_all_cash_bps=np.asarray(excess_rows, dtype=np.float64),
         gross_pnl_bps=np.asarray(gross_pnl_rows, dtype=np.float64),
+        equity_gross_pnl_bps=np.asarray(equity_gross_pnl_rows, dtype=np.float64),
+        hedge_gross_pnl_bps=np.asarray(hedge_gross_pnl_rows, dtype=np.float64),
         interest_bps=np.asarray(interest_rows, dtype=np.float64),
+        free_cash_interest_bps=np.asarray(free_cash_interest_rows, dtype=np.float64),
+        short_proceeds_interest_bps=np.asarray(
+            short_proceeds_interest_rows, dtype=np.float64
+        ),
+        short_proceeds_interest_base=np.asarray(
+            short_proceeds_interest_base_rows, dtype=np.float64
+        ),
         cost_bps=np.asarray(cost_rows, dtype=np.float64),
         borrow_bps=np.asarray(borrow_rows, dtype=np.float64),
+        equity_borrow_raw_bps=np.asarray(equity_borrow_raw_rows, dtype=np.float64),
+        equity_borrow_fee_bps=np.asarray(equity_borrow_fee_rows, dtype=np.float64),
+        cdi_benchmark_bps=np.asarray(cdi_benchmark_rows, dtype=np.float64),
         held_short_weighted_annual_borrow_rate=np.asarray(
             held_short_borrow_rate_rows, dtype=np.float64
         ),
@@ -3144,6 +3245,7 @@ def simulate_stateful_ledger(
         mark_price=np.stack(mark_rows),
         free_cash=np.asarray(free_cash_rows, dtype=np.float64),
         restricted_cash=np.asarray(restricted_rows, dtype=np.float64),
+        hedge_restricted_cash=np.asarray(hedge_restricted_rows, dtype=np.float64),
         receivables=np.asarray(receivable_rows, dtype=np.float64),
         payables=np.asarray(payable_rows, dtype=np.float64),
         marked_signed_holdings=np.asarray(holding_value_rows, dtype=np.float64),
@@ -3401,7 +3503,9 @@ def simulate_stateful_ledger(
         hedge_turnover_fraction_nav=np.asarray(hedge_turnover_rows, dtype=np.float64),
         hedge_cost_bps=np.asarray(hedge_cost_rows, dtype=np.float64),
         hedge_borrow_bps=np.asarray(hedge_borrow_rows, dtype=np.float64),
-        ex_ante_beta_before_hedge=np.asarray(ex_ante_beta_before_rows, dtype=np.float64),
+        ex_ante_beta_before_hedge=np.asarray(
+            ex_ante_beta_before_rows, dtype=np.float64
+        ),
         ex_ante_beta_after_hedge=np.asarray(ex_ante_beta_after_rows, dtype=np.float64),
         gross_fraction_nav_including_hedge=np.asarray(
             gross_including_hedge_rows, dtype=np.float64
@@ -3428,7 +3532,9 @@ def ledger_sensitivity_grid(
         "borrow_open",
     }
     if not required.issubset(shortable_by_borrow_source):
-        raise ValueError("rev4b ledger grid requires all three borrow availability cells")
+        raise ValueError(
+            "rev4b ledger grid requires all three borrow availability cells"
+        )
     results = {}
     for name, config in ledger_configurations().items():
         shortable = (
@@ -3467,8 +3573,8 @@ def ledger_configurations() -> dict[str, LedgerConfig]:
             "sensitivity_buffer_2k": replace(
                 headline, buffer_per_side=2 * headline.k_per_side
             ),
-            "sensitivity_short_proceeds_full": replace(
-                headline, short_proceeds_remuneration=1.0
+            "comparator_sterile_proceeds": replace(
+                headline, short_proceeds_remuneration=0.0
             ),
             "borrow_balance": replace(
                 headline,

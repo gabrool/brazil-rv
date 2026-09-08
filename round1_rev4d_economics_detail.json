@@ -1,0 +1,2463 @@
+{
+  "book_count": 18,
+  "candidate_count": 6,
+  "candidates": {
+    "b_intraday": {
+      "F1": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.8170714225376099,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.8063541149192747,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.8256716100919739
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.6696798309952483,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.6544543329336997,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.6792243055367403
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.125171824088247,
+            "average_holding_sessions": 7.039395608904549,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.4865394334259941,
+              "cdi_benchmark_bps": 4.772763709677421,
+              "equity_borrow_observed_rate_bps": 1.3994131066739448,
+              "equity_borrow_registration_fee_bps": 0.09656940948464725,
+              "equity_borrow_total_bps": 1.4959825161585922,
+              "equity_trading_cost_bps": 1.8622383417950095,
+              "gross_long_short_spread_pnl_bps": 5.722494480935035,
+              "hedge_borrow_bps": 0.04760184737755234,
+              "hedge_gross_pnl_bps": -1.6103094904179642,
+              "hedge_trading_cost_bps": 0.3738203849473683,
+              "net_excess_bps": -4.926761242864847
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9675627477853739,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.1215803037034764
+            },
+            "imputed_rate_share_of_short_notional": 0.047810799512752376,
+            "maximum_daily_reconciliation_error_bps": 1.1084466677857563e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -4.926761242864847,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -13.477205097803992,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 10.76603203543936
+            },
+            "placeholder_rate_share_of_short_notional": 0.04129517681369046,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 2,
+              "terminal_settlement_notional_fraction_nav": 0.0397183514866718
+            },
+            "turnover_fraction_nav": 0.5590146816855944
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": 0.014742955091339676,
+            "average_holding_sessions": 7.00150828885038,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9548342484320083,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.1081257584903073
+            },
+            "imputed_rate_share_of_short_notional": 0.046666701846436384,
+            "net_excess_bps_per_day": {
+              "estimate": 0.06387931768661406,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.04030886480813405,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 2,
+              "terminal_settlement_notional_fraction_nav": 0.03924691876712556
+            },
+            "turnover_fraction_nav": 0.5584037518158774
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\gbdt_ladder\\b_intraday\\F1\\evaluation.json",
+        "source_evaluation_sha256": "e90850d5340ae57e82bee249c26f7be14f7d7662213a8f6ea299620b92f3d58c"
+      },
+      "F2": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.7596697657944822,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.7505607968582874,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7658855455229703
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.6069253408814536,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.5891570474354848,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.6157110346336587
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.2711777304485088,
+            "average_holding_sessions": 5.7266062261121515,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.25986113081894574,
+              "cdi_benchmark_bps": 4.101695967741935,
+              "equity_borrow_observed_rate_bps": 0.9158001555362153,
+              "equity_borrow_registration_fee_bps": 0.09591266931096777,
+              "equity_borrow_total_bps": 1.0117128248471832,
+              "equity_trading_cost_bps": 2.391216873475035,
+              "gross_long_short_spread_pnl_bps": 3.1041614512957536,
+              "hedge_borrow_bps": 0.054730252025389205,
+              "hedge_gross_pnl_bps": -0.28351130358945065,
+              "hedge_trading_cost_bps": 0.33061781873660234,
+              "net_excess_bps": -5.329184719938693
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.948359436858402,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.0832142977500685
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.1084466677857563e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -5.329184719938693,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -11.78258216658083,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 3.435565415399222
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 0,
+              "terminal_settlement_notional_fraction_nav": 0.0
+            },
+            "turnover_fraction_nav": 0.6804586730529094
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -0.23279109113711843,
+            "average_holding_sessions": 5.703424338878771,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9377284714514043,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.0716322358464785
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -0.9704760234199944,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 0,
+              "terminal_settlement_notional_fraction_nav": 0.0
+            },
+            "turnover_fraction_nav": 0.6794965116806791
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\gbdt_ladder\\b_intraday\\F2\\evaluation.json",
+        "source_evaluation_sha256": "1f7dd5987ccfe868af1189f9c186c00cf2b049d37af0bd9df9b458aee532799e"
+      },
+      "F3": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.7586448088227071,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 126,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.7491215675478032,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7643455429544928
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.6099117257350828,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 122,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.5915286802950752,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.6182505268938687
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.5996727643918107,
+            "average_holding_sessions": 5.628324112309225,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.28269287166340656,
+              "cdi_benchmark_bps": 4.054483464566928,
+              "equity_borrow_observed_rate_bps": 2.3871236449470095,
+              "equity_borrow_registration_fee_bps": 0.09891884956970283,
+              "equity_borrow_total_bps": 2.4860424945167128,
+              "equity_trading_cost_bps": 2.468348556905108,
+              "gross_long_short_spread_pnl_bps": 3.331616528707319,
+              "hedge_borrow_bps": 0.05733735821821094,
+              "hedge_gross_pnl_bps": -0.1479313910094992,
+              "hedge_trading_cost_bps": 0.3694470859369708,
+              "net_excess_bps": -6.534666694109514
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9965042053017665,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.1358374529780475
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.0800249583553523e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -6.534666694109514,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 127,
+              "fold_boundary_preserved": true,
+              "lower_95": -16.1295509282027,
+              "possible_observations": 127,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 3.143718635517122
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.02945268182323238
+            },
+            "turnover_fraction_nav": 0.7094489107105199
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -0.5198968688185981,
+            "average_holding_sessions": 5.608044497627077,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9866339478560748,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.124981423293096
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -2.117858286640063,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.029243365162550918
+            },
+            "turnover_fraction_nav": 0.7084943597350828
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\gbdt_ladder\\b_intraday\\F3\\evaluation.json",
+        "source_evaluation_sha256": "a02b0ffb155ef01f4dd7f7bdd4714a2bef017efde15315952942cc3008cdb524"
+      },
+      "pooled": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.7783021830013668,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 372,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.771953435120186,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7816734162740793
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.6286812388694656,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 360,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.6171181892072777,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.6323027541168073
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.3317551548874496,
+            "average_holding_sessions": 6.131441982441975,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.3425484391136671,
+              "cdi_benchmark_bps": 4.307606399999999,
+              "equity_borrow_observed_rate_bps": 1.5740030597928805,
+              "equity_borrow_registration_fee_bps": 0.09714792444268941,
+              "equity_borrow_total_bps": 1.6711509842355694,
+              "equity_trading_cost_bps": 2.2424232357878244,
+              "gross_long_short_spread_pnl_bps": 4.046988359313192,
+              "hedge_borrow_bps": 0.053256066185806784,
+              "hedge_gross_pnl_bps": -0.6763228403070024,
+              "hedge_trading_cost_bps": 0.35805364578882043,
+              "net_excess_bps": -5.60437325210546
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9708087966485142,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.113544018143864
+            },
+            "imputed_rate_share_of_short_notional": 0.015936933170917458,
+            "maximum_daily_reconciliation_error_bps": 1.1084466677857563e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -5.60437325210546,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 375,
+              "fold_boundary_preserved": true,
+              "lower_95": -9.726745117220648,
+              "possible_observations": 375,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 1.8524643458702739
+            },
+            "placeholder_rate_share_of_short_notional": 0.01376505893789682,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 3
+            },
+            "turnover_fraction_nav": 0.6496407551496746
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": null,
+            "annualized_sharpe_undefined_reason": "fold summaries do not identify cross-fold daily second moments",
+            "average_holding_sessions": 6.100355458765476,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.959947436382039,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.101767018815959
+            },
+            "imputed_rate_share_of_short_notional": 0.015431122743888298,
+            "net_excess_bps_per_day": {
+              "estimate": -1.0170293171046056,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.013328797963222994,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 3
+            },
+            "turnover_fraction_nav": 0.6492757769598094
+          }
+        }
+      }
+    },
+    "inverse_volatility_20": {
+      "F1": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9946275171214074,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9937217968987142,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9955310867030038
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.9680504044262426,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9638757063141975,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9736496101861335
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.8136110679837216,
+            "average_holding_sessions": 4.154417315416302,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -1.9260354441328147,
+              "cdi_benchmark_bps": 4.772763709677422,
+              "equity_borrow_observed_rate_bps": 1.4850777953047498,
+              "equity_borrow_registration_fee_bps": 0.09887002703357645,
+              "equity_borrow_total_bps": 1.5839478223383263,
+              "equity_trading_cost_bps": 3.5103139970031294,
+              "gross_long_short_spread_pnl_bps": -3.4812178350258787,
+              "hedge_borrow_bps": 0.0016618599318761339,
+              "hedge_gross_pnl_bps": 7.156850320719224,
+              "hedge_trading_cost_bps": 0.30785811852897915,
+              "net_excess_bps": -8.426948465919175
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9827850437507857,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.414869892263835
+            },
+            "imputed_rate_share_of_short_notional": 0.07534678393487765,
+            "maximum_daily_reconciliation_error_bps": 1.1013412404281553e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -8.426948465919175,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -20.032339958060643,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 0.328658540661467
+            },
+            "placeholder_rate_share_of_short_notional": 0.04276854164539851,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 3,
+              "terminal_settlement_notional_fraction_nav": 0.07628130817335717
+            },
+            "turnover_fraction_nav": 0.954543028883027
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -0.8131148708078526,
+            "average_holding_sessions": 4.14148575869309,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9748016645580342,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.401743335028739
+            },
+            "imputed_rate_share_of_short_notional": 0.07381127318876365,
+            "net_excess_bps_per_day": {
+              "estimate": -3.75716399458059,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.04161714370176124,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 3,
+              "terminal_settlement_notional_fraction_nav": 0.07484605491704824
+            },
+            "turnover_fraction_nav": 0.9536682145594114
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\inverse_volatility_20\\F1\\evaluation.json",
+        "source_evaluation_sha256": "ac18799bb494ed2a235d5c5d424182e5ea985ac282529986299f7855be7f1044"
+      },
+      "F2": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.993525101697138,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9925565416265463,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9946851206192935
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.9630850032780451,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9572495535972416,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9691689447948338
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -2.7334244587082006,
+            "average_holding_sessions": 3.8574760102229098,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -1.4045059612622768,
+              "cdi_benchmark_bps": 4.101695967741935,
+              "equity_borrow_observed_rate_bps": 1.6599588241754475,
+              "equity_borrow_registration_fee_bps": 0.09754535362703723,
+              "equity_borrow_total_bps": 1.7575041778024851,
+              "equity_trading_cost_bps": 3.6972371568167355,
+              "gross_long_short_spread_pnl_bps": 3.2924606138999737,
+              "hedge_borrow_bps": 0.0015060918393952623,
+              "hedge_gross_pnl_bps": -2.634463669902586,
+              "hedge_trading_cost_bps": 0.3844483832560994,
+              "net_excess_bps": -10.688900794721546
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9681255065130876,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.3231043623367507
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 9.876544027065393e-13,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -10.688900794721546,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -16.208719417946053,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -4.278163447111405
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.03262901341901103
+            },
+            "turnover_fraction_nav": 1.0204213850182087
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -1.720080700196584,
+            "average_holding_sessions": 3.8466119629856204,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9626350772884724,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.3148021503805034
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -6.675671377387101,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.03214743118457399
+            },
+            "turnover_fraction_nav": 1.0204486941620887
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\inverse_volatility_20\\F2\\evaluation.json",
+        "source_evaluation_sha256": "42990d44f35124256da311f64e3d182a5500f5bd179a1220f32ea8f7f724e64c"
+      },
+      "F3": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9937700110778118,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 126,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9919813124022429,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9946750745930197
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.9650775112676696,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 122,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9574367427414225,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9701281254197799
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -4.352418977427991,
+            "average_holding_sessions": 4.13321503179072,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -1.5222573620098525,
+              "cdi_benchmark_bps": 4.054483464566929,
+              "equity_borrow_observed_rate_bps": 3.710778928269063,
+              "equity_borrow_registration_fee_bps": 0.0994598323751118,
+              "equity_borrow_total_bps": 3.8102387606441743,
+              "equity_trading_cost_bps": 3.507104319397987,
+              "gross_long_short_spread_pnl_bps": -7.582466902897072,
+              "hedge_borrow_bps": 0.0,
+              "hedge_gross_pnl_bps": 1.5008955969808655,
+              "hedge_trading_cost_bps": 0.37395556370741495,
+              "net_excess_bps": -19.349610776242564
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 2.005156881016398,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.407775698601016
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.1155520951433573e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -19.349610776242564,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 127,
+              "fold_boundary_preserved": true,
+              "lower_95": -32.044417485221125,
+              "possible_observations": 127,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -6.906983243361673
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": false,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 5,
+              "terminal_settlement_notional_fraction_nav": 0.16468022485564343
+            },
+            "turnover_fraction_nav": 0.9702649707763507
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -3.436046907523879,
+            "average_holding_sessions": 4.115689506713248,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9994252132101662,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.397412562826635
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -15.181525704731841,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": false,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 5,
+              "terminal_settlement_notional_fraction_nav": 0.1629739082737054
+            },
+            "turnover_fraction_nav": 0.9716112986408875
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\inverse_volatility_20\\F3\\evaluation.json",
+        "source_evaluation_sha256": "c7bc37d8eadaedd09bb5b84a3a904fea3ef4af5413e25382d3f647855715e883"
+      },
+      "pooled": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9939725632002295,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 372,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9932282779271734,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9945420585407179
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.96540158303185,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 360,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9620295781178839,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9686687718076283
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -2.9631234376810855,
+            "average_holding_sessions": 4.048369452476645,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -1.6168368513179805,
+              "cdi_benchmark_bps": 4.307606399999999,
+              "equity_borrow_observed_rate_bps": 2.296675905881908,
+              "equity_borrow_registration_fee_bps": 0.09863174910281411,
+              "equity_borrow_total_bps": 2.395307654984722,
+              "equity_trading_cost_bps": 3.571036244365887,
+              "gross_long_short_spread_pnl_bps": -2.6303445122334415,
+              "hedge_borrow_bps": 0.001047536052367075,
+              "hedge_gross_pnl_bps": 2.0037058280475546,
+              "hedge_trading_cost_bps": 0.35556896749917716,
+              "net_excess_bps": -12.874042338406015
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.985355810426757,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.3819166510672005
+            },
+            "imputed_rate_share_of_short_notional": 0.025115594644959216,
+            "maximum_daily_reconciliation_error_bps": 1.1155520951433573e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -12.874042338406015,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 375,
+              "fold_boundary_preserved": true,
+              "lower_95": -18.864085265370466,
+              "possible_observations": 375,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -7.2296891354991635
+            },
+            "placeholder_rate_share_of_short_notional": 0.01425618054846617,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": false,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 9
+            },
+            "turnover_fraction_nav": 0.9817431282258621
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": null,
+            "annualized_sharpe_undefined_reason": "fold summaries do not identify cross-fold daily second moments",
+            "average_holding_sessions": 4.035244492908647,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9791177548444212,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.371528095119277
+            },
+            "imputed_rate_share_of_short_notional": 0.024406927667751183,
+            "net_excess_bps_per_day": {
+              "estimate": -8.5912676016665,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.013761402184049051,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": false,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 9
+            },
+            "turnover_fraction_nav": 0.9818270176236233
+          }
+        }
+      }
+    },
+    "momentum_12_1": {
+      "F1": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9931713901739345,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9927935798115656,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9937369281438485
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.9688008690874411,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9660640412923448,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9717103404836384
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -0.4744390856867198,
+            "average_holding_sessions": 27.535828580973188,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -1.61388697948773,
+              "cdi_benchmark_bps": 4.772763709677423,
+              "equity_borrow_observed_rate_bps": 1.1783978401323743,
+              "equity_borrow_registration_fee_bps": 0.093759412032825,
+              "equity_borrow_total_bps": 1.2721572521651994,
+              "equity_trading_cost_bps": 0.4169124669873949,
+              "gross_long_short_spread_pnl_bps": 2.51135693244463,
+              "hedge_borrow_bps": 0.003834535094997107,
+              "hedge_gross_pnl_bps": 3.643338891235221,
+              "hedge_trading_cost_bps": 0.14825778364184292,
+              "net_excess_bps": -2.0731169033747325
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9453038925490431,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.2530977310704157
+            },
+            "imputed_rate_share_of_short_notional": 0.13176504101973907,
+            "maximum_daily_reconciliation_error_bps": 1.0658141036401503e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -2.0731169033747325,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -7.7054239779991685,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 7.402315600444311
+            },
+            "placeholder_rate_share_of_short_notional": 0.04155779292603954,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 2,
+              "terminal_settlement_notional_fraction_nav": 0.06545552638221164
+            },
+            "turnover_fraction_nav": 0.14129256265730944
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": 0.5904056030995715,
+            "average_holding_sessions": 27.460689291071105,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9141916048298855,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.217713619034283
+            },
+            "imputed_rate_share_of_short_notional": 0.12985851120009634,
+            "net_excess_bps_per_day": {
+              "estimate": 2.5379335564179013,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.04095648645780748,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 2,
+              "terminal_settlement_notional_fraction_nav": 0.06405460750540752
+            },
+            "turnover_fraction_nav": 0.13941322335650827
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\momentum_12_1\\F1\\evaluation.json",
+        "source_evaluation_sha256": "1f028de55609e40a25530e24c206b926fdc8d58a2baf9a9fc4c1a012487c5c60"
+      },
+      "F2": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9936625598061972,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9928810664259111,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9944999935338553
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.970680633856105,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9665649297749371,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9750149069652727
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.4912603456453604,
+            "average_holding_sessions": 28.460351890461062,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -1.4964315509296955,
+              "cdi_benchmark_bps": 4.101695967741936,
+              "equity_borrow_observed_rate_bps": 1.2701952234461846,
+              "equity_borrow_registration_fee_bps": 0.09066904694916135,
+              "equity_borrow_total_bps": 1.3608642703953455,
+              "equity_trading_cost_bps": 0.4142398350944225,
+              "gross_long_short_spread_pnl_bps": 2.5673241936917885,
+              "hedge_borrow_bps": 0.002226710829547455,
+              "hedge_gross_pnl_bps": -1.8274177209217584,
+              "hedge_trading_cost_bps": 0.11902662679021418,
+              "net_excess_bps": -6.7545784890110925
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.8971188945772373,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.2171835740779886
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.1084466677857563e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -6.7545784890110925,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -19.865906705571756,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 5.264881194578182
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 0,
+              "terminal_settlement_notional_fraction_nav": 0.0
+            },
+            "turnover_fraction_nav": 0.13331661547115914
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -0.5999889280296944,
+            "average_holding_sessions": 28.253896427199432,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.869253245205373,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.1853243450147577
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -2.6783252397092334,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 0,
+              "terminal_settlement_notional_fraction_nav": 0.0
+            },
+            "turnover_fraction_nav": 0.13231826272328812
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\momentum_12_1\\F2\\evaluation.json",
+        "source_evaluation_sha256": "bb28758665e3eff57d2369d5b7001148d15d67b325c4b16e2d8ee6a1558de58a"
+      },
+      "F3": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9937919638119349,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 126,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9930411771553354,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9941441483946932
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.9728090342566904,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 122,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9692251326846495,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9749698078569566
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": 0.008115688064314678,
+            "average_holding_sessions": 30.974451714597226,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -2.3506100262901217,
+              "cdi_benchmark_bps": 4.054483464566928,
+              "equity_borrow_observed_rate_bps": 0.9904005502621163,
+              "equity_borrow_registration_fee_bps": 0.09518308443028467,
+              "equity_borrow_total_bps": 1.085583634692401,
+              "equity_trading_cost_bps": 0.4312426348222867,
+              "gross_long_short_spread_pnl_bps": 8.772627837572395,
+              "hedge_borrow_bps": 0.0,
+              "hedge_gross_pnl_bps": -0.7226525515920106,
+              "hedge_trading_cost_bps": 0.08532601737682567,
+              "net_excess_bps": 0.04272950823184889
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 2.000053846851997,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.5287705227087462
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.0800249583553523e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": 0.04272950823184889,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 127,
+              "fold_boundary_preserved": true,
+              "lower_95": -11.230743756334084,
+              "possible_observations": 127,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 18.507900733769844
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 2,
+              "terminal_settlement_notional_fraction_nav": 0.06394804211684793
+            },
+            "turnover_fraction_nav": 0.1291421630497781
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": 0.8116217441653916,
+            "average_holding_sessions": 31.10776882270132,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9641935756140876,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.4876348206329144
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": 4.238982995433144,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 2,
+              "terminal_settlement_notional_fraction_nav": 0.06312249528733643
+            },
+            "turnover_fraction_nav": 0.12628315369122137
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\momentum_12_1\\F3\\evaluation.json",
+        "source_evaluation_sha256": "9cb45556f34432f59b8829f031888e1fbd512f8d2c5a67b37bc813e4d5825fc1"
+      },
+      "pooled": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9935439873329569,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 372,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9931330556805219,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.993858251345461
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.9707805584155506,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 360,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9686762110025604,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9724723360963788
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -0.6137288581916003,
+            "average_holding_sessions": 28.99021072867716,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -1.824551922961617,
+              "cdi_benchmark_bps": 4.3076064,
+              "equity_borrow_observed_rate_bps": 1.1450837593787468,
+              "equity_borrow_registration_fee_bps": 0.09321968169709988,
+              "equity_borrow_total_bps": 1.2383034410758467,
+              "equity_trading_cost_bps": 0.42088186688153534,
+              "gross_long_short_spread_pnl_bps": 4.650347186700293,
+              "hedge_borrow_bps": 0.0020042519857160685,
+              "hedge_gross_pnl_bps": 0.35572626951115754,
+              "hedge_trading_cost_bps": 0.11727912293448518,
+              "net_excess_bps": -2.9045535496277273
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9474922113260924,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.3330172759523835
+            },
+            "imputed_rate_share_of_short_notional": 0.043921680339913026,
+            "maximum_daily_reconciliation_error_bps": 1.1084466677857563e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -2.9045535496277273,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 375,
+              "fold_boundary_preserved": true,
+              "lower_95": -8.05628119526267,
+              "possible_observations": 375,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 5.8954984636732695
+            },
+            "placeholder_rate_share_of_short_notional": 0.01385259764201318,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 4
+            },
+            "turnover_fraction_nav": 0.1345837803927489
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": null,
+            "annualized_sharpe_undefined_reason": "fold summaries do not identify cross-fold daily second moments",
+            "average_holding_sessions": 28.958120718796305,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9162659880196298,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.298416879366563
+            },
+            "imputed_rate_share_of_short_notional": 0.042939881036831856,
+            "net_excess_bps_per_day": {
+              "estimate": 1.3891793911783576,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.013542944855381673,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 4
+            },
+            "turnover_fraction_nav": 0.1326204394471463
+          }
+        }
+      }
+    },
+    "reversal_21": {
+      "F1": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9415502416571009,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9357452974064301,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9464727721008617
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.7380554015947796,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.7229686823236345,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7577894721679787
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -0.9998004134947868,
+            "average_holding_sessions": 8.177560263034039,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.32610386448410866,
+              "cdi_benchmark_bps": 4.772763709677422,
+              "equity_borrow_observed_rate_bps": 0.9838508316478397,
+              "equity_borrow_registration_fee_bps": 0.10126437127246189,
+              "equity_borrow_total_bps": 1.0851152029203017,
+              "equity_trading_cost_bps": 1.64748484487035,
+              "gross_long_short_spread_pnl_bps": -2.541722573104406,
+              "hedge_borrow_bps": 0.2083354492205437,
+              "hedge_gross_pnl_bps": 5.9005136407156025,
+              "hedge_trading_cost_bps": 0.2824974749541951,
+              "net_excess_bps": -4.9635094785157206
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9728183408694318,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.3912667788860014
+            },
+            "imputed_rate_share_of_short_notional": 0.014744308976375771,
+            "maximum_daily_reconciliation_error_bps": 1.1084466677857563e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -4.9635094785157206,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -16.418179201364538,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 0.19689888360724578
+            },
+            "placeholder_rate_share_of_short_notional": 0.04033461907465876,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 3,
+              "terminal_settlement_notional_fraction_nav": 0.07819696949430999
+            },
+            "turnover_fraction_nav": 0.48249557995613634
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": 0.26658576291485386,
+            "average_holding_sessions": 8.201068842941725,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9583380766572493,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.3689497319081707
+            },
+            "imputed_rate_share_of_short_notional": 0.014286740359084178,
+            "net_excess_bps_per_day": {
+              "estimate": 1.3092591278509478,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.039078822919360184,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 3,
+              "terminal_settlement_notional_fraction_nav": 0.077232096976769
+            },
+            "turnover_fraction_nav": 0.4775811821998541
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\reversal_21\\F1\\evaluation.json",
+        "source_evaluation_sha256": "dd5fdaf34eca8da4317b02220b1b45923050a31ecc343e8e9cef8abfcf44bf21"
+      },
+      "F2": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9401491140084219,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9365694803193227,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9464407805587101
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.7415073211099837,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.734105336821907,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7598330608052437
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -3.2330569380648404,
+            "average_holding_sessions": 8.458452963065769,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": 0.23560717348934168,
+              "cdi_benchmark_bps": 4.101695967741935,
+              "equity_borrow_observed_rate_bps": 1.0914676743003644,
+              "equity_borrow_registration_fee_bps": 0.10281477463867936,
+              "equity_borrow_total_bps": 1.1942824489390436,
+              "equity_trading_cost_bps": 1.5914734262501427,
+              "gross_long_short_spread_pnl_bps": -6.517799748639594,
+              "hedge_borrow_bps": 0.22949341490453196,
+              "hedge_gross_pnl_bps": -1.2883410176542285,
+              "hedge_trading_cost_bps": 0.29144060689899526,
+              "net_excess_bps": -14.978919457539076
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9908174728610548,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.2997658001394
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.0729195309977513e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -14.978919457539076,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -25.462378929889546,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -5.198726301724205
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.015319756189165151
+            },
+            "turnover_fraction_nav": 0.47072850828728435
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -2.1057657049763043,
+            "average_holding_sessions": 8.414854238090834,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.979816052293114,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.289276014739815
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -9.689201786837724,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.01506354057805214
+            },
+            "turnover_fraction_nav": 0.4705526670518527
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\reversal_21\\F2\\evaluation.json",
+        "source_evaluation_sha256": "990e3abd9b7d360a83f53a9e12430575bf5a505f93e68b87a005b851efda3811"
+      },
+      "F3": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9310073380215792,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 126,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9211862106138341,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9389191221853685
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.7146774783755659,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 122,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.6693483390522385,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7459438513153743
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.6694267068604491,
+            "average_holding_sessions": 8.966098473578,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.042969757225112905,
+              "cdi_benchmark_bps": 4.0544834645669265,
+              "equity_borrow_observed_rate_bps": 2.984214708156675,
+              "equity_borrow_registration_fee_bps": 0.1037422803155232,
+              "equity_borrow_total_bps": 3.087956988472197,
+              "equity_trading_cost_bps": 1.515519865399862,
+              "gross_long_short_spread_pnl_bps": -3.327700413866401,
+              "hedge_borrow_bps": 0.21456112764536253,
+              "hedge_gross_pnl_bps": 3.24974429227228,
+              "hedge_trading_cost_bps": 0.26977251363747545,
+              "net_excess_bps": -9.263219838541099
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 2.0008884093221386,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.369046711568014
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.1013412404281553e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -9.263219838541099,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 127,
+              "fold_boundary_preserved": true,
+              "lower_95": -33.03944197155417,
+              "possible_observations": 127,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -1.3018121760229677
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 4,
+              "terminal_settlement_notional_fraction_nav": 0.13130532485857
+            },
+            "turnover_fraction_nav": 0.4463230947593344
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -0.6778280038962473,
+            "average_holding_sessions": 8.988194247251958,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9914766995888564,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.354644792981421
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -3.738917719471112,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 4,
+              "terminal_settlement_notional_fraction_nav": 0.1302928534356939
+            },
+            "turnover_fraction_nav": 0.44313165577117536
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\reversal_21\\F3\\evaluation.json",
+        "source_evaluation_sha256": "b34646c3c8f8327cffa7f059999c65a473c4b39a3d8ea8c8d385d2b86101d5e1"
+      },
+      "pooled": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.9375159820902642,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 372,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.9339927573429653,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.9416515938146302
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.7312739343435718,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 360,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.7178477317750684,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7470961635938292
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.9231931882890434,
+            "average_holding_sessions": 8.534037233225936,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.04447666360250787,
+              "cdi_benchmark_bps": 4.307606399999999,
+              "equity_borrow_observed_rate_bps": 1.6968927004626,
+              "equity_borrow_registration_fee_bps": 0.10261622318147458,
+              "equity_borrow_total_bps": 1.7995089236440744,
+              "equity_trading_cost_bps": 1.5842715960659297,
+              "gross_long_short_spread_pnl_bps": -4.122663254552772,
+              "hedge_borrow_bps": 0.21744011296658777,
+              "hedge_gross_pnl_bps": 2.62567181434184,
+              "hedge_trading_cost_bps": 0.28114515035134663,
+              "net_excess_bps": -9.731440286841371
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9881747410175417,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.3533597635311385
+            },
+            "imputed_rate_share_of_short_notional": 0.004914769658791924,
+            "maximum_daily_reconciliation_error_bps": 1.1084466677857563e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -9.731440286841371,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 375,
+              "fold_boundary_preserved": true,
+              "lower_95": -20.140684038953292,
+              "possible_observations": 375,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -6.256262483043438
+            },
+            "placeholder_rate_share_of_short_notional": 0.013444873024886254,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 8
+            },
+            "turnover_fraction_nav": 0.46651572766758503
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": null,
+            "annualized_sharpe_undefined_reason": "fold summaries do not identify cross-fold daily second moments",
+            "average_holding_sessions": 8.538333683864096,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9766630742336795,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.337759683447975
+            },
+            "imputed_rate_share_of_short_notional": 0.004724148812070502,
+            "net_excess_bps_per_day": {
+              "estimate": -4.037214506899177,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.012922064112001768,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 8
+            },
+            "turnover_fraction_nav": 0.4635901802404025
+          }
+        }
+      }
+    },
+    "reversal_5": {
+      "F1": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.7573245957867295,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.749333434216693,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7673603584192171
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.004245708768635256,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": -0.025488340183307125,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.035609004429837283
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.4784396094257326,
+            "average_holding_sessions": 3.2892943792971328,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.5707634837994972,
+              "cdi_benchmark_bps": 4.772763709677423,
+              "equity_borrow_observed_rate_bps": 1.1140309969133235,
+              "equity_borrow_registration_fee_bps": 0.09909999313285968,
+              "equity_borrow_total_bps": 1.2131309900461835,
+              "equity_trading_cost_bps": 4.098871417655512,
+              "gross_long_short_spread_pnl_bps": 3.551106893509578,
+              "hedge_borrow_bps": 0.12757477748180068,
+              "hedge_gross_pnl_bps": 1.3170210852531,
+              "hedge_trading_cost_bps": 0.6581439106513833,
+              "net_excess_bps": -6.573120310549058
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9559029727037716,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.2978907883178428
+            },
+            "imputed_rate_share_of_short_notional": 0.005708507583890152,
+            "maximum_daily_reconciliation_error_bps": 1.0516032489249483e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -6.573120310549058,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -13.252710651892418,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 3.1118656306754238
+            },
+            "placeholder_rate_share_of_short_notional": 0.042269654648702186,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.023614383068157115
+            },
+            "turnover_fraction_nav": 1.1892538320767236
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -0.14639377402038847,
+            "average_holding_sessions": 3.279842847643928,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.949211540465608,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.291440837156128
+            },
+            "imputed_rate_share_of_short_notional": 0.005507793381110842,
+            "net_excess_bps_per_day": {
+              "estimate": -0.6495063672899394,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.04075897307962121,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.023465097968119582
+            },
+            "turnover_fraction_nav": 1.1886005708266312
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\reversal_5\\F1\\evaluation.json",
+        "source_evaluation_sha256": "c40ea57b29afad50f094d424a9b0e89f9d635cc46a0ba49848f6ceb91ede8773"
+      },
+      "F2": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.7519541514998519,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.7428045451912918,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7631104975061108
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.01787931196544055,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": -0.0018291023161133113,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.04548596954844258
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -2.3960995322942242,
+            "average_holding_sessions": 3.3705296259194806,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.10966107269940106,
+              "cdi_benchmark_bps": 4.101695967741936,
+              "equity_borrow_observed_rate_bps": 0.9285496255320805,
+              "equity_borrow_registration_fee_bps": 0.10011203550701371,
+              "equity_borrow_total_bps": 1.0286616610390942,
+              "equity_trading_cost_bps": 4.039499378441308,
+              "gross_long_short_spread_pnl_bps": -1.3479547937401763,
+              "hedge_borrow_bps": 0.1594330116115312,
+              "hedge_gross_pnl_bps": 0.6205264470637369,
+              "hedge_trading_cost_bps": 0.6500786506658074,
+              "net_excess_bps": -10.816458088875468
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9757952100208274,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.252056650296942
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.1048939541069558e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -10.816458088875468,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -19.197920873330226,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -2.5300813905580273
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 2,
+              "terminal_settlement_notional_fraction_nav": 0.06314184677278659
+            },
+            "turnover_fraction_nav": 1.1723945072767787
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -1.3826482486754366,
+            "average_holding_sessions": 3.3658891653562444,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.974661560323178,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.253685773560116
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -6.24723127078142,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 2,
+              "terminal_settlement_notional_fraction_nav": 0.06277456134848736
+            },
+            "turnover_fraction_nav": 1.1733372451164361
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\reversal_5\\F2\\evaluation.json",
+        "source_evaluation_sha256": "874cbbc8aa4ee5995eb7678121778cba9d1e7ef16ee1d7888d37a211a69dc134"
+      },
+      "F3": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.7430287870232628,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 126,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.7265882932533615,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7598319677096873
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.010467500615534118,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 122,
+          "fold_boundary_preserved": true,
+          "lower_95": -0.01445136111155345,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.03236521912162657
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -3.452063057793384,
+            "average_holding_sessions": 3.402201356738701,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.39946382928211743,
+              "cdi_benchmark_bps": 4.054483464566928,
+              "equity_borrow_observed_rate_bps": 2.3683052742961683,
+              "equity_borrow_registration_fee_bps": 0.10019132101757366,
+              "equity_borrow_total_bps": 2.468496595313742,
+              "equity_trading_cost_bps": 3.977051137390738,
+              "gross_long_short_spread_pnl_bps": -4.231152727521123,
+              "hedge_borrow_bps": 0.13562425911838333,
+              "hedge_gross_pnl_bps": -1.398736715352554,
+              "hedge_trading_cost_bps": 0.6836196036429669,
+              "net_excess_bps": -17.348628332188575
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9820675398071548,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.3031013105679086
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.071143174158351e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -17.348628332188575,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 127,
+              "fold_boundary_preserved": true,
+              "lower_95": -32.25175963952508,
+              "possible_observations": 127,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -13.172697718674142
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 3,
+              "terminal_settlement_notional_fraction_nav": 0.0866313713844366
+            },
+            "turnover_fraction_nav": 1.1651676852584263
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -2.5090248604000647,
+            "average_holding_sessions": 3.3995455288058203,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9782334784055775,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.2987579745569993
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -12.602061992489451,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 3,
+              "terminal_settlement_notional_fraction_nav": 0.08615876461482253
+            },
+            "turnover_fraction_nav": 1.1638223178028646
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\reversal_5\\F3\\evaluation.json",
+        "source_evaluation_sha256": "9386d91336d5943e346fab784bf9a0d87595d176fc98f6a55de92972ed7ae728"
+      },
+      "pooled": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.7507067555945716,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 372,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.7443774626005788,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.7588111985517761
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.01086086817347273,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 360,
+          "fold_boundary_preserved": true,
+          "lower_95": -0.002922890802315131,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.02722195682142626
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -2.490484445543079,
+            "average_holding_sessions": 3.3540084539851045,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.3602788035325128,
+              "cdi_benchmark_bps": 4.3076064,
+              "equity_borrow_observed_rate_bps": 1.4774793787169158,
+              "equity_borrow_registration_fee_bps": 0.09980423818820308,
+              "equity_borrow_total_bps": 1.5772836169051188,
+              "equity_trading_cost_bps": 4.037982595105679,
+              "gross_long_short_spread_pnl_bps": -0.704441429396738,
+              "hedge_borrow_bps": 0.14083532468162088,
+              "hedge_gross_pnl_bps": 0.16697688308670247,
+              "hedge_trading_cost_bps": 0.6641047660426358,
+              "net_excess_bps": -11.625556052577576
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9712552408439177,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.284349583060898
+            },
+            "imputed_rate_share_of_short_notional": 0.0019028358612967174,
+            "maximum_daily_reconciliation_error_bps": 1.1048939541069558e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -11.625556052577576,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 375,
+              "fold_boundary_preserved": true,
+              "lower_95": -17.897118295364514,
+              "possible_observations": 375,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -7.856516592709187
+            },
+            "placeholder_rate_share_of_short_notional": 0.014089884882900729,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 6
+            },
+            "turnover_fraction_nav": 1.1756053415373096
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": null,
+            "annualized_sharpe_undefined_reason": "fold summaries do not identify cross-fold daily second moments",
+            "average_holding_sessions": 3.3488348047209615,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9674557766808476,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.2814345666601414
+            },
+            "imputed_rate_share_of_short_notional": 0.0018212436780206517,
+            "net_excess_bps_per_day": {
+              "estimate": -6.54841957377869,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.013477633764994747,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 6
+            },
+            "turnover_fraction_nav": 1.1751619294344111
+          }
+        }
+      }
+    },
+    "reversal_5_momentum_12_1_blend": {
+      "F1": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.8615032837888627,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.8565887635791738,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.8667016430633717
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.438543166851454,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.41624333195133373,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.4556113247424299
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -0.8035404037272228,
+            "average_holding_sessions": 5.4834983010493445,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -1.0372243047433807,
+              "cdi_benchmark_bps": 4.772763709677422,
+              "equity_borrow_observed_rate_bps": 1.3183948073293705,
+              "equity_borrow_registration_fee_bps": 0.10116967742876565,
+              "equity_borrow_total_bps": 1.419564484758136,
+              "equity_trading_cost_bps": 2.506060898173201,
+              "gross_long_short_spread_pnl_bps": 1.8879365179472285,
+              "hedge_borrow_bps": 0.04310778890335435,
+              "hedge_gross_pnl_bps": 4.623914151007586,
+              "hedge_trading_cost_bps": 0.3959207519369374,
+              "net_excess_bps": -3.6627912692375837
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9891264310069152,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.319400240260901
+            },
+            "imputed_rate_share_of_short_notional": 0.011580735097301119,
+            "maximum_daily_reconciliation_error_bps": 1.0818013151947525e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -3.6627912692375837,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -10.333986548491131,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 5.850480208324506
+            },
+            "placeholder_rate_share_of_short_notional": 0.039370092941676954,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.03334936707926558
+            },
+            "turnover_fraction_nav": 0.7254954125275348
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": 0.28890896656182297,
+            "average_holding_sessions": 5.473656888100277,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9823398748889196,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.3113512125476423
+            },
+            "imputed_rate_share_of_short_notional": 0.01125370313944562,
+            "net_excess_bps_per_day": {
+              "estimate": 1.3121596032504141,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.03824687360246202,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.03301710467666914
+            },
+            "turnover_fraction_nav": 0.7243201082620009
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\reversal_5_momentum_12_1_blend\\F1\\evaluation.json",
+        "source_evaluation_sha256": "22631cedbbeb8939d6dc1c7d85929110d15d3b6461ab64437a64776ecb04255f"
+      },
+      "F2": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.8649500005883514,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 123,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.8622091417707336,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.8709839583178685
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.4569595503608778,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 119,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.44262862571559153,
+          "possible_observations": 124,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.47544718839368755
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.7444517753901996,
+            "average_holding_sessions": 5.530210210864264,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.49103906855386703,
+              "cdi_benchmark_bps": 4.101695967741936,
+              "equity_borrow_observed_rate_bps": 1.0739270970467534,
+              "equity_borrow_registration_fee_bps": 0.10046034397460357,
+              "equity_borrow_total_bps": 1.1743874410213568,
+              "equity_trading_cost_bps": 2.4360846855831877,
+              "gross_long_short_spread_pnl_bps": 1.335551933450542,
+              "hedge_borrow_bps": 0.02454908589285139,
+              "hedge_gross_pnl_bps": -0.18226220866044315,
+              "hedge_trading_cost_bps": 0.41604208243240154,
+              "net_excess_bps": -7.490508606435497
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9716075718948878,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.1824817803709538
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.085798118083403e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -7.490508606435497,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 124,
+              "fold_boundary_preserved": true,
+              "lower_95": -19.126954844692627,
+              "possible_observations": 124,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 4.303315605744659
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.021182247534566736
+            },
+            "turnover_fraction_nav": 0.7130316920038973
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -0.7655142996156854,
+            "average_holding_sessions": 5.520375210293065,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9652825569274728,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.175244202492121
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -3.274016427594519,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": true,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 1,
+              "terminal_settlement_notional_fraction_nav": 0.021096426478398468
+            },
+            "turnover_fraction_nav": 0.7120105000337975
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\reversal_5_momentum_12_1_blend\\F2\\evaluation.json",
+        "source_evaluation_sha256": "eadedea6da36ad539c4bc483096548c10364d1b4ae74f1ade68a3b66690490cc"
+      },
+      "F3": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.8466244532842273,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 126,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.8337499212537909,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.8595473579041482
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.4108423265984649,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 122,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.38206162505714064,
+          "possible_observations": 127,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.4342825652148845
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.5688048021243655,
+            "average_holding_sessions": 5.257358158118581,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -1.3681421971324699,
+              "cdi_benchmark_bps": 4.054483464566927,
+              "equity_borrow_observed_rate_bps": 1.75350824464232,
+              "equity_borrow_registration_fee_bps": 0.10130403172476346,
+              "equity_borrow_total_bps": 1.8548122763670836,
+              "equity_trading_cost_bps": 2.615666025581874,
+              "gross_long_short_spread_pnl_bps": 5.6651028097498,
+              "hedge_borrow_bps": 0.014743180222290236,
+              "hedge_gross_pnl_bps": -3.518352495026988,
+              "hedge_trading_cost_bps": 0.4246535771401249,
+              "net_excess_bps": -8.185750406287905
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.998006133332293,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.404076964784393
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "maximum_daily_reconciliation_error_bps": 1.1048939541069558e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -8.185750406287905,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 127,
+              "fold_boundary_preserved": true,
+              "lower_95": -23.968261832560863,
+              "possible_observations": 127,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 3.5841383848456925
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": false,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 5,
+              "terminal_settlement_notional_fraction_nav": 0.1610911693590949
+            },
+            "turnover_fraction_nav": 0.7600799006804997
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": -0.7816021968791346,
+            "average_holding_sessions": 5.2485330828932115,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9923448935254717,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.397720729089541
+            },
+            "imputed_rate_share_of_short_notional": 0.0,
+            "net_excess_bps_per_day": {
+              "estimate": -4.067918579671567,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.0,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": false,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 5,
+              "terminal_settlement_notional_fraction_nav": 0.16002667504758222
+            },
+            "turnover_fraction_nav": 0.7592006612358848
+          }
+        },
+        "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z\\baselines\\reversal_5_momentum_12_1_blend\\F3\\evaluation.json",
+        "source_evaluation_sha256": "38e1cd739bc3b0d2be90b5bf6339a0be8b75ee07ac4e2e0be344b7b3dfa29103"
+      },
+      "pooled": {
+        "persistence_1": {
+          "block_length_sessions": 20,
+          "estimate": 0.8576033201403493,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 372,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.8534586763185347,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.8630661404581824
+        },
+        "persistence_5": {
+          "block_length_sessions": 20,
+          "estimate": 0.43524329775911164,
+          "finite_bootstrap_replications": 10000,
+          "finite_observations": 360,
+          "fold_boundary_preserved": true,
+          "lower_95": 0.4229254215701289,
+          "possible_observations": 375,
+          "replications": 10000,
+          "undefined_reason": null,
+          "upper_95": 0.4476414054178576
+        },
+        "scenarios": {
+          "borrow_balance": {
+            "annualized_net_excess_sharpe": -1.3746740085880822,
+            "average_holding_sessions": 5.42368889001073,
+            "decomposition_mean_bps_per_day": {
+              "cash_interest_bps": -0.9686899128658195,
+              "cdi_benchmark_bps": 4.3076064,
+              "equity_borrow_observed_rate_bps": 1.3849159018992372,
+              "equity_borrow_registration_fee_bps": 0.10098062582150062,
+              "equity_borrow_total_bps": 1.485896527720738,
+              "equity_trading_cost_bps": 2.5200417003591733,
+              "gross_long_short_spread_pnl_bps": 2.9844816661641285,
+              "hedge_borrow_bps": 0.027364896967894323,
+              "hedge_gross_pnl_bps": 0.27715753062031506,
+              "hedge_trading_cost_bps": 0.4123050553562504,
+              "net_excess_bps": -6.460265296485404
+            },
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9862467120780318,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.3019863284720827
+            },
+            "imputed_rate_share_of_short_notional": 0.0038602450324337063,
+            "maximum_daily_reconciliation_error_bps": 1.1048939541069558e-12,
+            "net_excess_bps_per_day": {
+              "block_length_sessions": 20,
+              "estimate": -6.460265296485404,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 375,
+              "fold_boundary_preserved": true,
+              "lower_95": -12.876351875263769,
+              "possible_observations": 375,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 0.4124293278399382
+            },
+            "placeholder_rate_share_of_short_notional": 0.013123364313892319,
+            "scenario": "borrow_balance",
+            "settlement": {
+              "economics_resolved": false,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 7
+            },
+            "turnover_fraction_nav": 0.7328690017373106
+          },
+          "sensitivity_short_proceeds_full": {
+            "annualized_net_excess_sharpe": null,
+            "annualized_sharpe_undefined_reason": "fold summaries do not identify cross-fold daily second moments",
+            "average_holding_sessions": 5.412863151275233,
+            "decomposition_mean_bps_per_day": null,
+            "decomposition_undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+            "gross": {
+              "equity_only_mean_fraction_nav": 1.9800879547279133,
+              "label": "whole_book_gross_including_beta_hedge",
+              "mean_fraction_nav": 2.295595637491473
+            },
+            "imputed_rate_share_of_short_notional": 0.0037212245047766853,
+            "net_excess_bps_per_day": {
+              "estimate": -2.026389082231888,
+              "lower_95": null,
+              "undefined_reason": "sealed_rev4d_retained_summary_but_not_daily_sensitivity_rows",
+              "upper_95": null
+            },
+            "placeholder_rate_share_of_short_notional": 0.012646966204547442,
+            "scenario": "sensitivity_short_proceeds_full",
+            "settlement": {
+              "economics_resolved": false,
+              "label": "terminal_last_mark_after_10_sessions",
+              "terminal_settlement_count": 7
+            },
+            "turnover_fraction_nav": 0.7320626117483636
+          }
+        }
+      }
+    }
+  },
+  "created_at_utc": "2026-09-08T18:46:36.185102Z",
+  "deployment_changed": false,
+  "gross_pnl_split_method": "retained total gross P&L minus deterministic BOVA11 prior-notional mark-to-market",
+  "method": "read_only extraction from hash-verified sealed evaluations; no model, score, ledger, or evaluation recomputation",
+  "official_validation_accessed": false,
+  "rev4d_equity_fee_split_method": "retained equity borrow times fixed 0.0025 fee divided by retained effective weighted annual rate",
+  "schema": "BRAZIL_RV_V2_ROUND1_REV4D_ECONOMICS_DETAIL_V1",
+  "sealed_evidence_limitation": "rev4d retained full-proceeds point/Sharpe summaries but not daily sensitivity rows; interval and decomposition are therefore null rather than inferred",
+  "source": {
+    "artifact_inventory_sha256": "fe9b466e6c1e9a38271cce03615b17bef01c48df66395dba462ac7af6c66ffd3",
+    "bova11_data_sha256": "4aa998afb26558c9c2d1cbf9374a6a3881e04fd3a322b769d0c2d6950371a7e9",
+    "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4d_733ac1e_20260908T180257Z",
+    "round1_result_sha256": "e782233bd1c1410fc06346ec8590433b6e0743210c970eebdcf325a2505f712c"
+  },
+  "test_accessed": false
+}
