@@ -1,0 +1,84 @@
+{
+  "status": "stopped_before_rebaseline_completion",
+  "implementation_commit": "1ad391ee816e06883b07e91fbf6091128bd1e947",
+  "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4f_1ad391e_20260908T232905Z",
+  "candidate": "reversal_5",
+  "fold": "F1",
+  "source_evaluation": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round1_rev4e_962b9e0_20260908T192330Z\\baselines\\reversal_5\\F1\\evaluation.json",
+  "source_evaluation_sha256": "b2f7772073f736115fb9616b480ebfe900503a546602c49747be1d77aba8af0f",
+  "replayed_evaluation_sha256": "0b13e3194919f846ad32dda0936b6bb2efd97ed5bae33277d58430bfb2955481",
+  "frozen_design_sha256": "976b2a2c2e21fb8b7767e981b5bdaf665bb6593e9d08b5316615a44594607b28",
+  "failure_record_sha256": "acb036d1ae284c216bd42a6be50bea0deaffa2d750ab0bc91b8a3b1a54ce1756",
+  "failed_gate": "unregistered_non_ledger_diagnostics_changed",
+  "changed_diagnostics": {
+    "diagnostics.lending_coverage.high_volatility_quartile_name_days": {
+      "before": 6192,
+      "after": 6181
+    },
+    "diagnostics.lending_coverage.high_volatility_quartile_rate_imputed_fraction": {
+      "before": 0.4299095607235142,
+      "after": 0.42986571752143665
+    },
+    "diagnostics.lending_coverage.high_volatility_quartile_rate_observed_prior_60_fraction": {
+      "before": 0.5198643410852714,
+      "after": 0.5201423717845008
+    },
+    "diagnostics.lending_coverage.high_volatility_quartile_rate_placeholder_fraction": {
+      "before": 0.05022609819121447,
+      "after": 0.04999191069406245
+    },
+    "diagnostics.lending_coverage.high_volatility_quartile_shortable_fraction_by_cell.borrow_balance": {
+      "before": 0.5708979328165374,
+      "after": 0.5709432130723184
+    },
+    "diagnostics.lending_coverage.high_volatility_quartile_shortable_fraction_by_cell.borrow_strict": {
+      "before": 0.5453811369509044,
+      "after": 0.5453810063096586
+    }
+  },
+  "all_remaining_undeclared_fields_bit_identical": true,
+  "score_outcome_hashes_bit_identical": {
+    "scores": true,
+    "score_mask": true,
+    "neutral_midrank_targets": true,
+    "neutral_target_mask": true,
+    "scaled_midrank_targets": true,
+    "scaled_target_mask": true,
+    "shareholder_midrank_targets": true,
+    "shareholder_target_mask": true,
+    "price_midrank_targets": true,
+    "price_target_mask": true,
+    "active": true
+  },
+  "headline_defect_signatures": {
+    "D1_entry_pending_printed_unblocked_unfilled": 0,
+    "D2_entry_fill_quantity_short": 0,
+    "D3_blocked_open_slots": 0,
+    "D4_cap_block_defects": 0,
+    "D5_ineligible_exit_within_hold_window": 0
+  },
+  "mean_gross_fraction_nav": 1.941866840995689,
+  "mean_unresolved_stale_inventory_fraction_nav": 0.001987908387588471,
+  "same_day_action_sessions": 56,
+  "proposed_registration_amendment": {
+    "append_to_recomputed_diagnostics": [
+      "diagnostics.lending_coverage.high_volatility_quartile_name_days",
+      "diagnostics.lending_coverage.high_volatility_quartile_rate_imputed_fraction",
+      "diagnostics.lending_coverage.high_volatility_quartile_rate_observed_prior_60_fraction",
+      "diagnostics.lending_coverage.high_volatility_quartile_rate_placeholder_fraction",
+      "diagnostics.lending_coverage.high_volatility_quartile_shortable_fraction_by_cell.borrow_balance",
+      "diagnostics.lending_coverage.high_volatility_quartile_shortable_fraction_by_cell.borrow_strict"
+    ],
+    "reason": "The high-volatility lending-coverage stratum consumes the same slow_valid-masked prior Yang-Zhang volatility as the authorized exposure correction. No score, rate or availability input changed."
+  },
+  "official_validation_accessed": false,
+  "test_accessed": false,
+  "transfer_chronology_clean": true,
+  "research_claim": false,
+  "deployment_changed": false,
+  "score_or_model_recomputed": false,
+  "round2_replay_started": false,
+  "sweep_rebuild_retraining_started": false,
+  "inventory_sha256": "25e4994bb199153e94febc6c335d1f42cb947fff6ac2387b2b6257329e34f832",
+  "access_audit_sha256": "d5acdac4555d5c14fe75c4d9891c194d9aa8dd31b845e3246581358630cdbf7c"
+}

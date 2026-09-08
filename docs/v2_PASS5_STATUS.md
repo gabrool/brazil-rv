@@ -1,6 +1,7 @@
 # Pass-5 implementation status
 
-This is the implementation checkpoint **before the first rev-4f score replay**.
+The implementation is committed; the **first rev4f replay stopped at its declared diagnostic-identity gate**.
+See [the stop report and proposed amendment](v2_PASS5_REPLAY_STOP.md).
 It is not a re-baseline result or authorization to start Round 3.
 
 The prior cleanup is committed separately as `fb6fc92`; the initial rev-4f
@@ -65,7 +66,7 @@ are in [0.5, 1.5]. The 5th/95th percentiles are 0.57235/1.93712.
 are copied into Git for review. This is input-only evidence, not a measured
 change in model edge. The canonical store and sealed results were not rewritten.
 
-## Clarifications implemented; execution pending
+## Clarifications implemented; first replay stopped
 
 The joined inferred-action builder -> evaluator -> ledger causality test passes:
 changing only the event-day close changes inferred cash terms but no event-day
@@ -88,7 +89,9 @@ Round 2 is recovered locally and fully hash-verified; see
 No paid instance was required. Remaining sequence: commit, rev4f replays and report,
 CPU execution sweep, intraday coverage repair, one development-only store build,
 16-book acceptance, Round 1' CPU, then stop for the user's go before paid Round 3.
-No replay, sweep, new store or new fit has yet run in this clarification pass.
+The first reversal_5/F1 replay was evaluated and stopped on six unregistered
+high-volatility lending-coverage fields. No completed rebaseline, Round-2 replay,
+sweep, new store or new fit has run. The exact six-field amendment awaits confirmation.
 
 Validation before replay: Ruff and compilation pass; the full research suite passed
 908 tests in 467.91 seconds. The final focused run passed 100 tests, including

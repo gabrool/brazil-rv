@@ -2498,3 +2498,25 @@ copy processes, not persisted in files. No score/model was recomputed for this c
 Validation before replay: Ruff and compilation pass; the full research suite passed
 908 tests in 467.91 seconds. The final focused run passed 100 tests, including
 the added invariant-exemption check and the joined corporate-action causality test.
+
+## Rev4f first replay stopped at diagnostic identity (2026-09-08)
+
+Commit `1ad391ee816e06883b07e91fbf6091128bd1e947` froze the first attempt at
+`D:\quant-data\b3\processed\model_runs\v2_round1_rev4f_1ad391e_20260908T232905Z`.
+The first candidate/fold, reversal_5/F1, changed six high-volatility lending-coverage
+fields because that stratum also consumes the newly slow-valid-masked volatility.
+Name-days changed from 6,192 to 6,181. This omitted diagnostic definition change
+triggered the registered stop. All other undeclared fields, including score and
+outcome identities, remain exactly equal. D1-D5 counts are zero; mean gross and
+unresolved/stale inventory remain inside their bounds for this first cell.
+
+The root is sealed as a stopped attempt, not a result. Frozen design, failure,
+access-audit and inventory hashes are `976b2a2c2e21fb8b7767e981b5bdaf665bb6593e9d08b5316615a44594607b28`,
+`acb036d1ae284c216bd42a6be50bea0deaffa2d750ab0bc91b8a3b1a54ce1756`,
+`d5acdac4555d5c14fe75c4d9891c194d9aa8dd31b845e3246581358630cdbf7c`, and
+`25e4994bb199153e94febc6c335d1f42cb947fff6ac2387b2b6257329e34f832`.
+The complete field/value comparison and proposed six-path registration amendment
+are in `docs/v2_PASS5_REPLAY_STOP.md` and `docs/v2_pass5_replay_stop_evidence.json`.
+No remaining Round-1 panel was replayed, and Round-2 replay, execution sweep,
+store rebuild, retraining and protected-date access were not started. Confirmation
+is requested before amending the list and restarting in a fresh root.
