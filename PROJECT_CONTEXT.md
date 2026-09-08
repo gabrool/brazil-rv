@@ -1761,3 +1761,41 @@ coverage-limited at 0.1127 of active name-days. The informational fine-only,
 0.0216976/0.0219637/0.0212408. The registration stopped before Round 2.
 Protected data and deployment remain untouched, and no paid instance was used
 for this CPU execution.
+
+## Current v2 rev4 acceptance state (2026-09-08)
+
+Rev4 constructed-book engineering is implemented at commit
+`3242ad3910efcf748b9844ad0c5480727eacb886`. It adds a virtual nonlinear
+neutral-target view over the immutable V3 store and a hash-bound BOVA11 hedge
+ledger. Raw fixed-width COTAHIST establishes the canonical BOVA11 identity as
+BDI14, not the proposed BDI02. The canonical hedge artifact is
+`D:\quant-data\b3\interim\external\bova11_hedge_close_v1_2009_2024_20260908T115000Z`;
+manifest/parquet SHA-256 values are
+`858c6fb07e234d8c28219a72efa29775d83ba334f9b457ed24317ab7d270544d`
+and `4aa998afb26558c9c2d1cbf9374a6a3881e04fd3a322b769d0c2d6950371a7e9`.
+
+The sealed 16-book CPU acceptance root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev4_3242ad3_20260908T131920Z`;
+manifest/inventory SHA-256 values are
+`175e95ec91e38d546c2857f53c05274efb793e78accc7ae2c55125b375763102`
+and `0f16f41c93a896c96e522bccc52f5252e71763e1156638dd7214fece78293d5b`.
+It is unsupported with protected access false/false. The inverse-volatility
+neutral-IC check passes, but 15 volatility-occupancy bounds and three F3 gross
+bounds fail. The occupancy implementation incorrectly narrows candidates to
+global top/bottom score halves before quintile balancing; the next registered
+revision must rank each side within every volatility quintile across the full
+eligible population. F3 remains executable-short coverage-limited.
+
+The additional legacy-identity reason is a disclosed invocation error: the
+acceptance was bound to the rev3 Round-1 result rather than the older canonical
+legacy reference `v2_round1_81fe0cb_20260907T023339Z`. It was not rerun because
+the independent construction bounds already stop the round. Round 1 was not
+started; Round 2/GPU work was explicitly withheld, no deployment changed, and
+no paid instance was launched.
+
+For future lending coverage, 127 official B3 BDI Chapter 05 PDFs covering
+2024-07-01 through 2024-12-30 are archived at
+`C:\quant-data\b3\raw\b3\bdi_lending_open_balance\pdf_20240701_20241230`
+with download-manifest SHA-256
+`f1754e98ad2cd890375a6038907670a4552e96f8c3c232c3bc3f136d7fcce03b`.
+They are not yet parsed and no lending sidecar or store was rebuilt.

@@ -1995,3 +1995,73 @@ interval was computed. Fold lending-net / realized-beta-slope deltas are:
 
 No pooled realized-beta statistic existed in the sealed result, so it remains
 JSON `null`; it was not synthesized from fold slopes.
+
+## Rev4 constructed-book acceptance stop (2026-09-08)
+
+The rev4 evaluation implementation and preregistration were frozen in commit
+`1c62085bca4c0d5381aa6884aed57a3aef4c6f6a`. A score-free operational loader
+repair, which permits a hash-verified BOVA11 history to extend outside the
+consumer store calendar while continuing to reject noncanonical dates inside
+that calendar, was committed as
+`3242ad3910efcf748b9844ad0c5480727eacb886`. Ruff, compileall, and all 887
+tests passed before the accepted replay.
+
+Rev4 computes the nonlinear neutral target as a deterministic virtual view of
+the immutable V3 store: ten volatility-decile dummies, five beta-quintile
+dummies, and linear rank-Gaussian log ADV, with no explicit intercept. Rows
+with 20--39 observations use and flag the registered rev3 linear fallback;
+rows with fewer than 20 observations remain invalid. The headline ledger uses
+executable lending shorts, volatility-quintile-balanced entry, and a BOVA11
+beta hedge outside the equity name caps. The fixed-width COTAHIST source shows
+BOVA11 continuously as `TIPREG=01`, `CODBDI=14` over the registered period;
+the document's requested BDI02 binding would retain only 92 observations in
+2019, so the preregistered canonical identity is BDI14. The sealed hedge
+artifact is
+`D:\quant-data\b3\interim\external\bova11_hedge_close_v1_2009_2024_20260908T115000Z`;
+its manifest and parquet SHA-256 values are
+`858c6fb07e234d8c28219a72efa29775d83ba334f9b457ed24317ab7d270544d`
+and `4aa998afb26558c9c2d1cbf9374a6a3881e04fd3a322b769d0c2d6950371a7e9`.
+The existing sealed lending archive has no BOVA11-ISIN rows, so the hedge
+borrow charge honestly uses the registered 2% floor.
+
+The 16-book CPU acceptance is sealed at
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev4_3242ad3_20260908T131920Z`.
+Pipeline-manifest and inventory SHA-256 values are
+`175e95ec91e38d546c2857f53c05274efb793e78accc7ae2c55125b375763102`
+and `0f16f41c93a896c96e522bccc52f5252e71763e1156638dd7214fece78293d5b`.
+It completed with `engineering_acceptance_status=unsupported` and protected
+access false/false. The inverse-volatility neutral-IC gate itself passed at
+`-0.00004450`, `0.01093123`, and `0.00229996` for F1/F2/F3. Acceptance stopped
+on 15 volatility-occupancy bounds, three F3 gross bounds, and one legacy
+identity check. No Round-1 root was created, no Round-2 or GPU work was run,
+and no paid instance was launched.
+
+The occupancy failures expose a construction error that must be resolved in a
+new registration rather than repaired after this score: the implementation
+forms the long and short candidate pools from the global top and bottom halves
+before applying volatility-quintile quotas. A score monotone in volatility can
+therefore never source both sides from every quintile. A future revision should
+rank long and short candidates within each volatility quintile across the full
+eligible population, while preserving global long/short disjointness and the
+registered spillover rules. The F3 gross failures remain genuine consequences
+of sparse executable-short coverage; they were not relaxed.
+
+The legacy identity failure was a caller/reference-binding mistake, not a
+calculation change. This acceptance was given the rev3 Round-1 root
+`v2_round1_rev3_f567e0f_20260907T173815Z`, while the rev3 acceptance's sealed
+legacy comparison root is
+`D:\quant-data\b3\processed\model_runs\v2_round1_81fe0cb_20260907T023339Z`
+(result SHA-256
+`ca39f11340f13956dca11da7fb6b3a8fa0a38f8a79cb558387d81aff26bf57a0`).
+The scored acceptance was not rerun because the independent occupancy and
+gross bounds already require a new design.
+
+For a later lending-sidecar rebuild, 127 official B3 BDI Chapter 05 PDFs for
+2024-07-01 through 2024-12-30 were downloaded without modifying any immutable
+source into
+`C:\quant-data\b3\raw\b3\bdi_lending_open_balance\pdf_20240701_20241230`.
+The download-manifest SHA-256 is
+`f1754e98ad2cd890375a6038907670a4552e96f8c3c232c3bc3f136d7fcce03b`.
+They have not been parsed and the lending sidecar/store has not been rebuilt;
+doing so would change the immutable data contract and belongs in the next
+explicitly registered round.
