@@ -1850,3 +1850,148 @@ file for 2024-07 onward is present. The raw 2024 annual COTAHIST archive is
 present and extends beyond July, so oddlot can be rebuilt beyond its current
 2024-06-28 derived cutoff without obtaining a new raw price archive. This
 audit changes no score, designation, protected access state, or deployment.
+
+## Round-2 diagnostic readout before Round 3
+
+The requested machine-readable readout is `round2_readout_detail.json`, SHA-256
+`ec84b540fc5cf0b4d7bbdef5e47b3be2798a8d8133be14125b4350dbf3a8781a`.
+It was extracted read-only from the sealed Round-2 result
+`e98792213e16615c6e44ba3036ed829100940eeef0b8a9a175a9a2b2f752f9a0`
+and inventory
+`39ee66e731aa51bf3859a70c974abdf2ee69301dff01f05fa1dfb626d3d755ce`.
+All 136 mirrored JSON artifacts matched their sealed hash sidecars. No model,
+score, or evaluation was recomputed. The only session arrays opened were the
+hash-verified `active` and `fast_present` slices for the registered 2023--2024
+F1/F2/F3 windows; no 2025/2026 session was opened. Official-validation/test
+access remained false/false and deployment remained unchanged.
+
+The predeclared parent check fails. “Within a third” is applied literally as
+`abs(lending net - headline net) / abs(headline net) <= 1/3`. Arm B misses the
+absolute 0.25 volatility-exposure bound in all three folds, misses the absolute
+0.30 realized-beta bound in all three folds, and its lending-cell net is not
+within one third of headline in either binding fold. F3 is reported but is not
+binding because lending coverage is limited there.
+
+| Fold | Vol exposure [95%] | Within ±.25 | Realized beta | Within ±.30 | Headline net | Lending net | Relative distance | Lending pass |
+| --- | ---: | :---: | ---: | :---: | ---: | ---: | ---: | :---: |
+| F1 | -.429788 [-.483945,-.396760] | no | -.559660 | no | 11.2659 | 3.6549 | 67.56% | no |
+| F2 | -.335214 [-.385725,-.254109] | no | -.330522 | no | 4.8538 | .1689 | 96.52% | no |
+| F3 | -.506668 [-.527354,-.473761] | no | -.896435 | no | 19.2836 | -2.0394 | 110.58% | n/a |
+
+Per the rule fixed before this extraction, Round 3 must therefore begin with
+the rev-4 evaluation change: nonlinear neutralization using vol-decile and
+beta-decile dummies plus a beta-hedged ledger cell, followed by reruns of Round
+1 and the Round-2 arms. Arm B is not accepted as the Round-3 parent from the
+rev-3 evidence, and no Round-3 registration was written by this extraction.
+
+### Candidate fold diagnostics
+
+The table reports point estimates; the full 95% exposure intervals, support
+counts, and labels are in the JSON.
+
+| Candidate | Fold | Vol-20 | Beta-60 | Log volume-20 | Momentum 12-1 | Return-5 | Realized beta | R² |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Arm A | F1 | -.642716 | -.512222 | .231809 | .615755 | .135826 | -.670671 | .5154 |
+| Arm A | F2 | -.238712 | -.275360 | .025047 | .712898 | .119295 | -.195496 | .0659 |
+| Arm A | F3 | -.656363 | -.622655 | .270619 | .709773 | .216177 | -.948758 | .5923 |
+| Arm B | F1 | -.429788 | -.347891 | .134637 | .748851 | -.080819 | -.559660 | .3587 |
+| Arm B | F2 | -.335214 | -.328942 | .202269 | .722763 | -.031392 | -.330522 | .1757 |
+| Arm B | F3 | -.506668 | -.491428 | .330827 | .773772 | -.038663 | -.896435 | .5695 |
+| Arm C | F1 | -.382457 | -.309385 | .126939 | .618553 | .069751 | -.630349 | .4405 |
+| Arm C | F2 | -.231544 | -.311753 | -.043571 | .738630 | .092074 | -.236850 | .1132 |
+| Arm C | F3 | -.441640 | -.438470 | .328095 | .725167 | .038161 | -.801821 | .5037 |
+| GBDT | F1 | -.154918 | -.153236 | -.106627 | .461146 | .025962 | -.358759 | .3015 |
+| GBDT | F2 | -.172366 | -.134110 | -.073871 | .492773 | -.021598 | -.244978 | .1507 |
+| GBDT | F3 | -.240064 | -.183007 | .074384 | .413484 | -.029445 | -.565906 | .5070 |
+| Ensemble | F1 | -.346833 | -.293583 | .023880 | .717014 | -.037396 | -.445017 | .3453 |
+| Ensemble | F2 | -.287475 | -.261961 | .080138 | .697496 | -.031047 | -.331064 | .2036 |
+| Ensemble | F3 | -.440387 | -.399565 | .241915 | .698382 | -.037594 | -.832715 | .5923 |
+
+Headline and lending-sidecar economics are:
+
+| Candidate | Fold | Headline net / gross label | Lending net / gross label | Settlement label |
+| --- | --- | ---: | ---: | --- |
+| Arm A | F1 | 4.1434 / within | 2.5989 / under | resolved |
+| Arm A | F2 | .6933 / within | -3.5352 / within | resolved |
+| Arm A | F3 | 10.9406 / within | .7556 / under | resolved |
+| Arm B | F1 | 11.2659 / within | 3.6549 / under | resolved |
+| Arm B | F2 | 4.8538 / within | .1689 / within | resolved |
+| Arm B | F3 | 19.2836 / within | -2.0394 / under | economics unresolved |
+| Arm C | F1 | -3.2494 / within | -7.0290 / within | resolved |
+| Arm C | F2 | .6637 / within | -3.2765 / within | resolved |
+| Arm C | F3 | 12.9529 / within | -2.8621 / under | economics unresolved |
+| GBDT | F1 | 3.5125 / within | 4.7092 / within | resolved |
+| GBDT | F2 | -2.4082 / within | -5.8482 / within | resolved |
+| GBDT | F3 | 2.8731 / within | -10.1318 / under | economics unresolved |
+| Ensemble | F1 | 6.0479 / within | 6.6048 / under | resolved |
+| Ensemble | F2 | -2.3008 / within | -2.1009 / within | resolved |
+| Ensemble | F3 | 11.7112 / within | -8.4018 / under | economics unresolved |
+
+For F3 the active-name-day shortable fraction is `0.112668` and the high-vol
+quartile shortable fraction is `0.104657`, versus `0.611838/0.495963` in F1
+and `0.692931/0.589325` in F2. This is the registered F3 lending-coverage
+caveat, not an omitted negative result.
+
+### Arm-B horizon and quality shape
+
+| Fold | Horizon | Neutral IC | Legacy IC | Price IC | Spread bps/holding session |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| F1 | D1 | .017593 | .036744 | .035368 | 18.691 |
+| F1 | D2 | .026861 | .050016 | .048040 | 16.700 |
+| F1 | D3 | .026365 | .050782 | .051178 | 16.113 |
+| F1 | D5 | .029227 | .054304 | .054870 | 12.458 |
+| F1 | D10 | .020856 | .048000 | .045768 | 8.082 |
+| F2 | D1 | .017406 | .036960 | .039170 | 24.552 |
+| F2 | D2 | .020922 | .042409 | .041070 | 15.892 |
+| F2 | D3 | .026243 | .050415 | .050716 | 16.113 |
+| F2 | D5 | .027240 | .053612 | .053636 | 16.096 |
+| F2 | D10 | .019807 | .056218 | .056988 | 16.748 |
+| F3 | D1 | .019582 | .042114 | .046765 | 28.653 |
+| F3 | D2 | .028493 | .053721 | .057985 | 28.843 |
+| F3 | D3 | .037929 | .071819 | .073449 | 30.499 |
+| F3 | D5 | .047530 | .097680 | .093900 | 31.863 |
+| F3 | D10 | .073605 | .151904 | .146254 | 37.078 |
+
+The Arm-B neutral IC by causal liquidity quartile and survival audit stratum is:
+
+| Fold | Q1 | Q2 | Q3 | Q4 | Survives | Delisted |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| F1 | .004847 | .024709 | .028542 | .052685 | .030893 | -.000124 |
+| F2 | .036189 | .013969 | -.008835 | .048679 | .018395 | .045081 |
+| F3 | .049391 | .026172 | .019593 | .034862 | .026604 | .030391 |
+
+The JSON contains the complete five-candidate per-horizon tables, all
+incremental-horizon IC rows, all requested quality rows, and the exact support
+counts. The network fast gate's mean activation was not logged in any sealed
+artifact and is recorded as JSON `null`, not inferred. The hash-verified
+`fast_present` coverage is:
+
+| Fold | Fast-present active name-days | Active name-days | Share | Gate activation |
+| --- | ---: | ---: | ---: | --- |
+| F1 | 14,296 | 24,598 | 58.1185% | not logged |
+| F2 | 13,873 | 23,568 | 58.8637% | not logged |
+| F3 | 14,106 | 23,059 | 61.1735% | not logged |
+
+### Exact-common-population parent comparisons
+
+| Pair | Neutral-IC delta [95%] | P1 delta | P5 delta | Headline-net delta [95%] | Lending-net delta |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| B minus GBDT | .005471 [-.003678,.014582] | .071898 | .123890 | 10.5228 [2.2233,18.6515] | 4.3817 |
+| Ensemble minus B | .001959 [-.002241,.006873] | -.027780 | -.037304 | -6.6557 [-10.8520,-.1627] | -1.9298 |
+
+The registered IC, persistence, and headline-net deltas above are copied from
+the sealed exact-common-population paired readouts. The lending-net point
+deltas are same-date differences of sealed lending-cell daily rows; no new
+interval was computed. Fold lending-net / realized-beta-slope deltas are:
+
+| Pair | Fold | Lending-net delta | Realized-beta delta |
+| --- | --- | ---: | ---: |
+| B minus GBDT | F1 | -1.0543 | -.200901 |
+| B minus GBDT | F2 | 6.0171 | -.085544 |
+| B minus GBDT | F3 | 8.0924 | -.330529 |
+| Ensemble minus B | F1 | 2.9498 | .114642 |
+| Ensemble minus B | F2 | -2.2698 | -.000542 |
+| Ensemble minus B | F3 | -6.3623 | .063720 |
+
+No pooled realized-beta statistic existed in the sealed result, so it remains
+JSON `null`; it was not synthesized from fold slopes.
