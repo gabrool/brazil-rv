@@ -49,7 +49,7 @@ ALLOWED_SEEDS: Final[tuple[int, ...]] = (11, 29, 47)
 V1_READ_SEEDS: Final[tuple[int, ...]] = (11, 29, 47, 61, 79, 97, 113, 131, 149, 167)
 GBDT_SEEDS: Final[tuple[int, ...]] = (11, 29, 47, 61, 79)
 
-# Rev-3 research binds every train/selection consumer to this virtual store
+# Rev-4 research binds every train/selection consumer to this virtual store
 # view.  The physical ``target_primary`` array remains available only as the
 # explicitly reported legacy scaled-target readout.
 REGISTERED_PRIMARY_TARGET: Final[str] = "target_primary_neutral"
@@ -59,6 +59,9 @@ TARGET_NEUTRALIZATION_FEATURES: Final[tuple[str, ...]] = (
     "beta_60",
     "log_volume_mean_20",
 )
+TARGET_NEUTRALIZATION_VOL_GROUPS: Final[int] = 10
+TARGET_NEUTRALIZATION_BETA_GROUPS: Final[int] = 5
+TARGET_NEUTRALIZATION_MIN_NONLINEAR_NAMES: Final[int] = 40
 
 # The M1 grid starts at 10:00. Index 345 is the 15:45 bar. Features consume
 # indices [0, 345); entry is the open of index 345 (minute 346 in one-based

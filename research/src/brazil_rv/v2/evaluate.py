@@ -39,7 +39,7 @@ BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V10"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V11"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
@@ -119,6 +119,10 @@ class EvaluationInputs:
     action_alignment: str = "retrospective"
     annual_borrow_rate_by_name: NDArray[np.floating] | None = None
     shortable: NDArray[np.bool_] | None = None
+    bova11_close: NDArray[np.floating] | None = None
+    bova11_manifest_sha256: str | None = None
+    bova11_data_sha256: str | None = None
+    neutral_target_fallback_flags: NDArray[np.bool_] | None = None
 
 
 @dataclass(frozen=True)
@@ -335,6 +339,26 @@ def _validate(inputs: EvaluationInputs) -> None:
         shortable = np.asarray(inputs.shortable)
         if shortable.shape != matrix_shape or shortable.dtype != np.bool_:
             raise ValueError("shortable mask must be Boolean and align names")
+    if inputs.bova11_close is None:
+        raise ValueError("constructed-book evaluation requires the BOVA11 close series")
+    bova11_close = np.asarray(inputs.bova11_close, dtype=np.float64)
+    if (
+        bova11_close.shape != (len(dates),)
+        or np.isinf(bova11_close).any()
+        or np.any(bova11_close[np.isfinite(bova11_close)] <= 0.0)
+    ):
+        raise ValueError("BOVA11 close must align dates and be positive or missing")
+    if inputs.bova11_manifest_sha256 is None or inputs.bova11_data_sha256 is None:
+        raise ValueError("constructed-book evaluation requires BOVA11 artifact hashes")
+    _validate_sha256(inputs.bova11_manifest_sha256, label="bova11_manifest_sha256")
+    _validate_sha256(inputs.bova11_data_sha256, label="bova11_data_sha256")
+    if inputs.neutral_target_fallback_flags is not None:
+        fallback = np.asarray(inputs.neutral_target_fallback_flags)
+        if fallback.dtype != np.bool_ or fallback.shape != (
+            len(dates),
+            len(HORIZONS),
+        ):
+            raise ValueError("neutral-target fallback flags must align dates/horizons")
     for name, values in (
         ("action_session_resolved", inputs.action_session_resolved),
         ("action_has_action", inputs.action_has_action),
@@ -825,7 +849,34 @@ def _ledger_rows(
             "deployed_gross_fraction_nav": _finite_or_none(
                 result.gross_fraction_nav[index]
             ),
+            "deployed_gross_fraction_nav_including_hedge": _finite_or_none(
+                result.gross_fraction_nav_including_hedge[index]
+            ),
             "deployed_net_fraction_nav": _finite_or_none(actual_net[index]),
+            "hedge_signed_notional": _finite_or_none(
+                result.hedge_signed_notional[index]
+            ),
+            "hedge_target_notional": _finite_or_none(
+                result.hedge_target_notional[index]
+            ),
+            "hedge_turnover_fraction_nav": _finite_or_none(
+                result.hedge_turnover_fraction_nav[index]
+            ),
+            "hedge_cost_bps": _finite_or_none(result.hedge_cost_bps[index]),
+            "hedge_borrow_bps": _finite_or_none(result.hedge_borrow_bps[index]),
+            "ex_ante_beta_before_hedge": _finite_or_none(
+                result.ex_ante_beta_before_hedge[index]
+            ),
+            "ex_ante_beta_after_hedge": _finite_or_none(
+                result.ex_ante_beta_after_hedge[index]
+            ),
+            "volatility_quota": result.volatility_quota[index].tolist(),
+            "volatility_occupancy_long": (
+                result.volatility_occupancy_long[index].tolist()
+            ),
+            "volatility_occupancy_short": (
+                result.volatility_occupancy_short[index].tolist()
+            ),
             "nav": _finite_or_none(result.nav[index]),
             "free_cash": _finite_or_none(result.free_cash[index]),
             "restricted_cash": _finite_or_none(result.restricted_cash[index]),
@@ -1459,6 +1510,16 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
                 else "unsupported"
             )
         ),
+        "bova11_close": _array_sha256(np.asarray(inputs.bova11_close)),
+        "bova11_manifest": str(inputs.bova11_manifest_sha256),
+        "bova11_data": str(inputs.bova11_data_sha256),
+        "neutral_target_fallback_flags": _array_sha256(
+            np.asarray(
+                inputs.neutral_target_fallback_flags
+                if inputs.neutral_target_fallback_flags is not None
+                else "unsupported"
+            )
+        ),
     }
     for name, values in sorted(inputs.prior_feature_values.items()):
         result[f"prior_feature_{name}"] = _array_sha256(np.asarray(values))
@@ -1528,6 +1589,11 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         "headline": {
             "cost_bps_per_side": ECONOMICS_HEADLINE[0],
             "annual_borrow_rate": ECONOMICS_HEADLINE[1],
+            "borrow_source": config.borrow_source,
+            "volatility_balanced_entries": config.volatility_balanced_entries,
+            "beta_hedge": config.beta_hedge,
+            "hedge_instrument": "BOVA11 exact ISIN BRBOVACTF003",
+            "hedge_outside_equity_caps": True,
         },
     }
 
@@ -1848,9 +1914,12 @@ def evaluate_scores(
         initial_reference_price=inputs.initial_reference_price,
         annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
         shortable=inputs.shortable,
+        selection_volatility=inputs.prior_feature_values["yang_zhang_vol_20"],
+        beta_60=inputs.prior_feature_values["beta_60"],
+        hedge_close=inputs.bova11_close,
     )
     configurations = ledger_configurations()
-    headline_name = f"cost_{ECONOMICS_HEADLINE[0]:g}_borrow_{ECONOMICS_HEADLINE[1]:g}"
+    headline_name = "cost_4_borrow_lending_v1"
     headline = grid[headline_name]
     d5_index = HORIZONS.index(5)
     d5_score = np.asarray(inputs.scores, dtype=np.float64)[..., d5_index]
@@ -1871,6 +1940,11 @@ def evaluate_scores(
         security_ids=inputs.security_ids,
         config=LedgerConfig(),
         initial_reference_price=inputs.initial_reference_price,
+        annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
+        shortable=inputs.shortable,
+        selection_volatility=inputs.prior_feature_values["yang_zhang_vol_20"],
+        beta_60=inputs.prior_feature_values["beta_60"],
+        hedge_close=inputs.bova11_close,
     )
     active = np.asarray(inputs.active, dtype=np.bool_)
     scaled_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
@@ -1999,7 +2073,7 @@ def evaluate_scores(
                 },
             }
         )
-        if scenario.startswith("cost_"):
+        if scenario.startswith(("cost_", "comparator_")):
             economics_daily.extend(
                 {
                     **row,
@@ -2098,6 +2172,22 @@ def evaluate_scores(
                 if np.isfinite(daily_primary).any()
                 else "no_date_has_a_defined_four_head_primary_ic"
             ),
+        },
+        "neutral_target_fallback": {
+            "method": "rev3_intercept_plus_three_linear_risks_below_40_names",
+            "date_horizons": [
+                {
+                    "date": inputs.dates[day].isoformat(),
+                    "horizon_sessions": HORIZONS[horizon],
+                }
+                for day, horizon in np.argwhere(
+                    np.asarray(
+                        inputs.neutral_target_fallback_flags
+                        if inputs.neutral_target_fallback_flags is not None
+                        else np.zeros((len(inputs.dates), len(HORIZONS)), dtype=np.bool_)
+                    )
+                )
+            ],
         },
         "daily_primary_ic": primary_rows,
         "horizon_readouts": horizon_rows,

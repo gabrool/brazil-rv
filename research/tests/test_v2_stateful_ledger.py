@@ -19,6 +19,9 @@ def _config(**changes: object) -> LedgerConfig:
             buffer_per_side=1,
             cost_bps_per_side=0.0,
             annual_borrow_rate=0.0,
+            borrow_source="uniform",
+            volatility_balanced_entries=False,
+            beta_hedge=False,
             planned_absolute_net_cap=1.10,
             planned_name_weight_cap=1.10,
         ),
@@ -40,6 +43,10 @@ def _run(
     initial_reference_price: np.ndarray | None = None,
     annual_borrow_rate_by_name: np.ndarray | None = None,
     shortable: np.ndarray | None = None,
+    selection_volatility: np.ndarray | None = None,
+    beta_60: np.ndarray | None = None,
+    hedge_close: np.ndarray | None = None,
+    hedge_annual_borrow_rate: np.ndarray | None = None,
 ) -> StatefulLedgerResult:
     days, names = close.shape
     dates = tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(days))
@@ -71,8 +78,24 @@ def _run(
         initial_reference_price=initial_reference_price,
         annual_borrow_rate_by_name=annual_borrow_rate_by_name,
         shortable=shortable,
+        selection_volatility=selection_volatility,
+        beta_60=beta_60,
+        hedge_close=hedge_close,
+        hedge_annual_borrow_rate=hedge_annual_borrow_rate,
         config=_config() if config is None else config,
     )
+
+
+def _constructed_inputs(days: int, names: int) -> dict[str, np.ndarray]:
+    return {
+        "annual_borrow_rate_by_name": np.full((days, names), 0.02),
+        "shortable": np.ones((days, names), dtype=np.bool_),
+        "selection_volatility": np.broadcast_to(
+            np.arange(names, dtype=np.float64), (days, names)
+        ).copy(),
+        "beta_60": np.ones((days, names), dtype=np.float64),
+        "hedge_close": np.full(days, 100.0),
+    }
 
 
 def _action_terms(
@@ -1128,7 +1151,7 @@ def test_small_universe_uses_effective_two_sided_k_without_rescaling_slots() -> 
     result = _run(
         close,
         scores,
-        config=LedgerConfig(
+        config=_config(
             k_per_side=30,
             buffer_per_side=30,
             cost_bps_per_side=0.0,
@@ -1182,7 +1205,7 @@ def test_retention_width_cannot_overlap_rank_bands() -> None:
     result = _run(
         close,
         scores,
-        config=LedgerConfig(
+        config=_config(
             k_per_side=2,
             buffer_per_side=4,
             cost_bps_per_side=0.0,
@@ -1219,7 +1242,7 @@ def test_risk_caps_are_bound_to_prior_positive_nav() -> None:
     result = _run(
         close,
         scores,
-        config=LedgerConfig(
+        config=_config(
             k_per_side=2,
             buffer_per_side=0,
             gross_target=2.0,
@@ -1251,7 +1274,7 @@ def test_sixty_slot_book_refills_while_three_names_per_side_rotate() -> None:
     result = _run(
         close,
         scores,
-        config=LedgerConfig(
+        config=_config(
             k_per_side=30,
             buffer_per_side=0,
             cost_bps_per_side=0.0,
@@ -1279,7 +1302,7 @@ def test_same_close_replacements_avoid_artificial_net_trim() -> None:
     result = _run(
         np.full((days, names), 100.0),
         scores,
-        config=LedgerConfig(
+        config=_config(
             k_per_side=30,
             buffer_per_side=0,
             planned_absolute_net_cap=0.08,
@@ -1304,7 +1327,7 @@ def test_adverse_fifteen_percent_rally_uses_proportional_gross_trims() -> None:
     result = _run(
         close,
         scores,
-        config=LedgerConfig(
+        config=_config(
             k_per_side=30,
             buffer_per_side=30,
             cost_bps_per_side=0.0,
@@ -1342,7 +1365,7 @@ def test_missing_reference_skips_candidate_and_admits_the_next_name() -> None:
     result = _run(
         np.full((4, names), 100.0),
         scores,
-        config=LedgerConfig(
+        config=_config(
             k_per_side=30,
             buffer_per_side=30,
             cost_bps_per_side=0.0,
@@ -1371,7 +1394,7 @@ def test_full_long_side_does_not_block_empty_short_side() -> None:
     result = _run(
         np.full((4, names), 100.0),
         scores,
-        config=LedgerConfig(
+        config=_config(
             k_per_side=30,
             buffer_per_side=30,
             planned_absolute_net_cap=1.10,
@@ -1399,7 +1422,7 @@ def test_pass4g_shortfall_decomposition_and_defect_counters() -> None:
     result = _run(
         close,
         scores,
-        config=LedgerConfig(
+        config=_config(
             k_per_side=30,
             buffer_per_side=30,
             cost_bps_per_side=0.0,
@@ -1441,7 +1464,7 @@ def test_pass4g_pending_nonprinters_are_explained_without_behavior_change() -> N
     result = _run(
         close,
         scores,
-        config=LedgerConfig(
+        config=_config(
             k_per_side=30,
             buffer_per_side=30,
             cost_bps_per_side=0.0,
@@ -1495,3 +1518,143 @@ def test_pass4g_sizing_decomposition_matches_hand_computed_mark_and_nav_drift() 
         expected_nav_drift,
         atol=1e-12,
     )
+
+
+def test_rev4_defaults_bind_lending_volatility_balance_and_beta_hedge() -> None:
+    config = LedgerConfig()
+    assert config.borrow_source == "lending_sidecar_v1"
+    assert config.volatility_balanced_entries
+    assert config.beta_hedge
+    assert config.hedge_rebalance_threshold_nav == 0.05
+    assert config.hedge_cost_bps_per_side == 4.0
+
+
+def test_rev4_entry_scheduler_fills_equal_volatility_quotas() -> None:
+    days, names = 4, 100
+    score_order = np.asarray(
+        [group * 20 + within for within in range(20) for group in range(5)]
+    )
+    score = np.empty(names, dtype=np.float64)
+    score[score_order] = np.arange(names, dtype=np.float64)
+    scores = np.broadcast_to(score, (days, names)).copy()
+    volatility = np.broadcast_to(
+        np.repeat(np.arange(5, dtype=np.float64), 20), (days, names)
+    ).copy()
+    inputs = _constructed_inputs(days, names)
+    inputs["selection_volatility"] = volatility
+    result = _run(
+        np.full((days, names), 100.0),
+        scores,
+        config=replace(
+            LedgerConfig(),
+            beta_hedge=False,
+            cost_bps_per_side=0.0,
+            hedge_cost_bps_per_side=0.0,
+        ),
+        initial_reference_price=np.full(names, 100.0),
+        **inputs,
+    )
+
+    np.testing.assert_array_equal(result.volatility_quota[0], [6, 6, 6, 6, 6])
+    np.testing.assert_array_equal(
+        result.volatility_occupancy_long[0], [6, 6, 6, 6, 6]
+    )
+    np.testing.assert_array_equal(
+        result.volatility_occupancy_short[0], [6, 6, 6, 6, 6]
+    )
+
+
+def test_rev4_unavailable_short_quota_spills_to_best_remaining_names() -> None:
+    days, names = 4, 100
+    score_order = np.asarray(
+        [group * 20 + within for within in range(20) for group in range(5)]
+    )
+    score = np.empty(names, dtype=np.float64)
+    score[score_order] = np.arange(names, dtype=np.float64)
+    scores = np.broadcast_to(score, (days, names)).copy()
+    volatility = np.broadcast_to(
+        np.repeat(np.arange(5, dtype=np.float64), 20), (days, names)
+    ).copy()
+    inputs = _constructed_inputs(days, names)
+    inputs["selection_volatility"] = volatility
+    shortable = inputs["shortable"]
+    shortable[:, :20] = False
+    result = _run(
+        np.full((days, names), 100.0),
+        scores,
+        config=replace(LedgerConfig(), beta_hedge=False, cost_bps_per_side=0.0),
+        initial_reference_price=np.full(names, 100.0),
+        **inputs,
+    )
+
+    assert result.volatility_occupancy_short[0, 0] == 0
+    assert result.volatility_occupancy_short[0].sum() == 30
+    assert result.volatility_occupancy_short[0].max() > 6
+
+
+def test_rev4_beta_hedge_is_separate_rebalances_and_carries_missing_print() -> None:
+    days, names = 4, 4
+    scores = np.broadcast_to(
+        np.asarray([-2.0, -1.0, 1.0, 2.0]), (days, names)
+    ).copy()
+    beta = np.broadcast_to(
+        np.asarray([0.5, 0.5, 1.5, 1.5]), (days, names)
+    ).copy()
+    rates = np.full((days, names), 0.02)
+    shortable = np.ones((days, names), dtype=np.bool_)
+    result = _run(
+        np.full((days, names), 100.0),
+        scores,
+        config=replace(
+            LedgerConfig(),
+            k_per_side=1,
+            buffer_per_side=1,
+            volatility_balanced_entries=False,
+            planned_absolute_net_cap=1.1,
+            planned_name_weight_cap=1.1,
+            cost_bps_per_side=0.0,
+        ),
+        initial_reference_price=np.full(names, 100.0),
+        annual_borrow_rate_by_name=rates,
+        shortable=shortable,
+        beta_60=beta,
+        hedge_close=np.asarray([100.0, np.nan, 110.0, 110.0]),
+    )
+
+    assert result.hedge_signed_notional[0] < 0.0
+    assert result.hedge_turnover_fraction_nav[0] > 0.0
+    assert result.hedge_signed_shares[1] == result.hedge_signed_shares[0]
+    assert result.hedge_mark_price[1] == result.hedge_mark_price[0]
+    assert abs(result.ex_ante_beta_after_hedge[0]) < 1e-12
+    assert result.hedge_borrow_bps[1] > 0.0
+    assert result.hedge_signed_notional[-1] == 0.0
+    assert np.all(result.gross_fraction_nav_including_hedge >= result.gross_fraction_nav)
+
+
+def test_rev4_uniform_comparator_is_exact_legacy_ledger() -> None:
+    days, names = 5, 6
+    close = np.full((days, names), 100.0)
+    scores = np.broadcast_to(np.arange(names, dtype=np.float64), close.shape).copy()
+    legacy = _run(close, scores, initial_reference_price=np.full(names, 100.0))
+    comparator = _run(
+        close,
+        scores,
+        config=replace(
+            LedgerConfig(),
+            k_per_side=1,
+            buffer_per_side=1,
+            cost_bps_per_side=0.0,
+            annual_borrow_rate=0.0,
+            borrow_source="uniform",
+            volatility_balanced_entries=False,
+            beta_hedge=False,
+            planned_absolute_net_cap=1.10,
+            planned_name_weight_cap=1.10,
+        ),
+        initial_reference_price=np.full(names, 100.0),
+    )
+
+    np.testing.assert_array_equal(comparator.nav, legacy.nav)
+    np.testing.assert_array_equal(comparator.daily_net_return, legacy.daily_net_return)
+    assert comparator.intended_orders == legacy.intended_orders
+    assert comparator.fills == legacy.fills

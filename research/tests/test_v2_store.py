@@ -389,7 +389,7 @@ def _feature_age(valid: np.ndarray) -> np.ndarray:
     return np.where(valid, 0.0, -1.0).astype(np.float32)
 
 
-def test_characteristic_neutral_target_removes_exact_linear_risk() -> None:
+def test_characteristic_neutral_target_uses_linear_fallback_below_40_names() -> None:
     names = 32
     z0 = np.linspace(-2.0, 2.0, names)
     z1 = np.tile(np.asarray([-1.0, 1.0]), names // 2)
@@ -400,19 +400,22 @@ def test_characteristic_neutral_target_removes_exact_linear_risk() -> None:
         [linear * np.sqrt(horizon) for horizon in (1, 2, 3, 5, 10)], axis=-1
     )[None]
     valid = np.ones_like(returns, dtype=np.bool_)
+    fallback = np.zeros((1, 5), dtype=np.bool_)
     output, output_valid = characteristic_neutral_targets(
         returns,
         valid,
         np.ones((1, names)),
         characteristics,
         np.ones((1, names), dtype=np.bool_),
+        fallback_flags=fallback,
     )
     assert output_valid.all()
+    assert fallback.all()
     np.testing.assert_array_equal(output, np.full_like(output, 0.5))
 
 
 def test_characteristic_neutral_target_retains_orthogonal_signal() -> None:
-    names = 40
+    names = 32
     pair_risk = np.linspace(-1.0, 1.0, names // 2)
     z0 = np.repeat(pair_risk, 2)
     z1 = np.zeros(names)
@@ -435,6 +438,71 @@ def test_characteristic_neutral_target_retains_orthogonal_signal() -> None:
     expected = store_module.midrank_unit_interval(orthogonal)
     np.testing.assert_allclose(output[0, :, 0], expected, atol=1e-6)
     assert abs(np.corrcoef(output[0, :, 0], 1.0 / sigma)[0, 1]) < 1e-7
+
+
+def test_characteristic_neutral_target_removes_nonlinear_volatility_groups() -> None:
+    names = 100
+    volatility = np.linspace(-3.0, 3.0, names)
+    beta = np.tile(np.linspace(-1.0, 1.0, 10), 10)
+    log_adv = np.linspace(2.0, -2.0, names)
+    vol_group = np.arange(names) * 10 // names
+    nonlinear = np.asarray([1.0, -0.8, 0.4, 1.2, -1.0] * 2)[vol_group]
+    scaled = nonlinear + 0.2 * log_adv
+    returns = np.stack(
+        [scaled * np.sqrt(horizon) for horizon in (1, 2, 3, 5, 10)], axis=-1
+    )[None]
+    fallback = np.zeros((1, 5), dtype=np.bool_)
+    output, valid = characteristic_neutral_targets(
+        returns,
+        np.ones_like(returns, dtype=np.bool_),
+        np.ones((1, names)),
+        np.column_stack((volatility, beta, log_adv))[None],
+        np.ones((1, names), dtype=np.bool_),
+        fallback_flags=fallback,
+    )
+
+    assert valid.all()
+    assert not fallback.any()
+    # The exact registered nonlinear exposure has been projected out.  A
+    # constant residual has no scoreable rank association with its group.
+    np.testing.assert_allclose(output, 0.5, atol=1e-6)
+
+
+def test_volatility_decile_only_score_is_null_against_rev4_target() -> None:
+    names = 200
+    volatility = np.linspace(-3.0, 3.0, names)
+    vol_group = np.arange(names) * 10 // names
+    beta = np.tile(np.repeat(np.arange(5, dtype=float), 4), 10)
+    log_adv = np.zeros(names)
+    within_group_signal = np.tile(np.tile([-0.4, -0.1, 0.1, 0.4], 5), 10)
+    scaled = within_group_signal
+    returns = np.stack(
+        [scaled * np.sqrt(horizon) for horizon in (1, 2, 3, 5, 10)], axis=-1
+    )[None]
+    target, valid = characteristic_neutral_targets(
+        returns,
+        np.ones_like(returns, dtype=np.bool_),
+        np.ones((1, names)),
+        np.column_stack((volatility, beta, log_adv))[None],
+        np.ones((1, names), dtype=np.bool_),
+    )
+
+    assert valid.all()
+    decile_only_score = store_module.midrank_unit_interval(vol_group.astype(float))
+    for horizon in range(5):
+        assert abs(np.corrcoef(decile_only_score, target[0, :, horizon])[0, 1]) < 0.01
+
+
+def test_characteristic_neutral_target_rejects_bad_fallback_audit_shape() -> None:
+    with pytest.raises(ValueError, match="fallback flags"):
+        characteristic_neutral_targets(
+            np.ones((1, 40, 5)),
+            np.ones((1, 40, 5), dtype=np.bool_),
+            np.ones((1, 40)),
+            np.ones((1, 40, 3)),
+            np.ones((1, 40), dtype=np.bool_),
+            fallback_flags=np.zeros((1, 4), dtype=np.bool_),
+        )
 
 
 def test_collate_uses_registered_fixed_fast_name_width() -> None:

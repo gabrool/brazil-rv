@@ -18,6 +18,37 @@ from brazil_rv.v2 import validate_pipeline as pipeline
 from v2_store_fixtures import write_fixture_store as write_store
 
 
+def _bova11_fixture(tmp_path: Path, store_root: Path) -> tuple[Path, str]:
+    dates = np.load(store_root / "date_index.npy", allow_pickle=False).astype(
+        "datetime64[D]"
+    )
+    root = tmp_path / "bova11"
+    root.mkdir()
+    data = root / "bova11_close.parquet"
+    pl.DataFrame(
+        {
+            "trade_date": dates.astype(object).tolist(),
+            "close_brl": 100.0 + np.arange(len(dates), dtype=np.float64) * 0.01,
+        },
+        schema={"trade_date": pl.Date, "close_brl": pl.Float64},
+    ).write_parquet(data)
+    manifest = {
+        "schema": "BRAZIL_RV_V2_BOVA11_HEDGE_SERIES_V1",
+        "status": "complete",
+        "security": {
+            "ticker": "BOVA11",
+            "isin": "BRBOVACTF003",
+            "security_spec": "CI",
+            "market_type": 10,
+            "bdi_code": "14",
+        },
+        "data_file": data.name,
+        "data_bytes": data.stat().st_size,
+        "data_sha256": sha256_file(data),
+    }
+    return root, write_json_atomic(root / "manifest.json", manifest)
+
+
 def _development_store(tmp_path: Path) -> tuple[Path, Path, str, Path, str]:
     date_axis = np.arange(
         np.datetime64("2010-01-04"),
@@ -460,6 +491,7 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         compile_forward=False,
         device="cpu",
     )
+    bova11_root, bova11_sha = _bova11_fixture(tmp_path, store_root)
     result = pipeline.run_pipeline_validation(
         store_root=store_root,
         cdi_path=cdi_path,
@@ -468,6 +500,8 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         experiment52_cdi_sha256=experiment52_cdi_sha,
         output_root=tmp_path / "validation",
         runtime=runtime,
+        bova11_root=bova11_root,
+        bova11_manifest_sha256=bova11_sha,
     )
 
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
@@ -544,6 +578,8 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
             experiment52_cdi_sha256=experiment52_cdi_sha,
             output_root=result.root,
             runtime=runtime,
+            bova11_root=bova11_root,
+            bova11_manifest_sha256=bova11_sha,
         )
 
 
@@ -655,6 +691,7 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
         lambda **kwargs: pytest.fail("GBDT leg must not repeat"),
     )
 
+    bova11_root, bova11_sha = _bova11_fixture(tmp_path, store_root)
     result = pipeline.resume_network_validation(
         store_root=store_root,
         store_manifest_sha256=sha256_file(store_root / "manifest.json"),
@@ -667,6 +704,8 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
         completed_classical_failure_sha256=failure_sha,
         output_root=tmp_path / "network-continuation",
         runtime=pipeline.ValidationRuntime(device="cuda"),
+        bova11_root=bova11_root,
+        bova11_manifest_sha256=bova11_sha,
     )
 
     assert len(calls) == 1
@@ -841,6 +880,8 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
             np.zeros(score_shape, dtype=np.float32),
             np.ones(score_shape, dtype=np.bool_),
             np.full(len(dates), 0.0004, dtype=np.float64),
+            np.full(len(dates), 100.0, dtype=np.float64),
+            {"manifest_sha256": "a" * 64, "data_sha256": "b" * 64},
             {},
             transfer_chronology_clean=True,
         )
@@ -1030,6 +1071,8 @@ def test_evaluation_payment_remap_requires_a_contiguous_window() -> None:
             np.zeros((2, 1, len(HORIZONS)), dtype=np.float32),
             np.ones((2, 1, len(HORIZONS)), dtype=np.bool_),
             np.zeros(4, dtype=np.float64),
+            np.full(4, 100.0, dtype=np.float64),
+            {"manifest_sha256": "a" * 64, "data_sha256": "b" * 64},
             {},
             transfer_chronology_clean=True,
         )
@@ -1103,6 +1146,9 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
         "terminal_nav": 1_000_000.0,
         "terminal_unresolved_inventory_fraction_nav": 0.01,
         "gross_shortfall_decomposition": {"total": 0.0},
+        "mean_volatility_quota_by_quintile": [6.0] * 5,
+        "mean_volatility_occupancy_long_by_quintile": [6.0] * 5,
+        "mean_volatility_occupancy_short_by_quintile": [6.0] * 5,
         "entry_defect_signatures": {
             "D1_entry_pending_printed_unblocked_unfilled": 0,
             "D2_entry_fill_quantity_short": 0,
@@ -1117,10 +1163,11 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
             "fold": fold,
             "name": name,
             "signal_definition_sign": pipeline._BASELINE_SIGNAL_SIGNS[name],
-            "evaluation": {
-                "daily_primary_neutral_target_ic": [0.01, None, -0.005],
-                "headline_economics": economics,
-            },
+                "evaluation": {
+                    "daily_primary_neutral_target_ic": [0.01, None, -0.005],
+                    "headline_economics": economics,
+                    "realized_beta_after_hedge": {"slope_beta": 0.0},
+                },
         }
         for fold in ("F1", "F2", "F3")
         for name in pipeline._BASELINE_SIGNAL_SIGNS

@@ -658,12 +658,19 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
 
     cdi = np.zeros(_DAY_COUNT, dtype=np.float64)
     source_hashes = {"fixture_store": sha256_file(store / "manifest.json")}
+    bova11_close = 100.0 + 0.01 * np.arange(_DAY_COUNT, dtype=np.float64)
+    bova11_binding = {
+        "manifest_sha256": "a" * 64,
+        "data_sha256": "b" * 64,
+    }
     inputs = _evaluation_inputs(
         scoring_loader.dataset.store,
         evaluation_indices,
         scores,
         score_mask,
         cdi,
+        bova11_close,
+        bova11_binding,
         source_hashes,
         transfer_chronology_clean=True,
     )
@@ -757,6 +764,8 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
         store=relocated_loader.dataset.store,
         indices=evaluation_indices,
         cdi=cdi,
+        bova11_close_by_index=bova11_close,
+        bova11_binding=bova11_binding,
     )
     np.testing.assert_array_equal(
         rebuilt.result.daily_primary_ic, result.daily_primary_ic
@@ -779,6 +788,8 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
             store=relocated_loader.dataset.store,
             indices=evaluation_indices,
             cdi=cdi,
+            bova11_close_by_index=bova11_close,
+            bova11_binding=bova11_binding,
         )
 
     stale_plan = tmp_path / "stale_plan.json"

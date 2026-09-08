@@ -38,16 +38,16 @@ from brazil_rv.v2.research_rounds import (
 from brazil_rv.v2.splits import development_folds
 
 
-def test_rev3_registration_replaces_the_voided_research_entrypoints(
+def test_rev4_registration_replaces_the_voided_research_entrypoints(
     tmp_path: Path,
 ) -> None:
-    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev3.md"
+    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4.md"
     assert research_rounds.PREREGISTRATION.is_file()
     with pytest.raises(FileNotFoundError):
         research_rounds.run_round1(output_root=tmp_path / "absent", num_threads=1)
 
 
-def test_rev3_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> None:
+def test_rev4_machine_protocol_matches_folds_evaluator_ledger_and_sources() -> None:
     protocol = research_rounds.load_registration_protocol()
     assert protocol == research_rounds.registration_protocol_from_code()
 
@@ -118,7 +118,7 @@ def test_acceptance_binds_store_hash_and_store_build_separately_from_freeze(
         "schedule_source": "reconstructed_v1",
     }
     report = {
-        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V9",
+        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V10",
         "status": "completed",
         "engineering_acceptance_status": "development_grade_inferred_actions",
         "research_claim": False,
@@ -226,6 +226,12 @@ def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
         "source_feature_valid": {"lending": np.ones_like(active)},
         "annual_borrow_rate_by_name": np.full_like(raw_close, 0.02),
         "shortable": np.ones_like(active),
+        "bova11_close": np.full(day_count, 100.0),
+        "bova11_manifest_sha256": "c" * 64,
+        "bova11_data_sha256": "d" * 64,
+        "neutral_target_fallback_flags": np.zeros(
+            (day_count, len(HORIZONS)), dtype=np.bool_
+        ),
     }
     for key in (
         "scaled_midrank_targets",
@@ -375,6 +381,90 @@ def test_undefined_economics_cannot_establish_not_worse() -> None:
     assert _economics_not_worse(undefined, positive) is False
     assert _economics_not_worse(positive, undefined) is False
     assert _small_interval_spanning_zero(undefined) is False
+
+
+def test_rev4_weighted_designation_applies_supported_economics_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def interval(estimate: float, lower: float, upper: float) -> dict[str, float]:
+        return {"estimate": estimate, "lower_95": lower, "upper_95": upper}
+
+    reports = {
+        "ic_leader": {
+            "summary": {
+                "pooled": {
+                    "primary_neutral_target_ic": interval(0.030, 0.020, 0.040),
+                    "headline_net_excess_bps": interval(1.0, -1.0, 3.0),
+                }
+            },
+            "paired": {},
+        },
+        "economic_leader": {
+            "summary": {
+                "pooled": {
+                    "primary_neutral_target_ic": interval(0.028, 0.018, 0.038),
+                    "headline_net_excess_bps": interval(5.0, 2.0, 8.0),
+                }
+            },
+            "paired": {
+                "ic_leader": {
+                    "pooled": {
+                        "primary_neutral_target_ic": interval(-0.002, -0.006, 0.002),
+                        "headline_net_excess_bps": interval(4.0, 1.0, 7.0),
+                    }
+                }
+            },
+        },
+    }
+    monkeypatch.setattr(
+        research_rounds,
+        "_pooled_readouts",
+        lambda rows: rows["summary"],
+    )
+    monkeypatch.setattr(
+        research_rounds,
+        "_paired_readouts",
+        lambda candidate, baseline: candidate["paired"][baseline["name"]],
+    )
+    reports["ic_leader"]["name"] = "ic_leader"
+    reports["economic_leader"]["name"] = "economic_leader"
+
+    chosen, audit = research_rounds._weighted_candidate_designation(
+        reports,
+        exact_tie_priority=("ic_leader", "economic_leader"),
+    )
+
+    assert chosen == "economic_leader"
+    assert audit["ic_best_candidate"] == "ic_leader"
+    assert audit["economics_override_applied"] is True
+
+
+def test_rev4_weighted_designation_returns_none_when_all_are_ineligible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    summary = {
+        "pooled": {
+            "primary_neutral_target_ic": {
+                "estimate": 0.02,
+                "lower_95": 0.01,
+                "upper_95": 0.03,
+            },
+            "headline_net_excess_bps": {
+                "estimate": -4.0,
+                "lower_95": -6.0,
+                "upper_95": -2.0,
+            },
+        }
+    }
+    monkeypatch.setattr(research_rounds, "_pooled_readouts", lambda _: summary)
+
+    chosen, audit = research_rounds._weighted_candidate_designation(
+        {"candidate": {}}, exact_tie_priority=("candidate",)
+    )
+
+    assert chosen is None
+    assert audit["eligible_candidates"] == []
+    assert audit["chosen_candidate"] is None
 
 
 def test_paired_readouts_use_the_exact_common_four_head_population() -> None:
@@ -576,6 +666,11 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
             values = self.read(name, selector)
             return np.where(valid_mask, values, 0.0)
 
+        def neutral_target_fallback_flags(
+            self, selector: np.ndarray
+        ) -> np.ndarray:
+            return np.zeros((len(selector), len(HORIZONS)), dtype=np.bool_)
+
     scores_path = tmp_path / "scores.npy"
     mask_path = tmp_path / "score_mask.npy"
     np.save(scores_path, inputs.scores, allow_pickle=False)
@@ -608,12 +703,21 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
     path = tmp_path / "evaluation.json"
     path.write_text(json.dumps(candidate.result.report), encoding="utf-8")
     cdi = np.zeros(day_count + 1, dtype=np.float64)
+    bova11 = np.concatenate(
+        (np.asarray([np.nan]), np.asarray(inputs.bova11_close, dtype=np.float64))
+    )
+    bova11_binding = {
+        "manifest_sha256": str(inputs.bova11_manifest_sha256),
+        "data_sha256": str(inputs.bova11_data_sha256),
+    }
 
     reconstructed = _evaluation_from_artifacts(
         path,
         store=FixtureStore(),
         indices=indices,
         cdi=cdi,
+        bova11_close_by_index=bova11,
+        bova11_binding=bova11_binding,
     )
 
     assert _input_hashes(reconstructed.inputs) == _input_hashes(inputs)
@@ -637,12 +741,16 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
             store=FixtureStore(),
             indices=indices,
             cdi=cdi,
+            bova11_close_by_index=bova11,
+            bova11_binding=bova11_binding,
         )
     recovered = _evaluation_from_artifacts(
         path,
         store=FixtureStore(),
         indices=indices,
         cdi=cdi,
+        bova11_close_by_index=bova11,
+        bova11_binding=bova11_binding,
         allow_legacy_missing_indices=True,
         expected_fold="F1",
     )
@@ -653,6 +761,8 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
             store=FixtureStore(),
             indices=indices,
             cdi=cdi,
+            bova11_close_by_index=bova11,
+            bova11_binding=bova11_binding,
             allow_legacy_missing_indices=True,
             expected_fold="F2",
         )
@@ -724,6 +834,11 @@ def test_evaluation_rejects_contaminated_report_before_score_array_access(
             store=object(),
             indices=np.asarray([1], dtype=np.int64),
             cdi=np.zeros(2, dtype=np.float64),
+            bova11_close_by_index=np.full(2, 100.0, dtype=np.float64),
+            bova11_binding={
+                "manifest_sha256": "c" * 64,
+                "data_sha256": "d" * 64,
+            },
         )
 
 

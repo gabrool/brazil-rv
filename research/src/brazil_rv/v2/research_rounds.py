@@ -16,6 +16,7 @@ from numpy.typing import NDArray
 
 from .artifacts import inventory, sha256_file, verify_inventory, write_json_atomic
 from .baselines import BaselinePanel, build_store_baselines
+from .bova11 import load_bova11_series
 from .config import PROJECT_ROOT
 from .contract import (
     GBDT_SEEDS,
@@ -71,12 +72,19 @@ ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4"
 ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4"
 RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4"
 PREREGISTRATION = (
-    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev3.md"
+    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4.md"
 )
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
 BOOTSTRAP_SEED = 20260815
 NETWORK_SEEDS = (11, 29, 47)
+_BASELINE_SIGNAL_NAMES = (
+    "reversal_5",
+    "reversal_21",
+    "momentum_12_1",
+    "reversal_5_momentum_12_1_blend",
+    "inverse_volatility_20",
+)
 RUNG_GROUPS: dict[str, tuple[str, ...]] = {
     "a_slow": (),
     "b_intraday": (),
@@ -170,7 +178,7 @@ def registration_protocol_from_code() -> dict[str, object]:
     """Build protocol facts that registration prose may not override."""
 
     return {
-        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V1",
+        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V2",
         "purge_sessions": {
             "fit_to_selection": FIT_TO_SELECTION_PURGE_SESSIONS,
             "selection_to_evaluation": SELECTION_TO_EVALUATION_PURGE_SESSIONS,
@@ -186,20 +194,55 @@ def registration_protocol_from_code() -> dict[str, object]:
         "target_neutralization": {
             "target_value_array": REGISTERED_PRIMARY_TARGET,
             "target_validity_array": REGISTERED_PRIMARY_TARGET_MASK,
-            "characteristics": [
-                "yang_zhang_vol_20",
-                "beta_60",
-                "log_volume_mean_20",
-            ],
-            "method": "rank_gauss_ols_with_intercept",
+            "method": "ols_10_vol_dummies_5_beta_dummies_linear_rank_gauss_log_adv",
+            "intercept": "absorbed_by_full_dummy_blocks",
             "clip": 5.0,
             "minimum_names": 20,
+            "nonlinear_minimum_names": 40,
+            "fallback_below_40_names": "rev3_intercept_plus_three_linear_risks",
         },
         "headline_cell": headline_ledger_protocol(),
+        "headline_cell_name": "cost_4_borrow_lending_v1",
+        "comparators": [
+            "comparator_lending_unconstructed",
+            "comparator_uniform_borrow",
+        ],
+        "candidate_decision_rule": {
+            "primary": "pooled_primary_neutral_target_ic",
+            "ineligible": (
+                "constructed_headline_net_excess_negative_with_95_interval_below_zero"
+            ),
+            "economics_override": (
+                "paired_constructed_economics_interval_above_zero_and_paired_ic_"
+                "interval_includes_zero"
+            ),
+        },
         "borrow_cells": ["uniform", "lending_sidecar_v1"],
         "realized_beta_label_threshold": 0.30,
-        "rung_d_evaluation_folds": ["F1", "F2"],
         "inverse_volatility_neutral_ic_absolute_bound": 0.02,
+        "round1": {
+            "controls": list(_BASELINE_SIGNAL_NAMES),
+            "gbdt_rungs": ["b_intraday"],
+            "data_span_preview": False,
+            "cpu_only": True,
+        },
+        "round2": {
+            "requires_explicit_go_after_round1": True,
+            "arms": ["A_fine_only", "B_pretrain_finetune"],
+            "dropped_arm": "C_joint_decay_756",
+            "parent_comparison_network_arm": "B_pretrain_finetune",
+        },
+        "bova11": {
+            "isin": "BRBOVACTF003",
+            "ticker": "BOVA11",
+            "security_spec": "CI",
+            "market_type": 10,
+            "bdi_code": "14",
+            "supplied_bdi_02_corrected_from_raw_cotahist": True,
+            "rebalance_threshold_fraction_nav": 0.05,
+            "cost_bps_per_side": 4.0,
+            "short_borrow_floor": 0.02,
+        },
         "source_tier_labels": dict(DEVELOPMENT_SOURCE_TIER_LABELS),
     }
 
@@ -271,13 +314,13 @@ def _verify_development_acceptance(
         raise ValueError("development acceptance report SHA-256 mismatch")
     report = _read_json(source)
     if (
-        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V9"
+        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V10"
         or report.get("status") != "completed"
         or report.get("engineering_acceptance_status")
         != "development_grade_inferred_actions"
         or report.get("research_claim") is not False
     ):
-        raise ValueError("development acceptance report is not an accepted rev-3 gate")
+        raise ValueError("development acceptance report is not an accepted rev-4 gate")
     _assert_false_access(report, path=source)
     implementation = report.get("code")
     if (
@@ -291,7 +334,7 @@ def _verify_development_acceptance(
         expected_implementation is not None
         and implementation != expected_implementation
     ):
-        raise ValueError("development acceptance implementation differs from rev-3")
+        raise ValueError("development acceptance implementation differs from rev-4")
     if (
         report.get("store_build_implementation_commit")
         != store_build_implementation_commit
@@ -482,6 +525,8 @@ def _evaluate(
     scores: NDArray[np.floating],
     score_mask: NDArray[np.bool_],
     cdi: NDArray[np.float64],
+    bova11_close_by_index: NDArray[np.float64],
+    bova11_binding: Mapping[str, str],
     source_hashes: Mapping[str, str],
     fold: str,
     output: Path,
@@ -492,6 +537,8 @@ def _evaluate(
         scores,
         score_mask,
         cdi,
+        bova11_close_by_index,
+        bova11_binding,
         source_hashes,
         transfer_chronology_clean=True,
     )
@@ -630,9 +677,7 @@ def _daily_series(
         row
         for row in economics["daily_table"]
         if isinstance(row, Mapping)
-        and float(row.get("cost_bps_per_side", -1.0)) == 4.0
-        and float(row.get("annual_borrow_rate", -1.0)) == 0.02
-        and row.get("borrow_source") == "uniform"
+        and row.get("scenario") == "cost_4_borrow_lending_v1"
     ]
     headline_by_date: dict[str, float] = {}
     for row in headline:
@@ -805,6 +850,103 @@ def _small_interval_spanning_zero(readout: Mapping[str, object]) -> bool:
         and estimate <= 0.002
         and float(lower) <= 0.0 <= float(upper)
     )
+
+
+def _interval_includes_zero(readout: Mapping[str, object]) -> bool:
+    lower = readout.get("lower_95")
+    upper = readout.get("upper_95")
+    return (
+        lower is not None
+        and upper is not None
+        and float(lower) <= 0.0 <= float(upper)
+    )
+
+
+def _interval_is_positive(readout: Mapping[str, object]) -> bool:
+    lower = readout.get("lower_95")
+    return lower is not None and float(lower) > 0.0
+
+
+def _significantly_negative(readout: Mapping[str, object]) -> bool:
+    upper = readout.get("upper_95")
+    return upper is not None and float(upper) < 0.0
+
+
+def _weighted_candidate_designation(
+    reports: Mapping[str, Mapping[str, _ResearchEvaluation]],
+    *,
+    exact_tie_priority: Sequence[str],
+) -> tuple[str | None, dict[str, object]]:
+    """Apply the registered IC-first rule with a supported economics override."""
+
+    readouts = {name: _pooled_readouts(rows) for name, rows in reports.items()}
+    eligible = [
+        name
+        for name in reports
+        if not _significantly_negative(
+            readouts[name]["pooled"]["headline_net_excess_bps"]
+        )
+    ]
+    if not eligible:
+        return None, {
+            "eligible_candidates": [],
+            "ic_best_candidate": None,
+            "economics_override_candidates": [],
+            "economics_override_applied": False,
+            "chosen_candidate": None,
+            "rule": (
+                "no candidate is designated when every constructed-book economics "
+                "interval is entirely below zero"
+            ),
+        }
+    priority = {
+        name: len(exact_tie_priority) - index
+        for index, name in enumerate(exact_tie_priority)
+    }
+    ic_best = max(
+        eligible,
+        key=lambda name: (
+            _ranking_point(readouts[name]["pooled"]["primary_neutral_target_ic"]),
+            priority.get(name, 0),
+        ),
+    )
+    overrides: list[tuple[str, dict[str, object]]] = []
+    for name in eligible:
+        if name == ic_best:
+            continue
+        paired = _paired_readouts(reports[name], reports[ic_best])
+        if _interval_is_positive(
+            paired["pooled"]["headline_net_excess_bps"]
+        ) and _interval_includes_zero(
+            paired["pooled"]["primary_neutral_target_ic"]
+        ):
+            overrides.append((name, paired))
+    chosen = (
+        ic_best
+        if not overrides
+        else max(
+            overrides,
+            key=lambda item: (
+                _ranking_point(item[1]["pooled"]["headline_net_excess_bps"]),
+                _ranking_point(
+                    readouts[item[0]]["pooled"]["primary_neutral_target_ic"]
+                ),
+                priority.get(item[0], 0),
+            ),
+        )[0]
+    )
+    return chosen, {
+        "eligible_candidates": eligible,
+        "ic_best_candidate": ic_best,
+        "economics_override_candidates": [name for name, _ in overrides],
+        "economics_override_applied": chosen != ic_best,
+        "chosen_candidate": chosen,
+        "rule": (
+            "designate the eligible pooled-neutral-IC leader unless another candidate "
+            "has a positive paired constructed-book economics interval and its paired "
+            "IC interval versus the leader includes zero"
+        ),
+    }
 
 
 def _pooled_readouts(
@@ -1260,6 +1402,8 @@ def _run_gbdt_candidate(
     pretrain: NDArray[np.int64] | None,
     decay_half_life: float | None,
     cdi: NDArray[np.float64],
+    bova11_close_by_index: NDArray[np.float64],
+    bova11_binding: Mapping[str, str],
     source_hashes: Mapping[str, str],
     root: Path,
     num_threads: int,
@@ -1373,6 +1517,8 @@ def _run_gbdt_candidate(
             scores=predictions,
             score_mask=score_mask,
             cdi=cdi,
+            bova11_close_by_index=bova11_close_by_index,
+            bova11_binding=bova11_binding,
             source_hashes=source_hashes,
             fold=fold,
             output=fold_root / "evaluation.json",
@@ -1395,6 +1541,8 @@ def freeze_round1(
     cdi_sha256: str,
     experiment52_cdi_path: Path,
     experiment52_cdi_sha256: str,
+    bova11_root: Path,
+    bova11_manifest_sha256: str,
     acceptance_path: Path,
     acceptance_sha256: str,
     output_root: Path,
@@ -1425,6 +1573,13 @@ def freeze_round1(
         expected_sha256=cdi_sha256,
         experiment52_cdi_path=experiment52_cdi_path,
         experiment52_expected_sha256=experiment52_cdi_sha256,
+    )
+
+
+    bova11 = load_bova11_series(
+        bova11_root,
+        expected_manifest_sha256=bova11_manifest_sha256,
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
     )
     if num_threads < 0:
         raise ValueError("num_threads must be non-negative")
@@ -1463,17 +1618,16 @@ def freeze_round1(
                 "sha256": experiment52_cdi_sha256,
             },
         },
+        "bova11": {
+            "root": str(Path(bova11_root).resolve(strict=True)),
+            "manifest_sha256": bova11.manifest_sha256,
+            "data_sha256": bova11.data_sha256,
+        },
         "folds": folds,
-        "baseline_roster": [
-            "reversal_5",
-            "reversal_21",
-            "momentum_12_1",
-            "reversal_5_momentum_12_1_blend",
-            "inverse_volatility_20",
-        ],
-        "gbdt_rungs": {name: list(groups) for name, groups in RUNG_GROUPS.items()},
+        "baseline_roster": list(_BASELINE_SIGNAL_NAMES),
+        "gbdt_rungs": {"b_intraday": []},
         "gbdt_seeds": list(GBDT_SEEDS),
-        "data_span_arms": ["fine_only", "pretrain_uniform", "pretrain_decay_756"],
+        "data_span_arms": [],
         "gbdt_num_threads": num_threads,
         "bootstrap": {
             "replications": BOOTSTRAP_REPLICATIONS,
@@ -1488,8 +1642,10 @@ def freeze_round1(
             "settlement_grace_sessions": 10,
             "settlement_haircut": 0.30,
             "settlement_economics_unresolved_fraction_nav": 0.15,
-            "headline_uses_executable_borrow": False,
+            "headline_uses_executable_borrow": True,
             "lending_sidecar_readout_present": True,
+            "volatility_balanced_entries": True,
+            "beta_hedge": True,
         },
     }
     return write_json_atomic(output / "frozen_design.json", design)
@@ -1551,6 +1707,18 @@ def run_round1(
             cdi_design["experiment52_reference"]["sha256"]
         ),
     )
+    bova_design = design["bova11"]
+    bova11 = load_bova11_series(
+        Path(str(bova_design["root"])),
+        expected_manifest_sha256=str(bova_design["manifest_sha256"]),
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+    )
+    if bova11.data_sha256 != bova_design["data_sha256"]:
+        raise ValueError("Round-1 BOVA11 data hash differs from the frozen design")
+    bova11_binding = {
+        "manifest_sha256": bova11.manifest_sha256,
+        "data_sha256": bova11.data_sha256,
+    }
     store, access = _open_round_store(
         store_root, fit, selection, evaluation, fit_target_window, pretrain
     )
@@ -1562,6 +1730,8 @@ def run_round1(
         "cdi_experiment52_reference": str(
             cdi_provenance["experiment52_reference"]["sha256"]
         ),
+        "bova11_manifest": bova11.manifest_sha256,
+        "bova11_data": bova11.data_sha256,
         "preregistration": str(design["preregistration"]["sha256"]),
     }
     events: list[dict[str, object]] = [
@@ -1602,6 +1772,8 @@ def run_round1(
                     scores=panel.scores[local],
                     score_mask=panel.score_mask[local],
                     cdi=cdi,
+                    bova11_close_by_index=bova11.close_by_session,
+                    bova11_binding=bova11_binding,
                     source_hashes=source_hashes,
                     fold=fold,
                     output=root / "evaluation.json",
@@ -1625,7 +1797,7 @@ def run_round1(
         rung_comparisons: dict[str, object] = {}
         kept: list[str] = []
         previous: str | None = None
-        for rung in RUNG_GROUPS:
+        for rung in ("b_intraday",):
             reports, records = _run_gbdt_candidate(
                 store=store,
                 rung=rung,
@@ -1636,6 +1808,8 @@ def run_round1(
                 pretrain=None,
                 decay_half_life=None,
                 cdi=cdi,
+                bova11_close_by_index=bova11.close_by_session,
+                bova11_binding=bova11_binding,
                 source_hashes=source_hashes,
                 root=output / "gbdt_ladder" / rung,
                 num_threads=num_threads,
@@ -1669,38 +1843,14 @@ def run_round1(
             ),
         )
 
-        span_reports: dict[str, dict[str, _ResearchEvaluation]] = {
-            "fine_only": rung_reports[parent]
-        }
-        span_records: dict[str, object] = {"fine_only": rung_records[parent]}
-        for arm, decay in (("pretrain_uniform", None), ("pretrain_decay_756", 756.0)):
-            reports, records = _run_gbdt_candidate(
-                store=store,
-                rung=parent,
-                fit=fit,
-                fit_target_window=fit_target_window,
-                selection=selection,
-                evaluation=evaluation,
-                pretrain=pretrain,
-                decay_half_life=decay,
-                cdi=cdi,
-                source_hashes=source_hashes,
-                root=output / "gbdt_data_span" / arm,
-                num_threads=num_threads,
-            )
-            span_reports[arm] = reports
-            span_records[arm] = records
-            events.append({"event": f"{arm}_completed", "at_utc": _utc_now()})
-        span_summaries = {
-            arm: _pooled_readouts(reports) for arm, reports in span_reports.items()
-        }
-        span_comparisons = {
-            f"{arm}_minus_fine_only": _paired_readouts(
-                reports, span_reports["fine_only"]
-            )
-            for arm, reports in span_reports.items()
-            if arm != "fine_only"
-        }
+        designated_rung, rung_designation = _weighted_candidate_designation(
+            {parent: rung_reports[parent]},
+            exact_tie_priority=(parent,),
+        )
+
+        span_records: dict[str, object] = {}
+        span_summaries: dict[str, object] = {}
+        span_comparisons: dict[str, object] = {}
         events.append({"event": "round1_completed", "at_utc": _utc_now()})
         result = {
             "schema": ROUND1_SCHEMA,
@@ -1722,14 +1872,12 @@ def run_round1(
                 "paired_deltas": rung_comparisons,
                 "kept_rungs": kept,
                 "parent_rung": parent,
-                "preference_rule": (
-                    "keep a rung if pooled-IC delta is positive with an interval mostly "
-                    "above zero OR headline net excess improves; drop a rung that worsens "
-                    "both; keep ambiguous rungs; parent is best kept pooled IC with "
-                    "economics as tie-break"
-                ),
+                "designated_rung": designated_rung,
+                "designation": rung_designation,
+                "preference_rule": rung_designation["rule"],
             },
             "gbdt_data_span_preview": {
+                "status": "not_rerun_by_rev4_reduced_roster",
                 "artifacts": span_records,
                 "readouts": span_summaries,
                 "paired_deltas": span_comparisons,
@@ -1862,6 +2010,20 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
         ),
         "preregistration": str(design["preregistration"]["sha256"]),
     }
+    bova_design = design["bova11"]
+    bova11 = load_bova11_series(
+        Path(str(bova_design["root"])),
+        expected_manifest_sha256=str(bova_design["manifest_sha256"]),
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+    )
+    if bova11.data_sha256 != bova_design["data_sha256"]:
+        raise ValueError("Round-1 BOVA11 data hash differs from frozen design")
+    bova11_binding = {
+        "manifest_sha256": bova11.manifest_sha256,
+        "data_sha256": bova11.data_sha256,
+    }
+    source_hashes["bova11_manifest"] = bova11.manifest_sha256
+    source_hashes["bova11_data"] = bova11.data_sha256
     reused_candidates = ["all_naive_baselines"]
     scored_candidates: list[str] = []
 
@@ -1878,6 +2040,8 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 store=store,
                 indices=evaluation[fold],
                 cdi=cdi,
+                bova11_close_by_index=bova11.close_by_session,
+                bova11_binding=bova11_binding,
             )
             baseline_records[name][fold] = _existing_score_and_evaluation_record(root)
     baseline_summary = {
@@ -1890,7 +2054,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     rung_comparisons: dict[str, object] = {}
     kept: list[str] = []
     previous: str | None = None
-    for rung in RUNG_GROUPS:
+    for rung in design["gbdt_rungs"]:
         candidate_root = output / "gbdt_ladder" / rung
         candidate_folds = (
             ("F1", "F2") if rung == "d_all_sidecars" else ("F1", "F2", "F3")
@@ -1909,6 +2073,8 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                     store=store,
                     indices=evaluation[fold],
                     cdi=cdi,
+                    bova11_close_by_index=bova11.close_by_session,
+                    bova11_binding=bova11_binding,
                 )
                 records[fold] = _existing_score_and_evaluation_record(root)
             if rung == "d_all_sidecars":
@@ -1931,6 +2097,8 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 pretrain=None,
                 decay_half_life=None,
                 cdi=cdi,
+                bova11_close_by_index=bova11.close_by_session,
+                bova11_binding=bova11_binding,
                 source_hashes=source_hashes,
                 root=candidate_root,
                 num_threads=num_threads,
@@ -1959,12 +2127,14 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             -list(RUNG_GROUPS).index(rung),
         ),
     )
+    designated_rung, rung_designation = _weighted_candidate_designation(
+        {parent: rung_reports[parent]},
+        exact_tie_priority=(parent,),
+    )
 
-    span_reports: dict[str, dict[str, _ResearchEvaluation]] = {
-        "fine_only": rung_reports[parent]
-    }
-    span_records: dict[str, object] = {"fine_only": rung_records[parent]}
-    for arm in ("pretrain_uniform", "pretrain_decay_756"):
+    span_reports: dict[str, dict[str, _ResearchEvaluation]] = {}
+    span_records: dict[str, object] = {}
+    for arm in design["data_span_arms"]:
         candidate_root = output / "gbdt_data_span" / arm
         candidate_folds = (
             ("F1", "F2") if parent == "d_all_sidecars" else ("F1", "F2", "F3")
@@ -1983,6 +2153,8 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                     store=store,
                     indices=evaluation[fold],
                     cdi=cdi,
+                    bova11_close_by_index=bova11.close_by_session,
+                    bova11_binding=bova11_binding,
                 )
                 records[fold] = _existing_score_and_evaluation_record(root)
             if parent == "d_all_sidecars":
@@ -2008,6 +2180,8 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 pretrain=pretrain,
                 decay_half_life=decay,
                 cdi=cdi,
+                bova11_close_by_index=bova11.close_by_session,
+                bova11_binding=bova11_binding,
                 source_hashes=source_hashes,
                 root=candidate_root,
                 num_threads=num_threads,
@@ -2015,13 +2189,12 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             scored_candidates.append(f"gbdt_data_span/{arm}")
         span_reports[arm] = reports
         span_records[arm] = records
-    span_summaries = {
+    span_summaries: dict[str, object] = {
         arm: _pooled_readouts(reports) for arm, reports in span_reports.items()
     }
     span_comparisons = {
-        f"{arm}_minus_fine_only": _paired_readouts(reports, span_reports["fine_only"])
+        f"{arm}_minus_fine_only": _paired_readouts(reports, rung_reports[parent])
         for arm, reports in span_reports.items()
-        if arm != "fine_only"
     }
 
     store.close()
@@ -2057,14 +2230,12 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             "paired_deltas": rung_comparisons,
             "kept_rungs": kept,
             "parent_rung": parent,
-            "preference_rule": (
-                "keep a rung if pooled-IC delta is positive with an interval mostly "
-                "above zero OR headline net excess improves; drop a rung that worsens "
-                "both; keep ambiguous rungs; parent is best kept pooled IC with "
-                "economics as tie-break"
-            ),
+            "designated_rung": designated_rung,
+            "designation": rung_designation,
+            "preference_rule": rung_designation["rule"],
         },
         "gbdt_data_span_preview": {
+            "status": "not_rerun_by_rev4_reduced_roster",
             "artifacts": span_records,
             "readouts": span_summaries,
             "paired_deltas": span_comparisons,
@@ -2124,6 +2295,8 @@ def freeze_round2(
     cdi_sha256: str,
     experiment52_cdi_path: Path,
     experiment52_cdi_sha256: str,
+    bova11_root: Path,
+    bova11_manifest_sha256: str,
     output_root: Path,
     fast_checkpoint: Path | None,
     fast_checkpoint_sha256: str | None,
@@ -2163,6 +2336,11 @@ def freeze_round2(
         expected_sha256=cdi_sha256,
         experiment52_cdi_path=experiment52_cdi_path,
         experiment52_expected_sha256=experiment52_cdi_sha256,
+    )
+    bova11 = load_bova11_series(
+        bova11_root,
+        expected_manifest_sha256=bova11_manifest_sha256,
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
     )
     if fast_checkpoint is not None or fast_checkpoint_sha256 is not None:
         raise ValueError(
@@ -2208,12 +2386,19 @@ def freeze_round2(
                 "sha256": experiment52_cdi_sha256,
             },
         },
+        "bova11": {
+            "root": str(Path(bova11_root).resolve(strict=True)),
+            "manifest_sha256": bova11.manifest_sha256,
+            "data_sha256": bova11.data_sha256,
+        },
         "enabled_sidecars": list(RUNG_GROUPS[parent]),
         "fast_initialization": fast,
         "network": {
             "seeds": list(NETWORK_SEEDS),
             "folds": ["F1", "F2", "F3"],
-            "arms": ["A_fine_only", "B_pretrain_finetune", "C_joint_decay_756"],
+            "arms": ["A_fine_only", "B_pretrain_finetune"],
+            "dropped_arm": "C_joint_decay_756",
+            "parent_comparison_network_arm": "B_pretrain_finetune",
             "maximum_epochs": 20,
             "patience": 3,
             "lambda_persistence": 0.0,
@@ -2376,7 +2561,7 @@ def write_round2_plan_smoke(*, output_root: Path) -> str:
         root / "round2_plan_smoke.json",
         {
             "schema": RUN_MANY_PLAN_SCHEMA,
-            "phase": "rev3_smoke",
+            "phase": "rev4_smoke",
             "max_parallel": 1,
             "first_failure_stop": True,
             "research_candidate_score": False,
@@ -2434,7 +2619,7 @@ def write_round2_plan_p(*, output_root: Path) -> str:
         root / "round2_plan_p.json",
         {
             "schema": RUN_MANY_PLAN_SCHEMA,
-            "phase": "rev3_stage_P",
+            "phase": "rev4_stage_P",
             "max_parallel": int(design["max_parallel_trajectories"]),
             "jobs": jobs,
         },
@@ -2467,7 +2652,6 @@ def write_round2_plan_main(*, output_root: Path) -> str:
     arms = (
         ("arm_A", "F", False),
         ("arm_B", "F", True),
-        ("arm_C", "J", False),
     )
     for arm, stage, uses_handoff in arms:
         for fold in ("F1", "F2", "F3"):
@@ -2500,7 +2684,7 @@ def write_round2_plan_main(*, output_root: Path) -> str:
         root / "round2_plan_main.json",
         {
             "schema": RUN_MANY_PLAN_SCHEMA,
-            "phase": "rev3_registered_arms",
+            "phase": "rev4_registered_arms_A_and_B",
             "max_parallel": int(design["max_parallel_trajectories"]),
             "stage_p_handoffs": {
                 str(seed): {"path": str(path), "sha256": digest}
@@ -2655,6 +2839,8 @@ def _evaluation_from_artifacts(
     store: V2Store,
     indices: NDArray[np.int64],
     cdi: NDArray[np.float64],
+    bova11_close_by_index: NDArray[np.float64],
+    bova11_binding: Mapping[str, str],
     allow_legacy_missing_indices: bool = False,
     expected_fold: str | None = None,
 ) -> _ResearchEvaluation:
@@ -2689,6 +2875,8 @@ def _evaluation_from_artifacts(
         scores,
         score_mask,
         cdi,
+        bova11_close_by_index,
+        bova11_binding,
         {str(key): str(value) for key, value in source_hashes.items()},
         transfer_chronology_clean=True,
     )
@@ -2727,9 +2915,7 @@ def _evaluation_from_artifacts(
         row
         for row in economics["daily_table"]
         if isinstance(row, Mapping)
-        and float(row.get("cost_bps_per_side", -1.0)) == 4.0
-        and float(row.get("annual_borrow_rate", -1.0)) == 0.02
-        and row.get("borrow_source") == "uniform"
+        and row.get("scenario") == "cost_4_borrow_lending_v1"
     ]
     by_date: dict[str, float] = {}
     for row in rows:
@@ -2760,41 +2946,25 @@ def _evaluation_from_artifacts(
 
 def _round2_arm_decision(
     arm_reports: Mapping[str, Mapping[str, _ResearchEvaluation]],
-) -> tuple[dict[str, object], dict[str, object], list[str], bool, str]:
+) -> tuple[dict[str, object], dict[str, object], list[str], bool, str | None]:
+    if tuple(arm_reports) != ("arm_A", "arm_B"):
+        raise ValueError("rev-4 Round 2 requires exactly Arms A and B")
     readouts = {
         arm: _pooled_readouts(reports) for arm, reports in arm_reports.items()
     }
     deltas = {
         "B_minus_A": _paired_readouts(arm_reports["arm_B"], arm_reports["arm_A"]),
-        "C_minus_A": _paired_readouts(arm_reports["arm_C"], arm_reports["arm_A"]),
     }
-    eligible = ["arm_A"]
-    a_economics = readouts["arm_A"]["pooled"]["headline_net_excess_bps"]
-    for arm in ("arm_B", "arm_C"):
-        if _economics_not_worse(
-            readouts[arm]["pooled"]["headline_net_excess_bps"], a_economics
-        ):
-            eligible.append(arm)
-    long_small_and_uncertain = all(
-        _small_interval_spanning_zero(
-            deltas[label]["pooled"]["primary_neutral_target_ic"]
-        )
-        for label in ("B_minus_A", "C_minus_A")
+    chosen, designation = _weighted_candidate_designation(
+        arm_reports, exact_tie_priority=("arm_A", "arm_B")
     )
-    arm_order = {"arm_A": 2, "arm_B": 1, "arm_C": 0}
-    chosen = (
-        "arm_A"
-        if long_small_and_uncertain
-        else max(
-            eligible,
-            key=lambda arm: (
-                _ranking_point(readouts[arm]["pooled"]["primary_neutral_target_ic"]),
-                _ranking_point(readouts[arm]["pooled"]["headline_net_excess_bps"]),
-                arm_order[arm],
-            ),
-        )
+    return (
+        readouts,
+        deltas,
+        list(designation["eligible_candidates"]),
+        bool(designation["economics_override_applied"]),
+        chosen,
     )
-    return readouts, deltas, eligible, long_small_and_uncertain, chosen
 
 
 def _round2_stage_p(root: Path) -> dict[str, object]:
@@ -2837,8 +3007,8 @@ def _round2_result(
     arm_readouts, arm_deltas, eligible, uncertain, chosen_arm = (
         _round2_arm_decision(arm_reports)
     )
-    if comparator_reports["network"] is not arm_reports[chosen_arm]:
-        raise ValueError("Round-2 comparator network differs from the chosen arm")
+    if comparator_reports["network"] is not arm_reports["arm_B"]:
+        raise ValueError("rev-4 parent comparison must use Arm B")
     comparator_readouts = {
         name: _pooled_readouts(reports) for name, reports in comparator_reports.items()
     }
@@ -2853,18 +3023,9 @@ def _round2_result(
             comparator_reports["ensemble"], comparator_reports["network"]
         ),
     }
-    parent_order = {"network": 2, "gbdt": 1, "ensemble": 0}
-    v2_parent = max(
-        comparator_readouts,
-        key=lambda name: (
-            _ranking_point(
-                comparator_readouts[name]["pooled"]["primary_neutral_target_ic"]
-            ),
-            _ranking_point(
-                comparator_readouts[name]["pooled"]["headline_net_excess_bps"]
-            ),
-            parent_order[name],
-        ),
+    v2_parent, parent_designation = _weighted_candidate_designation(
+        comparator_reports,
+        exact_tie_priority=("network", "gbdt", "ensemble"),
     )
     implementation = _git_identity()
     result: dict[str, object] = {
@@ -2886,20 +3047,17 @@ def _round2_result(
             "readouts": arm_readouts,
             "paired_deltas": arm_deltas,
             "eligible_by_economics": eligible,
-            "long_history_small_and_uncertain": uncertain,
+            "economics_override_applied": uncertain,
             "chosen_arm": chosen_arm,
-            "preference_rule": (
-                "highest mean pooled IC unless headline economics are worse than Arm A; "
-                "if neither long-history arm beats A by more than 0.002 with intervals "
-                "spanning zero, prefer A"
-            ),
+            "dropped_arm": "arm_C",
+            "preference_rule": _weighted_candidate_designation.__doc__,
         },
         "parent_comparison": {
             "artifacts": dict(comparator_artifacts),
             "readouts": comparator_readouts,
             "paired_deltas": comparator_deltas,
             "v2_parent": v2_parent,
-            "preference_rule": "best pooled IC with economics as tie-break",
+            "designation": parent_designation,
         },
     }
     if reporting_recovery is not None:
@@ -2944,19 +3102,33 @@ def finalize_round2(*, output_root: Path) -> str:
             cdi_design["experiment52_reference"]["sha256"]
         ),
     )
+    bova_design = design["bova11"]
+    bova11 = load_bova11_series(
+        Path(str(bova_design["root"])),
+        expected_manifest_sha256=str(bova_design["manifest_sha256"]),
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+    )
+    if bova11.data_sha256 != bova_design["data_sha256"]:
+        raise ValueError("Round-2 BOVA11 data hash differs from the frozen design")
+    bova11_binding = {
+        "manifest_sha256": bova11.manifest_sha256,
+        "data_sha256": bova11.data_sha256,
+    }
     source_hashes = {
         "v2_store_manifest": str(design["store"]["manifest_sha256"]),
         "cdi_development_extension": str(provenance["development_extension"]["sha256"]),
         "cdi_experiment52_reference": str(
             provenance["experiment52_reference"]["sha256"]
         ),
+        "bova11_manifest": bova11.manifest_sha256,
+        "bova11_data": bova11.data_sha256,
         "preregistration": str(design["preregistration"]["sha256"]),
         "round1_result": str(design["round1"]["result_sha256"]),
     }
     arm_reports: dict[str, dict[str, _ResearchEvaluation]] = {}
     arm_artifacts: dict[str, object] = {}
     try:
-        for arm in ("arm_A", "arm_B", "arm_C"):
+        for arm in ("arm_A", "arm_B"):
             arm_reports[arm] = {}
             arm_artifacts[arm] = {}
             for fold in ("F1", "F2", "F3"):
@@ -2990,6 +3162,8 @@ def finalize_round2(*, output_root: Path) -> str:
                     scores=scores,
                     score_mask=mask,
                     cdi=cdi,
+                    bova11_close_by_index=bova11.close_by_session,
+                    bova11_binding=bova11_binding,
                     source_hashes=source_hashes,
                     fold=fold,
                     output=aggregate / "evaluation.json",
@@ -3001,21 +3175,21 @@ def finalize_round2(*, output_root: Path) -> str:
                     "evaluation": str(aggregate / "evaluation.json"),
                     "evaluation_sha256": sha256_file(aggregate / "evaluation.json"),
                 }
-        _, _, _, _, chosen_arm = _round2_arm_decision(arm_reports)
+        _round2_arm_decision(arm_reports)
 
         comparator_reports: dict[str, dict[str, _ResearchEvaluation]] = {
-            "network": arm_reports[chosen_arm],
+            "network": arm_reports["arm_B"],
             "gbdt": {},
             "ensemble": {},
         }
         comparator_artifacts: dict[str, object] = {
-            "network": arm_artifacts[chosen_arm],
+            "network": arm_artifacts["arm_B"],
             "gbdt": {},
             "ensemble": {},
         }
         for fold in ("F1", "F2", "F3"):
             network_scores, network_mask = _score_artifact(
-                root / "aggregates" / chosen_arm / fold,
+                root / "aggregates" / "arm_B" / fold,
                 require_clean_transfer=True,
             )
             gbdt_scores, gbdt_mask = _load_round1_parent_fold(
@@ -3044,6 +3218,8 @@ def finalize_round2(*, output_root: Path) -> str:
                 scores=gbdt_scores,
                 score_mask=gbdt_mask,
                 cdi=cdi,
+                bova11_close_by_index=bova11.close_by_session,
+                bova11_binding=bova11_binding,
                 source_hashes=source_hashes,
                 fold=fold,
                 output=gbdt_root / "evaluation.json",
@@ -3078,6 +3254,8 @@ def finalize_round2(*, output_root: Path) -> str:
                 scores=ensemble_scores,
                 score_mask=network_mask,
                 cdi=cdi,
+                bova11_close_by_index=bova11.close_by_session,
+                bova11_binding=bova11_binding,
                 source_hashes=source_hashes,
                 fold=fold,
                 output=ensemble_root / "evaluation.json",
@@ -3151,6 +3329,18 @@ def recover_round2_result(*, output_root: Path) -> str:
                 cdi_design["experiment52_reference"]["sha256"]
             ),
         )
+        bova_design = design["bova11"]
+        bova11 = load_bova11_series(
+            Path(str(bova_design["root"])),
+            expected_manifest_sha256=str(bova_design["manifest_sha256"]),
+            canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+        )
+        if bova11.data_sha256 != bova_design["data_sha256"]:
+            raise ValueError("Round-2 BOVA11 data hash differs from frozen design")
+        bova11_binding = {
+            "manifest_sha256": bova11.manifest_sha256,
+            "data_sha256": bova11.data_sha256,
+        }
         source_hashes = {
             "v2_store_manifest": str(design["store"]["manifest_sha256"]),
             "cdi_development_extension": str(
@@ -3159,13 +3349,15 @@ def recover_round2_result(*, output_root: Path) -> str:
             "cdi_experiment52_reference": str(
                 provenance["experiment52_reference"]["sha256"]
             ),
+            "bova11_manifest": bova11.manifest_sha256,
+            "bova11_data": bova11.data_sha256,
             "preregistration": str(design["preregistration"]["sha256"]),
             "round1_result": str(design["round1"]["result_sha256"]),
         }
 
         arm_reports: dict[str, dict[str, _ResearchEvaluation]] = {}
         arm_artifacts: dict[str, object] = {}
-        for arm in ("arm_A", "arm_B", "arm_C"):
+        for arm in ("arm_A", "arm_B"):
             arm_reports[arm] = {}
             arm_artifacts[arm] = {}
             for fold in ("F1", "F2", "F3"):
@@ -3194,6 +3386,8 @@ def recover_round2_result(*, output_root: Path) -> str:
                     store=store,
                     indices=evaluation[fold],
                     cdi=cdi,
+                    bova11_close_by_index=bova11.close_by_session,
+                    bova11_binding=bova11_binding,
                     allow_legacy_missing_indices=True,
                     expected_fold=fold,
                 )
@@ -3201,14 +3395,14 @@ def recover_round2_result(*, output_root: Path) -> str:
                     aggregate
                 )
 
-        _, _, _, _, chosen_arm = _round2_arm_decision(arm_reports)
+        _round2_arm_decision(arm_reports)
         comparator_reports: dict[str, dict[str, _ResearchEvaluation]] = {
-            "network": arm_reports[chosen_arm],
+            "network": arm_reports["arm_B"],
             "gbdt": {},
             "ensemble": {},
         }
         comparator_artifacts: dict[str, object] = {
-            "network": arm_artifacts[chosen_arm],
+            "network": arm_artifacts["arm_B"],
             "gbdt": {},
             "ensemble": {},
         }
@@ -3220,6 +3414,8 @@ def recover_round2_result(*, output_root: Path) -> str:
                     store=store,
                     indices=evaluation[fold],
                     cdi=cdi,
+                    bova11_close_by_index=bova11.close_by_session,
+                    bova11_binding=bova11_binding,
                     allow_legacy_missing_indices=True,
                     expected_fold=fold,
                 )
@@ -3246,7 +3442,7 @@ def recover_round2_result(*, output_root: Path) -> str:
                 ),
                 "implementation": recovery_implementation,
                 "score_implementation": score_implementation,
-                "reused_aggregate_evaluations": 9,
+                "reused_aggregate_evaluations": 6,
                 "reused_comparator_evaluations": 6,
                 "scores_recomputed": 0,
                 "evaluations_recomputed": 0,
@@ -3330,6 +3526,8 @@ def _parser() -> argparse.ArgumentParser:
     freeze.add_argument("--cdi-sha256", required=True)
     freeze.add_argument("--experiment52-cdi", type=Path, required=True)
     freeze.add_argument("--experiment52-cdi-sha256", required=True)
+    freeze.add_argument("--bova11-root", type=Path, required=True)
+    freeze.add_argument("--bova11-manifest-sha256", required=True)
     freeze.add_argument("--development-acceptance", type=Path, required=True)
     freeze.add_argument("--development-acceptance-sha256", required=True)
     freeze.add_argument("--output-root", type=Path, required=True)
@@ -3354,6 +3552,8 @@ def _parser() -> argparse.ArgumentParser:
     freeze2.add_argument("--cdi-sha256", required=True)
     freeze2.add_argument("--experiment52-cdi", type=Path, required=True)
     freeze2.add_argument("--experiment52-cdi-sha256", required=True)
+    freeze2.add_argument("--bova11-root", type=Path, required=True)
+    freeze2.add_argument("--bova11-manifest-sha256", required=True)
     freeze2.add_argument("--output-root", type=Path, required=True)
     freeze2.add_argument("--fast-checkpoint", type=Path)
     freeze2.add_argument("--fast-checkpoint-sha256")
@@ -3380,6 +3580,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             cdi_sha256=arguments.cdi_sha256,
             experiment52_cdi_path=arguments.experiment52_cdi,
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
+            bova11_root=arguments.bova11_root,
+            bova11_manifest_sha256=arguments.bova11_manifest_sha256,
             acceptance_path=arguments.development_acceptance,
             acceptance_sha256=arguments.development_acceptance_sha256,
             output_root=arguments.output_root,
@@ -3403,6 +3605,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             cdi_sha256=arguments.cdi_sha256,
             experiment52_cdi_path=arguments.experiment52_cdi,
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
+            bova11_root=arguments.bova11_root,
+            bova11_manifest_sha256=arguments.bova11_manifest_sha256,
             output_root=arguments.output_root,
             fast_checkpoint=arguments.fast_checkpoint,
             fast_checkpoint_sha256=arguments.fast_checkpoint_sha256,

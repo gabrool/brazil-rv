@@ -97,6 +97,9 @@ def _fixture() -> EvaluationInputs:
         source_artifact_hashes={"store_manifest": "a" * 64},
         annual_borrow_rate_by_name=np.full(matrix_shape, 0.02),
         shortable=np.ones(matrix_shape, dtype=np.bool_),
+        bova11_close=np.full(len(dates), 100.0),
+        bova11_manifest_sha256="c" * 64,
+        bova11_data_sha256="d" * 64,
     )
 
 
@@ -395,9 +398,7 @@ def test_ledger_reports_every_evaluation_day_with_a_paid_cash_action() -> None:
     headline = [
         row
         for row in report["economics"]["daily_table"]
-        if row["cost_bps_per_side"] == 4.0
-        and row["annual_borrow_rate"] == 0.02
-        and row["borrow_source"] == "uniform"
+        if row["scenario"] == "cost_4_borrow_lending_v1"
     ]
     assert len(headline) == len(inputs.dates)
     assert {row["economics_resolved"] for row in headline} == {

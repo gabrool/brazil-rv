@@ -20,6 +20,7 @@ from brazil_rv.execution.inputs import load_daily_cdi_rates
 
 from .artifacts import inventory, sha256_file, write_json_atomic
 from .baselines import BaselinePanel, build_store_baselines
+from .bova11 import load_bova11_series
 from .config import (
     PROJECT_ROOT,
     PROTOCOL_CONFIG_ROOT,
@@ -70,8 +71,8 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V9"
-_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V8"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V10"
+_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V9"
 _ACCEPTANCE_ANCESTOR_SCHEMAS = frozenset(
     {
         "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5",
@@ -759,6 +760,8 @@ def _evaluation_inputs(
     scores: NDArray[np.floating],
     score_mask: NDArray[np.bool_],
     cdi_by_index: NDArray[np.float64],
+    bova11_close_by_index: NDArray[np.float64],
+    bova11_binding: Mapping[str, str],
     source_hashes: Mapping[str, str],
     *,
     transfer_chronology_clean: bool,
@@ -968,6 +971,10 @@ def _evaluation_inputs(
         action_alignment="retrospective",
         annual_borrow_rate_by_name=annual_borrow_rate_by_name,
         shortable=shortable,
+        bova11_close=np.asarray(bova11_close_by_index[indices], dtype=np.float64),
+        bova11_manifest_sha256=bova11_binding["manifest_sha256"],
+        bova11_data_sha256=bova11_binding["data_sha256"],
+        neutral_target_fallback_flags=store.neutral_target_fallback_flags(indices),
     )
 
 
@@ -978,6 +985,8 @@ def _evaluate_and_write(
     scores: NDArray[np.floating],
     score_mask: NDArray[np.bool_],
     cdi_by_index: NDArray[np.float64],
+    bova11_close_by_index: NDArray[np.float64],
+    bova11_binding: Mapping[str, str],
     source_hashes: Mapping[str, str],
     window_name: str,
     path: Path,
@@ -990,6 +999,8 @@ def _evaluate_and_write(
             scores,
             score_mask,
             cdi_by_index,
+            bova11_close_by_index,
+            bova11_binding,
             source_hashes,
             transfer_chronology_clean=transfer_chronology_clean,
         ),
@@ -1012,10 +1023,16 @@ def _evaluation_summary(
         if isinstance(row, Mapping)
         and row.get("cost_bps_per_side") == 4.0
         and row.get("annual_borrow_rate") == 0.02
-        and row.get("borrow_source") == "uniform"
+        and row.get("borrow_source") == "lending_sidecar_v1"
+        and row.get("volatility_balanced_entries") is True
+        and row.get("beta_hedge") is True
     )
     headline_report = economics["headline"]
     assert isinstance(headline_report, Mapping)
+    diagnostics = result.report["diagnostics"]
+    assert isinstance(diagnostics, Mapping)
+    realized_beta = diagnostics["realized_beta"]
+    assert isinstance(realized_beta, Mapping)
     return {
         "report": str(report_path),
         "report_sha256": report_sha256,
@@ -1030,6 +1047,7 @@ def _evaluation_summary(
             for row in result.report["horizon_readouts"]
         },
         "headline_economics": {**dict(headline), **dict(headline_report)},
+        "realized_beta_after_hedge": dict(realized_beta),
     }
 
 
@@ -1276,6 +1294,18 @@ def _development_acceptance(
                 "ineligible_exit_reeligible_within_10_sessions_share": headline.get(
                     "ineligible_exit_reeligible_within_10_sessions_share"
                 ),
+                "realized_beta_after_hedge": evaluation.get(
+                    "realized_beta_after_hedge"
+                ),
+                "mean_volatility_quota_by_quintile": headline.get(
+                    "mean_volatility_quota_by_quintile"
+                ),
+                "mean_volatility_occupancy_long_by_quintile": headline.get(
+                    "mean_volatility_occupancy_long_by_quintile"
+                ),
+                "mean_volatility_occupancy_short_by_quintile": headline.get(
+                    "mean_volatility_occupancy_short_by_quintile"
+                ),
             }
         )
         if (
@@ -1310,6 +1340,50 @@ def _development_acceptance(
             violations.append(f"{label}_mean_unresolved_stale_fraction_not_below_0_02")
         else:
             unresolved_stale_fractions.append(unresolved_stale)
+
+        quota = headline.get("mean_volatility_quota_by_quintile")
+        long_occupancy = headline.get("mean_volatility_occupancy_long_by_quintile")
+        short_occupancy = headline.get("mean_volatility_occupancy_short_by_quintile")
+        if not all(
+            isinstance(values, list) and len(values) == 5
+            for values in (quota, long_occupancy, short_occupancy)
+        ):
+            violations.append(f"{label}_volatility_occupancy_missing")
+        else:
+            for side, occupancy in (
+                ("long", long_occupancy),
+                ("short", short_occupancy),
+            ):
+                if any(
+                    abs(float(actual) - float(target)) > 2.0
+                    for actual, target in zip(occupancy, quota, strict=True)
+                ):
+                    violations.append(
+                        f"{label}_{side}_mean_volatility_quintile_occupancy_outside_2"
+                    )
+
+    realized_beta_by_control: dict[str, dict[str, float | None]] = {
+        name: {} for name in _BASELINE_SIGNAL_SIGNS
+    }
+    for record in baseline_records:
+        name = str(record.get("name"))
+        fold = str(record.get("fold"))
+        evaluation = record.get("evaluation")
+        diagnostic = (
+            evaluation.get("realized_beta_after_hedge")
+            if isinstance(evaluation, Mapping)
+            else None
+        )
+        raw_beta = diagnostic.get("slope_beta") if isinstance(diagnostic, Mapping) else None
+        realized_beta_by_control[name][fold] = (
+            None if raw_beta is None else float(raw_beta)
+        )
+    for name, folds in realized_beta_by_control.items():
+        passing = sum(
+            value is not None and abs(value) <= 0.30 for value in folds.values()
+        )
+        if passing < 2:
+            violations.append(f"{name}_realized_beta_after_hedge_fewer_than_two_folds")
 
     mean_unresolved_stale = (
         float(np.mean(unresolved_stale_fractions))
@@ -1346,6 +1420,8 @@ def _development_acceptance(
             "gross_relative_tolerance": 0.10,
             "gross_hard_floor": 1.5,
             "gross_hard_ceiling": 2.25,
+            "realized_beta_after_hedge_absolute_bound_in_at_least_two_folds": 0.30,
+            "mean_volatility_quintile_occupancy_absolute_slot_tolerance": 2.0,
             "entry_defect_signature_limits": {
                 "D1_entry_pending_printed_unblocked_unfilled": 0,
                 "D2_entry_fill_quantity_short": 0,
@@ -1359,6 +1435,7 @@ def _development_acceptance(
         "naive_pooled_primary_neutral_target_ic": pooled_ic,
         "inverse_volatility_neutral_ic_by_fold": inverse_volatility_by_fold,
         "inverse_volatility_absolute_neutral_ic_strictly_below": 0.02,
+        "realized_beta_after_hedge_by_control": realized_beta_by_control,
         "reversal_5_definition_negative_signed": reversal_definition_ok,
         "economics_by_evaluation": economics_rows,
         "mean_unresolved_stale_inventory_fraction_nav_across_evaluations": (
@@ -1542,6 +1619,8 @@ def _run_baselines(
     store: V2Store,
     fold_indices: Mapping[str, NDArray[np.int64]],
     cdi_by_index: NDArray[np.float64],
+    bova11_close_by_index: NDArray[np.float64],
+    bova11_binding: Mapping[str, str],
     root: Path,
     source_hashes: Mapping[str, str],
 ) -> list[dict[str, object]]:
@@ -1577,6 +1656,8 @@ def _run_baselines(
                 scores=panel.scores[local_indices],
                 score_mask=panel.score_mask[local_indices],
                 cdi_by_index=cdi_by_index,
+                bova11_close_by_index=bova11_close_by_index,
+                bova11_binding=bova11_binding,
                 source_hashes={
                     **source_hashes,
                     "score_manifest": manifest_sha,
@@ -1608,6 +1689,8 @@ def _run_gbdt(
     selection_indices: Mapping[str, NDArray[np.int64]],
     evaluation_indices: Mapping[str, NDArray[np.int64]],
     cdi_by_index: NDArray[np.float64],
+    bova11_close_by_index: NDArray[np.float64],
+    bova11_binding: Mapping[str, str],
     root: Path,
     source_hashes: Mapping[str, str],
     runtime: ValidationRuntime,
@@ -1699,6 +1782,8 @@ def _run_gbdt(
             scores=predictions,
             score_mask=score_mask,
             cdi_by_index=cdi_by_index,
+            bova11_close_by_index=bova11_close_by_index,
+            bova11_binding=bova11_binding,
             source_hashes={**source_hashes, "score_manifest": manifest_sha},
             window_name=fold,
             path=artifact_root / "evaluation.json",
@@ -1758,6 +1843,8 @@ def _run_network_smokes(
     pretrain_fit_indices: NDArray[np.int64],
     pretrain_selection_indices: NDArray[np.int64],
     cdi_by_index: NDArray[np.float64],
+    bova11_close_by_index: NDArray[np.float64],
+    bova11_binding: Mapping[str, str],
     root: Path,
     source_hashes: Mapping[str, str],
     runtime: ValidationRuntime,
@@ -1805,6 +1892,8 @@ def _run_network_smokes(
         scores=scratch_values,
         score_mask=scratch_mask,
         cdi_by_index=cdi_by_index,
+        bova11_close_by_index=bova11_close_by_index,
+        bova11_binding=bova11_binding,
         source_hashes={
             **source_hashes,
             "score_manifest": sha256_file(scratch_score.manifest_path),
@@ -1849,6 +1938,8 @@ def _run_network_smokes(
         scores=persistence_values,
         score_mask=persistence_mask,
         cdi_by_index=cdi_by_index,
+        bova11_close_by_index=bova11_close_by_index,
+        bova11_binding=bova11_binding,
         source_hashes={
             **source_hashes,
             "score_manifest": sha256_file(persistence_score.manifest_path),
@@ -2556,6 +2647,8 @@ def run_pipeline_validation(
     cdi_sha256: str,
     experiment52_cdi_path: Path,
     experiment52_cdi_sha256: str,
+    bova11_root: Path,
+    bova11_manifest_sha256: str,
     output_root: Path,
     runtime: ValidationRuntime = ValidationRuntime(),
     enabled_sidecars: Sequence[str] = (),
@@ -2622,6 +2715,16 @@ def run_pipeline_validation(
         experiment52_cdi_path=Path(experiment52_cdi_path),
         experiment52_expected_sha256=experiment52_cdi_sha256,
     )
+    bova11 = load_bova11_series(
+        bova11_root,
+        expected_manifest_sha256=bova11_manifest_sha256,
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+    )
+    bova11_binding = {
+        "root": str(Path(bova11_root).resolve(strict=True)),
+        "manifest_sha256": bova11.manifest_sha256,
+        "data_sha256": bova11.data_sha256,
+    }
     store_manifest_sha = sha256_file(store_path / "manifest.json")
     native_fast_audit = _verify_native_fast_audit(
         native_fast_audit_path,
@@ -2665,6 +2768,8 @@ def run_pipeline_validation(
         "cdi_experiment52_reference": str(
             cdi_provenance["experiment52_reference"]["sha256"]
         ),
+        "bova11_manifest": bova11.manifest_sha256,
+        "bova11_data": bova11.data_sha256,
     }
     output.mkdir(parents=True, exist_ok=False)
     try:
@@ -2672,6 +2777,8 @@ def run_pipeline_validation(
             store=store,
             fold_indices={name: evaluation_indices[name] for name in full.folds},
             cdi_by_index=cdi_by_index,
+            bova11_close_by_index=bova11.close_by_session,
+            bova11_binding=bova11_binding,
             root=output / "baselines",
             source_hashes=source_hashes,
         )
@@ -2682,6 +2789,8 @@ def run_pipeline_validation(
             selection_indices={"F1": selection_indices["F1"]},
             evaluation_indices={"F1": evaluation_indices["F1"]},
             cdi_by_index=cdi_by_index,
+            bova11_close_by_index=bova11.close_by_session,
+            bova11_binding=bova11_binding,
             root=output / "gbdt_triage",
             source_hashes=source_hashes,
             runtime=runtime,
@@ -2744,6 +2853,7 @@ def run_pipeline_validation(
                         "external_artifact_resolutions": external_resolutions,
                     },
                     "cdi": cdi_provenance,
+                    "bova11": bova11_binding,
                     "native_fast_raw_audit": native_fast_audit,
                     "lending_borrow_rate_archive": lending_rate_resolution,
                     "legacy_round1_baseline_reference": legacy_identity,
@@ -2805,6 +2915,8 @@ def replay_classical_economics(
     cdi_sha256: str,
     experiment52_cdi_path: Path,
     experiment52_cdi_sha256: str,
+    bova11_root: Path,
+    bova11_manifest_sha256: str,
     prior_classical_root: Path,
     prior_classical_manifest_sha256: str,
     prior_classical_inventory_sha256: str,
@@ -2833,6 +2945,16 @@ def replay_classical_economics(
     store_build_commit = store_metadata.get("implementation_git_commit")
     if not isinstance(store_build_commit, str):
         raise ValueError("store lacks its build implementation commit")
+    bova11 = load_bova11_series(
+        bova11_root,
+        expected_manifest_sha256=bova11_manifest_sha256,
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+    )
+    bova11_binding = {
+        "root": str(Path(bova11_root).resolve(strict=True)),
+        "manifest_sha256": bova11.manifest_sha256,
+        "data_sha256": bova11.data_sha256,
+    }
 
     source_root, prior, _ = _verified_prior_acceptance(
         root=prior_classical_root,
@@ -2950,6 +3072,8 @@ def replay_classical_economics(
         "cdi_experiment52_reference": str(
             cdi_provenance["experiment52_reference"]["sha256"]
         ),
+        "bova11_manifest": bova11.manifest_sha256,
+        "bova11_data": bova11.data_sha256,
     }
     output.mkdir(parents=True, exist_ok=False)
     comparison_rows: list[dict[str, object]] = []
@@ -2993,6 +3117,8 @@ def replay_classical_economics(
             scores=scores,
             score_mask=score_mask,
             cdi_by_index=cdi_by_index,
+            bova11_close_by_index=bova11.close_by_session,
+            bova11_binding=bova11_binding,
             source_hashes={**source_hashes, "score_manifest": score_manifest_sha},
             window_name=fold,
             path=destination / "evaluation.json",
@@ -3102,6 +3228,7 @@ def replay_classical_economics(
                         "external_artifact_resolutions": external_resolutions,
                     },
                     "cdi": cdi_provenance,
+                    "bova11": bova11_binding,
                     "native_fast_raw_audit": native_fast_audit,
                     "prior_classical_acceptance": {
                         "root": str(source_root),
@@ -3174,6 +3301,8 @@ def resume_network_validation(
     cdi_sha256: str,
     experiment52_cdi_path: Path,
     experiment52_cdi_sha256: str,
+    bova11_root: Path,
+    bova11_manifest_sha256: str,
     completed_classical_root: Path,
     completed_classical_inventory_sha256: str,
     completed_classical_failure_sha256: str,
@@ -3257,6 +3386,16 @@ def resume_network_validation(
         experiment52_cdi_path=Path(experiment52_cdi_path),
         experiment52_expected_sha256=experiment52_cdi_sha256,
     )
+    bova11 = load_bova11_series(
+        bova11_root,
+        expected_manifest_sha256=bova11_manifest_sha256,
+        canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
+    )
+    bova11_binding = {
+        "root": str(Path(bova11_root).resolve(strict=True)),
+        "manifest_sha256": bova11.manifest_sha256,
+        "data_sha256": bova11.data_sha256,
+    }
     requested_indices = np.unique(
         np.concatenate(
             (
@@ -3293,6 +3432,8 @@ def resume_network_validation(
         "cdi_experiment52_reference": str(
             cdi_provenance["experiment52_reference"]["sha256"]
         ),
+        "bova11_manifest": bova11.manifest_sha256,
+        "bova11_data": bova11.data_sha256,
         "completed_classical_inventory": completed_classical_inventory_sha256,
         "completed_classical_failure_record": completed_classical_failure_sha256,
     }
@@ -3307,6 +3448,8 @@ def resume_network_validation(
             pretrain_fit_indices=pretrain_fit,
             pretrain_selection_indices=pretrain_selection,
             cdi_by_index=cdi_by_index,
+            bova11_close_by_index=bova11.close_by_session,
+            bova11_binding=bova11_binding,
             root=output / "network_smokes",
             source_hashes=source_hashes,
             runtime=runtime,
@@ -3344,6 +3487,7 @@ def resume_network_validation(
                         "external_artifact_resolutions": external_resolutions,
                     },
                     "cdi": cdi_provenance,
+                    "bova11": bova11_binding,
                     "completed_classical_validation": classical_source,
                 },
                 "date_contract": {
@@ -3420,6 +3564,13 @@ def _parser() -> argparse.ArgumentParser:
         required=True,
         help="Expected SHA-256 of the Experiment-52 CDI reference.",
     )
+    parser.add_argument(
+        "--bova11-root",
+        type=Path,
+        required=True,
+        help="Immutable development-only exact-identity BOVA11 close artifact.",
+    )
+    parser.add_argument("--bova11-manifest-sha256", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--native-fast-audit", type=Path)
     parser.add_argument("--native-fast-audit-sha256")
@@ -3511,6 +3662,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             cdi_sha256=arguments.cdi_sha256,
             experiment52_cdi_path=arguments.experiment52_cdi_path,
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
+            bova11_root=arguments.bova11_root,
+            bova11_manifest_sha256=arguments.bova11_manifest_sha256,
             prior_classical_root=arguments.prior_classical_root,
             prior_classical_manifest_sha256=(arguments.prior_classical_manifest_sha256),
             prior_classical_inventory_sha256=(
@@ -3528,6 +3681,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             cdi_sha256=arguments.cdi_sha256,
             experiment52_cdi_path=arguments.experiment52_cdi_path,
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
+            bova11_root=arguments.bova11_root,
+            bova11_manifest_sha256=arguments.bova11_manifest_sha256,
             completed_classical_root=arguments.completed_classical_root,
             completed_classical_inventory_sha256=(
                 arguments.completed_classical_inventory_sha256
@@ -3546,6 +3701,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             cdi_sha256=arguments.cdi_sha256,
             experiment52_cdi_path=arguments.experiment52_cdi_path,
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
+            bova11_root=arguments.bova11_root,
+            bova11_manifest_sha256=arguments.bova11_manifest_sha256,
             output_root=arguments.output_root,
             runtime=runtime,
             enabled_sidecars=arguments.sidecar,

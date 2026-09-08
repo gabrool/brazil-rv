@@ -23,7 +23,10 @@ from .contract import (
     HORIZONS,
     REGISTERED_PRIMARY_TARGET,
     REGISTERED_PRIMARY_TARGET_MASK,
+    TARGET_NEUTRALIZATION_BETA_GROUPS,
     TARGET_NEUTRALIZATION_FEATURES,
+    TARGET_NEUTRALIZATION_MIN_NONLINEAR_NAMES,
+    TARGET_NEUTRALIZATION_VOL_GROUPS,
 )
 from .feature_spec import FeatureSpec, feature_schema_sha256
 from .normalization import midrank_unit_interval
@@ -111,12 +114,17 @@ def characteristic_neutral_targets(
     horizons: Sequence[int] = HORIZONS,
     clip: float = 5.0,
     minimum_names: int = 20,
+    nonlinear_minimum_names: int = TARGET_NEUTRALIZATION_MIN_NONLINEAR_NAMES,
+    fallback_flags: NDArray[np.bool_] | None = None,
 ) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
-    """Residualize the scaled return target against the three rev-3 risks.
+    """Residualize the scaled return target under the registered rev-4 view.
 
     ``characteristics`` are the store's already rank-Gaussianized decision-row
-    values for lagged volatility, beta, and log ADV.  Work is deliberately
-    row-wise so the virtual view never materializes another full-store panel.
+    values for lagged volatility, beta, and log ADV.  At sufficient support the
+    design uses ten volatility groups, five beta groups, and linear log ADV.
+    Smaller supported cross-sections retain the registered rev-3 linear
+    fallback.  Work is deliberately row-wise so the virtual view never
+    materializes another full-store panel.
     """
 
     returns = np.asarray(simple_returns, dtype=np.float64)
@@ -132,8 +140,29 @@ def characteristic_neutral_targets(
         raise ValueError("neutral-target characteristic validity is misaligned")
     if returns.shape[-1] != len(horizons):
         raise ValueError("neutral-target horizon axis is misaligned")
-    if clip <= 0.0 or not np.isfinite(clip) or minimum_names < 1:
+    if (
+        clip <= 0.0
+        or not np.isfinite(clip)
+        or minimum_names < 1
+        or nonlinear_minimum_names < minimum_names
+    ):
         raise ValueError("neutral-target clip and minimum support must be positive")
+    if fallback_flags is not None:
+        fallback = np.asarray(fallback_flags)
+        if fallback.dtype != np.bool_ or fallback.shape != (
+            returns.shape[0],
+            returns.shape[-1],
+        ):
+            raise ValueError("neutral-target fallback flags are misaligned")
+
+    def equal_count_groups(values: NDArray[np.float64], count: int) -> NDArray[np.int64]:
+        order = np.argsort(values, kind="stable")
+        groups = np.empty(values.size, dtype=np.int64)
+        groups[order] = np.minimum(
+            np.arange(values.size, dtype=np.int64) * count // values.size,
+            count - 1,
+        )
+        return groups
 
     output = np.zeros(returns.shape, dtype=np.float32)
     output_valid = np.zeros(returns.shape, dtype=np.bool_)
@@ -156,7 +185,28 @@ def characteristic_neutral_targets(
                 -clip,
                 clip,
             )
-            design = np.column_stack((np.ones(names.size), z[day, names]))
+            if names.size < nonlinear_minimum_names:
+                design = np.column_stack((np.ones(names.size), z[day, names]))
+                if fallback_flags is not None:
+                    fallback_flags[day, horizon_index] = True
+            else:
+                vol_group = equal_count_groups(
+                    z[day, names, 0], TARGET_NEUTRALIZATION_VOL_GROUPS
+                )
+                beta_group = equal_count_groups(
+                    z[day, names, 1], TARGET_NEUTRALIZATION_BETA_GROUPS
+                )
+                design = np.column_stack(
+                    (
+                        np.eye(TARGET_NEUTRALIZATION_VOL_GROUPS, dtype=np.float64)[
+                            vol_group
+                        ],
+                        np.eye(TARGET_NEUTRALIZATION_BETA_GROUPS, dtype=np.float64)[
+                            beta_group
+                        ],
+                        z[day, names, 2],
+                    )
+                )
             coefficients = np.linalg.lstsq(design, y, rcond=None)[0]
             residual = y - design @ coefficients
             tolerance = (
@@ -1403,7 +1453,7 @@ class V2Store:
     def _neutral_primary_view(
         self, selector: int | NDArray[np.int64]
     ) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
-        """Build the rev-3 characteristic-neutral target on authorized rows."""
+        """Build the rev-4 characteristic-neutral target on authorized rows."""
 
         scalar = isinstance(selector, int)
         indices = (
@@ -1449,6 +1499,52 @@ class V2Store:
             horizons=HORIZONS,
         )
         return (output[0], valid[0]) if scalar else (output, valid)
+
+    def neutral_target_fallback_flags(
+        self, selector: int | NDArray[np.int64]
+    ) -> NDArray[np.bool_]:
+        """Report the authorized date/horizon cells using the rev-3 fallback."""
+
+        scalar = isinstance(selector, int)
+        indices = (
+            np.asarray([selector], dtype=np.int64)
+            if scalar
+            else np.asarray(selector, dtype=np.int64)
+        )
+        if not self.authorized_for(indices):
+            raise PermissionError("neutral-target fallback audit exceeds store access")
+        canonical = self._target_mask("target_valid", indices)
+        returns = self._read_target_payload(
+            "target_shareholder_simple_return",
+            self._arrays["target_shareholder_simple_return"],
+            indices,
+            canonical,
+        )
+        sigma = np.asarray(
+            self._arrays["target_scale_sigma"][indices], dtype=np.float64
+        )
+        slow = np.asarray(self._arrays["slow_values"][indices], dtype=np.float64)
+        slow_valid = np.asarray(self._arrays["slow_valid"][indices], dtype=np.bool_)
+        feature_names = self.manifest.get("feature_names", {}).get("slow")
+        if not isinstance(feature_names, list):
+            raise ValueError("store lacks ordered slow-feature names")
+        feature_indices = [
+            feature_names.index(name) for name in TARGET_NEUTRALIZATION_FEATURES
+        ]
+        characteristics = slow[..., feature_indices]
+        characteristic_valid = slow_valid[..., feature_indices].all(axis=-1)
+        characteristic_valid &= np.isfinite(characteristics).all(axis=-1)
+        flags = np.zeros((len(indices), len(HORIZONS)), dtype=np.bool_)
+        characteristic_neutral_targets(
+            returns,
+            canonical,
+            sigma,
+            characteristics,
+            characteristic_valid,
+            horizons=HORIZONS,
+            fallback_flags=flags,
+        )
+        return flags[0] if scalar else flags
 
     def _read_target_payload(
         self,
