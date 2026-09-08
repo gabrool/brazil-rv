@@ -1,28 +1,28 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-06.
+Last verified: 2026-09-08.
 
 ## Purpose and current research state
 
 Brazil-RV has two offline research programs. The accepted v1 intraday system
-and its deployed research recipe remain unchanged and reproducible. V2 is now
-an intentionally incompatible multi-day system whose canonical implementation
-is commit `f0cf568303715e8783e539a683568535e2232c7f`. It predicts five daily
-horizons from one 15:45 decision snapshot, but the refactor is currently an
-engineering implementation rather than an accepted real-data research stack.
+and its deployed research recipe remain unchanged and reproducible. V2 is an
+intentionally incompatible multi-day system that predicts five daily horizons
+from one 15:45 decision snapshot. Its canonical real-data V3 store is
+`v2_daily_store_8021e42_20260906T202315Z` (manifest SHA-256
+`deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b`).
+It is explicitly development-grade: the calendar is reconstructed and the
+corporate-action terms are inferred from COTAHIST `DISMES`, not independently
+verified contractual terms.
 
-The current v2 Phases A-F engineering fixtures pass: contracts and raw
-foundation, causal features and point-in-time state, canonical consumers,
-orders/accounting, unified evaluation, and incompatible-artifact migration.
-Real-data Phase G acceptance is `unsupported`, not passed: the repository lacks
-an authoritative dated B3 session schedule and a complete contractual-action
-master, while the available provider/DISMES/price-jump evidence fails the
-registered action-quality thresholds and cannot prove historical share, cash,
-conversion, payment, or terminal-claim terms. Consequently there is no accepted
-real current-schema v2 store and no accepted v2 candidate. Older v2 stores and
-runs remain immutable historical evidence only. Phase H and experimental
-Section D have not begun; no official-validation or test outcome was accessed
-for this refactor, and no prediction, execution, or deployment recipe changed.
+Rev3 Round 1 and Round 2 are complete on development folds only. Round 1
+designated `b_intraday` as the neural parent. Round 2 selected the uniform-
+pretrain Arm B, with pooled characteristic-neutral IC `0.0271682` and headline
+net excess `11.8610` bps/day. The registered network/GBDT rank ensemble has the
+highest pooled neutral IC, `0.0291273`, and is the Round-2 research designation;
+its net excess is `5.2052` bps/day with a 95% interval spanning zero. These are
+development research claims, not a production or deployment decision. Official
+validation and the permanently spent test remained sealed, and deployment did
+not change.
 
 The accepted incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
@@ -100,11 +100,17 @@ coercing them to zero. Current schemas reject prior stores, checkpoints, scores,
 and partial resumes rather than silently translating them.
 
 Phases A-F have fixture-level engineering acceptance at commit
-`f0cf568303715e8783e539a683568535e2232c7f`. Phase G requires new authoritative
-calendar/action/status evidence and a fresh real current-schema build; it cannot
-be established by renaming or reopening the formerly accepted store. Until that
-source gate is satisfied, no revised research registration or Section D run is
-authorized.
+`f0cf568303715e8783e539a683568535e2232c7f`. Subsequent bounded passes produced
+the V3 store and completed the registered development-fold research program.
+Score-bearing Round-2 trajectories remain bound to commit
+`916ac0b7e6e3ab16dea72dbf480ebb086a8981b0`; reporting and sealing fixes through
+`2ee5334aef9bebbd2aa9088d4156a7c6919d64e4` reused and hash-verified completed
+artifacts without recomputing a score or evaluation. Authoritative dated B3
+schedule evidence, independently verified contractual action terms, auction
+execution marks, and historically executable borrow remain unavailable. Any
+stronger economics or production claim requires those sources and a new
+pre-result registration; it cannot be obtained by relabelling the current
+development-grade evidence.
 
 ## Superseded historical v2 foundation context
 

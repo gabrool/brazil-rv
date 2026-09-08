@@ -1742,3 +1742,111 @@ minus fine-only is +0.0002661 [-0.0078523, 0.0065975] neutral IC and
 +2.7928 bps/day [-4.0730, 7.4039], while uniform minus fine-only is
 -0.0004568 [-0.0081245, 0.0067001] and -1.3548 bps/day. Per the registration,
 execution stopped before Round 2. No paid instance was used for this CPU run.
+
+## Rev3 Round 2 completion and data-currency audit (2026-09-08)
+
+Round 2 is complete and sealed at:
+
+    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round2_rev3_916ac0b_20260907T215945Z
+
+The score-bearing implementation is
+`916ac0b7e6e3ab16dea72dbf480ebb086a8981b0`; frozen-design SHA-256 is
+`8ca83757f48204e94db153c3ff1b9891f1447e255510963433d7c5994d8d0b16`.
+The root contains the disposable smoke, all three Stage-P seeds, and exactly
+27 registered A/B/C × F1/F2/F3 × 11/29/47 main trajectories. Stage P ran
+8/7/8 epochs and selected epochs 5/4/5. The main selected-epoch counts were:
+
+| Arm/fold | Seed 11 | Seed 29 | Seed 47 |
+| --- | ---: | ---: | ---: |
+| A/F1 | 6 | 6 | 6 |
+| A/F2 | 7 | 18 | 8 |
+| A/F3 | 4 | 4 | 4 |
+| B/F1 | 4 | 5 | 4 |
+| B/F2 | 9 | 5 | 9 |
+| B/F3 | 4 | 4 | 4 |
+| C/F1 | 8 | 5 | 13 |
+| C/F2 | 4 | 4 | 5 |
+| C/F3 | 11 | 4 | 6 |
+
+Compiled-graph audits passed: the separate P and F paths each used two graphs
+in total, while joint Stage J correctly used two stable training graphs plus
+one selection graph. The original main launcher had assumed the P/F graph
+count for J and stopped after 23 completed trajectories. The recovery plan
+SHA-256 `b12ef7817e45c71ac6ae2392ed8db7e60f4987371bacab64dc2544639226b03c`
+contained only the four never-started C jobs; it preserved all completed
+scores and changed no run, seed, split, target, or model rule.
+
+Pooled registered readouts are:
+
+| Candidate | Neutral IC [95%] | Legacy IC | P1 / P5 | Spread bps/holding session | Net excess bps/day [95%] |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Arm A, fine only | .015342 [.006382,.025507] | .037740 | .9417 / .8820 | 12.184 | 5.305 [-1.122,17.684] |
+| Arm B, uniform pretrain | .027168 [.017567,.039919] | .053489 | .8709 / .7803 | 21.461 | 11.861 [3.224,22.959] |
+| Arm C, decay pretrain | .022510 [.013364,.036517] | .043230 | .8393 / .7997 | 13.249 | 3.532 [-3.125,15.172] |
+| Round-1 GBDT parent | .021698 [.013947,.032726] | .031943 | .7990 / .6564 | 9.724 | 1.338 [-6.340,12.308] |
+| Network/GBDT rank ensemble | .029127 [.020274,.041677] | .050420 | .8431 / .7430 | 15.050 | 5.205 [-2.219,17.844] |
+
+Arm B beat Arm A by `+0.011826` neutral IC
+`[+0.006217,+0.019384]` and `+6.5564` net bps/day
+`[+0.5000,+8.8891]`, so it is the registered R2.1 choice. Arm C improved
+neutral IC over A by `+0.007168` but worsened point economics by `-1.7729`
+bps/day; it was not designated. The ensemble beat the GBDT parent by
+`+0.007430` neutral IC `[+0.002645,+0.012852]` and is the R2.2 research
+designation under the registered best-IC rule. Relative to the Arm-B network,
+the ensemble's neutral-IC delta was only `+0.001959`
+`[-0.002241,+0.006873]`, while net economics fell `-6.6557` bps/day
+`[-10.8520,-0.1627]`; that tradeoff is retained rather than hidden.
+
+All nine aggregate and six comparator evaluations had completed before two
+reporting-only defects prevented final JSON serialization: old score manifests
+lacked the newly required evaluation-index metadata, and canonical Stage-P
+history files are JSON arrays. Commits
+`9679f040de4efe33065806909f22c89050d28009` and
+`6e0554c94214f82fa660ce439c3eb424bb5519e7` added a hash-bound reporting-only
+recovery that rebuilt and verified full evaluation inputs, re-derived every
+three-seed rank aggregate exactly, reused all 15 evaluations, and recomputed
+zero scores and zero evaluations. Commit
+`2ee5334aef9bebbd2aa9088d4156a7c6919d64e4` made the seal scanner inventory
+JSON-array research artifacts. Linux Ruff/compile and all 901 tests passed at
+the final seal commit.
+
+Round-2 result, access-audit, and log-inclusive inventory SHA-256 values are
+`e98792213e16615c6e44ba3036ed829100940eeef0b8a9a175a9a2b2f752f9a0`,
+`18c4f83cac0411ef215cfc4bde867329b41bd254b39c999ec664c4dc4a0b1b5b`,
+and `39ee66e731aa51bf3859a70c974abdf2ee69301dff01f05fa1dfb626d3d755ce`.
+The inventory contains 579 files. The access audit inspected 134 JSON
+artifacts, passed, and records official-validation/test access false/false,
+clean transfer chronology, and no deployment change.
+
+After the root and all operational logs were secured, Lambda accepted
+termination of exact paid GH200 instance
+`aed9c4a5d2e94ee8bd667ee52c104945` (`gpu_1x_gh200`, `us-east-3`, IP
+`192.222.50.196`) at `2026-09-08T01:49:50Z`. Provider inventories at
+`2026-09-08T01:51:53Z` and `2026-09-08T01:51:59Z` both confirmed that exact
+ID absent and returned zero active instances. No adjacent instance was touched.
+
+The required CPU-only source-currency audit is:
+
+    D:\quant-data\b3\processed\model_runs\v2_data_currency_audit_2ee5334_20260908T015300Z\data_currency_audit.json
+
+Its SHA-256 is
+`eb8a1370d1a4929657c9595bcc2ac49b40c85070c36230d2fdf1fdbcb483977f`.
+It hash-verified every sidecar archive against the sealed V3 store manifest and
+read only manifest/capability metadata plus the sidecar archive indexes; no
+2025/2026 model-session array was opened. Monthly counts from 2023-01 are in
+the JSON. The durable source cutoffs are:
+
+| Family | Store capability | Last available date | 2023+ archive name-days | 2023+ feature-valid name-days |
+| --- | --- | --- | ---: | ---: |
+| Options | source-semantics unavailable | 2024-07-01 | 49,033 | 49,033 |
+| Lending | enabled | 2024-07-01 | 35,429 | 35,427 |
+| Oddlot | enabled | 2024-06-28 | 130,445 | 130,445 |
+| Rebalance | source-semantics unavailable | 2024-06-28 | 45,978 | 45,978 |
+| Events | source-semantics unavailable | 2024-12-30 | 64,035 | 64,035 |
+| Fundamentals | source-semantics unavailable | 2024-06-28 | 50,613 | 50,613 |
+
+The indexed raw lending PDFs stop at report date 2024-06-28, so no raw lending
+file for 2024-07 onward is present. The raw 2024 annual COTAHIST archive is
+present and extends beyond July, so oddlot can be rebuilt beyond its current
+2024-06-28 derived cutoff without obtaining a new raw price archive. This
+audit changes no score, designation, protected access state, or deployment.
