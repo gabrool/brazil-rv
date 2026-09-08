@@ -13,12 +13,6 @@ from .artifacts import write_json_atomic
 from .contract import RUN_MANY_PLAN_SCHEMA, RUN_MANY_RESULT_SCHEMA, V1_READ_SEEDS
 
 MAX_PARALLEL_TRAJECTORIES = 6
-VOIDED_RESEARCH_PLAN_PHASES = frozenset({"stage_P", "registered_arms"})
-VOIDED_PRESET_MESSAGE = (
-    "the triage/full presets belong to the voided v2 Round 1/Round 2 "
-    "registration; create a new hash-bound plan only after engineering "
-    "acceptance and revised preregistration"
-)
 
 
 @dataclass(frozen=True)
@@ -238,29 +232,10 @@ def run_many(
     return ordered
 
 
-def preset_jobs(
-    *,
-    name: str,
-    store: Path,
-    output_root: Path,
-    fast_pretrained_checkpoint: Path,
-    fast_pretrained_sha256: str,
-    sidecars: Sequence[str] = (),
-    compile_forward: bool = True,
-) -> tuple[tuple[TrajectoryJob, ...], int, dict[str, object]]:
-    """Refuse the superseded named research presets."""
-
-    del name, store, output_root, fast_pretrained_checkpoint
-    del fast_pretrained_sha256, sidecars, compile_forward
-    raise RuntimeError(VOIDED_PRESET_MESSAGE)
-
-
 def load_plan(path: Path) -> tuple[tuple[TrajectoryJob, ...], int]:
     payload = _read_json(path)
     if payload.get("schema") != RUN_MANY_PLAN_SCHEMA:
-        raise ValueError("run-many plan is stale or lacks the current schema")
-    if payload.get("phase") in VOIDED_RESEARCH_PLAN_PHASES:
-        raise RuntimeError(VOIDED_PRESET_MESSAGE)
+        raise ValueError("run-many plan requires the current schema")
     raw_jobs = payload.get("jobs")
     if not isinstance(raw_jobs, list):
         raise ValueError("run-many plan must contain a jobs list")
@@ -292,47 +267,14 @@ def load_plan(path: Path) -> tuple[tuple[TrajectoryJob, ...], int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run v2 trajectories concurrently")
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--plan", type=Path)
-    source.add_argument("--preset", choices=("triage", "full"))
+    parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--store", type=Path)
-    parser.add_argument("--output-root", type=Path)
-    parser.add_argument("--fast-pretrained-checkpoint", type=Path)
-    parser.add_argument("--fast-pretrained-sha256")
-    parser.add_argument("--sidecar", action="append", default=[])
-    parser.add_argument(
-        "--compile-forward", action=argparse.BooleanOptionalAction, default=True
-    )
     arguments = parser.parse_args()
-    metadata: dict[str, object] = {}
-    if arguments.plan is not None:
-        jobs, max_parallel = load_plan(arguments.plan)
-    else:
-        if (
-            arguments.store is None
-            or arguments.output_root is None
-            or arguments.fast_pretrained_checkpoint is None
-            or arguments.fast_pretrained_sha256 is None
-        ):
-            parser.error(
-                "--preset requires --store, --output-root, "
-                "--fast-pretrained-checkpoint, and --fast-pretrained-sha256"
-            )
-        jobs, max_parallel, metadata = preset_jobs(
-            name=arguments.preset,
-            store=arguments.store,
-            output_root=arguments.output_root,
-            fast_pretrained_checkpoint=arguments.fast_pretrained_checkpoint,
-            fast_pretrained_sha256=arguments.fast_pretrained_sha256,
-            sidecars=arguments.sidecar,
-            compile_forward=arguments.compile_forward,
-        )
+    jobs, max_parallel = load_plan(arguments.plan)
     run_many(
         jobs,
         max_parallel=max_parallel,
         launcher_manifest_path=arguments.manifest,
-        launcher_metadata=metadata,
     )
 
 

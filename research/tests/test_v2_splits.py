@@ -80,17 +80,6 @@ def test_overlap_assertion_rejects_selection_without_second_purge() -> None:
         splits.assert_no_label_overlap(malformed)
 
 
-def test_block_parity_is_window_local_and_complementary() -> None:
-    dates = _weekdays(date(2024, 1, 2), date(2024, 1, 18))
-    forward, reverse = splits.block_parity_directions(dates)
-
-    assert forward.selection_dates == dates[:5] + dates[10:]
-    assert forward.evaluation_dates == dates[5:10]
-    assert reverse.selection_dates == forward.evaluation_dates
-    assert reverse.evaluation_dates == forward.selection_dates
-    assert set(forward.selection_dates) | set(forward.evaluation_dates) == set(dates)
-
-
 def test_target_masks_are_clipped_to_the_requested_window() -> None:
     dates = _weekdays(date(2024, 1, 2), date(2024, 1, 17))
     window = dates[:8]

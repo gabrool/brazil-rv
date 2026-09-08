@@ -57,7 +57,7 @@ from .data import collate_v2_daily, stage_fast_name_count
 from .losses import multi_horizon_loss, multi_horizon_loss_normalizers
 from .model import DailyMultiHorizonModel
 from .normalization import average_ranks
-from .splits import BLOCK_PARITY_SESSIONS, development_folds
+from .splits import development_folds
 
 
 class DatePairBatchSampler(Sampler[list[int]]):
@@ -398,41 +398,10 @@ class PatienceTracker:
         }
 
 
-def block_parity_mask(
-    date_count: int,
-    parity: int,
-    *,
-    block_size: int = BLOCK_PARITY_SESSIONS,
-) -> np.ndarray:
-    if date_count <= 0 or block_size <= 0:
-        raise ValueError("date_count and block_size must be positive")
-    if parity not in (0, 1):
-        raise ValueError("parity must be zero or one")
-    return (np.arange(date_count) // block_size) % 2 == parity
-
-
-def stitch_block_parity_predictions(
-    selected_on_even: np.ndarray,
-    selected_on_odd: np.ndarray,
-) -> np.ndarray:
-    """Stitch opposite-parity evaluations without shortening the date axis."""
-
-    even_model = np.asarray(selected_on_even)
-    odd_model = np.asarray(selected_on_odd)
-    if even_model.shape != odd_model.shape or even_model.ndim < 1:
-        raise ValueError("block-parity prediction arrays must have identical shapes")
-    even_dates = block_parity_mask(even_model.shape[0], 0)
-    result = np.empty_like(even_model)
-    # The model selected on odd blocks evaluates even blocks, and vice versa.
-    result[even_dates] = odd_model[even_dates]
-    result[~even_dates] = even_model[~even_dates]
-    return result
-
-
 def rank_average_ensemble(
     members: Sequence[np.ndarray], score_mask: np.ndarray
 ) -> np.ndarray:
-    """Tie-aware per-date/head rank-average of seed or parity members."""
+    """Tie-aware per-date/head rank-average of ensemble members."""
 
     arrays = tuple(np.asarray(member) for member in members)
     if not arrays or arrays[0].ndim != 3:

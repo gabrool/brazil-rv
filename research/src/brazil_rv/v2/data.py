@@ -1069,8 +1069,6 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             ("fast_patch_values", "fast_patch_valid"),
             ("current_features", "current_feature_mask"),
             ("targets", "target_mask"),
-            ("raw_targets", "raw_target_mask"),
-            ("raw_log_returns", "raw_target_mask"),
             ("to_close_target", "to_close_mask"),
         ):
             value = sample.get(value_key)
@@ -1092,7 +1090,3 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             ):
                 raise ValueError(f"dataset boundary produced non-finite {key}")
         return sample
-
-
-def store_date_lookup(store: V2Store) -> Mapping[str, int]:
-    return {str(value): index for index, value in enumerate(store.dates)}

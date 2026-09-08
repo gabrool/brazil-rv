@@ -26,7 +26,17 @@ a production or deployment decision. Official validation and the permanently
 spent test remained sealed, and deployment did not change. Earlier Rev3 results
 remain immutable historical evidence under their own registration.
 
-The accepted incumbent is the peer-free, full causal time-of-day normalized,
+The [multiday pipeline audit](docs/v2_MULTIDAY_AUDIT.md) identifies unresolved
+economic-beta and execution-timing defects in that ledger: normalized `beta_60`
+is used as an economic coefficient, hedge sizing consumes same-close outcomes,
+and retrospective inferred actions can alter decision-time orders. The reported
+economics have not been corrected for these findings. An input-only 2024 check
+also found eight of twenty intraday scalar features entirely invalid; M1/COTAHIST
+price-unit consistency never reaches the required twenty active names per day.
+Repair these contracts before making new economics claims or interpreting
+feature ablations. The audit's code cleanup does not change the frozen results.
+
+The accepted v1 incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
 recorded exact validation result is seed-11 IC **0.041972**. The rejected
 gap-pairwise loss, continuous-target sidecar, and residual equity-attention branch

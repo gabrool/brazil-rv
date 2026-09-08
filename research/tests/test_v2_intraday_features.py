@@ -8,11 +8,9 @@ from brazil_rv.v2.build_store import stream_intraday_from_assignments
 from brazil_rv.v2.corporate_actions import detect_cotahist_actions
 from brazil_rv.v2.decision_clock import SessionDefinition
 from brazil_rv.v2.intraday_features import (
-    _rolling_roll_spread,
+    _rolling_spread_from_moments,
     build_intraday_daily_features,
-    build_legacy_fixed_intraday_daily_features,
     detect_open_gap_boundaries,
-    five_minute_returns,
     mask_action_boundaries,
     replace_daily_close_anchors,
 )
@@ -87,6 +85,21 @@ def _build_scheduled(
     )
 
 
+def _build_minutes(*inputs: np.ndarray):
+    sessions = tuple(
+        SessionDefinition(
+            trade_date=date(2024, 1, 1) + timedelta(days=day),
+            continuous_open=time(10, 0),
+            decision_time=time(15, 45),
+            continuous_close=time(16, 45),
+            auction_close=time(17, 0),
+            source="test",
+        )
+        for day in range(inputs[0].shape[0])
+    )
+    return _build_scheduled(inputs, sessions)
+
+
 def _source_bars(
     sessions: tuple[SessionDefinition, ...],
     included_dates: frozenset[date],
@@ -147,19 +160,6 @@ def _source_bars(
                 }
             )
     return pl.DataFrame(rows)
-
-
-def test_intraday_features_use_completed_bars_before_cutoff_only() -> None:
-    inputs = _minutes()
-    original = build_legacy_fixed_intraday_daily_features(*inputs)
-    changed = [value.copy() for value in inputs]
-    for index in range(4):
-        changed[index][24, :, 346:] *= 10.0
-    changed[4][24, :, 346:] *= 1_000.0
-    mutated = build_legacy_fixed_intraday_daily_features(*changed)
-    np.testing.assert_array_equal(original.values[24], mutated.values[24])
-    np.testing.assert_array_equal(original.valid[24], mutated.valid[24])
-    np.testing.assert_array_equal(original.entry_open[24], mutated.entry_open[24])
 
 
 def test_scheduled_intraday_uses_shifted_prefix_and_continuous_close() -> None:
@@ -285,13 +285,14 @@ def test_scheduled_intraday_rejects_malformed_valid_activity() -> None:
 def test_entry_bar_does_not_control_fast_presence() -> None:
     inputs = list(_minutes())
     inputs[-1][24, 0, 345] = False
-    result = build_legacy_fixed_intraday_daily_features(*inputs)
-    assert not result.entry_open_valid[24, 0]
+    result = _build_minutes(*inputs)
+    # Scheduled summaries carry the last completed decision mark here.
+    assert result.entry_open_valid[24, 0]
     assert result.fast_present[24, 0]
 
 
 def test_action_boundaries_use_distinct_causal_clocks() -> None:
-    raw = build_legacy_fixed_intraday_daily_features(*_minutes())
+    raw = _build_minutes(*_minutes())
     result = replace(
         raw,
         values=np.ones_like(raw.values),
@@ -346,7 +347,7 @@ def test_open_gap_boundary_is_decision_known_and_close_t_invariant() -> None:
 
 
 def test_open_gap_without_dismes_masks_current_cross_session_features() -> None:
-    result = build_legacy_fixed_intraday_daily_features(*_minutes())
+    result = _build_minutes(*_minutes())
     shape = result.values.shape[:2]
     raw_open = np.full(shape, 100.0)
     raw_close = np.full(shape, 100.0)
@@ -384,9 +385,7 @@ def test_post_decision_split_classification_cannot_change_same_day_features() ->
             values[20, :, 346:] = post_decision_close
         volume = np.ones_like(price)
         observed = np.ones_like(price, dtype=np.bool_)
-        return build_legacy_fixed_intraday_daily_features(
-            *inputs, volume, observed
-        )
+        return _build_minutes(*inputs, volume, observed)
 
     raw_open = np.full((days, names), 100.0)
     distribution = np.ones_like(raw_open)
@@ -436,7 +435,7 @@ def test_post_decision_split_classification_cannot_change_same_day_features() ->
 
 
 def test_resolved_cash_action_does_not_mask_but_unit_change_does() -> None:
-    raw = build_legacy_fixed_intraday_daily_features(*_minutes())
+    raw = _build_minutes(*_minutes())
     result = replace(
         raw,
         values=np.ones_like(raw.values),
@@ -466,26 +465,17 @@ def test_resolved_cash_action_does_not_mask_but_unit_change_does() -> None:
 
 def test_fast_presence_ignores_every_entry_bar_field() -> None:
     inputs = _minutes()
-    original = build_legacy_fixed_intraday_daily_features(*inputs)
+    original = _build_minutes(*inputs)
     changed = [value.copy() for value in inputs]
     for index in range(5):
         changed[index][24, :, 345] = np.nan
     changed[-1][24, :, 345] = False
-    mutated = build_legacy_fixed_intraday_daily_features(*changed)
+    mutated = _build_minutes(*changed)
     np.testing.assert_array_equal(original.fast_present[24], mutated.fast_present[24])
 
 
-def test_five_minute_returns_are_adjacent_block_close_to_close() -> None:
-    close = np.asarray([[[1.0, 1.0, 1.0, 1.0, 100.0, 1.0, 1.0, 1.0, 1.0, 110.0]]])
-    returns, valid = five_minute_returns(
-        close.copy(), close, np.ones_like(close, dtype=bool), cutoff=10
-    )
-    np.testing.assert_allclose(returns, np.log(1.1))
-    assert valid.all()
-
-
 def test_cotahist_close_replaces_full_session_anchor() -> None:
-    result = build_legacy_fixed_intraday_daily_features(*_minutes())
+    result = _build_minutes(*_minutes())
     official = result.session_close.copy()
     official[-2, 0] *= 1.004
     replaced = replace_daily_close_anchors(
@@ -500,8 +490,8 @@ def test_cotahist_close_replaces_full_session_anchor() -> None:
 
 
 def test_cotahist_close_in_place_mode_matches_copy_mode() -> None:
-    copied_input = build_legacy_fixed_intraday_daily_features(*_minutes())
-    in_place_input = build_legacy_fixed_intraday_daily_features(*_minutes())
+    copied_input = _build_minutes(*_minutes())
+    in_place_input = _build_minutes(*_minutes())
     official = copied_input.session_close.copy()
     official[-2, 0] *= 1.004
     observed = np.ones_like(official, dtype=bool)
@@ -522,7 +512,7 @@ def test_cotahist_close_in_place_mode_matches_copy_mode() -> None:
 
 
 def test_m1_cotahist_unit_mismatch_masks_cross_session_features() -> None:
-    result = build_legacy_fixed_intraday_daily_features(*_minutes())
+    result = _build_minutes(*_minutes())
     official = result.session_close.copy()
     official[-2, 0] *= 1.006
     replaced = replace_daily_close_anchors(
@@ -539,13 +529,12 @@ def test_m1_cotahist_unit_mismatch_masks_cross_session_features() -> None:
 
 def test_decision_features_exclude_every_entry_and_later_bar_field() -> None:
     inputs = _minutes()
-    original = build_legacy_fixed_intraday_daily_features(*inputs)
+    original = _build_minutes(*inputs)
     changed = [value.copy() for value in inputs]
-    # The entry bar is index 345.  Its open is the separate entry price; no
-    # entry-bar H/L/C/volume or later value may enter a decision feature.
-    for index in (1, 2, 3, 4):
+    # No field from the decision bar at index 345 or later enters this snapshot.
+    for index in range(5):
         changed[index][24, :, 345:] *= 10_000.0
-    mutated = build_legacy_fixed_intraday_daily_features(*changed)
+    mutated = _build_minutes(*changed)
     np.testing.assert_array_equal(original.values[24], mutated.values[24])
     np.testing.assert_array_equal(original.valid[24], mutated.valid[24])
     np.testing.assert_array_equal(original.entry_open[24], mutated.entry_open[24])
@@ -556,34 +545,28 @@ def test_exact_final_m1_close_has_an_independent_observation_mask() -> None:
     inputs = list(_minutes())
     inputs[3][24, 0, -1] = 123.45
     inputs[-1][24, 1, -1] = False
-    result = build_legacy_fixed_intraday_daily_features(*inputs)
+    result = _build_minutes(*inputs)
     assert result.session_close[24, 0] == 123.45
     assert result.session_close_valid[24, 0]
     assert np.isnan(result.session_close[24, 1])
     assert not result.session_close_valid[24, 1]
 
 
-def test_volume_cleaning_matches_zero_for_unusable_observations() -> None:
-    inputs = list(_minutes())
-    changed = [value.copy() for value in inputs]
-    normalized = [value.copy() for value in inputs]
-    for minute, value in zip((10, 11, 12), (-1.0, np.nan, np.inf), strict=True):
-        changed[4][24, 0, minute] = value
-        normalized[4][24, 0, minute] = 0.0
-    changed[4][24, 0, 13] = 1_000_000.0
-    changed[5][24, 0, 13] = False
-    normalized[4][24, 0, 13] = 0.0
-    normalized[5][24, 0, 13] = False
-    actual = build_legacy_fixed_intraday_daily_features(*changed)
-    expected = build_legacy_fixed_intraday_daily_features(*normalized)
-    np.testing.assert_array_equal(actual.values, expected.values)
-    np.testing.assert_array_equal(actual.valid, expected.valid)
-
-
 def test_roll_spread_uses_negative_sample_covariance_and_masks_nonnegative() -> None:
     returns = np.asarray([[[0.01, -0.01, 0.01, -0.01]]])
-    valid = np.ones_like(returns, dtype=bool)
-    spread, mask = _rolling_roll_spread(returns, valid, 1)
+
+    def estimate(values: np.ndarray):
+        left, right = values[..., :-1], values[..., 1:]
+        return _rolling_spread_from_moments(
+            np.full(values.shape[:2], values.shape[-1] - 1, dtype=np.int64),
+            left.sum(axis=2),
+            right.sum(axis=2),
+            (left * right).sum(axis=2),
+            np.full(values.shape[0], values.shape[-1] - 1, dtype=np.int64),
+            1,
+        )
+
+    spread, mask = estimate(returns)
     left = returns[0, 0, :-1]
     right = returns[0, 0, 1:]
     expected = 2.0 * np.sqrt(-np.cov(left, right, ddof=1)[0, 1])
@@ -591,9 +574,7 @@ def test_roll_spread_uses_negative_sample_covariance_and_masks_nonnegative() -> 
     assert spread[0, 0] == expected
 
     increasing = np.asarray([[[0.01, 0.02, 0.03, 0.04]]])
-    spread, mask = _rolling_roll_spread(
-        increasing, np.ones_like(increasing, dtype=bool), 1
-    )
+    spread, mask = estimate(increasing)
     assert not mask[0, 0]
     assert np.isnan(spread[0, 0])
 

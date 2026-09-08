@@ -700,17 +700,10 @@ def test_store_writer_accepts_aligned_date_common_state_audit_arrays(tmp_path) -
         )
 
 
-def test_current_store_rejects_superseded_arrays_and_unmapped_native_fast(
+def test_current_store_requires_correct_native_fast_mapping(
     tmp_path: Path,
 ) -> None:
     dates = [date(2024, 1, 2), date(2024, 1, 3)]
-    with pytest.raises(ValueError, match="superseded synthetic-adjustment"):
-        write_store(
-            tmp_path / "legacy_array",
-            dates=dates,
-            isins=["BRTESTACNOR1"],
-            arrays={"adjusted_close": np.ones((2, 1), dtype=np.float32)},
-        )
     native = {
         "fast_patch_values": np.zeros((2, 1, 1, 7), dtype=np.float32),
         "fast_patch_valid": np.zeros((2, 1, 1, 7), dtype=np.bool_),
@@ -741,13 +734,13 @@ def test_current_store_rejects_superseded_arrays_and_unmapped_native_fast(
         )
 
 
-def test_open_store_rejects_the_superseded_daily_schema(tmp_path: Path) -> None:
+def test_open_store_requires_current_schema(tmp_path: Path) -> None:
     path = _base_store(tmp_path)
     manifest_path = path / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["schema"] = "BRAZIL_RV_V2_DAILY_STORE_V1"
+    manifest["schema"] = "unrecognized"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    with pytest.raises(ValueError, match="superseded v2 daily store"):
+    with pytest.raises(ValueError, match="not a current v2 daily store"):
         open_store_for_dates(path, [0], purpose="training")
 
 

@@ -41,7 +41,6 @@ from brazil_rv.v2.train import (
     reshape_date_pair_batch,
     sam_accumulated_step,
     sam_step,
-    stitch_block_parity_predictions,
     train_stage,
     _common_primary_selection_score,
     _configure_inductor_compiler,
@@ -331,15 +330,6 @@ def test_pretrain_internal_holdout_is_last_ten_percent_after_embargo() -> None:
     assert fit.tolist() == list(range(830))
     assert embargo.tolist() == list(range(830, 900))
     assert selection.tolist() == list(range(900, 1_000))
-
-
-def test_block_parity_stitch_preserves_full_contiguous_axis() -> None:
-    selected_on_even = np.full((13, 2), 10.0)
-    selected_on_odd = np.full((13, 2), 20.0)
-    stitched = stitch_block_parity_predictions(selected_on_even, selected_on_odd)
-    assert np.array_equal(stitched[:5], selected_on_odd[:5])
-    assert np.array_equal(stitched[5:10], selected_on_even[5:10])
-    assert np.array_equal(stitched[10:], selected_on_odd[10:])
 
 
 def test_rank_average_ensemble_is_per_group_and_tie_aware() -> None:

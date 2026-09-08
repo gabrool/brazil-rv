@@ -11,7 +11,6 @@ from brazil_rv.v2.gbdt import (
     GBDTConfig,
     LightGBMUnavailable,
     MultiHorizonGBDT,
-    assemble_gbdt_features,
     assemble_gbdt_scalar_view,
     gbdt_scalar_feature_names,
     require_lightgbm,
@@ -22,29 +21,6 @@ def test_missing_lightgbm_has_clear_install_error(monkeypatch) -> None:
     monkeypatch.setattr(gbdt_module, "lgb", None)
     with pytest.raises(LightGBMUnavailable, match="uv add lightgbm"):
         require_lightgbm()
-
-
-def test_gbdt_feature_assembly_uses_last_slow_step_and_fast_flag() -> None:
-    slow = np.arange(2 * 3 * 4 * 2, dtype=np.float32).reshape(2, 3, 4, 2)
-    intraday = np.ones((2, 3, 3), dtype=np.float32)
-    present = np.array([[True, False, True], [False, True, False]])
-    slow_age = np.full_like(slow, 4.0)
-    intraday_age = np.full_like(intraday, 2.0)
-    actual = assemble_gbdt_features(
-        slow,
-        intraday,
-        present,
-        slow_feature_mask=np.ones_like(slow, dtype=np.bool_),
-        intraday_feature_mask=np.ones_like(intraday, dtype=np.bool_),
-        slow_feature_age_sessions=slow_age,
-        intraday_feature_age_sessions=intraday_age,
-    )
-    assert actual.shape == (2, 3, 11)
-    assert np.array_equal(actual[..., :2], slow[:, :, -1])
-    assert np.allclose(actual[..., 2:4], np.log1p(4.0) / np.log1p(252.0))
-    assert np.array_equal(actual[..., 4:7], intraday)
-    assert np.allclose(actual[..., 7:10], np.log1p(2.0) / np.log1p(252.0))
-    assert np.array_equal(actual[..., -1], present)
 
 
 def test_gbdt_scalar_adapter_preserves_view_order_masks_ages_and_axes() -> None:
@@ -79,58 +55,6 @@ def test_gbdt_scalar_adapter_preserves_view_order_masks_ages_and_axes() -> None:
     assert view.date_indices.tolist() == [7]
     assert view.isins == ("BR1", "BR2")
     assert view.active.tolist() == [[True, False]]
-
-
-def test_gbdt_feature_masks_become_nan_and_nonfinite_valid_cells_fail() -> None:
-    slow = np.ones((1, 2, 3, 2), dtype=np.float32)
-    intraday = np.ones((1, 2, 2), dtype=np.float32)
-    slow_mask = np.ones_like(slow, dtype=np.bool_)
-    intraday_mask = np.ones_like(intraday, dtype=np.bool_)
-    slow_age = np.zeros_like(slow, dtype=np.float32)
-    intraday_age = np.zeros_like(intraday, dtype=np.float32)
-    slow_mask[0, 0, -1, 1] = False
-    slow_age[0, 0, -1, 1] = 7.0
-    intraday_mask[0, 1, 0] = False
-    intraday_age[0, 1, 0] = -1.0
-    slow[0, 0, -1, 1] = 99.0
-    intraday[0, 1, 0] = -99.0
-    actual = assemble_gbdt_features(
-        slow,
-        intraday,
-        np.ones((1, 2), dtype=np.bool_),
-        slow_feature_mask=slow_mask,
-        intraday_feature_mask=intraday_mask,
-        slow_feature_age_sessions=slow_age,
-        intraday_feature_age_sessions=intraday_age,
-    )
-    assert np.isnan(actual[0, 0, 1])
-    assert actual[0, 0, 3] == pytest.approx(np.log1p(7.0) / np.log1p(252.0))
-    assert np.isnan(actual[0, 1, 4])
-    assert np.isnan(actual[0, 1, 6])
-
-    slow[0, 1, -1, 0] = np.nan
-    with pytest.raises(ValueError, match="valid slow"):
-        assemble_gbdt_features(
-            slow,
-            intraday,
-            np.ones((1, 2), dtype=np.bool_),
-            slow_feature_mask=slow_mask,
-            intraday_feature_mask=intraday_mask,
-            slow_feature_age_sessions=slow_age,
-            intraday_feature_age_sessions=intraday_age,
-        )
-    slow[0, 1, -1, 0] = np.inf
-    slow_mask[0, 1, -1, 0] = False
-    with pytest.raises(ValueError, match="infinities"):
-        assemble_gbdt_features(
-            slow,
-            intraday,
-            np.ones((1, 2), dtype=np.bool_),
-            slow_feature_mask=slow_mask,
-            intraday_feature_mask=intraday_mask,
-            slow_feature_age_sessions=slow_age,
-            intraday_feature_age_sessions=intraday_age,
-        )
 
 
 def test_gbdt_panel_rejects_nonfinite_valid_targets_and_infinite_features() -> None:

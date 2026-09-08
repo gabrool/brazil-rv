@@ -30,7 +30,6 @@ OFFICIAL_VALIDATION_END = OFFICIAL_END
 TEST_FALLBACK_START = FALLBACK_TEST_START
 TEST_FALLBACK_END = ACCUMULATED_TEST_AFTER
 FIT_EMBARGO_SESSIONS = SELECTION_EMBARGO_SESSIONS
-BLOCK_PARITY_SESSIONS = 5
 FIT_TO_SELECTION_PURGE_SESSIONS = 10
 SELECTION_SESSIONS = 55
 SELECTION_TO_EVALUATION_PURGE_SESSIONS = 10
@@ -126,13 +125,6 @@ class DevelopmentFold:
             "label_intervals_sha256": _label_intervals_sha256(self),
             "no_label_overlap_assertion": assert_no_label_overlap(self),
         }
-
-
-@dataclass(frozen=True)
-class BlockParityDirection:
-    name: str
-    selection_dates: tuple[date, ...]
-    evaluation_dates: tuple[date, ...]
 
 
 def _ordered_unique(dates: Sequence[date]) -> tuple[date, ...]:
@@ -377,25 +369,6 @@ def _label_intervals_sha256(fold: DevelopmentFold) -> str:
         label_intervals(fold), sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
-
-
-def block_parity_directions(
-    selection_dates: Sequence[date],
-) -> tuple[BlockParityDirection, BlockParityDirection]:
-    dates = _ordered_unique(selection_dates)
-    block = np.arange(len(dates), dtype=np.int64) // BLOCK_PARITY_SESSIONS
-    even = tuple(
-        value for value, index in zip(dates, block, strict=True) if index % 2 == 0
-    )
-    odd = tuple(
-        value for value, index in zip(dates, block, strict=True) if index % 2 == 1
-    )
-    if not even or not odd or set(even) & set(odd):
-        raise ValueError("selection window cannot form both block parities")
-    return (
-        BlockParityDirection("even_select_odd_evaluate", even, odd),
-        BlockParityDirection("odd_select_even_evaluate", odd, even),
-    )
 
 
 def mask_targets_to_window(

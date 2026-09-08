@@ -38,13 +38,6 @@ from .splits import (
 )
 
 STORE_SCHEMA = "BRAZIL_RV_V2_DAILY_STORE_V3"
-_SUPERSEDED_STORE_SCHEMAS = frozenset(
-    (
-        "V2_DAILY_STORE_V1",
-        "BRAZIL_RV_V2_DAILY_STORE_V1",
-        "BRAZIL_RV_V2_DAILY_STORE_V2",
-    )
-)
 _SAFE_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 _WRITE_VERIFICATION = object()
 _MAX_CAUSAL_HISTORY_ROWS = max(*ALLOWED_LOOKBACKS, 253)
@@ -82,21 +75,6 @@ _SPARSE_FAST_ARRAYS = frozenset(
         "fast_patch_mask",
         "fast_last_price_age_minutes",
         "fast_last_price_age_valid",
-    }
-)
-_FORBIDDEN_CURRENT_ARRAYS = frozenset(
-    {
-        "adjusted_open",
-        "adjusted_high",
-        "adjusted_low",
-        "adjusted_close",
-        "price_adjustment_factor",
-        "neutralized_log_return",
-        "neutralized_log_return_valid",
-        "return_neutralized_event_mask",
-        "target_raw_midrank",
-        "target_raw_valid",
-        "target_raw_log_return",
     }
 )
 _FEATURE_SPEC_KEYS = frozenset(item.name for item in dataclass_fields(FeatureSpec))
@@ -479,11 +457,6 @@ def _validate_array_shapes(
     for name, raw in arrays.items():
         if not _SAFE_NAME.fullmatch(name):
             raise ValueError(f"unsafe array name: {name}")
-        if name in _FORBIDDEN_CURRENT_ARRAYS:
-            raise ValueError(
-                f"{name} belongs to the superseded synthetic-adjustment/target "
-                "contract and cannot be sealed under the current store schema"
-            )
         value = np.asarray(raw)
         if name in _DATE_ONLY_ARRAYS:
             if value.shape != (date_count,):
@@ -1197,12 +1170,6 @@ class V2Store:
         manifest_path = path / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         schema = manifest.get("schema")
-        if schema in _SUPERSEDED_STORE_SCHEMAS:
-            raise ValueError(
-                "superseded v2 daily store: decision-row, action/return, feature-mask, "
-                "and native-fast semantics are incompatible; rebuild from immutable "
-                "raw sources under the current schema"
-            )
         if schema != STORE_SCHEMA:
             raise ValueError("not a current v2 daily store")
         feature_schema_identity = _validated_feature_schema_sha256(

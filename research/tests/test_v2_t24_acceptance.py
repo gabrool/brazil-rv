@@ -822,5 +822,5 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
         ),
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="stale or lacks the current schema"):
+    with pytest.raises(ValueError, match="requires the current schema"):
         load_plan(stale_plan)

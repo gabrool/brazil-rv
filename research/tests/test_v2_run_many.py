@@ -167,35 +167,16 @@ def test_named_protocol_json_files_match_frozen_presets() -> None:
     assert protocol_preset("full") == FULL_PROTOCOL
 
 
-def test_voided_named_preset_is_hard_disabled(tmp_path) -> None:
-    checkpoint = tmp_path / "fast.pt"
-    checkpoint.write_bytes(b"accepted-fast-checkpoint")
-    with pytest.raises(RuntimeError, match="voided v2 Round 1/Round 2"):
-        launcher.preset_jobs(
-            name="triage",
-            store=tmp_path / "store",
-            output_root=tmp_path / "runs",
-            fast_pretrained_checkpoint=checkpoint,
-            fast_pretrained_sha256=launcher._sha256(checkpoint),
-        )
-
-
-def test_plan_loader_rejects_stale_schema_and_voided_research_phase(tmp_path) -> None:
+def test_plan_loader_requires_current_schema(tmp_path) -> None:
     plan = tmp_path / "plan.json"
     payload = {
-        "schema": "BRAZIL_RV_V2_RUN_MANY_PLAN_V1",
+        "schema": "unrecognized",
         "phase": "engineering_acceptance",
         "max_parallel": 1,
         "jobs": [],
     }
     plan.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(ValueError, match="stale or lacks the current schema"):
-        launcher.load_plan(plan)
-
-    payload["schema"] = RUN_MANY_PLAN_SCHEMA
-    payload["phase"] = "registered_arms"
-    plan.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(RuntimeError, match="voided v2 Round 1/Round 2"):
+    with pytest.raises(ValueError, match="requires the current schema"):
         launcher.load_plan(plan)
 
 
