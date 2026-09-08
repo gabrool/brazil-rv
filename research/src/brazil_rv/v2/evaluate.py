@@ -39,7 +39,7 @@ BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V13"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V14"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
@@ -909,6 +909,10 @@ def _ledger_rows(
                 result.ex_ante_beta_after_hedge[index]
             ),
             "volatility_quota": result.volatility_quota[index].tolist(),
+            "volatility_group_size": result.volatility_group_size[index].tolist(),
+            "entry_eligible_name_count": int(
+                result.entry_eligible_name_count[index]
+            ),
             "volatility_occupancy_long": (
                 result.volatility_occupancy_long[index].tolist()
             ),

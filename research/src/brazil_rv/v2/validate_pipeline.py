@@ -72,8 +72,8 @@ from .train import (
     train_stage,
 )
 
-PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V12"
-_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V11"
+PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V13"
+_PRIOR_PIPELINE_SCHEMA = "BRAZIL_RV_V2_PIPELINE_VALIDATION_V12"
 _ACCEPTANCE_ANCESTOR_SCHEMAS = frozenset(
     {
         "BRAZIL_RV_V2_PIPELINE_VALIDATION_V5",
@@ -1192,6 +1192,15 @@ def _development_acceptance(
                 ),
                 "mean_volatility_quota_by_quintile": headline.get(
                     "mean_volatility_quota_by_quintile"
+                ),
+                "mean_entry_eligible_name_count": headline.get(
+                    "mean_entry_eligible_name_count"
+                ),
+                "mean_volatility_group_size_by_quintile": headline.get(
+                    "mean_volatility_group_size_by_quintile"
+                ),
+                "minimum_volatility_group_size_by_quintile": headline.get(
+                    "minimum_volatility_group_size_by_quintile"
                 ),
                 "mean_volatility_occupancy_long_by_quintile": headline.get(
                     "mean_volatility_occupancy_long_by_quintile"

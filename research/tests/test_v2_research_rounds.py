@@ -80,7 +80,7 @@ def _lending_panels(inputs: EvaluationInputs) -> LendingBorrowPanels:
 def test_rev4_registration_replaces_the_voided_research_entrypoints(
     tmp_path: Path,
 ) -> None:
-    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4c.md"
+    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4d.md"
     assert research_rounds.PREREGISTRATION.is_file()
     with pytest.raises(FileNotFoundError):
         research_rounds.run_round1(output_root=tmp_path / "absent", num_threads=1)
@@ -157,7 +157,7 @@ def test_acceptance_binds_store_hash_and_store_build_separately_from_freeze(
         "schedule_source": "reconstructed_v1",
     }
     report = {
-        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V12",
+        "schema": "BRAZIL_RV_V2_PIPELINE_VALIDATION_V13",
         "status": "completed",
         "engineering_acceptance_status": "development_grade_inferred_actions",
         "research_claim": False,

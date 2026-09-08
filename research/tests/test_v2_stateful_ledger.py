@@ -1546,6 +1546,7 @@ def test_rev4_defaults_bind_lending_volatility_balance_and_beta_hedge() -> None:
     config = LedgerConfig()
     assert config.borrow_source == "borrow_balance"
     assert config.volatility_balanced_entries
+    assert config.small_stratum_scaling_threshold_multiple == 2
     assert config.beta_hedge
     assert config.hedge_rebalance_threshold_nav == 0.05
     assert config.hedge_notional_cap_nav == 0.60
@@ -1583,6 +1584,23 @@ def test_rev4_entry_scheduler_fills_equal_volatility_quotas() -> None:
     )
 
     np.testing.assert_array_equal(result.volatility_quota[0], [6, 6, 6, 6, 6])
+    np.testing.assert_array_equal(result.volatility_group_size[0], [60, 60, 60, 60, 60])
+    assert result.entry_eligible_name_count[0] == 300
+    assert result.summary()["mean_entry_eligible_name_count"] == 300.0
+    assert result.summary()["mean_volatility_group_size_by_quintile"] == [
+        60.0,
+        60.0,
+        60.0,
+        60.0,
+        60.0,
+    ]
+    assert result.summary()["minimum_volatility_group_size_by_quintile"] == [
+        60,
+        60,
+        60,
+        60,
+        60,
+    ]
     np.testing.assert_array_equal(
         result.volatility_occupancy_long[0], [6, 6, 6, 6, 6]
     )
@@ -1671,11 +1689,46 @@ def test_rev4_small_stratum_scales_quota_and_buffer_without_band_overlap() -> No
         k_eff=30,
         buffer=30,
         group_sizes=np.asarray([60, 60, 8, 60, 60]),
+        threshold_multiple=2,
     )
 
-    assert quota[2] == 1
-    assert buffer[2] == 1
+    assert quota[2] == 2
+    assert buffer[2] == 2
     assert 2 * (quota[2] + buffer[2]) <= 8
+
+
+def test_rev4d_stratum_threshold_preserves_full_and_scaled_disjoint_bands() -> None:
+    full_quota, full_buffer = _scaled_group_bands(
+        k_eff=30,
+        buffer=30,
+        group_sizes=np.full(5, 38),
+        threshold_multiple=2,
+    )
+    scaled_quota, scaled_buffer = _scaled_group_bands(
+        k_eff=30,
+        buffer=30,
+        group_sizes=np.full(5, 20),
+        threshold_multiple=2,
+    )
+
+    np.testing.assert_array_equal(full_quota, [6, 6, 6, 6, 6])
+    np.testing.assert_array_equal(full_buffer, [6, 6, 6, 6, 6])
+    np.testing.assert_array_equal(scaled_quota, [5, 5, 5, 5, 5])
+    np.testing.assert_array_equal(scaled_buffer, [5, 5, 5, 5, 5])
+    assert np.all(2 * (full_quota + full_buffer) <= 38)
+    assert np.all(2 * (scaled_quota + scaled_buffer) <= 20)
+
+
+def test_rev4c_small_stratum_fixture_is_exact_when_multiple_is_four() -> None:
+    quota, buffer = _scaled_group_bands(
+        k_eff=30,
+        buffer=30,
+        group_sizes=np.asarray([60, 60, 8, 60, 60]),
+        threshold_multiple=4,
+    )
+
+    np.testing.assert_array_equal(quota, [6, 6, 1, 6, 6])
+    np.testing.assert_array_equal(buffer, [6, 6, 1, 6, 6])
 
 
 def test_rev4_unavailable_short_quota_spills_to_best_remaining_names() -> None:

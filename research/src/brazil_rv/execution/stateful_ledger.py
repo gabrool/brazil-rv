@@ -72,6 +72,7 @@ class LedgerConfig:
     borrow_registration_fee: float = 0.0025
     volatility_balanced_entries: bool = True
     volatility_group_count: int = 5
+    small_stratum_scaling_threshold_multiple: int = 2
     beta_hedge: bool = True
     hedge_rebalance_threshold_nav: float = 0.05
     hedge_notional_cap_nav: float = 0.60
@@ -116,6 +117,8 @@ class LedgerConfig:
             raise ValueError("borrow registration fee must be non-negative")
         if self.volatility_group_count < 1:
             raise ValueError("volatility group count must be positive")
+        if self.small_stratum_scaling_threshold_multiple < 2:
+            raise ValueError("small-stratum scaling multiple must be at least two")
         if (
             self.hedge_rebalance_threshold_nav < 0.0
             or self.hedge_notional_cap_nav <= 0.0
@@ -368,6 +371,8 @@ class StatefulLedgerResult:
     beta_hedge: bool
     hedge_notional_cap_nav: float
     volatility_quota: NDArray[np.int64]
+    volatility_group_size: NDArray[np.int64]
+    entry_eligible_name_count: NDArray[np.int64]
     volatility_occupancy_long: NDArray[np.int64]
     volatility_occupancy_short: NDArray[np.int64]
     volatility_spilled_entries_long: NDArray[np.int64]
@@ -712,6 +717,15 @@ class StatefulLedgerResult:
             "mean_volatility_quota_by_quintile": np.mean(
                 self.volatility_quota, axis=0
             ).tolist(),
+            "mean_entry_eligible_name_count": float(
+                np.mean(self.entry_eligible_name_count)
+            ),
+            "mean_volatility_group_size_by_quintile": np.mean(
+                self.volatility_group_size, axis=0
+            ).tolist(),
+            "minimum_volatility_group_size_by_quintile": np.min(
+                self.volatility_group_size, axis=0
+            ).tolist(),
             "mean_volatility_occupancy_long_by_quintile": np.mean(
                 self.volatility_occupancy_long, axis=0
             ).tolist(),
@@ -1036,6 +1050,7 @@ def _scaled_group_bands(
     k_eff: int,
     buffer: int,
     group_sizes: NDArray[np.integer],
+    threshold_multiple: int,
 ) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
     """Scale quota and retention widths together in undersized quintiles."""
 
@@ -1044,9 +1059,9 @@ def _scaled_group_bands(
     retention_buffer = _balanced_quota(buffer, len(sizes))
     for group, size in enumerate(sizes):
         width = int(quota[group] + retention_buffer[group])
-        if width == 0 or int(size) >= 4 * width:
+        if width == 0 or int(size) >= threshold_multiple * width:
             continue
-        scale = float(size) / float(4 * width)
+        scale = float(size) / float(threshold_multiple * width)
         quota[group] = int(np.floor(quota[group] * scale))
         retention_buffer[group] = int(np.floor(retention_buffer[group] * scale))
     return quota, retention_buffer
@@ -1300,6 +1315,8 @@ def simulate_stateful_ledger(
     shortfall_sizing_mark_rows: list[float] = []
     shortfall_sizing_nav_rows: list[float] = []
     volatility_quota_rows: list[NDArray[np.int64]] = []
+    volatility_group_size_rows: list[NDArray[np.int64]] = []
+    entry_eligible_name_count_rows: list[int] = []
     volatility_occupancy_long_rows: list[NDArray[np.int64]] = []
     volatility_occupancy_short_rows: list[NDArray[np.int64]] = []
     volatility_spilled_long_rows: list[NDArray[np.int64]] = []
@@ -1673,6 +1690,7 @@ def simulate_stateful_ledger(
                 k_eff=k_eff,
                 buffer=config.buffer_per_side,
                 group_sizes=group_sizes,
+                threshold_multiple=config.small_stratum_scaling_threshold_multiple,
             )
             # An undersized stratum scales both its quota and buffer.  The
             # resulting quota sum is therefore the contractual side size for
@@ -1702,6 +1720,7 @@ def simulate_stateful_ledger(
             volatility_groups = np.full(name_count, -1, dtype=np.int64)
             volatility_quota = np.zeros(config.volatility_group_count, dtype=np.int64)
             volatility_buffer = np.zeros(config.volatility_group_count, dtype=np.int64)
+            group_sizes = np.zeros(config.volatility_group_count, dtype=np.int64)
             group_orders = {}
             long_retention = np.zeros(name_count, dtype=np.bool_)
             short_retention = np.zeros(name_count, dtype=np.bool_)
@@ -2849,6 +2868,8 @@ def simulate_stateful_ledger(
         net_including_hedge_rows.append(net_including_hedge)
         turnover_rows.append(traded_notional / start_nav)
         volatility_quota_rows.append(volatility_quota.copy())
+        volatility_group_size_rows.append(group_sizes.copy())
+        entry_eligible_name_count_rows.append(int(entry_eligible.sum()))
         volatility_occupancy_long_rows.append(long_volatility_occupancy)
         volatility_occupancy_short_rows.append(short_volatility_occupancy)
         volatility_spilled_long_rows.append(spilled_entries["buy"])
@@ -3037,6 +3058,9 @@ def simulate_stateful_ledger(
                     k_eff=later_k_eff,
                     buffer=config.buffer_per_side,
                     group_sizes=later_sizes,
+                    threshold_multiple=(
+                        config.small_stratum_scaling_threshold_multiple
+                    ),
                 )
                 later_group = int(later_groups[name])
                 if later_group < 0:
@@ -3358,6 +3382,10 @@ def simulate_stateful_ledger(
         beta_hedge=config.beta_hedge,
         hedge_notional_cap_nav=config.hedge_notional_cap_nav,
         volatility_quota=np.stack(volatility_quota_rows),
+        volatility_group_size=np.stack(volatility_group_size_rows),
+        entry_eligible_name_count=np.asarray(
+            entry_eligible_name_count_rows, dtype=np.int64
+        ),
         volatility_occupancy_long=np.stack(volatility_occupancy_long_rows),
         volatility_occupancy_short=np.stack(volatility_occupancy_short_rows),
         volatility_spilled_entries_long=np.stack(volatility_spilled_long_rows),

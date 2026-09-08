@@ -72,11 +72,11 @@ from .validate_pipeline import (
     _window_target_mask,
 )
 
-ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4C"
-ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4C"
-RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4C"
+ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4D"
+ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4D"
+RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4D"
 PREREGISTRATION = (
-    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4c.md"
+    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4d.md"
 )
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
@@ -262,7 +262,7 @@ def registration_protocol_from_code() -> dict[str, object]:
             "volatility_strata": "five_equal_count_yang_zhang_vol_20_quintiles",
             "rank_within_stratum": True,
             "quota_remainder_order": [3, 2, 4, 1, 5],
-            "small_stratum_scaling_threshold_multiple": 4,
+            "small_stratum_scaling_threshold_multiple": 2,
             "fill_order": "within_quintile_then_global_band_spill",
             "retention_uses_current_quintile": True,
             "occupancy_mean_absolute_deviation_limit_slots": 2.0,
@@ -364,7 +364,7 @@ def _verify_development_acceptance(
         raise ValueError("development acceptance report SHA-256 mismatch")
     report = _read_json(source)
     if (
-        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V12"
+        report.get("schema") != "BRAZIL_RV_V2_PIPELINE_VALIDATION_V13"
         or report.get("status") != "completed"
         or report.get("engineering_acceptance_status")
         != "development_grade_inferred_actions"
