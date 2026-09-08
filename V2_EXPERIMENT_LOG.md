@@ -2199,3 +2199,124 @@ no deployment changed, and no paid instance was launched. Direct provider
 inventory reads at `2026-09-08T17:22:49.2489669Z` and
 `2026-09-08T17:25:17.1049677Z` each returned zero nonterminal instances, so
 there was nothing to terminate and no adjacent instance was touched.
+
+## Rev4d stratum-threshold acceptance and Round 1 (2026-09-08)
+
+Rev4d changes one registered construction parameter: the proportional
+small-stratum scaling threshold is `2 * (k_q + b_q)`, not 4 times that sum.
+This is the minimum threshold that guarantees disjoint long and short bands
+and is the quintile-local equivalent of the original global half-population
+rule. Scaling below the threshold is unchanged. A 38-name stratum therefore
+keeps `k_q=b_q=6`, while a 20-name stratum scales to `k_q=b_q=5`; the rev4c
+behavior remains exactly reproducible when the multiple is explicitly set
+back to 4. The implementation, protocol, and preregistration were frozen
+before scores in commit
+`733ac1e729f98af964e022869a9dfaf617f93d3b`. Ruff, compileall, 149 focused
+tests, the later 84-test focused check, and all 899 tests passed.
+
+The first acceptance command mistakenly supplied the network-continuation
+`--store-manifest-sha256` switch without the other three network bindings. It
+failed before root creation or any score. Both attempt logs were retained.
+The fresh classical acceptance is:
+
+    D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev4d_733ac1e_20260908T175620Z
+
+Pipeline-manifest, final log-inclusive inventory, and operational-log
+manifest SHA-256 values are
+`ef789052472044406d5771dcdf02c5f5590637f345f3bf9eaff26e215355c9e6`,
+`f607751e8a998b003a8bdd284a0271b847395e54ba31d2bd103a5b26c03c4c86`,
+and `e370fc987fc98555b320d83e9ed4306005b35699acee41b0c003e81a6cf76509`.
+The run completed all 15 control books and the F1 GBDT ensemble. Every
+registered engineering hard gate passed: D1--D5 are zero, equity mean gross
+is 1.897--2.005, quota is six in every quintile, `small_universe` is exactly
+zero, the occupancy/null/beta/hedge bounds pass, transfer chronology is
+clean, and protected access is false/false. The manifest status remains
+`development_grade_inferred_actions`, accurately reflecting the source tier;
+its acceptance-reason list is empty.
+
+Here `decomp` is headline balance-cell
+`small_universe / additive occupancy / additive sizing / total` gross
+shortfall. Each quintile vector is Q1--Q5.
+
+| Evaluation | Eligible | Mean quintile sizes | Minimum sizes | Quota | Balance/strict/open equity gross | Decomp |
+| --- | ---: | --- | --- | --- | --- | --- |
+| F1 inverse volatility | 198.1 | 40.0/39.6/39.7/39.6/39.2 | 38/38/38/38/37 | 6/6/6/6/6 | 1.983/1.949/1.977 | .000/.024/-.007/.017 |
+| F1 momentum 12-1 | 196.6 | 39.7/39.3/39.3/39.3/38.9 | 38/38/37/38/37 | 6/6/6/6/6 | 1.945/1.926/1.941 | .000/.016/.039/.055 |
+| F1 reversal 21 | 198.1 | 40.0/39.6/39.7/39.6/39.2 | 38/38/38/38/37 | 6/6/6/6/6 | 1.973/1.963/1.973 | .000/.019/.008/.027 |
+| F1 reversal 5 | 198.1 | 40.0/39.6/39.7/39.6/39.2 | 38/38/38/38/37 | 6/6/6/6/6 | 1.956/1.910/1.953 | .000/.042/.002/.044 |
+| F1 reversal/momentum blend | 196.3 | 39.7/39.3/39.3/39.3/38.9 | 38/38/37/38/37 | 6/6/6/6/6 | 1.989/1.948/1.985 | .000/.018/-.007/.011 |
+| F2 inverse volatility | 190.0 | 38.4/38.0/38.0/38.0/37.6 | 37/37/37/37/37 | 6/6/6/6/6 | 1.968/1.968/1.972 | .000/.023/.009/.032 |
+| F2 momentum 12-1 | 187.6 | 37.9/37.5/37.5/37.5/37.1 | 37/37/36/37/36 | 6/6/6/6/6 | 1.897/1.897/1.903 | .000/.016/.087/.103 |
+| F2 reversal 21 | 190.0 | 38.4/38.0/38.0/38.0/37.6 | 37/37/37/37/37 | 6/6/6/6/6 | 1.991/1.991/1.990 | .000/.022/-.012/.009 |
+| F2 reversal 5 | 190.0 | 38.4/38.0/38.0/38.0/37.6 | 37/37/37/37/37 | 6/6/6/6/6 | 1.976/1.976/1.971 | .000/.021/.003/.024 |
+| F2 reversal/momentum blend | 187.5 | 37.9/37.5/37.5/37.5/37.1 | 37/37/36/37/36 | 6/6/6/6/6 | 1.972/1.972/1.970 | .000/.020/.008/.028 |
+| F3 inverse volatility | 181.3 | 36.6/36.3/36.3/36.3/35.8 | 35/35/34/35/34 | 6/6/6/6/6 | 2.005/2.005/2.013 | .000/.026/-.031/-.005 |
+| F3 momentum 12-1 | 178.6 | 36.2/35.7/35.7/35.7/35.3 | 34/34/34/34/34 | 6/6/6/6/6 | 2.000/2.000/1.994 | .000/.016/-.016/-.000 |
+| F3 reversal 21 | 181.2 | 36.6/36.3/36.3/36.3/35.8 | 35/35/34/35/34 | 6/6/6/6/6 | 2.001/2.001/1.967 | .000/.017/-.018/-.001 |
+| F3 reversal 5 | 181.3 | 36.6/36.3/36.3/36.3/35.8 | 35/35/34/35/34 | 6/6/6/6/6 | 1.982/1.981/1.977 | .000/.028/-.010/.018 |
+| F3 reversal/momentum blend | 178.3 | 36.1/35.6/35.6/35.6/35.3 | 34/34/34/34/34 | 6/6/6/6/6 | 1.998/1.997/1.988 | .000/.016/-.014/.002 |
+| F1 GBDT ensemble | 198.4 | 40.1/39.6/39.7/39.6/39.3 | 38/38/38/38/37 | 6/6/6/6/6 | 1.968/1.944/1.982 | .000/.017/.015/.032 |
+
+The authorized rev4d CPU Round 1 then ran exactly the five controls and the
+`b_intraday` GBDT on F1--F3. It is sealed at:
+
+    D:\quant-data\b3\processed\model_runs\v2_round1_rev4d_733ac1e_20260908T180257Z
+
+Frozen-design/result/access-audit/artifact-inventory SHA-256 values are
+`0e40ead5105cfaf16272f03a6e7272457771ec2d2931d088be0998ab92f6bb21`,
+`e782233bd1c1410fc06346ec8590433b6e0743210c970eebdcf325a2505f712c`,
+`102d0631e479d55a003c01e9b4d30bb4cf84875ae83840c098118659f99afa67`,
+and `fe9b466e6c1e9a38271cce03615b17bef01c48df66395dba462ac7af6c66ffd3`.
+The audit passes with chronology clean, protected access false/false, no
+deployment change, and research-claim status false.
+
+| Candidate | Pooled neutral IC [95%] | Legacy IC | P1/P5 | Spread bps/hold | Headline net bps/day [95%] | Finite days |
+| --- | --- | ---: | --- | ---: | --- | ---: |
+| Inverse volatility | .004378 [.001539,.007621] | .062256 | .9940/.9654 | 14.306 | -9.558 [-15.881,-4.023] | 248 |
+| Momentum 12-1 | .021473 [.010222,.034446] | .039860 | .9935/.9708 | 20.082 | -2.905 [-8.056,5.895] | 375 |
+| Reversal 21 | -.010957 [-.025548,-.006817] | -.018160 | .9375/.7313 | -2.491 | -9.731 [-20.141,-6.256] | 375 |
+| Reversal 5 | -.003795 [-.015977,.003713] | -.007037 | .7507/.0109 | -3.299 | -11.626 [-17.897,-7.857] | 375 |
+| Reversal/momentum blend | .013463 [.000585,.022574] | .023663 | .8576/.4352 | 5.249 | -5.577 [-11.783,2.422] | 248 |
+| `b_intraday` | .019991 [.011608,.029269] | .028696 | .7783/.6287 | 8.715 | -5.604 [-9.727,1.852] | 375 |
+
+The following is the complete fold-level headline diagnostic summary. Net is
+balance/strict/open bps/day; hedge is maximum absolute NAV/capped-session
+count; occupancy and spill are long/short. Imputed and placeholder shares are
+short-notional weighted.
+
+| Candidate | Fold | Net B/S/O | Realized beta | Equity gross | Hedge | Occupancy | Spill | Imputed | Placeholder sessions/share |
+| --- | --- | --- | ---: | ---: | --- | --- | --- | ---: | --- |
+| Inverse volatility | F1 | -8.43/-7.82/-4.66 | .033 | 1.983 | .600/25 | .25/.48 | 0/67 | 7.5% | 5/4.3% |
+| Inverse volatility | F2 | -10.69/-10.69/-7.98 | .002 | 1.968 | .600/12 | .11/.51 | 0/95 | 0.0% | 0/0.0% |
+| Inverse volatility | F3 | -19.35/-19.37/-25.64 | -.022 | 2.005 | .600/12 | .22/.30 | 0/24 | 0.0% | 0/0.0% |
+| Momentum 12-1 | F1 | -2.07/-1.80/-.68 | .005 | 1.945 | .600/3 | .94/.74 | 0/0 | 13.2% | 5/4.2% |
+| Momentum 12-1 | F2 | -6.75/-6.75/-6.20 | .172 | 1.897 | .500/0 | 1.12/.79 | 0/2 | 0.0% | 0/0.0% |
+| Momentum 12-1 | F3 | .04/.04/1.75 | -.018 | 2.000 | .600/68 | 1.28/.71 | 0/0 | 0.0% | 0/0.0% |
+| Reversal 21 | F1 | -4.96/-5.31/-2.78 | -.077 | 1.973 | .600/33 | .52/.65 | 0/55 | 1.5% | 5/4.0% |
+| Reversal 21 | F2 | -14.98/-14.98/-14.76 | -.151 | 1.991 | .600/29 | .63/.49 | 0/17 | 0.0% | 0/0.0% |
+| Reversal 21 | F3 | -9.26/-9.25/-5.31 | -.083 | 2.001 | .600/32 | .61/.37 | 0/6 | 0.0% | 0/0.0% |
+| Reversal 5 | F1 | -6.57/-6.38/-5.12 | -.032 | 1.956 | .600/33 | .23/.53 | 0/85 | .6% | 5/4.2% |
+| Reversal 5 | F2 | -10.82/-10.82/-12.12 | -.104 | 1.976 | .600/10 | .19/.30 | 0/41 | 0.0% | 0/0.0% |
+| Reversal 5 | F3 | -17.35/-17.44/-16.57 | -.023 | 1.982 | .600/27 | .30/.23 | 0/15 | 0.0% | 0/0.0% |
+| Reversal/momentum blend | F1 | -3.66/-3.94/-3.71 | -.032 | 1.989 | .600/26 | .40/.31 | 0/17 | 1.2% | 5/3.9% |
+| Reversal/momentum blend | F2 | -7.49/-7.49/-7.38 | .029 | 1.972 | .596/1 | .34/.30 | 0/18 | 0.0% | 0/0.0% |
+| Reversal/momentum blend | F3 | -8.19/-8.38/-5.53 | -.132 | 1.998 | .600/41 | .41/.24 | 0/9 | 0.0% | 0/0.0% |
+| `b_intraday` | F1 | -4.93/-3.46/-6.34 | -.037 | 1.968 | .429/0 | .32/.48 | 0/2 | 4.8% | 5/4.1% |
+| `b_intraday` | F2 | -5.33/-5.33/-6.01 | -.085 | 1.948 | .413/0 | .32/.35 | 0/21 | 0.0% | 0/0.0% |
+| `b_intraday` | F3 | -6.53/-6.46/-4.84 | -.204 | 1.997 | .458/0 | .22/.28 | 0/6 | 0.0% | 0/0.0% |
+
+Balance/strict/open active-name-day shortability is
+69.52%/66.15%/100% in F1, 69.29%/69.29%/100% in F2, and
+72.25%/71.10%/100% in F3. All three folds are labelled supported. The full
+per-day, per-horizon, three-borrow-cell, coverage, hedge, occupancy, spill,
+settlement, and source-hash tables remain in the sealed result and evaluation
+artifacts rather than being recomputed for this narrative.
+
+`b_intraday` is the only eligible GBDT rung and is therefore the designated
+Round-2 parent; the controls do not enter the GBDT designation. Its economics
+interval includes zero and is not evidence of a profitable deployable book.
+Per the user's explicit stop, Stage P, arms A/B, R2.2, and all Round-2 GPU work
+were not started. No paid instance was launched. Provider inventories at
+`2026-09-08T18:19:02.7146460Z` and `2026-09-08T18:20:22.7628797Z` each found
+zero nonterminal instances, so there was nothing to terminate and no adjacent
+instance was touched.

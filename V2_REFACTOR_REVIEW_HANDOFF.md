@@ -112,8 +112,10 @@ was not rewritten.
   mutating the sealed store.
 - Earlier Round-1/Round-2 results were not resumed across incompatible target,
   clock, action, or ledger schemas. They remain historical engineering
-  evidence. Rev3 Round 2 was completed and sealed, but rev4/rev4b/rev4c are new
-  registrations rather than post-result edits to it.
+  evidence. Rev3 Round 2 was frozen but stopped at its no-score compiler smoke;
+  that failed root and its evidence were sealed, but no registered Rev3
+  Round-2 score completed. Rev4/rev4b/rev4c/rev4d are new registrations rather
+  than post-result edits to it.
 - No official validation, permanently held-out test, deployment change, or
   production trading infrastructure was authorized or performed.
 - Rev4c CPU Round 1 and all rev4c Round 2 GPU work were not run. The prerequisite
@@ -122,20 +124,39 @@ was not rewritten.
 
 ## Current disposition
 
-Rev4c code is at `155c909f8c80c0e5047bd2e9141dbae33e36c91f`.
-All 897 tests passed before its fresh score. The acceptance root and exact
-hashes are recorded in `V2_EXPERIMENT_LOG.md`.
+Rev4d code and registration are at
+`733ac1e729f98af964e022869a9dfaf617f93d3b`. All 899 tests passed before the
+fresh acceptance score. Exact roots, hashes, and full tables are recorded in
+`V2_EXPERIMENT_LOG.md`.
 
-The intended hedge/equity separation worked: every book has D1--D5 equal to
-zero, hedge exposure stays at or below 0.60 NAV, occupancy and neutral-IC
-checks pass, and the largest absolute post-hedge beta is 0.1801. The result is
-still `unsupported` because all 16 headline equity books have mean gross below
-the unchanged 1.50 floor (1.268828--1.498712). The dominant shortfall is the
-registered `small_universe` term, roughly 0.49 NAV in F1 and 0.66--0.67 NAV in
-F2/F3, not another hedge-cap interaction. That is the next design question;
-it was not answered after observing the score.
+The rev4c failure was resolved with one parameter rather than a new sizing or
+selection system. The prior four-times threshold scaled a quintile unless it
+had 48 names, even though disjoint 12-name long/short bands require only 24.
+Rev4d therefore uses `2 * (k_q + b_q)`. This choice preserves the proportional
+small-stratum rule, matches the original global half-population contract, and
+leaves all clocks, identity, target, borrow, hedge, cap, and accounting rules
+unchanged. It was not chosen by tuning the gross floor: it was preregistered,
+unit-tested at 38 and 20 names, and frozen before the new score.
 
-Any continuation should therefore begin with a new pre-result specification
-that reconciles target gross, per-name sizing, slot/quintile construction, and
-the genuinely available eligible population. It must not relabel this run as
-passed, reuse it as a Round-1 parent, or tune the 1.50 floor after the fact.
+The new acceptance passes every registered hard gate. All 16 books have
+D1--D5 zero and equity mean gross between 1.897 and 2.005; quota is six in
+every quintile and the `small_universe` shortfall is exactly zero. Hedge,
+occupancy, null, post-hedge beta, chronology, hashes, and protected-access
+checks pass. The result remains honestly labelled
+`development_grade_inferred_actions` because the refactor did not invent
+verified actions, auctions, or historical borrow execution.
+
+The authorized CPU Round 1 then completed only the five controls and the
+`b_intraday` GBDT on F1--F3. `b_intraday` is the sole eligible GBDT rung and
+designated parent. Its pooled neutral IC is .019991
+[.011608,.029269], while headline balance net excess is -5.604 bps/day
+[-9.727,1.852]; this is not profitable-deployment evidence. The strongest
+control neutral IC is momentum 12-1 at .021473, but controls are deliberately
+ineligible for GBDT parent designation.
+
+No suggestion was silently broadened in rev4d. In particular, the gross
+bounds were not relaxed, the scored rev4c root was not overwritten or retried,
+the unparsed B3 PDFs did not mutate the sealed lending source, and no protected
+period or deployment was accessed. The user explicitly withheld Round 2, so
+Stage P, A/B arms, R2.2, and GPU work were not started. There was no paid
+instance to terminate; two provider reads returned zero nonterminal instances.

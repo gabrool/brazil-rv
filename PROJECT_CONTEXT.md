@@ -1857,3 +1857,36 @@ small-universe term, not hedge/cap interference, and D4 is zero throughout.
 This scored stop was not relaxed or retried. Rev4c Round 1 and Round 2 were
 not started, no deployment changed, and no paid instance was launched. Two
 direct provider inventories returned zero nonterminal instances.
+
+## Current v2 rev4d state (2026-09-08)
+
+Rev4d is frozen in commit
+`733ac1e729f98af964e022869a9dfaf617f93d3b`. Its only research change is the
+small-stratum scaling threshold from four to two times `k_q + b_q`, the exact
+condition needed for disjoint within-volatility-quintile long and short
+bands. The proportional rule below that threshold is unchanged. All 899 tests
+passed before scores.
+
+The completed 16-book acceptance root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev4d_733ac1e_20260908T175620Z`;
+manifest/final-inventory SHA-256 values are
+`ef789052472044406d5771dcdf02c5f5590637f345f3bf9eaff26e215355c9e6`
+and `f607751e8a998b003a8bdd284a0271b847395e54ba31d2bd103a5b26c03c4c86`.
+All hard gates pass: D1--D5 are zero, all equity mean-gross values are within
+1.5--2.25 (range 1.897--2.005), quota is six per quintile, `small_universe`
+is zero, and occupancy, beta, hedge, chronology, hashes, and protected-access
+checks pass. The source tier remains explicitly development-grade.
+
+Rev4d Round 1 is completed and sealed at
+`D:\quant-data\b3\processed\model_runs\v2_round1_rev4d_733ac1e_20260908T180257Z`.
+Frozen-design/result/access-audit/inventory SHA-256 values are
+`0e40ead5105cfaf16272f03a6e7272457771ec2d2931d088be0998ab92f6bb21`,
+`e782233bd1c1410fc06346ec8590433b6e0743210c970eebdcf325a2505f712c`,
+`102d0631e479d55a003c01e9b4d30bb4cf84875ae83840c098118659f99afa67`,
+and `fe9b466e6c1e9a38271cce03615b17bef01c48df66395dba462ac7af6c66ffd3`.
+`b_intraday` is the sole eligible GBDT rung and designated parent, with pooled
+neutral IC .019991 [.011608,.029269] and headline balance net excess -5.604
+bps/day [-9.727,1.852]. The result is not a deployment claim. Round 2 remains
+unrun pending explicit authorization; official validation, the permanently
+spent test, and deployment remain untouched. Two provider reads confirmed
+zero nonterminal instances.
