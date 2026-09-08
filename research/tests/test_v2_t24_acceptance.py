@@ -49,6 +49,7 @@ from brazil_rv.v2.splits import development_folds
 from brazil_rv.v2.store import STORE_SCHEMA
 from brazil_rv.v2.train import DatePairBatchSampler, train_stage
 from brazil_rv.v2.validate_pipeline import _evaluation_inputs
+from hedge_beta_fixtures import write_hedge_beta_fixture
 
 _COLLECTOR_SCRIPTS = Path(__file__).resolve().parents[2] / "collector" / "scripts"
 sys.path.insert(0, str(_COLLECTOR_SCRIPTS))
@@ -420,9 +421,7 @@ def _build_fixture_store(root: Path, *, mutate_post_decision: bool = False) -> P
             "available_date": pl.Series(
                 np.repeat(dates[1:], _NAME_COUNT).tolist(), dtype=pl.Date
             ),
-            "security_id": np.tile(
-                [f"ISIN:{isin}" for isin in isins], _DAY_COUNT - 1
-            ),
+            "security_id": np.tile([f"ISIN:{isin}" for isin in isins], _DAY_COUNT - 1),
             "lending_taker_fee_level_log_tanh": np.full(
                 (_DAY_COUNT - 1) * _NAME_COUNT,
                 lending_rate_encoded,
@@ -660,7 +659,15 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
     cdi = np.zeros(_DAY_COUNT, dtype=np.float64)
     source_hashes = {"fixture_store": sha256_file(store / "manifest.json")}
     bova11_close = 100.0 + 0.01 * np.arange(_DAY_COUNT, dtype=np.float64)
+    beta_binding = write_hedge_beta_fixture(
+        tmp_path / "hedge_beta",
+        dates=np.load(store / "date_index.npy"),
+        isins=np.load(store / "isin_index.npy").tolist(),
+        store_sha256=sha256_file(store / "manifest.json"),
+        bova11_sha256="a" * 64,
+    )
     bova11_binding = {
+        **beta_binding,
         "manifest_sha256": "a" * 64,
         "data_sha256": "b" * 64,
     }

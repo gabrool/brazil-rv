@@ -37,10 +37,9 @@ from .splits import (
 MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
-ECONOMICS_ANNUAL_BORROW_RATES = (0.02, 0.04)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
-PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V14"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V16"
+PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
 
@@ -126,6 +125,11 @@ class EvaluationInputs:
     bova11_close: NDArray[np.floating] | None = None
     bova11_manifest_sha256: str | None = None
     bova11_data_sha256: str | None = None
+    hedge_beta: NDArray[np.floating] | None = None
+    hedge_beta_valid: NDArray[np.bool_] | None = None
+    hedge_beta_history: tuple[NDArray[np.floating], NDArray[np.bool_]] | None = None
+    hedge_beta_manifest_sha256: str | None = None
+    initial_hedge_reference_price: float = np.nan
     neutral_target_fallback_flags: NDArray[np.bool_] | None = None
 
 
@@ -375,6 +379,11 @@ def _validate(inputs: EvaluationInputs) -> None:
         raise ValueError("constructed-book evaluation requires BOVA11 artifact hashes")
     _validate_sha256(inputs.bova11_manifest_sha256, label="bova11_manifest_sha256")
     _validate_sha256(inputs.bova11_data_sha256, label="bova11_data_sha256")
+    if inputs.hedge_beta_manifest_sha256 is None:
+        raise ValueError("evaluation requires a hash-bound economic hedge-beta sidecar")
+    _validate_sha256(
+        inputs.hedge_beta_manifest_sha256, label="hedge_beta_manifest_sha256"
+    )
     if inputs.neutral_target_fallback_flags is not None:
         fallback = np.asarray(inputs.neutral_target_fallback_flags)
         if fallback.dtype != np.bool_ or fallback.shape != (
@@ -918,6 +927,7 @@ def _ledger_rows(
                 result.hedge_unconstrained_target_notional[index]
             ),
             "hedge_capped": bool(result.hedge_capped[index]),
+            "hedge_beta_fallback": bool(result.hedge_beta_fallback_sessions[index]),
             "hedge_turnover_fraction_nav": _finite_or_none(
                 result.hedge_turnover_fraction_nav[index]
             ),
@@ -1583,6 +1593,12 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         "bova11_close": _array_sha256(np.asarray(inputs.bova11_close)),
         "bova11_manifest": str(inputs.bova11_manifest_sha256),
         "bova11_data": str(inputs.bova11_data_sha256),
+        "hedge_beta_manifest": str(inputs.hedge_beta_manifest_sha256),
+        "hedge_beta": _array_sha256(np.asarray(inputs.hedge_beta)),
+        "hedge_beta_valid": _array_sha256(np.asarray(inputs.hedge_beta_valid)),
+        "initial_hedge_reference_price": _array_sha256(
+            np.asarray(inputs.initial_hedge_reference_price)
+        ),
         "annual_borrow_rate_by_name": _array_sha256(
             np.asarray(inputs.annual_borrow_rate_by_name)
         ),
@@ -1602,6 +1618,11 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
     }
     for name, values in sorted(inputs.prior_feature_values.items()):
         result[f"prior_feature_{name}"] = _array_sha256(np.asarray(values))
+    if inputs.hedge_beta_history is not None:
+        for name, values in zip(
+            ("values", "valid"), inputs.hedge_beta_history, strict=True
+        ):
+            result[f"hedge_beta_history_{name}"] = _array_sha256(np.asarray(values))
     for roster_name, roster in (
         ("source_archive_present", inputs.source_archive_present),
         ("source_feature_valid", inputs.source_feature_valid),
@@ -1665,7 +1686,11 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         ),
         "short_proceeds_remuneration": config.short_proceeds_remuneration,
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
-        "annual_borrow_rates": list(ECONOMICS_ANNUAL_BORROW_RATES),
+        "cost_grid_borrow_cells": ["borrow_balance", "borrow_strict", "borrow_open"],
+        "borrow_daily_accrual": "expm1(log1p(annual_rate)/252); registration fee separately",
+        "pending_entries_follow_retention": config.cancel_pending_outside_retention,
+        "hedge_decision": "15:45; prior marks, prior BOVA11 close and prior NAV",
+        "hedge_beta_manifest_sha256": inputs.hedge_beta_manifest_sha256,
         "headline": {
             "cost_bps_per_side": ECONOMICS_HEADLINE[0],
             "annual_borrow_rate": ECONOMICS_HEADLINE[1],
@@ -1686,7 +1711,10 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
 
 
 def _realized_beta_diagnostic(
-    inputs: EvaluationInputs, headline: StatefulLedgerResult
+    inputs: EvaluationInputs,
+    headline: StatefulLedgerResult,
+    *,
+    against_bova11: bool = False,
 ) -> dict[str, object]:
     d1 = HORIZONS.index(1)
     returns = np.asarray(inputs.shareholder_simple_returns, dtype=np.float64)
@@ -1702,6 +1730,12 @@ def _realized_beta_diagnostic(
         )
         if names.any():
             market[ledger_day] = float(returns[source_day, names, d1].mean())
+    if against_bova11:
+        close = np.asarray(inputs.bova11_close, dtype=np.float64)
+        previous = np.concatenate(([inputs.initial_hedge_reference_price], close[:-1]))
+        usable = np.isfinite(close) & np.isfinite(previous) & (previous > 0.0)
+        market[:] = np.nan
+        market[usable] = close[usable] / previous[usable] - 1.0
     book = np.full(len(inputs.dates), np.nan, dtype=np.float64)
     book[: len(headline.daily_net_return)] = headline.daily_net_return
     used = np.isfinite(market) & np.isfinite(book)
@@ -1730,7 +1764,11 @@ def _realized_beta_diagnostic(
         "r_squared": r_squared,
         "classification": "directional" if abs(beta) > 0.30 else "beta_neutral",
         "directional_threshold_absolute_beta": 0.30,
-        "alignment": "ledger_day_t versus equal_weight_active_D1_from_t_minus_1",
+        "alignment": (
+            "ledger_day_t versus BOVA11_close_t_over_close_t_minus_1"
+            if against_bova11
+            else "ledger_day_t versus equal_weight_active_D1_from_t_minus_1"
+        ),
     }
 
 
@@ -1986,6 +2024,11 @@ def _diagnostics(
             if headline is not None
             else {"status": "unsupported", "classification": "unsupported"}
         ),
+        "realized_beta_bova11": (
+            _realized_beta_diagnostic(inputs, headline, against_bova11=True)
+            if headline is not None
+            else {"status": "unsupported", "classification": "unsupported"}
+        ),
         "lending_coverage": _lending_coverage(inputs),
     }
 
@@ -2057,7 +2100,10 @@ def evaluate_scores(
         borrow_rate_placeholder=inputs.borrow_rate_placeholder,
         shortable_by_borrow_source=inputs.shortable_by_borrow_source,
         selection_volatility=inputs.prior_feature_values["yang_zhang_vol_20"],
-        beta_60=inputs.prior_feature_values["beta_60"],
+        hedge_beta=inputs.hedge_beta,
+        hedge_beta_valid=inputs.hedge_beta_valid,
+        hedge_beta_history=inputs.hedge_beta_history,
+        initial_hedge_reference_price=inputs.initial_hedge_reference_price,
         hedge_close=inputs.bova11_close,
     )
     configurations = ledger_configurations()
@@ -2087,7 +2133,10 @@ def evaluate_scores(
         borrow_rate_placeholder=inputs.borrow_rate_placeholder,
         shortable=inputs.shortable_by_borrow_source["borrow_balance"],
         selection_volatility=inputs.prior_feature_values["yang_zhang_vol_20"],
-        beta_60=inputs.prior_feature_values["beta_60"],
+        hedge_beta=inputs.hedge_beta,
+        hedge_beta_valid=inputs.hedge_beta_valid,
+        hedge_beta_history=inputs.hedge_beta_history,
+        initial_hedge_reference_price=inputs.initial_hedge_reference_price,
         hedge_close=inputs.bova11_close,
     )
     active = np.asarray(inputs.active, dtype=np.bool_)

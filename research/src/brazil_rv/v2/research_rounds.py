@@ -76,12 +76,12 @@ from .validate_pipeline import (
     _window_target_mask,
 )
 
-PRIOR_ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4D"
-ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4E"
-ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4E"
+PRIOR_ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4E"
+ROUND1_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND1_CANONICAL_V4F"
+ROUND2_SCHEMA = "BRAZIL_RV_V2_RESEARCH_ROUND2_CANONICAL_V4F"
 RESEARCH_SCORE_SCHEMA = "BRAZIL_RV_V2_RESEARCH_SCORE_V4D"
 PREREGISTRATION = (
-    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4e.md"
+    PROJECT_ROOT / "research" / "preregistrations" / "v2_round1_round2_rev4f.md"
 )
 BOOTSTRAP_REPLICATIONS = 10_000
 BOOTSTRAP_BLOCK = 20
@@ -118,8 +118,8 @@ DEVELOPMENT_SOURCE_TIER_LABELS = {
     "action_terms_source": "inferred_cotahist_dismes_v1",
     "schedule_source": "reconstructed_v1",
 }
-REGISTRATION_PROTOCOL_BEGIN = "<!-- BRAZIL_RV_V2_PROTOCOL_JSON_BEGIN -->"
-REGISTRATION_PROTOCOL_END = "<!-- BRAZIL_RV_V2_PROTOCOL_JSON_END -->"
+REGISTRATION_PROTOCOL_BEGIN = "<!-- BRAZIL_RV_V2_REV4F_PROTOCOL_JSON_BEGIN -->"
+REGISTRATION_PROTOCOL_END = "<!-- BRAZIL_RV_V2_REV4F_PROTOCOL_JSON_END -->"
 
 
 @dataclass(frozen=True)
@@ -187,7 +187,23 @@ def registration_protocol_from_code() -> dict[str, object]:
     """Build protocol facts that registration prose may not override."""
 
     return {
-        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V4E",
+        "schema": "BRAZIL_RV_V2_REGISTRATION_PROTOCOL_V4F",
+        "hedge_beta": {
+            "lookback": 60,
+            "minimum_pairs": 40,
+            "last_endpoint": "t-1",
+            "blume": [0.67, 0.33],
+            "clip": [-1.0, 3.0],
+            "fallback_max_age": 20,
+            "fallback_default": 1.0,
+        },
+        "hedge_decision": "15:45; fixed quantity from prior BOVA11 close and prior NAV",
+        "borrow_daily_accrual": "expm1(log1p(annual_rate)/252); fee separately",
+        "cost_grid": {
+            "cost_bps": [2, 4, 7],
+            "borrow": ["balance", "strict", "open"],
+            "construction": "headline",
+        },
         "purge_sessions": {
             "fit_to_selection": FIT_TO_SELECTION_PURGE_SESSIONS,
             "selection_to_evaluation": SELECTION_TO_EVALUATION_PURGE_SESSIONS,
@@ -1807,6 +1823,8 @@ def freeze_round1(
     experiment52_cdi_sha256: str,
     bova11_root: Path,
     bova11_manifest_sha256: str,
+    hedge_beta_root: Path,
+    hedge_beta_manifest_sha256: str,
     lending_archive_root: Path,
     lending_archive_manifest_sha256: str,
     acceptance_path: Path,
@@ -1894,6 +1912,8 @@ def freeze_round1(
         },
         "bova11": {
             "root": str(Path(bova11_root).resolve(strict=True)),
+            "hedge_beta_root": str(hedge_beta_root.resolve(strict=True)),
+            "hedge_beta_manifest_sha256": hedge_beta_manifest_sha256,
             "manifest_sha256": bova11.manifest_sha256,
             "data_sha256": bova11.data_sha256,
         },
@@ -2003,6 +2023,7 @@ def run_round1(
     if bova11.data_sha256 != bova_design["data_sha256"]:
         raise ValueError("Round-1 BOVA11 data hash differs from the frozen design")
     bova11_binding = {
+        **bova_design,
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
@@ -2330,6 +2351,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
     if bova11.data_sha256 != bova_design["data_sha256"]:
         raise ValueError("Round-1 BOVA11 data hash differs from frozen design")
     bova11_binding = {
+        **bova_design,
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
@@ -2584,19 +2606,25 @@ def _ledger_replay_non_ledger_projection(
     return projection
 
 
-def freeze_round1_ledger_replay(*, source_round1_root: Path, output_root: Path) -> str:
-    """Freeze rev4e around the sealed rev4d scores before replaying the ledger."""
+def freeze_round1_ledger_replay(
+    *,
+    source_round1_root: Path,
+    output_root: Path,
+    hedge_beta_root: Path,
+    hedge_beta_manifest_sha256: str,
+) -> str:
+    """Bind a new economic-beta sidecar to sealed rev4e scores before replay."""
 
     protocol = verify_registration_protocol()
     code = _git_identity()
     source = source_round1_root.resolve(strict=True)
     source_result = _verify_sealed_root(source, expected_schema=PRIOR_ROUND1_SCHEMA)
     if source_result.get("gbdt_ladder", {}).get("parent_rung") != "b_intraday":
-        raise ValueError("rev4e replay requires the sealed b_intraday parent")
+        raise ValueError("rev4f replay requires the sealed b_intraday parent")
     source_design_path = source / "frozen_design.json"
     source_design = _read_json(source_design_path)
     if source_design.get("schema") != PRIOR_ROUND1_SCHEMA:
-        raise ValueError("rev4e replay source is not the sealed rev4d design")
+        raise ValueError("rev4f replay source is not the sealed rev4e design")
     output = output_root.resolve()
     if output.exists():
         raise FileExistsError(output)
@@ -2606,7 +2634,7 @@ def freeze_round1_ledger_replay(*, source_round1_root: Path, output_root: Path) 
         "status": "frozen_before_score",
         **RESEARCH_FLAGS,
         "frozen_at_utc": _utc_now(),
-        "scope": "ledger_only_replay_of_hash_bound_rev4d_score_panels",
+        "scope": "ledger_only_replay_of_hash_bound_rev4e_score_panels",
         "implementation": code,
         "preregistration": {
             "path": str(PREREGISTRATION.resolve(strict=True)),
@@ -2623,7 +2651,11 @@ def freeze_round1_ledger_replay(*, source_round1_root: Path, output_root: Path) 
         "store": source_design["store"],
         "development_acceptance": source_design["development_acceptance"],
         "cdi": source_design["cdi"],
-        "bova11": source_design["bova11"],
+        "bova11": {
+            **source_design["bova11"],
+            "hedge_beta_root": str(hedge_beta_root.resolve(strict=True)),
+            "hedge_beta_manifest_sha256": hedge_beta_manifest_sha256,
+        },
         "lending_archive": source_design["lending_archive"],
         "folds": source_design["folds"],
         "baseline_roster": list(_BASELINE_SIGNAL_NAMES),
@@ -2631,21 +2663,18 @@ def freeze_round1_ledger_replay(*, source_round1_root: Path, output_root: Path) 
         "gbdt_seeds": list(GBDT_SEEDS),
         "bootstrap": source_design["bootstrap"],
         "ledger_change": {
-            "headline_short_proceeds_remuneration": 1.0,
-            "sterile_comparator_short_proceeds_remuneration": 0.0,
-            "equity_borrow_registration_fee": {
-                "fraction_of_contract_rate": 0.20,
-                "annual_floor": 0.00025,
-                "annual_cap": 0.0070,
-            },
-            "hedge_short_borrow_changed": False,
+            "economic_beta": protocol["hedge_beta"],
+            "hedge_decision": protocol["hedge_decision"],
+            "borrow_daily_accrual": protocol["borrow_daily_accrual"],
+            "cost_grid": protocol["cost_grid"],
+            "pending_entry_retention": True,
         },
     }
     return write_json_atomic(output / "frozen_design.json", design)
 
 
 def run_round1_ledger_replay(*, output_root: Path) -> str:
-    """Re-evaluate only the ledger over the sealed rev4d Round-1 score panels."""
+    """Re-evaluate only the ledger over the sealed rev4e Round-1 score panels."""
 
     output = output_root.resolve(strict=True)
     design_path = output / "frozen_design.json"
@@ -2653,18 +2682,18 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
     if (
         design.get("schema") != ROUND1_SCHEMA
         or design.get("status") != "frozen_before_score"
-        or design.get("scope") != "ledger_only_replay_of_hash_bound_rev4d_score_panels"
+        or design.get("scope") != "ledger_only_replay_of_hash_bound_rev4e_score_panels"
     ):
-        raise ValueError("Round-1 rev4e root is not its frozen ledger replay")
+        raise ValueError("Round-1 rev4f root is not its frozen ledger replay")
     code = _git_identity()
     if design.get("implementation") != code:
-        raise ValueError("Round-1 rev4e implementation differs from the freeze")
+        raise ValueError("Round-1 rev4f implementation differs from the freeze")
     result_path = output / "round1_result.json"
     if result_path.exists():
         raise FileExistsError(result_path)
     source_binding = design.get("prior_round1")
     if not isinstance(source_binding, Mapping):
-        raise ValueError("Round-1 rev4e lacks its prior-root binding")
+        raise ValueError("Round-1 rev4f lacks its prior-root binding")
     source = Path(str(source_binding["root"])).resolve(strict=True)
     source_result = _verify_sealed_root(source, expected_schema=PRIOR_ROUND1_SCHEMA)
     for name, path in (
@@ -2673,11 +2702,11 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
         ("frozen_design_sha256", source / "frozen_design.json"),
     ):
         if sha256_file(path) != source_binding.get(name):
-            raise ValueError(f"sealed rev4d {name} differs from the frozen binding")
+            raise ValueError(f"sealed rev4e {name} differs from the frozen binding")
     store_root = Path(str(design["store"]["root"])).resolve(strict=True)
     store_manifest, dates = _read_store_header(store_root)
     if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
-        raise ValueError("Round-1 rev4e store manifest hash mismatch")
+        raise ValueError("Round-1 rev4f store manifest hash mismatch")
     source_tiers = _source_tier_labels(store_manifest)
     fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
     pretrain = _pretrain_indices(dates)
@@ -2698,8 +2727,9 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
         canonical_dates=dates.astype("datetime64[D]").astype(object).tolist(),
     )
     if bova11.data_sha256 != bova_design["data_sha256"]:
-        raise ValueError("Round-1 rev4e BOVA11 data hash mismatch")
+        raise ValueError("Round-1 rev4f BOVA11 data hash mismatch")
     bova11_binding = {
+        **bova_design,
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
@@ -2733,7 +2763,7 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
         new_projection = _ledger_replay_non_ledger_projection(replayed.report)
         if old_projection != new_projection:
             raise RuntimeError(
-                f"non-ledger evaluation fields changed in rev4e replay: {source_path}"
+                f"non-ledger evaluation fields changed in rev4f replay: {source_path}"
             )
         new_sha = write_json_atomic(destination_path, replayed.report)
         comparison_rows.append(
@@ -2803,11 +2833,11 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
             rung_reports, exact_tie_priority=("b_intraday",)
         )
         if designated not in {"b_intraday", None}:
-            raise RuntimeError("rev4e produced an impossible rung designation")
+            raise RuntimeError("rev4f produced an impossible rung designation")
         economics_detail = _round1_economics_detail(
             {**baseline_reports, "b_intraday": rung_reports["b_intraday"]}
         )
-        detail_path = output / "round1_rev4e_economics_detail.json"
+        detail_path = output / "round1_rev4f_economics_detail.json"
         detail_sha = write_json_atomic(detail_path, economics_detail)
         source_hashes = {
             "v2_store_manifest": str(design["store"]["manifest_sha256"]),
@@ -2869,7 +2899,7 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
                 "preference_rule": designation["rule"],
             },
             "gbdt_data_span_preview": {
-                "status": "not_rerun_by_rev4e_ledger_only_replay",
+                "status": "not_rerun_by_rev4f_ledger_only_replay",
                 "artifacts": {},
                 "readouts": {},
                 "paired_deltas": {},
@@ -2877,7 +2907,7 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
             },
             "operational_events": [
                 {
-                    "event": "rev4e_ledger_only_replay_completed",
+                    "event": "rev4f_ledger_only_replay_completed",
                     "at_utc": _utc_now(),
                 }
             ],
@@ -2933,6 +2963,8 @@ def freeze_round2(
     experiment52_cdi_sha256: str,
     bova11_root: Path,
     bova11_manifest_sha256: str,
+    hedge_beta_root: Path,
+    hedge_beta_manifest_sha256: str,
     lending_archive_root: Path,
     lending_archive_manifest_sha256: str,
     output_root: Path,
@@ -3040,6 +3072,8 @@ def freeze_round2(
         },
         "bova11": {
             "root": str(Path(bova11_root).resolve(strict=True)),
+            "hedge_beta_root": str(hedge_beta_root.resolve(strict=True)),
+            "hedge_beta_manifest_sha256": hedge_beta_manifest_sha256,
             "manifest_sha256": bova11.manifest_sha256,
             "data_sha256": bova11.data_sha256,
         },
@@ -3771,6 +3805,7 @@ def finalize_round2(*, output_root: Path) -> str:
     if bova11.data_sha256 != bova_design["data_sha256"]:
         raise ValueError("Round-2 BOVA11 data hash differs from the frozen design")
     bova11_binding = {
+        **bova_design,
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
@@ -4005,6 +4040,7 @@ def recover_round2_result(*, output_root: Path) -> str:
         if bova11.data_sha256 != bova_design["data_sha256"]:
             raise ValueError("Round-2 BOVA11 data hash differs from frozen design")
         bova11_binding = {
+            **bova_design,
             "manifest_sha256": bova11.manifest_sha256,
             "data_sha256": bova11.data_sha256,
         }
@@ -4203,6 +4239,8 @@ def _parser() -> argparse.ArgumentParser:
     freeze.add_argument("--experiment52-cdi-sha256", required=True)
     freeze.add_argument("--bova11-root", type=Path, required=True)
     freeze.add_argument("--bova11-manifest-sha256", required=True)
+    freeze.add_argument("--hedge-beta-root", type=Path, required=True)
+    freeze.add_argument("--hedge-beta-manifest-sha256", required=True)
     freeze.add_argument("--lending-archive-root", type=Path, required=True)
     freeze.add_argument("--lending-archive-manifest-sha256", required=True)
     freeze.add_argument("--development-acceptance", type=Path, required=True)
@@ -4218,6 +4256,8 @@ def _parser() -> argparse.ArgumentParser:
     freeze_replay = commands.add_parser("freeze-round1-ledger-replay")
     freeze_replay.add_argument("--source-round1-root", type=Path, required=True)
     freeze_replay.add_argument("--output-root", type=Path, required=True)
+    freeze_replay.add_argument("--hedge-beta-root", type=Path, required=True)
+    freeze_replay.add_argument("--hedge-beta-manifest-sha256", required=True)
     run_replay = commands.add_parser("run-round1-ledger-replay")
     run_replay.add_argument("--output-root", type=Path, required=True)
     seal = commands.add_parser("seal-root")
@@ -4236,6 +4276,8 @@ def _parser() -> argparse.ArgumentParser:
     freeze2.add_argument("--experiment52-cdi-sha256", required=True)
     freeze2.add_argument("--bova11-root", type=Path, required=True)
     freeze2.add_argument("--bova11-manifest-sha256", required=True)
+    freeze2.add_argument("--hedge-beta-root", type=Path, required=True)
+    freeze2.add_argument("--hedge-beta-manifest-sha256", required=True)
     freeze2.add_argument("--lending-archive-root", type=Path, required=True)
     freeze2.add_argument("--lending-archive-manifest-sha256", required=True)
     freeze2.add_argument("--output-root", type=Path, required=True)
@@ -4266,6 +4308,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
+            hedge_beta_root=arguments.hedge_beta_root,
+            hedge_beta_manifest_sha256=arguments.hedge_beta_manifest_sha256,
             lending_archive_root=arguments.lending_archive_root,
             lending_archive_manifest_sha256=(arguments.lending_archive_manifest_sha256),
             acceptance_path=arguments.development_acceptance,
@@ -4287,6 +4331,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         digest = freeze_round1_ledger_replay(
             source_round1_root=arguments.source_round1_root,
             output_root=arguments.output_root,
+            hedge_beta_root=arguments.hedge_beta_root,
+            hedge_beta_manifest_sha256=arguments.hedge_beta_manifest_sha256,
         )
     elif arguments.command == "run-round1-ledger-replay":
         digest = run_round1_ledger_replay(output_root=arguments.output_root)
@@ -4300,6 +4346,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
+            hedge_beta_root=arguments.hedge_beta_root,
+            hedge_beta_manifest_sha256=arguments.hedge_beta_manifest_sha256,
             lending_archive_root=arguments.lending_archive_root,
             lending_archive_manifest_sha256=(arguments.lending_archive_manifest_sha256),
             output_root=arguments.output_root,

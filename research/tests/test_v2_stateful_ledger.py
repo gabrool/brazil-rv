@@ -52,7 +52,9 @@ def _run(
     borrow_rate_placeholder: np.ndarray | None = None,
     shortable: np.ndarray | None = None,
     selection_volatility: np.ndarray | None = None,
-    beta_60: np.ndarray | None = None,
+    hedge_beta: np.ndarray | None = None,
+    hedge_beta_valid: np.ndarray | None = None,
+    initial_hedge_reference_price: float = 100.0,
     hedge_close: np.ndarray | None = None,
     hedge_annual_borrow_rate: np.ndarray | None = None,
 ) -> StatefulLedgerResult:
@@ -95,7 +97,13 @@ def _run(
         ),
         shortable=shortable,
         selection_volatility=selection_volatility,
-        beta_60=beta_60,
+        hedge_beta=hedge_beta,
+        hedge_beta_valid=(
+            np.isfinite(hedge_beta)
+            if hedge_beta is not None and hedge_beta_valid is None
+            else hedge_beta_valid
+        ),
+        initial_hedge_reference_price=initial_hedge_reference_price,
         hedge_close=hedge_close,
         hedge_annual_borrow_rate=hedge_annual_borrow_rate,
         config=_config() if config is None else config,
@@ -111,7 +119,7 @@ def _constructed_inputs(days: int, names: int) -> dict[str, np.ndarray]:
         "selection_volatility": np.broadcast_to(
             np.arange(names, dtype=np.float64), (days, names)
         ).copy(),
-        "beta_60": np.ones((days, names), dtype=np.float64),
+        "hedge_beta": np.ones((days, names), dtype=np.float64),
         "hedge_close": np.full(days, 100.0),
     }
 
@@ -210,7 +218,10 @@ def test_lending_borrow_charges_observed_rate_plus_registered_capped_fee() -> No
     assert charged.any()
     first_charged = int(np.flatnonzero(charged)[0])
     assert lending.borrow_bps[first_charged] == pytest.approx(
-        (0.407 / 0.024) * uniform.borrow_bps[first_charged]
+        ((1.40 ** (1 / 252) - 1) + (1.007 ** (1 / 252) - 1)) * 10_000
+    )
+    assert uniform.borrow_bps[first_charged] == pytest.approx(
+        ((1.02 ** (1 / 252) - 1) + (1.004 ** (1 / 252) - 1)) * 10_000
     )
     np.testing.assert_allclose(
         lending.held_short_weighted_annual_borrow_rate[charged], 0.407
@@ -364,7 +375,7 @@ def test_current_unresolved_action_session_blocks_entry_only() -> None:
     }
 
 
-def test_unfilled_top_entry_reserves_slot_and_is_not_replaced() -> None:
+def test_pending_band_cancellation_off_preserves_old_slot_reservation() -> None:
     close = np.full((5, 3), 100.0)
     close[1:4, 0] = np.nan
     scores = np.asarray(
@@ -376,7 +387,7 @@ def test_unfilled_top_entry_reserves_slot_and_is_not_replaced() -> None:
             [0.0, 3.0, -3.0],
         ]
     )
-    result = _run(close, scores)
+    result = _run(close, scores, config=_config(cancel_pending_outside_retention=False))
 
     entries = [order for order in result.intended_orders if order.purpose == "entry"]
     assert {(order.decision_session, order.security_index) for order in entries} == {
@@ -1610,6 +1621,157 @@ def test_rev4_defaults_bind_lending_volatility_balance_and_beta_hedge() -> None:
     assert uniform.beta_hedge
 
 
+@pytest.mark.parametrize("changed_instrument", ["equity", "hedge"])
+def test_rev4f_all_orders_ignore_later_closes(changed_instrument: str) -> None:
+    close = np.full((4, 4), 100.0)
+    bova = np.full(4, 100.0)
+    scores = np.tile([-2.0, -1.0, 1.0, 2.0], (4, 1))
+    config = _config(beta_hedge=True, hedge_cost_bps_per_side=4.0)
+    kwargs = dict(
+        config=config,
+        initial_reference_price=np.full(4, 100.0),
+        hedge_beta=np.tile([1.0, 1.0, 1.134, 1.134], (4, 1)),
+    )
+    original = _run(close, scores, hedge_close=bova, **kwargs)
+    if changed_instrument == "equity":
+        close[0, 3] = 110.0
+    else:
+        bova[0] = 110.0
+    changed = _run(close, scores, hedge_close=bova, **kwargs)
+    original_orders = [
+        order for order in original.intended_orders if order.decision_session == 0
+    ]
+    changed_orders = [
+        order for order in changed.intended_orders if order.decision_session == 0
+    ]
+    assert original_orders == changed_orders
+    hedge = next(order for order in original_orders if order.purpose == "hedge")
+    assert hedge.reference_price == 100.0
+    assert hedge.quantity == pytest.approx(0.134 / 100)
+    assert original.hedge_target_notional[0] == pytest.approx(-0.134)
+    assert [f for f in original.fills if f.fill_session == 0] != [
+        f for f in changed.fills if f.fill_session == 0
+    ]
+    np.testing.assert_allclose(changed.reconciliation_error, 0.0, atol=1e-15)
+
+
+def test_rev4f_missing_hedge_print_cancels_and_reconciles_fixed_quantity() -> None:
+    scores = np.tile([-1.0, 1.0], (4, 1))
+    result = _run(
+        np.full((4, 2), 100.0),
+        scores,
+        config=_config(beta_hedge=True),
+        initial_reference_price=np.full(2, 100.0),
+        hedge_beta=np.tile([1.0, 1.2], (4, 1)),
+        hedge_close=np.asarray([np.nan, 100.0, 100.0, 100.0]),
+    )
+    hedges = [order for order in result.intended_orders if order.purpose == "hedge"]
+    assert hedges[0].decision_session == 0
+    cancellation = next(
+        c for c in result.cancellations if c.order_id == hedges[0].order_id
+    )
+    assert cancellation.reason == "expired"
+    for order in hedges:
+        filled = sum(f.quantity for f in result.fills if f.order_id == order.order_id)
+        cancelled = sum(
+            c.unfilled_quantity
+            for c in result.cancellations
+            if c.order_id == order.order_id
+        )
+        assert filled + cancelled == pytest.approx(order.quantity)
+    assert result.hedge_signed_shares[-1] == 0.0
+
+
+def test_rev4f_hedge_fallback_does_not_block_entries_and_is_reported() -> None:
+    result = _run(
+        np.full((4, 2), 100.0),
+        np.tile([-1.0, 1.0], (4, 1)),
+        config=_config(beta_hedge=True),
+        initial_reference_price=np.full(2, 100.0),
+        hedge_beta=np.zeros((4, 2)),
+        hedge_beta_valid=np.zeros((4, 2), dtype=bool),
+        hedge_close=np.full(4, 100.0),
+    )
+    assert result.submitted_entry_count[0] == 2
+    assert result.hedge_beta_fallback_sessions.all()
+    assert result.summary()["hedge_beta_fallback_sessions"] == 4
+    np.testing.assert_array_equal(result.hedge_target_notional, 0.0)
+
+
+def test_terminal_settlement_intention_precedes_possible_last_print() -> None:
+    close = np.full((13, 2), 100.0)
+    close[1:, 1] = np.nan
+    scores = np.tile([-1.0, 1.0], (13, 1))
+    original = _run(close, scores, initial_reference_price=np.full(2, 100.0))
+    close[10, 1] = 105.0
+    changed = _run(close, scores, initial_reference_price=np.full(2, 100.0))
+    assert [o for o in original.intended_orders if o.decision_session == 10] == [
+        o for o in changed.intended_orders if o.decision_session == 10
+    ]
+    assert original.terminal_settlement_count[10] == 1
+    assert changed.terminal_settlement_count[10] == 0
+
+
+def test_ledger_signature_does_not_accept_model_feature_beta() -> None:
+    import inspect
+
+    parameters = inspect.signature(simulate_stateful_ledger).parameters
+    assert "hedge_beta" in parameters and "hedge_beta_valid" in parameters
+    assert "beta_60" not in parameters
+
+
+def test_rev4f_cost_grid_preserves_headline_construction() -> None:
+    headline = LedgerConfig()
+    grid = ledger_configurations()
+    for cost in (2.0, 4.0, 7.0):
+        for borrow in ("balance", "strict", "open"):
+            key = (
+                f"borrow_{borrow}" if cost == 4.0 else f"cost_{cost:g}_borrow_{borrow}"
+            )
+            assert grid[key] == replace(
+                headline, cost_bps_per_side=cost, borrow_source=f"borrow_{borrow}"
+            )
+
+
+def test_rev4f_pending_entry_cancelled_outside_current_quintile_band() -> None:
+    days, names = 4, 100
+    scores = np.tile(np.arange(names, dtype=float), (days, 1))
+    scores[0, 0] = 1000.0
+    scores[1:, 0] = 10.5
+    close = np.full((days, names), 100.0)
+    close[0, 0] = np.nan
+    config = _config(
+        k_per_side=5,
+        buffer_per_side=5,
+        volatility_balanced_entries=True,
+        planned_gross_cap=3.0,
+        planned_absolute_net_cap=1.1,
+    )
+    inputs = dict(
+        selection_volatility=np.tile(np.repeat(np.arange(5), 20), (days, 1)),
+        initial_reference_price=np.full(names, 100.0),
+    )
+    result = _run(close, scores, config=config, **inputs)
+    initial = next(
+        o
+        for o in result.intended_orders
+        if o.security_index == 0 and o.purpose == "entry"
+    )
+    cancelled = next(c for c in result.cancellations if c.order_id == initial.order_id)
+    assert cancelled.reason == "band_exit"
+    assert cancelled.cancellation_session == 1
+    assert not any(f.order_id == initial.order_id for f in result.fills)
+    off = _run(
+        close,
+        scores,
+        config=replace(config, cancel_pending_outside_retention=False),
+        **inputs,
+    )
+    assert any(
+        f.order_id == initial.order_id and f.fill_session == 1 for f in off.fills
+    )
+
+
 def test_rev4_entry_scheduler_fills_equal_volatility_quotas() -> None:
     days, names = 4, 300
     score_order = np.asarray(
@@ -1831,7 +1993,7 @@ def test_rev4_beta_hedge_is_separate_rebalances_and_carries_missing_print() -> N
         borrow_rate_imputed=np.zeros_like(shortable),
         borrow_rate_placeholder=np.zeros_like(shortable),
         shortable=shortable,
-        beta_60=beta,
+        hedge_beta=beta,
         hedge_close=np.asarray([100.0, np.nan, 110.0, 110.0]),
     )
 
@@ -1840,8 +2002,10 @@ def test_rev4_beta_hedge_is_separate_rebalances_and_carries_missing_print() -> N
     assert result.hedge_signed_shares[1] == result.hedge_signed_shares[0]
     assert result.hedge_mark_price[1] == result.hedge_mark_price[0]
     assert result.hedge_capped[0]
-    assert result.ex_ante_beta_after_hedge[0] == pytest.approx(0.40024)
-    assert abs(result.hedge_signed_notional[0]) / result.nav[0] <= 0.60 + 1e-12
+    assert result.ex_ante_beta_after_hedge[0] == pytest.approx(0.4)
+    assert abs(result.hedge_target_notional[0]) / result.start_nav[0] == pytest.approx(
+        0.60
+    )
     assert result.hedge_borrow_bps[1] > 0.0
     assert result.hedge_signed_notional[-1] == 0.0
     assert np.all(
@@ -1855,7 +2019,7 @@ def test_rev4c_hedge_does_not_consume_equity_caps() -> None:
     days, names = 4, 20
     scores = np.broadcast_to(np.arange(names, dtype=np.float64), (days, names)).copy()
     inputs = _constructed_inputs(days, names)
-    inputs["beta_60"] = np.broadcast_to(
+    inputs["hedge_beta"] = np.broadcast_to(
         np.concatenate((np.full(10, 0.45), np.zeros(10))), (days, names)
     ).copy()
     result = _run(
@@ -1883,7 +2047,7 @@ def test_rev4c_hedge_requirement_is_capped_and_labelled() -> None:
     days, names = 4, 20
     scores = np.broadcast_to(np.arange(names, dtype=np.float64), (days, names)).copy()
     inputs = _constructed_inputs(days, names)
-    inputs["beta_60"] = np.broadcast_to(
+    inputs["hedge_beta"] = np.broadcast_to(
         np.concatenate((np.zeros(10), np.full(10, 0.8))), (days, names)
     ).copy()
     result = _run(

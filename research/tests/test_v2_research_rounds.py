@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from hedge_beta_fixtures import write_hedge_beta_fixture
+
 import copy
 import json
 from dataclasses import replace
@@ -81,7 +83,7 @@ def _lending_panels(inputs: EvaluationInputs) -> LendingBorrowPanels:
 def test_rev4e_registration_replaces_the_voided_research_entrypoints(
     tmp_path: Path,
 ) -> None:
-    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4e.md"
+    assert research_rounds.PREREGISTRATION.name == "v2_round1_round2_rev4f.md"
     assert research_rounds.PREREGISTRATION.is_file()
     with pytest.raises(FileNotFoundError):
         research_rounds.run_round1(output_root=tmp_path / "absent", num_threads=1)
@@ -157,7 +159,7 @@ def test_registration_protocol_requires_ineligible_hold_sessions(
     registered = research_rounds.PREREGISTRATION.read_text(encoding="utf-8")
     stale = tmp_path / "stale_registration.md"
     stale.write_text(
-        registered.replace('"ineligible_hold_sessions":5,', "", 1),
+        registered.replace('"ineligible_hold_sessions":5,', ""),
         encoding="utf-8",
     )
 
@@ -307,6 +309,9 @@ def _evaluation_pair() -> tuple[_ResearchEvaluation, _ResearchEvaluation]:
         "bova11_close": np.full(day_count, 100.0),
         "bova11_manifest_sha256": "c" * 64,
         "bova11_data_sha256": "d" * 64,
+        "hedge_beta": np.ones_like(raw_close),
+        "hedge_beta_valid": np.ones_like(active),
+        "hedge_beta_manifest_sha256": "1" * 64,
         "neutral_target_fallback_flags": np.zeros(
             (day_count, len(HORIZONS)), dtype=np.bool_
         ),
@@ -747,6 +752,27 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         def neutral_target_fallback_flags(self, selector: np.ndarray) -> np.ndarray:
             return np.zeros((len(selector), len(HORIZONS)), dtype=np.bool_)
 
+    FixtureStore.root = tmp_path / "fixture_store"
+    FixtureStore.root.mkdir()
+    (FixtureStore.root / "manifest.json").write_text(json.dumps(FixtureStore.manifest))
+    beta_binding = write_hedge_beta_fixture(
+        tmp_path / "hedge_beta",
+        dates=FixtureStore.dates,
+        isins=inputs.security_ids,
+        store_sha256=sha256_file(FixtureStore.root / "manifest.json"),
+        bova11_sha256=str(inputs.bova11_manifest_sha256),
+    )
+    inputs = replace(
+        inputs,
+        hedge_beta_manifest_sha256=beta_binding["hedge_beta_manifest_sha256"],
+        hedge_beta_history=(
+            np.ones((1, name_count)),
+            np.ones((1, name_count), dtype=bool),
+        ),
+    )
+    candidate = _ResearchEvaluation(
+        result=evaluate_scores(inputs, window_name="fixture"), inputs=inputs
+    )
     scores_path = tmp_path / "scores.npy"
     mask_path = tmp_path / "score_mask.npy"
     np.save(scores_path, inputs.scores, allow_pickle=False)
@@ -783,6 +809,7 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         (np.asarray([np.nan]), np.asarray(inputs.bova11_close, dtype=np.float64))
     )
     bova11_binding = {
+        **beta_binding,
         "manifest_sha256": str(inputs.bova11_manifest_sha256),
         "data_sha256": str(inputs.bova11_data_sha256),
     }

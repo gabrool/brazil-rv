@@ -8,12 +8,13 @@ import numpy as np
 from numpy.typing import NDArray
 
 from brazil_rv.v2.corporate_actions import AlignedActionTerms, apply_contractual_action
+from brazil_rv.v2.hedge_beta import resolve_hedge_beta
 
 
 OrderSide = Literal["buy", "sell"]
 BorrowSource = Literal["uniform", "borrow_strict", "borrow_balance", "borrow_open"]
 OrderPurpose = Literal[
-    "entry", "exit", "risk_exit", "terminal_exit", "terminal_settlement"
+    "entry", "exit", "risk_exit", "terminal_exit", "terminal_settlement", "hedge"
 ]
 ExitInstructionCause = Literal[
     "ineligible_hold_exhausted",
@@ -22,6 +23,7 @@ ExitInstructionCause = Literal[
     "terminal",
 ]
 CancellationReason = Literal[
+    "band_exit",
     "expired",
     "evaluation_end",
     "exit_instruction",
@@ -31,6 +33,7 @@ CancellationReason = Literal[
     "terminal_settlement",
 ]
 _CANCELLATION_REASONS: tuple[CancellationReason, ...] = (
+    "band_exit",
     "expired",
     "evaluation_end",
     "exit_instruction",
@@ -85,6 +88,7 @@ class LedgerConfig:
     initial_capital_brl: float = 1.0
     lot_size: int | None = None
     entry_expiry_sessions: int = 3
+    cancel_pending_outside_retention: bool = True
     ineligible_hold_sessions: int = 5
     settlement_grace_sessions: int = 10
     settlement_haircut: float = 0.30
@@ -244,7 +248,8 @@ class _ValidatedInputs:
     borrow_rate_placeholder: NDArray[np.bool_]
     shortable: NDArray[np.bool_]
     selection_volatility: NDArray[np.float64]
-    beta_60: NDArray[np.float64]
+    hedge_beta: NDArray[np.float64]
+    hedge_beta_fallback: NDArray[np.bool_]
     hedge_close: NDArray[np.float64]
     hedge_annual_borrow_rate: NDArray[np.float64]
 
@@ -414,6 +419,7 @@ class StatefulLedgerResult:
     hedge_signed_notional: NDArray[np.float64]
     hedge_unconstrained_target_notional: NDArray[np.float64]
     hedge_target_notional: NDArray[np.float64]
+    hedge_beta_fallback_sessions: NDArray[np.bool_]
     hedge_capped: NDArray[np.bool_]
     hedge_turnover_fraction_nav: NDArray[np.float64]
     hedge_cost_bps: NDArray[np.float64]
@@ -733,6 +739,9 @@ class StatefulLedgerResult:
             ),
             "hedge_notional_cap_nav": self.hedge_notional_cap_nav,
             "hedge_capped_session_count": int(self.hedge_capped.sum()),
+            "hedge_beta_fallback_sessions": int(
+                self.hedge_beta_fallback_sessions.sum()
+            ),
             "maximum_absolute_hedge_fraction_nav": float(
                 np.max(
                     np.divide(
@@ -798,7 +807,9 @@ def _validate_inputs(
     borrow_rate_placeholder: NDArray[np.bool_] | None,
     shortable: NDArray[np.bool_] | None,
     selection_volatility: NDArray[np.floating] | None,
-    beta_60: NDArray[np.floating] | None,
+    hedge_beta: NDArray[np.floating] | None,
+    hedge_beta_valid: NDArray[np.bool_] | None,
+    hedge_beta_history: tuple[NDArray[np.floating], NDArray[np.bool_]] | None,
     hedge_close: NDArray[np.floating] | None,
     hedge_annual_borrow_rate: NDArray[np.floating] | None,
     borrow_source: BorrowSource,
@@ -875,12 +886,16 @@ def _validate_inputs(
         volatility = np.full(matrix_shape, np.nan, dtype=np.float64)
 
     if beta_hedge:
-        if beta_60 is None or hedge_close is None:
-            raise ValueError("beta hedge requires beta_60 and BOVA11 close inputs")
-        beta = np.asarray(beta_60, dtype=np.float64)
+        if hedge_beta is None or hedge_beta_valid is None or hedge_close is None:
+            raise ValueError(
+                "beta hedge requires economic hedge_beta, validity and BOVA11 closes"
+            )
+        beta, beta_fallback = resolve_hedge_beta(
+            hedge_beta, hedge_beta_valid, history=hedge_beta_history
+        )
         hedge = np.asarray(hedge_close, dtype=np.float64)
-        if beta.shape != matrix_shape or np.isinf(beta).any():
-            raise ValueError("beta_60 must align [date, name] without infinity")
+        if beta.shape != matrix_shape:
+            raise ValueError("hedge_beta must align [date, name]")
         if hedge.shape != (len(date_values),) or np.isinf(hedge).any():
             raise ValueError("BOVA11 close must align the date axis without infinity")
         if (hedge[np.isfinite(hedge)] <= 0.0).any():
@@ -899,6 +914,7 @@ def _validate_inputs(
                 )
     else:
         beta = np.full(matrix_shape, np.nan, dtype=np.float64)
+        beta_fallback = np.zeros(matrix_shape, dtype=np.bool_)
         hedge = np.full(len(date_values), np.nan, dtype=np.float64)
         hedge_borrow = np.full(len(date_values), np.nan, dtype=np.float64)
 
@@ -1004,7 +1020,8 @@ def _validate_inputs(
         borrow_rate_placeholder=placeholder,
         shortable=shortable_mask,
         selection_volatility=volatility,
-        beta_60=beta,
+        hedge_beta=beta,
+        hedge_beta_fallback=beta_fallback,
         hedge_close=hedge,
         hedge_annual_borrow_rate=hedge_borrow,
     )
@@ -1157,8 +1174,11 @@ def simulate_stateful_ledger(
     borrow_rate_placeholder: NDArray[np.bool_] | None = None,
     shortable: NDArray[np.bool_] | None = None,
     selection_volatility: NDArray[np.floating] | None = None,
-    beta_60: NDArray[np.floating] | None = None,
+    hedge_beta: NDArray[np.floating] | None = None,
+    hedge_beta_valid: NDArray[np.bool_] | None = None,
+    hedge_beta_history: tuple[NDArray[np.floating], NDArray[np.bool_]] | None = None,
     hedge_close: NDArray[np.floating] | None = None,
+    initial_hedge_reference_price: float = np.nan,
     hedge_annual_borrow_rate: NDArray[np.floating] | None = None,
 ) -> StatefulLedgerResult:
     """Run causal close-proxy orders, fills, and a raw signed-share ledger."""
@@ -1180,7 +1200,9 @@ def simulate_stateful_ledger(
         borrow_rate_placeholder=borrow_rate_placeholder,
         shortable=shortable,
         selection_volatility=selection_volatility,
-        beta_60=beta_60,
+        hedge_beta=hedge_beta,
+        hedge_beta_valid=hedge_beta_valid,
+        hedge_beta_history=hedge_beta_history,
         hedge_close=hedge_close,
         hedge_annual_borrow_rate=hedge_annual_borrow_rate,
         borrow_source=config.borrow_source,
@@ -1191,9 +1213,15 @@ def simulate_stateful_ledger(
     shares = np.zeros(name_count, dtype=np.float64)
     marks = np.full(name_count, np.nan, dtype=np.float64)
     hedge_shares = 0.0
-    hedge_mark = np.nan
+    if not np.isnan(initial_hedge_reference_price) and (
+        not np.isfinite(initial_hedge_reference_price)
+        or initial_hedge_reference_price <= 0
+    ):
+        raise ValueError(
+            "initial BOVA11 reference must be a positive prior close or missing"
+        )
+    hedge_mark = float(initial_hedge_reference_price)
     hedge_restricted_cash = 0.0
-    last_beta = np.full(name_count, np.nan, dtype=np.float64)
     # This is the last observed close strictly before the first decision.  It
     # lets the first evaluation session form the same causal order it would
     # form inside a longer continuous ledger, without reading that session's
@@ -1368,6 +1396,7 @@ def simulate_stateful_ledger(
     hedge_notional_rows: list[float] = []
     hedge_unconstrained_target_rows: list[float] = []
     hedge_target_rows: list[float] = []
+    hedge_beta_fallback_rows: list[bool] = []
     hedge_capped_rows: list[bool] = []
     hedge_turnover_rows: list[float] = []
     hedge_cost_rows: list[float] = []
@@ -1395,7 +1424,7 @@ def simulate_stateful_ledger(
         nonlocal next_order_id
         order = IntendedOrder(
             order_id=f"order-{next_order_id:08d}",
-            security=inputs.securities[name],
+            security="BRBOVACTF003" if purpose == "hedge" else inputs.securities[name],
             security_index=name,
             decision_date=inputs.dates[day],
             decision_session=day,
@@ -1657,10 +1686,16 @@ def simulate_stateful_ledger(
             )
             effective_rates = raw_rates + fee_rates
             equity_borrow_raw = float(
-                np.sum(short_values * raw_rates) / config.annual_sessions
+                np.sum(
+                    short_values
+                    * np.expm1(np.log1p(raw_rates) / config.annual_sessions)
+                )
             )
             equity_borrow_fee = float(
-                np.sum(short_values * fee_rates) / config.annual_sessions
+                np.sum(
+                    short_values
+                    * np.expm1(np.log1p(fee_rates) / config.annual_sessions)
+                )
             )
             borrow = equity_borrow_raw + equity_borrow_fee
             weighted_borrow_rate = float(
@@ -1674,7 +1709,8 @@ def simulate_stateful_ledger(
             )
         else:
             equity_borrow_raw = (
-                config.annual_borrow_rate / config.annual_sessions * short_value_at_open
+                np.expm1(np.log1p(config.annual_borrow_rate) / config.annual_sessions)
+                * short_value_at_open
             )
             uniform_fee_rate = float(
                 equity_borrow_registration_fee(
@@ -1683,7 +1719,8 @@ def simulate_stateful_ledger(
                 )
             )
             equity_borrow_fee = (
-                uniform_fee_rate / config.annual_sessions * short_value_at_open
+                np.expm1(np.log1p(uniform_fee_rate) / config.annual_sessions)
+                * short_value_at_open
             )
             borrow = equity_borrow_raw + equity_borrow_fee
             weighted_borrow_rate = (
@@ -1699,8 +1736,8 @@ def simulate_stateful_ledger(
                 else 0.0,
                 config.hedge_annual_borrow_rate,
             )
-            hedge_borrow = (
-                abs(hedge_shares * hedge_mark) * hedge_rate / config.annual_sessions
+            hedge_borrow = abs(hedge_shares * hedge_mark) * np.expm1(
+                np.log1p(hedge_rate) / config.annual_sessions
             )
             borrow += hedge_borrow
         held_short_borrow_rate_rows.append(weighted_borrow_rate)
@@ -1715,13 +1752,9 @@ def simulate_stateful_ledger(
             & inputs.membership[day]
             & np.isfinite(inputs.score[day])
         )
-        finite_beta = np.isfinite(inputs.beta_60[day])
-        last_beta[finite_beta] = inputs.beta_60[day, finite_beta]
         entry_eligible = eligible.copy()
         if config.volatility_balanced_entries:
             entry_eligible &= np.isfinite(inputs.selection_volatility[day])
-        if config.beta_hedge:
-            entry_eligible &= finite_beta
         eligible_names = np.flatnonzero(eligible)
         order = (
             eligible_names[np.argsort(inputs.score[day, eligible_names], kind="stable")]
@@ -1791,7 +1824,20 @@ def simulate_stateful_ledger(
                 config.k_per_side + config.buffer_per_side,
                 len(order) // 2,
             )
+            if retention:
+                long_retention[order[-retention:]] = True
+                short_retention[order[:retention]] = True
         retention_rows.append(retention)
+
+        if config.cancel_pending_outside_retention:
+            for name, pending in tuple(pending_entries.items()):
+                retained = (
+                    long_retention[name]
+                    if pending.order.side == "buy"
+                    else short_retention[name]
+                )
+                if not retained:
+                    cancelled_today += int(cancel_entry(name, day, "band_exit"))
 
         signed_values = np.zeros(name_count, dtype=np.float64)
         held = shares != 0.0
@@ -2446,6 +2492,87 @@ def simulate_stateful_ledger(
         gross_cap_below_target_rows.append(gross_cap_below_target)
         name_cap_fresh_rows.append(name_cap_fresh)
 
+        # A last-mark settlement is conditional accounting, not an observed
+        # market execution. Freeze its quantity before the possible final print;
+        # expire the intention if a print makes the settlement unnecessary.
+        settlement_orders = {
+            int(name): submit_order(
+                day,
+                int(name),
+                "sell" if shares[name] > 0.0 else "buy",
+                abs(float(shares[name])),
+                float(marks[name]),
+                "terminal_settlement",
+                day,
+            )
+            for name in np.flatnonzero(
+                (shares != 0.0)
+                & ~settled_names
+                & (missing_sessions >= config.settlement_grace_sessions - 1)
+            )
+        }
+
+        # Freeze the hedge before reading any current-session fill or close.
+        planned_equity = np.zeros(name_count, dtype=np.float64)
+        held_for_hedge = shares != 0.0
+        planned_equity[held_for_hedge] = shares[held_for_hedge] * marks[held_for_hedge]
+        for name, pending in pending_entries.items():
+            direction = 1.0 if pending.order.side == "buy" else -1.0
+            planned_equity[name] += (
+                direction * pending.remaining_quantity * pending.order.reference_price
+            )
+        for name, pending in pending_exits.items():
+            direction = 1.0 if pending.order.side == "buy" else -1.0
+            planned_equity[name] += direction * pending.remaining_quantity * marks[name]
+        beta_required = held_for_hedge.copy()
+        for name in pending_entries:
+            beta_required[name] = True
+        hedge_beta_fallback_rows.append(
+            bool(
+                config.beta_hedge
+                and np.any(beta_required & inputs.hedge_beta_fallback[day])
+            )
+        )
+        exposure = planned_equity != 0.0
+        equity_beta_notional = (
+            float(np.sum(planned_equity[exposure] * inputs.hedge_beta[day, exposure]))
+            if config.beta_hedge
+            else 0.0
+        )
+        hedge_unconstrained_target_notional = (
+            -equity_beta_notional if day != day_count - 1 else 0.0
+        )
+        hedge_limit = config.hedge_notional_cap_nav * start_nav
+        hedge_target_notional = float(
+            np.clip(hedge_unconstrained_target_notional, -hedge_limit, hedge_limit)
+        )
+        hedge_capped = (
+            abs(hedge_unconstrained_target_notional - hedge_target_notional) > 1e-12
+        )
+        hedge_notional_before = hedge_shares * hedge_mark if hedge_shares else 0.0
+        rebalance_required = config.beta_hedge and (
+            abs(hedge_target_notional - hedge_notional_before)
+            > config.hedge_rebalance_threshold_nav * start_nav
+            or abs(hedge_notional_before) > hedge_limit + 1e-12
+            or (day == day_count - 1 and hedge_shares != 0.0)
+        )
+        hedge_order = None
+        if rebalance_required and np.isfinite(hedge_mark):
+            change = hedge_target_notional / hedge_mark - hedge_shares
+            if change != 0.0:
+                hedge_order = submit_order(
+                    day,
+                    name_count,
+                    "buy" if change > 0 else "sell",
+                    abs(change),
+                    hedge_mark,
+                    "hedge",
+                    day,
+                )
+        decision_hedge_notional = (
+            hedge_target_notional if hedge_order is not None else hedge_notional_before
+        )
+
         # Only now may current-session prints affect the result. This makes the
         # immutable intended-order set invariant to those later observations.
         printed = np.isfinite(inputs.raw_close[day]) & (inputs.raw_close[day] > 0.0)
@@ -2586,6 +2713,19 @@ def simulate_stateful_ledger(
             & ~settled_names
             & (missing_sessions >= config.settlement_grace_sessions)
         )
+        for name, pending in settlement_orders.items():
+            if not due_for_settlement[name]:
+                cancellations.append(
+                    OrderCancellation(
+                        order_id=pending.order.order_id,
+                        security=pending.order.security,
+                        security_index=name,
+                        cancellation_date=inputs.dates[day],
+                        cancellation_session=day,
+                        unfilled_quantity=pending.order.quantity,
+                        reason="expired",
+                    )
+                )
         for name in np.flatnonzero(due_for_settlement):
             pending = pending_exits.pop(int(name), None)
             if pending is not None:
@@ -2606,15 +2746,7 @@ def simulate_stateful_ledger(
             before = float(shares[name])
             quantity = abs(before)
             side: OrderSide = "sell" if before > 0.0 else "buy"
-            settlement = submit_order(
-                day,
-                int(name),
-                side,
-                quantity,
-                price,
-                "terminal_settlement",
-                None,
-            )
+            settlement = settlement_orders[int(name)]
             scenario_price = price * (
                 1.0 - config.settlement_haircut
                 if before > 0.0
@@ -2671,89 +2803,16 @@ def simulate_stateful_ledger(
         hedge_traded_notional = 0.0
         hedge_cost = 0.0
         hedge_gross_pnl = 0.0
+        hedge_cost_rate = config.hedge_cost_bps_per_side / 10_000.0
         bova_printed = config.beta_hedge and np.isfinite(inputs.hedge_close[day])
         if bova_printed:
             current_hedge_close = float(inputs.hedge_close[day])
             if hedge_shares != 0.0:
                 hedge_gross_pnl = hedge_shares * (current_hedge_close - hedge_mark)
-                hedge_mark = current_hedge_close
-        planned_equity = np.zeros(name_count, dtype=np.float64)
-        held_for_hedge = shares != 0.0
-        planned_equity[held_for_hedge] = shares[held_for_hedge] * marks[held_for_hedge]
-        for name, pending in pending_entries.items():
-            direction = 1.0 if pending.order.side == "buy" else -1.0
-            planned_equity[name] += (
-                direction * pending.remaining_quantity * pending.order.reference_price
-            )
-        beta_values = np.where(
-            np.isfinite(inputs.beta_60[day]), inputs.beta_60[day], last_beta
-        )
-        beta_required = planned_equity != 0.0
-        if config.beta_hedge and np.any(beta_required & ~np.isfinite(beta_values)):
-            raise ValueError("held or pending equity exposure has no causal beta_60")
-        equity_beta_notional = (
-            float(
-                np.sum(
-                    planned_equity[beta_required] * beta_values[beta_required],
-                    dtype=np.float64,
-                )
-            )
-            if config.beta_hedge
-            else 0.0
-        )
-        hedge_unconstrained_target_notional = (
-            -equity_beta_notional if config.beta_hedge else 0.0
-        )
-        if day == day_count - 1:
-            hedge_unconstrained_target_notional = 0.0
-        hedge_notional_before = (
-            hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0
-        )
-        prehedge_nav = (
-            _equity(
-                free_cash,
-                restricted_by_name,
-                shares,
-                marks,
-                receivable_by_name,
-                payable_by_name,
-            )
-            + hedge_restricted_cash
-            + hedge_notional_before
-        )
-        hedge_cost_rate = config.hedge_cost_bps_per_side / 10_000.0
-        target_sign = float(np.sign(hedge_unconstrained_target_notional))
-        low = 0.0
-        high = abs(hedge_unconstrained_target_notional)
-        for _ in range(64):
-            midpoint = (low + high) / 2.0
-            signed_midpoint = target_sign * midpoint
-            post_cost_nav = prehedge_nav - hedge_cost_rate * abs(
-                signed_midpoint - hedge_notional_before
-            )
-            if midpoint <= config.hedge_notional_cap_nav * post_cost_nav:
-                low = midpoint
-            else:
-                high = midpoint
-        hedge_target_notional = target_sign * low
-        hedge_capped = bool(
-            abs(hedge_unconstrained_target_notional - hedge_target_notional) > 1e-12
-        )
-        hedge_limit = config.hedge_notional_cap_nav * prehedge_nav
-        rebalance_required = (
-            config.beta_hedge
-            and bova_printed
-            and (
-                abs(hedge_target_notional - hedge_notional_before)
-                > config.hedge_rebalance_threshold_nav * prehedge_nav
-                or abs(hedge_notional_before) > hedge_limit + 1e-12
-                or (day == day_count - 1 and hedge_shares != 0.0)
-            )
-        )
-        if rebalance_required:
-            desired_shares = hedge_target_notional / current_hedge_close
-            share_change = desired_shares - hedge_shares
-            if share_change != 0.0:
+            hedge_mark = current_hedge_close
+        if hedge_order is not None:
+            order = hedge_order.order
+            if bova_printed:
                 hedge_share_array = np.asarray([hedge_shares], dtype=np.float64)
                 hedge_mark_array = np.asarray([hedge_mark], dtype=np.float64)
                 hedge_restricted_array = np.asarray(
@@ -2761,8 +2820,8 @@ def simulate_stateful_ledger(
                 )
                 free_cash, hedge_traded_notional = _book_fill(
                     name=0,
-                    side="buy" if share_change > 0.0 else "sell",
-                    quantity=abs(share_change),
+                    side=order.side,
+                    quantity=order.quantity,
                     price=current_hedge_close,
                     shares=hedge_share_array,
                     marks=hedge_mark_array,
@@ -2771,11 +2830,37 @@ def simulate_stateful_ledger(
                     cost_rate=hedge_cost_rate,
                 )
                 hedge_shares = float(hedge_share_array[0])
-                hedge_mark = float(hedge_mark_array[0])
                 hedge_restricted_cash = float(hedge_restricted_array[0])
                 hedge_cost = hedge_cost_rate * hedge_traded_notional
                 traded_notional += hedge_traded_notional
                 costs += hedge_cost
+                fills.append(
+                    Fill(
+                        order_id=order.order_id,
+                        security=order.security,
+                        security_index=order.security_index,
+                        fill_date=inputs.dates[day],
+                        fill_session=day,
+                        side=order.side,
+                        quantity=order.quantity,
+                        price=current_hedge_close,
+                        gross_notional=hedge_traded_notional,
+                        cost=hedge_cost,
+                        purpose="hedge",
+                    )
+                )
+            else:
+                cancellations.append(
+                    OrderCancellation(
+                        order_id=order.order_id,
+                        security=order.security,
+                        security_index=order.security_index,
+                        cancellation_date=inputs.dates[day],
+                        cancellation_session=day,
+                        unfilled_quantity=order.quantity,
+                        reason="evaluation_end" if day == day_count - 1 else "expired",
+                    )
+                )
 
         held_now = shares != 0.0
         marked_holdings = float(np.sum(shares[held_now] * marks[held_now]))
@@ -2828,8 +2913,8 @@ def simulate_stateful_ledger(
         gross_including_hedge = gross + abs(hedge_notional) / current_nav
         net_notional_including_hedge = float(signed_values.sum() + hedge_notional)
         net_including_hedge = net_notional_including_hedge / current_nav
-        ex_ante_before = equity_beta_notional / prehedge_nav
-        ex_ante_after = (equity_beta_notional + hedge_notional) / current_nav
+        ex_ante_before = equity_beta_notional / start_nav
+        ex_ante_after = (equity_beta_notional + decision_hedge_notional) / start_nav
         unresolved_stale = held_now & (
             ~printed
             | explicit_unresolved_action
@@ -3130,8 +3215,6 @@ def simulate_stateful_ledger(
                     inputs.selection_volatility[later_day]
                 )
                 later_entry_eligible = later_group_eligible.copy()
-                if config.beta_hedge:
-                    later_entry_eligible &= np.isfinite(inputs.beta_60[later_day])
                 later_k_eff = min(
                     config.k_per_side, int(later_entry_eligible.sum()) // 2
                 )
@@ -3499,6 +3582,9 @@ def simulate_stateful_ledger(
             hedge_unconstrained_target_rows, dtype=np.float64
         ),
         hedge_target_notional=np.asarray(hedge_target_rows, dtype=np.float64),
+        hedge_beta_fallback_sessions=np.asarray(
+            hedge_beta_fallback_rows, dtype=np.bool_
+        ),
         hedge_capped=np.asarray(hedge_capped_rows, dtype=np.bool_),
         hedge_turnover_fraction_nav=np.asarray(hedge_turnover_rows, dtype=np.float64),
         hedge_cost_bps=np.asarray(hedge_cost_rows, dtype=np.float64),
@@ -3551,21 +3637,15 @@ def ledger_sensitivity_grid(
 
 
 def ledger_configurations() -> dict[str, LedgerConfig]:
-    """Return named reference assumptions without changing intended orders."""
+    """Stress costs and borrow availability on the same constructed, hedged book."""
 
     headline = LedgerConfig()
-    legacy = replace(
-        headline,
-        borrow_source="uniform",
-        volatility_balanced_entries=False,
-        beta_hedge=False,
-    )
     configurations = {
-        f"cost_{cost:g}_borrow_{borrow:g}": replace(
-            legacy, cost_bps_per_side=cost, annual_borrow_rate=borrow
-        )
+        (
+            f"borrow_{borrow}" if cost == 4.0 else f"cost_{cost:g}_borrow_{borrow}"
+        ): replace(headline, cost_bps_per_side=cost, borrow_source=f"borrow_{borrow}")
         for cost in (2.0, 4.0, 7.0)
-        for borrow in (0.02, 0.04)
+        for borrow in ("balance", "strict", "open")
     }
     configurations.update(
         {
@@ -3575,21 +3655,6 @@ def ledger_configurations() -> dict[str, LedgerConfig]:
             ),
             "comparator_sterile_proceeds": replace(
                 headline, short_proceeds_remuneration=0.0
-            ),
-            "borrow_balance": replace(
-                headline,
-                cost_bps_per_side=4.0,
-                borrow_source="borrow_balance",
-            ),
-            "borrow_strict": replace(
-                headline,
-                cost_bps_per_side=4.0,
-                borrow_source="borrow_strict",
-            ),
-            "borrow_open": replace(
-                headline,
-                cost_bps_per_side=4.0,
-                borrow_source="borrow_open",
             ),
             "comparator_uniform_borrow": replace(
                 headline,

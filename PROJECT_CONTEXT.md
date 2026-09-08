@@ -36,6 +36,16 @@ price-unit consistency never reaches the required twenty active names per day.
 Repair these contracts before making new economics claims or interpreting
 feature ablations. The audit's code cleanup does not change the frozen results.
 
+Pass 5 is partially implemented; [its status and remaining blockers](docs/v2_PASS5_STATUS.md)
+are the continuation contract. The ledger now requires a hash-bound economic BOVA11
+beta sidecar and fixes hedge intention timing, pending-entry retention and borrow
+accrual. The development-only sidecar is `v2_hedge_beta_rev4f_20260908T225248Z`,
+manifest `f5fa41536740ca412550cb81d2b44c9541e338dc060d674ab8ea270edd7be712`.
+The retrospective action decision path is still unrepaired. No rev4f score replay,
+execution sweep, store rebuild or retraining has run; the rev4e economics above
+remain historical and uncorrected. Resolve the action-availability and diagnostic
+identity conflicts in the pass-5 status before replaying or advancing the campaign.
+
 The accepted v1 incumbent is the peer-free, full causal time-of-day normalized,
 width-64 causal TCN trained uniformly with soft Spearman and SAM-AdamW. The best
 recorded exact validation result is seed-11 IC **0.041972**. The rejected

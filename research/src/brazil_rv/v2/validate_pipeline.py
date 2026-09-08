@@ -21,6 +21,7 @@ from brazil_rv.execution.inputs import load_daily_cdi_rates
 from .artifacts import inventory, sha256_file, write_json_atomic
 from .baselines import BaselinePanel, build_store_baselines
 from .bova11 import load_bova11_series
+from .hedge_beta import HEDGE_BETA_MAX_AGE, load_hedge_beta_sidecar
 from .lending_archive import LendingBorrowPanels, load_lending_borrow_panels
 from .config import (
     PROJECT_ROOT,
@@ -738,13 +739,17 @@ def _evaluation_inputs(
     # daily fields were sourced from t-1 during construction, so consumers
     # must not apply another shift here.
     slow_prior = np.asarray(store.read("slow_values", indices))
+    slow_valid = np.asarray(store.read("slow_valid", indices), dtype=np.bool_)
     prior_feature_values = {
-        name: slow_prior[..., slow_names.index(name)] for name in diagnostic_names
+        name: np.where(
+            slow_valid[..., slow_names.index(name)],
+            slow_prior[..., slow_names.index(name)],
+            np.nan,
+        )
+        for name in diagnostic_names
     }
     history_index = slow_names.index("observed_history_age_sessions")
-    history_valid = np.asarray(store.read("slow_valid", indices), dtype=np.bool_)[
-        ..., history_index
-    ]
+    history_valid = slow_valid[..., history_index]
     transformed_history_age = np.asarray(
         slow_prior[..., history_index], dtype=np.float64
     )
@@ -778,6 +783,17 @@ def _evaluation_inputs(
     )
     known_payment = action_payment_session >= 0
     action_payment_session[known_payment] -= int(indices[0])
+    beta_start = max(0, int(indices[0]) - HEDGE_BETA_MAX_AGE)
+    beta_dates = store.dates[beta_start : int(indices[-1]) + 1]
+    beta_panel = load_hedge_beta_sidecar(
+        Path(bova11_binding["hedge_beta_root"]),
+        expected_manifest_sha256=bova11_binding["hedge_beta_manifest_sha256"],
+        expected_store_manifest_sha256=sha256_file(store.root / "manifest.json"),
+        expected_bova11_manifest_sha256=bova11_binding["manifest_sha256"],
+        canonical_dates=beta_dates.astype(object).tolist(),
+        isins=store.isins,
+    )
+    history_count = int(indices[0]) - beta_start
     return EvaluationInputs(
         dates=_dates_for_indices(store.dates, indices),
         session_indices=indices.copy(),
@@ -848,6 +864,18 @@ def _evaluation_inputs(
         bova11_close=np.asarray(bova11_close_by_index[indices], dtype=np.float64),
         bova11_manifest_sha256=bova11_binding["manifest_sha256"],
         bova11_data_sha256=bova11_binding["data_sha256"],
+        hedge_beta=beta_panel.values[history_count:],
+        hedge_beta_valid=beta_panel.valid[history_count:],
+        hedge_beta_history=(
+            beta_panel.values[:history_count],
+            beta_panel.valid[:history_count],
+        ),
+        hedge_beta_manifest_sha256=beta_panel.manifest_sha256,
+        initial_hedge_reference_price=(
+            float(bova11_close_by_index[int(indices[0]) - 1])
+            if indices[0] > 0
+            else np.nan
+        ),
         neutral_target_fallback_flags=store.neutral_target_fallback_flags(indices),
     )
 
@@ -1238,9 +1266,7 @@ def _development_acceptance(
                     "maximum_absolute_hedge_fraction_nav"
                 ),
                 "lending_coverage": evaluation.get("lending_coverage"),
-                "borrow_cell_economics": evaluation.get(
-                    "borrow_cell_economics"
-                ),
+                "borrow_cell_economics": evaluation.get("borrow_cell_economics"),
             }
         )
         if (
@@ -1306,7 +1332,9 @@ def _development_acceptance(
             if isinstance(evaluation, Mapping)
             else None
         )
-        raw_beta = diagnostic.get("slope_beta") if isinstance(diagnostic, Mapping) else None
+        raw_beta = (
+            diagnostic.get("slope_beta") if isinstance(diagnostic, Mapping) else None
+        )
         realized_beta_by_control[name][fold] = (
             None if raw_beta is None else float(raw_beta)
         )
@@ -2588,6 +2616,8 @@ def run_pipeline_validation(
     experiment52_cdi_sha256: str,
     bova11_root: Path,
     bova11_manifest_sha256: str,
+    hedge_beta_root: Path,
+    hedge_beta_manifest_sha256: str,
     lending_archive_root: Path,
     lending_archive_manifest_sha256: str,
     output_root: Path,
@@ -2659,6 +2689,8 @@ def run_pipeline_validation(
     )
     bova11_binding = {
         "root": str(Path(bova11_root).resolve(strict=True)),
+        "hedge_beta_root": str(hedge_beta_root.resolve(strict=True)),
+        "hedge_beta_manifest_sha256": hedge_beta_manifest_sha256,
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
@@ -2869,6 +2901,8 @@ def replay_classical_economics(
     experiment52_cdi_sha256: str,
     bova11_root: Path,
     bova11_manifest_sha256: str,
+    hedge_beta_root: Path,
+    hedge_beta_manifest_sha256: str,
     lending_archive_root: Path,
     lending_archive_manifest_sha256: str,
     prior_classical_root: Path,
@@ -2906,6 +2940,8 @@ def replay_classical_economics(
     )
     bova11_binding = {
         "root": str(Path(bova11_root).resolve(strict=True)),
+        "hedge_beta_root": str(hedge_beta_root.resolve(strict=True)),
+        "hedge_beta_manifest_sha256": hedge_beta_manifest_sha256,
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
@@ -3267,6 +3303,8 @@ def resume_network_validation(
     experiment52_cdi_sha256: str,
     bova11_root: Path,
     bova11_manifest_sha256: str,
+    hedge_beta_root: Path,
+    hedge_beta_manifest_sha256: str,
     lending_archive_root: Path,
     lending_archive_manifest_sha256: str,
     completed_classical_root: Path,
@@ -3359,6 +3397,8 @@ def resume_network_validation(
     )
     bova11_binding = {
         "root": str(Path(bova11_root).resolve(strict=True)),
+        "hedge_beta_root": str(hedge_beta_root.resolve(strict=True)),
+        "hedge_beta_manifest_sha256": hedge_beta_manifest_sha256,
         "manifest_sha256": bova11.manifest_sha256,
         "data_sha256": bova11.data_sha256,
     }
@@ -3547,6 +3587,8 @@ def _parser() -> argparse.ArgumentParser:
         help="Immutable development-only exact-identity BOVA11 close artifact.",
     )
     parser.add_argument("--bova11-manifest-sha256", required=True)
+    parser.add_argument("--hedge-beta-root", type=Path, required=True)
+    parser.add_argument("--hedge-beta-manifest-sha256", required=True)
     parser.add_argument(
         "--lending-archive-root",
         type=Path,
@@ -3644,10 +3686,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
+            hedge_beta_root=arguments.hedge_beta_root,
+            hedge_beta_manifest_sha256=arguments.hedge_beta_manifest_sha256,
             lending_archive_root=arguments.lending_archive_root,
-            lending_archive_manifest_sha256=(
-                arguments.lending_archive_manifest_sha256
-            ),
+            lending_archive_manifest_sha256=(arguments.lending_archive_manifest_sha256),
             prior_classical_root=arguments.prior_classical_root,
             prior_classical_manifest_sha256=(arguments.prior_classical_manifest_sha256),
             prior_classical_inventory_sha256=(
@@ -3667,10 +3709,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
+            hedge_beta_root=arguments.hedge_beta_root,
+            hedge_beta_manifest_sha256=arguments.hedge_beta_manifest_sha256,
             lending_archive_root=arguments.lending_archive_root,
-            lending_archive_manifest_sha256=(
-                arguments.lending_archive_manifest_sha256
-            ),
+            lending_archive_manifest_sha256=(arguments.lending_archive_manifest_sha256),
             completed_classical_root=arguments.completed_classical_root,
             completed_classical_inventory_sha256=(
                 arguments.completed_classical_inventory_sha256
@@ -3691,10 +3733,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             experiment52_cdi_sha256=arguments.experiment52_cdi_sha256,
             bova11_root=arguments.bova11_root,
             bova11_manifest_sha256=arguments.bova11_manifest_sha256,
+            hedge_beta_root=arguments.hedge_beta_root,
+            hedge_beta_manifest_sha256=arguments.hedge_beta_manifest_sha256,
             lending_archive_root=arguments.lending_archive_root,
-            lending_archive_manifest_sha256=(
-                arguments.lending_archive_manifest_sha256
-            ),
+            lending_archive_manifest_sha256=(arguments.lending_archive_manifest_sha256),
             output_root=arguments.output_root,
             runtime=runtime,
             enabled_sidecars=arguments.sidecar,

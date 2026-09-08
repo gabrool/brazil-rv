@@ -12,6 +12,8 @@ import pytest
 from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
 from brazil_rv.v2.contract import FINETUNE_START, HORIZONS, SLOW_FEATURES
 from brazil_rv.v2.score import ScoreArtifact
+from brazil_rv.v2.hedge_beta import build_hedge_beta_sidecar
+from hedge_beta_fixtures import write_hedge_beta_fixture
 from brazil_rv.v2.lending_archive import LendingBorrowPanels
 from brazil_rv.v2.store import V2Store, open_store_for_samples
 from brazil_rv.v2.train import StageTrainingResult
@@ -51,9 +53,11 @@ def _bova11_fixture(tmp_path: Path, store_root: Path) -> tuple[Path, str]:
 
 
 def _lending_fixture(tmp_path: Path, store_root: Path) -> tuple[Path, str]:
-    dates = np.load(store_root / "date_index.npy", allow_pickle=False).astype(
-        "datetime64[D]"
-    ).astype(object)
+    dates = (
+        np.load(store_root / "date_index.npy", allow_pickle=False)
+        .astype("datetime64[D]")
+        .astype(object)
+    )
     isins = np.load(store_root / "isin_index.npy", allow_pickle=False).astype(str)
     root = tmp_path / "lending_archive"
     root.mkdir()
@@ -71,7 +75,9 @@ def _lending_fixture(tmp_path: Path, store_root: Path) -> tuple[Path, str]:
             "available_date": pl.Series(
                 np.repeat(dates[1:], len(isins)).tolist(), dtype=pl.Date
             ),
-            "security_id": np.tile([f"ISIN:{value}" for value in isins], len(dates) - 1),
+            "security_id": np.tile(
+                [f"ISIN:{value}" for value in isins], len(dates) - 1
+            ),
             "source_identity_method": np.full(rows, "fixture"),
             "lending_balance_quantity": np.ones(rows, dtype=np.int64),
             "lending_balance_brl": np.ones(rows, dtype=np.float64),
@@ -85,7 +91,9 @@ def _lending_fixture(tmp_path: Path, store_root: Path) -> tuple[Path, str]:
             "available_date": pl.Series(
                 np.repeat(dates[1:], len(isins)).tolist(), dtype=pl.Date
             ),
-            "security_id": np.tile([f"ISIN:{value}" for value in isins], len(dates) - 1),
+            "security_id": np.tile(
+                [f"ISIN:{value}" for value in isins], len(dates) - 1
+            ),
             "registered_contracts": np.ones(rows, dtype=np.int64),
             "registered_quantity": np.ones(rows, dtype=np.int64),
             "annual_taker_rate": np.full(rows, 0.02),
@@ -547,6 +555,15 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         device="cpu",
     )
     bova11_root, bova11_sha = _bova11_fixture(tmp_path, store_root)
+    beta_root = tmp_path / "hedge_beta"
+    build_hedge_beta_sidecar(
+        store_root=store_root,
+        expected_store_manifest_sha256=sha256_file(store_root / "manifest.json"),
+        bova11_root=bova11_root,
+        expected_bova11_manifest_sha256=bova11_sha,
+        output_root=beta_root,
+    )
+    beta_sha = sha256_file(beta_root / "manifest.json")
     lending_root, lending_sha = _lending_fixture(tmp_path, store_root)
     result = pipeline.run_pipeline_validation(
         store_root=store_root,
@@ -558,6 +575,8 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         runtime=runtime,
         bova11_root=bova11_root,
         bova11_manifest_sha256=bova11_sha,
+        hedge_beta_root=beta_root,
+        hedge_beta_manifest_sha256=beta_sha,
         lending_archive_root=lending_root,
         lending_archive_manifest_sha256=lending_sha,
     )
@@ -638,6 +657,8 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
             runtime=runtime,
             bova11_root=bova11_root,
             bova11_manifest_sha256=bova11_sha,
+            hedge_beta_root=beta_root,
+            hedge_beta_manifest_sha256=beta_sha,
             lending_archive_root=lending_root,
             lending_archive_manifest_sha256=lending_sha,
         )
@@ -752,6 +773,15 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
     )
 
     bova11_root, bova11_sha = _bova11_fixture(tmp_path, store_root)
+    beta_root = tmp_path / "hedge_beta"
+    build_hedge_beta_sidecar(
+        store_root=store_root,
+        expected_store_manifest_sha256=sha256_file(store_root / "manifest.json"),
+        bova11_root=bova11_root,
+        expected_bova11_manifest_sha256=bova11_sha,
+        output_root=beta_root,
+    )
+    beta_sha = sha256_file(beta_root / "manifest.json")
     lending_root, lending_sha = _lending_fixture(tmp_path, store_root)
     result = pipeline.resume_network_validation(
         store_root=store_root,
@@ -767,6 +797,8 @@ def test_network_continuation_verifies_classical_source_and_skips_it(
         runtime=pipeline.ValidationRuntime(device="cuda"),
         bova11_root=bova11_root,
         bova11_manifest_sha256=bova11_sha,
+        hedge_beta_root=beta_root,
+        hedge_beta_manifest_sha256=beta_sha,
         lending_archive_root=lending_root,
         lending_archive_manifest_sha256=lending_sha,
     )
@@ -922,8 +954,11 @@ def test_runtime_caps_and_dataset_refuse_sealed_dates(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.parametrize("invalid_slow_diagnostics", [False, True])
 def test_evaluation_inputs_zero_targets_outside_the_exact_window(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_slow_diagnostics: bool,
 ) -> None:
     store_root, _, _, _, _ = _development_store(tmp_path)
     dates = np.load(store_root / "date_index.npy", allow_pickle=False)
@@ -935,7 +970,24 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
         history_lookbacks=20,
         history_end_offsets=-1,
     )
+    if invalid_slow_diagnostics:
+        original_read = V2Store.read
+
+        def read_with_invalid_slow(self, name, selectors):
+            values = original_read(self, name, selectors)
+            if name == "slow_valid":
+                values[:] = False
+            return values
+
+        monkeypatch.setattr(V2Store, "read", read_with_invalid_slow)
     score_shape = (len(indices), len(store.isins), len(HORIZONS))
+    beta_binding = write_hedge_beta_fixture(
+        tmp_path / "beta",
+        dates=dates,
+        isins=store.isins,
+        store_sha256=sha256_file(store_root / "manifest.json"),
+        bova11_sha256="a" * 64,
+    )
     try:
         inputs = pipeline._evaluation_inputs(
             store,
@@ -944,7 +996,7 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
             np.ones(score_shape, dtype=np.bool_),
             np.full(len(dates), 0.0004, dtype=np.float64),
             np.full(len(dates), 100.0, dtype=np.float64),
-            {"manifest_sha256": "a" * 64, "data_sha256": "b" * 64},
+            {"manifest_sha256": "a" * 64, "data_sha256": "b" * 64, **beta_binding},
             _borrow_panels(len(dates), len(store.isins)),
             {},
             transfer_chronology_clean=True,
@@ -965,6 +1017,10 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
         (inputs.price_midrank_targets, inputs.price_target_mask),
     ):
         assert np.all(values[~mask] == 0.0)
+    if invalid_slow_diagnostics:
+        assert all(
+            np.isnan(values).all() for values in inputs.prior_feature_values.values()
+        )
     assert inputs.action_payment_session[0, 0] == len(indices)
     assert np.all(inputs.action_payment_session[:, 1:] == -1)
     assert inputs.security_ids == store.isins
@@ -1230,11 +1286,11 @@ def test_development_acceptance_requires_registered_sanity_bounds() -> None:
             "fold": fold,
             "name": name,
             "signal_definition_sign": pipeline._BASELINE_SIGNAL_SIGNS[name],
-                "evaluation": {
-                    "daily_primary_neutral_target_ic": [0.01, None, -0.005],
-                    "headline_economics": economics,
-                    "realized_beta_after_hedge": {"slope_beta": 0.0},
-                },
+            "evaluation": {
+                "daily_primary_neutral_target_ic": [0.01, None, -0.005],
+                "headline_economics": economics,
+                "realized_beta_after_hedge": {"slope_beta": 0.0},
+            },
         }
         for fold in ("F1", "F2", "F3")
         for name in pipeline._BASELINE_SIGNAL_SIGNS

@@ -106,6 +106,10 @@ def _fixture() -> EvaluationInputs:
         bova11_close=np.full(len(dates), 100.0),
         bova11_manifest_sha256="c" * 64,
         bova11_data_sha256="d" * 64,
+        hedge_beta=np.broadcast_to(1.0 + 0.2 * np.sin(base), matrix_shape).copy(),
+        hedge_beta_valid=np.ones(matrix_shape, dtype=bool),
+        hedge_beta_manifest_sha256="e" * 64,
+        initial_hedge_reference_price=100.0,
     )
 
 
@@ -118,6 +122,7 @@ def test_harness_metrics_are_nontrivial_on_rotating_fixture() -> None:
         assert 0.0 < abs(row["mean_shareholder_rank_ic"]) < 1.0
         assert 0.0 < abs(row["mean_price_return_rank_ic"]) < 1.0
         assert row["mean_shareholder_return_spread_total_bps"] != 0.0
+
         assert row["mean_shareholder_return_spread_bps_per_holding_session"] != 0.0
         assert 0.0 < abs(row["mean_persistence_1_session"]) < 1.0
         assert 0.0 < abs(row["mean_persistence_5_sessions"]) < 1.0
@@ -125,6 +130,21 @@ def test_harness_metrics_are_nontrivial_on_rotating_fixture() -> None:
     assert len(report["diagnostics"]["matched_universe_ic"]) == 5
     assert report["official_validation_accessed"] is False
     assert report["test_accessed"] is False
+
+
+def test_realized_beta_uses_the_actual_hedge_instrument_return() -> None:
+    from types import SimpleNamespace
+
+    inputs = _fixture()
+    market = np.sin(np.arange(len(inputs.dates))) * 0.01
+    inputs = replace(inputs, bova11_close=100.0 * np.cumprod(1.0 + market))
+    book = SimpleNamespace(daily_net_return=0.0001 + 1.5 * market)
+    diagnostic = evaluate_module._realized_beta_diagnostic(
+        inputs, book, against_bova11=True
+    )
+    assert diagnostic["slope_beta"] == pytest.approx(1.5)
+    assert diagnostic["intercept_daily"] == pytest.approx(0.0001)
+    assert diagnostic["observation_count"] == len(inputs.dates)
 
 
 def test_target_mask_never_becomes_the_economics_score_mask() -> None:
@@ -494,15 +514,11 @@ def test_legacy_primary_readout_uses_rev2_population_without_characteristics() -
     ]
 
     assert {row["neutral_target_valid_name_count"] for row in date_rows} == {55}
-    assert {row["legacy_scaled_target_valid_name_count"] for row in date_rows} == {
-        59
-    }
+    assert {row["legacy_scaled_target_valid_name_count"] for row in date_rows} == {59}
     assert {row["legacy_scaled_target_population"] for row in date_rows} == {
         "common_D1_D2_D3_D5"
     }
-    horizon_rows = {
-        row["horizon_sessions"]: row for row in report["horizon_readouts"]
-    }
+    horizon_rows = {row["horizon_sessions"]: row for row in report["horizon_readouts"]}
     assert horizon_rows[1]["neutral_target_possible_name_days"] == 1_176
     assert horizon_rows[1]["legacy_scaled_target_possible_name_days"] == 1_180
     assert horizon_rows[10]["legacy_scaled_target_population"] == "per_horizon_D10"
