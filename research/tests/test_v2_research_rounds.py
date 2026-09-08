@@ -293,6 +293,46 @@ def test_folded_bootstrap_records_undefined_readout_as_null() -> None:
     assert result["undefined_reason"] == "no_defined_daily_values"
 
 
+def test_folded_bootstrap_serializes_sparse_unsupported_interval_as_null() -> None:
+    values = np.full(40, np.nan, dtype=np.float64)
+    values[-1] = 2.0
+
+    result = _folded_bootstrap((values,), replications=1, seed=0)
+
+    assert result["estimate"] == 2.0
+    assert result["lower_95"] is None
+    assert result["upper_95"] is None
+    assert result["finite_bootstrap_replications"] == 0
+    assert result["undefined_reason"] == "no_finite_bootstrap_draws"
+    json.dumps(result, allow_nan=False)
+
+
+def test_round2_joint_plan_expects_both_training_graphs() -> None:
+    common = {
+        "name": "job",
+        "seed": 11,
+        "fold": "F1",
+        "run_dir": Path("run"),
+        "command": ["python"],
+        "source_tiers": {
+            "action_terms_source": "inferred_cotahist_dismes_v1",
+            "schedule_source": "reconstructed_v1",
+        },
+    }
+
+    joint = research_rounds._plan_job(stage="J", **common)
+    fine = research_rounds._plan_job(stage="F", **common)
+
+    assert joint["expected_manifest"]["compiled_graph_count"] == 3
+    assert joint["expected_manifest"]["compiled_graphs"] == {
+        "training": 2,
+        "selection": 1,
+        "total": 3,
+    }
+    assert fine["expected_manifest"]["compiled_graph_count"] == 2
+    assert fine["expected_manifest"]["compiled_graphs"]["training"] == 1
+
+
 def test_undefined_economics_cannot_establish_not_worse() -> None:
     undefined = {"estimate": None, "lower_95": None, "upper_95": None}
     positive = {"estimate": 1.0, "lower_95": 0.5, "upper_95": 1.5}
@@ -551,6 +591,36 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
         candidate.result.daily_primary_ic,
         equal_nan=True,
     )
+
+    manifest_path = tmp_path / "score_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["metadata"] = {"fold": "F1"}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="axis differs"):
+        _evaluation_from_artifacts(
+            path,
+            store=FixtureStore(),
+            indices=indices,
+            cdi=cdi,
+        )
+    recovered = _evaluation_from_artifacts(
+        path,
+        store=FixtureStore(),
+        indices=indices,
+        cdi=cdi,
+        allow_legacy_missing_indices=True,
+        expected_fold="F1",
+    )
+    assert _input_hashes(recovered.inputs) == _input_hashes(inputs)
+    with pytest.raises(ValueError, match="fold differs"):
+        _evaluation_from_artifacts(
+            path,
+            store=FixtureStore(),
+            indices=indices,
+            cdi=cdi,
+            allow_legacy_missing_indices=True,
+            expected_fold="F2",
+        )
 
 
 @pytest.mark.parametrize(

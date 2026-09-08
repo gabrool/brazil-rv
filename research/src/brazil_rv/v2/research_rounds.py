@@ -717,6 +717,7 @@ def _folded_bootstrap(
             "upper_95": None,
             "possible_observations": possible_observations,
             "finite_observations": 0,
+            "finite_bootstrap_replications": 0,
             "undefined_reason": "no_defined_daily_values",
             "replications": replications,
             "block_length_sessions": BOOTSTRAP_BLOCK,
@@ -740,13 +741,23 @@ def _folded_bootstrap(
         sums += np.nansum(selected, axis=1)
         counts += np.isfinite(selected).sum(axis=1)
     draws = np.divide(sums, counts, out=np.full(replications, np.nan), where=counts > 0)
+    finite_draws = draws[np.isfinite(draws)]
+    if not finite_draws.size:
+        lower: float | None = None
+        upper: float | None = None
+        undefined_reason: str | None = "no_finite_bootstrap_draws"
+    else:
+        lower = float(np.quantile(finite_draws, 0.025))
+        upper = float(np.quantile(finite_draws, 0.975))
+        undefined_reason = None
     return {
         "estimate": estimate,
-        "lower_95": float(np.nanquantile(draws, 0.025)),
-        "upper_95": float(np.nanquantile(draws, 0.975)),
+        "lower_95": lower,
+        "upper_95": upper,
         "possible_observations": possible_observations,
         "finite_observations": finite_observations,
-        "undefined_reason": None,
+        "finite_bootstrap_replications": int(finite_draws.size),
+        "undefined_reason": undefined_reason,
         "replications": replications,
         "block_length_sessions": BOOTSTRAP_BLOCK,
         "fold_boundary_preserved": True,
@@ -755,7 +766,10 @@ def _folded_bootstrap(
 
 def _readout_point(readout: Mapping[str, object]) -> float | None:
     value = readout.get("estimate")
-    return None if value is None else float(value)
+    if value is None:
+        return None
+    point = float(value)
+    return point if math.isfinite(point) else None
 
 
 def _ranking_point(readout: Mapping[str, object]) -> float:
@@ -2302,6 +2316,12 @@ def _plan_job(
     stage: str,
     source_tiers: Mapping[str, str],
 ) -> dict[str, object]:
+    graph_count = 3 if stage == "J" else 2
+    compiled_graphs = {
+        "training": 2 if stage == "J" else 1,
+        "selection": 1,
+        "total": graph_count,
+    }
     return {
         "name": name,
         "seed": seed,
@@ -2316,8 +2336,8 @@ def _plan_job(
             "official_validation_accessed": False,
             "test_accessed": False,
             "transfer_chronology_clean": True,
-            "compiled_graph_count": 2,
-            "compiled_graphs": {"training": 1, "selection": 1, "total": 2},
+            "compiled_graph_count": graph_count,
+            "compiled_graphs": compiled_graphs,
             **source_tiers,
         },
     }
@@ -2635,6 +2655,8 @@ def _evaluation_from_artifacts(
     store: V2Store,
     indices: NDArray[np.int64],
     cdi: NDArray[np.float64],
+    allow_legacy_missing_indices: bool = False,
+    expected_fold: str | None = None,
 ) -> _ResearchEvaluation:
     """Rebuild retained comparison inputs from hash-bound score/store artifacts."""
 
@@ -2649,10 +2671,15 @@ def _evaluation_from_artifacts(
     if score_manifest.get("transfer_chronology_clean") is not True:
         raise ValueError(f"score/evaluation transfer chronology differs: {path}")
     metadata = score_manifest.get("metadata")
-    if not isinstance(metadata, Mapping) or (
-        metadata.get("evaluation_date_indices") != indices.tolist()
-    ):
+    if not isinstance(metadata, Mapping):
+        raise ValueError(f"score artifact lacks evaluation metadata: {path}")
+    recorded_indices = metadata.get("evaluation_date_indices")
+    if recorded_indices is None and not allow_legacy_missing_indices:
         raise ValueError(f"score artifact axis differs from the evaluation: {path}")
+    if recorded_indices is not None and recorded_indices != indices.tolist():
+        raise ValueError(f"score artifact axis differs from the evaluation: {path}")
+    if expected_fold is not None and metadata.get("fold") != expected_fold:
+        raise ValueError(f"score artifact fold differs from the evaluation: {path}")
     source_hashes = report.get("source_artifact_hashes")
     if not isinstance(source_hashes, Mapping) or not source_hashes:
         raise ValueError(f"evaluation lacks source artifact hashes: {path}")
@@ -2731,6 +2758,159 @@ def _evaluation_from_artifacts(
     return _ResearchEvaluation(result=retained, inputs=inputs)
 
 
+def _round2_arm_decision(
+    arm_reports: Mapping[str, Mapping[str, _ResearchEvaluation]],
+) -> tuple[dict[str, object], dict[str, object], list[str], bool, str]:
+    readouts = {
+        arm: _pooled_readouts(reports) for arm, reports in arm_reports.items()
+    }
+    deltas = {
+        "B_minus_A": _paired_readouts(arm_reports["arm_B"], arm_reports["arm_A"]),
+        "C_minus_A": _paired_readouts(arm_reports["arm_C"], arm_reports["arm_A"]),
+    }
+    eligible = ["arm_A"]
+    a_economics = readouts["arm_A"]["pooled"]["headline_net_excess_bps"]
+    for arm in ("arm_B", "arm_C"):
+        if _economics_not_worse(
+            readouts[arm]["pooled"]["headline_net_excess_bps"], a_economics
+        ):
+            eligible.append(arm)
+    long_small_and_uncertain = all(
+        _small_interval_spanning_zero(
+            deltas[label]["pooled"]["primary_neutral_target_ic"]
+        )
+        for label in ("B_minus_A", "C_minus_A")
+    )
+    arm_order = {"arm_A": 2, "arm_B": 1, "arm_C": 0}
+    chosen = (
+        "arm_A"
+        if long_small_and_uncertain
+        else max(
+            eligible,
+            key=lambda arm: (
+                _ranking_point(readouts[arm]["pooled"]["primary_neutral_target_ic"]),
+                _ranking_point(readouts[arm]["pooled"]["headline_net_excess_bps"]),
+                arm_order[arm],
+            ),
+        )
+    )
+    return readouts, deltas, eligible, long_small_and_uncertain, chosen
+
+
+def _round2_stage_p(root: Path) -> dict[str, object]:
+    stage_p: dict[str, object] = {}
+    for seed in NETWORK_SEEDS:
+        p_root = root / "trajectories" / "arm_B" / "stage_P" / f"seed_{seed}"
+        manifest = _read_json(p_root / "run_manifest.json")
+        _assert_current_clean_training(manifest, path=p_root / "run_manifest.json")
+        if manifest.get("stage") != "P" or manifest.get("seed") != seed:
+            raise ValueError(f"Stage-P trajectory identity differs for seed {seed}")
+        history = _read_json(p_root / "history.json")
+        stage_p[str(seed)] = {
+            "history": str(p_root / "history.json"),
+            "history_sha256": sha256_file(p_root / "history.json"),
+            "raw_patience_checkpoint_sha256": sha256_file(p_root / "raw_patience.pt"),
+            "final_ema_checkpoint_sha256": sha256_file(p_root / "final_ema.pt"),
+            "selected_epoch": manifest.get("selected_epoch"),
+            "stopped_epoch": manifest.get("stopped_epoch"),
+            "holdout_history": history,
+        }
+    return stage_p
+
+
+def _round2_result(
+    *,
+    root: Path,
+    design: Mapping[str, object],
+    store: V2Store,
+    access: Mapping[str, object],
+    source_hashes: Mapping[str, str],
+    arm_reports: Mapping[str, Mapping[str, _ResearchEvaluation]],
+    arm_artifacts: Mapping[str, object],
+    comparator_reports: Mapping[str, Mapping[str, _ResearchEvaluation]],
+    comparator_artifacts: Mapping[str, object],
+    reporting_recovery: Mapping[str, object] | None = None,
+) -> str:
+    arm_readouts, arm_deltas, eligible, uncertain, chosen_arm = (
+        _round2_arm_decision(arm_reports)
+    )
+    if comparator_reports["network"] is not arm_reports[chosen_arm]:
+        raise ValueError("Round-2 comparator network differs from the chosen arm")
+    comparator_readouts = {
+        name: _pooled_readouts(reports) for name, reports in comparator_reports.items()
+    }
+    comparator_deltas = {
+        "network_minus_gbdt": _paired_readouts(
+            comparator_reports["network"], comparator_reports["gbdt"]
+        ),
+        "ensemble_minus_gbdt": _paired_readouts(
+            comparator_reports["ensemble"], comparator_reports["gbdt"]
+        ),
+        "ensemble_minus_network": _paired_readouts(
+            comparator_reports["ensemble"], comparator_reports["network"]
+        ),
+    }
+    parent_order = {"network": 2, "gbdt": 1, "ensemble": 0}
+    v2_parent = max(
+        comparator_readouts,
+        key=lambda name: (
+            _ranking_point(
+                comparator_readouts[name]["pooled"]["primary_neutral_target_ic"]
+            ),
+            _ranking_point(
+                comparator_readouts[name]["pooled"]["headline_net_excess_bps"]
+            ),
+            parent_order[name],
+        ),
+    )
+    implementation = _git_identity()
+    result: dict[str, object] = {
+        "schema": ROUND2_SCHEMA,
+        "status": "completed",
+        **RESEARCH_FLAGS,
+        **_source_tier_labels(store.manifest),
+        "completed_at_utc": _utc_now(),
+        "frozen_design": {
+            "path": str(root / "frozen_design.json"),
+            "sha256": sha256_file(root / "frozen_design.json"),
+        },
+        "implementation": implementation,
+        "store_access": dict(access),
+        "sources": dict(source_hashes),
+        "stage_p_holdout": _round2_stage_p(root),
+        "data_span_arms": {
+            "artifacts": dict(arm_artifacts),
+            "readouts": arm_readouts,
+            "paired_deltas": arm_deltas,
+            "eligible_by_economics": eligible,
+            "long_history_small_and_uncertain": uncertain,
+            "chosen_arm": chosen_arm,
+            "preference_rule": (
+                "highest mean pooled IC unless headline economics are worse than Arm A; "
+                "if neither long-history arm beats A by more than 0.002 with intervals "
+                "spanning zero, prefer A"
+            ),
+        },
+        "parent_comparison": {
+            "artifacts": dict(comparator_artifacts),
+            "readouts": comparator_readouts,
+            "paired_deltas": comparator_deltas,
+            "v2_parent": v2_parent,
+            "preference_rule": "best pooled IC with economics as tie-break",
+        },
+    }
+    if reporting_recovery is not None:
+        result["score_implementation"] = design["implementation"]
+        result["reporting_recovery"] = dict(reporting_recovery)
+        result["operational_events"] = [
+            {
+                "event": "round2_reporting_recovered_from_completed_artifacts",
+                "at_utc": _utc_now(),
+            }
+        ]
+    return write_json_atomic(root / "round2_result.json", result)
+
+
 def finalize_round2(*, output_root: Path) -> str:
     root = output_root.resolve(strict=True)
     design = _read_json(root / "frozen_design.json")
@@ -2796,6 +2976,7 @@ def finalize_round2(*, output_root: Path) -> str:
                         "engine": "starter_network",
                         "arm": arm,
                         "fold": fold,
+                        "evaluation_date_indices": evaluation[fold].tolist(),
                         "seeds": list(NETWORK_SEEDS),
                         "seed_aggregation": "tie-aware rank average",
                     },
@@ -2817,44 +2998,7 @@ def finalize_round2(*, output_root: Path) -> str:
                     "evaluation": str(aggregate / "evaluation.json"),
                     "evaluation_sha256": sha256_file(aggregate / "evaluation.json"),
                 }
-        arm_readouts = {
-            arm: _pooled_readouts(reports) for arm, reports in arm_reports.items()
-        }
-        arm_deltas = {
-            "B_minus_A": _paired_readouts(arm_reports["arm_B"], arm_reports["arm_A"]),
-            "C_minus_A": _paired_readouts(arm_reports["arm_C"], arm_reports["arm_A"]),
-        }
-        eligible = ["arm_A"]
-        a_economics = arm_readouts["arm_A"]["pooled"]["headline_net_excess_bps"]
-        for arm in ("arm_B", "arm_C"):
-            if _economics_not_worse(
-                arm_readouts[arm]["pooled"]["headline_net_excess_bps"],
-                a_economics,
-            ):
-                eligible.append(arm)
-        long_small_and_uncertain = all(
-            _small_interval_spanning_zero(
-                arm_deltas[label]["pooled"]["primary_neutral_target_ic"]
-            )
-            for label in ("B_minus_A", "C_minus_A")
-        )
-        arm_order = {"arm_A": 2, "arm_B": 1, "arm_C": 0}
-        chosen_arm = (
-            "arm_A"
-            if long_small_and_uncertain
-            else max(
-                eligible,
-                key=lambda arm: (
-                    _ranking_point(
-                        arm_readouts[arm]["pooled"]["primary_neutral_target_ic"]
-                    ),
-                    _ranking_point(
-                        arm_readouts[arm]["pooled"]["headline_net_excess_bps"]
-                    ),
-                    arm_order[arm],
-                ),
-            )
-        )
+        _, _, _, _, chosen_arm = _round2_arm_decision(arm_reports)
 
         comparator_reports: dict[str, dict[str, _ResearchEvaluation]] = {
             "network": arm_reports[chosen_arm],
@@ -2888,6 +3032,7 @@ def finalize_round2(*, output_root: Path) -> str:
                     "engine": "round1_gbdt_parent",
                     "parent_rung": parent,
                     "fold": fold,
+                    "evaluation_date_indices": evaluation[fold].tolist(),
                 },
             )
             g_eval = _evaluate(
@@ -2921,6 +3066,7 @@ def finalize_round2(*, output_root: Path) -> str:
                     "members": ["network", "gbdt"],
                     "weights": [0.5, 0.5],
                     "fold": fold,
+                    "evaluation_date_indices": evaluation[fold].tolist(),
                 },
             )
             e_eval = _evaluate(
@@ -2940,89 +3086,170 @@ def finalize_round2(*, output_root: Path) -> str:
                 "evaluation": str(ensemble_root / "evaluation.json"),
                 "evaluation_sha256": sha256_file(ensemble_root / "evaluation.json"),
             }
-        comparator_readouts = {
-            name: _pooled_readouts(reports)
-            for name, reports in comparator_reports.items()
-        }
-        comparator_deltas = {
-            "network_minus_gbdt": _paired_readouts(
-                comparator_reports["network"], comparator_reports["gbdt"]
+        return _round2_result(
+            root=root,
+            design=design,
+            store=store,
+            access=access,
+            source_hashes=source_hashes,
+            arm_reports=arm_reports,
+            arm_artifacts=arm_artifacts,
+            comparator_reports=comparator_reports,
+            comparator_artifacts=comparator_artifacts,
+        )
+    finally:
+        store.close()
+
+
+def recover_round2_result(*, output_root: Path) -> str:
+    """Write the missing Round-2 report from complete hash-bound artifacts only."""
+    root = output_root.resolve(strict=True)
+    result_path = root / "round2_result.json"
+    if result_path.exists():
+        raise FileExistsError(result_path)
+    design_path = root / "frozen_design.json"
+    design = _read_json(design_path)
+    score_implementation = design.get("implementation")
+    if (
+        design.get("schema") != ROUND2_SCHEMA
+        or design.get("status") != "frozen_before_score"
+        or not isinstance(score_implementation, Mapping)
+        or score_implementation.get("tracked_worktree_clean") is not True
+        or not isinstance(score_implementation.get("commit"), str)
+        or len(str(score_implementation["commit"])) != 40
+    ):
+        raise ValueError("Round-2 root is not a clean commit-bound frozen design")
+    recovery_implementation = _git_identity()
+
+    round1_root = Path(str(design["round1"]["root"]))
+    _verify_sealed_root(round1_root, expected_schema=ROUND1_SCHEMA)
+    store_root = Path(str(design["store"]["root"]))
+    if sha256_file(store_root / "manifest.json") != design["store"]["manifest_sha256"]:
+        raise ValueError("Round-2 store manifest hash mismatch")
+    store_manifest, dates = _read_store_header(store_root)
+    source_tiers = _source_tier_labels(store_manifest)
+    if any(design.get(key) != value for key, value in source_tiers.items()):
+        raise ValueError("Round-2 frozen source tiers differ from the store")
+    fit, selection, evaluation, fit_target_window, _ = _fold_indices(dates)
+    pretrain = _pretrain_indices(dates)
+    store, access = _open_round_store(
+        store_root, fit, selection, evaluation, fit_target_window, pretrain
+    )
+    try:
+        cdi_design = design["cdi"]
+        cdi, provenance = _load_development_cdi(
+            dates=dates,
+            cdi_path=Path(str(cdi_design["development_extension"]["path"])),
+            expected_sha256=str(cdi_design["development_extension"]["sha256"]),
+            experiment52_cdi_path=Path(
+                str(cdi_design["experiment52_reference"]["path"])
             ),
-            "ensemble_minus_gbdt": _paired_readouts(
-                comparator_reports["ensemble"], comparator_reports["gbdt"]
-            ),
-            "ensemble_minus_network": _paired_readouts(
-                comparator_reports["ensemble"], comparator_reports["network"]
-            ),
-        }
-        parent_order = {"network": 2, "gbdt": 1, "ensemble": 0}
-        v2_parent = max(
-            comparator_readouts,
-            key=lambda name: (
-                _ranking_point(
-                    comparator_readouts[name]["pooled"]["primary_neutral_target_ic"]
-                ),
-                _ranking_point(
-                    comparator_readouts[name]["pooled"]["headline_net_excess_bps"]
-                ),
-                parent_order[name],
+            experiment52_expected_sha256=str(
+                cdi_design["experiment52_reference"]["sha256"]
             ),
         )
-        stage_p = {}
-        for seed in NETWORK_SEEDS:
-            p_root = root / "trajectories" / "arm_B" / "stage_P" / f"seed_{seed}"
-            manifest = _read_json(p_root / "run_manifest.json")
-            _assert_current_clean_training(manifest, path=p_root / "run_manifest.json")
-            if manifest.get("stage") != "P" or manifest.get("seed") != seed:
-                raise ValueError(f"Stage-P trajectory identity differs for seed {seed}")
-            history = _read_json(p_root / "history.json")
-            stage_p[str(seed)] = {
-                "history": str(p_root / "history.json"),
-                "history_sha256": sha256_file(p_root / "history.json"),
-                "raw_patience_checkpoint_sha256": sha256_file(
-                    p_root / "raw_patience.pt"
-                ),
-                "final_ema_checkpoint_sha256": sha256_file(p_root / "final_ema.pt"),
-                "selected_epoch": manifest.get("selected_epoch"),
-                "stopped_epoch": manifest.get("stopped_epoch"),
-                "holdout_history": history,
-            }
-        result = {
-            "schema": ROUND2_SCHEMA,
-            "status": "completed",
-            **RESEARCH_FLAGS,
-            **_source_tier_labels(store.manifest),
-            "completed_at_utc": _utc_now(),
-            "frozen_design": {
-                "path": str(root / "frozen_design.json"),
-                "sha256": sha256_file(root / "frozen_design.json"),
-            },
-            "implementation": _git_identity(),
-            "store_access": access,
-            "sources": source_hashes,
-            "stage_p_holdout": stage_p,
-            "data_span_arms": {
-                "artifacts": arm_artifacts,
-                "readouts": arm_readouts,
-                "paired_deltas": arm_deltas,
-                "eligible_by_economics": eligible,
-                "long_history_small_and_uncertain": long_small_and_uncertain,
-                "chosen_arm": chosen_arm,
-                "preference_rule": (
-                    "highest mean pooled IC unless headline economics are worse than Arm A; "
-                    "if neither long-history arm beats A by more than 0.002 with intervals "
-                    "spanning zero, prefer A"
-                ),
-            },
-            "parent_comparison": {
-                "artifacts": comparator_artifacts,
-                "readouts": comparator_readouts,
-                "paired_deltas": comparator_deltas,
-                "v2_parent": v2_parent,
-                "preference_rule": "best pooled IC with economics as tie-break",
-            },
+        source_hashes = {
+            "v2_store_manifest": str(design["store"]["manifest_sha256"]),
+            "cdi_development_extension": str(
+                provenance["development_extension"]["sha256"]
+            ),
+            "cdi_experiment52_reference": str(
+                provenance["experiment52_reference"]["sha256"]
+            ),
+            "preregistration": str(design["preregistration"]["sha256"]),
+            "round1_result": str(design["round1"]["result_sha256"]),
         }
-        return write_json_atomic(root / "round2_result.json", result)
+
+        arm_reports: dict[str, dict[str, _ResearchEvaluation]] = {}
+        arm_artifacts: dict[str, object] = {}
+        for arm in ("arm_A", "arm_B", "arm_C"):
+            arm_reports[arm] = {}
+            arm_artifacts[arm] = {}
+            for fold in ("F1", "F2", "F3"):
+                aggregate = root / "aggregates" / arm / fold
+                stored_scores, stored_mask = _score_artifact(
+                    aggregate, require_clean_transfer=True
+                )
+                expected_scores, expected_mask = _aggregate_network_fold(
+                    root,
+                    arm,
+                    fold,
+                    expected_dates=store.dates[evaluation[fold]],
+                    expected_isins=store.isins,
+                    expected_feature_schema_sha256=str(
+                        store.manifest["feature_schema_sha256"]
+                    ),
+                )
+                if not np.array_equal(stored_mask, expected_mask) or not np.array_equal(
+                    stored_scores, expected_scores
+                ):
+                    raise ValueError(
+                        f"stored Round-2 aggregate differs from its seed members: {arm}/{fold}"
+                    )
+                arm_reports[arm][fold] = _evaluation_from_artifacts(
+                    aggregate / "evaluation.json",
+                    store=store,
+                    indices=evaluation[fold],
+                    cdi=cdi,
+                    allow_legacy_missing_indices=True,
+                    expected_fold=fold,
+                )
+                arm_artifacts[arm][fold] = _existing_score_and_evaluation_record(
+                    aggregate
+                )
+
+        _, _, _, _, chosen_arm = _round2_arm_decision(arm_reports)
+        comparator_reports: dict[str, dict[str, _ResearchEvaluation]] = {
+            "network": arm_reports[chosen_arm],
+            "gbdt": {},
+            "ensemble": {},
+        }
+        comparator_artifacts: dict[str, object] = {
+            "network": arm_artifacts[chosen_arm],
+            "gbdt": {},
+            "ensemble": {},
+        }
+        for name in ("gbdt", "ensemble"):
+            for fold in ("F1", "F2", "F3"):
+                candidate = root / "comparators" / name / fold
+                comparator_reports[name][fold] = _evaluation_from_artifacts(
+                    candidate / "evaluation.json",
+                    store=store,
+                    indices=evaluation[fold],
+                    cdi=cdi,
+                    allow_legacy_missing_indices=True,
+                    expected_fold=fold,
+                )
+                comparator_artifacts[name][fold] = (
+                    _existing_score_and_evaluation_record(candidate)
+                )
+        return _round2_result(
+            root=root,
+            design=design,
+            store=store,
+            access=access,
+            source_hashes=source_hashes,
+            arm_reports=arm_reports,
+            arm_artifacts=arm_artifacts,
+            comparator_reports=comparator_reports,
+            comparator_artifacts=comparator_artifacts,
+            reporting_recovery={
+                "scope": (
+                    "hash-verify and reuse all completed trajectory, aggregate, comparator, "
+                    "and evaluation artifacts; tolerate only the missing evaluation-index "
+                    "metadata in the original reporting outputs after rebuilding and "
+                    "hash-verifying their full evaluation inputs; serialize unsupported "
+                    "bootstrap intervals as JSON null"
+                ),
+                "implementation": recovery_implementation,
+                "score_implementation": score_implementation,
+                "reused_aggregate_evaluations": 9,
+                "reused_comparator_evaluations": 6,
+                "scores_recomputed": 0,
+                "evaluations_recomputed": 0,
+                "result_changing_retry": False,
+            },
+        )
     finally:
         store.close()
 
@@ -3134,6 +3361,8 @@ def _parser() -> argparse.ArgumentParser:
     plan_main.add_argument("--output-root", type=Path, required=True)
     finalize = commands.add_parser("finalize-round2")
     finalize.add_argument("--output-root", type=Path, required=True)
+    recover2 = commands.add_parser("recover-round2-result")
+    recover2.add_argument("--output-root", type=Path, required=True)
     return parser
 
 
@@ -3182,6 +3411,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         digest = write_round2_plan_main(output_root=arguments.output_root)
     elif arguments.command == "finalize-round2":
         digest = finalize_round2(output_root=arguments.output_root)
+    elif arguments.command == "recover-round2-result":
+        digest = recover_round2_result(output_root=arguments.output_root)
     else:
         digest = seal_root(
             root=arguments.root,
