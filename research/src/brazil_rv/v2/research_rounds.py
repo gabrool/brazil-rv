@@ -3280,8 +3280,10 @@ def seal_root(
     flagged = []
     transfer_flags: list[bool] = []
     for path in json_paths:
-        payload = _read_json(path)
-        if "official_validation_accessed" in payload or "test_accessed" in payload:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(payload, Mapping) and (
+            "official_validation_accessed" in payload or "test_accessed" in payload
+        ):
             _assert_false_access(payload, path=path)
             flagged.append(path.relative_to(output).as_posix())
             transfer = payload["transfer_chronology_clean"]

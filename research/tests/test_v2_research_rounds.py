@@ -964,6 +964,9 @@ def test_round_gbdt_adapter_uses_shared_views_and_preserves_frozen_order() -> No
 def test_superseded_root_seals_literal_contaminated_chronology(
     tmp_path: Path,
 ) -> None:
+    (tmp_path / "history.json").write_text(
+        json.dumps([{"epoch": 1}]), encoding="utf-8"
+    )
     (tmp_path / "superseded.json").write_text(
         json.dumps(
             {
@@ -985,3 +988,4 @@ def test_superseded_root_seals_literal_contaminated_chronology(
     assert access["transfer_chronology_clean"] is False
     assert inventory["research_claim"] is False
     assert inventory["transfer_chronology_clean"] is False
+    assert any(row["path"] == "history.json" for row in inventory["files"])
