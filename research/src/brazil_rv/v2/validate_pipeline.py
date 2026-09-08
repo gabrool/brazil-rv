@@ -49,7 +49,7 @@ from .data import (
     scalar_feature_names,
     stage_fast_name_count,
 )
-from .data_roots import resolve_external_files
+from .data_roots import resolve_external_files, resolve_external_root
 from .evaluate import (
     EVALUATION_SCHEMA,
     EvaluationInputs,
@@ -949,7 +949,7 @@ def _legacy_round1_baseline_identity(
 ) -> dict[str, object]:
     """Compare every legacy naive IC with the hash-bound rev-2 Round-1 artifact."""
 
-    root = prior_root.resolve(strict=True)
+    root, root_resolution = resolve_external_root(prior_root)
     result_path = root / "round1_result.json"
     inventory_path = root / "artifact_inventory.json"
     if sha256_file(result_path) != prior_result_sha256.casefold():
@@ -997,6 +997,7 @@ def _legacy_round1_baseline_identity(
         "prior_root": str(root),
         "prior_result_sha256": prior_result_sha256.casefold(),
         "prior_inventory_sha256": prior_inventory_sha256.casefold(),
+        "root_resolution": root_resolution.payload(),
     }
 
 

@@ -27,6 +27,19 @@ class ExternalFileResolution:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class ExternalRootResolution:
+    recorded_path: str
+    resolved_path: str
+    recorded_root_prefix: str | None
+    local_root_prefix: str | None
+    override_file: str | None
+    override_file_sha256: str | None
+
+    def payload(self) -> dict[str, object]:
+        return asdict(self)
+
+
 def portable_name(path: str) -> str:
     """Return a basename without assuming the recorded path's host OS."""
 
@@ -154,6 +167,47 @@ def resolve_external_file(
         resolved_path=str(resolved),
         bytes=size,
         sha256=digest,
+        recorded_root_prefix=recorded_prefix,
+        local_root_prefix=str(local_root),
+        override_file=str(override),
+        override_file_sha256=override_sha,
+    )
+
+
+def resolve_external_root(
+    recorded_path: str | Path,
+    *,
+    override_path: str | Path | None = None,
+) -> tuple[Path, ExternalRootResolution]:
+    """Relocate a recorded directory; callers must hash-verify its bound files."""
+
+    recorded = str(recorded_path)
+    native = Path(recorded)
+    if native.is_absolute() and native.is_dir():
+        resolved = native.resolve(strict=True)
+        return resolved, ExternalRootResolution(
+            recorded_path=recorded,
+            resolved_path=str(resolved),
+            recorded_root_prefix=None,
+            local_root_prefix=None,
+            override_file=None,
+            override_file_sha256=None,
+        )
+
+    override, override_sha, mappings = _load_override(override_path)
+    recorded_prefix, local_prefix = _matching_mapping(recorded, mappings)
+    normalized = _normalized(recorded)
+    suffix = normalized[len(recorded_prefix) :].lstrip("/")
+    parts = PurePosixPath(suffix).parts
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("external artifact path escapes its mapped data root")
+    local_root = Path(local_prefix).resolve(strict=True)
+    resolved = local_root.joinpath(*parts).resolve(strict=True)
+    if not resolved.is_relative_to(local_root) or not resolved.is_dir():
+        raise ValueError("resolved external artifact is not a directory in its data root")
+    return resolved, ExternalRootResolution(
+        recorded_path=recorded,
+        resolved_path=str(resolved),
         recorded_root_prefix=recorded_prefix,
         local_root_prefix=str(local_root),
         override_file=str(override),

@@ -10,6 +10,7 @@ from brazil_rv.v2.data_roots import (
     DATA_ROOTS_ENV,
     DATA_ROOTS_SCHEMA,
     resolve_external_file,
+    resolve_external_root,
 )
 
 
@@ -49,3 +50,30 @@ def test_foreign_absolute_path_resolves_and_remains_hash_bound(
     artifact.write_bytes(b"changed-pane")
     with pytest.raises(ValueError, match="SHA-256 mismatch"):
         resolve_external_file(record)
+
+
+def test_foreign_absolute_root_resolves_for_caller_hash_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_root = tmp_path / "lambda-data"
+    artifact_root = local_root / "sealed"
+    artifact_root.mkdir(parents=True)
+    override = tmp_path / "data_roots.json"
+    override.write_text(
+        json.dumps(
+            {
+                "schema": DATA_ROOTS_SCHEMA,
+                "roots": {r"D:\quant-data": str(local_root)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(DATA_ROOTS_ENV, str(override))
+
+    resolved, audit = resolve_external_root(r"D:\quant-data\sealed")
+
+    assert resolved == artifact_root.resolve()
+    assert audit.recorded_path == r"D:\quant-data\sealed"
+    assert audit.resolved_path == str(artifact_root.resolve())
+    assert audit.override_file == str(override.resolve())
+    assert audit.override_file_sha256 == sha256_file(override)

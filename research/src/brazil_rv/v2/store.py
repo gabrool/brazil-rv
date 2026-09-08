@@ -216,6 +216,26 @@ def characteristic_neutral_targets(
             )
             if float(np.max(np.abs(residual), initial=0.0)) <= tolerance:
                 residual.fill(0.0)
+            else:
+                # LAPACK implementations may leave different machine-epsilon
+                # noise among mathematically tied projected residuals.  Exact
+                # ranking would amplify that irrelevant noise into a material
+                # characteristic exposure.  Canonicalize only ties within a
+                # bound far below the float32 target's stored precision.
+                tie_tolerance = 512.0 * np.finfo(np.float64).eps * max(
+                    1.0, float(np.max(np.abs(y), initial=0.0))
+                )
+                order = np.argsort(residual, kind="stable")
+                sorted_residual = residual[order]
+                start = 0
+                for end in range(1, names.size + 1):
+                    if (
+                        end == names.size
+                        or sorted_residual[end] - sorted_residual[start]
+                        > tie_tolerance
+                    ):
+                        residual[order[start:end]] = sorted_residual[start]
+                        start = end
             output[day, names, horizon_index] = midrank_unit_interval(residual)
             output_valid[day, names, horizon_index] = True
     return output, output_valid
