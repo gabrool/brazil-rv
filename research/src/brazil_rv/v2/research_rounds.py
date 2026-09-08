@@ -2729,6 +2729,9 @@ def run_round1_ledger_replay(*, output_root: Path) -> str:
             expected_evaluation_schema=PRIOR_EVALUATION_SCHEMA,
         )
         replayed = evaluate_scores(retained.inputs, window_name=fold)
+        for key in ("research_claim", "deployment_changed"):
+            if key in retained.result.report:
+                replayed.report[key] = retained.result.report[key]
         old_projection = _ledger_replay_non_ledger_projection(retained.result.report)
         new_projection = _ledger_replay_non_ledger_projection(replayed.report)
         if old_projection != new_projection:
