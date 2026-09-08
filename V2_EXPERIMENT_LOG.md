@@ -2127,3 +2127,75 @@ recorded nonzero D4 cap-block signatures (8--165). These are scored results,
 not an operational failure, so no retry or post-score repair was made. Per the
 registered stop, no rev4b Round-1 root was created, Round 2/GPU was not run,
 no deployment changed, and no paid instance was launched.
+
+## Rev4c hedge-cap acceptance stop (2026-09-08)
+
+Rev4c is implemented in commits
+`29a9edf964b2d1e0929fbaa0b38fc8bd44e3c61c` and
+`155c909f8c80c0e5047bd2e9141dbae33e36c91f`. The planned gross cap,
+absolute-net cap, name cap, target band, hard-gross bounds, and D4 diagnostic
+now apply only to the equity book. BOVA11 is controlled independently at
+`abs(hedge notional) <= 0.60 * NAV`; an infeasible target is capped and both
+the unconstrained target and residual beta remain observable. Whole-book
+gross and dollar net are report-only. Before the first causal lending rate on
+2023-07-11, all three borrow cells use and explicitly count the registered 2%
+placeholder rather than refusing shorts. The lending archive itself was not
+changed.
+
+The hedge cap is solved against post-transaction-cost NAV, including forced
+rebalancing when a held hedge is outside the current limit. The dataset and
+model contracts are otherwise unchanged. Required tests cover a balanced
+equity book with a +0.45-NAV hedge and zero D4 blocks, a requested 0.80-NAV
+hedge capped at 0.60 with the cap label, and bit-identical rev4b behavior when
+the hedge is disabled. Ruff, compileall, and all 897 tests passed before the
+acceptance score; the final reporting-focused test set passed 28 tests.
+
+The fresh 16-book CPU acceptance is sealed at
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev4c_155c909_20260908T171132Z`.
+Pipeline-manifest and final log-inclusive inventory SHA-256 values are
+`aab2330e1fc9ba91ad977619c56da50232c2f8a31ba8e989d87b2793886764d6`
+and `99e726a2c621a4dc00284264ae952ce321f6d8051d449653644a0f0166843ee1`.
+The operational-log hash manifest SHA-256 is
+`e2165197b77b1ebbd452a11cf6f33f5ac645856796c307f8142a575261590a9c`.
+Transfer chronology is clean and official-validation/test access is
+false/false.
+
+Every book has D1--D5 equal to zero. The largest mean volatility-quintile
+occupancy deviation is 1.0457 slots, the largest absolute post-hedge beta is
+0.1801, and the inverse-volatility neutral IC is
+-0.00004450/0.01093123/0.00229996 for F1/F2/F3. Hedge exposure never exceeds
+0.60 NAV. The F1 books explicitly record five placeholder-rate sessions.
+
+The acceptance nevertheless stops as `unsupported`: all 16 headline
+equity-book mean gross values fall below the unchanged 1.50 hard floor. The
+range is 1.268828--1.498712, so even the closest book is genuinely outside the
+registered bound. The gross-shortfall decomposition shows that the dominant
+term is `small_universe` (about 0.49 NAV in F1 and 0.66--0.67 NAV in F2/F3),
+not a hedge/equity cap interaction; D4 is zero throughout. Headline
+balance/strict/open mean gross and headline shortfall are:
+
+| Evaluation | Balance | Strict | Open | Shortfall | Small universe |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| F1 inverse volatility | 1.498712 | 1.465721 | 1.489828 | .501288 | .491935 |
+| F1 momentum 12-1 | 1.444896 | 1.442336 | 1.467522 | .555104 | .515591 |
+| F1 reversal 21 | 1.490016 | 1.473263 | 1.488075 | .509984 | .491935 |
+| F1 reversal 5 | 1.471518 | 1.432611 | 1.474311 | .528482 | .491935 |
+| F1 reversal/momentum blend | 1.475689 | 1.440869 | 1.469344 | .524311 | .517204 |
+| F2 inverse volatility | 1.324509 | 1.324509 | 1.323306 | .675491 | .657527 |
+| F2 momentum 12-1 | 1.268828 | 1.268828 | 1.267289 | .731172 | .666129 |
+| F2 reversal 21 | 1.339516 | 1.339516 | 1.334775 | .660484 | .657527 |
+| F2 reversal 5 | 1.327443 | 1.327443 | 1.315886 | .672557 | .657527 |
+| F2 reversal/momentum blend | 1.313955 | 1.313955 | 1.322040 | .686045 | .666129 |
+| F3 inverse volatility | 1.340842 | 1.340314 | 1.343776 | .659158 | .666667 |
+| F3 momentum 12-1 | 1.356415 | 1.355885 | 1.331059 | .643585 | .666667 |
+| F3 reversal 21 | 1.330833 | 1.330308 | 1.327527 | .669167 | .666667 |
+| F3 reversal 5 | 1.323644 | 1.322375 | 1.324794 | .676356 | .666667 |
+| F3 reversal/momentum blend | 1.313486 | 1.311666 | 1.324271 | .686514 | .666667 |
+| F1 GBDT ensemble | 1.486267 | 1.471353 | 1.492639 | .513733 | .489785 |
+
+Because the registered acceptance stop is a scored result, it was neither
+relaxed nor retried. Rev4c Round 1 was not created, Round 2/GPU was not run,
+no deployment changed, and no paid instance was launched. Direct provider
+inventory reads at `2026-09-08T17:22:49.2489669Z` and
+`2026-09-08T17:25:17.1049677Z` each returned zero nonterminal instances, so
+there was nothing to terminate and no adjacent instance was touched.

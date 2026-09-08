@@ -1833,3 +1833,27 @@ because all 16 books have equity-only mean gross below the fixed 1.50 floor
 This is a scored stop, so it was not retried or repaired in place. No rev4b
 Round 1 or Round 2 was started, no deployment changed, and no paid instance
 was launched.
+
+## Current v2 rev4c acceptance state (2026-09-08)
+
+The canonical rev4c implementation is commit
+`155c909f8c80c0e5047bd2e9141dbae33e36c91f`. Equity entries and D4 now use
+equity-only gross/net/name limits. BOVA11 has a separate absolute 0.60-NAV
+limit and reports capped targets, residual beta, whole-book gross, and
+whole-book dollar net. All borrow cells use a separately flagged 2% rate
+placeholder before the first causal published rate on 2023-07-11; the sealed
+lending archive is unchanged.
+
+The fresh 16-book CPU acceptance root is
+`D:\quant-data\b3\processed\model_runs\v2_development_acceptance_rev4c_155c909_20260908T171132Z`;
+manifest/final-inventory SHA-256 values are
+`aab2330e1fc9ba91ad977619c56da50232c2f8a31ba8e989d87b2793886764d6`
+and `99e726a2c621a4dc00284264ae952ce321f6d8051d449653644a0f0166843ee1`.
+D1--D5, occupancy, neutral-IC, realized-beta, hedge, chronology, hash, and
+protected-access checks pass. Acceptance is still `unsupported`: all 16
+headline equity books miss the unchanged 1.50 mean-gross floor, ranging from
+1.268828 to 1.498712. The dominant registered shortfall component is the
+small-universe term, not hedge/cap interference, and D4 is zero throughout.
+This scored stop was not relaxed or retried. Rev4c Round 1 and Round 2 were
+not started, no deployment changed, and no paid instance was launched. Two
+direct provider inventories returned zero nonterminal instances.
