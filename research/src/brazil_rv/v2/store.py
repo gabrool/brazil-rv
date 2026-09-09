@@ -1227,7 +1227,9 @@ class V2Store:
                 item, size=int(record["bytes"]), sha256=str(record["sha256"])
             ):
                 raise ValueError(f"store table hash mismatch: {name}")
-        _validate_array_shapes(arrays, dates.size, len(isins))
+        # The immutable writer validated payload values before sealing them.
+        # Hash and header checks above preserve that contract without decoding
+        # ungranted rows (including held-out dates) during a reader open.
         if "fast_patch_values" in arrays:
             try:
                 mapping_record = manifest["tables"]["native_fast_security_mapping"]

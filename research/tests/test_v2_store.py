@@ -1364,6 +1364,54 @@ def test_store_with_sealed_dates_rejects_direct_ungated_open(tmp_path) -> None:
         open_store_for_dates(path, [0], purpose="evaluation")
 
 
+def test_reader_open_checks_sealed_bytes_without_decoding_payload_rows(
+    tmp_path, monkeypatch
+) -> None:
+    path = write_store(
+        tmp_path / "reader_payload_boundary",
+        dates=[date(2024, 12, 30), date(2025, 1, 2), date(2026, 1, 2)],
+        isins=["BRTESTACNOR1"],
+        arrays={
+            "slow_values": np.ones((3, 1, 1), dtype=np.float32),
+            "slow_valid": np.ones((3, 1, 1), dtype=np.bool_),
+            "slow_age_sessions": np.zeros((3, 1, 1), dtype=np.float32),
+            "slow_timestep_valid": np.ones((3, 1), dtype=np.bool_),
+            "active": np.ones((3, 1), dtype=np.bool_),
+        },
+    )
+    original = np.load
+    reads = []
+
+    class HeaderOnlyUntilExplicitRead:
+        def __init__(self, array):
+            self.array = array
+            self.shape, self.dtype, self.ndim = array.shape, array.dtype, array.ndim
+            self._mmap = array._mmap
+
+        def __array__(self, *args, **kwargs):
+            raise AssertionError("reader decoded the whole payload during open")
+
+        def __getitem__(self, selector):
+            assert np.array_equal(np.atleast_1d(selector), [0])
+            reads.append(selector)
+            return self.array[selector]
+
+    def load(file, *args, **kwargs):
+        value = original(file, *args, **kwargs)
+        if Path(file).name not in {"date_index.npy", "isin_index.npy"}:
+            return HeaderOnlyUntilExplicitRead(value)
+        return value
+
+    monkeypatch.setattr(np, "load", load)
+    store, _ = open_store_for_dates(path, [0], purpose="evaluation")
+    try:
+        assert not reads
+        assert store.read("slow_values", [0]).tolist() == [[[1.0]]]
+        assert len(reads) == 1
+    finally:
+        store.close()
+
+
 def test_direct_store_open_is_always_gated_and_capability_is_date_bounded(
     tmp_path,
 ) -> None:

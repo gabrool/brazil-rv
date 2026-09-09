@@ -1,0 +1,976 @@
+{
+  "authority": "User explicitly authorized recommended amendments and autonomous completion before absence.",
+  "completed_array_comparisons_before_coverage_export_failure": [
+    {
+      "array": "action_cash_per_prior_share",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "action_has_action",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "action_payment_session",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "action_session_resolved",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "action_shares_per_prior_share",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "action_successor_index",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "active",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "activity_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "ambiguous_action_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "audit_eventual_survives_to_final_year",
+      "different_cells": 397719,
+      "status": "different"
+    },
+    {
+      "array": "common_state_diagnostic_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "common_state_diagnostic_values",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "detected_cash_event_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "detected_event_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "detected_split_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "distribution_change_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "distribution_number",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "fast_last_price_age_minutes",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "fast_last_price_age_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "fast_patch_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "fast_patch_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "fast_patch_values",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "fast_present",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "inferred_action_c1_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "inferred_action_large_move_no_action_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "inferred_action_u1_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "inferred_action_u2_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "intraday_age_sessions",
+      "different_cells": 995285,
+      "status": "different"
+    },
+    {
+      "array": "intraday_boundary_lagged_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "intraday_boundary_sameday_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "intraday_unit_or_unresolved_boundary_mask",
+      "different_cells": 150044,
+      "status": "different"
+    },
+    {
+      "array": "intraday_valid",
+      "different_cells": 479006,
+      "status": "different"
+    },
+    {
+      "array": "intraday_values",
+      "different_cells": 748410,
+      "status": "different"
+    },
+    {
+      "array": "observed",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "price_jump_anomaly_mask",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "prior_reference_close",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "quantity",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "raw_close",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "raw_high",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "raw_low",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "raw_open",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "shareholder_wealth_close",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "shareholder_wealth_high",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "shareholder_wealth_low",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "shareholder_wealth_open",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "shareholder_wealth_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "sidecar_oddlot_age_sessions",
+      "different_cells": 840078,
+      "status": "different"
+    },
+    {
+      "array": "sidecar_oddlot_valid",
+      "different_cells": 841218,
+      "status": "different"
+    },
+    {
+      "array": "sidecar_oddlot_values",
+      "different_cells": 839848,
+      "status": "different"
+    },
+    {
+      "array": "slow_age_sessions",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "slow_timestep_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "slow_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "slow_values",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "source_session_complete",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_normalized_cross_section_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_normalized_residual",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_price_midrank",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_price_simple_return",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_price_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_primary",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_scale_sigma",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_shareholder_midrank",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_shareholder_simple_return",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_shareholder_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_terminal_loss",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_terminal_wealth",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "target_to_close",
+      "different_cells": 89199,
+      "status": "different"
+    },
+    {
+      "array": "target_to_close_normalized_residual",
+      "different_cells": 88615,
+      "status": "different"
+    },
+    {
+      "array": "target_to_close_raw_log_return",
+      "different_cells": 83960,
+      "status": "different"
+    },
+    {
+      "array": "target_to_close_valid",
+      "different_cells": 84843,
+      "status": "different"
+    },
+    {
+      "array": "target_valid",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "trade_count",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "trade_observed",
+      "different_cells": 0,
+      "status": "exact"
+    },
+    {
+      "array": "volume_brl",
+      "different_cells": 0,
+      "status": "exact"
+    }
+  ],
+  "continuation": "Commit the amendment before a fresh comparison root; do not rebuild unchanged valid store bytes.",
+  "coverage_correction": "Global diagnostics use sessions as the denominator; named and native features retain causal active-name-day denominators. Generic observation count keys and explicit units avoid mislabelling.",
+  "coverage_export_failure": "A date-level common_state_diagnostic validity array was incorrectly masked as date/name/feature; no comparison report was published.",
+  "failed_comparison_implementation": "0fdddcc",
+  "failed_comparison_logs": "D:\\quant-data\\b3\\interim\\v2_cpu_comparison_20260909T103343Z",
+  "log_files": [
+    {
+      "bytes": 172,
+      "path": "D:\\quant-data\\b3\\interim\\v2_cpu_comparison_20260909T103343Z\\completion.json",
+      "sha256": "38f34041ff390aecdeb6078fb93294038c912a443f569f1f50ee868601107dc6"
+    },
+    {
+      "bytes": 189,
+      "path": "D:\\quant-data\\b3\\interim\\v2_cpu_comparison_20260909T103343Z\\launch.json",
+      "sha256": "25cbee131368786d908aadfdf2f07ac1072777a1c72e5b35e278f0e567ef75cf"
+    },
+    {
+      "bytes": 1989,
+      "path": "D:\\quant-data\\b3\\interim\\v2_cpu_comparison_20260909T103343Z\\stderr.log",
+      "sha256": "45d901fd46d13b6cccc6ee4d5e324f5a9eee0adce7497be7a547dd92e41db484"
+    },
+    {
+      "bytes": 6201,
+      "path": "D:\\quant-data\\b3\\interim\\v2_cpu_comparison_20260909T103343Z\\stdout.log",
+      "sha256": "66ce88bc5f5e122e8ac9f8f5ea6151da5395c1ef464adfcb6af17ea14188f35b"
+    }
+  ],
+  "reader_findings": {
+    "correction": "Remove the duplicate reader payload scan. Writer validation remains before sealing; readers verify hashes, shape/dtype headers, schema, axes and native mapping metadata. Payload decoding occurs only through date-bound read methods.",
+    "former_code": "V2Store._open_internal called _validate_array_shapes on full mapped arrays after granting bounded sample dates.",
+    "heldout_performance_read_once": "Not exercised; remains closed. This is not a claim that no held-out bytes were historically scanned.",
+    "historical_access_disclosure": "Earlier access flags describe granted model rows, not these implicit validation scans. Literal earlier claims of no later payload access are therefore qualified by this finding; immutable historical artifacts and flags are not rewritten.",
+    "scope": "Value checks scanned feature ages/validity, slow timestep consistency, action share/cash/resolution/successor/payment arrays and prior-reference prices across all stored dates, including 2025/2026 in the old store.",
+    "use": "Integrity validation only; no held-out fitting, score selection, IC, economics or performance evaluation ran."
+  },
+  "recorded_at_utc": "2026-09-09T10:44:40.580313+00:00",
+  "survival_flag_proof": {
+    "array": "audit_eventual_survives_to_final_year",
+    "changed_cells": 397719,
+    "changed_names": 107,
+    "current_final_year": 2024,
+    "current_flag_exact_from_2024_observation_and_continuation_identity": true,
+    "current_manifest_sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64",
+    "current_root": "D:\\quant-data\\b3\\processed\\v2_daily_store_3d67624_20260909T100323Z",
+    "current_survivor_names": 442,
+    "model_input": false,
+    "names": [
+      {
+        "current": false,
+        "isin": "BRADMFACNOR3",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRAESBACNOR7",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRAGXYACNOR4",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRAHEBACNPA3",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRAHEBACNPB1",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRAMBPACNOR6",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRAPERACNOR9",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRARNDACNOR6",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRARZZACNOR3",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRATOMACNOR1",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRAUAUACNOR1",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRAXIAACNOR0",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRAXIAACNPA3",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRAXIAACNPB1",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRAXIAACNPC9",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRAZTEACNOR4",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRAZULA01OR8",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRAZULACNOR7",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRAZULACNPR4",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRAZULCDAM13",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRAZULCDAXX7",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRAZULCDAYY3",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRB100ACNOR0",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRBAHIACNOR1",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBOBRACNPR3",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRBPARACNOR5",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRBRFSACNOR8",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBRGEACNOR6",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBRGEACNPA9",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBRGEACNPB7",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBRGEACNPC5",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBRGEACNPD3",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBRGEACNPE1",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBRGEACNPF8",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBRITACNOR0",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBRIVACNOR6",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRBRIVACNPR3",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCCROACNOR2",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRCCTYACNOR7",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRCEEDACNPR6",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCIELACNOR3",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCLSAACNOR0",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCPLEACNPA1",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCPLEACNPB9",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCRFBACNOR2",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCRIVACNOR4",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCRIVACNPR1",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCSABACNOR1",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCSRNACNOR0",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCSRNACNPA3",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCSRNACNPB1",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCTNMACNOR9",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCTNMACNPR6",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCTSAACNOR3",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRCTSAACNPR0",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRCYREACNPR4",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRDMFNACNOR6",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRECOMACNOR9",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BREGGYACNOR1",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRELETACNOR6",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRELETACNPA9",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRELETACNPB7",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRELMDACNOR3",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BREMAEACNOR4",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BREMBJACNOR1",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BREMBRACNOR4",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRENATACNOR0",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BREQPAACNPB2",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRFIGEACNOR6",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRGOLLA01PR5",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRGOLLACNPR4",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRJBSSACNOR8",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRKRSAACNOR0",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRLIPRACNOR7",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRLVTCACNOR4",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRMBLYACNOR5",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRMBRFACNOR1",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRMMAQACNOR1",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRMMAQACNPR8",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRMOTVACNOR7",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRMRFGACNOR0",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRMTSAACNOR2",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRNATUACNOR6",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRNINJACNOR5",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRNTCOACNOR5",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRNUTRACNOR0",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BROBTCACNOR0",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BROSXBACNOR8",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRPASSACNOR7",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRPORTACNOR8",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRRDNIACNOR9",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRRENTACNPR1",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRRIAAACNOR2",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRRNEWACNOR8",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRRNEWACNPR5",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRRRRPACNOR5",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRRVEEACNOR9",
+        "previous": true
+      },
+      {
+        "current": false,
+        "isin": "BRSAUDACNOR9",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRSGPSACNOR4",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRSOMAACNOR3",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRSRNAACNOR4",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRSTBPACNOR3",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRTOKYACNOR5",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRTRPLACNOR4",
+        "previous": false
+      },
+      {
+        "current": true,
+        "isin": "BRTRPLACNPR1",
+        "previous": false
+      },
+      {
+        "current": false,
+        "isin": "BRWDCNACNOR2",
+        "previous": true
+      },
+      {
+        "current": true,
+        "isin": "BRZAMPACNOR5",
+        "previous": false
+      }
+    ],
+    "official_validation_accessed": false,
+    "previous_final_year": 2026,
+    "previous_manifest_sha256": "deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b",
+    "previous_root": "D:\\quant-data\\b3\\processed\\v2_daily_store_8021e42_20260906T202315Z",
+    "previous_survivor_names": 407,
+    "recorded_at_utc": "2026-09-09T10:35:49.501865+00:00",
+    "test_accessed": false
+  },
+  "validation": {
+    "comparison_tests_passed": 4,
+    "new_tests": [
+      "Header-only reader open with synthetic 2024/2025/2026 rows",
+      "Session-level diagnostic coverage",
+      "Corrupt survival flag rejected despite registered endpoint change"
+    ],
+    "ruff": "passed",
+    "store_tests_passed": 47
+  }
+}

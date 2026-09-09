@@ -43,6 +43,14 @@ the paired `b_intraday` minus `a_slow` ablation; the registered parent stays
 decoded to integer sessions with `np.rint`, with unchanged validity and an int32
 hash. Five exact-60-session boundary cells move to their correct bucket; sealed
 replay strata and model inputs remain unchanged.
+Store readers validate sealed hashes and headers before date-bounded reads;
+payload-value validation belongs to the immutable writer. A subsequent audit found
+that the former duplicate reader validation scanned later ages/masks and
+action/reference-price values in the old store during integrity checks. No
+held-out fitting or performance evaluation ran, but earlier literal claims of no
+later payload access require this qualification. Historical sealed flags record
+granted model rows and are not rewritten. See
+[the disclosure and correction](docs/v2_store_comparison_stop_evidence.json).
 Official validation and the permanently spent test remain sealed; deployment
 is unchanged. Earlier results remain immutable under their own registrations.
 

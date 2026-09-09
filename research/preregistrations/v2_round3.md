@@ -112,6 +112,29 @@ authority, preserve that scratch and restart in a fresh clean-commit root.
 No research setting or memory bound changes. Evidence and measured stopped-run
 peak RSS are in `docs/v2_sidecar_lookup_evidence.json`.
 
+The completed 3d67624 store passed the full-build 8-GiB bound. Its first complete
+array comparison found one additional audit-only change: the eventual-survival
+flag ends at 2024 in this store, versus 2026 in the historical store. Register only
+`audit_eventual_survives_to_final_year` as an endpoint-dependent exception, and
+require its exact independent reconstruction from final-year observations and
+continuation identity. The proof changes 107 names / 397,719 cells; it changes no
+model input, eligibility, target or economic action. A corrupt flag still stops.
+The comparison then failed while exporting date-level global diagnostic coverage;
+count those diagnostics by session and other features by causal active name-day.
+Preserve the failed logs and restart the audit in a fresh root after this amendment.
+
+The investigation also found duplicate full-array value validation during reader
+open. In historical old-store opens this integrity scan included later ages,
+validity and action/reference-price values despite bounded requested model dates.
+It did not fit, score, select or evaluate held-out performance. Earlier literal
+no-payload-access statements are qualified by this disclosure; sealed access flags
+describe granted model rows and remain immutable. Remove the duplicate reader scan:
+the writer still validates before sealing, and readers retain hash/header/schema
+checks and bounded payload access. Synthetic sentinel tests forbid implicit payload
+decoding on open. The official performance read-once rule remains unexercised and
+closed. These amendments use the user's explicit autonomous authority, with evidence
+in `docs/v2_store_comparison_stop_evidence.json`, before further dependent work.
+
 The final completed daily row retains the next decision timestamp from calendar
 metadata, even though the next session has no market data or consumer row in this
 store. Otherwise nine December 30 inferred action components would be marked

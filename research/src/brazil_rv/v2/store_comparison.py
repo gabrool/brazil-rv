@@ -8,9 +8,11 @@ import json
 from pathlib import Path
 
 import numpy as np
+import polars as pl
 
 from .artifacts import inventory, sha256_file, write_json_atomic
 from .contract import DEVELOPMENT_END, FINETUNE_START, HORIZONS, PRETRAIN_END
+from .data_foundation import continuation_identity_axis
 from .store import open_store_for_samples, peak_rss_bytes
 
 
@@ -20,6 +22,7 @@ def monthly_coverage(store, dates: np.ndarray) -> list[dict[str, object]]:
     rows = []
     for family, features in store.manifest["feature_names"].items():
         native = family == "native_fast"
+        date_level = family == "common_state_diagnostic"
         key = "fast_patch_valid" if native else f"{family}_valid"
         if key not in store.manifest["arrays"]:
             continue
@@ -36,18 +39,21 @@ def monthly_coverage(store, dates: np.ndarray) -> list[dict[str, object]]:
             valid = store.read(key, indices).astype(bool)
             if native:
                 valid = valid.any(axis=2) & active[:, native_indices, None]
-            else:
+            elif not date_level:
                 valid &= active[..., None]
-            denominator = int(active.sum())
-            counts = valid.sum(axis=(0, 1))
+            denominator = len(indices) if date_level else int(active.sum())
+            counts = valid.sum(axis=0 if date_level else (0, 1))
             rows.append(
                 {
                     "family": family,
                     "month": str(month),
                     "sessions": len(indices),
-                    "active_name_days": denominator,
+                    "active_name_days": int(active.sum()),
+                    "possible_observations": denominator,
                     "feature_count": len(features),
-                    "coverage_unit": "active_name_day_with_any_valid_patch"
+                    "coverage_unit": "session_with_valid_diagnostic"
+                    if date_level
+                    else "active_name_day_with_any_valid_patch"
                     if native
                     else "active_name_day_with_valid_feature",
                     **(
@@ -62,7 +68,7 @@ def monthly_coverage(store, dates: np.ndarray) -> list[dict[str, object]]:
                         if native
                         else {}
                     ),
-                    "any_feature_valid_name_days": int(valid.any(axis=-1).sum()),
+                    "any_feature_valid_observations": int(valid.any(axis=-1).sum()),
                     "mean_feature_coverage": float(
                         counts.sum() / (denominator * len(features))
                     )
@@ -70,7 +76,7 @@ def monthly_coverage(store, dates: np.ndarray) -> list[dict[str, object]]:
                     else None,
                     "features": {
                         name: {
-                            "valid_name_days": int(count),
+                            "valid_observations": int(count),
                             "fraction": float(count / denominator)
                             if denominator
                             else None,
@@ -83,18 +89,38 @@ def monthly_coverage(store, dates: np.ndarray) -> list[dict[str, object]]:
 
 
 def registered_change(name: str) -> bool:
-    return (
-        name.startswith(
-            (
-                "intraday_",
-                "m1_cotahist_",
-                "target_to_close",
-                "sidecar_lending_",
-                "sidecar_oddlot_",
-            )
+    return name.startswith(
+        (
+            "intraday_",
+            "m1_cotahist_",
+            "target_to_close",
+            "sidecar_lending_",
+            "sidecar_oddlot_",
         )
-        or name == "fast_sigma"
+    ) or name in {"fast_sigma", "audit_eventual_survives_to_final_year"}
+
+
+def _survival_audit(store, dates: np.ndarray) -> dict[str, object] | None:
+    name = "audit_eventual_survives_to_final_year"
+    if name not in store.manifest["arrays"]:
+        return None
+    # This hashed audit table is intentionally outside the model table API.
+    links = pl.read_parquet(
+        store.root / store.manifest["tables"]["isin_succession_links"]["path"]
     )
+    identities = np.asarray(continuation_identity_axis(store.isins, links))
+    final_year = dates[-1].astype("datetime64[Y]")
+    final_rows = np.flatnonzero(dates.astype("datetime64[Y]") == final_year)
+    observed = store.read("observed", final_rows).any(axis=0)
+    expected = np.isin(identities, identities[observed])
+    actual = store.read(name, np.arange(len(dates)))
+    differences = int((actual != expected[None, :]).sum())
+    return {
+        "final_year": str(final_year),
+        "expected_survivor_names": int(expected.sum()),
+        "different_cells": differences,
+        "exact_from_final_year_observation_and_continuation_identity": differences == 0,
+    }
 
 
 def _open_audit_store(root, rows, dates, *, verify_hashes=True):
@@ -129,6 +155,9 @@ def compare(*, previous: Path, current: Path, output: Path) -> dict[str, object]
     try:
         if old.isins != new.isins:
             raise ValueError("rebuilt security axis differs from canonical metadata")
+        survival = _survival_audit(new, dates)
+        if survival and survival["different_cells"]:
+            failures.append("audit_eventual_survives_to_final_year")
         # Physical arrays only: the virtual neutral target follows from the
         # unchanged shareholder returns, sigma and neutralization characteristics.
         old_names, new_names = set(old.manifest["arrays"]), set(new.manifest["arrays"])
@@ -155,6 +184,12 @@ def compare(*, previous: Path, current: Path, output: Path) -> dict[str, object]
                 name
             ) != new.array_dtype(name):
                 record["status"] = "shape_or_dtype_changed"
+                record.update(
+                    previous_shape=old.array_shape(name),
+                    current_shape=new.array_shape(name),
+                    previous_dtype=old.array_dtype(name).str,
+                    current_dtype=new.array_dtype(name).str,
+                )
                 if not changed:
                     failures.append(name)
                 comparisons.append(record)
@@ -226,6 +261,7 @@ def compare(*, previous: Path, current: Path, output: Path) -> dict[str, object]
             "status": "stop" if failures else "passed",
             "unexpected_differences": failures,
             "arrays": comparisons,
+            "survival_audit": survival,
             "previous": {
                 "root": str(previous),
                 "manifest_sha256": sha256_file(previous / "manifest.json"),
