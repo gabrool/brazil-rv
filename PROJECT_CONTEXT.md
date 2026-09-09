@@ -2035,3 +2035,17 @@ promotion. The selected execution policy remains theta=1, D3/D5/D10 equal-notion
 buffer nine, with its in-sample selection label. The repaired development store
 and all sealed Round-3 artifacts remain immutable. CPU re-baselining precedes
 Round 4; paid compute requires a renewed go, and 2025/2026 access is unauthorized.
+
+The fourteen-fold CPU checkpoint is now accepted and sealed: 70 controls and
+56 GBDT cells (1,400 individual head/seed fits), with all unchanged gates passed.
+Inventory SHA-256 is
+`36aa5f132828aacf700ce728f1d202942c5b11ca9f4b8f9be04df9e8e59da917`;
+the root and full readouts are recorded in
+[the checkpoint report](docs/v2_RESEARCH_CHECKPOINT.md). Economics retain the
+existing resolved-fold pooling rule and explicit candidate-specific exclusions;
+engineering acceptance is not a full-calendar or implementability claim.
+[Round 4](research/preregistrations/v2_round4.md) is registered as fast_off plus
+S0/H/P/L/C, with twelve screening P runs, 252 main F runs and nine selection-only
+F runs. Confirmation on seeds 61/79/97 on both sides precedes any designation
+or S0 default change. No Round-4 neural result exists yet. Paid compute still
+requires a renewed go, and the proposed 2025-read bar has not been approved.

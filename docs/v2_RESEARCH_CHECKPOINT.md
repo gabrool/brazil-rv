@@ -1,7 +1,7 @@
 # Research checkpoint implementation and CPU acceptance
 
 Status: the protocol and graph changes are implemented. The CPU re-baseline and
-diagnostics are complete, accepted and sealed. Round 4 is the next registration;
+diagnostics are complete, accepted and sealed. [Round 4 is registered](../research/preregistrations/v2_round4.md);
 no GPU training has started and paid compute still requires Gabriel's renewed go.
 
 The implementation is on GitHub in `d2f7de4`, following the protocol and CDI commits.
@@ -254,7 +254,7 @@ eligible fields. Exact sample counts, hashes and per-fold top lists are retained
 | 14 | overnight_return_sum_5 (0.000303) | overnight_return_sum_5 (0.000330) | — |
 | 15 | vwap_deviation_1545 (0.000278) | vwap_deviation_1545 (0.000287) | — |
 
-The B6 momentum diagnostic above is complete. The corresponding fourteen-fold neural
+The B6 momentum diagnostic reported below is complete. The corresponding fourteen-fold neural
 parent diagnostic and the nine selection-only fine-tunes require the later authorized
 GPU run. CPU results do not promote a GBDT or change the predeclared neural comparison.
 
@@ -286,8 +286,8 @@ model/data/scoring paths, actual S0/C Stage-P training and transfer, H/P checkpo
 reuse, invalid sidecars, daily diagnostic causality and spread conservation, plan
 counts and seed pairing, and promotion eligibility. Ruff and the targeted suites pass.
 
-CPU results and their sealed evidence are now published. Next register `v2_round4.md`
-and freeze a fresh root with its smoke plan only. The staged plans
+CPU results and their sealed evidence were published in `bd8ce6b` before registering
+`v2_round4.md`. Next freeze a fresh root with its smoke plan only. The staged plans
 are prepared for that registration; GPU smoke and training remain untested until an
 authorized paid session. Launch still requires Gabriel's renewed go. Use the existing
 operational `.txt` handoff as the authority for Lambda paths and launch procedures.
