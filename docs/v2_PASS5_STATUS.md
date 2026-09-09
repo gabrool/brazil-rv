@@ -9,7 +9,7 @@ The unrounded history-age decoder and all quality-stratification fields remain
 unchanged. Both earlier stopped roots remain immutable historical evidence.
 
 Arm B remains the network choice and the ensemble remains the overall designation.
-The next authorized step is the CPU execution sweep. The user clarified that the
+The CPU execution sweep is complete. The user clarified that the
 liquidity readout attributes the original trades, without replacement names.
 Nearest-integer history-age canonicalisation is registered for Round 1' on the
 rebuilt store, not the sealed-panel replays.
@@ -120,7 +120,14 @@ name-cap correction is prepared and passes 151 targeted tests. The stopped root,
 trace and partial results are [reported here](v2_R31_D4_STOP.md). The user explicitly
 approved the tested correction and a fresh R3.1 restart; the effective registration
 records it. No policy was selected from the stopped partial grid.
-After the sweep: intraday coverage repair, one development-only store build,
+The approved restart completed all 240 panels / 960 scenario ledgers. Every
+D1-D5 and headline gate passed; all 48 sealed baseline daily tables are exact.
+The registered joint-first rule selected unsmoothed D3/D5/D10, equal sizing and
+buffer 9 per quintile. B's paired gain is 3.2533 [-0.4199, 6.5484] bps/day;
+the horizon-only buffer-6 change has a larger gain but lower selection priority.
+The label is `execution_parameter_selected_in_sample`. Full tables, methods and
+sealed hashes are in [the completed sweep report](v2_R31_EXECUTION_SWEEP.md).
+Next: intraday coverage repair, one development-only store build,
 16-book acceptance, Round 1' CPU, then stop for the user's GPU go.
 
 Validation before replay: Ruff and compilation pass; the full research suite passed

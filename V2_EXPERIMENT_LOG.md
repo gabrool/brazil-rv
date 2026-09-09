@@ -2668,3 +2668,31 @@ restart. The effective registration now specifies candidate-specific name-cap
 enforcement with unchanged aggregate limits and pending-inventory reporting.
 The stopped root and diagnostic stay immutable; baseline identity is checked again
 before any new policy cell.
+
+### R3.1 completed: registered joint execution change adopted
+
+Root `v2_execution_sweep_df4492c_20260909T003922Z` contains all 240 panels and
+960 scenario ledgers (20 policies, four candidates, three folds). All D1-D5
+counters are zero; every headline gross, stale and occupancy gate passes.
+All 48 baseline scenario daily tables reproduce the sealed rev4f sources exactly.
+Reconstructed inputs and source inventories remain exact. All 526 inventory files
+and the complete file set are verified; result SHA-256 is
+`fb77b728f46b23213cb64adb9471443b2c91d42efc6795a868f4ebeb63adaa51`, inventory
+`f6595754dda8312767034ca1cbeb5aacbf890e2f871bd82dcc5fd3f735b7c2a5`.
+
+The registered joint-first rule selects theta=1, D3/D5/D10, equal notional and
+buffer 9 per quintile, labelled `execution_parameter_selected_in_sample`.
+Arm B net is 6.2755 [2.8093,13.4829] bps/day; paired gain is
+3.2533 [-0.4199,6.5484], traded IC 0.0252926. The horizon-only buffer-6 cell
+also qualifies and has the larger gain, 3.9558 [0.6603,5.8411], but is an
+individual change and follows qualifying joint changes in the frozen rule.
+The selected policy's comparator nets are ensemble 1.8117, GBDT -2.4891 and
+momentum 3.1900 bps/day. Their results do not reopen the Round-2 designation.
+
+Every headline cell has supported economics on all 375 evaluation sessions.
+Liquidity attribution uses only original qualifying trades, with no replacement
+selection or leverage rescaling; full-book accounting reconciles within
+1.407e-11 bps. The report and bounded audit JSON are committed for GitHub review:
+`docs/v2_R31_EXECUTION_SWEEP.md`, `docs/v2_r31_execution_sweep_evidence.json`.
+No fit, new store, paid instance, or protected-date payload was used. Intraday
+repair, the bounded build/acceptance and Round 1' CPU remain before the GPU stop.

@@ -26,6 +26,16 @@ research designation: IC `0.0265307`, net `2.6377` [-0.1505, 9.8608]. Paired
 B−A and ensemble-versus-GBDT economics intervals still span zero; no economics
 override fired. These are development research results. See
 [the Round-2 before/after report](docs/v2_PASS5_ROUND2_REBASELINE.md).
+R3.1 is complete on 240 panels / 960 ledgers, with zero D1-D5 flags and exact
+reproduction of all 48 sealed baseline daily tables. Its registered joint-first
+rule adopts unsmoothed D3/D5/D10, equal sizing and buffer 9 per quintile, labelled
+`execution_parameter_selected_in_sample`. Arm B's paired gain is 3.2533 bps/day
+[-0.4199, 6.5484]; the horizon-only buffer-6 cell has the higher gain but is an
+individual change. This execution recipe applies to the remaining program;
+sealed replays retain their original policy. See
+[the sweep report](docs/v2_R31_EXECUTION_SWEEP.md). The next steps are the
+intraday repair, bounded store rebuild, acceptance and Round 1' CPU, followed
+by the explicit GPU approval stop.
 Official validation and the permanently spent test remain sealed; deployment
 is unchanged. Earlier results remain immutable under their own registrations.
 
