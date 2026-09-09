@@ -20,7 +20,6 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import polars as pl
-from pypdf import PdfReader
 
 from .bdi_lending import load_identities, load_stock_days
 
@@ -148,6 +147,8 @@ def parse_registered_lines(
 def parse_registered_pdf(
     path: Path, report_date: date
 ) -> tuple[list[RegisteredLoan], int]:
+    from pypdf import PdfReader
+
     reader = PdfReader(path)
     rows = []
     for page in reader.pages:

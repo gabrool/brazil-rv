@@ -19,7 +19,6 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 import polars as pl
-from pypdf import PdfReader
 
 CONTRACT_VERSION = "B3_BDI_LENDING_OPEN_BALANCE_V1"
 RAW_CONTRACT_VERSION = "B3_BDI_CHAPTER_05_PDF_SNAPSHOT_V1"
@@ -279,6 +278,8 @@ def parse_bdi_pages(pages: list[str], report_date: date) -> Bulletin | None:
 
 
 def parse_bdi_pdf(path: Path, report_date: date) -> tuple[Bulletin | None, int]:
+    from pypdf import PdfReader
+
     reader = PdfReader(path)
     pages = [page.extract_text(extraction_mode="layout") or "" for page in reader.pages]
     return parse_bdi_pages(pages, report_date), len(reader.pages)

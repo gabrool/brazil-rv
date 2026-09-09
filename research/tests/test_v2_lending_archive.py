@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from datetime import date
 from pathlib import Path
 
@@ -15,6 +17,19 @@ from brazil_rv.v2.lending_archive import (
     _identical,
     load_lending_borrow_panels,
 )
+
+
+def test_round3_import_does_not_require_pdf_preprocessing_dependency() -> None:
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; sys.modules['pypdf'] = None; import brazil_rv.v2.round3",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def _write_archive(
