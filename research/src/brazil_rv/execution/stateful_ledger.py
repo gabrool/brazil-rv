@@ -1116,19 +1116,27 @@ def _scaled_group_bands(
     buffer: int,
     group_sizes: NDArray[np.integer],
     threshold_multiple: int,
+    capacity_buffer: int | None = None,
 ) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
     """Scale quota and retention widths together in undersized quintiles."""
 
     sizes = np.asarray(group_sizes, dtype=np.int64)
     quota = _balanced_quota(k_eff, len(sizes))
     retention_buffer = _balanced_quota(buffer, len(sizes))
+    capacity = _balanced_quota(
+        buffer if capacity_buffer is None else capacity_buffer, len(sizes)
+    )
     for group, size in enumerate(sizes):
-        width = int(quota[group] + retention_buffer[group])
+        width = int(quota[group] + capacity[group])
         if width == 0 or int(size) >= threshold_multiple * width:
             continue
         scale = float(size) / float(threshold_multiple * width)
         quota[group] = int(np.floor(quota[group] * scale))
         retention_buffer[group] = int(np.floor(retention_buffer[group] * scale))
+    if capacity_buffer is not None:
+        # Buffer ablations keep the reference quota/scaling fixed. Retention
+        # still cannot overlap the opposite side in an undersized stratum.
+        retention_buffer = np.minimum(retention_buffer, sizes // 2 - quota)
     return quota, retention_buffer
 
 
@@ -1197,8 +1205,16 @@ def simulate_stateful_ledger(
     initial_hedge_reference_price: float = np.nan,
     initial_unresolved_action: NDArray[np.bool_] | None = None,
     hedge_annual_borrow_rate: NDArray[np.floating] | None = None,
+    entry_sizing_volatility: NDArray[np.floating] | None = None,
+    capacity_buffer_per_side: int | None = None,
 ) -> StatefulLedgerResult:
-    """Run causal close-proxy orders, fills, and a raw signed-share ledger."""
+    """Run causal close-proxy orders, fills, and a raw signed-share ledger.
+
+    Optional entry volatility applies inverse-volatility sizing to each side's
+    new-entry cohort; existing inventory is not rebalanced. It must already be
+    available at the decision. Capacity can be bound to a reference buffer for
+    a retention-only ablation without changing entry quotas.
+    """
 
     inputs = _validate_inputs(
         dates,
@@ -1227,6 +1243,13 @@ def simulate_stateful_ledger(
         beta_hedge=config.beta_hedge,
     )
     day_count, name_count = inputs.score.shape
+    sizing_volatility = (
+        None
+        if entry_sizing_volatility is None
+        else np.asarray(entry_sizing_volatility, dtype=np.float64)
+    )
+    if sizing_volatility is not None and sizing_volatility.shape != inputs.score.shape:
+        raise ValueError("entry sizing volatility must align with decision scores")
     initial_unresolved_action = (
         np.zeros(name_count, dtype=np.bool_)
         if initial_unresolved_action is None
@@ -1569,6 +1592,7 @@ def simulate_stateful_ledger(
                 buffer=config.buffer_per_side,
                 group_sizes=group_sizes,
                 threshold_multiple=config.small_stratum_scaling_threshold_multiple,
+                capacity_buffer=capacity_buffer_per_side,
             )
             # An undersized stratum scales both its quota and buffer.  The
             # resulting quota sum is therefore the contractual side size for
@@ -2095,6 +2119,49 @@ def simulate_stateful_ledger(
                 )
                 return None if candidate is None else (candidate, False)
 
+            side_budget = {
+                "buy": long_slots * slot_notional,
+                "sell": short_slots * slot_notional,
+            }
+            inverse_weight_scale: dict[OrderSide, float] = {}
+            if sizing_volatility is not None:
+                for side in ("buy", "sell"):
+                    candidates = [
+                        name
+                        for name in candidates_by_side[side]
+                        if np.isfinite(last_observed[name])
+                        and last_observed[name] > 0.0
+                    ]
+                    sigma = sizing_volatility[day, candidates]
+                    if np.any(~np.isfinite(sigma) | (sigma <= 0.0)):
+                        raise ValueError(
+                            "inverse-volatility entries require positive causal sigma"
+                        )
+                    planned: list[int] = []
+                    for group in group_priority:
+                        deficit = max(
+                            int(
+                                volatility_quota[group]
+                                - volatility_occupancy[side][group]
+                            ),
+                            0,
+                        )
+                        planned.extend(
+                            [
+                                name
+                                for name in candidates
+                                if volatility_groups[name] == group
+                            ][:deficit]
+                        )
+                    planned.extend(name for name in candidates if name not in planned)
+                    planned = planned[: remaining_slots[side]]
+                    inverse_weight_scale[side] = (
+                        side_budget[side]
+                        / float(np.sum(1.0 / sizing_volatility[day, planned]))
+                        if planned
+                        else 0.0
+                    )
+
             if long_slots > short_slots:
                 current_side: OrderSide = "buy"
             elif short_slots > long_slots:
@@ -2129,9 +2196,20 @@ def simulate_stateful_ledger(
                     blocked_reference += 1
                     current_side = "sell" if current_side == "buy" else "buy"
                     continue
+                entry_notional = slot_notional
+                if sizing_volatility is not None:
+                    entry_notional = min(
+                        inverse_weight_scale[current_side]
+                        / sizing_volatility[day, name],
+                        start_nav * config.planned_name_weight_cap,
+                        side_budget[current_side],
+                    )
+                    if entry_notional <= 1e-12 * start_nav:
+                        current_side = "sell" if current_side == "buy" else "buy"
+                        continue
                 proposed = planned_values.copy()
                 proposed[name] += (
-                    slot_notional if current_side == "buy" else -slot_notional
+                    entry_notional if current_side == "buy" else -entry_notional
                 )
                 gross_before, net_before, _ = _risk(planned_values, start_nav)
                 planned_gross, planned_net, planned_name = _risk(proposed, start_nav)
@@ -2150,7 +2228,7 @@ def simulate_stateful_ledger(
                     violates_net
                     and abs(net_before)
                     <= config.planned_absolute_net_cap
-                    - slot_notional / start_nav
+                    - entry_notional / start_nav
                     - 1e-9
                 )
                 name_cap_fresh += int(
@@ -2168,12 +2246,13 @@ def simulate_stateful_ledger(
                     day,
                     name,
                     current_side,
-                    slot_notional,
+                    entry_notional,
                     reference,
                     "entry",
                     expiry,
                 )
                 remaining_slots[current_side] -= 1
+                side_budget[current_side] -= entry_notional
                 if config.volatility_balanced_entries:
                     volatility_occupancy[current_side][volatility_groups[name]] += 1
                     if is_spill:
@@ -3220,6 +3299,7 @@ def simulate_stateful_ledger(
                     threshold_multiple=(
                         config.small_stratum_scaling_threshold_multiple
                     ),
+                    capacity_buffer=capacity_buffer_per_side,
                 )
                 later_group = int(later_groups[name])
                 if later_group < 0:

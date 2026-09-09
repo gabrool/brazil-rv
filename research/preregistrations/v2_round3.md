@@ -42,6 +42,80 @@ hash decoded diagnostic provenance after canonicalisation to its natural type;
 model inputs, targets and scores remain hashed exactly as stored. This future rule
 is inactive for rev4f and the R3.1 replays of its sealed panels.
 
+## R3.1 executable details frozen before policy results
+
+Inputs are the completed rev4f R1 and R2 roots. The freeze verifies and binds each
+complete inventory, result and design, and binds the clean implementation commit
+and this registration. Momentum comes from R1; B, ensemble and GBDT from R2.
+Protected reports remain immutable references; every reconstructed input hash is
+checked exactly, including the unrounded diagnostic history age. No score is fitted
+or regenerated. Temporary traded-signal diagnostics never replace model scores.
+The current policy must reproduce every stored daily row exactly for the three
+borrow cases and sterile comparator before an alternative can be interpreted.
+
+Grid order is theta 1, 0.5, 0.25; within theta the horizon tuples (1,2,3,5),
+(3,5,10), (5,10); within each tuple equal then inverse sigma. Composite ranks and
+smoothing restart at each evaluation fold, alongside the existing empty ledger.
+Missing composites carry state for at most five sessions, for every theta; daily
+reranking follows smoothing. Active eligibility remains a separate requirement.
+Traded IC evaluates that composite against each of the existing D1/D2/D3/D5 neutral
+targets on their common supported population and averages the four daily ICs.
+Persistence and top-minus-bottom-decile shareholder spread use the same existing
+definitions with the temporary composite broadcast across those heads. Raw IC,
+per-horizon, incremental, liquidity-quartile and persistence metrics remain in the
+hash-bound source report.
+
+Inverse sizing consumes `target_scale_sigma` on its already causal decision row,
+not normalized Yang-Zhang or normalized beta. On each side, the initially selected
+new-entry cohort follows the existing rank/quintile/overflow priority. Its inverse
+sigma weights sum to the equal-notional budget for that side's open slots before
+the 5% cap. Apply the cap after normalization; capped excess is not redistributed.
+Risk-blocked candidates may be replaced in existing priority order using the same
+normalization, bounded by the remaining side budget. Existing holdings are not
+resized daily. Missing/nonpositive sigma for an entry candidate is a stop, not a
+silent universe exclusion or fallback. Future sigma cannot affect earlier orders.
+
+The buffer follow-ups use the best Arm-B paired net-excess point among the first
+18 cells, regardless of qualification, with grid order resolving exact ties.
+Both use that same cell on all four candidates. Reference buffer 30 fixes quota
+scaling for all cells; retention buffers are 15/30/45 across the five quintiles.
+Actual retention widths are clipped only to keep opposite bands disjoint; quota
+and eligible support do not change with buffer. Report quota exceptions by date;
+any departure from six in any fold excludes that policy from adoption.
+
+The IC floor uses B's sealed pooled raw neutral IC (0.024776554367602583) minus
+0.003, as the supplied rule says. Also report the current policy's composite IC.
+Among cells meeting all three thresholds and capacity eligibility, choose the
+highest paired net point among joint changes first, otherwise among single changes,
+otherwise retain the current policy. A buffer change counts as a dimension.
+Do not combine separate single-dimension winners into an untested policy. Pooled
+and paired intervals use the existing 10,000-replication, 20-session, fold-preserving
+bootstrap, seed 20260815. Economics-unresolved folds remain descriptive and are
+excluded whole from supported economics; paired deltas use common support.
+
+The user explicitly chose attribution of original trades for the R$20m readout.
+Entry intentions are classified by the median of the preceding 20 completed daily
+BRL volumes, requiring all 20 activity-valid finite nonnegative observations.
+Otherwise classification is unknown, reported separately and excluded. Partial
+fills retain their original intention's classification. Actions convert the same
+inventory and cash entitlements; exits and trims remove the held cohort proportion.
+Attribute equity P&L, actual equity fill costs and compounded equity borrow/fees
+directly. Allocate shared hedge P&L/cost/borrow and funding-minus-CDI by the cohort's
+share of opening equity gross; use actual entry turnover if opening gross is zero.
+Cash-only effects with neither remain explicitly unallocated. Report every shared
+component separately. All contributions use the original full-book NAV, with no
+replacement names, leverage rescaling or separately simulated liquid book.
+Reconstructed shares, equity P&L/cost/borrow and the complete contribution partition
+must reconcile to the original ledger. This readout has no selection weight.
+
+All scenarios retain D1-D5 stops. As in existing acceptance, headline books also
+require mean gross in [1.5,2.25], mean stale/unresolved inventory below 2%, and mean
+absolute quintile occupancy deviation at most two slots per side. Sterile and borrow
+stress departures from headline bounds are reported, never adopted independently.
+The liquidity contribution is not a standalone book and has no minimum-gross gate.
+A failing panel is written before stopping; the failed root is sealed without a
+research claim. No partially observed grid can select a policy.
+
 ## Operational authority and closing order
 
 Use the locations and launcher from the user's `Work in CBrazil-RV..txt`, verified

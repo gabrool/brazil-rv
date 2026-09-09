@@ -2605,3 +2605,17 @@ untouched. No paid instance was launched.
 The next step is the R3.1 CPU policy sweep. The user explicitly selected
 attribution of the original qualifying trades for its R$20m entry-liquidity
 readout, without a separately selected liquid book or replacement trades.
+
+### R3.1 implementation and pre-result freeze
+
+Implemented the 18-cell causal smoothing/horizon/entry-sizing grid and two
+buffer follow-ups, with fixed reference capacity and Arm-B-only selection.
+The effective Round-3 registration records the exact cohort sizing, traded-IC
+reference, tie order and original-trade liquidity attribution before results.
+The default policy must match all four sealed scenario daily tables exactly.
+Liquidity accounting reconciles shares and equity P&L/cost/borrow, including
+actions and partial fills, and reports allocated shared hedge/funding effects.
+The sweep freezes verified rev4f source inventories and a clean commit, records
+all folds/candidates, and seals any stop without selecting from a partial grid.
+Validation: 139 existing ledger/evaluator/research-round tests and nine new
+targeted policy/attribution tests pass; Ruff is clean. No GPU work is authorized.

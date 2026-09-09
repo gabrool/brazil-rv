@@ -790,8 +790,10 @@ def _economics_signal(
     inputs: EvaluationInputs,
     scores_input: NDArray[np.floating] | None = None,
     score_mask_input: NDArray[np.bool_] | None = None,
+    *,
+    horizons: Sequence[int] = PRIMARY_HORIZONS,
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
-    indexes = [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS]
+    indexes = [HORIZONS.index(horizon) for horizon in horizons]
     scores = np.asarray(
         inputs.scores if scores_input is None else scores_input, dtype=np.float64
     )[..., indexes]
@@ -808,12 +810,42 @@ def _economics_signal(
             head_ranks = np.stack(
                 [
                     average_ranks(scores[day, valid, horizon_index])
-                    for horizon_index in range(len(PRIMARY_HORIZONS))
+                    for horizon_index in range(len(horizons))
                 ]
             )
             averaged_rank = head_ranks.mean(axis=0)
             composite[day, valid] = 2.0 * ((averaged_rank + 0.5) / count) - 1.0
     return composite, composite_mask
+
+
+def _ledger_inputs(
+    inputs: EvaluationInputs,
+    scores: NDArray[np.floating],
+    score_mask: NDArray[np.bool_],
+) -> dict[str, object]:
+    """Bind the same accounting inputs for evaluations and policy replays."""
+    return {
+        "dates": inputs.dates,
+        "scores": scores,
+        "score_mask": score_mask,
+        "active": np.asarray(inputs.active, dtype=np.bool_),
+        "raw_close": inputs.raw_close,
+        "action_terms": _aligned_action_terms(inputs),
+        "action_payment_session": inputs.action_payment_session,
+        "cdi_returns": inputs.cdi_returns,
+        "security_ids": inputs.security_ids,
+        "initial_reference_price": inputs.initial_reference_price,
+        "initial_unresolved_action": inputs.initial_unresolved_action,
+        "annual_borrow_rate_by_name": inputs.annual_borrow_rate_by_name,
+        "borrow_rate_imputed": inputs.borrow_rate_imputed,
+        "borrow_rate_placeholder": inputs.borrow_rate_placeholder,
+        "selection_volatility": inputs.prior_feature_values["yang_zhang_vol_20"],
+        "hedge_beta": inputs.hedge_beta,
+        "hedge_beta_valid": inputs.hedge_beta_valid,
+        "hedge_beta_history": inputs.hedge_beta_history,
+        "initial_hedge_reference_price": inputs.initial_hedge_reference_price,
+        "hedge_close": inputs.bova11_close,
+    }
 
 
 def _ledger_rows(
@@ -2093,29 +2125,10 @@ def evaluate_scores(
     ) = _daily_metrics(inputs, primary_population, legacy_primary_population)
     persistence, persistence_rows = _persistence(inputs)
     economics_score, economics_mask = _economics_signal(inputs)
-    action_terms = _aligned_action_terms(inputs)
+    ledger_inputs = _ledger_inputs(inputs, economics_score, economics_mask)
     grid = ledger_sensitivity_grid(
-        dates=inputs.dates,
-        scores=economics_score,
-        score_mask=economics_mask,
-        active=np.asarray(inputs.active, dtype=np.bool_),
-        raw_close=inputs.raw_close,
-        action_terms=action_terms,
-        action_payment_session=inputs.action_payment_session,
-        cdi_returns=inputs.cdi_returns,
-        security_ids=inputs.security_ids,
-        initial_reference_price=inputs.initial_reference_price,
-        initial_unresolved_action=inputs.initial_unresolved_action,
-        annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
-        borrow_rate_imputed=inputs.borrow_rate_imputed,
-        borrow_rate_placeholder=inputs.borrow_rate_placeholder,
         shortable_by_borrow_source=inputs.shortable_by_borrow_source,
-        selection_volatility=inputs.prior_feature_values["yang_zhang_vol_20"],
-        hedge_beta=inputs.hedge_beta,
-        hedge_beta_valid=inputs.hedge_beta_valid,
-        hedge_beta_history=inputs.hedge_beta_history,
-        initial_hedge_reference_price=inputs.initial_hedge_reference_price,
-        hedge_close=inputs.bova11_close,
+        **ledger_inputs,
     )
     configurations = ledger_configurations()
     headline_name = "borrow_balance"
@@ -2128,28 +2141,9 @@ def evaluate_scores(
         & np.isfinite(d5_score)
     )
     d5_only = simulate_stateful_ledger(
-        dates=inputs.dates,
-        scores=d5_score,
-        score_mask=d5_score_mask,
-        active=np.asarray(inputs.active, dtype=np.bool_),
-        raw_close=inputs.raw_close,
-        action_terms=action_terms,
-        action_payment_session=inputs.action_payment_session,
-        cdi_returns=inputs.cdi_returns,
-        security_ids=inputs.security_ids,
+        **{**ledger_inputs, "scores": d5_score, "score_mask": d5_score_mask},
         config=LedgerConfig(),
-        initial_reference_price=inputs.initial_reference_price,
-        initial_unresolved_action=inputs.initial_unresolved_action,
-        annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
-        borrow_rate_imputed=inputs.borrow_rate_imputed,
-        borrow_rate_placeholder=inputs.borrow_rate_placeholder,
         shortable=inputs.shortable_by_borrow_source["borrow_balance"],
-        selection_volatility=inputs.prior_feature_values["yang_zhang_vol_20"],
-        hedge_beta=inputs.hedge_beta,
-        hedge_beta_valid=inputs.hedge_beta_valid,
-        hedge_beta_history=inputs.hedge_beta_history,
-        initial_hedge_reference_price=inputs.initial_hedge_reference_price,
-        hedge_close=inputs.bova11_close,
     )
     active = np.asarray(inputs.active, dtype=np.bool_)
     scaled_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
