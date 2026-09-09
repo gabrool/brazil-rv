@@ -19,13 +19,25 @@ def monthly_coverage(store, dates: np.ndarray) -> list[dict[str, object]]:
     months = dates.astype("datetime64[M]")
     rows = []
     for family, features in store.manifest["feature_names"].items():
-        key = f"{family}_valid"
+        native = family == "native_fast"
+        key = "fast_patch_valid" if native else f"{family}_valid"
         if key not in store.manifest["arrays"]:
             continue
+        if native:
+            native_indices = (
+                store.read_table("native_fast_security_mapping")
+                .sort("fast_index")
+                .get_column("store_name_index")
+                .to_numpy()
+            )
         for month in np.unique(months):
             indices = np.flatnonzero(months == month)
             active = store.read("active", indices).astype(bool)
-            valid = store.read(key, indices).astype(bool) & active[..., None]
+            valid = store.read(key, indices).astype(bool)
+            if native:
+                valid = valid.any(axis=2) & active[:, native_indices, None]
+            else:
+                valid &= active[..., None]
             denominator = int(active.sum())
             counts = valid.sum(axis=(0, 1))
             rows.append(
@@ -35,6 +47,21 @@ def monthly_coverage(store, dates: np.ndarray) -> list[dict[str, object]]:
                     "sessions": len(indices),
                     "active_name_days": denominator,
                     "feature_count": len(features),
+                    "coverage_unit": "active_name_day_with_any_valid_patch"
+                    if native
+                    else "active_name_day_with_valid_feature",
+                    **(
+                        {
+                            "mapped_active_name_days": int(
+                                active[:, native_indices].sum()
+                            ),
+                            "fast_present_active_name_days": int(
+                                (store.read("fast_present", indices) & active).sum()
+                            ),
+                        }
+                        if native
+                        else {}
+                    ),
                     "any_feature_valid_name_days": int(valid.any(axis=-1).sum()),
                     "mean_feature_coverage": float(
                         counts.sum() / (denominator * len(features))
