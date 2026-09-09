@@ -1,14 +1,18 @@
 # Pass-5 implementation status
 
-The approved six-field amendment is committed as `a25ae45`. **Round 1 completed:
-18 panels, protected fields bit-identical, headline gates passed.**
-See [the full before/after report](v2_PASS5_REBASELINE.md).
-Round 2 stopped before its first new evaluation on the unregistered decoded
-`history_age_sessions` input hash. All 12 panels' quality-stratification fields
-still match exactly. [The one-field provenance amendment](v2_PASS5_ROUND2_STOP.md)
-was explicitly approved in the next user instruction and is now registered before
-a fresh Round-2 replay. The decoder and all protected quality fields remain unchanged.
-The original six-field stop remains [immutable historical evidence](v2_PASS5_REPLAY_STOP.md).
+Both rev4f replays completed and are sealed: **18 Round-1 panels and 12 Round-2
+panels, all protected fields bit-identical, headline gates passed**. See the
+[Round-1 report](v2_PASS5_REBASELINE.md) and
+[Round-2 report](v2_PASS5_ROUND2_REBASELINE.md). The six lending fields and the
+single history-age provenance hash were explicitly approved in separate amendments.
+The unrounded history-age decoder and all quality-stratification fields remain
+unchanged. Both earlier stopped roots remain immutable historical evidence.
+
+Arm B remains the network choice and the ensemble remains the overall designation.
+The next authorized step is the CPU execution sweep. The user clarified that the
+liquidity readout attributes the original trades, without replacement names.
+Nearest-integer history-age canonicalisation is registered for Round 1' on the
+rebuilt store, not the sealed-panel replays.
 
 The prior cleanup is committed separately as `fb6fc92`; the initial rev-4f
 registration was committed as `0302b27` before new derived beta output.
@@ -46,7 +50,7 @@ Its rev-4f JSON block includes the clarified order, action and replay contracts.
   BOVA11 is reported alongside the unchanged equal-weight-universe diagnostic.
   Evaluation schema is V16; new freeze/validation commands require beta bindings.
 
-The example in §1.1 contains an arithmetic typo: for notionals (-1,+1) and raw
+The example in Â§1.1 contains an arithmetic typo: for notionals (-1,+1) and raw
 betas (1,1.2), the hedge is -0.20 NAV; Blume betas (1,1.134) imply **-0.134**,
 not -0.194. The specified formula is implemented and tested.
 
@@ -72,7 +76,7 @@ are in [0.5, 1.5]. The 5th/95th percentiles are 0.57235/1.93712.
 are copied into Git for review. This is input-only evidence, not a measured
 change in model edge. The canonical store and sealed results were not rewritten.
 
-## Clarifications implemented; Round 1 complete, Round 2 stopped
+## Clarifications implemented; both replays completed
 
 The joined inferred-action builder -> evaluator -> ledger causality test passes:
 changing only the event-day close changes inferred cash terms but no event-day
@@ -100,8 +104,10 @@ inventory `9940b01076677f19ea8dbf1cca0af2991e2899494e491c92d666d0ceb0c7aafb`.
 Round 2 was frozen under the same commit and stopped at its input-identity check,
 before any new evaluation. The stopped inventory is
 `9d90d85129368f571eb6daf43185eb35aad945e90e1e46f63df36248898d7ef6`.
-After resolving this registered stop, the remaining sequence is Round-2 replay
-and combined conclusions, CPU execution sweep, intraday coverage repair, one
+The subsequent approved fresh replay completed under `564efc8`. Its result hash is
+`808369c99b14eebcf3d6f55d67b888c8a2e4cb536965f21adae9c17d282d25a6`;
+inventory `0f8b3bb6116c0fe285671fd77666fa50ea9690d8ca707a70d3ba3c5dd69767f6`.
+The remaining sequence is CPU execution sweep, intraday coverage repair, one
 development-only store build, 16-book acceptance, Round 1' CPU, then stop for
 the user's go before paid Round 3. No sweep, new store or new fit has run.
 

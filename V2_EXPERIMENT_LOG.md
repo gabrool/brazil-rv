@@ -2577,3 +2577,31 @@ validity mask, source identities or protected diagnostic comparisons. The new
 manifest protocol states that the current decode is unrounded. Natural-type
 canonicalisation, specifically `np.rint` and an integer hash for history age, is
 registered for Round 1' on the rebuilt store; it is not active in these replays.
+
+## Rev4f Round 2 completed (2026-09-08 local / 2026-09-09 UTC)
+
+The fresh root is
+`D:\quant-data\b3\processed\model_runs\v2_round2_rev4f_564efc8_20260909T000352Z`.
+The amendment passed 27 targeted tests and Ruff before freeze. All 12 panels
+replayed without model/score recomputation; protected evaluation fields and
+pooled/paired non-economic statistics are exactly identical. D1-D5 are zero
+across reported scenarios; all headline gross, stale/unresolved and occupancy
+gates pass. The 80-file replay inventory and original 400-file inventory were
+verified after reporting. Design/result/access/inventory identities are in
+`docs/v2_PASS5_ROUND2_REBASELINE.md` and its machine-readable evidence.
+Result: `808369c99b14eebcf3d6f55d67b888c8a2e4cb536965f21adae9c17d282d25a6`;
+inventory: `0f8b3bb6116c0fe285671fd77666fa50ea9690d8ca707a70d3ba3c5dd69767f6`.
+
+Arm B net excess is 3.022 [0.144,9.977] bps/day; the ensemble is 2.638
+[-0.151,9.861]. B-minus-A is 0.844 [-5.051,6.387], ensemble-minus-GBDT is
+2.561 [-1.358,7.435], and ensemble-minus-B is -0.385 [-4.985,4.652]. Neutral
+ICs and their paired intervals are unchanged. Arm B remains the network choice;
+the ensemble remains the overall designation, with no economics override.
+Mean hedge size at least halves in 9/12 panels and cap sessions fall 73 to zero.
+Only 5/12 realized BOVA11 slopes are inside the advance ±0.15 expectation;
+that expectation is not a gate. Official validation/test and deployment remain
+untouched. No paid instance was launched.
+
+The next step is the R3.1 CPU policy sweep. The user explicitly selected
+attribution of the original qualifying trades for its R$20m entry-liquidity
+readout, without a separately selected liquid book or replacement trades.

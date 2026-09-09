@@ -19,22 +19,23 @@ every protected field bit-identical and headline gates passed. The `b_intraday`
 GBDT retains neutral IC `0.0199906`; corrected net excess is `0.0763` bps/day.
 Momentum retains IC `0.0214729`; corrected net excess is `3.2190` bps/day.
 Both economics intervals span zero. See [the full before/after report](docs/v2_PASS5_REBASELINE.md).
-Round 2 remains a completed **rev4e** historical result. It selected the uniform-pretrain Arm B, with pooled characteristic-
-neutral IC `0.0247766` and headline net excess `2.4040` bps/day. The registered
-network/GBDT equal-rank ensemble has the highest pooled neutral IC, `0.0265307`,
-and is the Round-2 research designation; its net excess is `1.2261` bps/day
-with a 95% interval spanning zero. These are development research claims, not
-a production or deployment decision. Official validation and the permanently
-spent test remained sealed, and deployment did not change. Earlier Rev3 results
-remain immutable historical evidence under their own registration.
+Round 2 is also re-baselined under rev4f on its 12 sealed panels, preserving all
+protected fields. Arm B remains the selected network: neutral IC `0.0247766`,
+net excess `3.0222` bps/day [0.1445, 9.9769]. The ensemble remains the overall
+research designation: IC `0.0265307`, net `2.6377` [-0.1505, 9.8608]. Paired
+B−A and ensemble-versus-GBDT economics intervals still span zero; no economics
+override fired. These are development research results. See
+[the Round-2 before/after report](docs/v2_PASS5_ROUND2_REBASELINE.md).
+Official validation and the permanently spent test remain sealed; deployment
+is unchanged. Earlier results remain immutable under their own registrations.
 
 The [multiday pipeline audit](docs/v2_MULTIDAY_AUDIT.md) identified
 economic-beta and execution-timing defects in the rev4e ledger: normalized `beta_60`
 is used as an economic coefficient, hedge sizing consumes same-close outcomes,
 and retrospective inferred actions can alter decision-time orders. Round-1 rev4f
-economics now correct these findings. The Round-2 replay stopped before its first
-new evaluation on the decoded history-age provenance hash; its economics remain
-uncorrected until that registered stop is resolved. An input-only 2024 check
+and Round-2 rev4f economics now correct these findings. The decoded history-age
+provenance exemption was explicitly approved; all quality strata remain exactly
+unchanged. An input-only 2024 check
 also found eight of twenty intraday scalar features entirely invalid; M1/COTAHIST
 price-unit consistency never reaches the required twenty active names per day.
 Repair these contracts before making new economics claims or interpreting
