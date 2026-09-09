@@ -59,7 +59,8 @@ def _oddlot_row_reference(source: pl.DataFrame, days: list[date]) -> pl.DataFram
     return pl.DataFrame(rows).sort("isin", "available_date", "source_trade_date")
 
 
-def test_raw_annual_lending_rate_and_exact_change_are_supported() -> None:
+@pytest.mark.parametrize("rate_column", ["annual_taker_rate", "loan_rate_annual_decimal"])
+def test_raw_annual_lending_rate_and_exact_change_are_supported(rate_column) -> None:
     days = [date(2024, 1, 1) + timedelta(days=index) for index in range(7)]
     raw_rates = [0.10, 0.11, 0.12, 0.13, 0.14, 0.25]
     source = pl.DataFrame(
@@ -67,8 +68,8 @@ def test_raw_annual_lending_rate_and_exact_change_are_supported() -> None:
             "available_date": days[1:],
             "source_trade_date": days[:-1],
             "isin": ["BRTESTACNOR1"] * 6,
-            "loan_rate_annual_decimal": raw_rates,
-            "loan_rate_annual_decimal_mask": [True] * 6,
+            rate_column: raw_rates,
+            f"{rate_column}_mask": [True] * 6,
         }
     )
     derived = derive_known_archive_features(
@@ -80,6 +81,36 @@ def test_raw_annual_lending_rate_and_exact_change_are_supported() -> None:
     assert result.values[1, 0, 0] == pytest.approx(0.10)
     assert result.values[6, 0, 1] == pytest.approx(0.15)
     assert result.valid[6, 0].all()
+
+
+def test_new_lending_archive_projection_keeps_decimal_rate_and_d_plus_one(tmp_path):
+    days = [date(2024, 1, 2), date(2024, 1, 3)]
+    path = tmp_path / "rates.parquet"
+    pl.DataFrame(
+        {
+            "available_date": [days[1]],
+            "source_trade_date": [days[0]],
+            "security_id": ["ISIN:BRTESTACNOR1"],
+            "annual_taker_rate": [0.02],
+        }
+    ).write_parquet(path)
+    assignments = pl.DataFrame(
+        {
+            "security_id": ["ISIN:BRTESTACNOR1"],
+            "isin": ["BRTESTACNOR1"],
+        }
+    )
+    result = _parse_sidecars(
+        [f"lending={path}"],
+        days,
+        ["BRTESTACNOR1"],
+        assignments,
+        daily_volume_brl=np.ones((2, 1)),
+    )["lending"]
+    index = result.feature_names.index("loan_rate")
+    assert not result.valid[0, 0, index]
+    assert result.valid[1, 0, index]
+    assert result.values[1, 0, index] == pytest.approx(0.02)
 
 
 def test_legacy_transformed_options_and_clipped_leverage_are_disabled() -> None:

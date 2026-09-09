@@ -3599,6 +3599,7 @@ def _parse_sidecars(
                 "source_position_date",
                 "source_trade_date",
                 "lending_balance_brl",
+                "annual_taker_rate",
                 "loan_rate_annual_decimal",
                 "lending_taker_fee_annual_decimal",
             ),

@@ -12,8 +12,8 @@ from numpy.typing import NDArray
 
 from brazil_rv.modeling.contract import workspace_path
 from brazil_rv.preprocessing.io import (
+    SOURCE_COLUMNS,
     dense_grid,
-    load_source_file,
     validate_session_bars,
 )
 
@@ -135,7 +135,12 @@ def _grid_raw_names(
         resolved = recorded if recorded.is_file() else workspace_path(recorded)
         resolved = resolved.resolve(strict=True)
         if resolved not in cache:
-            cache[resolved] = load_source_file(resolved)
+            cache[resolved] = (
+                pl.scan_parquet(resolved)
+                .filter(pl.col("ts_exchange").dt.date().is_between(dates[0], dates[-1]))
+                .select(SOURCE_COLUMNS)
+                .collect()
+            )
         first = row.get("first_overlap_date")
         last = row.get("last_overlap_date")
         if isinstance(first, str):

@@ -759,6 +759,7 @@ def _raw_lending_features(
     raw_rate_columns = tuple(
         column
         for column in (
+            "annual_taker_rate",
             "loan_rate_annual_decimal",
             "lending_taker_fee_annual_decimal",
         )

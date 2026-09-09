@@ -27,6 +27,12 @@ pass, including joined builder causality and provider invariance. Both existing
 production-axis memory tests passed. Real-data coverage and the new store build
 are still pending; no repaired-model result has been observed.
 
+The bounded odd-lot derivation reuses the validated annual COTAHIST parser,
+retains exact ISIN identity and raw BRL volumes, and publishes on the next session.
+The new lending archive's `annual_taker_rate` is consumed directly in decimal
+units. The independent native-fast audit also filters its raw M1 date range before
+decoding. Thirty-two targeted sidecar/archive/native-fast tests pass.
+
 The prior cleanup is committed separately as `fb6fc92`; the initial rev-4f
 registration was committed as `0302b27` before new derived beta output.
 The rev-4e registration is retained verbatim inside
