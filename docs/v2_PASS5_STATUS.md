@@ -112,9 +112,15 @@ supplied missing-score carry changed theta=1 risk-trim decisions. A baseline-onl
 isolation exactly reproduced the sealed book when carry was disabled. The user
 explicitly clarified that theta=1 retains current behavior and carry applies only
 at theta<1. [Evidence and preserved roots](v2_R31_BASELINE_STOP.md) record this.
-A fresh freeze will apply that clarification. No alternative grid cell, new store
-or new fit has run. After the sweep: intraday coverage repair, one development-only
-store build, 16-book acceptance, Round 1' CPU, then stop for the user's GPU go.
+The fresh `29fb045` freeze reproduced all 12 baseline panels / 48 scenario daily
+tables exactly, then stopped in the first inverse-sigma cell on 32 D4 flags in
+GBDT/F1's open-borrow scenario. A stale partial exit in one overweight name was
+incorrectly vetoing unrelated valid-size entries. The minimal candidate-specific
+name-cap correction is prepared and passes 151 targeted tests. The stopped root,
+trace and partial results are [reported here](v2_R31_D4_STOP.md); the explicit
+section-6 stop remains pending review before a fresh sweep. No policy was selected.
+After the sweep: intraday coverage repair, one development-only store build,
+16-book acceptance, Round 1' CPU, then stop for the user's GPU go.
 
 Validation before replay: Ruff and compilation pass; the full research suite passed
 908 tests in 467.91 seconds. The final focused run passed 100 tests, including

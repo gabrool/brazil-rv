@@ -2636,3 +2636,29 @@ The canonical policy and effective registration now implement that interpretatio
 all original/stopped roots remain immutable. The new regression isolates risk-trim
 priority under missing scores, and a second checks the approved theta-specific
 carry rule. Eleven policy/attribution tests pass. Restart from a fresh clean freeze.
+
+### R3.1 D4 stop: unrelated-name concentration veto
+
+Fresh root `v2_execution_sweep_29fb045_20260909T003119Z` reproduced all 12
+baseline panels and 48 scenario daily tables exactly. Eighteen panels completed;
+the nineteenth (GBDT/F1, theta=1, default horizons, inverse sigma, b=6) stopped
+after open borrow raised 32 D4 flags. There are 75 scenario ledgers. No partial
+grid selects a policy. Root inventory:
+`a74798e30dddb0edb2aed456ae1c476ffdbbf686ac849e91e3e59c150961450d`.
+
+Exact failure tracing attributes all flags to fresh-entry name-cap blocks on
+2023-12-27. The candidate sizes were 1.807%-5%; an unrelated held short with an
+unfilled partial risk exit had projected weight -5.039847%. The entry gate checked
+the maximum weight across the entire book rather than the candidate's own weight.
+The prepared correction retains book gross/net checks and the unchanged per-name
+cap, while allowing unrelated entries. Existing excess inventory and pending exits
+remain visible. The new fixture fails before and passes after the correction;
+151 targeted tests and Ruff pass. No corrected real-data cell has run.
+Section-6 stop review is pending before registering and freezing the restart.
+Full hashes, trace and observed readouts: `docs/v2_R31_D4_STOP.md` and JSON evidence.
+
+The already observed inverse-sigma cell is descriptive: B-minus-current net is
+-2.8504 [-6.8946,-0.9896] bps/day and ensemble-minus-current is
+-1.0778 [-4.4437,1.6941]. No adoption decision follows from an incomplete grid.
+All original inputs/reports and both source inventories remain exact. No store
+rebuild, new fit, protected-date payload or paid instance was accessed.

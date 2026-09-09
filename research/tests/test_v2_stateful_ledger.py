@@ -124,6 +124,54 @@ def _constructed_inputs(days: int, names: int) -> dict[str, np.ndarray]:
     }
 
 
+def test_pending_overweight_name_does_not_block_other_names_entries() -> None:
+    close = np.full((7, 6), 100.0)
+    close[1, 0] = 120.0
+    close[2:5, 0] = np.nan
+    close[5:, 0] = 120.0
+    close[2:, 5] = 90.0
+    scores = np.broadcast_to(np.arange(6, dtype=float), close.shape).copy()
+    scores[3:, 3] = 4.5
+    config = _config(
+        k_per_side=2,
+        buffer_per_side=0,
+        planned_gross_cap=3.0,
+        planned_name_weight_cap=0.6,
+    )
+    result = _run(
+        close, scores, config=config, initial_reference_price=np.full(6, 100.0)
+    )
+    pending_trim = next(
+        order
+        for order in result.intended_orders
+        if order.security_index == 0
+        and order.decision_session == 2
+        and order.purpose == "risk_exit"
+    )
+    assert pending_trim.position_fraction < 1
+    assert not any(
+        fill.order_id == pending_trim.order_id and fill.fill_session < 5
+        for fill in result.fills
+    )
+    replacement = next(
+        order
+        for order in result.intended_orders
+        if order.security_index == 3
+        and order.decision_session == 3
+        and order.purpose == "entry"
+    )
+    assert (
+        replacement.planned_notional / result.start_nav[3]
+        <= config.planned_name_weight_cap
+    )
+    assert result.name_cap_block_on_fresh_entry.sum() == 0
+    # The unfilled old position is still carried and reported over its cap.
+    assert (
+        abs(result.signed_shares[3, 0] * result.mark_price[3, 0]) / result.nav[3]
+        > config.planned_name_weight_cap
+    )
+
+
 def _action_terms(
     shape: tuple[int, int],
     *,

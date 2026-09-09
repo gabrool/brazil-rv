@@ -2212,12 +2212,18 @@ def simulate_stateful_ledger(
                     entry_notional if current_side == "buy" else -entry_notional
                 )
                 gross_before, net_before, _ = _risk(planned_values, start_nav)
-                planned_gross, planned_net, planned_name = _risk(proposed, start_nav)
+                planned_gross, planned_net, _ = _risk(proposed, start_nav)
                 violates_gross = planned_gross > config.planned_gross_cap + 1e-12
                 violates_net = (
                     abs(planned_net) > config.planned_absolute_net_cap + 1e-12
                 )
-                violates_name = planned_name > config.planned_name_weight_cap + 1e-12
+                # A missing print can leave another name overweight while its
+                # risk exit is pending. Its concentration cannot veto an entry
+                # in this name; aggregate gross/net limits still apply.
+                violates_name = (
+                    abs(proposed[name]) / start_nav
+                    > config.planned_name_weight_cap + 1e-12
+                )
                 blocked_gross += int(violates_gross)
                 blocked_net += int(violates_net)
                 blocked_name += int(violates_name)
