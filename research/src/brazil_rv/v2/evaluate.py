@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import date
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -2135,6 +2135,7 @@ def evaluate_scores(
     registration_path: Path | None = None,
     preregistration_root: Path = PREREGISTRATION_ROOT,
     protocol: ProtocolPreset = FULL_PROTOCOL,
+    settle_terminal_residuals: bool = False,
 ) -> EvaluationResult:
     """Evaluate one score cube after enforcing the v2 access boundary."""
     ledger = authorize_dates(
@@ -2201,6 +2202,9 @@ def evaluate_scores(
         if policy.inverse_volatility:
             ledger_inputs["entry_sizing_volatility"] = inputs.target_scale_sigma
     headline_config = policy.ledger_config() if policy is not None else LedgerConfig()
+    headline_config = replace(
+        headline_config, settle_terminal_residuals=settle_terminal_residuals
+    )
     grid = ledger_sensitivity_grid(
         shortable_by_borrow_source=inputs.shortable_by_borrow_source,
         headline_config=headline_config,
@@ -2511,7 +2515,11 @@ def evaluate_scores(
                 ),
                 "terminal_unresolved_inventory_fraction_nav": (
                     _finite_or_none(
-                        headline.unresolved_inventory_notional / headline.nav[-1]
+                        (
+                            headline.unresolved_inventory_notional
+                            + headline.terminal_boundary_unpriced_inventory_notional
+                        )
+                        / headline.nav[-1]
                     )
                     if headline.nav[-1] != 0.0
                     else None
@@ -2599,6 +2607,13 @@ def evaluate_scores(
             "actual_risk_breach_dates": int(headline.actual_risk_breach.sum()),
         },
     }
+    if settle_terminal_residuals:
+        report["economics"]["contract"].update(
+            terminal_residuals_settled=True,
+            terminal_boundary_convention="last_mark_after_10_sessions_with_evaluation_end_acceleration",
+            economics_pooling="full_common_calendar_unresolved_is_a_label",
+            terminal_unresolved_inventory_readout="remaining_inventory_plus_unpriced_equity_settled_at_boundary",
+        )
     if policy is not None:
         traded = traded_readouts(inputs, economics_score, economics_mask)
         report["economics"]["execution_policy"] = {
@@ -2791,8 +2806,8 @@ def paired_comparison(
     ):
         raise ValueError("paired economics arrays differ from their date axes")
     ic_delta, paired_population_rows = _paired_primary_daily(candidate, baseline)
-    candidate_unresolved = _headline_economics_unresolved(candidate.report)
-    baseline_unresolved = _headline_economics_unresolved(baseline.report)
+    candidate_unresolved = headline_economics_excluded(candidate.report)
+    baseline_unresolved = headline_economics_excluded(baseline.report)
     economics_undefined_reason = None
     if candidate_unresolved or baseline_unresolved:
         economics_delta = np.full(
@@ -2860,7 +2875,7 @@ def paired_comparison(
     }
 
 
-def _headline_economics_unresolved(report: Mapping[str, object]) -> bool:
+def headline_economics_excluded(report: Mapping[str, object]) -> bool:
     economics = report.get("economics")
     if not isinstance(economics, Mapping):
         raise ValueError("evaluation report lacks economics")
@@ -2872,7 +2887,9 @@ def _headline_economics_unresolved(report: Mapping[str, object]) -> bool:
         raise ValueError(
             "evaluation report lacks an explicit economics resolution flag"
         )
-    return value
+    return value and not economics.get("contract", {}).get(
+        "terminal_residuals_settled", False
+    )
 
 
 _PAIRED_INPUT_KEYS = (

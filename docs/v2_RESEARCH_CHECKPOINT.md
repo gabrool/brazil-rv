@@ -1,5 +1,10 @@
 # Research checkpoint implementation and CPU acceptance
 
+Subsequent authorization: [Round-4 A1–A3](v2_ROUND4.md) accepts this sealed checkpoint
+and authorizes amended paid sessions after revision/freeze. The figures below retain
+their original resolved-fold economics definition; the A1 replay adds full-calendar
+economics separately and preserves these source artifacts.
+
 Status: **the pre-GPU checkpoint is complete**. The protocol and graph changes are
 implemented; the CPU re-baseline and diagnostics are accepted and sealed.
 [Round 4 is registered](../research/preregistrations/v2_round4.md), with a fresh frozen
@@ -224,8 +229,10 @@ evidence of historical locates or a new candidate selection criterion.
 | F13 | 2024H1 | 0.005620 | 0.007187 | 0.008671 | 0.003268 | 0.012215 |
 | F14 | 2024H2 | 0.057806 | 0.039126 | 0.043445 | 0.045473 | 0.061313 |
 
-F1–F8 give identical GBDT results before the intraday information becomes usable;
-the full-calendar mean therefore includes long periods without incremental inputs.
+F1–F8 give identical GBDT results. The later validity-only A2 audit finds current
+intraday support during F8 beginning 2021-07-19, although its earlier fit had none;
+F1–F7 have no such evaluation input. The full-calendar mean includes long periods
+without incremental inputs.
 Lending and intraday rungs also match through F10. Per-fold intervals and all metrics
 remain in the evidence rather than treating these repeated early values as extra
 independent evidence about incremental information.

@@ -1,0 +1,361 @@
+{
+  "F4_last_marks": [
+    {
+      "close": null,
+      "date": "2019-12-23"
+    },
+    {
+      "close": null,
+      "date": "2019-12-26"
+    },
+    {
+      "close": null,
+      "date": "2019-12-27"
+    },
+    {
+      "close": null,
+      "date": "2019-12-30"
+    }
+  ],
+  "F4_last_observed_mark": {
+    "F4_observed_sessions": 34,
+    "close": 96.15,
+    "date": "2019-08-16",
+    "sessions_to_F4_end": 92
+  },
+  "bova11_binding": {
+    "data_sha256": "4aa998afb26558c9c2d1cbf9374a6a3881e04fd3a322b769d0c2d6950371a7e9",
+    "hedge_beta_manifest_sha256": "225adc6fe336d2380e5c94897ba5d6ece4fcc8e0b0aca6d631dca9063314edb4",
+    "hedge_beta_root": "D:\\quant-data\\b3\\processed\\v2_hedge_beta_rebuilt_e02f934_20260909T104556Z",
+    "manifest_sha256": "858c6fb07e234d8c28219a72efa29775d83ba334f9b457ed24317ab7d270544d",
+    "root": "D:\\quant-data\\b3\\interim\\external\\bova11_hedge_close_v1_2009_2024_20260908T115000Z"
+  },
+  "cpu_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_research_checkpoint_d2f7de4_20260909",
+  "informative_folds": {
+    "access": {
+      "official_validation_accessed": false,
+      "purpose": "evaluation",
+      "registration": null,
+      "test_accessed": false
+    },
+    "coverage": {
+      "L": {
+        "F1": {
+          "active_name_days": 16959,
+          "consumed_presence_sha256": "afd3b7230cc4c6efc249e20d07066f27a3581ea5584bad934ac3089c622603a2",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F10": {
+          "active_name_days": 26064,
+          "consumed_presence_sha256": "23722e2aa8e94d704a5e373b21958f6d6d2838d7a41a570ca9787e55ec3af673",
+          "first_informative_date": "2022-07-01",
+          "informative_name_days": 17422,
+          "informative_sessions": 126,
+          "last_informative_date": "2022-12-29"
+        },
+        "F11": {
+          "active_name_days": 24323,
+          "consumed_presence_sha256": "a45070aa5474864684ddbaa4d825f79b193b3838a770aa151dccd27c25bf4c14",
+          "first_informative_date": "2023-01-02",
+          "informative_name_days": 16660,
+          "informative_sessions": 124,
+          "last_informative_date": "2023-06-30"
+        },
+        "F12": {
+          "active_name_days": 24598,
+          "consumed_presence_sha256": "b37ad00c31b1fb1d3ab6a5fe65b2ac991734e352ec39fe0238320fea9088e9ea",
+          "first_informative_date": "2023-07-03",
+          "informative_name_days": 16623,
+          "informative_sessions": 124,
+          "last_informative_date": "2023-12-28"
+        },
+        "F13": {
+          "active_name_days": 23568,
+          "consumed_presence_sha256": "92fa565476804f4e59eb544688dcc85c1b6179f52f26377cb7a085655bcb9a38",
+          "first_informative_date": "2024-01-02",
+          "informative_name_days": 16329,
+          "informative_sessions": 124,
+          "last_informative_date": "2024-06-28"
+        },
+        "F14": {
+          "active_name_days": 23059,
+          "consumed_presence_sha256": "75fbc7c4ab1a6e9d0755aedbd350a7977aa17a1d994a5855be4d7d2117b85326",
+          "first_informative_date": "2024-07-01",
+          "informative_name_days": 16655,
+          "informative_sessions": 127,
+          "last_informative_date": "2024-12-30"
+        },
+        "F2": {
+          "active_name_days": 17219,
+          "consumed_presence_sha256": "6e7e27d98bdbd15237ca161ed0ae270863ae210aab3c1108a4eb19f0a3d392b6",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F3": {
+          "active_name_days": 17607,
+          "consumed_presence_sha256": "6e7e27d98bdbd15237ca161ed0ae270863ae210aab3c1108a4eb19f0a3d392b6",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F4": {
+          "active_name_days": 19397,
+          "consumed_presence_sha256": "29a808a9357c9d99445d3c10bc0d89257c35132f5397cf8b9c8b94467b543855",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F5": {
+          "active_name_days": 21108,
+          "consumed_presence_sha256": "afd3b7230cc4c6efc249e20d07066f27a3581ea5584bad934ac3089c622603a2",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F6": {
+          "active_name_days": 22956,
+          "consumed_presence_sha256": "29a808a9357c9d99445d3c10bc0d89257c35132f5397cf8b9c8b94467b543855",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F7": {
+          "active_name_days": 25512,
+          "consumed_presence_sha256": "6e7e27d98bdbd15237ca161ed0ae270863ae210aab3c1108a4eb19f0a3d392b6",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F8": {
+          "active_name_days": 29077,
+          "consumed_presence_sha256": "091a6d95ed38baaecd5009ea93bd92d40447aea4bf953b45e10c2a64862a1a6c",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F9": {
+          "active_name_days": 27845,
+          "consumed_presence_sha256": "6d197bd254515b4ac66916a1b6c19ebf1672036fb9fca132490a856a9e030eee",
+          "first_informative_date": "2022-03-23",
+          "informative_name_days": 9653,
+          "informative_sessions": 69,
+          "last_informative_date": "2022-06-30"
+        }
+      },
+      "S0": {
+        "F1": {
+          "active_name_days": 16959,
+          "consumed_presence_sha256": "afd3b7230cc4c6efc249e20d07066f27a3581ea5584bad934ac3089c622603a2",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F10": {
+          "active_name_days": 26064,
+          "consumed_presence_sha256": "5091b991cccfb7eb503857655a45d5cf758edc33abe44d477bbf87930685d1f2",
+          "first_informative_date": "2022-07-01",
+          "informative_name_days": 17220,
+          "informative_sessions": 126,
+          "last_informative_date": "2022-12-29"
+        },
+        "F11": {
+          "active_name_days": 24323,
+          "consumed_presence_sha256": "ca4be9a7e9e48a1e472f608081d14445696d8671e9796157f59d16cfa05cec2b",
+          "first_informative_date": "2023-01-02",
+          "informative_name_days": 16432,
+          "informative_sessions": 124,
+          "last_informative_date": "2023-06-30"
+        },
+        "F12": {
+          "active_name_days": 24598,
+          "consumed_presence_sha256": "5bd79df8c13344a7683834839590a96b3cd0fea3dac084283634d82bb5f7cee2",
+          "first_informative_date": "2023-07-03",
+          "informative_name_days": 16421,
+          "informative_sessions": 124,
+          "last_informative_date": "2023-12-28"
+        },
+        "F13": {
+          "active_name_days": 23568,
+          "consumed_presence_sha256": "8178d56fadf248badf48490536419c53b56dc615f5b00d952cf8f1f05d071cdd",
+          "first_informative_date": "2024-01-02",
+          "informative_name_days": 16108,
+          "informative_sessions": 124,
+          "last_informative_date": "2024-06-28"
+        },
+        "F14": {
+          "active_name_days": 23059,
+          "consumed_presence_sha256": "56ad0f7592e8d571d8d34d14868e9ac5dec1924096e2f0b337135dc39c8683c9",
+          "first_informative_date": "2024-07-01",
+          "informative_name_days": 16307,
+          "informative_sessions": 127,
+          "last_informative_date": "2024-12-30"
+        },
+        "F2": {
+          "active_name_days": 17219,
+          "consumed_presence_sha256": "6e7e27d98bdbd15237ca161ed0ae270863ae210aab3c1108a4eb19f0a3d392b6",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F3": {
+          "active_name_days": 17607,
+          "consumed_presence_sha256": "6e7e27d98bdbd15237ca161ed0ae270863ae210aab3c1108a4eb19f0a3d392b6",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F4": {
+          "active_name_days": 19397,
+          "consumed_presence_sha256": "29a808a9357c9d99445d3c10bc0d89257c35132f5397cf8b9c8b94467b543855",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F5": {
+          "active_name_days": 21108,
+          "consumed_presence_sha256": "afd3b7230cc4c6efc249e20d07066f27a3581ea5584bad934ac3089c622603a2",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F6": {
+          "active_name_days": 22956,
+          "consumed_presence_sha256": "29a808a9357c9d99445d3c10bc0d89257c35132f5397cf8b9c8b94467b543855",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F7": {
+          "active_name_days": 25512,
+          "consumed_presence_sha256": "6e7e27d98bdbd15237ca161ed0ae270863ae210aab3c1108a4eb19f0a3d392b6",
+          "first_informative_date": null,
+          "informative_name_days": 0,
+          "informative_sessions": 0,
+          "last_informative_date": null
+        },
+        "F8": {
+          "active_name_days": 29077,
+          "consumed_presence_sha256": "60100de9e00c6d02e90c10740d07c53a6c4c360a6d64fdb44bc17b233d1a498a",
+          "first_informative_date": "2021-07-19",
+          "informative_name_days": 15023,
+          "informative_sessions": 114,
+          "last_informative_date": "2021-12-30"
+        },
+        "F9": {
+          "active_name_days": 27845,
+          "consumed_presence_sha256": "5a3df8e639f70bc2772ace6c0d4686d26d0011c9fcd7deb68cf3d88be2a74c49",
+          "first_informative_date": "2022-01-03",
+          "informative_name_days": 17076,
+          "informative_sessions": 124,
+          "last_informative_date": "2022-06-30"
+        }
+      }
+    },
+    "folds": {
+      "C": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8",
+        "F9",
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14"
+      ],
+      "H": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8",
+        "F9",
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14"
+      ],
+      "L": [
+        "F9",
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14"
+      ],
+      "P": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8",
+        "F9",
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14"
+      ],
+      "S0": [
+        "F8",
+        "F9",
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14"
+      ],
+      "fast_off": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8",
+        "F9",
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14"
+      ]
+    },
+    "information_set": {
+      "L": "active_at_t_and_any_lending_valid_on_valid_slow_timestep_in_t_minus_60_through_t_minus_1",
+      "S0": "active_at_t_and_any_intraday_valid_at_t"
+    },
+    "scores_read": false,
+    "store_manifest_sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64"
+  }
+}

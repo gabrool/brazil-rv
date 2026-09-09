@@ -2799,3 +2799,27 @@ was accepted at 15:18:12 UTC. Provider inventory verified the exact ID absent at
 2026-09-09T15:20:22.615520+00:00 and 2026-09-09T15:20:43.033397+00:00. Complete host recovery preceded termination. The closing
 documentation commit records these later provider observations; the instance is
 already gone and the monitor stays paused. No adjacent instance was touched.
+
+## 2026-09-09: Round-4 A1–A3 amendment before fresh execution freeze
+
+The accepted checkpoint remains sealed. The authorized Round-4 revision settles
+terminal unpriced equity and hedge residuals at labelled last marks, retains the
+30% adverse settlement scenario and uncertainty labels, and pools every book on
+the full 1,738-session calendar. A separate ledger-only replay must preserve all
+non-ledger fields and reproduce the former resolved-fold readout exactly before
+parent acceptance. The replay runs on the local CPU alongside GPU smokes/P.
+
+Bound-source diagnosis finds F4's BOVA11 series last prints on 2019-08-16 at 96.15,
+92 sessions before the terminal date; only 34 F4 sessions have prints. The hedge
+close order was correct. Last-mark settlement repairs the accounting residual,
+not the missing hedge returns. This limitation remains prominent in the report.
+Pre-score validity measurements register S0 on F8–F14 (first 2021-07-19) and L on
+F9–F14 (first consumed 2022-03-23). H/P/C use all folds. S0's tie rule uses its
+informative subset; all paired readouts include both subsets and all folds.
+Momentum diagnostics extend to every arm without acquiring selection weight.
+
+Targeted settlement, causality, pooling, continuity, subset and confirmation-roster
+checks pass. No arm, seed, training setting, execution policy or holdout permission
+changes. Paid sessions are authorized after this revision's clean commit and fresh
+compute-host freeze. See `docs/v2_ROUND4.md`; continuous-book replay is registered
+for future work only. No Round-4 instance or neural score exists at this amendment.

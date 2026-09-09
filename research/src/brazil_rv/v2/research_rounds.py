@@ -49,6 +49,7 @@ from .evaluate import (
     _validate_paired_identity,
     evaluate_scores,
     headline_ledger_protocol,
+    headline_economics_excluded,
     primary_population_protocol,
 )
 from .data import ScalarFeatureView, read_scalar_feature_view, scalar_feature_names
@@ -703,6 +704,7 @@ def _evaluate(
     fold: str,
     output: Path,
     execution_policy: ExecutionPolicy | None = None,
+    settle_terminal_residuals: bool = False,
 ) -> _ResearchEvaluation:
     inputs = _evaluation_inputs(
         store,
@@ -717,7 +719,9 @@ def _evaluate(
         transfer_chronology_clean=True,
         execution_policy=execution_policy,
     )
-    result = evaluate_scores(inputs, window_name=fold)
+    result = evaluate_scores(
+        inputs, window_name=fold, settle_terminal_residuals=settle_terminal_residuals
+    )
     result.report.update(RESEARCH_FLAGS)
     write_json_atomic(output, result.report)
     if execution_policy is not None:
@@ -871,7 +875,7 @@ def _daily_series(
         [headline_by_date.get(day, np.nan) for day in ordered_dates],
         dtype=np.float64,
     )
-    if headline_summary["economics_unresolved"]:
+    if headline_economics_excluded(report):
         economics_values.fill(np.nan)
     legacy_by_date: dict[str, list[float]] = {day: [] for day in ordered_dates}
     metric_rows = report.get("daily_metric_table")
@@ -1599,10 +1603,9 @@ def _paired_readouts(
             candidate_series["turnover_fraction_nav"]
             - baseline_series["turnover_fraction_nav"]
         )
-        if (
-            left.result.report["economics"]["headline"]["economics_unresolved"]
-            or right.result.report["economics"]["headline"]["economics_unresolved"]
-        ):
+        if headline_economics_excluded(
+            left.result.report
+        ) or headline_economics_excluded(right.result.report):
             economics_delta = np.full(len(left.result.dates), np.nan)
         else:
             economics_delta = (
@@ -1616,12 +1619,8 @@ def _paired_readouts(
                 "undefined_reason": (
                     "economics_unresolved"
                     if (
-                        left.result.report["economics"]["headline"][
-                            "economics_unresolved"
-                        ]
-                        or right.result.report["economics"]["headline"][
-                            "economics_unresolved"
-                        ]
+                        headline_economics_excluded(left.result.report)
+                        or headline_economics_excluded(right.result.report)
                     )
                     else (None if np.isfinite(value) else "missing_daily_economics")
                 ),

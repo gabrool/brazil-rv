@@ -124,6 +124,54 @@ def _constructed_inputs(days: int, names: int) -> dict[str, np.ndarray]:
     }
 
 
+def test_boundary_no_print_settles_before_grace_with_haircut_and_same_prior_path():
+    close = np.full((3, 2), 100.0)
+    close[-1, 1] = np.nan
+    scores = np.broadcast_to([-1.0, 1.0], close.shape).copy()
+    old = _run(close, scores, initial_reference_price=np.full(2, 100.0))
+    new = _run(
+        close,
+        scores,
+        initial_reference_price=np.full(2, 100.0),
+        config=_config(settle_terminal_residuals=True),
+    )
+    np.testing.assert_array_equal(new.nav[:-1], old.nav[:-1])
+    assert old.signed_shares[-1, 1] > 0
+    assert not new.signed_shares[-1].any()
+    assert new.terminal_settlement_count[-1] == 1
+    assert new.terminal_boundary_unpriced_inventory_notional == pytest.approx(1.0)
+    assert new.nav[-1] == pytest.approx(old.nav[-1])
+    assert new.settlement_haircut_scenario_nav[-1] == pytest.approx(new.nav[-1] - 0.3)
+    assert new.economics_unresolved  # The label survives cash settlement.
+    assert (
+        next(f for f in new.fills if f.purpose == "terminal_settlement").price == 100.0
+    )
+
+
+@pytest.mark.parametrize("terminal_price", [120.0, np.nan])
+def test_boundary_hedge_closes_at_print_or_labelled_last_mark(terminal_price):
+    close = np.full((3, 2), 100.0)
+    scores = np.broadcast_to([-1.0, 1.0], close.shape).copy()
+    result = _run(
+        close,
+        scores,
+        initial_reference_price=np.full(2, 100.0),
+        hedge_beta=np.broadcast_to([0.0, 0.5], close.shape).copy(),
+        hedge_close=np.asarray([100.0, 110.0, terminal_price]),
+        config=_config(beta_hedge=True, settle_terminal_residuals=True),
+    )
+    assert result.hedge_signed_shares[-2] != 0
+    assert result.hedge_signed_shares[-1] == 0
+    fill = [f for f in result.fills if f.security_index == 2][-1]
+    assert fill.price == (120.0 if np.isfinite(terminal_price) else 110.0)
+    assert fill.purpose == (
+        "hedge" if np.isfinite(terminal_price) else "terminal_settlement"
+    )
+    assert (result.terminal_hedge_last_mark_settlement_notional > 0) == (
+        not np.isfinite(terminal_price)
+    )
+
+
 def test_pending_overweight_name_does_not_block_other_names_entries() -> None:
     close = np.full((7, 6), 100.0)
     close[1, 0] = 120.0

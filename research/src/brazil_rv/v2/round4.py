@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from .contract import (
     RUN_MANY_PLAN_SCHEMA,
 )
 from .data_roots import portable_name, resolve_external_root
+from .evaluate import _array_sha256, evaluate_scores
 from .research_checkpoint import (
     SCHEMA as CHECKPOINT_SCHEMA,
     CELLS,
@@ -30,10 +32,79 @@ from .research_checkpoint import (
 from .train import model_config_contract, stage_p_model_config
 
 REGISTRATION = PROJECT_ROOT / "research/preregistrations/v2_round4.md"
+PROTOCOL = REGISTRATION.with_suffix(".json")
 SCHEMA = "BRAZIL_RV_V2_ROUND4_V1"
 ARMS = ("fast_off", "S0", "H", "P", "L", "C")
 FRESH_P = ("fast_off", "S0", "L", "C")
 WEIGHTS_H = tuple(value / 3.5 for value in (0.25, 0.25, 1.0, 1.0, 1.0))
+
+
+def informative_fold_protocol(store_root: Path) -> dict:
+    """Measure input presence only, on the exact current or causal slow window."""
+    _, dates = rr._read_store_header(store_root)
+    _, _, evaluation, _, _ = rr._fold_indices(dates)
+    indices = np.concatenate(tuple(evaluation.values()))
+    store, access = rr.open_store_for_samples(
+        store_root,
+        indices,
+        purpose="evaluation",
+        history_lookbacks=60,
+        history_end_offsets=-1,
+    )
+    coverage = {"S0": {}, "L": {}}
+    try:
+        for fold, rows in evaluation.items():
+            active = np.asarray(store.read("active", rows), dtype=bool)
+            intraday = np.asarray(store.read("intraday_valid", rows), dtype=bool).any(
+                axis=-1
+            )
+            history_rows = np.arange(rows[0] - 60, rows[-1], dtype=np.int64)
+            lending = np.asarray(
+                store.read("sidecar_lending_valid", history_rows), dtype=bool
+            ).any(axis=-1)
+            lending &= np.asarray(
+                store.read("slow_timestep_valid", history_rows), dtype=bool
+            )
+            lending_windows = np.stack(
+                [lending[i : i + 60].any(axis=0) for i in range(len(rows))]
+            )
+            for arm, present in (("S0", intraday), ("L", lending_windows)):
+                observed = active & present
+                days = observed.any(axis=1)
+                coverage[arm][fold] = {
+                    "active_name_days": int(active.sum()),
+                    "informative_name_days": int(observed.sum()),
+                    "informative_sessions": int(days.sum()),
+                    "first_informative_date": str(dates[rows[days][0]])
+                    if days.any()
+                    else None,
+                    "last_informative_date": str(dates[rows[days][-1]])
+                    if days.any()
+                    else None,
+                    "consumed_presence_sha256": _array_sha256(observed),
+                }
+        return {
+            "store_manifest_sha256": sha256_file(store_root / "manifest.json"),
+            "information_set": {
+                "S0": "active_at_t_and_any_intraday_valid_at_t",
+                "L": "active_at_t_and_any_lending_valid_on_valid_slow_timestep_in_t_minus_60_through_t_minus_1",
+            },
+            "coverage": coverage,
+            "folds": {
+                arm: [
+                    f
+                    for f in DEVELOPMENT_FOLDS
+                    if coverage[arm][f]["informative_name_days"] > 0
+                ]
+                if arm in coverage
+                else list(DEVELOPMENT_FOLDS)
+                for arm in ARMS
+            },
+            "access": access.payload(),
+            "scores_read": False,
+        }
+    finally:
+        store.close()
 
 
 def arm_config(feature_names: dict, arm: str, *, stage: str = "F") -> ModelConfig:
@@ -118,6 +189,12 @@ def freeze(cpu_root: Path, output: Path) -> str:
     if dates[-1] > np.datetime64(DEVELOPMENT_END):
         raise PermissionError("Round 4 refuses a store extending beyond development")
     rr._fold_indices(dates)
+    amendments = rr._read_json(PROTOCOL)
+    observed_subsets = informative_fold_protocol(Path(design["store"]["root"]))
+    if amendments["informative_folds"] != observed_subsets:
+        raise ValueError(
+            "Round-4 informative subsets differ from the pre-score registration"
+        )
     design.update(
         schema=SCHEMA,
         implementation=code,
@@ -131,7 +208,9 @@ def freeze(cpu_root: Path, output: Path) -> str:
         preregistration={
             "path": str(REGISTRATION),
             "sha256": sha256_file(REGISTRATION),
+            "protocol_sha256": sha256_file(PROTOCOL),
         },
+        round4_protocol=amendments,
         feature_names=manifest["feature_names"],
         feature_schema_sha256=manifest["feature_schema_sha256"],
         model_contracts={
@@ -155,6 +234,8 @@ def _design(root: Path) -> dict:
         raise ValueError("Round-4 implementation differs from its frozen commit")
     if sha256_file(REGISTRATION) != design["preregistration"]["sha256"]:
         raise ValueError("Round-4 registration changed after freeze")
+    if sha256_file(PROTOCOL) != design["preregistration"]["protocol_sha256"]:
+        raise ValueError("Round-4 protocol changed after freeze")
     return design
 
 
@@ -233,13 +314,18 @@ def write_plan(root: Path, phase: str, *, confirmation_arms=()) -> str:
                     "evaluate and accept the re-baselined parent before arms"
                 )
     if phase.startswith("confirmation"):
-        if not confirmation_arms or any(arm not in ARMS for arm in confirmation_arms):
-            raise ValueError("confirmation needs an explicit screened arm roster")
         if not (root / "screening_result.json").exists():
             raise ValueError("confirmation follows the complete screening readout")
-        confirmation_arms = tuple(
-            arm for arm in ARMS if arm in {*confirmation_arms, "fast_off", "S0"}
+        required = required_confirmation_arms(
+            rr._read_json(root / "screening_result.json")
         )
+        if confirmation_arms and set(confirmation_arms) | {"fast_off", "S0"} != set(
+            required
+        ):
+            raise ValueError(
+                "confirmation roster differs from the registered screening rule"
+            )
+        confirmation_arms = required
     if phase == "smoke":
         roster = [(a, 11, "F14" if a == "L" else "F1", "F") for a in ARMS]
     elif phase == "p":
@@ -336,7 +422,9 @@ def write_plan(root: Path, phase: str, *, confirmation_arms=()) -> str:
     )
 
 
-def promotion_trace(readouts: dict, comparisons: dict, *, confirmed: bool) -> dict:
+def promotion_trace(
+    readouts: dict, comparisons: dict, *, confirmed: bool, s0_informative: dict
+) -> dict:
     """Apply the registered tie/eligibility rules; screening never promotes."""
     eligible = [
         a
@@ -358,8 +446,8 @@ def promotion_trace(readouts: dict, comparisons: dict, *, confirmed: bool) -> di
         default=None,
     )
     override = None
+    options = []
     if leader is not None:
-        options = []
         for arm in eligible:
             if arm == leader:
                 continue
@@ -373,9 +461,7 @@ def promotion_trace(readouts: dict, comparisons: dict, *, confirmed: bool) -> di
                 options,
                 key=lambda a: readouts[a]["headline_net_excess_bps"]["estimate"],
             )
-    s0_delta = comparisons.get("S0_minus_fast_off", {}).get(
-        "primary_neutral_target_ic", {}
-    )
+    s0_delta = s0_informative["pooled"]["primary_neutral_target_ic"]
     upper = s0_delta.get("upper_95")
     s0_adopt = "S0" in eligible and upper is not None and upper >= 0
     return {
@@ -383,9 +469,11 @@ def promotion_trace(readouts: dict, comparisons: dict, *, confirmed: bool) -> di
         "eligible": eligible,
         "ic_leader": leader,
         "economics_override": override,
+        "economics_override_qualifiers": options,
         "designation": (override or leader) if confirmed else None,
         "next_round_parent": ("S0" if s0_adopt else "fast_off") if confirmed else None,
         "retained_parent_eligible": "fast_off" in eligible,
+        "S0_informative_comparison": s0_informative,
         "provisional_parent": "S0" if s0_adopt else "fast_off",
         "S0_reason": "simpler_with_no_demonstrated_IC_inferiority"
         if s0_adopt
@@ -393,10 +481,161 @@ def promotion_trace(readouts: dict, comparisons: dict, *, confirmed: bool) -> di
         if "S0" not in eligible
         else "paired_IC_upper_bound_below_zero_or_undefined",
         "read_2025_authorized": False,
-        "economics_basis": "registered_resolved_fold_pool; inspect per_candidate_economics_coverage; not an implementability claim",
+        "economics_basis": "full_common_calendar_with_registered_terminal_settlement; unresolved_is_a_label; not_an_implementability_claim",
         "read_bar_status": "Gabriel_to_set",
         "in_sample_selection_label": True,
     }
+
+
+def required_confirmation_arms(screening: dict) -> tuple[str, ...]:
+    trace = screening["promotion_trace"]
+    needed = {
+        "fast_off",
+        "S0",
+        trace["ic_leader"],
+        *trace["economics_override_qualifiers"],
+    }
+    return tuple(arm for arm in ARMS if arm in needed)
+
+
+def settlement_replay_projection(report: dict) -> dict:
+    """Only accounting and its exposure/risk diagnostics may change in A1."""
+    projection = copy.deepcopy(report)
+    projection.pop("economics")
+    for key in (
+        "exposure_daily",
+        "exposure_summary",
+        "realized_beta",
+        "realized_beta_bova11",
+    ):
+        projection["diagnostics"].pop(key)
+    for key in (
+        "stale_mark_name_days",
+        "unresolved_action_name_days",
+        "valuation_scenario_count",
+        "actual_risk_breach_dates",
+    ):
+        projection["mask_coverage"].pop(key)
+    return projection
+
+
+def replay_cpu(root: Path) -> str:
+    from .checkpoint_readouts import candidate_readout, paired_readouts, retained
+
+    design = _design(root)
+    result_path = root / "cpu_replay_result.json"
+    if result_path.exists() or (root / "cpu_replay_stop.json").exists():
+        raise FileExistsError("CPU replay is already completed or stopped")
+    cpu = Path(design["cpu_checkpoint"]["root"])
+    context = rr._open_ledger_replay(design)
+    paths, comparisons, continuity = {}, {}, {}
+    try:
+        for name in (*rr._BASELINE_SIGNAL_NAMES, *CELLS):
+            family = "gbdt" if name in CELLS else "baselines"
+            paths[name], comparisons[name] = {}, {}
+            old_paths = {}
+            for fold in DEVELOPMENT_FOLDS:
+                source = cpu / family / name / fold
+                destination = root / "cpu_replay" / family / name / fold
+                paths[name][fold], old_paths[fold] = destination, source
+                if cpu_cell_completed(destination):
+                    comparisons[name][fold] = rr._read_json(
+                        destination / "replay_comparison.json"
+                    )
+                    continue
+                destination.mkdir(parents=True, exist_ok=False)
+                original = retained(context, source, fold)
+                replayed = evaluate_scores(
+                    original.inputs, window_name=fold, settle_terminal_residuals=True
+                )
+                replayed.report.update(rr.RESEARCH_FLAGS)
+                write_json_atomic(destination / "evaluation.json", replayed.report)
+                if settlement_replay_projection(
+                    original.result.report
+                ) != settlement_replay_projection(replayed.report):
+                    changed = rr._changed_field_paths(
+                        settlement_replay_projection(original.result.report),
+                        settlement_replay_projection(replayed.report),
+                        "report",
+                    )
+                    raise ValueError(
+                        f"settlement replay changed protected fields: {name}/{fold}: {sorted(changed)}"
+                    )
+                for file in (
+                    "scores.npy",
+                    "score_mask.npy",
+                    "score_manifest.json",
+                    "score_manifest.json.sha256",
+                ):
+                    shutil.copyfile(source / file, destination / file)
+                comparison = {
+                    "source_evaluation_sha256": sha256_file(source / "evaluation.json"),
+                    "replayed_evaluation_sha256": sha256_file(
+                        destination / "evaluation.json"
+                    ),
+                    "non_ledger_fields_bit_identical": True,
+                    "scores_and_models_refitted": False,
+                    "source_economics_unresolved": original.result.report["economics"][
+                        "headline"
+                    ]["economics_unresolved"],
+                }
+                write_json_atomic(destination / "replay_comparison.json", comparison)
+                _finish_cell(
+                    destination,
+                    rr._ResearchEvaluation(result=replayed, inputs=original.inputs),
+                    name=name,
+                    fold=fold,
+                )
+                comparisons[name][fold] = comparison
+                del original, replayed
+            before = candidate_readout(old_paths)
+            after = candidate_readout(paths[name])
+            for scope in ("pooled", "round3_windows"):
+                if (
+                    before[scope]["headline_net_excess_bps"]
+                    != after[scope]["resolved_fold_only_net_excess_bps"]
+                ):
+                    raise ValueError(
+                        f"resolved-fold continuity differs: {name}/{scope}"
+                    )
+            continuity[name] = {
+                "bit_identical": True,
+                "sealed_resolved_fold_readout": before["pooled"][
+                    "headline_net_excess_bps"
+                ],
+            }
+        readouts = {name: candidate_readout(by_fold) for name, by_fold in paths.items()}
+        for name, readout in readouts.items():
+            value = readout["pooled"]["headline_net_excess_bps"]
+            if value["finite_observations"] != value["possible_observations"]:
+                raise ValueError(f"settlement economics is not full-calendar: {name}")
+        pairs = paired_readouts(
+            context,
+            {name: paths[name] for name in (*CELLS, "momentum_12_1")},
+            root / "cpu_replay/paired",
+        )
+        return write_json_atomic(
+            result_path,
+            {
+                "schema": SCHEMA,
+                "status": "completed",
+                "registration_sha256": design["preregistration"]["sha256"],
+                "source_cpu_result_sha256": design["cpu_checkpoint"]["result_sha256"],
+                "readouts": readouts,
+                "paired": pairs,
+                "replay_comparisons": comparisons,
+                "resolved_fold_continuity": continuity,
+                **rr.RESEARCH_FLAGS,
+            },
+        )
+    except BaseException as error:
+        write_json_atomic(
+            root / "cpu_replay_stop.json",
+            {"error": str(error), "at_utc": rr._utc_now()},
+        )
+        raise
+    finally:
+        context.store.close()
 
 
 def evaluate_phase(root: Path, phase: str) -> str:
@@ -425,6 +664,26 @@ def evaluate_phase(root: Path, phase: str) -> str:
     source_hashes = rr._read_json(
         cpu_root / "baselines/momentum_12_1/F1/evaluation.json"
     )["source_artifact_hashes"]
+    replay = rr._read_json(root / "cpu_replay_result.json")
+    if (
+        replay["status"] != "completed"
+        or replay["registration_sha256"] != design["preregistration"]["sha256"]
+        or replay["source_cpu_result_sha256"]
+        != design["cpu_checkpoint"]["result_sha256"]
+    ):
+        raise ValueError(
+            "acceptance requires the registered completed CPU settlement replay"
+        )
+    for name in (*rr._BASELINE_SIGNAL_NAMES, *CELLS):
+        for fold in DEVELOPMENT_FOLDS:
+            if not cpu_cell_completed(
+                root
+                / "cpu_replay"
+                / ("gbdt" if name in CELLS else "baselines")
+                / name
+                / fold
+            ):
+                raise ValueError(f"CPU settlement acceptance missing: {name}/{fold}")
     context = rr._open_ledger_replay(design)
     _, dates = rr._read_store_header(Path(design["store"]["root"]))
     policy, _ = rr.load_selected_policy(
@@ -530,6 +789,7 @@ def evaluate_phase(root: Path, phase: str) -> str:
                     fold=fold,
                     output=destination / "evaluation.json",
                     execution_policy=policy,
+                    settle_terminal_residuals=True,
                 )
                 _finish_cell(destination, evaluated, name=arm, fold=fold)
                 trajectories[f"{arm}/{fold}"] = records
@@ -545,7 +805,10 @@ def evaluate_phase(root: Path, phase: str) -> str:
                 },
             )
         paired = paired_readouts(
-            context, {arm: paths[arm] for arm in arms}, root / "paired" / group
+            context,
+            {arm: paths[arm] for arm in arms},
+            root / "paired" / group,
+            informative_folds=design["round4_protocol"]["informative_folds"]["folds"],
         )
         selection_comparison = None
         if phase == "screening":
@@ -559,21 +822,30 @@ def evaluate_phase(root: Path, phase: str) -> str:
                 },
                 root / "diagnostics/selection_metric",
             )
-        momentum = {}
+        momentum = {arm: {} for arm in arms}
+        momentum_baseline = candidate_readout(
+            {
+                fold: root / "cpu_replay/baselines/momentum_12_1" / fold
+                for fold in DEVELOPMENT_FOLDS
+            }
+        )
         for fold in DEVELOPMENT_FOLDS:
-            parent = retained(context, paths["fast_off"][fold], fold)
             m_score, m_mask = rr._score_artifact(
                 cpu_root / "baselines/momentum_12_1" / fold, require_clean_transfer=True
             )
-            diagnostic = momentum_diagnostics(parent.inputs, m_score, m_mask)
-            write_json_atomic(
-                root / "diagnostics" / group / "momentum" / f"{fold}.json", diagnostic
-            )
-            momentum[fold] = diagnostic
+            for arm in arms:
+                candidate = retained(context, paths[arm][fold], fold)
+                diagnostic = momentum_diagnostics(candidate.inputs, m_score, m_mask)
+                write_json_atomic(
+                    root / "diagnostics" / group / "momentum" / arm / f"{fold}.json",
+                    diagnostic,
+                )
+                momentum[arm][fold] = diagnostic
         trace = promotion_trace(
             {a: r["pooled"] for a, r in readouts.items()},
             {key: value["pooled"] for key, value in paired.items()},
             confirmed=phase == "confirmation",
+            s0_informative=paired["S0_minus_fast_off"]["informative_subsets"]["S0"],
         )
         return write_json_atomic(
             result_path,
@@ -586,7 +858,28 @@ def evaluate_phase(root: Path, phase: str) -> str:
                 "readouts": readouts,
                 "paired": paired,
                 "selection_metric_only": selection_comparison,
-                "momentum_diagnostics": pooled_momentum_diagnostics(momentum),
+                "momentum_diagnostics": {
+                    arm: {
+                        "pooled": pooled_momentum_diagnostics(by_fold),
+                        "folds": by_fold,
+                    }
+                    for arm, by_fold in momentum.items()
+                },
+                "momentum_baseline": momentum_baseline,
+                "primary_ic_by_fold": {
+                    fold: {
+                        "momentum_12_1": momentum_baseline["folds"][fold][
+                            "primary_neutral_target_ic"
+                        ],
+                        **{
+                            arm: readouts[arm]["folds"][fold][
+                                "primary_neutral_target_ic"
+                            ]
+                            for arm in arms
+                        },
+                    }
+                    for fold in DEVELOPMENT_FOLDS
+                },
                 "promotion_trace": trace,
                 "trajectories": trajectories,
                 "access": context.access,
@@ -605,7 +898,7 @@ def evaluate_phase(root: Path, phase: str) -> str:
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("freeze", "plan", "evaluate"))
+    parser.add_argument("action", choices=("freeze", "plan", "evaluate", "replay-cpu"))
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--cpu-root", type=Path)
     parser.add_argument(
@@ -627,6 +920,8 @@ def main(argv=None):
         if args.cpu_root is None:
             parser.error("freeze requires --cpu-root")
         print(freeze(args.cpu_root, args.root))
+    elif args.action == "replay-cpu":
+        print(replay_cpu(args.root))
     elif args.action == "plan":
         if args.phase is None:
             parser.error("plan requires --phase")

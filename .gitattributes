@@ -5,6 +5,8 @@ research/configs/v2/b3_session_schedule_reconstructed_v1.csv text eol=lf
 research/preregistrations/v2_round1_round2_rev4f.md text eol=lf
 research/preregistrations/v2_round3.md text eol=lf
 research/preregistrations/v2_round4.md text eol=lf
+research/preregistrations/v2_round4.json text eol=lf
+research/preregistrations/v2_round4.json.sha256 text eol=lf
 # Keep audit evidence hashes identical on the host and in GitHub's file bytes.
 docs/*.json text eol=lf
 docs/*.sha256 text eol=lf

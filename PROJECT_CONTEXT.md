@@ -2047,5 +2047,12 @@ engineering acceptance is not a full-calendar or implementability claim.
 [Round 4](research/preregistrations/v2_round4.md) is registered as fast_off plus
 S0/H/P/L/C, with twelve screening P runs, 252 main F runs and nine selection-only
 F runs. Confirmation on seeds 61/79/97 on both sides precedes any designation
-or S0 default change. No Round-4 neural result exists yet. Paid compute still
-requires a renewed go, and the proposed 2025-read bar has not been approved.
+or S0 default change. No Round-4 neural result exists yet. Gabriel subsequently
+authorized paid Round-4 sessions through A1–A3 after revision and a fresh freeze.
+The amended books settle unpriced terminal equity/hedge residuals at their last mark,
+retain the uncertainty and 30% haircut labels, and pool full-calendar economics.
+Resolved-fold economics remain secondary continuity evidence. S0's tie decision uses
+the validity-derived F8–F14 subset; L's informative subset is F9–F14. Every arm receives
+momentum-residual diagnostics. The BOVA11 series' last F4 mark is 2019-08-16, 92 sessions
+before its end; terminal settlement does not repair those missing hedge returns.
+The old CPU seal remains immutable. The proposed 2025-read bar remains unapproved.

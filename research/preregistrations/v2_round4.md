@@ -4,8 +4,10 @@ Registered after the completed CPU report in commit `bd8ce6b`, before any Round-
 neural fit or score. This implements Gabriel's `v2_research_checkpoint.md` and the
 [accepted checkpoint contract](v2_research_checkpoint.md). The CPU results are
 diagnostics; they do not change the arm roster, paired parent or promotion rule.
-This registration permits preparation. Paid compute requires Gabriel's renewed go.
-It grants no 2025/2026 consumer access, deployment change or later research round.
+Revision A1–A3 incorporates Gabriel's `v2_round4_go_amendments.md`. Paid compute is
+authorized after this revision is committed and a fresh execution root is frozen
+from it on the compute host. No arm, seed, training setting or execution policy
+changes. No 2025/2026 consumer access, deployment change or later research round is granted.
 
 ## Accepted inputs and information set
 
@@ -104,7 +106,8 @@ All historical per-head, spread and persistence definitions remain.
 The selected execution policy is theta=1, D3/D5/D10, equal notional, buffer nine per
 volatility quintile. Carry `execution_parameter_selected_in_sample=true`; theta=1
 retains the current missing-score behavior. Use the same ledger, close-proxy fills,
-borrow/collateral, costs, risk limits and terminal handling as the accepted CPU root.
+borrow/collateral, costs and risk limits as the accepted CPU root, with A1's terminal
+accounting amendment below.
 No execution sweep or blend candidate is authorized.
 
 ## Stages and exact counts
@@ -145,7 +148,7 @@ that roster cannot be promoted without its own matched six-seed confirmation. Th
 counts preserve mandatory S0 confirmation even when another arm leads screening.
 
 The existing staged planner implements smoke, P, parent, arms, selection, confirmation-P
-and confirmation-F. Generate only the smoke plan before renewed paid-compute go. Later
+and confirmation-F. The A1–A3 go authorizes the staged session after fresh freeze. Later
 plans bind actual accepted checkpoint hashes and should not be fabricated in advance.
 Do not start Round 5 or re-fit H/P/L/C on S0 within this round. If S0 becomes the parent,
 any transferred finding is a Round-5 hypothesis requiring 42 screening fits on its
@@ -159,20 +162,20 @@ include all candidates, folds, former three windows, primary/legacy/per-horizon 
 spread, persistence, turnover, economics, lending-coverage subsets, all six GBDT pairs
 and identical per-fold TreeSHAP sample indices. No GBDT replaces the neural parent.
 
-After neural scoring, report fast_off's daily cross-sectional correlation with
+After neural scoring, report every arm's and fast_off's daily cross-sectional correlation with
 momentum_12_1 (mean, sample SD, by fold), per-day rank-OLS residual IC, and the share of
 the unchanged four-head decile spread attributable to extreme momentum quintiles.
 Use the current diagnostic implementation and preserve unknown momentum attribution.
 This is score-spread attribution, not constructed-book P&L. Show the sealed B6 results
 beside it. The nine old-selection fits isolate Stage-F selection using the same new P,
 graph and fit dates; they are not a refit of B6 and cannot become a candidate.
+Show momentum's primary IC beside every candidate per fold, and all per-fold paired
+deltas. These diagnostics distinguish additional momentum exposure from residual
+ranking information; they have zero selection weight and do not create a new gate.
 
-Report resolved and unresolved economics separately for every candidate/fold. Under
-the retained rule an unresolved terminal fold is excluded as a whole from pooled
-economics; do not invent a terminal print, revalue it, or call that mean a full-calendar
-return. Current GBDTs exclude F4/F8, whereas momentum excludes F4/F7. Paired economics
-uses the intersection, never subtraction of unequal-calendar means. The eligibility
-rule below retains that existing resolved-fold basis and its development-only label.
+Report settled economics on the full common calendar, with unresolved labels retained.
+The former resolved-fold-only figures remain a secondary continuity readout, as
+specified in A1 below. The eligibility rule uses amended full-calendar economics.
 Report the observed-rate era and the strict held-short subset with no imputed or
 placeholder opening short notional. None establishes capacity or locates.
 
@@ -192,7 +195,7 @@ interval is strictly positive. If several qualify, use their pooled economics po
 estimate to choose the override. Record the full eligibility/leader/override trace.
 
 Separately, S0 becomes the next-round parent unless its paired primary-IC upper 95%
-bound versus fast_off is below zero, subject to the same nonnegative-economics
+bound versus fast_off on its predeclared informative subset is below zero, subject to the same nonnegative-economics
 eligibility and six-seed confirmation. An undefined comparison cannot establish a tie.
 If S0 fails eligibility or this comparison, retain fast_off and state the reason and
 the retained parent's eligibility. Retaining a research comparator does not make an
@@ -209,16 +212,99 @@ off-contract targets/transfer, a replay changing a protected non-ledger field, a
 2025/2026 consumer row, an unauthorized paid instance, or a store/build exceeding
 the measured 8-GiB invariant. Do not waive a gate. A proven defect or regime-wrong
 gate needs a recorded amendment and affected cells in a fresh root. Gabriel's standing
-authority permits recommended implementation resolutions, but not a paid launch or
-holdout read without the renewed authorization required here.
+authority permits recommended implementation resolutions. Paid sessions are now
+authorized by A1–A3; the holdout read remains unauthorized.
 
-After paid-compute go: smoke, P, parent acceptance, arms/selection, evaluation,
+After amended freeze: smoke and P while the host runs the CPU settlement replay;
+parent fits and acceptance after the replay passes; arms/selection, evaluation,
 confirmation as required, then seal. Every paid session must end with the sealed root
 copied to the host, full hash verification, instance termination, and two provider
 inventory reads. Never terminate before the verified host copy exists. Preserve partial
 sessions and stop evidence; no scored-cell overwrite. Publish `docs/v2_ROUND4.md` with
 the parent re-baseline, every arm, paired deltas, diagnostic panels, GBDT context,
 S0 decision, promotion trace and read-bar status, then stop for the next research stage.
+
+## A1: terminal residual settlement and common-calendar economics
+
+Source diagnosis: the hash-bound BOVA11 series has no 2019-12-30 close. The existing
+terminal intention already requests a complete hedge close, but without a print it
+expires and leaves the hedge open. The last observed mark is 96.15 on 2019-08-16,
+92 sessions before F4's end (only 34 of F4's 126 sessions have observed BOVA11 marks).
+This is a material source gap, not merely a boundary sequencing artifact. A1 closes
+the accounting residual; it cannot recover missing hedge returns. Preserve that
+limitation and the bound source without inventing prices. The amendment closes a terminal hedge at the
+terminal close when present, otherwise at its last known mark as labelled accounting
+settlement. Ordinary missing-print hedge rebalances still do not fill.
+
+Equities without a terminal print settle at their last mark at the evaluation boundary,
+even if the ten-session grace has not elapsed. The ordinary within-fold convention
+remains `last_mark_after_10_sessions`; the additional boundary rule is explicitly
+`last_mark_after_10_sessions_with_evaluation_end_acceleration`. It does not synthesize
+a print, alter historical prices or add future knowledge to a decision. Freeze conditional
+settlement intentions before reading the terminal close; an actual print cancels them.
+Keep the 30% adverse settlement haircut scenario, including a hedge settled without
+a print, and the 15%-NAV aggregate settlement label. Record equity residual notional
+before boundary settlement, the hedge's last-mark settlement notional, the haircut NAV
+delta, and actual remaining shares. `terminal_unresolved_inventory_fraction_nav` reports
+remaining equity plus the unpriced equity settled at the boundary. `economics_unresolved`
+remains true for these uncertain residuals and other existing reasons; it no longer
+excludes a fold from amended economics. Accounting validity and hard bounds still gate.
+
+Use `settle_terminal_residuals=True` for every amended book, including sensitivities
+and D5 diagnostics. The historical setting remains available only for unchanged prior
+registrations and the explicitly requested continuity comparison; no sealed output is
+rewritten. Pool primary and paired economics over all 1,738 sessions. A candidate's
+`resolved_fold_only_net_excess_bps` is secondary and never the promotion basis.
+
+Replay all 126 sealed CPU panels in a fresh root without refitting scores or models.
+Only `economics`, the four ledger-derived diagnostic paths `exposure_daily`,
+`exposure_summary`, `realized_beta`, `realized_beta_bova11`, and the four ledger mask
+counts `stale_mark_name_days`, `unresolved_action_name_days`, `valuation_scenario_count`,
+`actual_risk_breach_dates` may change. All input hashes, outcomes, support, ICs, score
+spreads/persistence and other fields must remain bit-identical. Record source and
+destination hashes, gate each replayed book, and assert exact continuity of the sealed
+resolved-fold pooled and former-three-window economics. The CPU replay may run in
+parallel with GPU smokes and P, but parent acceptance requires its completed bound result.
+
+A continuous-path walk-forward, carrying the book across fold boundaries while only
+the model changes, is registered as future overlay-replay or Round-5 work. It is not
+implemented or evaluated in this round.
+
+## A2: informative fold subsets fixed before scores
+
+The [Round-4 protocol JSON](v2_round4.json) binds counts and consumed-presence hashes
+computed only from the repaired store's validity arrays, active membership and causal
+history. S0 uses any current intraday validity at t among active names. L uses any
+lending validity on a valid slow timestep in t-60 through t-1 for an active decision-time
+name, exactly the supplied slow history. H, P, C and the parent use all fourteen folds.
+
+Measured subsets: **S0 F8–F14**, first supported decision 2021-07-19; **L F9–F14**,
+first supported decision 2022-03-23. F7 has no valid current intraday input, correcting
+the supplied expected F7–F14 range. Each selected fold remains whole; no names/days are
+selected retrospectively. Registration and freeze recheck the source manifest and the
+same validity-derived payload before any neural score. Use these same subsets during
+screening and confirmation, with all-fold deltas retained beside them.
+
+For every pair report the subset corresponding to each member's distinguishing
+information beside the all-fold comparison, for every existing paired metric. S0's
+simpler-wins-ties bound uses its F8–F14 subset. IC designation and the economics override
+continue to use the all-fold rules, and nonnegative economics uses the full calendar.
+The same-arm non-informative comparisons can still differ through initialization and
+graph effects; zero input coverage is not a promise of equal neural predictions.
+
+## A3 and session budget
+
+Momentum correlation, momentum-residual primary IC and extreme-momentum decile-spread
+share are required for every arm at screening and confirmation, pooled and by fold.
+Report B6's sealed diagnostics as historical context only. No correlation or residual
+threshold is introduced, and no arm is selected by these readouts.
+
+Measure smokes and Stage P before projecting wall time; expanding F14 fits span much
+more history than Round 3. Split at useful stage boundaries into sealed, recoverable
+sessions when needed. Every paid session ends with verified host recovery, exact-ID
+termination and two provider reads. The confirmation roster remains fast_off, S0, the
+eligible screening IC leader and every eligible override qualifier. Subsequent sessions
+retain the same frozen registration, seeds, settings and hash-bound checkpoint inputs.
 
 The **2025-read bar is unapproved and remains Gabriel's decision**. The proposal is:
 confirmed primary-IC lower 95% bound above momentum's point estimate; persistence-1

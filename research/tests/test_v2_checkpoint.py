@@ -17,6 +17,106 @@ from brazil_rv.v2.train import _common_primary_selection_score
 from test_v2_evaluate import _fixture
 
 
+def test_settlement_replay_pools_no_print_fold_and_keeps_nonledger_identical():
+    from brazil_rv.v2 import research_rounds as rr
+    from brazil_rv.v2.round4 import settlement_replay_projection
+
+    inputs = _fixture()
+    prices = inputs.raw_close.copy()
+    prices[-1] = np.nan
+    inputs = replace(inputs, raw_close=prices)
+    old = evaluate_scores(inputs, window_name="F1", protocol=TRIAGE_PROTOCOL)
+    new = evaluate_scores(
+        inputs,
+        window_name="F1",
+        protocol=TRIAGE_PROTOCOL,
+        settle_terminal_residuals=True,
+    )
+    assert settlement_replay_projection(old.report) == settlement_replay_projection(
+        new.report
+    )
+    assert new.report["economics"]["headline"]["economics_unresolved"]
+    assert (
+        new.report["economics"]["headline"][
+            "terminal_unresolved_inventory_fraction_nav"
+        ]
+        > 0
+    )
+    old_series = rr._daily_series(rr._ResearchEvaluation(old, inputs))
+    new_series = rr._daily_series(rr._ResearchEvaluation(new, inputs))
+    assert np.isnan(old_series["headline_net_excess_bps"]).all()
+    assert np.isfinite(new_series["headline_net_excess_bps"]).all()
+    np.testing.assert_array_equal(
+        new.headline_net_excess_bps[:-1], old.headline_net_excess_bps[:-1]
+    )
+    pair = rr._paired_readouts(
+        {"F1": rr._ResearchEvaluation(new, inputs)},
+        {"F1": rr._ResearchEvaluation(new, inputs)},
+    )
+    assert pair["pooled"]["headline_net_excess_bps"]["estimate"] == 0.0
+    assert pair["pooled"]["headline_net_excess_bps"]["finite_observations"] == len(
+        inputs.dates
+    )
+
+
+def test_resolved_fold_secondary_reproduces_prior_economics_exactly(tmp_path):
+    from brazil_rv.v2 import research_rounds as rr
+    from brazil_rv.v2.artifacts import write_json_atomic
+    from brazil_rv.v2.checkpoint_readouts import candidate_readout
+    from dataclasses import fields
+
+    # Expand the fixture universe so its normal buffered book has resolved economics.
+    inputs = _fixture()
+    changes = {}
+    for field in fields(inputs):
+        value = getattr(inputs, field.name)
+        if isinstance(value, np.ndarray) and value.ndim >= 2 and value.shape[1] == 60:
+            changes[field.name] = np.repeat(value, 2, axis=1)
+        elif isinstance(value, dict):
+            changes[field.name] = {
+                k: np.repeat(v, 2, axis=1)
+                if isinstance(v, np.ndarray) and v.ndim >= 2 and v.shape[1] == 60
+                else v
+                for k, v in value.items()
+            }
+    changes["security_ids"] = tuple(f"SEC-{i}" for i in range(120))
+    changes["action_successor_index"] = np.broadcast_to(
+        np.arange(120), (25, 120)
+    ).copy()
+    inputs = replace(inputs, **changes)
+    old = evaluate_scores(inputs, window_name="F1", protocol=TRIAGE_PROTOCOL)
+    new = evaluate_scores(
+        inputs,
+        window_name="F1",
+        protocol=TRIAGE_PROTOCOL,
+        settle_terminal_residuals=True,
+    )
+    assert not old.report["economics"]["headline"]["economics_unresolved"]
+    np.testing.assert_array_equal(
+        old.headline_net_excess_bps, new.headline_net_excess_bps
+    )
+    outputs = {}
+    for label, result in (("old", old), ("new", new)):
+        path = tmp_path / label
+        write_json_atomic(path / "evaluation.json", result.report)
+        fields = rr._daily_series(rr._ResearchEvaluation(result, inputs))
+        write_json_atomic(
+            path / "daily_readouts.json",
+            {
+                "dates": [d.isoformat() for d in inputs.dates],
+                "series": {
+                    k: [float(x) if np.isfinite(x) else None for x in v]
+                    for k, v in fields.items()
+                },
+            },
+        )
+        outputs[label] = candidate_readout({"F1": path})
+    assert (
+        outputs["new"]["pooled"]["resolved_fold_only_net_excess_bps"]
+        == outputs["old"]["pooled"]["headline_net_excess_bps"]
+    )
+
+
 def test_cpu_seal_discloses_absent_transfer_without_weakening_access(tmp_path):
     import json
     from brazil_rv.v2.research_rounds import seal_root

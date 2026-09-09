@@ -1,10 +1,90 @@
 import json
 
 import pytest
+import numpy as np
+from types import SimpleNamespace
 
 from brazil_rv.v2 import round4
 from brazil_rv.v2.contract import DEVELOPMENT_FOLDS
 from brazil_rv.v2.train import _train_parser
+
+
+def test_informative_subsets_read_only_validity_and_lending_excludes_decision_row(
+    tmp_path, monkeypatch
+):
+    days = np.arange(np.datetime64("2018-01-01"), np.datetime64("2018-04-21"))
+    arrays = {
+        "active": np.ones((110, 2), bool),
+        "slow_timestep_valid": np.ones((110, 2), bool),
+        "intraday_valid": np.zeros((110, 2, 1), bool),
+        "sidecar_lending_valid": np.zeros((110, 2, 1), bool),
+    }
+    arrays["intraday_valid"][84, 0, 0] = True
+    arrays["sidecar_lending_valid"][84, 0, 0] = True
+    store = SimpleNamespace(
+        read=lambda key, rows: arrays[key][rows], close=lambda: None
+    )
+    windows = {"F1": np.arange(60, 85), "F2": np.arange(85, 110)}
+    monkeypatch.setattr(round4, "DEVELOPMENT_FOLDS", ("F1", "F2"))
+    monkeypatch.setattr(round4.rr, "_read_store_header", lambda _: ({}, days))
+    monkeypatch.setattr(
+        round4.rr, "_fold_indices", lambda _: (None, None, windows, None, None)
+    )
+    monkeypatch.setattr(
+        round4.rr,
+        "open_store_for_samples",
+        lambda *a, **k: (store, SimpleNamespace(payload=lambda: {})),
+    )
+    (tmp_path / "manifest.json").write_text("{}")
+    result = round4.informative_fold_protocol(tmp_path)
+    assert result["folds"]["S0"] == ["F1"]
+    assert result["folds"]["L"] == ["F2"]
+    assert result["coverage"]["L"]["F1"]["informative_sessions"] == 0
+    arrays["intraday_valid"][109] = True
+    assert (
+        round4.informative_fold_protocol(tmp_path)["coverage"]["S0"]["F1"]
+        == result["coverage"]["S0"]["F1"]
+    )
+
+
+def test_paired_informative_subsets_keep_whole_folds_and_reverse_intervals(
+    tmp_path, monkeypatch
+):
+    from brazil_rv.v2 import checkpoint_readouts as cr
+
+    monkeypatch.setattr(cr, "retained", lambda context, path, fold: None)
+
+    def paired(left, right):
+        fold = next(iter(left))
+        value = 0.0 if fold == "F1" else 1.0
+        return {
+            "population_audit": {
+                fold: {
+                    "primary_neutral_target_ic": [{"delta": value} for _ in range(25)]
+                }
+            },
+            "folds": {fold: {"primary_neutral_target_ic": {"estimate": value}}},
+        }
+
+    monkeypatch.setattr(cr.rr, "_paired_readouts", paired)
+    paths = {
+        name: {fold: tmp_path for fold in ("F1", "F2")} for name in ("L", "fast_off")
+    }
+    result = cr.paired_readouts(
+        None,
+        paths,
+        tmp_path / "pairs",
+        informative_folds={"L": ["F2"], "fast_off": ["F1", "F2"]},
+    )
+    forward = result["L_minus_fast_off"]
+    assert forward["pooled"]["primary_neutral_target_ic"]["estimate"] == 0.5
+    subset = forward["informative_subsets"]["L"]
+    assert subset["folds"] == ["F2"]
+    assert subset["pooled"]["primary_neutral_target_ic"]["estimate"] == 1.0
+    reverse = result["fast_off_minus_L"]["informative_subsets"]["L"]["pooled"][
+        "primary_neutral_target_ic"
+    ]
+    assert reverse["lower_95"] == reverse["upper_95"] == -1.0
 
 
 def _design():
@@ -49,6 +129,9 @@ def test_freeze_rejects_a_cpu_root_that_no_longer_matches_its_seal(
 
 
 def test_phase_counts_same_seed_handoffs_and_cli_options(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        round4, "required_confirmation_arms", lambda _: ("fast_off", "S0", "H")
+    )
     monkeypatch.setattr(round4, "_design", lambda root: _design())
     monkeypatch.setattr(
         round4,
@@ -133,23 +216,76 @@ def test_promotion_uses_paired_intervals_eligibility_and_confirmation():
             "headline_net_excess_bps": interval(0.5, 0.1, 0.9),
         }
     }
-    screened = round4.promotion_trace(readouts, comparisons, confirmed=False)
+    subset = {"folds": ["F8", "F9"], "pooled": comparisons["S0_minus_fast_off"]}
+    screened = round4.promotion_trace(
+        readouts, comparisons, confirmed=False, s0_informative=subset
+    )
     assert screened["ic_leader"] == "fast_off" and "H" not in screened["eligible"]
     assert screened["economics_override"] == "S0"
     assert screened["designation"] is screened["next_round_parent"] is None
-    confirmed = round4.promotion_trace(readouts, comparisons, confirmed=True)
+    confirmed = round4.promotion_trace(
+        readouts, comparisons, confirmed=True, s0_informative=subset
+    )
     assert confirmed["designation"] == confirmed["next_round_parent"] == "S0"
     comparisons["S0_minus_fast_off"]["primary_neutral_target_ic"] = interval(
         -0.002, -0.003, -0.001
     )
     assert (
-        round4.promotion_trace(readouts, comparisons, confirmed=True)[
-            "next_round_parent"
-        ]
+        round4.promotion_trace(
+            readouts, comparisons, confirmed=True, s0_informative=subset
+        )["next_round_parent"]
         == "fast_off"
     )
     readouts["S0"]["headline_net_excess_bps"]["estimate"] = -1
     assert (
-        round4.promotion_trace(readouts, comparisons, confirmed=True)["designation"]
+        round4.promotion_trace(
+            readouts, comparisons, confirmed=True, s0_informative=subset
+        )["designation"]
         == "fast_off"
     )
+
+
+def test_s0_tie_uses_informative_subset_even_if_all_folds_look_better():
+    levels = {
+        a: {
+            "primary_neutral_target_ic": {"estimate": 0.03},
+            "headline_net_excess_bps": {"estimate": 1.0},
+        }
+        for a in ("fast_off", "S0")
+    }
+    comparisons = {
+        "S0_minus_fast_off": {
+            "primary_neutral_target_ic": {
+                "estimate": 0.001,
+                "lower_95": -0.001,
+                "upper_95": 0.003,
+            },
+            "headline_net_excess_bps": {"estimate": 0, "lower_95": -1, "upper_95": 1},
+        }
+    }
+    subset = {
+        "folds": ["F8"],
+        "pooled": {
+            "primary_neutral_target_ic": {
+                "estimate": -0.003,
+                "lower_95": -0.005,
+                "upper_95": -0.001,
+            }
+        },
+    }
+    trace = round4.promotion_trace(
+        levels, comparisons, confirmed=True, s0_informative=subset
+    )
+    assert trace["next_round_parent"] == "fast_off"
+    assert trace["S0_informative_comparison"] == subset
+
+
+def test_confirmation_includes_every_override_qualifier_and_mandatory_s0():
+    assert round4.required_confirmation_arms(
+        {
+            "promotion_trace": {
+                "ic_leader": "H",
+                "economics_override_qualifiers": ["P", "L"],
+            }
+        }
+    ) == ("fast_off", "S0", "H", "P", "L")

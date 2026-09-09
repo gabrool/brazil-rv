@@ -94,6 +94,7 @@ class LedgerConfig:
     settlement_grace_sessions: int = 10
     settlement_haircut: float = 0.30
     settlement_economics_unresolved_fraction_nav: float = 0.15
+    settle_terminal_residuals: bool = False
     annual_sessions: int = 252
 
     def __post_init__(self) -> None:
@@ -417,6 +418,8 @@ class StatefulLedgerResult:
     insolvent: bool
     insolvency_date: date | None
     economics_unresolved: bool
+    terminal_boundary_unpriced_inventory_notional: float
+    terminal_hedge_last_mark_settlement_notional: float
     gross_target: float
     ineligible_hold_sessions: int
     settlement_grace_sessions: int
@@ -749,6 +752,8 @@ class StatefulLedgerResult:
                 else None
             ),
             "economics_unresolved": self.economics_unresolved,
+            "terminal_boundary_unpriced_inventory_notional": self.terminal_boundary_unpriced_inventory_notional,
+            "terminal_hedge_last_mark_settlement_notional": self.terminal_hedge_last_mark_settlement_notional,
             "mark_mode": "raw",
             "share_sizing_mode": self.share_sizing_mode,
             "volatility_balanced_entries": self.volatility_balanced_entries,
@@ -1458,6 +1463,8 @@ def simulate_stateful_ledger(
     insolvency_date: date | None = None
     action_uncertainty_seen = False
     terminal_printed = np.zeros(name_count, dtype=np.bool_)
+    terminal_boundary_unpriced_inventory_notional = 0.0
+    terminal_hedge_last_mark_settlement_notional = 0.0
     terminal_prior_pending_exit = np.zeros(name_count, dtype=np.bool_)
 
     def submit_order(
@@ -2360,7 +2367,10 @@ def simulate_stateful_ledger(
             for name in np.flatnonzero(
                 (shares != 0.0)
                 & ~settled_names
-                & (missing_sessions >= config.settlement_grace_sessions - 1)
+                & (
+                    (missing_sessions >= config.settlement_grace_sessions - 1)
+                    | (config.settle_terminal_residuals and day == day_count - 1)
+                )
             )
         }
 
@@ -2795,11 +2805,19 @@ def simulate_stateful_ledger(
 
         settlement_count = 0
         settlement_notional = 0.0
+        if config.settle_terminal_residuals and day == day_count - 1:
+            boundary_unpriced = (shares != 0.0) & ~printed
+            terminal_boundary_unpriced_inventory_notional = float(
+                np.abs(shares[boundary_unpriced] * marks[boundary_unpriced]).sum()
+            )
         due_for_settlement = (
             (shares != 0.0)
             & ~printed
             & ~settled_names
-            & (missing_sessions >= config.settlement_grace_sessions)
+            & (
+                (missing_sessions >= config.settlement_grace_sessions)
+                | (config.settle_terminal_residuals and day == day_count - 1)
+            )
         )
         for name, pending in settlement_orders.items():
             if not due_for_settlement[name]:
@@ -2884,7 +2902,28 @@ def simulate_stateful_ledger(
             hedge_mark = current_hedge_close
         if hedge_order is not None:
             order = hedge_order.order
-            if bova_printed:
+            settle_hedge_last_mark = (
+                config.settle_terminal_residuals
+                and day == day_count - 1
+                and not bova_printed
+                and hedge_shares != 0.0
+            )
+            if settle_hedge_last_mark:
+                # Boundary accounting only: never present a stale mark as a print.
+                current_hedge_close = float(hedge_mark)
+                terminal_hedge_last_mark_settlement_notional = abs(
+                    hedge_shares * hedge_mark
+                )
+                settlement_count += 1
+                settlement_notional += terminal_hedge_last_mark_settlement_notional
+                scenario_delta = (
+                    -terminal_hedge_last_mark_settlement_notional
+                    * config.settlement_haircut
+                )
+                settlement_scenario_adjustment += scenario_delta * (
+                    1.0 - hedge_cost_rate if hedge_shares > 0 else 1.0 + hedge_cost_rate
+                )
+            if bova_printed or settle_hedge_last_mark:
                 hedge_share_array = np.asarray([hedge_shares], dtype=np.float64)
                 hedge_mark_array = np.asarray([hedge_mark], dtype=np.float64)
                 hedge_restricted_array = np.asarray(
@@ -2923,7 +2962,9 @@ def simulate_stateful_ledger(
                         price=current_hedge_close,
                         gross_notional=hedge_traded_notional,
                         cost=hedge_cost,
-                        purpose="hedge",
+                        purpose="terminal_settlement"
+                        if settle_hedge_last_mark
+                        else "hedge",
                     )
                 )
             else:
@@ -3254,6 +3295,8 @@ def simulate_stateful_ledger(
         or receivable_by_name.any()
         or payable_by_name.any()
         or hedge_shares != 0.0
+        or terminal_boundary_unpriced_inventory_notional > 0.0
+        or terminal_hedge_last_mark_settlement_notional > 0.0
         or settlement_fraction > config.settlement_economics_unresolved_fraction_nav
         or mean_gross < 0.5 * config.gross_target
     )
@@ -3623,6 +3666,8 @@ def simulate_stateful_ledger(
         insolvent=insolvent,
         insolvency_date=insolvency_date,
         economics_unresolved=economics_unresolved,
+        terminal_boundary_unpriced_inventory_notional=terminal_boundary_unpriced_inventory_notional,
+        terminal_hedge_last_mark_settlement_notional=terminal_hedge_last_mark_settlement_notional,
         gross_target=config.gross_target,
         ineligible_hold_sessions=config.ineligible_hold_sessions,
         settlement_grace_sessions=config.settlement_grace_sessions,

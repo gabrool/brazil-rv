@@ -36,8 +36,23 @@ def candidate_readout(paths: dict[str, Path]) -> dict:
             "terminal_settlement_economics_unresolved": summary[
                 "terminal_settlement_economics_unresolved"
             ],
+            "terminal_settlement_notional_fraction_nav": summary[
+                "terminal_settlement_notional_fraction_nav"
+            ],
+            "terminal_settlement_haircut_delta_nav": summary[
+                "terminal_nav_settlement_haircut_scenario"
+            ]
+            - summary["terminal_nav"],
+            "terminal_hedge_last_mark_settlement_notional": summary.get(
+                "terminal_hedge_last_mark_settlement_notional", 0.0
+            ),
         }
         fields = saved["series"]
+        fields["resolved_fold_only_net_excess_bps"] = (
+            [None] * len(saved["dates"])
+            if summary["economics_unresolved"]
+            else list(fields["headline_net_excess_bps"])
+        )
         # These are descriptive projections of the retained report, never a replay
         # or a mutation of an already accepted CPU cell.
         headline = {
@@ -74,8 +89,10 @@ def candidate_readout(paths: dict[str, Path]) -> dict:
                 for f, row in economics_coverage.items()
                 if row["economics_unresolved"]
             ],
-            "pooling_rule": "existing_rule_excludes_whole_unresolved_folds_without_filling_or_revaluing",
-            "interpretation": "resolved_fold_economics_only_when_any_fold_is_unresolved",
+            "pooling_rule": report["economics"]["contract"].get(
+                "economics_pooling", "resolved_folds_only"
+            ),
+            "interpretation": "inspect_terminal_settlement_and_unresolved_labels; resolved_fold_only_net_excess_bps_retains_secondary_pool",
         },
         "turnover_note": "includes_initial_and_terminal_book_trades; unchanged_non_circular_block_intervals_underweight_boundary_spikes",
         "pooled": {
@@ -110,7 +127,13 @@ def retained(context, path: Path, fold: str):
     )
 
 
-def paired_readouts(context, paths: dict[str, dict[str, Path]], output: Path) -> dict:
+def paired_readouts(
+    context,
+    paths: dict[str, dict[str, Path]],
+    output: Path,
+    *,
+    informative_folds: dict[str, list[str]] | None = None,
+) -> dict:
     """Retain per-fold population audits and pool their paired daily deltas."""
     names = tuple(paths)
     daily, fold_results = {}, {}
@@ -141,6 +164,20 @@ def paired_readouts(context, paths: dict[str, dict[str, Path]], output: Path) ->
         }
         result[key] = {"pooled": pooled, "folds": fold_results[key]}
         left, right = key.split("_minus_")
+        if informative_folds is not None:
+            subsets = {}
+            for arm in (left, right):
+                selected = [f for f in informative_folds[arm] if f in by_fold]
+                subsets[arm] = {
+                    "folds": selected,
+                    "pooled": {
+                        metric: rr._folded_bootstrap(
+                            tuple(by_fold[f][metric] for f in selected)
+                        )
+                        for metric in metrics
+                    },
+                }
+            result[key]["informative_subsets"] = subsets
         reverse = {}
         for metric, row in pooled.items():
             reverse[metric] = {
@@ -150,6 +187,28 @@ def paired_readouts(context, paths: dict[str, dict[str, Path]], output: Path) ->
                 "upper_95": None if row["lower_95"] is None else -row["lower_95"],
             }
         result[f"{right}_minus_{left}"] = {"pooled": reverse, "opposite_of": key}
+        if informative_folds is not None:
+            result[f"{right}_minus_{left}"]["informative_subsets"] = {
+                arm: {
+                    "folds": subset["folds"],
+                    "pooled": {
+                        metric: {
+                            **row,
+                            "estimate": None
+                            if row["estimate"] is None
+                            else -row["estimate"],
+                            "lower_95": None
+                            if row["upper_95"] is None
+                            else -row["upper_95"],
+                            "upper_95": None
+                            if row["lower_95"] is None
+                            else -row["lower_95"],
+                        }
+                        for metric, row in subset["pooled"].items()
+                    },
+                }
+                for arm, subset in subsets.items()
+            }
     return result
 
 
