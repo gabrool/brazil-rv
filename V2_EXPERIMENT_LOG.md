@@ -2761,3 +2761,34 @@ The initial watcher exited at 12:19:17 UTC after a launch HTTP 400. The provider
 ## 2026-09-09: Round-3 minimal-runtime import repair
 
 GH200 `de56fb8978734edba0f0b18059c0710f` launched at 13:17:40 UTC; bootstrap passed on 5762514. All 554 store/beta/native-audit/acceptance/Round-1-prime transport files and their exact file sets verified on NFS. The first Round-3 freeze failed during module import because lending preprocessing imported optional `pypdf` eagerly. It created no frozen root and ran no trajectory. Move the two PDF-reader imports into their PDF parsing functions; parquet lending consumers keep the minimal GPU runtime. The regression imports the Round-3 module with `pypdf` explicitly unavailable. All 12 targeted parser/lending tests and Ruff pass. Refresh the same approved instance from this clean commit, then freeze a fresh root; data, registration and training settings do not change.
+
+## 2026-09-09: Round 3 completed and recovered
+
+`v2_round3_e49aacd_20260909T133152Z` completed two serial one-epoch smokes,
+six fresh Stage-P trajectories, 18 Arm-B fine-tunes and nine matched fast-off fits.
+Finalization ended at 15:02:02 UTC. All 24 aggregate/comparator books pass the
+registered D1-D5 and headline bounds. No old-store checkpoint was reused.
+The selected policy remains theta 1, D3/D5/D10, equal sizing, buffer 9, explicitly
+selected in sample. No official-validation or test performance read ran.
+
+Six-seed B IC is 0.025078 [0.016108, 0.035333], net excess 4.436
+[1.307, 11.653] bps/day. The registered point-IC rule retains six seeds and the
+IC-first comparison designates the network without an economics override.
+Six-minus-three IC is only 0.000039 [-0.000489, 0.000564]; net is -1.078
+[-3.620, 1.049]. B3-minus-fast-off IC is -0.000200 [-0.001068, 0.000718],
+D1 is 0.000083 [-0.000624, 0.000871], and net is 0.075 [-1.666, 2.292].
+The native stream has not earned its place in this experiment; no post-result
+parent modification follows from that finding. B6's paired neutral IC improves
+on GBDT, while paired economics and both primary comparisons to momentum remain
+inconclusive. All four criteria for the future 2025 read are met; it stays unspent.
+
+The closed GPU logger and operational helpers/logs are sealed with the results.
+Result SHA-256: `ae2e4d7b05569282ba1756801375d935ddaaf36477e56fc7fe5b592044ae208b`.
+Inventory SHA-256: `939c9b2c1e1366bf7cd62e1c040ba78ea29960b87f00e372008435f5b56ab829`.
+All 732 physical files / 603,721,484 bytes, including inventory self-files, were
+copied to the host and verified at 15:11:07 UTC before instance closure. Phase
+timings, hardware, GPU utilization, transport hashes and exact-ID closure are in
+`docs/v2_round3_operations.json`; the five-minute heartbeat is paused.
+See `docs/v2_ROUND3.md` and its evidence JSON for complete paired, horizon,
+fold, gate/gradient, exposure and economic scenario readouts. Stop this research
+pass here; further Round-4 work requires a new registration.

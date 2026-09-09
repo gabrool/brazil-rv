@@ -1,0 +1,105 @@
+{
+  "complete_host_copy": {
+    "archive_sha256": "4c270b8d2da8ee970cf078302b6c49d64acd7bcaf93ef6a4bcfffb88f7402c25",
+    "hashes": {
+      "access_audit.json": "4f3874ea1eaff1917e93bbebf5590fcb70212f61f2d2a5898f983ec3ef55b27c",
+      "artifact_inventory.json": "939c9b2c1e1366bf7cd62e1c040ba78ea29960b87f00e372008435f5b56ab829",
+      "frozen_design.json": "c9f84509649e316fb2da3f4f314249917c01ac174c08e188bca70178d85de324",
+      "round3_result.json": "ae2e4d7b05569282ba1756801375d935ddaaf36477e56fc7fe5b592044ae208b"
+    },
+    "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round3_e49aacd_20260909T133152Z",
+    "physical_file_count": 732,
+    "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round3_e49aacd_20260909T133152Z",
+    "status": "exact_complete_copy_sha256_verified",
+    "total_bytes": 603721484,
+    "transport_inventory_sha256": "4286c37ba8623db74fa6355c488b8c6e4b505888c7de7664998ba7af65f76896",
+    "verified_at_utc": "2026-09-09T15:11:07.010122+00:00"
+  },
+  "filesystem_id": "14e3042026dd4a71b5b375abf8b083bd",
+  "gpu_log_interval_seconds": 15,
+  "hardware": {
+    "cpu_count": 64,
+    "cuda": "12.6",
+    "gpu": "NVIDIA GH200 480GB",
+    "gpu_memory_bytes": 101468602368,
+    "instance_id": "de56fb8978734edba0f0b18059c0710f",
+    "numpy": "2.5.1",
+    "platform": "Linux-6.8.0-1013-nvidia-64k-aarch64-with-glibc2.35",
+    "polars": "1.42.1",
+    "python": "3.12.14 (main, Sep  1 2026, 14:15:30) [Clang 22.1.3 ]",
+    "recorded_at_utc": "2026-09-09T13:32:54.072265+00:00",
+    "system_memory": "MemTotal:       551214144 kB\nMemFree:        525480128 kB\nMemAvailable:   513930496 kB\nBuffers:          470336 kB\nCached:         16698240 kB\nSwapCached:            0 kB\nActive:          1266240 kB\nInactive:       16489344 kB\nActive(anon):     627328 kB\nInactive(anon):        0 kB\nActive(file):     638912 kB\nInactive(file): 16489344 kB\nUnevictable:       33152 kB\nMlocked:           29120 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:              3072 kB\nWriteback:             0 kB\nAnonPages:        623552 kB\nMapped:           428672 kB\nShmem:             32000 kB\nKReclaimable:     427264 kB\nSlab:            1880256 kB\nSReclaimable:     427264 kB\nSUnreclaim:      1452992 kB\nKernelStack:       62336 kB\nPageTables:        19648 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    275607040 kB\nCommitted_AS:    4807552 kB\nVmallocTotal:   137168158720 kB\nVmallocUsed:      178944 kB\nVmallocChunk:          0 kB\nPercpu:           143360 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nCmaTotal:         524288 kB\nCmaFree:          203776 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:     524288 kB\nHugetlb:               0 kB\n",
+    "torch": "2.13.0+cu126"
+  },
+  "implementation_commit": {
+    "commit": "e49aacdac01c076c7ff882076bec76c4cb095d5a",
+    "tracked_worktree_clean": true
+  },
+  "instance_id": "de56fb8978734edba0f0b18059c0710f",
+  "instance_type": "gpu_1x_gh200",
+  "launch_accepted_at_utc": "2026-09-09T13:17:40.7956406Z",
+  "max_parallel_trajectories": 6,
+  "monitor_id": "brazil-rv-gh200-launch-monitor",
+  "monitor_status": "PAUSED",
+  "phases": {
+    "finalize": {
+      "completed_at_utc": "2026-09-09T15:02:02.012754+00:00",
+      "duration_seconds": 270.895829,
+      "exit_code": 0,
+      "gpu_samples": 18,
+      "gpu_utilization_ge_90_fraction": 0.0,
+      "gpu_utilization_mean_pct": 0.0,
+      "gpu_utilization_median_pct": 0.0,
+      "peak_gpu_memory_mib": 3.0,
+      "peak_gpu_power_w": 91.56,
+      "phase": "finalize",
+      "started_at_utc": "2026-09-09T14:57:31.116925+00:00",
+      "status": "completed"
+    },
+    "main": {
+      "completed_at_utc": "2026-09-09T14:57:31.086925+00:00",
+      "duration_seconds": 1904.766206,
+      "exit_code": 0,
+      "gpu_samples": 127,
+      "gpu_utilization_ge_90_fraction": 0.5984251968503937,
+      "gpu_utilization_mean_pct": 69.74015748031496,
+      "gpu_utilization_median_pct": 97.0,
+      "peak_gpu_memory_mib": 68605.0,
+      "peak_gpu_power_w": 462.56,
+      "phase": "main",
+      "started_at_utc": "2026-09-09T14:25:46.320719+00:00",
+      "status": "completed"
+    },
+    "p": {
+      "completed_at_utc": "2026-09-09T14:25:46.289876+00:00",
+      "duration_seconds": 2199.561787,
+      "exit_code": 0,
+      "gpu_samples": 147,
+      "gpu_utilization_ge_90_fraction": 0.5578231292517006,
+      "gpu_utilization_mean_pct": 66.49659863945578,
+      "gpu_utilization_median_pct": 98.0,
+      "peak_gpu_memory_mib": 52813.0,
+      "peak_gpu_power_w": 367.03,
+      "phase": "p",
+      "started_at_utc": "2026-09-09T13:49:06.728089+00:00",
+      "status": "completed"
+    },
+    "smoke": {
+      "completed_at_utc": "2026-09-09T13:45:16.309332+00:00",
+      "duration_seconds": 742.054194,
+      "exit_code": 0,
+      "gpu_samples": 49,
+      "gpu_utilization_ge_90_fraction": 0.0,
+      "gpu_utilization_mean_pct": 3.3877551020408165,
+      "gpu_utilization_median_pct": 0.0,
+      "peak_gpu_memory_mib": 11176.0,
+      "peak_gpu_power_w": 201.16,
+      "phase": "smoke",
+      "started_at_utc": "2026-09-09T13:32:54.255138+00:00",
+      "status": "completed"
+    }
+  },
+  "region": "us-east-3",
+  "status": "complete_host_copy_verified_before_termination",
+  "termination_status": "pending_after_report_push_and_three_way_commit_match"
+}

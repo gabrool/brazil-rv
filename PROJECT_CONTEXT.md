@@ -25,6 +25,18 @@ Paired net excess is -0.874 [-5.439, 7.458] bps/day. The repaired intraday input
 have not demonstrated a GBDT improvement. The registered parent remains
 `b_intraday`; native-TCN contribution is tested separately in Round 3.
 See [the paired report](docs/v2_ROUND1_PRIME.md).
+Round 3 is complete on that repaired store. Its registered rule retains six-seed
+Arm B and designates the network over the GBDT and ensemble, with no economics
+override. B6 neutral IC is 0.025078 [0.016108, 0.035333], and net excess is
+4.436 [1.307, 11.653] bps/day. The seed extension's paired IC and net intervals
+span zero. Native-fast B3 minus matched fast-off has neutral IC -0.000200
+[-0.001068, 0.000718] and net 0.075 [-1.666, 2.292] bps/day; D1 also spans zero.
+The fast stream has not demonstrated incremental value at these horizons.
+All four registered development criteria for a future 2025 read are met, but
+this pass does not spend that read. Round 4 requires a new registration.
+All 24 aggregate/comparator books pass the registered gates; the complete sealed
+732-file root is hash-verified locally and on the persistent Lambda filesystem.
+See [the Round-3 report](docs/v2_ROUND3.md) and [operations evidence](docs/v2_round3_operations.json).
 The historical 8021e42 store remains immutable and binds the sealed replays.
 It is explicitly development-grade: the calendar is reconstructed and the
 corporate-action terms are inferred from COTAHIST `DISMES`, not independently

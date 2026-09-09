@@ -1,10 +1,11 @@
 # Pass-5 implementation status
 
-The repaired store, fresh 16-book acceptance and Round 1' are complete. The next
-stage is the registered GH200 Round-3 experiment. The user's autonomous authority
-remains active, including recommended resolutions, efficient GH200 use, verified
-host recovery and exact-instance termination. No paid instance has been launched
-as of this CPU report.
+The registered pass is complete through Round 3: repaired store, fresh 16-book
+acceptance, Round 1', two smokes, six fresh Stage-P fits, 18 Arm-B fits and nine
+matched fast-off fits. All 24 Round-3 aggregate/comparator books pass the gates.
+The complete 732-file GPU root is sealed and SHA-256/exact-set verified on the
+host. Report publication and the approved exact-instance closure are recorded in
+[the operations evidence](v2_round3_operations.json). The five-minute monitor is paused.
 
 The user requested five-minute heartbeat monitoring while the approved launcher
 waits for capacity. Its first launch attempt returned HTTP 400 with no instance
@@ -39,6 +40,13 @@ Completed evidence:
   is -0.004836 [-0.009128, 0.001347]; paired net is -0.874 [-5.439, 7.458] bps/day.
   The repair has not demonstrated a GBDT improvement. Keep the registered
   `b_intraday` parent; this does not reopen rung selection.
+- [Round 3](v2_ROUND3.md): retain six-seed Arm B under the registered IC rule;
+  designate the network, with no economics override. Neutral IC is 0.025078
+  [0.016108, 0.035333] and net excess is 4.436 [1.307, 11.653] bps/day.
+  Native-fast pooled and D1 paired IC intervals span zero; it has not earned its
+  place on this evidence. The six-seed extension also has no supported paired
+  improvement. All four development criteria for the future 2025 read are met,
+  but the read remains unspent. Round 4 requires a new registration.
 
 The initial cleanup, including removal of retired daily-swing and GBDT code, is
 included in main through commit fb6fc92. Subsequent changes remove duplicate
@@ -57,16 +65,17 @@ and headers, then decode payload only through date-bound access. The official
 performance read-once rule remains unexercised in this pass.
 
 The effective [Round-3 registration](../research/preregistrations/v2_round3.md)
-still calls for two serial smokes, six fresh Stage-P seeds, 18 Arm-B fine-tunes and
-nine matched fast-off fine-tunes. No old-store P checkpoint is reused. Report
-per-horizon ablation, six-versus-three seeds, gate activations, branch gradients,
-all economics scenarios and the 2025 decision rule without exercising it. Complete
-host copying and all-file SHA-256/exact-set verification precede termination of
-the exact recorded GH200 ID, followed by two absence checks.
+was executed without old-store checkpoint reuse. The report includes per-horizon
+ablation, six-versus-three seeds, gate activations, branch gradients, all economics
+scenarios and the unexercised 2025 rule. Six trajectories ran concurrently; median
+GPU utilization was 98% in pretraining and 97% in fine-tuning, including compilation
+and gaps. Peak sampled memory was 68,605 of 97,871 MiB. Complete host recovery
+is required before exact-ID termination and its two absence checks; their live
+closing status is preserved in the operations evidence.
 
 Failed/interrupted roots remain immutable evidence. The memory stop, slow lookup
 stop and Windows Update restart were followed by a fresh successful build; no
 partial arrays were reused. Raw sources and earlier sealed research roots remain
 unchanged. The temporary background S3 upload command was rejected by automatic
-approval review with "blocked by policy"; verified bundles are prepared for the
-approved launcher's SSH transfer path.
+approval review with "blocked by policy"; all transfers used the approved
+launcher's SSH path and passed full hash and exact-file-set verification.
