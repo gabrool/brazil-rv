@@ -21,12 +21,11 @@ import polars as pl
 from numpy.typing import NDArray
 
 from .contract import (
-    COTAHIST_YEARS,
+    DEVELOPMENT_END,
     DECISION_FEATURE_CONTRACT,
     FEATURE_AGE_CONTRACT,
     HORIZONS,
     INTRADAY_DAILY_FEATURES,
-    INTRADAY_PRIOR_SESSION_FEATURES,
     SIDECAR_FEATURES,
     SLOW_FEATURES,
     STORE_START,
@@ -92,8 +91,8 @@ from .intraday_features import (
     build_intraday_daily_features,
     build_native_fast_features_into,
     detect_open_gap_boundaries,
-    mask_action_boundaries,
-    replace_daily_close_anchors,
+    decision_action_boundaries,
+    shareholder_reference_returns,
 )
 from .sidecars import (
     SidecarResult,
@@ -411,10 +410,7 @@ def _require_build_resource_preflight(
     effective_violations = [
         violation
         for violation in violations
-        if not (
-            allow_low_memory
-            and violation == "available_build_memory_below_10_gib"
-        )
+        if not (allow_low_memory and violation == "available_build_memory_below_10_gib")
     ]
     if not effective_violations:
         return
@@ -579,6 +575,9 @@ def stream_intraday_from_assignments(
     sigma_asof: NDArray[np.floating],
     kept_rows: NDArray[np.integer],
     workspace: Path,
+    official_log_return: NDArray[np.floating] | None = None,
+    completed_action_boundary: NDArray[np.bool_] | None = None,
+    same_day_boundary: NDArray[np.bool_] | None = None,
 ) -> StreamedIntraday:
     """Build sparse native M1 and broad daily summaries source-by-source.
 
@@ -591,7 +590,7 @@ def stream_intraday_from_assignments(
     from brazil_rv.modeling.contract import workspace_path
     from brazil_rv.preprocessing.io import (
         dense_grid,
-        load_source_file,
+        SOURCE_COLUMNS,
         validate_session_bars,
         validate_physical_source_identity,
     )
@@ -652,8 +651,21 @@ def stream_intraday_from_assignments(
         np.bool_,
         fill=False,
     )
+    support = _workspace_array(
+        workspace, "full_intraday_support", feature_values.shape, np.float32, fill=0.0
+    )
+    source_age = _workspace_array(
+        workspace,
+        "full_intraday_source_age",
+        feature_values.shape,
+        np.float32,
+        fill=-1.0,
+    )
+    return_consistent = _workspace_array(
+        workspace, "full_m1_return_consistent", shape, np.bool_, fill=False
+    )
     entry = _workspace_array(
-        workspace, "full_intraday_entry", shape, np.float32, fill=np.nan
+        workspace, "full_intraday_decision_mark", shape, np.float32, fill=np.nan
     )
     entry_valid = _workspace_array(
         workspace, "full_intraday_entry_valid", shape, np.bool_, fill=False
@@ -757,7 +769,14 @@ def stream_intraday_from_assignments(
         source_path = raw_path if raw_path.is_file() else workspace_path(raw_path)
         source_path = source_path.resolve()
         source_paths.append(source_path)
-        source = load_source_file(source_path)
+        source = (
+            pl.scan_parquet(source_path)
+            .filter(
+                pl.col("ts_exchange").dt.date().is_between(calendar[0], calendar[-1])
+            )
+            .select(list(SOURCE_COLUMNS))
+            .collect()
+        )
         source_sha256 = source_records([source_path])[0]["sha256"]
         if "xp_symbol" in group.columns:
             validate_physical_source_identity(group, source, source_path)
@@ -882,6 +901,21 @@ def stream_intraday_from_assignments(
                 volume_valid=volume_valid,
                 session_valid=session_valid,
                 sessions=local_sessions,
+                official_log_return=(
+                    None
+                    if official_log_return is None
+                    else official_log_return[start:stop, target, None]
+                ),
+                completed_action_boundary=(
+                    None
+                    if completed_action_boundary is None
+                    else completed_action_boundary[start:stop, target, None]
+                ),
+                same_day_boundary=(
+                    None
+                    if same_day_boundary is None
+                    else same_day_boundary[start:stop, target, None]
+                ),
             )
             prefix_indices = np.asarray(
                 [
@@ -906,8 +940,11 @@ def stream_intraday_from_assignments(
             to_close_entry_valid[start:stop, target] = local_entry_valid
             feature_values[start:stop, target] = native.values[:, 0]
             feature_valid[start:stop, target] = native.valid[:, 0]
-            entry[start:stop, target] = native.entry_open[:, 0]
-            entry_valid[start:stop, target] = native.entry_open_valid[:, 0]
+            support[start:stop, target] = native.support_fraction[:, 0]
+            source_age[start:stop, target] = native.source_age_sessions[:, 0]
+            return_consistent[start:stop, target] = native.return_consistent[:, 0]
+            entry[start:stop, target] = native.decision_mark[:, 0]
+            entry_valid[start:stop, target] = native.decision_mark_valid[:, 0]
             realized[start:stop, target] = native.realized_daily_vol[:, 0]
             present[start:stop, target] = native.fast_present[:, 0]
             session_close[start:stop, target] = native.session_close[:, 0]
@@ -993,13 +1030,15 @@ def stream_intraday_from_assignments(
         result=IntradayDailyResult(
             values=feature_values,
             valid=feature_valid,
-            entry_open=entry,
-            entry_open_valid=entry_valid,
+            decision_mark=entry,
+            decision_mark_valid=entry_valid,
             session_close=session_close,
             session_close_valid=session_close_valid,
             realized_daily_vol=realized,
             fast_present=present,
-            close_anchor_consistent=session_close_valid.copy(),
+            return_consistent=return_consistent,
+            support_fraction=support,
+            source_age_sessions=source_age,
         ),
         audit=pl.DataFrame(audit_rows),
         source_paths=tuple(sorted(set(source_paths))),
@@ -1774,7 +1813,9 @@ def _align_intraday_result(
     session_close = np.full(output_shape, np.nan, dtype=np.float64)
     session_close_valid = np.zeros(output_shape, dtype=np.bool_)
     present = np.zeros(output_shape, dtype=np.bool_)
-    anchor_consistent = np.zeros(output_shape, dtype=np.bool_)
+    return_consistent = np.zeros(output_shape, dtype=np.bool_)
+    support = np.zeros(values.shape, dtype=np.float32)
+    source_age = np.full(values.shape, -1.0, dtype=np.float32)
     for source_date, day in enumerate(minute_dates.astype("datetime64[D]").tolist()):
         target_date = date_lookup.get(day)
         if target_date is None:
@@ -1785,10 +1826,10 @@ def _align_intraday_result(
                 continue
             values[target_date, target_isin] = result.values[source_date, source_isin]
             valid[target_date, target_isin] = result.valid[source_date, source_isin]
-            entry[target_date, target_isin] = result.entry_open[
+            entry[target_date, target_isin] = result.decision_mark[
                 source_date, source_isin
             ]
-            entry_valid[target_date, target_isin] = result.entry_open_valid[
+            entry_valid[target_date, target_isin] = result.decision_mark_valid[
                 source_date, source_isin
             ]
             session_close[target_date, target_isin] = result.session_close[
@@ -1803,19 +1844,27 @@ def _align_intraday_result(
             present[target_date, target_isin] = result.fast_present[
                 source_date, source_isin
             ]
-            anchor_consistent[target_date, target_isin] = (
-                result.close_anchor_consistent[source_date, source_isin]
-            )
+            return_consistent[target_date, target_isin] = result.return_consistent[
+                source_date, source_isin
+            ]
+            support[target_date, target_isin] = result.support_fraction[
+                source_date, source_isin
+            ]
+            source_age[target_date, target_isin] = result.source_age_sessions[
+                source_date, source_isin
+            ]
     return IntradayDailyResult(
         values=values,
         valid=valid,
-        entry_open=entry,
-        entry_open_valid=entry_valid,
+        decision_mark=entry,
+        decision_mark_valid=entry_valid,
         session_close=session_close,
         session_close_valid=session_close_valid,
         realized_daily_vol=realized,
         fast_present=present,
-        close_anchor_consistent=anchor_consistent,
+        return_consistent=return_consistent,
+        support_fraction=support,
+        source_age_sessions=source_age,
     )
 
 
@@ -1825,7 +1874,6 @@ def build_daily_store(
     output_dir: Path,
     *,
     minute_panel: MinutePanel | None = None,
-    streamed_intraday: StreamedIntraday | None = None,
     sidecars: Mapping[str, SidecarResult] | None = None,
     stream_intraday: bool = False,
     sidecar_arguments: Sequence[str] = (),
@@ -1839,6 +1887,7 @@ def build_daily_store(
     isin_link_allowlist: Path | None = None,
     minimum_rank_names: int = 20,
     store_start: date | None = STORE_START,
+    security_axis: Sequence[str] | None = None,
     resource_preflight: Mapping[str, object] | None = None,
     action_terms_source: str = "verified_contractual_terms",
     schedule_source: str | None = None,
@@ -1849,7 +1898,7 @@ def build_daily_store(
     if (
         sum(
             value is not None and value is not False
-            for value in (minute_panel, streamed_intraday, stream_intraday)
+            for value in (minute_panel, stream_intraday)
         )
         > 1
     ):
@@ -1863,9 +1912,7 @@ def build_daily_store(
         "inferred_cotahist_dismes_v1",
     }:
         raise ValueError("unsupported corporate-action source tier")
-    has_intraday = (
-        minute_panel is not None or streamed_intraday is not None or stream_intraday
-    )
+    has_intraday = minute_panel is not None or stream_intraday
 
     m1_isins: tuple[str, ...] = ()
     if m1_assignments is not None:
@@ -1891,6 +1938,7 @@ def build_daily_store(
     panel = panel_from_daily(
         cash,
         dates=calendar,
+        isins=security_axis,
         source_session_complete=source_session_complete,
         invalid_observations=validation.rejected,
     )
@@ -2015,11 +2063,26 @@ def build_daily_store(
     identity_successor = np.broadcast_to(
         np.arange(len(panel.isins), dtype=np.int64), panel.observed.shape
     )
-    intraday_unit_or_unresolved_boundary = (
-        ~decision_actions.session_resolved
-        | ~np.isclose(decision_actions.shares_per_prior_share, 1.0)
-        | (decision_actions.successor_index != identity_successor)
+    intraday_unit_or_unresolved_boundary = decision_action_boundaries(
+        panel.open_brl,
+        panel.close_brl,
+        panel.observed,
+        decision_actions.session_resolved,
+        verified_action_terms,
+        session_schedule,
+        panel.isins,
     )
+    # Completed reference returns use retrospective terms solely for historical
+    # M1 validation. The scalar builder shifts their use past the closing time.
+    intraday_official_return = shareholder_reference_returns(
+        panel.close_brl, panel.observed, retrospective_actions
+    )
+    intraday_completed_boundary = (
+        retrospective_actions.has_action
+        | ~retrospective_actions.session_resolved
+        | (retrospective_actions.successor_index != identity_successor)
+    )
+    intraday_same_day_boundary = intraday_unit_or_unresolved_boundary
     wealth_paths = {
         name: workspace / f"{name}.npy"
         for name in (
@@ -2250,6 +2313,13 @@ def build_daily_store(
         np.float32,
         fill=-1.0,
     )
+    intraday_support_fraction = _workspace_array(
+        workspace,
+        "intraday_support_fraction",
+        intraday_values.shape,
+        np.float32,
+        fill=0.0,
+    )
     fast_sigma = np.full(shape, np.nan, dtype=np.float64)
     fast_present = np.zeros(shape, dtype=np.bool_)
     entry = np.full(shape, np.nan, dtype=np.float64)
@@ -2257,12 +2327,13 @@ def build_daily_store(
     realized_daily = np.full(shape, np.nan, dtype=np.float64)
     m1_session_close = np.full(shape, np.nan, dtype=np.float64)
     m1_session_close_valid = np.zeros(shape, dtype=np.bool_)
-    close_anchor_consistent = np.zeros(shape, dtype=np.bool_)
+    return_consistent = np.zeros(shape, dtype=np.bool_)
     intraday_audit: pl.DataFrame | None = None
     intraday_source_paths: tuple[Path, ...] = ()
     native_fast_arrays: dict[str, NDArray[np.generic]] = {}
     native_fast_mapping: pl.DataFrame | None = None
     streamed_workspace_arrays: tuple[NDArray[np.generic], ...] = ()
+    streamed_intraday: StreamedIntraday | None = None
     if stream_intraday:
         if m1_assignments is None:
             raise ValueError("streamed intraday construction requires M1 assignments")
@@ -2274,6 +2345,9 @@ def build_daily_store(
             sigma_asof=target_scale_sigma,
             kept_rows=kept_rows,
             workspace=workspace,
+            official_log_return=intraday_official_return,
+            completed_action_boundary=intraday_completed_boundary,
+            same_day_boundary=intraday_same_day_boundary,
         )
     if minute_panel is not None:
         if not np.array_equal(minute_panel.dates, panel.dates):
@@ -2294,6 +2368,11 @@ def build_daily_store(
             volume_valid=minute_panel.volume_valid,
             session_valid=minute_panel.session_valid,
             sessions=session_schedule,
+            official_log_return=intraday_official_return[:, minute_store_indices],
+            completed_action_boundary=intraday_completed_boundary[
+                :, minute_store_indices
+            ],
+            same_day_boundary=intraday_same_day_boundary[:, minute_store_indices],
         )
         aligned = _align_intraday_result(
             native, minute_panel.dates, minute_panel.isins, panel.dates, panel.isins
@@ -2301,15 +2380,6 @@ def build_daily_store(
         del native
         m1_session_close = aligned.session_close.copy()
         m1_session_close_valid = aligned.session_close_valid.copy()
-        aligned = replace_daily_close_anchors(
-            aligned, panel.close_brl, panel.observed, copy_buffers=False
-        )
-        aligned = mask_action_boundaries(
-            aligned,
-            lagged_boundary=intraday_unit_or_unresolved_boundary,
-            same_day_boundary=intraday_unit_or_unresolved_boundary,
-            copy_buffers=False,
-        )
         intraday_specs = feature_specs(
             "intraday",
             INTRADAY_DAILY_FEATURES,
@@ -2331,7 +2401,9 @@ def build_daily_store(
             intraday_age_sessions,
             source_rows=kept_rows,
             decision_rows=kept_rows,
+            source_age_sessions=aligned.source_age_sessions,
         )
+        intraday_support_fraction[:] = aligned.support_fraction[kept_rows]
         fast_sigma = np.where(aligned.valid[..., 14], aligned.values[..., 14], np.nan)
         fast_present = aligned.fast_present
         prefix_indices = np.asarray(
@@ -2360,7 +2432,7 @@ def build_daily_store(
         ).astype(np.float32)
         entry_valid[:, minute_store_indices] = minute_entry_valid
         realized_daily = aligned.realized_daily_vol
-        close_anchor_consistent = aligned.close_anchor_consistent
+        return_consistent = aligned.return_consistent
         patch_count = max(
             (
                 (row.decision_time.hour * 60 + row.decision_time.minute)
@@ -2433,13 +2505,15 @@ def build_daily_store(
         streamed_workspace_arrays = (
             aligned.values,
             aligned.valid,
-            aligned.entry_open,
-            aligned.entry_open_valid,
+            aligned.decision_mark,
+            aligned.decision_mark_valid,
             aligned.session_close,
             aligned.session_close_valid,
             aligned.realized_daily_vol,
             aligned.fast_present,
-            aligned.close_anchor_consistent,
+            aligned.return_consistent,
+            aligned.support_fraction,
+            aligned.source_age_sessions,
             streamed_intraday.to_close_entry,
             streamed_intraday.to_close_entry_valid,
         )
@@ -2447,15 +2521,6 @@ def build_daily_store(
             raise ValueError("streamed intraday derivatives are misaligned")
         m1_session_close = aligned.session_close.copy()
         m1_session_close_valid = aligned.session_close_valid.copy()
-        aligned = replace_daily_close_anchors(
-            aligned, panel.close_brl, panel.observed, copy_buffers=False
-        )
-        aligned = mask_action_boundaries(
-            aligned,
-            lagged_boundary=intraday_unit_or_unresolved_boundary,
-            same_day_boundary=intraday_unit_or_unresolved_boundary,
-            copy_buffers=False,
-        )
         intraday_specs = feature_specs(
             "intraday",
             INTRADAY_DAILY_FEATURES,
@@ -2477,13 +2542,15 @@ def build_daily_store(
             intraday_age_sessions,
             source_rows=kept_rows,
             decision_rows=kept_rows,
+            source_age_sessions=aligned.source_age_sessions,
         )
+        intraday_support_fraction[:] = aligned.support_fraction[kept_rows]
         fast_sigma = np.where(aligned.valid[..., 14], aligned.values[..., 14], np.nan)
         fast_present = aligned.fast_present
         entry = streamed_intraday.to_close_entry
         entry_valid = streamed_intraday.to_close_entry_valid
         realized_daily = aligned.realized_daily_vol
-        close_anchor_consistent = aligned.close_anchor_consistent
+        return_consistent = aligned.return_consistent
         native_fast_arrays = dict(streamed_intraday.native_arrays)
         native_fast_mapping = streamed_intraday.native_mapping
 
@@ -2491,10 +2558,10 @@ def build_daily_store(
     if has_intraday:
         to_close = build_to_close_target(
             entry,
-            np.where(panel.observed, panel.close_brl, np.nan),
+            np.where(m1_session_close_valid, m1_session_close, np.nan),
             realized_daily,
             universe.active,
-            fast_present & entry_valid & close_anchor_consistent,
+            fast_present & entry_valid & return_consistent,
         )
         for name, values in (
             ("target_to_close", to_close.target),
@@ -2504,7 +2571,7 @@ def build_daily_store(
                 to_close.normalized_residual,
             ),
             ("target_to_close_raw_log_return", to_close.raw_log_return),
-            ("m1_cotahist_close_consistent_mask", close_anchor_consistent),
+            ("m1_cotahist_return_consistent_mask", return_consistent),
         ):
             to_close_arrays[name] = _copy_selected_workspace_array(
                 workspace, f"store_{name}", values, kept_rows
@@ -2514,19 +2581,6 @@ def build_daily_store(
             del aligned
         streamed_intraday = None
         gc.collect()
-
-    prior_session_features = np.asarray(
-        [
-            INTRADAY_DAILY_FEATURES.index(name)
-            for name in INTRADAY_PRIOR_SESSION_FEATURES
-        ],
-        dtype=np.int64,
-    )
-    for start in range(0, intraday_age_sessions.shape[0], 32):
-        block = intraday_age_sessions[start : start + 32]
-        for feature_index in prior_session_features:
-            column = block[..., feature_index]
-            column[column >= 0.0] += 1.0
 
     target_shape = (kept_rows.size, len(panel.isins), len(HORIZONS))
     target_arrays: dict[str, NDArray[np.generic]] = {
@@ -2680,6 +2734,7 @@ def build_daily_store(
             "intraday_values": intraday_values,
             "intraday_valid": intraday_valid,
             "intraday_age_sessions": intraday_age_sessions,
+            "intraday_support_fraction": intraday_support_fraction,
             "fast_present": _copy_selected_workspace_array(
                 workspace, "store_fast_present", fast_present, kept_rows
             ),
@@ -3009,6 +3064,27 @@ def build_daily_store(
             panel.close_brl,
             panel.observed,
         )
+        ratio_valid = (
+            m1_session_close_valid
+            & panel.observed
+            & np.isfinite(m1_session_close)
+            & (m1_session_close > 0)
+            & np.isfinite(panel.close_brl)
+            & (panel.close_brl > 0)
+        )
+        ratio_rows, ratio_names = np.nonzero(ratio_valid & keep[:, None])
+        tables["m1_cotahist_level_ratio"] = pl.DataFrame(
+            {
+                "trade_date": panel.dates[ratio_rows].astype("datetime64[ms]"),
+                "isin": np.asarray(panel.isins)[ratio_names],
+                "m1_to_cotahist_close": m1_session_close[ratio_rows, ratio_names]
+                / panel.close_brl[ratio_rows, ratio_names],
+                "return_consistent": return_consistent[ratio_rows, ratio_names],
+                "completed_action_boundary": intraday_completed_boundary[
+                    ratio_rows, ratio_names
+                ],
+            }
+        ).with_columns(pl.col("trade_date").cast(pl.Date))
     if intraday_audit is not None:
         tables["m1_source_audit"] = intraday_audit
     tables["common_state_diagnostics"] = common_state_table
@@ -3185,6 +3261,17 @@ def build_daily_store(
             "minimum_rank_names": minimum_rank_names,
         },
         "feature_age_contract": dict(FEATURE_AGE_CONTRACT),
+        "intraday_consistency": {
+            "comparison": "adjacent exact M1 close log return versus COTAHIST shareholder wealth",
+            "maximum_absolute_log_return_difference": 0.005,
+            "clock": "completed session validation only; never gate its own decision prefix",
+            "action_rows": "exclude completed inferred-action/identity rows; current open-known boundaries only",
+            "rolling_minimum_fraction": 0.8,
+            "rolling_sums": "sum actual observations; no extrapolation or filling",
+            "activity": "only physical rows certify activity; absent sparse-archive minutes remain unknown",
+            "source_age": "sessions since newest observation consumed; independent of feature validity; unknown -1",
+            "to_close_target": "exact entry and continuous-close prices both in M1 units",
+        },
         "survivorship_gates": {
             "internally_derived_feature_family_max_gap": 0.05,
             "target_family_max_gap": 0.10,
@@ -3399,6 +3486,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--implementation-commit", required=True)
     parser.add_argument("--actions", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--store-end", type=date.fromisoformat, default=DEVELOPMENT_END)
     parser.add_argument(
         "--previous-store",
         required=True,
@@ -3427,6 +3515,8 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
 
 def _load_action_bundle(
     actions_path: Path,
+    *,
+    end_date: date | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, tuple[Path, ...]]:
     """Load and hash-verify the exact immutable acquisition bundle."""
 
@@ -3459,7 +3549,9 @@ def _load_action_bundle(
     if paths["actions"] != actions_path:
         raise ValueError("--actions is not the action file bound by its manifest")
     return (
-        pl.read_parquet(paths["actions"]),
+        pl.scan_parquet(paths["actions"])
+        .filter(pl.lit(True) if end_date is None else pl.col("ex_date") <= end_date)
+        .collect(),
         pl.read_parquet(paths["acquisition_audit"]),
         pl.read_parquet(paths["security_master"]),
         (manifest_path, *paths.values()),
@@ -3795,10 +3887,12 @@ def _validate_cotahist_parse_audit(
         )
         for path in raw_sources
     }
-    if set(int(row.get("year", -1)) for row in rows) != set(expected):
-        raise ValueError("COTAHIST parse audit year coverage differs from raw inputs")
+    if not set(expected).issubset(int(row.get("year", -1)) for row in rows):
+        raise ValueError("COTAHIST parse audit does not cover the requested raw inputs")
     for raw in rows:
         year = int(raw["year"])
+        if year not in expected:
+            continue
         source_path, source_sha = expected[year]
         if raw.get("error"):
             raise ValueError(f"COTAHIST parser failed for {year}: {raw['error']}")
@@ -3853,9 +3947,9 @@ def main(arguments: Sequence[str] | None = None) -> None:
         resource_preflight,
         allow_low_memory=args.i_understand_low_memory_risk,
     )
+    years = tuple(range(2009, args.store_end.year + 1))
     raw_sources = tuple(
-        (args.cotahist_raw_root / f"COTAHIST_A{year}.ZIP").resolve()
-        for year in COTAHIST_YEARS
+        (args.cotahist_raw_root / f"COTAHIST_A{year}.ZIP").resolve() for year in years
     )
     missing_raw = [str(path) for path in raw_sources if not path.is_file()]
     if missing_raw:
@@ -3863,7 +3957,11 @@ def main(arguments: Sequence[str] | None = None) -> None:
     if not args.cotahist_parse_audit.is_file():
         raise FileNotFoundError(args.cotahist_parse_audit)
     _validate_cotahist_parse_audit(args.cotahist_parse_audit, raw_sources)
-    schedule = load_session_schedule(args.session_schedule)
+    schedule = tuple(
+        row
+        for row in load_session_schedule(args.session_schedule)
+        if row.trade_date <= args.store_end
+    )
     resolved_schedule_source = schedule_source_label(schedule)
     schedule_reconstruction_audit: dict[str, object] | None = None
     schedule_audit_path: Path | None = None
@@ -3905,32 +4003,39 @@ def main(arguments: Sequence[str] | None = None) -> None:
             "canonical M1 assignments must bind unique security_id and ISIN rows"
         )
     m1_isins = tuple(assignments.get_column("isin").cast(pl.String).to_list())
-    paths = sorted(args.cotahist_root.glob("year=*/equities_daily_*.parquet"))
-    daily = load_cotahist(paths, v1_isins=m1_isins).filter(
-        pl.col("trade_date").dt.year().is_in(COTAHIST_YEARS)
-    )
+    paths = [
+        args.cotahist_root / f"year={year}" / f"equities_daily_{year}.parquet"
+        for year in years
+    ]
+    daily = load_cotahist(paths, v1_isins=m1_isins, end_date=args.store_end)
     foundation = daily
     available_years = set(
         foundation.get_column("trade_date").dt.year().unique().to_list()
     )
-    if available_years != set(COTAHIST_YEARS):
+    if available_years != set(years):
         raise ValueError(
             "canonical COTAHIST foundation must contain exactly years "
-            f"{COTAHIST_YEARS}; got {sorted(available_years)}"
+            f"{years}; got {sorted(available_years)}"
         )
     actions, acquisition_audit, action_master, action_sources = _load_action_bundle(
-        args.actions
+        args.actions,
+        end_date=args.store_end,
     )
     expected_master = build_security_master(foundation)
-    master_columns = ["isin", "ticker", "first_date", "last_date"]
+    # Provider master may extend beyond this build. Only its identity coverage
+    # is needed; its future last-observation dates never define the model axis.
+    if not expected_master.join(
+        action_master, on=["isin", "ticker"], how="anti"
+    ).is_empty():
+        raise ValueError("corporate-action security master misses a COTAHIST identity")
+    prior_manifest = json.loads((args.previous_store / "manifest.json").read_text())
+    axis_path = args.previous_store / "isin_index.npy"
     if (
-        not action_master.select(master_columns)
-        .sort(master_columns)
-        .equals(expected_master.select(master_columns).sort(master_columns))
+        source_records([axis_path])[0]["sha256"]
+        != prior_manifest["indices"]["isin_index.npy"]["sha256"]
     ):
-        raise ValueError(
-            "corporate-action security master differs from the COTAHIST foundation"
-        )
+        raise ValueError("previous-store security axis hash mismatch")
+    security_axis = tuple(np.load(axis_path, allow_pickle=False).tolist())
     minute = load_minute_npz(args.minute_npz) if args.minute_npz else None
     # The builder materializes M1 and sidecar families only when their turn is
     # reached, then releases each raw family after writing its normalized
@@ -3956,6 +4061,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
             *(Path(value.split("=", 1)[1]) for value in args.sidecar),
         ),
         implementation_commit=args.implementation_commit,
+        security_axis=security_axis,
         cotahist_raw_sources=raw_sources,
         cotahist_parse_audit=args.cotahist_parse_audit,
         session_schedule=schedule,

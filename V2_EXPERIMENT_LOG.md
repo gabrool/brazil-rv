@@ -2696,3 +2696,21 @@ selection or leverage rescaling; full-book accounting reconciles within
 `docs/v2_R31_EXECUTION_SWEEP.md`, `docs/v2_r31_execution_sweep_evidence.json`.
 No fit, new store, paid instance, or protected-date payload was used. Intraday
 repair, the bounded build/acceptance and Round 1' CPU remain before the GPU stop.
+
+### Pass 5b implementation before archive coverage
+
+The user explicitly authorized autonomous completion and recommended resolutions
+while absent, including GH200 work after the CPU checks. The holdout remains closed.
+The effective registration records this and the required verified host copy before
+exact-instance termination.
+
+Removed the level-anchor replacement and blanket window invalidation. Intraday
+scalars use M1-internal ratios with adjacent-return validation on completed data;
+rolling support is explicit (4/5 or 16/20), without missing-observation invention.
+Support and underlying-source ages are retained. Corrected the intraday action
+clock and the M1-entry/COTAHIST-close diagnostic mismatch. The canonical bounded
+builder preserves the old security axis and excludes post-2024 payload before
+decoding. Archive-only coverage has a committed runner and precedes the one build.
+Validation: 90 focused tests pass; both existing production-axis memory tests pass.
+The joined fixture changes inferred cash terms by mutating only an event-day
+COTAHIST close and preserves all same-day intraday/native inputs exactly.

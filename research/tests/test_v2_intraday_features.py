@@ -1,18 +1,16 @@
-from dataclasses import replace
 from datetime import date, datetime, time, timedelta
 
 import numpy as np
 import polars as pl
 
 from brazil_rv.v2.build_store import stream_intraday_from_assignments
-from brazil_rv.v2.corporate_actions import detect_cotahist_actions
 from brazil_rv.v2.decision_clock import SessionDefinition
 from brazil_rv.v2.intraday_features import (
     _rolling_spread_from_moments,
     build_intraday_daily_features,
     detect_open_gap_boundaries,
-    mask_action_boundaries,
-    replace_daily_close_anchors,
+    _rolling_summary,
+    return_consistency,
 )
 
 
@@ -25,7 +23,14 @@ def _minutes() -> tuple[np.ndarray, ...]:
         + np.arange(minutes)[None, None, :] * 0.001
     )
     observed = np.ones(base.shape, dtype=bool)
-    return base, base * 1.001, base * 0.999, base + 0.0005, np.ones(base.shape), observed
+    return (
+        base,
+        base * 1.001,
+        base * 0.999,
+        base + 0.0005,
+        np.ones(base.shape),
+        observed,
+    )
 
 
 def _scheduled_minutes() -> tuple[
@@ -74,7 +79,7 @@ def _scheduled_minutes() -> tuple[
 
 
 def _build_scheduled(
-    inputs: tuple[np.ndarray, ...], sessions: tuple[SessionDefinition, ...]
+    inputs: tuple[np.ndarray, ...], sessions: tuple[SessionDefinition, ...], **kwargs
 ):
     observed = inputs[-1]
     return build_intraday_daily_features(
@@ -82,10 +87,11 @@ def _build_scheduled(
         volume_valid=observed.copy(),
         session_valid=np.ones(observed.shape[:2], dtype=np.bool_),
         sessions=sessions,
+        **kwargs,
     )
 
 
-def _build_minutes(*inputs: np.ndarray):
+def _build_minutes(*inputs: np.ndarray, **kwargs):
     sessions = tuple(
         SessionDefinition(
             trade_date=date(2024, 1, 1) + timedelta(days=day),
@@ -97,7 +103,7 @@ def _build_minutes(*inputs: np.ndarray):
         )
         for day in range(inputs[0].shape[0])
     )
-    return _build_scheduled(inputs, sessions)
+    return _build_scheduled(inputs, sessions, **kwargs)
 
 
 def _source_bars(
@@ -166,8 +172,8 @@ def test_scheduled_intraday_uses_shifted_prefix_and_continuous_close() -> None:
     inputs, sessions = _scheduled_minutes()
     result = _build_scheduled(inputs, sessions)
 
-    assert result.entry_open[24, 0] == 100.0
-    assert result.entry_open_valid[24, 0]
+    assert result.decision_mark[24, 0] == 100.0
+    assert result.decision_mark_valid[24, 0]
     assert result.session_close[24, 0] == 120.0
     assert result.session_close[24, 0] != inputs[3][24, 0, -1]
     np.testing.assert_allclose(result.values[25, 0, 0], np.log(100.0 / 120.0))
@@ -196,7 +202,7 @@ def test_scheduled_intraday_decision_state_ignores_decision_and_later_rows() -> 
         actual.realized_daily_vol[25], baseline.realized_daily_vol[25]
     )
     np.testing.assert_array_equal(actual.fast_present[25], baseline.fast_present[25])
-    np.testing.assert_array_equal(actual.entry_open[25], baseline.entry_open[25])
+    np.testing.assert_array_equal(actual.decision_mark[25], baseline.decision_mark[25])
     assert not actual.session_close_valid[25, 0]
 
 
@@ -287,180 +293,109 @@ def test_entry_bar_does_not_control_fast_presence() -> None:
     inputs[-1][24, 0, 345] = False
     result = _build_minutes(*inputs)
     # Scheduled summaries carry the last completed decision mark here.
-    assert result.entry_open_valid[24, 0]
+    assert result.decision_mark_valid[24, 0]
     assert result.fast_present[24, 0]
 
 
-def test_action_boundaries_use_distinct_causal_clocks() -> None:
-    raw = _build_minutes(*_minutes())
-    result = replace(
-        raw,
-        values=np.ones_like(raw.values),
-        valid=np.ones_like(raw.valid),
+def _official_returns(inputs):
+    final_close = inputs[3][..., -1]
+    result = np.full(final_close.shape, np.nan)
+    result[1:] = np.log(final_close[1:] / final_close[:-1])
+    return result
+
+
+def test_return_consistency_accepts_different_levels_and_rejects_return_jump():
+    close = np.asarray([[100.0], [101.0], [102.0], [103.0]])
+    official_return = np.full(close.shape, np.nan)
+    official_return[1:] = np.log(close[1:] / close[:-1])
+    observed = np.ones(close.shape, dtype=bool)
+    for scale in (0.03, 1.0, 19.0):
+        result = return_consistency(close * scale, observed, official_return)
+        np.testing.assert_array_equal(result[:, 0], [False, True, True, True])
+    official_return[2] += 0.006
+    assert not return_consistency(close, observed, official_return)[2, 0]
+    observed[1] = False
+    assert not return_consistency(close, observed, official_return)[1:3].any()
+
+
+def test_m1_internal_scalars_keep_units_and_validate_only_completed_history():
+    inputs = _minutes()
+    reference = _official_returns(inputs)
+    original = _build_minutes(*inputs, official_log_return=reference)
+    scaled = tuple(x * 0.07 if i < 4 else x.copy() for i, x in enumerate(inputs))
+    result = _build_minutes(*scaled, official_log_return=reference)
+    np.testing.assert_array_equal(result.valid, original.valid)
+    np.testing.assert_allclose(result.values, original.values, atol=1e-7)
+    expected = np.log(inputs[0][-1, 0, 0] / inputs[3][-2, 0, -1])
+    assert result.values[-1, 0, 0] == np.float32(expected)
+    assert result.session_close[-1, 0] == scaled[3][-1, 0, -1]
+
+
+def test_current_close_and_inferred_action_cannot_change_current_decision():
+    inputs = _minutes()
+    reference = _official_returns(inputs)
+    boundaries = np.zeros(reference.shape, dtype=bool)
+    original = _build_minutes(
+        *inputs, official_log_return=reference, completed_action_boundary=boundaries
     )
-    lagged = np.zeros(result.values.shape[:2], dtype=np.bool_)
-    same_day = np.zeros_like(lagged)
-    lagged[20, 0] = True
-    same_day[20, 1] = True
-
-    masked = mask_action_boundaries(
-        result,
-        lagged_boundary=lagged,
-        same_day_boundary=same_day,
+    mutated = tuple(x.copy() for x in inputs)
+    for value in mutated[:4]:
+        value[23, :, 345:] *= 0.92
+    changed_reference = reference.copy()
+    changed_reference[23] += 0.02
+    boundaries[23] = True
+    result = _build_minutes(
+        *mutated,
+        official_log_return=changed_reference,
+        completed_action_boundary=boundaries,
     )
-
-    # A close-derived classification cannot change its own decision row.
-    assert masked.valid[20, 0].all()
-    # The open-known boundary masks the current cross-session fields.
-    same_day_features = {0, 2, 3, 6, 7, 17}
-    for feature in range(result.values.shape[-1]):
-        assert masked.valid[20, 1, feature] == (feature not in same_day_features)
-    # Its exact trailing dependants stay masked while their windows contain it;
-    # row-local overnight/differential fields clear on the next row.
-    for feature in (2, 3, 7, 17):
-        assert not masked.valid[21, 1, feature]
-    assert masked.valid[21, 1, 0]
-    assert masked.valid[21, 1, 6]
-
-    # On the next decision the boundary affects only lag-one full-session
-    # summaries. Same-session scale-free rolling fields do not cross units.
-    lagged_features = {8, 9, 10}
-    for feature in range(result.values.shape[-1]):
-        assert masked.valid[21, 0, feature] == (feature not in lagged_features)
-    assert masked.valid[22, 0, 8]
-    assert masked.valid[24, 0, 2]
-    assert np.all(masked.values[~masked.valid] == 0.0)
+    for field in ("values", "valid", "support_fraction", "source_age_sessions"):
+        np.testing.assert_array_equal(
+            getattr(result, field)[23], getattr(original, field)[23]
+        )
+    assert not result.valid[24, :, (0, 6, 8, 9, 10)].any()
+    assert result.valid[23, :, 1].all()
+    assert not result.return_consistent[23].any()
 
 
-def test_open_gap_boundary_is_decision_known_and_close_t_invariant() -> None:
-    raw_open = np.asarray([[100.0], [50.0], [51.0]])
-    raw_close = np.asarray([[100.0], [52.0], [53.0]])
-    observed = np.ones_like(raw_open, dtype=bool)
-    expected = detect_open_gap_boundaries(raw_open, raw_close, observed)
-    assert expected[:, 0].tolist() == [False, True, False]
-
-    changed = raw_close.copy()
-    changed[1, 0] = 5_200.0
-    actual = detect_open_gap_boundaries(raw_open, changed, observed)
-    assert actual[1, 0] == expected[1, 0]
-    assert actual[2, 0] != expected[2, 0]
+def test_open_known_boundary_excludes_observation_without_destroying_rolling_window():
+    inputs = _minutes()
+    known = np.zeros(inputs[0].shape[:2], dtype=bool)
+    known[23] = True
+    result = _build_minutes(*inputs, same_day_boundary=known)
+    assert not result.valid[23, :, (0, 6)].any()
+    assert result.valid[23, :, 2].all()
+    np.testing.assert_array_equal(result.support_fraction[23, :, 2], np.float32(0.8))
+    np.testing.assert_array_equal(result.source_age_sessions[23, :, 2], 1.0)
 
 
-def test_open_gap_without_dismes_masks_current_cross_session_features() -> None:
-    result = _build_minutes(*_minutes())
-    shape = result.values.shape[:2]
-    raw_open = np.full(shape, 100.0)
-    raw_close = np.full(shape, 100.0)
-    quantity = np.full(shape, 100.0)
-    distribution = np.ones(shape)
-    observed = np.ones(shape, dtype=np.bool_)
-    raw_open[20, 0] = 50.0
-
-    detected = detect_cotahist_actions(
-        raw_close, quantity, distribution, observed
-    )
-    same_day = detect_open_gap_boundaries(raw_open, raw_close, observed)
-    assert same_day[20, 0]
-    assert not detected.event_candidate.any()
-
-    masked = mask_action_boundaries(
-        result,
-        lagged_boundary=detected.split_event,
-        same_day_boundary=same_day,
-    )
-    for feature in (0, 2, 3, 6, 7):
-        assert not masked.valid[20, 0, feature]
-    assert masked.valid[20, 0, 1] == result.valid[20, 0, 1]
-    assert masked.valid[21, 0, 0] == result.valid[21, 0, 0]
-    assert not masked.valid[21, 0, 2]
+def test_rolling_support_counts_observations_without_imputation():
+    values = np.arange(1, 7, dtype=float)[:, None]
+    valid = np.ones(values.shape, dtype=bool)
+    valid[4] = False
+    sums, accepted, coverage, age = _rolling_summary(values, valid, 5, total=True)
+    assert accepted[4, 0] and sums[4, 0] == 10.0
+    assert coverage[4, 0] == np.float32(0.8) and age[4, 0] == 1
+    valid[3] = False
+    assert not _rolling_summary(values, valid, 5)[1][4, 0]
+    # Historical close knowledge can reject yesterday, never today's sample.
+    valid[:] = True
+    completed = valid.copy()
+    completed[4] = False
+    assert _rolling_summary(values, valid, 5, completed_valid=completed)[2][4, 0] == 1
+    assert _rolling_summary(values, valid, 5, completed_valid=completed)[2][
+        5, 0
+    ] == np.float32(0.8)
 
 
-def test_post_decision_split_classification_cannot_change_same_day_features() -> None:
-    days, names, minutes = 25, 1, 405
-
-    def intraday(post_decision_close: float):
-        price = np.full((days, names, minutes), 100.0)
-        inputs = [price.copy() for _ in range(4)]
-        for values in inputs:
-            values[20, :, 346:] = post_decision_close
-        volume = np.ones_like(price)
-        observed = np.ones_like(price, dtype=np.bool_)
-        return _build_minutes(*inputs, volume, observed)
-
-    raw_open = np.full((days, names), 100.0)
-    distribution = np.ones_like(raw_open)
-    distribution[20:] = 2.0
-    observed = np.ones_like(raw_open, dtype=np.bool_)
-
-    close_92 = np.full_like(raw_open, 100.0)
-    close_92[20] = 92.0
-    quantity_92 = np.full_like(raw_open, 100.0)
-    quantity_92[20] = 100.0 / 0.92
-    close_93 = close_92.copy()
-    close_93[20] = 93.0
-    quantity_93 = quantity_92.copy()
-    quantity_93[20] = 100.0 / 0.93
-
-    actions_92 = detect_cotahist_actions(
-        close_92, quantity_92, distribution, observed
-    )
-    actions_93 = detect_cotahist_actions(
-        close_93, quantity_93, distribution, observed
-    )
-    assert actions_92.split_event[20, 0]
-    assert not actions_93.split_event[20, 0]
-
-    gap_92 = detect_open_gap_boundaries(raw_open, close_92, observed)
-    gap_93 = detect_open_gap_boundaries(raw_open, close_93, observed)
-    np.testing.assert_array_equal(gap_92[20], gap_93[20])
-    assert not gap_92[20, 0]
-
-    result_92 = replace_daily_close_anchors(intraday(92.0), close_92, observed)
-    result_93 = replace_daily_close_anchors(intraday(93.0), close_93, observed)
-    masked_92 = mask_action_boundaries(
-        result_92,
-        lagged_boundary=actions_92.split_event,
-        same_day_boundary=gap_92,
-    )
-    masked_93 = mask_action_boundaries(
-        result_93,
-        lagged_boundary=actions_93.split_event,
-        same_day_boundary=gap_93,
-    )
-
-    np.testing.assert_array_equal(masked_92.values[20], masked_93.values[20])
-    np.testing.assert_array_equal(masked_92.valid[20], masked_93.valid[20])
-    assert masked_92.valid[21, 0, 2]
-    assert masked_93.valid[21, 0, 2]
-
-
-def test_resolved_cash_action_does_not_mask_but_unit_change_does() -> None:
-    raw = _build_minutes(*_minutes())
-    result = replace(
-        raw,
-        values=np.ones_like(raw.values),
-        valid=np.ones_like(raw.valid),
-    )
-    cash_only_boundary = np.zeros(result.values.shape[:2], dtype=np.bool_)
-    unit_boundary = cash_only_boundary.copy()
-    unit_boundary[20, 0] = True
-
-    dividend = mask_action_boundaries(
-        result,
-        lagged_boundary=cash_only_boundary,
-        same_day_boundary=cash_only_boundary,
-    )
-    split = mask_action_boundaries(
-        result,
-        lagged_boundary=unit_boundary,
-        same_day_boundary=unit_boundary,
-    )
-
-    assert dividend.valid[20, 0].all()
-    assert split.valid[20, 0, 1]
-    assert not split.valid[20, 0, 0]
-    assert not split.valid[21, 0, 2]
-    assert not split.valid[21, 0, 8]
+def test_open_gap_boundary_is_decision_known_and_close_t_invariant():
+    open_ = np.asarray([[100.0], [50.0], [51.0]])
+    close = np.asarray([[100.0], [52.0], [53.0]])
+    observed = np.ones(close.shape, dtype=bool)
+    original = detect_open_gap_boundaries(open_, close, observed)
+    close[1] = 500.0
+    assert original[1, 0]
+    assert detect_open_gap_boundaries(open_, close, observed)[1, 0] == original[1, 0]
 
 
 def test_fast_presence_ignores_every_entry_bar_field() -> None:
@@ -474,59 +409,6 @@ def test_fast_presence_ignores_every_entry_bar_field() -> None:
     np.testing.assert_array_equal(original.fast_present[24], mutated.fast_present[24])
 
 
-def test_cotahist_close_replaces_full_session_anchor() -> None:
-    result = _build_minutes(*_minutes())
-    official = result.session_close.copy()
-    official[-2, 0] *= 1.004
-    replaced = replace_daily_close_anchors(
-        result, official, np.ones_like(official, dtype=bool)
-    )
-    assert replaced.session_close[-2, 0] == official[-2, 0]
-    expected_overnight = np.log(
-        (result.entry_open[-1, 0] / np.exp(result.values[-1, 0, 1]))
-        / official[-2, 0]
-    )
-    assert replaced.values[-1, 0, 0] == np.float32(expected_overnight)
-
-
-def test_cotahist_close_in_place_mode_matches_copy_mode() -> None:
-    copied_input = _build_minutes(*_minutes())
-    in_place_input = _build_minutes(*_minutes())
-    official = copied_input.session_close.copy()
-    official[-2, 0] *= 1.004
-    observed = np.ones_like(official, dtype=bool)
-    copied = replace_daily_close_anchors(copied_input, official, observed)
-    in_place_values = in_place_input.values
-    in_place_valid = in_place_input.valid
-    in_place = replace_daily_close_anchors(
-        in_place_input, official, observed, copy_buffers=False
-    )
-    assert in_place.values is in_place_values
-    assert in_place.valid is in_place_valid
-    np.testing.assert_array_equal(in_place.values, copied.values)
-    np.testing.assert_array_equal(in_place.valid, copied.valid)
-    np.testing.assert_array_equal(in_place.session_close, copied.session_close)
-    np.testing.assert_array_equal(
-        in_place.session_close_valid, copied.session_close_valid
-    )
-
-
-def test_m1_cotahist_unit_mismatch_masks_cross_session_features() -> None:
-    result = _build_minutes(*_minutes())
-    official = result.session_close.copy()
-    official[-2, 0] *= 1.006
-    replaced = replace_daily_close_anchors(
-        result, official, np.ones_like(official, dtype=bool)
-    )
-
-    assert not replaced.close_anchor_consistent[-2, 0]
-    assert not replaced.session_close_valid[-2, 0]
-    assert not replaced.valid[-1, 0, 0]
-    assert not replaced.valid[-1, 0, 8]
-    assert not replaced.valid[-1, 0, 10]
-    assert replaced.valid[-2, 0, 1]
-
-
 def test_decision_features_exclude_every_entry_and_later_bar_field() -> None:
     inputs = _minutes()
     original = _build_minutes(*inputs)
@@ -537,7 +419,7 @@ def test_decision_features_exclude_every_entry_and_later_bar_field() -> None:
     mutated = _build_minutes(*changed)
     np.testing.assert_array_equal(original.values[24], mutated.values[24])
     np.testing.assert_array_equal(original.valid[24], mutated.valid[24])
-    np.testing.assert_array_equal(original.entry_open[24], mutated.entry_open[24])
+    np.testing.assert_array_equal(original.decision_mark[24], mutated.decision_mark[24])
     assert not np.array_equal(original.session_close[24], mutated.session_close[24])
 
 
@@ -606,7 +488,6 @@ def test_streamed_intraday_carries_exact_observed_final_m1_close(
     )
     schedule = tuple(sessions)
     source_path = tmp_path / "source.parquet"
-    source_path.write_bytes(b"immutable-source")
     assignments = pl.DataFrame(
         {
             "security_id": ["SEC_TEST"],
@@ -615,9 +496,7 @@ def test_streamed_intraday_carries_exact_observed_final_m1_close(
         }
     )
     daily = pl.DataFrame({"isin": [isin] * len(dates), "trade_date": dates})
-    source = _source_bars(
-        schedule, frozenset(dates), marked_date=dates[-1]
-    )
+    source = _source_bars(schedule, frozenset(dates), marked_date=dates[-1])
 
     import brazil_rv.preprocessing.io as io
 
@@ -628,7 +507,7 @@ def test_streamed_intraday_carries_exact_observed_final_m1_close(
         grid_calls.append((bars.clone(), date_count, minute_count))
         return dense_grid(bars, date_count, minute_count)
 
-    monkeypatch.setattr(io, "load_source_file", lambda path: source)
+    source.write_parquet(source_path)
     monkeypatch.setattr(io, "dense_grid", capture_grid)
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -651,9 +530,9 @@ def test_streamed_intraday_carries_exact_observed_final_m1_close(
     assert shifted.get_column("minute_idx").min() == 0
     assert shifted.get_column("minute_idx").max() == 359
     expected_mark = 100.0 + 24 * 0.1 + 314 * 0.001 + 0.0005
-    np.testing.assert_allclose(result.result.entry_open[24, 1], expected_mark)
+    np.testing.assert_allclose(result.result.decision_mark[24, 1], expected_mark)
     np.testing.assert_allclose(result.to_close_entry[24, 1], 777.0)
-    assert result.result.entry_open[24, 1] != result.to_close_entry[24, 1]
+    assert result.result.decision_mark[24, 1] != result.to_close_entry[24, 1]
     assert result.result.session_close[24, 1] == np.float32(123.45)
     assert result.result.session_close_valid[24, 1]
     assert not result.to_close_entry_valid[:, 0].any()
@@ -668,9 +547,7 @@ def test_streamed_intraday_carries_exact_observed_final_m1_close(
     ]
     native = result.native_arrays
     assert native["fast_patch_values"].shape == (2, 1, 69, 7)
-    np.testing.assert_array_equal(
-        native["fast_patch_mask"][:, 0].sum(axis=1), [69, 63]
-    )
+    np.testing.assert_array_equal(native["fast_patch_mask"][:, 0].sum(axis=1), [69, 63])
     assert native["fast_patch_valid"][1, 0, :63].any()
     assert native["fast_last_price_age_valid"][1, 0, :63].all()
     assert not native["fast_patch_mask"][1, 0, 63:].any()
@@ -703,7 +580,6 @@ def test_streamed_intraday_grids_only_the_assignment_date_span(
     )
     schedule = tuple(sessions)
     source_path = tmp_path / "source.parquet"
-    source_path.write_bytes(b"immutable-source")
     assignments = pl.DataFrame(
         {
             "security_id": ["SEC_TEST"],
@@ -725,7 +601,7 @@ def test_streamed_intraday_grids_only_the_assignment_date_span(
         grid_calls.append((bars.clone(), date_count, minute_count))
         return dense_grid(bars, date_count, minute_count)
 
-    monkeypatch.setattr(io, "load_source_file", lambda path: source)
+    source.write_parquet(source_path)
     monkeypatch.setattr(io, "dense_grid", capture_grid)
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -755,14 +631,9 @@ def test_streamed_intraday_grids_only_the_assignment_date_span(
     assert result.to_close_entry_valid[27:52].all()
     assert not result.to_close_entry_valid[:27].any()
     assert not result.to_close_entry_valid[52:].any()
-    assert np.all(
-        result.result.entry_open[27:52]
-        != result.to_close_entry[27:52]
-    )
+    assert np.all(result.result.decision_mark[27:52] != result.to_close_entry[27:52])
     np.testing.assert_array_equal(
         result.native_arrays["fast_patch_mask"][:, 0].sum(axis=1),
         [69, 63, 69],
     )
-    assert result.native_mapping.get_column("security_id").to_list() == [
-        "SEC_TEST"
-    ]
+    assert result.native_mapping.get_column("security_id").to_list() == ["SEC_TEST"]

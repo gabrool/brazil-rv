@@ -44,6 +44,46 @@ is inactive for rev4f and the R3.1 replays of its sealed panels.
 
 ## R3.1 executable details frozen before policy results
 
+### Subsequent authority and data-repair details
+
+After the completed R3.1 report, the user explicitly authorized completion while
+absent, including choosing the recommended option whenever input would otherwise
+be requested. This supersedes the requirement to wait for another GPU go after
+the CPU steps, provided preceding checks support continuation. Record substantive
+amendments and their evidence before dependent work. It does not authorize opening
+the 2025/2026 holdout. Use the supplied TXT's GH200 launcher, use available capacity
+where practical, secure and verify the complete host artifact copy, then terminate
+the exact recorded instance and verify its absence twice.
+
+The data repair uses an unchanged 0.005 absolute log-return tolerance on adjacent
+exact M1 closes versus COTAHIST shareholder wealth. Completed-session validation
+and inferred-action flags first affect the following decision. Current boundaries
+use only the observed open, prior unresolved history, and terms actually available
+by that decision. The former daily-feature action mask used the following decision
+as its cutoff and is therefore unsuitable for a same-day intraday feature.
+
+Rolling sums/means require 4/5 or 16/20 observations in their fixed calendar windows.
+Sums include actual observed returns without extrapolation; means use actual
+support. Historical overnight observations are revalidated only with closes that
+are already past; the current observation never consults its own close. Relative
+prefix volume requires at least 16 complete, validated prior prefixes. Moment
+estimators retain their existing 80% observed-return/pair requirement. Coverage
+fractions and the age of the newest underlying observation are recorded. Sparse
+archive gaps remain unknown activity; no OHLC or volume is filled.
+
+Changed families comprise intraday scalars/masks/ages/support, their boundary and
+M1/COTAHIST diagnostics, `fast_sigma` (the intraday-volatility auxiliary), and
+the lending/oddlot sidecars. The to-close intraday target also belongs to this
+repair: both exact endpoints use M1 units; the old M1-entry/COTAHIST-close ratio
+is removed. Native fast patch values/masks/ages, `fast_present`, slow inputs,
+the universe, economic action arrays and multi-day targets are not changed by
+the feature repair. Compare unchanged arrays on the common authorized date and
+identity axes; target comparisons use the existing capability's endpoint masking,
+so no 2025-dependent tail label is decoded. Preserve the canonical 933-name axis
+from identity metadata, without making future-only names eligible historically.
+The CLI reads only COTAHIST years 2009-2024 and pushes the end-date predicate into
+M1/COTAHIST decoding before materialization. The new calendar ends 2024-12-30.
+
 Inputs are the completed rev4f R1 and R2 roots. The freeze verifies and binds each
 complete inventory, result and design, and binds the clean implementation commit
 and this registration. Momentum comes from R1; B, ensemble and GBDT from R2.

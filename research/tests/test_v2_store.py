@@ -1670,7 +1670,7 @@ def test_dataset_rejects_dates_outside_its_stage_before_array_open(tmp_path) -> 
         V2DailyDataset(path, [1], stage="joint", lookback=20)
 
 
-def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
+def test_store_to_close_uses_m1_units_and_causal_return_validation(tmp_path) -> None:
     days = 70
     names = ("BRTESTACNOR1", "BRTESTACNPR0")
     dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(days)]
@@ -1810,6 +1810,32 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
     assert {
         name: record["sha256"] for name, record in full_manifest["arrays"].items()
     } == {name: record["sha256"] for name, record in empty_manifest["arrays"].items()}
+    # Same-day COTAHIST close changes inferred cash terms, but the M1 prefix
+    # and every decision-time scalar/age/support cell must remain exact.
+    changed_daily = pl.DataFrame(daily_rows).with_columns(
+        pl.when((pl.col("trade_date") == dates[63]) & (pl.col("isin") == names[1]))
+        .then(pl.col("close_brl") * 0.995)
+        .otherwise(pl.col("close_brl"))
+        .alias("close_brl")
+    )
+    changed_root = build_daily_store(
+        changed_daily, actions, tmp_path / "daily_store_inferred_close_mutation",
+        minute_panel=panel, action_acquisition_audit=successful_audit,
+        session_schedule=_session_schedule(dates), minimum_rank_names=1,
+        store_start=None, action_terms_source="inferred_cotahist_dismes_v1",
+    )
+    assert np.load(inferred_full_root / "action_cash_per_prior_share.npy")[63, 1] != np.load(
+        changed_root / "action_cash_per_prior_share.npy"
+    )[63, 1]
+    for name in (
+        "intraday_values", "intraday_valid", "intraday_age_sessions",
+        "intraday_support_fraction", "intraday_unit_or_unresolved_boundary_mask",
+        "fast_patch_values", "fast_patch_valid", "fast_present",
+    ):
+        np.testing.assert_array_equal(
+            np.load(inferred_full_root / f"{name}.npy")[:64],
+            np.load(changed_root / f"{name}.npy")[:64], err_msg=name,
+        )
     raw = np.load(root / "target_to_close_raw_log_return.npy")
     valid = np.load(root / "target_to_close_valid.npy")
     expected = np.log(cotahist_close / minute[64, 0, 345])
@@ -1818,7 +1844,7 @@ def test_store_to_close_uses_cotahist_close_anchor(tmp_path) -> None:
     assert valid[64].all()
     assert np.isnan(raw[65, 0])
     assert not valid[65].any()
-    consistent = np.load(root / "m1_cotahist_close_consistent_mask.npy")
+    consistent = np.load(root / "m1_cotahist_return_consistent_mask.npy")
     assert not consistent[65].any()
     cash_event = np.load(root / "detected_cash_event_mask.npy")
     anomaly = np.load(root / "price_jump_anomaly_mask.npy")

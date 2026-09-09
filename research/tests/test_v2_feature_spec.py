@@ -107,6 +107,16 @@ def test_decision_snapshot_applies_daily_lag_once_with_current_membership() -> N
     assert output_valid[2].all()
 
 
+def test_estimator_age_tracks_underlying_observation_and_preserves_known_staleness() -> None:
+    valid = np.asarray([False, False, True, False, True])[:, None, None]
+    source_age = np.asarray([-1, -1, 1, -1, 0], dtype=np.float32)[:, None, None]
+    output = np.empty(source_age.shape, dtype=np.float32)
+    observation_age_sessions_into(
+        valid, np.ones((5, 1), dtype=bool), output, source_age_sessions=source_age,
+    )
+    np.testing.assert_array_equal(output[:, 0, 0], [-1, -1, 1, 2, 0])
+
+
 def test_observation_age_uses_exchange_rows_and_preserves_known_staleness() -> None:
     valid = np.asarray(
         [

@@ -212,7 +212,7 @@ _SLOW_FORMULAS: dict[str, tuple[str, str]] = {
 _INTRADAY_FORMULAS: dict[str, tuple[str, str]] = {
     "overnight_return": (
         "decimal_log_return",
-        "log(session open / last observed prior-session close), using only decision-known action boundaries",
+        "log(M1 session open / exact adjacent M1 session close); prior return consistency and decision-known boundaries",
     ),
     "intraday_return_1545": (
         "decimal_log_return",
@@ -220,19 +220,19 @@ _INTRADAY_FORMULAS: dict[str, tuple[str, str]] = {
     ),
     "overnight_return_sum_5": (
         "decimal_log_return",
-        "exact sum of overnight_return over five sessions ending at the decision",
+        "sum of observed overnight_return in five sessions ending at the decision; minimum 4/5; completed-session return validation",
     ),
     "overnight_return_sum_20": (
         "decimal_log_return",
-        "exact sum of overnight_return over 20 sessions ending at the decision",
+        "sum of observed overnight_return in 20 sessions ending at the decision; minimum 16/20; completed-session return validation",
     ),
     "intraday_return_sum_5": (
         "decimal_log_return",
-        "exact sum of intraday_return_1545 over five sessions ending at the decision",
+        "sum of observed intraday_return_1545 in five sessions ending at the decision; minimum 4/5",
     ),
     "intraday_return_sum_20": (
         "decimal_log_return",
-        "exact sum of intraday_return_1545 over 20 sessions ending at the decision",
+        "sum of observed intraday_return_1545 in 20 sessions ending at the decision; minimum 16/20",
     ),
     "overnight_minus_intraday": (
         "decimal_log_return",
@@ -240,11 +240,11 @@ _INTRADAY_FORMULAS: dict[str, tuple[str, str]] = {
     ),
     "overnight_minus_intraday_mean_20": (
         "decimal_log_return",
-        "mean overnight-minus-intraday differential over 20 exact sessions",
+        "observed-sample mean overnight-minus-intraday differential in 20 sessions; minimum 16/20; completed-session return validation",
     ),
     "last_30_minute_return_share_lag1": (
         "signed_unbounded_ratio",
-        "prior session last-30-minute log return divided by its full-session log return",
+        "prior validated session M1 last-30-minute log return divided by M1 full-session log return",
     ),
     "last_hour_volume_share_lag1": (
         "fraction_0_1",
@@ -252,7 +252,7 @@ _INTRADAY_FORMULAS: dict[str, tuple[str, str]] = {
     ),
     "close_vwap_deviation_lag1": (
         "decimal_log_return",
-        "prior session log(final close / full-session VWAP)",
+        "prior validated session log(M1 final close / M1 full-session VWAP)",
     ),
     "vwap_deviation_1545": (
         "decimal_log_return",
@@ -264,11 +264,11 @@ _INTRADAY_FORMULAS: dict[str, tuple[str, str]] = {
     ),
     "realized_vol_5m_5": (
         "decimal_log_return_volatility",
-        "root-mean-square aggregation of realized_vol_5m_1 over five exact sessions",
+        "observed-sample mean of realized_vol_5m_1 in five sessions; minimum 4/5",
     ),
     "realized_vol_5m_20": (
         "decimal_log_return_volatility",
-        "root-mean-square aggregation of realized_vol_5m_1 over 20 exact sessions",
+        "observed-sample mean of realized_vol_5m_1 in 20 sessions; minimum 16/20",
     ),
     "realized_skew_5m_20": (
         "standardized_unitless",
@@ -280,7 +280,7 @@ _INTRADAY_FORMULAS: dict[str, tuple[str, str]] = {
     ),
     "corwin_schultz_spread_20": (
         "decimal_return_spread",
-        "Corwin-Schultz high-low spread estimate over 20 exact completed sessions",
+        "observed-sample mean of causal Corwin-Schultz prefix high-low estimates in 20 sessions; minimum 16/20",
     ),
     "intraday_range_1545": (
         "decimal_log_range",
@@ -288,7 +288,7 @@ _INTRADAY_FORMULAS: dict[str, tuple[str, str]] = {
     ),
     "volume_1545_relative_median_20": (
         "ratio",
-        "completed-prefix BRL turnover divided by prior-20 median turnover at the same decision clock",
+        "M1 completed-prefix turnover divided by median of at least 16/20 prior activity-complete, return-validated sessions at the same clock",
     ),
 }
 
@@ -343,8 +343,14 @@ _SIDECAR_FORMULAS: dict[str, tuple[str, str]] = {
         "exact five-exchange-session change in oddlot_volume_share at the known vintage",
     ),
     "log_market_cap": ("log_brl", "log point-in-time market capitalization in BRL"),
-    "book_to_market": ("ratio", "point-in-time book equity divided by market capitalization"),
-    "gross_profitability": ("ratio", "point-in-time gross profit divided by total assets"),
+    "book_to_market": (
+        "ratio",
+        "point-in-time book equity divided by market capitalization",
+    ),
+    "gross_profitability": (
+        "ratio",
+        "point-in-time gross profit divided by total assets",
+    ),
     "liabilities_to_assets": (
         "ratio",
         "liabilities divided by assets from one coherent publicly available filing row",
@@ -454,8 +460,7 @@ def feature_specs(
                 clip=clip,
                 availability_rule=(
                     "prior full-session observation available by decision t"
-                    if family == "intraday"
-                    and name in INTRADAY_PRIOR_SESSION_FEATURES
+                    if family == "intraday" and name in INTRADAY_PRIOR_SESSION_FEATURES
                     else _family_availability_rule(family)
                 ),
                 formula=formula,
@@ -608,9 +613,7 @@ def transform_feature_panel_into(
         else np.asarray(source_rows, dtype=np.int64)
     )
     membership_indices = (
-        rows
-        if membership_rows is None
-        else np.asarray(membership_rows, dtype=np.int64)
+        rows if membership_rows is None else np.asarray(membership_rows, dtype=np.int64)
     )
     if membership_indices.shape != rows.shape:
         raise ValueError("membership_rows must align with source_rows")
@@ -664,9 +667,7 @@ def transform_feature_panel_into(
                 ) / np.log1p(252.0)
             elif spec.transform == "signed_clip":
                 assert spec.clip is not None
-                transformed[usable] = np.clip(
-                    cross[usable], -spec.clip, spec.clip
-                )
+                transformed[usable] = np.clip(cross[usable], -spec.clip, spec.clip)
             elif spec.transform == "annual_rate":
                 transformed[usable] = np.clip(
                     np.arcsinh(cross[usable] / 0.01), -5.0, 5.0
@@ -689,6 +690,7 @@ def observation_age_sessions_into(
     *,
     source_rows: NDArray[np.integer] | None = None,
     decision_rows: NDArray[np.integer] | None = None,
+    source_age_sessions: NDArray[np.floating] | None = None,
 ) -> None:
     """Write source ages independently of transforms or current membership.
 
@@ -712,9 +714,7 @@ def observation_age_sessions_into(
         else np.asarray(source_rows, dtype=np.int64)
     )
     decisions = (
-        rows
-        if decision_rows is None
-        else np.asarray(decision_rows, dtype=np.int64)
+        rows if decision_rows is None else np.asarray(decision_rows, dtype=np.int64)
     )
     if rows.ndim != 1 or decisions.shape != rows.shape:
         raise ValueError("source_rows and decision_rows must be aligned vectors")
@@ -727,7 +727,10 @@ def observation_age_sessions_into(
         or np.any(decisions < rows)
     ):
         raise ValueError("source/decision rows violate the causal calendar")
-    if destination.shape != (rows.size, *mask.shape[1:]) or destination.dtype != np.float32:
+    if (
+        destination.shape != (rows.size, *mask.shape[1:])
+        or destination.dtype != np.float32
+    ):
         raise ValueError("feature age destination must be aligned float32")
     destination[...] = -1.0
     last_seen = np.full(mask.shape[1:], -1, dtype=np.int32)
@@ -737,10 +740,15 @@ def observation_age_sessions_into(
     ):
         if source_row >= 0:
             for raw_row in range(scanned_through + 1, source_row + 1):
-                last_seen[mask[raw_row]] = raw_row
+                usable = mask[raw_row]
+                last_seen[usable] = (
+                    raw_row
+                    if source_age_sessions is None
+                    else raw_row - source_age_sessions[raw_row, usable].astype(np.int32)
+                )
             scanned_through = max(scanned_through, int(source_row))
         seen = last_seen >= 0
-        destination[output_row, seen] = (
-            decision_row - last_seen[seen]
-        ).astype(np.float32)
+        destination[output_row, seen] = (decision_row - last_seen[seen]).astype(
+            np.float32
+        )
         destination[output_row, ~membership[decision_row], :] = -1.0

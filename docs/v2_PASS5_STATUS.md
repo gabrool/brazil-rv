@@ -14,6 +14,19 @@ liquidity readout attributes the original trades, without replacement names.
 Nearest-integer history-age canonicalisation is registered for Round 1' on the
 rebuilt store, not the sealed-panel replays.
 
+The user subsequently authorized autonomous completion while absent, including
+the recommended resolution of questions and the GH200 stage after successful CPU
+checks. The effective Round-3 registration records that authority, the unchanged
+holdout boundary, and the required artifact-copy/termination sequence.
+
+The intraday repair is implemented for the archive coverage audit: return rather
+than level consistency, separate daily/intraday action clocks, observed-support
+rolling estimators and their metadata, M1-internal to-close endpoints, bounded
+source decoding, and preserved canonical identity metadata. Ninety focused tests
+pass, including joined builder causality and provider invariance. Both existing
+production-axis memory tests passed. Real-data coverage and the new store build
+are still pending; no repaired-model result has been observed.
+
 The prior cleanup is committed separately as `fb6fc92`; the initial rev-4f
 registration was committed as `0302b27` before new derived beta output.
 The rev-4e registration is retained verbatim inside

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, replace
+from datetime import date
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -90,7 +91,9 @@ class DailyPanel:
         if np.any(self.trade_observed & ~self.activity_valid):
             raise ValueError("an observed daily activity row must be activity-valid")
         if np.any(self.observed & ~self.source_session_complete[:, None]):
-            raise ValueError("daily prices cannot be observed on an incomplete source session")
+            raise ValueError(
+                "daily prices cannot be observed on an incomplete source session"
+            )
         if np.any(self.activity_valid & ~self.source_session_complete[:, None]):
             raise ValueError("activity cannot be valid on an incomplete source session")
         activity = (self.volume_brl, self.trades, self.quantity)
@@ -146,10 +149,16 @@ def _select_cash_equities(
     daily: pl.DataFrame, *, v1_isins: Sequence[str] = ()
 ) -> pl.DataFrame:
     identity = _identity_column(daily)
-    spec = "security_spec_base" if "security_spec_base" in daily.columns else "security_spec"
+    spec = (
+        "security_spec_base"
+        if "security_spec_base" in daily.columns
+        else "security_spec"
+    )
     required = {"trade_date", identity, spec, "market_type"}
     if not required.issubset(daily.columns):
-        raise ValueError(f"COTAHIST columns missing: {sorted(required - set(daily.columns))}")
+        raise ValueError(
+            f"COTAHIST columns missing: {sorted(required - set(daily.columns))}"
+        )
     bdi = "bdi_code" if "bdi_code" in daily.columns else "cod_bdi"
     if bdi not in daily.columns:
         raise ValueError("COTAHIST data has no BDI code")
@@ -206,14 +215,12 @@ def validate_cotahist_daily(
         )
     unique = daily.unique(maintain_order=True)
     exact_duplicates = daily.height - unique.height
-    conflicts = (
-        unique.group_by("trade_date", identity)
-        .len()
-        .filter(pl.col("len") > 1)
-    )
+    conflicts = unique.group_by("trade_date", identity).len().filter(pl.col("len") > 1)
     if conflicts.height:
         examples = (
-            unique.join(conflicts.select("trade_date", identity), on=("trade_date", identity))
+            unique.join(
+                conflicts.select("trade_date", identity), on=("trade_date", identity)
+            )
             .sort("trade_date", identity)
             .head(20)
             .to_dicts()
@@ -229,8 +236,10 @@ def validate_cotahist_daily(
     )
     bad_bounds = ~(
         (pl.col("low_brl") <= pl.min_horizontal("open_brl", "close_brl"))
-        & (pl.min_horizontal("open_brl", "close_brl")
-           <= pl.max_horizontal("open_brl", "close_brl"))
+        & (
+            pl.min_horizontal("open_brl", "close_brl")
+            <= pl.max_horizontal("open_brl", "close_brl")
+        )
         & (pl.max_horizontal("open_brl", "close_brl") <= pl.col("high_brl"))
     )
     bad_activity = pl.any_horizontal(
@@ -264,9 +273,7 @@ def validate_cotahist_daily(
             .then(pl.lit("invalid_quote_factor"))
         )
     validated = unique.with_columns(
-        reason.otherwise(pl.lit(None, dtype=pl.String)).alias(
-            "raw_validation_reason"
-        )
+        reason.otherwise(pl.lit(None, dtype=pl.String)).alias("raw_validation_reason")
     )
     rejected = validated.filter(pl.col("raw_validation_reason").is_not_null())
     accepted = validated.filter(pl.col("raw_validation_reason").is_null()).drop(
@@ -274,10 +281,10 @@ def validate_cotahist_daily(
     )
     status_rows = pl.concat(
         (
-            accepted.select(
-                pl.col("trade_date"), pl.lit("accepted").alias("reason")
+            accepted.select(pl.col("trade_date"), pl.lit("accepted").alias("reason")),
+            rejected.select(
+                "trade_date", pl.col("raw_validation_reason").alias("reason")
             ),
-            rejected.select("trade_date", pl.col("raw_validation_reason").alias("reason")),
         )
     )
     audit = (
@@ -346,11 +353,18 @@ def filter_cash_equities(
     ).accepted
 
 
-def load_cotahist(paths: Sequence[Path], *, v1_isins: Sequence[str] = ()) -> pl.DataFrame:
+def load_cotahist(
+    paths: Sequence[Path], *, v1_isins: Sequence[str] = (), end_date: date | None = None
+) -> pl.DataFrame:
     if not paths:
         raise ValueError("at least one parsed COTAHIST file is required")
+    source = pl.concat(
+        (pl.scan_parquet(path) for path in paths), how="diagonal_relaxed"
+    )
+    if end_date is not None:
+        source = source.filter(pl.col("trade_date") <= end_date)
     return filter_cash_equities(
-        pl.concat((pl.read_parquet(path) for path in paths), how="diagonal_relaxed"),
+        source.collect(),
         v1_isins=v1_isins,
         require_units=True,
     )
@@ -384,7 +398,12 @@ def build_security_master(
                 raise ValueError(f"Blank ticker for {isin}")
             if current_ticker is not None and value_ticker != current_ticker:
                 rows.append(
-                    {"isin": isin, "ticker": current_ticker, "first_date": first, "last_date": last}
+                    {
+                        "isin": isin,
+                        "ticker": current_ticker,
+                        "first_date": first,
+                        "last_date": last,
+                    }
                 )
                 first = value_date
             elif current_ticker is None:
@@ -392,12 +411,21 @@ def build_security_master(
             current_ticker, last = value_ticker, value_date
         if current_ticker is not None:
             rows.append(
-                {"isin": isin, "ticker": current_ticker, "first_date": first, "last_date": last}
+                {
+                    "isin": isin,
+                    "ticker": current_ticker,
+                    "first_date": first,
+                    "last_date": last,
+                }
             )
     master = pl.DataFrame(rows).sort("isin", "first_date")
-    links = pl.DataFrame(
-        schema={"predecessor_isin": pl.String, "successor_isin": pl.String}
-    ) if succession_links is None else succession_links
+    links = (
+        pl.DataFrame(
+            schema={"predecessor_isin": pl.String, "successor_isin": pl.String}
+        )
+        if succession_links is None
+        else succession_links
+    )
     roots = continuation_identity_axis(
         tuple(master.get_column("isin").unique(maintain_order=True).to_list()),
         links,
@@ -430,7 +458,11 @@ def detect_isin_successions(daily: pl.DataFrame) -> pl.DataFrame:
         daily.select(
             pl.col("trade_date"),
             pl.col(identity).cast(pl.String).alias("isin"),
-            pl.col(ticker).cast(pl.String).str.strip_chars().str.to_uppercase().alias("ticker"),
+            pl.col(ticker)
+            .cast(pl.String)
+            .str.strip_chars()
+            .str.to_uppercase()
+            .alias("ticker"),
         )
         .filter(pl.col("isin").is_not_null() & (pl.col("ticker") != ""))
         .unique()
@@ -510,9 +542,7 @@ def detect_isin_successions(daily: pl.DataFrame) -> pl.DataFrame:
     ).select(*schema)
 
 
-def load_isin_link_allowlist(
-    path: Path, candidates: pl.DataFrame
-) -> pl.DataFrame:
+def load_isin_link_allowlist(path: Path, candidates: pl.DataFrame) -> pl.DataFrame:
     """Load source-backed ISIN conversions and bind them to detected candidates.
 
     The repository allowlist is intentionally empty until contractual terms
@@ -647,7 +677,9 @@ def continuation_identity_axis(
     return tuple(roots[str(isin)] for isin in isins)
 
 
-def verify_v1_mapping(assignments: pl.DataFrame, available_isins: Sequence[str]) -> pl.DataFrame:
+def verify_v1_mapping(
+    assignments: pl.DataFrame, available_isins: Sequence[str]
+) -> pl.DataFrame:
     """Verify and return the exact one-to-one v1 security-id to ISIN mapping."""
 
     if not {"security_id", "isin"}.issubset(assignments.columns):
@@ -657,7 +689,11 @@ def verify_v1_mapping(assignments: pl.DataFrame, available_isins: Sequence[str])
         raise ValueError("one v1 security_id maps to multiple ISINs")
     if mapping.get_column("isin").n_unique() != mapping.height:
         raise ValueError("multiple v1 security_ids map to one ISIN")
-    invalid = [value for value in mapping.get_column("isin").to_list() if not VALID_ISIN.fullmatch(str(value))]
+    invalid = [
+        value
+        for value in mapping.get_column("isin").to_list()
+        if not VALID_ISIN.fullmatch(str(value))
+    ]
     if invalid:
         raise ValueError(f"v1 mapping contains invalid ISINs: {invalid}")
     missing = sorted(set(mapping.get_column("isin").to_list()) - set(available_isins))
@@ -676,7 +712,13 @@ def panel_from_daily(
 ) -> DailyPanel:
     identity = _identity_column(daily)
     calendar = tuple(dates)
-    security_axis = tuple(sorted(isins if isins is not None else daily.get_column(identity).unique().to_list()))
+    security_axis = tuple(
+        sorted(
+            isins
+            if isins is not None
+            else daily.get_column(identity).unique().to_list()
+        )
+    )
     if len(set(security_axis)) != len(security_axis):
         raise ValueError("duplicate ISIN on requested axis")
     date_lookup = {value: index for index, value in enumerate(calendar)}
@@ -712,7 +754,9 @@ def panel_from_daily(
                 excluded[date_index, isin_index] = True
     needed = {"trade_date", identity, *(set(values) - {"distribution_number"})}
     if not needed.issubset(daily.columns):
-        raise ValueError(f"daily panel columns missing: {sorted(needed - set(daily.columns))}")
+        raise ValueError(
+            f"daily panel columns missing: {sorted(needed - set(daily.columns))}"
+        )
     selected = daily
     if "distribution_number" not in selected.columns:
         selected = selected.with_columns(
@@ -727,7 +771,9 @@ def panel_from_daily(
             raise ValueError("duplicate date/ISIN daily row")
         for name in values:
             value = row[name]
-            values[name][date_index, isin_index] = np.nan if value is None else float(value)
+            values[name][date_index, isin_index] = (
+                np.nan if value is None else float(value)
+            )
         observed[date_index, isin_index] = True
         trade_observed[date_index, isin_index] = True
 
