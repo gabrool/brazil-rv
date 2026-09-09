@@ -178,6 +178,10 @@ instance has been launched at this point.
 The complete Round-3 finalizer also passes a synthetic artifact test covering all
 24 aggregate books, 27 fine-tune diagnostics, matched P identities, the momentum
 comparator's distinct score mask, paired deltas, and the final sealed inventory.
+Before Round 1' is frozen, the two current registrations are pinned to LF line
+endings. Their Windows files now match the Git blobs byte-for-byte; this prevents
+the GH200 from seeing a different registration hash after checkout. The committed
+registration text and all sealed research artifacts are unchanged.
 
 Validation before replay: Ruff and compilation pass; the full research suite passed
 908 tests in 467.91 seconds. The final focused run passed 100 tests, including
