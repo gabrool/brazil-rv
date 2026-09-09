@@ -22,6 +22,7 @@ from .baselines import BaselinePanel, build_store_baselines
 from .bova11 import Bova11Series, load_bova11_series
 from .config import PROJECT_ROOT
 from .contract import (
+    DEVELOPMENT_FOLDS,
     GBDT_SEEDS,
     HORIZONS,
     PRETRAIN_END,
@@ -111,6 +112,20 @@ RUNG_GROUPS: dict[str, tuple[str, ...]] = {
         "fundamentals",
     ),
 }
+LEGACY_INTRADAY_FEATURES = (
+    "intraday_return_1545",
+    "intraday_return_sum_5",
+    "intraday_return_sum_20",
+    "last_hour_volume_share_lag1",
+    "vwap_deviation_1545",
+    "realized_vol_5m_1",
+    "realized_vol_5m_5",
+    "realized_vol_5m_20",
+    "realized_skew_5m_20",
+    "roll_spread_20",
+    "corwin_schultz_spread_20",
+    "intraday_range_1545",
+)
 RESEARCH_FLAGS = {
     "research_claim": True,
     "official_validation_accessed": False,
@@ -592,7 +607,7 @@ def _fold_indices(
             dates, (*fold.fit_dates, *fold.purge_before_dates)
         )
         payload[fold.name] = fold.payload()
-    if tuple(fit) != ("F1", "F2", "F3"):
+    if tuple(fit) != DEVELOPMENT_FOLDS:
         raise ValueError("development fold roster differs from the registration")
     return fit, selection, evaluation, fit_target_window, payload
 
@@ -621,9 +636,9 @@ def _open_round_store(
         np.concatenate(
             (
                 pretrain,
-                *(fit[name] for name in ("F1", "F2", "F3")),
-                *(selection[name] for name in ("F1", "F2", "F3")),
-                *(evaluation[name] for name in ("F1", "F2", "F3")),
+                *fit.values(),
+                *selection.values(),
+                *evaluation.values(),
             )
         )
     ).astype(np.int64)
@@ -637,9 +652,9 @@ def _open_round_store(
             np.concatenate(
                 (
                     pretrain,
-                    *(fit_target_window[name] for name in ("F1", "F2", "F3")),
-                    *(selection[name] for name in ("F1", "F2", "F3")),
-                    *(evaluation[name] for name in ("F1", "F2", "F3")),
+                    *fit_target_window.values(),
+                    *selection.values(),
+                    *evaluation.values(),
                 )
             )
         ),
@@ -882,6 +897,15 @@ def _daily_series(
     )
     return {
         "primary_neutral_target_ic": primary_values,
+        "legacy_primary_ic_1235": np.asarray(
+            [
+                np.nan
+                if row["primary_neutral_target_ic"] is None
+                else row["primary_neutral_target_ic"]
+                for row in report.get("daily_legacy_primary_ic_1235", daily_primary)
+            ],
+            dtype=np.float64,
+        ),
         "legacy_scaled_target_ic": legacy_values,
         "shareholder_rank_ic": _single_family_ic_series(
             evaluation.inputs,
@@ -1110,7 +1134,7 @@ def _pooled_readouts(
     evaluations: Mapping[str, _ResearchEvaluation],
 ) -> dict[str, object]:
     folds = tuple(evaluations)
-    if not folds or any(fold not in ("F1", "F2", "F3") for fold in folds):
+    if not folds or any(fold not in DEVELOPMENT_FOLDS for fold in folds):
         raise ValueError("pooled report roster must be an ordered fold subset")
     series = {
         fold: _daily_series(evaluation) for fold, evaluation in evaluations.items()
@@ -1592,7 +1616,7 @@ def _paired_readouts(
             "shareholder_return_spread_bps_per_holding_session": spread_rows,
             "headline_net_excess_bps": economics_rows,
         }
-    labels = tuple(deltas["F1"])
+    labels = tuple(deltas[folds[0]])
     return {
         "schema": "BRAZIL_RV_V2_POOLED_PAIRED_READOUTS_V2",
         "folds": {
@@ -1613,9 +1637,15 @@ def _feature_names(store: V2Store, rung: str) -> tuple[str, ...]:
     output = list(gbdt_scalar_feature_names(slow_names))
     if rung != "a_slow":
         intraday_names = scalar_feature_names(store, ("intraday",))
+        if rung == "b_intraday_legacy12":
+            intraday_names = tuple(
+                name for name in intraday_names if name in LEGACY_INTRADAY_FEATURES
+            )
         output.extend(gbdt_scalar_feature_names(intraday_names))
         output.append("fast_present")
-    for group in _resolved_sidecar_groups(store, RUNG_GROUPS[rung]):
+    for group in _resolved_sidecar_groups(
+        store, RUNG_GROUPS["b_intraday" if rung == "b_intraday_legacy12" else rung]
+    ):
         group_names = scalar_feature_names(store, (f"sidecar_{group}",))
         output.extend(gbdt_scalar_feature_names(group_names))
     if len(output) != len(set(output)):
@@ -1674,6 +1704,21 @@ def _gbdt_features(
     parts = [assemble_gbdt_scalar_view(slow, label="slow")]
     if rung != "a_slow":
         intraday = read_scalar_feature_view(store, indices, ("intraday",))
+        if rung == "b_intraday_legacy12":
+            from dataclasses import replace
+
+            fields = [
+                i
+                for i, name in enumerate(intraday.names)
+                if name in LEGACY_INTRADAY_FEATURES
+            ]
+            intraday = replace(
+                intraday,
+                names=tuple(intraday.names[i] for i in fields),
+                values=intraday.values[..., fields],
+                valid=intraday.valid[..., fields],
+                age_sessions=intraday.age_sessions[..., fields],
+            )
         intraday_valid = intraday.valid.copy()
         intraday_age = intraday.age_sessions.copy()
         intraday_valid[pretrain] = False
@@ -1696,7 +1741,9 @@ def _gbdt_features(
                 present[..., None],
             )
         )
-    for group in _resolved_sidecar_groups(store, RUNG_GROUPS[rung]):
+    for group in _resolved_sidecar_groups(
+        store, RUNG_GROUPS["b_intraday" if rung == "b_intraday_legacy12" else rung]
+    ):
         sidecar = read_scalar_feature_view(store, indices, (f"sidecar_{group}",))
         parts.append(assemble_gbdt_scalar_view(sidecar, label=group))
     result = np.concatenate(parts, axis=-1, dtype=np.float32)
@@ -1749,7 +1796,7 @@ def _run_gbdt_candidate(
     feature_names = _feature_names(store, rung)
     reports: dict[str, _ResearchEvaluation] = {}
     records: dict[str, object] = {}
-    folds = ("F1", "F2") if rung == "d_all_sidecars" else ("F1", "F2", "F3")
+    folds = ("F1", "F2") if rung == "d_all_sidecars" else tuple(evaluation)
     if rung == "d_all_sidecars":
         records["F3"] = {
             "status": "source_unsupported",
@@ -3990,13 +4037,16 @@ def _evaluation_from_artifacts(
         primary_targets,
         primary_outcome_mask,
         primary_score_mask,
-    ) = _primary_population_components(inputs)
+    ) = _primary_population_components(
+        inputs, tuple(report["primary_horizons_sessions"])
+    )
     _, daily_primary, _ = _primary_daily_metrics(
         primary_scores,
         primary_targets,
         primary_outcome_mask,
         primary_score_mask,
         inputs.dates,
+        tuple(report["primary_horizons_sessions"]),
     )
     economics = report.get("economics")
     if not isinstance(economics, Mapping) or not isinstance(
@@ -4031,6 +4081,7 @@ def _evaluation_from_artifacts(
         primary_targets=primary_targets,
         primary_outcome_mask=primary_outcome_mask,
         primary_score_mask=primary_score_mask,
+        primary_horizons=tuple(report["primary_horizons_sessions"]),
     )
     return _ResearchEvaluation(result=retained, inputs=inputs)
 

@@ -202,7 +202,7 @@ def test_selection_uses_one_supported_population_for_all_primary_heads() -> None
     ) == pytest.approx(1.0)
 
     mask[0, :5, 3] = False
-    with pytest.raises(ValueError, match="common four-head population"):
+    with pytest.raises(ValueError, match="common declared-head population"):
         _common_primary_selection_score(predictions, targets, mask, active)
 
 
@@ -1046,15 +1046,15 @@ def test_stage_input_contract_rejects_wrong_p_embargo_and_boundaries() -> None:
         first_index=0,
         last_index=99,
         first_date="2010-01-04",
-        last_date="2020-12-31",
+        last_date="2015-12-31",
         alignment=DECISION_FEATURE_ALIGNMENT,
         canonical_splits=canonical,
     )
     selection = _tracked_input(
         first_index=169,
         last_index=199,
-        first_date="2021-01-04",
-        last_date="2021-07-30",
+        first_date="2016-01-04",
+        last_date="2016-06-30",
         alignment=DECISION_FEATURE_ALIGNMENT,
         canonical_splits=canonical,
     )
@@ -1101,11 +1101,11 @@ def _joint_segment(
 def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> None:
     axis = np.arange(
         np.datetime64("2010-01-04"),
-        np.datetime64("2021-08-20"),
+        np.datetime64("2016-07-22"),
         dtype="datetime64[D]",
     )
-    pretrain = np.flatnonzero(axis <= np.datetime64("2021-07-30"))
-    finetune = np.flatnonzero(axis >= np.datetime64("2021-08-16"))
+    pretrain = np.flatnonzero(axis <= np.datetime64("2016-06-30"))
+    finetune = np.flatnonzero(axis >= np.datetime64("2016-07-18"))
     segments = _model_input_segments(
         axis, np.concatenate((pretrain, finetune)), "joint"
     )
@@ -1153,7 +1153,7 @@ def test_joint_input_contract_records_and_enforces_ordered_p_f_segments() -> Non
     )
     training["segments"] = [
         _joint_segment(
-            "P", DECISION_FEATURE_ALIGNMENT, 0, 99, "2010-01-04", "2021-07-30"
+            "P", DECISION_FEATURE_ALIGNMENT, 0, 99, "2010-01-04", "2016-06-30"
         ),
         _joint_segment(
             "F",

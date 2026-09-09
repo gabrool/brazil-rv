@@ -1,11 +1,50 @@
 {
   "schema": "BRAZIL_RV_V2_PROTOCOL_V2",
   "name": "triage",
-  "folds": ["F1", "F2"],
-  "seeds": [11],
+  "folds": [
+    "F1",
+    "F2"
+  ],
+  "seeds": [
+    11
+  ],
   "decision_minute_index": 345,
   "slow_lookback": 60,
-  "horizons_sessions": [1, 2, 3, 5, 10],
+  "horizons_sessions": [
+    1,
+    2,
+    3,
+    5,
+    10
+  ],
+  "primary_horizons_sessions": [
+    3,
+    5,
+    10
+  ],
+  "legacy_primary_horizons_sessions": [
+    1,
+    2,
+    3,
+    5
+  ],
+  "seed_roles": {
+    "screening": [
+      11,
+      29,
+      47
+    ],
+    "confirmation": [
+      61,
+      79,
+      97
+    ]
+  },
+  "pretrain_end": "2016-06-30",
+  "development_start": "2016-07-18",
+  "development_end": "2024-12-30",
+  "promotion_rule": "research/preregistrations/v2_research_checkpoint.md#promotion",
+  "execution_parameter_selected_in_sample": true,
   "training": {
     "date_pairs_per_batch": 8,
     "epochs": 20,
@@ -16,6 +55,24 @@
     "weight_decay": 0.01,
     "ema_decay": 0.995,
     "lambda_persistence": 0.0,
+    "horizon_loss_weights": [
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.2
+    ],
+    "stage_f_selection_horizons": [
+      3,
+      5,
+      10
+    ],
+    "stage_p_selection_horizons": [
+      1,
+      2,
+      3,
+      5
+    ],
     "use_bf16": false
   },
   "evaluation": {

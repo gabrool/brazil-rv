@@ -10,12 +10,19 @@ from .contract import (
     ALLOWED_LOOKBACKS,
     ALLOWED_SEEDS,
     DEFAULT_LOOKBACK,
+    PRETRAIN_END,
+    FINETUNE_START,
+    DEVELOPMENT_END,
+    DEFAULT_HORIZON_LOSS_WEIGHTS,
+    DEVELOPMENT_FOLDS,
+    CONFIRMATION_SEEDS,
     DECISION_MINUTE_INDEX,
     GBDT_SEEDS as GBDT_SEEDS,
     HORIZONS as HORIZONS,
     INTRADAY_DAILY_FEATURES,
     PROTOCOL_SCHEMA,
     PRIMARY_HORIZONS as PRIMARY_HORIZONS,
+    TRADED_PRIMARY_HORIZONS,
     SOFT_RANK_TEMPERATURE,
 )
 
@@ -34,6 +41,7 @@ class ModelConfig:
 
     slow_feature_count: int
     current_feature_count: int = len(INTRADAY_DAILY_FEATURES)
+    common_state_feature_count: int = 0
     slow_lookback: int = DEFAULT_LOOKBACK
     gru_layers: int = 1
     hidden_width: int = 64
@@ -48,6 +56,8 @@ class ModelConfig:
     fast_pretrained_sha256: str | None = None
     allow_contaminated_v1_initialization: bool = False
     lambda_persistence: float = 0.0
+    horizon_loss_weights: tuple[float, ...] = DEFAULT_HORIZON_LOSS_WEIGHTS
+    selection_horizons: tuple[int, ...] = TRADED_PRIMARY_HORIZONS
     to_close_weight: float = 0.0
     soft_rank_temperature: float = SOFT_RANK_TEMPERATURE
     use_bf16: bool = False
@@ -55,10 +65,32 @@ class ModelConfig:
     time_decay_half_life_sessions: float | None = None
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "horizon_loss_weights", tuple(self.horizon_loss_weights)
+        )
+        object.__setattr__(self, "selection_horizons", tuple(self.selection_horizons))
         if self.slow_feature_count <= 0:
             raise ValueError("slow_feature_count must come from a nonempty store")
-        if self.current_feature_count <= 0:
-            raise ValueError("current_feature_count must come from a nonempty store")
+        if self.current_feature_count < 0:
+            raise ValueError("current_feature_count cannot be negative")
+        if self.current_feature_count == 0 and not self.disable_fast_stream:
+            raise ValueError("the slow-only graph requires the fast stream disabled")
+        if self.common_state_feature_count not in (0, 3):
+            raise ValueError("common state uses the three stored diagnostic fields")
+        if (
+            len(self.horizon_loss_weights) != len(HORIZONS)
+            or any(not math.isfinite(x) or x < 0 for x in self.horizon_loss_weights)
+            or not math.isclose(sum(self.horizon_loss_weights), 1.0, abs_tol=1e-12)
+        ):
+            raise ValueError(
+                "horizon loss weights must be finite, nonnegative and sum to one"
+            )
+        if (
+            not self.selection_horizons
+            or len(set(self.selection_horizons)) != len(self.selection_horizons)
+            or any(h not in HORIZONS for h in self.selection_horizons)
+        ):
+            raise ValueError("selection horizons must be a declared nonempty head set")
         if self.slow_lookback not in ALLOWED_LOOKBACKS:
             raise ValueError("slow_lookback must be 20, 60, or 120 sessions")
         if self.gru_layers not in (1, 2):
@@ -148,7 +180,7 @@ TRIAGE_PROTOCOL = ProtocolPreset(
 )
 FULL_PROTOCOL = ProtocolPreset(
     name="full",
-    folds=("F1", "F2", "F3"),
+    folds=DEVELOPMENT_FOLDS,
     seeds=ALLOWED_SEEDS,
     max_epochs_override=None,
     bootstrap_replications=10_000,
@@ -170,6 +202,17 @@ def _expected_protocol_payload(preset: ProtocolPreset) -> dict[str, object]:
         "decision_minute_index": DECISION_MINUTE_INDEX,
         "slow_lookback": DEFAULT_LOOKBACK,
         "horizons_sessions": list(HORIZONS),
+        "primary_horizons_sessions": list(TRADED_PRIMARY_HORIZONS),
+        "legacy_primary_horizons_sessions": list(PRIMARY_HORIZONS),
+        "seed_roles": {
+            "screening": list(ALLOWED_SEEDS),
+            "confirmation": list(CONFIRMATION_SEEDS),
+        },
+        "pretrain_end": PRETRAIN_END.isoformat(),
+        "development_start": FINETUNE_START.isoformat(),
+        "development_end": DEVELOPMENT_END.isoformat(),
+        "promotion_rule": "research/preregistrations/v2_research_checkpoint.md#promotion",
+        "execution_parameter_selected_in_sample": True,
         "training": {
             "date_pairs_per_batch": 8,
             "epochs": 20,
@@ -180,6 +223,9 @@ def _expected_protocol_payload(preset: ProtocolPreset) -> dict[str, object]:
             "weight_decay": 0.01,
             "ema_decay": 0.995,
             "lambda_persistence": 0.0,
+            "horizon_loss_weights": list(DEFAULT_HORIZON_LOSS_WEIGHTS),
+            "stage_f_selection_horizons": list(TRADED_PRIMARY_HORIZONS),
+            "stage_p_selection_horizons": list(PRIMARY_HORIZONS),
             "use_bf16": False,
         },
         "evaluation": {
@@ -209,9 +255,7 @@ def load_protocol_preset(path: Path) -> ProtocolPreset:
         raise ValueError("v2 protocol filename must equal its frozen preset name")
     expected = _expected_protocol_payload(preset)
     if not _exact_json_match(payload, expected):
-        raise ValueError(
-            f"v2 protocol config differs from the frozen {name!r} preset"
-        )
+        raise ValueError(f"v2 protocol config differs from the frozen {name!r} preset")
     return preset
 
 

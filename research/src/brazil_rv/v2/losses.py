@@ -7,7 +7,7 @@ import torch
 from brazil_rv.modeling.contract import SOFT_RANK_STANDARDIZATION_EPS
 from brazil_rv.modeling.engine import _soft_spearman_loss_sum
 
-from .contract import SOFT_RANK_TEMPERATURE
+from .contract import DEFAULT_HORIZON_LOSS_WEIGHTS, SOFT_RANK_TEMPERATURE
 
 
 def _flatten_date_pairs(values: torch.Tensor) -> torch.Tensor:
@@ -114,9 +114,7 @@ def multi_horizon_loss_normalizers(
         if target_mask.ndim != 4 or target_mask.shape[1] != 2:
             raise ValueError("persistence normalization requires adjacent date pairs")
         if score_mask.ndim == 3:
-            persistent_mask = score_mask[..., None].expand(
-                -1, -1, -1, 5
-            )
+            persistent_mask = score_mask[..., None].expand(-1, -1, -1, 5)
         elif score_mask.ndim == 4:
             persistent_mask = score_mask[..., :5]
             if persistent_mask.shape != target_mask[..., :5].shape:
@@ -144,6 +142,7 @@ def multi_horizon_loss_components(
     persistence_weight: float = 0.0,
     temperature: float = SOFT_RANK_TEMPERATURE,
     to_close_weight: float = 0.0,
+    horizon_loss_weights: tuple[float, ...] = DEFAULT_HORIZON_LOSS_WEIGHTS,
     normalization_counts: Mapping[str, torch.Tensor] | None = None,
 ) -> dict[str, torch.Tensor]:
     if scores.shape != targets.shape or scores.shape != target_mask.shape:
@@ -184,7 +183,12 @@ def multi_horizon_loss_components(
             for head in range(5)
         )
     )
-    horizon = head_losses.mean()
+    # Preserve the exact reduction (and gradients) of the uniform contract.
+    horizon = (
+        head_losses.mean()
+        if horizon_loss_weights == DEFAULT_HORIZON_LOSS_WEIGHTS
+        else (head_losses * head_losses.new_tensor(horizon_loss_weights)).sum()
+    )
     to_close = (
         _masked_head_loss(
             flat_scores[..., 5:],
@@ -227,6 +231,7 @@ def multi_horizon_loss(
     persistence_weight: float = 0.0,
     temperature: float = SOFT_RANK_TEMPERATURE,
     to_close_weight: float = 0.0,
+    horizon_loss_weights: tuple[float, ...] = DEFAULT_HORIZON_LOSS_WEIGHTS,
     normalization_counts: Mapping[str, torch.Tensor] | None = None,
 ) -> torch.Tensor:
     return multi_horizon_loss_components(
@@ -237,5 +242,6 @@ def multi_horizon_loss(
         persistence_weight=persistence_weight,
         temperature=temperature,
         to_close_weight=to_close_weight,
+        horizon_loss_weights=horizon_loss_weights,
         normalization_counts=normalization_counts,
     )["total"]

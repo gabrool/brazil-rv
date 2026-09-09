@@ -19,15 +19,15 @@ def _weekdays(start: date, end: date) -> tuple[date, ...]:
 
 
 def test_development_folds_have_chronological_selection_and_evaluation() -> None:
-    calendar = _weekdays(date(2021, 8, 16), date(2024, 12, 30))
+    calendar = _weekdays(date(2016, 7, 18), date(2024, 12, 30))
     folds = splits.development_folds(calendar)
 
-    assert [fold.name for fold in folds] == ["F1", "F2", "F3"]
+    assert [fold.name for fold in folds] == [f"F{i}" for i in range(1, 15)]
     assert [
-        (fold.evaluation_dates[0], fold.evaluation_dates[-1]) for fold in folds
+        (fold.evaluation_dates[0], fold.evaluation_dates[-1]) for fold in folds[-3:]
     ] == [
         (date(2023, 7, 3), date(2023, 12, 29)),
-        (date(2024, 1, 2), date(2024, 6, 28)),
+        (date(2024, 1, 1), date(2024, 6, 28)),
         (date(2024, 7, 1), date(2024, 12, 30)),
     ]
     positions = {value: index for index, value in enumerate(calendar)}
@@ -54,19 +54,19 @@ def test_development_folds_have_chronological_selection_and_evaluation() -> None
 def test_development_fold_uses_sessions_inside_a_closed_date_boundary() -> None:
     calendar = tuple(
         value
-        for value in _weekdays(date(2021, 8, 16), date(2024, 12, 30))
+        for value in _weekdays(date(2016, 7, 18), date(2024, 12, 30))
         if value != date(2023, 12, 29)
     )
 
     folds = splits.development_folds(calendar)
 
-    assert folds[0].evaluation_dates[0] == date(2023, 7, 3)
-    assert folds[0].evaluation_dates[-1] == date(2023, 12, 28)
-    assert date(2024, 1, 2) not in folds[0].evaluation_dates
+    assert folds[11].evaluation_dates[0] == date(2023, 7, 3)
+    assert folds[11].evaluation_dates[-1] == date(2023, 12, 28)
+    assert date(2024, 1, 2) not in folds[11].evaluation_dates
 
 
 def test_overlap_assertion_rejects_selection_without_second_purge() -> None:
-    calendar = _weekdays(date(2021, 8, 16), date(2024, 12, 30))
+    calendar = _weekdays(date(2016, 7, 18), date(2024, 12, 30))
     fold = splits.development_folds(calendar)[0]
     malformed = splits.DevelopmentFold(
         name=fold.name,

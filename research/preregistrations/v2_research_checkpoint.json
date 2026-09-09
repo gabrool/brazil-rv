@@ -1,0 +1,513 @@
+{
+  "schema": "BRAZIL_RV_V2_PROTOCOL_V2",
+  "name": "full",
+  "folds": [
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8",
+    "F9",
+    "F10",
+    "F11",
+    "F12",
+    "F13",
+    "F14"
+  ],
+  "seeds": [
+    11,
+    29,
+    47
+  ],
+  "decision_minute_index": 345,
+  "slow_lookback": 60,
+  "horizons_sessions": [
+    1,
+    2,
+    3,
+    5,
+    10
+  ],
+  "primary_horizons_sessions": [
+    3,
+    5,
+    10
+  ],
+  "legacy_primary_horizons_sessions": [
+    1,
+    2,
+    3,
+    5
+  ],
+  "seed_roles": {
+    "screening": [
+      11,
+      29,
+      47
+    ],
+    "confirmation": [
+      61,
+      79,
+      97
+    ]
+  },
+  "pretrain_end": "2016-06-30",
+  "development_start": "2016-07-18",
+  "development_end": "2024-12-30",
+  "promotion_rule": "research/preregistrations/v2_research_checkpoint.md#promotion",
+  "execution_parameter_selected_in_sample": true,
+  "training": {
+    "date_pairs_per_batch": 8,
+    "epochs": 20,
+    "patience": 3,
+    "sam_rho": 0.125,
+    "learning_rate": 0.0003,
+    "pretrained_learning_rate_multiplier": 0.3,
+    "weight_decay": 0.01,
+    "ema_decay": 0.995,
+    "lambda_persistence": 0.0,
+    "horizon_loss_weights": [
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.2
+    ],
+    "stage_f_selection_horizons": [
+      3,
+      5,
+      10
+    ],
+    "stage_p_selection_horizons": [
+      1,
+      2,
+      3,
+      5
+    ],
+    "use_bf16": false
+  },
+  "evaluation": {
+    "paired_bootstrap_replications": 10000,
+    "paired_bootstrap_block_sessions": 20
+  },
+  "max_parallel_trajectories": 6,
+  "official_registration": null,
+  "fold_table": [
+    {
+      "name": "F1",
+      "evaluation": [
+        "2018-01-02",
+        "2018-06-29",
+        123
+      ],
+      "fit": [
+        "2016-07-18",
+        "2017-09-06",
+        286
+      ],
+      "purge_before": [
+        "2017-09-08",
+        "2017-09-21"
+      ],
+      "selection": [
+        "2017-09-22",
+        "2017-12-13",
+        55
+      ],
+      "purge_after": [
+        "2017-12-14",
+        "2017-12-28"
+      ]
+    },
+    {
+      "name": "F2",
+      "evaluation": [
+        "2018-07-02",
+        "2018-12-28",
+        122
+      ],
+      "fit": [
+        "2016-07-18",
+        "2018-03-13",
+        409
+      ],
+      "purge_before": [
+        "2018-03-14",
+        "2018-03-27"
+      ],
+      "selection": [
+        "2018-03-28",
+        "2018-06-15",
+        55
+      ],
+      "purge_after": [
+        "2018-06-18",
+        "2018-06-29"
+      ]
+    },
+    {
+      "name": "F3",
+      "evaluation": [
+        "2019-01-02",
+        "2019-06-28",
+        122
+      ],
+      "fit": [
+        "2016-07-18",
+        "2018-09-05",
+        531
+      ],
+      "purge_before": [
+        "2018-09-06",
+        "2018-09-20"
+      ],
+      "selection": [
+        "2018-09-21",
+        "2018-12-12",
+        55
+      ],
+      "purge_after": [
+        "2018-12-13",
+        "2018-12-28"
+      ]
+    },
+    {
+      "name": "F4",
+      "evaluation": [
+        "2019-07-01",
+        "2019-12-30",
+        126
+      ],
+      "fit": [
+        "2016-07-18",
+        "2019-03-12",
+        653
+      ],
+      "purge_before": [
+        "2019-03-13",
+        "2019-03-26"
+      ],
+      "selection": [
+        "2019-03-27",
+        "2019-06-13",
+        55
+      ],
+      "purge_after": [
+        "2019-06-14",
+        "2019-06-28"
+      ]
+    },
+    {
+      "name": "F5",
+      "evaluation": [
+        "2020-01-02",
+        "2020-06-30",
+        123
+      ],
+      "fit": [
+        "2016-07-18",
+        "2019-09-10",
+        779
+      ],
+      "purge_before": [
+        "2019-09-11",
+        "2019-09-24"
+      ],
+      "selection": [
+        "2019-09-25",
+        "2019-12-12",
+        55
+      ],
+      "purge_after": [
+        "2019-12-13",
+        "2019-12-30"
+      ]
+    },
+    {
+      "name": "F6",
+      "evaluation": [
+        "2020-07-01",
+        "2020-12-30",
+        126
+      ],
+      "fit": [
+        "2016-07-18",
+        "2020-03-11",
+        902
+      ],
+      "purge_before": [
+        "2020-03-12",
+        "2020-03-25"
+      ],
+      "selection": [
+        "2020-03-26",
+        "2020-06-16",
+        55
+      ],
+      "purge_after": [
+        "2020-06-17",
+        "2020-06-30"
+      ]
+    },
+    {
+      "name": "F7",
+      "evaluation": [
+        "2021-01-04",
+        "2021-06-30",
+        122
+      ],
+      "fit": [
+        "2016-07-18",
+        "2020-09-10",
+        1028
+      ],
+      "purge_before": [
+        "2020-09-11",
+        "2020-09-24"
+      ],
+      "selection": [
+        "2020-09-25",
+        "2020-12-14",
+        55
+      ],
+      "purge_after": [
+        "2020-12-15",
+        "2020-12-30"
+      ]
+    },
+    {
+      "name": "F8",
+      "evaluation": [
+        "2021-07-01",
+        "2021-12-30",
+        125
+      ],
+      "fit": [
+        "2016-07-18",
+        "2021-03-12",
+        1150
+      ],
+      "purge_before": [
+        "2021-03-15",
+        "2021-03-26"
+      ],
+      "selection": [
+        "2021-03-29",
+        "2021-06-16",
+        55
+      ],
+      "purge_after": [
+        "2021-06-17",
+        "2021-06-30"
+      ]
+    },
+    {
+      "name": "F9",
+      "evaluation": [
+        "2022-01-03",
+        "2022-06-30",
+        124
+      ],
+      "fit": [
+        "2016-07-18",
+        "2021-09-10",
+        1275
+      ],
+      "purge_before": [
+        "2021-09-13",
+        "2021-09-24"
+      ],
+      "selection": [
+        "2021-09-27",
+        "2021-12-15",
+        55
+      ],
+      "purge_after": [
+        "2021-12-16",
+        "2021-12-30"
+      ]
+    },
+    {
+      "name": "F10",
+      "evaluation": [
+        "2022-07-01",
+        "2022-12-29",
+        126
+      ],
+      "fit": [
+        "2016-07-18",
+        "2022-03-14",
+        1399
+      ],
+      "purge_before": [
+        "2022-03-15",
+        "2022-03-28"
+      ],
+      "selection": [
+        "2022-03-29",
+        "2022-06-15",
+        55
+      ],
+      "purge_after": [
+        "2022-06-17",
+        "2022-06-30"
+      ]
+    },
+    {
+      "name": "F11",
+      "evaluation": [
+        "2023-01-02",
+        "2023-06-30",
+        124
+      ],
+      "fit": [
+        "2016-07-18",
+        "2022-09-12",
+        1525
+      ],
+      "purge_before": [
+        "2022-09-13",
+        "2022-09-26"
+      ],
+      "selection": [
+        "2022-09-27",
+        "2022-12-15",
+        55
+      ],
+      "purge_after": [
+        "2022-12-16",
+        "2022-12-29"
+      ]
+    },
+    {
+      "name": "F12",
+      "evaluation": [
+        "2023-07-03",
+        "2023-12-28",
+        124
+      ],
+      "fit": [
+        "2016-07-18",
+        "2023-03-13",
+        1649
+      ],
+      "purge_before": [
+        "2023-03-14",
+        "2023-03-27"
+      ],
+      "selection": [
+        "2023-03-28",
+        "2023-06-16",
+        55
+      ],
+      "purge_after": [
+        "2023-06-19",
+        "2023-06-30"
+      ]
+    },
+    {
+      "name": "F13",
+      "evaluation": [
+        "2024-01-02",
+        "2024-06-28",
+        124
+      ],
+      "fit": [
+        "2016-07-18",
+        "2023-09-08",
+        1773
+      ],
+      "purge_before": [
+        "2023-09-11",
+        "2023-09-22"
+      ],
+      "selection": [
+        "2023-09-25",
+        "2023-12-13",
+        55
+      ],
+      "purge_after": [
+        "2023-12-14",
+        "2023-12-28"
+      ]
+    },
+    {
+      "name": "F14",
+      "evaluation": [
+        "2024-07-01",
+        "2024-12-30",
+        127
+      ],
+      "fit": [
+        "2016-07-18",
+        "2024-03-12",
+        1897
+      ],
+      "purge_before": [
+        "2024-03-13",
+        "2024-03-26"
+      ],
+      "selection": [
+        "2024-03-27",
+        "2024-06-14",
+        55
+      ],
+      "purge_after": [
+        "2024-06-17",
+        "2024-06-28"
+      ]
+    }
+  ],
+  "sources": {
+    "store": {
+      "build_implementation_commit": "3d676241d86de4481f99a6112ae59fa838f8712a",
+      "manifest_sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64",
+      "root": "D:\\quant-data\\b3\\processed\\v2_daily_store_3d67624_20260909T100323Z",
+      "schema": "BRAZIL_RV_V2_DAILY_STORE_V3"
+    },
+    "bova11": {
+      "data_sha256": "4aa998afb26558c9c2d1cbf9374a6a3881e04fd3a322b769d0c2d6950371a7e9",
+      "hedge_beta_manifest_sha256": "225adc6fe336d2380e5c94897ba5d6ece4fcc8e0b0aca6d631dca9063314edb4",
+      "hedge_beta_root": "D:\\quant-data\\b3\\processed\\v2_hedge_beta_rebuilt_e02f934_20260909T104556Z",
+      "manifest_sha256": "858c6fb07e234d8c28219a72efa29775d83ba334f9b457ed24317ab7d270544d",
+      "root": "D:\\quant-data\\b3\\interim\\external\\bova11_hedge_close_v1_2009_2024_20260908T115000Z"
+    },
+    "cdi": {
+      "development_extension": {
+        "path": "C:\\quant-data\\b3\\interim\\external\\cdi_sgs12_v2_development_20260903T190000Z\\daily_cdi.parquet",
+        "sha256": "a60147d598ffabea13a64228e3ec3f18beee7956b8ddca9e0d725cdc63250d23"
+      },
+      "experiment52_reference": {
+        "path": "C:\\quant-data\\b3\\interim\\external\\experiment52_cdi_exact_e380cd7_20260903\\daily_cdi.parquet",
+        "sha256": "38d7934ebb6849b1e20310a81130f6faa68f4618c8edb0d046185067c83da2ea"
+      }
+    },
+    "execution_policy": {
+      "inventory_sha256": "f6595754dda8312767034ca1cbeb5aacbf890e2f871bd82dcc5fd3f735b7c2a5",
+      "label": "execution_parameter_selected_in_sample",
+      "policy": {
+        "buffer_per_quintile": 9,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inverse_volatility": false,
+        "theta": 1.0
+      },
+      "result_sha256": "fb77b728f46b23213cb64adb9471443b2c91d42efc6795a868f4ebeb63adaa51",
+      "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_execution_sweep_df4492c_20260909T003922Z"
+    }
+  },
+  "lending_archive": {
+    "balances_sha256": "f60ae328010e093e1cc18aff35c37561d3492ad9713c68f54c97efe3ab75aff8",
+    "manifest_sha256": "5b4c83dd59796baf1cc4c5b2c441c1010b098966dbe72c80a7c7f025e1993e2b",
+    "rates_sha256": "14b688452719e311544019c0f63f8700ce336aaf7ae9776a94bff8a9c4f2620f",
+    "root": "C:\\quant-data\\b3\\interim\\external\\lending_archive_v2_2009_202412_a2d9f6d_20260908T125233Z",
+    "source_label": "lending_archive_v2_2009_202412"
+  },
+  "source_design_sha256": "f3f056798e9e79ac57da90d2592669e57bb28549f8a34b1aa2978daadf22a259"
+}

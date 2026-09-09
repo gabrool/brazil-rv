@@ -2020,3 +2020,18 @@ and headline net excess +1.226 bps/day [-1.691,8.364]. No economics override
 fired. All artifact, chronology, and access audits pass; official validation
 and the spent test remain untouched, and deployment did not change. Round 3
 and 2025 access remain forbidden.
+
+## Research checkpoint (2026-09-09)
+
+The current forward research contract is
+`research/preregistrations/v2_research_checkpoint.md` and its accompanying JSON.
+It supersedes the old three-fold defaults above: fourteen half-year evaluation
+folds cover 2018H1–2024H2, with expanding fits from 2016-07-18, and Stage P ends
+2016-06-30. Primary IC and Stage-F checkpoint selection use common D3/D5/D10
+neutral-target support; `legacy_primary_ic_1235` preserves the former headline.
+The paired parent is the Round-3 fast-off configuration; B6 remains historical.
+Screening seeds are 11/29/47, and confirmation 61/79/97 is mandatory before any
+promotion. The selected execution policy remains theta=1, D3/D5/D10 equal-notional,
+buffer nine, with its in-sample selection label. The repaired development store
+and all sealed Round-3 artifacts remain immutable. CPU re-baselining precedes
+Round 4; paid compute requires a renewed go, and 2025/2026 access is unauthorized.

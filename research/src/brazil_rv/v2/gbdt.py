@@ -104,9 +104,7 @@ def assemble_gbdt_scalar_view(
         np.log1p(np.clip(ages, 0.0, 252.0)) / np.log1p(252.0),
         np.nan,
     )
-    return np.concatenate(
-        (encoded_values, encoded_ages), axis=-1, dtype=np.float32
-    )
+    return np.concatenate((encoded_values, encoded_ages), axis=-1, dtype=np.float32)
 
 
 def _validate_panel(
@@ -402,12 +400,15 @@ class MultiHorizonGBDT:
             contributions = []
             for models in self.models.values():
                 for model in models:
-                    values = model.predict(
-                        flat,
-                        num_iteration=model.best_iteration or None,
-                        pred_contrib=True,
-                    )
-                    contributions.append(np.mean(np.abs(values[:, :-1]), axis=0))
+                    total = np.zeros(flat.shape[-1], dtype=np.float64)
+                    for start in range(0, len(flat), 4096):
+                        values = model.predict(
+                            flat[start : start + 4096],
+                            num_iteration=model.best_iteration or None,
+                            pred_contrib=True,
+                        )
+                        total += np.abs(values[:, :-1]).sum(axis=0)
+                    contributions.append(total / len(flat))
             result["mean_abs_tree_shap"] = np.mean(np.stack(contributions), axis=0)
         return result
 
@@ -455,9 +456,7 @@ class MultiHorizonGBDT:
                     "schema": GBDT_MODELS_SCHEMA,
                     "config": asdict(self.config),
                     "feature_names": (
-                        None
-                        if self.feature_names is None
-                        else list(self.feature_names)
+                        None if self.feature_names is None else list(self.feature_names)
                     ),
                     "models": records,
                     **extra,
@@ -483,9 +482,9 @@ class MultiHorizonGBDT:
         actual_manifest_sha256 = sha256_file(manifest_path)
         if actual_manifest_sha256 != expected_manifest_sha256:
             raise ValueError("GBDT model manifest SHA-256 mismatch")
-        sha_record = (path / "model_manifest.json.sha256").read_text(
-            encoding="ascii"
-        ).split()[0]
+        sha_record = (
+            (path / "model_manifest.json.sha256").read_text(encoding="ascii").split()[0]
+        )
         if sha_record != expected_manifest_sha256:
             raise ValueError("GBDT manifest sidecar SHA-256 mismatch")
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -530,19 +529,15 @@ class MultiHorizonGBDT:
             if key in by_key:
                 raise ValueError("GBDT model manifest repeats a member")
             artifact = path / filename
-            if (
-                artifact.stat().st_size != int(record.get("bytes", -1))
-                or sha256_file(artifact) != record.get("sha256")
-            ):
+            if artifact.stat().st_size != int(record.get("bytes", -1)) or sha256_file(
+                artifact
+            ) != record.get("sha256"):
                 raise ValueError("GBDT member hash or size mismatch")
             by_key[key] = library.Booster(model_file=str(artifact))
-        expected = {
-            (head, seed) for head in range(5) for seed in config.seeds
-        }
+        expected = {(head, seed) for head in range(5) for seed in config.seeds}
         if set(by_key) != expected:
             raise ValueError("GBDT model roster differs from its configuration")
         model.models = {
-            head: [by_key[(head, seed)] for seed in config.seeds]
-            for head in range(5)
+            head: [by_key[(head, seed)] for seed in config.seeds] for head in range(5)
         }
         return model

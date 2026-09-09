@@ -42,6 +42,10 @@ from .contract import (
     DECISION_FEATURE_ALIGNMENT,
     DECISION_SAMPLE_SCHEMA,
     DEVELOPMENT_END,
+    DEVELOPMENT_FOLDS,
+    HORIZONS,
+    PRIMARY_HORIZONS,
+    TRADED_PRIMARY_HORIZONS,
     FINAL_EMA_SCHEMA,
     FEATURE_AGE_CONTRACT,
     FINETUNE_START,
@@ -692,13 +696,15 @@ def _common_primary_selection_score(
     targets: np.ndarray,
     target_mask: np.ndarray,
     active_mask: np.ndarray,
+    *,
+    horizons: tuple[int, ...] = PRIMARY_HORIZONS,
 ) -> float:
-    """Mean daily D1/D2/D3/D5 IC on one fixed, supported population."""
+    """Mean daily IC for the declared, already sliced heads on common support."""
 
     expected = predictions.shape
     if (
         predictions.ndim != 3
-        or expected[-1] != 4
+        or expected[-1] != len(horizons)
         or targets.shape != expected
         or target_mask.shape != expected
         or active_mask.shape != expected[:2]
@@ -715,7 +721,7 @@ def _common_primary_selection_score(
         if common.sum() < 20:
             continue
         correlations: list[float] = []
-        for head in range(4):
+        for head in range(len(horizons)):
             left = average_ranks(predictions[date, common, head].astype(np.float64))
             right = average_ranks(targets[date, common, head].astype(np.float64))
             left -= left.mean()
@@ -725,11 +731,11 @@ def _common_primary_selection_score(
                 correlations = []
                 break
             correlations.append(float(np.sum(left * right) / denominator))
-        if len(correlations) == 4:
+        if len(correlations) == len(horizons):
             daily_primary.append(float(np.mean(correlations)))
     if not daily_primary:
         raise ValueError(
-            "selection window lacks a common four-head population of at least 20 names"
+            "selection window lacks a common declared-head population of at least 20 names"
         )
     return float(np.mean(daily_primary))
 
@@ -742,6 +748,7 @@ def _selection_score(
     stage: str,
     use_bf16: bool,
     disable_fast_stream: bool = False,
+    selection_horizons: tuple[int, ...] = TRADED_PRIMARY_HORIZONS,
 ) -> float:
     model.eval()
     prediction_rows: list[np.ndarray] = []
@@ -749,6 +756,8 @@ def _selection_score(
     mask_rows: list[np.ndarray] = []
     active_rows: list[np.ndarray] = []
     date_rows: list[np.ndarray | None] = []
+    horizons = PRIMARY_HORIZONS if stage == "P" else selection_horizons
+    head_indices = [HORIZONS.index(h) for h in horizons]
     with torch.no_grad():
         for cpu_batch in loader:
             _validate_stage_batch(stage, cpu_batch, require_date_pairs=False)
@@ -761,9 +770,13 @@ def _selection_score(
                 enabled=use_bf16 and device.type == "cuda",
             ):
                 predictions = _model_forward(model, batch)
-            prediction_rows.append(predictions[..., :4].float().cpu().numpy())
-            target_rows.append(batch["targets"][..., :4].float().cpu().numpy())
-            mask_rows.append(batch["target_mask"][..., :4].bool().cpu().numpy())
+            prediction_rows.append(predictions[..., head_indices].float().cpu().numpy())
+            target_rows.append(
+                batch["targets"][..., head_indices].float().cpu().numpy()
+            )
+            mask_rows.append(
+                batch["target_mask"][..., head_indices].bool().cpu().numpy()
+            )
             active_rows.append(batch["active_mask"].bool().cpu().numpy())
             date_index = cpu_batch.get("date_index")
             if date_index is None:
@@ -796,7 +809,9 @@ def _selection_score(
         targets = targets[order]
         mask = mask[order]
         active = active[order]
-    return _common_primary_selection_score(predictions, targets, mask, active)
+    return _common_primary_selection_score(
+        predictions, targets, mask, active, horizons=horizons
+    )
 
 
 def _configure_inductor_compiler() -> None:
@@ -804,9 +819,7 @@ def _configure_inductor_compiler() -> None:
         return
     compiler = shutil.which("g++-12")
     if compiler is None:
-        raise RuntimeError(
-            "Arm64 Inductor requires g++-12 for the GH200 Armv9 target"
-        )
+        raise RuntimeError("Arm64 Inductor requires g++-12 for the GH200 Armv9 target")
     torch._inductor.config.cpp.cxx = (compiler,)
 
 
@@ -1213,6 +1226,8 @@ def model_config_contract(config: ModelConfig) -> dict[str, object]:
 
     payload = asdict(config)
     payload.pop("fast_pretrained_checkpoint")
+    payload["horizon_loss_weights"] = list(config.horizon_loss_weights)
+    payload["selection_horizons"] = list(config.selection_horizons)
     return payload
 
 
@@ -1350,12 +1365,12 @@ def _validate_tracked_stage_inputs(
             raise ValueError(f"stage {stage} requires its first 10-session purge")
         matches = [
             name
-            for name in ("F1", "F2", "F3")
+            for name in DEVELOPMENT_FOLDS
             if fold == name or fold.startswith(f"{name}_")
         ]
         if len(matches) != 1:
             raise ValueError(
-                f"stage {stage} fold must identify canonical F1, F2, or F3"
+                f"stage {stage} fold must identify a canonical development fold"
             )
         split_name = matches[0]
     else:
@@ -1867,6 +1882,7 @@ def train_stage(
                             target_mask,
                             score_mask=active,
                             persistence_weight=model_config.lambda_persistence,
+                            horizon_loss_weights=model_config.horizon_loss_weights,
                             temperature=model_config.soft_rank_temperature,
                             to_close_weight=model_config.to_close_weight,
                             normalization_counts=normalization_counts,
@@ -1904,6 +1920,7 @@ def train_stage(
             stage=stage,
             use_bf16=model_config.use_bf16,
             disable_fast_stream=model_config.disable_fast_stream,
+            selection_horizons=model_config.selection_horizons,
         )
         selection_compiled_graph_count += (
             _unique_compiled_graphs() - compiled_before_selection
@@ -2200,9 +2217,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         drop_last=True,
     )
     fixed_fast_name_count = (
-        0
-        if stage == "P"
-        else stage_fast_name_count(train_dataset, selection_dataset)
+        0 if stage == "P" else stage_fast_name_count(train_dataset, selection_dataset)
     )
     stage_collate = partial(
         collate_v2_daily, fixed_fast_name_count=fixed_fast_name_count

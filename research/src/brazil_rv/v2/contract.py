@@ -33,8 +33,8 @@ FEATURE_AGE_CONTRACT: Final[dict[str, object]] = {
 
 COTAHIST_YEARS: Final[tuple[int, ...]] = tuple(range(2009, 2027))
 STORE_START: Final[date] = date(2010, 1, 4)
-PRETRAIN_END: Final[date] = date(2021, 7, 30)
-FINETUNE_START: Final[date] = date(2021, 8, 16)
+PRETRAIN_END: Final[date] = date(2016, 6, 30)
+FINETUNE_START: Final[date] = date(2016, 7, 18)
 DEVELOPMENT_END: Final[date] = date(2024, 12, 30)
 OFFICIAL_START: Final[date] = date(2025, 1, 2)
 OFFICIAL_END: Final[date] = date(2025, 12, 30)
@@ -43,6 +43,10 @@ ACCUMULATED_TEST_AFTER: Final[date] = date(2026, 7, 17)
 
 HORIZONS: Final[tuple[int, ...]] = (1, 2, 3, 5, 10)
 PRIMARY_HORIZONS: Final[tuple[int, ...]] = (1, 2, 3, 5)
+TRADED_PRIMARY_HORIZONS: Final[tuple[int, ...]] = (3, 5, 10)
+DEVELOPMENT_FOLDS: Final[tuple[str, ...]] = tuple(f"F{x}" for x in range(1, 15))
+CONFIRMATION_SEEDS: Final[tuple[int, ...]] = (61, 79, 97)
+DEFAULT_HORIZON_LOSS_WEIGHTS: Final[tuple[float, ...]] = (0.2,) * 5
 ALLOWED_LOOKBACKS: Final[tuple[int, ...]] = (20, 60, 120)
 DEFAULT_LOOKBACK: Final[int] = 60
 ALLOWED_SEEDS: Final[tuple[int, ...]] = (11, 29, 47)

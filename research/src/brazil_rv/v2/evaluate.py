@@ -26,6 +26,7 @@ from .config import FULL_PROTOCOL, ProtocolPreset
 from .contract import (
     HORIZONS,
     PRIMARY_HORIZONS,
+    TRADED_PRIMARY_HORIZONS,
     REGISTERED_PRIMARY_TARGET,
 )
 from .corporate_actions import AlignedActionTerms
@@ -45,7 +46,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V16"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V17"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -55,10 +56,9 @@ def primary_population_protocol() -> dict[str, object]:
 
     return {
         "target": REGISTERED_PRIMARY_TARGET,
-        "horizons_sessions": list(PRIMARY_HORIZONS),
+        "horizons_sessions": list(TRADED_PRIMARY_HORIZONS),
         "requirements": [
             "active_at_entry",
-            "finite_target_scale_sigma_greater_than_1e-8",
             "valid_and_finite_neutral_target_on_every_primary_horizon",
             "valid_and_finite_neutralization_characteristics",
             "valid_and_finite_score_on_every_primary_horizon",
@@ -153,6 +153,7 @@ class EvaluationResult:
     primary_targets: NDArray[np.float64]
     primary_outcome_mask: NDArray[np.bool_]
     primary_score_mask: NDArray[np.bool_]
+    primary_horizons: tuple[int, ...] = PRIMARY_HORIZONS
 
 
 def _array_sha256(values: NDArray[np.generic]) -> str:
@@ -524,22 +525,29 @@ def _rev2_primary_population_components(
 
 def _primary_population_components(
     inputs: EvaluationInputs,
+    horizons: tuple[int, ...] = PRIMARY_HORIZONS,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
     NDArray[np.bool_],
     NDArray[np.bool_],
 ]:
-    indexes = [HORIZONS.index(horizon) for horizon in PRIMARY_HORIZONS]
+    indexes = [HORIZONS.index(horizon) for horizon in horizons]
     scores = np.asarray(inputs.scores, dtype=np.float64)[..., indexes]
     targets = np.asarray(inputs.neutral_midrank_targets, dtype=np.float64)[..., indexes]
     characteristic_population = np.asarray(inputs.neutral_target_mask, dtype=np.bool_)[
         ..., indexes
     ].all(axis=-1) & np.isfinite(targets).all(axis=-1)
-    rev2_outcome_population, score_population = _rev2_primary_population_components(
-        inputs
+    score_population = np.asarray(inputs.score_mask, dtype=np.bool_)[..., indexes].all(
+        axis=-1
+    ) & np.isfinite(scores).all(axis=-1)
+    outcome_population = (
+        np.asarray(inputs.active, dtype=np.bool_) & characteristic_population
     )
-    outcome_population = rev2_outcome_population & characteristic_population
+    if horizons == PRIMARY_HORIZONS:
+        # Retain the historical rev-4 population for the named legacy readout.
+        rev2_outcome_population, _ = _rev2_primary_population_components(inputs)
+        outcome_population &= rev2_outcome_population
     return scores, targets, outcome_population, score_population
 
 
@@ -549,8 +557,9 @@ def _primary_daily_metrics(
     outcome_population: NDArray[np.bool_],
     score_population: NDArray[np.bool_],
     dates: Sequence[date],
+    horizons: tuple[int, ...] = PRIMARY_HORIZONS,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], list[dict[str, object]]]:
-    head_ic = np.full((len(dates), len(PRIMARY_HORIZONS)), np.nan, dtype=np.float64)
+    head_ic = np.full((len(dates), len(horizons)), np.nan, dtype=np.float64)
     daily_primary = np.full(len(dates), np.nan, dtype=np.float64)
     rows: list[dict[str, object]] = []
     for day, day_value in enumerate(dates):
@@ -563,7 +572,7 @@ def _primary_daily_metrics(
         elif common_count < MIN_CROSS_SECTION:
             reasons.append("fewer_than_20_common_scores")
         else:
-            for horizon_index, horizon in enumerate(PRIMARY_HORIZONS):
+            for horizon_index, horizon in enumerate(horizons):
                 value, _, reason = _spearman_result(
                     scores[day, :, horizon_index],
                     targets[day, :, horizon_index],
@@ -574,7 +583,7 @@ def _primary_daily_metrics(
                     reasons.append(f"D{horizon}:{reason}")
         if not reasons:
             # Every head is defined on this exact population; a plain mean is
-            # therefore the registered equal-four-head aggregation, not a
+            # therefore the registered equal-head aggregation, not a
             # missing-head nanmean.
             daily_primary[day] = float(head_ic[day].mean())
         rows.append(
@@ -587,7 +596,7 @@ def _primary_daily_metrics(
                 "score_support_loss_name_count": outcome_count - common_count,
                 "head_neutral_target_spearman_ic": {
                     f"D{horizon}": _finite_or_none(head_ic[day, index])
-                    for index, horizon in enumerate(PRIMARY_HORIZONS)
+                    for index, horizon in enumerate(horizons)
                 },
                 "primary_neutral_target_ic": _finite_or_none(daily_primary[day]),
                 "undefined_reason": ";".join(reasons) if reasons else None,
@@ -1328,6 +1337,7 @@ def _quality_stratification(
     primary_targets: NDArray[np.float64],
     primary_outcome_mask: NDArray[np.bool_],
     primary_score_mask: NDArray[np.bool_],
+    horizons: tuple[int, ...] = TRADED_PRIMARY_HORIZONS,
 ) -> dict[str, object]:
     shape = primary_outcome_mask.shape
     rows: list[dict[str, object]] = []
@@ -1344,6 +1354,7 @@ def _quality_stratification(
             outcome,
             score,
             inputs.dates,
+            horizons,
         )
         rows.append(
             {
@@ -2123,6 +2134,7 @@ def evaluate_scores(
     window_name: str,
     registration_path: Path | None = None,
     preregistration_root: Path = PREREGISTRATION_ROOT,
+    protocol: ProtocolPreset = FULL_PROTOCOL,
 ) -> EvaluationResult:
     """Evaluate one score cube after enforcing the v2 access boundary."""
     ledger = authorize_dates(
@@ -2150,7 +2162,7 @@ def evaluate_scores(
         _rev2_primary_population_components(inputs)
     )
     legacy_primary_population = legacy_primary_outcome_mask & legacy_primary_score_mask
-    _, daily_primary, primary_rows = _primary_daily_metrics(
+    _, daily_legacy_primary, legacy_primary_rows = _primary_daily_metrics(
         primary_scores,
         primary_targets,
         primary_outcome_mask,
@@ -2165,6 +2177,19 @@ def evaluate_scores(
         spread_total_bps,
         metric_rows,
     ) = _daily_metrics(inputs, primary_population, legacy_primary_population)
+    historical_neutral_outcome_mask = primary_outcome_mask
+    primary_scores, primary_targets, primary_outcome_mask, primary_score_mask = (
+        _primary_population_components(inputs, TRADED_PRIMARY_HORIZONS)
+    )
+    primary_population = primary_outcome_mask & primary_score_mask
+    _, daily_primary, primary_rows = _primary_daily_metrics(
+        primary_scores,
+        primary_targets,
+        primary_outcome_mask,
+        primary_score_mask,
+        inputs.dates,
+        TRADED_PRIMARY_HORIZONS,
+    )
     persistence, persistence_rows = _persistence(inputs)
     policy = inputs.execution_policy
     economics_score, economics_mask = (
@@ -2205,7 +2230,7 @@ def evaluate_scores(
     horizon_rows: list[dict[str, object]] = []
     for horizon_index, horizon in enumerate(HORIZONS):
         if horizon in PRIMARY_HORIZONS:
-            neutral_possible = primary_outcome_mask
+            neutral_possible = historical_neutral_outcome_mask
             legacy_possible = legacy_primary_outcome_mask
             legacy_population_name = "common_D1_D2_D3_D5"
         else:
@@ -2380,16 +2405,16 @@ def evaluate_scores(
         "action_terms_source": inputs.action_terms_source,
         "schedule_source": inputs.schedule_source,
         "horizons_sessions": list(HORIZONS),
-        "primary_horizons_sessions": list(PRIMARY_HORIZONS),
+        "primary_horizons_sessions": list(TRADED_PRIMARY_HORIZONS),
         "metric_contract": {
             "primary_target": REGISTERED_PRIMARY_TARGET,
             "primary_population": (
-                "per date: active entry names with finite sigma>1e-8 and valid, "
-                "finite score and neutral outcome on every D1/D2/D3/D5 head"
+                "per date: active entry names with valid, finite scores and "
+                "neutral outcomes on every D3/D5/D10 head"
             ),
             "minimum_names": MIN_CROSS_SECTION,
             "daily_primary_aggregation": (
-                "equal mean of all four head Spearman correlations only when "
+                "equal mean of all three head Spearman correlations only when "
                 "every head is defined"
             ),
             "shareholder_return": "gross contractual holding simple return",
@@ -2398,6 +2423,17 @@ def evaluate_scores(
         "mean_daily_primary_neutral_target_ic": _finite_or_none(
             _finite_mean(daily_primary)
         ),
+        "primary_ic": _bootstrap_payload(
+            daily_primary,
+            replications=protocol.bootstrap_replications,
+            block_length=protocol.bootstrap_block_length,
+        ),
+        "legacy_primary_ic_1235": _bootstrap_payload(
+            daily_legacy_primary,
+            replications=protocol.bootstrap_replications,
+            block_length=protocol.bootstrap_block_length,
+        ),
+        "daily_legacy_primary_ic_1235": legacy_primary_rows,
         "annual_borrow_rate_by_name": _array_sha256(
             np.asarray(
                 inputs.annual_borrow_rate_by_name
@@ -2429,7 +2465,7 @@ def evaluate_scores(
             "undefined_reason": (
                 None
                 if np.isfinite(daily_primary).any()
-                else "no_date_has_a_defined_four_head_primary_ic"
+                else "no_date_has_a_defined_traded_head_primary_ic"
             ),
         },
         "neutral_target_fallback": {
@@ -2596,6 +2632,7 @@ def evaluate_scores(
         primary_targets=primary_targets,
         primary_outcome_mask=primary_outcome_mask,
         primary_score_mask=primary_score_mask,
+        primary_horizons=TRADED_PRIMARY_HORIZONS,
     )
 
 
@@ -2646,10 +2683,13 @@ def _paired_primary_daily(
     candidate: EvaluationResult,
     baseline: EvaluationResult,
 ) -> tuple[NDArray[np.float64], list[dict[str, object]]]:
+    if candidate.primary_horizons != baseline.primary_horizons:
+        raise ValueError("paired primary horizon contracts differ")
+    horizons = candidate.primary_horizons
     expected_scores = (
         len(candidate.dates),
         candidate.primary_outcome_mask.shape[1],
-        len(PRIMARY_HORIZONS),
+        len(horizons),
     )
     for label, result in (("candidate", candidate), ("baseline", baseline)):
         if result.primary_scores.shape != expected_scores:
@@ -2668,6 +2708,7 @@ def _paired_primary_daily(
         common_outcome,
         common_score,
         candidate.dates,
+        horizons,
     )
     baseline_heads, baseline_daily, baseline_rows = _primary_daily_metrics(
         baseline.primary_scores,
@@ -2675,6 +2716,7 @@ def _paired_primary_daily(
         common_outcome,
         common_score,
         baseline.dates,
+        horizons,
     )
     delta = candidate_daily - baseline_daily
     rows: list[dict[str, object]] = []
@@ -2696,11 +2738,11 @@ def _paired_primary_daily(
                 ),
                 "candidate_head_neutral_target_spearman_ic": {
                     f"D{horizon}": _finite_or_none(candidate_heads[day, index])
-                    for index, horizon in enumerate(PRIMARY_HORIZONS)
+                    for index, horizon in enumerate(horizons)
                 },
                 "baseline_head_neutral_target_spearman_ic": {
                     f"D{horizon}": _finite_or_none(baseline_heads[day, index])
-                    for index, horizon in enumerate(PRIMARY_HORIZONS)
+                    for index, horizon in enumerate(horizons)
                 },
                 "candidate_primary_neutral_target_ic": _finite_or_none(
                     candidate_daily[day]
@@ -2793,8 +2835,9 @@ def paired_comparison(
         "primary_population": {
             "definition": (
                 "per-date intersection of candidate and baseline finite score "
-                "support with active, sigma-valid outcomes on D1/D2/D3/D5"
+                "support with active, valid neutral outcomes on the declared heads"
             ),
+            "horizons_sessions": list(candidate.primary_horizons),
             "minimum_names": MIN_CROSS_SECTION,
             "possible_date_count": len(candidate.dates),
             "used_date_count": int(np.isfinite(ic_delta).sum()),

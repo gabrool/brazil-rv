@@ -40,9 +40,12 @@ PREREGISTRATION_ROOT = PROJECT_ROOT / "research" / "preregistrations"
 AccessPurpose = Literal["training", "selection", "evaluation"]
 
 _SELECTION_WINDOWS = {
-    "F1": (date(2023, 7, 3), date(2023, 12, 29)),
-    "F2": (date(2024, 1, 2), date(2024, 6, 28)),
-    "F3": (date(2024, 7, 1), date(2024, 12, 30)),
+    f"F{2 * (year - 2018) + half}": (
+        date(year, 1 if half == 1 else 7, 1),
+        date(year, 6, 30) if half == 1 else min(date(year, 12, 31), DEVELOPMENT_END),
+    )
+    for year in range(2018, 2025)
+    for half in (1, 2)
 }
 
 

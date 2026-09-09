@@ -388,7 +388,7 @@ def test_paired_bootstrap_uses_daily_primary_and_headline_deltas() -> None:
         "lower_95": 2.0,
         "upper_95": 2.0,
         "possible_date_count": 25,
-        "defined_date_count": 20,
+        "defined_date_count": 15,
         "undefined_reason": None,
     }
     assert comparison["daily_headline_net_excess_bps_delta"] == {
@@ -543,7 +543,7 @@ def test_primary_reports_why_a_day_is_undefined_instead_of_averaging_heads() -> 
     assert first["primary_neutral_target_ic"] is None
     assert first["used"] is False
     assert first["undefined_reason"] == "D3:constant_score"
-    assert first["head_neutral_target_spearman_ic"]["D1"] is not None
+    assert first["head_neutral_target_spearman_ic"]["D5"] is not None
     assert first["head_neutral_target_spearman_ic"]["D3"] is None
 
 
@@ -670,7 +670,7 @@ def test_paired_comparison_intersects_different_candidate_score_populations() ->
 
     assert first["common_candidate_baseline_name_count"] == 20
     assert first["delta"] == pytest.approx(0.0)
-    assert comparison["primary_population"]["used_date_count"] == 20
+    assert comparison["primary_population"]["used_date_count"] == 15
 
 
 def test_paired_comparison_preserves_undefined_dates_and_reason() -> None:
@@ -835,8 +835,8 @@ def test_invalid_tail_mask_is_rejected_before_target_payload_decode() -> None:
 def test_report_exposes_primary_and_economic_coverage() -> None:
     report = evaluate_scores(_fixture(), window_name="F2").report
 
-    assert report["primary_support"]["possible_date_count"] == 20
-    assert report["primary_support"]["used_date_count"] == 20
+    assert report["primary_support"]["possible_date_count"] == 15
+    assert report["primary_support"]["used_date_count"] == 15
     assert report["economics"]["coverage"]["possible_date_count"] == 25
     assert report["economics"]["coverage"]["finite_net_excess_date_count"] == 25
     assert report["economics"]["d5_only_diagnostic"]["horizon_sessions"] == 5
