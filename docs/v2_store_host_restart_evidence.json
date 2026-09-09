@@ -1,0 +1,57 @@
+{
+  "resolution": "Restart the identical tested implementation from a fresh root, with stdout/stderr and the memory monitor persisted to disk. No partially written array is reused.",
+  "implementation_commit": "3d676241d86de4481f99a6112ae59fa838f8712a",
+  "authority": "User explicitly authorized preferred resolutions and autonomous completion while absent.",
+  "last_memory_sample_sha256": "2e3ed8e3797ce420dbc17ca156a8dc75d9fad57aafef39ffc8b9695a8a9a3fcd",
+  "preserved_workspace": "D:/quant-data/b3/processed/.v2_daily_store_3d67624_20260909T030315Z.arrays-wr7s65eh",
+  "research_settings_changed": false,
+  "system_events": [
+    {
+      "TimeCreated": "2026-09-09T00:31:22.7210257-03:00",
+      "Id": 6005,
+      "Message": "The Event log service was started."
+    },
+    {
+      "TimeCreated": "2026-09-09T00:31:01.634547-03:00",
+      "Id": 6006,
+      "Message": "The Event log service was stopped."
+    },
+    {
+      "TimeCreated": "2026-09-09T00:30:53.4691394-03:00",
+      "Id": 1074,
+      "Message": "The process C:\\Windows\\servicing\\TrustedInstaller.exe (KAPRZIN) has initiated the restart of computer KAPRZIN on behalf of user NT AUTHORITY\\SYSTEM for the following reason: Operating System: Upgrade (Planned)\r\n Reason Code: 0x80020003\r\n Shutdown Type: restart\r\n Comment: "
+    },
+    {
+      "TimeCreated": "2026-09-09T00:30:40.9206679-03:00",
+      "Id": 6005,
+      "Message": "The Event log service was started."
+    },
+    {
+      "TimeCreated": "2026-09-09T00:30:14.4222298-03:00",
+      "Id": 6006,
+      "Message": "The Event log service was stopped."
+    },
+    {
+      "TimeCreated": "2026-09-09T00:29:05.5234843-03:00",
+      "Id": 1074,
+      "Message": "The process C:\\Windows\\uus\\AMD64\\MoUsoCoreWorker.exe (KAPRZIN) has initiated the restart of computer KAPRZIN on behalf of user NT AUTHORITY\\SYSTEM for the following reason: Operating System: Service pack (Planned)\r\n Reason Code: 0x80020010\r\n Shutdown Type: restart\r\n Comment: "
+    }
+  ],
+  "recorded_at_utc": "2026-09-09T10:03:14.5452702Z",
+  "last_memory_sample": {
+    "process_start": "2026-09-09T03:03:14.3476822Z",
+    "sample_count": 1523,
+    "peak_rss_gib": 7.076377868652344,
+    "process_id": 15300,
+    "peak_rss_bytes": 7598202880,
+    "maximum_gib": 8,
+    "status": "monitoring",
+    "last_sample_utc": "2026-09-09T03:29:05.650348Z"
+  },
+  "test_accessed": false,
+  "paid_instance_launched": false,
+  "status": "interrupted_by_planned_windows_restart_before_publication",
+  "published_store_exists": false,
+  "official_validation_accessed": false,
+  "intended_output": "D:/quant-data/b3/processed/v2_daily_store_3d67624_20260909T030315Z"
+}
