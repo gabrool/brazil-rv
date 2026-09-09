@@ -2792,3 +2792,10 @@ timings, hardware, GPU utilization, transport hashes and exact-ID closure are in
 See `docs/v2_ROUND3.md` and its evidence JSON for complete paired, horizon,
 fold, gate/gradient, exposure and economic scenario readouts. Stop this research
 pass here; further Round-4 work requires a new registration.
+
+Instance closure: the report commit `c22cdef86b6e9a953303c0917862d0023afd35c9`
+matched clean local main, GitHub and the GH200 at 15:17:39 UTC. Exact-ID termination
+was accepted at 15:18:12 UTC. Provider inventory verified the exact ID absent at
+2026-09-09T15:20:22.615520+00:00 and 2026-09-09T15:20:43.033397+00:00. Complete host recovery preceded termination. The closing
+documentation commit records these later provider observations; the instance is
+already gone and the monitor stays paused. No adjacent instance was touched.

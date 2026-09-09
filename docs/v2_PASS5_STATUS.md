@@ -4,7 +4,7 @@ The registered pass is complete through Round 3: repaired store, fresh 16-book
 acceptance, Round 1', two smokes, six fresh Stage-P fits, 18 Arm-B fits and nine
 matched fast-off fits. All 24 Round-3 aggregate/comparator books pass the gates.
 The complete 732-file GPU root is sealed and SHA-256/exact-set verified on the
-host. Report publication and the approved exact-instance closure are recorded in
+host. The exact GH200 instance was terminated and its absence confirmed twice. Report publication and closure are recorded in
 [the operations evidence](v2_round3_operations.json). The five-minute monitor is paused.
 
 The user requested five-minute heartbeat monitoring while the approved launcher
@@ -70,8 +70,8 @@ ablation, six-versus-three seeds, gate activations, branch gradients, all econom
 scenarios and the unexercised 2025 rule. Six trajectories ran concurrently; median
 GPU utilization was 98% in pretraining and 97% in fine-tuning, including compilation
 and gaps. Peak sampled memory was 68,605 of 97,871 MiB. Complete host recovery
-is required before exact-ID termination and its two absence checks; their live
-closing status is preserved in the operations evidence.
+preceded exact-ID termination and its two absence checks; their timestamps and
+provider evidence are preserved in the operations record.
 
 Failed/interrupted roots remain immutable evidence. The memory stop, slow lookup
 stop and Windows Update restart were followed by a fresh successful build; no

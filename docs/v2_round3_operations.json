@@ -1,4 +1,5 @@
 {
+  "closing_commit_note": "Report commit c22cdef86b6e9a953303c0917862d0023afd35c9 matched clean local main, GitHub and instance before termination. The later documentation-only closing commit records provider absence after the instance is gone.",
   "complete_host_copy": {
     "archive_sha256": "4c270b8d2da8ee970cf078302b6c49d64acd7bcaf93ef6a4bcfffb88f7402c25",
     "hashes": {
@@ -100,6 +101,66 @@
     }
   },
   "region": "us-east-3",
-  "status": "complete_host_copy_verified_before_termination",
-  "termination_status": "pending_after_report_push_and_three_way_commit_match"
+  "status": "completed_recovered_published_terminated_absent_twice",
+  "termination": {
+    "absence_checks": [
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-09T15:18:37.189281+00:00",
+        "exact_instance_id": "de56fb8978734edba0f0b18059c0710f",
+        "target_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-09T15:19:15.608362+00:00",
+        "exact_instance_id": "de56fb8978734edba0f0b18059c0710f",
+        "target_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": true,
+        "checked_at_utc": "2026-09-09T15:20:22.615520+00:00",
+        "exact_instance_id": "de56fb8978734edba0f0b18059c0710f",
+        "target_status": []
+      },
+      {
+        "absent": true,
+        "checked_at_utc": "2026-09-09T15:20:43.033397+00:00",
+        "exact_instance_id": "de56fb8978734edba0f0b18059c0710f",
+        "target_status": []
+      }
+    ],
+    "preflight": {
+      "checked_at_utc": "2026-09-09T15:18:09.106252+00:00",
+      "id": "de56fb8978734edba0f0b18059c0710f",
+      "ip": "192.222.50.160",
+      "status": "active"
+    },
+    "pretermination_commit_match": {
+      "complete_host_copy_verified_at_utc": "2026-09-09T15:11:07.010122+00:00",
+      "github_main": "c22cdef86b6e9a953303c0917862d0023afd35c9",
+      "instance_head": "c22cdef86b6e9a953303c0917862d0023afd35c9",
+      "instance_id": "de56fb8978734edba0f0b18059c0710f",
+      "local_main": "c22cdef86b6e9a953303c0917862d0023afd35c9",
+      "status": "local_github_instance_clean_commit_match",
+      "verified_at_utc": "2026-09-09T15:17:39.485483+00:00"
+    },
+    "provider_response": {
+      "terminated_instances": [
+        {
+          "id": "de56fb8978734edba0f0b18059c0710f",
+          "instance_type": "gpu_1x_gh200",
+          "price_cents_per_hour": 229,
+          "region": "us-east-3",
+          "status": "terminating"
+        }
+      ]
+    },
+    "requested_at_utc": "2026-09-09T15:18:12.404341+00:00",
+    "requested_instance_id": "de56fb8978734edba0f0b18059c0710f"
+  },
+  "termination_status": "terminated_exact_instance_absent_twice"
 }

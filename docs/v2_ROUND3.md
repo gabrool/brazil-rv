@@ -105,7 +105,7 @@ The GH200 ran up to six trajectories concurrently, each with eight CPU threads. 
 | finalize | 4.51 | 0.0% | 0.0% | 3 |
 
 
-The complete sealed root contains **732 physical files / 603,721,484 bytes**, including checkpoint, score, diagnostic, inventory self-files and closed operational logs. The host copy was SHA-256 and exact-file-set verified at 2026-09-09 15:11:07 UTC. The source remains on the attached persistent filesystem. [Operations evidence](v2_round3_operations.json) records hardware, phase timings, transport hashes and instance closure. The five-minute monitor is paused. No research artifact is modified after sealing.
+The complete sealed root contains **732 physical files / 603,721,484 bytes**, including checkpoint, score, diagnostic, inventory self-files and closed operational logs. The host copy was SHA-256 and exact-file-set verified at 2026-09-09 15:11:07 UTC. The source remains on the attached persistent filesystem. [Operations evidence](v2_round3_operations.json) records hardware, phase timings, transport hashes and instance closure. The five-minute monitor is paused. Exact instance `de56fb8978734edba0f0b18059c0710f` was terminated only after host verification and clean local/GitHub/instance commit match at `c22cdef`. Provider inventory confirmed its absence at 2026-09-09T15:20:22.615520+00:00 and 2026-09-09T15:20:43.033397+00:00. This closing documentation is recorded after the instance is gone. No research artifact is modified after sealing.
 
 Root: `D:\quant-data\b3\processed\model_runs\v2_round3_e49aacd_20260909T133152Z`
 
