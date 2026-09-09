@@ -36,6 +36,15 @@ units. The independent native-fast audit also filters its raw M1 date range befo
 decoding. Thirty-two targeted sidecar/archive/native-fast tests pass.
 The odd-lot archive is complete (1,253,007 rows, 0.413 GiB peak RSS).
 
+The combined store build is running from a clean isolated checkout. Its source
+calendar bytes now retain the original audited LF identity on Windows as well.
+Future evaluations explicitly consume the sealed R3.1 policy and record the traded
+composite separately from raw model readouts. Round 1' runs the two requested
+GBDT feature sets with a fixed `b_intraday` parent. The five history-age threshold
+corrections are documented in [the exact evidence](v2_history_age_canonical_evidence.json).
+The policy integration passed 107 evaluation/execution/validation/research tests;
+four focused adapter cases also verify canonical age decoding and validity.
+
 The prior cleanup is committed separately as `fb6fc92`; the initial rev-4f
 registration was committed as `0302b27` before new derived beta output.
 The rev-4e registration is retained verbatim inside

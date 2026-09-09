@@ -33,7 +33,9 @@ from .contract import (
     STORE_START,
     TRAINING_STAGE_SCHEMA,
 )
+from .execution_policy import ExecutionPolicy, load_selected_policy
 from .evaluate import (
+    enforce_registered_book_bounds,
     EVALUATION_SCHEMA,
     PRIOR_EVALUATION_SCHEMA,
     EvaluationInputs,
@@ -685,6 +687,7 @@ def _evaluate(
     source_hashes: Mapping[str, str],
     fold: str,
     output: Path,
+    execution_policy: ExecutionPolicy | None = None,
 ) -> _ResearchEvaluation:
     inputs = _evaluation_inputs(
         store,
@@ -697,10 +700,13 @@ def _evaluate(
         lending_borrow,
         source_hashes,
         transfer_chronology_clean=True,
+        execution_policy=execution_policy,
     )
     result = evaluate_scores(inputs, window_name=fold)
     result.report.update(RESEARCH_FLAGS)
     write_json_atomic(output, result.report)
+    if execution_policy is not None:
+        enforce_registered_book_bounds(result.report)
     return _ResearchEvaluation(result=result, inputs=inputs)
 
 
@@ -1737,6 +1743,7 @@ def _run_gbdt_candidate(
     source_hashes: Mapping[str, str],
     root: Path,
     num_threads: int,
+    execution_policy: ExecutionPolicy | None = None,
 ) -> tuple[dict[str, _ResearchEvaluation], dict[str, object]]:
     config = GBDTConfig(seeds=GBDT_SEEDS, num_threads=num_threads)
     feature_names = _feature_names(store, rung)
@@ -1853,6 +1860,7 @@ def _run_gbdt_candidate(
             source_hashes=source_hashes,
             fold=fold,
             output=fold_root / "evaluation.json",
+            execution_policy=execution_policy,
         )
         reports[fold] = evaluated
         records[fold] = {
@@ -1882,9 +1890,15 @@ def freeze_round1(
     acceptance_sha256: str,
     output_root: Path,
     num_threads: int,
+    execution_sweep_root: Path | None = None,
 ) -> str:
     protocol = verify_registration_protocol()
     code = _git_identity()
+    execution_policy, policy_binding = (
+        load_selected_policy(execution_sweep_root)
+        if execution_sweep_root is not None
+        else (None, None)
+    )
     output = output_root.resolve()
     if output.exists():
         raise FileExistsError(output)
@@ -1901,6 +1915,8 @@ def freeze_round1(
         store_build_implementation_commit=store_build_commit,
         source_tiers=source_tiers,
     )
+    if acceptance_report.get("execution_policy") != policy_binding:
+        raise ValueError("Round-1 policy must match fresh store acceptance")
     fit, selection, evaluation, _, folds = _fold_indices(dates)
     _load_development_cdi(
         dates=dates,
@@ -1983,7 +1999,11 @@ def freeze_round1(
         },
         "folds": folds,
         "baseline_roster": list(_BASELINE_SIGNAL_NAMES),
-        "gbdt_rungs": {"b_intraday": []},
+        "gbdt_rungs": (
+            {"a_slow": [], "b_intraday": []}
+            if execution_policy is not None
+            else {"b_intraday": []}
+        ),
         "gbdt_seeds": list(GBDT_SEEDS),
         "data_span_arms": [],
         "gbdt_num_threads": num_threads,
@@ -2006,6 +2026,19 @@ def freeze_round1(
             "beta_hedge": True,
         },
     }
+    if execution_policy is not None:
+        registration = PROJECT_ROOT / "research/preregistrations/v2_round3.md"
+        design.update(
+            {
+                "execution_policy": policy_binding,
+                "fixed_parent_rung": "b_intraday",
+                "history_age_decoding": "np.rint after inverse transform; int32 hash; validity unchanged",
+                "round3_registration": {
+                    "path": str(registration),
+                    "sha256": sha256_file(registration),
+                },
+            }
+        )
     return write_json_atomic(output / "frozen_design.json", design)
 
 
@@ -2017,6 +2050,18 @@ def run_round1(
     output = output_root.resolve(strict=True)
     design_path = output / "frozen_design.json"
     design = _read_json(design_path)
+    policy_binding = design.get("execution_policy")
+    execution_policy = None
+    if policy_binding is not None:
+        execution_policy, actual_binding = load_selected_policy(
+            Path(policy_binding["root"]),
+            expected_result_sha256=policy_binding["result_sha256"],
+        )
+        if actual_binding != policy_binding:
+            raise ValueError("Round-1 execution policy differs from its frozen binding")
+        registration = design["round3_registration"]
+        if sha256_file(Path(registration["path"])) != registration["sha256"]:
+            raise ValueError("Round-1 Round-3 amendment changed after freeze")
     if (
         design.get("schema") != ROUND1_SCHEMA
         or design.get("status") != "frozen_before_score"
@@ -2157,6 +2202,7 @@ def run_round1(
                     bova11_binding=bova11_binding,
                     lending_borrow=lending_borrow,
                     source_hashes=source_hashes,
+                    execution_policy=execution_policy,
                     fold=fold,
                     output=root / "evaluation.json",
                 )
@@ -2179,7 +2225,7 @@ def run_round1(
         rung_comparisons: dict[str, object] = {}
         kept: list[str] = []
         previous: str | None = None
-        for rung in ("b_intraday",):
+        for rung in design["gbdt_rungs"]:
             reports, records = _run_gbdt_candidate(
                 store=store,
                 rung=rung,
@@ -2194,6 +2240,7 @@ def run_round1(
                 bova11_binding=bova11_binding,
                 lending_borrow=lending_borrow,
                 source_hashes=source_hashes,
+                execution_policy=execution_policy,
                 root=output / "gbdt_ladder" / rung,
                 num_threads=num_threads,
             )
@@ -2225,6 +2272,10 @@ def run_round1(
                 -list(RUNG_GROUPS).index(rung),
             ),
         )
+
+        if "fixed_parent_rung" in design:
+            parent = str(design["fixed_parent_rung"])
+            kept = [parent]
 
         designated_rung, rung_designation = _weighted_candidate_designation(
             {parent: rung_reports[parent]},
@@ -2335,6 +2386,18 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
         raise FileExistsError(result_path)
     design_path = output / "frozen_design.json"
     design = _read_json(design_path)
+    policy_binding = design.get("execution_policy")
+    execution_policy = None
+    if policy_binding is not None:
+        execution_policy, actual_binding = load_selected_policy(
+            Path(policy_binding["root"]),
+            expected_result_sha256=policy_binding["result_sha256"],
+        )
+        if actual_binding != policy_binding:
+            raise ValueError("Round-1 execution policy differs from its frozen binding")
+        registration = design["round3_registration"]
+        if sha256_file(Path(registration["path"])) != registration["sha256"]:
+            raise ValueError("Round-1 Round-3 amendment changed after freeze")
     if (
         design.get("schema") != ROUND1_SCHEMA
         or design.get("status") != "frozen_before_score"
@@ -2491,6 +2554,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 bova11_binding=bova11_binding,
                 lending_borrow=lending_borrow,
                 source_hashes=source_hashes,
+                execution_policy=execution_policy,
                 root=candidate_root,
                 num_threads=num_threads,
             )
@@ -2518,6 +2582,10 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
             -list(RUNG_GROUPS).index(rung),
         ),
     )
+    if "fixed_parent_rung" in design:
+        parent = str(design["fixed_parent_rung"])
+        kept = [parent]
+
     designated_rung, rung_designation = _weighted_candidate_designation(
         {parent: rung_reports[parent]},
         exact_tie_priority=(parent,),
@@ -2576,6 +2644,7 @@ def resume_round1(*, output_root: Path, num_threads: int) -> str:
                 bova11_binding=bova11_binding,
                 lending_borrow=lending_borrow,
                 source_hashes=source_hashes,
+                execution_policy=execution_policy,
                 root=candidate_root,
                 num_threads=num_threads,
             )
@@ -3871,6 +3940,17 @@ def _evaluation_from_artifacts(
     source_hashes = report.get("source_artifact_hashes")
     if not isinstance(source_hashes, Mapping) or not source_hashes:
         raise ValueError(f"evaluation lacks source artifact hashes: {path}")
+    policy_record = report["economics"].get("execution_policy")
+    execution_policy = (
+        None
+        if policy_record is None
+        else ExecutionPolicy(
+            theta=policy_record["theta"],
+            horizons=tuple(policy_record["horizons"]),
+            inverse_volatility=policy_record["inverse_volatility"],
+            buffer_per_quintile=policy_record["buffer_per_quintile"],
+        )
+    )
     inputs = _evaluation_inputs(
         store,
         indices,
@@ -3882,6 +3962,7 @@ def _evaluation_from_artifacts(
         lending_borrow,
         {str(key): str(value) for key, value in source_hashes.items()},
         transfer_chronology_clean=True,
+        execution_policy=execution_policy,
     )
     recorded_hashes = report.get("input_hashes")
     rebuilt_hashes = _input_hashes(inputs)
@@ -4562,6 +4643,7 @@ def _parser() -> argparse.ArgumentParser:
     freeze.add_argument("--development-acceptance-sha256", required=True)
     freeze.add_argument("--output-root", type=Path, required=True)
     freeze.add_argument("--num-threads", type=int, default=0)
+    freeze.add_argument("--execution-sweep-root", type=Path)
     run = commands.add_parser("run-round1")
     run.add_argument("--output-root", type=Path, required=True)
     run.add_argument("--num-threads", type=int, default=0)
@@ -4637,6 +4719,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             acceptance_sha256=arguments.development_acceptance_sha256,
             output_root=arguments.output_root,
             num_threads=arguments.num_threads,
+            execution_sweep_root=arguments.execution_sweep_root,
         )
     elif arguments.command == "run-round1":
         digest = run_round1(

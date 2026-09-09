@@ -18,6 +18,7 @@ from brazil_rv.v2.evaluate import (
     paired_comparison,
     write_evaluation_report,
 )
+from brazil_rv.v2.execution_policy import ExecutionPolicy, traded_signal
 
 
 def _weekdays(start: date, count: int) -> tuple[date, ...]:
@@ -28,6 +29,70 @@ def _weekdays(start: date, count: int) -> tuple[date, ...]:
             values.append(current)
         current += timedelta(days=1)
     return tuple(values)
+
+
+def test_selected_policy_matches_direct_ledger_and_keeps_raw_ic():
+    inputs = _fixture()
+    old = evaluate_scores(inputs, window_name="F1")
+    policy = ExecutionPolicy(horizons=(3, 5, 10), buffer_per_quintile=9)
+    changed = replace(inputs, execution_policy=policy)
+    result = evaluate_scores(changed, window_name="F1")
+    score, mask = traded_signal(changed, policy)
+    direct = evaluate_module.simulate_stateful_ledger(
+        **evaluate_module._ledger_inputs(changed, score, mask),
+        config=policy.ledger_config(),
+        capacity_buffer_per_side=30,
+        shortable=changed.shortable_by_borrow_source["borrow_balance"],
+    )
+    assert result.report["economics"]["headline_audit"]["daily_state"] == (
+        evaluate_module._ledger_rows(direct, cost_bps=4.0, annual_borrow_rate=0.02)
+    )
+    np.testing.assert_array_equal(result.daily_primary_ic, old.daily_primary_ic)
+    assert result.report["economics"]["contract"]["signal_horizons_sessions"] == [
+        3,
+        5,
+        10,
+    ]
+    assert result.report["economics"]["contract"]["buffer_per_side"] == 45
+    assert "traded_signal" in result.report["economics"]
+    assert "execution_policy" not in old.report["input_hashes"]
+
+
+def test_future_history_age_hash_uses_integer_counts_and_separate_validity():
+    inputs = _fixture()
+    age = np.full(inputs.active.shape, 60.0)
+    age[0, 0] = np.nan
+    policy = ExecutionPolicy(horizons=(3, 5, 10), buffer_per_quintile=9)
+    original = replace(inputs, history_age_sessions=age, execution_policy=policy)
+    drift = replace(original, history_age_sessions=age - 1.4e-7)
+    first = evaluate_module._input_hashes(original)
+    second = evaluate_module._input_hashes(drift)
+    assert first["history_age_sessions"] == second["history_age_sessions"]
+    assert first["history_age_valid"] == second["history_age_valid"]
+    integer = np.where(np.isfinite(age), age, -1).astype(np.int32)
+    assert first["history_age_sessions"] == evaluate_module._array_sha256(integer)
+    legacy = evaluate_module._input_hashes(replace(original, execution_policy=None))
+    assert legacy["history_age_sessions"] == evaluate_module._array_sha256(age)
+
+
+def test_registered_book_stop_includes_nonheadline_defects():
+    summary = {
+        "scenario": "borrow_balance", "entry_defect_signatures": {},
+        "mean_gross_fraction_nav": 2.0,
+        "mean_unresolved_stale_inventory_fraction_nav": 0.0, "insolvent": False,
+        "mean_absolute_volatility_occupancy_deviation_long": 0.0,
+        "mean_absolute_volatility_occupancy_deviation_short": 0.0,
+    }
+    report = {"economics": {
+        "summaries": [summary],
+        "d5_only_diagnostic": {"summary": {"entry_defect_signatures": {}}},
+    }}
+    evaluate_module.enforce_registered_book_bounds(report)
+    report["economics"]["summaries"].append({
+        **summary, "scenario": "borrow_open", "entry_defect_signatures": {"D4": 1},
+    })
+    with pytest.raises(RuntimeError, match="borrow_open.*D4"):
+        evaluate_module.enforce_registered_book_bounds(report)
 
 
 def _fixture() -> EvaluationInputs:

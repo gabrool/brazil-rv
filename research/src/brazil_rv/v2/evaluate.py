@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 from dataclasses import asdict, dataclass
 from datetime import date
@@ -28,6 +29,12 @@ from .contract import (
     REGISTERED_PRIMARY_TARGET,
 )
 from .corporate_actions import AlignedActionTerms
+from .execution_policy import (
+    ExecutionPolicy,
+    ledger_gate_failures,
+    traded_readouts,
+    traded_signal,
+)
 from .splits import (
     PREREGISTRATION_ROOT,
     authorize_dates,
@@ -132,6 +139,7 @@ class EvaluationInputs:
     initial_unresolved_action: NDArray[np.bool_] | None = None
     initial_hedge_reference_price: float = np.nan
     neutral_target_fallback_flags: NDArray[np.bool_] | None = None
+    execution_policy: ExecutionPolicy | None = None
 
 
 @dataclass(frozen=True)
@@ -1656,6 +1664,17 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
             )
         ),
     }
+    if inputs.execution_policy is not None:
+        result["execution_policy"] = hashlib.sha256(
+            json.dumps(asdict(inputs.execution_policy), sort_keys=True).encode("ascii")
+        ).hexdigest()
+        if inputs.history_age_sessions is not None:
+            age = np.asarray(inputs.history_age_sessions)
+            valid = np.isfinite(age)
+            result["history_age_sessions"] = _array_sha256(
+                np.where(valid, np.rint(age), -1).astype(np.int32)
+            )
+            result["history_age_valid"] = _array_sha256(valid)
     for name, values in sorted(inputs.prior_feature_values.items()):
         result[f"prior_feature_{name}"] = _array_sha256(np.asarray(values))
     if inputs.hedge_beta_history is not None:
@@ -1681,14 +1700,20 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
 
 
 def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
-    config = LedgerConfig()
+    policy = inputs.execution_policy
+    config = policy.ledger_config() if policy is not None else LedgerConfig()
     return {
         "signal_construction": (
             "arithmetic mean of each D=1,2,3,5 head's tie-aware "
             "cross-sectional ranks, centered and rescaled to [-1,1]; "
             "all four score masks required and D=10 excluded"
+            if policy is None
+            else "tie-aware mean rank over the frozen policy heads, causal smoothing, "
+            "then daily reranking; carry only when theta < 1"
         ),
-        "signal_horizons_sessions": list(PRIMARY_HORIZONS),
+        "signal_horizons_sessions": list(
+            PRIMARY_HORIZONS if policy is None else policy.horizons
+        ),
         "k_per_side": config.k_per_side,
         "effective_k_per_side": "min(k_per_side, floor(eligible_names / 2))",
         "buffer_per_side": config.buffer_per_side,
@@ -2075,6 +2100,23 @@ def _diagnostics(
     }
 
 
+def enforce_registered_book_bounds(report: Mapping[str, object]) -> None:
+    """Called after persisting a fresh report, so a stopped book stays reviewable."""
+    economics = report["economics"]
+    failures = {
+        row["scenario"]: ledger_gate_failures(
+            row, headline=row["scenario"] == "borrow_balance"
+        )
+        for row in economics["summaries"]
+    }
+    failures["d5_only_diagnostic"] = ledger_gate_failures(
+        economics["d5_only_diagnostic"]["summary"], headline=False
+    )
+    failures = {name: flags for name, flags in failures.items() if flags}
+    if failures:
+        raise RuntimeError(f"registered book stop: {failures}")
+
+
 def evaluate_scores(
     inputs: EvaluationInputs,
     *,
@@ -2124,13 +2166,22 @@ def evaluate_scores(
         metric_rows,
     ) = _daily_metrics(inputs, primary_population, legacy_primary_population)
     persistence, persistence_rows = _persistence(inputs)
-    economics_score, economics_mask = _economics_signal(inputs)
+    policy = inputs.execution_policy
+    economics_score, economics_mask = (
+        _economics_signal(inputs) if policy is None else traded_signal(inputs, policy)
+    )
     ledger_inputs = _ledger_inputs(inputs, economics_score, economics_mask)
+    if policy is not None:
+        ledger_inputs["capacity_buffer_per_side"] = 30
+        if policy.inverse_volatility:
+            ledger_inputs["entry_sizing_volatility"] = inputs.target_scale_sigma
+    headline_config = policy.ledger_config() if policy is not None else LedgerConfig()
     grid = ledger_sensitivity_grid(
         shortable_by_borrow_source=inputs.shortable_by_borrow_source,
+        headline_config=headline_config,
         **ledger_inputs,
     )
-    configurations = ledger_configurations()
+    configurations = ledger_configurations(headline_config)
     headline_name = "borrow_balance"
     headline = grid[headline_name]
     d5_index = HORIZONS.index(5)
@@ -2142,7 +2193,7 @@ def evaluate_scores(
     )
     d5_only = simulate_stateful_ledger(
         **{**ledger_inputs, "scores": d5_score, "score_mask": d5_score_mask},
-        config=LedgerConfig(),
+        config=headline_config,
         shortable=inputs.shortable_by_borrow_source["borrow_balance"],
     )
     active = np.asarray(inputs.active, dtype=np.bool_)
@@ -2512,6 +2563,29 @@ def evaluate_scores(
             "actual_risk_breach_dates": int(headline.actual_risk_breach.sum()),
         },
     }
+    if policy is not None:
+        traded = traded_readouts(inputs, economics_score, economics_mask)
+        report["economics"]["execution_policy"] = {
+            **asdict(policy),
+            "capacity_buffer_per_side": 30,
+            "label": "execution_parameter_selected_in_sample",
+        }
+        report["economics"]["traded_signal"] = {
+            "mean": {
+                name: _finite_or_none(_finite_mean(values))
+                for name, values in traded.items()
+            },
+            "daily": [
+                {
+                    "date": day.isoformat(),
+                    **{
+                        name: _finite_or_none(values[index])
+                        for name, values in traded.items()
+                    },
+                }
+                for index, day in enumerate(inputs.dates)
+            ],
+        }
     return EvaluationResult(
         report=report,
         dates=inputs.dates,

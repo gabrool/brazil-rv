@@ -1,0 +1,95 @@
+{
+  "access": {
+    "official_validation_accessed": false,
+    "purpose": "evaluation",
+    "registration": null,
+    "test_accessed": false
+  },
+  "authorization": "user explicit autonomous recommended-option authority",
+  "decision": "canonical integer counts for future freezes; sealed replay decoder unchanged",
+  "folds": [
+    {
+      "canonical_stratum_counts": [
+        1,
+        215,
+        24382
+      ],
+      "changes": [
+        {
+          "canonical": 60,
+          "date": "2023-12-19",
+          "isin": "BRBHIAACNOR1",
+          "raw": 59.999999859984925
+        }
+      ],
+      "fold": "F1",
+      "raw_stratum_counts": [
+        2,
+        214,
+        24382
+      ],
+      "stratum_changed_cells": 1,
+      "valid_name_days": 24598
+    },
+    {
+      "canonical_stratum_counts": [
+        2,
+        309,
+        23257
+      ],
+      "changes": [
+        {
+          "canonical": 60,
+          "date": "2024-01-25",
+          "isin": "BRALOSACNOR5",
+          "raw": 59.999999859984925
+        },
+        {
+          "canonical": 60,
+          "date": "2024-03-05",
+          "isin": "BRSRNAACNOR4",
+          "raw": 59.999999859984925
+        }
+      ],
+      "fold": "F2",
+      "raw_stratum_counts": [
+        4,
+        307,
+        23257
+      ],
+      "stratum_changed_cells": 2,
+      "valid_name_days": 23568
+    },
+    {
+      "canonical_stratum_counts": [
+        2,
+        307,
+        22750
+      ],
+      "changes": [
+        {
+          "canonical": 60,
+          "date": "2024-10-25",
+          "isin": "BRAZZAACNOR9",
+          "raw": 59.999999859984925
+        },
+        {
+          "canonical": 60,
+          "date": "2024-12-05",
+          "isin": "BRBRAVACNOR3",
+          "raw": 59.999999859984925
+        }
+      ],
+      "fold": "F3",
+      "raw_stratum_counts": [
+        4,
+        305,
+        22750
+      ],
+      "stratum_changed_cells": 2,
+      "valid_name_days": 23059
+    }
+  ],
+  "scope": "three development evaluation folds",
+  "source_manifest_sha256": "deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b"
+}

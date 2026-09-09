@@ -3677,6 +3677,7 @@ def simulate_stateful_ledger(
 def ledger_sensitivity_grid(
     *,
     shortable_by_borrow_source: Mapping[BorrowSource, NDArray[np.bool_]],
+    headline_config: LedgerConfig | None = None,
     **inputs: object,
 ) -> dict[str, StatefulLedgerResult]:
     """Run the registered financing/cost grid and structural sensitivities."""
@@ -3691,7 +3692,7 @@ def ledger_sensitivity_grid(
             "rev4b ledger grid requires all three borrow availability cells"
         )
     results = {}
-    for name, config in ledger_configurations().items():
+    for name, config in ledger_configurations(headline_config).items():
         shortable = (
             np.ones_like(next(iter(shortable_by_borrow_source.values())))
             if config.borrow_source == "uniform"
@@ -3705,10 +3706,12 @@ def ledger_sensitivity_grid(
     return results
 
 
-def ledger_configurations() -> dict[str, LedgerConfig]:
+def ledger_configurations(
+    headline_config: LedgerConfig | None = None,
+) -> dict[str, LedgerConfig]:
     """Stress costs and borrow availability on the same constructed, hedged book."""
 
-    headline = LedgerConfig()
+    headline = headline_config if headline_config is not None else LedgerConfig()
     configurations = {
         (
             f"borrow_{borrow}" if cost == 4.0 else f"cost_{cost:g}_borrow_{borrow}"

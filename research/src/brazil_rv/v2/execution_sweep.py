@@ -21,6 +21,7 @@ from brazil_rv.v2.evaluate import (
 )
 from brazil_rv.v2.execution_policy import (
     ExecutionPolicy,
+    ledger_gate_failures,
     original_trade_attribution,
     policy_grid,
     prior_median_volume,
@@ -121,21 +122,6 @@ def _source_path(sources, candidate, fold):
     )
 
 
-def _failures(summary, *, headline):
-    failed = [key for key, count in summary["entry_defect_signatures"].items() if count]
-    if headline:
-        if not 1.5 <= summary["mean_gross_fraction_nav"] <= 2.25:
-            failed.append("mean_gross_outside_1.5_to_2.25")
-        if summary["mean_unresolved_stale_inventory_fraction_nav"] >= 0.02:
-            failed.append("mean_unresolved_stale_inventory_at_least_0.02")
-        if summary["insolvent"]:
-            failed.append("insolvent")
-        for side in ("long", "short"):
-            if summary[f"mean_absolute_volatility_occupancy_deviation_{side}"] > 2:
-                failed.append(f"mean_quintile_occupancy_deviation_{side}_above_two")
-    return failed
-
-
 def _finite_list(array):
     return [float(value) if np.isfinite(value) else None for value in array]
 
@@ -198,7 +184,7 @@ def _panel(inputs, original_report, policy, median_volume):
                 result["failed_gates"].append(
                     f"{scenario}:baseline_daily_not_bit_identical"
                 )
-        failed = _failures(summary, headline=scenario == "borrow_balance")
+        failed = ledger_gate_failures(summary, headline=scenario == "borrow_balance")
         result["failed_gates"].extend(f"{scenario}:{name}" for name in failed)
         if scenario == "borrow_balance":
             result["liquidity_attribution"] = original_trade_attribution(

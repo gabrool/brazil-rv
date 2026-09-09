@@ -955,10 +955,12 @@ def test_runtime_caps_and_dataset_refuse_sealed_dates(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("invalid_slow_diagnostics", [False, True])
+@pytest.mark.parametrize("canonical_history_age", [False, True])
 def test_evaluation_inputs_zero_targets_outside_the_exact_window(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     invalid_slow_diagnostics: bool,
+    canonical_history_age: bool,
 ) -> None:
     store_root, _, _, _, _ = _development_store(tmp_path)
     dates = np.load(store_root / "date_index.npy", allow_pickle=False)
@@ -970,16 +972,18 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
         history_lookbacks=20,
         history_end_offsets=-1,
     )
-    if invalid_slow_diagnostics:
-        original_read = V2Store.read
+    original_read = V2Store.read
+    age_index = store.manifest["feature_names"]["slow"].index("observed_history_age_sessions")
 
-        def read_with_invalid_slow(self, name, selectors):
-            values = original_read(self, name, selectors)
-            if name == "slow_valid":
-                values[:] = False
-            return values
+    def read_with_diagnostic_age(self, name, selectors):
+        values = original_read(self, name, selectors)
+        if name == "slow_values":
+            values[..., age_index] = np.float32(np.log1p(60.0) / np.log1p(252.0))
+        if name == "slow_valid" and invalid_slow_diagnostics:
+            values[:] = False
+        return values
 
-        monkeypatch.setattr(V2Store, "read", read_with_invalid_slow)
+    monkeypatch.setattr(V2Store, "read", read_with_diagnostic_age)
     score_shape = (len(indices), len(store.isins), len(HORIZONS))
     beta_binding = write_hedge_beta_fixture(
         tmp_path / "beta",
@@ -1000,6 +1004,7 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
             _borrow_panels(len(dates), len(store.isins)),
             {},
             transfer_chronology_clean=True,
+            execution_policy=(pipeline.ExecutionPolicy() if canonical_history_age else None),
         )
     finally:
         store.close()
@@ -1021,6 +1026,12 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
         assert all(
             np.isnan(values).all() for values in inputs.prior_feature_values.values()
         )
+    if invalid_slow_diagnostics:
+        assert np.isnan(inputs.history_age_sessions).all()
+    elif canonical_history_age:
+        assert np.all(inputs.history_age_sessions == 60)
+    else:
+        assert np.all(inputs.history_age_sessions < 60)
     assert inputs.action_payment_session[0, 0] == len(indices)
     assert np.all(inputs.action_payment_session[:, 1:] == -1)
     assert inputs.security_ids == store.isins

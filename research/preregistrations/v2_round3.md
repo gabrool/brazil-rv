@@ -2,7 +2,8 @@
 
 Registered before execution-policy results. The supplied Round-3 proposal is retained
 below. The following pass-5 amendments take precedence over its original sequencing,
-store identity, fit counts and operational examples. No paid work is authorized here.
+store identity, fit counts and operational examples. Paid work follows the subsequent
+explicit user authority recorded below.
 
 1. Complete and report the rev4f Round-1/2 ledger replays on sealed scores first.
    The current code/diagnostic contract is `v2_round1_round2_rev4f.md`.
@@ -20,7 +21,7 @@ store identity, fit counts and operational examples. No paid work is authorized 
    the canonical 8021e42 store slice. Keep the measured 8-GiB bound; the former
    10-GiB admission requirement is waived. Run fresh 16-book rev4f acceptance.
 4. Run controls and GBDT on that store (Round 1'), reporting b_intraday minus a_slow.
-   STOP for the user's explicit GPU go before the following steps.
+   Continue to the GPU steps under the subsequent explicit user authority below.
 5. Once authorized, smoke first, then train six fresh Stage-P seeds
    11/29/47/61/79/97 and 18 Arm-B fine-tune fold/seed fits on the new store.
    The nine fast-off ablation fits use seeds 11/29/47 and the same corresponding
@@ -36,8 +37,15 @@ memory above 8 GiB, protected-date access, or unauthorized paid work.
 
 For Round 1' on the rebuilt store, decoded history age is canonicalised with
 `np.rint` to integer sessions after the existing inverse transform; its validity
-mask is unchanged and its hash covers canonical integers. Check raw-versus-canonical
-age stratification against the current store before that freeze. More generally,
+mask is unchanged and its hash covers canonical integers. The pre-freeze check
+found five exact-threshold name-days across F1/F2/F3 (1/2/2) decoded as
+59.999999859984925 instead of their natural count 60. Under the user's explicit
+autonomous authority, amend the proposed identity assertion: future stratification
+uses the correct 60-251 bucket for those five cells. Assert unchanged validity,
+integer reconstruction, and unchanged buckets away from the exact threshold;
+report the five changes rather than claiming raw/canonical identity. Evidence is
+in `docs/v2_history_age_canonical_evidence.json`. Sealed replay strata stay unchanged.
+More generally,
 hash decoded diagnostic provenance after canonicalisation to its natural type;
 model inputs, targets and scores remain hashed exactly as stored. This future rule
 is inactive for rev4f and the R3.1 replays of its sealed panels.
@@ -89,6 +97,13 @@ metadata, even though the next session has no market data or consumer row in thi
 store. Otherwise nine December 30 inferred action components would be marked
 unknown solely because the array was truncated, changing its final wealth row.
 This retains the canonical information cutoff and does not open 2025 payload.
+
+Fresh acceptance, Round 1' and Round 3 bind the completed R3.1 inventory and result
+and apply its selected theta=1, D3/D5/D10, equal-notional, buffer-9 policy. Capacity
+scaling retains the reference buffer of 30. Raw score-based IC/readouts keep the
+registered target populations; the traded composite gets separate diagnostics.
+Round 1' runs only `a_slow` and `b_intraday` as a paired ablation. The parent remains
+`b_intraday` for the registered Arm-B experiment; this does not reopen rung selection.
 
 Inputs are the completed rev4f R1 and R2 roots. The freeze verifies and binds each
 complete inventory, result and design, and binds the clean implementation commit

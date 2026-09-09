@@ -1,8 +1,13 @@
 """Registered ledger-only signals and attribution of the original filled trades."""
 
+from __future__ import annotations
+
 from collections import defaultdict
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from itertools import product
+import json
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
@@ -14,12 +19,10 @@ from brazil_rv.execution.stateful_ledger import (
 )
 from brazil_rv.modeling.metrics import average_ranks
 from brazil_rv.v2.corporate_actions import AlignedActionTerms
-from brazil_rv.v2.evaluate import (
-    EvaluationInputs,
-    _economics_signal,
-    _primary_daily_metrics,
-    _primary_population_components,
-)
+from brazil_rv.v2.artifacts import inventory, sha256_file
+
+if TYPE_CHECKING:
+    from brazil_rv.v2.evaluate import EvaluationInputs
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,9 @@ class ExecutionPolicy:
     horizons: tuple[int, ...] = (1, 2, 3, 5)
     inverse_volatility: bool = False
     buffer_per_quintile: int = 6
+
+    def ledger_config(self) -> LedgerConfig:
+        return replace(LedgerConfig(), buffer_per_side=5 * self.buffer_per_quintile)
 
     @property
     def key(self) -> str:
@@ -54,6 +60,51 @@ def policy_grid() -> tuple[ExecutionPolicy, ...]:
             (1.0, 0.5, 0.25), ((1, 2, 3, 5), (3, 5, 10), (5, 10)), (False, True)
         )
     )
+
+
+def load_selected_policy(root: Path, *, expected_result_sha256: str | None = None):
+    """Bind the complete sealed sweep before applying its choice to new scores."""
+    root = root.resolve(strict=True)
+    inventory_path = root / "artifact_inventory.json"
+    sealed = json.loads(inventory_path.read_text())
+    if (
+        sealed["status"] != "passed"
+        or inventory(root, exclude=set(sealed["excluded_self"])) != sealed["files"]
+    ):
+        raise ValueError("execution sweep inventory differs from its sealed files")
+    result_path = root / "execution_sweep_result.json"
+    result_sha = sha256_file(result_path)
+    if expected_result_sha256 is not None and result_sha != expected_result_sha256:
+        raise ValueError("execution sweep result differs from its frozen binding")
+    result = json.loads(result_path.read_text())
+    if result["status"] != "complete" or not result["protected_inputs_exact"]:
+        raise ValueError("execution policy requires a completed, exact-input sweep")
+    if result["official_validation_accessed"] or result["test_accessed"]:
+        raise PermissionError("execution policy source accessed protected outcomes")
+    raw = result["decision"]["selected_policy"]
+    policy = ExecutionPolicy(**{**raw, "horizons": tuple(raw["horizons"])})
+    return policy, {
+        "root": str(root),
+        "result_sha256": result_sha,
+        "inventory_sha256": sha256_file(inventory_path),
+        "policy": {**asdict(policy), "horizons": list(policy.horizons)},
+        "label": result["decision"]["label"],
+    }
+
+
+def ledger_gate_failures(summary, *, headline):
+    failed = [key for key, count in summary["entry_defect_signatures"].items() if count]
+    if headline:
+        if not 1.5 <= summary["mean_gross_fraction_nav"] <= 2.25:
+            failed.append("mean_gross_outside_1.5_to_2.25")
+        if summary["mean_unresolved_stale_inventory_fraction_nav"] >= 0.02:
+            failed.append("mean_unresolved_stale_inventory_at_least_0.02")
+        if summary["insolvent"]:
+            failed.append("insolvent")
+        for side in ("long", "short"):
+            if summary[f"mean_absolute_volatility_occupancy_deviation_{side}"] > 2:
+                failed.append(f"mean_quintile_occupancy_deviation_{side}_above_two")
+    return failed
 
 
 def smooth_and_rank(
@@ -89,6 +140,8 @@ def smooth_and_rank(
 
 
 def traded_signal(inputs: EvaluationInputs, policy: ExecutionPolicy):
+    from brazil_rv.v2.evaluate import _economics_signal
+
     composite, valid = _economics_signal(inputs, horizons=policy.horizons)
     return smooth_and_rank(
         composite,
@@ -103,6 +156,10 @@ def traded_readouts(inputs: EvaluationInputs, scores, mask) -> dict[str, NDArray
     from brazil_rv.v2.research_rounds import (
         _single_persistence_series,
         _single_spread_series,
+    )
+    from brazil_rv.v2.evaluate import (
+        _primary_daily_metrics,
+        _primary_population_components,
     )
 
     view = replace(

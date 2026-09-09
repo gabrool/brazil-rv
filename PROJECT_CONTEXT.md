@@ -33,9 +33,16 @@ rule adopts unsmoothed D3/D5/D10, equal sizing and buffer 9 per quintile, labell
 [-0.4199, 6.5484]; the horizon-only buffer-6 cell has the higher gain but is an
 individual change. This execution recipe applies to the remaining program;
 sealed replays retain their original policy. See
-[the sweep report](docs/v2_R31_EXECUTION_SWEEP.md). The next steps are the
-intraday repair, bounded store rebuild, acceptance and Round 1' CPU, followed
-by the explicit GPU approval stop.
+[the sweep report](docs/v2_R31_EXECUTION_SWEEP.md). The user subsequently authorized
+autonomous completion, including the GH200 work after successful CPU checks,
+with verified artifact recovery and instance termination. The repaired intraday
+archive coverage is reported in [the 2024 table](docs/v2_INTRADAY_COVERAGE.md).
+Fresh acceptance and Round 1' explicitly bind the selected policy. Round 1' is
+the paired `b_intraday` minus `a_slow` ablation; the registered parent stays
+`b_intraday`, without reopening the rung ladder. Its diagnostic history age is
+decoded to integer sessions with `np.rint`, with unchanged validity and an int32
+hash. Five exact-60-session boundary cells move to their correct bucket; sealed
+replay strata and model inputs remain unchanged.
 Official validation and the permanently spent test remain sealed; deployment
 is unchanged. Earlier results remain immutable under their own registrations.
 

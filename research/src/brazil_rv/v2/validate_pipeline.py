@@ -51,7 +51,9 @@ from .data import (
     stage_fast_name_count,
 )
 from .data_roots import resolve_external_files, resolve_external_root
+from .execution_policy import ExecutionPolicy, load_selected_policy
 from .evaluate import (
+    enforce_registered_book_bounds,
     EVALUATION_SCHEMA,
     EvaluationInputs,
     EvaluationResult,
@@ -657,6 +659,7 @@ def _evaluation_inputs(
     source_hashes: Mapping[str, str],
     *,
     transfer_chronology_clean: bool,
+    execution_policy: ExecutionPolicy | None = None,
 ) -> EvaluationInputs:
     if transfer_chronology_clean is not True:
         raise PermissionError(
@@ -758,6 +761,8 @@ def _evaluation_inputs(
         np.expm1(np.clip(transformed_history_age, 0.0, 1.0) * np.log1p(252.0)),
         np.nan,
     )
+    if execution_policy is not None:
+        history_age_sessions = np.rint(history_age_sessions)
     source_archive_present: dict[str, NDArray[np.bool_]] = {}
     source_feature_valid: dict[str, NDArray[np.bool_]] = {}
     for group in SIDECAR_FEATURES:
@@ -839,6 +844,7 @@ def _evaluation_inputs(
             "lending_archive_rates": lending_borrow.rate_sha256,
         },
         history_age_sessions=history_age_sessions,
+        execution_policy=execution_policy,
         source_archive_present=source_archive_present or None,
         source_feature_valid=source_feature_valid or None,
         initial_reference_price=initial_reference_price,
@@ -904,6 +910,7 @@ def _evaluate_and_write(
     window_name: str,
     path: Path,
     transfer_chronology_clean: bool = True,
+    execution_policy: ExecutionPolicy | None = None,
 ) -> tuple[EvaluationResult, str]:
     result = evaluate_scores(
         _evaluation_inputs(
@@ -917,11 +924,15 @@ def _evaluate_and_write(
             lending_borrow,
             source_hashes,
             transfer_chronology_clean=transfer_chronology_clean,
+            execution_policy=execution_policy,
         ),
         window_name=window_name,
     )
     result.report.update(PIPELINE_FLAGS)
-    return result, write_json_atomic(path, result.report)
+    report_sha = write_json_atomic(path, result.report)
+    if execution_policy is not None:
+        enforce_registered_book_bounds(result.report)
+    return result, report_sha
 
 
 def _evaluation_summary(
@@ -1594,6 +1605,7 @@ def _run_baselines(
     lending_borrow: LendingBorrowPanels,
     root: Path,
     source_hashes: Mapping[str, str],
+    execution_policy: ExecutionPolicy | None = None,
 ) -> list[dict[str, object]]:
     first_index = min(int(indices[0]) for indices in fold_indices.values())
     last_index = max(int(indices[-1]) for indices in fold_indices.values())
@@ -1635,6 +1647,7 @@ def _run_baselines(
                     "score_manifest": manifest_sha,
                 },
                 window_name=fold,
+                execution_policy=execution_policy,
                 path=artifact_root / "evaluation.json",
             )
             records.append(
@@ -1666,6 +1679,7 @@ def _run_gbdt(
     lending_borrow: LendingBorrowPanels,
     root: Path,
     source_hashes: Mapping[str, str],
+    execution_policy: ExecutionPolicy | None = None,
     runtime: ValidationRuntime,
     sidecars: Sequence[str],
 ) -> list[dict[str, object]]:
@@ -1760,6 +1774,7 @@ def _run_gbdt(
             lending_borrow=lending_borrow,
             source_hashes={**source_hashes, "score_manifest": manifest_sha},
             window_name=fold,
+            execution_policy=execution_policy,
             path=artifact_root / "evaluation.json",
         )
         records.append(
@@ -2635,6 +2650,7 @@ def run_pipeline_validation(
     enabled_sidecars: Sequence[str] = (),
     native_fast_audit_path: Path | None = None,
     native_fast_audit_sha256: str | None = None,
+    execution_sweep_root: Path | None = None,
 ) -> PipelineValidationResult:
     """Run only the development-fold integration checks required by v2 section 11.
 
@@ -2656,6 +2672,11 @@ def run_pipeline_validation(
     ):
         raise ValueError("validation output and immutable input store must be disjoint")
     code = _git_identity()
+    execution_policy, policy_binding = (
+        load_selected_policy(execution_sweep_root)
+        if execution_sweep_root is not None
+        else (None, None)
+    )
     store_manifest, dates = _read_store_header(store_path)
     store_metadata = store_manifest.get("metadata")
     if not isinstance(store_metadata, Mapping):
@@ -2770,6 +2791,7 @@ def run_pipeline_validation(
             lending_borrow=lending_borrow,
             root=output / "baselines",
             source_hashes=source_hashes,
+            execution_policy=execution_policy,
         )
         gbdt_records = _run_gbdt(
             store=store,
@@ -2783,6 +2805,7 @@ def run_pipeline_validation(
             lending_borrow=lending_borrow,
             root=output / "gbdt_triage",
             source_hashes=source_hashes,
+            execution_policy=execution_policy,
             runtime=runtime,
             sidecars=sidecars,
         )
@@ -2825,6 +2848,7 @@ def run_pipeline_validation(
                 "runtime": asdict(runtime),
                 "protocols": protocol_hashes,
                 "enabled_sidecars": list(sidecars),
+                "execution_policy": policy_binding,
                 "sources": {
                     "store": {
                         "root": str(store_path),
@@ -3649,6 +3673,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--compile-forward", action=argparse.BooleanOptionalAction, default=True
     )
+    parser.add_argument("--execution-sweep-root", type=Path)
     return parser
 
 
@@ -3752,6 +3777,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             enabled_sidecars=arguments.sidecar,
             native_fast_audit_path=arguments.native_fast_audit,
             native_fast_audit_sha256=arguments.native_fast_audit_sha256,
+            execution_sweep_root=arguments.execution_sweep_root,
         )
     print(
         json.dumps(
