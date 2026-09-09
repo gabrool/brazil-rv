@@ -90,3 +90,6 @@ def test_schedule_source_label_and_next_decision_cutoffs() -> None:
     )
     assert schedule_source_label(schedule) == "reconstructed_v1"
     assert next_session_decision_cutoffs(schedule) == (schedule[1].decision_at, None)
+    assert next_session_decision_cutoffs(
+        schedule[:1], following_decision_at=schedule[1].decision_at
+    ) == next_session_decision_cutoffs(schedule)[:1]

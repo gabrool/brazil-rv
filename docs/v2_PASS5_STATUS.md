@@ -25,13 +25,16 @@ rolling estimators and their metadata, M1-internal to-close endpoints, bounded
 source decoding, and preserved canonical identity metadata. Ninety focused tests
 pass, including joined builder causality and provider invariance. Both existing
 production-axis memory tests passed. Real-data coverage and the new store build
-are still pending; no repaired-model result has been observed.
+have now reached archive coverage: see [the 2024 table](v2_INTRADAY_COVERAGE.md).
+Coverage restores previously absent overnight/lagged-return fields at 2.17 GiB
+peak RSS. The combined store and repaired-model runs remain pending.
 
 The bounded odd-lot derivation reuses the validated annual COTAHIST parser,
 retains exact ISIN identity and raw BRL volumes, and publishes on the next session.
 The new lending archive's `annual_taker_rate` is consumed directly in decimal
 units. The independent native-fast audit also filters its raw M1 date range before
 decoding. Thirty-two targeted sidecar/archive/native-fast tests pass.
+The odd-lot archive is complete (1,253,007 rows, 0.413 GiB peak RSS).
 
 The prior cleanup is committed separately as `fb6fc92`; the initial rev-4f
 registration was committed as `0302b27` before new derived beta output.

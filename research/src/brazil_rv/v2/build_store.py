@@ -1884,6 +1884,7 @@ def build_daily_store(
     cotahist_raw_sources: Sequence[Path] = (),
     cotahist_parse_audit: Path | None = None,
     session_schedule: Sequence[SessionDefinition] | None = None,
+    following_decision_at: datetime | None = None,
     isin_link_allowlist: Path | None = None,
     minimum_rank_names: int = 20,
     store_start: date | None = STORE_START,
@@ -1956,7 +1957,9 @@ def build_daily_store(
         )
     continuation_isins = continuation_identity_axis(panel.isins, isin_successions)
     decision_timestamps = tuple(row.decision_at for row in session_schedule)
-    daily_action_cutoffs = next_session_decision_cutoffs(session_schedule)
+    daily_action_cutoffs = next_session_decision_cutoffs(
+        session_schedule, following_decision_at=following_decision_at
+    )
     resolved_schedule_source = schedule_source or schedule_source_label(
         session_schedule
     )
@@ -3170,6 +3173,9 @@ def build_daily_store(
     metadata = {
         "store_start": str(kept_dates[0]),
         "store_end": str(kept_dates[-1]),
+        "final_daily_action_cutoff": (
+            daily_action_cutoffs[-1].isoformat() if daily_action_cutoffs[-1] else None
+        ),
         "lookback_rows_materialized": False,
         "slow_entry_alignment": dict(DECISION_FEATURE_CONTRACT),
         "native_fast": {
@@ -3958,10 +3964,17 @@ def main(arguments: Sequence[str] | None = None) -> None:
     if not args.cotahist_parse_audit.is_file():
         raise FileNotFoundError(args.cotahist_parse_audit)
     _validate_cotahist_parse_audit(args.cotahist_parse_audit, raw_sources)
+    full_schedule = load_session_schedule(args.session_schedule)
     schedule = tuple(
         row
-        for row in load_session_schedule(args.session_schedule)
+        for row in full_schedule
         if row.trade_date <= args.store_end
+    )
+    # Calendar metadata preserves the last completed row's original information
+    # cutoff. No market data or consumer row for that following session is read.
+    following_decision_at = next(
+        (row.decision_at for row in full_schedule if row.trade_date > args.store_end),
+        None,
     )
     resolved_schedule_source = schedule_source_label(schedule)
     schedule_reconstruction_audit: dict[str, object] | None = None
@@ -4066,6 +4079,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
         cotahist_raw_sources=raw_sources,
         cotahist_parse_audit=args.cotahist_parse_audit,
         session_schedule=schedule,
+        following_decision_at=following_decision_at,
         isin_link_allowlist=args.isin_links_allowlist,
         resource_preflight=resource_preflight,
         action_terms_source=args.action_terms_source,

@@ -84,6 +84,12 @@ from identity metadata, without making future-only names eligible historically.
 The CLI reads only COTAHIST years 2009-2024 and pushes the end-date predicate into
 M1/COTAHIST decoding before materialization. The new calendar ends 2024-12-30.
 
+The final completed daily row retains the next decision timestamp from calendar
+metadata, even though the next session has no market data or consumer row in this
+store. Otherwise nine December 30 inferred action components would be marked
+unknown solely because the array was truncated, changing its final wealth row.
+This retains the canonical information cutoff and does not open 2025 payload.
+
 Inputs are the completed rev4f R1 and R2 roots. The freeze verifies and binds each
 complete inventory, result and design, and binds the clean implementation commit
 and this registration. Momentum comes from R1; B, ensemble and GBDT from R2.

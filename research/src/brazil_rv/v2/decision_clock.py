@@ -37,12 +37,14 @@ def decision_timestamp(trade_date: date) -> datetime:
 
 def next_session_decision_cutoffs(
     schedule: Sequence[SessionDefinition],
+    *,
+    following_decision_at: datetime | None = None,
 ) -> tuple[datetime | None, ...]:
     """Map a completed daily row to the first decision that may consume it."""
 
     validate_session_schedule(schedule)
     decisions = tuple(row.decision_at for row in schedule)
-    return (*decisions[1:], None)
+    return (*decisions[1:], following_decision_at)
 
 
 def schedule_source_label(schedule: Sequence[SessionDefinition]) -> str:
