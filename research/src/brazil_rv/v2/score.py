@@ -83,6 +83,7 @@ def _model_batch(
         "current_features",
         "current_feature_mask",
         "current_feature_age_sessions",
+        "common_state_features",
         "fast_patch_values",
         "fast_patch_valid",
         "fast_patch_mask",
@@ -111,17 +112,15 @@ def _model_batch(
         "slow_history_mask",
         "slow_feature_age_sessions",
         "active_mask",
-        "current_features",
-        "current_feature_mask",
-        "current_feature_age_sessions",
-        "fast_present",
     }
     missing = required - result.keys()
     if missing:
         raise ValueError(f"scoring batch is missing model inputs: {sorted(missing)}")
-    if omit_fast_stream:
+    if omit_fast_stream and "fast_present" in result:
         result["fast_present"] = torch.zeros_like(result["fast_present"])
-    any_fast_present = torch.any(result["fast_present"].bool())
+    any_fast_present = "fast_present" in result and torch.any(
+        result["fast_present"].bool()
+    )
     if not omit_fast_stream and not any_fast_present:
         for name in (
             "fast_patch_values",
@@ -150,10 +149,11 @@ def _forward(model: torch.nn.Module, batch: Mapping[str, torch.Tensor]) -> torch
         batch["slow_feature_mask"],
         batch["slow_history_mask"],
         batch["active_mask"],
-        current_features=batch["current_features"],
-        current_feature_mask=batch["current_feature_mask"],
+        current_features=batch.get("current_features"),
+        current_feature_mask=batch.get("current_feature_mask"),
         slow_feature_age_sessions=batch["slow_feature_age_sessions"],
-        current_feature_age_sessions=batch["current_feature_age_sessions"],
+        current_feature_age_sessions=batch.get("current_feature_age_sessions"),
+        common_state_features=batch.get("common_state_features"),
         fast_patch_mask=batch.get("fast_patch_mask"),
         fast_present=batch.get("fast_present"),
         fast_state_position=batch.get("fast_state_position"),
@@ -517,6 +517,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         stage="pretrain" if stage == "P" else "evaluation",
         lookback=int(selection["lookback_sessions"]),
         enabled_sidecars=tuple(sidecars),
+        include_intraday=model_config.current_feature_count > 0,
+        include_fast=bool(selection["features"]["ordered_native_fast_names"])
+        or model_config.fast_encoder_mode == "legacy_v1_contaminated",
+        include_common_state=model_config.common_state_feature_count > 0,
         purpose="evaluation",
     )
     loader = DataLoader(

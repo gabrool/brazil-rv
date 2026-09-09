@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import gc
+import shutil
+import time
 from pathlib import Path
 
 import numpy as np
@@ -15,13 +17,20 @@ from .config import PROJECT_ROOT, FULL_PROTOCOL, _expected_protocol_payload
 from .contract import DEVELOPMENT_END, DEVELOPMENT_FOLDS
 from .evaluate import enforce_registered_book_bounds
 from .execution_policy import load_selected_policy
+from .store import peak_rss_bytes
 
 REGISTRATION = PROJECT_ROOT / "research/preregistrations/v2_research_checkpoint.md"
 CELLS = ("a_slow", "b_intraday", "c_lending", "b_intraday_legacy12")
 SCHEMA = "BRAZIL_RV_V2_RESEARCH_CHECKPOINT_V1"
 
 
-def freeze(source_design: Path, output: Path, *, num_threads: int) -> None:
+def freeze(
+    source_design: Path,
+    output: Path,
+    *,
+    num_threads: int,
+    reuse_controls_from: Path | None = None,
+) -> None:
     source = rr._read_json(source_design)
     code = rr._git_identity()
     _, dates = rr._read_store_header(Path(source["store"]["root"]))
@@ -75,11 +84,63 @@ def freeze(source_design: Path, output: Path, *, num_threads: int) -> None:
         "folds": fold_table,
         "gbdt_num_threads": num_threads,
         "gbdt_cells": list(CELLS),
+        "tree_shap": "separate_post_fit_diagnostic_up_to_4096_active_rows_per_fold_evenly_spaced",
         "economics_label": "development_grade_close_proxy_with_observed_imputed_and_placeholder_borrow",
         "official_validation_accessed": False,
         "test_accessed": False,
     }
     output.mkdir(parents=True, exist_ok=False)
+    if reuse_controls_from is not None:
+        previous = rr._read_json(reuse_controls_from / "frozen_design.json")
+        for key in (
+            "schema",
+            "store",
+            "cdi",
+            "bova11",
+            "lending_archive",
+            "execution_policy",
+            "registration",
+            "protocol",
+            "folds",
+        ):
+            if previous[key] != design[key]:
+                raise ValueError(f"control reuse source differs on {key}")
+        markers = {}
+        for name in rr._BASELINE_SIGNAL_NAMES:
+            for fold in DEVELOPMENT_FOLDS:
+                relative = Path("baselines") / name / fold
+                source_root = reuse_controls_from / relative
+                if not _completed(source_root):
+                    raise ValueError(
+                        f"control reuse requires an accepted cell: {relative}"
+                    )
+                marker = rr._read_json(source_root / "accepted.json")
+                if (
+                    marker["name"],
+                    marker["fold"],
+                    marker["engineering_acceptance"],
+                ) != (name, fold, "passed"):
+                    raise ValueError(
+                        "control reuse cell identity or acceptance differs"
+                    )
+                markers[relative.as_posix()] = sha256_file(
+                    source_root / "accepted.json"
+                )
+        for relative in markers:
+            shutil.copytree(reuse_controls_from / relative, output / relative)
+            if rr.inventory(reuse_controls_from / relative) != rr.inventory(
+                output / relative
+            ):
+                raise ValueError("copied control differs byte-for-byte from its source")
+        design["reused_controls"] = {
+            "root": str(reuse_controls_from.resolve()),
+            "frozen_design_sha256": sha256_file(
+                reuse_controls_from / "frozen_design.json"
+            ),
+            "accepted_marker_sha256": markers,
+            "reason": "unchanged_accepted_controls_after_moving_TreeSHAP_out_of_fitting",
+            "recomputed": False,
+        }
     write_json_atomic(output / "frozen_design.json", design)
 
 
@@ -100,7 +161,7 @@ def _finish_cell(root: Path, evaluation, *, name: str, fold: str) -> None:
     point = report["primary_ic"]["estimate"]
     if name == "inverse_volatility_20" and (point is None or abs(point) >= 0.02):
         raise RuntimeError(f"null control stop: {name}/{fold}, primary_ic={point}")
-    if name not in CELLS and (point is None or abs(point) >= 0.10):
+    if name in rr._BASELINE_SIGNAL_NAMES and (point is None or abs(point) >= 0.10):
         raise RuntimeError(f"control magnitude stop: {name}/{fold}, primary_ic={point}")
     series = rr._daily_series(evaluation)
     # Calendar availability alone is not evidence that the held shorts had observed
@@ -217,6 +278,7 @@ def _summary(output: Path) -> dict:
 
 
 def run(output: Path) -> None:
+    started = time.perf_counter()
     design = rr._read_json(output / "frozen_design.json")
     if design["schema"] != SCHEMA or design["implementation"] != rr._git_identity():
         raise ValueError("CPU checkpoint implementation differs from its frozen commit")
@@ -252,6 +314,11 @@ def run(output: Path) -> None:
     current = None
     try:
         for fold, indices in evaluation.items():
+            if all(
+                _completed(output / "baselines" / name / fold)
+                for name in rr._BASELINE_SIGNAL_NAMES
+            ):
+                continue
             start = max(0, int(indices[0]) - 253)
             panels = build_store_baselines(
                 store, np.arange(start, int(indices[-1]) + 1)
@@ -345,6 +412,15 @@ def run(output: Path) -> None:
         raise
     finally:
         store.close()
+        write_json_atomic(
+            output / "cpu_run_resources.json",
+            {
+                "elapsed_seconds": time.perf_counter() - started,
+                "process_peak_rss_bytes": peak_rss_bytes(),
+                "fit_threads": design["gbdt_num_threads"],
+                "scope": "this_CPU_process_including_store_views_training_and_evaluation",
+            },
+        )
 
 
 def main(argv=None):
@@ -353,11 +429,17 @@ def main(argv=None):
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--source-design", type=Path)
     parser.add_argument("--num-threads", type=int, default=8)
+    parser.add_argument("--reuse-controls-from", type=Path)
     args = parser.parse_args(argv)
     if args.action == "freeze":
         if args.source_design is None:
             parser.error("freeze requires --source-design")
-        freeze(args.source_design, args.root, num_threads=args.num_threads)
+        freeze(
+            args.source_design,
+            args.root,
+            num_threads=args.num_threads,
+            reuse_controls_from=args.reuse_controls_from,
+        )
     else:
         run(args.root)
     return 0

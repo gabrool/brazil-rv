@@ -581,6 +581,8 @@ def test_paired_readouts_use_the_exact_common_four_head_population() -> None:
 
     assert set(paired["pooled"]) == {
         "primary_neutral_target_ic",
+        "legacy_primary_ic_1235",
+        "turnover_fraction_nav",
         "shareholder_rank_ic",
         "price_return_rank_ic",
         "persistence_1",

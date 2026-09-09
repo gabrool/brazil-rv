@@ -678,6 +678,17 @@ def _tracked_pretrain_loaders(tmp_path):
             "target_shareholder_simple_return": targets,
             "target_shareholder_valid": np.ones_like(targets, dtype=np.bool_),
             "target_scale_sigma": np.ones((dates.size, name_count), dtype=np.float32),
+            "sidecar_lending_values": np.full(
+                (dates.size, name_count, 2), np.nan, dtype=np.float32
+            ),
+            "sidecar_lending_valid": np.zeros((dates.size, name_count, 2), dtype=bool),
+            "sidecar_lending_age_sessions": np.full(
+                (dates.size, name_count, 2), -1, dtype=np.float32
+            ),
+            "common_state_diagnostic_values": np.ones(
+                (dates.size, 3), dtype=np.float32
+            ),
+            "common_state_diagnostic_valid": np.ones((dates.size, 3), dtype=bool),
         },
         feature_names={
             "slow": [
@@ -685,6 +696,12 @@ def _tracked_pretrain_loaders(tmp_path):
                 *(f"slow_{index}" for index in range(3, 32)),
             ],
             "intraday": list(INTRADAY_DAILY_FEATURES),
+            "sidecar_lending": ["lending_test_1", "lending_test_2"],
+            "common_state_diagnostic": [
+                "common_test_1",
+                "common_test_2",
+                "common_test_3",
+            ],
         },
         metadata={
             "feature_age_contract": dict(FEATURE_AGE_CONTRACT),
@@ -879,6 +896,29 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
         expected_seed=29,
     )
     assert transferred == initialized
+    for arm_config in (
+        replace(config, disable_fast_stream=True, lambda_persistence=0.1),
+        replace(
+            config,
+            disable_fast_stream=True,
+            horizon_loss_weights=tuple(x / 3.5 for x in (0.25, 0.25, 1, 1, 1)),
+        ),
+        replace(config, disable_fast_stream=True, selection_horizons=(1, 2, 3, 5)),
+    ):
+        arm = DailyMultiHorizonModel(arm_config)
+        assert (
+            load_pretrain_handoff(
+                arm,
+                result.raw_patience_checkpoint,
+                expected_sha256=manifest["artifacts"]["raw_patience.pt"],
+                expected_seed=29,
+            )
+            == initialized
+        )
+        assert all(
+            torch.equal(arm.state_dict()[name], first_state[name])
+            for name in initialized
+        )
     assert all(
         torch.equal(ablated.state_dict()[name], fine_tune.state_dict()[name])
         for name in transferred

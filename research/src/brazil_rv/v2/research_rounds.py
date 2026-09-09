@@ -897,6 +897,20 @@ def _daily_series(
     )
     return {
         "primary_neutral_target_ic": primary_values,
+        "turnover_fraction_nav": np.asarray(
+            [
+                next(
+                    (
+                        row["turnover_fraction_nav"]
+                        for row in headline
+                        if row["date"] == day
+                    ),
+                    np.nan,
+                )
+                for day in ordered_dates
+            ],
+            dtype=np.float64,
+        ),
         "legacy_primary_ic_1235": np.asarray(
             [
                 np.nan
@@ -1548,6 +1562,18 @@ def _paired_readouts(
             raise ValueError(f"paired date axes differ for {fold}")
         _validate_paired_identity(left.result.report, right.result.report)
         primary_delta, primary_rows = _paired_primary_daily(left.result, right.result)
+        ls, lt, lo, lm = _primary_population_components(left.inputs)
+        rs, rt, ro, rm = _primary_population_components(right.inputs)
+        _, legacy_left, _ = _primary_daily_metrics(
+            ls, lt, lo & ro, lm & rm, left.inputs.dates
+        )
+        _, legacy_right, _ = _primary_daily_metrics(
+            rs, rt, lo & ro, lm & rm, right.inputs.dates
+        )
+        legacy_delta = legacy_left - legacy_right
+        legacy_rows = _paired_population_rows(
+            left.inputs.dates, lo & ro & lm & rm, legacy_delta
+        )
         shareholder_delta, shareholder_rows = _common_family_ic_delta(
             left.inputs,
             right.inputs,
@@ -1569,6 +1595,10 @@ def _paired_readouts(
         spread_delta, spread_rows = _common_spread_delta(left.inputs, right.inputs)
         candidate_series = _daily_series(left)
         baseline_series = _daily_series(right)
+        turnover_delta = (
+            candidate_series["turnover_fraction_nav"]
+            - baseline_series["turnover_fraction_nav"]
+        )
         if (
             left.result.report["economics"]["headline"]["economics_unresolved"]
             or right.result.report["economics"]["headline"]["economics_unresolved"]
@@ -1600,21 +1630,31 @@ def _paired_readouts(
         ]
         deltas[fold] = {
             "primary_neutral_target_ic": primary_delta,
+            "legacy_primary_ic_1235": legacy_delta,
             "shareholder_rank_ic": shareholder_delta,
             "price_return_rank_ic": price_delta,
             "persistence_1": persistence_1,
             "persistence_5": persistence_5,
             "shareholder_return_spread_bps_per_holding_session": spread_delta,
             "headline_net_excess_bps": economics_delta,
+            "turnover_fraction_nav": turnover_delta,
         }
         population_audit[fold] = {
             "primary_neutral_target_ic": primary_rows,
+            "legacy_primary_ic_1235": legacy_rows,
             "shareholder_rank_ic": shareholder_rows,
             "price_return_rank_ic": price_rows,
             "persistence_1": persistence_1_rows,
             "persistence_5": persistence_5_rows,
             "shareholder_return_spread_bps_per_holding_session": spread_rows,
             "headline_net_excess_bps": economics_rows,
+            "turnover_fraction_nav": [
+                {
+                    "date": day.isoformat(),
+                    "delta": float(value) if np.isfinite(value) else None,
+                }
+                for day, value in zip(left.inputs.dates, turnover_delta, strict=True)
+            ],
         }
     labels = tuple(deltas[folds[0]])
     return {
@@ -1861,7 +1901,9 @@ def _run_gbdt_candidate(
             sample_weights=sample_weights,
         )
         predictions = model.predict_ranks(evaluation_x, score_mask)
-        raw_importance = model.feature_importance(evaluation_x)
+        # Gain is cheap. TreeSHAP belongs to the bounded, active-row diagnostic
+        # pass after fitting; explaining the full inactive panel dominated runtime.
+        raw_importance = model.feature_importance()
         importance = {name: values.tolist() for name, values in raw_importance.items()}
         model_record = _persist_model(
             model,
@@ -4632,12 +4674,28 @@ def seal_root(
         if path.name not in {"artifact_inventory.json", "access_audit.json"}
     ]
     flagged = []
+    data_only = []
     transfer_flags: list[bool] = []
     for path in json_paths:
         payload = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(payload, Mapping) and (
             "official_validation_accessed" in payload or "test_accessed" in payload
         ):
+            if (
+                payload.get("schema") == "BRAZIL_RV_V2_RESEARCH_CHECKPOINT_V1"
+                and path.parent == output
+                and path.name in {"frozen_design.json", "checkpoint_cpu_result.json"}
+            ):
+                if (
+                    payload.get("official_validation_accessed") is not False
+                    or payload.get("test_accessed") is not False
+                ):
+                    raise PermissionError(f"sealed-window access recorded in {path}")
+                # CPU controls/GBDT have no transferred neural checkpoint. Do not
+                # rewrite their immutable manifests to invent a transfer flag.
+                data_only.append(path.relative_to(output).as_posix())
+                flagged.append(path.relative_to(output).as_posix())
+                continue
             _assert_false_access(payload, path=path)
             flagged.append(path.relative_to(output).as_posix())
             transfer = payload["transfer_chronology_clean"]
@@ -4653,6 +4711,7 @@ def seal_root(
         "status": "passed",
         **access_flags,
         "json_artifacts_with_access_flags": flagged,
+        "data_only_artifacts_without_neural_transfer": data_only,
         "json_artifact_count": len(json_paths),
         "audited_at_utc": _utc_now(),
     }

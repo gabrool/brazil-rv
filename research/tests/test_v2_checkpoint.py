@@ -17,6 +17,31 @@ from brazil_rv.v2.train import _common_primary_selection_score
 from test_v2_evaluate import _fixture
 
 
+def test_cpu_seal_discloses_absent_transfer_without_weakening_access(tmp_path):
+    import json
+    from brazil_rv.v2.research_rounds import seal_root
+    from brazil_rv.v2.research_checkpoint import SCHEMA
+    from brazil_rv.v2.artifacts import write_json_atomic
+
+    path = tmp_path / "frozen_design.json"
+    payload = {
+        "schema": SCHEMA,
+        "official_validation_accessed": False,
+        "test_accessed": False,
+    }
+    write_json_atomic(path, payload)
+    before = path.read_bytes()
+    seal_root(root=tmp_path)
+    assert path.read_bytes() == before
+    audit = json.loads((tmp_path / "access_audit.json").read_text())
+    assert audit["data_only_artifacts_without_neural_transfer"] == [
+        "frozen_design.json"
+    ]
+    write_json_atomic(path, {**payload, "official_validation_accessed": True})
+    with pytest.raises(PermissionError, match="sealed-window access"):
+        seal_root(root=tmp_path)
+
+
 def test_default_loss_preserves_mean_value_and_gradient_bitwise():
     torch.manual_seed(19)
     scores = torch.randn(2, 30, 6, requires_grad=True)

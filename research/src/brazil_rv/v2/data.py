@@ -172,6 +172,8 @@ def collate_v2_daily(
 
     if not samples:
         raise ValueError("cannot collate an empty v2 batch")
+    if all(not (_COMPACT_FAST_KEYS & sample.keys()) for sample in samples):
+        return dict(default_collate(samples))
     compact: list[dict[str, NDArray[np.generic]]] = []
     patch_shape: tuple[int, int] | None = None
     max_fast_names = 0
@@ -263,6 +265,8 @@ def stage_fast_name_count(*datasets: "V2DailyDataset") -> int:
 
     if not datasets:
         raise ValueError("at least one dataset is required")
+    if all(not dataset.include_fast for dataset in datasets):
+        return 0
     maximum = 0
     for dataset in datasets:
         active = np.asarray(
@@ -469,6 +473,9 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         stage: Stage,
         lookback: int = 60,
         enabled_sidecars: Sequence[str] = (),
+        include_intraday: bool = True,
+        include_fast: bool = True,
+        include_common_state: bool = False,
         target_window_indices: Sequence[int] | None = None,
         fast_store: str | Path | None = None,
         verify_fast_hashes: bool = True,
@@ -479,6 +486,9 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         self.date_indices = np.asarray(date_indices, dtype=np.int64)
         self.stage = stage
         self.lookback = lookback
+        self.include_intraday = include_intraday
+        self.include_fast = include_fast
+        self.include_common_state = include_common_state
         self.primary_target_name = REGISTERED_PRIMARY_TARGET
         self.primary_target_mask_name = REGISTERED_PRIMARY_TARGET_MASK
         if len(set(enabled_sidecars)) != len(enabled_sidecars):
@@ -601,13 +611,9 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         ):
             raise ValueError("slow_timestep_valid is misaligned with the store axes")
         self.store.array_shape("active")
-        if not self.store.has_array("intraday_values") or not self.store.has_array(
-            "intraday_valid"
-        ):
-            raise ValueError("canonical v2 samples require current intraday features")
-        if self.store.array_shape("intraday_age_sessions") != self.store.array_shape(
-            "intraday_values"
-        ):
+        if include_intraday and self.store.array_shape(
+            "intraday_age_sessions"
+        ) != self.store.array_shape("intraday_values"):
             raise ValueError("current feature ages are misaligned with the store")
         for group in self.enabled_sidecars:
             self.store.array_shape(f"sidecar_{group}_values")
@@ -621,7 +627,11 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             "fast_patch_valid",
             "fast_patch_mask",
         }
-        native_present = native_arrays.intersection(self.store.array_names)
+        native_present = (
+            native_arrays.intersection(self.store.array_names)
+            if include_fast
+            else set()
+        )
         if native_present and native_present != native_arrays:
             raise ValueError("the native fast arrays must be stored together")
         if native_present:
@@ -653,8 +663,8 @@ class V2DailyDataset(Dataset[dict[str, object]]):
                 raise ValueError("native fast mapping does not cover its array axis")
             self._fast_patch_count = int(value_shape[2])
             self._fast_channel_count = int(value_shape[3])
-        configured_fast = fast_store
-        if configured_fast is None and not native_present:
+        configured_fast = fast_store if include_fast else None
+        if include_fast and configured_fast is None and not native_present:
             configured_fast = self.store.manifest.get("metadata", {}).get(
                 "v1_fast_store"
             )
@@ -947,19 +957,8 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         date_index = int(self.date_indices[item])
         slow_end = slow_row_index(date_index, self.stage)
         history, feature_mask, history_mask, feature_age = self._slow_window(slow_end)
-        (
-            fast_values,
-            fast_valid,
-            patch_mask,
-            fast_name_index,
-            fast_state_position,
-            fast_present,
-        ) = self._fast(date_index)
-        v1_equity_slow = self._v1_equity_slow(date_index, fast_name_index)
         active = np.asarray(self.store.read("active", date_index), dtype=np.bool_)
-        current_view = read_scalar_feature_view(
-            self.store, np.asarray([date_index], dtype=np.int64), ("intraday",)
-        )
+        fast_present = np.zeros(active.shape, dtype=np.bool_)
         sample: dict[str, object] = {
             "schema": DECISION_SAMPLE_SCHEMA,
             "date_index": np.int64(date_index),
@@ -968,18 +967,48 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             "slow_feature_mask": feature_mask,
             "slow_history_mask": history_mask,
             "slow_feature_age_sessions": feature_age,
-            "fast_patch_values": fast_values,
-            "fast_patch_valid": fast_valid,
-            "fast_patch_mask": patch_mask,
-            "fast_name_index": fast_name_index,
-            "fast_state_position": fast_state_position,
-            "fast_present": fast_present,
-            "v1_equity_slow": v1_equity_slow,
             "active_mask": active,
-            "current_features": current_view.values[0],
-            "current_feature_mask": current_view.valid[0],
-            "current_feature_age_sessions": current_view.age_sessions[0],
         }
+        if self.include_fast:
+            (
+                fast_values,
+                fast_valid,
+                patch_mask,
+                fast_name_index,
+                fast_state_position,
+                fast_present,
+            ) = self._fast(date_index)
+            sample.update(
+                fast_patch_values=fast_values,
+                fast_patch_valid=fast_valid,
+                fast_patch_mask=patch_mask,
+                fast_name_index=fast_name_index,
+                fast_state_position=fast_state_position,
+                v1_equity_slow=self._v1_equity_slow(date_index, fast_name_index),
+            )
+        if self.include_intraday:
+            current_view = read_scalar_feature_view(
+                self.store, np.asarray([date_index], dtype=np.int64), ("intraday",)
+            )
+            sample.update(
+                current_features=current_view.values[0],
+                current_feature_mask=current_view.valid[0],
+                current_feature_age_sessions=current_view.age_sessions[0],
+                fast_present=fast_present,
+            )
+        if self.include_common_state:
+            valid = np.asarray(
+                self.store.read("common_state_diagnostic_valid", date_index),
+                dtype=np.bool_,
+            )
+            values = np.asarray(
+                self.store.read("common_state_diagnostic_values", date_index),
+                dtype=np.float32,
+            )
+            sample["common_state_features"] = _zero_invalid_values(
+                values, valid, name="common_state_features"
+            )
+            sample["common_state_feature_mask"] = valid
         target_pairs = (
             (
                 REGISTERED_PRIMARY_TARGET,

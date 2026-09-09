@@ -43,9 +43,10 @@ def _bounded_feature_age(
         torch.all((age_sessions >= -1.0) & (~valid | age_known)),
         "feature ages must be at least -1 and known for every valid feature",
     )
-    bounded = torch.log1p(
-        age_sessions.clamp(min=0.0, max=_FEATURE_AGE_CAP_SESSIONS)
-    ) / _FEATURE_AGE_LOG_DENOMINATOR
+    bounded = (
+        torch.log1p(age_sessions.clamp(min=0.0, max=_FEATURE_AGE_CAP_SESSIONS))
+        / _FEATURE_AGE_LOG_DENOMINATOR
+    )
     return torch.where(age_known, bounded, torch.zeros_like(bounded)), age_known
 
 
@@ -112,9 +113,7 @@ class FastTCNEncoder(nn.Module):
                 name_count,
                 TCN_ARCHITECTURE.slow_width,
             ):
-                raise ValueError(
-                    "legacy v1 context requires shape [batch, name, 32]"
-                )
+                raise ValueError("legacy v1 context requires shape [batch, name, 32]")
             prefix = patches.new_zeros(
                 batch_size,
                 name_count,
@@ -144,9 +143,7 @@ class FastTCNEncoder(nn.Module):
         else:
             assert patch_valid is not None
             effective_valid = patch_valid.bool() & patch_mask[..., None].bool()
-            clean = torch.where(
-                effective_valid, patches, torch.zeros_like(patches)
-            )
+            clean = torch.where(effective_valid, patches, torch.zeros_like(patches))
             torch._assert_async(
                 torch.all(torch.isfinite(clean)),
                 "native fast values marked valid must be finite",
@@ -204,9 +201,7 @@ class FastTCNEncoder(nn.Module):
                 ),
                 "native fast_state_position must identify its last present patch",
             )
-        index = last.clamp_min(0)[..., None, None].expand(
-            -1, -1, 1, _FAST_HIDDEN_WIDTH
-        )
+        index = last.clamp_min(0)[..., None, None].expand(-1, -1, 1, _FAST_HIDDEN_WIDTH)
         raw = sequence.gather(2, index).squeeze(2)
         if self.legacy_v1_context:
             assert v1_equity_slow is not None
@@ -265,26 +260,26 @@ class DailyMultiHorizonModel(nn.Module):
             batch_first=True,
             dropout=config.dropout if config.gru_layers == 2 else 0.0,
         )
-        self.current_input_projection = nn.Linear(
-            4 * config.current_feature_count, config.hidden_width
-        )
-        self.current_input_norm = nn.LayerNorm(config.hidden_width)
-        self.fast_encoder = FastTCNEncoder(legacy_v1_context=legacy_fast)
-        self.absent_state = nn.Parameter(torch.zeros(_FAST_HIDDEN_WIDTH))
-        self.fast_gate = nn.Linear(
-            config.hidden_width + _FAST_HIDDEN_WIDTH,
-            _FAST_HIDDEN_WIDTH,
-        )
+        if config.current_feature_count:
+            self.current_input_projection = nn.Linear(
+                4 * config.current_feature_count, config.hidden_width
+            )
+            self.current_input_norm = nn.LayerNorm(config.hidden_width)
+            self.fast_encoder = FastTCNEncoder(legacy_v1_context=legacy_fast)
+            self.absent_state = nn.Parameter(torch.zeros(_FAST_HIDDEN_WIDTH))
+            self.fast_gate = nn.Linear(
+                config.hidden_width + _FAST_HIDDEN_WIDTH, _FAST_HIDDEN_WIDTH
+            )
         self.pool_gate = nn.Linear(
             config.hidden_width + 2 * config.hidden_width,
             2 * config.hidden_width,
         )
         fusion_input_width = (
-            2 * config.hidden_width
-            + _FAST_HIDDEN_WIDTH
-            + 2 * config.hidden_width
-            + 1
+            4 * config.hidden_width + _FAST_HIDDEN_WIDTH + 1
+            if config.current_feature_count
+            else 3 * config.hidden_width
         )
+        fusion_input_width += config.common_state_feature_count
         self.fusion_projection = nn.Linear(fusion_input_width, config.fusion_width)
         self.trunk = nn.Sequential(
             *(
@@ -306,8 +301,9 @@ class DailyMultiHorizonModel(nn.Module):
             }
         )
         self.apply(_initialize_module)
-        nn.init.zeros_(self.fast_gate.weight)
-        nn.init.constant_(self.fast_gate.bias, TARGETED_FUSION_GATE_BIAS)
+        if config.current_feature_count:
+            nn.init.zeros_(self.fast_gate.weight)
+            nn.init.constant_(self.fast_gate.bias, TARGETED_FUSION_GATE_BIAS)
         nn.init.zeros_(self.pool_gate.weight)
         nn.init.constant_(self.pool_gate.bias, TARGETED_FUSION_GATE_BIAS)
         nn.init.zeros_(self.heads["to_close"].weight)
@@ -379,9 +375,7 @@ class DailyMultiHorizonModel(nn.Module):
         positions = torch.arange(lookback, device=slow_features.device)[None, :]
         source = lookback - lengths[:, None] + positions
         source = source.clamp(min=0, max=lookback - 1)
-        packed_inputs = flat.gather(
-            1, source[..., None].expand(-1, -1, flat.shape[-1])
-        )
+        packed_inputs = flat.gather(1, source[..., None].expand(-1, -1, flat.shape[-1]))
         packed_inputs = torch.where(
             positions[..., None] < lengths[:, None, None],
             packed_inputs,
@@ -406,18 +400,28 @@ class DailyMultiHorizonModel(nn.Module):
 
     def _current_states(
         self,
-        current_features: torch.Tensor,
-        current_feature_mask: torch.Tensor,
-        current_feature_age_sessions: torch.Tensor,
+        current_features: torch.Tensor | None = None,
+        current_feature_mask: torch.Tensor | None = None,
+        current_feature_age_sessions: torch.Tensor | None = None,
     ) -> torch.Tensor:
+        if (
+            current_features is None
+            or current_feature_mask is None
+            or current_feature_age_sessions is None
+        ):
+            raise ValueError("the current branch requires values, validity and ages")
         if current_features.ndim != 3:
             raise ValueError("current_features must have shape [batch, name, field]")
         if current_feature_mask.shape != current_features.shape:
             raise ValueError("current_feature_mask is misaligned with current_features")
         if current_feature_age_sessions.shape != current_features.shape:
-            raise ValueError("current feature ages are misaligned with current_features")
+            raise ValueError(
+                "current feature ages are misaligned with current_features"
+            )
         if current_features.shape[-1] != self.config.current_feature_count:
-            raise ValueError("current feature width differs from the model configuration")
+            raise ValueError(
+                "current feature width differs from the model configuration"
+            )
         valid = current_feature_mask.bool()
         clean = torch.where(valid, current_features, torch.zeros_like(current_features))
         bounded_age, age_known = _bounded_feature_age(
@@ -463,9 +467,7 @@ class DailyMultiHorizonModel(nn.Module):
         v1_equity_slow: torch.Tensor | None,
     ) -> torch.Tensor:
         batch_size, name_count = slow.shape[:2]
-        absent = self.absent_state.view(1, 1, -1).expand(
-            batch_size, name_count, -1
-        )
+        absent = self.absent_state.view(1, 1, -1).expand(batch_size, name_count, -1)
         if fast_patch_values is None:
             if (
                 fast_patch_valid is not None
@@ -481,7 +483,9 @@ class DailyMultiHorizonModel(nn.Module):
             )
             return absent
         if fast_patch_values.ndim != 4:
-            raise ValueError("fast values must have shape [batch, fast, patch, channel]")
+            raise ValueError(
+                "fast values must have shape [batch, fast, patch, channel]"
+            )
         if fast_patch_values.shape[0] != batch_size:
             raise ValueError("fast values are misaligned with the model batch")
         fast_count, patch_count = fast_patch_values.shape[1:3]
@@ -553,9 +557,7 @@ class DailyMultiHorizonModel(nn.Module):
             "padded compact fast slots must contain only zero metadata",
         )
         encoded = self.fast_encoder(
-            fast_patch_values.reshape(
-                batch_size * fast_count, 1, patch_count, -1
-            ),
+            fast_patch_values.reshape(batch_size * fast_count, 1, patch_count, -1),
             fast_patch_mask.reshape(batch_size * fast_count, 1, patch_count),
             (
                 None
@@ -569,9 +571,7 @@ class DailyMultiHorizonModel(nn.Module):
                 batch_size * fast_count, 1, patch_count, -1
             ),
         ).reshape(batch_size, fast_count, _FAST_HIDDEN_WIDTH)
-        encoded = torch.where(
-            real_slot[..., None], encoded, torch.zeros_like(encoded)
-        )
+        encoded = torch.where(real_slot[..., None], encoded, torch.zeros_like(encoded))
         updates = torch.zeros_like(absent).scatter_add(
             1,
             selected_names[..., None].expand(-1, -1, _FAST_HIDDEN_WIDTH),
@@ -628,9 +628,7 @@ class DailyMultiHorizonModel(nn.Module):
         )
         compact_mask = fast_patch_mask & present.bool()[..., None]
         patch_valid = compact_mask[..., None].expand_as(fast_patches)
-        positions = torch.where(
-            present.bool(), positions, torch.zeros_like(positions)
-        )
+        positions = torch.where(present.bool(), positions, torch.zeros_like(positions))
         compact_slow = torch.where(
             present.bool()[..., None], v1_equity_slow, torch.zeros_like(v1_equity_slow)
         )
@@ -657,10 +655,11 @@ class DailyMultiHorizonModel(nn.Module):
         fast_state_position: torch.Tensor | None = None,
         v1_equity_slow: torch.Tensor | None = None,
         *,
-        current_features: torch.Tensor,
-        current_feature_mask: torch.Tensor,
+        current_features: torch.Tensor | None = None,
+        current_feature_mask: torch.Tensor | None = None,
         slow_feature_age_sessions: torch.Tensor,
-        current_feature_age_sessions: torch.Tensor,
+        current_feature_age_sessions: torch.Tensor | None = None,
+        common_state_features: torch.Tensor | None = None,
         fast_patch_values: torch.Tensor | None = None,
         fast_patch_valid: torch.Tensor | None = None,
         fast_name_index: torch.Tensor | None = None,
@@ -673,7 +672,9 @@ class DailyMultiHorizonModel(nn.Module):
             v1_equity_slow = None
             fast_present = torch.zeros_like(active_mask, dtype=slow_features.dtype)
         if fast_patches is not None and fast_patch_values is not None:
-            raise ValueError("native compact and dense legacy fast inputs cannot be mixed")
+            raise ValueError(
+                "native compact and dense legacy fast inputs cannot be mixed"
+            )
         if fast_patch_values is not None:
             if (
                 fast_patch_values.ndim != 4
@@ -688,14 +689,18 @@ class DailyMultiHorizonModel(nn.Module):
                 torch.all((~real) | (names < slow_features.shape[1])),
                 "compact fast name index is outside the broad store axis",
             )
-            derived_present = torch.zeros(
-                slow_features.shape[:2],
-                dtype=torch.long,
-                device=slow_features.device,
-            ).scatter_add(1, names, real.long()) if names.shape[1] else torch.zeros(
-                slow_features.shape[:2],
-                dtype=torch.long,
-                device=slow_features.device,
+            derived_present = (
+                torch.zeros(
+                    slow_features.shape[:2],
+                    dtype=torch.long,
+                    device=slow_features.device,
+                ).scatter_add(1, names, real.long())
+                if names.shape[1]
+                else torch.zeros(
+                    slow_features.shape[:2],
+                    dtype=torch.long,
+                    device=slow_features.device,
+                )
             )
             torch._assert_async(
                 torch.all(derived_present <= 1),
@@ -715,14 +720,13 @@ class DailyMultiHorizonModel(nn.Module):
             slow_history_mask,
             slow_feature_age_sessions,
         )
-        current = self._current_states(
-            current_features,
-            current_feature_mask,
-            current_feature_age_sessions,
-        )
-        if current.shape[:2] != slow.shape[:2]:
-            raise ValueError("current and slow feature axes are misaligned")
-        if fast_patches is not None:
+        if self.config.current_feature_count:
+            current = self._current_states(
+                current_features, current_feature_mask, current_feature_age_sessions
+            )
+            if current.shape[:2] != slow.shape[:2]:
+                raise ValueError("current and slow feature axes are misaligned")
+        if self.config.current_feature_count and fast_patches is not None:
             fast = self._legacy_dense_fast_states(
                 slow,
                 present,
@@ -731,7 +735,7 @@ class DailyMultiHorizonModel(nn.Module):
                 fast_state_position,
                 v1_equity_slow,
             )
-        else:
+        elif self.config.current_feature_count:
             fast = self._fast_states(
                 slow,
                 present,
@@ -754,15 +758,28 @@ class DailyMultiHorizonModel(nn.Module):
         pooled = torch.cat((mean, dispersion), dim=-1)
         pooled = pooled[:, None].expand(-1, slow.shape[1], -1)
 
-        gated_fast = (
-            torch.sigmoid(self.fast_gate(torch.cat((slow, fast), dim=-1))) * fast
-        )
         gated_pool = (
             torch.sigmoid(self.pool_gate(torch.cat((slow, pooled), dim=-1))) * pooled
         )
-        fused = torch.cat(
-            (slow, current, gated_fast, gated_pool, present[..., None]), dim=-1
-        )
+        if self.config.current_feature_count:
+            gated_fast = (
+                torch.sigmoid(self.fast_gate(torch.cat((slow, fast), dim=-1))) * fast
+            )
+            fused = torch.cat(
+                (slow, current, gated_fast, gated_pool, present[..., None]), dim=-1
+            )
+        else:
+            fused = torch.cat((slow, gated_pool), dim=-1)
+        if self.config.common_state_feature_count:
+            if common_state_features is None or common_state_features.shape != (
+                slow.shape[0],
+                self.config.common_state_feature_count,
+            ):
+                raise ValueError(
+                    "common-state fields must align with the batch date axis"
+                )
+            common = common_state_features[:, None, :].expand(-1, slow.shape[1], -1)
+            fused = torch.cat((fused, common), dim=-1)
         hidden = self.trunk(self.fusion_projection(fused))
         predictions = torch.cat(
             tuple(
@@ -787,7 +804,11 @@ def _initialize_module(module: nn.Module) -> None:
 
 
 def count_non_fast_parameters(model: DailyMultiHorizonModel) -> int:
-    fast_ids = {id(parameter) for parameter in model.fast_encoder.parameters()}
+    fast_ids = (
+        {id(parameter) for parameter in model.fast_encoder.parameters()}
+        if model.config.current_feature_count
+        else set()
+    )
     return sum(
         parameter.numel()
         for parameter in model.parameters()

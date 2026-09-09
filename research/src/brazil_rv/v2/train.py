@@ -10,7 +10,7 @@ import random
 import shutil
 import subprocess
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from functools import partial
 from pathlib import Path
 
@@ -43,6 +43,7 @@ from .contract import (
     DECISION_SAMPLE_SCHEMA,
     DEVELOPMENT_END,
     DEVELOPMENT_FOLDS,
+    DEFAULT_HORIZON_LOSS_WEIGHTS,
     HORIZONS,
     PRIMARY_HORIZONS,
     TRADED_PRIMARY_HORIZONS,
@@ -473,7 +474,7 @@ def load_pretrain_handoff(
         raise ValueError("stage-P handoff lacks explicit transfer chronology")
     contract = _verified_checkpoint_input_contract(payload)
     fine_config = model_config_contract(model.config)
-    pretrain_config = dict(fine_config, disable_fast_stream=False)
+    pretrain_config = model_config_contract(stage_p_model_config(model.config))
     if contract.get("model_config") != pretrain_config:
         raise ValueError("stage-P model contract differs from stage F")
     if fine_tune_input_contract is not None:
@@ -554,10 +555,11 @@ def _model_forward(model: nn.Module, batch: Mapping[str, torch.Tensor]) -> torch
         batch["slow_feature_mask"],
         batch["slow_history_mask"],
         batch["active_mask"],
-        current_features=batch["current_features"],
-        current_feature_mask=batch["current_feature_mask"],
+        current_features=batch.get("current_features"),
+        current_feature_mask=batch.get("current_feature_mask"),
         slow_feature_age_sessions=batch["slow_feature_age_sessions"],
-        current_feature_age_sessions=batch["current_feature_age_sessions"],
+        current_feature_age_sessions=batch.get("current_feature_age_sessions"),
+        common_state_features=batch.get("common_state_features"),
         fast_patch_mask=batch.get("fast_patch_mask"),
         fast_present=batch.get("fast_present"),
         fast_state_position=batch.get("fast_state_position"),
@@ -583,6 +585,7 @@ def _to_device(
         "current_features",
         "current_feature_mask",
         "current_feature_age_sessions",
+        "common_state_features",
         "fast_patch_values",
         "fast_patch_valid",
         "fast_patch_mask",
@@ -633,7 +636,7 @@ def _to_device(
     current = transferred.get("current_features")
     current_mask = transferred.get("current_feature_mask")
     current_age = transferred.get("current_feature_age_sessions")
-    if (
+    if any(value is not None for value in (current, current_mask, current_age)) and (
         current is None
         or current_mask is None
         or current_age is None
@@ -749,6 +752,7 @@ def _selection_score(
     use_bf16: bool,
     disable_fast_stream: bool = False,
     selection_horizons: tuple[int, ...] = TRADED_PRIMARY_HORIZONS,
+    slow_only: bool = False,
 ) -> float:
     model.eval()
     prediction_rows: list[np.ndarray] = []
@@ -760,7 +764,9 @@ def _selection_score(
     head_indices = [HORIZONS.index(h) for h in horizons]
     with torch.no_grad():
         for cpu_batch in loader:
-            _validate_stage_batch(stage, cpu_batch, require_date_pairs=False)
+            _validate_stage_batch(
+                stage, cpu_batch, require_date_pairs=False, slow_only=slow_only
+            )
             batch = _to_device(
                 cpu_batch, device, omit_fast_stream=stage == "P" or disable_fast_stream
             )
@@ -968,9 +974,18 @@ def _loader_input_payload(
             ):
                 raise ValueError("store slow feature names are malformed")
             intraday_names = list(feature_names.get("intraday", ()))
+            if not getattr(candidate, "include_intraday", True):
+                intraday_names = []
             if not all(isinstance(value, str) and value for value in intraday_names):
                 raise ValueError("store intraday feature names are malformed")
             native_fast_names = list(feature_names.get("native_fast", ()))
+            if not getattr(candidate, "include_fast", True):
+                native_fast_names = []
+            common_names = (
+                list(feature_names.get("common_state_diagnostic", ()))
+                if getattr(candidate, "include_common_state", False)
+                else []
+            )
             if not all(isinstance(value, str) and value for value in native_fast_names):
                 raise ValueError("store native-fast feature names are malformed")
             selected_dates = np.asarray(dates[indices], dtype="datetime64[D]")
@@ -1042,6 +1057,10 @@ def _loader_input_payload(
                     "ordered_sidecar_names": sidecar_names,
                     "ordered_intraday_names": intraday_names,
                     "ordered_native_fast_names": native_fast_names,
+                    "ordered_common_state_names": common_names,
+                    "common_state_transform": "stored_causal_values_invalid_zeroed"
+                    if common_names
+                    else None,
                 },
                 "target": {
                     "value_array": str(getattr(candidate, "primary_target_name", "")),
@@ -1231,6 +1250,17 @@ def model_config_contract(config: ModelConfig) -> dict[str, object]:
     return payload
 
 
+def stage_p_model_config(config: ModelConfig) -> ModelConfig:
+    """Fine-only H/P/selection arms reuse the exact uniform parent P graph."""
+    return replace(
+        config,
+        horizon_loss_weights=DEFAULT_HORIZON_LOSS_WEIGHTS,
+        lambda_persistence=0.0,
+        selection_horizons=TRADED_PRIMARY_HORIZONS,
+        disable_fast_stream=config.current_feature_count == 0,
+    )
+
+
 def build_checkpoint_input_contract(
     model_config: ModelConfig,
     train_loader: Iterable[Mapping[str, object]],
@@ -1311,6 +1341,11 @@ def _validate_tracked_stage_inputs(
         or len(current) != model_config.current_feature_count
     ):
         raise ValueError("model current width differs from ordered store feature names")
+    if (
+        len(features.get("ordered_common_state_names", []))
+        != model_config.common_state_feature_count
+    ):
+        raise ValueError("model common-state width differs from ordered store fields")
     if training.get("lookback_sessions") != model_config.slow_lookback:
         raise ValueError("model lookback differs from the input store contract")
     train_dates = training.get("dates")
@@ -1470,6 +1505,7 @@ def _validate_stage_batch(
     *,
     require_date_pairs: bool = True,
     expected_pairs: int | None = None,
+    slow_only: bool = False,
 ) -> None:
     required = {
         "slow_features",
@@ -1477,12 +1513,15 @@ def _validate_stage_batch(
         "slow_history_mask",
         "slow_feature_age_sessions",
         "active_mask",
-        "current_features",
-        "current_feature_mask",
-        "current_feature_age_sessions",
         "targets",
         "target_mask",
     }
+    if not slow_only:
+        required |= {
+            "current_features",
+            "current_feature_mask",
+            "current_feature_age_sessions",
+        }
     missing = required - batch.keys()
     if missing:
         raise ValueError(f"training batch is missing tensors: {sorted(missing)}")
@@ -1501,10 +1540,10 @@ def _validate_stage_batch(
         or slow_feature_age.shape != slow_features.shape
     ):
         raise ValueError("slow values, validity, and age tensors are misaligned")
-    current_features = batch["current_features"]
-    current_feature_mask = batch["current_feature_mask"]
-    current_feature_age = batch["current_feature_age_sessions"]
-    if (
+    current_features = batch.get("current_features")
+    current_feature_mask = batch.get("current_feature_mask")
+    current_feature_age = batch.get("current_feature_age_sessions")
+    if not slow_only and (
         not isinstance(current_features, torch.Tensor)
         or current_features.shape[:2] != slow_features.shape[:2]
         or not isinstance(current_feature_mask, torch.Tensor)
@@ -1568,7 +1607,7 @@ def _validate_stage_batch(
             raise ValueError("stage P cannot access a present fast stream")
         if compact_present and batch["fast_patch_values"].shape[1] != 0:
             raise ValueError("stage P compact fast allocation must have K=0")
-    else:
+    elif not slow_only:
         present = batch.get("fast_present")
         if not isinstance(present, torch.Tensor):
             raise ValueError("F/J batches require the fast-presence flag")
@@ -1804,6 +1843,7 @@ def train_stage(
                 stage,
                 cpu_batch,
                 expected_pairs=8,
+                slow_only=model_config.current_feature_count == 0,
             )
             full_target_mask = reshape_date_pair_batch(cpu_batch["target_mask"]).bool()
             if model_config.to_close_weight:
@@ -1921,6 +1961,7 @@ def train_stage(
             use_bf16=model_config.use_bf16,
             disable_fast_stream=model_config.disable_fast_stream,
             selection_horizons=model_config.selection_horizons,
+            slow_only=model_config.current_feature_count == 0,
         )
         selection_compiled_graph_count += (
             _unique_compiled_graphs() - compiled_before_selection
@@ -2152,6 +2193,17 @@ def _train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--sidecar", action="append", default=[])
     parser.add_argument("--disable-fast-stream", action="store_true")
+    parser.add_argument("--slow-only", action="store_true")
+    parser.add_argument("--common-state", action="store_true")
+    parser.add_argument(
+        "--horizon-loss-weights",
+        type=float,
+        nargs=5,
+        default=DEFAULT_HORIZON_LOSS_WEIGHTS,
+    )
+    parser.add_argument(
+        "--selection-horizons", type=int, nargs="+", default=TRADED_PRIMARY_HORIZONS
+    )
     parser.add_argument("--record-branch-diagnostics", action="store_true")
     parser.add_argument("--lambda-persistence", type=float, default=0.0)
     parser.add_argument(
@@ -2190,12 +2242,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     ) = _cli_stage_indices(store_root, stage, fold)
     dataset_stage = {"P": "pretrain", "F": "finetune", "J": "joint"}[stage]
     sidecars = tuple(dict.fromkeys(str(value) for value in arguments.sidecar))
+    feature_options = dict(
+        include_intraday=not arguments.slow_only,
+        include_fast=not (arguments.disable_fast_stream or arguments.slow_only),
+        include_common_state=arguments.common_state,
+    )
     train_dataset = V2DailyDataset(
         store_root,
         fit_indices,
         stage=dataset_stage,
         lookback=arguments.lookback,
         enabled_sidecars=sidecars,
+        **feature_options,
         purpose="training",
         target_window_indices=fit_target_window,
     )
@@ -2205,6 +2263,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         stage=dataset_stage,
         lookback=arguments.lookback,
         enabled_sidecars=sidecars,
+        **feature_options,
         purpose="selection",
         target_window_indices=selection_indices,
     )
@@ -2238,9 +2297,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     fast_checkpoint = arguments.fast_pretrained_checkpoint
     model_config = ModelConfig(
         slow_feature_count=_cli_feature_count(store_root, sidecars),
-        current_feature_count=_cli_current_feature_count(store_root),
+        current_feature_count=0
+        if arguments.slow_only
+        else _cli_current_feature_count(store_root),
+        common_state_feature_count=3 if arguments.common_state else 0,
         slow_lookback=arguments.lookback,
-        disable_fast_stream=arguments.disable_fast_stream,
+        disable_fast_stream=arguments.disable_fast_stream or arguments.slow_only,
         fast_encoder_mode=(
             "legacy_v1_contaminated" if fast_checkpoint is not None else "native"
         ),
@@ -2251,12 +2313,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             arguments.allow_contaminated_v1_initialization
         ),
         lambda_persistence=arguments.lambda_persistence,
+        horizon_loss_weights=tuple(arguments.horizon_loss_weights),
+        selection_horizons=tuple(arguments.selection_horizons),
         to_close_weight=arguments.to_close_weight,
         soft_rank_temperature=arguments.soft_rank_temperature,
         use_bf16=arguments.use_bf16,
         compile_forward=arguments.compile_forward,
         time_decay_half_life_sessions=decay,
     )
+    if stage == "P":
+        model_config = stage_p_model_config(model_config)
     device = None if arguments.device == "auto" else torch.device(arguments.device)
     result = train_stage(
         stage=stage,
@@ -2283,6 +2349,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             stage="pretrain" if stage == "P" else "evaluation",
             lookback=arguments.lookback,
             enabled_sidecars=sidecars,
+            **feature_options,
             purpose="evaluation",
         )
         score_loader = DataLoader(

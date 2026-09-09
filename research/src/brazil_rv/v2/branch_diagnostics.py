@@ -42,7 +42,10 @@ def gate_activations(
     """
     from .score import _forward, _model_batch
 
-    totals: dict[str, dict[int, torch.Tensor]] = {"fast": {}, "pool": {}}
+    gates = {"pool": model.pool_gate}
+    if model.config.current_feature_count:
+        gates = {"fast": model.fast_gate, **gates}
+    totals: dict[str, dict[int, torch.Tensor]] = {name: {} for name in gates}
     active: torch.Tensor
     present: torch.Tensor
     archive_counts = torch.zeros(2, dtype=torch.int64, device=device)
@@ -75,9 +78,9 @@ def gate_activations(
         return hook
 
     handles = [
-        model.fast_gate.register_forward_hook(capture("fast")),
-        model.pool_gate.register_forward_hook(capture("pool")),
+        gate.register_forward_hook(capture(name)) for name, gate in gates.items()
     ]
+    archive_consumed = getattr(getattr(loader, "dataset", None), "include_fast", True)
     was_training = model.training
     model.eval()
     try:
@@ -87,8 +90,12 @@ def gate_activations(
                     cpu_batch, device, omit_fast_stream=model.config.disable_fast_stream
                 )
                 active = batch["active_mask"].bool()
-                present = batch["fast_present"].bool()
-                archive_present = cpu_batch["fast_present"].to(device).bool()
+                present = batch.get("fast_present", torch.zeros_like(active)).bool()
+                archive_present = (
+                    cpu_batch.get("fast_present", torch.zeros_like(active))
+                    .to(device)
+                    .bool()
+                )
                 for state in (0, 1):
                     archive_counts[state] += (
                         active & (archive_present == bool(state))
@@ -112,7 +119,10 @@ def gate_activations(
         "pass": "eager_inference_after_canonical_scoring",
         "disable_fast_stream": model.config.disable_fast_stream,
         "date_count": date_count,
-        "archive_fast_present_counts": archive_counts.cpu().tolist(),
+        "archive_fast_present_counts": archive_counts.cpu().tolist()
+        if archive_consumed
+        else None,
+        "archive_presence_consumed": archive_consumed,
         "effective_fast_present_counts": effective_counts.cpu().tolist(),
         "gates": {},
     }
