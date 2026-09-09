@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -15,6 +16,30 @@ from brazil_rv.v2.model import (
     count_non_fast_parameters,
     load_v1_fast_encoder,
 )
+
+
+def test_fast_off_bypasses_tcn_and_matches_explicit_absent_stream() -> None:
+    inputs = _inputs()
+    config = ModelConfig(slow_feature_count=32, dropout=0.0, compile_forward=False)
+    reference = DailyMultiHorizonModel(config).eval()
+    ablated = DailyMultiHorizonModel(replace(config, disable_fast_stream=True)).eval()
+    ablated.load_state_dict(reference.state_dict())
+    calls = []
+    handle = ablated.fast_encoder.register_forward_hook(lambda *_: calls.append(1))
+    try:
+        with torch.no_grad():
+            expected = _run(reference, *inputs, fast_present=torch.zeros(2, 4))
+            actual = _run(
+                ablated,
+                *inputs,
+                fast_present=torch.ones(2, 4),
+                fast_patch_values=torch.full((2, 4, 5, 7), float("nan")),
+                fast_name_index=torch.arange(4).expand(2, -1),
+            )
+        assert torch.equal(actual, expected)
+        assert not calls
+    finally:
+        handle.remove()
 
 
 def _inputs() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:

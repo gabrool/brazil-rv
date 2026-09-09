@@ -158,8 +158,19 @@ buffer 9 per quintile. B's paired gain is 3.2533 [-0.4199, 6.5484] bps/day;
 the horizon-only buffer-6 change has a larger gain but lower selection priority.
 The label is `execution_parameter_selected_in_sample`. Full tables, methods and
 sealed hashes are in [the completed sweep report](v2_R31_EXECUTION_SWEEP.md).
-Next: intraday coverage repair, one development-only store build,
-16-book acceptance, Round 1' CPU, then stop for the user's GPU go.
+The archive-only intraday coverage report is complete, as is the bounded oddlot
+derivation. The combined store is building from clean `a2c04e5`; its measured peak
+so far is 7.07 GiB. Byte comparisons, native-fast audit, fresh beta binding,
+16-book acceptance and Round 1' follow. The user explicitly authorized autonomous
+continuation through the GPU work after successful CPU checks.
+
+The Round-3 runner and diagnostics are implemented before its results: six fresh P
+fits, 18 B fits, nine matched fast-off fits, paired horizon tables and the registered
+2025 readout. Two score-free smoke trajectories check both forward paths first.
+Targeted model/training/scoring tests passed (66); further tests cover the six-seed
+roster, paired handoffs, per-horizon populations and inclusive decision thresholds.
+Logging preserves exact SAM updates, RNG and canonical score bytes. No paid
+instance has been launched at this point.
 
 Validation before replay: Ruff and compilation pass; the full research suite passed
 908 tests in 467.91 seconds. The final focused run passed 100 tests, including

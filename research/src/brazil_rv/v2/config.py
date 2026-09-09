@@ -42,6 +42,7 @@ class ModelConfig:
     trunk_swiglu_hidden: int = 48
     dropout: float = 0.1
     fast_encoder_mode: Literal["native", "legacy_v1_contaminated"] = "native"
+    disable_fast_stream: bool = False
     fast_pretrained: bool = False
     fast_pretrained_checkpoint: Path | None = None
     fast_pretrained_sha256: str | None = None

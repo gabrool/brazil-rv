@@ -667,6 +667,11 @@ class DailyMultiHorizonModel(nn.Module):
     ) -> torch.Tensor:
         if active_mask.shape != slow_features.shape[:2]:
             raise ValueError("active_mask is misaligned with the model rows")
+        if self.config.disable_fast_stream:
+            fast_patches = fast_patch_values = fast_patch_valid = None
+            fast_patch_mask = fast_name_index = fast_state_position = None
+            v1_equity_slow = None
+            fast_present = torch.zeros_like(active_mask, dtype=slow_features.dtype)
         if fast_patches is not None and fast_patch_values is not None:
             raise ValueError("native compact and dense legacy fast inputs cannot be mixed")
         if fast_patch_values is not None:

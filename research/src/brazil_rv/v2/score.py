@@ -119,6 +119,8 @@ def _model_batch(
     missing = required - result.keys()
     if missing:
         raise ValueError(f"scoring batch is missing model inputs: {sorted(missing)}")
+    if omit_fast_stream:
+        result["fast_present"] = torch.zeros_like(result["fast_present"])
     any_fast_present = torch.any(result["fast_present"].bool())
     if not omit_fast_stream and not any_fast_present:
         for name in (
@@ -180,6 +182,7 @@ def score_checkpoint_artifact(
     output_dir: Path,
     expected_checkpoint_sha256: str | None = None,
     device: torch.device | None = None,
+    record_branch_diagnostics: bool = False,
 ) -> ScoreArtifact:
     """Score one authorized chronological axis into an immutable artifact root.
 
@@ -323,7 +326,8 @@ def score_checkpoint_artifact(
             batch = _model_batch(
                 cpu_batch,
                 target_device,
-                omit_fast_stream=dataset.stage == "pretrain",
+                omit_fast_stream=dataset.stage == "pretrain"
+                or model_config.disable_fast_stream,
             )
             with torch.autocast(
                 device_type=target_device.type,
@@ -434,6 +438,15 @@ def score_checkpoint_artifact(
             ),
             "test_accessed": bool(access.get("test_accessed")),
         }
+        if record_branch_diagnostics:
+            from .branch_diagnostics import gate_activations
+
+            gate_path = staging / "gate_activations.json"
+            gate_report = gate_activations(model, loader, target_device)
+            manifest["gate_diagnostics"] = {
+                "path": gate_path.name,
+                "sha256": write_json_atomic(gate_path, gate_report),
+            }
         manifest_path = staging / "score_manifest.json"
         manifest_sha256 = write_json_atomic(manifest_path, manifest)
         os.replace(staging, output)

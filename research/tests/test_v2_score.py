@@ -144,6 +144,7 @@ def test_scoring_is_repeat_bit_identical_and_provenance_bound(tmp_path) -> None:
         output_dir=tmp_path / "scores_second",
         expected_checkpoint_sha256=first.checkpoint_sha256,
         device=torch.device("cpu"),
+        record_branch_diagnostics=True,
     )
     scores = np.load(first.scores_path, allow_pickle=False)
     repeated = np.load(second.scores_path, allow_pickle=False)
@@ -152,6 +153,11 @@ def test_scoring_is_repeat_bit_identical_and_provenance_bound(tmp_path) -> None:
     assert scores.dtype == np.float32
     assert np.array_equal(scores, repeated)
     assert first.scores_path.read_bytes() == second.scores_path.read_bytes()
+    second_manifest = json.loads(second.manifest_path.read_text())
+    gates = second_manifest["gate_diagnostics"]
+    assert gates["sha256"] == sha256_file(second.root / gates["path"])
+    gate_report = json.loads((second.root / gates["path"]).read_text())
+    assert sum(gate_report["effective_fast_present_counts"]) == int(active.sum())
     assert np.array_equal(score_mask, np.repeat(active[..., None], 5, axis=-1))
     assert np.all(scores[~score_mask] == 0.0)
 

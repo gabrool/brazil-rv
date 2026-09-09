@@ -191,6 +191,34 @@ research claim. No partially observed grid can select a policy.
 
 ## Operational authority and closing order
 
+The executable Round-3 freeze (`brazil_rv.v2.round3`) binds the completed Round 1'
+inventory and source identities, selected execution policy, this registration and
+one clean implementation. Foreign paths are resolved through the approved data-root
+mapping and recorded without changing source artifacts. Smoke includes one native
+and one fast-off F1/seed-11 epoch, serially, without score artifacts; neither is
+reused. Six fresh P trajectories then precede 18 B and nine matched fast-off fits.
+The existing scheduler runs up to six trajectories concurrently, stopping queued
+work on first failure. Concurrency may be reduced for measured capacity constraints;
+the training batch, precision and model contract are unchanged.
+
+The fast-off flag is part of the checkpoint model contract. It zeros the effective
+presence flag and bypasses the TCN in every forward; current intraday scalars and
+the learned absent-state path remain unchanged. P-to-F transfer may differ only
+in this registered flag, retaining all existing identity and chronology checks.
+Gradient diagnostics read the already accumulated second SAM gradient before its
+global clip, reporting branch L2 mean/maximum by epoch, with absent gradients zero.
+Gate diagnostics run on active evaluation name-days of the selected raw-Patience
+checkpoint in a separate eager inference pass after canonical scoring. They record
+sigmoid-gate moments by effective fast-presence state and preserve RNG state; no
+hooks enter the compiled training graph. Archive presence is also reported.
+
+Paired ablation D1/D2/D3/D5 ICs use the exact common four-head primary population;
+D10 retains its per-horizon population. The B3-minus-fast-off comparison uses the
+matched three seeds. B6-minus-B3 uses the registered tie-aware rank averages and
+six-seed adoption rule. Equal-weight network/GBDT ensembles are reported for all
+three network panels. The 2025 rule is assessed on six-seed B on common resolved
+headline/sterile economic support and never opens the holdout in this run.
+
 Use the locations and launcher from the user's `Work in CBrazil-RV..txt`, verified
 against current filesystem/Git state. Its historical Git status is not a reset
 instruction. In particular, do not use alternate instance types suggested by the

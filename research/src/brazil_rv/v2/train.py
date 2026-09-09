@@ -241,6 +241,7 @@ class SAMStepResult:
     second_loss: float
     first_gradient_norm: float
     update_gradient_norm: float
+    branch_gradient_norms: dict[str, float] | None = None
 
 
 def _rng_state() -> tuple[torch.Tensor, list[torch.Tensor] | None]:
@@ -284,6 +285,7 @@ def sam_accumulated_step(
     gradient_clip: float = GRADIENT_CLIP,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
     ema: ModelEMA | None = None,
+    record_branch_gradients: bool = False,
 ) -> SAMStepResult:
     """Apply one SAM update from loss contributions over one effective batch."""
 
@@ -327,6 +329,11 @@ def sam_accumulated_step(
         with torch.no_grad():
             for parameter, original in zip(parameters, originals, strict=True):
                 parameter.copy_(original)
+        branch_norms = None
+        if record_branch_gradients:
+            from .branch_diagnostics import gradient_norms
+
+            branch_norms = gradient_norms(model)
         update_norm = torch.nn.utils.clip_grad_norm_(
             parameters, gradient_clip, error_if_nonfinite=True
         )
@@ -341,6 +348,7 @@ def sam_accumulated_step(
             second_loss=second_value,
             first_gradient_norm=float(first_norm.detach()),
             update_gradient_norm=float(update_norm.detach()),
+            branch_gradient_norms=branch_norms,
         )
     except BaseException:
         with torch.no_grad():
@@ -460,10 +468,12 @@ def load_pretrain_handoff(
     if type(payload.get("transfer_chronology_clean")) is not bool:
         raise ValueError("stage-P handoff lacks explicit transfer chronology")
     contract = _verified_checkpoint_input_contract(payload)
-    if contract.get("model_config") != model_config_contract(model.config):
+    fine_config = model_config_contract(model.config)
+    pretrain_config = dict(fine_config, disable_fast_stream=False)
+    if contract.get("model_config") != pretrain_config:
         raise ValueError("stage-P model contract differs from stage F")
     if fine_tune_input_contract is not None:
-        if fine_tune_input_contract.get("model_config") != contract.get("model_config"):
+        if fine_tune_input_contract.get("model_config") != fine_config:
             raise ValueError("stage-P and stage-F model contracts differ")
         pretrain_inputs = contract.get("training")
         fine_inputs = fine_tune_input_contract.get("training")
@@ -596,6 +606,8 @@ def _to_device(
         if name in names and isinstance(value, torch.Tensor)
     }
     present = transferred.get("fast_present")
+    if omit_fast_stream and present is not None:
+        transferred["fast_present"] = torch.zeros_like(present)
     if not omit_fast_stream and present is not None and not torch.any(present.bool()):
         for name in (
             "fast_patch_values",
@@ -729,6 +741,7 @@ def _selection_score(
     *,
     stage: str,
     use_bf16: bool,
+    disable_fast_stream: bool = False,
 ) -> float:
     model.eval()
     prediction_rows: list[np.ndarray] = []
@@ -739,7 +752,9 @@ def _selection_score(
     with torch.no_grad():
         for cpu_batch in loader:
             _validate_stage_batch(stage, cpu_batch, require_date_pairs=False)
-            batch = _to_device(cpu_batch, device, omit_fast_stream=stage == "P")
+            batch = _to_device(
+                cpu_batch, device, omit_fast_stream=stage == "P" or disable_fast_stream
+            )
             with torch.autocast(
                 device_type=device.type,
                 dtype=torch.bfloat16,
@@ -1589,6 +1604,7 @@ def train_stage(
     device: torch.device | None = None,
     selection_parity: int | None = None,
     microbatch_pairs: int = 8,
+    record_branch_diagnostics: bool = False,
 ) -> StageTrainingResult:
     """Run one frozen P/F/J trajectory and archive raw-Patience plus final EMA."""
 
@@ -1762,11 +1778,12 @@ def train_stage(
     forward_model = compile_forward(model) if model_config.compile_forward else model
     training_compiled_graph_count = 0
     selection_compiled_graph_count = 0
-    history: list[dict[str, float | int]] = []
+    history: list[dict[str, object]] = []
     for epoch in range(1, maximum_epochs + 1):
         _set_loader_epoch(train_loader, epoch - 1)
         model.train()
         losses: list[float] = []
+        branch_norms: dict[str, list[float]] = {}
         for cpu_batch in train_loader:
             _validate_stage_batch(
                 stage,
@@ -1807,7 +1824,8 @@ def train_stage(
                     batch = _to_device(
                         cpu_microbatch,
                         device,
-                        omit_fast_stream=stage == "P",
+                        omit_fast_stream=stage == "P"
+                        or model_config.disable_fast_stream,
                     )
                     with torch.autocast(
                         device_type=device.type,
@@ -1868,11 +1886,14 @@ def train_stage(
                 rho=sam_rho,
                 scheduler=scheduler,
                 ema=ema,
+                record_branch_gradients=record_branch_diagnostics,
             )
             training_compiled_graph_count += (
                 _unique_compiled_graphs() - compiled_before_update
             )
             losses.append(update.first_loss)
+            for name, norm in (update.branch_gradient_norms or {}).items():
+                branch_norms.setdefault(name, []).append(norm)
         if not losses:
             raise ValueError("training loader produced no date pairs")
         compiled_before_selection = _unique_compiled_graphs()
@@ -1882,6 +1903,7 @@ def train_stage(
             device,
             stage=stage,
             use_bf16=model_config.use_bf16,
+            disable_fast_stream=model_config.disable_fast_stream,
         )
         selection_compiled_graph_count += (
             _unique_compiled_graphs() - compiled_before_selection
@@ -1893,6 +1915,16 @@ def train_stage(
                 "selection_score": selection_score,
             }
         )
+        if record_branch_diagnostics:
+            history[-1]["branch_gradient_norms"] = {
+                name: {
+                    "mean": float(np.mean(values)),
+                    "maximum": max(values),
+                    "updates": len(values),
+                }
+                for name, values in branch_norms.items()
+            }
+            history[-1]["gradient_timing"] = "second_SAM_pass_before_global_clipping"
         if tracker.update(epoch, selection_score, model):
             break
     if tracker.best_state_dict is None or tracker.stopped_epoch is None:
@@ -2102,6 +2134,8 @@ def _train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--selection-batch-size", type=int, default=16)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--sidecar", action="append", default=[])
+    parser.add_argument("--disable-fast-stream", action="store_true")
+    parser.add_argument("--record-branch-diagnostics", action="store_true")
     parser.add_argument("--lambda-persistence", type=float, default=0.0)
     parser.add_argument(
         "--to-close-weight", type=float, choices=(0.0, 0.2), default=0.0
@@ -2191,6 +2225,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         slow_feature_count=_cli_feature_count(store_root, sidecars),
         current_feature_count=_cli_current_feature_count(store_root),
         slow_lookback=arguments.lookback,
+        disable_fast_stream=arguments.disable_fast_stream,
         fast_encoder_mode=(
             "legacy_v1_contaminated" if fast_checkpoint is not None else "native"
         ),
@@ -2222,6 +2257,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         patience=arguments.patience,
         device=device,
         microbatch_pairs=arguments.microbatch_pairs,
+        record_branch_diagnostics=arguments.record_branch_diagnostics,
     )
     if arguments.score_output_dir is not None:
         from .score import score_checkpoint_artifact
@@ -2258,6 +2294,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_dir=arguments.score_output_dir,
             expected_checkpoint_sha256=sha256_file(result.raw_patience_checkpoint),
             device=device,
+            record_branch_diagnostics=arguments.record_branch_diagnostics,
         )
     return 0
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
@@ -870,6 +871,27 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
         torch.equal(value, fast_before[name])
         for name, value in fine_tune.fast_encoder.state_dict().items()
     )
+    ablated = DailyMultiHorizonModel(replace(config, disable_fast_stream=True))
+    transferred = load_pretrain_handoff(
+        ablated,
+        result.raw_patience_checkpoint,
+        expected_sha256=manifest["artifacts"]["raw_patience.pt"],
+        expected_seed=29,
+    )
+    assert transferred == initialized
+    assert all(
+        torch.equal(ablated.state_dict()[name], fine_tune.state_dict()[name])
+        for name in transferred
+    )
+    with pytest.raises(ValueError, match="model contract differs"):
+        load_pretrain_handoff(
+            DailyMultiHorizonModel(
+                replace(config, disable_fast_stream=True, dropout=0.2)
+            ),
+            result.raw_patience_checkpoint,
+            expected_sha256=manifest["artifacts"]["raw_patience.pt"],
+            expected_seed=29,
+        )
 
     base_payload = torch.load(
         result.raw_patience_checkpoint, map_location="cpu", weights_only=False
