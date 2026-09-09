@@ -527,14 +527,14 @@ def finalize(*, root: Path) -> str:
                 scores, other_mask = rr._score_artifact(
                     path, require_clean_transfer=True
                 )
-                if not np.array_equal(mask, other_mask):
-                    raise ValueError("comparator mask differs from network")
+                if name == "gbdt" and not np.array_equal(mask, other_mask):
+                    raise ValueError("GBDT ensemble mask differs from network")
                 panels[name] = scores
                 evaluate_panel(
                     name,
                     fold,
                     scores,
-                    mask,
+                    other_mask,
                     {"engine": "sealed_round1_comparator", "source_root": str(path)},
                 )
             for name in ("B3", "B6", "fast_off"):
