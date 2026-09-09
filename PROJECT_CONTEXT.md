@@ -1,15 +1,23 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-08.
+Last verified: 2026-09-09.
 
 ## Purpose and current research state
 
 Brazil-RV has two offline research programs. The accepted v1 intraday system
 and its deployed research recipe remain unchanged and reproducible. V2 is an
 intentionally incompatible multi-day system that predicts five daily horizons
-from one 15:45 decision snapshot. Its canonical real-data V3 store is
-`v2_daily_store_8021e42_20260906T202315Z` (manifest SHA-256
-`deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b`).
+from one 15:45 decision snapshot. Its repaired development V3 store is
+`v2_daily_store_3d67624_20260909T100323Z` (manifest SHA-256
+`db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64`).
+It ends on 2024-12-30, with repaired intraday fields, lending v2 and re-derived
+oddlot. Full-build peak RSS is 6.7059 GiB. Untouched arrays match the historical
+8021e42 store's authorized slice; native-fast reconstruction has zero value or
+mask error. The new endpoint-dependent survival audit flag reconstructs exactly.
+The economic-beta arrays are byte-identical to rev4f, with a new store binding.
+See [the input audit](docs/v2_REBUILT_STORE.md). Fresh 16-book acceptance and
+Round 1' follow; this input audit alone does not constitute model acceptance.
+The historical 8021e42 store remains immutable and binds the sealed replays.
 It is explicitly development-grade: the calendar is reconstructed and the
 corporate-action terms are inferred from COTAHIST `DISMES`, not independently
 verified contractual terms.

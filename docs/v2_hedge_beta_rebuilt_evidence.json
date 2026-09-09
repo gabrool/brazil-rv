@@ -1,0 +1,290 @@
+{
+  "arrays": [
+    {
+      "array": "date_index.npy",
+      "current_sha256": "3fecbda9616f6d0360647ee3f2a790669cb518ab2804e74b728a47c3afa5bdc0",
+      "previous_sha256": "3fecbda9616f6d0360647ee3f2a790669cb518ab2804e74b728a47c3afa5bdc0"
+    },
+    {
+      "array": "hedge_beta.npy",
+      "current_sha256": "16ff5d76c83a956d311132d987fd038f173e13f6bf151b05e1e6f291f95c3a53",
+      "previous_sha256": "16ff5d76c83a956d311132d987fd038f173e13f6bf151b05e1e6f291f95c3a53"
+    },
+    {
+      "array": "hedge_beta_valid.npy",
+      "current_sha256": "5463aa5cd0b2ade8308d02e457cea4ab63377fbb44001e1cd5ef11973c70d722",
+      "previous_sha256": "5463aa5cd0b2ade8308d02e457cea4ab63377fbb44001e1cd5ef11973c70d722"
+    },
+    {
+      "array": "isin_index.npy",
+      "current_sha256": "624dad7fe5307e37cd5933c24fc8c20d4eed8aa69f6a34d2a325627b3d4f5e73",
+      "previous_sha256": "624dad7fe5307e37cd5933c24fc8c20d4eed8aa69f6a34d2a325627b3d4f5e73"
+    }
+  ],
+  "current_manifest_sha256": "225adc6fe336d2380e5c94897ba5d6ece4fcc8e0b0aca6d631dca9063314edb4",
+  "current_root": "D:\\quant-data\\b3\\processed\\v2_hedge_beta_rebuilt_e02f934_20260909T104556Z",
+  "manifest": {
+    "access": {
+      "official_validation_accessed": false,
+      "purpose": "evaluation",
+      "registration": null,
+      "test_accessed": false
+    },
+    "arrays": {
+      "date_index": {
+        "bytes": 29864,
+        "path": "date_index.npy",
+        "sha256": "3fecbda9616f6d0360647ee3f2a790669cb518ab2804e74b728a47c3afa5bdc0"
+      },
+      "hedge_beta": {
+        "bytes": 27743816,
+        "path": "hedge_beta.npy",
+        "sha256": "16ff5d76c83a956d311132d987fd038f173e13f6bf151b05e1e6f291f95c3a53"
+      },
+      "hedge_beta_valid": {
+        "bytes": 3468089,
+        "path": "hedge_beta_valid.npy",
+        "sha256": "5463aa5cd0b2ade8308d02e457cea4ab63377fbb44001e1cd5ef11973c70d722"
+      },
+      "isin_index": {
+        "bytes": 44912,
+        "path": "isin_index.npy",
+        "sha256": "624dad7fe5307e37cd5933c24fc8c20d4eed8aa69f6a34d2a325627b3d4f5e73"
+      }
+    },
+    "bova11": {
+      "data_sha256": "4aa998afb26558c9c2d1cbf9374a6a3881e04fd3a322b769d0c2d6950371a7e9",
+      "manifest_sha256": "858c6fb07e234d8c28219a72efa29775d83ba334f9b457ed24317ab7d270544d",
+      "root": "D:\\quant-data\\b3\\interim\\external\\bova11_hedge_close_v1_2009_2024_20260908T115000Z"
+    },
+    "contract": {
+      "benchmark_return": "adjacent BOVA11 simple close return",
+      "blume": [
+        0.67,
+        0.33
+      ],
+      "calendar_window_sessions": 60,
+      "clip": [
+        -1.0,
+        3.0
+      ],
+      "equity_return": "adjacent shareholder-wealth simple return",
+      "estimator": "OLS slope with intercept",
+      "last_return_endpoint": "t-1",
+      "minimum_valid_pairs": 40
+    },
+    "distribution_by_year": [
+      {
+        "active_name_days": 29565,
+        "active_valid_name_days": 24458,
+        "fraction_between_0_5_and_1_5": 0.9055523755008587,
+        "quantiles_01_05_50_95_99": [
+          0.34110235234295483,
+          0.4586000591141115,
+          0.7833425062527297,
+          1.1825467072398739,
+          1.3250162959500456
+        ],
+        "year": 2010
+      },
+      {
+        "active_name_days": 31843,
+        "active_valid_name_days": 31788,
+        "fraction_between_0_5_and_1_5": 0.9128601988171637,
+        "quantiles_01_05_50_95_99": [
+          0.32106849654897385,
+          0.45316664465652867,
+          0.8184007924786831,
+          1.3054908539333647,
+          1.479141703520263
+        ],
+        "year": 2011
+      },
+      {
+        "active_name_days": 32889,
+        "active_valid_name_days": 32886,
+        "fraction_between_0_5_and_1_5": 0.77163534634799,
+        "quantiles_01_05_50_95_99": [
+          0.22960359818376166,
+          0.35143142247332415,
+          0.7065735206346401,
+          1.3597151240176255,
+          1.6921010586328045
+        ],
+        "year": 2012
+      },
+      {
+        "active_name_days": 34960,
+        "active_valid_name_days": 34936,
+        "fraction_between_0_5_and_1_5": 0.793336386535379,
+        "quantiles_01_05_50_95_99": [
+          0.2231655809205453,
+          0.34831520146480677,
+          0.6923859951360523,
+          1.3876322357450266,
+          1.7241226417639266
+        ],
+        "year": 2013
+      },
+      {
+        "active_name_days": 32656,
+        "active_valid_name_days": 32630,
+        "fraction_between_0_5_and_1_5": 0.8549494330370825,
+        "quantiles_01_05_50_95_99": [
+          0.2175915368663907,
+          0.39439885461961627,
+          0.742699593390604,
+          1.2346341822986546,
+          1.5546869540763246
+        ],
+        "year": 2014
+      },
+      {
+        "active_name_days": 28694,
+        "active_valid_name_days": 28694,
+        "fraction_between_0_5_and_1_5": 0.889140586882275,
+        "quantiles_01_05_50_95_99": [
+          0.290434276269969,
+          0.4408722234200108,
+          0.8128939442580182,
+          1.3310844587893216,
+          1.640625087411473
+        ],
+        "year": 2015
+      },
+      {
+        "active_name_days": 28150,
+        "active_valid_name_days": 28150,
+        "fraction_between_0_5_and_1_5": 0.8645470692717584,
+        "quantiles_01_05_50_95_99": [
+          0.2609705005083518,
+          0.4339898450583234,
+          0.8253434838067831,
+          1.4907910628063907,
+          1.8165434876461384
+        ],
+        "year": 2016
+      },
+      {
+        "active_name_days": 30766,
+        "active_valid_name_days": 30697,
+        "fraction_between_0_5_and_1_5": 0.8716812717855165,
+        "quantiles_01_05_50_95_99": [
+          0.24500084769003155,
+          0.4166464124998318,
+          0.8394789451226556,
+          1.43307314665648,
+          1.7146911407132714
+        ],
+        "year": 2017
+      },
+      {
+        "active_name_days": 34178,
+        "active_valid_name_days": 34151,
+        "fraction_between_0_5_and_1_5": 0.88422008140318,
+        "quantiles_01_05_50_95_99": [
+          0.2052275673678518,
+          0.4172488431359672,
+          0.7972603373122884,
+          1.3144806103747788,
+          1.6216483836183913
+        ],
+        "year": 2018
+      },
+      {
+        "active_name_days": 37004,
+        "active_valid_name_days": 25981,
+        "fraction_between_0_5_and_1_5": 0.938108617836111,
+        "quantiles_01_05_50_95_99": [
+          0.32519292614428924,
+          0.492808832579558,
+          0.828330057913918,
+          1.2080733279684706,
+          1.466081806709326
+        ],
+        "year": 2019
+      },
+      {
+        "active_name_days": 44064,
+        "active_valid_name_days": 36963,
+        "fraction_between_0_5_and_1_5": 0.9624489354219083,
+        "quantiles_01_05_50_95_99": [
+          0.41356533726887396,
+          0.5797665036250511,
+          0.9670238437337451,
+          1.3559871202205118,
+          1.5553346585983885
+        ],
+        "year": 2020
+      },
+      {
+        "active_name_days": 54589,
+        "active_valid_name_days": 54526,
+        "fraction_between_0_5_and_1_5": 0.9085757253420387,
+        "quantiles_01_05_50_95_99": [
+          0.28107048594372025,
+          0.4999777851780052,
+          0.902007325589042,
+          1.4613540000363114,
+          1.7924765264786215
+        ],
+        "year": 2021
+      },
+      {
+        "active_name_days": 53909,
+        "active_valid_name_days": 53872,
+        "fraction_between_0_5_and_1_5": 0.88502376002376,
+        "quantiles_01_05_50_95_99": [
+          0.41806292774484777,
+          0.5616494600315178,
+          0.9884886465958771,
+          1.6344017751796875,
+          2.0260413369309527
+        ],
+        "year": 2022
+      },
+      {
+        "active_name_days": 48921,
+        "active_valid_name_days": 48868,
+        "fraction_between_0_5_and_1_5": 0.8538307276745518,
+        "quantiles_01_05_50_95_99": [
+          0.3888025933571715,
+          0.5339917742004788,
+          0.9949121659479774,
+          1.679006021239804,
+          2.02376668200205
+        ],
+        "year": 2023
+      },
+      {
+        "active_name_days": 46627,
+        "active_valid_name_days": 46601,
+        "fraction_between_0_5_and_1_5": 0.8008411836655865,
+        "quantiles_01_05_50_95_99": [
+          0.3333548006101751,
+          0.5723464753325878,
+          1.053149371382679,
+          1.937120772515374,
+          2.4108691560679123
+        ],
+        "year": 2024
+      }
+    ],
+    "first_date": "2010-01-04",
+    "implementation_sha256": "fac2f645434430291b5b2cf3c83fa197b6d02a6c2a7b03111b31f914543884ce",
+    "last_date": "2024-12-30",
+    "schema": "BRAZIL_RV_V2_HEDGE_BETA_V1",
+    "status": "complete",
+    "store": {
+      "manifest_sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64",
+      "root": "D:\\quant-data\\b3\\processed\\v2_daily_store_3d67624_20260909T100323Z"
+    }
+  },
+  "new_store_manifest_sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64",
+  "new_store_root": "D:\\quant-data\\b3\\processed\\v2_daily_store_3d67624_20260909T100323Z",
+  "official_validation_accessed": false,
+  "previous_manifest_sha256": "f5fa41536740ca412550cb81d2b44c9541e338dc060d674ab8ea270edd7be712",
+  "previous_root": "D:\\quant-data\\b3\\processed\\v2_hedge_beta_rev4f_20260908T225248Z",
+  "status": "exact",
+  "test_accessed": false
+}
