@@ -57,6 +57,14 @@ imputation), and a stricter subset with positive short exposure and no imputed o
 placeholder opening short notional. None is presented as evidence of historical locates.
 The heuristic sqrt(1738/375) precision gain is not a confidence-interval guarantee.
 
+Before the first scored fold, the CPU startup found that the old CDI extension starts
+2021-08-16. A BCB SGS-12 prefix through 2021-08-15 now extends the derived series back
+to 2016-07-18. Every old-extension date/value is bitwise unchanged; all new development
+sessions align, and the Experiment-52 overlap proof still passes. The amended JSON
+binds the new file, with source/hash evidence in `docs/v2_checkpoint_cdi_evidence.json`.
+The unscored `v2_research_checkpoint_34e2140_20260909` attempt is retained with its
+startup log; the restart uses a fresh root. This changes no rate assumptions or gates.
+
 ## CPU checkpoint and stops
 
 Run the five existing controls on each fold, then a_slow and b_intraday GBDT, then the

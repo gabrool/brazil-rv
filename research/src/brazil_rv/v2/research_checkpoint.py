@@ -65,6 +65,7 @@ def freeze(source_design: Path, output: Path, *, num_threads: int) -> None:
             key: source[key]
             for key in ("store", "cdi", "bova11", "lending_archive", "execution_policy")
         },
+        "cdi": registered["sources"]["cdi"],
         "registration": {
             "path": str(REGISTRATION),
             "sha256": sha256_file(REGISTRATION),

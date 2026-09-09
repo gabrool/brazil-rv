@@ -477,8 +477,8 @@
     },
     "cdi": {
       "development_extension": {
-        "path": "C:\\quant-data\\b3\\interim\\external\\cdi_sgs12_v2_development_20260903T190000Z\\daily_cdi.parquet",
-        "sha256": "a60147d598ffabea13a64228e3ec3f18beee7956b8ddca9e0d725cdc63250d23"
+        "path": "C:\\quant-data\\b3\\interim\\external\\cdi_sgs12_checkpoint_development_20260909\\daily_cdi.parquet",
+        "sha256": "ee75978a727b4741660d58b5ab06ce39131a8ba3bbd0fadf12952302808a750e"
       },
       "experiment52_reference": {
         "path": "C:\\quant-data\\b3\\interim\\external\\experiment52_cdi_exact_e380cd7_20260903\\daily_cdi.parquet",

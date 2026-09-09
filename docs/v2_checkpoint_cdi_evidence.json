@@ -1,0 +1,49 @@
+{
+  "alignment_proof": {
+    "development_extension": {
+      "path": "C:\\quant-data\\b3\\interim\\external\\cdi_sgs12_checkpoint_development_20260909\\daily_cdi.parquet",
+      "sha256": "ee75978a727b4741660d58b5ab06ce39131a8ba3bbd0fadf12952302808a750e"
+    },
+    "equality_proof": {
+      "comparison_columns": [
+        "trade_date",
+        "daily_cdi_rate"
+      ],
+      "exact_byte_match": true,
+      "max_abs_daily_cdi_rate": 0.0,
+      "overlap_count": 310,
+      "overlap_date_range": {
+        "end": "2024-06-28",
+        "start": "2023-04-03"
+      },
+      "reference_fully_contained": true
+    },
+    "experiment52_reference": {
+      "path": "C:\\quant-data\\b3\\interim\\external\\experiment52_cdi_exact_e380cd7_20260903\\daily_cdi.parquet",
+      "sha256": "38d7934ebb6849b1e20310a81130f6faa68f4618c8edb0d046185067c83da2ea"
+    }
+  },
+  "development_extension": {
+    "path": "C:\\quant-data\\b3\\interim\\external\\cdi_sgs12_checkpoint_development_20260909\\daily_cdi.parquet",
+    "sha256": "ee75978a727b4741660d58b5ab06ce39131a8ba3bbd0fadf12952302808a750e"
+  },
+  "first_date": "2016-07-18",
+  "last_date": "2024-12-30",
+  "official_validation_accessed": false,
+  "old_extension": {
+    "path": "C:\\quant-data\\b3\\interim\\external\\cdi_sgs12_v2_development_20260903T190000Z\\daily_cdi.parquet",
+    "sha256": "a60147d598ffabea13a64228e3ec3f18beee7956b8ddca9e0d725cdc63250d23"
+  },
+  "old_extension_values_bitwise_unchanged": true,
+  "prefix": {
+    "path": "C:\\quant-data\\b3\\interim\\external\\cdi_sgs12_checkpoint_prefix_20260909\\daily_cdi.parquet",
+    "sha256": "f5adb35a5e300f759baf240410cda6a69de061b8f6f17479377f659d2c95f69b"
+  },
+  "prefix_manifest": {
+    "path": "C:\\quant-data\\b3\\interim\\external\\cdi_sgs12_checkpoint_prefix_20260909\\cdi_manifest.json",
+    "sha256": "46737b29768c0a5d8470971bc1ff1c5a7ab695d0ea111d4f5b0c6efe482ced84"
+  },
+  "rows": 2122,
+  "source": "Banco Central do Brasil SGS 12",
+  "test_accessed": false
+}
