@@ -961,6 +961,7 @@ class StoreStaging:
         sources: Sequence[Mapping[str, object]] = (),
         metadata: Mapping[str, object] | None = None,
         tables: Mapping[str, pl.DataFrame] | None = None,
+        maximum_peak_rss_bytes: int | None = None,
     ) -> Path:
         arrays = {name: self.open_array(name) for name in sorted(self._arrays)}
         try:
@@ -1013,6 +1014,14 @@ class StoreStaging:
             key: list(value) for key, value in (feature_names or {}).items()
         }
         metadata_payload = dict(metadata or {})
+        if maximum_peak_rss_bytes is not None:
+            measured_peak = peak_rss_bytes()
+            if measured_peak > maximum_peak_rss_bytes:
+                raise MemoryError(
+                    f"store publication exceeded peak RSS bound: {measured_peak} > {maximum_peak_rss_bytes}"
+                )
+            metadata_payload["build_peak_rss_bytes"] = measured_peak
+            metadata_payload["build_peak_rss_gib"] = measured_peak / 1024**3
         feature_schema_identity = _validated_feature_schema_sha256(
             metadata_payload, ordered_feature_names
         )

@@ -1,0 +1,33 @@
+{
+  "recorded_at_utc": "2026-09-09T02:07:01.074639+00:00",
+  "status": "stopped_before_publication",
+  "implementation_commit": "a2c04e5d896063f51e82cedf62099d1696ca9a46",
+  "intended_output": "D:/quant-data/b3/processed/v2_daily_store_a2c04e5_20260909T012321Z",
+  "preserved_workspace": "D:/quant-data/b3/processed/.v2_daily_store_a2c04e5_20260909T012321Z.arrays-tv0b0vex",
+  "external_monitor": {
+    "path": "D:\\quant-data\\b3\\interim\\v2_build_memory_a2c04e5_20260909T012321Z.json",
+    "sha256": "1860fefb7d082323752d73dd7b40fb3f9cc16769a2cc046cfc307459547737b3",
+    "last_sample": {
+      "peak_rss_bytes": 8753762304,
+      "process_id": 10388,
+      "sample_count": 460,
+      "peak_rss_gib": 8.152576446533203,
+      "last_sample_utc": "2026-09-09T02:00:12.3120793Z",
+      "status": "monitoring",
+      "maximum_gib": 8.0
+    }
+  },
+  "direct_process_check_peak_rss_gib": 8.152652740478516,
+  "build_process_stopped": true,
+  "published_store_exists": false,
+  "stage": "after lending-sidecar arrays were materialized",
+  "cause": "Completed native mappings and consumed raw intraday mappings remained resident during later families; whole-panel indexed support copy added a temporary allocation.",
+  "resolution_authority": "User explicitly authorized preferred resolutions and autonomous completion while absent.",
+  "resolution": "Preserve stopped scratch and evidence; release consumed mappings, chunk support copying, close each final-write source, enforce final publication peak; commit and restart in a fresh root before acceptance.",
+  "maximum_peak_rss_bytes_unchanged": 8589934592,
+  "research_settings_changed": false,
+  "official_validation_accessed": false,
+  "test_accessed": false,
+  "paid_instance_launched": false,
+  "validation": "68 existing targeted tests pass; new publication-bound regression passes."
+}

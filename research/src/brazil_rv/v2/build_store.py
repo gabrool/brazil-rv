@@ -102,10 +102,10 @@ from .sidecars import (
     rebuild_publication_lag_validity,
 )
 from .store import (
+    StoreStaging,
     available_memory_status_bytes,
     close_memmap,
     peak_rss_bytes,
-    write_store,
 )
 from .targets import (
     build_economic_multi_day_targets_into,
@@ -120,6 +120,7 @@ EXTERNAL_VALIDITY_BOOTSTRAP_CONFIDENCE = 0.95
 EXTERNAL_VALIDITY_MIN_NAMES = 20
 EXTERNAL_VALIDITY_MIN_NAME_DAYS = 2_000
 MINIMUM_BUILD_FREE_MEMORY_BYTES = 10 * 1024**3
+MAXIMUM_BUILD_PEAK_RSS_BYTES = 8 * 1024**3
 COMMON_STATE_DIAGNOSTICS = (
     "recent_market_log_return",
     "median_raw_daily_volatility",
@@ -1026,6 +1027,12 @@ def stream_intraday_from_assignments(
                 local_native_age_valid,
             )
         del source
+    # The completed native tensors are only read again by the final writer.
+    # Release their dirty mapped pages before transforming the scalar families.
+    for name, mapped in native_arrays.items():
+        path = Path(mapped.filename)
+        close_memmap(mapped)
+        native_arrays[name] = np.load(path, mmap_mode="r", allow_pickle=False)
     return StreamedIntraday(
         result=IntradayDailyResult(
             values=feature_values,
@@ -2406,7 +2413,10 @@ def build_daily_store(
             decision_rows=kept_rows,
             source_age_sessions=aligned.source_age_sessions,
         )
-        intraday_support_fraction[:] = aligned.support_fraction[kept_rows]
+        for start in range(0, kept_rows.size, 64):
+            intraday_support_fraction[start : start + 64] = aligned.support_fraction[
+                kept_rows[start : start + 64]
+            ]
         fast_sigma = np.where(aligned.valid[..., 14], aligned.values[..., 14], np.nan)
         fast_present = aligned.fast_present
         prefix_indices = np.asarray(
@@ -2547,7 +2557,10 @@ def build_daily_store(
             decision_rows=kept_rows,
             source_age_sessions=aligned.source_age_sessions,
         )
-        intraday_support_fraction[:] = aligned.support_fraction[kept_rows]
+        for start in range(0, kept_rows.size, 64):
+            intraday_support_fraction[start : start + 64] = aligned.support_fraction[
+                kept_rows[start : start + 64]
+            ]
         fast_sigma = np.where(aligned.valid[..., 14], aligned.values[..., 14], np.nan)
         fast_present = aligned.fast_present
         entry = streamed_intraday.to_close_entry
@@ -2583,6 +2596,18 @@ def build_daily_store(
         if "aligned" in locals():
             del aligned
         streamed_intraday = None
+        # Raw scalar values/masks/support/ages and entry endpoints have been
+        # consumed. Only these small masks remain needed by later diagnostics.
+        retained_workspace_arrays = (fast_present, return_consistent)
+        for value in streamed_workspace_arrays:
+            if not any(value is retained for retained in retained_workspace_arrays):
+                close_memmap(value)
+        streamed_workspace_arrays = tuple(
+            value
+            for value in streamed_workspace_arrays
+            if any(value is retained for retained in retained_workspace_arrays)
+        )
+        del entry, entry_valid, realized_daily
         gc.collect()
 
     target_shape = (kept_rows.size, len(panel.isins), len(HORIZONS))
@@ -2942,6 +2967,16 @@ def build_daily_store(
         )
         del raw_valid, result
         gc.collect()
+        print(
+            json.dumps(
+                {
+                    "build_phase": "sidecar_complete",
+                    "family": group,
+                    "peak_rss_gib": peak_rss_bytes() / 1024**3,
+                }
+            ),
+            flush=True,
+        )
     del prior_adv20
     gc.collect()
 
@@ -3170,6 +3205,8 @@ def build_daily_store(
         for year in sorted(set(calendar_year.tolist()))
     }
     build_peak_rss = peak_rss_bytes()
+    if build_peak_rss > MAXIMUM_BUILD_PEAK_RSS_BYTES:
+        raise MemoryError(f"store build exceeded 8 GiB: {build_peak_rss / 1024**3:.6f}")
     metadata = {
         "store_start": str(kept_dates[0]),
         "store_end": str(kept_dates[-1]),
@@ -3402,21 +3439,19 @@ def build_daily_store(
                 ),
             }
     try:
-        result = write_store(
-            output_dir,
-            dates=kept_dates,
-            isins=panel.isins,
-            arrays=arrays,
-            feature_names=feature_names,
-            sources=source_records(
-                (
-                    *source_paths,
-                    *intraday_source_paths,
-                )
-            ),
-            metadata=metadata,
-            tables=tables,
-        )
+        # Each derived mapping is owned here. Close it after its final copy so
+        # source and destination pages do not accumulate across the whole store.
+        with StoreStaging(output_dir, dates=kept_dates, isins=panel.isins) as staging:
+            for name, value in sorted(arrays.items()):
+                staging.write_array(name, value)
+                close_memmap(value)
+            result = staging.seal(
+                feature_names=feature_names,
+                sources=source_records((*source_paths, *intraday_source_paths)),
+                metadata=metadata,
+                tables=tables,
+                maximum_peak_rss_bytes=MAXIMUM_BUILD_PEAK_RSS_BYTES,
+            )
     finally:
         for value in arrays.values():
             close_memmap(value)

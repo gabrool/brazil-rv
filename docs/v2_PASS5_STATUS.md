@@ -159,8 +159,12 @@ the horizon-only buffer-6 change has a larger gain but lower selection priority.
 The label is `execution_parameter_selected_in_sample`. Full tables, methods and
 sealed hashes are in [the completed sweep report](v2_R31_EXECUTION_SWEEP.md).
 The archive-only intraday coverage report is complete, as is the bounded oddlot
-derivation. The combined store is building from clean `a2c04e5`; its measured peak
-so far is 7.07 GiB. Byte comparisons, native-fast audit, fresh beta binding,
+derivation. The first combined store build from clean `a2c04e5` stopped before
+publication at a measured peak above 8 GiB during lending-sidecar processing.
+Completed native and raw intraday mappings are now released before subsequent
+families, and final publication enforces the same memory bound. The stop and
+fresh-root restart are recorded in `v2_store_memory_stop_evidence.json`.
+Byte comparisons, native-fast audit, fresh beta binding,
 16-book acceptance and Round 1' follow. The user explicitly authorized autonomous
 continuation through the GPU work after successful CPU checks.
 

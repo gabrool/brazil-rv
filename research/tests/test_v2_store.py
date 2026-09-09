@@ -72,6 +72,34 @@ def test_close_memmap_reaches_mapping_through_ndarray_view(tmp_path: Path) -> No
     path.unlink()
 
 
+def test_store_peak_bound_covers_publication_and_records_final_peak(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    measured = 9 * 1024**3
+    monkeypatch.setattr(store_module, "peak_rss_bytes", lambda: measured)
+    dates = np.asarray(["2024-01-02"], dtype="datetime64[D]")
+    metadata = {"feature_schema": fixture_feature_schema({}), "build_peak_rss_bytes": 1}
+    failed = tmp_path / "excess_peak"
+    with pytest.raises(MemoryError, match="publication exceeded peak RSS bound"):
+        with store_module.StoreStaging(
+            failed, dates=dates, isins=["BRTESTACNOR1"]
+        ) as staging:
+            staging.write_array("active", np.ones((1, 1), dtype=np.bool_))
+            staging.seal(metadata=metadata, maximum_peak_rss_bytes=8 * 1024**3)
+    assert not failed.exists()
+
+    measured = 7 * 1024**3
+    accepted = tmp_path / "within_peak"
+    with store_module.StoreStaging(
+        accepted, dates=dates, isins=["BRTESTACNOR1"]
+    ) as staging:
+        staging.write_array("active", np.ones((1, 1), dtype=np.bool_))
+        staging.seal(metadata=metadata, maximum_peak_rss_bytes=8 * 1024**3)
+    recorded = json.loads((accepted / "manifest.json").read_text())["metadata"]
+    assert recorded["build_peak_rss_bytes"] == measured
+    assert recorded["build_peak_rss_gib"] == 7.0
+
+
 def test_minute_archive_requires_independent_activity_and_source_masks(
     tmp_path: Path,
 ) -> None:

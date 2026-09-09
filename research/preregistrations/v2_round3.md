@@ -92,6 +92,16 @@ from identity metadata, without making future-only names eligible historically.
 The CLI reads only COTAHIST years 2009-2024 and pushes the end-date predicate into
 M1/COTAHIST decoding before materialization. The new calendar ends 2024-12-30.
 
+The first combined build, `v2_daily_store_a2c04e5_20260909T012321Z`, was stopped
+after measured peak RSS exceeded 8 GiB during lending-sidecar processing. It
+published no store and supplies no research result. Under the user's autonomous
+authority, restart in a fresh root after releasing completed native mappings and
+consumed raw intraday mappings, chunking the support copy, and closing each derived
+source mapping after its final write. The unchanged 8-GiB bound must also cover
+final validation and publication; record the measured final peak in the manifest.
+No data, feature, target, model, or acceptance setting changes in this amendment.
+The measured stop evidence is `docs/v2_store_memory_stop_evidence.json`.
+
 The final completed daily row retains the next decision timestamp from calendar
 metadata, even though the next session has no market data or consumer row in this
 store. Otherwise nine December 30 inferred action components would be marked
