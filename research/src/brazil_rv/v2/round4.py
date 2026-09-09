@@ -384,6 +384,7 @@ def promotion_trace(readouts: dict, comparisons: dict, *, confirmed: bool) -> di
         if "S0" not in eligible
         else "paired_IC_upper_bound_below_zero_or_undefined",
         "read_2025_authorized": False,
+        "economics_basis": "registered_resolved_fold_pool; inspect per_candidate_economics_coverage; not an implementability claim",
         "read_bar_status": "Gabriel_to_set",
         "in_sample_selection_label": True,
     }

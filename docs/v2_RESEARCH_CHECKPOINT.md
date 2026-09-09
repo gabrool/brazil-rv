@@ -4,6 +4,12 @@ Status: the protocol is committed; the graph changes and staged Round-4 runner a
 implemented. The CPU GBDT re-baseline is still running. Round 4 is not yet registered
 or launched. This document will receive the completed CPU readout before registration.
 
+The implementation is on GitHub in `d2f7de4`, following the protocol and CDI commits.
+The active CPU root is
+`D:/quant-data/b3/processed/model_runs/v2_research_checkpoint_d2f7de4_20260909`,
+running from an isolated clean checkout at that commit. All 70 copied controls
+passed exact source-contract and file-inventory verification at freeze.
+
 ## Governing contract
 
 The accepted contract is [v2_research_checkpoint.md](../research/preregistrations/v2_research_checkpoint.md)
@@ -51,6 +57,24 @@ All 70 control/fold cells passed the unchanged engineering gates, including the 
 folds: D1–D5, equity gross 1.5–2.25, stale inventory, occupancy, insolvency, null-control
 absolute IC below .02, and control absolute IC below .10. No gate was waived or amended.
 
+The [control readout](v2_checkpoint_controls.json) includes every fold and confidence
+intervals. Fourteen-fold primary IC is -0.000493 for reversal-5, -0.013047 for
+reversal-21, +0.025134 for momentum, +0.018014 for the existing diagnostic blend,
+and +0.003434 for the inverse-volatility null. Momentum's primary interval is
+[0.012752, 0.034368]; its old-window primary is 0.032833 and its old-window legacy
+headline is 0.021473. The blend remains a control, never a promotion candidate.
+
+Engineering acceptance does not make every fold's economics resolved. Momentum has
+unresolved terminal economics in F4 (2019H2, remaining hedge) and F7 (2021H1, a position
+without a terminal print). The existing rule excludes these whole folds from economics
+pooling, leaving 1,490 of 1,738 sessions. Its +2.718 bps/day [-1.203, 6.903] therefore
+describes resolved-fold economics, not the full fourteen-fold return. The old three
+windows are fully resolved at +3.190 bps/day. No missing price is invented and no
+valuation rule is changed. Every candidate's economics coverage is reported separately.
+Turnover includes initial/final book trades; the unchanged non-circular block bootstrap
+underweights those boundary spikes, so its interval need not contain the whole-panel
+turnover mean. Turnover is a readout, not a gate.
+
 The first attempt stopped before scoring because the original CDI file began in 2021.
 The replacement derived file adds the official BCB prefix while retaining all original
 overlapping observations exactly; see [CDI evidence](v2_checkpoint_cdi_evidence.json).
@@ -87,6 +111,19 @@ include daily rank correlation, per-day rank-regression residual IC, and attribu
 of the unchanged four-head decile spread to extreme momentum quintiles. Missing
 momentum remains an explicit unattributed group. This spread attribution is not a
 constructed-book P&L attribution. No diagnostic contributes to selection.
+
+The [historical B6 diagnostic](v2_checkpoint_b6_diagnostics.json) has completed after
+verification of the original Round-3 inventory. Its old-window primary is 0.033588,
+legacy primary 0.025078, and momentum-residual primary IC 0.014644. Average daily
+composite rank correlation with momentum is 0.758935 (daily SD 0.051451); extreme
+momentum quintiles account for 86.47% of the unchanged decile-spread contribution.
+These are descriptive figures without selection weight or a refit. The new parent
+diagnostic and the selection-only paired experiment remain pending GPU training.
+
+Targeted tests cover loss value/gradient equivalence, head support, calendar/access,
+model/data/scoring paths, actual S0/C Stage-P training and transfer, H/P checkpoint
+reuse, invalid sidecars, daily diagnostic causality and spread conservation, plan
+counts and seed pairing, and promotion eligibility. Ruff and the targeted suites pass.
 
 After CPU completion: produce the paired/TreeSHAP diagnostics, verify and seal the
 root, publish the completed CPU report, then register `v2_round4.md`. The staged plans

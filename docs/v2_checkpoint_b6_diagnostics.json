@@ -1,0 +1,772 @@
+{
+  "candidate": "historical_B6",
+  "deployment_changed": false,
+  "fold_mapping": {
+    "F1": "F12",
+    "F2": "F13",
+    "F3": "F14"
+  },
+  "full_readout": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_research_checkpoint_d2f7de4_20260909\\historical_b6_diagnostics.json",
+    "sha256": "2ffd57a3bf460fff1ee0ac8784717f6ae2dafb794574fc56f46e1911633eb41e"
+  },
+  "historical_inventory_sha256": "939c9b2c1e1366bf7cd62e1c040ba78ea29960b87f00e372008435f5b56ab829",
+  "historical_score_manifests": {
+    "F1": "9395e84c4f3e1d3dd4881117d43b8d87a1b753f51d5a264c128e6a832aafd18d",
+    "F2": "38a5315a007b09e638bf2b766c67a32f1114f0dc09940ee468aa689ee7072eae",
+    "F3": "4e0ae52f4bd3a20bf6848f874305d2109509725727139589dd2467f363a902d1"
+  },
+  "implementation": {
+    "commit": "d2f7de406413f4c4462e957646144786e039821a",
+    "tracked_worktree_clean": true
+  },
+  "integrity_scan_disclosure": "historical_integrity_only_scans_of_later_old_store_rows_disclosed_in_Round3",
+  "official_validation_accessed": false,
+  "pooled": {
+    "extreme_momentum_spread_share": 0.8646794019627143,
+    "folds": {
+      "F12": {
+        "extreme_momentum_spread_share": 0.7369379383139851,
+        "summary": {
+          "D10_neutral_ic": {
+            "defined_sessions": 114,
+            "mean": 0.010474338644546497,
+            "possible_sessions": 124,
+            "sd": 0.0983878236078848
+          },
+          "D10_neutral_ic_momentum_supported": {
+            "defined_sessions": 114,
+            "mean": 0.013260558696624158,
+            "possible_sessions": 124,
+            "sd": 0.10106365394423442
+          },
+          "D10_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.7977941488768753,
+            "possible_sessions": 124,
+            "sd": 0.028127541320940763
+          },
+          "D10_residual_ic": {
+            "defined_sessions": 114,
+            "mean": -0.009617267300227744,
+            "possible_sessions": 124,
+            "sd": 0.07622332834876801
+          },
+          "D1_neutral_ic": {
+            "defined_sessions": 119,
+            "mean": 0.011298499640586941,
+            "possible_sessions": 124,
+            "sd": 0.10617283740681444
+          },
+          "D1_neutral_ic_momentum_supported": {
+            "defined_sessions": 119,
+            "mean": 0.011965895811537067,
+            "possible_sessions": 124,
+            "sd": 0.10674166714338017
+          },
+          "D1_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.6942358793447995,
+            "possible_sessions": 124,
+            "sd": 0.040860588965784546
+          },
+          "D1_residual_ic": {
+            "defined_sessions": 119,
+            "mean": 0.0036014707285581347,
+            "possible_sessions": 124,
+            "sd": 0.07985964225953351
+          },
+          "D2_neutral_ic": {
+            "defined_sessions": 119,
+            "mean": 0.019512481768134325,
+            "possible_sessions": 124,
+            "sd": 0.1119039227779683
+          },
+          "D2_neutral_ic_momentum_supported": {
+            "defined_sessions": 119,
+            "mean": 0.020674434982618062,
+            "possible_sessions": 124,
+            "sd": 0.1127594084600138
+          },
+          "D2_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.7016089535478324,
+            "possible_sessions": 124,
+            "sd": 0.04105944066909877
+          },
+          "D2_residual_ic": {
+            "defined_sessions": 119,
+            "mean": 0.013260104205787463,
+            "possible_sessions": 124,
+            "sd": 0.0826144543533346
+          },
+          "D3_neutral_ic": {
+            "defined_sessions": 119,
+            "mean": 0.01731281438134469,
+            "possible_sessions": 124,
+            "sd": 0.1064431793427288
+          },
+          "D3_neutral_ic_momentum_supported": {
+            "defined_sessions": 119,
+            "mean": 0.018510713898999043,
+            "possible_sessions": 124,
+            "sd": 0.10786854571954316
+          },
+          "D3_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.7311259200241527,
+            "possible_sessions": 124,
+            "sd": 0.03613093548892486
+          },
+          "D3_residual_ic": {
+            "defined_sessions": 119,
+            "mean": 0.009203594870638583,
+            "possible_sessions": 124,
+            "sd": 0.07907488732388775
+          },
+          "D5_neutral_ic": {
+            "defined_sessions": 119,
+            "mean": 0.01990294749126247,
+            "possible_sessions": 124,
+            "sd": 0.10595217954049638
+          },
+          "D5_neutral_ic_momentum_supported": {
+            "defined_sessions": 119,
+            "mean": 0.02137201343011206,
+            "possible_sessions": 124,
+            "sd": 0.10665023967869139
+          },
+          "D5_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.7561825120308866,
+            "possible_sessions": 124,
+            "sd": 0.03259214640378646
+          },
+          "D5_residual_ic": {
+            "defined_sessions": 119,
+            "mean": 0.009713396451192092,
+            "possible_sessions": 124,
+            "sd": 0.07236710120818408
+          },
+          "composite_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.7638769468718368,
+            "possible_sessions": 124,
+            "sd": 0.031857581693126094
+          },
+          "legacy_primary_ic_1235": {
+            "defined_sessions": 119,
+            "mean": 0.0170066858203321,
+            "possible_sessions": 124,
+            "sd": 0.09228512712444459
+          },
+          "legacy_primary_ic_1235_on_momentum_supported_population": {
+            "defined_sessions": 119,
+            "mean": 0.018130764530816555,
+            "possible_sessions": 124,
+            "sd": 0.09312612360319958
+          },
+          "legacy_primary_ic_1235_residual": {
+            "defined_sessions": 119,
+            "mean": 0.008944641564044066,
+            "possible_sessions": 124,
+            "sd": 0.06728814623831075
+          },
+          "primary_ic": {
+            "defined_sessions": 114,
+            "mean": 0.017612189930795233,
+            "possible_sessions": 124,
+            "sd": 0.08846371446326409
+          },
+          "primary_ic_on_momentum_supported_population": {
+            "defined_sessions": 114,
+            "mean": 0.01947464098790372,
+            "possible_sessions": 124,
+            "sd": 0.08986406266414018
+          },
+          "primary_ic_residual": {
+            "defined_sessions": 114,
+            "mean": 0.001843705499195994,
+            "possible_sessions": 124,
+            "sd": 0.0660998316995683
+          },
+          "spread_contribution_extreme_momentum_bps_per_session": {
+            "defined_sessions": 119,
+            "mean": 14.693950385011796,
+            "possible_sessions": 124,
+            "sd": 93.74143323652547
+          },
+          "spread_contribution_middle_momentum_bps_per_session": {
+            "defined_sessions": 119,
+            "mean": 4.865128750858061,
+            "possible_sessions": 124,
+            "sd": 26.558823076882
+          },
+          "spread_contribution_unknown_momentum_bps_per_session": {
+            "defined_sessions": 119,
+            "mean": 0.38011739759885965,
+            "possible_sessions": 124,
+            "sd": 2.8637141103404664
+          }
+        }
+      },
+      "F13": {
+        "extreme_momentum_spread_share": 0.9341286349749416,
+        "summary": {
+          "D10_neutral_ic": {
+            "defined_sessions": 114,
+            "mean": 0.019013246293734944,
+            "possible_sessions": 124,
+            "sd": 0.0836529148098756
+          },
+          "D10_neutral_ic_momentum_supported": {
+            "defined_sessions": 114,
+            "mean": 0.018379547006612915,
+            "possible_sessions": 124,
+            "sd": 0.08369558672591912
+          },
+          "D10_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.7234218331540967,
+            "possible_sessions": 124,
+            "sd": 0.041443607151245634
+          },
+          "D10_residual_ic": {
+            "defined_sessions": 114,
+            "mean": 0.015123383022398568,
+            "possible_sessions": 124,
+            "sd": 0.08230581746428042
+          },
+          "D1_neutral_ic": {
+            "defined_sessions": 119,
+            "mean": 0.014939385979341325,
+            "possible_sessions": 124,
+            "sd": 0.09456578719279604
+          },
+          "D1_neutral_ic_momentum_supported": {
+            "defined_sessions": 119,
+            "mean": 0.015052966548140291,
+            "possible_sessions": 124,
+            "sd": 0.09457549319193646
+          },
+          "D1_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.6845357634839592,
+            "possible_sessions": 124,
+            "sd": 0.05329382772953634
+          },
+          "D1_residual_ic": {
+            "defined_sessions": 119,
+            "mean": 0.019633050022923662,
+            "possible_sessions": 124,
+            "sd": 0.07874420931335997
+          },
+          "D2_neutral_ic": {
+            "defined_sessions": 119,
+            "mean": 0.018950021550805718,
+            "possible_sessions": 124,
+            "sd": 0.093099781945858
+          },
+          "D2_neutral_ic_momentum_supported": {
+            "defined_sessions": 119,
+            "mean": 0.019220013693436733,
+            "possible_sessions": 124,
+            "sd": 0.09306740818916884
+          },
+          "D2_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.6881911387130613,
+            "possible_sessions": 124,
+            "sd": 0.05295593059122587
+          },
+          "D2_residual_ic": {
+            "defined_sessions": 119,
+            "mean": 0.024029784615552923,
+            "possible_sessions": 124,
+            "sd": 0.0836891844736055
+          },
+          "D3_neutral_ic": {
+            "defined_sessions": 119,
+            "mean": 0.024335654853309026,
+            "possible_sessions": 124,
+            "sd": 0.09030951338630816
+          },
+          "D3_neutral_ic_momentum_supported": {
+            "defined_sessions": 119,
+            "mean": 0.024326152079486494,
+            "possible_sessions": 124,
+            "sd": 0.09031193419097978
+          },
+          "D3_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.7019459995335359,
+            "possible_sessions": 124,
+            "sd": 0.051061549331059185
+          },
+          "D3_residual_ic": {
+            "defined_sessions": 119,
+            "mean": 0.026691319807263754,
+            "possible_sessions": 124,
+            "sd": 0.08258255441814508
+          },
+          "D5_neutral_ic": {
+            "defined_sessions": 119,
+            "mean": 0.02865065191065056,
+            "possible_sessions": 124,
+            "sd": 0.08923165690158913
+          },
+          "D5_neutral_ic_momentum_supported": {
+            "defined_sessions": 119,
+            "mean": 0.028302298597491626,
+            "possible_sessions": 124,
+            "sd": 0.08904428600601544
+          },
+          "D5_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.7058059979082635,
+            "possible_sessions": 124,
+            "sd": 0.04754417909244879
+          },
+          "D5_residual_ic": {
+            "defined_sessions": 119,
+            "mean": 0.024839950955588476,
+            "possible_sessions": 124,
+            "sd": 0.0817854981881452
+          },
+          "composite_rank_correlation_with_momentum": {
+            "defined_sessions": 124,
+            "mean": 0.7126947101843866,
+            "possible_sessions": 124,
+            "sd": 0.04677775275880447
+          },
+          "legacy_primary_ic_1235": {
+            "defined_sessions": 119,
+            "mean": 0.02171892857352666,
+            "possible_sessions": 124,
+            "sd": 0.07736151889142474
+          },
+          "legacy_primary_ic_1235_on_momentum_supported_population": {
+            "defined_sessions": 119,
+            "mean": 0.021725357729638795,
+            "possible_sessions": 124,
+            "sd": 0.07728638855947954
+          },
+          "legacy_primary_ic_1235_residual": {
+            "defined_sessions": 119,
+            "mean": 0.023798526350332208,
+            "possible_sessions": 124,
+            "sd": 0.06963115718312918
+          },
+          "primary_ic": {
+            "defined_sessions": 114,
+            "mean": 0.02375474397860656,
+            "possible_sessions": 124,
+            "sd": 0.07637581810279713
+          },
+          "primary_ic_on_momentum_supported_population": {
+            "defined_sessions": 114,
+            "mean": 0.023653302091413517,
+            "possible_sessions": 124,
+            "sd": 0.0762854443700537
+          },
+          "primary_ic_residual": {
+            "defined_sessions": 114,
+            "mean": 0.024364544753781768,
+            "possible_sessions": 124,
+            "sd": 0.07090791835450615
+          },
+          "spread_contribution_extreme_momentum_bps_per_session": {
+            "defined_sessions": 119,
+            "mean": 13.99718579756362,
+            "possible_sessions": 124,
+            "sd": 69.38202283630727
+          },
+          "spread_contribution_middle_momentum_bps_per_session": {
+            "defined_sessions": 119,
+            "mean": 1.4973208713932198,
+            "possible_sessions": 124,
+            "sd": 24.608215992693893
+          },
+          "spread_contribution_unknown_momentum_bps_per_session": {
+            "defined_sessions": 119,
+            "mean": -0.5102900702021077,
+            "possible_sessions": 124,
+            "sd": 2.541269284013952
+          }
+        }
+      },
+      "F14": {
+        "extreme_momentum_spread_share": 0.9148885963004094,
+        "summary": {
+          "D10_neutral_ic": {
+            "defined_sessions": 117,
+            "mean": 0.07834507312873759,
+            "possible_sessions": 127,
+            "sd": 0.10273528408510871
+          },
+          "D10_neutral_ic_momentum_supported": {
+            "defined_sessions": 117,
+            "mean": 0.07824339566602585,
+            "possible_sessions": 127,
+            "sd": 0.1042888563332403
+          },
+          "D10_rank_correlation_with_momentum": {
+            "defined_sessions": 127,
+            "mean": 0.8291789429546662,
+            "possible_sessions": 127,
+            "sd": 0.026751836195368226
+          },
+          "D10_residual_ic": {
+            "defined_sessions": 117,
+            "mean": 0.025776429019731314,
+            "possible_sessions": 127,
+            "sd": 0.07864729064277025
+          },
+          "D1_neutral_ic": {
+            "defined_sessions": 122,
+            "mean": 0.023560823656382845,
+            "possible_sessions": 127,
+            "sd": 0.08783978649796641
+          },
+          "D1_neutral_ic_momentum_supported": {
+            "defined_sessions": 122,
+            "mean": 0.02347405063922636,
+            "possible_sessions": 127,
+            "sd": 0.08835666301346688
+          },
+          "D1_rank_correlation_with_momentum": {
+            "defined_sessions": 127,
+            "mean": 0.7403254161495568,
+            "possible_sessions": 127,
+            "sd": 0.03967703981950063
+          },
+          "D1_residual_ic": {
+            "defined_sessions": 122,
+            "mean": 0.003842192283730641,
+            "possible_sessions": 127,
+            "sd": 0.06513419689426084
+          },
+          "D2_neutral_ic": {
+            "defined_sessions": 122,
+            "mean": 0.029229965885895985,
+            "possible_sessions": 127,
+            "sd": 0.09613957886197602
+          },
+          "D2_neutral_ic_momentum_supported": {
+            "defined_sessions": 122,
+            "mean": 0.028714870494286858,
+            "possible_sessions": 127,
+            "sd": 0.09669423449683506
+          },
+          "D2_rank_correlation_with_momentum": {
+            "defined_sessions": 127,
+            "mean": 0.7433695975305387,
+            "possible_sessions": 127,
+            "sd": 0.040264381753967494
+          },
+          "D2_residual_ic": {
+            "defined_sessions": 122,
+            "mean": 0.005807069840210312,
+            "possible_sessions": 127,
+            "sd": 0.07889725562823201
+          },
+          "D3_neutral_ic": {
+            "defined_sessions": 122,
+            "mean": 0.04189739514030191,
+            "possible_sessions": 127,
+            "sd": 0.09457603403992962
+          },
+          "D3_neutral_ic_momentum_supported": {
+            "defined_sessions": 122,
+            "mean": 0.041129257720786454,
+            "possible_sessions": 127,
+            "sd": 0.09560825264642088
+          },
+          "D3_rank_correlation_with_momentum": {
+            "defined_sessions": 127,
+            "mean": 0.7713771619563705,
+            "possible_sessions": 127,
+            "sd": 0.035838592108018236
+          },
+          "D3_residual_ic": {
+            "defined_sessions": 122,
+            "mean": 0.012621463808065012,
+            "possible_sessions": 127,
+            "sd": 0.07162402579117451
+          },
+          "D5_neutral_ic": {
+            "defined_sessions": 122,
+            "mean": 0.050221869917768,
+            "possible_sessions": 127,
+            "sd": 0.09966077433640691
+          },
+          "D5_neutral_ic_momentum_supported": {
+            "defined_sessions": 122,
+            "mean": 0.04950175451842325,
+            "possible_sessions": 127,
+            "sd": 0.1002377240871569
+          },
+          "D5_rank_correlation_with_momentum": {
+            "defined_sessions": 127,
+            "mean": 0.7922914691040254,
+            "possible_sessions": 127,
+            "sd": 0.03183873227412061
+          },
+          "D5_residual_ic": {
+            "defined_sessions": 122,
+            "mean": 0.014874221390703721,
+            "possible_sessions": 127,
+            "sd": 0.08058885659212559
+          },
+          "composite_rank_correlation_with_momentum": {
+            "defined_sessions": 127,
+            "mean": 0.7992578830124007,
+            "possible_sessions": 127,
+            "sd": 0.03104353043133046
+          },
+          "legacy_primary_ic_1235": {
+            "defined_sessions": 122,
+            "mean": 0.03622751365008718,
+            "possible_sessions": 127,
+            "sd": 0.07954908663116682
+          },
+          "legacy_primary_ic_1235_on_momentum_supported_population": {
+            "defined_sessions": 122,
+            "mean": 0.035704983343180736,
+            "possible_sessions": 127,
+            "sd": 0.08017041802413719
+          },
+          "legacy_primary_ic_1235_residual": {
+            "defined_sessions": 122,
+            "mean": 0.009286236830677422,
+            "possible_sessions": 127,
+            "sd": 0.06221898556794705
+          },
+          "primary_ic": {
+            "defined_sessions": 117,
+            "mean": 0.05873552528633054,
+            "possible_sessions": 127,
+            "sd": 0.08670529728661971
+          },
+          "primary_ic_on_momentum_supported_population": {
+            "defined_sessions": 117,
+            "mean": 0.058376459097485005,
+            "possible_sessions": 127,
+            "sd": 0.08726993642742564
+          },
+          "primary_ic_residual": {
+            "defined_sessions": 117,
+            "mean": 0.01764370188981438,
+            "possible_sessions": 127,
+            "sd": 0.06645048321550993
+          },
+          "spread_contribution_extreme_momentum_bps_per_session": {
+            "defined_sessions": 122,
+            "mean": 26.774298899303204,
+            "possible_sessions": 127,
+            "sd": 105.51992945023795
+          },
+          "spread_contribution_middle_momentum_bps_per_session": {
+            "defined_sessions": 122,
+            "mean": 3.098856474593526,
+            "possible_sessions": 127,
+            "sd": 24.48732291631968
+          },
+          "spread_contribution_unknown_momentum_bps_per_session": {
+            "defined_sessions": 122,
+            "mean": -0.6080634189067317,
+            "possible_sessions": 127,
+            "sd": 4.840701301226589
+          }
+        }
+      }
+    },
+    "selection_weight": 0,
+    "summary": {
+      "D10_neutral_ic": {
+        "defined_sessions": 345,
+        "mean": 0.03631292243196053,
+        "possible_sessions": 375,
+        "sd": 0.09979440367413718
+      },
+      "D10_neutral_ic_momentum_supported": {
+        "defined_sessions": 345,
+        "mean": 0.03698970824085232,
+        "possible_sessions": 375,
+        "sd": 0.10101450990732214
+      },
+      "D10_rank_correlation_with_momentum": {
+        "defined_sessions": 375,
+        "mean": 0.7838306867388883,
+        "possible_sessions": 375,
+        "sd": 0.05512746367709662
+      },
+      "D10_residual_ic": {
+        "defined_sessions": 345,
+        "mean": 0.01056098373227837,
+        "possible_sessions": 375,
+        "sd": 0.08025036280152748
+      },
+      "D1_neutral_ic": {
+        "defined_sessions": 360,
+        "mean": 0.01665758020791714,
+        "possible_sessions": 375,
+        "sd": 0.09629068201043535
+      },
+      "D1_neutral_ic_momentum_supported": {
+        "defined_sessions": 360,
+        "mean": 0.016886329996631175,
+        "possible_sessions": 375,
+        "sd": 0.0966446954809309
+      },
+      "D1_rank_correlation_with_momentum": {
+        "defined_sessions": 375,
+        "mean": 0.7066373641646927,
+        "possible_sessions": 375,
+        "sd": 0.051106430176165694
+      },
+      "D1_residual_ic": {
+        "defined_sessions": 360,
+        "mean": 0.008982376189004087,
+        "possible_sessions": 375,
+        "sd": 0.07496954212017992
+      },
+      "D2_neutral_ic": {
+        "defined_sessions": 360,
+        "mean": 0.02261970481398104,
+        "possible_sessions": 375,
+        "sd": 0.10051247686086925
+      },
+      "D2_neutral_ic_momentum_supported": {
+        "defined_sessions": 360,
+        "mean": 0.022918482202093103,
+        "possible_sessions": 375,
+        "sd": 0.10097082379271473
+      },
+      "D2_rank_correlation_with_momentum": {
+        "defined_sessions": 375,
+        "mean": 0.7113150675379446,
+        "possible_sessions": 375,
+        "sd": 0.050797060175655044
+      },
+      "D2_residual_ic": {
+        "defined_sessions": 360,
+        "mean": 0.014294331361792123,
+        "possible_sessions": 375,
+        "sd": 0.0818521216967837
+      },
+      "D3_neutral_ic": {
+        "defined_sessions": 360,
+        "mean": 0.02796569457233507,
+        "possible_sessions": 375,
+        "sd": 0.09760923191526868
+      },
+      "D3_neutral_ic_momentum_supported": {
+        "defined_sessions": 360,
+        "mean": 0.028098212481599244,
+        "possible_sessions": 375,
+        "sd": 0.09838305932428981
+      },
+      "D3_rank_correlation_with_momentum": {
+        "defined_sessions": 375,
+        "mean": 0.7351088469162997,
+        "possible_sessions": 375,
+        "sd": 0.050359511640264594
+      },
+      "D3_residual_ic": {
+        "defined_sessions": 360,
+        "mean": 0.016142537309039747,
+        "possible_sessions": 375,
+        "sd": 0.07799355095500206
+      },
+      "D5_neutral_ic": {
+        "defined_sessions": 360,
+        "mean": 0.033069295718875964,
+        "possible_sessions": 375,
+        "sd": 0.09908850335488265
+      },
+      "D5_neutral_ic_momentum_supported": {
+        "defined_sessions": 360,
+        "mean": 0.03319571439592354,
+        "possible_sessions": 375,
+        "sd": 0.09937767884306535
+      },
+      "D5_rank_correlation_with_momentum": {
+        "defined_sessions": 375,
+        "mean": 0.7517535781564421,
+        "possible_sessions": 375,
+        "sd": 0.05194965968290415
+      },
+      "D5_residual_ic": {
+        "defined_sessions": 360,
+        "mean": 0.016462509308535395,
+        "possible_sessions": 375,
+        "sd": 0.07840993227861363
+      },
+      "composite_rank_correlation_with_momentum": {
+        "defined_sessions": 375,
+        "mean": 0.7589350309801242,
+        "possible_sessions": 375,
+        "sd": 0.05145107428112145
+      },
+      "legacy_primary_ic_1235": {
+        "defined_sessions": 360,
+        "mean": 0.025078068828277306,
+        "possible_sessions": 375,
+        "sd": 0.08346792730640498
+      },
+      "legacy_primary_ic_1235_on_momentum_supported_population": {
+        "defined_sessions": 360,
+        "mean": 0.025274684769061768,
+        "possible_sessions": 375,
+        "sd": 0.08389434359677868
+      },
+      "legacy_primary_ic_1235_residual": {
+        "defined_sessions": 360,
+        "mean": 0.013970438542092838,
+        "possible_sessions": 375,
+        "sd": 0.06659199417499143
+      },
+      "primary_ic": {
+        "defined_sessions": 345,
+        "mean": 0.03358807804107964,
+        "possible_sessions": 375,
+        "sd": 0.08575337885702741
+      },
+      "primary_ic_on_momentum_supported_population": {
+        "defined_sessions": 345,
+        "mean": 0.034048206450573645,
+        "possible_sessions": 375,
+        "sd": 0.08625571315239763
+      },
+      "primary_ic_residual": {
+        "defined_sessions": 345,
+        "mean": 0.014643633767964487,
+        "possible_sessions": 375,
+        "sd": 0.06829729655207845
+      },
+      "spread_contribution_extreme_momentum_bps_per_session": {
+        "defined_sessions": 360,
+        "mean": 18.557526865115182,
+        "possible_sessions": 375,
+        "sd": 90.8749341344356
+      },
+      "spread_contribution_middle_momentum_bps_per_session": {
+        "defined_sessions": 360,
+        "mean": 3.1533110970786464,
+        "possible_sessions": 375,
+        "sd": 25.196768015264073
+      },
+      "spread_contribution_unknown_momentum_bps_per_session": {
+        "defined_sessions": 360,
+        "mean": -0.24909523651779938,
+        "possible_sessions": 375,
+        "sd": 3.593565338136743
+      }
+    }
+  },
+  "refitted": false,
+  "research_claim": true,
+  "test_accessed": false,
+  "transfer_chronology_clean": true
+}

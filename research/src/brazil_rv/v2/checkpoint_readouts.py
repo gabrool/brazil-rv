@@ -18,9 +18,25 @@ from .research_diagnostics import momentum_diagnostics, pooled_momentum_diagnost
 
 def candidate_readout(paths: dict[str, Path]) -> dict:
     series = {}
+    economics_coverage = {}
     for fold, path in paths.items():
         saved = rr._read_json(path / "daily_readouts.json")
         report = rr._read_json(path / "evaluation.json")
+        summary = report["economics"]["headline"]
+        economics_coverage[fold] = {
+            "economics_unresolved": summary["economics_unresolved"],
+            "sessions": len(saved["dates"]),
+            "terminal_unresolved_inventory_fraction_nav": summary[
+                "terminal_unresolved_inventory_fraction_nav"
+            ],
+            "terminal_hedge_signed_notional": summary["terminal_hedge_signed_notional"],
+            "unresolved_receivable": summary["unresolved_receivable"],
+            "unresolved_payable": summary["unresolved_payable"],
+            "terminal_no_print_dominates": summary["terminal_no_print_dominates"],
+            "terminal_settlement_economics_unresolved": summary[
+                "terminal_settlement_economics_unresolved"
+            ],
+        }
         fields = saved["series"]
         # These are descriptive projections of the retained report, never a replay
         # or a mutation of an already accepted CPU cell.
@@ -51,6 +67,17 @@ def candidate_readout(paths: dict[str, Path]) -> dict:
     }
     labels = tuple(next(iter(values.values())))
     return {
+        "economics_coverage": {
+            "by_fold": economics_coverage,
+            "unresolved_folds": [
+                f
+                for f, row in economics_coverage.items()
+                if row["economics_unresolved"]
+            ],
+            "pooling_rule": "existing_rule_excludes_whole_unresolved_folds_without_filling_or_revaluing",
+            "interpretation": "resolved_fold_economics_only_when_any_fold_is_unresolved",
+        },
+        "turnover_note": "includes_initial_and_terminal_book_trades; unchanged_non_circular_block_intervals_underweight_boundary_spikes",
         "pooled": {
             key: rr._folded_bootstrap(tuple(row[key] for row in values.values()))
             for key in labels
@@ -128,6 +155,8 @@ def paired_readouts(context, paths: dict[str, dict[str, Path]], output: Path) ->
 
 def gbdt_diagnostics(root: Path) -> str:
     implementation = rr._git_identity()
+    if (root / "checkpoint_diagnostics.json").exists():
+        raise FileExistsError(root / "checkpoint_diagnostics.json")
     if (
         rr._read_json(root / "checkpoint_cpu_result.json")["status"]
         != "cpu_rebaseline_complete"
