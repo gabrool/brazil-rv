@@ -5,8 +5,9 @@ The approved six-field amendment is committed as `a25ae45`. **Round 1 completed:
 See [the full before/after report](v2_PASS5_REBASELINE.md).
 Round 2 stopped before its first new evaluation on the unregistered decoded
 `history_age_sessions` input hash. All 12 panels' quality-stratification fields
-still match exactly. [The proposed one-field provenance amendment](v2_PASS5_ROUND2_STOP.md)
-is documented but not applied; pass-5 section 6 requires explicit approval.
+still match exactly. [The one-field provenance amendment](v2_PASS5_ROUND2_STOP.md)
+was explicitly approved in the next user instruction and is now registered before
+a fresh Round-2 replay. The decoder and all protected quality fields remain unchanged.
 The original six-field stop remains [immutable historical evidence](v2_PASS5_REPLAY_STOP.md).
 
 The prior cleanup is committed separately as `fb6fc92`; the initial rev-4f

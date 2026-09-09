@@ -157,7 +157,7 @@ def test_replay_projection_requires_declared_diagnostics_and_preserves_score_fie
     }
 
 
-def test_replay_exemptions_cannot_hide_score_or_outcome_mutations() -> None:
+def test_replay_exemptions_cannot_hide_score_outcome_or_quality_mutations() -> None:
     candidate, _ = _evaluation_pair()
     old = candidate.result.report
     corrected = copy.deepcopy(old)
@@ -172,6 +172,9 @@ def test_replay_exemptions_cannot_hide_score_or_outcome_mutations() -> None:
         changed = copy.deepcopy(corrected)
         changed["input_hashes"][key] = "b" * 64
         assert _ledger_replay_non_ledger_projection(changed) != original_projection
+    changed = copy.deepcopy(corrected)
+    changed["quality_and_coverage_stratification"]["rows"][0]["used_name_days"] += 1
+    assert _ledger_replay_non_ledger_projection(changed) != original_projection
 
 
 def test_registration_protocol_requires_ineligible_hold_sessions(

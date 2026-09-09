@@ -2569,3 +2569,11 @@ recomputed_input_hashes, keeping all diagnostic/score-derived identity checks.
 It is not applied without separate approval under the user's pass-5 §6 stop.
 Round-2 rev4f conclusions, execution sweep, coverage repair, rebuild, acceptance
 and Round 1' remain unrun. No protected-date payload or paid instance was accessed.
+
+The user subsequently approved exactly the `history_age_sessions` provenance-hash
+amendment in `v2_pass5_round2_stop_approval.md`. The executable list and registration
+are amended before a fresh Round-2 freeze, without changing the decode formula,
+validity mask, source identities or protected diagnostic comparisons. The new
+manifest protocol states that the current decode is unrounded. Natural-type
+canonicalisation, specifically `np.rint` and an integer hash for history age, is
+registered for Round 1' on the rebuilt store; it is not active in these replays.

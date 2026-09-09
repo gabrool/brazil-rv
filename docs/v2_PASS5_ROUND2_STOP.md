@@ -46,7 +46,7 @@ The same fold-specific hashes apply to A, B, GBDT and ensemble:
 | F2 | `b39666f41506291758daa83ab17f4fd481220f6c8dd8c60d354ab04b19ac514e` | `85e549f58305093cd2fb9c9dbc2cf5d3e3b631eb670b248d3fa634f624d5deab` |
 | F3 | `c2540a7a12cc2ccf489fea75ad70bc6a92e2be7c8c4b2f9424e9d8b9fc05b53f` | `4bfbbf10901dd83887f74590ac6a311ac27a5780fe27c24ddb5a25dfd5cc85dd` |
 
-## Proposed amendment, not applied
+## Amendment subsequently approved
 
 Add exactly **`history_age_sessions`** to the rev4f `recomputed_input_hashes` list.
 It is a decoded diagnostic provenance array, not a model input or outcome. Keep
@@ -54,14 +54,17 @@ the source-store identity, formula and every quality/score-derived field unchang
 Do not add anything to `recomputed_diagnostics`, round the decoded ages, or weaken
 the protected-field comparison. Report the old/new hash explicitly.
 
-If approved, commit that exact registration/code-list amendment, freeze a fresh
+The user explicitly approved this exact amendment in
+`v2_pass5_round2_stop_approval.md`. Commit the registration/code-list amendment, freeze a fresh
 Round-2 root, and rerun its 12 sealed panels. The completed Round-1 root remains
 valid under its own frozen registration and does not need another replay. Preserve
 this stopped root unchanged. Any further protected-field difference still stops.
 
-This is a separate amendment from the six lending fields already approved; it has
-not been inferred from that approval. The user-supplied pass-5 section 6 stop is
-the reason explicit approval is requested.
+This was a separate amendment from the six lending fields already approved; it
+was not inferred from that earlier approval. The user-supplied pass-5 section 6
+required the stop. The explicit new approval now authorizes continuation.
+Nearest-integer history-age canonicalisation is registered for Round 1' on the
+rebuilt store only; it is not applied to this replay.
 
 ## Immutable evidence
 

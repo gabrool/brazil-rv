@@ -1034,10 +1034,11 @@
     "add_to_recomputed_input_hashes": [
       "history_age_sessions"
     ],
+    "approval_source": "user-provided v2_pass5_round2_stop_approval.md",
     "continuation": "new clean-commit frozen Round-2 replay root; preserve this stopped root; retain completed Round-1 replay",
     "no_change_to_recomputed_diagnostics": true,
     "remaining_protected_projection_must_stay_bit_identical": true,
-    "status": "not_applied_pending_explicit_approval"
+    "status": "subsequently_explicitly_approved_registered_before_fresh_round2_replay"
   },
   "research_claim": false,
   "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4f_a25ae45_20260908T233834Z",

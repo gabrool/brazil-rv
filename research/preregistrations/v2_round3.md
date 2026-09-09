@@ -34,6 +34,14 @@ All pass-5 stops remain binding: D1-D5 defects or hard bounds, failed causality,
 unregistered replay differences, changes to untouched store families, measured
 memory above 8 GiB, protected-date access, or unauthorized paid work.
 
+For Round 1' on the rebuilt store, decoded history age is canonicalised with
+`np.rint` to integer sessions after the existing inverse transform; its validity
+mask is unchanged and its hash covers canonical integers. Check raw-versus-canonical
+age stratification against the current store before that freeze. More generally,
+hash decoded diagnostic provenance after canonicalisation to its natural type;
+model inputs, targets and scores remain hashed exactly as stored. This future rule
+is inactive for rev4f and the R3.1 replays of its sealed panels.
+
 ## Operational authority and closing order
 
 Use the locations and launcher from the user's `Work in CBrazil-RV..txt`, verified

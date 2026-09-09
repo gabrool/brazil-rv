@@ -217,6 +217,7 @@ RECOMPUTED_INPUT_HASHES = (
     "hedge_beta_history_valid",
     "initial_hedge_reference_price",
     "initial_unresolved_action",
+    "history_age_sessions",
 )
 
 
@@ -243,6 +244,11 @@ def registration_protocol_from_code() -> dict[str, object]:
         },
         "recomputed_diagnostics": list(RECOMPUTED_DIAGNOSTICS),
         "recomputed_input_hashes": list(RECOMPUTED_INPUT_HASHES),
+        "history_age_decoding": {
+            "formula": "expm1(clip(stored,0,1)*log1p(252))",
+            "validity": "unchanged_slow_valid",
+            "canonicalisation": "none_for_rev4f_sealed_panel_replays",
+        },
         "borrow_daily_accrual": "expm1(log1p(annual_rate)/252); fee separately",
         "cost_grid": {
             "cost_bps": [2, 4, 7],
@@ -3891,7 +3897,8 @@ def _evaluation_from_artifacts(
         differing = sorted(
             key
             for key in set(recorded) | set(rebuilt_hashes)
-            if recorded.get(key) != rebuilt_hashes.get(key)
+            if key not in allowed_changes
+            and recorded.get(key) != rebuilt_hashes.get(key)
         )
         raise ValueError(
             "evaluation inputs no longer match score/store artifacts: "
