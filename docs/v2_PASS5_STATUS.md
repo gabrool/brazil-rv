@@ -175,6 +175,9 @@ Targeted model/training/scoring tests passed (66); further tests cover the six-s
 roster, paired handoffs, per-horizon populations and inclusive decision thresholds.
 Logging preserves exact SAM updates, RNG and canonical score bytes. No paid
 instance has been launched at this point.
+The complete Round-3 finalizer also passes a synthetic artifact test covering all
+24 aggregate books, 27 fine-tune diagnostics, matched P identities, the momentum
+comparator's distinct score mask, paired deltas, and the final sealed inventory.
 
 Validation before replay: Ruff and compilation pass; the full research suite passed
 908 tests in 467.91 seconds. The final focused run passed 100 tests, including
