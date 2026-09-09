@@ -117,8 +117,9 @@ tables exactly, then stopped in the first inverse-sigma cell on 32 D4 flags in
 GBDT/F1's open-borrow scenario. A stale partial exit in one overweight name was
 incorrectly vetoing unrelated valid-size entries. The minimal candidate-specific
 name-cap correction is prepared and passes 151 targeted tests. The stopped root,
-trace and partial results are [reported here](v2_R31_D4_STOP.md); the explicit
-section-6 stop remains pending review before a fresh sweep. No policy was selected.
+trace and partial results are [reported here](v2_R31_D4_STOP.md). The user explicitly
+approved the tested correction and a fresh R3.1 restart; the effective registration
+records it. No policy was selected from the stopped partial grid.
 After the sweep: intraday coverage repair, one development-only store build,
 16-book acceptance, Round 1' CPU, then stop for the user's GPU go.
 

@@ -2662,3 +2662,9 @@ The already observed inverse-sigma cell is descriptive: B-minus-current net is
 -1.0778 [-4.4437,1.6941]. No adoption decision follows from an incomplete grid.
 All original inputs/reports and both source inventories remain exact. No store
 rebuild, new fit, protected-date payload or paid instance was accessed.
+
+The user subsequently explicitly approved correction `1d19da2` and a fresh R3.1
+restart. The effective registration now specifies candidate-specific name-cap
+enforcement with unchanged aggregate limits and pending-inventory reporting.
+The stopped root and diagnostic stay immutable; baseline identity is checked again
+before any new policy cell.

@@ -28,8 +28,9 @@ The fixture also checks that the old overweight inventory and its unfilled
 partial exit remain in the book. The corrected sweep has not been run.
 All 151 targeted ledger, evaluator, research-round and policy tests pass; Ruff is clean.
 
-Pass-5 section 6 explicitly stops on any D1-D5 flag. Continue only after this
-correction is reviewed and registered, using a fresh freeze. No partial grid
+Pass-5 section 6 explicitly stops on any D1-D5 flag. The user explicitly approved
+the tested correction in `1d19da2` and a fresh R3.1 restart. The effective Round-3
+registration now records it; the stopped root remains immutable. No partial grid
 may select a policy.
 
 ## Observed scope

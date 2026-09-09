@@ -166,6 +166,7 @@
       "security_id": "BRBBDCACNOR1"
     }
   ],
+  "approved_correction_commit": "1d19da29e3ad5dd0f9ccf50ed3792ecfdbaffd11",
   "baseline_panels_exact": 12,
   "baseline_scenario_daily_tables_exact": 48,
   "completed_panel_count": 18,
@@ -687,6 +688,7 @@
   "proposed_fix": "Check each entry candidate against its own 5% name cap; keep book-wide gross/net limits, pending exits and all held exposure reporting.",
   "protected_inputs_exact": true,
   "raw_scores_recomputed": false,
+  "restart_authorized": true,
   "roots": {
     "exact_failure_diagnosis": {
       "exact_inventory_verified": true,
@@ -982,6 +984,6 @@
   ],
   "scenario_count": 75,
   "source_inventories_still_exact": true,
-  "status": "stopped_pending_D4_review",
+  "status": "stopped_root_preserved_correction_approved",
   "test_accessed": false
 }

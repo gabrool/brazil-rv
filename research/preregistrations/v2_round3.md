@@ -79,6 +79,14 @@ normalization, bounded by the remaining side budget. Existing holdings are not
 resized daily. Missing/nonpositive sigma for an entry candidate is a stop, not a
 silent universe exclusion or fallback. Future sigma cannot affect earlier orders.
 
+Following the sealed `29fb045` D4 stop, the user explicitly approved the correction
+in `1d19da2`: apply the unchanged 5% entry name cap to the candidate's own proposed
+weight. An unrelated held name may remain overweight while its risk exit awaits
+a print; this cannot veto otherwise valid entries. Aggregate gross/net limits,
+held concentration diagnostics, risk exits and the D4 counter remain unchanged.
+The failing old root and exact-failure trace are immutable. A fresh committed
+freeze applies this correction and first rechecks all 48 baseline daily tables.
+
 The buffer follow-ups use the best Arm-B paired net-excess point among the first
 18 cells, regardless of qualification, with grid order resolving exact ties.
 Both use that same cell on all four candidates. Reference buffer 30 fixes quota
