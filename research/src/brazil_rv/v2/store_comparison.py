@@ -14,6 +14,47 @@ from .contract import DEVELOPMENT_END, HORIZONS
 from .store import open_store_for_dates, peak_rss_bytes
 
 
+def monthly_coverage(store, dates: np.ndarray) -> list[dict[str, object]]:
+    """Feature and family coverage on the causal active universe, month by month."""
+    months = dates.astype("datetime64[M]")
+    rows = []
+    for family, features in store.manifest["feature_names"].items():
+        key = f"{family}_valid"
+        if key not in store.manifest["arrays"]:
+            continue
+        for month in np.unique(months):
+            indices = np.flatnonzero(months == month)
+            active = store.read("active", indices).astype(bool)
+            valid = store.read(key, indices).astype(bool) & active[..., None]
+            denominator = int(active.sum())
+            counts = valid.sum(axis=(0, 1))
+            rows.append(
+                {
+                    "family": family,
+                    "month": str(month),
+                    "sessions": len(indices),
+                    "active_name_days": denominator,
+                    "feature_count": len(features),
+                    "any_feature_valid_name_days": int(valid.any(axis=-1).sum()),
+                    "mean_feature_coverage": float(
+                        counts.sum() / (denominator * len(features))
+                    )
+                    if denominator and features
+                    else None,
+                    "features": {
+                        name: {
+                            "valid_name_days": int(count),
+                            "fraction": float(count / denominator)
+                            if denominator
+                            else None,
+                        }
+                        for name, count in zip(features, counts, strict=True)
+                    },
+                }
+            )
+    return rows
+
+
 def registered_change(name: str) -> bool:
     return (
         name.startswith(
@@ -132,6 +173,13 @@ def compare(*, previous: Path, current: Path, output: Path) -> dict[str, object]
                 ),
                 flush=True,
             )
+        # Releasing mappings before the coverage pass bounds audit RSS too.
+        old.close()
+        new.close()
+        new, _ = open_store_for_dates(
+            current, rows, purpose="evaluation", verify_hashes=False
+        )
+        coverage = monthly_coverage(new, dates)
         build_metadata = new.manifest["metadata"]
         result = {
             "schema": "BRAZIL_RV_V2_BOUNDED_STORE_COMPARISON",
@@ -165,6 +213,7 @@ def compare(*, previous: Path, current: Path, output: Path) -> dict[str, object]
         new.close()
     output.mkdir(parents=True, exist_ok=False)
     write_json_atomic(output / "comparison.json", result)
+    write_json_atomic(output / "monthly_feature_coverage.json", coverage)
     write_json_atomic(output / "artifact_inventory.json", inventory(output))
     return result
 
