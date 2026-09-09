@@ -1,188 +1,65 @@
 # Pass-5 implementation status
 
-Both rev4f replays completed and are sealed: **18 Round-1 panels and 12 Round-2
-panels, all protected fields bit-identical, headline gates passed**. See the
-[Round-1 report](v2_PASS5_REBASELINE.md) and
-[Round-2 report](v2_PASS5_ROUND2_REBASELINE.md). The six lending fields and the
-single history-age provenance hash were explicitly approved in separate amendments.
-The unrounded history-age decoder and all quality-stratification fields remain
-unchanged. Both earlier stopped roots remain immutable historical evidence.
+The repaired store, fresh 16-book acceptance and Round 1' are complete. The next
+stage is the registered GH200 Round-3 experiment. The user's autonomous authority
+remains active, including recommended resolutions, efficient GH200 use, verified
+host recovery and exact-instance termination. No paid instance has been launched
+as of this CPU report.
 
-Arm B remains the network choice and the ensemble remains the overall designation.
-The CPU execution sweep is complete. The user clarified that the
-liquidity readout attributes the original trades, without replacement names.
-Nearest-integer history-age canonicalisation is registered for Round 1' on the
-rebuilt store, not the sealed-panel replays.
+Completed evidence:
 
-The user subsequently authorized autonomous completion while absent, including
-the recommended resolution of questions and the GH200 stage after successful CPU
-checks. The effective Round-3 registration records that authority, the unchanged
-holdout boundary, and the required artifact-copy/termination sequence.
+- [Round-1 rev4f replay](v2_PASS5_REBASELINE.md): 18 sealed panels, protected fields
+  exact, corrected economic-beta/notional/action timing and headline gates passed.
+- [Round-2 rev4f replay](v2_PASS5_ROUND2_REBASELINE.md): 12 sealed panels, protected
+  fields exact. Arm B remains the network and the ensemble the overall designation.
+- [R3.1](v2_R31_EXECUTION_SWEEP.md): 240 panels / 960 ledgers, zero D1-D5 flags,
+  all 48 baseline daily tables exact. Adopt theta 1, D3/D5/D10, equal notional and
+  buffer 9 per quintile, explicitly labelled selected in sample.
+- [Intraday archive audit](v2_INTRADAY_COVERAGE.md): causal return consistency,
+  completed-session action clocks, observed-support windows, true ages, and
+  M1-internal to-close endpoints. Sparse archive gaps remain unknown.
+- [Repaired store](v2_REBUILT_STORE.md): 3,717 sessions / 933 ISINs through
+  2024-12-30, full-build peak 6.7059 GiB. Untouched arrays match the historical
+  authorized slice; the endpoint-dependent audit survival flag reconstructs exactly.
+  The independent 20-by-20 native-fast audit has zero value/mask error. Lending v2
+  and re-derived oddlot publication masks reproduce independently. Monthly coverage
+  is reported for all materialized families. The rebuilt economic-beta arrays are
+  byte-identical to rev4f.
+- [Fresh acceptance](v2_ACCEPTANCE_REBUILT.md): all 16 books pass and 75 legacy
+  control ICs are exact. F3 inverse-volatility and reversal/momentum-blend economics
+  remain unresolved under the registered terminal-settlement rule.
+- [Round 1'](v2_ROUND1_PRIME.md): all 21 panels pass. Intraday-minus-slow neutral IC
+  is -0.004836 [-0.009128, 0.001347]; paired net is -0.874 [-5.439, 7.458] bps/day.
+  The repair has not demonstrated a GBDT improvement. Keep the registered
+  `b_intraday` parent; this does not reopen rung selection.
 
-The intraday repair is implemented for the archive coverage audit: return rather
-than level consistency, separate daily/intraday action clocks, observed-support
-rolling estimators and their metadata, M1-internal to-close endpoints, bounded
-source decoding, and preserved canonical identity metadata. Ninety focused tests
-pass, including joined builder causality and provider invariance. Both existing
-production-axis memory tests passed. Real-data coverage and the new store build
-have now reached archive coverage: see [the 2024 table](v2_INTRADAY_COVERAGE.md).
-Coverage restores previously absent overnight/lagged-return fields at 2.17 GiB
-peak RSS. The combined store and repaired-model runs remain pending.
+The initial cleanup, including removal of retired daily-swing and GBDT code, is
+included in main through commit fb6fc92. Subsequent changes remove duplicate
+reader payload scans and per-row calendar construction. The latest reader and
+comparison changes pass 51 targeted tests and Ruff. Earlier model/diagnostic tests
+verify exact SAM updates, RNG and score bytes with logging enabled. The complete
+Round-3 synthetic finalizer test covers 24 books, 27 fine-tune diagnostics, matched
+P checkpoints, paired populations, comparator masks and the sealed inventory.
 
-The bounded odd-lot derivation reuses the validated annual COTAHIST parser,
-retains exact ISIN identity and raw BRL volumes, and publishes on the next session.
-The new lending archive's `annual_taker_rate` is consumed directly in decimal
-units. The independent native-fast audit also filters its raw M1 date range before
-decoding. Thirty-two targeted sidecar/archive/native-fast tests pass.
-The odd-lot archive is complete (1,253,007 rows, 0.413 GiB peak RSS).
+Historical integrity-only reader scans included later old-store ages/masks and
+action/reference-price values. No held-out fitting or performance evaluation ran,
+but literal earlier no-payload-access statements require this qualification.
+[The disclosure and correction](v2_store_comparison_stop_evidence.json) preserve
+the original evidence and sealed flags. Corrected readers verify sealed hashes
+and headers, then decode payload only through date-bound access. The official
+performance read-once rule remains unexercised in this pass.
 
-The combined store build is running from a clean isolated checkout. Its source
-calendar bytes now retain the original audited LF identity on Windows as well.
-Future evaluations explicitly consume the sealed R3.1 policy and record the traded
-composite separately from raw model readouts. Round 1' runs the two requested
-GBDT feature sets with a fixed `b_intraday` parent. The five history-age threshold
-corrections are documented in [the exact evidence](v2_history_age_canonical_evidence.json).
-The policy integration passed 107 evaluation/execution/validation/research tests;
-four focused adapter cases also verify canonical age decoding and validity.
+The effective [Round-3 registration](../research/preregistrations/v2_round3.md)
+still calls for two serial smokes, six fresh Stage-P seeds, 18 Arm-B fine-tunes and
+nine matched fast-off fine-tunes. No old-store P checkpoint is reused. Report
+per-horizon ablation, six-versus-three seeds, gate activations, branch gradients,
+all economics scenarios and the 2025 decision rule without exercising it. Complete
+host copying and all-file SHA-256/exact-set verification precede termination of
+the exact recorded GH200 ID, followed by two absence checks.
 
-The prior cleanup is committed separately as `fb6fc92`; the initial rev-4f
-registration was committed as `0302b27` before new derived beta output.
-The rev-4e registration is retained verbatim inside
-[the rev-4f amendment](../research/preregistrations/v2_round1_round2_rev4f.md).
-Its rev-4f JSON block includes the clarified order, action and replay contracts.
-
-## Implemented and exercised
-
-- Economic BOVA11 beta: intercept OLS on 60 completed sessions ending t-1,
-  minimum 40 adjacent valid return pairs, Blume 0.67/0.33, clipping to [-1, 3].
-  Neither missing equity observations nor BOVA11 gaps are bridged.
-- Hash-bound derived beta arrays, masks, date/security axes, source-store identity,
-  BOVA11 identity, implementation hash and annual distributions. Requests for
-  2025/2026 are refused before payload access.
-- Ledger arguments `hedge_beta` and `hedge_beta_valid` replace the model-feature
-  argument. Fallback uses the last valid beta for at most 20 sessions, then 1.0.
-  The adapter supplies the preceding 20 sessions at a fold boundary. Missing beta
-  no longer excludes a name from entry selection. Fallback sessions are reported.
-- Hedge notionals are fixed before current-session prints. The target uses held
-  prior marks, pending/planned entries and planned exits; threshold and cap use
-  prior NAV. BOVA11 prior close records the reference. Hedge orders, fills and missed-print
-  cancellations are recorded. Execution imbalance is carried to the next decision.
-- Conditional last-mark settlement intentions are also fixed before a possible
-  final print, then expire if a print makes settlement unnecessary. The ten-session
-  convention and accounting fixtures are retained.
-- Pending entries leaving their current-quintile side retention band cancel with
-  reason `band_exit`; the switch-off fixture retains the previous slot behavior.
-- Equity borrow, registration fee and hedge borrow use separate compounded daily
-  accrual. The nine cost/availability cases all preserve headline construction:
-  2/4/7 bps by balance/strict/open. The 4-bps rows retain the canonical
-  `borrow_balance`, `borrow_strict`, `borrow_open` names without duplicate runs.
-  The unused unhedged legacy-strategy grid and its annual-rate label are removed.
-- Extracted diagnostic slow fields respect `slow_valid`. Realized beta against
-  BOVA11 is reported alongside the unchanged equal-weight-universe diagnostic.
-  Evaluation schema is V16; new freeze/validation commands require beta bindings.
-
-The example in Â§1.1 contains an arithmetic typo: for notionals (-1,+1) and raw
-betas (1,1.2), the hedge is -0.20 NAV; Blume betas (1,1.134) imply **-0.134**,
-not -0.194. The specified formula is implemented and tested.
-
-## Derived artifact
-
-Root: `D:\quant-data\b3\processed\v2_hedge_beta_rev4f_20260908T225248Z`
-
-Manifest SHA-256:
-`f5fa41536740ca412550cb81d2b44c9541e338dc060d674ab8ea270edd7be712`
-
-Source store:
-`v2_daily_store_8021e42_20260906T202315Z`,
-manifest `deb9ca8449c5b9a83bf25ac19218069c006e183361b6f6ba836717ade63b491b`.
-
-Source BOVA11 manifest:
-`858c6fb07e234d8c28219a72efa29775d83ba334f9b457ed24317ab7d270544d`.
-
-The sidecar spans 3,717 sessions, 2010-01-04 through 2024-12-30, and 933 ISINs.
-It has 986,957 valid name-days. During 2024, 46,601 of 46,627 active name-days
-are valid (99.94%). Median beta is 1.05315; 80.08% of valid active observations
-are in [0.5, 1.5]. The 5th/95th percentiles are 0.57235/1.93712.
-[Full manifest and annual distributions](v2_pass5_hedge_beta_evidence.json)
-are copied into Git for review. This is input-only evidence, not a measured
-change in model edge. The canonical store and sealed results were not rewritten.
-
-## Clarifications implemented; both replays completed
-
-The joined inferred-action builder -> evaluator -> ledger causality test passes:
-changing only the event-day close changes inferred cash terms but no event-day
-intention. Entries and ordinary hedge trades carry notionals. Exits, trims and
-terminal liquidations carry position fractions of converted opening inventory.
-Partial fractions rebase after fills and survive conversions. Terminal liquidation
-supersedes a still-partial trim. Same-day action cancellations and round-lot sizing
-are removed; only prior-session uncertainty may block or cancel entries.
-
-The adapter supplies the previous session's uncertainty at a fold boundary. The
-registration declares recomputed diagnostics/provenance, requires their presence,
-reports before/after and preserves all other identities. Round 1 and Round 2 have
-CPU replay commands that reuse sealed panels. Replays stop on invariant differences,
-D1-D5 defects, mean gross outside [1.5,2.25], or mean unresolved/stale inventory >=2%.
-The explicit notional rule supersedes the impossible requirement for unchanged
-fixed-share economics when the fill price differs from the reference price.
-
-Round 2 is recovered locally and fully hash-verified; see
-[v2_round2_host_copy_evidence.json](v2_round2_host_copy_evidence.json).
-No paid instance was required. The first reversal_5/F1 replay stopped on six
-unregistered high-volatility lending-coverage fields. The user approved that exact
-amendment, and a fresh Round-1 replay completed under it. Its result SHA-256 is
-`415aae05aed3df1a21f20d87fbe2b06827df0fec317af58b4bf0f8a84ae35839`;
-inventory `9940b01076677f19ea8dbf1cca0af2991e2899494e491c92d666d0ceb0c7aafb`.
-Round 2 was frozen under the same commit and stopped at its input-identity check,
-before any new evaluation. The stopped inventory is
-`9d90d85129368f571eb6daf43185eb35aad945e90e1e46f63df36248898d7ef6`.
-The subsequent approved fresh replay completed under `564efc8`. Its result hash is
-`808369c99b14eebcf3d6f55d67b888c8a2e4cb536965f21adae9c17d282d25a6`;
-inventory `0f8b3bb6116c0fe285671fd77666fa50ea9690d8ca707a70d3ba3c5dd69767f6`.
-The R3.1 runner is implemented. Its first baseline panel stopped because the
-supplied missing-score carry changed theta=1 risk-trim decisions. A baseline-only
-isolation exactly reproduced the sealed book when carry was disabled. The user
-explicitly clarified that theta=1 retains current behavior and carry applies only
-at theta<1. [Evidence and preserved roots](v2_R31_BASELINE_STOP.md) record this.
-The fresh `29fb045` freeze reproduced all 12 baseline panels / 48 scenario daily
-tables exactly, then stopped in the first inverse-sigma cell on 32 D4 flags in
-GBDT/F1's open-borrow scenario. A stale partial exit in one overweight name was
-incorrectly vetoing unrelated valid-size entries. The minimal candidate-specific
-name-cap correction is prepared and passes 151 targeted tests. The stopped root,
-trace and partial results are [reported here](v2_R31_D4_STOP.md). The user explicitly
-approved the tested correction and a fresh R3.1 restart; the effective registration
-records it. No policy was selected from the stopped partial grid.
-The approved restart completed all 240 panels / 960 scenario ledgers. Every
-D1-D5 and headline gate passed; all 48 sealed baseline daily tables are exact.
-The registered joint-first rule selected unsmoothed D3/D5/D10, equal sizing and
-buffer 9 per quintile. B's paired gain is 3.2533 [-0.4199, 6.5484] bps/day;
-the horizon-only buffer-6 change has a larger gain but lower selection priority.
-The label is `execution_parameter_selected_in_sample`. Full tables, methods and
-sealed hashes are in [the completed sweep report](v2_R31_EXECUTION_SWEEP.md).
-The archive-only intraday coverage report is complete, as is the bounded oddlot
-derivation. The first combined store build from clean `a2c04e5` stopped before
-publication at a measured peak above 8 GiB during lending-sidecar processing.
-Completed native and raw intraday mappings are now released before subsequent
-families, and final publication enforces the same memory bound. The stop and
-fresh-root restart are recorded in `v2_store_memory_stop_evidence.json`.
-Byte comparisons, native-fast audit, fresh beta binding,
-16-book acceptance and Round 1' follow. The user explicitly authorized autonomous
-continuation through the GPU work after successful CPU checks.
-
-The Round-3 runner and diagnostics are implemented before its results: six fresh P
-fits, 18 B fits, nine matched fast-off fits, paired horizon tables and the registered
-2025 readout. Two score-free smoke trajectories check both forward paths first.
-Targeted model/training/scoring tests passed (66); further tests cover the six-seed
-roster, paired handoffs, per-horizon populations and inclusive decision thresholds.
-Logging preserves exact SAM updates, RNG and canonical score bytes. No paid
-instance has been launched at this point.
-The complete Round-3 finalizer also passes a synthetic artifact test covering all
-24 aggregate books, 27 fine-tune diagnostics, matched P identities, the momentum
-comparator's distinct score mask, paired deltas, and the final sealed inventory.
-Before Round 1' is frozen, the two current registrations are pinned to LF line
-endings. Their Windows files now match the Git blobs byte-for-byte; this prevents
-the GH200 from seeing a different registration hash after checkout. The committed
-registration text and all sealed research artifacts are unchanged.
-
-Validation before replay: Ruff and compilation pass; the full research suite passed
-908 tests in 467.91 seconds. The final focused run passed 100 tests, including
-the added invariant-exemption check and the joined corporate-action causality test.
+Failed/interrupted roots remain immutable evidence. The memory stop, slow lookup
+stop and Windows Update restart were followed by a fresh successful build; no
+partial arrays were reused. Raw sources and earlier sealed research roots remain
+unchanged. The temporary background S3 upload command was rejected by automatic
+approval review with "blocked by policy"; verified bundles are prepared for the
+approved launcher's SSH transfer path.

@@ -15,8 +15,16 @@ oddlot. Full-build peak RSS is 6.7059 GiB. Untouched arrays match the historical
 8021e42 store's authorized slice; native-fast reconstruction has zero value or
 mask error. The new endpoint-dependent survival audit flag reconstructs exactly.
 The economic-beta arrays are byte-identical to rev4f, with a new store binding.
-See [the input audit](docs/v2_REBUILT_STORE.md). Fresh 16-book acceptance and
-Round 1' follow; this input audit alone does not constitute model acceptance.
+See [the input audit](docs/v2_REBUILT_STORE.md). Fresh 16-book development-grade
+acceptance passed, including 75 exact legacy-control IC comparisons. Two F3
+control books retain unresolved economics under the frozen terminal-settlement
+rule. [Acceptance evidence](docs/v2_ACCEPTANCE_REBUILT.md) preserves these limits.
+Round 1' is complete and sealed on 21 panels. `a_slow` IC is 0.015301 and
+`b_intraday` IC is 0.010465; paired b-minus-a is -0.004836 [-0.009128, 0.001347].
+Paired net excess is -0.874 [-5.439, 7.458] bps/day. The repaired intraday inputs
+have not demonstrated a GBDT improvement. The registered parent remains
+`b_intraday`; native-TCN contribution is tested separately in Round 3.
+See [the paired report](docs/v2_ROUND1_PRIME.md).
 The historical 8021e42 store remains immutable and binds the sealed replays.
 It is explicitly development-grade: the calendar is reconstructed and the
 corporate-action terms are inferred from COTAHIST `DISMES`, not independently
@@ -68,11 +76,10 @@ is used as an economic coefficient, hedge sizing consumes same-close outcomes,
 and retrospective inferred actions can alter decision-time orders. Round-1 rev4f
 and Round-2 rev4f economics now correct these findings. The decoded history-age
 provenance exemption was explicitly approved; all quality strata remain exactly
-unchanged. An input-only 2024 check
-also found eight of twenty intraday scalar features entirely invalid; M1/COTAHIST
-price-unit consistency never reaches the required twenty active names per day.
-Repair these contracts before making new economics claims or interpreting
-feature ablations. The audit's code cleanup does not change the frozen results.
+unchanged. The original-store input audit found eight of twenty intraday scalar
+features entirely invalid and unusable M1/COTAHIST level anchoring. Those contracts
+are repaired in the new store; sparse archive gaps remain unknown. The audit's
+code cleanup does not change the frozen historical results.
 
 Pass 5 uses [the clarified rev4f registration](research/preregistrations/v2_round1_round2_rev4f.md).
 The ledger consumes economic BOVA11 beta, notional entries and hedge rebalances,
@@ -80,9 +87,12 @@ and position-fraction exits/trims. Decisions use only action uncertainty known
 through t-1. Retrospective opening-inventory conversion occurs after all intentions
 and before fills. Replay exemptions enumerate only authorized diagnostic/provenance
 fields; scores, masks, targets, populations and score-derived readouts remain fixed.
-[Pass-5 status](docs/v2_PASS5_STATUS.md) records completed work. The beta sidecar is
+[Pass-5 status](docs/v2_PASS5_STATUS.md) records completed work. Sealed rev4f uses
 `v2_hedge_beta_rev4f_20260908T225248Z`, manifest
 `f5fa41536740ca412550cb81d2b44c9541e338dc060d674ab8ea270edd7be712`.
+The repaired store uses `v2_hedge_beta_rebuilt_e02f934_20260909T104556Z`, manifest
+`225adc6fe336d2380e5c94897ba5d6ece4fcc8e0b0aca6d631dca9063314edb4`;
+all four array files are byte-identical to rev4f.
 
 Sealed rev4e Round 2 is now mirrored in
 `D:\quant-data\b3\processed\model_runs\v2_round2_rev4e_2b40b24_20260908T202100Z`.

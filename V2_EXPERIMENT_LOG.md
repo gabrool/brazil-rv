@@ -2714,3 +2714,42 @@ decoding. Archive-only coverage has a committed runner and precedes the one buil
 Validation: 90 focused tests pass; both existing production-axis memory tests pass.
 The joined fixture changes inferred cash terms by mutating only an event-day
 COTAHIST close and preserves all same-day intraday/native inputs exactly.
+
+### Repaired store accepted; Round 1' completed before Round 3
+
+The successful store `v2_daily_store_3d67624_20260909T100323Z` ends on
+2024-12-30, covers 3,717 sessions / 933 ISINs, and peaks at 6.7059 GiB including
+publication. Manifest is `db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64`.
+The canonical-slice comparison passes; the additional audit-only survival flag
+is independently reconstructed for the new 2024 endpoint. Native-fast 20-by-20
+raw reconstruction is exact. The rebuilt beta's four arrays are byte-identical.
+See `docs/v2_REBUILT_STORE.md` and the reader-validation disclosure in
+`docs/v2_store_comparison_stop_evidence.json`; old integrity scans touched later
+payload values without running held-out fitting or performance evaluation.
+
+Acceptance `v2_acceptance_rebuilt_615ae41_20260909T104639Z` passes all 16 books
+and all 75 legacy-IC identity comparisons. Manifest is
+`c5f7058d1fb77859313d0875a27c8bdd672cbb39635441561d9f02cc52504a15`, inventory
+`f4b6194673fad27486c3be8dc8096166dd1031b6450cc6f5d92ad86c458e4c9c`.
+F3 inverse-volatility and reversal/momentum-blend economics remain unresolved;
+their terminal settlement fractions are 19.93% and 16.55%. This classification is
+retained, not relaxed by acceptance. See `docs/v2_ACCEPTANCE_REBUILT.md`.
+
+Round 1' `v2_round1_prime_615ae41_20260909T105303Z` completed 21 evaluations
+and 150 GBDT head/seed fits under the fixed `a_slow`/`b_intraday` comparison.
+All registered book gates pass. Result is
+`fb4a6ae1b82e31fbe777757a1e33fd84c8748b07bcc9bf23145bf25c34f871fa`, sealed inventory
+`c97646eafce7abb78c63826e007ffb4a78c2cdc15954a42bfdedb37b615e2a9a`.
+All 296 inventory entries plus two self-files are verified, including closed logs.
+`a_slow` neutral IC is 0.015301 and `b_intraday` 0.010465. The paired difference is
+-0.004836 [-0.009128, 0.001347]; paired net is -0.874 [-5.439, 7.458] bps/day.
+The repaired intraday inputs have not demonstrated a GBDT improvement. Their
+availability repair is not a performance claim. Keep the registered `b_intraday`
+parent for the separate native-TCN experiment. Full levels, fold differences and
+economics are in `docs/v2_ROUND1_PRIME.md` and its evidence JSON.
+
+The user's autonomous continuation authority is active. No GH200 has launched at
+this CPU checkpoint. Input and CPU artifact bundles are prepared for verified
+SSH transfer; the background S3 command was blocked by automatic approval review.
+Round 3 and its final verified host recovery/termination remain to run. The
+official 2025 performance rule is not exercised in this pass.
