@@ -1,0 +1,90 @@
+{
+  "confirmation": {
+    "paired_minimum_roster": [
+      "fast_off",
+      "S0"
+    ],
+    "seeds": [
+      61,
+      79,
+      97
+    ],
+    "stage_f_per_configuration": 42,
+    "stage_p_per_needed_graph": 3
+  },
+  "cpu_checkpoint": {
+    "frozen_design_sha256": "7d3f074afbef581e7c13fd3315db1becda3cddc579465fcb977af21cdc60b230",
+    "inventory_sha256": "36aa5f132828aacf700ce728f1d202942c5b11ca9f4b8f9be04df9e8e59da917",
+    "result_sha256": "6418e2f156d4ed899d897e5efa4e170f24044f53163dbda5cf503dfa281a091b",
+    "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_research_checkpoint_d2f7de4_20260909"
+  },
+  "deployment_changed": false,
+  "frozen_commit": "1cb642514648af3652f94530fdef2f3868d08b78",
+  "frozen_design_sha256": "4ac1408fc76060c0e08699d7142679a2180b68c81af3fcba2d866f84586bf923",
+  "host_plan_scope": "Review-only host plan; Windows commands are not a Lambda launch plan.",
+  "next_session_contract": "After renewed go, use the operational .txt handoff and frozen commit. Resolve/verify sources on the actual host, freeze a fresh execution root, regenerate host-specific plans, and preserve this frozen preparation root. Six concurrent trajectories after serial smokes when resources permit. Seal, host-copy, verify all hashes, terminate, then two provider inventories.",
+  "official_validation_accessed": false,
+  "overlay_started": false,
+  "paid_compute_launched": false,
+  "parsed_smoke_jobs": [
+    {
+      "arm": "fast_off",
+      "device": "cuda",
+      "fold": "F1",
+      "maximum_epochs": 1,
+      "seed": 11
+    },
+    {
+      "arm": "S0",
+      "device": "cuda",
+      "fold": "F1",
+      "maximum_epochs": 1,
+      "seed": 11
+    },
+    {
+      "arm": "H",
+      "device": "cuda",
+      "fold": "F1",
+      "maximum_epochs": 1,
+      "seed": 11
+    },
+    {
+      "arm": "P",
+      "device": "cuda",
+      "fold": "F1",
+      "maximum_epochs": 1,
+      "seed": 11
+    },
+    {
+      "arm": "L",
+      "device": "cuda",
+      "fold": "F14",
+      "maximum_epochs": 1,
+      "seed": 11
+    },
+    {
+      "arm": "C",
+      "device": "cuda",
+      "fold": "F1",
+      "maximum_epochs": 1,
+      "seed": 11
+    }
+  ],
+  "read_2025_bar": "unapproved_Gabriel_to_set",
+  "registration_git_bytes_match_frozen_sha256": true,
+  "registration_sha256": "6377ee9ef8bd2931679eefb8120bf4495276e23c538b4e518de3f41c3578f263",
+  "round4_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_1cb6425_20260909T205015Z",
+  "screening_fit_counts": {
+    "arm_f": 210,
+    "parent_f": 42,
+    "selection_only_f": 9,
+    "smoke": 6,
+    "stage_p": 12
+  },
+  "smoke_executed": false,
+  "smoke_plan_sha256": "be5b3447b6fcdcb3799330ec792aeb8653ab0ea2fc4841d8dc5eda39cfc962b7",
+  "stage_f_executed": false,
+  "stage_p_executed": false,
+  "status": "pre_GPU_checkpoint_complete_awaiting_renewed_paid_compute_go",
+  "test_accessed": false
+}

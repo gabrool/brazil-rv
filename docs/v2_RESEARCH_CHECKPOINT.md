@@ -1,8 +1,10 @@
 # Research checkpoint implementation and CPU acceptance
 
-Status: the protocol and graph changes are implemented. The CPU re-baseline and
-diagnostics are complete, accepted and sealed. [Round 4 is registered](../research/preregistrations/v2_round4.md);
-no GPU training has started and paid compute still requires Gabriel's renewed go.
+Status: **the pre-GPU checkpoint is complete**. The protocol and graph changes are
+implemented; the CPU re-baseline and diagnostics are accepted and sealed.
+[Round 4 is registered](../research/preregistrations/v2_round4.md), with a fresh frozen
+root and six-job smoke plan ready for review. No GPU training has started; paid compute
+requires Gabriel's renewed go.
 
 The implementation is on GitHub in `d2f7de4`, following the protocol and CDI commits.
 The completed CPU root is
@@ -287,9 +289,9 @@ reuse, invalid sidecars, daily diagnostic causality and spread conservation, pla
 counts and seed pairing, and promotion eligibility. Ruff and the targeted suites pass.
 
 CPU results and their sealed evidence were published in `bd8ce6b` before registering
-`v2_round4.md`. Next freeze a fresh root with its smoke plan only. The staged plans
-are prepared for that registration; GPU smoke and training remain untested until an
-authorized paid session. Launch still requires Gabriel's renewed go. Use the existing
+`v2_round4.md` in `1cb6425`. The fresh root and smoke plan are prepared below; GPU smoke
+and training remain untested until an authorized paid session. Launch still requires
+Gabriel's renewed go. Use the existing
 operational `.txt` handoff as the authority for Lambda paths and launch procedures.
 Every paid session must end with a sealed host copy, hash verification, termination,
 and two provider reads.
@@ -300,3 +302,34 @@ are calibrated before evaluation. Meaningful-capital execution assumptions prece
 implementability claims or the read; deployment evidence is deferred. No 2025/2026
 consumer access, overlay execution, deployment change, or paid launch is authorized
 by this checkpoint.
+
+## Round-4 preparation ready for review
+
+The fresh preparation root is
+`D:/quant-data/b3/processed/model_runs/v2_round4_1cb6425_20260909T205015Z`,
+frozen at clean commit `1cb642514648af3652f94530fdef2f3868d08b78` after verifying the
+complete CPU inventory and accepted cells. Its frozen-design SHA-256 is
+`4ac1408fc76060c0e08699d7142679a2180b68c81af3fcba2d866f84586bf923`;
+the smoke-plan SHA-256 is
+`be5b3447b6fcdcb3799330ec792aeb8653ab0ea2fc4841d8dc5eda39cfc962b7`.
+
+Review the [full frozen design](v2_round4_frozen_design.json),
+[six-job smoke plan](v2_round4_smoke_plan.json), and
+[prelaunch verification and canonical root](v2_round4_prelaunch.json).
+The registration's Git bytes match its frozen digest, with LF endings pinned for the
+Windows/Linux handoff. Every smoke command was parsed against the actual training CLI
+and checked for its arm, fold, seed, one epoch, CUDA device, feature/loss flags, absence
+of reusable score output and model contract. This verifies the plan, not CUDA execution.
+There are no smoke, P or F outputs in the new root.
+
+This is a host review plan containing Windows paths. After renewed go, use the frozen
+commit and the operational `.txt` handoff to resolve and verify sources on the actual
+compute host, freeze a fresh execution root and generate its host-specific commands.
+Preserve this preparation root and do not rewrite its frozen paths in place. The latest
+main branch additionally publishes these review artifacts; the frozen commit identifies
+the exact training implementation. Generate later stages only after their preceding
+smokes, checkpoints and parent acceptance exist.
+
+The immediate decision is whether to authorize that paid session. Confirmation is
+mandatory before any promotion; the proposed 2025-read and overlay-adoption bars still
+need Gabriel's decision. The completed CPU work does not authorize either read or overlay.
