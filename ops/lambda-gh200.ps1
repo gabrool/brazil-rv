@@ -268,14 +268,22 @@ function Invoke-LambdaApi {
                 & $Sleeper $delay
                 continue
             }
+            $failureMessage = Protect-Text $_.Exception.Message
+            $details = [string]$_.ErrorDetails.Message
+            $apiError = $null
+            if (-not [string]::IsNullOrWhiteSpace($details)) {
+                try { $apiError = Get-Value ($details | ConvertFrom-Json) 'error' }
+                catch { } # Non-JSON HTTP errors retain the original exception message.
+            }
+            $lambdaCode = [string](Get-Value $apiError 'code')
+            if (-not [string]::IsNullOrWhiteSpace($lambdaCode)) {
+                $failureMessage += " [$(Protect-Text $lambdaCode)] $(Protect-Text (Get-Value $apiError 'message'))"
+            }
             $exception = New-Object InvalidOperationException(
-                "Lambda API $Method $Path failed (HTTP $status): $(Protect-Text $_.Exception.Message)"
+                "Lambda API $Method $Path failed (HTTP $status): $failureMessage"
             )
             $exception.Data['HttpStatus'] = $status
-            $details = [string]$_.ErrorDetails.Message
-            if ($details -match 'global/insufficient-capacity') {
-                $exception.Data['LambdaCode'] = 'global/insufficient-capacity'
-            }
+            $exception.Data['LambdaCode'] = $lambdaCode
             throw $exception
         }
     }
@@ -655,7 +663,7 @@ function Start-LaunchWatcher {
             Start-Sleep -Seconds 3
             $instance = Select-ManagedInstance @((Invoke-LambdaApi GET '/instances' $null)) $type.Name
             if ($null -eq $instance) {
-                if ($_.Exception.Data['LambdaCode'] -eq 'global/insufficient-capacity') {
+                if ($_.Exception.Data['LambdaCode'] -eq 'instance-operations/launch/insufficient-capacity') {
                     Write-Log 'Capacity disappeared before launch; polling continues.'
                     $type.Available = $false
                     continue

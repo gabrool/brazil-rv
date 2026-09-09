@@ -1,0 +1,38 @@
+{
+  "correction": [
+    "Preserve structured provider code and redacted explanation in failures.",
+    "Recognize the documented capacity-race code after reconciling provider instance inventory.",
+    "Do not retry other HTTP 400 rejections or blindly repeat launch POSTs."
+  ],
+  "documented_contract": {
+    "capacity_error_code": "instance-operations/launch/insufficient-capacity",
+    "openapi_version": "1.10.0",
+    "url": "https://docs-api.lambda.ai/api/cloud/spec.json"
+  },
+  "failed_at_utc": "2026-09-09T12:19:17.2117730Z",
+  "failure": "POST /instance-operations/launch returned HTTP 400; the former logger omitted the structured provider detail, so the exact original rejection reason cannot be recovered.",
+  "monitor": "The user requested a five-minute heartbeat instead of continuous model polling; its process/log pointers are refreshed after the approved launcher restarts.",
+  "provider_check": {
+    "gh200_capacity_regions": [],
+    "instances": [],
+    "intended_filesystem_in_use": false,
+    "observed_at_utc": "2026-09-09T12:25:02.9526858Z"
+  },
+  "research_impact": "No GPU trajectory started. Model, data, registration and completed research artifacts unchanged.",
+  "status": "launcher_error_handling_corrected_before_restart",
+  "stopped_launcher_implementation": "802868a",
+  "verification": {
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\ops\\test-lambda-gh200.ps1",
+    "includes": [
+      "capacity-code extraction",
+      "provider-message redaction",
+      "no blind POST retry",
+      "other launch failures remain failures"
+    ],
+    "tests_passed": 13
+  },
+  "watcher_log": {
+    "path": "C:\\Users\\gabri\\AppData\\Local\\BrazilRV\\lambda-gh200\\logs\\watcher_20260909T112026Z.log",
+    "sha256": "95e7b4122d0a24a7df06ef43dc2e1fbcaeff832a68219d2e0890e657bb85e7b7"
+  }
+}

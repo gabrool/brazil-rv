@@ -2753,3 +2753,7 @@ this CPU checkpoint. Input and CPU artifact bundles are prepared for verified
 SSH transfer; the background S3 command was blocked by automatic approval review.
 Round 3 and its final verified host recovery/termination remain to run. The
 official 2025 performance rule is not exercised in this pass.
+
+## 2026-09-09: GH200 launcher capacity-error correction
+
+The initial watcher exited at 12:19:17 UTC after a launch HTTP 400. The provider inventory at 12:25:02 UTC is empty and the intended filesystem is unused. Its former logger did not preserve the provider detail, so the original reason is unknown. The launcher checked an incorrect capacity-error code; the current official API specifies `instance-operations/launch/insufficient-capacity`. It now retains the structured redacted explanation and handles that code only after inventory reconciliation. Other rejections still stop; there is no blind launch retry. All 13 compact launcher tests pass. No GPU fit began and no research setting changed. The user requested five-minute heartbeat monitoring while waiting. See [the stop evidence](docs/v2_lambda_launch_stop_evidence.json).

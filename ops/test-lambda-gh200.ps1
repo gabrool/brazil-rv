@@ -114,6 +114,50 @@ Test-Case 'Retry-After reads HttpResponseHeaders without index access' {
     finally { $response.Dispose() }
 }
 
+Test-Case 'Launch errors preserve the documented capacity code without retrying POST' {
+    $state = [pscustomobject]@{ Count = 0 }
+    $request = {
+        param([hashtable]$Parameters)
+        $state.Count++
+        $exception = New-Object Exception('Bad Request')
+        $exception.Data['StatusCode'] = 400
+        $record = New-Object Management.Automation.ErrorRecord(
+            $exception, 'HttpError', [Management.Automation.ErrorCategory]::InvalidOperation, $null
+        )
+        $record.ErrorDetails = New-Object Management.Automation.ErrorDetails(
+            '{"error":{"code":"instance-operations/launch/insufficient-capacity","message":"Capacity disappeared secret-value"}}'
+        )
+        throw $record
+    }.GetNewClosure()
+    $script:Secrets.Add('secret-value')
+    try {
+        Invoke-LambdaApi POST '/instance-operations/launch' @{} 5 $request { param($Seconds) } | Out-Null
+        throw 'Expected a launch failure.'
+    }
+    catch {
+        Assert-True ($_.Exception.Data['LambdaCode'] -eq 'instance-operations/launch/insufficient-capacity') 'Documented capacity code was lost.'
+        Assert-True ($_.Exception.Message -match 'Capacity disappeared <redacted>') 'Provider explanation was lost or unredacted.'
+        Assert-True ($state.Count -eq 1) 'Launch POST was retried without reconciling instance inventory.'
+    }
+    finally { $script:Secrets.Clear() }
+}
+
+Test-Case 'Other launch rejection codes remain failures' {
+    $request = {
+        param([hashtable]$Parameters)
+        $exception = New-Object Exception('Bad Request')
+        $exception.Data['StatusCode'] = 400
+        $record = New-Object Management.Automation.ErrorRecord(
+            $exception, 'HttpError', [Management.Automation.ErrorCategory]::InvalidOperation, $null
+        )
+        $record.ErrorDetails = New-Object Management.Automation.ErrorDetails(
+            '{"error":{"code":"global/invalid-parameters","message":"Invalid field"}}'
+        )
+        throw $record
+    }
+    Assert-Throws { Invoke-LambdaApi POST '/instance-operations/launch' @{} 1 $request { param($Seconds) } } 'global/invalid-parameters.*Invalid field'
+}
+
 Test-Case 'Single-GPU GH200 type is selected' {
     $instanceTypes = [pscustomobject]@{
         gh200 = [pscustomobject]@{

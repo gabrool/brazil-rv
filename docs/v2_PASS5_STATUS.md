@@ -6,6 +6,13 @@ remains active, including recommended resolutions, efficient GH200 use, verified
 host recovery and exact-instance termination. No paid instance has been launched
 as of this CPU report.
 
+The user requested five-minute heartbeat monitoring while the approved launcher
+waits for capacity. Its first launch attempt returned HTTP 400 with no instance
+created. The launcher now preserves the structured provider explanation and
+recognizes the current documented capacity-race code after inventory reconciliation;
+all 13 targeted launcher checks pass. The old logger omitted the specific original
+reason, so it is not inferred as a fact. See [the operational evidence](v2_lambda_launch_stop_evidence.json).
+
 Completed evidence:
 
 - [Round-1 rev4f replay](v2_PASS5_REBASELINE.md): 18 sealed panels, protected fields
