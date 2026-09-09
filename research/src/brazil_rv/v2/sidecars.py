@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Mapping, Sequence
@@ -241,19 +242,16 @@ def _decision_index_for_row(
 ) -> int | None:
     effective = _effective_public_availability(row)
     if effective is not None:
-        decisions = tuple(
-            datetime.combine(day, decision_time, tzinfo=B3_TIMEZONE).astimezone(UTC)
-            for day in normalized_dates
+        index = bisect_left(
+            normalized_dates,
+            effective,
+            key=lambda day: datetime.combine(
+                day, decision_time, tzinfo=B3_TIMEZONE
+            ).astimezone(UTC),
         )
-        index = int(np.searchsorted(np.asarray(decisions, dtype=object), effective))
         return index if index < len(normalized_dates) else None
     available_date = _as_date(row["available_date"])
-    index = int(
-        np.searchsorted(
-            np.asarray(normalized_dates, dtype="datetime64[D]"),
-            np.datetime64(available_date, "D"),
-        )
-    )
+    index = bisect_left(normalized_dates, available_date)
     if index >= len(normalized_dates):
         return None
     if normalized_dates[index] != available_date:

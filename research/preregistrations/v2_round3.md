@@ -102,6 +102,16 @@ final validation and publication; record the measured final peak in the manifest
 No data, feature, target, model, or acceptance setting changes in this amendment.
 The measured stop evidence is `docs/v2_store_memory_stop_evidence.json`.
 
+The second build, `v2_daily_store_20e9d20_20260909T020726Z`, was voluntarily
+stopped before publication to remove repeated full-calendar construction for
+each sidecar row. Direct binary search preserves the same decision timestamps,
+date-only availability rules and independent publication-mask audit. The isolated
+lookup benchmark and real oddlot sample have exact values, masks, ages and
+coverage; all 75 targeted sidecar/store tests pass. Under the same autonomous
+authority, preserve that scratch and restart in a fresh clean-commit root.
+No research setting or memory bound changes. Evidence and measured stopped-run
+peak RSS are in `docs/v2_sidecar_lookup_evidence.json`.
+
 The final completed daily row retains the next decision timestamp from calendar
 metadata, even though the next session has no market data or consumer row in this
 store. Otherwise nine December 30 inferred action components would be marked

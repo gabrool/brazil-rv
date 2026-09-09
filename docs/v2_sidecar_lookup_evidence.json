@@ -1,0 +1,40 @@
+{
+  "recorded_at_utc": "2026-09-08T23:59:47.153754-03:00",
+  "reference_commit": "20e9d20908b5ee4038a530afd6447ec48492dead",
+  "calendar_sessions": 3963,
+  "lookup_equivalence_cases": 80,
+  "mean_seconds_per_date_only_row": {
+    "prior": 0.0013977754999359604,
+    "current": 8.755849994486198E-07
+  },
+  "lookup_speedup": 1596.3904141987111,
+  "prior_oddlot_two_pass_lookup_minutes_estimate": 58.38074952827527,
+  "current_oddlot_two_pass_lookup_minutes_estimate": 0.03657047111347056,
+  "source": "D:\\quant-data\\b3\\interim\\b3\\odd_lot\\v2_archive_b830fb5_20260909T011714Z\\odd_lot_activity.parquet",
+  "source_sha256": "4ba8658599c36b16cd89aff2df812e59e823e77e0a8fe8dd86f1cc2caaa3bcd5",
+  "raw_oddlot_sample_rows": 1000,
+  "materialized_sample_names": 371,
+  "sample_array_hashes_exact": {
+    "values": "bb382cd9d0e8a40f7c1b37fc99a18e266238e16e2300fc737366b34a374a31bb",
+    "valid": "631e8d953be81c9c6e98934cd009f42676ba711ce12fda5635e4ce7e72212f72",
+    "age_sessions": "73bb6e40acb13e4b91012ed35e74759e2a1f84a111c4fd9a042dabce746033c0"
+  },
+  "sample_annual_coverage_exact": true,
+  "independent_publication_validity_exact": true,
+  "validation": "75 targeted sidecar/store tests pass; Ruff passes.",
+  "research_semantics_changed": false,
+  "official_validation_accessed": false,
+  "test_accessed": false,
+  "note": "Runtime extrapolations isolate the date-only lookup and are not an end-to-end build benchmark.",
+  "stopped_build": {
+    "authority": "User explicitly authorized preferred resolutions and autonomous completion while absent.",
+    "process_id": 14452,
+    "stopped_at_utc": "2026-09-09T03:03:04.7592291Z",
+    "reason": "Avoid redundant full-calendar allocation for each sidecar row; preserve all research semantics.",
+    "peak_rss_gib": 7.090324401855469,
+    "intended_output": "D:/quant-data/b3/processed/v2_daily_store_20e9d20_20260909T020726Z",
+    "published_store_exists": false,
+    "peak_rss_bytes": 7613177856,
+    "preserved_workspace": "D:/quant-data/b3/processed/.v2_daily_store_20e9d20_20260909T020726Z.arrays-p0yi0lzo"
+  }
+}
