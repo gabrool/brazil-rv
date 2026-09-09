@@ -778,7 +778,7 @@ def stream_intraday_from_assignments(
             .collect()
         )
         source_sha256 = source_records([source_path])[0]["sha256"]
-        if "xp_symbol" in group.columns:
+        if not source.is_empty() and "xp_symbol" in group.columns:
             validate_physical_source_identity(group, source, source_path)
         claimed_dates: set[date] = set()
         for row in group.iter_rows(named=True):

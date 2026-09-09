@@ -145,7 +145,7 @@ def audit(*, reference_store: Path, output: Path) -> dict[str, object]:
         flush=True,
     )
     with tempfile.TemporaryDirectory(
-        prefix=".intraday-archive-", dir=output.parent
+        prefix=".intraday-archive-", dir=output.parent, ignore_cleanup_errors=True
     ) as scratch:
         streamed = stream_intraday_from_assignments(
             assignments,

@@ -553,6 +553,29 @@ def test_streamed_intraday_carries_exact_observed_final_m1_close(
     assert not native["fast_patch_mask"][1, 0, 63:].any()
 
 
+def test_future_only_source_has_zero_bounded_coverage_without_symbol_payload(tmp_path):
+    _, sessions = _scheduled_minutes()
+    source_path = tmp_path / "future.parquet"
+    _source_bars(sessions, frozenset(row.trade_date for row in sessions)).with_columns(
+        (pl.col("ts_exchange") + pl.duration(days=366)).alias("ts_exchange"),
+        pl.lit("FUTURE_ONLY").alias("symbol"),
+    ).write_parquet(source_path)
+    assignments = pl.DataFrame({
+        "security_id": ["SEC_TEST"], "isin": ["BRTESTACNOR1"],
+        "xp_symbol": ["TEST3"], "source_file": [str(source_path)],
+    })
+    daily = pl.DataFrame(schema={"isin": pl.String, "trade_date": pl.Date})
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    result = stream_intraday_from_assignments(
+        assignments, daily, sessions, ["BRTESTACNOR1"],
+        sigma_asof=np.full((len(sessions), 1), 0.02),
+        kept_rows=np.arange(len(sessions)), workspace=workspace,
+    )
+    assert not result.result.valid.any()
+    assert result.audit["allowed_date_count"].to_list() == [0]
+
+
 def test_streamed_intraday_grids_only_the_assignment_date_span(
     tmp_path, monkeypatch
 ) -> None:
