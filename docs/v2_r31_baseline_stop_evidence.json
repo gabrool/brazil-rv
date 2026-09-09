@@ -1,0 +1,1316 @@
+{
+  "alternative_grid_cells_run": 0,
+  "approved_clarification": "theta=1 no carry; theta<1 carry at most five sessions; restart fresh root",
+  "diagnosis": {
+    "carried_held_names": [
+      {
+        "active": false,
+        "carried_score": 0.6479591836734695,
+        "prior_shares": 0.003161104277920921,
+        "raw_valid": false,
+        "security_id": "BRPRNRACNOR4",
+        "security_index": 669
+      },
+      {
+        "active": false,
+        "carried_score": -0.9642857142857143,
+        "prior_shares": -0.036363078216709636,
+        "raw_valid": false,
+        "security_id": "BRRCSLACNPR1",
+        "security_index": 691
+      }
+    ],
+    "cases": {
+      "registered_carry": {
+        "changed_daily_count": 22,
+        "daily_exact_to_sealed": false,
+        "mean_net_excess_bps": 0.18957670582527678,
+        "orders": 2695
+      },
+      "rerank_without_carry": {
+        "changed_daily_count": 0,
+        "daily_exact_to_sealed": true,
+        "mean_net_excess_bps": 0.016444581675541643,
+        "orders": 2697
+      },
+      "unchanged_current": {
+        "changed_daily_count": 0,
+        "daily_exact_to_sealed": true,
+        "mean_net_excess_bps": 0.016444581675541643,
+        "orders": 2697
+      }
+    },
+    "deployment_changed": false,
+    "first_differing_date": "2023-11-28",
+    "first_differing_day_risk_trims": {
+      "registered_carry": [
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002218",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 1.0,
+          "purpose": "risk_exit",
+          "reference_price": 16.3700008392334,
+          "security": "BRCURYACNOR3",
+          "security_index": 298,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002219",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 1.0,
+          "purpose": "risk_exit",
+          "reference_price": 4.559999942779541,
+          "security": "BRHAPVACNOR4",
+          "security_index": 444,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002220",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 0.9999999999999999,
+          "purpose": "risk_exit",
+          "reference_price": 3.619999885559082,
+          "security": "BRHBSAACNOR0",
+          "security_index": 447,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002221",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 0.1698529983652476,
+          "purpose": "risk_exit",
+          "reference_price": 18.469999313354492,
+          "security": "BRVLIDACNOR5",
+          "security_index": 903,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002222",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 1.0,
+          "purpose": "risk_exit",
+          "reference_price": 21.25,
+          "security": "BRYDUQACNOR3",
+          "security_index": 931,
+          "side": "sell"
+        }
+      ],
+      "rerank_without_carry": [
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002218",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 1.0,
+          "purpose": "risk_exit",
+          "reference_price": 16.3700008392334,
+          "security": "BRCURYACNOR3",
+          "security_index": 298,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002219",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 1.0,
+          "purpose": "risk_exit",
+          "reference_price": 4.559999942779541,
+          "security": "BRHAPVACNOR4",
+          "security_index": 444,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002220",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 0.9999999999999999,
+          "purpose": "risk_exit",
+          "reference_price": 3.619999885559082,
+          "security": "BRHBSAACNOR0",
+          "security_index": 447,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002221",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 1.0,
+          "purpose": "risk_exit",
+          "reference_price": 11.350000381469727,
+          "security": "BRPRNRACNOR4",
+          "security_index": 669,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002222",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 0.264522842884359,
+          "purpose": "risk_exit",
+          "reference_price": 21.25,
+          "security": "BRYDUQACNOR3",
+          "security_index": 931,
+          "side": "sell"
+        }
+      ],
+      "unchanged_current": [
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002218",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 1.0,
+          "purpose": "risk_exit",
+          "reference_price": 16.3700008392334,
+          "security": "BRCURYACNOR3",
+          "security_index": 298,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002219",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 1.0,
+          "purpose": "risk_exit",
+          "reference_price": 4.559999942779541,
+          "security": "BRHAPVACNOR4",
+          "security_index": 444,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002220",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 0.9999999999999999,
+          "purpose": "risk_exit",
+          "reference_price": 3.619999885559082,
+          "security": "BRHBSAACNOR0",
+          "security_index": 447,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002221",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 1.0,
+          "purpose": "risk_exit",
+          "reference_price": 11.350000381469727,
+          "security": "BRPRNRACNOR4",
+          "security_index": 669,
+          "side": "sell"
+        },
+        {
+          "decision_date": "2023-11-28",
+          "decision_session": 102,
+          "expiry_date": null,
+          "expiry_session": null,
+          "limit_price": null,
+          "order_id": "order-00002222",
+          "order_type": "close_proxy",
+          "planned_notional": null,
+          "position_fraction": 0.264522842884359,
+          "purpose": "risk_exit",
+          "reference_price": 21.25,
+          "security": "BRYDUQACNOR3",
+          "security_index": 931,
+          "side": "sell"
+        }
+      ]
+    },
+    "official_validation_accessed": false,
+    "protected_inputs_exact": true,
+    "research_claim": false,
+    "scope": "baseline-only implementation isolation, no alternative grid cell",
+    "source": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4f_564efc8_20260909T000352Z\\aggregates\\arm_B\\F1\\evaluation.json",
+      "sha256": "7f94894d6a3ec0f6aade80134f5c3e3f35271de30784c392964deec3751b1d11"
+    },
+    "stopped_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_execution_sweep_8e592df_20260909T002609Z",
+    "store_access": {
+      "official_validation_accessed": false,
+      "purpose": "evaluation",
+      "registration": null,
+      "test_accessed": false
+    },
+    "test_accessed": false,
+    "transfer_chronology_clean": true
+  },
+  "failed_gates": [
+    "borrow_balance:baseline_daily_not_bit_identical",
+    "borrow_strict:baseline_daily_not_bit_identical",
+    "comparator_sterile_proceeds:baseline_daily_not_bit_identical"
+  ],
+  "implementation_commit": "8e592df",
+  "liquidity_attribution_max_reconciliation_error_bps": 1.4052344357584623e-11,
+  "liquidity_attribution_mean": {
+    "equity_borrow_fee_bps": 0.05883356065072605,
+    "equity_borrow_raw_bps": 0.6014977273898868,
+    "equity_gross_pnl_bps": 3.678380643758266,
+    "equity_trading_cost_bps": 1.9424252078681816,
+    "liquid_gross_fraction_nav": 1.2706640228772812,
+    "net_excess_contribution_bps": 1.917953443733577,
+    "other_trades_net_excess_contribution_bps": -1.72837673790842,
+    "shared_allocation_fraction": 0.6552235565765879,
+    "shared_funding_less_cdi_bps": -0.2661683647831673,
+    "shared_hedge_borrow_bps": 0.009788153213419953,
+    "shared_hedge_cost_bps": 0.1411342824894221,
+    "shared_hedge_gross_pnl_bps": 1.2594200963701128,
+    "unallocated_cash_bps": 0.0
+  },
+  "new_model_fits": 0,
+  "official_validation_accessed": false,
+  "paid_instance_launched": false,
+  "policy_selected": false,
+  "protected_inputs_exact": true,
+  "roots": {
+    "baseline_diagnosis": {
+      "exact_inventory_verified": true,
+      "file_count": 4,
+      "hashes": {
+        "access_audit.json": "6a12280b6ac8dc63ba2ea931f7963aedd486034fddf9d3abd2ab65fae22c0bba",
+        "artifact_inventory.json": "60305ec4f86d02ddccaf5e1b70250c79f2b077a4bcd1ac2f9a33fa355446d5a9",
+        "diagnosis.json": "de28427e733b19a499581470496b60463f479064ef508a281f6647f86c6e7262"
+      },
+      "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_execution_baseline_diagnosis_8e592df_20260909"
+    },
+    "order_trace": {
+      "exact_inventory_verified": true,
+      "file_count": 4,
+      "hashes": {
+        "access_audit.json": "63dd8cc2743176e0be440a4c5921026c3cf0525005ebe39ed9d8077751f206ea",
+        "artifact_inventory.json": "84a6732f6ac76e37c37ee1f2dc73cdb998ffe0b1c45ac11d8648d82af6c5bea7",
+        "diagnosis.json": "79393c87a014edc9293bce14bd53e562f067bd391ca3401f439c6b3acfe2859b"
+      },
+      "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_execution_baseline_trace_8e592df_20260909"
+    },
+    "stopped_sweep": {
+      "exact_inventory_verified": true,
+      "file_count": 8,
+      "hashes": {
+        "access_audit.json": "5c8b62a61b7d81aaf0b81c0f85fbabc7e3dca8b987b045ad4b307d66e9ed2acd",
+        "artifact_inventory.json": "09d8d32a00fae7ec2a9e69ff43850e59d6a2d0b9cd30d1c08c615dd709bf9db5",
+        "failure.json": "00725d1315208cdb54ad9250b9baf41c437cf68cc5b435f49b5b606c696661aa",
+        "frozen_design.json": "2021cfb54afdb33446f4b5b6ce9c2e436458b7c3ceb5e32eef77f79ee321ee94"
+      },
+      "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_execution_sweep_8e592df_20260909T002609Z"
+    }
+  },
+  "scenarios": [
+    {
+      "changed_days": [
+        "2023-11-28",
+        "2023-11-29",
+        "2023-11-30",
+        "2023-12-01",
+        "2023-12-04",
+        "2023-12-05",
+        "2023-12-06",
+        "2023-12-07",
+        "2023-12-08",
+        "2023-12-11",
+        "2023-12-12",
+        "2023-12-13",
+        "2023-12-14",
+        "2023-12-15",
+        "2023-12-18",
+        "2023-12-19",
+        "2023-12-20",
+        "2023-12-21",
+        "2023-12-22",
+        "2023-12-26",
+        "2023-12-27",
+        "2023-12-28"
+      ],
+      "replay_mean_net_excess_bps": 0.18957670582527678,
+      "replay_summary": {
+        "annualized_net_excess_sharpe": 0.035838795288588216,
+        "average_holding_sessions_approximation": 5.113650710558178,
+        "beta_hedge": true,
+        "blocked_entry_candidates_by_cause": {
+          "gross_cap": 0,
+          "missing_reference": 0,
+          "name_cap": 0,
+          "net_cap": 251
+        },
+        "borrow_source": "borrow_balance",
+        "cancellations_by_reason": {
+          "band_exit": 0,
+          "evaluation_end": 0,
+          "exit_instruction": 0,
+          "expired": 0,
+          "position_closed": 0,
+          "prior_action_unresolved": 1,
+          "risk_name_cap": 0,
+          "risk_net_cap": 0,
+          "terminal_settlement": 2
+        },
+        "cancelled_entry_count": 1,
+        "compounded_net_excess_terminal_settlement_haircut_scenario": -0.023919678295002966,
+        "compounded_net_excess_unresolved_excluded": -0.0019908290886794244,
+        "compounded_net_excess_vs_all_cash": -0.0019908290886794244,
+        "economics_unresolved": false,
+        "entry_defect_signatures": {
+          "D1_entry_pending_printed_unblocked_unfilled": 0,
+          "D2_entry_fill_quantity_short": 0,
+          "D3_blocked_open_slots": 0,
+          "D4_cap_block_defects": 0,
+          "D5_ineligible_exit_within_hold_window": 0
+        },
+        "excluded_short_entry_candidate_count": 2466,
+        "exit_instructions_by_cause": {
+          "ineligible_hold_exhausted": 13,
+          "rank_out_of_retention": 1211,
+          "settlement_grace": 0,
+          "terminal": 60
+        },
+        "fill_count": 2692,
+        "gross_shortfall_decomposition": {
+          "occupancy_band_exhausted": 0.01639784946236559,
+          "occupancy_blocked": 0.0,
+          "occupancy_exit_gap": 0.01666666666666667,
+          "occupancy_other": -0.001075268817204301,
+          "occupancy_pending": 0.00026881720430107527,
+          "occupancy_share": 0.5056782045097007,
+          "sizing_fill": -0.004050380488352743,
+          "sizing_mark_drift": -0.0036768782799517404,
+          "sizing_nav_drift": 0.03926087882241709,
+          "small_universe": 0.0,
+          "total": 0.06379168457024176
+        },
+        "hedge_beta_fallback_sessions": 0,
+        "hedge_capped_session_count": 0,
+        "hedge_notional_cap_nav": 0.6,
+        "imputed_rate_share_of_short_notional": 0.05304445010702887,
+        "ineligible_exit_reeligible_within_10_sessions_share": 0.0024509803921568627,
+        "ineligible_held_sessions_by_cause": {
+          "membership_false": 119,
+          "score_nonfinite": 13,
+          "score_valid_false": 13
+        },
+        "ineligible_hold_sessions": 5,
+        "insolvency_date": null,
+        "insolvent": false,
+        "intended_entry_count": 1308,
+        "intended_entry_fill_rate": 0.999295429602839,
+        "intended_order_count": 2695,
+        "mark_mode": "raw",
+        "maximum_absolute_hedge_fraction_nav": 0.34969833271245443,
+        "maximum_gross_fraction_nav": 2.149805970673105,
+        "maximum_stale_mark_inventory_fraction_nav": 0.06988547907205557,
+        "maximum_unresolved_claim_inventory_fraction_nav": 0.0,
+        "maximum_unresolved_stale_inventory_fraction_nav": 0.06988547907205557,
+        "mean_absolute_ex_ante_beta_after_hedge": 0.011561087586393062,
+        "mean_absolute_net_fraction_nav_including_hedge": 0.10446380055134036,
+        "mean_absolute_volatility_occupancy_deviation_long": 0.3419354838709677,
+        "mean_absolute_volatility_occupancy_deviation_short": 0.4064516129032258,
+        "mean_daily_exits_per_side": 5.362903225806452,
+        "mean_entry_eligible_name_count": 198.1048387096774,
+        "mean_gross_fraction_nav": 1.9362083154297582,
+        "mean_gross_fraction_nav_including_hedge": 2.0427398285537994,
+        "mean_net_excess_bps_per_day": 0.18957670582527678,
+        "mean_pending_exit_age_sessions": 4.5,
+        "mean_stale_mark_inventory_fraction_nav": 0.0050044388760140945,
+        "mean_turnover_fraction_nav": 0.7572704609769533,
+        "mean_unresolved_claim_inventory_fraction_nav": 0.0,
+        "mean_unresolved_stale_inventory_fraction_nav": 0.0050044388760140945,
+        "mean_volatility_group_size_by_quintile": [
+          40.04032258064516,
+          39.57258064516129,
+          39.67741935483871,
+          39.57258064516129,
+          39.24193548387097
+        ],
+        "mean_volatility_occupancy_long_by_quintile": [
+          5.548387096774194,
+          5.951612903225806,
+          5.983870967741935,
+          6.120967741935484,
+          5.717741935483871
+        ],
+        "mean_volatility_occupancy_short_by_quintile": [
+          5.540322580645161,
+          5.798387096774194,
+          5.830645161290323,
+          5.919354838709677,
+          5.717741935483871
+        ],
+        "mean_volatility_quota_by_quintile": [
+          6.0,
+          6.0,
+          6.0,
+          6.0,
+          6.0
+        ],
+        "minimum_gross_fraction_nav": 0.0,
+        "minimum_volatility_group_size_by_quintile": [
+          38,
+          38,
+          38,
+          38,
+          37
+        ],
+        "placeholder_priced_session_count": 5,
+        "placeholder_rate_share_of_short_notional": 0.0386811554847263,
+        "risk_trim_days_by_type": {
+          "gross": 0,
+          "name": 11,
+          "net": 5
+        },
+        "risk_trim_notional_by_type": {
+          "gross": 0.0,
+          "name": 0.03048856409158522,
+          "net": 0.9903212844473871
+        },
+        "same_close_replacements": 1184,
+        "same_day_action_sessions": 57,
+        "settled_then_printed_count": 0,
+        "settlement_economics_unresolved_fraction_nav": 0.15,
+        "settlement_grace_sessions": 10,
+        "settlement_haircut": 0.3,
+        "share_sizing_mode": "notional_entries_position_fraction_exits",
+        "short_notional_weighted_borrow_rate": 0.04266939529534451,
+        "short_side_unshortable_candidate_share": 0.5466637109288406,
+        "spilled_entries_long_by_quintile": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "spilled_entries_short_by_quintile": [
+          0,
+          0,
+          0,
+          0,
+          9
+        ],
+        "stale_mark_name_days": 18,
+        "terminal_hedge_signed_notional": 0.0,
+        "terminal_nav": 1.0588414187135233,
+        "terminal_nav_settlement_haircut_scenario": 1.0355759272920606,
+        "terminal_nav_unresolved_excluded": 1.0588414187135233,
+        "terminal_net_notional_including_hedge": 0.0,
+        "terminal_no_print_dominates": false,
+        "terminal_settlement_convention": "last_mark_after_10_sessions",
+        "terminal_settlement_count": 2,
+        "terminal_settlement_economics_unresolved": false,
+        "terminal_settlement_notional": 0.07650647860543333,
+        "terminal_settlement_notional_fraction_nav": 0.07005133345970985,
+        "terminal_unresolved_reason_breakdown": {
+          "no_terminal_print": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "other": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "prior_pending_exit": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "settlement_grace_sessions": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "unresolved_action": {
+            "count": 0,
+            "notional": 0.0
+          }
+        },
+        "unresolved_action_name_days": 0,
+        "unresolved_inventory_count": 0,
+        "unresolved_inventory_notional": 0.0,
+        "unresolved_payable": 0.0,
+        "unresolved_receivable": 0.0,
+        "valuation_scenario_count": 0,
+        "volatility_balanced_entries": true,
+        "zero_entry_days_by_cause": {
+          "gross_cap": 0,
+          "missing_reference": 0,
+          "name_cap": 0,
+          "net_cap": 5,
+          "small_universe": 0
+        }
+      },
+      "scenario": "borrow_balance",
+      "source_mean_net_excess_bps": 0.01644458167554245
+    },
+    {
+      "changed_days": [],
+      "replay_mean_net_excess_bps": -0.7075418341787164,
+      "replay_summary": {
+        "annualized_net_excess_sharpe": -0.13248451916265258,
+        "average_holding_sessions_approximation": 6.749371023078928,
+        "beta_hedge": true,
+        "blocked_entry_candidates_by_cause": {
+          "gross_cap": 0,
+          "missing_reference": 0,
+          "name_cap": 0,
+          "net_cap": 69
+        },
+        "borrow_source": "borrow_open",
+        "cancellations_by_reason": {
+          "band_exit": 0,
+          "evaluation_end": 0,
+          "exit_instruction": 0,
+          "expired": 0,
+          "position_closed": 0,
+          "prior_action_unresolved": 2,
+          "risk_name_cap": 0,
+          "risk_net_cap": 0,
+          "terminal_settlement": 2
+        },
+        "cancelled_entry_count": 2,
+        "compounded_net_excess_terminal_settlement_haircut_scenario": -0.034595918630582756,
+        "compounded_net_excess_unresolved_excluded": -0.013111055953741846,
+        "compounded_net_excess_vs_all_cash": -0.013111055953741846,
+        "economics_unresolved": false,
+        "entry_defect_signatures": {
+          "D1_entry_pending_printed_unblocked_unfilled": 0,
+          "D2_entry_fill_quantity_short": 0,
+          "D3_blocked_open_slots": 0,
+          "D4_cap_block_defects": 0,
+          "D5_ineligible_exit_within_hold_window": 0
+        },
+        "excluded_short_entry_candidate_count": 0,
+        "exit_instructions_by_cause": {
+          "ineligible_hold_exhausted": 21,
+          "rank_out_of_retention": 934,
+          "settlement_grace": 0,
+          "terminal": 60
+        },
+        "fill_count": 2103,
+        "gross_shortfall_decomposition": {
+          "occupancy_band_exhausted": 0.0024193548387096775,
+          "occupancy_blocked": 0.0,
+          "occupancy_exit_gap": 0.01666666666666667,
+          "occupancy_other": -0.0005376344086021505,
+          "occupancy_pending": 0.0005376344086021505,
+          "occupancy_share": 0.5349226096915385,
+          "sizing_fill": -0.0215080696194796,
+          "sizing_mark_drift": -0.0055211569562481485,
+          "sizing_nav_drift": 0.04362317290043133,
+          "small_universe": 0.0,
+          "total": 0.03567996783007965
+        },
+        "hedge_beta_fallback_sessions": 0,
+        "hedge_capped_session_count": 0,
+        "hedge_notional_cap_nav": 0.6,
+        "imputed_rate_share_of_short_notional": 0.41054594447024134,
+        "ineligible_exit_reeligible_within_10_sessions_share": 0.004188481675392671,
+        "ineligible_held_sessions_by_cause": {
+          "membership_false": 176,
+          "score_nonfinite": 21,
+          "score_valid_false": 21
+        },
+        "ineligible_hold_sessions": 5,
+        "insolvency_date": null,
+        "insolvent": false,
+        "intended_entry_count": 1022,
+        "intended_entry_fill_rate": 0.9981057161352513,
+        "intended_order_count": 2107,
+        "mark_mode": "raw",
+        "maximum_absolute_hedge_fraction_nav": 0.2041708953271181,
+        "maximum_gross_fraction_nav": 2.1957235290674326,
+        "maximum_stale_mark_inventory_fraction_nav": 0.06919742747967954,
+        "maximum_unresolved_claim_inventory_fraction_nav": 0.0,
+        "maximum_unresolved_stale_inventory_fraction_nav": 0.06919742747967954,
+        "mean_absolute_ex_ante_beta_after_hedge": 0.013701223148993783,
+        "mean_absolute_net_fraction_nav_including_hedge": 0.07331437543801736,
+        "mean_absolute_volatility_occupancy_deviation_long": 0.31290322580645163,
+        "mean_absolute_volatility_occupancy_deviation_short": 0.47096774193548385,
+        "mean_daily_exits_per_side": 4.165322580645161,
+        "mean_entry_eligible_name_count": 198.1048387096774,
+        "mean_gross_fraction_nav": 1.9643200321699203,
+        "mean_gross_fraction_nav_including_hedge": 2.0230976557666716,
+        "mean_net_excess_bps_per_day": -0.7075418341787164,
+        "mean_pending_exit_age_sessions": 4.5,
+        "mean_stale_mark_inventory_fraction_nav": 0.004970714962768236,
+        "mean_turnover_fraction_nav": 0.5820749890480422,
+        "mean_unresolved_claim_inventory_fraction_nav": 0.0,
+        "mean_unresolved_stale_inventory_fraction_nav": 0.004970714962768236,
+        "mean_volatility_group_size_by_quintile": [
+          40.04032258064516,
+          39.57258064516129,
+          39.67741935483871,
+          39.57258064516129,
+          39.24193548387097
+        ],
+        "mean_volatility_occupancy_long_by_quintile": [
+          5.57258064516129,
+          5.991935483870968,
+          6.024193548387097,
+          6.120967741935484,
+          5.67741935483871
+        ],
+        "mean_volatility_occupancy_short_by_quintile": [
+          5.362903225806452,
+          5.911290322580645,
+          6.145161290322581,
+          6.032258064516129,
+          5.274193548387097
+        ],
+        "mean_volatility_quota_by_quintile": [
+          6.0,
+          6.0,
+          6.0,
+          6.0,
+          6.0
+        ],
+        "minimum_gross_fraction_nav": 0.0,
+        "minimum_volatility_group_size_by_quintile": [
+          38,
+          38,
+          38,
+          38,
+          37
+        ],
+        "placeholder_priced_session_count": 5,
+        "placeholder_rate_share_of_short_notional": 0.03864952541515606,
+        "risk_trim_days_by_type": {
+          "gross": 0,
+          "name": 12,
+          "net": 1
+        },
+        "risk_trim_notional_by_type": {
+          "gross": 0.0,
+          "name": 0.01818940963011527,
+          "net": 0.1945796527193088
+        },
+        "same_close_replacements": 949,
+        "same_day_action_sessions": 53,
+        "settled_then_printed_count": 0,
+        "settlement_economics_unresolved_fraction_nav": 0.15,
+        "settlement_grace_sessions": 10,
+        "settlement_haircut": 0.3,
+        "share_sizing_mode": "notional_entries_position_fraction_exits",
+        "short_notional_weighted_borrow_rate": 0.03780088084436251,
+        "short_side_unshortable_candidate_share": 0.0,
+        "spilled_entries_long_by_quintile": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "spilled_entries_short_by_quintile": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "stale_mark_name_days": 18,
+        "terminal_hedge_signed_notional": 0.0,
+        "terminal_nav": 1.0470433740327645,
+        "terminal_nav_settlement_haircut_scenario": 1.0242489317163292,
+        "terminal_nav_unresolved_excluded": 1.0470433740327645,
+        "terminal_net_notional_including_hedge": 0.0,
+        "terminal_no_print_dominates": false,
+        "terminal_settlement_convention": "last_mark_after_10_sessions",
+        "terminal_settlement_count": 2,
+        "terminal_settlement_economics_unresolved": false,
+        "terminal_settlement_notional": 0.07495835727056126,
+        "terminal_settlement_notional_fraction_nav": 0.06968188127387205,
+        "terminal_unresolved_reason_breakdown": {
+          "no_terminal_print": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "other": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "prior_pending_exit": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "settlement_grace_sessions": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "unresolved_action": {
+            "count": 0,
+            "notional": 0.0
+          }
+        },
+        "unresolved_action_name_days": 0,
+        "unresolved_inventory_count": 0,
+        "unresolved_inventory_notional": 0.0,
+        "unresolved_payable": 0.0,
+        "unresolved_receivable": 0.0,
+        "valuation_scenario_count": 0,
+        "volatility_balanced_entries": true,
+        "zero_entry_days_by_cause": {
+          "gross_cap": 0,
+          "missing_reference": 0,
+          "name_cap": 0,
+          "net_cap": 1,
+          "small_universe": 0
+        }
+      },
+      "scenario": "borrow_open",
+      "source_mean_net_excess_bps": -0.7075418341787165
+    },
+    {
+      "changed_days": [
+        "2023-11-28",
+        "2023-11-29",
+        "2023-11-30",
+        "2023-12-01",
+        "2023-12-04",
+        "2023-12-05",
+        "2023-12-06",
+        "2023-12-07",
+        "2023-12-08",
+        "2023-12-11",
+        "2023-12-12",
+        "2023-12-13",
+        "2023-12-14",
+        "2023-12-15",
+        "2023-12-18",
+        "2023-12-19",
+        "2023-12-20",
+        "2023-12-21",
+        "2023-12-22",
+        "2023-12-26",
+        "2023-12-27",
+        "2023-12-28"
+      ],
+      "replay_mean_net_excess_bps": 0.9925893735214085,
+      "replay_summary": {
+        "annualized_net_excess_sharpe": 0.19380442746034565,
+        "average_holding_sessions_approximation": 5.228030437603567,
+        "beta_hedge": true,
+        "blocked_entry_candidates_by_cause": {
+          "gross_cap": 0,
+          "missing_reference": 0,
+          "name_cap": 0,
+          "net_cap": 381
+        },
+        "borrow_source": "borrow_strict",
+        "cancellations_by_reason": {
+          "band_exit": 0,
+          "evaluation_end": 0,
+          "exit_instruction": 0,
+          "expired": 0,
+          "position_closed": 0,
+          "prior_action_unresolved": 1,
+          "risk_name_cap": 0,
+          "risk_net_cap": 0,
+          "terminal_settlement": 2
+        },
+        "cancelled_entry_count": 1,
+        "compounded_net_excess_terminal_settlement_haircut_scenario": -0.013856860002275595,
+        "compounded_net_excess_unresolved_excluded": 0.008263825044741102,
+        "compounded_net_excess_vs_all_cash": 0.008263825044741102,
+        "economics_unresolved": false,
+        "entry_defect_signatures": {
+          "D1_entry_pending_printed_unblocked_unfilled": 0,
+          "D2_entry_fill_quantity_short": 0,
+          "D3_blocked_open_slots": 0,
+          "D4_cap_block_defects": 0,
+          "D5_ineligible_exit_within_hold_window": 0
+        },
+        "excluded_short_entry_candidate_count": 2585,
+        "exit_instructions_by_cause": {
+          "ineligible_hold_exhausted": 13,
+          "rank_out_of_retention": 1189,
+          "settlement_grace": 0,
+          "terminal": 60
+        },
+        "fill_count": 2638,
+        "gross_shortfall_decomposition": {
+          "occupancy_band_exhausted": 0.041935483870967745,
+          "occupancy_blocked": 0.0,
+          "occupancy_exit_gap": 0.01666666666666667,
+          "occupancy_other": -0.0008064516129032258,
+          "occupancy_pending": 0.00026881720430107527,
+          "occupancy_share": 0.6865782212709339,
+          "sizing_fill": -0.005401587740154901,
+          "sizing_mark_drift": -0.007222513154626183,
+          "sizing_nav_drift": 0.039130452774856675,
+          "small_universe": 0.0,
+          "total": 0.08457086800910796
+        },
+        "hedge_beta_fallback_sessions": 0,
+        "hedge_capped_session_count": 0,
+        "hedge_notional_cap_nav": 0.6,
+        "imputed_rate_share_of_short_notional": 0.05342591553470971,
+        "ineligible_exit_reeligible_within_10_sessions_share": 0.0024958402662229617,
+        "ineligible_held_sessions_by_cause": {
+          "membership_false": 120,
+          "score_nonfinite": 13,
+          "score_valid_false": 13
+        },
+        "ineligible_hold_sessions": 5,
+        "insolvency_date": null,
+        "insolvent": false,
+        "intended_entry_count": 1282,
+        "intended_entry_fill_rate": 0.9992877298175199,
+        "intended_order_count": 2641,
+        "mark_mode": "raw",
+        "maximum_absolute_hedge_fraction_nav": 0.33383724903816464,
+        "maximum_gross_fraction_nav": 2.169596164414723,
+        "maximum_stale_mark_inventory_fraction_nav": 0.06970966256553174,
+        "maximum_unresolved_claim_inventory_fraction_nav": 0.0,
+        "maximum_unresolved_stale_inventory_fraction_nav": 0.06970966256553174,
+        "mean_absolute_ex_ante_beta_after_hedge": 0.011065117734493052,
+        "mean_absolute_net_fraction_nav_including_hedge": 0.09283700096968213,
+        "mean_absolute_volatility_occupancy_deviation_long": 0.3903225806451613,
+        "mean_absolute_volatility_occupancy_deviation_short": 0.48870967741935484,
+        "mean_daily_exits_per_side": 5.254032258064516,
+        "mean_entry_eligible_name_count": 198.1048387096774,
+        "mean_gross_fraction_nav": 1.915429131990892,
+        "mean_gross_fraction_nav_including_hedge": 1.996060520464673,
+        "mean_net_excess_bps_per_day": 0.9925893735214085,
+        "mean_pending_exit_age_sessions": 4.5,
+        "mean_stale_mark_inventory_fraction_nav": 0.004988251821392568,
+        "mean_turnover_fraction_nav": 0.7327536267630796,
+        "mean_unresolved_claim_inventory_fraction_nav": 0.0,
+        "mean_unresolved_stale_inventory_fraction_nav": 0.004988251821392568,
+        "mean_volatility_group_size_by_quintile": [
+          40.04032258064516,
+          39.57258064516129,
+          39.67741935483871,
+          39.57258064516129,
+          39.24193548387097
+        ],
+        "mean_volatility_occupancy_long_by_quintile": [
+          5.5,
+          5.919354838709677,
+          6.0,
+          5.991935483870968,
+          5.556451612903226
+        ],
+        "mean_volatility_occupancy_short_by_quintile": [
+          5.403225806451613,
+          5.685483870967742,
+          5.709677419354839,
+          5.862903225806452,
+          5.717741935483871
+        ],
+        "mean_volatility_quota_by_quintile": [
+          6.0,
+          6.0,
+          6.0,
+          6.0,
+          6.0
+        ],
+        "minimum_gross_fraction_nav": 0.0,
+        "minimum_volatility_group_size_by_quintile": [
+          38,
+          38,
+          38,
+          38,
+          37
+        ],
+        "placeholder_priced_session_count": 5,
+        "placeholder_rate_share_of_short_notional": 0.03895932829055986,
+        "risk_trim_days_by_type": {
+          "gross": 0,
+          "name": 11,
+          "net": 5
+        },
+        "risk_trim_notional_by_type": {
+          "gross": 0.0,
+          "name": 0.030144553727728222,
+          "net": 0.8608804685057408
+        },
+        "same_close_replacements": 1152,
+        "same_day_action_sessions": 54,
+        "settled_then_printed_count": 0,
+        "settlement_economics_unresolved_fraction_nav": 0.15,
+        "settlement_grace_sessions": 10,
+        "settlement_haircut": 0.3,
+        "share_sizing_mode": "notional_entries_position_fraction_exits",
+        "short_notional_weighted_borrow_rate": 0.04300255927332295,
+        "short_side_unshortable_candidate_share": 0.5682567597274126,
+        "spilled_entries_long_by_quintile": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "spilled_entries_short_by_quintile": [
+          0,
+          0,
+          0,
+          0,
+          8
+        ],
+        "stale_mark_name_days": 18,
+        "terminal_hedge_signed_notional": 0.0,
+        "terminal_nav": 1.0697211308920522,
+        "terminal_nav_settlement_haircut_scenario": 1.0462521105455656,
+        "terminal_nav_unresolved_excluded": 1.0697211308920522,
+        "terminal_net_notional_including_hedge": 0.0,
+        "terminal_no_print_dominates": false,
+        "terminal_settlement_convention": "last_mark_after_10_sessions",
+        "terminal_settlement_count": 2,
+        "terminal_settlement_economics_unresolved": false,
+        "terminal_settlement_notional": 0.07717632189473189,
+        "terminal_settlement_notional_fraction_nav": 0.0698302623073612,
+        "terminal_unresolved_reason_breakdown": {
+          "no_terminal_print": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "other": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "prior_pending_exit": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "settlement_grace_sessions": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "unresolved_action": {
+            "count": 0,
+            "notional": 0.0
+          }
+        },
+        "unresolved_action_name_days": 0,
+        "unresolved_inventory_count": 0,
+        "unresolved_inventory_notional": 0.0,
+        "unresolved_payable": 0.0,
+        "unresolved_receivable": 0.0,
+        "valuation_scenario_count": 0,
+        "volatility_balanced_entries": true,
+        "zero_entry_days_by_cause": {
+          "gross_cap": 0,
+          "missing_reference": 0,
+          "name_cap": 0,
+          "net_cap": 5,
+          "small_universe": 0
+        }
+      },
+      "scenario": "borrow_strict",
+      "source_mean_net_excess_bps": 1.0426310570075485
+    },
+    {
+      "changed_days": [
+        "2023-11-28",
+        "2023-11-29",
+        "2023-11-30",
+        "2023-12-01",
+        "2023-12-04",
+        "2023-12-05",
+        "2023-12-06",
+        "2023-12-07",
+        "2023-12-08",
+        "2023-12-11",
+        "2023-12-12",
+        "2023-12-13",
+        "2023-12-14",
+        "2023-12-15",
+        "2023-12-18",
+        "2023-12-19",
+        "2023-12-20",
+        "2023-12-21",
+        "2023-12-22",
+        "2023-12-26",
+        "2023-12-27",
+        "2023-12-28"
+      ],
+      "replay_mean_net_excess_bps": -4.643273136931587,
+      "replay_summary": {
+        "annualized_net_excess_sharpe": -0.8767785333053586,
+        "average_holding_sessions_approximation": 5.150798135086529,
+        "beta_hedge": true,
+        "blocked_entry_candidates_by_cause": {
+          "gross_cap": 0,
+          "missing_reference": 0,
+          "name_cap": 0,
+          "net_cap": 251
+        },
+        "borrow_source": "borrow_balance",
+        "cancellations_by_reason": {
+          "band_exit": 0,
+          "evaluation_end": 0,
+          "exit_instruction": 0,
+          "expired": 0,
+          "position_closed": 0,
+          "prior_action_unresolved": 1,
+          "risk_name_cap": 0,
+          "risk_net_cap": 0,
+          "terminal_settlement": 2
+        },
+        "cancelled_entry_count": 1,
+        "compounded_net_excess_terminal_settlement_haircut_scenario": -0.08125208462843359,
+        "compounded_net_excess_unresolved_excluded": -0.060041195054706065,
+        "compounded_net_excess_vs_all_cash": -0.060041195054706065,
+        "economics_unresolved": false,
+        "entry_defect_signatures": {
+          "D1_entry_pending_printed_unblocked_unfilled": 0,
+          "D2_entry_fill_quantity_short": 0,
+          "D3_blocked_open_slots": 0,
+          "D4_cap_block_defects": 0,
+          "D5_ineligible_exit_within_hold_window": 0
+        },
+        "excluded_short_entry_candidate_count": 2465,
+        "exit_instructions_by_cause": {
+          "ineligible_hold_exhausted": 13,
+          "rank_out_of_retention": 1212,
+          "settlement_grace": 0,
+          "terminal": 60
+        },
+        "fill_count": 2692,
+        "gross_shortfall_decomposition": {
+          "occupancy_band_exhausted": 0.01639784946236559,
+          "occupancy_blocked": 0.0,
+          "occupancy_exit_gap": 0.01666666666666667,
+          "occupancy_other": -0.0008064516129032258,
+          "occupancy_pending": 0.00026881720430107527,
+          "occupancy_share": 0.6381430584950941,
+          "sizing_fill": -0.0067764484303550745,
+          "sizing_mark_drift": -0.003669188643175286,
+          "sizing_nav_drift": 0.028889899342563488,
+          "small_universe": 0.0,
+          "total": 0.05097114398946356
+        },
+        "hedge_beta_fallback_sessions": 0,
+        "hedge_capped_session_count": 0,
+        "hedge_notional_cap_nav": 0.6,
+        "imputed_rate_share_of_short_notional": 0.05437111028676211,
+        "ineligible_exit_reeligible_within_10_sessions_share": 0.0024489795918367346,
+        "ineligible_held_sessions_by_cause": {
+          "membership_false": 119,
+          "score_nonfinite": 13,
+          "score_valid_false": 13
+        },
+        "ineligible_hold_sessions": 5,
+        "insolvency_date": null,
+        "insolvent": false,
+        "intended_entry_count": 1310,
+        "intended_entry_fill_rate": 0.9992762625288408,
+        "intended_order_count": 2695,
+        "mark_mode": "raw",
+        "maximum_absolute_hedge_fraction_nav": 0.3442543742719576,
+        "maximum_gross_fraction_nav": 2.1614248713053845,
+        "maximum_stale_mark_inventory_fraction_nav": 0.0704346635911175,
+        "maximum_unresolved_claim_inventory_fraction_nav": 0.0,
+        "maximum_unresolved_stale_inventory_fraction_nav": 0.0704346635911175,
+        "mean_absolute_ex_ante_beta_after_hedge": 0.013151255615999623,
+        "mean_absolute_net_fraction_nav_including_hedge": 0.1025701891804026,
+        "mean_absolute_volatility_occupancy_deviation_long": 0.3403225806451613,
+        "mean_absolute_volatility_occupancy_deviation_short": 0.4064516129032258,
+        "mean_daily_exits_per_side": 5.370967741935484,
+        "mean_entry_eligible_name_count": 198.1048387096774,
+        "mean_gross_fraction_nav": 1.9490288560105364,
+        "mean_gross_fraction_nav_including_hedge": 2.0499788127727503,
+        "mean_net_excess_bps_per_day": -4.643273136931587,
+        "mean_pending_exit_age_sessions": 4.5,
+        "mean_stale_mark_inventory_fraction_nav": 0.005040938026246489,
+        "mean_turnover_fraction_nav": 0.7567871249832215,
+        "mean_unresolved_claim_inventory_fraction_nav": 0.0,
+        "mean_unresolved_stale_inventory_fraction_nav": 0.005040938026246489,
+        "mean_volatility_group_size_by_quintile": [
+          40.04032258064516,
+          39.57258064516129,
+          39.67741935483871,
+          39.57258064516129,
+          39.24193548387097
+        ],
+        "mean_volatility_occupancy_long_by_quintile": [
+          5.57258064516129,
+          5.951612903225806,
+          5.983870967741935,
+          6.137096774193548,
+          5.669354838709677
+        ],
+        "mean_volatility_occupancy_short_by_quintile": [
+          5.540322580645161,
+          5.798387096774194,
+          5.830645161290323,
+          5.919354838709677,
+          5.717741935483871
+        ],
+        "mean_volatility_quota_by_quintile": [
+          6.0,
+          6.0,
+          6.0,
+          6.0,
+          6.0
+        ],
+        "minimum_gross_fraction_nav": 0.0,
+        "minimum_volatility_group_size_by_quintile": [
+          38,
+          38,
+          38,
+          38,
+          37
+        ],
+        "placeholder_priced_session_count": 5,
+        "placeholder_rate_share_of_short_notional": 0.03965589252873376,
+        "risk_trim_days_by_type": {
+          "gross": 0,
+          "name": 12,
+          "net": 5
+        },
+        "risk_trim_notional_by_type": {
+          "gross": 0.0,
+          "name": 0.03084597721781085,
+          "net": 0.9722684266114866
+        },
+        "same_close_replacements": 1186,
+        "same_day_action_sessions": 57,
+        "settled_then_printed_count": 0,
+        "settlement_economics_unresolved_fraction_nav": 0.15,
+        "settlement_grace_sessions": 10,
+        "settlement_haircut": 0.3,
+        "share_sizing_mode": "notional_entries_position_fraction_exits",
+        "short_notional_weighted_borrow_rate": 0.04252924516679343,
+        "short_side_unshortable_candidate_share": 0.5465631929046563,
+        "spilled_entries_long_by_quintile": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "spilled_entries_short_by_quintile": [
+          0,
+          0,
+          0,
+          0,
+          9
+        ],
+        "stale_mark_name_days": 18,
+        "terminal_hedge_signed_notional": 0.0,
+        "terminal_nav": 0.9972526741930899,
+        "terminal_nav_settlement_haircut_scenario": 0.9747489046256086,
+        "terminal_nav_unresolved_excluded": 0.9972526741930899,
+        "terminal_net_notional_including_hedge": 0.0,
+        "terminal_no_print_dominates": false,
+        "terminal_settlement_convention": "last_mark_after_10_sessions",
+        "terminal_settlement_count": 2,
+        "terminal_settlement_economics_unresolved": false,
+        "terminal_settlement_notional": 0.07400183647803371,
+        "terminal_settlement_notional_fraction_nav": 0.0706963207262224,
+        "terminal_unresolved_reason_breakdown": {
+          "no_terminal_print": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "other": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "prior_pending_exit": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "settlement_grace_sessions": {
+            "count": 0,
+            "notional": 0.0
+          },
+          "unresolved_action": {
+            "count": 0,
+            "notional": 0.0
+          }
+        },
+        "unresolved_action_name_days": 0,
+        "unresolved_inventory_count": 0,
+        "unresolved_inventory_notional": 0.0,
+        "unresolved_payable": 0.0,
+        "unresolved_receivable": 0.0,
+        "valuation_scenario_count": 0,
+        "volatility_balanced_entries": true,
+        "zero_entry_days_by_cause": {
+          "gross_cap": 0,
+          "missing_reference": 0,
+          "name_cap": 0,
+          "net_cap": 5,
+          "small_universe": 0
+        }
+      },
+      "scenario": "comparator_sterile_proceeds",
+      "source_mean_net_excess_bps": -4.733967493089597
+    }
+  ],
+  "source_evaluation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round2_rev4f_564efc8_20260909T000352Z\\aggregates\\arm_B\\F1\\evaluation.json",
+    "sha256": "7f94894d6a3ec0f6aade80134f5c3e3f35271de30784c392964deec3751b1d11"
+  },
+  "status": "stopped_root_preserved_clarification_approved",
+  "test_accessed": false
+}

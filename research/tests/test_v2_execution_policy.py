@@ -210,3 +210,56 @@ def test_sweep_baseline_serialization_matches_evaluation():
         inputs, source, ExecutionPolicy(), np.full(inputs.active.shape, 30e6)
     )
     assert not any("baseline_daily" in failure for failure in panel["failed_gates"])
+
+
+def test_missing_score_carry_at_theta_one_changes_risk_trim_priority():
+    """The supplied carry rule is an execution change even without smoothing."""
+    inputs = _fixture()
+    active = inputs.active.copy()
+    active[2:, -1] = False
+    close = inputs.raw_close.copy()
+    close[1:, -2:] = 400.0
+    raw = np.broadcast_to(np.arange(60, dtype=float), active.shape).copy()
+    raw[~active] = np.nan
+    inputs = replace(inputs, active=active, raw_close=close)
+    config = replace(
+        LedgerConfig(),
+        k_per_side=2,
+        buffer_per_side=2,
+        volatility_balanced_entries=False,
+        beta_hedge=False,
+        planned_name_weight_cap=1.0,
+        planned_absolute_net_cap=0.6,
+    )
+    books = []
+    for carry in (0, 5):
+        scores, mask = smooth_and_rank(raw, active, theta=1, carry_sessions=carry)
+        kwargs = {
+            **_ledger_inputs(inputs, scores, mask),
+            "initial_reference_price": np.full(60, 100.0),
+        }
+        books.append(
+            simulate_stateful_ledger(
+                **kwargs,
+                config=config,
+                shortable=inputs.shortable_by_borrow_source["borrow_balance"],
+            )
+        )
+    trims = [
+        [
+            order.security_index
+            for order in book.intended_orders
+            if order.decision_session == 2 and order.purpose == "risk_exit"
+        ]
+        for book in books
+    ]
+    assert trims == [[59], [58]]
+
+
+def test_theta_one_preserves_missing_composites_but_smoothing_carries():
+    inputs = _fixture()
+    inputs.score_mask[2:4, 0] = False
+    _, current_mask = traded_signal(inputs, ExecutionPolicy())
+    _, smooth_mask = traded_signal(inputs, ExecutionPolicy(theta=0.5))
+    assert not current_mask[2:4, 0].any()
+    assert smooth_mask[2:4, 0].all()

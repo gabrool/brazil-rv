@@ -90,7 +90,12 @@ def smooth_and_rank(
 
 def traded_signal(inputs: EvaluationInputs, policy: ExecutionPolicy):
     composite, valid = _economics_signal(inputs, horizons=policy.horizons)
-    return smooth_and_rank(composite, valid, theta=policy.theta)
+    return smooth_and_rank(
+        composite,
+        valid,
+        theta=policy.theta,
+        carry_sessions=0 if policy.theta == 1.0 else 5,
+    )
 
 
 def traded_readouts(inputs: EvaluationInputs, scores, mask) -> dict[str, NDArray]:

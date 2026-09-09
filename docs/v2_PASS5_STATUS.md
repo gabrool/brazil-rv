@@ -107,9 +107,14 @@ before any new evaluation. The stopped inventory is
 The subsequent approved fresh replay completed under `564efc8`. Its result hash is
 `808369c99b14eebcf3d6f55d67b888c8a2e4cb536965f21adae9c17d282d25a6`;
 inventory `0f8b3bb6116c0fe285671fd77666fa50ea9690d8ca707a70d3ba3c5dd69767f6`.
-The remaining sequence is CPU execution sweep, intraday coverage repair, one
-development-only store build, 16-book acceptance, Round 1' CPU, then stop for
-the user's go before paid Round 3. No sweep, new store or new fit has run.
+The R3.1 runner is implemented. Its first baseline panel stopped because the
+supplied missing-score carry changed theta=1 risk-trim decisions. A baseline-only
+isolation exactly reproduced the sealed book when carry was disabled. The user
+explicitly clarified that theta=1 retains current behavior and carry applies only
+at theta<1. [Evidence and preserved roots](v2_R31_BASELINE_STOP.md) record this.
+A fresh freeze will apply that clarification. No alternative grid cell, new store
+or new fit has run. After the sweep: intraday coverage repair, one development-only
+store build, 16-book acceptance, Round 1' CPU, then stop for the user's GPU go.
 
 Validation before replay: Ruff and compilation pass; the full research suite passed
 908 tests in 467.91 seconds. The final focused run passed 100 tests, including

@@ -56,8 +56,12 @@ borrow cases and sterile comparator before an alternative can be interpreted.
 Grid order is theta 1, 0.5, 0.25; within theta the horizon tuples (1,2,3,5),
 (3,5,10), (5,10); within each tuple equal then inverse sigma. Composite ranks and
 smoothing restart at each evaluation fold, alongside the existing empty ledger.
-Missing composites carry state for at most five sessions, for every theta; daily
-reranking follows smoothing. Active eligibility remains a separate requirement.
+By the user's explicit clarification after the sealed baseline stop, theta=1
+preserves current missing-score behavior (no carry); theta=0.5/0.25 carry missing
+composites for at most five sessions. Daily reranking follows smoothing. Active
+eligibility remains a separate requirement. The stopped `8e592df` root stays
+immutable; a fresh committed freeze applies this clarification. The baseline-only
+isolation showed that no-carry reranking reproduces its sealed Arm-B/F1 book exactly.
 Traded IC evaluates that composite against each of the existing D1/D2/D3/D5 neutral
 targets on their common supported population and averages the four daily ICs.
 Persistence and top-minus-bottom-decile shareholder spread use the same existing

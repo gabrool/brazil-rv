@@ -2619,3 +2619,20 @@ The sweep freezes verified rev4f source inventories and a clean commit, records
 all folds/candidates, and seals any stop without selecting from a partial grid.
 Validation: 139 existing ledger/evaluator/research-round tests and nine new
 targeted policy/attribution tests pass; Ruff is clean. No GPU work is authorized.
+
+### R3.1 baseline stop and approved theta=1 clarification
+
+The first baseline root `v2_execution_sweep_8e592df_20260909T002609Z` stopped on
+Arm-B/F1: five-session missing-score carry changes risk-trim priorities even at
+theta=1. Three scenario daily tables differ on 22 days; borrow-open is identical.
+D1-D5 and headline hard gates all pass. No alternative grid cell was run. The
+root is sealed without a research claim (inventory
+`09d8d32a00fae7ec2a9e69ff43850e59d6a2d0b9cd30d1c08c615dd709bf9db5`).
+Baseline-only isolation proves that reranking without carry reproduces the sealed
+book exactly. The full order trace and hashes are in `docs/v2_R31_BASELINE_STOP.md`.
+
+The user explicitly chose: preserve current theta=1, carry only at theta<1.
+The canonical policy and effective registration now implement that interpretation;
+all original/stopped roots remain immutable. The new regression isolates risk-trim
+priority under missing scores, and a second checks the approved theta-specific
+carry rule. Eleven policy/attribution tests pass. Restart from a fresh clean freeze.
