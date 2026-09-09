@@ -1,0 +1,21 @@
+{
+  "authority": "User authorized autonomous recommended resolutions while absent.",
+  "log_hashes": {
+    "completion.json": "49d5550f752de42272a869e7aa9ee58178d4ec3578079d038e620e4236af96d7",
+    "launch.json": "a9d4657fec08658d63c3903b4c894362136e34d5770f7e2bd88cdd2e9cb08e5e",
+    "stderr.log": "6c0b9c8951f5f17f2b2b65d8c8b1d62a23d3c680a2954cac8ac21daf0934299f",
+    "stdout.log": "42219684b70b79a52887f1af46b83f31256c858e7d3d9ccdfade98478bde312b"
+  },
+  "log_root": "D:\\quant-data\\b3\\interim\\v2_cpu_comparison_20260909T103125Z",
+  "new_store_manifest_sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64",
+  "new_store_root": "D:/quant-data/b3/processed/v2_daily_store_3d67624_20260909T100323Z",
+  "official_validation_accessed": false,
+  "reason": "The comparison requested the ten-session 2021 pretrain embargo as evaluation samples; the existing model access boundary correctly rejected 2021-08-02 before opening payload arrays.",
+  "recorded_at_utc": "2026-09-09T10:33:41.432007+00:00",
+  "research_settings_changed": false,
+  "resolution": "Use the same existing bounded-history capability as the hedge-beta builder. Embargo rows are audited as causal history of authorized later samples, not as new model samples. The all-array comparison and through-2024 target-endpoint bound are unchanged.",
+  "status": "audit_access_setup_failed_before_array_payload",
+  "store_rebuilt_again": false,
+  "test_accessed": false,
+  "validation": "Two targeted tests pass, including a changed embargo input and distinct out-of-bound target payloads; Ruff passes."
+}

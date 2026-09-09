@@ -10,8 +10,8 @@ from pathlib import Path
 import numpy as np
 
 from .artifacts import inventory, sha256_file, write_json_atomic
-from .contract import DEVELOPMENT_END, HORIZONS
-from .store import open_store_for_dates, peak_rss_bytes
+from .contract import DEVELOPMENT_END, FINETUNE_START, HORIZONS, PRETRAIN_END
+from .store import open_store_for_samples, peak_rss_bytes
 
 
 def monthly_coverage(store, dates: np.ndarray) -> list[dict[str, object]]:
@@ -97,6 +97,23 @@ def registered_change(name: str) -> bool:
     )
 
 
+def _open_audit_store(root, rows, dates, *, verify_hashes=True):
+    # The pretrain embargo remains unsampleable. As in the beta builder, it is
+    # covered only as bounded causal history of later authorized samples.
+    samples = rows[
+        (dates <= np.datetime64(PRETRAIN_END))
+        | (dates >= np.datetime64(FINETUNE_START))
+    ]
+    return open_store_for_samples(
+        root,
+        samples,
+        purpose="evaluation",
+        history_lookbacks=60,
+        history_end_offsets=0,
+        verify_hashes=verify_hashes,
+    )
+
+
 def compare(*, previous: Path, current: Path, output: Path) -> dict[str, object]:
     dates = np.load(current / "date_index.npy", allow_pickle=False)
     old_dates = np.load(previous / "date_index.npy", allow_pickle=False)
@@ -106,8 +123,8 @@ def compare(*, previous: Path, current: Path, output: Path) -> dict[str, object]
     if not np.array_equal(old_dates[old_rows], dates):
         raise ValueError("rebuilt calendar differs from the canonical date slice")
     rows = np.arange(len(dates), dtype=np.int64)
-    old, old_access = open_store_for_dates(previous, old_rows, purpose="evaluation")
-    new, new_access = open_store_for_dates(current, rows, purpose="evaluation")
+    old, old_access = _open_audit_store(previous, old_rows, dates)
+    new, new_access = _open_audit_store(current, rows, dates)
     comparisons, failures = [], []
     try:
         if old.isins != new.isins:
@@ -121,12 +138,10 @@ def compare(*, previous: Path, current: Path, output: Path) -> dict[str, object]
                 # between arrays instead of retaining two complete stores in RSS.
                 old.close()
                 new.close()
-                old, _ = open_store_for_dates(
-                    previous, old_rows, purpose="evaluation", verify_hashes=False
+                old, _ = _open_audit_store(
+                    previous, old_rows, dates, verify_hashes=False
                 )
-                new, _ = open_store_for_dates(
-                    current, rows, purpose="evaluation", verify_hashes=False
-                )
+                new, _ = _open_audit_store(current, rows, dates, verify_hashes=False)
             changed = registered_change(name)
             record = {"array": name, "registered_change": changed}
             if name not in old_names or name not in new_names:
@@ -203,9 +218,7 @@ def compare(*, previous: Path, current: Path, output: Path) -> dict[str, object]
         # Releasing mappings before the coverage pass bounds audit RSS too.
         old.close()
         new.close()
-        new, _ = open_store_for_dates(
-            current, rows, purpose="evaluation", verify_hashes=False
-        )
+        new, _ = _open_audit_store(current, rows, dates, verify_hashes=False)
         coverage = monthly_coverage(new, dates)
         build_metadata = new.manifest["metadata"]
         result = {
@@ -228,6 +241,7 @@ def compare(*, previous: Path, current: Path, output: Path) -> dict[str, object]
                 "names": len(new.isins),
             },
             "target_comparison": "authorized (t,t+H] endpoints only; unavailable target payload is not decoded",
+            "pretrain_embargo_access": "bounded causal history only; never a training, selection, or evaluation sample",
             "previous_access": old_access.payload(),
             "current_access": new_access.payload(),
             "build_peak_rss_bytes": build_metadata.get("build_peak_rss_bytes"),
