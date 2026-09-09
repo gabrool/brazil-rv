@@ -20,6 +20,34 @@ def _design():
     }
 
 
+def test_freeze_rejects_a_cpu_root_that_no_longer_matches_its_seal(
+    tmp_path, monkeypatch
+):
+    from brazil_rv.v2.artifacts import write_json_atomic
+
+    monkeypatch.setattr(round4.rr, "_git_identity", lambda: {})
+    write_json_atomic(
+        tmp_path / "checkpoint_cpu_result.json",
+        {
+            "schema": round4.CHECKPOINT_SCHEMA,
+            "status": "cpu_rebaseline_complete",
+        },
+    )
+    write_json_atomic(
+        tmp_path / "artifact_inventory.json",
+        {
+            "status": "passed",
+            "files": [],
+            "excluded_self": [
+                "artifact_inventory.json",
+                "artifact_inventory.json.sha256",
+            ],
+        },
+    )
+    with pytest.raises(ValueError, match="verified sealed CPU root"):
+        round4.freeze(tmp_path, tmp_path / "round4")
+
+
 def test_phase_counts_same_seed_handoffs_and_cli_options(tmp_path, monkeypatch):
     monkeypatch.setattr(round4, "_design", lambda root: _design())
     monkeypatch.setattr(

@@ -76,6 +76,14 @@ def freeze(cpu_root: Path, output: Path) -> str:
         or result.get("status") != "cpu_rebaseline_complete"
     ):
         raise ValueError("Round 4 requires the completed CPU re-baseline")
+    inventory_path = cpu_root / "artifact_inventory.json"
+    sealed = rr._read_json(inventory_path)
+    if (
+        sealed.get("status") != "passed"
+        or rr.inventory(cpu_root, exclude=set(sealed["excluded_self"]))
+        != sealed["files"]
+    ):
+        raise ValueError("Round 4 requires a verified sealed CPU root")
     for name in (*rr._BASELINE_SIGNAL_NAMES, *CELLS):
         family = "gbdt" if name in CELLS else "baselines"
         for fold in DEVELOPMENT_FOLDS:
@@ -118,6 +126,7 @@ def freeze(cpu_root: Path, output: Path) -> str:
             "root": str(cpu_root.resolve()),
             "result_sha256": sha256_file(result_path),
             "frozen_design_sha256": sha256_file(cpu_root / "frozen_design.json"),
+            "inventory_sha256": sha256_file(inventory_path),
         },
         preregistration={
             "path": str(REGISTRATION),

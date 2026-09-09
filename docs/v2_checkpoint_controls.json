@@ -2,6 +2,158 @@
   "accepted_cells": 70,
   "candidates": {
     "inverse_volatility_20": {
+      "economics_coverage": {
+        "by_fold": {
+          "F1": {
+            "economics_unresolved": false,
+            "sessions": 123,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F10": {
+            "economics_unresolved": false,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F11": {
+            "economics_unresolved": true,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": true,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F12": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F13": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F14": {
+            "economics_unresolved": true,
+            "sessions": 127,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": true,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F2": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F3": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F4": {
+            "economics_unresolved": true,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": -0.0675438476152935,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F5": {
+            "economics_unresolved": false,
+            "sessions": 123,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F6": {
+            "economics_unresolved": false,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F7": {
+            "economics_unresolved": true,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": true,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.03434166007044406,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F8": {
+            "economics_unresolved": false,
+            "sessions": 125,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F9": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          }
+        },
+        "interpretation": "resolved_fold_economics_only_when_any_fold_is_unresolved",
+        "pooling_rule": "existing_rule_excludes_whole_unresolved_folds_without_filling_or_revaluing",
+        "unresolved_folds": [
+          "F4",
+          "F7",
+          "F11",
+          "F14"
+        ]
+      },
       "per_horizon_pooled": {
         "D10_neutral_ic": {
           "block_length_sessions": 20,
@@ -429,9 +581,160 @@
           "undefined_reason": null,
           "upper_95": 0.7986601929808761
         }
-      }
+      },
+      "turnover_note": "includes_initial_and_terminal_book_trades; unchanged_non_circular_block_intervals_underweight_boundary_spikes"
     },
     "momentum_12_1": {
+      "economics_coverage": {
+        "by_fold": {
+          "F1": {
+            "economics_unresolved": false,
+            "sessions": 123,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F10": {
+            "economics_unresolved": false,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F11": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F12": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F13": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F14": {
+            "economics_unresolved": false,
+            "sessions": 127,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F2": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F3": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F4": {
+            "economics_unresolved": true,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": -0.10996756761736391,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F5": {
+            "economics_unresolved": false,
+            "sessions": 123,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F6": {
+            "economics_unresolved": false,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F7": {
+            "economics_unresolved": true,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": true,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.03328642134950311,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F8": {
+            "economics_unresolved": false,
+            "sessions": 125,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F9": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          }
+        },
+        "interpretation": "resolved_fold_economics_only_when_any_fold_is_unresolved",
+        "pooling_rule": "existing_rule_excludes_whole_unresolved_folds_without_filling_or_revaluing",
+        "unresolved_folds": [
+          "F4",
+          "F7"
+        ]
+      },
       "per_horizon_pooled": {
         "D10_neutral_ic": {
           "block_length_sessions": 20,
@@ -859,9 +1162,159 @@
           "undefined_reason": null,
           "upper_95": 0.07110509253759666
         }
-      }
+      },
+      "turnover_note": "includes_initial_and_terminal_book_trades; unchanged_non_circular_block_intervals_underweight_boundary_spikes"
     },
     "reversal_21": {
+      "economics_coverage": {
+        "by_fold": {
+          "F1": {
+            "economics_unresolved": false,
+            "sessions": 123,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F10": {
+            "economics_unresolved": false,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F11": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F12": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F13": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F14": {
+            "economics_unresolved": false,
+            "sessions": 127,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F2": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F3": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F4": {
+            "economics_unresolved": true,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.07090985819819363,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F5": {
+            "economics_unresolved": false,
+            "sessions": 123,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F6": {
+            "economics_unresolved": false,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F7": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F8": {
+            "economics_unresolved": false,
+            "sessions": 125,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F9": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          }
+        },
+        "interpretation": "resolved_fold_economics_only_when_any_fold_is_unresolved",
+        "pooling_rule": "existing_rule_excludes_whole_unresolved_folds_without_filling_or_revaluing",
+        "unresolved_folds": [
+          "F4"
+        ]
+      },
       "per_horizon_pooled": {
         "D10_neutral_ic": {
           "block_length_sessions": 20,
@@ -1289,9 +1742,160 @@
           "undefined_reason": null,
           "upper_95": 0.31013542120627646
         }
-      }
+      },
+      "turnover_note": "includes_initial_and_terminal_book_trades; unchanged_non_circular_block_intervals_underweight_boundary_spikes"
     },
     "reversal_5": {
+      "economics_coverage": {
+        "by_fold": {
+          "F1": {
+            "economics_unresolved": false,
+            "sessions": 123,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F10": {
+            "economics_unresolved": false,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F11": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F12": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F13": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F14": {
+            "economics_unresolved": false,
+            "sessions": 127,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F2": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F3": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F4": {
+            "economics_unresolved": true,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": -0.061239010620855336,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F5": {
+            "economics_unresolved": false,
+            "sessions": 123,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F6": {
+            "economics_unresolved": false,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F7": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F8": {
+            "economics_unresolved": true,
+            "sessions": 125,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": true,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.03345182411677413,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F9": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          }
+        },
+        "interpretation": "resolved_fold_economics_only_when_any_fold_is_unresolved",
+        "pooling_rule": "existing_rule_excludes_whole_unresolved_folds_without_filling_or_revaluing",
+        "unresolved_folds": [
+          "F4",
+          "F8"
+        ]
+      },
       "per_horizon_pooled": {
         "D10_neutral_ic": {
           "block_length_sessions": 20,
@@ -1719,9 +2323,162 @@
           "undefined_reason": null,
           "upper_95": 0.9209591077813093
         }
-      }
+      },
+      "turnover_note": "includes_initial_and_terminal_book_trades; unchanged_non_circular_block_intervals_underweight_boundary_spikes"
     },
     "reversal_5_momentum_12_1_blend": {
+      "economics_coverage": {
+        "by_fold": {
+          "F1": {
+            "economics_unresolved": false,
+            "sessions": 123,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F10": {
+            "economics_unresolved": false,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F11": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F12": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F13": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F14": {
+            "economics_unresolved": true,
+            "sessions": 127,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": true,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F2": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F3": {
+            "economics_unresolved": false,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F4": {
+            "economics_unresolved": true,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": -0.08891118492195617,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F5": {
+            "economics_unresolved": false,
+            "sessions": 123,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F6": {
+            "economics_unresolved": false,
+            "sessions": 126,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F7": {
+            "economics_unresolved": true,
+            "sessions": 122,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": true,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.03587831769242054,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F8": {
+            "economics_unresolved": true,
+            "sessions": 125,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": true,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.03333382719983619,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          },
+          "F9": {
+            "economics_unresolved": false,
+            "sessions": 124,
+            "terminal_hedge_signed_notional": 0.0,
+            "terminal_no_print_dominates": false,
+            "terminal_settlement_economics_unresolved": false,
+            "terminal_unresolved_inventory_fraction_nav": 0.0,
+            "unresolved_payable": 0.0,
+            "unresolved_receivable": 0.0
+          }
+        },
+        "interpretation": "resolved_fold_economics_only_when_any_fold_is_unresolved",
+        "pooling_rule": "existing_rule_excludes_whole_unresolved_folds_without_filling_or_revaluing",
+        "unresolved_folds": [
+          "F4",
+          "F7",
+          "F8",
+          "F14"
+        ]
+      },
       "per_horizon_pooled": {
         "D10_neutral_ic": {
           "block_length_sessions": 20,
@@ -2149,7 +2906,8 @@
           "undefined_reason": null,
           "upper_95": 0.5006969160549438
         }
-      }
+      },
+      "turnover_note": "includes_initial_and_terminal_book_trades; unchanged_non_circular_block_intervals_underweight_boundary_spikes"
     }
   },
   "deployment_changed": false,
@@ -2157,10 +2915,10 @@
   "frozen_design_sha256": "7d3f074afbef581e7c13fd3315db1becda3cddc579465fcb977af21cdc60b230",
   "full_readout": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_research_checkpoint_d2f7de4_20260909\\controls_readout.json",
-    "sha256": "ca21283a5ce02d3d81721ca8dea2274f67146914eaf5d60bd1e1ba1fc5afd5c6"
+    "sha256": "1a6982409bc2e02456691c90d2c282f6fc26a485427f9fc1071176ad54cfe009"
   },
   "implementation": {
-    "commit": "d2f7de406413f4c4462e957646144786e039821a",
+    "commit": "b991b5fa42dee4dd33fbdf225ab0314e5d7672b6",
     "tracked_worktree_clean": true
   },
   "official_validation_accessed": false,
