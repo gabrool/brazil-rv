@@ -18,11 +18,7 @@ from .round5_cvm import ENET, Tables, normalized, sha256, write_json
 
 
 def _text(payload: bytes) -> str:
-    try:
-        return payload.decode("utf-8")
-    except UnicodeDecodeError:
-        # Historical ENET pages actually use Windows-1252, without a meta charset.
-        return payload.decode("cp1252")
+    return payload.decode("utf-8")
 
 
 def _identity(document: dict) -> dict:

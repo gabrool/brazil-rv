@@ -38,7 +38,7 @@ def table(unit="Unidade", treasury="104.136.909"):
             for row in rows
         )
         + "</table>"
-    ).encode("cp1252")
+    ).encode("utf-8")
 
 
 def viewer(*, group=False, version=1, captcha="N", code="009512", handler=True):
