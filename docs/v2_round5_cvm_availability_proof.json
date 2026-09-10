@@ -1,0 +1,151 @@
+{
+  "schema": "ROUND5_CVM_SOURCE_AVAILABILITY_PROOF_V1",
+  "status": "source_audit_and_fixture_passed_full_build_pending",
+  "source_root": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm",
+  "through": "2024-12-30",
+  "source_bindings": {
+    "annual_manifest.json": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\annual_manifest.json",
+      "sha256": "5831dd5611a9b5150e246409ce2b906859ab70b52a431c5fdd31f0e45dce56c9"
+    },
+    "rad_manifest.json": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\rad_manifest.json",
+      "sha256": "cbdcd42ffde4e7d5e979b688d68a7ef9ac78468c427877a8e7ac73154fd4af6d"
+    },
+    "identity_name_probe.json": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\identity_name_probe.json",
+      "sha256": "a1a7d1c2a61732c5f2ef6262088af35401900454c0cc2b405164d151fdcd6f44"
+    }
+  },
+  "decision_rule": {
+    "timezone": "America/Sao_Paulo",
+    "cutoff": "15:45:00",
+    "exact_minute": "receipt +1minute <= decision",
+    "date_only": "next B3 session",
+    "example_same_day": "2024-01-04 15:44 ->2024-01-04 15:45",
+    "example_next_session": "2024-01-04 15:45 ->2024-01-05 15:45",
+    "builder_additional_lag": false
+  },
+  "raw_features": {
+    "events": [
+      "sessions_since_financial_filing",
+      "filing_is_dfp",
+      "sessions_since_material_fact",
+      "material_fact_count_20",
+      "dividend_announcement_age",
+      "offering_or_buyback_flag",
+      "sessions_until_expected_filing"
+    ],
+    "fundamentals": [
+      "log_market_cap",
+      "book_to_market",
+      "earnings_yield_ttm",
+      "gross_profitability",
+      "liabilities_to_assets",
+      "accruals_to_assets",
+      "revenue_growth_yoy",
+      "sue",
+      "statement_age_sessions"
+    ],
+    "scope_flags": [
+      "fundamental_financial_flag",
+      "fundamental_consolidated_flag",
+      "valuation_single_class_flag"
+    ]
+  },
+  "age_columns": "Each raw feature has matching <name>_age_sessions; multiquarter age is oldest contributing receipt. Price revaluation retains share-count/accounting age. Current event-window count/absence age0.",
+  "identity": {
+    "name_rule": "exact normalized spelling, punctuation/accent removed and terminal corporate S.A. removed; no abbreviation/fuzzy match; later ticker proof diagnostic only",
+    "probe_summary": [
+      {
+        "year": 2010,
+        "issuer_names": 933,
+        "observed_isins": 546,
+        "exact_legal_name_isins": 105,
+        "later_agree_isins": 74,
+        "ambiguous": 0,
+        "later_disagree": 1
+      },
+      {
+        "year": 2011,
+        "issuer_names": 965,
+        "observed_isins": 535,
+        "exact_legal_name_isins": 110,
+        "later_agree_isins": 80,
+        "ambiguous": 0,
+        "later_disagree": 0
+      },
+      {
+        "year": 2012,
+        "issuer_names": 943,
+        "observed_isins": 504,
+        "exact_legal_name_isins": 106,
+        "later_agree_isins": 81,
+        "ambiguous": 0,
+        "later_disagree": 0
+      },
+      {
+        "year": 2013,
+        "issuer_names": 918,
+        "observed_isins": 470,
+        "exact_legal_name_isins": 109,
+        "later_agree_isins": 86,
+        "ambiguous": 0,
+        "later_disagree": 0
+      },
+      {
+        "year": 2014,
+        "issuer_names": 913,
+        "observed_isins": 458,
+        "exact_legal_name_isins": 103,
+        "later_agree_isins": 88,
+        "ambiguous": 0,
+        "later_disagree": 0
+      },
+      {
+        "year": 2015,
+        "issuer_names": 906,
+        "observed_isins": 461,
+        "exact_legal_name_isins": 99,
+        "later_agree_isins": 86,
+        "ambiguous": 0,
+        "later_disagree": 0
+      },
+      {
+        "year": 2016,
+        "issuer_names": 884,
+        "observed_isins": 447,
+        "exact_legal_name_isins": 96,
+        "later_agree_isins": 85,
+        "ambiguous": 0,
+        "later_disagree": 0
+      },
+      {
+        "year": 2017,
+        "issuer_names": 877,
+        "observed_isins": 443,
+        "exact_legal_name_isins": 93,
+        "later_agree_isins": 88,
+        "ambiguous": 0,
+        "later_disagree": 1
+      }
+    ],
+    "consumer_rule": "Already received FCA legal spelling or cash ticker; prior observed permanent ISIN; class and effective bounds; unique contemporaneous CNPJ; exact-name-only instruments must have existed by FCA receipt; same CNPJ legal root and same CVM code are required for establishment alias joins.",
+    "future_survivor_filter": false,
+    "sector_backprojection": false,
+    "classified_disagreements": [
+      "Paranapanema establishment suffix change within root60398369 /CVM009393",
+      "Smiles genuine legal succession/new ISIN, excluded from old-FCA name fallback"
+    ],
+    "ticker_reuse_rule": "A known FCA ticker cannot label an ISIN first observed after its receipt unless the FCA explicitly preannounced that exact first B3 listing session. No generic stale-age threshold."
+  },
+  "version_contract": "Annual account rows cannot use another version or ambiguous same-version document ID. Missing originals remain missing; later same-number replacement enters at its own receipt.",
+  "valuation_contract": "Only one issued class/dated ISIN; non-treasury own-version count × observed t−1 close; mask intervening completed DISMES/split/ambiguity or known FRE share-capital change; no retrospective action resolution or inferred ratio adjustment.",
+  "fixture_tests": "research/tests/test_v2_round5_cvm.py",
+  "fixtures_passed": 21,
+  "full_family_build_performed": false,
+  "original_recovery_status": "running; completion manifest not yet sealed",
+  "group_b": "timing audit only; no original receipt/vintage guarantee, no model consumer",
+  "ttm_contract": "Annual12monthflow directly; interim currentYTD + priorannual - prior-yearsameYTD; each ownlatestpublicversion, exact fiscalstart/end and accountingbasis; standaloneQ4/SUE still require received9M andDFP.",
+  "group_b_report": "docs/v2_round5_group_b_funds.md"
+}

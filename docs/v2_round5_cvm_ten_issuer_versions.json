@@ -1,0 +1,688 @@
+{
+  "scope": "2019-2023 reference periods; receipts through 2024-12-31; existing immutable snapshot only",
+  "ten_issuers": [
+    {
+      "issuer": "009512",
+      "name": "PETROLEO BRASILEIRO S.A. PETROBRAS",
+      "header_versions": 22,
+      "rad_versions": 22,
+      "first_version_count": 20,
+      "later_version_count": 2,
+      "version_gaps": [],
+      "rad_missing_from_archive": [],
+      "archive_missing_rad": [],
+      "headers_with_no_account_detail": [
+        [
+          "009512",
+          "DFP",
+          "2020-12-31",
+          1
+        ],
+        [
+          "009512",
+          "DFP",
+          "2023-12-31",
+          1
+        ]
+      ],
+      "sample_revision": [
+        {
+          "kind": "DFP",
+          "reference_date": "2023-12-31",
+          "version": 1,
+          "receipt_date": "2024-03-08",
+          "id_doc": "134555",
+          "timestamp": "2024-03-08 02:30:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=134555"
+        },
+        {
+          "kind": "DFP",
+          "reference_date": "2023-12-31",
+          "version": 2,
+          "receipt_date": "2024-03-25",
+          "id_doc": "135086",
+          "timestamp": "2024-03-25 19:21:00",
+          "statements": [
+            "BPA_con",
+            "BPA_ind",
+            "BPP_con",
+            "BPP_ind",
+            "DFC_MI_con",
+            "DFC_MI_ind",
+            "DRE_con",
+            "DRE_ind"
+          ],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=135086"
+        }
+      ]
+    },
+    {
+      "issuer": "004170",
+      "name": "VALE S.A.",
+      "header_versions": 28,
+      "rad_versions": 28,
+      "first_version_count": 20,
+      "later_version_count": 8,
+      "version_gaps": [],
+      "rad_missing_from_archive": [],
+      "archive_missing_rad": [],
+      "headers_with_no_account_detail": [
+        [
+          "004170",
+          "ITR",
+          "2019-06-30",
+          1
+        ],
+        [
+          "004170",
+          "ITR",
+          "2019-06-30",
+          2
+        ],
+        [
+          "004170",
+          "DFP",
+          "2019-12-31",
+          1
+        ],
+        [
+          "004170",
+          "ITR",
+          "2020-09-30",
+          1
+        ],
+        [
+          "004170",
+          "ITR",
+          "2021-03-31",
+          1
+        ],
+        [
+          "004170",
+          "ITR",
+          "2021-06-30",
+          1
+        ],
+        [
+          "004170",
+          "ITR",
+          "2022-03-31",
+          1
+        ],
+        [
+          "004170",
+          "DFP",
+          "2022-12-31",
+          1
+        ]
+      ],
+      "sample_revision": [
+        {
+          "kind": "ITR",
+          "reference_date": "2022-03-31",
+          "version": 1,
+          "receipt_date": "2022-04-27",
+          "id_doc": "113986",
+          "timestamp": "2022-04-27 18:11:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=113986"
+        },
+        {
+          "kind": "ITR",
+          "reference_date": "2022-03-31",
+          "version": 2,
+          "receipt_date": "2022-04-29",
+          "id_doc": "114080",
+          "timestamp": "2022-04-29 18:35:00",
+          "statements": [
+            "BPA_con",
+            "BPA_ind",
+            "BPP_con",
+            "BPP_ind",
+            "DFC_MI_con",
+            "DFC_MI_ind",
+            "DRE_con",
+            "DRE_ind"
+          ],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=114080"
+        }
+      ]
+    },
+    {
+      "issuer": "019348",
+      "name": "ITAU UNIBANCO HOLDING S.A.",
+      "header_versions": 23,
+      "rad_versions": 23,
+      "first_version_count": 20,
+      "later_version_count": 3,
+      "version_gaps": [],
+      "rad_missing_from_archive": [],
+      "archive_missing_rad": [],
+      "headers_with_no_account_detail": [
+        [
+          "019348",
+          "ITR",
+          "2019-06-30",
+          1
+        ],
+        [
+          "019348",
+          "DFP",
+          "2020-12-31",
+          1
+        ],
+        [
+          "019348",
+          "DFP",
+          "2020-12-31",
+          2
+        ]
+      ],
+      "sample_revision": [
+        {
+          "kind": "ITR",
+          "reference_date": "2019-06-30",
+          "version": 1,
+          "receipt_date": "2019-07-29",
+          "id_doc": "85681",
+          "timestamp": "2019-07-29 19:01:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=85681"
+        },
+        {
+          "kind": "ITR",
+          "reference_date": "2019-06-30",
+          "version": 2,
+          "receipt_date": "2019-11-25",
+          "id_doc": "89812",
+          "timestamp": "2019-11-25 18:02:00",
+          "statements": [
+            "BPA_con",
+            "BPA_ind",
+            "BPP_con",
+            "BPP_ind",
+            "DFC_MI_con",
+            "DFC_MI_ind",
+            "DRE_con",
+            "DRE_ind"
+          ],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=89812"
+        }
+      ]
+    },
+    {
+      "issuer": "000906",
+      "name": "BCO BRADESCO S.A.",
+      "header_versions": 23,
+      "rad_versions": 23,
+      "first_version_count": 20,
+      "later_version_count": 3,
+      "version_gaps": [],
+      "rad_missing_from_archive": [],
+      "archive_missing_rad": [],
+      "headers_with_no_account_detail": [
+        [
+          "000906",
+          "DFP",
+          "2019-12-31",
+          1
+        ],
+        [
+          "000906",
+          "DFP",
+          "2020-12-31",
+          1
+        ],
+        [
+          "000906",
+          "DFP",
+          "2021-12-31",
+          1
+        ]
+      ],
+      "sample_revision": [
+        {
+          "kind": "DFP",
+          "reference_date": "2021-12-31",
+          "version": 1,
+          "receipt_date": "2022-02-08",
+          "id_doc": "111629",
+          "timestamp": "2022-02-08 18:41:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=111629"
+        },
+        {
+          "kind": "DFP",
+          "reference_date": "2021-12-31",
+          "version": 2,
+          "receipt_date": "2022-03-17",
+          "id_doc": "112640",
+          "timestamp": "2022-03-17 18:03:00",
+          "statements": [
+            "BPA_con",
+            "BPA_ind",
+            "BPP_con",
+            "BPP_ind",
+            "DFC_MD_con",
+            "DFC_MI_ind",
+            "DRE_con",
+            "DRE_ind"
+          ],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=112640"
+        }
+      ]
+    },
+    {
+      "issuer": "005410",
+      "name": "WEG S.A.",
+      "header_versions": 20,
+      "rad_versions": 20,
+      "first_version_count": 20,
+      "later_version_count": 0,
+      "version_gaps": [],
+      "rad_missing_from_archive": [],
+      "archive_missing_rad": [],
+      "headers_with_no_account_detail": [],
+      "sample_revision": []
+    },
+    {
+      "issuer": "013986",
+      "name": "SUZANO S.A.",
+      "header_versions": 22,
+      "rad_versions": 22,
+      "first_version_count": 20,
+      "later_version_count": 2,
+      "version_gaps": [],
+      "rad_missing_from_archive": [],
+      "archive_missing_rad": [],
+      "headers_with_no_account_detail": [
+        [
+          "013986",
+          "ITR",
+          "2019-09-30",
+          1
+        ],
+        [
+          "013986",
+          "ITR",
+          "2020-03-31",
+          1
+        ]
+      ],
+      "sample_revision": [
+        {
+          "kind": "ITR",
+          "reference_date": "2020-03-31",
+          "version": 1,
+          "receipt_date": "2020-05-14",
+          "id_doc": "93120",
+          "timestamp": "2020-05-14 18:22:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=93120"
+        },
+        {
+          "kind": "ITR",
+          "reference_date": "2020-03-31",
+          "version": 2,
+          "receipt_date": "2020-05-19",
+          "id_doc": "93272",
+          "timestamp": "2020-05-19 13:56:00",
+          "statements": [
+            "BPA_con",
+            "BPA_ind",
+            "BPP_con",
+            "BPP_ind",
+            "DFC_MI_con",
+            "DFC_MI_ind",
+            "DRE_con",
+            "DRE_ind"
+          ],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=93272"
+        }
+      ]
+    },
+    {
+      "issuer": "022470",
+      "name": "MAGAZINE LUIZA S.A.",
+      "header_versions": 23,
+      "rad_versions": 23,
+      "first_version_count": 20,
+      "later_version_count": 3,
+      "version_gaps": [],
+      "rad_missing_from_archive": [],
+      "archive_missing_rad": [],
+      "headers_with_no_account_detail": [
+        [
+          "022470",
+          "ITR",
+          "2021-06-30",
+          1
+        ],
+        [
+          "022470",
+          "ITR",
+          "2023-09-30",
+          1
+        ],
+        [
+          "022470",
+          "ITR",
+          "2023-09-30",
+          2
+        ]
+      ],
+      "sample_revision": [
+        {
+          "kind": "ITR",
+          "reference_date": "2023-09-30",
+          "version": 1,
+          "receipt_date": "2023-11-13",
+          "id_doc": "132433",
+          "timestamp": "2023-11-13 20:22:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=132433"
+        },
+        {
+          "kind": "ITR",
+          "reference_date": "2023-09-30",
+          "version": 2,
+          "receipt_date": "2024-03-18",
+          "id_doc": "134842",
+          "timestamp": "2024-03-18 21:27:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=134842"
+        },
+        {
+          "kind": "ITR",
+          "reference_date": "2023-09-30",
+          "version": 3,
+          "receipt_date": "2024-03-18",
+          "id_doc": "134845",
+          "timestamp": "2024-03-18 22:08:00",
+          "statements": [
+            "BPA_con",
+            "BPA_ind",
+            "BPP_con",
+            "BPP_ind",
+            "DFC_MI_con",
+            "DFC_MI_ind",
+            "DRE_con",
+            "DRE_ind"
+          ],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=134845"
+        }
+      ]
+    },
+    {
+      "issuer": "021610",
+      "name": "B3 S.A. - BRASIL, BOLSA, BALCÃO",
+      "header_versions": 21,
+      "rad_versions": 21,
+      "first_version_count": 20,
+      "later_version_count": 1,
+      "version_gaps": [],
+      "rad_missing_from_archive": [],
+      "archive_missing_rad": [],
+      "headers_with_no_account_detail": [
+        [
+          "021610",
+          "DFP",
+          "2022-12-31",
+          1
+        ]
+      ],
+      "sample_revision": [
+        {
+          "kind": "DFP",
+          "reference_date": "2022-12-31",
+          "version": 1,
+          "receipt_date": "2023-02-15",
+          "id_doc": "123562",
+          "timestamp": "2023-02-15 19:25:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=123562"
+        },
+        {
+          "kind": "DFP",
+          "reference_date": "2022-12-31",
+          "version": 2,
+          "receipt_date": "2023-03-23",
+          "id_doc": "124513",
+          "timestamp": "2023-03-23 18:08:00",
+          "statements": [
+            "BPA_con",
+            "BPA_ind",
+            "BPP_con",
+            "BPP_ind",
+            "DFC_MI_con",
+            "DFC_MI_ind",
+            "DRE_con",
+            "DRE_ind"
+          ],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=124513"
+        }
+      ]
+    },
+    {
+      "issuer": "016659",
+      "name": "PORTO SEGURO S.A.",
+      "header_versions": 28,
+      "rad_versions": 28,
+      "first_version_count": 20,
+      "later_version_count": 8,
+      "version_gaps": [],
+      "rad_missing_from_archive": [],
+      "archive_missing_rad": [],
+      "headers_with_no_account_detail": [
+        [
+          "016659",
+          "DFP",
+          "2020-12-31",
+          1
+        ],
+        [
+          "016659",
+          "DFP",
+          "2020-12-31",
+          2
+        ],
+        [
+          "016659",
+          "ITR",
+          "2023-03-31",
+          1
+        ],
+        [
+          "016659",
+          "ITR",
+          "2023-06-30",
+          1
+        ],
+        [
+          "016659",
+          "ITR",
+          "2023-06-30",
+          2
+        ],
+        [
+          "016659",
+          "ITR",
+          "2023-09-30",
+          1
+        ],
+        [
+          "016659",
+          "ITR",
+          "2023-09-30",
+          2
+        ],
+        [
+          "016659",
+          "ITR",
+          "2023-09-30",
+          3
+        ]
+      ],
+      "sample_revision": [
+        {
+          "kind": "ITR",
+          "reference_date": "2023-09-30",
+          "version": 1,
+          "receipt_date": "2023-11-09",
+          "id_doc": "132033",
+          "timestamp": "2023-11-09 18:18:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=132033"
+        },
+        {
+          "kind": "ITR",
+          "reference_date": "2023-09-30",
+          "version": 2,
+          "receipt_date": "2023-11-17",
+          "id_doc": "132723",
+          "timestamp": "2023-11-17 19:13:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=132723"
+        },
+        {
+          "kind": "ITR",
+          "reference_date": "2023-09-30",
+          "version": 3,
+          "receipt_date": "2023-12-01",
+          "id_doc": "132877",
+          "timestamp": "2023-12-01 10:50:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=132877"
+        },
+        {
+          "kind": "ITR",
+          "reference_date": "2023-09-30",
+          "version": 4,
+          "receipt_date": "2024-02-27",
+          "id_doc": "134293",
+          "timestamp": "2024-02-27 18:40:00",
+          "statements": [
+            "BPA_con",
+            "BPA_ind",
+            "BPP_con",
+            "BPP_ind",
+            "DFC_MI_con",
+            "DFC_MI_ind",
+            "DRE_con",
+            "DRE_ind"
+          ],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=134293"
+        }
+      ]
+    },
+    {
+      "issuer": "020990",
+      "name": "AMERICANAS S.A. - EM RECUPERAÇÃO JUDICIAL",
+      "header_versions": 23,
+      "rad_versions": 23,
+      "first_version_count": 20,
+      "later_version_count": 3,
+      "version_gaps": [],
+      "rad_missing_from_archive": [],
+      "archive_missing_rad": [],
+      "headers_with_no_account_detail": [
+        [
+          "020990",
+          "DFP",
+          "2019-12-31",
+          1
+        ],
+        [
+          "020990",
+          "ITR",
+          "2020-03-31",
+          1
+        ],
+        [
+          "020990",
+          "DFP",
+          "2020-12-31",
+          1
+        ]
+      ],
+      "sample_revision": [
+        {
+          "kind": "ITR",
+          "reference_date": "2020-03-31",
+          "version": 1,
+          "receipt_date": "2020-05-07",
+          "id_doc": "92819",
+          "timestamp": "2020-05-07 19:06:00",
+          "statements": [],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=92819"
+        },
+        {
+          "kind": "ITR",
+          "reference_date": "2020-03-31",
+          "version": 2,
+          "receipt_date": "2020-05-21",
+          "id_doc": "93342",
+          "timestamp": "2020-05-21 17:54:00",
+          "statements": [
+            "BPA_con",
+            "BPA_ind",
+            "BPP_con",
+            "BPP_ind",
+            "DFC_MI_con",
+            "DFC_MI_ind",
+            "DRE_con",
+            "DRE_ind"
+          ],
+          "link": "http://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=93342"
+        }
+      ]
+    }
+  ],
+  "archive_count": 16168,
+  "rad_count": 16148,
+  "rad_missing_from_archive_total": 10,
+  "archive_missing_rad_total": 30,
+  "sources": [
+    {
+      "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\itr_cia_aberta_2019.zip",
+      "sha256": "dbfe1e32296563a9efdcb993ed5811876e3d50b778bc547fe004af15b9a75021"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\dfp_cia_aberta_2019.zip",
+      "sha256": "bc82a1162b44686e8953b521e3424a5938b6661ff4655f832db4ea9488296a0d"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\itr_cia_aberta_2020.zip",
+      "sha256": "4ca11b431eb21aa98f813a3c18086ca600f234f5eb0dcec0c51a8641fccbca0a"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\dfp_cia_aberta_2020.zip",
+      "sha256": "8fb97d1887aed1e1e2d85e54cb133baf9f65b9f46f60fa8720f09c1f7a74362e"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\itr_cia_aberta_2021.zip",
+      "sha256": "c8723d5ccd4a6e99e9bc1566f2a558139cee1c2d96e4b940c4bcbedcb46a173a"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\dfp_cia_aberta_2021.zip",
+      "sha256": "64b8693b709538a0357c5179ae02231cb380d0000956ee57a873a21d4efda2e4"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\itr_cia_aberta_2022.zip",
+      "sha256": "dedc7698d6b6ab2300b5021f52913a4da86b3518a83985309d65b83736eabf6f"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\dfp_cia_aberta_2022.zip",
+      "sha256": "0dfd5e09bfe723d36b9e0f4fb7bf8e40c167d693e6f204c37026be1a5edd85d3"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\itr_cia_aberta_2023.zip",
+      "sha256": "43950193fdd20e6cffb9f75c0c40d91bd2010b440e81188110f75669d70e0748"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\dfp_cia_aberta_2023.zip",
+      "sha256": "f0bb2e59debb5232c48ade7d0806c273f919a3d1a9ffea2e8a5cb2b0439c5b97"
+    }
+  ]
+}
