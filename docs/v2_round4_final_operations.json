@@ -406,6 +406,185 @@
     "status": "closed_operational_logs_sha256_verified",
     "verified_at_utc": "2026-09-10T13:04:04.040Z"
   },
+  "closing_documentation_note": "Report commit b6a1144 matched clean local main, GitHub and the instance before termination. This later documentation records provider observations after the instance ceased to exist. Sealed research roots are unchanged.",
+  "closure": {
+    "absence_checks": [
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T13:07:40.3217175Z",
+        "exact_instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T13:07:50.6318391Z",
+        "exact_instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T13:08:00.9571244Z",
+        "exact_instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T13:08:11.2734556Z",
+        "exact_instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T13:08:21.6152190Z",
+        "exact_instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T13:08:31.9259513Z",
+        "exact_instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": true,
+        "checked_at_utc": "2026-09-10T13:08:42.2241632Z",
+        "exact_instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+        "remaining_status": []
+      },
+      {
+        "absent": true,
+        "checked_at_utc": "2026-09-10T13:08:52.5076574Z",
+        "exact_instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+        "remaining_status": []
+      }
+    ],
+    "before": {
+      "id": "248ec61615fa4c7ba2a58a32ff8fc813",
+      "name": "brazil-rv-gh200",
+      "status": "active"
+    },
+    "closed_operational_logs": {
+      "files": [
+        {
+          "bytes": 568,
+          "host_path": "C:\\Users\\gabri\\AppData\\Local\\BrazilRV\\lambda-gh200\\artifacts\\round4-closed-logs-c77ed66\\round4_a4_continue_c77ed66.log",
+          "name": "round4_a4_continue_c77ed66.log",
+          "remote_path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_ops/round4_a4_continue_c77ed66.log",
+          "sha256": "d052951cc42b3eb772bafa63ff528995f694b595a2c5d147651f377bb00dee60"
+        },
+        {
+          "bytes": 256,
+          "host_path": "C:\\Users\\gabri\\AppData\\Local\\BrazilRV\\lambda-gh200\\artifacts\\round4-closed-logs-c77ed66\\round4_audit_pack_c77ed66.log",
+          "name": "round4_audit_pack_c77ed66.log",
+          "remote_path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_ops/round4_audit_pack_c77ed66.log",
+          "sha256": "b63a3bf5bd1e94bb75ec2de4239cca40fecc01f849de666a347f6720a368772c"
+        },
+        {
+          "bytes": 1770,
+          "host_path": "C:\\Users\\gabri\\AppData\\Local\\BrazilRV\\lambda-gh200\\artifacts\\round4-closed-logs-c77ed66\\round4_a4_state_248ec616.json",
+          "name": "round4_a4_state_248ec616.json",
+          "remote_path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_ops/round4_a4_state_248ec616.json",
+          "sha256": "24f8a60cd5606b63d89fe74e7decbcdb46b7c24a3a62e713759574a19928e508"
+        }
+      ],
+      "instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+      "status": "closed_operational_logs_sha256_verified",
+      "verified_at_utc": "2026-09-10T13:04:04.040Z"
+    },
+    "commit_match": {
+      "all_match": true,
+      "github_main_commit": "b6a114465920c3bad2b35420ab085b15d2b6a42b",
+      "instance_clean": true,
+      "instance_commit": "b6a114465920c3bad2b35420ab085b15d2b6a42b",
+      "instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+      "local_clean": true,
+      "local_commit": "b6a114465920c3bad2b35420ab085b15d2b6a42b",
+      "verified_at_utc": "2026-09-10T13:07:25.026Z"
+    },
+    "host_verified_at_utc": "2026-09-10T13:04:53.030646+00:00",
+    "instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+    "status": "terminated_absent_twice",
+    "termination_requested_at_utc": "2026-09-10T13:07:30.0046524Z",
+    "termination_response_received": true,
+    "verified_recoveries": [
+      {
+        "archive_sha256": "47229a09a8481e9a7230a57fb538ef2cedf6994d5bdf1bb14207e1e322b3c0e0",
+        "hashes": {
+          "access_audit.json": "36597dcc90c322b3e5d1695d8bb4618ea092268c332e305a9e9712fbdddbf32b",
+          "artifact_inventory.json": "a4c9d098124515594c27acc970b0f3805adc3a36ebbed74e9ddf5be82b284c76",
+          "frozen_design.json": "b1965d5a6c87f9f8adf997a099e385618e42eecbfbcd80a0de55ce652211546b",
+          "screening_result.json": "6ab60e7a3c37d53563c5fd3e140a0f001ce7b43dd9aa5b9a6ca92b5e281bdaee"
+        },
+        "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_arms_3d1e95f_20260910T015000Z",
+        "physical_file_count": 7711,
+        "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_arms_3d1e95f_20260910T015000Z",
+        "status": "exact_complete_copy_sha256_verified",
+        "total_bytes": 5111515026,
+        "transport_inventory_sha256": "1dd9f5ab35b6f40e6d1638958c5b1009566d96a3e5933dcad002d33bd62cc43d",
+        "verified_at_utc": "2026-09-10T12:19:54.065976+00:00"
+      },
+      {
+        "archive_sha256": "93671a323d8577a6ee3c1b605434346ddae05fa3f7d2d490568e055764ac6a6b",
+        "hashes": {
+          "access_audit.json": "d9c55a7740beaffb4aa2e2729fe6d6b05c19f5968d8c9f5fecdc2decafe7f866",
+          "artifact_inventory.json": "bf2431e60ab6123b3d91aba93cab408b14eba0fef38124a97afee830f43087e6",
+          "frozen_design.json": "e19a4d75ea24c2e4da9c68201af4c8023b8daddc4f6337e770ae793a4e51668b",
+          "seed_audit_stop.json": "6f6f0b1cce8f34ce912840577429690794b63474368d3a0407ebee99e4a25b3d"
+        },
+        "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_seed_audit_eb5e9ca_20260910",
+        "physical_file_count": 3721,
+        "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_eb5e9ca_20260910",
+        "status": "exact_complete_copy_sha256_verified",
+        "total_bytes": 4105325893,
+        "transport_inventory_sha256": "05306ea573926ba7013536cb4360eff434bafd653b7d1cc30b74e147675bb810",
+        "verified_at_utc": "2026-09-10T12:50:52.179371+00:00"
+      },
+      {
+        "archive_sha256": "b3eddecf6158e24ba52258c4626d7c9e5f09c089ade6185912711d3b338e8e58",
+        "hashes": {
+          "access_audit.json": "96b1c4bcfb5484bb9c95a7b2016a07f5868e01390a721b8a9ceae85c7d23e1f5",
+          "artifact_inventory.json": "b95f98a6995827e8785cea002011075150b8afb65f7b6bdf9998b37afb7b060d",
+          "frozen_design.json": "915176dc4445a38230c590356afcdbf8f2394fa068920c89de79dec9ce9c9692",
+          "seed_audit_stop.json": "856c6aacd913d12314ea02b78a261616fc67b134a614711a8d85f3b215cc6d6d"
+        },
+        "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_seed_audit_714d185_20260910",
+        "physical_file_count": 3237,
+        "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_714d185_20260910",
+        "status": "exact_complete_copy_sha256_verified",
+        "total_bytes": 4078255019,
+        "transport_inventory_sha256": "695cf7d166e1619dca302ceb1947994791325ee28b8bff654a74034e02967153",
+        "verified_at_utc": "2026-09-10T12:58:37.025188+00:00"
+      },
+      {
+        "archive_sha256": "235b08fc1134694fc2500caf288a89535b05d6e5a0cd98f377182ce8fb954340",
+        "hashes": {
+          "access_audit.json": "8051a4efd2c872fdd7cca89caa5316d45da342314c04d2143db48c7623d0ace4",
+          "artifact_inventory.json": "5d66a1d9f4f10bab89c7a32f61f4b9a9eafeb6b4c92c9771175f21ad9f68703d",
+          "frozen_design.json": "9db6dd6d18432f876b8bebe9ba0e07d1bd681a4aa7a192e8749d0e846b30b5a9",
+          "seed_audit_result.json": "f98b7d7d647844f17805a3f38fa07ed2bba83a59812c408d756b83a99bfba974"
+        },
+        "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_seed_audit_c77ed66_20260910",
+        "physical_file_count": 3885,
+        "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_c77ed66_20260910",
+        "status": "exact_complete_copy_sha256_verified",
+        "total_bytes": 4219203657,
+        "transport_inventory_sha256": "eb70bc6f017efc695f7f068d0065a380893b4ef381a8176419d1834f880ab7ac",
+        "verified_at_utc": "2026-09-10T13:04:53.030646+00:00"
+      }
+    ]
+  },
   "instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
   "new_training_runs_after_budget_amendment": 0,
   "recovered_roots": {
@@ -474,6 +653,6 @@
       "verified_at_utc": "2026-09-10T13:04:53.030646+00:00"
     }
   },
-  "status": "all_required_roots_recovered_report_published_shutdown_pending",
+  "status": "complete_recovered_published_terminated_absent_twice",
   "training_commit": "3d1e95fe52a6ff5549289f546c14482a42aac920"
 }

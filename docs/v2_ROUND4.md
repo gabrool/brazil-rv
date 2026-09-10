@@ -5,7 +5,7 @@ three-seed fits and full screening are retained; no further training ran.
 Working research parent: **S0**; research designation: **S0**.
 P fails one unchanged seed-sensitivity occupancy bound and is excluded from
 all final choices. All required roots are sealed and fully recovered locally.
-Final instance closure follows commit parity. The development-only limitations
+The GH200 is terminated, with its exact ID confirmed absent twice. The development-only limitations
 and post-result amendments below are part of the conclusion.
 
 The controlling [registration](../research/preregistrations/v2_round4.md) and
@@ -370,4 +370,9 @@ Complete host recovery covers the original screening, the failed occupancy
 audit (including the first loader stop), the preemptively interrupted reporting
 attempt, and the final audit. Each exact file set and SHA-256 verified before
 instance closure. See [recovery evidence](v2_round4_final_operations.json).
-Exact-instance shutdown and provider absence checks follow the report commit.
+Report commit `b6a114465920c3bad2b35420ab085b15d2b6a42b` matched clean local
+main, GitHub and the compute host before termination. Exact instance
+`248ec61615fa4c7ba2a58a32ff8fc813` was confirmed absent at
+2026-09-10T13:08:42.2241632Z and 2026-09-10T13:08:52.5076574Z.
+The closing documentation records these later provider observations; no sealed
+artifact changed and no adjacent instance was touched. The monitor is paused.
