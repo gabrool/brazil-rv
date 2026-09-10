@@ -1,12 +1,12 @@
 {
-  "status": "Historical source review in progress; no final family/store/screens and no forward capture.",
+  "status": "83 own-source dispositions accepted:76 reconciled and7 unavailable. Actual cohort source support passes; selected capital review and final source/store admission remain open.",
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "028cdf5fda0adb881375b7294c47c5d719b8436bc99cefc02edbff21c06b44f1"
+    "sha256": "3ab651a7bbadf1d2d93625fe4b96a14c49bb6b61803c4a851659f36f9a434260"
   },
   "counts": {
     "audited_unavailable": 7,
-    "reconciled": 69
+    "reconciled": 76
   },
   "accepted_batch": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_batch_20260910T192900Z\\acceptance.json",
@@ -1349,17 +1349,200 @@
           }
         ]
       }
+    },
+    {
+      "acceptance": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_selected_seven_20260910T232800Z\\acceptance.json",
+        "sha256": "739ec33cfd39c7fb94ac6587a219a1b6f2e3c25c0bef3a6d9046d17912554ef2"
+      },
+      "review": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_selected_seven_20260910T232800Z.json",
+        "sha256": "ec9575092e15a2af0ff6e461b41a5e5c1cb13bc1de43776ccaff83ae6e2519f9"
+      },
+      "counts_after": {
+        "audited_unavailable": 7,
+        "reconciled": 76
+      },
+      "reconciliations": [
+        {
+          "id": "121705",
+          "reference": "2022-09-30",
+          "version": 1,
+          "paid_in_shares": {
+            "ON": 132188474,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 590428,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            70,
+            73
+          ],
+          "reason": "Own 30September2022 capital narrative and capital-total row both specify132188474 ordinary shares; the separate dated treasury quantity table specifies590428. The standardized table repeats prior78531824 and mis-scales both quantities. The current circulation row mistakenly repeats the capital total and fails its subtotal; use independently stated issued capital minus the separately dated treasury count, not that inconsistent circulation row. No future or adjacent filing supplies a value.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\121705\\result.json",
+            "sha256": "3b9de7af9eb218b04ef47030d1bfdaa45956e1a579da8f6085d66e54fda51272"
+          }
+        },
+        {
+          "id": "88945",
+          "reference": "2019-09-30",
+          "version": 1,
+          "paid_in_shares": {
+            "ON": 1361263584,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 12042004,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            115
+          ],
+          "reason": "Own September2019 note22.1 reports1361263584 ordinary shares and a complete shareholder table including12042004 treasury shares. Its totals reconcile exactly. Both quantities are individual shares, contradicting the standardized thousands heading. Do not use the weighted-average EPS denominator.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\88945\\result.json",
+            "sha256": "113bb900584b6729b1363522805cb65c3eed87997c892ecbb678c239d9eb4972"
+          }
+        },
+        {
+          "id": "93120",
+          "reference": "2020-03-31",
+          "version": 1,
+          "paid_in_shares": {
+            "ON": 1361263584,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 12042004,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            124
+          ],
+          "reason": "Own March2020 note24.1 reports1361263584 ordinary shares. Its complete current shareholder table has12042004 treasury and sums exactly to that issued total. The adjacent note24.2 paragraph prints12042044, an internal40-share discrepancy. Prefer the arithmetically complete dated table, also matching the composition numerator after unit correction. If the paragraph were correct, the net-count relative difference would be0.000296467 bps. This explicitly documented bounded uncertainty is not silently treated as exact legal precision; no other filing supplies the count.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\93120\\result.json",
+            "sha256": "549fad4c132c8b72be5a9da46a1505802e021a8298ea4a3663e78ad53cf5aade"
+          }
+        },
+        {
+          "id": "89151",
+          "reference": "2019-09-30",
+          "version": 1,
+          "paid_in_shares": {
+            "ON": 128721560,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 0,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            83,
+            84
+          ],
+          "reason": "Own September2019 note20 reports128721560 issued ordinary shares. The treasury continuation states cancellation of all4230300 holdings in May2019, no further acquisitions through30September, and the resulting128721560 issued shares. Treasury is therefore observed zero; repurchase authorizations and prior2018 holdings are not current shares. The table thousands heading inflates actual share units.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\89151\\result.json",
+            "sha256": "259c8a9b3ea558f8fabe51433f10d38b72ea65a3132d98aa1d61d5fe4627ce4d"
+          }
+        },
+        {
+          "id": "77343",
+          "reference": "2018-06-30",
+          "version": 1,
+          "paid_in_shares": {
+            "ON": 146117538,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 34400,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            24,
+            68
+          ],
+          "reason": "Own June2018 ownership statement explicitly gives fully subscribed and paid146117538 ordinary shares. Own dated treasury note reports34400 shares, versus17200 at the prior December. Use current actual quantity, not monetaryR$43, authorization or weighted-average EPS counts. Both standardized quantities are overstated1000x.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\77343\\result.json",
+            "sha256": "180e469ae5f979dc2393a0e2a9b1ca517e50c3e9b72cdf116aa7943b2e97e7ba"
+          }
+        },
+        {
+          "id": "83180",
+          "reference": "2019-03-31",
+          "version": 1,
+          "paid_in_shares": {
+            "ON": 29833333,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 9788,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            62,
+            63,
+            77
+          ],
+          "reason": "Own March2019 capital note gives fully paid29833333 ordinary shares. The current shareholder table gives9788 treasury and29823545 outside treasury; both sum to the issued total. The additional same-period ownership table explicitly headed em unidades independently confirms both counts. This resolves the misleading mil word in the nearby treasury prose; do not multiply that phrase or use a weighted-average count. The standardized unit1 table has truncated thousand-share lots and cannot supply precise quantities.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\83180\\result.json",
+            "sha256": "8531359cf8989eaa2e23cc0c77abaa93102a0e0e3016263748d920b05bd22b25"
+          }
+        },
+        {
+          "id": "103718",
+          "reference": "2021-03-31",
+          "version": 1,
+          "paid_in_shares": {
+            "ON": 1147265,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 0,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            29
+          ],
+          "reason": "Own March2021 note14.1 gives1147265 ordinary shares, and the February issuance paragraph explicitly says fully subscribed and paid. The dated shareholder table allocates689078 to controlling holders and458187 to SPEED, totaling100% and1147265, with no treasury allocation; it confirms the explicit composition-table zero. Do not borrow a later IPO/share split or the malformed previous-year comparison. The standardized unit1 table wrongly contains1147 truncated lots.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\103718\\result.json",
+            "sha256": "fb0a17c5e543e226bc55a30195e4627abb87f7fba45f3e4d90e11db860a11465"
+          }
+        }
+      ]
     }
   ],
   "review_priority": {
-    "evidence": {
-      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_priority_20260910T193200Z.json",
-      "sha256": "ae2836dc66083b9b2671a33229589c6ab0d71e757972adfaeef9ce3efd777d35"
+    "source_preflight": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\source_preflight_83650bb_20260910T230949Z\\manifest.json",
+    "source_support_complete": true,
+    "inventory_flags": 1352,
+    "selected_flags_before_seven": 478,
+    "selected_previously_reviewed": 17,
+    "pending_selected_before_seven": 461,
+    "valued_pending_before_seven": 242,
+    "pending_selected_after_seven": 454,
+    "valued_pending_after_seven": 236,
+    "unretrieved_notes_among_valued": 14,
+    "method": "Exact production ledger selection reproduced; production issuer_market_cap supplies price/class/capital-event masking. No eligibility, labels, outcomes, source values or model masks determine review priority. Recompute after identity, availability, class-support or usable-count changes. These seven changes preserve each positive class, dates and source validity, so selected/valuation-available sets stay exact while six valued quantities change. Nonvalued flags remain documented, not permanent exclusions.",
+    "valuation_trace": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\source_preflight_83650bb_20260910T230949Z\\valued_capital_review.json",
+      "sha256": "562c9f6d9ea4c039e4415f492a4cfe585a77c51aabcff470553c6ee1f3c8b01a"
     },
-    "potentially_consumed_on_old_bridge": 1318,
-    "no_old_bridge_link": 4,
-    "receipt_after_old_bridge_end": 30,
-    "final_exclusion_allowed": false
+    "full_inventory_queue": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\source_preflight_83650bb_20260910T230949Z\\capital_review_queue.json",
+      "sha256": "9e32f2e2c867a0fa398b1a83ae8c3288d77449c6bac6c68d6d7f8b80774a8cad"
+    },
+    "quantity_only_selection_proof": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_selected_seven_20260910T232800Z\\selection_preservation.json",
+      "sha256": "6e87ee6838d7aa087e205a40af658d52dec4c3abd271e14e899e0427c404db80"
+    }
   },
   "note_helper_correction": {
     "tests_passed": 21,

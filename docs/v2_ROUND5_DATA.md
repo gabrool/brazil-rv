@@ -24,6 +24,19 @@ account tests and eleven source-preflight tests pass. See
 This closes those thirteen source-support gaps, not the remaining capital-unit
 review or the final source/store acceptance.
 
+The refreshed full source check passes with no missing account/capital source
+or invalid cache in the admitted cohort. Exact capital selection plus the
+production valuation helper narrows1,352 original flags to242 currently valued,
+unreviewed filings before the latest batch. Seven more own-filing reviews now
+resolve Nexpe, two Suzano versions, Ser Educacional, Trisul, Eternit and Armac;
+six affected actual valuation windows. There remain236 currently valued flags
+and218 conditional, currently nonvalued flags. No source ratio or failed note
+retrieval determines a value or a mask. Quantity-only corrections preserve class
+support, receipts and source selection, so the already completed source scan is
+reused for this batch. The [capital review evidence](v2_round5_capital_note_audit.json)
+records these cases, including Suzano's40-share internal discrepancy and the
+chosen arithmetically complete own-period shareholder table.
+
 ## Completed economic correction
 
 The BOVA11 filter now accepts BDI02 and14 for the exact ETF ISIN, market and
@@ -52,7 +65,7 @@ frozen replay. Original registration bytes are retained.
 
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
-| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded retry are complete: 1,299 readable originals and 53 unresolved transport failures. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 69 reconciled and seven audited unavailable records. | Finish capital-share unit reviews and actual admitted-cohort coverage, then produce final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
+| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded retry are complete: 1,299 readable originals and 53 unresolved transport failures. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 76 reconciled and seven audited unavailable records. | Finish capital-share unit reviews and actual admitted-cohort coverage, then produce final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
 | Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. The 2,196-document supplement is complete and both failures are recovered: 1,766 original XML and 430 exact HTML metadata sources. The main 6,768-document queue and all seven exceptions are complete (6,761 original successes, five bounded recoveries and two own-package dispositions). Sector translation uses only evidence received by each decision. | Audit actual newly admitted account/capital gaps and capital-source selection; accept the revised dated bridge, then rebuild sector, cross-market exposures and lending utilization. Candidate retrieval is not automatic identity admission. Existing archives remain immutable comparators. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Refresh utilization against the accepted new identity/free float, then admit the final store. The other six fields remain exact. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
