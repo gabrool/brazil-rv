@@ -6,6 +6,7 @@ import argparse
 import gc
 import json
 import time
+import platform
 from importlib.metadata import version
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, replace
@@ -52,10 +53,41 @@ MAXIMUM_RSS = 8 * 1024**3
 
 
 def model_program_identity():
+    # Bind the code that can alter fitted labels, model selection or reported
+    # statistics. Preparation-only input transforms are sealed in cache hashes;
+    # unrelated acquisition/documentation commits do not invalidate a resume.
     return {
         name: sha256_file(Path(__file__).with_name(name + ".py"))
-        for name in ("round5_screens", "gbdt", "round5_magnitude", "normalization")
+        for name in (
+            "round5_screens",
+            "gbdt",
+            "baselines",
+            "round5_magnitude",
+            "normalization",
+            "validate_pipeline",
+            "evaluate",
+            "research_rounds",
+            "contract",
+            "splits",
+            "config",
+        )
     }
+
+
+def library_versions():
+    return {
+        "python": platform.python_version(),
+        **{name: version(name) for name in ("numpy", "lightgbm", "scipy")},
+    }
+
+
+def verify_program(design):
+    if design["model_program_sha256"] != model_program_identity():
+        raise ValueError(
+            "screen semantic implementation differs from its frozen design"
+        )
+    if design["library_versions"] != library_versions():
+        raise ValueError("screen library versions differ from the frozen design")
 
 
 def bind(path):
@@ -67,6 +99,31 @@ def verify(record):
     if sha256_file(path) != record["sha256"]:
         raise ValueError(f"screen artifact identity differs: {path}")
     return path
+
+
+def verified_design(path):
+    design = json.loads(path.read_text(encoding="utf-8"))
+    verify_program(design)
+    for record in (*design["amendments"], *design["arrays"].values()):
+        verify(record)
+    for record in design["families"].values():
+        verify(record["values"])
+        verify(record["presence"])
+    return design
+
+
+def verified_result(path, design_hash, family, fold, seed):
+    result = json.loads(path.read_text(encoding="utf-8"))
+    if (result["design_sha256"], result["family"], result["fold"], result["seed"]) != (
+        design_hash,
+        family,
+        fold,
+        seed,
+    ):
+        raise ValueError("completed cell binds another screen design or cell identity")
+    for record in result["outputs"].values():
+        verify(record)
+    return result
 
 
 def _save(root, name, array):
@@ -140,9 +197,7 @@ def prepare(store_root: Path, output: Path, amendments: list[Path], *, threads=4
             "schema": "BRAZIL_RV_ROUND5_CPU_SCREENS_V1",
             "code": code,
             "model_program_sha256": model_program_identity(),
-            "library_versions": {
-                name: version(name) for name in ("numpy", "lightgbm", "scipy")
-            },
+            "library_versions": library_versions(),
             "store": bind(store_root / "manifest.json"),
             "acceptance": bind(acceptance_path),
             "amendments": [bind(path) for path in amendments],
@@ -232,17 +287,16 @@ def run_cell(design_path: str, family: str, fold: str, seed: int):
     started = time.monotonic()
     path = Path(design_path)
     design = json.loads(path.read_text(encoding="utf-8"))
+    # Spawned workers may begin well after dispatch. Verify the small semantic
+    # binding again, without rereading the large caches already checked by run.
+    verify_program(design)
     if seed not in design["config"]["seeds"] or family not in design["families"]:
         raise ValueError("cell is not registered in the frozen screen design")
     root = path.parent / "cells" / family / fold / f"seed_{seed}"
     result_path = root / "result.json"
     design_hash = sha256_file(path)
     if result_path.exists():
-        result = json.loads(result_path.read_text(encoding="utf-8"))
-        if result["design_sha256"] != design_hash:
-            raise ValueError("completed cell binds another screen design")
-        for record in result["outputs"].values():
-            verify(record)
+        verified_result(result_path, design_hash, family, fold, seed)
         return {
             "family": family,
             "fold": fold,
@@ -393,15 +447,8 @@ def run_cell(design_path: str, family: str, fold: str, seed: int):
 
 
 def run(design_path: Path, *, workers=2):
-    design = json.loads(design_path.read_text(encoding="utf-8"))
+    design = verified_design(design_path)
     code = rr._git_identity()
-    if design["model_program_sha256"] != model_program_identity():
-        raise ValueError("screen model implementation differs from its frozen design")
-    for record in (*design["amendments"], *design["arrays"].values()):
-        verify(record)
-    for record in design["families"].values():
-        verify(record["values"])
-        verify(record["presence"])
     write_json_atomic(
         design_path.parent / "execution.json",
         {
@@ -420,35 +467,57 @@ def run(design_path: Path, *, workers=2):
     with ProcessPoolExecutor(max_workers=workers, max_tasks_per_child=1) as executor:
         pending = {executor.submit(run_cell, *cell): cell for cell in cells}
         done = 0
-        for future in as_completed(pending):
-            result = future.result()
-            done += 1
-            print(
-                json.dumps({"completed": done, "total": len(cells), **result}),
-                flush=True,
-            )
-    return summarize(design_path)
+        try:
+            for future in as_completed(pending):
+                result = future.result()
+                done += 1
+                print(
+                    json.dumps({"completed": done, "total": len(cells), **result}),
+                    flush=True,
+                )
+        except BaseException:
+            # Context-manager shutdown alone waits for the entire submitted
+            # program. Cancel pending cells; dispatched cells finish safely and
+            # retain their atomic model/result artifacts for a later resume.
+            executor.shutdown(wait=True, cancel_futures=True)
+            raise
+    return _summarize(design_path, design)
 
 
 def summarize(design_path: Path):
-    design = json.loads(design_path.read_text(encoding="utf-8"))
+    # This is also a standalone CLI entry point, with no preceding coordinator.
+    return _summarize(design_path, verified_design(design_path))
+
+
+def _summarize(design_path, design):
+    verify_program(design)
+    design_hash = sha256_file(design_path)
     start = design["cache_start_global_index"]
     arrays = {k: _cache(v) for k, v in design["arrays"].items()}
+    verified_cells = {}
     daily_by_family, by_family = {}, {}
     for family in design["families"]:
         daily_by_family[family], records = {}, {}
         for fold, indices in design["evaluation"].items():
             scores, seed_readouts, importance = [], [], []
             for seed in design["config"]["seeds"]:
+                key = (family, fold, seed)
                 root = design_path.parent / "cells" / family / fold / f"seed_{seed}"
-                result = json.loads((root / "result.json").read_text(encoding="utf-8"))
-                if result["status"] == "no_family_observation_in_fit_use_parent":
-                    root = design_path.parent / "cells/a_slow" / fold / f"seed_{seed}"
-                    result = json.loads(
-                        (root / "result.json").read_text(encoding="utf-8")
+                if key not in verified_cells:
+                    verified_cells[key] = verified_result(
+                        root / "result.json", design_hash, *key
                     )
-                for record in result["outputs"].values():
-                    verify(record)
+                result = verified_cells[key]
+                if result["status"] == "no_family_observation_in_fit_use_parent":
+                    key = ("a_slow", fold, seed)
+                    root = design_path.parent / "cells/a_slow" / fold / f"seed_{seed}"
+                    if key not in verified_cells:
+                        verified_cells[key] = verified_result(
+                            root / "result.json", design_hash, *key
+                        )
+                    result = verified_cells[key]
+                if result["status"] != "completed":
+                    raise ValueError("screen readout requires a completed matched cell")
                 scores.append(
                     np.load(result["outputs"]["scores"]["path"], allow_pickle=False)
                 )
@@ -518,7 +587,7 @@ def summarize(design_path: Path):
         "schema": "BRAZIL_RV_ROUND5_CPU_SCREEN_READOUT_V1",
         "design": bind(design_path),
         "families": by_family,
-        "seeds": list(GBDT_SEEDS),
+        "seeds": list(design["config"]["seeds"]),
         "primary_horizons": list(TRADED_PRIMARY_HORIZONS),
         "network_selection_weight": 0,
         "interpretation": "information readout only; null screens do not demote neural families",

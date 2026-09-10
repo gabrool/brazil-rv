@@ -1,8 +1,10 @@
 import json
+from concurrent.futures import Future
 from dataclasses import asdict
 from datetime import date, timedelta
 
 import numpy as np
+import pytest
 
 from brazil_rv.v2 import round5_screens as screen
 from brazil_rv.v2.artifacts import write_json_atomic
@@ -106,6 +108,8 @@ def test_synthetic_cell_roundtrip_and_partial_resume_do_not_refit(
         },
     }
     design = {
+        "model_program_sha256": screen.model_program_identity(),
+        "library_versions": screen.library_versions(),
         "config": asdict(config),
         "cache_start_global_index": 100,
         "arrays": bindings,
@@ -135,3 +139,203 @@ def test_synthetic_cell_roundtrip_and_partial_resume_do_not_refit(
     (root / "result.json").unlink()
     screen.run_cell(str(path), "a_slow", "F1", 11)
     assert json.loads((root / "result.json").read_text())["outputs"] == saved["outputs"]
+
+
+@pytest.fixture
+def sealed_summary(tmp_path):
+    """Bound synthetic cells exercise summary integrity without research fits."""
+    count, names = 30, 25
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    active = np.ones((count, names), bool)
+    values = np.broadcast_to(np.arange(names)[None, :, None], (count, names, 5)).astype(
+        np.float32
+    )
+    arrays = {
+        "active": active,
+        "targets": values,
+        "target_mask": np.ones_like(values, bool),
+        "dates": np.arange(np.datetime64("2024-01-01"), np.datetime64("2024-01-31")),
+    }
+    bindings = {key: screen._save(cache, key, value) for key, value in arrays.items()}
+    features = screen._save(cache, "features", values[..., :2])
+    parent = {
+        "values": features,
+        "presence": screen._save(cache, "parent_presence", active),
+        "coverage": {"F1": {"fit": 1, "evaluation": 1, "informative": True}},
+    }
+    events = {
+        "values": features,
+        "presence": screen._save(cache, "events_presence", ~active),
+        "coverage": {"F1": {"fit": 0, "evaluation": 0, "informative": False}},
+    }
+    design = {
+        "model_program_sha256": screen.model_program_identity(),
+        "library_versions": screen.library_versions(),
+        "amendments": [],
+        "config": {"seeds": [11]},
+        "cache_start_global_index": 0,
+        "arrays": bindings,
+        "families": {"events": events, "a_slow": parent},
+        "evaluation": {"F1": list(range(count))},
+    }
+    path = tmp_path / "design.json"
+    # Put the skipped family first, so its parent binding must be checked on the
+    # fallback path rather than incidentally through a prior baseline readout.
+    path.write_text(json.dumps(design), encoding="utf8")
+    for family in design["families"]:
+        root = tmp_path / "cells" / family / "F1" / "seed_11"
+        root.mkdir(parents=True)
+        result = {
+            "design_sha256": screen.sha256_file(path),
+            "family": family,
+            "fold": "F1",
+            "seed": 11,
+            "outputs": {},
+        }
+        if family == "events":
+            result["status"] = "no_family_observation_in_fit_use_parent"
+        else:
+            result.update(
+                {
+                    "status": "completed",
+                    "mean_primary_ic": 1.0,
+                    "feature_names": ["x", "x_age"],
+                    "importance": {"gain": [1.0, 0.0]},
+                    "outputs": {"scores": screen._save(root, "scores", values)},
+                }
+            )
+        write_json_atomic(root / "result.json", result)
+    return path, design
+
+
+def test_standalone_summary_verifies_and_reuses_the_matched_parent(sealed_summary):
+    path, _ = sealed_summary
+    result = screen.summarize(path)
+    assert result["seeds"] == [11]
+    assert (
+        result["families"]["events"]["all_folds"]["paired_delta_vs_a_slow"]["estimate"]
+        == 0
+    )
+    assert (
+        result["families"]["events"]["informative_folds"]["status"]
+        == "no_informative_folds"
+    )
+
+
+@pytest.mark.parametrize(
+    "dependency",
+    [
+        "baselines",
+        "validate_pipeline",
+        "evaluate",
+        "research_rounds",
+        "contract",
+        "splits",
+        "config",
+    ],
+)
+def test_semantic_dependency_change_blocks_summary_and_worker_resume(
+    sealed_summary, monkeypatch, dependency
+):
+    path, _ = sealed_summary
+    actual_hash = screen.sha256_file
+    monkeypatch.setattr(
+        screen,
+        "sha256_file",
+        lambda p: "changed" if p.name == dependency + ".py" else actual_hash(p),
+    )
+    with pytest.raises(ValueError, match="semantic implementation"):
+        screen.summarize(path)
+    with pytest.raises(ValueError, match="semantic implementation"):
+        screen.run_cell(str(path), "a_slow", "F1", 11)
+    assert not (path.parent / "readout.json").exists()
+
+
+def test_library_change_blocks_coordinator_summary_and_worker_resume(
+    sealed_summary, monkeypatch
+):
+    path, _ = sealed_summary
+    changed = {**screen.library_versions(), "lightgbm": "different-build"}
+    monkeypatch.setattr(screen, "library_versions", lambda: changed)
+    for operation in (
+        lambda: screen.run(path),
+        lambda: screen.summarize(path),
+        lambda: screen.run_cell(str(path), "a_slow", "F1", 11),
+    ):
+        with pytest.raises(ValueError, match="library versions"):
+            operation()
+    assert not (path.parent / "execution.json").exists()
+
+
+@pytest.mark.parametrize("cache", ["targets", "family_presence"])
+def test_standalone_summary_rejects_corrupted_input_cache(sealed_summary, cache):
+    path, design = sealed_summary
+    record = (
+        design["arrays"]["targets"]
+        if cache == "targets"
+        else design["families"]["events"]["presence"]
+    )
+    with open(record["path"], "ab") as stream:
+        stream.write(b"corruption")
+    with pytest.raises(ValueError, match="artifact identity differs"):
+        screen.summarize(path)
+
+
+@pytest.mark.parametrize(
+    "family,field,value",
+    [
+        ("events", "design_sha256", "another-design"),
+        ("a_slow", "design_sha256", "another-design"),
+        ("a_slow", "seed", 29),
+    ],
+)
+def test_summary_rejects_mixed_cells_including_reused_parent(
+    sealed_summary, family, field, value
+):
+    path, _ = sealed_summary
+    cell = path.parent / "cells" / family / "F1/seed_11/result.json"
+    result = json.loads(cell.read_text())
+    result[field] = value
+    write_json_atomic(cell, result)
+    with pytest.raises(ValueError, match="another screen design or cell identity"):
+        screen.summarize(path)
+    assert not (path.parent / "readout.json").exists()
+
+
+def test_failed_worker_cancels_queued_program_and_preserves_original_error(
+    sealed_summary, monkeypatch
+):
+    path, _ = sealed_summary
+    shutdowns, submitted = [], []
+
+    class Pool:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            self.shutdown(wait=True)
+
+        def submit(self, *_):
+            future = Future()
+            if not submitted:
+                future.set_exception(RuntimeError("synthetic worker failure"))
+            submitted.append(future)
+            return future
+
+        def shutdown(self, *, wait=True, cancel_futures=False):
+            shutdowns.append((wait, cancel_futures))
+            if cancel_futures:
+                for future in submitted:
+                    future.cancel()
+
+    monkeypatch.setattr(screen, "ProcessPoolExecutor", Pool)
+    monkeypatch.setattr(screen.rr, "_git_identity", lambda: {"commit": "fixture"})
+    with pytest.raises(RuntimeError, match="synthetic worker failure"):
+        screen.run(path)
+    assert shutdowns[0] == (True, True)
+    assert submitted[1].cancelled()
+    assert not (path.parent / "readout.json").exists()
