@@ -2,7 +2,8 @@
 
 Status: A1–A3 is committed in `3d1e95f`. The 126-cell CPU replay and the three-seed
 neural parent on all fourteen folds are complete, accepted, sealed and recovered.
-This is the first session checkpoint; arms and confirmation remain outstanding.
+The first session is closed. The second session is running arms, selection-only fits
+and screening; confirmation remains outstanding.
 The original CPU root and historical B6 panels remain immutable. No arm comparison
 or promotion is made here. Holdout consumers and deployment remain outside this work.
 
@@ -174,3 +175,26 @@ and clean local/GitHub/instance match at `a0ce839`. Provider inventory confirmed
 its absence at 2026-09-10T01:37:28.6759002Z and 2026-09-10T01:37:38.9778036Z.
 This closing documentation records later provider observations. No sealed artifact
 was modified. The remaining arms and confirmation are still authorized for fresh sessions.
+
+## Second session: arms and screening
+
+Exact instance `248ec61615fa4c7ba2a58a32ff8fc813` was launched through the approved
+launcher and bootstrapped from clean main `e51e0ea`, then checked out the unchanged
+frozen training commit `3d1e95f`. Its fresh root is
+`/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_arms_3d1e95f_20260910T015000Z`.
+The fresh freeze exactly matches the original design SHA-256
+`b1965d5a6c87f9f8adf997a099e385618e42eecbfbcd80a0de55ce652211546b`.
+
+After verifying the complete sealed parent root, the session copied 2,848 files /
+2,707,447,895 bytes of smoke, P, parent and CPU-replay artifacts unchanged. The exact
+copied file set and hashes passed; `operations/reuse_provenance.json` has SHA-256
+`ff8054f887abc5c1c21250e2b299d1a6bc582ae2e6fa242c8c86e6b454666bd2`.
+Source manifests retain their original paths and hashes, with the immutable source
+root available on the same persistent filesystem. Completed trajectories are reused.
+
+The driver started at 2026-09-10T01:58:35.317926+00:00, sequencing 210 arm fits,
+nine selection-only fits and full screening evaluation. The arm plan has SHA-256
+`d2e6370604abce6012b021cbc825d418d37303a2541e0a0d0e8a476dbf9a4187`
+and six concurrent trajectories; the first six processes are active. This session
+ends after screening with complete recovery, verification and exact-instance
+termination. Confirmation follows in a fresh session using the registered roster.
