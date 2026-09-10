@@ -1,6 +1,6 @@
 # Round 5 data round — work in progress
 
-Status: acquisition and family validation are running. **The final store and
+Status: original capital and FCA registration recovery and family validation are running. **The final store and
 GBDT screens are not yet complete. The continuous-book replay is complete.** This document
 will be replaced with the completed acceptance tables and readouts before the
 round is closed. CPU only; no paid instance or neural fit has run this round.
@@ -38,7 +38,7 @@ frozen replay. Original registration bytes are retained.
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
 | Events and fundamentals | All 4,344 missing original account versions recovered. Description-based bank/insurer accounting, parent/group reconciliation and complete-class issuer valuation are corrected. Exact capital pages are being collected for 15,596 additional filings. | Finish capital-count recovery and final joined coverage/admission tables. |
-| Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. Three sector-relative fields are sealed; current sector files are not backprojected. | Final store admission. |
+| Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. A further 6,765 missing original FCA versions are recoverable and are being acquired. | Accept the improved dated bridge, then rebuild sector, cross-market exposures and lending utilization. Existing archives remain immutable comparators. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Final store admission. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
 | Cross-market | Sealed 57-field archive includes public shocks, causal exposures and interactions, with historical DST and early closes. Unavailable oil, ADR-premium and foreign-flow fields are explicitly masked. | Final store admission; no guessed measurement or publication lag. |
@@ -65,6 +65,16 @@ revision first observed inside a truncated archive is not an original filing.
 The corresponding amendments and targeted tests are committed before the final
 family build. A quiet five-minute continuation monitor advances the remaining
 acquisition, build and screen stages, then returns to daily source capture.
+
+The final source freeze also waits for original FCA recovery. Among 401 issuers,
+6,765 versions (3,386 originals) are absent from annual detail tables. The median
+gap to the retained same-reference version is 124 calendar days; this measures
+source opportunity, not additional model coverage, because earlier-year metadata
+can already be known. Original security descriptions can be generic shares even
+when today's viewer renders a typed label. Historical source semantics and dated
+B3 cash identity govern the join. Original sector codes and separately sourced
+labels must remain distinct. The old identity-dependent admissions will be
+replaced only after the revised bridge and dependent families pass their proofs.
 
 ## Store and model contract
 
