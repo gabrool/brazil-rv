@@ -2834,3 +2834,10 @@ checkpoint, with no arm selection, confirmation or holdout read. The complete ro
 is sealed and host-verified; exact-ID closure follows publication. Arms continue
 in a fresh session using the same registered code/settings and sealed P/parent inputs.
 See docs/v2_ROUND4.md and its result/operations JSON for all folds and evidence.
+
+Parent-session closure: report commit `a0ce839` matched clean local main, GitHub
+and the exact GH200. Host recovery verified all 2,900 files / 2,708,863,375 bytes
+before termination. Provider inventory confirmed instance `482f0aea79aa459bbd4c0466e6d3607e`
+absent at 2026-09-10T01:37:28.6759002Z and 2026-09-10T01:37:38.9778036Z.
+No adjacent instance was touched. Arms and confirmation continue in fresh sessions;
+training remains bound to `3d1e95f` and all holdout restrictions remain active.

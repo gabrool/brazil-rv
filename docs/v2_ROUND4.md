@@ -169,5 +169,8 @@ The closed complete root contains 2,900 physical files /
 2026-09-10T01:32:46.639853+00:00. Host root: `D:\quant-data\b3\processed\model_runs\v2_round4_3d1e95f_20260909T220000Z`.
 Parent result SHA-256: `fcdc338d54f8626b8c448710243e135366ad746a13c71c848823e9f370661b40`.
 Inventory SHA-256: `c5e836d4945ea85227dfbfcd11b1b79066fe7d34ca6d1f9e9ce7d81252acedd3`.
-Exact-ID termination follows report publication and local/GitHub/instance commit match;
-its provider evidence will be appended after closure. No sealed artifact is modified.
+Exact instance `482f0aea79aa459bbd4c0466e6d3607e` was terminated after verified recovery
+and clean local/GitHub/instance match at `a0ce839`. Provider inventory confirmed
+its absence at 2026-09-10T01:37:28.6759002Z and 2026-09-10T01:37:38.9778036Z.
+This closing documentation records later provider observations. No sealed artifact
+was modified. The remaining arms and confirmation are still authorized for fresh sessions.

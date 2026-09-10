@@ -584,7 +584,92 @@
       }
     }
   },
-  "status": "parent_session_complete_recovered_termination_pending",
+  "status": "parent_session_complete_recovered_published_terminated_absent_twice",
+  "termination": {
+    "absence_checks": [
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T01:36:26.2375610Z",
+        "exact_instance_id": "482f0aea79aa459bbd4c0466e6d3607e",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T01:36:36.9571226Z",
+        "exact_instance_id": "482f0aea79aa459bbd4c0466e6d3607e",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T01:36:47.3030666Z",
+        "exact_instance_id": "482f0aea79aa459bbd4c0466e6d3607e",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T01:36:57.6971870Z",
+        "exact_instance_id": "482f0aea79aa459bbd4c0466e6d3607e",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T01:37:08.0526781Z",
+        "exact_instance_id": "482f0aea79aa459bbd4c0466e6d3607e",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": false,
+        "checked_at_utc": "2026-09-10T01:37:18.3848731Z",
+        "exact_instance_id": "482f0aea79aa459bbd4c0466e6d3607e",
+        "remaining_status": [
+          "terminating"
+        ]
+      },
+      {
+        "absent": true,
+        "checked_at_utc": "2026-09-10T01:37:28.6759002Z",
+        "exact_instance_id": "482f0aea79aa459bbd4c0466e6d3607e",
+        "remaining_status": []
+      },
+      {
+        "absent": true,
+        "checked_at_utc": "2026-09-10T01:37:38.9778036Z",
+        "exact_instance_id": "482f0aea79aa459bbd4c0466e6d3607e",
+        "remaining_status": []
+      }
+    ],
+    "before": {
+      "id": "482f0aea79aa459bbd4c0466e6d3607e",
+      "name": "brazil-rv-gh200",
+      "status": "active"
+    },
+    "commit_match": {
+      "all_match": true,
+      "checked_at_utc": "2026-09-10T01:36:10.691446+00:00",
+      "github_main": "a0ce8396dd955e9a34b989d78a45718f740ebc03",
+      "instance_clean": true,
+      "instance_commit": "a0ce8396dd955e9a34b989d78a45718f740ebc03",
+      "instance_id": "482f0aea79aa459bbd4c0466e6d3607e",
+      "local_clean": true,
+      "local_main": "a0ce8396dd955e9a34b989d78a45718f740ebc03",
+      "published_result_bytes_verified": true
+    },
+    "host_verified_at_utc": "2026-09-10T01:32:46.639853+00:00",
+    "instance_id": "482f0aea79aa459bbd4c0466e6d3607e",
+    "status": "terminated_absent_twice",
+    "termination_requested_at_utc": "2026-09-10T01:36:15.8878050Z",
+    "termination_response_received": true
+  },
   "test_accessed": false,
   "training_commit": "3d1e95fe52a6ff5549289f546c14482a42aac920"
 }
