@@ -500,12 +500,12 @@ _ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
     ),
     "observed_series_put_call_oi_log_ratio": (
         "log_ratio",
-        "log(sum explicitly reported put OI / sum explicitly reported call OI), both sums positive; observed series subset, not complete-market OI; BVBG.086 opening D is closing D-1, actual publication clock",
+        "log(sum explicitly reported put OI / sum explicitly reported call OI), both sums positive; observed subset, not complete-market OI; newest position public at decision, opening D is closing D-1, usual age2 or verified early-publication age1",
         "rank_gauss",
     ),
     "observed_series_oi_coverage": (
         "fraction_0_1",
-        "listed series with an explicit OI field / dated known listed series; zero means no reported support, never zero economic OI; unknown listing population masked",
+        "listed series with explicit OI / dated known listed series in newest position public at decision; zero means no reported support, never zero economic OI; unknown listings masked; actual position age, including early publications",
         "bounded_fraction",
     ),
     "delta_oi_to_volume_1": (

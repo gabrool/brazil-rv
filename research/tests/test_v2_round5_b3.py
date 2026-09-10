@@ -22,7 +22,8 @@ from brazil_rv.v2.round5_b3 import (
 
 def _assert_joined_publication_change(before, after, days, first, family):
     names = [
-        c for c in before.columns
+        c
+        for c in before.columns
         if c not in {"date", "isin"} and not c.endswith("_age_sessions")
     ]
     peers = tuple(f"PEER_{i}" for i in range(19))
@@ -37,8 +38,12 @@ def _assert_joined_publication_change(before, after, days, first, family):
     for raw, valid, age in (left, right):
         values, observed = np.zeros_like(raw), np.zeros_like(valid)
         transform_feature_panel_into(
-            raw, valid, np.ones(raw.shape[:2], dtype=bool),
-            feature_specs("sidecar_" + family, names), values, observed,
+            raw,
+            valid,
+            np.ones(raw.shape[:2], dtype=bool),
+            feature_specs("sidecar_" + family, names),
+            values,
+            observed,
         )
         age = age.copy()
         age[~observed] = -1
@@ -290,6 +295,7 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
             "source_trade_date": sessions,
             "isin": ["ABC"] * 31,
             "listed_series": [2] * 31,
+            "available_date": [d + timedelta(days=1) for d in sessions],
             "oi_observed_series": [2] * 31,
             "call_oi": [100.0 + i for i in range(31)],
             "put_oi": [50.0] * 31,
@@ -366,13 +372,30 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
     assert partial_oi.filter(pl.col("date") <= sessions[22]).equals(
         partial_after.filter(pl.col("date") <= sessions[22])
     )
-    _assert_joined_publication_change(partial_oi, partial_after, sessions, 23, "options")
+    _assert_joined_publication_change(
+        partial_oi, partial_after, sessions, 23, "options"
+    )
     missing_row = partial_after.filter(pl.col("date") == sessions[23]).row(
         0, named=True
     )
     assert missing_row["observed_series_put_call_oi_log_ratio"] is None
     assert missing_row["observed_series_put_call_oi_log_ratio_age_sessions"] is None
     assert missing_row["observed_series_oi_coverage"] == 0.25
+    early_position = partial.filter(
+        pl.col("source_trade_date") == sessions[22]
+    ).with_columns(
+        pl.lit(sessions[22]).alias("available_date"),
+        pl.lit(999.0).alias("call_oi"),
+    )
+    early_oi, _ = activity_decision_features(
+        cash, volumes, pl.concat([partial, early_position]), nonregular, sessions
+    )
+    _assert_joined_publication_change(partial_oi, early_oi, sessions, 22, "options")
+    early_row = early_oi.filter(pl.col("date") == sessions[22]).row(0, named=True)
+    assert early_row["observed_series_put_call_oi_log_ratio"] == np.log(50.0 / 999.0)
+    assert early_row["observed_series_put_call_oi_log_ratio_age_sessions"] == 1
+    assert early_row["observed_series_oi_coverage_age_sessions"] == 1
+    assert early_row["put_call_oi_log_ratio"] is None
 
     changed_cash = cash.with_columns(
         pl.when(pl.col("source_trade_date") == sessions[22])
@@ -392,7 +415,9 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
     assert micro.filter(pl.col("date") <= sessions[22]).equals(
         micro_after.filter(pl.col("date") <= sessions[22])
     )
-    _assert_joined_publication_change(micro, micro_after, sessions, 23, "microstructure")
+    _assert_joined_publication_change(
+        micro, micro_after, sessions, 23, "microstructure"
+    )
     for feature in ("avg_trade_size_20", "after_hours_volume_share_5"):
         assert micro.filter(pl.col("date") == sessions[23])[feature].item() != (
             micro_after.filter(pl.col("date") == sessions[23])[feature].item()

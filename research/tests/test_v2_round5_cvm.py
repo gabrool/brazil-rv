@@ -153,7 +153,12 @@ def test_expected_filing_calendar_is_not_clipped_or_backprojected():
     first = round5_cvm.expected_filing_distance(
         sessions[1], date(2024, 9, 30), receipts, sessions, calendar
     )
-    mutated = {**calendar, "full_sessions": calendar["full_sessions"][:-1]}
+    mutated = {
+        **calendar,
+        "full_sessions": [
+            d for d in calendar["full_sessions"] if d != date(2025, 1, 3)
+        ],
+    }
     assert first == round5_cvm.expected_filing_distance(
         sessions[1], date(2024, 9, 30), receipts, sessions, mutated
     )
@@ -163,6 +168,12 @@ def test_expected_filing_calendar_is_not_clipped_or_backprojected():
         sessions[2], date(2024, 9, 30), receipts, sessions, calendar
     )
     assert exact == 6
+    assert (
+        round5_cvm.expected_filing_distance(
+            sessions[2], date(2024, 9, 30), receipts, sessions, mutated
+        )
+        == exact - 1
+    )
 
 
 def test_identity_uses_known_cadastre_and_prior_ticker_observation():

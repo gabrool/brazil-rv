@@ -744,6 +744,14 @@ def activity_decision_features(
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Causal trailing option activity and mean trade size on the fixed calendar."""
     dates = pl.DataFrame({"source_trade_date": sessions[:-1], "date": sessions[1:]})
+    published_positions = snapshots
+    if snapshots.height:
+        snapshots = (
+            snapshots.join(dates, on="source_trade_date", how="inner")
+            .filter(pl.col("available_date") <= pl.col("date"))
+            .sort("available_date")
+            .unique(subset=["source_trade_date", "isin"], keep="last")
+        )
     grid = (
         dates.join(cash.select("isin").unique(), how="cross")
         .join(
@@ -761,7 +769,6 @@ def activity_decision_features(
                 "source_trade_date",
                 "isin",
                 "listed_series",
-                "oi_observed_series",
                 "call_oi",
                 "put_oi",
                 "oi_all_listed_observed",
@@ -772,7 +779,6 @@ def activity_decision_features(
     else:
         grid = grid.with_columns(
             pl.lit(None, dtype=pl.Int64).alias("listed_series"),
-            pl.lit(None, dtype=pl.Int64).alias("oi_observed_series"),
             pl.lit(None, dtype=pl.Float64).alias("call_oi"),
             pl.lit(None, dtype=pl.Float64).alias("put_oi"),
             pl.lit(False).alias("oi_all_listed_observed"),
@@ -830,12 +836,6 @@ def activity_decision_features(
             pl.when(pl.col("oi_all_listed_observed"))
             .then(((pl.col("put_oi") + 1) / (pl.col("call_oi") + 1)).log())
             .alias("put_call_oi_log_ratio"),
-            pl.when((pl.col("call_oi") > 0) & (pl.col("put_oi") > 0))
-            .then((pl.col("put_oi") / pl.col("call_oi")).log())
-            .alias("observed_series_put_call_oi_log_ratio"),
-            pl.when(pl.col("listed_series") > 0)
-            .then(pl.col("oi_observed_series") / pl.col("listed_series"))
-            .alias("observed_series_oi_coverage"),
             pl.when(pl.col("oi_stock_quantity_20") > 0)
             .then(pl.col("oi_change") / (pl.col("oi_stock_quantity_20") / 20))
             .alias("delta_oi_to_volume_1"),
@@ -894,8 +894,6 @@ def activity_decision_features(
                         in {
                             "put_call_oi_log_ratio",
                             "delta_oi_to_volume_1",
-                            "observed_series_put_call_oi_log_ratio",
-                            "observed_series_oi_coverage",
                         }
                         else 1
                     )
@@ -907,14 +905,61 @@ def activity_decision_features(
             .sort("date", "isin")
         )
 
-    return selected(
+    options = selected(
         [
             "option_to_stock_volume_20",
             "put_call_volume_ratio_5",
             "put_call_oi_log_ratio",
             "delta_oi_to_volume_1",
             "uncovered_call_share",
-            "observed_series_put_call_oi_log_ratio",
-            "observed_series_oi_coverage",
         ]
-    ), selected(["avg_trade_size_20", "after_hours_volume_share_5"])
+    )
+    observed_fields = [
+        "observed_series_put_call_oi_log_ratio",
+        "observed_series_oi_coverage",
+    ]
+    if published_positions.height:
+        positions = {day: index for index, day in enumerate(sessions)}
+        observed = (
+            published_positions.filter(pl.col("available_date").is_in(sessions))
+            .sort("source_trade_date")
+            .unique(subset=["available_date", "isin"], keep="last")
+            .with_columns(
+                pl.when((pl.col("call_oi") > 0) & (pl.col("put_oi") > 0))
+                .then((pl.col("put_oi") / pl.col("call_oi")).log())
+                .alias(observed_fields[0]),
+                pl.when(pl.col("listed_series") > 0)
+                .then(pl.col("oi_observed_series") / pl.col("listed_series"))
+                .alias(observed_fields[1]),
+            )
+        )
+        # Opening D positions describe the previous close. On the rare original
+        # pre-decision publication, source age is one, not the usual EOD age two.
+        age = (
+            pl.col("available_date").replace_strict(positions, return_dtype=pl.Int32)
+            - pl.col("source_trade_date").replace_strict(
+                positions, return_dtype=pl.Int32
+            )
+            + 1
+        )
+        observed = observed.select(
+            pl.col("available_date").alias("date"),
+            "isin",
+            *observed_fields,
+            *[
+                pl.when(pl.col(f).is_not_null()).then(age).alias(f + "_age_sessions")
+                for f in observed_fields
+            ],
+        )
+        options = options.join(observed, on=["date", "isin"], how="full", coalesce=True)
+    else:
+        options = options.with_columns(
+            *[pl.lit(None, dtype=pl.Float64).alias(f) for f in observed_fields],
+            *[
+                pl.lit(None, dtype=pl.Int32).alias(f + "_age_sessions")
+                for f in observed_fields
+            ],
+        )
+    return options.sort("date", "isin"), selected(
+        ["avg_trade_size_20", "after_hours_volume_share_5"]
+    )

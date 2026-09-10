@@ -28,6 +28,14 @@ Add two explicitly labeled source features to the options family:
 Both features use only the original PR version published by the historical 15:45
 decision. BVBG.086's opening-D positions represent the D-1 close. An after-hours-D
 publication consumed at D+1 consequently has age two for these OI statistics.
+Use an explicitly timestamped earlier original publication at its actual first
+decision. On 2021-06-11 the PR printed TradeDate June11 and creation01:53:59;
+the contemporaneous IN version was created10:31:28, with its18:13 version excluded.
+Its opening position describes June10, so 156 coverage observations and133
+both-positive ratios are eligible on June11 with age one. When an older position
+report also arrives at that decision, use the newest known source position.
+This does not backdate full-day volumes. That early report has no complete OI
+underlying, so the requested strict aggregate fields do not gain an early value.
 No second lag is applied at the family join. The original source creation times,
 identity intervals and reported fields remain bound in the archive manifests.
 
