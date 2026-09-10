@@ -72,3 +72,12 @@ and zero treasury, while its own note reports99,631 thousand paid-in shares and
 41,025 treasury shares. Its document-specific reconciliation uses only the
 note's stated quantities and precision. No market-price inference, global scale
 override, or claim of a complete note-by-note source audit is introduced.
+
+A sealed exact-document disposition supersedes a parseable HTML/XML count too.
+Source consistency is stronger evidence than syntactic validity: Petrobras
+DFP2010 ID5007 and DFP2017 ID72291 print individual-share figures beneath a
+thousands heading, while their own capital notes explicitly state the actual
+individual-share quantities. Successful parsing cannot bypass such an audit.
+The superseded source and its hash remain recorded; unrelated accounts and the
+original availability timestamp remain unchanged. Adjacent filings locate
+investigation candidates only; they never determine corrected counts or masks.

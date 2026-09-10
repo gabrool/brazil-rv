@@ -171,6 +171,79 @@ def test_changed_note_bytes_cannot_reuse_a_capital_disposition(tmp_path):
         capital.load_capital_dispositions(path, [DOCUMENT])
 
 
+@pytest.mark.parametrize("disposition", ("reconciled", "audited_unavailable"))
+def test_builder_applies_own_note_audit_even_to_parseable_capital(
+    tmp_path, monkeypatch, disposition
+):
+    import polars as pl
+
+    from brazil_rv.v2 import round5_cvm as cvm
+
+    source_session(monkeypatch)
+    capital_root = tmp_path / "capital" / DOCUMENT["id"]
+    original = capital.capital_page(DOCUMENT, capital_root)
+    path, evidence = disposition_fixture(tmp_path, disposition)
+    path.rename(tmp_path / "capital_source_dispositions.json")
+    cvm.write_json(
+        tmp_path / "calendar_2025_announced.json",
+        {
+            "source": {"path": str(evidence), "sha256": cvm.sha256(evidence)},
+            "available_date": "2024-01-02",
+            "base_through": "2024-12-30",
+            "through": "2025-12-31",
+            "sessions": [],
+        },
+    )
+    day = date(2024, 1, 2)
+    identity = pl.DataFrame(
+        {
+            "date": [day],
+            "isin": ["ON"],
+            "cnpj": [DOCUMENT["cnpj"]],
+            "cvm_code": [DOCUMENT["cvm_code"]],
+        }
+    )
+    accounts = {"con": {"assets": {"value": 123000}}}
+    document = {**DOCUMENT, "accounts": accounts}
+    monkeypatch.setattr(
+        cvm,
+        "store_axes_and_identity_observations",
+        lambda *_: ([day], ["ON"], pl.DataFrame()),
+    )
+    monkeypatch.setattr(cvm, "rad_rows", lambda *_: [])
+    monkeypatch.setattr(cvm, "fca_documents", lambda *_: [])
+    monkeypatch.setattr(cvm, "build_identity", lambda *_: identity)
+    monkeypatch.setattr(cvm, "public_float_observations", lambda *_: pl.DataFrame())
+    monkeypatch.setattr(cvm, "filing_headers", lambda *_: [])
+    monkeypatch.setattr(
+        cvm, "event_features", lambda *_: identity.select("date", "cvm_code")
+    )
+    monkeypatch.setattr(cvm, "load_accounts", lambda *_: [document])
+    monkeypatch.setattr(cvm, "capital_change_observations", lambda *_: [])
+    monkeypatch.setattr(cvm, "valuation_market", lambda *_: None)
+
+    class ReachedFeatureConsumer(Exception):
+        pass
+
+    def inspect_documents(documents, *_):
+        assert documents[0]["shares"] == (
+            {"ON": 90_948_793, "PN": 0} if disposition == "reconciled" else None
+        )
+        assert documents[0]["accounts"] == accounts
+        assert documents[0]["reference"] == DOCUMENT["reference"]
+        raise ReachedFeatureConsumer
+
+    monkeypatch.setattr(cvm, "fundamental_features", inspect_documents)
+    with pytest.raises(ReachedFeatureConsumer):
+        cvm.build(tmp_path, tmp_path / "unused_store", tmp_path / "output")
+    assert capital.load_capital(DOCUMENT, capital_root) == original["capital"]
+    sources = json.loads(
+        (tmp_path / "output/capital_source_manifests.json").read_text()
+    )
+    assert len(sources) == 2
+    assert sources[-1]["disposition"] == disposition
+
+
 def test_reference_and_unknown_scale_cannot_borrow_another_period():
     with pytest.raises(ValueError, match="reference date"):
         capital.parse_capital(table(), {**DOCUMENT, "reference": date(2023, 9, 30)})

@@ -2423,7 +2423,9 @@ def build(root: Path, store: Path, output: Path) -> dict:
                     "manifest_sha256": sha256(capital_root / "manifest.json"),
                 }
             )
-        if document.get("shares") is None and document["id"] in capital_dispositions:
+        # An exact own-note audit can disprove a numerically parseable table.
+        # It therefore supersedes that table, not only absent/negative counts.
+        if document["id"] in capital_dispositions:
             disposition = capital_dispositions[document["id"]]
             document["shares"] = disposition["shares"]
             shares_source = (
