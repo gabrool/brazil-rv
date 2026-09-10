@@ -1,4 +1,11 @@
-# Round 5 forward capture acceptance
+# Round 5 forward capture stopped
+
+The user explicitly stopped all forward capture on September 10, 2026. This
+instruction supersedes the capture requests in the original Round-5 registration
+and its supplied scope. No current/future snapshots or manual capture runs are
+authorized. At the stop, no capture process or matching Windows scheduled task
+was active. The existing Codex task was changed to historical Round-5 continuation
+only and will pause on completion; it must not restore daily capture.
 
 The first capture completed in 18.1 seconds on September 10, 2026. It is a raw archive for future work, excluded from the development store and all Round-5 model screens. No paid instance or continuous process is required.
 
@@ -14,14 +21,10 @@ The source endpoints were verified from the [official B3 index application](http
 
 The first output is `D:\quant-data\b3\interim\round5_data_20260910T140442Z\forward_capture\20260910T152200661738Z`. Its manifest SHA-256 is `a5548985698b677ba89a881de135e6be8a08190dc58f6f4e113ed943fec70d63`. The 36 source responses preserve raw bytes, URLs, SHA-256 hashes and UTC retrieval timestamps. All three current index configurations had inactive preview flags even though their preview endpoints returned 76/100/104 old constituent rows. The archive preserves that distinction.
 
-Run from the repository:
-
-```powershell
-uv run --project research python -m brazil_rv.v2.round5_capture --root D:\quant-data\b3\interim\forward_market_capture --family all --workers 4
-```
-
-Use `--family index` or `--family asia` for separate runs. Each invocation creates a new timestamped directory and a manifest, with partial failures returning a nonzero exit status. Four focused tests protect exact-contract roster selection, missing-minute preservation, complete index pagination, and inactive preview interpretation.
-
-The initial minute responses span September 8 morning through September 10 at 23:00 Shanghai, with some illiquid contracts reaching further back. The active daily capture at **12:10 São Paulo (23:10 Shanghai)** overlaps that retention window and records both Asian minutes and all index views. Its Codex automation ID is `brazil-rv-daily-source-capture`; ordinary successful runs stay quiet. The stable forward root is `D:\quant-data\b3\interim\forward_market_capture`; the first acceptance snapshot above remains immutable in its original location.
-
-This one daily snapshot does not claim to observe index announcements made later that afternoon. Any later manual capture gets its actual collection timestamp. Local scheduled tasks require the computer on and the app running, as described in the [official scheduling documentation](https://learn.chatgpt.com/docs/automations?surface=app). Missed runs or a changed vendor retention window can leave gaps; first-capture timestamps are never backdated to make a complete historical archive. The source still requires a future risk-track acceptance audit before minute values are used by a model or execution policy.
+The initial minute responses span September 8 morning through September 10 at
+23:00 Shanghai, with some illiquid contracts reaching further back. That one
+snapshot does not claim complete announcement or intraday history. Four focused
+tests originally checked exact-contract roster selection, missing-minute
+preservation, complete index pagination and inactive preview interpretation.
+The first snapshot and its source hashes remain immutable in their original
+location. No additional snapshot is scheduled or requested.

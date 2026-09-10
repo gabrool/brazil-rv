@@ -6,8 +6,8 @@ will be replaced with the completed acceptance tables and readouts before the
 round is closed. CPU only; no paid instance or neural fit has run this round.
 
 The development boundary is 2024-12-30. Historical consumers are bounded to that
-date. The explicitly requested Group-B forward archives are separate, quarantined
-source capture and confer no permission for held-out model evaluation.
+date. The user stopped all forward capture on September 10, 2026. The existing
+Group-B snapshot remains quarantined evidence, outside historical consumers.
 
 ## Completed economic correction
 
@@ -64,7 +64,8 @@ filing expectations require the actual original version's receipt; a later
 revision first observed inside a truncated archive is not an original filing.
 The corresponding amendments and targeted tests are committed before the final
 family build. A quiet five-minute continuation monitor advances the remaining
-acquisition, build and screen stages, then returns to daily source capture.
+historical acquisition, build and screen stages, then pauses. It cannot launch
+forward capture or restore a capture schedule.
 
 The final source freeze also waits for original FCA recovery. Among 401 issuers,
 6,765 versions (3,386 originals) are absent from annual detail tables. The median
@@ -115,7 +116,7 @@ tests cover extension admission, survival/ADV gates, and the existing provider
 invariance and causal-price fixture. Actual full-data audit results remain
 pending the final store build.
 
-## Continuous book and forward collection
+## Continuous book and stopped forward collection
 
 The [continuous S0 replay](v2_round5_continuous_book.md) carries positions, pending
 orders, cash and claims across all 13 model switches over 1,738 development days.
@@ -125,10 +126,10 @@ registered engineering gates pass. Economic uncertainty remains explicit:
 of short notional still uses placeholder borrow pricing. Peak worker RSS was
 3.438 GiB; the completed output was hash-verified and reused after the PC restart.
 
-[Forward capture](v2_round5_forward_capture.md) is implemented and has a verified
-36-response initial snapshot. A quiet daily 12:10 São Paulo automation captures
-current index views and exact-contract Asian minute data into a separate future
-archive. Group-B [funds](v2_round5_group_b_funds.md),
+[Forward capture](v2_round5_forward_capture.md) produced one verified 36-response
+snapshot before the user's stop instruction. No capture process is running and
+the recurring task now performs historical Round-5 continuation only. The
+existing snapshot remains immutable and quarantined. Group-B [funds](v2_round5_group_b_funds.md),
 [energy](v2_round5_group_b_energy.md), and [Focus](v2_round5_group_b_focus.md)
 timing tables are complete; none is a Round-5 model input.
 

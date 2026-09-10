@@ -186,6 +186,11 @@ families preserve S0 forwards, parent gradients and RNG state exactly; no neural
 fit runs in this round. Historical sidecar-concatenation recipes bind their
 original code commits. See the registration and `docs/v2_README.md`.
 
+The user stopped all forward capture on 2026-09-10. No current/future market
+snapshots or recurring capture are authorized. The existing quarantined snapshot
+remains immutable evidence. The five-minute monitor continues historical Round-5
+work only and must pause after completion, without restoring daily capture.
+
 Round-5 CVM identity uses each original filing's historical security description
 and exchange listing dates; modern viewer class labels and governance-segment
 entry dates cannot replace those facts. Numeric sector groups use explicit
