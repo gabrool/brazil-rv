@@ -11,9 +11,9 @@ from collections import defaultdict
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
-from xml.etree.ElementTree import iterparse
 from zoneinfo import ZoneInfo
 
+from lxml.etree import iterparse
 import polars as pl
 import numpy as np
 
@@ -21,7 +21,6 @@ from brazil_rv.v2.artifacts import sha256_file
 from brazil_rv.preprocessing.b3_options_open_interest import (
     _descendant,
     _instrument_id,
-    _local,
     _text,
 )
 from brazil_rv.preprocessing.options_activity import (
@@ -96,9 +95,9 @@ def parse_options_snapshot(
     cash = {}
     options = {}
     with historical_xml(in_path, available_date) as (handle, in_audit):
-        for _, element in iterparse(handle, events=("end",)):
-            if _local(element.tag) != "Instrm":
-                continue
+        for _, element in iterparse(
+            handle, events=("end",), tag="{*}Instrm", resolve_entities=False, no_network=True
+        ):
             identifier = _instrument_id(element)
             info = _descendant(element, "InstrmInf")
             equity = _descendant(info, "EqtyInf")
@@ -144,9 +143,9 @@ def parse_options_snapshot(
     stock_rows = []
     seen = set()
     with historical_xml(pr_path, available_date) as (handle, pr_audit):
-        for _, element in iterparse(handle, events=("end",)):
-            if _local(element.tag) != "PricRpt":
-                continue
+        for _, element in iterparse(
+            handle, events=("end",), tag="{*}PricRpt", resolve_entities=False, no_network=True
+        ):
             identifier = _instrument_id(element)
             if identifier in options or identifier in cash:
                 if _text(_descendant(element, "TradDt"), "Dt") != str(source_date):
@@ -224,9 +223,9 @@ def cash_price_report(
     rows = []
     seen = set()
     with historical_xml(pr_path, available_date) as (handle, audit):
-        for _, element in iterparse(handle, events=("end",)):
-            if _local(element.tag) != "PricRpt":
-                continue
+        for _, element in iterparse(
+            handle, events=("end",), tag="{*}PricRpt", resolve_entities=False, no_network=True
+        ):
             isin = identities.get(_text(element, "TckrSymb"))
             if isin is not None:
                 if _text(_descendant(element, "TradDt"), "Dt") != str(source_date):
