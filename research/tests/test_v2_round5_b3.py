@@ -14,6 +14,7 @@ from brazil_rv.v2.round5_b3 import (
     stitch_legacy_balances,
     lending_decision_features,
     lending_utilization_features,
+    cash_price_report,
 )
 
 
@@ -122,6 +123,31 @@ def test_option_snapshot_uses_known_version_and_keeps_missing_oi_unknown(tmp_pat
     assert rows["oi_all_listed_observed"].to_list() == [False]
     assert audit["pr"]["selected_member"] == "before.xml"
     assert audit["pr"]["versions_after_decision_excluded"] == 1
+
+
+def test_cash_report_gap_uses_exact_dated_ticker_without_instrument_file(tmp_path):
+    pr = tmp_path / "PR.zip"
+    _nested(
+        pr,
+        {
+            "known.xml": "<Doc><CreDtAndTm>2023-12-08T20:00:00</CreDtAndTm>"
+            "<PricRpt><TradDt><Dt>2023-12-08</Dt></TradDt><TckrSymb>OLD3</TckrSymb>"
+            "<FinInstrmQty>100</FinInstrmQty><RglrTraddCtrcts>90</RglrTraddCtrcts>"
+            "</PricRpt></Doc>"
+        },
+    )
+    cash = pl.DataFrame(
+        {
+            "source_trade_date": [date(2023, 12, 8), date(2023, 12, 11)],
+            "ticker": ["OLD3", "OLD3"],
+            "isin": ["ABC", "DEF"],
+        }
+    )
+    rows, _ = cash_price_report(pr, date(2023, 12, 8), date(2023, 12, 11), cash)
+    assert rows["isin"].to_list() == ["ABC"]
+    assert rows["quantity"].to_list() == [100.0]
+    assert rows["regular_quantity"].to_list() == [90.0]
+    assert rows["nonregular_quantity"].to_list() == [None]
 
 
 def test_cotahist_options_use_explicit_dated_isin_not_ticker_prefix(tmp_path):

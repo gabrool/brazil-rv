@@ -172,17 +172,7 @@ def parse_options_snapshot(
                     agg["oi_observed_series"] += 1
                     agg["call_oi" if kind == "CALL" else "put_oi"] += value
             if identifier in cash:
-                row = {"isin": cash[identifier]}
-                for name, tag in (
-                    ("quantity", "FinInstrmQty"),
-                    ("trades", "TradQty"),
-                    ("volume_brl", "NtlFinVol"),
-                    ("regular_quantity", "RglrTraddCtrcts"),
-                    ("nonregular_quantity", "NonRglrTraddCtrcts"),
-                ):
-                    raw = _text(element, tag)
-                    row[name] = float(raw) if raw is not None else None
-                stock_rows.append(row)
+                stock_rows.append(_cash_record(element, cash[identifier]))
             element.clear()
     oi_rows = [{"isin": isin, **values} for isin, values in aggregates.items()]
     for row in oi_rows:
@@ -201,6 +191,52 @@ def parse_options_snapshot(
             "stock_instruments": len(cash),
         },
     )
+
+
+def _cash_record(element, isin: str) -> dict:
+    row = {"isin": isin}
+    for name, tag in (
+        ("quantity", "FinInstrmQty"),
+        ("trades", "TradQty"),
+        ("volume_brl", "NtlFinVol"),
+        ("regular_quantity", "RglrTraddCtrcts"),
+        ("nonregular_quantity", "NonRglrTraddCtrcts"),
+    ):
+        raw = _text(element, tag)
+        row[name] = float(raw) if raw is not None else None
+    return row
+
+
+def cash_price_report(
+    pr_path: Path,
+    source_date: date,
+    available_date: date,
+    cash: pl.DataFrame,
+) -> tuple[pl.DataFrame, dict]:
+    """Recover cash activity using exact same-date COTAHIST ticker identities."""
+    dated = (
+        cash.filter(pl.col("source_trade_date") == source_date)
+        .group_by("ticker")
+        .agg(pl.col("isin").n_unique().alias("count"), pl.col("isin").first())
+        .filter(pl.col("count") == 1)
+    )
+    identities = dict(dated.select("ticker", "isin").iter_rows())
+    rows = []
+    seen = set()
+    with historical_xml(pr_path, available_date) as (handle, audit):
+        for _, element in iterparse(handle, events=("end",)):
+            if _local(element.tag) != "PricRpt":
+                continue
+            isin = identities.get(_text(element, "TckrSymb"))
+            if isin is not None:
+                if _text(_descendant(element, "TradDt"), "Dt") != str(source_date):
+                    raise ValueError("Cash price-report date does not match source date")
+                if isin in seen:
+                    raise ValueError("Multiple price-report records map to one cash ISIN")
+                seen.add(isin)
+                rows.append(_cash_record(element, isin))
+            element.clear()
+    return pl.DataFrame(rows), audit
 
 
 def cotahist_option_quantities(
