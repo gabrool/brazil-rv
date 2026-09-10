@@ -13,6 +13,7 @@ from brazil_rv.v2.round5_b3 import (
     activity_decision_features,
     stitch_legacy_balances,
     lending_decision_features,
+    lending_utilization_features,
 )
 
 
@@ -324,3 +325,91 @@ def test_lending_feature_uses_publication_date_and_preserves_reference_age():
         changed.filter(pl.col("date") == days[22])["loan_balance_to_volume_20"].item()
         == 6.0
     )
+
+
+def test_utilization_uses_received_float_snapshot_and_known_unit_boundaries():
+    days = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
+    balances = pl.DataFrame(
+        {
+            "source_position_date": days[1:5],
+            "available_date": days[2:6],
+            "security_id": ["ISIN:ABC"] * 4,
+            "lending_balance_quantity": [10] * 4,
+        }
+    )
+    identity = pl.DataFrame(
+        {
+            "date": days[2:6],
+            "isin": ["ABC"] * 4,
+            "cnpj": ["12345678000202"] * 4,
+            "cvm_code": ["123"] * 4,
+            "class": ["ON"] * 4,
+            "identity_effective_start": [days[0]] * 4,
+        }
+    )
+    floats = pl.DataFrame(
+        {
+            "date": [days[3]],
+            "snapshot_date": [days[1]],
+            "reference": [date(2023, 1, 1)],
+            "cnpj": ["12345678000101"],
+            "cvm_code": ["123"],
+            "class": ["ON"],
+            "free_float_shares": [100.0],
+            "document_id": ["1"],
+            "version": [1],
+        }
+    )
+    barriers = np.zeros((7, 1), dtype=np.int32)
+    barriers[5:] = 1  # A source-session unit change on days[4].
+    market = {"columns": {"ABC": 0}, "barrier_prefix": barriers}
+    result, _ = lending_utilization_features(
+        balances, floats, identity, days, market, []
+    )
+    assert result["date"].to_list() == days[3:5]
+    assert result["utilization_proxy"].to_list() == [0.1, 0.1]
+    assert result["utilization_proxy_age_sessions"].to_list() == [1, 1]
+    changed, _ = lending_utilization_features(
+        balances,
+        floats.with_columns(pl.lit(200.0).alias("free_float_shares")),
+        identity,
+        days,
+        market,
+        [],
+    )
+    assert result.filter(pl.col("date") < days[3]).equals(
+        changed.filter(pl.col("date") < days[3])
+    )
+    assert changed["utilization_proxy"].to_list() == [0.05, 0.05]
+    wrong_issuer, _ = lending_utilization_features(
+        balances,
+        floats.with_columns(pl.lit("456").alias("cvm_code")),
+        identity,
+        days,
+        market,
+        [],
+    )
+    assert wrong_issuer.is_empty()
+    future_known_change = {
+        "cnpj": "12345678000101",
+        "cvm_code": "123",
+        "available_index": 4,
+        "effective": days[2],
+    }
+    capital, _ = lending_utilization_features(
+        balances, floats, identity, days, market, [future_known_change]
+    )
+    assert capital["date"].to_list() == [days[3]]
+    preferred = identity.with_columns(pl.lit("PN").alias("class"))
+    preferred = pl.concat(
+        [preferred, preferred.with_columns(pl.lit("DEF").alias("isin"))]
+    )
+    ambiguous, _ = lending_utilization_features(
+        balances,
+        floats.with_columns(pl.lit("PN").alias("class")),
+        preferred,
+        days,
+        market,
+        [],
+    )
+    assert ambiguous.is_empty()

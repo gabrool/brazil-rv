@@ -6,6 +6,7 @@ import json
 import io
 import re
 import zipfile
+from bisect import bisect_right
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
@@ -542,6 +543,121 @@ def lending_decision_features(
         )
         .sort("date", "isin")
     )
+
+
+def lending_utilization_features(
+    balances: pl.DataFrame,
+    free_float: pl.DataFrame,
+    identity: pl.DataFrame,
+    sessions: list[date],
+    market: dict,
+    capital_changes: list[dict],
+) -> tuple[pl.DataFrame, dict[str, int]]:
+    """Loan shares / known, dated freely circulating shares of the same class.
+
+    The FRE filing year is not the float measurement date. Its last-meeting
+    snapshot date governs quantity-unit continuity, while receipt governs
+    knowledge. An observed unit boundary or known intervening capital change
+    invalidates the old denominator; shares are never retrospectively adjusted.
+    """
+    positions = {day: index for index, day in enumerate(sessions)}
+    mapped = identity.with_columns(pl.col("cnpj").str.slice(0, 8).alias("issuer_root"))
+    class_counts = mapped.group_by("date", "issuer_root", "cvm_code", "class").agg(
+        pl.col("isin").n_unique().alias("class_security_count")
+    )
+    mapped = mapped.join(
+        class_counts, on=["date", "issuer_root", "cvm_code", "class"]
+    )
+    joined = (
+        balances.with_columns(
+            pl.col("available_date").alias("date"),
+            pl.col("security_id").str.strip_prefix("ISIN:").alias("isin"),
+        )
+        .join(mapped, on=["date", "isin"], how="left")
+        .sort("date", "isin")
+    )
+    sources = defaultdict(list)
+    for row in free_float.iter_rows(named=True):
+        if row["snapshot_date"] is not None and row["free_float_shares"] > 0:
+            sources[(row["cnpj"][:8], row["cvm_code"], row["class"])].append(row)
+    for rows in sources.values():
+        rows.sort(key=lambda r: (r["date"], r["version"], r["document_id"]))
+    changes = defaultdict(list)
+    for event in capital_changes:
+        changes[(event["cnpj"][:8], event["cvm_code"])].append(event)
+    cursor = defaultdict(int)
+    known = defaultdict(list)
+    audit = defaultdict(int)
+    output = []
+    for row in joined.iter_rows(named=True):
+        index = positions[row["date"]]
+        source_index = positions.get(row["source_position_date"])
+        key = (row["issuer_root"], row["cvm_code"], row["class"])
+        source = sources[key]
+        while cursor[key] < len(source) and source[cursor[key]]["date"] <= row["date"]:
+            known[key].append(source[cursor[key]])
+            cursor[key] += 1
+        if (
+            row["class"] not in {"ON", "PN"}
+            or row["class_security_count"] != 1
+            or row["identity_effective_start"] > row["source_position_date"]
+        ):
+            audit["identity_or_class_unavailable"] += 1
+            continue
+        candidates = [
+            d for d in known[key] if d["snapshot_date"] <= row["source_position_date"]
+        ]
+        if not candidates:
+            audit["dated_float_unavailable"] += 1
+            continue
+        document = max(
+            candidates,
+            key=lambda d: (
+                d["snapshot_date"], d["reference"], d["version"], d["date"], d["document_id"]
+            ),
+        )
+        if any(
+            event["available_index"] <= index
+            and document["snapshot_date"] < event["effective"] <= row["source_position_date"]
+            for event in changes[(row["issuer_root"], row["cvm_code"])]
+        ):
+            audit["known_capital_boundary"] += 1
+            continue
+        column = market["columns"].get(row["isin"])
+        first = bisect_right(sessions, document["snapshot_date"])
+        prefix = market["barrier_prefix"]
+        if (
+            column is None
+            or source_index is None
+            or first > source_index + 1
+            or prefix[source_index + 1, column] != prefix[first, column]
+        ):
+            audit["observed_unit_boundary"] += 1
+            continue
+        quantity = row["lending_balance_quantity"]
+        if quantity is None or quantity < 0:
+            audit["loan_quantity_unavailable"] += 1
+            continue
+        output.append(
+            {
+                "date": row["date"],
+                "isin": row["isin"],
+                "utilization_proxy": quantity / document["free_float_shares"],
+                "utilization_proxy_age_sessions": index
+                - min(source_index, positions[document["date"]]),
+            }
+        )
+    audit["source_balance_rows"] = balances.height
+    audit["valid_rows"] = len(output)
+    return pl.DataFrame(
+        output,
+        schema={
+            "date": pl.Date,
+            "isin": pl.String,
+            "utilization_proxy": pl.Float64,
+            "utilization_proxy_age_sessions": pl.Int32,
+        },
+    ), dict(audit)
 
 
 def activity_decision_features(
