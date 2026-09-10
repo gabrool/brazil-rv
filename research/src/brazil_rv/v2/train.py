@@ -58,10 +58,11 @@ from .contract import (
     TRAINING_STAGE_SCHEMA,
     V1_READ_SEEDS,
 )
-from .data import collate_v2_daily, stage_fast_name_count
+from .data import V2DailyDataset, collate_v2_daily, stage_fast_name_count
 from .losses import multi_horizon_loss, multi_horizon_loss_normalizers
 from .model import DailyMultiHorizonModel
 from .normalization import average_ranks
+from .round5_magnitude import FitClip
 from .splits import development_folds
 
 
@@ -486,9 +487,21 @@ def load_pretrain_handoff(
             fine_inputs, Mapping
         ):
             raise ValueError("stage-P handoff input provenance is missing")
-        if _input_static_identity(pretrain_inputs) != _input_static_identity(
-            fine_inputs
-        ):
+        identities = [
+            _input_static_identity(pretrain_inputs),
+            _input_static_identity(fine_inputs),
+        ]
+        # Each stage estimates clipping from its own fit dates. Its frozen
+        # bounds remain part of scoring identity, not P/F structural identity.
+        for identity in identities:
+            features = identity.get("features")
+            if isinstance(features, Mapping):
+                identity["features"] = {
+                    name: value
+                    for name, value in features.items()
+                    if name != "magnitude_clip"
+                }
+        if identities[0] != identities[1]:
             raise ValueError("stage-P and stage-F store/feature identities differ")
     state = payload.get("model_state_dict")
     if not isinstance(state, Mapping):
@@ -1045,6 +1058,18 @@ def _loader_input_payload(
                     candidate, "external_artifact_resolutions", ()
                 )
             ]
+            magnitude_provenance = {}
+            if "magnitudes" in enabled_sidecars:
+                clip = getattr(candidate, "magnitude_clip", None)
+                if not isinstance(clip, FitClip):
+                    raise ValueError(
+                        "magnitude inputs require frozen fit clipping bounds"
+                    )
+                if clip.lower.size != len(sidecar_names["magnitudes"]):
+                    raise ValueError(
+                        "magnitude clipping width differs from store fields"
+                    )
+                magnitude_provenance["magnitude_clip"] = clip.payload()
             return {
                 "schema": MODEL_INPUT_SCHEMA,
                 "store": {
@@ -1065,6 +1090,7 @@ def _loader_input_payload(
                     "sidecar_encoding": "masked_zero_initialized_residual_projection",
                     "enabled_sidecar_groups": list(enabled_sidecars),
                     "ordered_sidecar_names": sidecar_names,
+                    **magnitude_provenance,
                     "ordered_intraday_names": intraday_names,
                     "ordered_native_fast_names": native_fast_names,
                     "ordered_common_state_names": common_names,
@@ -1274,11 +1300,41 @@ def stage_p_model_config(config: ModelConfig) -> ModelConfig:
     )
 
 
+def _magnitude_dataset(loader: object) -> V2DailyDataset | None:
+    candidate: object | None = loader
+    seen: set[int] = set()
+    while candidate is not None and id(candidate) not in seen:
+        seen.add(id(candidate))
+        if isinstance(candidate, V2DailyDataset):
+            return candidate if "magnitudes" in candidate.enabled_sidecars else None
+        candidate = getattr(candidate, "dataset", None)
+    return None
+
+
+def _fit_magnitude_clip(train_loader: object, selection_loader: object) -> None:
+    training = _magnitude_dataset(train_loader)
+    selection = _magnitude_dataset(selection_loader)
+    if training is None:
+        return
+    indices = training.date_indices
+    # Read only authorized fit rows, excluding history, embargo and selection.
+    fit = FitClip.fit(
+        training.store.read("sidecar_magnitudes_values", indices),
+        training.store.read("sidecar_magnitudes_valid", indices),
+        training.store.read("active", indices),
+        np.arange(indices.size),
+    )
+    training.magnitude_clip = FitClip(fit.lower, fit.upper, tuple(indices.tolist()))
+    if selection is not None:
+        selection.magnitude_clip = training.magnitude_clip
+
+
 def build_checkpoint_input_contract(
     model_config: ModelConfig,
     train_loader: Iterable[Mapping[str, object]],
     selection_loader: Iterable[Mapping[str, object]],
 ) -> dict[str, object]:
+    _fit_magnitude_clip(train_loader, selection_loader)
     training = _loader_input_payload(train_loader)
     selection = _loader_input_payload(selection_loader)
     if training is None or selection is None:
@@ -1710,17 +1766,9 @@ def train_stage(
         "training": _loader_access_payload(train_loader),
         "selection": _loader_access_payload(selection_loader),
     }
-    input_stores = {
-        "training": _loader_input_payload(train_loader),
-        "selection": _loader_input_payload(selection_loader),
-    }
     if any(payload is None for payload in access_ledgers.values()):
         raise ValueError(
             "production train and selection loaders must expose authorized access ledgers"
-        )
-    if any(payload is None for payload in input_stores.values()):
-        raise ValueError(
-            "production train and selection loaders must expose canonical model inputs"
         )
     for purpose, payload in access_ledgers.items():
         if payload is not None and payload.get("purpose") != purpose:
@@ -1740,6 +1788,9 @@ def train_stage(
     checkpoint_input_contract = build_checkpoint_input_contract(
         model_config, train_loader, selection_loader
     )
+    input_stores = {
+        name: checkpoint_input_contract[name] for name in ("training", "selection")
+    }
     training_inputs = checkpoint_input_contract["training"]
     selection_inputs = checkpoint_input_contract["selection"]
     assert isinstance(training_inputs, Mapping)

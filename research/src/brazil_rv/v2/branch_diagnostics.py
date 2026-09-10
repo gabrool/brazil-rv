@@ -40,7 +40,8 @@ def gate_activations(
     never enter the compiled training/scoring graph; labels are ignored. Preserve
     RNG even if iteration through a DataLoader draws its worker seed.
     """
-    from .score import _forward, _model_batch
+    from .score import _model_batch
+    from .train import _model_forward
 
     gates = {"pool": model.pool_gate}
     if model.config.current_feature_count:
@@ -107,7 +108,7 @@ def gate_activations(
                     dtype=torch.bfloat16,
                     enabled=model.config.use_bf16 and device.type == "cuda",
                 ):
-                    _forward(model, batch)
+                    _model_forward(model, batch)
     finally:
         for handle in handles:
             handle.remove()

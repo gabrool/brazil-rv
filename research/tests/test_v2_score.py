@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 from datetime import date, timedelta
 
 import numpy as np
@@ -18,9 +19,16 @@ from brazil_rv.v2.contract import (
 )
 from brazil_rv.v2.data import V2DailyDataset
 from brazil_rv.v2.model import DailyMultiHorizonModel
+from brazil_rv.v2.round5_magnitude import FEATURE_NAMES, FitClip
 from brazil_rv.v2.score import score_checkpoint_artifact
 from v2_store_fixtures import write_fixture_store as write_store
-from brazil_rv.v2.train import build_checkpoint_input_contract
+from brazil_rv.v2.train import (
+    _canonical_payload_sha256,
+    build_checkpoint_input_contract,
+    load_pretrain_handoff,
+    model_config_contract,
+    stage_p_model_config,
+)
 
 
 def _omit_absent_fast(rows):
@@ -41,6 +49,7 @@ def _scoring_fixture(
     *,
     slow_names: tuple[str, str] = ("slow_0", "slow_1"),
     include_official: bool = False,
+    include_magnitudes: bool = False,
 ):
     tmp_path.mkdir(parents=True, exist_ok=True)
     name_count = 4
@@ -55,6 +64,24 @@ def _scoring_fixture(
     ).astype(np.float32)
     active = np.ones((day_count, name_count), dtype=np.bool_)
     active[21, 2] = False
+    magnitude_arrays = {}
+    if include_magnitudes:
+        values = np.arange(day_count * name_count * 4, dtype=np.float32).reshape(
+            day_count, name_count, 4
+        )
+        valid = np.ones_like(values, bool)
+        valid[20:22, :, 3] = False
+        valid[20, 0, 0] = False
+        values[20, 0, 0] = -1e9
+        values[21, 2] = 1e9
+        values[22:] *= 1e6
+        magnitude_arrays = {
+            "sidecar_magnitudes_values": values,
+            "sidecar_magnitudes_valid": valid,
+            "sidecar_magnitudes_age_sessions": np.where(valid, 1, -1).astype(
+                np.float32
+            ),
+        }
     store = write_store(
         tmp_path / "store",
         dates=dates,
@@ -68,35 +95,57 @@ def _scoring_fixture(
             "intraday_valid": np.ones_like(intraday, dtype=np.bool_),
             "intraday_age_sessions": np.zeros_like(intraday, dtype=np.float32),
             "active": active,
+            **magnitude_arrays,
         },
         feature_names={
             "slow": list(slow_names),
             "intraday": list(INTRADAY_DAILY_FEATURES),
+            **(
+                {"sidecar_magnitudes": list(FEATURE_NAMES)}
+                if include_magnitudes
+                else {}
+            ),
         },
         metadata={
             "feature_age_contract": dict(FEATURE_AGE_CONTRACT),
             "slow_entry_alignment": dict(DECISION_FEATURE_CONTRACT),
         },
     )
+    score_indices = [22, 23, 24] if include_magnitudes else [20, 21, 22]
     dataset = V2DailyDataset(
         store,
-        [20, 21, 22],
+        score_indices,
         stage="evaluation",
         lookback=20,
         purpose="evaluation",
+        enabled_sidecars=("magnitudes",) if include_magnitudes else (),
     )
     config = ModelConfig(
         slow_feature_count=2,
         slow_lookback=20,
         dropout=0.1,
         compile_forward=False,
+        sidecar_feature_counts=(("magnitudes", 4),) if include_magnitudes else (),
     )
     torch.manual_seed(29)
     model = DailyMultiHorizonModel(config)
     loader = DataLoader(
         dataset, batch_size=2, shuffle=False, collate_fn=_omit_absent_fast
     )
-    input_contract = build_checkpoint_input_contract(config, loader, loader)
+    training_loader = loader
+    if include_magnitudes:
+        training_loader = DataLoader(
+            V2DailyDataset(
+                store,
+                [20, 21],
+                stage="finetune",
+                lookback=20,
+                purpose="training",
+                enabled_sidecars=("magnitudes",),
+            ),
+            batch_size=2,
+        )
+    input_contract = build_checkpoint_input_contract(config, training_loader, loader)
     checkpoint = tmp_path / "raw_patience.pt"
     torch.save(
         {
@@ -115,7 +164,76 @@ def _scoring_fixture(
         },
         checkpoint,
     )
-    return dataset, config, checkpoint, active[20:23]
+    return dataset, config, checkpoint, active[score_indices]
+
+
+def test_magnitude_scoring_restores_training_bounds_without_refitting(
+    tmp_path, monkeypatch
+):
+    dataset, config, checkpoint, _ = _scoring_fixture(tmp_path, include_magnitudes=True)
+    payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
+    inputs = payload["input_contract"]
+    frozen = inputs["training"]["features"]["magnitude_clip"]
+    assert frozen == inputs["selection"]["features"]["magnitude_clip"]
+    assert frozen["fit_date_indices"] == [20, 21]
+    assert frozen["lower"][0] > 0 and frozen["upper"][0] < 1000
+    assert frozen["lower"][3] is None and frozen["upper"][3] is None
+    dataset.magnitude_clip = None
+    with pytest.raises(ValueError, match="frozen fit clipping"):
+        dataset[0]
+
+    def no_fit(*args, **kwargs):
+        raise AssertionError("scoring must never estimate clipping bounds")
+
+    monkeypatch.setattr(FitClip, "fit", no_fit)
+    artifact = score_checkpoint_artifact(
+        checkpoint=checkpoint,
+        model_config=config,
+        loader=DataLoader(dataset, batch_size=2, collate_fn=_omit_absent_fast),
+        output_dir=tmp_path / "magnitude_scores",
+        device=torch.device("cpu"),
+    )
+    assert dataset.magnitude_clip.payload() == frozen
+    sample = dataset[0]
+    assert (sample["sidecar_magnitudes_values"][:, 0] <= frozen["upper"][0]).all()
+    assert (sample["sidecar_magnitudes_values"][:, 3] > 1e6).all()
+    manifest = json.loads(artifact.manifest_path.read_text(encoding="utf8"))
+    assert manifest["scoring_input"]["features"]["magnitude_clip"] == frozen
+
+
+def test_magnitude_handoff_allows_stage_fit_bounds_but_keeps_feature_identity(tmp_path):
+    _, config, checkpoint, _ = _scoring_fixture(tmp_path, include_magnitudes=True)
+    payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
+    fine_contract = deepcopy(payload["input_contract"])
+    pretrain_config = stage_p_model_config(config)
+    payload["stage"] = "P"
+    payload["model_state_dict"] = DailyMultiHorizonModel(pretrain_config).state_dict()
+    contract = payload["input_contract"]
+    contract["model_config"] = model_config_contract(pretrain_config)
+    for subset in ("training", "selection"):
+        clip = contract[subset]["features"]["magnitude_clip"]
+        clip["fit_date_indices"] = [0, 1]
+        clip["lower"] = [x / 2 if x is not None else None for x in clip["lower"]]
+        clip["upper"] = [x / 2 if x is not None else None for x in clip["upper"]]
+    contract.pop("sha256")
+    contract["sha256"] = _canonical_payload_sha256(contract)
+    pretrain_path = tmp_path / "magnitude_pretrain.pt"
+    torch.save(payload, pretrain_path)
+    transferred = load_pretrain_handoff(
+        DailyMultiHorizonModel(config),
+        pretrain_path,
+        expected_sha256=sha256_file(pretrain_path),
+        fine_tune_input_contract=fine_contract,
+    )
+    assert "sidecar_projections.magnitudes" in transferred
+    fine_contract["training"]["features"]["ordered_slow_names"] = ["different"]
+    with pytest.raises(ValueError, match="store/feature identities differ"):
+        load_pretrain_handoff(
+            DailyMultiHorizonModel(config),
+            pretrain_path,
+            expected_sha256=sha256_file(pretrain_path),
+            fine_tune_input_contract=fine_contract,
+        )
 
 
 def test_scoring_is_repeat_bit_identical_and_provenance_bound(tmp_path) -> None:
@@ -162,6 +280,7 @@ def test_scoring_is_repeat_bit_identical_and_provenance_bound(tmp_path) -> None:
     assert np.all(scores[~score_mask] == 0.0)
 
     manifest = json.loads(first.manifest_path.read_text(encoding="utf-8"))
+    assert "magnitude_clip" not in manifest["scoring_input"]["features"]
     assert manifest["checkpoint"]["kind"] == "BRAZIL_RV_V2_RAW_PATIENCE_V2"
     assert manifest["checkpoint"]["seed"] == 29
     assert manifest["access_ledger"]["purpose"] == "evaluation"

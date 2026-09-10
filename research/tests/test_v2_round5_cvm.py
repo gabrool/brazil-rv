@@ -1,11 +1,13 @@
 from copy import deepcopy
 from datetime import date, datetime
 import io
+from pathlib import Path
 
 import numpy as np
 import polars as pl
 import pytest
 
+from brazil_rv.v2 import round5_cvm
 from brazil_rv.v2.round5_cvm import (
     assign_account,
     available_session,
@@ -26,6 +28,42 @@ def test_minute_receipt_enters_first_available_decision():
     assert available_session(datetime(2024, 1, 5, 15, 45), sessions) == 1
     assert available_session(date(2024, 1, 5), sessions) == 1
     assert available_session(datetime(2024, 1, 6, 12), sessions) == 1
+
+
+def test_float_snapshot_date_is_separate_from_filing_year_and_receipt(monkeypatch):
+    sessions = [date(2024, 5, d) for d in (6, 7)]
+    document = {
+        "id": "10",
+        "cnpj": "12345678000100",
+        "cvm_code": "001234",
+        "reference": date(2024, 1, 1),
+        "version": 2,
+        "receipt": sessions[0],
+    }
+    monkeypatch.setattr(round5_cvm, "filing_headers", lambda *args: [document])
+    monkeypatch.setattr(
+        round5_cvm, "annual_paths", lambda *args: [Path("fre_2024.zip")]
+    )
+    monkeypatch.setattr(
+        round5_cvm,
+        "read_csv_member",
+        lambda *args: [
+            {
+                "ID_Documento": "10",
+                "Quantidade_Acoes_Ordinarias_Circulacao": "100",
+                "Data_Ultima_Assembleia": "2024-04-30",
+            }
+        ],
+    )
+    result = round5_cvm.public_float_observations(
+        Path("unused"),
+        [{"id": "10", "group": "cadastre", "receipt": datetime(2024, 5, 6, 15, 44)}],
+        sessions,
+    ).row(0, named=True)
+    assert result["date"] == sessions[0]
+    assert result["snapshot_date"] == date(2024, 4, 30)
+    assert result["reference"] == date(2024, 1, 1)
+    assert result["cvm_code"] == "001234"
 
 
 def test_event_source_mutation_changes_first_available_decision_only():

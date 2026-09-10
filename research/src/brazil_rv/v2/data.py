@@ -24,6 +24,7 @@ from .contract import (
     V1_STORE_V2_ZERO_SLOW_FIELDS,
 )
 from .data_roots import ExternalFileResolution, resolve_external_files
+from .round5_magnitude import FitClip
 from .store import V2Store, open_store_for_samples
 from .splits import AccessPurpose, PREREGISTRATION_ROOT, authorize_dates
 
@@ -494,6 +495,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         if len(set(enabled_sidecars)) != len(enabled_sidecars):
             raise ValueError("enabled sidecar groups must be unique")
         self.enabled_sidecars = tuple(sorted(enabled_sidecars))
+        self.magnitude_clip: FitClip | None = None
         target_indices = (
             self.date_indices
             if target_window_indices is None
@@ -972,9 +974,14 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         for group in self.enabled_sidecars:
             family = f"sidecar_{group}"
             view = read_scalar_feature_view(self.store, [date_index], (family,))
-            sample[f"{family}_values"] = _zero_invalid_values(
-                view.values[0], view.valid[0], name=family
-            )
+            values = _zero_invalid_values(view.values[0], view.valid[0], name=family)
+            if group == "magnitudes":
+                if self.magnitude_clip is None:
+                    raise ValueError(
+                        "magnitude inputs require frozen fit clipping bounds"
+                    )
+                values = self.magnitude_clip.transform(values, view.valid[0])
+            sample[f"{family}_values"] = values
             sample[f"{family}_valid"] = view.valid[0]
             sample[f"{family}_age_sessions"] = view.age_sessions[0]
         if self.include_fast:

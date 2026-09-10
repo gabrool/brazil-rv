@@ -23,10 +23,12 @@ from .contract import (
 )
 from .data import V2DailyDataset, collate_v2_daily
 from .model import DailyMultiHorizonModel
+from .round5_magnitude import FitClip
 from .train import (
     _canonical_payload_sha256,
     _input_static_identity,
     _loader_input_payload,
+    _model_forward,
     _repository_commit_if_available,
     _verified_checkpoint_input_contract,
     compile_forward,
@@ -104,7 +106,8 @@ def _model_batch(
     result = {
         name: value.to(device, non_blocking=device.type == "cuda")
         for name, value in batch.items()
-        if name in names and isinstance(value, torch.Tensor)
+        if (name in names or name.startswith("sidecar_"))
+        and isinstance(value, torch.Tensor)
     }
     required = {
         "slow_features",
@@ -141,27 +144,6 @@ def _model_batch(
         ):
             raise ValueError("present fast samples require compact values and metadata")
     return result
-
-
-def _forward(model: torch.nn.Module, batch: Mapping[str, torch.Tensor]) -> torch.Tensor:
-    return model(
-        batch["slow_features"],
-        batch["slow_feature_mask"],
-        batch["slow_history_mask"],
-        batch["active_mask"],
-        current_features=batch.get("current_features"),
-        current_feature_mask=batch.get("current_feature_mask"),
-        slow_feature_age_sessions=batch["slow_feature_age_sessions"],
-        current_feature_age_sessions=batch.get("current_feature_age_sessions"),
-        common_state_features=batch.get("common_state_features"),
-        fast_patch_mask=batch.get("fast_patch_mask"),
-        fast_present=batch.get("fast_present"),
-        fast_state_position=batch.get("fast_state_position"),
-        v1_equity_slow=batch.get("v1_equity_slow"),
-        fast_patch_values=batch.get("fast_patch_values"),
-        fast_patch_valid=batch.get("fast_patch_valid"),
-        fast_name_index=batch.get("fast_name_index"),
-    )
 
 
 def _array_record(path: Path, values: np.ndarray) -> dict[str, object]:
@@ -256,8 +238,18 @@ def score_checkpoint_artifact(
     current_commit = _repository_commit_if_available()
     if recorded_commit is not None and current_commit != recorded_commit:
         raise ValueError("scoring implementation commit differs from the checkpoint")
-    scoring_input = _loader_input_payload(loader)
     checkpoint_selection = checkpoint_contract.get("selection")
+    if "magnitudes" in dataset.enabled_sidecars:
+        features = (
+            checkpoint_selection.get("features", {})
+            if isinstance(checkpoint_selection, Mapping)
+            else {}
+        )
+        clip = features.get("magnitude_clip") if isinstance(features, Mapping) else None
+        if not isinstance(clip, Mapping):
+            raise ValueError("checkpoint lacks frozen magnitude clipping bounds")
+        dataset.magnitude_clip = FitClip.from_payload(clip)
+    scoring_input = _loader_input_payload(loader)
     if not isinstance(scoring_input, Mapping) or not isinstance(
         checkpoint_selection, Mapping
     ):
@@ -334,7 +326,7 @@ def score_checkpoint_artifact(
                 dtype=torch.bfloat16,
                 enabled=model_config.use_bf16 and target_device.type == "cuda",
             ):
-                predictions = _forward(forward_model, batch)[..., : len(HORIZONS)]
+                predictions = _model_forward(forward_model, batch)[..., : len(HORIZONS)]
             if predictions.shape[:2] != batch["active_mask"].shape:
                 raise ValueError("model scores are misaligned with the active universe")
             date_parts.append(date_index.detach().cpu().numpy().astype(np.int64))

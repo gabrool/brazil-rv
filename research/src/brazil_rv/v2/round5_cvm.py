@@ -639,8 +639,11 @@ def attach_viewer_accounts(document: dict, destination: Path) -> None:
         or int(manifest["document"]["version"]) != document["version"]
     ):
         raise ValueError("Recovered viewer identity differs from requested document")
+    parsed = {**document, "accounts": {}}
     for page in manifest["pages"]:
         payload = (destination / page["file"]).read_bytes()
+        if hashlib.sha256(payload).hexdigest() != page["sha256"]:
+            raise ValueError("Recovered account page differs from its source manifest")
         text = payload.decode("utf8", errors="replace")
         title = re.search(r"<h2[^>]*>(.*?)</h2>", text, re.S)
         title_text = (
@@ -670,8 +673,11 @@ def attach_viewer_accounts(document: dict, destination: Path) -> None:
                     continue
                 value = float(row[column].replace(".", "").replace(",", ".")) * scale
                 assign_account(
-                    document, page["basis"], row[0], value, start, dates[-1], row[1]
+                    parsed, page["basis"], row[0], value, start, dates[-1], row[1]
                 )
+    if not parsed["accounts"]:
+        raise ValueError("Recovered account pages lack the requested reference period")
+    document["accounts"] = parsed["accounts"]
     document["recovered_original"] = True
 
 
@@ -1588,6 +1594,8 @@ def public_float_observations(
     Retained detail versions enter only at their own receipt. Preferred totals
     are not allocated among multiple classes, and units are not invented from
     their component-share counts. The consumer must match the dated class.
+    Data_Ultima_Assembleia dates the reported distribution snapshot; the filing
+    reference is only the FRE reference year and cannot date share-unit barriers.
     """
     headers = {d["id"]: d for d in filing_headers(root, "fre")}
     exact = {r["id"]: r for r in rad if r["id"] and r["group"] == "cadastre"}
@@ -1618,11 +1626,17 @@ def public_float_observations(
                         {
                             "date": sessions[index],
                             "cnpj": document["cnpj"],
+                            "cvm_code": document["cvm_code"],
                             "class": cls,
                             "free_float_shares": float(raw),
                             "document_id": document["id"],
                             "version": document["version"],
                             "reference": document["reference"],
+                            "snapshot_date": date.fromisoformat(
+                                row["Data_Ultima_Assembleia"]
+                            )
+                            if row.get("Data_Ultima_Assembleia")
+                            else None,
                         }
                     )
     return pl.DataFrame(
@@ -1630,11 +1644,13 @@ def public_float_observations(
         schema={
             "date": pl.Date,
             "cnpj": pl.String,
+            "cvm_code": pl.String,
             "class": pl.String,
             "free_float_shares": pl.Float64,
             "document_id": pl.String,
             "version": pl.Int32,
             "reference": pl.Date,
+            "snapshot_date": pl.Date,
         },
     )
 
@@ -1685,6 +1701,7 @@ def capital_change_observations(
                 output.append(
                     {
                         "cnpj": document["cnpj"],
+                        "cvm_code": document["cvm_code"],
                         "document_id": document["id"],
                         "available_index": available_session(receipt, sessions),
                         "effective": date.fromisoformat(effective),
@@ -1781,16 +1798,23 @@ def build(root: Path, store: Path, output: Path) -> dict:
     events.write_parquet(output / "events.parquet")
     documents = load_accounts(root, set(identity.get_column("cnpj")))
     recovery_audit = {"attached": 0, "invalid": []}
+    original_sources = []
     for document in documents:
         path = root / "originals" / document["id"]
         if not document.get("accounts") and (path / "manifest.json").exists():
             try:
                 attach_viewer_accounts(document, path)
                 recovery_audit["attached"] += 1
+                original_sources.append({
+                    "document_id": document["id"],
+                    "manifest_path": str(path / "manifest.json"),
+                    "manifest_sha256": sha256(path / "manifest.json"),
+                })
             except (ValueError, KeyError) as error:
                 recovery_audit["invalid"].append(
                     {"id": document["id"], "reason": str(error)}
                 )
+    write_json(output / "original_source_manifests.json", original_sources)
     capital_changes = capital_change_observations(root, rad, sessions)
     write_json(output / "capital_change_observations.json", capital_changes)
     fundamentals, audit = fundamental_features(
@@ -1817,6 +1841,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
     manifest = {
         "schema": "ROUND5_CVM_DERIVED_V1",
         "source_root": str(root),
+        "source_program_sha256": sha256(Path(__file__)),
         "base_store": str(store),
         "base_store_manifest_sha256": sha256(store / "manifest.json"),
         "through": str(END),
@@ -1835,7 +1860,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "coverage": family_tables,
         "files": {
             p.name: {"sha256": sha256(p), "bytes": p.stat().st_size}
-            for p in output.glob("*.parquet")
+            for p in output.iterdir() if p.is_file()
         },
         "limitations": [
             "EarlyFCA2010–2017 omits ticker symbols; only unique exact historical legal spellings with contemporaneous class/existing-security evidence are admitted.",
