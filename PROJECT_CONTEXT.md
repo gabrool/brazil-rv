@@ -186,6 +186,15 @@ families preserve S0 forwards, parent gradients and RNG state exactly; no neural
 fit runs in this round. Historical sidecar-concatenation recipes bind their
 original code commits. See the registration and `docs/v2_README.md`.
 
+Round-5 CVM identity uses each original filing's historical security description
+and exchange listing dates; modern viewer class labels and governance-segment
+entry dates cannot replace those facts. Issuer valuation requires own-version
+capital quantities with an explicit share-unit scale. The annual capital CSV
+omits that scale and is not a model count source. Negative treasury quantities
+require a separately evidenced same-filing reconciliation; otherwise the count
+stays unavailable while unrelated accounting fields remain usable. The final
+extended store is still pending; `docs/v2_ROUND5_DATA.md` records current status.
+
 The store builder streams family-by-family into disk-backed float32 arrays and
 records peak RSS. Intended orders are fixed before later fill observations;
 unfilled exposure, contractual claims, cash, funding, costs, and insolvency are
