@@ -64,9 +64,13 @@ can make the printed total differ from ON+PN; printed class counts remain usable
 Completed manifests are immutable and verified on resume. A failed attempt
 retains its raw bytes in `attempts/000N`; retrying starts a separate attempt.
 Transient network/backend failures may retry the whole three-request sequence.
-No successful source is overwritten. The missing-only bulk orchestrator belongs
-to `round5_cvm.py`; it should skip capital already supported by exact annual or
-original-ZIP data, use modest concurrency, and report unretrievable filings.
+No successful source is overwritten. The missing-only acquisition skips only
+capital supported by exact own-version HTML or original ZIP with an explicit
+quantity unit. Annual capital CSV alone is insufficient: its printed values omit
+the independent quantity scale. Exact Bradesco 123448 reports thousands while
+Ourofino 129981 and Petrobras 135086 report units, and all six annual CSV fields
+match those unscaled printed values. The unsafe annual fallback was removed in
+`0ddbe3d`; a separate 6,728-document acquisition recovers the missing own scales.
 
 Targeted validation:
 
@@ -79,3 +83,63 @@ wrong versions/dates/issuers, CAPTCHA and missing handlers, actual form fields,
 all four saved source hashes, immutable successful resume, and preserved failed
 attempts. This helper does not change valuation's corporate-action uncertainty
 policy or claim that share counts remain valid after subsequent capital events.
+
+## Completed primary collection and bounded exception review
+
+The primary collection finished 15,596 documents in 2,744.437 seconds with
+15,586 successful HTML captures and ten exceptions. Successful captures contain
+1,111,088,953 archived bytes, including saved POST bodies; actual successful
+response bytes total 1,028,423,397. These totals exclude failed attempts and the
+separate original-ZIP downloads.
+
+| Exact public filing ID | Bounded review result | Admitted ON / PN quantity |
+| --- | --- | ---: |
+| 10064 | Blank HTML viewer; exact original ZIP verifies own identity and capital | 5,389,000 / 10,778,000 |
+| 76263 | Blank HTML viewer; exact original ZIP | 15,701,103,000 / 0 |
+| 76265 | Blank HTML viewer; exact original ZIP | 15,710,221,000 / 0 |
+| 124710 | Blank HTML viewer; retained exact flat-XML original | 8,407,000 / 134,000 |
+| 82925 | Negative structured treasury; own note17.2, physical PDF page60, states positive 52,119 ordinary treasury shares at2019-03-31 | 90,250,881 / 0 |
+| 88901 | Negative structured treasury; own note17.2, physical PDF page58, states positive 5,207 ordinary treasury shares at2019-09-30 | 90,948,793 / 0 |
+| 86096 | Negative printed treasury; exact-original endpoint returned preserved non-ZIP backend error | Unavailable |
+| 93466 | Negative printed treasury; exact-original endpoint returned preserved non-ZIP backend error | Unavailable |
+| 136853 | Negative printed treasury; exact-original endpoint returned preserved non-ZIP backend error | Unavailable |
+| 134538 | Own HTML/XML both negative; the retained original note confirms paid-in capital but does not establish positive end-period treasury holdings | Unavailable |
+
+The two note reconciliations are document-specific. Filing82925's numeric
+52,119 conflicts with a parenthetical spelled-out 45 thousand; the numeric value
+is supported by the reported R$2.332million balance and R$44.75 average cost
+(both rounded), and the structured magnitude52 thousand. That conflict is
+retained explicitly. Filing88901's numeric and spelled-out counts agree. Paid-in
+capital remains at its original thousand-share reporting precision; the more
+precise treasury note is retained without rounding it back to thousands.
+
+No global absolute-value conversion is used. The shared HTML/XML quantity rule
+requires finite, nonnegative paid-in and treasury counts, with treasury no larger
+than paid-in. Unknown treasury for a positive issued class remains missing.
+Explicit zero paid-in implies zero outstanding even if its treasury cell is
+blank. Invalid capital never removes unrelated accounting observations.
+
+The four unavailable entries are source-quality outcomes, not invented zeros.
+Three preserve a297-byte service-unavailable response; this does not prove
+permanent unretrievability. A later bounded exact-source retry can revisit them.
+For134538, cash treasury balances and weighted-average EPS share denominators are
+not substituted for an end-period holding count. Own receipt timing is unchanged
+for both supported note counts and unrelated accounting fields.
+
+Immutable evidence under the Round5 root is:
+
+- `cvm/capital_source_dispositions.json`, SHA-256 `fe0f2fee42c01e977d465ea85c352bd71d6ab0be20150f843365652e8f8b3f7f`: exact document identities, source hashes, reasons, positive note quantities and unavailable dispositions.
+- `cvm/capital_failure_final_audit_20260910/`: all ten saved HTML chains, final original-source outcomes and exact PDF note pages. Earlier diagnostic parses are superseded by this corrected-parser audit.
+- `cvm/capital_pending_source_audit.json`, SHA-256 `746cdc83a91402d2e8c027b84e9aecc7f8186a053dd2e14040cd8785941ebcaa`: six annual negative-count filings123448,96021,98404,129981,132020,136104 remain pending exact-source quantity review. Known-scale probes123448/129981 were excluded from the scale queue only because their units were already established; their quantities are not accepted.
+
+The primary failure gate accepts only verified own-version HTML/XML, a
+hash-bound positive own-note reconciliation, or an explicit audited-unavailable
+disposition. Unreviewed errors still stop it. Passing that primary gate does not
+clear the overall source freeze: remaining scale/FCA collections, the six annual
+exceptions, any new batch failures and newly admitted identity-cohort gaps still
+require their source audits. Only afterward can the new CVM family be sealed and
+its dependent identity-based families rebuilt.
+
+The106 targeted tests passed for the shared count rule, XML account preservation,
+own-document disposition identity/source mutation, FCA identity and actual
+transformed first-decision causality. No model was fitted for these checks.
