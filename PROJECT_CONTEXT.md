@@ -227,6 +227,11 @@ period/basis and original evidence. Apply them after parsing, before temporal
 account arithmetic; preserve receipt timestamps and independent share units.
 Explicit source headings can be wrong, but headings or adjacent ratios alone
 cannot determine an override. Final family manifests bind applied corrections.
+Original viewer account caches may include a separately recovered `individual/`
+group from that exact filing. Empty consolidated tables do not suppress those
+already published individual accounts or justify borrowing a later consolidated
+release. Both source manifests are bound; the existing ledger prefers usable
+consolidated accounts and records the chosen basis.
 
 The store builder streams family-by-family into disk-backed float32 arrays and
 records peak RSS. Intended orders are fixed before later fill observations;

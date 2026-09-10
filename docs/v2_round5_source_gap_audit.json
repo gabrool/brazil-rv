@@ -1,0 +1,501 @@
+{
+  "schema": "ROUND5_CVM_ADMITTED_COHORT_GAP_ACCEPTANCE_V1",
+  "scope": "Exact source support only; capital unit-review queue, source freeze and final store remain pending.",
+  "producer": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\accept_admitted_cohort_gaps.py",
+    "sha256": "6ad614b6fda7f52f91fbdd1d167eea3bbc752739b827aaf693e17d1a113f37f3"
+  },
+  "cvm_program": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_cvm.py",
+    "sha256": "7a5bdd504c9043e22381837afeca260449093d2c8997cd4751a0cc4f97f774f6"
+  },
+  "preflight": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\source_preflight_51fc446_20260910T225000Z\\manifest.json",
+    "sha256": "e6310e3233e89a04807971031cfb0887ed40b20fea9daa6e4525c3efa871f2a1"
+  },
+  "recovery": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\admitted_cohort_gap_recovery_20260910T225500Z\\result.json",
+    "sha256": "740b1ce4e7eca16aa1f3d6998ea37dd04ee32f0531274bd2951ad5b8e8441d6f"
+  },
+  "account": {
+    "document": {
+      "id": "133758",
+      "cnpj": "90400888000142",
+      "cvm_code": "020532",
+      "reference": "2023-12-31",
+      "version": 1,
+      "kind": "DFP"
+    },
+    "finding": "The own January filing explicitly withholds consolidated accounts until 20 February 2024. Its own individual group supplies current-reference accounts immediately; no later filing or timestamp is borrowed.",
+    "original_sources_unchanged": {
+      "manifest.json": "bff276f98b2a01e0fff223f8651876868fba1150b25723e2f0618de95994b611",
+      "statement_2_2.html": "b73d38f42c336cda596890403b72da5aa77c26f16d8b61210a06298c2330f7c6",
+      "statement_2_3.html": "ffde868fb6923eecd06e3e4b0f18c5b985d7922928dd9da09c6dc7e916a6e905",
+      "statement_2_4.html": "60a4e9a0a0139e0474c19a369940a1b5affd8bfa55e5f8ae4c887172dddf714b",
+      "statement_2_99.html": "f513a59e09f3152217648fe67e72ffb1a0016b9f4d76fb6fff07bbafbde36112",
+      "viewer.html": "7adde3be74fb4a56d4008eec56c6ccac40ca548bdfa8c8445cb176ffec907d65"
+    },
+    "copied_source_bytes_exact": {
+      "group.html": "a6b52ae73770ffb1d5907404e68930c75f2ef53ada7f258ed3a8589136b5c3fd",
+      "manifest.json": "eedf375977f9e3517585ef440ee7d66c1ad71d9a06e57fae9f41077dfac0eaad",
+      "parsed_accounts.json": "fdc143f8142d34d7714dc6ffddbf64f851b775db4c236b4f35a9a5c35788d445",
+      "post_form.txt": "860abb1d77c07507981d8b13fceb2351821e7776adf5c90ef1edee8564c9b5d0",
+      "statement_1_2.html": "0773dd83fe686a5cc1b468dee47f954948b63fdd0cacf6324c84d2dd7bcd9bea",
+      "statement_1_3.html": "6770b35eba1835c5c49a64ec894fac4812be3c469c7a9d2923caf4eea045b256",
+      "statement_1_4.html": "771158d0b5307d79f53c15e509cdd8ca8e631de98ed82eb95c60adbf3a187957",
+      "statement_1_99.html": "c8937e0eb1f0fb23b2c6062cce6f04c2a4904150cecc71f334d973c2a0dbe201",
+      "viewer.html": "c47c758652f022c3f9d74f56b2844cba54a3aa13a71da4ec46c793e96c5881a2"
+    },
+    "sources": [
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\originals\\133758\\manifest.json",
+        "sha256": "bff276f98b2a01e0fff223f8651876868fba1150b25723e2f0618de95994b611"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\originals\\133758\\individual\\manifest.json",
+        "sha256": "eedf375977f9e3517585ef440ee7d66c1ad71d9a06e57fae9f41077dfac0eaad"
+      }
+    ],
+    "basis": "ind",
+    "accounts": {
+      "ind": {
+        "assets": {
+          "value": 1159075748000.0,
+          "start": null,
+          "end": "2023-12-31",
+          "description": "Ativo Total",
+          "source_code": "1"
+        },
+        "equity": {
+          "value": 85913641000.0,
+          "start": null,
+          "end": "2023-12-31",
+          "description": "Patrimônio Líquido",
+          "source_code": "2.07"
+        },
+        "revenue": {
+          "value": 105552506000.0,
+          "start": "2023-01-01",
+          "end": "2023-12-31",
+          "description": "Receitas de Intermediação Financeira",
+          "source_code": "3.01"
+        },
+        "gross_profit": {
+          "value": 12914368000.0,
+          "start": "2023-01-01",
+          "end": "2023-12-31",
+          "description": "Resultado Bruto de Intermediação Financeira",
+          "source_code": "3.03"
+        },
+        "net_income": {
+          "value": 8864230000.0,
+          "start": "2023-01-01",
+          "end": "2023-12-31",
+          "description": "Lucro ou Prejuízo Líquido do Período",
+          "source_code": "3.11"
+        },
+        "cash_flow": {
+          "value": 7363762000.0,
+          "start": "2023-01-01",
+          "end": "2023-12-31",
+          "description": "Caixa Líquido das Atividades Operacionais",
+          "source_code": "6.01"
+        }
+      }
+    },
+    "liabilities_to_assets": 0.9258774578380705
+  },
+  "capital_sources_recovered_and_verified": [
+    {
+      "document": {
+        "id": "87073",
+        "cnpj": "45242914000105",
+        "cvm_code": "024848",
+        "reference": "2019-03-31",
+        "version": "1",
+        "kind": "ITR"
+      },
+      "capital": {
+        "reference": "2019-03-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 1035720.0,
+          "PN": 0.0,
+          "total": 1035720.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 1035720.0,
+          "PN": 0.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\87073\\manifest.json",
+        "sha256": "8af0451f4ef1241bb867008f0f6fd91522b1587a7269b8bc8cd24ef5bb5b4e84"
+      }
+    },
+    {
+      "document": {
+        "id": "87079",
+        "cnpj": "45242914000105",
+        "cvm_code": "024848",
+        "reference": "2019-06-30",
+        "version": "1",
+        "kind": "ITR"
+      },
+      "capital": {
+        "reference": "2019-06-30",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 1035720.0,
+          "PN": 0.0,
+          "total": 1035720.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 1035720.0,
+          "PN": 0.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\87079\\manifest.json",
+        "sha256": "55332632160bcca71ca0fdcd9bbce94cb80b4545faaef1267d4ced85916019b4"
+      }
+    },
+    {
+      "document": {
+        "id": "10296",
+        "cnpj": "60394723000144",
+        "cvm_code": "014931",
+        "reference": "2011-03-31",
+        "version": "1",
+        "kind": "ITR"
+      },
+      "capital": {
+        "reference": "2011-03-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 191100.0,
+          "PN": 83307.0,
+          "total": 274407.0
+        },
+        "treasury": {
+          "ON": 11142.0,
+          "PN": 0.0,
+          "total": 11142.0
+        },
+        "shares": {
+          "ON": 179958.0,
+          "PN": 83307.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\10296\\manifest.json",
+        "sha256": "6e08768ee90ccb059a377aaa7283d00b25ef5be61d3e059c1af9cb41ba0486b6"
+      }
+    },
+    {
+      "document": {
+        "id": "143013",
+        "cnpj": "08902291000115",
+        "cvm_code": "025585",
+        "reference": "2024-09-30",
+        "version": "1",
+        "kind": "ITR"
+      },
+      "capital": {
+        "reference": "2024-09-30",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 5432044538.0,
+          "PN": 0.0,
+          "total": 5432044538.0
+        },
+        "treasury": {
+          "ON": 53294300.0,
+          "PN": 0.0,
+          "total": 53294300.0
+        },
+        "shares": {
+          "ON": 5378750238.0,
+          "PN": 0.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\143013\\manifest.json",
+        "sha256": "825978d328dad829ca1cc923e90166cecfeb8cf05f78f4ca8baaae4a0cb42724"
+      }
+    },
+    {
+      "document": {
+        "id": "6754",
+        "cnpj": "60394723000144",
+        "cvm_code": "014931",
+        "reference": "2010-12-31",
+        "version": "1",
+        "kind": "DFP"
+      },
+      "capital": {
+        "reference": "2010-12-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 191100116.0,
+          "PN": 83709922.0,
+          "total": 274810038.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 403400.0,
+          "total": 403400.0
+        },
+        "shares": {
+          "ON": 191100116.0,
+          "PN": 83306522.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\6754\\manifest.json",
+        "sha256": "c04c3dca4eb67c273e8147809d2d8c5e147c3e384a80fb08ccf4451cdbcf6de5"
+      }
+    },
+    {
+      "document": {
+        "id": "6761",
+        "cnpj": "60394723000144",
+        "cvm_code": "014931",
+        "reference": "2010-12-31",
+        "version": "2",
+        "kind": "DFP"
+      },
+      "capital": {
+        "reference": "2010-12-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 191100116.0,
+          "PN": 83709922.0,
+          "total": 274810038.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 403400.0,
+          "total": 403400.0
+        },
+        "shares": {
+          "ON": 191100116.0,
+          "PN": 83306522.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\6761\\manifest.json",
+        "sha256": "74cb9bac60d4449c9f1844404b16ed412ec9515c5133152cb9bf410a98050dee"
+      }
+    },
+    {
+      "document": {
+        "id": "89334",
+        "cnpj": "45242914000105",
+        "cvm_code": "024848",
+        "reference": "2019-09-30",
+        "version": "1",
+        "kind": "ITR"
+      },
+      "capital": {
+        "reference": "2019-09-30",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 1035720.0,
+          "PN": 0.0,
+          "total": 1035720.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 1035720.0,
+          "PN": 0.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\89334\\manifest.json",
+        "sha256": "c05ef8cb419d8563d9ea00464cd466e5db885ebeac1ea4ae0b6316ce0435ea0d"
+      }
+    },
+    {
+      "document": {
+        "id": "97692",
+        "cnpj": "08902291000115",
+        "cvm_code": "025585",
+        "reference": "2019-12-31",
+        "version": "1",
+        "kind": "DFP"
+      },
+      "capital": {
+        "reference": "2019-12-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 181001902.0,
+          "PN": 0.0,
+          "total": 181001902.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 181001902.0,
+          "PN": 0.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\97692\\manifest.json",
+        "sha256": "1900e5676a139cdb4ad87fcbb966e983daf4381d65ab9081c93b8694e4a20501"
+      }
+    },
+    {
+      "document": {
+        "id": "87072",
+        "cnpj": "45242914000105",
+        "cvm_code": "024848",
+        "reference": "2018-12-31",
+        "version": "1",
+        "kind": "DFP"
+      },
+      "capital": {
+        "reference": "2018-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 1035720000.0,
+          "PN": 0.0,
+          "total": 1035720000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 1035720000.0,
+          "PN": 0.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\87072\\manifest.json",
+        "sha256": "351a598c0d293e623bd5a25148f924a72de751b393f35f044e662e64fdbd1e29"
+      }
+    },
+    {
+      "document": {
+        "id": "91737",
+        "cnpj": "45242914000105",
+        "cvm_code": "024848",
+        "reference": "2019-12-31",
+        "version": "2",
+        "kind": "DFP"
+      },
+      "capital": {
+        "reference": "2019-12-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 308245068.0,
+          "PN": 0.0,
+          "total": 308245068.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 308245068.0,
+          "PN": 0.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\91737\\manifest.json",
+        "sha256": "05126f6efd02a9a4f7254068e614be10a5f4867b25fb4ab6c01c9e11542cd504"
+      }
+    },
+    {
+      "document": {
+        "id": "91677",
+        "cnpj": "45242914000105",
+        "cvm_code": "024848",
+        "reference": "2019-12-31",
+        "version": "1",
+        "kind": "DFP"
+      },
+      "capital": {
+        "reference": "2019-12-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 308245068.0,
+          "PN": 0.0,
+          "total": 308245068.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 308245068.0,
+          "PN": 0.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\91677\\manifest.json",
+        "sha256": "9e53e47af254357f3290b26dae1c425229ee52a82b165c0c9cb6dedc6ff0f908"
+      }
+    },
+    {
+      "document": {
+        "id": "134512",
+        "cnpj": "08902291000115",
+        "cvm_code": "025585",
+        "reference": "2023-12-31",
+        "version": "1",
+        "kind": "DFP"
+      },
+      "capital": {
+        "reference": "2023-12-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 5485338838.0,
+          "PN": 0.0,
+          "total": 5485338838.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 5485338838.0,
+          "PN": 0.0
+        }
+      },
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\134512\\manifest.json",
+        "sha256": "08777130697d2c52abe0db4d4bf91f8c10f2efc9faccbc13923095cbbade3803"
+      }
+    }
+  ],
+  "all_thirteen_gaps_source_supported": true,
+  "validation": {
+    "account_tests_passed": 52,
+    "preflight_tests_passed": 11,
+    "ruff": "passed",
+    "limits": "Final cohort rerun and capital review remain pending; no final store or fit exists."
+  }
+}

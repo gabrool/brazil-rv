@@ -95,6 +95,12 @@ not establish an alias to equity registration025011 or invent SOMA3. The exact
 public envelope, original source bytes, reviewed pages and derivation are bound
 in [the completion evidence](v2_round5_fca_completion_audit.json).
 
-The full source preflight is running against clean51fc446. It will reconcile the
-actual new dated cohort and trace capital versions selected at model decisions.
-Acquisition completion does not itself clear the final source/store hold.
+The first full source preflight completed against clean51fc446:821,266 dated
+identity rows,398 registrations,22,349 financial documents and no remaining FCA
+source failures. Its twelve capital gaps are recovered. The single account gap,
+Santander133758, has usable own-version individual statements while the original
+consolidated pages explicitly defer publication. The separate group is now
+recovered without altering the old cache or borrowing a later release; both
+manifests enter provenance. See [source-gap evidence](v2_round5_source_gap_audit.json).
+Recompute capital selection with these sources before the remaining review.
+Source support does not itself clear the final source/store hold.

@@ -769,16 +769,32 @@ def apply_account_unit_dispositions(root: Path, documents: list[dict]) -> dict |
     return {"path": str(path), "sha256": sha256(path), "applied_ids": applied}
 
 
-def attach_viewer_accounts(document: dict, destination: Path) -> None:
-    manifest = json.loads((destination / "manifest.json").read_text(encoding="utf8"))
-    if (
-        manifest["document"]["id"] != document["id"]
-        or int(manifest["document"]["version"]) != document["version"]
-    ):
-        raise ValueError("Recovered viewer identity differs from requested document")
+def attach_viewer_accounts(document: dict, destination: Path) -> list[Path]:
+    """Attach own-version books, including separately recovered individual pages.
+
+    A viewer can expose empty consolidated tables before publishing that book.
+    Preserve those source bytes and recover its individual group separately;
+    the existing feature ledger prefers consolidated accounts when present.
+    Return every consumed manifest so callers bind the complete source set.
+    """
+    manifests = [destination / "manifest.json"]
+    individual = destination / "individual" / "manifest.json"
+    if individual.exists():
+        manifests.append(individual)
+    pages = []
+    for path in manifests:
+        manifest = json.loads(path.read_text(encoding="utf8"))
+        if (
+            manifest["document"]["id"] != document["id"]
+            or int(manifest["document"]["version"]) != document["version"]
+        ):
+            raise ValueError(
+                "Recovered viewer identity differs from requested document"
+            )
+        pages.extend((path.parent, page) for page in manifest["pages"])
     parsed = {**document, "accounts": {}}
-    for page in manifest["pages"]:
-        payload = (destination / page["file"]).read_bytes()
+    for source, page in pages:
+        payload = (source / page["file"]).read_bytes()
         if hashlib.sha256(payload).hexdigest() != page["sha256"]:
             raise ValueError("Recovered account page differs from its source manifest")
         text = payload.decode("utf8", errors="replace")
@@ -824,6 +840,7 @@ def attach_viewer_accounts(document: dict, destination: Path) -> None:
         raise ValueError("Recovered account pages lack the requested reference period")
     document["accounts"] = parsed["accounts"]
     document["recovered_original"] = True
+    return manifests
 
 
 def recovery_inventory(documents: list[dict]) -> dict:
@@ -2404,14 +2421,15 @@ def build(root: Path, store: Path, output: Path) -> dict:
         path = root / "originals" / document["id"]
         if not document.get("accounts") and (path / "manifest.json").exists():
             try:
-                attach_viewer_accounts(document, path)
+                manifests = attach_viewer_accounts(document, path)
                 recovery_audit["attached"] += 1
-                original_sources.append(
+                original_sources.extend(
                     {
                         "document_id": document["id"],
-                        "manifest_path": str(path / "manifest.json"),
-                        "manifest_sha256": sha256(path / "manifest.json"),
+                        "manifest_path": str(manifest_path),
+                        "manifest_sha256": sha256(manifest_path),
                     }
+                    for manifest_path in manifests
                 )
             except (ValueError, KeyError) as error:
                 recovery_audit["invalid"].append(

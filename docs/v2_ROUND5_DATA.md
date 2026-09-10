@@ -1,6 +1,8 @@
 # Round 5 data round â€” work in progress
 
-Status: historical acquisition is complete; the full dated identity/source preflight is running. **The final store and
+Status: historical acquisition and the first full dated source preflight are complete.
+Its twelve capital gaps and one account gap now have verified own-filing sources;
+capital review and final identity admission remain open. **The final store and
 GBDT screens are not yet complete. The continuous-book replay is complete.** This document
 will be replaced with the completed acceptance tables and readouts before the
 round is closed. CPU only; no paid instance or neural fit has run this round.
@@ -8,6 +10,19 @@ round is closed. CPU only; no paid instance or neural fit has run this round.
 The development boundary is 2024-12-30. Historical consumers are bounded to that
 date. The user stopped all forward capture on September 10, 2026. The existing
 Group-B snapshot remains quarantined evidence, outside historical consumers.
+
+The preflight checked 22,349 financial documents against 821,266 dated identity
+rows and 398 registrations. Its source gaps were specific: twelve capital pages
+and Santander DFP2023 version1. All twelve pages are recovered. Santander's
+January filing explicitly deferred consolidated accounts to20February2024,
+while its own individual group already provided the current accounts. That
+group is recovered with six metrics and the original receipt; all previous
+source files remain byte-identical. The parser binds both manifests and keeps
+the existing consolidated-first, individual-fallback rule. Fifty-two focused
+account tests and eleven source-preflight tests pass. See
+[the exact source evidence](v2_round5_source_gap_audit.json).
+This closes those thirteen source-support gaps, not the remaining capital-unit
+review or the final source/store acceptance.
 
 ## Completed economic correction
 

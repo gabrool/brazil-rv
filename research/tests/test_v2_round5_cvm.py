@@ -197,6 +197,57 @@ def test_viewer_source_hash_failure_cannot_attach_partial_accounts(tmp_path):
     assert "accounts" not in document
 
 
+@pytest.mark.parametrize("consolidated_available", (False, True))
+@pytest.mark.parametrize("invalid_supplement", (None, "version", "bytes"))
+def test_own_individual_recovery_preserves_basis_and_source_integrity(
+    tmp_path, consolidated_available, invalid_supplement
+):
+    document = {"id": "10", "version": 1, "reference": date(2023, 12, 31)}
+    manifests = []
+    for basis, folder, assets, equity in (
+        ("con", tmp_path, "200" if consolidated_available else "", "100"),
+        ("ind", tmp_path / "individual", "100", "20"),
+    ):
+        folder.mkdir(exist_ok=True)
+        if not assets:
+            equity = ""
+        payload = (
+            "<h2>Reais Mil</h2><table><tr><td>Conta</td><td>Descricao</td>"
+            "<td>31/12/2023</td></tr>"
+            f"<tr><td>1</td><td>Ativo Total</td><td>{assets}</td></tr>"
+            f"<tr><td>2.03</td><td>Patrimonio Liquido</td><td>{equity}</td></tr>"
+            "</table>"
+        ).encode()
+        (folder / "statement.html").write_bytes(payload)
+        manifest = {
+            "document": {**document},
+            "pages": [
+                {
+                    "file": "statement.html",
+                    "basis": basis,
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                }
+            ],
+        }
+        if basis == "ind" and invalid_supplement == "version":
+            manifest["document"]["version"] = 2
+        if basis == "ind" and invalid_supplement == "bytes":
+            (folder / "statement.html").write_bytes(payload + b"changed")
+        manifests.append(folder / "manifest.json")
+        manifests[-1].write_text(json.dumps(manifest, default=str))
+    if invalid_supplement:
+        with pytest.raises(ValueError, match="differs"):
+            round5_cvm.attach_viewer_accounts(document, tmp_path)
+        assert "accounts" not in document
+        return
+    assert round5_cvm.attach_viewer_accounts(document, tmp_path) == manifests
+    state = fundamental_state({("DFP", document["reference"]): document})
+    assert state["_basis_consolidated"] == float(consolidated_available)
+    assert state["liabilities_to_assets"] == pytest.approx(
+        0.5 if consolidated_available else 0.8
+    )
+
+
 def test_event_source_mutation_changes_first_available_decision_only():
     sessions = [date(2024, 1, d) for d in (2, 3, 4, 5, 8)]
     earlier = {
