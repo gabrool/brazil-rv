@@ -37,7 +37,7 @@ frozen replay. Original registration bytes are retained.
 
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
-| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded retry are complete: 1,299 readable originals and 53 unresolved transport failures. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 60 reconciled and seven audited unavailable records. | Finish capital-share unit reviews and actual admitted-cohort coverage, then produce final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
+| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded retry are complete: 1,299 readable originals and 53 unresolved transport failures. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 69 reconciled and seven audited unavailable records. | Finish capital-share unit reviews and actual admitted-cohort coverage, then produce final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
 | Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. The 2,196-document supplement is complete and both failures are recovered: 1,766 original XML and 430 exact HTML metadata sources. The main 6,768-document queue continues. Sector translation uses only evidence received by each decision. | Audit remaining primary failures and actual newly admitted account/capital gaps; accept the revised dated bridge, then rebuild sector, cross-market exposures and lending utilization. Candidate retrieval is not automatic identity admission. Existing archives remain immutable comparators. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Refresh utilization against the accepted new identity/free float, then admit the final store. The other six fields remain exact. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
@@ -157,6 +157,21 @@ capital-table figures. Irani's year-end treasury holdings are distinguished
 from authorized repurchase limits and purchases during the program. These
 eight source dispositions passed the existing evidence validator and the
 primary capital gate; they do not complete the broader capital review.
+
+Nine more independently reviewed filings cover Fibam (three), Tegma, GOL,
+B2W, Irani and T4F (two). Tegma7902 uses its explicitly dated March2011
+shareholder table; its narrative repeats older treasury dates. Irani19998
+separates current treasury quantity columns from monetary values and prior-year
+comparatives. Each correction retains the original receipt and class identity.
+
+The prepared source preflight now traces which capital versions the production
+ledger selects at each dated identity decision. The earlier 1,318-document
+issuer-relevance count is only a broad upper bound. The trace can prioritize
+actual selected flags without correcting or masking unselected documents. It
+runs before price/class/barrier exclusions and must be recomputed if any source
+disposition changes. Eleven targeted preflight tests pass, including direct
+comparison with the actual valuation producer and future-version isolation.
+The actual trace awaits the completed FCA cohort; no exclusion is claimed yet.
 
 The capital-note review locator now recognizes dates inside the capital declaration
 and named classes without a repeated word for shares. It separates an explicitly

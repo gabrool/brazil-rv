@@ -2,11 +2,11 @@
   "status": "Historical source review in progress; no final family/store/screens and no forward capture.",
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "851d2b85d90ce60cab70956814464efb6af24bb9b7e95760735dbeb7a1bb42fc"
+    "sha256": "028cdf5fda0adb881375b7294c47c5d719b8436bc99cefc02edbff21c06b44f1"
   },
   "counts": {
     "audited_unavailable": 7,
-    "reconciled": 60
+    "reconciled": 69
   },
   "accepted_batch": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_batch_20260910T192900Z\\acceptance.json",
@@ -1137,6 +1137,218 @@
         "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_eight_notes_20260910T214700Z.json",
         "sha256": "5d5c3a76c78678d727a1011c84c24307881ac7b9671b2bb84bea5aa28d90c128"
       }
+    },
+    {
+      "acceptance": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_nine_notes_20260910T220000Z\\acceptance.json",
+        "sha256": "2865d867ee832ca81eaae004f6cb2e5b998b1903994d2b1f570b2afbea754f65"
+      },
+      "review_file": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_nine_notes_20260910T220000Z.json",
+        "sha256": "eebc60e1c0535f35b3255d871e7c44eeec8b0617332a5c0d6ee15e4f336c3ed4"
+      },
+      "review": {
+        "reviewed_at_utc": "2026-09-10T21:55:16.941795+00:00",
+        "scope": "Nine original-filings reconciled from independently reviewed own-period capital and treasury disclosures. No adjacent ratios, future receipt changes or inferred cancellations.",
+        "reconciliations": [
+          {
+            "id": "5785",
+            "reference": "2010-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 265160,
+              "PN": 461354
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              20
+            ],
+            "reason": "Own dated Fibam management report explicitly states paid-in capital of 726,514 shares, comprising 265,160 ordinary and 461,354 preferred shares, in actual shares rather than thousand-share lots. Each filing independently states its own reporting date. Retain its original explicit zero treasury; full-text review found no contrary current holdings. Do not infer the quantities from other periods or from the monetary R$23.7 million capital amount.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5785\\result.json",
+              "sha256": "33fb0b076cb7b572fa021c0c2171af55068a39dbedca9abc2479ee8444f08668"
+            }
+          },
+          {
+            "id": "5787",
+            "reference": "2010-12-31",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 265160,
+              "PN": 461354
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              20
+            ],
+            "reason": "Own dated Fibam management report explicitly states paid-in capital of 726,514 shares, comprising 265,160 ordinary and 461,354 preferred shares, in actual shares rather than thousand-share lots. Each filing independently states its own reporting date. Retain its original explicit zero treasury; full-text review found no contrary current holdings. Do not infer the quantities from other periods or from the monetary R$23.7 million capital amount.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5787\\result.json",
+              "sha256": "6551acf35b9539cd982a2bbb902bde6f4c81e9f10c4eefdf32a3622b353ce5bd"
+            }
+          },
+          {
+            "id": "42255",
+            "reference": "2014-09-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 265160,
+              "PN": 461354
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              20
+            ],
+            "reason": "Own dated Fibam management report explicitly states paid-in capital of 726,514 shares, comprising 265,160 ordinary and 461,354 preferred shares, in actual shares rather than thousand-share lots. Each filing independently states its own reporting date. Retain its original explicit zero treasury; full-text review found no contrary current holdings. Do not infer the quantities from other periods or from the monetary R$23.7 million capital amount.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\42255\\result.json",
+              "sha256": "46e87ed519438a1fe3b1498c1410c5bca985fdf139e277c71e74dfc1cef03182"
+            }
+          },
+          {
+            "id": "7902",
+            "reference": "2011-03-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 66002915,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 65200,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              98
+            ],
+            "reason": "Own Tegma shareholder table expressly dated 31 March 2011 states fully subscribed and paid-in capital, labels quantities in units, and reports 66,002,915 ordinary shares including 65,200 in treasury. Use this current dated table. The narrative note87 repeats 31 December 2010 and 2009 and cannot independently redate treasury to the current quarter. Current table evidence yields 65,937,715 outstanding ordinary shares, no preferred shares.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\7902\\result.json",
+              "sha256": "c878249581231496c1ea14c3bed6a209cd4cae0fb6aa6a80feb163c29e6dcc9e"
+            }
+          },
+          {
+            "id": "10835",
+            "reference": "2011-06-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 137032734,
+              "PN": 133354132
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 454425
+            },
+            "visually_reviewed_pages": [
+              37,
+              38,
+              39
+            ],
+            "reason": "Own GOL note11(a) explicitly states current 30 June 2011 capital of 270,386,866 shares, comprising 137,032,734 ordinary and 133,354,132 preferred. Its current shareholder table allocates treasury solely to preferred shares; note11(d) gives exact current treasury of 454,425. Own current units, not the source table's thousand multiplier, determine each class quantity. The authorized monetary ceiling and weighted-average EPS denominator are not capital counts.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\10835\\result.json",
+              "sha256": "8f52dd9d0845f0157bc99a3c27e7c34f6f047ecde731ba0a17f520884a6074b5"
+            }
+          },
+          {
+            "id": "14652",
+            "reference": "2011-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 159816337,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 3279982,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              44,
+              99,
+              100,
+              108
+            ],
+            "reason": "Own B2W 2011 version1 management shareholder table and note21(a) independently report current 31 December 2011 paid-in 159,816,337 ordinary shares and treasury 3,279,982, yielding 156,536,355 outstanding. June2011 subscription was fully paid. Note21(c)'s treasury rollforward is internally inconsistent: it includes a cancellation line but still prints the same ending treasury. Own note31 dates cancellation approval to 1 March 2012, subsequent to the reporting date. Reconcile the current dated shareholder tables with that explicit subsequent event; retain the disclosed rollforward inconsistency. No version2/3 quantity or later-market observation supplies the correction.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\14652\\result.json",
+              "sha256": "73eb4e1737304ab322427bf402bb248e0d9636ed71af117532e3bc947da0e565"
+            }
+          },
+          {
+            "id": "19998",
+            "reference": "2012-06-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 149279740,
+              "PN": 12810260
+            },
+            "treasury_shares": {
+              "ON": 1338040,
+              "PN": 2626100
+            },
+            "visually_reviewed_pages": [
+              72
+            ],
+            "reason": "Own Irani note21(a) reports 30 June 2012 capital of 149,279,740 ordinary and 12,810,260 preferred shares. The same page's current treasury quantity column separately gives ordinary 92,040 plus 1,246,000 and preferred 274,000 plus 2,352,100, totaling 3,964,140. The adjacent monetary-value column and December2011 comparative are not share quantities for the current endpoint. Use current treasury 1,338,040 ordinary and 2,626,100 preferred; future disposal/cancellation is only proposed.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\19998\\result.json",
+              "sha256": "ee4f4e3bdcbf1ddcf79763bc483e7482952d3e9b276f8a413269d2f8fb07726a"
+            }
+          },
+          {
+            "id": "34771",
+            "reference": "2013-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 69791465,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 1061100,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              76,
+              77
+            ],
+            "reason": "Own T4F note21(a) explicitly states current 31 December 2013 capital of 69,791,465 ordinary shares. Note21(g)'s current treasury table clearly separates the exact quantity 1,061,100 from monetary total and per-share costs. The authorized maximum repurchase of four million shares is not the actual holding. Retain original paid-in classification and zero preferred shares, correcting the source thousand multiplier from own-unit evidence.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\34771\\result.json",
+              "sha256": "e35fc1d5d110c99c8d2cd25cfe0c365c86c23ab8a3ddc43c14a5fe75a6d43591"
+            }
+          },
+          {
+            "id": "40201",
+            "reference": "2014-06-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 69791465,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 1472300,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              51,
+              52
+            ],
+            "reason": "Own T4F note21(a) explicitly states current 30 June 2014 capital of 69,791,465 ordinary shares. Note21(g)'s current treasury table clearly separates exact quantity 1,472,300 from monetary total and per-share costs. The four-million-share authorization is not the actual holding. Retain original paid-in classification and zero preferred shares, correcting the source thousand multiplier from this filing's own evidence.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\40201\\result.json",
+              "sha256": "88dee457113417bed5fc398d488068ed5652b4ecd61c8fa8f18844f0ada58fca"
+            }
+          }
+        ]
+      }
     }
   ],
   "review_priority": {
@@ -1206,5 +1418,27 @@
       "TimeoutError": 4,
       "non_zip_or_incomplete_response": 8
     }
+  },
+  "capital_selection_preflight": {
+    "driver": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm_source_preflight.py",
+      "sha256": "6ccce0395c34f30632cbf1400bb18138cfdad37c85c8c4f4010517b3458e415e"
+    },
+    "previous_driver": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\preflight_before_capital_selection.py",
+      "sha256": "1978b080d24ba66660a2aa30d358299a87f45fb6b13625bd865b4b01e1aac217"
+    },
+    "test_source": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\test_cvm_source_preflight.py",
+      "sha256": "e44670053d9facd261f0e6a298be41d2fafe12263f352d768bddc66dcb3319e5"
+    },
+    "test_result": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\capital_selection_preflight_tests.xml",
+      "sha256": "ee99f74b92deb0fb6d7a22e164efeab00987ef3b4d593dfae40f5ab86a98845c"
+    },
+    "tests_passed": 11,
+    "method": "Trace exact production-account scope, structured RAD availability, per-kind/reference highest-version ledger and latest nonmissing capital at each dated identity decision. Before price/class/barrier masks, so this is a conservative review queue. Does not change source data or masks. Recompute after any disposition/identity change; an unavailable newer count can expose an older filing.",
+    "proof": "Distinct integer share quantities and unit prices reproduce actual fundamental_features selected documents under same-decision version supersession, missing current counts, alternate CNPJ establishment, outside-production candidates and future filings. Ruff passes. Pending guard returns before reading unfinished FCA or creating an output.",
+    "actual_scan_started": false
   }
 }
