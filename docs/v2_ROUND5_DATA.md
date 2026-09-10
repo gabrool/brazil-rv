@@ -37,7 +37,7 @@ frozen replay. Original registration bytes are retained.
 
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
-| Events and fundamentals | All 4,344 missing original account versions recovered. Description-based bank/insurer accounting, parent/group reconciliation and complete-class issuer valuation are corrected. Exact capital pages are being collected for 15,596 additional filings. | Finish capital-count recovery and final joined coverage/admission tables. |
+| Events and fundamentals | The initial 4,344 missing account versions are recovered. The first capital batch recovered 15,586 of 15,596 filings; exceptions are being audited. A further 6,728 exact capital pages are being recovered to establish quantity units absent from annual CSVs. | Finish source exceptions, expanded-cohort coverage and final joined admission tables. |
 | Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. A further 6,765 missing original FCA versions are recoverable and are being acquired. | Accept the improved dated bridge, then rebuild sector, cross-market exposures and lending utilization. Existing archives remain immutable comparators. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Final store admission. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
@@ -82,6 +82,17 @@ govern each version, and genuine modern ticker and preferred-class fields are
 retained. Listing dates are also distinct from entry into a governance segment;
 the latter must not erase an earlier valid listing. These source corrections
 are registered in the [FCA identity amendment](../research/preregistrations/v2_round5_fca_identity_amendment.md).
+
+The capital source audit also found a material unit defect. Annual composition
+CSVs retain printed quantities without their unit scale: Bradesco DFP 2022
+requires a factor of 1,000, while the checked Ourofino and Petrobras filings
+already report individual shares. The model path now uses exact-version XML or
+HTML with explicit quantity units; the unsafe CSV fallback has been removed.
+Negative treasury quantities cannot inflate outstanding shares. Any repair must
+be reconciled to the same filing's notes and retain its evidence; otherwise the
+count remains unavailable without erasing unrelated accounting fields. The
+[valuation amendment](../research/preregistrations/v2_round5_valuation_amendment.md)
+records these corrections; 106 targeted tests passed before the new collection.
 
 ## Store and model contract
 
