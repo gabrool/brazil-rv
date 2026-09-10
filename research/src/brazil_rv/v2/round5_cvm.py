@@ -913,16 +913,22 @@ def fca_documents(
                 }
             )
     exact = {r["id"]: r for r in rad or [] if r["id"] and r["group"] == "cadastre"}
+    parsed_fca_helper_sha = sha256(Path(__file__).with_name("round5_cvm_fca.py"))
     for document in headers:
         original = root / "fca_originals" / document["id"]
         if (original / "manifest.json").exists():
             from .round5_cvm_fca import load_fca
 
             metadata = load_fca(document, original)
+            captured = json.loads(
+                (original / "manifest.json").read_text(encoding="utf8")
+            )
             document["original_fca_source"] = {
                 "document_id": document["id"],
                 "manifest_path": str(original / "manifest.json"),
                 "manifest_sha256": sha256(original / "manifest.json"),
+                "captured_helper_sha256": captured.get("helper_sha256"),
+                "parsed_helper_sha256": parsed_fca_helper_sha,
             }
             if metadata is not None:
                 document.update(metadata)
