@@ -1,0 +1,15 @@
+{
+  "bova11": {
+    "manifest_sha256": "2d554c84c7b28fbb89dbfd3945bfd0493089bc09dd35a50b73f6c5a601e69424",
+    "root": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\bova11"
+  },
+  "code_commit": "36409dd43c09ac78010a80622a4977ce8f0a8ffd",
+  "hedge_beta": {
+    "manifest_sha256": "11d99362c2e7dac22594eac8f5a8d104ca88c20e767cf7844955a60aff6b4dad",
+    "root": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\hedge_beta"
+  },
+  "new_lending_rates": null,
+  "new_lending_rates_status": "source_audit_pending",
+  "registration_sha256": "56192dd81ac5f40e97aa16804d6396a3eca31a12d0ab8d8b00306fe7c0858b9b",
+  "schema": "BRAZIL_RV_ROUND5_ECONOMIC_SOURCES_V1"
+}

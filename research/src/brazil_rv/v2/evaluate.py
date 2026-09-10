@@ -2128,6 +2128,190 @@ def enforce_registered_book_bounds(report: Mapping[str, object]) -> None:
         raise RuntimeError(f"registered book stop: {failures}")
 
 
+def _evaluate_economics(
+    inputs: EvaluationInputs, *, settle_terminal_residuals: bool = False
+) -> tuple[dict[str, object], StatefulLedgerResult, NDArray[np.bool_]]:
+    """Run the canonical ledger grid without recomputing score-only statistics."""
+    policy = inputs.execution_policy
+    economics_score, economics_mask = (
+        _economics_signal(inputs) if policy is None else traded_signal(inputs, policy)
+    )
+    ledger_inputs = _ledger_inputs(inputs, economics_score, economics_mask)
+    if policy is not None:
+        ledger_inputs["capacity_buffer_per_side"] = 30
+        if policy.inverse_volatility:
+            ledger_inputs["entry_sizing_volatility"] = inputs.target_scale_sigma
+    headline_config = policy.ledger_config() if policy is not None else LedgerConfig()
+    headline_config = replace(
+        headline_config, settle_terminal_residuals=settle_terminal_residuals
+    )
+    grid = ledger_sensitivity_grid(
+        shortable_by_borrow_source=inputs.shortable_by_borrow_source,
+        headline_config=headline_config,
+        **ledger_inputs,
+    )
+    configurations = ledger_configurations(headline_config)
+    headline_name = "borrow_balance"
+    headline = grid[headline_name]
+    d5_index = HORIZONS.index(5)
+    d5_score = np.asarray(inputs.scores, dtype=np.float64)[..., d5_index]
+    d5_score_mask = (
+        np.asarray(inputs.score_mask, dtype=np.bool_)[..., d5_index]
+        & np.asarray(inputs.active, dtype=np.bool_)
+        & np.isfinite(d5_score)
+    )
+    d5_only = simulate_stateful_ledger(
+        **{**ledger_inputs, "scores": d5_score, "score_mask": d5_score_mask},
+        config=headline_config,
+        shortable=inputs.shortable_by_borrow_source["borrow_balance"],
+    )
+    economics_summaries: list[dict[str, object]] = []
+    economics_daily: list[dict[str, object]] = []
+    for scenario, result in grid.items():
+        config = configurations[scenario]
+        economics_summaries.append(
+            {
+                "scenario": scenario,
+                "cost_bps_per_side": config.cost_bps_per_side,
+                "annual_borrow_rate": config.annual_borrow_rate,
+                "borrow_source": config.borrow_source,
+                "buffer_per_side": config.buffer_per_side,
+                "short_proceeds_remuneration": (config.short_proceeds_remuneration),
+                "borrow_registration_fee_fraction": (
+                    config.borrow_registration_fee_fraction
+                ),
+                "borrow_registration_fee_floor": (config.borrow_registration_fee_floor),
+                "borrow_registration_fee_cap": config.borrow_registration_fee_cap,
+                "terminal_settlement_convention": TERMINAL_SETTLEMENT_CONVENTION,
+                "settlement_grace_sessions": config.settlement_grace_sessions,
+                "settlement_haircut": config.settlement_haircut,
+                "path_model_count": 1,
+                **{
+                    key: _finite_or_none(value) if isinstance(value, float) else value
+                    for key, value in result.summary().items()
+                },
+            }
+        )
+        if scenario.startswith(("cost_", "borrow_", "comparator_")):
+            economics_daily.extend(
+                {
+                    **row,
+                    "scenario": scenario,
+                }
+                for row in _ledger_rows(
+                    result,
+                    cost_bps=config.cost_bps_per_side,
+                    annual_borrow_rate=config.annual_borrow_rate,
+                )
+            )
+    headline_daily = _ledger_rows(
+        headline,
+        cost_bps=ECONOMICS_HEADLINE[0],
+        annual_borrow_rate=ECONOMICS_HEADLINE[1],
+    )
+    holding_audit = _holding_audit(headline, inputs.security_ids)
+    action_attribution = _action_attribution(inputs, headline)
+    deployed_net = np.asarray(
+        [
+            float(row["deployed_net_fraction_nav"])
+            if row["deployed_net_fraction_nav"] is not None
+            else math.nan
+            for row in headline_daily
+        ],
+        dtype=np.float64,
+    )
+    economics = {
+        "contract": _economics_contract(inputs),
+        "headline": {
+            "scenario": headline_name,
+            **{
+                key: _finite_or_none(value) if isinstance(value, float) else value
+                for key, value in headline.summary().items()
+            },
+            "mean_deployed_net_fraction_nav": _finite_or_none(
+                _finite_mean(deployed_net)
+            ),
+            "terminal_unresolved_inventory_fraction_nav": (
+                _finite_or_none(
+                    (
+                        headline.unresolved_inventory_notional
+                        + headline.terminal_boundary_unpriced_inventory_notional
+                    )
+                    / headline.nav[-1]
+                )
+                if headline.nav[-1] != 0.0
+                else None
+            ),
+        },
+        "summaries": economics_summaries,
+        "daily_table": economics_daily,
+        "headline_audit": {
+            "daily_state": headline_daily,
+            "intended_orders": _serialise_records(headline.intended_orders),
+            "fills": _serialise_records(headline.fills),
+            "cancellations": _serialise_records(headline.cancellations),
+            "holding_age_distribution": holding_audit,
+            "claims_and_action_attribution": action_attribution,
+        },
+        "d5_only_diagnostic": {
+            "horizon_sessions": 5,
+            "contract": "D5 score head with the exact headline ledger settings",
+            "summary": {
+                key: _finite_or_none(value) if isinstance(value, float) else value
+                for key, value in d5_only.summary().items()
+            },
+            "daily_table": _ledger_rows(
+                d5_only,
+                cost_bps=LedgerConfig().cost_bps_per_side,
+                annual_borrow_rate=LedgerConfig().annual_borrow_rate,
+            ),
+        },
+        "coverage": {
+            "possible_date_count": len(inputs.dates),
+            "reported_date_count": len(headline.dates),
+            "finite_net_excess_date_count": int(
+                np.isfinite(headline.net_excess_all_cash_bps).sum()
+            ),
+            "score_supported_date_count": int(economics_mask.any(axis=1).sum()),
+            "score_supported_name_days": int(economics_mask.sum()),
+            "deployed_date_count": int((headline.gross_fraction_nav > 0.0).sum()),
+            "all_cash_date_count": int((headline.gross_fraction_nav == 0.0).sum()),
+            "economics_unresolved": headline.economics_unresolved,
+        },
+    }
+    if settle_terminal_residuals:
+        economics["contract"].update(
+            terminal_residuals_settled=True,
+            terminal_boundary_convention="last_mark_after_10_sessions_with_evaluation_end_acceleration",
+            economics_pooling="full_common_calendar_unresolved_is_a_label",
+            terminal_unresolved_inventory_readout="remaining_inventory_plus_unpriced_equity_settled_at_boundary",
+        )
+    if policy is not None:
+        traded = traded_readouts(inputs, economics_score, economics_mask)
+        economics["execution_policy"] = {
+            **asdict(policy),
+            "capacity_buffer_per_side": 30,
+            "label": "execution_parameter_selected_in_sample",
+        }
+        economics["traded_signal"] = {
+            "mean": {
+                name: _finite_or_none(_finite_mean(values))
+                for name, values in traded.items()
+            },
+            "daily": [
+                {
+                    "date": day.isoformat(),
+                    **{
+                        name: _finite_or_none(values[index])
+                        for name, values in traded.items()
+                    },
+                }
+                for index, day in enumerate(inputs.dates)
+            ],
+        }
+    return economics, headline, economics_mask
+
+
 def evaluate_scores(
     inputs: EvaluationInputs,
     *,
@@ -2192,38 +2376,8 @@ def evaluate_scores(
         TRADED_PRIMARY_HORIZONS,
     )
     persistence, persistence_rows = _persistence(inputs)
-    policy = inputs.execution_policy
-    economics_score, economics_mask = (
-        _economics_signal(inputs) if policy is None else traded_signal(inputs, policy)
-    )
-    ledger_inputs = _ledger_inputs(inputs, economics_score, economics_mask)
-    if policy is not None:
-        ledger_inputs["capacity_buffer_per_side"] = 30
-        if policy.inverse_volatility:
-            ledger_inputs["entry_sizing_volatility"] = inputs.target_scale_sigma
-    headline_config = policy.ledger_config() if policy is not None else LedgerConfig()
-    headline_config = replace(
-        headline_config, settle_terminal_residuals=settle_terminal_residuals
-    )
-    grid = ledger_sensitivity_grid(
-        shortable_by_borrow_source=inputs.shortable_by_borrow_source,
-        headline_config=headline_config,
-        **ledger_inputs,
-    )
-    configurations = ledger_configurations(headline_config)
-    headline_name = "borrow_balance"
-    headline = grid[headline_name]
-    d5_index = HORIZONS.index(5)
-    d5_score = np.asarray(inputs.scores, dtype=np.float64)[..., d5_index]
-    d5_score_mask = (
-        np.asarray(inputs.score_mask, dtype=np.bool_)[..., d5_index]
-        & np.asarray(inputs.active, dtype=np.bool_)
-        & np.isfinite(d5_score)
-    )
-    d5_only = simulate_stateful_ledger(
-        **{**ledger_inputs, "scores": d5_score, "score_mask": d5_score_mask},
-        config=headline_config,
-        shortable=inputs.shortable_by_borrow_source["borrow_balance"],
+    economics, headline, economics_mask = _evaluate_economics(
+        inputs, settle_terminal_residuals=settle_terminal_residuals
     )
     active = np.asarray(inputs.active, dtype=np.bool_)
     scaled_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
@@ -2328,61 +2482,6 @@ def evaluate_scores(
                 ),
             }
         )
-    economics_summaries: list[dict[str, object]] = []
-    economics_daily: list[dict[str, object]] = []
-    for scenario, result in grid.items():
-        config = configurations[scenario]
-        economics_summaries.append(
-            {
-                "scenario": scenario,
-                "cost_bps_per_side": config.cost_bps_per_side,
-                "annual_borrow_rate": config.annual_borrow_rate,
-                "borrow_source": config.borrow_source,
-                "buffer_per_side": config.buffer_per_side,
-                "short_proceeds_remuneration": (config.short_proceeds_remuneration),
-                "borrow_registration_fee_fraction": (
-                    config.borrow_registration_fee_fraction
-                ),
-                "borrow_registration_fee_floor": (config.borrow_registration_fee_floor),
-                "borrow_registration_fee_cap": config.borrow_registration_fee_cap,
-                "terminal_settlement_convention": TERMINAL_SETTLEMENT_CONVENTION,
-                "settlement_grace_sessions": config.settlement_grace_sessions,
-                "settlement_haircut": config.settlement_haircut,
-                "path_model_count": 1,
-                **{
-                    key: _finite_or_none(value) if isinstance(value, float) else value
-                    for key, value in result.summary().items()
-                },
-            }
-        )
-        if scenario.startswith(("cost_", "borrow_", "comparator_")):
-            economics_daily.extend(
-                {
-                    **row,
-                    "scenario": scenario,
-                }
-                for row in _ledger_rows(
-                    result,
-                    cost_bps=config.cost_bps_per_side,
-                    annual_borrow_rate=config.annual_borrow_rate,
-                )
-            )
-    headline_daily = _ledger_rows(
-        headline,
-        cost_bps=ECONOMICS_HEADLINE[0],
-        annual_borrow_rate=ECONOMICS_HEADLINE[1],
-    )
-    holding_audit = _holding_audit(headline, inputs.security_ids)
-    action_attribution = _action_attribution(inputs, headline)
-    deployed_net = np.asarray(
-        [
-            float(row["deployed_net_fraction_nav"])
-            if row["deployed_net_fraction_nav"] is not None
-            else math.nan
-            for row in headline_daily
-        ],
-        dtype=np.float64,
-    )
     quality_stratification = _quality_stratification(
         inputs,
         primary_scores,
@@ -2502,65 +2601,7 @@ def evaluate_scores(
         ),
         "daily_metric_table": metric_rows,
         "persistence_table": persistence_rows,
-        "economics": {
-            "contract": _economics_contract(inputs),
-            "headline": {
-                "scenario": headline_name,
-                **{
-                    key: _finite_or_none(value) if isinstance(value, float) else value
-                    for key, value in headline.summary().items()
-                },
-                "mean_deployed_net_fraction_nav": _finite_or_none(
-                    _finite_mean(deployed_net)
-                ),
-                "terminal_unresolved_inventory_fraction_nav": (
-                    _finite_or_none(
-                        (
-                            headline.unresolved_inventory_notional
-                            + headline.terminal_boundary_unpriced_inventory_notional
-                        )
-                        / headline.nav[-1]
-                    )
-                    if headline.nav[-1] != 0.0
-                    else None
-                ),
-            },
-            "summaries": economics_summaries,
-            "daily_table": economics_daily,
-            "headline_audit": {
-                "daily_state": headline_daily,
-                "intended_orders": _serialise_records(headline.intended_orders),
-                "fills": _serialise_records(headline.fills),
-                "cancellations": _serialise_records(headline.cancellations),
-                "holding_age_distribution": holding_audit,
-                "claims_and_action_attribution": action_attribution,
-            },
-            "d5_only_diagnostic": {
-                "horizon_sessions": 5,
-                "contract": "D5 score head with the exact headline ledger settings",
-                "summary": {
-                    key: _finite_or_none(value) if isinstance(value, float) else value
-                    for key, value in d5_only.summary().items()
-                },
-                "daily_table": _ledger_rows(
-                    d5_only,
-                    cost_bps=LedgerConfig().cost_bps_per_side,
-                    annual_borrow_rate=LedgerConfig().annual_borrow_rate,
-                ),
-            },
-            "coverage": {
-                "possible_date_count": len(inputs.dates),
-                "reported_date_count": len(headline.dates),
-                "finite_net_excess_date_count": int(
-                    np.isfinite(headline.net_excess_all_cash_bps).sum()
-                ),
-                "score_supported_date_count": int(economics_mask.any(axis=1).sum()),
-                "score_supported_name_days": int(economics_mask.sum()),
-                "deployed_date_count": int((headline.gross_fraction_nav > 0.0).sum()),
-                "all_cash_date_count": int((headline.gross_fraction_nav == 0.0).sum()),
-                "economics_unresolved": headline.economics_unresolved,
-            },
-        },
+        "economics": economics,
         "diagnostics": _diagnostics(inputs, headline),
         "quality_and_coverage_stratification": quality_stratification,
         "input_hashes": _input_hashes(inputs),
@@ -2607,36 +2648,6 @@ def evaluate_scores(
             "actual_risk_breach_dates": int(headline.actual_risk_breach.sum()),
         },
     }
-    if settle_terminal_residuals:
-        report["economics"]["contract"].update(
-            terminal_residuals_settled=True,
-            terminal_boundary_convention="last_mark_after_10_sessions_with_evaluation_end_acceleration",
-            economics_pooling="full_common_calendar_unresolved_is_a_label",
-            terminal_unresolved_inventory_readout="remaining_inventory_plus_unpriced_equity_settled_at_boundary",
-        )
-    if policy is not None:
-        traded = traded_readouts(inputs, economics_score, economics_mask)
-        report["economics"]["execution_policy"] = {
-            **asdict(policy),
-            "capacity_buffer_per_side": 30,
-            "label": "execution_parameter_selected_in_sample",
-        }
-        report["economics"]["traded_signal"] = {
-            "mean": {
-                name: _finite_or_none(_finite_mean(values))
-                for name, values in traded.items()
-            },
-            "daily": [
-                {
-                    "date": day.isoformat(),
-                    **{
-                        name: _finite_or_none(values[index])
-                        for name, values in traded.items()
-                    },
-                }
-                for index, day in enumerate(inputs.dates)
-            ],
-        }
     return EvaluationResult(
         report=report,
         dates=inputs.dates,
