@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-09.
+Last verified: 2026-09-10.
 
 ## Purpose and current research state
 
@@ -2030,8 +2030,13 @@ folds cover 2018H1–2024H2, with expanding fits from 2016-07-18, and Stage P en
 2016-06-30. Primary IC and Stage-F checkpoint selection use common D3/D5/D10
 neutral-target support; `legacy_primary_ic_1235` preserves the former headline.
 The paired parent is the Round-3 fast-off configuration; B6 remains historical.
-Screening seeds are 11/29/47, and confirmation 61/79/97 is mandatory before any
-promotion. The selected execution policy remains theta=1, D3/D5/D10 equal-notional,
+Screening seeds are 11/29/47. The user-authorized
+[Round-4 A4 budget amendment](research/preregistrations/v2_round4_budget_amendment.md)
+replaces the unexecuted mandatory 61/79/97 extension with fixed saved-score seed
+sensitivity and explicitly provisional development conclusions. It preserves all
+fourteen folds and training/evaluation settings. Subsequent routine research uses
+three matched seeds; extra seeds require a separately registered decision. The
+selected execution policy remains theta=1, D3/D5/D10 equal-notional,
 buffer nine, with its in-sample selection label. The repaired development store
 and all sealed Round-3 artifacts remain immutable. CPU re-baselining precedes
 Round 4; paid compute requires a renewed go, and 2025/2026 access is unauthorized.
@@ -2046,8 +2051,10 @@ existing resolved-fold pooling rule and explicit candidate-specific exclusions;
 engineering acceptance is not a full-calendar or implementability claim.
 [Round 4](research/preregistrations/v2_round4.md) is registered as fast_off plus
 S0/H/P/L/C, with twelve screening P runs, 252 main F runs and nine selection-only
-F runs. Confirmation on seeds 61/79/97 on both sides precedes any designation
-or S0 default change. No Round-4 neural result exists yet. Gabriel subsequently
+F runs. A4 permits a working research parent only when its original provisional
+choice is unchanged and eligible across the full three-seed panel and all three
+leave-one-out panels; otherwise fast_off remains the comparator with an inconclusive
+label. This is not six-seed confirmation. Gabriel subsequently
 authorized paid Round-4 sessions through A1–A3 after revision and a fresh freeze.
 The amended books settle unpriced terminal equity/hedge residuals at their last mark,
 retain the uncertainty and 30% haircut labels, and pool full-calendar economics.

@@ -1,5 +1,12 @@
 # Round 4: first neural research round on the fourteen-fold checkpoint
 
+**Current budget amendment (2026-09-10):**
+[A4](v2_round4_budget_amendment.md) supersedes the unexecuted mandatory six-seed
+confirmation stage with fixed three-seed development reporting and saved-score
+leave-one-seed-out sensitivity. The original A1–A3 execution below remains the
+historical contract of the frozen screening root; its completed artifacts are not
+rewritten. No six-seed confirmation or independent replication is claimed under A4.
+
 Registered after the completed CPU report in commit `bd8ce6b`, before any Round-4
 neural fit or score. This implements Gabriel's `v2_research_checkpoint.md` and the
 [accepted checkpoint contract](v2_research_checkpoint.md). The CPU results are

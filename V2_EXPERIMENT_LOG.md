@@ -2841,3 +2841,16 @@ before termination. Provider inventory confirmed instance `482f0aea79aa459bbd4c0
 absent at 2026-09-10T01:37:28.6759002Z and 2026-09-10T01:37:38.9778036Z.
 No adjacent instance was touched. Arms and confirmation continue in fresh sessions;
 training remains bound to `3d1e95f` and all holdout restrictions remain active.
+
+## 2026-09-10: user-authorized Round-4 budget amendment A4
+
+After the user asked to accelerate research without materially reducing quality,
+replaced the unexecuted blanket 61/79/97 extension with fixed three-seed development
+reporting and all three saved-score leave-one-out panels. All 14 folds, six arms,
+training settings, A1–A3 readouts, economic rules and engineering gates are retained.
+The amendment is explicitly post-training and is fixed before the new seed audit.
+It permits only seed-stable working research choices; unstable choices are
+inconclusive, with fast_off retained as comparator. No independent replication,
+six-seed confirmation, holdout permission, deployment or Round 5 is implied.
+The original frozen screening root is preserved. See the A4 registration and
+`round4_seed_audit.py`; 11 targeted decision/registration tests passed before execution.

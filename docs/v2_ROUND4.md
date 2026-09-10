@@ -1,15 +1,22 @@
-# Round 4: A1–A3 execution record
+# Round 4: execution and development evidence
 
 Status: A1–A3 is committed in `3d1e95f`. The 126-cell CPU replay and the three-seed
 neural parent on all fourteen folds are complete, accepted, sealed and recovered.
-The first session is closed. The second session is running arms, selection-only fits
-and screening; confirmation remains outstanding.
+The first session is closed. All 210 arm fits and nine selection-only fits are now
+complete; full screening is running on the unchanged frozen code. Gabriel's
+2026-09-10 [A4 budget amendment](../research/preregistrations/v2_round4_budget_amendment.md)
+replaces the unexecuted extra three-seed stage with saved-score seed sensitivity.
+No additional neural training or replacement GH200 is planned.
 The original CPU root and historical B6 panels remain immutable. No arm comparison
 or promotion is made here. Holdout consumers and deployment remain outside this work.
 
 The controlling [registration](../research/preregistrations/v2_round4.md) and
 [protocol JSON](../research/preregistrations/v2_round4.json) retain all six configurations,
-screening/confirmation seeds, training settings and the selected execution policy.
+the original screening seeds, training settings and selected execution policy.
+The old six-seed requirement is superseded by A4 for this round. The fixed diagnostic
+checks all three leave-one-seed-out panels, all six arms and all fourteen folds.
+Unstable choices remain inconclusive; no six-seed or independent-replication claim
+is made. The amendment was made after training, not before original scores existed.
 The prior [CPU checkpoint report](v2_RESEARCH_CHECKPOINT.md) is historical context;
 its resolved-fold-only economics will be retained as a secondary replay readout.
 
@@ -197,4 +204,5 @@ nine selection-only fits and full screening evaluation. The arm plan has SHA-256
 `d2e6370604abce6012b021cbc825d418d37303a2541e0a0d0e8a476dbf9a4187`
 and six concurrent trajectories; the first six processes are active. This session
 ends after screening with complete recovery, verification and exact-instance
-termination. Confirmation follows in a fresh session using the registered roster.
+termination. A4 now replaces the former planned fresh confirmation session with
+a CPU-only saved-score audit on this instance before final recovery and closure.
