@@ -510,17 +510,22 @@ def lending_decision_features(
         rate_grid.with_columns(
             pl.col("registered_quantity")
             .shift(1)
-            .rolling_mean(window_size=20, min_samples=20)
+            .rolling_mean(window_size=20, min_samples=15)
             .over("isin")
             .alias("prior_mean"),
             pl.col("registered_quantity")
             .shift(1)
-            .rolling_std(window_size=20, min_samples=20, ddof=1)
+            .rolling_std(window_size=20, min_samples=15, ddof=1)
             .over("isin")
             .alias("prior_std"),
         )
         .with_columns(
-            pl.when((pl.col("prior_std") > 0) & (pl.col("registered_quantity") > 0))
+            pl.when(
+                (pl.col("prior_std") > 0)
+                & pl.col("prior_std").is_finite()
+                & (pl.col("registered_quantity") > 0)
+                & (pl.col("source_trade_date").replace_strict(positions) >= 20)
+            )
             .then(
                 (pl.col("registered_quantity") - pl.col("prior_mean"))
                 / pl.col("prior_std")

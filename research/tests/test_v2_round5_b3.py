@@ -325,6 +325,26 @@ def test_lending_feature_uses_publication_date_and_preserves_reference_age():
         changed.filter(pl.col("date") == days[22])["loan_balance_to_volume_20"].item()
         == 6.0
     )
+    assert result.filter(pl.col("date") == days[20])[
+        "new_loan_volume_surprise"
+    ].item() is None
+    with_five_gaps = rates.filter(~pl.col("source_trade_date").is_in(days[5:10]))
+    sparse = lending_decision_features(
+        balance, with_five_gaps, days, ["ABC"], np.full((31, 1), 100.0)
+    )
+    observed = np.asarray([i + 1 for i in range(20) if not 5 <= i < 10])
+    expected = (21 - observed.mean()) / observed.std(ddof=1)
+    assert np.isclose(
+        sparse.filter(pl.col("date") == days[21])["new_loan_volume_surprise"].item(),
+        expected,
+    )
+    with_six_gaps = with_five_gaps.filter(pl.col("source_trade_date") != days[10])
+    insufficient = lending_decision_features(
+        balance, with_six_gaps, days, ["ABC"], np.full((31, 1), 100.0)
+    )
+    assert insufficient.filter(pl.col("date") == days[21])[
+        "new_loan_volume_surprise"
+    ].item() is None
 
 
 def test_utilization_uses_received_float_snapshot_and_known_unit_boundaries():
