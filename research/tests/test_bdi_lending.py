@@ -121,6 +121,21 @@ def test_old_pdf_layout_reads_printed_balance_date_and_prefixed_rows() -> None:
     assert bulletin.positions[1].balance_brl == 4_110_257.73
 
 
+def test_legacy_seven_decimal_currency_is_not_a_thousands_group() -> None:
+    bulletin = parse_bdi_pages(
+        [
+            "Banco de Títulos\nSALDO ACUMULADO DE AÇÕES EMPRESTADAS\n"
+            "emprestadas em 29/05/2020\n"
+            "AALR3 CENTRO DE IMAGE ON 800396 7816985.3500000\n"
+            "ADHM3 HUB COSMETICOS ON 182 446.9100000\n"
+        ],
+        date(2020, 6, 1),
+    )
+    assert bulletin is not None
+    assert bulletin.positions[0].balance_brl == 7_816_985.35
+    assert bulletin.positions[1].balance_brl == 446.91
+
+
 def test_rows_use_next_session_exact_lags_and_future_mutation_isolated() -> None:
     first = date(2023, 1, 2)
     sessions = [first + timedelta(days=index) for index in range(43)]

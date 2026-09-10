@@ -124,7 +124,7 @@ def _money(value: str) -> float:
         return float(value.replace(thousands, "").replace(decimal, "."))
     if "," in value:
         return float(value.replace(".", "").replace(",", "."))
-    if "." in value and len(value.rsplit(".", 1)[1]) == 2:
+    if value.count(".") == 1 and len(value.rsplit(".", 1)[1]) in (2, 7):
         return float(value.replace(",", ""))
     return float(value.replace(".", "").replace(",", ""))
 

@@ -14,6 +14,7 @@ from xml.etree.ElementTree import iterparse
 from zoneinfo import ZoneInfo
 
 import polars as pl
+import numpy as np
 
 from brazil_rv.v2.artifacts import sha256_file
 from brazil_rv.preprocessing.b3_options_open_interest import (
@@ -22,7 +23,10 @@ from brazil_rv.preprocessing.b3_options_open_interest import (
     _local,
     _text,
 )
-from brazil_rv.preprocessing.options_activity import _choose_txt_member, parse_option_line
+from brazil_rv.preprocessing.options_activity import (
+    _choose_txt_member,
+    parse_option_line,
+)
 
 
 RATE_FIELDS = (
@@ -383,3 +387,316 @@ def write_rate_source_candidate(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     return manifest
+
+
+def stitch_legacy_balances(
+    old: pl.DataFrame,
+    extracted: pl.DataFrame,
+    cash: pl.DataFrame,
+    admissible_reports: list[date],
+    sessions: list[date],
+) -> tuple[pl.DataFrame, dict[str, object]]:
+    """Bind printed legacy tickers to exact dated cash identities, without carry."""
+    legacy = extracted.filter(pl.col("report_date").is_in(admissible_reports))
+    mapping = cash.select("source_trade_date", "ticker", "isin").unique()
+    unambiguous = (
+        mapping.group_by("source_trade_date", "ticker")
+        .agg(pl.col("isin").n_unique().alias("identity_count"), pl.col("isin").first())
+        .filter(pl.col("identity_count") == 1)
+        .drop("identity_count")
+    )
+    joined = legacy.drop("isin").join(
+        unambiguous,
+        left_on=["position_date", "ticker"],
+        right_on=["source_trade_date", "ticker"],
+        how="inner",
+    )
+    next_sessions = pl.DataFrame(
+        {"report_date": sessions[:-1], "available_date": sessions[1:]},
+        schema={"report_date": pl.Date, "available_date": pl.Date},
+    )
+    new = (
+        joined.join(next_sessions, on="report_date", how="inner")
+        .select(
+            pl.col("position_date").alias("source_position_date"),
+            pl.col("report_date").alias("source_report_date"),
+            "available_date",
+            (pl.lit("ISIN:") + pl.col("isin")).alias("security_id"),
+            pl.lit("exact_position_date_cotahist_ticker_isin").alias(
+                "source_identity_method"
+            ),
+            pl.col("quantity").alias("lending_balance_quantity"),
+            pl.col("balance_brl").alias("lending_balance_brl"),
+        )
+        .cast(old.schema)
+    )
+    keys = ["available_date", "security_id"]
+    additions = new.join(old.select(keys), on=keys, how="anti")
+    result = pl.concat([old, additions]).sort(keys)
+    if result.select(pl.struct(keys).is_duplicated().any()).item():
+        raise ValueError("Legacy lending identities collide at one publication")
+    return result, {
+        "old_rows_preserved_exactly": old.height,
+        "admissible_raw_rows": legacy.height,
+        "exact_identity_matches": joined.height,
+        "identity_unresolved_rows": legacy.height - joined.height,
+        "added_rows": additions.height,
+        "added_isins": additions["security_id"].n_unique(),
+        "first_added_available_date": str(additions["available_date"].min()),
+        "last_added_available_date": str(additions["available_date"].max()),
+    }
+
+
+def lending_decision_features(
+    balances: pl.DataFrame,
+    rates: pl.DataFrame,
+    sessions: list[date],
+    isins: list[str],
+    daily_volume_brl: np.ndarray,
+) -> pl.DataFrame:
+    """Extend the existing five source-date/vintage formulas without redefining them."""
+    from brazil_rv.v2.sidecars import _raw_lending_features
+
+    def identity(frame):
+        return frame.with_columns(
+            pl.col("security_id").str.strip_prefix("ISIN:").alias("isin")
+        ).drop("security_id")
+
+    raw = identity(balances).join(
+        identity(rates), on=["available_date", "isin"], how="full", coalesce=True
+    )
+    result = _raw_lending_features(raw, sessions, isins, daily_volume_brl)
+    positions = {day: index for index, day in enumerate(sessions)}
+    fields = [
+        "loan_balance_to_volume_20",
+        "loan_balance_change_1",
+        "loan_balance_change_5",
+        "loan_rate",
+        "loan_rate_change_5",
+    ]
+    columns = [pl.col("available_date").alias("date"), pl.col("isin")]
+    for feature in fields:
+        source = (
+            "source_trade_date"
+            if feature.startswith("loan_rate")
+            else "source_position_date"
+        )
+        age = pl.col("available_date").replace_strict(
+            positions, default=None, return_dtype=pl.Int32
+        ) - pl.col(source).replace_strict(
+            positions, default=None, return_dtype=pl.Int32
+        )
+        columns.extend(
+            [
+                pl.when(pl.col(feature + "_mask")).then(pl.col(feature)).alias(feature),
+                pl.when(pl.col(feature + "_mask"))
+                .then(age)
+                .alias(feature + "_age_sessions"),
+            ]
+        )
+    features = result.select(columns)
+    rate_grid = (
+        pl.DataFrame({"source_trade_date": sessions[:-1], "date": sessions[1:]})
+        .join(pl.DataFrame({"isin": isins}), how="cross")
+        .join(
+            identity(rates).select("source_trade_date", "isin", "registered_quantity"),
+            on=["source_trade_date", "isin"],
+            how="left",
+        )
+        .sort("isin", "source_trade_date")
+    )
+    rate_grid = (
+        rate_grid.with_columns(
+            pl.col("registered_quantity")
+            .shift(1)
+            .rolling_mean(window_size=20, min_samples=20)
+            .over("isin")
+            .alias("prior_mean"),
+            pl.col("registered_quantity")
+            .shift(1)
+            .rolling_std(window_size=20, min_samples=20, ddof=1)
+            .over("isin")
+            .alias("prior_std"),
+        )
+        .with_columns(
+            pl.when((pl.col("prior_std") > 0) & (pl.col("registered_quantity") > 0))
+            .then(
+                (pl.col("registered_quantity") - pl.col("prior_mean"))
+                / pl.col("prior_std")
+            )
+            .alias("new_loan_volume_surprise")
+        )
+        .filter(pl.col("new_loan_volume_surprise").is_not_null())
+        .select(
+            "date",
+            "isin",
+            "new_loan_volume_surprise",
+            pl.lit(1).alias("new_loan_volume_surprise_age_sessions"),
+        )
+    )
+    return (
+        features.join(rate_grid, on=["date", "isin"], how="full", coalesce=True)
+        .with_columns(
+            pl.lit(None, dtype=pl.Float64).alias("utilization_proxy"),
+            pl.lit(None, dtype=pl.Int32).alias("utilization_proxy_age_sessions"),
+        )
+        .sort("date", "isin")
+    )
+
+
+def activity_decision_features(
+    cash: pl.DataFrame,
+    option_quantities: pl.DataFrame,
+    snapshots: pl.DataFrame,
+    nonregular: pl.DataFrame,
+    sessions: list[date],
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Causal trailing option activity and mean trade size on the fixed calendar."""
+    dates = pl.DataFrame({"source_trade_date": sessions[:-1], "date": sessions[1:]})
+    grid = (
+        dates.join(cash.select("isin").unique(), how="cross")
+        .join(
+            cash.select(
+                "source_trade_date", "isin", "quantity", "volume_brl", "trades"
+            ),
+            on=["source_trade_date", "isin"],
+            how="left",
+        )
+        .join(option_quantities, on=["source_trade_date", "isin"], how="left")
+    )
+    if snapshots.height:
+        grid = grid.join(
+            snapshots.select(
+                "source_trade_date",
+                "isin",
+                "listed_series",
+                "call_oi",
+                "put_oi",
+                "oi_all_listed_observed",
+            ),
+            on=["source_trade_date", "isin"],
+            how="left",
+        )
+    else:
+        grid = grid.with_columns(
+            pl.lit(None, dtype=pl.Int64).alias("listed_series"),
+            pl.lit(None, dtype=pl.Float64).alias("call_oi"),
+            pl.lit(None, dtype=pl.Float64).alias("put_oi"),
+            pl.lit(False).alias("oi_all_listed_observed"),
+        )
+    # Complete COTAHIST reports all executed trades. A known listed series with
+    # no printed trade has zero activity; absent historical listing status stays unknown.
+    grid = grid.with_columns(
+        [
+            pl.when(pl.col("listed_series") > 0)
+            .then(pl.col(name).fill_null(0))
+            .otherwise(pl.col(name))
+            .cast(pl.Float64)
+            .alias(name)
+            for name in ("call_quantity", "put_quantity")
+        ]
+    ).sort("isin", "source_trade_date")
+
+    def rolling(name, window):
+        return (
+            pl.col(name)
+            .rolling_sum(window_size=window, min_samples=window)
+            .over("isin")
+        )
+
+    grid = (
+        grid.with_columns(
+            (pl.col("call_quantity") + pl.col("put_quantity")).alias("option_quantity"),
+            pl.when(pl.col("oi_all_listed_observed"))
+            .then(pl.col("call_oi") + pl.col("put_oi"))
+            .alias("total_oi"),
+        )
+        .with_columns(
+            rolling("quantity", 20).alias("stock_quantity_20"),
+            rolling("option_quantity", 20).alias("option_quantity_20"),
+            rolling("put_quantity", 5).alias("put_quantity_5"),
+            rolling("call_quantity", 5).alias("call_quantity_5"),
+            rolling("volume_brl", 20).alias("stock_brl_20"),
+            rolling("trades", 20).alias("stock_trades_20"),
+            pl.col("total_oi").diff().over("isin").alias("oi_change"),
+        )
+        .with_columns(
+            pl.when(pl.col("stock_quantity_20") > 0)
+            .then(pl.col("option_quantity_20") / pl.col("stock_quantity_20"))
+            .alias("option_to_stock_volume_20"),
+            pl.when(pl.col("call_quantity_5") > 0)
+            .then(pl.col("put_quantity_5") / pl.col("call_quantity_5"))
+            .alias("put_call_volume_ratio_5"),
+            pl.when(pl.col("oi_all_listed_observed"))
+            .then(((pl.col("put_oi") + 1) / (pl.col("call_oi") + 1)).log())
+            .alias("put_call_oi_log_ratio"),
+            pl.when(pl.col("stock_quantity_20") > 0)
+            .then(pl.col("oi_change") / (pl.col("stock_quantity_20") / 20))
+            .alias("delta_oi_to_volume_1"),
+            pl.lit(None, dtype=pl.Float64).alias("uncovered_call_share"),
+            pl.when(pl.col("stock_trades_20") > 0)
+            .then(pl.col("stock_brl_20") / pl.col("stock_trades_20"))
+            .alias("avg_trade_size_20"),
+        )
+    )
+    if nonregular.height:
+        after = nonregular.select(
+            "source_trade_date",
+            "isin",
+            pl.col("quantity").alias("reported_quantity"),
+            pl.when(pl.col("nonregular_quantity").is_not_null())
+            .then(pl.col("nonregular_quantity"))
+            .otherwise(pl.col("quantity") - pl.col("regular_quantity"))
+            .alias("after_quantity"),
+        )
+        grid = grid.join(after, on=["source_trade_date", "isin"], how="left").sort(
+            "isin", "source_trade_date"
+        )
+        grid = grid.with_columns(
+            pl.when(
+                (pl.col("after_quantity") >= 0)
+                & (pl.col("after_quantity") <= pl.col("reported_quantity"))
+            )
+            .then(pl.col("after_quantity"))
+            .alias("after_quantity")
+        )
+        grid = grid.with_columns(
+            rolling("after_quantity", 5).alias("after_quantity_5"),
+            rolling("reported_quantity", 5).alias("reported_quantity_5"),
+        )
+        grid = grid.with_columns(
+            pl.when(pl.col("reported_quantity_5") > 0)
+            .then(pl.col("after_quantity_5") / pl.col("reported_quantity_5"))
+            .alias("after_hours_volume_share_5")
+        )
+    else:
+        grid = grid.with_columns(
+            pl.lit(None, dtype=pl.Float64).alias("after_hours_volume_share_5")
+        )
+
+    def selected(features):
+        return (
+            grid.select(
+                "date",
+                "isin",
+                *features,
+                *[
+                    pl.when(pl.col(feature).is_not_null())
+                    .then(1)
+                    .alias(feature + "_age_sessions")
+                    for feature in features
+                ],
+            )
+            .filter(pl.any_horizontal(pl.col(name).is_not_null() for name in features))
+            .sort("date", "isin")
+        )
+
+    return selected(
+        [
+            "option_to_stock_volume_20",
+            "put_call_volume_ratio_5",
+            "put_call_oi_log_ratio",
+            "delta_oi_to_volume_1",
+            "uncovered_call_share",
+        ]
+    ), selected(["avg_trade_size_20", "after_hours_volume_share_5"])

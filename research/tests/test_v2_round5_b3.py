@@ -1,14 +1,18 @@
-from datetime import date
+from datetime import date, timedelta
 import io
 import zipfile
 
 import polars as pl
+import numpy as np
 
 from brazil_rv.v2.round5_b3 import (
     RATE_FIELDS,
     stitch_registered_rates,
     parse_options_snapshot,
     cotahist_option_quantities,
+    activity_decision_features,
+    stitch_legacy_balances,
+    lending_decision_features,
 )
 
 
@@ -141,3 +145,157 @@ def test_cotahist_options_use_explicit_dated_isin_not_ticker_prefix(tmp_path):
     )
     assert result["isin"].to_list() == ["BRBBASACNOR3"]
     assert result["call_quantity"].to_list() == [123]
+
+
+def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
+    sessions = [date(2024, 1, 1) + timedelta(days=i) for i in range(31)]
+    cash = pl.DataFrame(
+        {
+            "source_trade_date": sessions,
+            "isin": ["ABC"] * 31,
+            "quantity": [1000.0] * 31,
+            "volume_brl": [10000.0] * 31,
+            "trades": [10.0] * 31,
+        }
+    )
+    volumes = pl.DataFrame(
+        {
+            "source_trade_date": sessions,
+            "isin": ["ABC"] * 31,
+            "call_quantity": [20.0] * 31,
+            "put_quantity": [10.0] * 31,
+        }
+    )
+    nonregular = cash.with_columns(
+        pl.lit(1000.0).alias("regular_quantity"),
+        pl.lit(None, dtype=pl.Float64).alias("nonregular_quantity"),
+    )
+    option, micro = activity_decision_features(
+        cash, volumes, pl.DataFrame(), nonregular, sessions
+    )
+    assert (
+        option.filter(pl.col("date") == sessions[20])[
+            "option_to_stock_volume_20"
+        ].item()
+        == 0.03
+    )
+    assert micro["avg_trade_size_20"].drop_nulls().unique().to_list() == [1000.0]
+    assert micro["after_hours_volume_share_5"].drop_nulls().unique().to_list() == [0.0]
+    assert option["put_call_oi_log_ratio"].null_count() == option.height
+    changed = volumes.with_columns(
+        pl.when(pl.col("source_trade_date") == sessions[22])
+        .then(200.0)
+        .otherwise(pl.col("call_quantity"))
+        .alias("call_quantity")
+    )
+    mutated, _ = activity_decision_features(
+        cash, changed, pl.DataFrame(), nonregular, sessions
+    )
+    assert option.filter(pl.col("date") <= sessions[22]).equals(
+        mutated.filter(pl.col("date") <= sessions[22])
+    )
+    assert (
+        option.filter(pl.col("date") == sessions[23])[
+            "option_to_stock_volume_20"
+        ].item()
+        != mutated.filter(pl.col("date") == sessions[23])[
+            "option_to_stock_volume_20"
+        ].item()
+    )
+    missing, _ = activity_decision_features(
+        cash,
+        volumes.filter(pl.col("source_trade_date") != sessions[22]),
+        pl.DataFrame(),
+        nonregular,
+        sessions,
+    )
+    assert missing.filter(pl.col("date") == sessions[23]).height == 0
+
+
+def test_legacy_balance_identity_requires_exact_position_date_and_preserves_old():
+    days = [date(2020, 1, d) for d in (2, 3, 6, 7)]
+    old = pl.DataFrame(
+        {
+            "source_position_date": [days[2]],
+            "source_report_date": [days[2]],
+            "available_date": [days[3]],
+            "security_id": ["ISIN:ABC"],
+            "source_identity_method": ["old"],
+            "lending_balance_quantity": [30],
+            "lending_balance_brl": [300.0],
+        }
+    )
+    raw = pl.DataFrame(
+        {
+            "position_date": [days[0], days[1]],
+            "report_date": [days[0], days[1]],
+            "ticker": ["OLD3", "OLD3"],
+            "isin": [None, None],
+            "quantity": [10, 20],
+            "balance_brl": [100.0, 200.0],
+        }
+    )
+    cash = pl.DataFrame(
+        {
+            "source_trade_date": [days[0], days[1]],
+            "ticker": ["OLD3", "NEW3"],
+            "isin": ["ABC", "ABC"],
+        }
+    )
+    result, audit = stitch_legacy_balances(old, raw, cash, days[:2], days)
+    assert audit["added_rows"] == 1
+    assert audit["identity_unresolved_rows"] == 1
+    assert result.filter(pl.col("available_date") == days[3]).equals(old)
+    assert (
+        result.filter(pl.col("available_date") == days[1])[
+            "lending_balance_quantity"
+        ].item()
+        == 10
+    )
+
+
+def test_lending_feature_uses_publication_date_and_preserves_reference_age():
+    days = [date(2024, 1, 1) + timedelta(days=i) for i in range(31)]
+    balance = pl.DataFrame(
+        {
+            "source_position_date": [days[20]],
+            "source_report_date": [days[21]],
+            "available_date": [days[22]],
+            "security_id": ["ISIN:ABC"],
+            "source_identity_method": ["fixture"],
+            "lending_balance_quantity": [30],
+            "lending_balance_brl": [300.0],
+        }
+    )
+    rates = pl.DataFrame(
+        {
+            "source_trade_date": days[:30],
+            "available_date": days[1:],
+            "security_id": ["ISIN:ABC"] * 30,
+            "registered_quantity": list(range(1, 31)),
+            "registered_contracts": [1] * 30,
+            "annual_taker_rate": [0.03] * 30,
+        }
+    )
+    result = lending_decision_features(
+        balance, rates, days, ["ABC"], np.full((31, 1), 100.0)
+    )
+    row = result.filter(pl.col("date") == days[22]).row(0, named=True)
+    assert row["loan_balance_to_volume_20"] == 3.0
+    assert row["loan_balance_to_volume_20_age_sessions"] == 2
+    assert row["loan_rate_age_sessions"] == 1
+    assert row["new_loan_volume_surprise"] is not None
+    changed = lending_decision_features(
+        balance.with_columns(pl.lit(600.0).alias("lending_balance_brl")),
+        rates,
+        days,
+        ["ABC"],
+        np.full((31, 1), 100.0),
+    )
+    assert result.filter(pl.col("date") < days[22]).equals(
+        changed.filter(pl.col("date") < days[22])
+    )
+    assert (
+        changed.filter(pl.col("date") == days[22])["loan_balance_to_volume_20"].item()
+        == 6.0
+    )
