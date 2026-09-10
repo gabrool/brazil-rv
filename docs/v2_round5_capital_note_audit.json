@@ -2,11 +2,11 @@
   "status": "Historical source review in progress; no final family/store/screens and no forward capture.",
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "5cbb178ee897a3abba0af032b33d80849554fdbcfb752eb1f27bea3396868c4f"
+    "sha256": "851d2b85d90ce60cab70956814464efb6af24bb9b7e95760735dbeb7a1bb42fc"
   },
   "counts": {
     "audited_unavailable": 7,
-    "reconciled": 52
+    "reconciled": 60
   },
   "accepted_batch": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_batch_20260910T192900Z\\acceptance.json",
@@ -945,6 +945,198 @@
           "11018/11036": "Quantity represents paid-in capital at the filing reference date, received at the unchanged filing receipt. The next-day payment is not backdated into that endpoint."
         }
       }
+    },
+    {
+      "acceptance": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_eight_notes_20260910T214700Z\\acceptance.json",
+        "sha256": "898abb4fa680a4ad067af68804caa79a9c57b5b2e59ff4ae87de4e94b770d6e0"
+      },
+      "review": {
+        "reconciliations": [
+          {
+            "id": "4776",
+            "paid_in_shares": {
+              "ON": 467934646,
+              "PN": 0
+            },
+            "reason": "Own Fibria current 31 December 2010 note24(a) explicitly states fully paid capital of 467,934,646 ordinary shares; the authorized ceiling of 529,624,961 is separate. Own notes23(d) and24(a) describe 309,451 and 33,371 shares retained in treasury, totaling 342,822 and corroborating the original current capital-table quantity in actual share units. The source table's purported paid-in 467,591,824 is already net of that treasury; using it as gross capital would subtract treasury twice. Reconcile gross paid-in and treasury independently, yielding 467,591,824 outstanding. The earlier issuance paragraph's 464,934,646 is not the explicit current endpoint. Each original version supplies its own evidence; no later cancellation or adjacent-version quantity is inferred.",
+            "reference": "2010-12-31",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\4776\\result.json",
+              "sha256": "b87f6e7c1b7a123257126bc3fe4d0e95668f3d1939a7b8f6965abffe50ec365e"
+            },
+            "treasury_shares": {
+              "ON": 342822,
+              "PN": 0
+            },
+            "version": 1,
+            "visually_reviewed_pages": [
+              139,
+              140
+            ]
+          },
+          {
+            "id": "4777",
+            "paid_in_shares": {
+              "ON": 467934646,
+              "PN": 0
+            },
+            "reason": "Own Fibria current 31 December 2010 note24(a) explicitly states fully paid capital of 467,934,646 ordinary shares; the authorized ceiling of 529,624,961 is separate. Own notes23(d) and24(a) describe 309,451 and 33,371 shares retained in treasury, totaling 342,822 and corroborating the original current capital-table quantity in actual share units. The source table's purported paid-in 467,591,824 is already net of that treasury; using it as gross capital would subtract treasury twice. Reconcile gross paid-in and treasury independently, yielding 467,591,824 outstanding. The earlier issuance paragraph's 464,934,646 is not the explicit current endpoint. Each original version supplies its own evidence; no later cancellation or adjacent-version quantity is inferred.",
+            "reference": "2010-12-31",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\4777\\result.json",
+              "sha256": "96fc1bfbb73f9ef041dcc49123e94b9eee397fa28f2fe50bdeebae258ce7065a"
+            },
+            "treasury_shares": {
+              "ON": 342822,
+              "PN": 0
+            },
+            "version": 2,
+            "visually_reviewed_pages": [
+              139,
+              140
+            ]
+          },
+          {
+            "id": "4903",
+            "paid_in_shares": {
+              "ON": 137032734,
+              "PN": 133303934
+            },
+            "reason": "Own GOL note22(a) current 31 December 2010 capital/shareholder table reports 137,032,734 ordinary and 133,303,934 preferred shares; treasury is allocated solely to preferred shares. Own note22(d) gives the exact current treasury balance of 454,425 shares. The 1,119,775 preferred shares described as cancelled in December 2009 are a prior event, not current treasury. Resolve each version's own quantity scale and rounded table precision against these exact current quantities. Receipts and independently audited currency units are unchanged.",
+            "reference": "2010-12-31",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\4903\\result.json",
+              "sha256": "fefaa0bc684204fa72a5615a86c934a8ad8bdc121fc8ba2fdfe06d86a854c011"
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 454425
+            },
+            "version": 2,
+            "visually_reviewed_pages": [
+              108,
+              112
+            ]
+          },
+          {
+            "id": "4904",
+            "paid_in_shares": {
+              "ON": 137032734,
+              "PN": 133303934
+            },
+            "reason": "Own GOL note22(a) current 31 December 2010 capital/shareholder table reports 137,032,734 ordinary and 133,303,934 preferred shares; treasury is allocated solely to preferred shares. Own note22(d) gives the exact current treasury balance of 454,425 shares. The 1,119,775 preferred shares described as cancelled in December 2009 are a prior event, not current treasury. Resolve each version's own quantity scale and rounded table precision against these exact current quantities. Receipts and independently audited currency units are unchanged.",
+            "reference": "2010-12-31",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\4904\\result.json",
+              "sha256": "9af68f8f613804d604acf629ecff5b7c069216f1492d4cbe3d41b1811318807d"
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 454425
+            },
+            "version": 3,
+            "visually_reviewed_pages": [
+              108,
+              112
+            ]
+          },
+          {
+            "id": "5052",
+            "paid_in_shares": {
+              "ON": 66002915,
+              "PN": 0
+            },
+            "reason": "Own Tegma note21(a) states fully paid capital of 66,002,915 ordinary shares; note21(d) explicitly states the 31 December 2010 treasury endpoint of 65,200 ordinary shares. The same original filing's current shareholder table separately labels quantities in units and repeats both exact quantities. The note's R$342 thousand is monetary treasury cost, not a share count. Resolve each version independently, preserving zero preferred shares and yielding 65,937,715 outstanding ordinary shares.",
+            "reference": "2010-12-31",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5052\\result.json",
+              "sha256": "23cb38c68a900a4ccd11dbd3c29f6be4f3777d1b917fd3851e0e653ca30c5ae7"
+            },
+            "treasury_shares": {
+              "ON": 65200,
+              "PN": 0
+            },
+            "version": 1,
+            "visually_reviewed_pages": [
+              109,
+              126
+            ]
+          },
+          {
+            "id": "5078",
+            "paid_in_shares": {
+              "ON": 66002915,
+              "PN": 0
+            },
+            "reason": "Own Tegma note21(a) states fully paid capital of 66,002,915 ordinary shares; note21(d) explicitly states the 31 December 2010 treasury endpoint of 65,200 ordinary shares. The same original filing's current shareholder table separately labels quantities in units and repeats both exact quantities. The note's R$342 thousand is monetary treasury cost, not a share count. Resolve each version independently, preserving zero preferred shares and yielding 65,937,715 outstanding ordinary shares.",
+            "reference": "2010-12-31",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5078\\result.json",
+              "sha256": "d301e2a59bbaa4173150e7add50423fabca37f88ddab76e0276be78ba3ac2ca0"
+            },
+            "treasury_shares": {
+              "ON": 65200,
+              "PN": 0
+            },
+            "version": 2,
+            "visually_reviewed_pages": [
+              109,
+              126
+            ]
+          },
+          {
+            "id": "5789",
+            "paid_in_shares": {
+              "ON": 7463987,
+              "PN": 640513
+            },
+            "reason": "Own Irani note25(a) gives current 31 December 2010 capital of 7,463,987 ordinary and 640,513 preferred shares. The own current management report explicitly gives year-end treasury holdings of 13,502 ordinary and 1,200 preferred shares. These are holdings, not the authorized repurchase limits of 62,356/18,646 or the program's purchases of 7,900/1,200. Original paid-in-capital classification is retained, with independently evidenced exact share units and precision for both classes. Each original version is reconciled from its own source, without copying the other version.",
+            "reference": "2010-12-31",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\5789\\result.json",
+              "sha256": "7c11dd6269f528a77183142b7ed9c9fd3923454e466234fc9e56ad313290f53c"
+            },
+            "treasury_shares": {
+              "ON": 13502,
+              "PN": 1200
+            },
+            "version": 1,
+            "visually_reviewed_pages": [
+              48,
+              93
+            ]
+          },
+          {
+            "id": "5798",
+            "paid_in_shares": {
+              "ON": 7463987,
+              "PN": 640513
+            },
+            "reason": "Own Irani note25(a) gives current 31 December 2010 capital of 7,463,987 ordinary and 640,513 preferred shares. The own current management report explicitly gives year-end treasury holdings of 13,502 ordinary and 1,200 preferred shares. These are holdings, not the authorized repurchase limits of 62,356/18,646 or the program's purchases of 7,900/1,200. Original paid-in-capital classification is retained, with independently evidenced exact share units and precision for both classes. Each original version is reconciled from its own source, without copying the other version.",
+            "reference": "2010-12-31",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5798\\result.json",
+              "sha256": "a8886f374e6b2ce81540d8e249b0f8efac7aeec68efca4de18677c539e205842"
+            },
+            "treasury_shares": {
+              "ON": 13502,
+              "PN": 1200
+            },
+            "version": 2,
+            "visually_reviewed_pages": [
+              48,
+              93
+            ]
+          }
+        ],
+        "reviewed_at_utc": "2026-09-10T21:43:16.756213+00:00",
+        "scope": "Eight independently reviewed original filings. Exact current capital, share-class treasury, and gross-versus-net reconciliation from own evidence; no adjacent-ratio inference."
+      },
+      "review_file": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_eight_notes_20260910T214700Z.json",
+        "sha256": "5d5c3a76c78678d727a1011c84c24307881ac7b9671b2bb84bea5aa28d90c128"
+      }
     }
   ],
   "review_priority": {
@@ -1002,12 +1194,12 @@
       "unresolved": 53,
       "further_automatic_retry": false,
       "note_index": {
-        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\note_passages_post_retry_51fc446.json",
-        "sha256": "33d31be89e9091d553cb7f4fdd74fc82316577100a564c83b435d9dd11fbfd3f"
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\note_passages_73c2894.json",
+        "sha256": "82b212574882c130d4a6517e03f4d46742c5a63026371898daa5b11e8bb1fa58"
       },
       "total_readable_notes": 1299,
       "capital_passage_documents": 1240,
-      "literal_proposal_documents": 64
+      "literal_proposal_documents": 175
     },
     "failure_categories": {
       "cvm_backend_service_unavailable": 41,
