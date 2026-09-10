@@ -70,9 +70,17 @@ def original_fca(document: dict, source: Path) -> dict:
     }.items():
         actual = general.findtext(key, "")
         actual = actual[:10] if "DataReferencia" in key else digits(actual)
-        if actual != value:
+        same = (
+            len(actual) == 14 and actual[:8] == value[:8]
+            if key == "CompanhiaAberta/NumeroCnpjCompanhiaAberta"
+            else actual == value
+        )
+        if not same:
             raise ValueError(f"Nested FCA identity differs at {key}")
     result = {
+        "source_cnpj": digits(
+            general.findtext("CompanhiaAberta/NumeroCnpjCompanhiaAberta", "")
+        ),
         "legal_name": general.findtext(
             "CompanhiaAberta/NomeRazaoSocialCompanhiaAberta"
         ),
@@ -151,14 +159,15 @@ def _general_html(payload: bytes, document: dict) -> dict:
     for row in table.rows:
         for offset in range(0, len(row) - 1, 2):
             fields[normalized(row[offset]).rstrip(":").strip()] = row[offset + 1]
-    if digits(fields.get("c.n.p.j.", "")) != document["cnpj"]:
+    source_cnpj = digits(fields.get("c.n.p.j.", ""))
+    if len(source_cnpj) != 14 or source_cnpj[:8] != document["cnpj"][:8]:
         raise ValueError("Exact FCA HTML CNPJ differs")
     if digits(fields.get("codigo cvm", "")) != document["cvm_code"]:
         raise ValueError("Exact FCA HTML CVM registration differs")
     name, sector = fields.get("nome empresarial"), fields.get("setor de atividade")
     if not name:
         raise ValueError("Exact FCA HTML omits its historical issuer name")
-    return {"legal_name": name, "sector": sector}
+    return {"legal_name": name, "sector": sector, "source_cnpj": source_cnpj}
 
 
 def _generic_html_securities(payload: bytes) -> list[dict]:

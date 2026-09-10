@@ -17,7 +17,9 @@ from brazil_rv.v2.round5_cvm_fca import (
 from brazil_rv.v2.round5_cvm import build_identity, sha256
 
 
-def original_fixture(tmp_path, *, public_id="70793", inner_version=1, modern=False):
+def original_fixture(
+    tmp_path, *, public_id="70793", inner_version=1, modern=False, inner_cnpj=None
+):
     document = dict(
         id="70793",
         cnpj="33592510000154",
@@ -38,6 +40,8 @@ def original_fixture(tmp_path, *, public_id="70793", inner_version=1, modern=Fal
       <Documento><NumeroSequencialDocumento>1294</NumeroSequencialDocumento>
       <DataReferenciaDocumento>2018-01-01T00:00:00</DataReferenciaDocumento>
       <NumeroVersaoDocumento>{inner_version}</NumeroVersaoDocumento></Documento></FormularioCadastral>"""
+    if inner_cnpj is not None:
+        general = general.replace("33.592.510/0001-54", inner_cnpj)
     security = """<ArrayOfValorMobiliario><ValorMobiliario>
       <ValorMobiliarioNegociado><Dominio><CodigoOpcao>1</CodigoOpcao></Dominio>
       <DescricaoOpcaoDominio>Ações</DescricaoOpcaoDominio></ValorMobiliarioNegociado>
@@ -76,6 +80,25 @@ def test_original_generic_equity_is_not_modern_ordinary_label(tmp_path):
     assert row["source_segment_description"] == "Novo Mercado"
     assert row["start"] == "1968-04-01" and row["end"] == "9999-12-31"
     assert row["segment_start"] == "2017-12-22"
+
+
+def test_historical_establishment_preserves_same_legal_issuer(tmp_path):
+    document, path = original_fixture(tmp_path, inner_cnpj="33.592.510/0002-35")
+    metadata = original_fca(document, path)
+    assert metadata["source_cnpj"] == "33592510000235"
+    assert document["cnpj"] == "33592510000154"  # Public header remains exact.
+    general = b"""<table><tr><td>Nome Empresarial:</td><td>VALE S.A.</td></tr>
+      <tr><td>C.N.P.J.:</td><td>33.592.510/0002-35</td><td>Codigo CVM:</td><td>00417-0</td></tr></table>"""
+    assert _general_html(general, document)["source_cnpj"] == "33592510000235"
+    with pytest.raises(ValueError, match="CVM registration"):
+        _general_html(general, {**document, "cvm_code": "004171"})
+
+
+@pytest.mark.parametrize("cnpj", ("33592511/0001-54", "33592510"))
+def test_original_cannot_borrow_a_different_or_incomplete_legal_root(tmp_path, cnpj):
+    document, path = original_fixture(tmp_path, inner_cnpj=cnpj)
+    with pytest.raises(ValueError, match="Nested FCA identity differs"):
+        original_fca(document, path)
 
 
 def test_current_reader_recovers_original_ticker_and_preferred_class_immutably(

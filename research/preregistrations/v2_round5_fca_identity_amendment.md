@@ -86,3 +86,12 @@ The source freeze remains held until original retrieval failures, surviving
 annual converter semantics, sector translations and any newly exposed missing
 financial/capital source versions are audited. Acquisition may run independently;
 no final family or model fit may bypass this source-coverage decision.
+
+The original FCA's full CNPJ is retained as `source_cnpj`. Its establishment
+suffix may differ from the current public envelope while the legal eight-digit
+root and exact CVM registration remain identical, as in Paranapanema FCA359:
+original60398369000126 versus public-header60398369000479. The exact public
+ID/version/reference/envelope identity remains required. The nested original
+and exact-ID HTML use the same legal-root-plus-CVM contract already used by
+the dated identity bridge; a changed legal root, missing CNPJ or changed CVM
+registration still fails. No legal-name alias or issuer-succession merge is added.
