@@ -148,11 +148,16 @@
     ],
     "network_requests": 0,
     "actual_parser_acceptance": {
-      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\identity_recovery_20260910T191700Z\\parser_acceptance.json",
-      "sha256": "728d3de98552e345a271b89d116a3ea5d348f673794321ad22b228c2930083b5"
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\identity_recovery_c8cdadd\\parser_acceptance.json",
+      "sha256": "44404da38fafedf4900e3720840d467e605401e91365a41af70bed6b3c2a76de"
     },
     "rule": "Blank/zero public CNPJ may use the same original Documento.xml only with exact CNPJ/CVM/reference. Public ID/version exact; nonzero conflicts rejected.",
-    "source_admission": "Identity and notes recovered; capital quantities still need review."
+    "source_admission": "Identity and notes recovered; capital quantities still need review.",
+    "clean_code_commit": "c8cdadd",
+    "source_results": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\identity_recovery_c8cdadd\\result.json",
+      "sha256": "10785537e20e6f5d36c9e46f2a9faf994feedd0a0982871bc6b39bb336f9f4b8"
+    }
   },
   "currency_units": {
     "triage": {
