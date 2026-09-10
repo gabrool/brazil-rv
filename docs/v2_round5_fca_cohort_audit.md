@@ -73,3 +73,28 @@ no count, and valuation remains missing where no other independently valid
 known count satisfies the existing class and unit-boundary rules. Unrelated
 accounting features remain usable. The concrete implementation plan is
 `capital_unavailable_disposition_plan.json`; it approves no disposition itself.
+
+The primary 6,768-document acquisition and 2,196-document supplement are now
+complete. The primary batch had 6,761 successes, six unavailable results and one
+interrupted read. A bounded pass reusing original responses recovered Klabin476,
+Globex4929, Fica7099, Bradesco34107 and Tupy48539. Tupy uses the already tested
+historical CNPJ establishment rule; all original failures remain preserved.
+
+Two remaining packages have explicit source dispositions. Light125223 contains
+a single FCA XML encoded as CP1252 despite its UTF-8 declaration. Its two issuer
+blocks, year and version match the public envelope. Literal XML supplies LIGT3,
+the 12December2005 listing date and sector3120. Same-package PDF pages2/4 confirm
+the equity/stock-exchange category. The admitted class remains generic SHARES;
+the export's modern ordinary-share label cannot replace dated B3 class proof.
+No broad numeric-enum decoder was introduced for this single source.
+
+Soma91233's nested registration091243 is a registration applicant. Its own
+securities XML and same-package PDF contain only an expired debenture listing.
+The disposition preserves that source code and emits no equity listing. It does
+not establish an alias to equity registration025011 or invent SOMA3. The exact
+public envelope, original source bytes, reviewed pages and derivation are bound
+in [the completion evidence](v2_round5_fca_completion_audit.json).
+
+The full source preflight is running against clean51fc446. It will reconcile the
+actual new dated cohort and trace capital versions selected at model decisions.
+Acquisition completion does not itself clear the final source/store hold.

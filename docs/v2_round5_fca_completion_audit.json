@@ -1,0 +1,235 @@
+{
+  "inventory": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_run_20260910T163955Z\\inventory.json",
+    "sha256": "4a12b328f82530f5cf6fdfbd03eef4fa301fba9eeb3d90353734a678599b66d6"
+  },
+  "result": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_run_20260910T163955Z\\result.json",
+    "sha256": "0d2641a6b219aa63c985e805ead22625feb3cd4fe52ee7e0d33ca54a4f39cf76"
+  },
+  "original_counts": {
+    "recovered": 6761,
+    "unavailable": 6,
+    "worker_error": 1
+  },
+  "completed_documents": 6768,
+  "exceptions": [
+    {
+      "id": "476",
+      "manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\476\\manifest.json",
+        "sha256": "feebb04df1d078fd82145fe179982409a5a16fa8b6f490e27aa915130a19cc1a"
+      },
+      "metadata_source": "exact_fca_html_generic_equity_only"
+    },
+    {
+      "id": "4929",
+      "manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\4929\\manifest.json",
+        "sha256": "0ff8e429d1ee19fa54bf0be22ef210242fd91bdc0df1f98ecacbc7ed59783c6a"
+      },
+      "metadata_source": "exact_fca_html_generic_equity_only"
+    },
+    {
+      "id": "7099",
+      "manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\7099\\manifest.json",
+        "sha256": "109cd3a6c9229ce57b44b0371ae585585e2a9ac01f4e615099a381604103ebbf"
+      },
+      "metadata_source": "exact_fca_html_generic_equity_only"
+    },
+    {
+      "id": "34107",
+      "manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\34107\\manifest.json",
+        "sha256": "512e72309c0eeb2c14bf8252eeaa334e1c4111cd9540a8c7c74b427dac52cee9"
+      },
+      "metadata_source": "exact_fca_html_generic_equity_only"
+    },
+    {
+      "id": "48539",
+      "manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\48539\\manifest.json",
+        "sha256": "f908856bb91d54341ab967be9d9f4a7a548e8eea98df9c221c45701684dec100"
+      },
+      "metadata_source": "original_fca_xml"
+    },
+    {
+      "id": "91233",
+      "manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\91233\\manifest.json",
+        "sha256": "ba1d9c3b8654a73010d043a564d10bfbcb791a698da5fd6084f4ddcfacb4525e"
+      },
+      "metadata_source": "audited_original_fca_non_equity"
+    },
+    {
+      "id": "125223",
+      "manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\125223\\manifest.json",
+        "sha256": "54ea047e245b218c62bffea953e785144e540f28da681dbf8bc29a7c12ecdb7e"
+      },
+      "metadata_source": "audited_original_fca_flat_xml"
+    }
+  ],
+  "transport_recovery": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\recovery_result.json",
+    "sha256": "6681d978c186b7895f14b7b432b2c4a5af7f3943a6941549365b241efc0337b9"
+  },
+  "remaining_view_recovery": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\remaining_view_recovery.json",
+    "sha256": "be107ca73195f73723a5681c90eb96d653def2a16e9f39314a129b651221e3bc"
+  },
+  "own_source_note_acceptance": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\source_note_acceptance.json",
+    "sha256": "c0e88c2320e82bcbb4b7cb549343cde11bb6b4123a608c53afc3da7031b4a81f"
+  },
+  "complete": true,
+  "meaning": "Every primary queued document has a completed source cache. Full dated-identity/class/sector and consumption acceptance is separate; Soma has no equity identity.",
+  "own_package_reviews": [
+    {
+      "id": "91233",
+      "manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\91233\\manifest.json",
+        "sha256": "ba1d9c3b8654a73010d043a564d10bfbcb791a698da5fd6084f4ddcfacb4525e",
+        "bytes": 2975
+      },
+      "review": {
+        "document": {
+          "id": "91233",
+          "cnpj": "10285590000108",
+          "cvm_code": "025011",
+          "reference": "2020-01-01",
+          "version": 1,
+          "receipt": "2020-07-24",
+          "kind": "FCA",
+          "name": "GRUPO DE MODA SOMA S.A."
+        },
+        "reason": "Own package is a registration applicant and lists only a debenture, as independently reviewed on physical PDF pages2/4. Preserve nested registration091243; it is not accepted as equity registration025011. No equity class, ticker, listing or identity is invented. The public envelope retains exact ID/version/CNPJ/reference. This disposition resolves a non-equity source, not an equity-registration alias.",
+        "metadata": {
+          "legal_name": "GRUPO DE MODA SOMA S.A.",
+          "source_cnpj": "10285590000108",
+          "source_cvm_code": "091243",
+          "sector_code": "1050",
+          "sector": null,
+          "sector_label_source": null,
+          "securities": [],
+          "metadata_source": "audited_original_fca_non_equity"
+        },
+        "sources": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\91233\\attempts\\0001\\original_response_1.bin",
+            "sha256": "b2c08ae8e4f7354b4d22f1a3bdebf717cd456fb54d11dbfad89b75060e2f5b8e",
+            "bytes": 1335333
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\91233\\source.pdf",
+            "sha256": "53a786881432fc86d4839d98e8f3867adeadcf8da93069c2f3f4d7f907f2b282",
+            "bytes": 2429888
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\91233\\source.txt",
+            "sha256": "63e4ff236eb5c4046d9b4925e4b4461e47b632ebed4b35d5b06475dba477f8e9",
+            "bytes": 4427
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\91233\\page_2.png",
+            "sha256": "66b201efc72f260a64b6902708d63ae4e4e1122af5b8610dfcc474a339f04c48",
+            "bytes": 145056
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\91233\\page_4.png",
+            "sha256": "99e28e1a5741da152634739536bb37f7b2b4b0182a2f5249a4b840149fb62eac",
+            "bytes": 39609
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\source_note_producer.py",
+            "sha256": "29eca411b87375f90b76ca361d3104a660e8f21776032363f095e0807ef428d1",
+            "bytes": 8417
+          }
+        ],
+        "reviewed_at_utc": "2026-09-10T22:43:33.885578+00:00"
+      }
+    },
+    {
+      "id": "125223",
+      "manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\125223\\manifest.json",
+        "sha256": "54ea047e245b218c62bffea953e785144e540f28da681dbf8bc29a7c12ecdb7e",
+        "bytes": 3566
+      },
+      "review": {
+        "document": {
+          "id": "125223",
+          "cnpj": "03378521000175",
+          "cvm_code": "019879",
+          "reference": "2023-01-01",
+          "version": 1,
+          "receipt": "2023-04-13",
+          "kind": "FCA",
+          "name": "LIGHT S.A. - EM RECUPERAÇÃO JUDICIAL"
+        },
+        "reason": "Own single-file FCA XML is CP1252 despite its UTF-8 declaration. Both issuer blocks, year and version match the exact public envelope. Own XML supplies LIGT3, original listing12December2005, sector3120 and legal name. Same-package PDF pages2/4 confirm the equity/stock-exchange category and listing. Preserve generic SHARES, so the modern export ordinary-class label never substitutes for dated B3 class evidence. No general numeric-enum mapping or future name/sector-label backfill is introduced.",
+        "metadata": {
+          "legal_name": "LIGHT S.A.",
+          "source_cnpj": "03378521000175",
+          "source_cvm_code": "019879",
+          "sector_code": "3120",
+          "sector": null,
+          "sector_label_source": null,
+          "metadata_source": "audited_original_fca_flat_xml",
+          "securities": [
+            {
+              "ticker": "LIGT3",
+              "class": "SHARES",
+              "preferred_class": "",
+              "unit_composition": "",
+              "start": "2005-12-12",
+              "end": "9999-12-31",
+              "listing_start": "2005-12-12",
+              "listing_end": "9999-12-31",
+              "segment_start": "2005-12-12",
+              "segment_end": "9999-12-31",
+              "source_type_code": "1",
+              "source_market_code": "3",
+              "source_type_authority": "Own flat XML and reviewed same-package PDF establish equity only; exact ON/PN class must be resolved from dated B3 observations."
+            }
+          ]
+        },
+        "sources": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\125223\\attempts\\0001\\original_response_1.bin",
+            "sha256": "f1e02e4a318d9c02d0430bb94c2ab210a40ca8cd736a92efc87c82de227e69c5",
+            "bytes": 1228467
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\125223\\source.pdf",
+            "sha256": "4b919fecca4693eb92ff7d253858fc4d32afa9924fabbc2953a2f759325efe27",
+            "bytes": 2433120
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\125223\\source.txt",
+            "sha256": "990269299f59c6664bbe9d050cf7e063e0ee9fe6e3554ae86f078aa99a102384",
+            "bytes": 4954
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\125223\\page_2.png",
+            "sha256": "38aacd1edfad56c293fec91c2faa10ddc480bf1212e42c9e800fe61c75b7986e",
+            "bytes": 151776
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\125223\\page_4.png",
+            "sha256": "717073029865355a980e39ff530c8b53cf61b72c7629283dbf0c9ddb51f3b444",
+            "bytes": 40072
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_primary_failure_audit_20260910T224100Z\\source_note_producer.py",
+            "sha256": "29eca411b87375f90b76ca361d3104a660e8f21776032363f095e0807ef428d1",
+            "bytes": 8417
+          }
+        ],
+        "reviewed_at_utc": "2026-09-10T22:43:33.894138+00:00"
+      }
+    }
+  ],
+  "interpretation": "Primary acquisition and its seven exceptions are complete. All prior attempts are retained. This is not final dated identity/sector admission or a source freeze; the full source preflight is running."
+}
