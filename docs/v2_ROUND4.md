@@ -1,14 +1,12 @@
 # Round 4: execution and development evidence
 
-Status: A1–A3 is committed in `3d1e95f`. The 126-cell CPU replay and the three-seed
-neural parent on all fourteen folds are complete, accepted, sealed and recovered.
-The first session is closed. All 210 arm fits and nine selection-only fits are now
-complete, as is full screening on the unchanged frozen code. The A4 CPU audit is running. Gabriel's
-2026-09-10 [A4 budget amendment](../research/preregistrations/v2_round4_budget_amendment.md)
-replaces the unexecuted extra three-seed stage with saved-score seed sensitivity.
-No additional neural training or replacement GH200 is planned.
-The original CPU root and historical B6 panels remain immutable. Arm comparisons are
-provisional until the A4 audit completes. Holdout consumers and deployment remain outside this work.
+Status: Round 4 and its fixed A4/A4.1 seed audit are complete. All original
+three-seed fits and full screening are retained; no further training ran.
+Working research parent: **S0**; research designation: **S0**.
+P fails one unchanged seed-sensitivity occupancy bound and is excluded from
+all final choices. All required roots are sealed and fully recovered locally.
+Final instance closure follows commit parity. The development-only limitations
+and post-result amendments below are part of the conclusion.
 
 The controlling [registration](../research/preregistrations/v2_round4.md) and
 [protocol JSON](../research/preregistrations/v2_round4.json) retain all six configurations,
@@ -217,7 +215,7 @@ arrays are omitted from GitHub and remain in the sealed, verified full source.
 
 All six configurations have nonnegative net point estimates. S0 is the provisional
 IC leader and provisional working parent; no economics override qualifies.
-**A4 stability is not yet complete: these are not yet accepted final choices.**
+The final A4 decision below supersedes this original provisional screening label.
 The first complete-score audit stopped at P/F14 with seeds 11/47: long-quintile
 occupancy deviation was 2.061417 against the unchanged 2.0 limit; D1–D5 were zero.
 [A4.1](../research/preregistrations/v2_round4_budget_amendment.md) now disqualifies
@@ -299,3 +297,77 @@ adapter is shared by the omission and final decisions. Forty-two targeted tests
 pass, including actual economics-override and excluded-arm selection through the
 nested-report adapter; it also reproduces the original screening choice on the
 published full report. No score, book, threshold or selection rule changes.
+
+## Final A4 development decision
+
+Working research parent: **S0**. Research designation: **S0**.
+Both choices are stable across all four fixed panels.
+The audit accepts 251 of 252 leave-one-out books and retains one rejected book.
+P is excluded from every final choice after its isolated occupancy failure; its
+reported metrics remain descriptive. The original three-seed headline is unchanged.
+This is the fixed A4/A4.1 development decision, with post-result amendments disclosed;
+it is not six-seed confirmation or independent replication. The overlapping panels
+do not provide new independent confidence levels. No 2025/2026 or deployment read ran.
+
+[The machine-readable audit](v2_round4_seed_audit_report.json) retains all omission
+summary metrics, pairs, informative subsets, fold points, individual-seed IC and
+matched individual-seed IC deltas. Raw daily arrays and population audits remain
+in the complete verified host copy.
+
+| Panel | Eligible arms after engineering exclusions | IC leader | Economics override | Provisional parent |
+| --- | --- | --- | --- | --- |
+| omit 11 | fast_off, S0, H, L, C | S0 | none | S0 |
+| omit 29 | fast_off, S0, H, L, C | S0 | none | S0 |
+| omit 47 | fast_off, S0, H, L, C | S0 | none | S0 |
+| full 11/29/47 | fast_off, S0, H, L, C | S0 | none | S0 |
+
+| Omitted seed | Arm | Primary IC [95%] | Net excess bps/day [95%] |
+| --- | --- | --- | --- |
+| 11 | fast_off | 0.023383 [0.013599, 0.031539] | 4.938 [0.652, 8.801] |
+| 11 | S0 | 0.026464 [0.016822, 0.035002] | 5.194 [1.363, 9.422] |
+| 11 | H | 0.023745 [0.013767, 0.031948] | 4.140 [0.008, 8.266] |
+| 11 | P | 0.023117 [0.012158, 0.032059] | 2.617 [-1.697, 6.339] |
+| 11 | L | 0.023853 [0.013976, 0.032572] | 4.401 [0.034, 8.556] |
+| 11 | C | 0.023818 [0.014231, 0.032682] | 3.998 [-0.302, 7.804] |
+| 29 | fast_off | 0.023321 [0.013513, 0.031419] | 3.399 [-1.126, 7.202] |
+| 29 | S0 | 0.026512 [0.016772, 0.035000] | 5.638 [1.591, 9.622] |
+| 29 | H | 0.023688 [0.013767, 0.031870] | 4.022 [-0.371, 8.018] |
+| 29 | P | 0.022907 [0.011800, 0.031858] | 3.384 [-0.692, 7.100] |
+| 29 | L | 0.023874 [0.013973, 0.032698] | 5.192 [0.749, 9.066] |
+| 29 | C | 0.022955 [0.013463, 0.031651] | 4.440 [0.457, 8.387] |
+| 47 | fast_off | 0.023654 [0.013829, 0.031955] | 5.118 [1.066, 9.362] |
+| 47 | S0 | 0.026649 [0.016906, 0.035275] | 4.599 [0.837, 8.723] |
+| 47 | H | 0.024062 [0.014141, 0.032435] | 4.557 [0.133, 8.715] |
+| 47 | P | 0.022461 [0.011407, 0.031365] | 2.848 [-1.452, 6.508] |
+| 47 | L | 0.023295 [0.013614, 0.031809] | 4.104 [0.077, 8.245] |
+| 47 | C | 0.025006 [0.015308, 0.033780] | 4.731 [0.385, 8.800] |
+
+| Omitted seed | S0 minus fast_off IC [95%] | Net delta bps/day [95%] | Informative IC [95%] |
+| --- | --- | --- | --- |
+| 11 | 0.003081 [0.001557, 0.005107] | 0.256 [-1.041, 2.442] | 0.005187 [0.002042, 0.008827] |
+| 29 | 0.003191 [0.001421, 0.005329] | 2.239 [0.718, 4.445] | 0.007038 [0.003563, 0.011247] |
+| 47 | 0.002995 [0.001306, 0.005010] | -0.519 [-2.518, 1.673] | 0.006164 [0.002676, 0.010046] |
+
+S0's paired IC improvement remains positive in every omission, including its
+informative subset. Its incremental net return is less stable: omitting seed 47
+changes the net point difference to negative, and two of the three net intervals
+span zero. The stable model choice does not establish a stable economic advantage.
+
+| Individual seed | fast_off IC [95%] | S0 IC [95%] | Matched S0 minus fast_off IC [95%] |
+| --- | --- | --- | --- |
+| 11 | 0.023409 [0.013718, 0.031643] | 0.026696 [0.016807, 0.035380] | 0.003286 [0.000941, 0.005737] |
+| 29 | 0.023570 [0.013728, 0.031891] | 0.026563 [0.016959, 0.035195] | 0.002993 [0.001471, 0.005066] |
+| 47 | 0.023012 [0.013263, 0.030941] | 0.026223 [0.016596, 0.034538] | 0.003211 [0.001554, 0.005367] |
+
+Every source fit, all fourteen folds, the original 20-epoch/patience-three
+contract, execution/cost assumptions and 10,000-draw intervals are retained.
+The saved-score audit trains zero models. It replaces the blanket extra
+three-seed stage; evidence about unseen initializations is correspondingly
+weaker. Extra seeds are reserved for a separately registered consequential
+or close decision, without choosing seeds until a desired answer appears.
+
+Complete host recovery covers the original screening, the failed occupancy
+audit (including the first loader stop), the preemptively interrupted reporting
+attempt, and the final audit. Each exact file set and SHA-256 verified before
+instance closure. See [recovery evidence](v2_round4_final_operations.json).
+Exact-instance shutdown and provider absence checks follow the report commit.

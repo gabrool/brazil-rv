@@ -2872,3 +2872,7 @@ The shared adapter now supplies pooled metrics to the unchanged selection rule.
 Forty-two targeted tests pass, including both override outcomes and failed-arm
 exclusion, and the actual full screening report retains S0 after P exclusion.
 This is an implementation repair with no changed score or research decision rule.
+
+## 2026-09-10: Round-4 fixed three-seed development result
+
+A4/A4.1 completes with 251 accepted and 1 rejected leave-one-out books. The working parent is S0; research designation is S0. P is excluded across every final panel after its unchanged occupancy failure. No additional neural fitting ran. Original full screening and all three fixed omissions, individual seed IC, paired intervals and exact failure evidence are published in docs/v2_ROUND4.md and the seed-audit JSON. All four required roots are fully host-recovered and hash-verified. This closes the research calculation as development evidence, with no independent-replication, holdout or deployment claim. Report commit parity and exact-instance shutdown follow.

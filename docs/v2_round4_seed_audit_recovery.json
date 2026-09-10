@@ -1,0 +1,16 @@
+{
+  "archive_sha256": "235b08fc1134694fc2500caf288a89535b05d6e5a0cd98f377182ce8fb954340",
+  "hashes": {
+    "access_audit.json": "8051a4efd2c872fdd7cca89caa5316d45da342314c04d2143db48c7623d0ace4",
+    "artifact_inventory.json": "5d66a1d9f4f10bab89c7a32f61f4b9a9eafeb6b4c92c9771175f21ad9f68703d",
+    "frozen_design.json": "9db6dd6d18432f876b8bebe9ba0e07d1bd681a4aa7a192e8749d0e846b30b5a9",
+    "seed_audit_result.json": "f98b7d7d647844f17805a3f38fa07ed2bba83a59812c408d756b83a99bfba974"
+  },
+  "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_seed_audit_c77ed66_20260910",
+  "physical_file_count": 3885,
+  "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_c77ed66_20260910",
+  "status": "exact_complete_copy_sha256_verified",
+  "total_bytes": 4219203657,
+  "transport_inventory_sha256": "eb70bc6f017efc695f7f068d0065a380893b4ef381a8176419d1834f880ab7ac",
+  "verified_at_utc": "2026-09-10T13:04:53.030646+00:00"
+}

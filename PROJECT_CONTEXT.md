@@ -2063,3 +2063,5 @@ the validity-derived F8–F14 subset; L's informative subset is F9–F14. Every 
 momentum-residual diagnostics. The BOVA11 series' last F4 mark is 2019-08-16, 92 sessions
 before its end; terminal settlement does not repair those missing hedge returns.
 The old CPU seal remains immutable. The proposed 2025-read bar remains unapproved.
+
+Round 4 is now complete under A4/A4.1 as a fixed three-seed development result. The working research parent is `S0`; the research designation is `S0`. P is disqualified across all choice panels after one two-seed F14 book exceeded the unchanged occupancy bound. Original full screening and every fixed seed omission remain reported. No further neural fits were made; all roots are recovered and verified. See [Round 4](docs/v2_ROUND4.md) for exact comparisons, amendments and limits. No new round, 2025/2026 consumer access or deployment is authorized.

@@ -1,0 +1,479 @@
+{
+  "audit": {
+    "accepted_leave_one_out_books": 251,
+    "decision": {
+      "confirmed_six_seed_panel": false,
+      "deployment_authorized": false,
+      "designation_stable": true,
+      "independent_replication": false,
+      "panel_order": [
+        "full_11_29_47",
+        "omit_11",
+        "omit_29",
+        "omit_47"
+      ],
+      "parent_inconclusive": false,
+      "parent_stable": true,
+      "provisional_designations": [
+        "S0",
+        "S0",
+        "S0",
+        "S0"
+      ],
+      "provisional_parents": [
+        "S0",
+        "S0",
+        "S0",
+        "S0"
+      ],
+      "read_2025_authorized": false,
+      "research_designation": "S0",
+      "working_research_parent": "S0"
+    },
+    "decision_traces_after_engineering_exclusions": {
+      "11": {
+        "S0_informative_comparison": {
+          "folds": [
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "F13",
+            "F14"
+          ],
+          "pooled": {
+            "headline_net_excess_bps": {
+              "block_length_sessions": 20,
+              "estimate": -0.6433822588972277,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 874,
+              "fold_boundary_preserved": true,
+              "lower_95": -2.719130503456249,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 2.848701772764751
+            },
+            "primary_neutral_target_ic": {
+              "block_length_sessions": 20,
+              "estimate": 0.005186823042522681,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 804,
+              "fold_boundary_preserved": true,
+              "lower_95": 0.0020424369240844707,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 0.00882667901480907
+            }
+          }
+        },
+        "S0_reason": "simpler_with_no_demonstrated_IC_inferiority",
+        "confirmed_six_seed_panel": false,
+        "designation": null,
+        "economics_basis": "full_common_calendar_with_registered_terminal_settlement; unresolved_is_a_label; not_an_implementability_claim",
+        "economics_override": null,
+        "economics_override_qualifiers": [],
+        "eligible": [
+          "fast_off",
+          "S0",
+          "H",
+          "L",
+          "C"
+        ],
+        "ic_leader": "S0",
+        "in_sample_selection_label": true,
+        "next_round_parent": null,
+        "provisional_parent": "S0",
+        "read_2025_authorized": false,
+        "read_bar_status": "Gabriel_to_set",
+        "retained_parent_eligible": true
+      },
+      "29": {
+        "S0_informative_comparison": {
+          "folds": [
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "F13",
+            "F14"
+          ],
+          "pooled": {
+            "headline_net_excess_bps": {
+              "block_length_sessions": 20,
+              "estimate": 1.8775186133164459,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 874,
+              "fold_boundary_preserved": true,
+              "lower_95": -0.802246204362923,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 5.624713755477497
+            },
+            "primary_neutral_target_ic": {
+              "block_length_sessions": 20,
+              "estimate": 0.007038384869971116,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 804,
+              "fold_boundary_preserved": true,
+              "lower_95": 0.003562966556692497,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 0.011246532892151098
+            }
+          }
+        },
+        "S0_reason": "simpler_with_no_demonstrated_IC_inferiority",
+        "confirmed_six_seed_panel": false,
+        "designation": null,
+        "economics_basis": "full_common_calendar_with_registered_terminal_settlement; unresolved_is_a_label; not_an_implementability_claim",
+        "economics_override": null,
+        "economics_override_qualifiers": [],
+        "eligible": [
+          "fast_off",
+          "S0",
+          "H",
+          "L",
+          "C"
+        ],
+        "ic_leader": "S0",
+        "in_sample_selection_label": true,
+        "next_round_parent": null,
+        "provisional_parent": "S0",
+        "read_2025_authorized": false,
+        "read_bar_status": "Gabriel_to_set",
+        "retained_parent_eligible": true
+      },
+      "47": {
+        "S0_informative_comparison": {
+          "folds": [
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "F13",
+            "F14"
+          ],
+          "pooled": {
+            "headline_net_excess_bps": {
+              "block_length_sessions": 20,
+              "estimate": -0.8098887028889812,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 874,
+              "fold_boundary_preserved": true,
+              "lower_95": -3.666357655985294,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 2.852957926526968
+            },
+            "primary_neutral_target_ic": {
+              "block_length_sessions": 20,
+              "estimate": 0.006163852993870283,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 804,
+              "fold_boundary_preserved": true,
+              "lower_95": 0.0026758437971376903,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 0.010045708389716707
+            }
+          }
+        },
+        "S0_reason": "simpler_with_no_demonstrated_IC_inferiority",
+        "confirmed_six_seed_panel": false,
+        "designation": null,
+        "economics_basis": "full_common_calendar_with_registered_terminal_settlement; unresolved_is_a_label; not_an_implementability_claim",
+        "economics_override": null,
+        "economics_override_qualifiers": [],
+        "eligible": [
+          "fast_off",
+          "S0",
+          "H",
+          "L",
+          "C"
+        ],
+        "ic_leader": "S0",
+        "in_sample_selection_label": true,
+        "next_round_parent": null,
+        "provisional_parent": "S0",
+        "read_2025_authorized": false,
+        "read_bar_status": "Gabriel_to_set",
+        "retained_parent_eligible": true
+      },
+      "full": {
+        "S0_informative_comparison": {
+          "folds": [
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "F13",
+            "F14"
+          ],
+          "pooled": {
+            "headline_net_excess_bps": {
+              "block_length_sessions": 20,
+              "estimate": 1.525985740540112,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 874,
+              "fold_boundary_preserved": true,
+              "lower_95": -0.2852810398211717,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 5.69290996859919
+            },
+            "legacy_primary_ic_1235": {
+              "block_length_sessions": 20,
+              "estimate": 0.003153587473296773,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 839,
+              "fold_boundary_preserved": true,
+              "lower_95": 0.0009786378120889999,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 0.005209620682827953
+            },
+            "persistence_1": {
+              "block_length_sessions": 20,
+              "estimate": -0.026751690711123304,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 867,
+              "fold_boundary_preserved": true,
+              "lower_95": -0.029530062879698723,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -0.025603141051914177
+            },
+            "persistence_5": {
+              "block_length_sessions": 20,
+              "estimate": -0.03597416827827122,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 839,
+              "fold_boundary_preserved": true,
+              "lower_95": -0.0403930112966974,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -0.033450469063699556
+            },
+            "price_return_rank_ic": {
+              "block_length_sessions": 20,
+              "estimate": 0.004236784515921209,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 839,
+              "fold_boundary_preserved": true,
+              "lower_95": 0.0011257602669530581,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 0.008468204818762048
+            },
+            "primary_neutral_target_ic": {
+              "block_length_sessions": 20,
+              "estimate": 0.0061126045502175,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 804,
+              "fold_boundary_preserved": true,
+              "lower_95": 0.0028383709891566457,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 0.009971914711280519
+            },
+            "shareholder_rank_ic": {
+              "block_length_sessions": 20,
+              "estimate": 0.004285959282271934,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 839,
+              "fold_boundary_preserved": true,
+              "lower_95": 0.0012069231709127737,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 0.008549176510750215
+            },
+            "shareholder_return_spread_bps_per_holding_session": {
+              "block_length_sessions": 20,
+              "estimate": 1.6506571647454507,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 839,
+              "fold_boundary_preserved": true,
+              "lower_95": -0.4193452806300956,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": 4.671482859261821
+            },
+            "turnover_fraction_nav": {
+              "block_length_sessions": 20,
+              "estimate": -0.02135537488106948,
+              "finite_bootstrap_replications": 10000,
+              "finite_observations": 874,
+              "fold_boundary_preserved": true,
+              "lower_95": -0.033339352513662664,
+              "possible_observations": 874,
+              "replications": 10000,
+              "undefined_reason": null,
+              "upper_95": -0.00709744575332842
+            }
+          }
+        },
+        "S0_reason": "simpler_with_no_demonstrated_IC_inferiority",
+        "confirmed_six_seed_panel": false,
+        "designation": null,
+        "economics_basis": "full_common_calendar_with_registered_terminal_settlement; unresolved_is_a_label; not_an_implementability_claim",
+        "economics_override": null,
+        "economics_override_qualifiers": [],
+        "eligible": [
+          "fast_off",
+          "S0",
+          "H",
+          "L",
+          "C"
+        ],
+        "ic_leader": "S0",
+        "in_sample_selection_label": true,
+        "next_round_parent": null,
+        "provisional_parent": "S0",
+        "read_2025_authorized": false,
+        "read_bar_status": "Gabriel_to_set",
+        "retained_parent_eligible": true
+      }
+    },
+    "deployment_changed": false,
+    "excluded_arms": [
+      "P"
+    ],
+    "limitation": "post_training_budget_amendment; overlapping_sensitivity_panels; not_independent_replication; time_intervals_conditional_on_fitted_ensemble",
+    "new_training_runs": 0,
+    "official_validation_accessed": false,
+    "omission_result_sha256": {
+      "11": "52b6540a887295ebd25f99f0bab219d4f51df5fbae09d9998a476ed8bd305e01",
+      "29": "defcbf92e83cd1007085cfcd85d35fddd7749041117473bdb06f7188647c7760",
+      "47": "7c61d39640387a64f9f92fd7ea95ddf90f8ecb188445630fda03ca69fa3a4c3b"
+    },
+    "rejected_leave_one_out_books": {
+      "11": {},
+      "29": {
+        "P/F14": "registered book stop: {'borrow_balance': ['mean_quintile_occupancy_deviation_long_above_two']}"
+      },
+      "47": {}
+    },
+    "research_claim": true,
+    "source_screening_sha256": "6ab60e7a3c37d53563c5fd3e140a0f001ce7b43dd9aa5b9a6ca92b5e281bdaee",
+    "status": "three_seed_development_complete",
+    "test_accessed": false,
+    "transfer_chronology_clean": true
+  },
+  "audit_commit": "c77ed66c174191eb78463ecf635521dcd7c007d7",
+  "closed_operational_logs": {
+    "files": [
+      {
+        "bytes": 568,
+        "host_path": "C:\\Users\\gabri\\AppData\\Local\\BrazilRV\\lambda-gh200\\artifacts\\round4-closed-logs-c77ed66\\round4_a4_continue_c77ed66.log",
+        "name": "round4_a4_continue_c77ed66.log",
+        "remote_path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_ops/round4_a4_continue_c77ed66.log",
+        "sha256": "d052951cc42b3eb772bafa63ff528995f694b595a2c5d147651f377bb00dee60"
+      },
+      {
+        "bytes": 256,
+        "host_path": "C:\\Users\\gabri\\AppData\\Local\\BrazilRV\\lambda-gh200\\artifacts\\round4-closed-logs-c77ed66\\round4_audit_pack_c77ed66.log",
+        "name": "round4_audit_pack_c77ed66.log",
+        "remote_path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_ops/round4_audit_pack_c77ed66.log",
+        "sha256": "b63a3bf5bd1e94bb75ec2de4239cca40fecc01f849de666a347f6720a368772c"
+      },
+      {
+        "bytes": 1770,
+        "host_path": "C:\\Users\\gabri\\AppData\\Local\\BrazilRV\\lambda-gh200\\artifacts\\round4-closed-logs-c77ed66\\round4_a4_state_248ec616.json",
+        "name": "round4_a4_state_248ec616.json",
+        "remote_path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_ops/round4_a4_state_248ec616.json",
+        "sha256": "24f8a60cd5606b63d89fe74e7decbcdb46b7c24a3a62e713759574a19928e508"
+      }
+    ],
+    "instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+    "status": "closed_operational_logs_sha256_verified",
+    "verified_at_utc": "2026-09-10T13:04:04.040Z"
+  },
+  "instance_id": "248ec61615fa4c7ba2a58a32ff8fc813",
+  "new_training_runs_after_budget_amendment": 0,
+  "recovered_roots": {
+    "failed_audit": {
+      "archive_sha256": "93671a323d8577a6ee3c1b605434346ddae05fa3f7d2d490568e055764ac6a6b",
+      "hashes": {
+        "access_audit.json": "d9c55a7740beaffb4aa2e2729fe6d6b05c19f5968d8c9f5fecdc2decafe7f866",
+        "artifact_inventory.json": "bf2431e60ab6123b3d91aba93cab408b14eba0fef38124a97afee830f43087e6",
+        "frozen_design.json": "e19a4d75ea24c2e4da9c68201af4c8023b8daddc4f6337e770ae793a4e51668b",
+        "seed_audit_stop.json": "6f6f0b1cce8f34ce912840577429690794b63474368d3a0407ebee99e4a25b3d"
+      },
+      "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_seed_audit_eb5e9ca_20260910",
+      "physical_file_count": 3721,
+      "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_eb5e9ca_20260910",
+      "status": "exact_complete_copy_sha256_verified",
+      "total_bytes": 4105325893,
+      "transport_inventory_sha256": "05306ea573926ba7013536cb4360eff434bafd653b7d1cc30b74e147675bb810",
+      "verified_at_utc": "2026-09-10T12:50:52.179371+00:00"
+    },
+    "interrupted_audit": {
+      "archive_sha256": "b3eddecf6158e24ba52258c4626d7c9e5f09c089ade6185912711d3b338e8e58",
+      "hashes": {
+        "access_audit.json": "96b1c4bcfb5484bb9c95a7b2016a07f5868e01390a721b8a9ceae85c7d23e1f5",
+        "artifact_inventory.json": "b95f98a6995827e8785cea002011075150b8afb65f7b6bdf9998b37afb7b060d",
+        "frozen_design.json": "915176dc4445a38230c590356afcdbf8f2394fa068920c89de79dec9ce9c9692",
+        "seed_audit_stop.json": "856c6aacd913d12314ea02b78a261616fc67b134a614711a8d85f3b215cc6d6d"
+      },
+      "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_seed_audit_714d185_20260910",
+      "physical_file_count": 3237,
+      "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_714d185_20260910",
+      "status": "exact_complete_copy_sha256_verified",
+      "total_bytes": 4078255019,
+      "transport_inventory_sha256": "695cf7d166e1619dca302ceb1947994791325ee28b8bff654a74034e02967153",
+      "verified_at_utc": "2026-09-10T12:58:37.025188+00:00"
+    },
+    "screening": {
+      "archive_sha256": "47229a09a8481e9a7230a57fb538ef2cedf6994d5bdf1bb14207e1e322b3c0e0",
+      "hashes": {
+        "access_audit.json": "36597dcc90c322b3e5d1695d8bb4618ea092268c332e305a9e9712fbdddbf32b",
+        "artifact_inventory.json": "a4c9d098124515594c27acc970b0f3805adc3a36ebbed74e9ddf5be82b284c76",
+        "frozen_design.json": "b1965d5a6c87f9f8adf997a099e385618e42eecbfbcd80a0de55ce652211546b",
+        "screening_result.json": "6ab60e7a3c37d53563c5fd3e140a0f001ce7b43dd9aa5b9a6ca92b5e281bdaee"
+      },
+      "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_arms_3d1e95f_20260910T015000Z",
+      "physical_file_count": 7711,
+      "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_arms_3d1e95f_20260910T015000Z",
+      "status": "exact_complete_copy_sha256_verified",
+      "total_bytes": 5111515026,
+      "transport_inventory_sha256": "1dd9f5ab35b6f40e6d1638958c5b1009566d96a3e5933dcad002d33bd62cc43d",
+      "verified_at_utc": "2026-09-10T12:19:54.065976+00:00"
+    },
+    "seed_audit": {
+      "archive_sha256": "235b08fc1134694fc2500caf288a89535b05d6e5a0cd98f377182ce8fb954340",
+      "hashes": {
+        "access_audit.json": "8051a4efd2c872fdd7cca89caa5316d45da342314c04d2143db48c7623d0ace4",
+        "artifact_inventory.json": "5d66a1d9f4f10bab89c7a32f61f4b9a9eafeb6b4c92c9771175f21ad9f68703d",
+        "frozen_design.json": "9db6dd6d18432f876b8bebe9ba0e07d1bd681a4aa7a192e8749d0e846b30b5a9",
+        "seed_audit_result.json": "f98b7d7d647844f17805a3f38fa07ed2bba83a59812c408d756b83a99bfba974"
+      },
+      "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_seed_audit_c77ed66_20260910",
+      "physical_file_count": 3885,
+      "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_c77ed66_20260910",
+      "status": "exact_complete_copy_sha256_verified",
+      "total_bytes": 4219203657,
+      "transport_inventory_sha256": "eb70bc6f017efc695f7f068d0065a380893b4ef381a8176419d1834f880ab7ac",
+      "verified_at_utc": "2026-09-10T13:04:53.030646+00:00"
+    }
+  },
+  "status": "all_required_roots_recovered_report_published_shutdown_pending",
+  "training_commit": "3d1e95fe52a6ff5549289f546c14482a42aac920"
+}
