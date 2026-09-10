@@ -37,7 +37,7 @@ frozen replay. Original registration bytes are retained.
 
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
-| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection has finished: 1,052 readable originals, nine separately recovered identity cases and 291 transport failures undergoing one bounded retry. The capital disposition file now has 31 reconciled and seven audited unavailable records. | Finish the identified unit discrepancies and actual admitted-cohort coverage, then produce final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
+| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded retry are complete: 1,299 readable originals and 53 unresolved transport failures. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 31 reconciled and seven audited unavailable records. | Finish capital-share unit reviews and actual admitted-cohort coverage, then produce final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
 | Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. The 2,196-document supplement is complete and both failures are recovered: 1,766 original XML and 430 exact HTML metadata sources. The main 6,768-document queue continues. Sector translation uses only evidence received by each decision. | Audit remaining primary failures and actual newly admitted account/capital gaps; accept the revised dated bridge, then rebuild sector, cross-market exposures and lending utilization. Candidate retrieval is not automatic identity admission. Existing archives remain immutable comparators. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Refresh utilization against the accepted new identity/free float, then admit the final store. The other six fields remain exact. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
@@ -142,8 +142,13 @@ CVM service-unavailable error, two report a closed connection and one is an
 incomplete ZIP. They are transport failures, not evidence that
 the historical filings do not exist. One two-worker retry preserves the original
 failures and skips all successful originals and nine cached identity recoveries.
-The retry also covers 38 timeouts, 15 truncated responses and seven disconnected
-responses. Further automatic retry loops are not scheduled.
+The retry also covered 38 timeouts, 15 truncated responses and seven disconnected
+responses. It completed all 291 attempts and recovered 238 originals. Together with
+the initial successes and nine identity recoveries, 1,299 notes are readable. The
+remaining 53 failures comprise 41 identical backend-unavailable responses, four
+timeouts and eight other non-ZIP/incomplete responses. Their source bytes and
+failures are preserved. Further automatic retry loops are not scheduled; retrieval
+failure alone does not change existing quantities, masks or receipts.
 
 The review-priority check finds that1,318 of1,352 flagged documents could enter
 the earlier identity bridge; four lack a link and30 arrived after its final
@@ -160,23 +165,32 @@ originals reparse successfully. The same review identified a separate possible
 currency-unit problem in early statements: some structured sources label units
 while their notes state thousands of reais. Matching own-period account rows
 must establish any correction; the presence of a note heading alone does not.
-This investigation remains a source-freeze hold. See the
+The identified monetary-unit batch is now resolved; capital quantities and final
+identity admission remain source-freeze holds. See the
 [source-note checkpoint](v2_round5_capital_note_audit.json).
 
 Tracing the 47 currency candidates through the actual builder confirms that
 all use recovered HTML accounts, with monetary values matching original XML.
-Fourteen own-document reviews establish thousands of reais despite the source
-unit heading. These include MPX/Eneva, Magnesita, CEG, Excelsior, OSX, Unipar,
-Cemig, Telefonica Brasil, Triunfo, Karsten, Tegma, Telebras and Banese. An explicit correction now binds each filing's complete input
-rows and source evidence before any temporal arithmetic. It preserves receipts,
-periods and independent share counts. Sixty-nine targeted tests pass, including
-first-eligible-decision behavior and changed-version/row/evidence failures.
-The [currency-unit audit](v2_round5_currency_unit_audit.json) records the reviewed
-cases, including eight further accepted filings, and the 33 remaining currency candidates.
-The Triunfo and Banese unit proofs reconcile precise current-period tables to
-explicit million-real amounts in their own management reports; rounded prose does
-not replace the precise table values. No blanket currency rescaling
-or model-input admission is implied by a matching number or a note heading.
+All 47 own-document reviews establish thousands of reais despite the source
+unit heading. Each correction binds the filing's complete input rows and source
+evidence before temporal arithmetic. Re-parsing all 47 original HTML books and
+applying the full disposition file confirms scaling exactly once, with receipts,
+periods, basis and independent share counts preserved. Sixty-nine targeted tests
+passed for the unchanged correction implementation, including first-eligible-
+decision behavior and changed-version/row/evidence failures. The
+[currency-unit audit](v2_round5_currency_unit_audit.json) includes every reviewed
+case, physical pages, source hashes, reasoning and final acceptance.
+
+Own rounded monetary narratives establish units without replacing precise table
+values. IGB's 2011 narrative uses coarse/truncated million-real figures rather
+than exact nearest rounding; its 2013 narrative explicitly says approximately.
+Manguinhos's own 2010 note spells out a monetary capital amount in millions that
+matches the current capital component of its original consolidated balance sheet,
+corroborating its explicit thousand-real presentation. This is currency evidence,
+not a share-quantity inference. Several apparent date mismatches were PDF text
+extraction ordering errors; rendered columns confirmed the existing periods.
+No blanket currency rescaling or final model-input admission follows from a
+matching number, adjacent filing ratio or a note heading alone.
 
 ## Store and model contract
 

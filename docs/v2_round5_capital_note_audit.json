@@ -165,12 +165,12 @@
       "sha256": "acdf479d708a296d0d03eb821aa4ed14640c749c1e2c39093bcbbc3ead13c4bb"
     },
     "example": "MPX/Eneva5553 public and inner currency scale1; parsed consolidated revenue98455 and parent income-256250. Own note pages185-186 declare thousands of reais and include those own-period amounts. Other accounts and cohort coverage still need independent reconciliation.",
-    "status": "Fourteen exact own-source currency corrections accepted;33 currency candidates still open.",
+    "status": "All 47 identified own-source currency discrepancies reconciled; no currency candidate remains in this audit.",
     "current_acceptance": {
-      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_unit_review\\accepted_eight_20260910T204700Z\\acceptance.json",
-      "sha256": "6dd23f81de0f6c3341fc0a9db7227e34d202e0ff66dd8400f5639a4072fe276c"
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_unit_review\\accepted_remaining_six_20260910T211700Z\\acceptance.json",
+      "sha256": "d2971a18bf31b9ff5e3c60245340b7eabfedd06aa17d29b4367d57eb2a52f0cf"
     },
-    "meaning": "The actual HTML account books and XML magnitudes agree, but the reviewed own-period disclosures establish thousand-BRL presentation for14 filings. Clean51fc446 corrects only exact bound rows before temporal arithmetic. Publication dates and independent share quantities remain unchanged."
+    "meaning": "Clean 51fc446 corrects only exact bound monetary account rows before temporal arithmetic. Own-period monetary statements establish the unit; original receipts and independent share quantities remain unchanged. Final capital/identity admission remains pending."
   },
   "targeted_tests": 58,
   "source_freeze_ready": false,
@@ -498,14 +498,16 @@
       "91021"
     ],
     "reason": "Earlier-quarter capital in a current page header and prior-year classes after a sentence ending in a year must not be used as current capital. No consumer uses proposals directly.",
-    "remaining_manual_review": [
+    "remaining_manual_review": [],
+    "reviewed_proposal_ids": [
       "54638",
       "63573",
       "73028",
       "91021",
       "92819",
       "93475"
-    ]
+    ],
+    "scope": "These six earlier proposals were reviewed in the existing accepted batch. Other capital candidates remain under review; an absent proposal is not an unavailable disposition."
   },
   "completed_note_acquisition": {
     "evidence": {
@@ -516,6 +518,33 @@
     "identity_recoveries": 9,
     "transport_retries": 291,
     "retry_workers": 2,
-    "source_ready_is_not_admitted": true
+    "source_ready_is_not_admitted": true,
+    "bounded_retry": {
+      "status": "complete",
+      "result": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\result.json",
+        "sha256": "b4e245ae9039c22a3125b87116e66ad91a52874ae2b0aa4b3b96a26fb0ec31bf"
+      },
+      "failure_audit": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\failure_audit.json",
+        "sha256": "8f3e034369ce7817b2e147f08c249d9c544983feb78063884da5d2de8f9707f6"
+      },
+      "attempted": 291,
+      "recovered": 238,
+      "unresolved": 53,
+      "further_automatic_retry": false,
+      "note_index": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\note_passages_post_retry_51fc446.json",
+        "sha256": "33d31be89e9091d553cb7f4fdd74fc82316577100a564c83b435d9dd11fbfd3f"
+      },
+      "total_readable_notes": 1299,
+      "capital_passage_documents": 1240,
+      "literal_proposal_documents": 64
+    },
+    "failure_categories": {
+      "cvm_backend_service_unavailable": 41,
+      "TimeoutError": 4,
+      "non_zip_or_incomplete_response": 8
+    }
   }
 }
