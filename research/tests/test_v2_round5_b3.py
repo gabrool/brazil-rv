@@ -5,6 +5,8 @@ import zipfile
 import polars as pl
 import numpy as np
 
+from brazil_rv.v2.round5_store import align_family
+from brazil_rv.v2.feature_spec import feature_specs, transform_feature_panel_into
 from brazil_rv.v2.round5_b3 import (
     RATE_FIELDS,
     stitch_registered_rates,
@@ -16,6 +18,37 @@ from brazil_rv.v2.round5_b3 import (
     lending_utilization_features,
     cash_price_report,
 )
+
+
+def _assert_joined_publication_change(before, after, days, first, family):
+    names = [
+        c for c in before.columns
+        if c not in {"date", "isin"} and not c.endswith("_age_sessions")
+    ]
+    peers = tuple(f"PEER_{i}" for i in range(19))
+    frozen = [before.with_columns(pl.lit(isin).alias("isin")) for isin in peers]
+    axis = ("ABC", *peers)
+    left = align_family(pl.concat([before, *frozen]), days, axis, names)
+    right = align_family(pl.concat([after, *frozen]), days, axis, names)
+    for original, mutated in zip(left, right):
+        np.testing.assert_array_equal(original[:first], mutated[:first])
+    assert not np.array_equal(left[0][first], right[0][first])
+    transformed = []
+    for raw, valid, age in (left, right):
+        values, observed = np.zeros_like(raw), np.zeros_like(valid)
+        transform_feature_panel_into(
+            raw, valid, np.ones(raw.shape[:2], dtype=bool),
+            feature_specs("sidecar_" + family, names), values, observed,
+        )
+        age = age.copy()
+        age[~observed] = -1
+        transformed.append((values, observed, age))
+    for original, mutated in zip(*transformed):
+        np.testing.assert_array_equal(original[:first], mutated[:first])
+    assert any(
+        not np.array_equal(original[first], mutated[first])
+        for original, mutated in zip(*transformed)
+    )
 
 
 def test_registered_rates_preserve_old_exclude_zero_and_use_exact_next_session():
@@ -234,6 +267,7 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
     assert option.filter(pl.col("date") <= sessions[22]).equals(
         mutated.filter(pl.col("date") <= sessions[22])
     )
+    _assert_joined_publication_change(option, mutated, sessions, 23, "options")
     assert (
         option.filter(pl.col("date") == sessions[23])[
             "option_to_stock_volume_20"
@@ -292,6 +326,7 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
     assert oi_before.filter(pl.col("date") <= sessions[22]).equals(
         oi_after.filter(pl.col("date") <= sessions[22])
     )
+    _assert_joined_publication_change(oi_before, oi_after, sessions, 23, "options")
     for feature in (
         "put_call_oi_log_ratio",
         "delta_oi_to_volume_1",
@@ -331,6 +366,7 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
     assert partial_oi.filter(pl.col("date") <= sessions[22]).equals(
         partial_after.filter(pl.col("date") <= sessions[22])
     )
+    _assert_joined_publication_change(partial_oi, partial_after, sessions, 23, "options")
     missing_row = partial_after.filter(pl.col("date") == sessions[23]).row(
         0, named=True
     )
@@ -356,6 +392,7 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
     assert micro.filter(pl.col("date") <= sessions[22]).equals(
         micro_after.filter(pl.col("date") <= sessions[22])
     )
+    _assert_joined_publication_change(micro, micro_after, sessions, 23, "microstructure")
     for feature in ("avg_trade_size_20", "after_hours_volume_share_5"):
         assert micro.filter(pl.col("date") == sessions[23])[feature].item() != (
             micro_after.filter(pl.col("date") == sessions[23])[feature].item()
@@ -445,6 +482,7 @@ def test_lending_feature_uses_publication_date_and_preserves_reference_age():
     assert result.filter(pl.col("date") < days[22]).equals(
         changed.filter(pl.col("date") < days[22])
     )
+    _assert_joined_publication_change(result, changed, days, 22, "lending")
     assert (
         changed.filter(pl.col("date") == days[22])["loan_balance_to_volume_20"].item()
         == 6.0
@@ -528,6 +566,7 @@ def test_utilization_uses_received_float_snapshot_and_known_unit_boundaries():
     assert result.filter(pl.col("date") < days[3]).equals(
         changed.filter(pl.col("date") < days[3])
     )
+    _assert_joined_publication_change(result, changed, days, 3, "lending")
     assert changed["utilization_proxy"].to_list() == [0.05, 0.05]
     wrong_issuer, _ = lending_utilization_features(
         balances,
