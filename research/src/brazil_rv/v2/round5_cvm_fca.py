@@ -105,13 +105,27 @@ def original_fca(document: dict, source: Path) -> dict:
         market_type = security.findtext("MercadoNegociacao/DescricaoOpcaoDominio", "")
         if normalized(market_type) != "bolsa":
             continue
+        preferred_description = security.findtext(
+            "ClasseAcao/DescricaoOpcaoDominio", ""
+        ).strip()
+        preferred = (
+            security.findtext("ClasseAcao/SiglaOpcaoDominio", "").strip().upper()
+        )
+        if not preferred:
+            letter = re.fullmatch(
+                r"(?:classe\s+)?([a-z])", normalized(preferred_description)
+            )
+            preferred = letter[1].upper() if letter else preferred_description
         for market in security.findall("MercadosNegociacao/MercadoNegociacao"):
             result["securities"].append(
                 {
-                    "ticker": "",
+                    "ticker": security.findtext("CodigoNegociacao", "").strip().upper(),
                     "class": share_class,
-                    "preferred_class": "",
-                    "unit_composition": "",
+                    "preferred_class": preferred,
+                    "source_class_description": preferred_description,
+                    "unit_composition": security.findtext(
+                        "ComposicaoBDRUnit", ""
+                    ).strip(),
                     "start": _date(market.findtext("DataInicioRelc"), date.min),
                     "end": _date(market.findtext("DataFimRelc"), date.max),
                     "listing_start": _date(market.findtext("DataInicioRelc"), date.min),
@@ -189,13 +203,33 @@ def _generic_html_securities(payload: bytes) -> list[dict]:
 
 
 def load_fca(document: dict, destination: Path) -> dict | None:
-    """Read a hash-verified exact-version snapshot without acquiring anything."""
+    """Parse hash-verified exact-version sources with the current read contract.
+
+    Source manifests remain immutable when extraction is corrected; derived
+    identity manifests bind the parser version that interprets these bytes.
+    """
     manifest = json.loads((destination / "manifest.json").read_text(encoding="utf8"))
     if manifest["document"] != _document_identity(document):
         raise ValueError("FCA cache document identity differs")
     for source in manifest["sources"]:
         if sha256(Path(source["path"])) != source["sha256"]:
             raise ValueError("FCA source hash differs")
+    metadata = manifest["metadata"]
+    if metadata and metadata["metadata_source"] == "original_fca_xml":
+        for source in manifest["sources"]:
+            path = Path(source["path"])
+            if not zipfile.is_zipfile(path):
+                continue
+            try:
+                result = original_fca(document, path)
+            except (ValueError, KeyError, ET.ParseError, zipfile.BadZipFile):
+                continue
+            result.update(
+                sector=metadata["sector"],
+                sector_label_source=metadata["sector_label_source"],
+            )
+            return result
+        raise ValueError("FCA original metadata has no matching source package")
     return manifest["metadata"]
 
 

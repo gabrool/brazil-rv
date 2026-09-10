@@ -1,8 +1,10 @@
 from datetime import date
 import io
+import json
 import urllib.error
 import zipfile
 
+import polars as pl
 import pytest
 
 from brazil_rv.v2.round5_cvm_fca import (
@@ -10,10 +12,12 @@ from brazil_rv.v2.round5_cvm_fca import (
     _generic_html_securities,
     original_fca,
     recover_fca,
+    load_fca,
 )
+from brazil_rv.v2.round5_cvm import build_identity, sha256
 
 
-def original_fixture(tmp_path, *, public_id="70793", inner_version=1):
+def original_fixture(tmp_path, *, public_id="70793", inner_version=1, modern=False):
     document = dict(
         id="70793",
         cnpj="33592510000154",
@@ -44,6 +48,13 @@ def original_fixture(tmp_path, *, public_id="70793", inner_version=1):
       <DataFimNeg>0001-01-01T00:00:00</DataFimNeg>
       <DataInicioRelc>1968-04-01T00:00:00</DataInicioRelc>
       </MercadoNegociacao></MercadosNegociacao></ValorMobiliario></ArrayOfValorMobiliario>"""
+    if modern:
+        security = security.replace("Ações</", "Ações Preferenciais</").replace(
+            "</ValorMobiliario>",
+            "<CodigoNegociacao>VALE5</CodigoNegociacao><ClasseAcao>"
+            "<DescricaoOpcaoDominio>Classe A</DescricaoOpcaoDominio></ClasseAcao>"
+            "<ComposicaoBDRUnit></ComposicaoBDRUnit></ValorMobiliario>",
+        )
     nested = io.BytesIO()
     with zipfile.ZipFile(nested, "w") as archive:
         archive.writestr("FormularioCadastral.xml", general)
@@ -65,6 +76,68 @@ def test_original_generic_equity_is_not_modern_ordinary_label(tmp_path):
     assert row["source_segment_description"] == "Novo Mercado"
     assert row["start"] == "1968-04-01" and row["end"] == "9999-12-31"
     assert row["segment_start"] == "2017-12-22"
+
+
+def test_current_reader_recovers_original_ticker_and_preferred_class_immutably(
+    tmp_path,
+):
+    document, path = original_fixture(tmp_path, modern=True)
+    metadata = original_fca(document, path)
+    row = metadata["securities"][0]
+    assert (row["ticker"], row["class"], row["preferred_class"]) == (
+        "VALE5",
+        "PN",
+        "A",
+    )
+    row["ticker"] = row["preferred_class"] = ""
+    metadata.update(sector="Extração Mineral", sector_label_source="exact_fca_html")
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "document": {
+                    k: str(document[k])
+                    for k in ("id", "cnpj", "cvm_code", "reference", "version", "kind")
+                },
+                "metadata": metadata,
+                "sources": [{"path": str(path), "sha256": sha256(path)}],
+            }
+        ),
+        encoding="utf8",
+    )
+    before = manifest.read_bytes()
+    loaded = load_fca(document, tmp_path)
+    assert loaded["securities"][0]["ticker"] == "VALE5"
+    assert loaded["securities"][0]["preferred_class"] == "A"
+    assert loaded["securities"][0]["source_class_description"] == "Classe A"
+    assert loaded["sector"] == "Extração Mineral"
+    assert manifest.read_bytes() == before
+
+
+def test_original_preferred_class_joins_actual_b3_pna_only(tmp_path):
+    document, path = original_fixture(tmp_path, modern=True)
+    parsed = original_fca(document, path)
+    sessions = [date(2018, 1, day) for day in (2, 3, 4, 5)]
+    securities = parsed["securities"]
+    for row in securities:
+        row["start"], row["end"] = (
+            date.fromisoformat(row["start"]),
+            date.fromisoformat(row["end"]),
+        )
+    document.update(parsed, available_index=2, sector="1030", securities=securities)
+    observations = pl.DataFrame(
+        {
+            "trade_date": [sessions[0]] * 2,
+            "isin": ["PNA", "PNB"],
+            "ticker": ["VALE5", "VALE6"],
+            "issuer_short_name": ["VALE", "VALE"],
+            "security_spec_base": ["PNA", "PNB"],
+        }
+    )
+    identity = build_identity([document], observations, sessions, ["PNA", "PNB"])
+    assert set(identity["isin"]) == {"PNA"}
+    assert set(identity["preferred_class"]) == {"A"}
+    assert identity["date"].min() == sessions[2]
 
 
 @pytest.mark.parametrize("mutation", ["public_id", "inner_version"])
