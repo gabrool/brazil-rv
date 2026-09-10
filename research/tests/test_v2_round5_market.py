@@ -97,3 +97,35 @@ def test_treasury_units_and_next_decision():
         )
         == 1
     )
+
+
+def test_vix_early_close_is_same_day_and_historical_dst_is_respected():
+    rows = parse_fred(
+        b"observation_date,VIXCLS\n2018-11-23,21\n2023-11-24,13\n2024-07-03,12\n",
+        "vix.csv",
+        "VIXCLS",
+    )
+    assert [(r["available_at"].hour, r["available_at"].minute) for r in rows] == [
+        (18, 15),
+        (18, 16),
+        (17, 16),
+    ]
+    # Brazil was on summer time in 2018: 18:15 UTC is 16:15, past decision.
+    assert (
+        first_available_decision(
+            rows[0]["available_at"], [date(2018, 11, 23), date(2018, 11, 26)]
+        )
+        == 1
+    )
+    assert (
+        first_available_decision(
+            rows[1]["available_at"], [date(2023, 11, 24), date(2023, 11, 27)]
+        )
+        == 0
+    )
+    assert (
+        first_available_decision(
+            rows[2]["available_at"], [date(2024, 7, 3), date(2024, 7, 4)]
+        )
+        == 0
+    )

@@ -237,6 +237,95 @@ def _verify_file(path: Path, record: dict) -> None:
         raise ValueError(f"sealed artifact differs: {path}")
 
 
+def summarize_replay(root: Path, treatment: str, output: Path) -> dict:
+    """Pool matched daily economics by strategy, never across overlapping arms."""
+    if output.exists():
+        raise FileExistsError(output)
+    design_path = root / "frozen_design.json"
+    design = rr._read_json(design_path)
+    groups: dict[str, list[dict]] = {}
+    books, sources = [], []
+    affected = set()
+    for book in design["books"]:
+        path = root / treatment / book["key"] / "comparison.json"
+        comparison = rr._read_json(path)
+        actual = sha256_file(path)
+        recorded = path.with_suffix(".json.sha256").read_text().split()[0]
+        if actual != recorded or comparison["frozen_design_sha256"] != sha256_file(
+            design_path
+        ):
+            raise ValueError("replay comparison identity differs")
+        if not comparison["protected_non_ledger_fields_bit_identical"]:
+            raise ValueError("replay has a protected-field change")
+        sources.append({"path": str(path), "sha256": actual})
+        pair = comparison["headline_net_excess_bps"]
+        before, after = (np.asarray(pair[k], np.float64) for k in ("before", "after"))
+        matched = np.isfinite(before) & np.isfinite(after)
+        if before.shape != after.shape:
+            raise ValueError("replay daily economics axes differ")
+        before, after = (
+            np.where(matched, before, np.nan),
+            np.where(matched, after, np.nan),
+        )
+        row = {
+            "key": book["key"],
+            "fold": book["fold"],
+            "historical_status": book["historical_status"],
+            "before_bps_per_day": float(np.nanmean(before)) if matched.any() else None,
+            "after_bps_per_day": float(np.nanmean(after)) if matched.any() else None,
+            "paired_delta_bps_per_day": float(np.nanmean(after - before))
+            if matched.any()
+            else None,
+            "matched_days": int(matched.sum()),
+            "accounting_recomputed": comparison["accounting_recomputed"],
+            "protected_fields_exact": True,
+        }
+        books.append(row)
+        if comparison["accounting_recomputed"]:
+            affected.add(book["fold"])
+        if book["historical_status"] == "accepted":
+            groups.setdefault(book["key"].rsplit("/", 1)[0], []).append(
+                {"fold": book["fold"], "before": before, "after": after}
+            )
+    pooled = {}
+    for key, rows in sorted(groups.items()):
+        rows.sort(key=lambda row: int(row["fold"][1:]))
+        pooled[key] = {
+            "folds": [row["fold"] for row in rows],
+            **{
+                label: rr._folded_bootstrap(
+                    tuple(
+                        row["after"] - row["before"]
+                        if label == "paired_delta"
+                        else row[label]
+                        for row in rows
+                    )
+                )
+                for label in ("before", "after", "paired_delta")
+            },
+        }
+    result = {
+        "schema": "BRAZIL_RV_ROUND5_ECONOMIC_READOUT_V1",
+        "replay_root": str(root),
+        "treatment": treatment,
+        "frozen_design_sha256": sha256_file(design_path),
+        "book_count": len(books),
+        "all_protected_fields_exact": True,
+        "accounting_recomputed_folds": sorted(
+            affected, key=lambda value: int(value[1:])
+        ),
+        "historically_rejected_books_excluded_from_pools": [
+            b["key"] for b in books if b["historical_status"] != "accepted"
+        ],
+        "pooling": "matched resolved daily observations; each strategy pooled separately; original folded block bootstrap; no independent resampling of paired outcomes",
+        "pooled": pooled,
+        "books": books,
+        "comparisons": sources,
+    }
+    write_json_atomic(output, result)
+    return result
+
+
 def enumerate_books(registration: dict) -> tuple[list[dict], dict]:
     """Use sealed inventories rather than recursive directory discovery."""
     books, original_design = [], None

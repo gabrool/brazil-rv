@@ -199,11 +199,7 @@ def parse_fred(payload: bytes, source: str, series: str) -> list[dict]:
         reference = date.fromisoformat(item["observation_date"])
         # Brent's precise assessment timestamp remains a source-audit question.
         # Retrieve it now without pretending a guessed time proves availability.
-        available = (
-            datetime.combine(reference, time(16, 15), NEW_YORK).astimezone(UTC)
-            if series == "VIXCLS"
-            else None
-        )
+        available = vix_close(reference) if series == "VIXCLS" else None
         rows.append(
             {
                 "series": "vix_close" if series == "VIXCLS" else "brent_spot",
@@ -214,6 +210,29 @@ def parse_fred(payload: bytes, source: str, series: str) -> list[dict]:
             }
         )
     return rows
+
+
+def vix_close(reference: date) -> datetime:
+    """Last VIX dissemination, including the historical US half-day schedule.
+
+    Cboe's 2023/2024 holiday notices give 13:15 ET option closes; the 2021-09-27
+    dissemination change adds a minute to the VIX final spot. Both are on the
+    same side of Brazil's decision; keeping the minute avoids a false timestamp.
+    Only observed source dates are processed; no US holiday bar is invented.
+    """
+    early = (
+        (reference.month == 7 and reference.day == 3 and reference.weekday() < 4)
+        or (reference.month == 12 and reference.day == 24 and reference.weekday() < 4)
+        or (
+            reference.month == 11
+            and reference.weekday() == 4
+            and 23 <= reference.day <= 29
+        )
+    )
+    minute = 16 if reference >= date(2021, 9, 27) else 15
+    return datetime.combine(
+        reference, time(13 if early else 16, minute), NEW_YORK
+    ).astimezone(UTC)
 
 
 def acquire(root: Path, *, workers: int = 4) -> dict:

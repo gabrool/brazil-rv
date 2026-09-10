@@ -383,7 +383,242 @@ _REBALANCE_FORMULAS: dict[str, tuple[str, str]] = {
 }
 
 
+# Round-5 producers emit already decision-dated physical quantities. Common
+# states and magnitude channels retain their units: cross-sectional ranking
+# would erase a common scalar, and is not the registered magnitude experiment.
+_ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
+    "filing_is_dfp": ("flag", "latest known financial filing is DFP", "binary"),
+    "sessions_since_material_fact": (
+        "sessions",
+        "sessions since the latest known RAD material fact",
+        "age_sessions",
+    ),
+    "material_fact_count_20": (
+        "count",
+        "received material facts in the inclusive current and prior 19 decisions",
+        "rank_gauss",
+    ),
+    "dividend_announcement_age": (
+        "sessions",
+        "sessions since latest received dividend/JCP/proventos announcement",
+        "age_sessions",
+    ),
+    "offering_or_buyback_flag": (
+        "flag",
+        "an offering or buyback announcement was received in the inclusive last five decisions",
+        "binary",
+    ),
+    "sessions_until_expected_filing": (
+        "signed_sessions",
+        "next fiscal quarter end plus prior-year same-quarter first receipt lag, minus current decision in B3 sessions; negative means overdue expectation",
+        "precomputed_native",
+    ),
+    "log_market_cap": (
+        "log_brl",
+        "log((issued minus treasury shares from known capital composition) times exact t-1 close); only verified single-class issuers; intervening unknown capital actions invalidate",
+        "rank_gauss",
+    ),
+    "book_to_market": (
+        "ratio",
+        "parent book equity from latest received version divided by point-in-time single-class market capitalization",
+        "rank_gauss",
+    ),
+    "earnings_yield_ttm": (
+        "ratio",
+        "parent earnings TTM divided by point-in-time market capitalization; annual DFP directly or known current YTD plus prior DFP minus prior-year YTD",
+        "rank_gauss",
+    ),
+    "gross_profitability": (
+        "ratio",
+        "known TTM gross profit divided by current total assets; financial intermediation result only when source line semantics agree, insurers otherwise masked",
+        "rank_gauss",
+    ),
+    "liabilities_to_assets": (
+        "ratio",
+        "(assets minus total equity including noncontrolling interests) / assets from one known filing and accounting basis",
+        "rank_gauss",
+    ),
+    "accruals_to_assets": (
+        "ratio",
+        "nonfinancial (TTM net income minus operating cash flow) / mean(current and prior-year assets); all received versions and same accounting basis",
+        "rank_gauss",
+    ),
+    "revenue_growth_yoy": (
+        "ratio",
+        "nonfinancial (revenue TTM minus year-earlier revenue TTM) / abs(year-earlier revenue TTM); known YTD bridges",
+        "rank_gauss",
+    ),
+    "sue": (
+        "standardized_accounting_surprise",
+        "standalone-quarter parent earnings minus same quarter prior year, divided by sample deviation of the previous eight consecutive seasonal changes, excluding current surprise",
+        "rank_gauss",
+    ),
+    "statement_age_sessions": (
+        "sessions",
+        "sessions since receipt of the current financial statement",
+        "age_sessions",
+    ),
+    "fundamental_financial_flag": (
+        "flag",
+        "dated CVM sector identifies bank, credit intermediary or insurer",
+        "binary",
+    ),
+    "fundamental_consolidated_flag": (
+        "flag",
+        "consolidated accounting basis selected, otherwise individual",
+        "binary",
+    ),
+    "valuation_single_class_flag": (
+        "flag",
+        "market capitalization supported by one verified issued share class",
+        "binary",
+    ),
+    "utilization_proxy": (
+        "ratio",
+        "published lending share quantity / latest received true free-float share quantity for that class; never total issued shares or guessed unit composition",
+        "rank_gauss",
+    ),
+    "new_loan_volume_surprise": (
+        "standardized_flow",
+        "positive registered share flow minus mean of the strictly prior 20 complete source sessions, divided by their sample deviation; actual accepted source availability",
+        "rank_gauss",
+    ),
+    "option_to_stock_volume_20": (
+        "quantity_ratio",
+        "sum(call plus put underlying-share quantities) / sum(cash share quantity), inclusive 20 source sessions",
+        "rank_gauss",
+    ),
+    "put_call_volume_ratio_5": (
+        "quantity_ratio",
+        "sum put underlying-share quantity / sum call underlying-share quantity, inclusive five source sessions; positive call denominator",
+        "rank_gauss",
+    ),
+    "put_call_oi_log_ratio": (
+        "log_ratio",
+        "log((put OI + 1)/(call OI + 1)) only for a proven complete position snapshot; BVBG.086 opening D is closing D-1, with its actual publication clock",
+        "rank_gauss",
+    ),
+    "delta_oi_to_volume_1": (
+        "quantity_ratio",
+        "one-position-session change in total option OI / mean cash share quantity over 20 sessions ending at the OI position date; no BRL/contract unit mismatch",
+        "rank_gauss",
+    ),
+    "uncovered_call_share": (
+        "fraction_0_1",
+        "published uncovered call OI divided by all call OI, only if the source exposes that split",
+        "bounded_fraction",
+    ),
+    "avg_trade_size_20": (
+        "brl_per_trade",
+        "inclusive 20-source-session sum cash BRL turnover / sum cash trade count",
+        "rank_gauss",
+    ),
+    "after_hours_volume_share_5": (
+        "fraction_0_1",
+        "inclusive five-source-session sum explicitly reported nonregular quantity / sum reported total quantity; total minus regular only when both are observed",
+        "bounded_fraction",
+    ),
+    "return_1_over_vol_20": (
+        "volatility_scaled_log_return",
+        "exact one-session decision-causal wealth log return / Yang-Zhang-20, ending t-1; parent validity; consumer fit-only 0.5/99.5 percentile clipping",
+        "precomputed_native",
+    ),
+    "daily_vol_20_raw": (
+        "daily_decimal_volatility",
+        "decision-causal wealth Yang-Zhang-20 ending t-1, minimum 16/20 and parent validity; consumer fit-only 0.5/99.5 percentile clipping",
+        "precomputed_native",
+    ),
+    "log_traded_value_20": (
+        "log_brl",
+        "log(mean BRL turnover over exact 20 sessions ending t-1); parent activity validity; consumer fit-only 0.5/99.5 percentile clipping",
+        "precomputed_native",
+    ),
+    "economic_beta_60": (
+        "unitless_slope",
+        "causal economic BOVA11 OLS slope, minimum45/60 observed pairs through t-1, Blume0.67*beta+0.33 and original[-1,3] bound; consumer fit-only percentile clipping",
+        "precomputed_native",
+    ),
+    **{
+        f"name_minus_sector_return_{h}": (
+            "log_return",
+            f"name exact {h}-session wealth return through t-1 minus equal-issuer mean of at least two other issuers in its decision-known sector; other own share classes excluded",
+            "rank_gauss",
+        )
+        for h in (5, 21)
+    },
+    "sector_momentum_12_1": (
+        "log_return",
+        "equal-issuer mean of exact wealth return252 minus return21 through t-1 among at least two other issuers in current known sector",
+        "rank_gauss",
+    ),
+    "adr_premium_close": (
+        "price_ratio_minus_one",
+        "ADR close converted with decision-known FX and dated conversion ratio / B3 close minus one; contemporaneous unadjusted price and dated identity required",
+        "precomputed_native",
+    ),
+    "foreign_flow_5": (
+        "billion_brl",
+        "sum of five consecutive published B3 foreign net trading flows in billions of BRL; actual publication version, no stock-lending or balance-of-payments substitution",
+        "precomputed_native",
+    ),
+    "foreign_flow_5_times_log_volume_mean_20": (
+        "billion_brl_times_log_brl",
+        "decision-known foreign_flow_5 times causal unranked log mean BRL turnover20",
+        "precomputed_native",
+    ),
+    "index_pressure": (
+        "weight_percentage_points_times_sessions_per_million_brl",
+        "sum over IBOV/IBXX/SMLL of same-publication signed preview-minus-current weight in percentage points times remaining B3 sessions to effective date divided by prior cash ADV20 in BRL millions; no inferred fund AUM or months-old weight drift",
+        "precomputed_native",
+    ),
+    "index_event_age": (
+        "sessions",
+        "sessions since latest index preview contributing to the compact pressure signal",
+        "age_sessions",
+    ),
+}
+for _factor in (
+    "fx",
+    *(f"rates_br_{n}" for n in (30, 90, 180, 360, 720, 1080)),
+    *(f"rates_us_{n}" for n in ("3m", "2y", "5y", "10y")),
+    "oil",
+    "vix",
+    "iron",
+    "rebar",
+    "hrc",
+    "pulp",
+    "ewz",
+):
+    for _horizon in (1, 5):
+        _ROUND5_FORMULAS[f"shock_{_factor}_{_horizon}"] = (
+            "percentage_points" if _factor.startswith("rates_") else "log_return",
+            f"latest known {_factor} change over {_horizon} exact source sessions; rates in percentage points, other series log changes; source clock and true age, no repeated holiday print or spliced futures price",
+            "precomputed_native",
+        )
+for _factor, _series in {
+    "fx": "fx",
+    "rates_br": "rates_br_360",
+    "rates_us": "rates_us_10y",
+    "oil": "oil",
+    "iron": "iron",
+    "vix": "vix",
+}.items():
+    _ROUND5_FORMULAS[f"exposure_{_factor}"] = (
+        "excess_log_return_per_shock_unit",
+        f"OLS with intercept of wealth log return minus log1p(CDI) on reference-date {_series} shock1 in prior120 B3 sessions, minimum60 public pairs through t-1; leave-one-issuer-out sector empirical-Bayes shrinkage with >=3 peers, otherwise raw OLS; tau2=max(peer slope sample variance-mean estimation variance,0)",
+        "precomputed_native",
+    )
+    for _horizon in (1, 5):
+        _ROUND5_FORMULAS[f"exposure_{_factor}_times_shock_{_horizon}"] = (
+            "log_return",
+            f"exposure_{_factor} times decision-known shock_{_series}_{_horizon}; both inputs valid",
+            "precomputed_native",
+        )
+
+
 def _semantic_definition(family: str, name: str) -> tuple[str, str]:
+    if family.startswith("sidecar_") and name in _ROUND5_FORMULAS:
+        return _ROUND5_FORMULAS[name][:2]
     if family == "slow":
         definitions = _SLOW_FORMULAS
         key = name
@@ -430,7 +665,11 @@ def feature_specs(
         name = str(raw_name)
         units, formula = _semantic_definition(family, name)
         suffix = name.split("_", 1)[1] if family == "sidecar_rebalance" else name
-        if suffix in _BINARY:
+        round5 = _ROUND5_FORMULAS.get(name) if family.startswith("sidecar_") else None
+        if round5 is not None:
+            transform = round5[2]
+            clip = None
+        elif suffix in _BINARY:
             transform: Transform = "binary"
             clip = None
         elif suffix in _BOUNDED_FRACTIONS:
