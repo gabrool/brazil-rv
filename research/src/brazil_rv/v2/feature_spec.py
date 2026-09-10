@@ -415,12 +415,12 @@ _ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
     ),
     "log_market_cap": (
         "log_brl",
-        "log((issued minus treasury shares from known capital composition) times exact t-1 close); only verified single-class issuers; intervening unknown capital actions invalidate",
+        "log(sum of each positive issued class's own non-treasury share count times its separately observed exact t-1 close); explicit own-document quantity scale and complete contemporaneous class mapping required; aggregate preferred counts cannot price subclasses; intervening unknown capital actions invalidate",
         "rank_gauss",
     ),
     "book_to_market": (
         "ratio",
-        "parent book equity from latest received version divided by point-in-time single-class market capitalization",
+        "parent book equity from latest received version divided by point-in-time complete-class issuer market capitalization",
         "rank_gauss",
     ),
     "earnings_yield_ttm": (

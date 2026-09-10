@@ -51,8 +51,18 @@ legal-name association with the existing security; units and later-born
 successors remain excluded. Explicit source classes and observed preferred
 suffixes remain constraints. Exact original numeric sector codes become the
 grouping keys, while display labels are annotations. Annual labels require an
-unambiguous exact-ID code translation. Surviving annual converter semantics and
-unmatched labels remain source-freeze audit items.
+unambiguous exact-ID code translation using only evidence received by that
+decision. A global mapping assembled from all recovered filings was found to
+backfill or erase earlier groups when future evidence was added. The corrected
+session sweep admits mapping evidence at its own receipt and re-resolves active
+label-only filings immediately, without waiting for another issuer filing.
+Later conflicts mask translated groups only from that first eligible decision;
+direct numeric classifications remain available at their own receipt.
+`sector_known_date` and `sector_mapping_id` preserve the separate mapping clock
+and source. Market-observation ages remain unchanged. Actual 24-name transformed
+fixtures test future-only mappings, conflicting mappings and reclassification.
+Surviving annual converter semantics and unmatched labels remain source-freeze
+audit items.
 
 The dated identity uses exchange listing/cancellation, not entry into a trading
 segment. WEG's 1982 listing predates its 2007 Novo Mercado entry; Vale's 1968
