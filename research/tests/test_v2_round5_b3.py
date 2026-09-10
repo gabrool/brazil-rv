@@ -1,8 +1,15 @@
 from datetime import date
+import io
+import zipfile
 
 import polars as pl
 
-from brazil_rv.v2.round5_b3 import RATE_FIELDS, stitch_registered_rates
+from brazil_rv.v2.round5_b3 import (
+    RATE_FIELDS,
+    stitch_registered_rates,
+    parse_options_snapshot,
+    cotahist_option_quantities,
+)
 
 
 def test_registered_rates_preserve_old_exclude_zero_and_use_exact_next_session():
@@ -61,3 +68,76 @@ def test_registered_rates_preserve_old_exclude_zero_and_use_exact_next_session()
         result.filter(pl.col("available_date") < days[2])
     )
     assert changed.row(1, named=True)["annual_taker_rate"] == 0.14
+
+
+def _nested(path, versions):
+    inner = io.BytesIO()
+    with zipfile.ZipFile(inner, "w") as archive:
+        for name, xml in versions.items():
+            archive.writestr(name, xml)
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("nested.zip", inner.getvalue())
+
+
+def test_option_snapshot_uses_known_version_and_keeps_missing_oi_unknown(tmp_path):
+    header = "<Doc><CreDtAndTm>2024-12-27T20:00:00</CreDtAndTm>"
+
+    def instrument(identifier, body):
+        return (
+            f"<Instrm><ActvtyInd>true</ActvtyInd><FinInstrmId><Id>{identifier}</Id></FinInstrmId>"
+            f"<FinInstrmAttrCmon><Mkt>10</Mkt></FinInstrmAttrCmon><InstrmInf>{body}</InstrmInf></Instrm>"
+        )
+
+    cash = instrument("CASH", "<EqtyInf><ISIN>ABC</ISIN></EqtyInf>")
+    option = "<OptnOnEqtsInf><UndrlygInstrmId><Id>CASH</Id></UndrlygInstrmId><OptnTp>CALL</OptnTp><TckrSymb>XYZ</TckrSymb><TradgStartDt>2024-12-01</TradgStartDt><TradgEndDt>2025-01-31</TradgEndDt><XprtnDt>2025-01-31</XprtnDt></OptnOnEqtsInf>"
+    ins = tmp_path / "IN.zip"
+    pr = tmp_path / "PR.zip"
+    _nested(ins, {"in.xml": header + cash + instrument("OPT", option) + "</Doc>"})
+    report = (
+        "<PricRpt><TradDt><Dt>2024-12-27</Dt></TradDt><FinInstrmId><Id>OPT</Id></FinInstrmId>"
+        "<TckrSymb>XYZ</TckrSymb><FinInstrmQty>100</FinInstrmQty>{}</PricRpt>"
+    )
+    _nested(
+        pr,
+        {
+            "before.xml": header + report.format("") + "</Doc>",
+            "future.xml": header.replace("2024-12-27", "2025-01-02")
+            + report.format("<OpnIntrst>999</OpnIntrst>")
+            + "</Doc>",
+        },
+    )
+    rows, _, audit = parse_options_snapshot(
+        ins,
+        pr,
+        date(2024, 12, 27),
+        date(2024, 12, 30),
+        {"ABC": (date(2020, 1, 1), date(2024, 12, 30))},
+    )
+    assert rows["oi_observed_series"].to_list() == [0]
+    assert rows["oi_all_listed_observed"].to_list() == [False]
+    assert audit["pr"]["selected_member"] == "before.xml"
+    assert audit["pr"]["versions_after_decision_excluded"] == 1
+
+
+def test_cotahist_options_use_explicit_dated_isin_not_ticker_prefix(tmp_path):
+    row = list(" " * 245)
+    for start, text in [
+        (0, "01"),
+        (2, "20100104"),
+        (12, "WRONGA20"),
+        (24, "070"),
+        (152, "000000000000000123"),
+        (202, "20100118"),
+        (230, "BRBBASACNOR3"),
+    ]:
+        row[start : start + len(text)] = text
+    path = tmp_path / "COTAHIST_A2010.ZIP"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("COTAHIST_A2010.TXT", "".join(row))
+    result = cotahist_option_quantities(
+        path,
+        {"BRBBASACNOR3": (date(2010, 1, 4), date(2024, 12, 30))},
+        end=date(2024, 12, 30),
+    )
+    assert result["isin"].to_list() == ["BRBBASACNOR3"]
+    assert result["call_quantity"].to_list() == [123]
