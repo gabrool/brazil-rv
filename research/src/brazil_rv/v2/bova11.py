@@ -21,10 +21,9 @@ from .contract import DEVELOPMENT_END, OFFICIAL_START
 BOVA11_ISIN = "BRBOVACTF003"
 BOVA11_TICKER = "BOVA11"
 BOVA11_SECURITY_SPEC = "CI"
-# B3 classifies exchange-traded funds under BDI 14. BOVA11 briefly also
-# appeared under 02 in part of 2019, but 14 is the continuous ETF series and
-# the only classification present throughout the registered 2023--2024 folds.
-BOVA11_BDI_CODE = "14"
+# The same BOVA11 cash-market instrument used BDI 02 from 2019-08-19 to
+# 2019-12-30 and BDI 14 otherwise. BDI is a source classification, not identity.
+BOVA11_BDI_CODES = ("02", "14")
 BOVA11_MARKET_TYPE = 10
 BOVA11_SCHEMA = "BRAZIL_RV_V2_BOVA11_HEDGE_SERIES_V1"
 _RECORD_LENGTH = 245
@@ -65,6 +64,7 @@ def _archive_rows(source: Path) -> tuple[list[tuple[date, float]], dict[str, obj
     header_count = 0
     trailer_count = 0
     malformed_count = 0
+    bdi_row_counts = dict.fromkeys(BOVA11_BDI_CODES, 0)
     with zipfile.ZipFile(source) as archive:
         member = _member(archive, source)
         with archive.open(member) as handle:
@@ -82,7 +82,7 @@ def _archive_rows(source: Path) -> tuple[list[tuple[date, float]], dict[str, obj
                 if line[:2] != b"01":
                     continue
                 if (
-                    _text(line[10:12]) != BOVA11_BDI_CODE
+                    _text(line[10:12]) not in BOVA11_BDI_CODES
                     or _text(line[12:24]) != BOVA11_TICKER
                     or _integer(line[24:27]) != BOVA11_MARKET_TYPE
                     or _text(line[39:49]).split()[0] != BOVA11_SECURITY_SPEC
@@ -94,6 +94,7 @@ def _archive_rows(source: Path) -> tuple[list[tuple[date, float]], dict[str, obj
                 if close <= 0.0 or not np.isfinite(close):
                     raise ValueError(f"BOVA11 has an invalid close in {source}")
                 rows.append((_day(line[2:10]), close))
+                bdi_row_counts[_text(line[10:12])] += 1
     if header_count != 1 or trailer_count != 1 or malformed_count:
         raise ValueError(
             f"malformed COTAHIST archive {source}: headers={header_count}, "
@@ -105,6 +106,7 @@ def _archive_rows(source: Path) -> tuple[list[tuple[date, float]], dict[str, obj
         "sha256": sha256_file(source),
         "txt_member": member,
         "bova11_row_count": len(rows),
+        "bdi_row_counts": bdi_row_counts,
     }
 
 
@@ -159,7 +161,7 @@ def build_bova11_series(
                 "isin": BOVA11_ISIN,
                 "security_spec": BOVA11_SECURITY_SPEC,
                 "market_type": BOVA11_MARKET_TYPE,
-                "bdi_code": BOVA11_BDI_CODE,
+                "bdi_codes": list(BOVA11_BDI_CODES),
             },
             "scope": "development sessions only; 2025/2026 rows are forbidden",
             "first_date": min(by_day).isoformat(),
@@ -199,19 +201,20 @@ def load_bova11_series(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema") != BOVA11_SCHEMA or manifest.get("status") != "complete":
         raise ValueError("BOVA11 manifest contract is invalid")
-    if manifest.get("security") != {
-        "ticker": BOVA11_TICKER,
-        "isin": BOVA11_ISIN,
-        "security_spec": BOVA11_SECURITY_SPEC,
-        "market_type": BOVA11_MARKET_TYPE,
-        "bdi_code": BOVA11_BDI_CODE,
-    }:
+    if any(
+        manifest.get("security", {}).get(key) != value
+        for key, value in {
+            "ticker": BOVA11_TICKER,
+            "isin": BOVA11_ISIN,
+            "security_spec": BOVA11_SECURITY_SPEC,
+            "market_type": BOVA11_MARKET_TYPE,
+        }.items()
+    ):
         raise ValueError("BOVA11 manifest security identity is invalid")
     data_path = root / str(manifest.get("data_file"))
-    if (
-        data_path.stat().st_size != manifest.get("data_bytes")
-        or sha256_file(data_path) != manifest.get("data_sha256")
-    ):
+    if data_path.stat().st_size != manifest.get("data_bytes") or sha256_file(
+        data_path
+    ) != manifest.get("data_sha256"):
         raise ValueError("BOVA11 close series hash or byte count mismatch")
     frame = pl.read_parquet(data_path)
     if frame.columns != ["trade_date", "close_brl"]:
@@ -239,7 +242,9 @@ def load_bova11_series(
         if first_canonical <= day <= last_canonical and day not in date_index
     ]
     if foreign:
-        raise ValueError(f"BOVA11 rows are outside the canonical calendar: {foreign[:5]}")
+        raise ValueError(
+            f"BOVA11 rows are outside the canonical calendar: {foreign[:5]}"
+        )
     aligned = np.full(len(canonical), np.nan, dtype=np.float64)
     for day, value in zip(source_dates, close, strict=True):
         index = date_index.get(day)

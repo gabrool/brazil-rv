@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import zipfile
 from datetime import date
 from pathlib import Path
@@ -64,7 +65,7 @@ def test_bova11_builder_filters_exact_contract_and_loader_hash_verifies(
         2024,
         [
             _quote_line(first, close_cents=10_000),
-            _quote_line(second, close_cents=10_100),
+            _quote_line(second, cod_bdi="02", close_cents=10_100),
             _quote_line(first, isin="BRWRONG00000"),
             _quote_line(first, ticker="WRONG11"),
             _quote_line(first, spec="UNT"),
@@ -82,6 +83,8 @@ def test_bova11_builder_filters_exact_contract_and_loader_hash_verifies(
     )
 
     assert manifest["observation_count"] == 2
+    assert manifest["security"]["bdi_codes"] == ["02", "14"]
+    assert manifest["sources"][0]["bdi_row_counts"] == {"02": 1, "14": 1}
     np.testing.assert_allclose(loaded.close_by_session[:2], [100.0, 101.0])
     assert np.isnan(loaded.close_by_session[2])
     with pytest.raises(ValueError, match="manifest SHA-256 mismatch"):
@@ -101,6 +104,55 @@ def test_bova11_builder_filters_exact_contract_and_loader_hash_verifies(
             expected_manifest_sha256=manifest_sha,
             canonical_dates=[first, second],
         )
+
+
+@pytest.mark.parametrize("second_close", [10_000, 10_100])
+def test_bova11_classifications_cannot_duplicate_or_conflict(
+    tmp_path: Path, second_close: int
+) -> None:
+    day = date(2019, 8, 19)
+    source = tmp_path / "COTAHIST_A2019.ZIP"
+    _archive(
+        source,
+        2019,
+        [
+            _quote_line(day, cod_bdi="14", close_cents=10_000),
+            _quote_line(day, cod_bdi="02", close_cents=second_close),
+        ],
+    )
+    output = tmp_path / "bova"
+    if second_close != 10_000:
+        with pytest.raises(ValueError, match="conflicting BOVA11 close"):
+            build_bova11_series([source], output)
+        assert not output.exists()
+    else:
+        manifest = build_bova11_series([source], output)
+        assert manifest["observation_count"] == 1
+        loaded = load_bova11_series(
+            output,
+            expected_manifest_sha256=sha256_file(output / "manifest.json"),
+            canonical_dates=[day],
+        )
+        np.testing.assert_array_equal(loaded.close_by_session, [100.0])
+
+
+def test_bova11_loader_can_compare_a_sealed_single_classification_artifact(
+    tmp_path: Path,
+) -> None:
+    day = date(2019, 8, 16)
+    source = tmp_path / "COTAHIST_A2019.ZIP"
+    _archive(source, 2019, [_quote_line(day)])
+    output = tmp_path / "bova"
+    manifest = build_bova11_series([source], output)
+    manifest["security"].pop("bdi_codes")
+    manifest["security"]["bdi_code"] = "14"
+    (output / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    loaded = load_bova11_series(
+        output,
+        expected_manifest_sha256=sha256_file(output / "manifest.json"),
+        canonical_dates=[day],
+    )
+    np.testing.assert_array_equal(loaded.close_by_session, [100.0])
 
 
 def test_bova11_builder_refuses_official_period(tmp_path: Path) -> None:
