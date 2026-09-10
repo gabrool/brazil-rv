@@ -119,6 +119,7 @@ def test_expected_filing_age_keeps_oldest_used_first_receipt_after_restatement()
         "group": "structured",
         "reference": date(2022, 12, 31),
         "receipt": datetime(2024, 1, 2, 13),
+        "version": "1",
     }
     latest = {
         **previous,
@@ -126,7 +127,7 @@ def test_expected_filing_age_keeps_oldest_used_first_receipt_after_restatement()
         "reference": date(2023, 9, 30),
         "receipt": datetime(2024, 1, 3, 13),
     }
-    revision = {**previous, "receipt": datetime(2024, 1, 4, 13)}
+    revision = {**previous, "receipt": datetime(2024, 1, 4, 13), "version": "2"}
     baseline = event_features([previous, latest], sessions)
     changed = event_features([previous, latest, revision], sessions)
     assert baseline["sessions_until_expected_filing"].equals(
@@ -134,6 +135,31 @@ def test_expected_filing_age_keeps_oldest_used_first_receipt_after_restatement()
     )
     assert changed["sessions_until_expected_filing_age_sessions"][2] == 2
     assert changed["sessions_since_financial_filing"][2] == 0
+
+
+def test_first_observed_later_version_cannot_supply_original_filing_lag():
+    sessions = [date(2024, 1, d) for d in (2, 3, 4, 5)]
+    earlier_revision = {
+        "cvm_code": "1",
+        "kind": "DFP",
+        "group": "structured",
+        "reference": date(2022, 12, 31),
+        "receipt": datetime(2024, 1, 2, 13),
+        "version": "2",
+    }
+    latest = {
+        **earlier_revision,
+        "kind": "ITR",
+        "reference": date(2023, 9, 30),
+        "receipt": datetime(2024, 1, 3, 13),
+        "version": "1",
+    }
+    unavailable = event_features([earlier_revision, latest], sessions)
+    assert unavailable["sessions_until_expected_filing"].null_count() == len(sessions)
+    assert unavailable["sessions_since_financial_filing"].to_list() == [0, 0, 1, 2]
+    original = {**earlier_revision, "version": "1"}
+    supported = event_features([original, latest], sessions)
+    assert supported["sessions_until_expected_filing"][1] is not None
 
 
 def test_expected_filing_calendar_is_not_clipped_or_backprojected():

@@ -1132,6 +1132,7 @@ def event_features(
         receipts = {}
         receipt_indices = {}
         latest_reference = None
+        latest_reference_source_index = None
         for index, current in enumerate(sessions):
             while cursor < len(source) and source[cursor][0] <= index:
                 event_index, event = source[cursor]
@@ -1144,11 +1145,12 @@ def event_features(
                     )
                     ref = event["reference"]
                     if ref is not None:
-                        receipts.setdefault(ref, event["receipt"].date())
-                        receipt_indices.setdefault(ref, event_index)
-                        latest_reference = (
-                            max(latest_reference, ref) if latest_reference else ref
-                        )
+                        if str(event.get("version", "")) == "1":
+                            receipts.setdefault(ref, event["receipt"].date())
+                            receipt_indices.setdefault(ref, event_index)
+                        if latest_reference is None or ref > latest_reference:
+                            latest_reference = ref
+                            latest_reference_source_index = event_index
                 if event["group"] == "material_fact":
                     last_fact = event_index
                     fact_indices.append(event_index)
@@ -1200,7 +1202,7 @@ def event_features(
             if record["sessions_until_expected_filing"] is not None:
                 prior_reference = year_before(quarter_next(latest_reference))
                 expected_source_index = min(
-                    receipt_indices[latest_reference], receipt_indices[prior_reference]
+                    latest_reference_source_index, receipt_indices[prior_reference]
                 )
                 expectation = quarter_next(latest_reference) + (
                     receipts[prior_reference] - prior_reference
@@ -2241,6 +2243,17 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "receipt_audit": audit,
         "original_recovery": recovery_audit,
         "capital_sources_by_reference_year": dict(capital_coverage),
+        "source_contracts": {
+            name: {
+                "path": str(Path(__file__).parents[3] / "preregistrations" / name),
+                "sha256": sha256(Path(__file__).parents[3] / "preregistrations" / name),
+            }
+            for name in (
+                "v2_round5_data.json",
+                "v2_round5_event_calendar_amendment.md",
+                "v2_round5_valuation_amendment.md",
+            )
+        },
         "source_manifests": {
             name: {"path": str(root / name), "sha256": sha256(root / name)}
             for name in (

@@ -4,9 +4,12 @@ Registered before the final event archive, store build and CPU information scree
 under the user's authorization to choose the recommended source resolution.
 
 The next expected filing date remains the next fiscal quarter end plus the
-issuer's prior-year corresponding **first** receipt lag. Later versions cannot
-rewrite that first receipt. The source age is the oldest first receipt actually
-used to establish the latest known reference and its seasonal expectation;
+issuer's prior-year corresponding **version-1** receipt lag. A first-observed
+later revision inside a truncated historical query is not an original receipt;
+when version 1 is unavailable, the seasonal lag is unavailable. Later versions
+cannot rewrite that first receipt. Actual filing clocks still include all
+restatements. The source age is the oldest publication actually used to establish
+the latest known reference and the prior-year version-1 seasonal expectation;
 an unrelated restatement cannot make the forecast appear newly observed.
 
 The development store ends on 2024-12-30. Its array boundary is not a prediction
