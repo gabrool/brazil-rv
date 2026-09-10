@@ -211,6 +211,31 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
     )
     assert missing.filter(pl.col("date") == sessions[23]).height == 0
 
+    opening_positions = pl.DataFrame(
+        {
+            "source_trade_date": sessions,
+            "isin": ["ABC"] * 31,
+            "listed_series": [2] * 31,
+            "call_oi": [100.0 + i for i in range(31)],
+            "put_oi": [50.0] * 31,
+            "oi_all_listed_observed": [True] * 31,
+        }
+    )
+    changed_cash = cash.with_columns(
+        pl.when(pl.col("source_trade_date") == sessions[22])
+        .then(100000.0)
+        .otherwise(pl.col("quantity"))
+        .alias("quantity")
+    )
+    oi, _ = activity_decision_features(
+        changed_cash, volumes, opening_positions, nonregular, sessions
+    )
+    row = oi.filter(pl.col("date") == sessions[23]).row(0, named=True)
+    assert row["delta_oi_to_volume_1"] == 0.001
+    assert row["delta_oi_to_volume_1_age_sessions"] == 2
+    assert row["put_call_oi_log_ratio_age_sessions"] == 2
+    assert row["option_to_stock_volume_20_age_sessions"] == 1
+
 
 def test_legacy_balance_identity_requires_exact_position_date_and_preserves_old():
     days = [date(2020, 1, d) for d in (2, 3, 6, 7)]

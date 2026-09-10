@@ -613,6 +613,13 @@ def activity_decision_features(
         )
         .with_columns(
             rolling("quantity", 20).alias("stock_quantity_20"),
+            # BVBG.086 OpnIntrst is the opening D / closing D-1 position.
+            # The end-of-day PR publication is consumed at D+1, age two.
+            pl.col("quantity")
+            .shift(1)
+            .rolling_sum(window_size=20, min_samples=20)
+            .over("isin")
+            .alias("oi_stock_quantity_20"),
             rolling("option_quantity", 20).alias("option_quantity_20"),
             rolling("put_quantity", 5).alias("put_quantity_5"),
             rolling("call_quantity", 5).alias("call_quantity_5"),
@@ -630,8 +637,8 @@ def activity_decision_features(
             pl.when(pl.col("oi_all_listed_observed"))
             .then(((pl.col("put_oi") + 1) / (pl.col("call_oi") + 1)).log())
             .alias("put_call_oi_log_ratio"),
-            pl.when(pl.col("stock_quantity_20") > 0)
-            .then(pl.col("oi_change") / (pl.col("stock_quantity_20") / 20))
+            pl.when(pl.col("oi_stock_quantity_20") > 0)
+            .then(pl.col("oi_change") / (pl.col("oi_stock_quantity_20") / 20))
             .alias("delta_oi_to_volume_1"),
             pl.lit(None, dtype=pl.Float64).alias("uncovered_call_share"),
             pl.when(pl.col("stock_trades_20") > 0)
@@ -682,7 +689,11 @@ def activity_decision_features(
                 *features,
                 *[
                     pl.when(pl.col(feature).is_not_null())
-                    .then(1)
+                    .then(
+                        2
+                        if feature in {"put_call_oi_log_ratio", "delta_oi_to_volume_1"}
+                        else 1
+                    )
                     .alias(feature + "_age_sessions")
                     for feature in features
                 ],
