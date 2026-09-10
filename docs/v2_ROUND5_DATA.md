@@ -29,13 +29,34 @@ or invalid cache in the admitted cohort. Exact capital selection plus the
 production valuation helper narrows1,352 original flags to242 currently valued,
 unreviewed filings before the latest batch. Seven more own-filing reviews now
 resolve Nexpe, two Suzano versions, Ser Educacional, Trisul, Eternit and Armac;
-six affected actual valuation windows. There remain236 currently valued flags
-and218 conditional, currently nonvalued flags. No source ratio or failed note
+six affected actual valuation windows. After the subsequent eight-note batch,
+there remain 228 currently valued flags and 218 conditional, currently nonvalued
+flags. No source ratio or failed note
 retrieval determines a value or a mask. Quantity-only corrections preserve class
 support, receipts and source selection, so the already completed source scan is
 reused for this batch. The [capital review evidence](v2_round5_capital_note_audit.json)
 records these cases, including Suzano's40-share internal discrepancy and the
 chosen arithmetically complete own-period shareholder table.
+
+A bounded alternate official ENET notes route recovered thirteen of fourteen
+previously unreadable, currently valued filings. The exact filing's selected
+notes group embeds its PDF; issuer, reference, version and document ID stay
+bound to that public filing. Five scanned PDFs were indexed with local Windows
+OCR, used only to locate pages for visual inspection. All retrieval and OCR jobs
+are complete. Terra Santa document 96075 remains unretrieved; its later version
+cannot supply the missing original note.
+
+Eight recovered notes have now been reviewed. São Martinho, Veste and Azevedo
+DFP2022 version 1 require thousand-fold quantity corrections. Terra Santa
+version 2 supplies an exact count 439 shares below its rounded table. Armac,
+Cambuci, HBR and Azevedo version 2 confirm existing counts. These four
+corrections and four confirmations preserve receipts, class support and source
+selection, so they do not require another whole-source scan. All 91 dispositions
+pass their evidence checks; the primary capital acquisition gate also passes.
+Five recovered notes still need disposition, including Kora, whose monetary
+capital, repurchase authorization and weighted-average EPS shares cannot replace
+current paid-in and treasury quantities. The final source and store acceptance
+remain open.
 
 ## Completed economic correction
 
@@ -65,7 +86,7 @@ frozen replay. Original registration bytes are retained.
 
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
-| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded retry are complete: 1,299 readable originals and 53 unresolved transport failures. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 76 reconciled and seven audited unavailable records. | Finish capital-share unit reviews and actual admitted-cohort coverage, then produce final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
+| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded ZIP retry produced 1,299 readable originals; an alternate exact ENET notes route recovered 13 more. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 84 reconciled and seven audited unavailable records. | Finish the 228 currently valued capital-source flags and final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
 | Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. The 2,196-document supplement is complete and both failures are recovered: 1,766 original XML and 430 exact HTML metadata sources. The main 6,768-document queue and all seven exceptions are complete (6,761 original successes, five bounded recoveries and two own-package dispositions). Sector translation uses only evidence received by each decision. | Audit actual newly admitted account/capital gaps and capital-source selection; accept the revised dated bridge, then rebuild sector, cross-market exposures and lending utilization. Candidate retrieval is not automatic identity admission. Existing archives remain immutable comparators. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Refresh utilization against the accepted new identity/free float, then admit the final store. The other six fields remain exact. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
