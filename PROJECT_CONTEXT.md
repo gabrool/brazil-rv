@@ -179,6 +179,13 @@ value is invalid. The canonical fast branch uses native, compact, separately
 masked five-minute inputs and fresh weights; v1 fast artifacts are isolated as
 contaminated historical diagnostics and are not a clean-path dependency.
 
+Round 5 is a CPU-only data round. Its neural input contract changes enabled
+sidecars to separate decision-row, zero-initialized residual projections, gated
+after cross-sectional pooling. The slow GRU inputs remain unchanged. Invalid
+families preserve S0 forwards, parent gradients and RNG state exactly; no neural
+fit runs in this round. Historical sidecar-concatenation recipes bind their
+original code commits. See the registration and `docs/v2_README.md`.
+
 The store builder streams family-by-family into disk-backed float32 arrays and
 records peak RSS. Intended orders are fixed before later fill observations;
 unfilled exposure, contractual claims, cash, funding, costs, and insolvency are

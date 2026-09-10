@@ -133,7 +133,9 @@ def characteristic_neutral_targets(
         ):
             raise ValueError("neutral-target fallback flags are misaligned")
 
-    def equal_count_groups(values: NDArray[np.float64], count: int) -> NDArray[np.int64]:
+    def equal_count_groups(
+        values: NDArray[np.float64], count: int
+    ) -> NDArray[np.int64]:
         order = np.argsort(values, kind="stable")
         groups = np.empty(values.size, dtype=np.int64)
         groups[order] = np.minimum(
@@ -200,8 +202,10 @@ def characteristic_neutral_targets(
                 # ranking would amplify that irrelevant noise into a material
                 # characteristic exposure.  Canonicalize only ties within a
                 # bound far below the float32 target's stored precision.
-                tie_tolerance = 512.0 * np.finfo(np.float64).eps * max(
-                    1.0, float(np.max(np.abs(y), initial=0.0))
+                tie_tolerance = (
+                    512.0
+                    * np.finfo(np.float64).eps
+                    * max(1.0, float(np.max(np.abs(y), initial=0.0)))
                 )
                 order = np.argsort(residual, kind="stable")
                 sorted_residual = residual[order]
@@ -209,8 +213,7 @@ def characteristic_neutral_targets(
                 for end in range(1, names.size + 1):
                     if (
                         end == names.size
-                        or sorted_residual[end] - sorted_residual[start]
-                        > tie_tolerance
+                        or sorted_residual[end] - sorted_residual[start] > tie_tolerance
                     ):
                         residual[order[start:end]] = sorted_residual[start]
                         start = end
@@ -932,6 +935,18 @@ class StoreStaging:
             raise KeyError(name)
         return np.load(self.array_path(name), mmap_mode=mode, allow_pickle=False)
 
+    def copy_array(self, name: str, source: Path) -> None:
+        """Copy a sealed array's bytes without rematerializing its payload in RAM."""
+        destination = self.array_path(name)
+        if name in self._arrays or destination.exists():
+            raise ValueError(f"duplicate store array: {name}")
+        array = np.load(source, mmap_mode="r", allow_pickle=False)
+        try:
+            self._arrays[name] = (array.shape, array.dtype)
+        finally:
+            close_memmap(array)
+        shutil.copyfile(source, destination)
+
     def create_scratch_array(
         self,
         name: str,
@@ -960,7 +975,7 @@ class StoreStaging:
         feature_names: Mapping[str, Sequence[str]] | None = None,
         sources: Sequence[Mapping[str, object]] = (),
         metadata: Mapping[str, object] | None = None,
-        tables: Mapping[str, pl.DataFrame] | None = None,
+        tables: Mapping[str, pl.DataFrame | Path] | None = None,
         maximum_peak_rss_bytes: int | None = None,
     ) -> Path:
         arrays = {name: self.open_array(name) for name in sorted(self._arrays)}
@@ -972,6 +987,8 @@ class StoreStaging:
                     raise ValueError(
                         "native fast arrays require native_fast_security_mapping"
                     )
+                if isinstance(mapping, Path):
+                    mapping = pl.read_parquet(mapping)
                 _validate_native_fast_mapping(
                     mapping,
                     fast_count=arrays["fast_patch_values"].shape[1],
@@ -1002,11 +1019,18 @@ class StoreStaging:
             if not _SAFE_NAME.fullmatch(name):
                 raise ValueError(f"unsafe table name: {name}")
             path = self.staging / f"{name}.parquet"
-            frame.write_parquet(path)
+            if isinstance(frame, Path):
+                shutil.copyfile(frame, path)
+                source_frame = pl.scan_parquet(path)
+                row_count = source_frame.select(pl.len()).collect().item()
+                columns = source_frame.collect_schema().names()
+            else:
+                frame.write_parquet(path)
+                row_count, columns = frame.height, frame.columns
             table_inventory[name] = {
                 "path": path.name,
-                "rows": frame.height,
-                "columns": frame.columns,
+                "rows": row_count,
+                "columns": columns,
                 "bytes": path.stat().st_size,
                 "sha256": sha256_file(path),
             }

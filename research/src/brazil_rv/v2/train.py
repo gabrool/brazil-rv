@@ -567,6 +567,15 @@ def _model_forward(model: nn.Module, batch: Mapping[str, torch.Tensor]) -> torch
         fast_patch_values=batch.get("fast_patch_values"),
         fast_patch_valid=batch.get("fast_patch_valid"),
         fast_name_index=batch.get("fast_name_index"),
+        sidecars={
+            key.removeprefix("sidecar_").removesuffix("_values"): (
+                value,
+                batch[key.removesuffix("_values") + "_valid"],
+                batch[key.removesuffix("_values") + "_age_sessions"],
+            )
+            for key, value in batch.items()
+            if key.startswith("sidecar_") and key.endswith("_values")
+        },
     )
 
 
@@ -610,7 +619,8 @@ def _to_device(
     transferred = {
         name: value.to(device, non_blocking=device.type == "cuda")
         for name, value in batch.items()
-        if name in names and isinstance(value, torch.Tensor)
+        if (name in names or name.startswith("sidecar_"))
+        and isinstance(value, torch.Tensor)
     }
     present = transferred.get("fast_present")
     if omit_fast_stream and present is not None:
@@ -968,7 +978,6 @@ def _loader_input_payload(
                 ):
                     raise ValueError(f"store lacks ordered sidecar names for {group}")
                 sidecar_names[group] = list(values)
-                slow_names.extend(values)
             if not slow_names or not all(
                 isinstance(value, str) and value for value in slow_names
             ):
@@ -1052,7 +1061,8 @@ def _loader_input_payload(
                     "decision_sample_schema": DECISION_SAMPLE_SCHEMA,
                     "decision_feature_contract": dict(DECISION_FEATURE_CONTRACT),
                     "feature_age_contract": dict(FEATURE_AGE_CONTRACT),
-                    "ordered_slow_and_sidecar_names": slow_names,
+                    "ordered_slow_names": slow_names,
+                    "sidecar_encoding": "masked_zero_initialized_residual_projection",
                     "enabled_sidecar_groups": list(enabled_sidecars),
                     "ordered_sidecar_names": sidecar_names,
                     "ordered_intraday_names": intraday_names,
@@ -1247,6 +1257,9 @@ def model_config_contract(config: ModelConfig) -> dict[str, object]:
     payload.pop("fast_pretrained_checkpoint")
     payload["horizon_loss_weights"] = list(config.horizon_loss_weights)
     payload["selection_horizons"] = list(config.selection_horizons)
+    payload["sidecar_feature_counts"] = [
+        list(item) for item in config.sidecar_feature_counts
+    ]
     return payload
 
 
@@ -1332,9 +1345,14 @@ def _validate_tracked_stage_inputs(
     features = training.get("features")
     if not isinstance(features, Mapping):
         raise ValueError("model input feature provenance is missing")
-    ordered = features.get("ordered_slow_and_sidecar_names")
+    ordered = features.get("ordered_slow_names")
     if not isinstance(ordered, list) or len(ordered) != model_config.slow_feature_count:
         raise ValueError("model slow width differs from ordered store feature names")
+    sidecar_names = features.get("ordered_sidecar_names", {})
+    if dict(model_config.sidecar_feature_counts) != {
+        name: len(values) for name, values in sidecar_names.items()
+    }:
+        raise ValueError("model sidecar widths differ from ordered store feature names")
     current = features.get("ordered_intraday_names")
     if (
         not isinstance(current, list)
@@ -2151,18 +2169,20 @@ def _cli_stage_indices(
     return fit, selection, evaluation, fit_target_window
 
 
-def _cli_feature_count(store_root: Path, sidecars: Sequence[str]) -> int:
+def _cli_feature_counts(
+    store_root: Path, sidecars: Sequence[str]
+) -> tuple[int, tuple[tuple[str, int], ...]]:
     manifest = json.loads((store_root / "manifest.json").read_text(encoding="utf-8"))
     names = manifest.get("feature_names")
     if not isinstance(names, Mapping) or not isinstance(names.get("slow"), list):
         raise ValueError("store manifest lacks ordered slow feature names")
-    count = len(names["slow"])
-    for group in sidecars:
+    counts = []
+    for group in sorted(sidecars):
         values = names.get(f"sidecar_{group}")
         if not isinstance(values, list):
             raise ValueError(f"store lacks the requested sidecar group: {group}")
-        count += len(values)
-    return count
+        counts.append((group, len(values)))
+    return len(names["slow"]), tuple(counts)
 
 
 def _cli_current_feature_count(store_root: Path) -> int:
@@ -2295,8 +2315,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         collate_fn=stage_collate,
     )
     fast_checkpoint = arguments.fast_pretrained_checkpoint
+    slow_count, sidecar_counts = _cli_feature_counts(store_root, sidecars)
     model_config = ModelConfig(
-        slow_feature_count=_cli_feature_count(store_root, sidecars),
+        slow_feature_count=slow_count,
+        sidecar_feature_counts=sidecar_counts,
         current_feature_count=0
         if arguments.slow_only
         else _cli_current_feature_count(store_root),

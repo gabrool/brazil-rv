@@ -42,6 +42,7 @@ class ModelConfig:
     slow_feature_count: int
     current_feature_count: int = len(INTRADAY_DAILY_FEATURES)
     common_state_feature_count: int = 0
+    sidecar_feature_counts: tuple[tuple[str, int], ...] = ()
     slow_lookback: int = DEFAULT_LOOKBACK
     gru_layers: int = 1
     hidden_width: int = 64
@@ -65,6 +66,19 @@ class ModelConfig:
     time_decay_half_life_sessions: float | None = None
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "sidecar_feature_counts",
+            tuple(
+                (str(name), int(count)) for name, count in self.sidecar_feature_counts
+            ),
+        )
+        if len(dict(self.sidecar_feature_counts)) != len(
+            self.sidecar_feature_counts
+        ) or any(not name or count <= 0 for name, count in self.sidecar_feature_counts):
+            raise ValueError(
+                "sidecar families require unique names and positive widths"
+            )
         object.__setattr__(
             self, "horizon_loss_weights", tuple(self.horizon_loss_weights)
         )

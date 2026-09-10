@@ -124,8 +124,9 @@ def arm_config(feature_names: dict, arm: str, *, stage: str = "F") -> ModelConfi
     elif arm == "L":
         config = replace(
             config,
-            slow_feature_count=config.slow_feature_count
-            + len(feature_names["sidecar_lending"]),
+            sidecar_feature_counts=(
+                ("lending", len(feature_names["sidecar_lending"])),
+            ),
         )
     elif arm == "C":
         config = replace(config, common_state_feature_count=3)

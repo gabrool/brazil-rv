@@ -24,6 +24,7 @@ from brazil_rv.v2.corporate_actions import normalize_yfinance_actions
 from brazil_rv.v2.config import ModelConfig
 from brazil_rv.v2.contract import (
     FINETUNE_START,
+    PRETRAIN_END,
     INTRADAY_DAILY_FEATURES,
     TARGET_NEUTRALIZATION_FEATURES,
 )
@@ -969,12 +970,17 @@ def test_dataset_reads_canonical_decision_row_and_external_sparse_fast_mapping(
     np.testing.assert_array_equal(slow_view.dates, dataset.store.dates[[20]])
     assert slow_view.isins == dataset.store.isins
     np.testing.assert_array_equal(slow_view.active[0], sample["active_mask"])
-    np.testing.assert_array_equal(sample["slow_features"][:, -1], slow_view.values[0])
     np.testing.assert_array_equal(
-        sample["slow_feature_mask"][:, -1], slow_view.valid[0]
+        sample["slow_features"][:, -1], slow_view.values[0, :, :2]
     )
     np.testing.assert_array_equal(
-        sample["slow_feature_age_sessions"][:, -1], slow_view.age_sessions[0]
+        sample["sidecar_fundamentals_values"], slow_view.values[0, :, 2:]
+    )
+    np.testing.assert_array_equal(
+        sample["slow_feature_mask"][:, -1], slow_view.valid[0, :, :2]
+    )
+    np.testing.assert_array_equal(
+        sample["slow_feature_age_sessions"][:, -1], slow_view.age_sessions[0, :, :2]
     )
     np.testing.assert_array_equal(sample["current_features"], current_view.values[0])
     np.testing.assert_array_equal(sample["current_feature_mask"], current_view.valid[0])
@@ -982,7 +988,7 @@ def test_dataset_reads_canonical_decision_row_and_external_sparse_fast_mapping(
         sample["current_feature_age_sessions"], current_view.age_sessions[0]
     )
     assert sample["slow_features"][0, -1, 0] == 20.0
-    assert sample["slow_features"][0, -1, 2] == 120.0
+    assert sample["sidecar_fundamentals_values"][0, 0] == 120.0
     assert sample["slow_feature_age_sessions"][0, -1, 0] == 3.0
     assert np.count_nonzero(sample["slow_feature_age_sessions"][0]) == 1
     assert sample["fast_present"].tolist() == [True, False, False]
@@ -1151,6 +1157,7 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
     model = DailyMultiHorizonModel(
         ModelConfig(
             slow_feature_count=int(sample["slow_features"].shape[-1]),
+            sidecar_feature_counts=tuple((group, 1) for group in sorted(sidecars)),
             current_feature_count=int(sample["current_features"].shape[-1]),
             slow_lookback=20,
             fast_encoder_mode="legacy_v1_contaminated",
@@ -1174,6 +1181,14 @@ def test_dataset_boundary_cleans_every_masked_array_before_model_use(
             fast_patch_values=batch["fast_patch_values"],
             fast_patch_valid=batch["fast_patch_valid"],
             fast_name_index=batch["fast_name_index"],
+            sidecars={
+                group: (
+                    batch[f"sidecar_{group}_values"],
+                    batch[f"sidecar_{group}_valid"],
+                    batch[f"sidecar_{group}_age_sessions"],
+                )
+                for group in sidecars
+            },
         )
     assert torch.isfinite(predictions[batch["active_mask"]]).all()
 
@@ -1537,7 +1552,10 @@ def test_causal_history_capability_allows_only_bounded_pre_sample_rows(
 ) -> None:
     dates = [
         value.astype(object)
-        for value in np.arange(np.datetime64("2021-07-01"), np.datetime64("2021-08-17"))
+        for value in np.arange(
+            np.datetime64(FINETUNE_START) - np.timedelta64(46, "D"),
+            np.datetime64(FINETUNE_START) + np.timedelta64(1, "D"),
+        )
         if np.is_busday(value)
     ]
     dates.extend((date(2025, 1, 2), date(2026, 1, 2)))
@@ -1548,7 +1566,7 @@ def test_causal_history_capability_allows_only_bounded_pre_sample_rows(
         arrays={"active": np.ones((len(dates), 1), dtype=np.bool_)},
     )
     sample_index = dates.index(FINETUNE_START)
-    gap_index = dates.index(date(2021, 8, 2))
+    gap_index = sample_index - 10
     store, ledger = open_store_for_samples(
         path,
         [sample_index],
@@ -1727,7 +1745,7 @@ def test_dataset_rejects_dates_outside_its_stage_before_array_open(tmp_path) -> 
     with pytest.raises(ValueError, match="pretrain stage"):
         V2DailyDataset(path, [20], stage="pretrain", lookback=20)
 
-    dates = [date(2021, 7, 30), date(2021, 8, 5), FINETUNE_START]
+    dates = [PRETRAIN_END, PRETRAIN_END + timedelta(days=1), FINETUNE_START]
     path = write_store(
         tmp_path / "stage_windows",
         dates=dates,
@@ -1895,22 +1913,34 @@ def test_store_to_close_uses_m1_units_and_causal_return_validation(tmp_path) -> 
         .alias("close_brl")
     )
     changed_root = build_daily_store(
-        changed_daily, actions, tmp_path / "daily_store_inferred_close_mutation",
-        minute_panel=panel, action_acquisition_audit=successful_audit,
-        session_schedule=_session_schedule(dates), minimum_rank_names=1,
-        store_start=None, action_terms_source="inferred_cotahist_dismes_v1",
+        changed_daily,
+        actions,
+        tmp_path / "daily_store_inferred_close_mutation",
+        minute_panel=panel,
+        action_acquisition_audit=successful_audit,
+        session_schedule=_session_schedule(dates),
+        minimum_rank_names=1,
+        store_start=None,
+        action_terms_source="inferred_cotahist_dismes_v1",
     )
-    assert np.load(inferred_full_root / "action_cash_per_prior_share.npy")[63, 1] != np.load(
-        changed_root / "action_cash_per_prior_share.npy"
-    )[63, 1]
+    assert (
+        np.load(inferred_full_root / "action_cash_per_prior_share.npy")[63, 1]
+        != np.load(changed_root / "action_cash_per_prior_share.npy")[63, 1]
+    )
     for name in (
-        "intraday_values", "intraday_valid", "intraday_age_sessions",
-        "intraday_support_fraction", "intraday_unit_or_unresolved_boundary_mask",
-        "fast_patch_values", "fast_patch_valid", "fast_present",
+        "intraday_values",
+        "intraday_valid",
+        "intraday_age_sessions",
+        "intraday_support_fraction",
+        "intraday_unit_or_unresolved_boundary_mask",
+        "fast_patch_values",
+        "fast_patch_valid",
+        "fast_present",
     ):
         np.testing.assert_array_equal(
             np.load(inferred_full_root / f"{name}.npy")[:64],
-            np.load(changed_root / f"{name}.npy")[:64], err_msg=name,
+            np.load(changed_root / f"{name}.npy")[:64],
+            err_msg=name,
         )
     raw = np.load(root / "target_to_close_raw_log_return.npy")
     valid = np.load(root / "target_to_close_valid.npy")

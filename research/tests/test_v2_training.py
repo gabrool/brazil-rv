@@ -1012,7 +1012,7 @@ def _tracked_input(
             "fast_identity": {},
         },
         "features": {
-            "ordered_slow_and_sidecar_names": [f"slow_{i}" for i in range(32)],
+            "ordered_slow_names": [f"slow_{i}" for i in range(32)],
             "enabled_sidecar_groups": [],
             "ordered_sidecar_names": {},
             "ordered_intraday_names": list(INTRADAY_DAILY_FEATURES),

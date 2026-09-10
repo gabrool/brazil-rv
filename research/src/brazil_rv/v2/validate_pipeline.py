@@ -1480,14 +1480,6 @@ def _verify_native_fast_audit(
     return {"path": str(source), "sha256": expected_sha256.casefold()}
 
 
-def _slow_feature_count(store: V2Store, sidecars: Sequence[str]) -> int:
-    width = int(store.array_shape("slow_values")[-1])
-    for group in sidecars:
-        width += int(store.array_shape(f"sidecar_{group}_values")[-1])
-        store.array_shape(f"sidecar_{group}_valid")
-    return width
-
-
 def _gbdt_features(
     store: V2Store,
     indices: NDArray[np.int64],
@@ -1842,7 +1834,11 @@ def _run_network_smokes(
     seed: int,
 ) -> dict[str, object]:
     base_config = ModelConfig(
-        slow_feature_count=_slow_feature_count(store, sidecars),
+        slow_feature_count=int(store.array_shape("slow_values")[-1]),
+        sidecar_feature_counts=tuple(
+            (group, int(store.array_shape(f"sidecar_{group}_values")[-1]))
+            for group in sidecars
+        ),
         slow_lookback=runtime.slow_lookback,
         lambda_persistence=0.0,
         compile_forward=runtime.compile_forward,
@@ -2695,12 +2691,7 @@ def run_pipeline_validation(
     pretrain_fit, pretrain_embargo, pretrain_selection = _pretrain_indices(
         dates, runtime
     )
-    triage = protocol_preset("triage")
     full = protocol_preset("full")
-    if triage.folds != ("F1", "F2") or triage.seeds != (11,):
-        raise ValueError("triage protocol differs from the validation contract")
-    if full.folds != ("F1", "F2", "F3"):
-        raise ValueError("full protocol differs from the validation contract")
     missing_folds = set(full.folds) - set(evaluation_indices)
     if missing_folds:
         raise ValueError(

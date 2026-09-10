@@ -154,7 +154,7 @@ Masks are independent contracts, not interchangeable readiness flags:
 
 | Store/sample mask | Contract |
 |---|---|
-| `slow_valid` / `slow_feature_mask` | validity of each slow or enabled-sidecar value |
+| `slow_valid` / `slow_feature_mask` | validity of each slow value |
 | `slow_age_sessions` / `slow_feature_age_sessions` | exchange sessions since the most recent usable source observation; `-1` means unknown/left-censored |
 | `slow_timestep_valid` / `slow_history_mask` | a real elapsed per-name calendar timestep versus left padding; a genuine missing market observation remains a timestep |
 | `intraday_valid` / `current_feature_mask` | validity of each current scalar value |
@@ -315,6 +315,17 @@ or sector embedding:
    presence flag, then project to width 128.
 5. Apply two residual LayerNorm/SwiGLU blocks and emit D1/D2/D3/D5/D10 plus
    to-close scores.
+
+From Round 5, enabled sidecar families use separate decision-row inputs. Each
+has one zero-initialized, bias-free residual projection of its values, validity
+bits and bounded source ages into the fused representation before the trunk.
+The projection is gated by per-name family validity after cross-sectional
+pooling. Invalid families contribute exactly zero and receive no gradient from
+invalid rows. They do not expand or alter the slow GRU input. Construction
+consumes no random numbers, preserving S0 initialization and dropout; fixtures
+verify exact parent batches, forward values and parent gradients. Historical
+Round-4 sidecar concatenation recipes remain reproducible at their sealed code
+commits. No Round-5 neural fit is authorized.
 
 The daily objective is the equal mean of five per-date soft-Spearman horizon
 losses. Persistence is optional. The to-close term contributes nothing at its

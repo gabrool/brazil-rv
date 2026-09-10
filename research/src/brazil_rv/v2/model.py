@@ -314,6 +314,14 @@ class DailyMultiHorizonModel(nn.Module):
                 config.fast_pretrained_checkpoint,
                 expected_sha256=config.fast_pretrained_sha256,
             )
+        # Construct after the parent, using zeros directly: no RNG consumption,
+        # so both its initialization and subsequent dropout stream stay exact.
+        self.sidecar_projections = nn.ParameterDict(
+            {
+                name: nn.Parameter(torch.zeros(config.fusion_width, 3 * count))
+                for name, count in config.sidecar_feature_counts
+            }
+        )
 
     def _slow_states(
         self,
@@ -663,6 +671,8 @@ class DailyMultiHorizonModel(nn.Module):
         fast_patch_values: torch.Tensor | None = None,
         fast_patch_valid: torch.Tensor | None = None,
         fast_name_index: torch.Tensor | None = None,
+        sidecars: Mapping[str, tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
+        | None = None,
     ) -> torch.Tensor:
         if active_mask.shape != slow_features.shape[:2]:
             raise ValueError("active_mask is misaligned with the model rows")
@@ -780,7 +790,33 @@ class DailyMultiHorizonModel(nn.Module):
                 )
             common = common_state_features[:, None, :].expand(-1, slow.shape[1], -1)
             fused = torch.cat((fused, common), dim=-1)
-        hidden = self.trunk(self.fusion_projection(fused))
+        hidden = self.fusion_projection(fused)
+        supplied = {} if sidecars is None else sidecars
+        if supplied.keys() != self.sidecar_projections.keys():
+            raise ValueError("sidecar tensors differ from the configured families")
+        for name, projection in self.sidecar_projections.items():
+            values, valid, age = supplied[name]
+            if (
+                values.shape != valid.shape
+                or values.shape != age.shape
+                or values.shape[:2] != hidden.shape[:2]
+                or values.shape[-1] * 3 != projection.shape[1]
+            ):
+                raise ValueError(
+                    f"{name} sidecar values, masks and ages are misaligned"
+                )
+            valid = valid.bool() & active_mask.bool()[..., None]
+            clean = torch.where(valid, values, torch.zeros_like(values))
+            bounded_age, _ = _bounded_feature_age(age, valid)
+            bounded_age = torch.where(valid, bounded_age, torch.zeros_like(bounded_age))
+            inputs = torch.cat((clean, valid.to(clean.dtype), bounded_age), dim=-1)
+            residual = torch.nn.functional.linear(inputs, projection)
+            # Gate after cross-sectional pooling: an invalid name's own parent
+            # representation cannot change through another name's sidecar.
+            hidden = torch.where(
+                valid.any(dim=-1, keepdim=True), hidden + residual, hidden
+            )
+        hidden = self.trunk(hidden)
         predictions = torch.cat(
             tuple(
                 self.heads[name](hidden)

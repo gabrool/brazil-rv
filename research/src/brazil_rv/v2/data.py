@@ -772,7 +772,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         view = read_scalar_feature_view(
             self.store,
             indices,
-            ("slow", *(f"sidecar_{group}" for group in self.enabled_sidecars)),
+            ("slow",),
         )
         return lazy_slow_window(
             view.values,
@@ -969,6 +969,14 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             "slow_feature_age_sessions": feature_age,
             "active_mask": active,
         }
+        for group in self.enabled_sidecars:
+            family = f"sidecar_{group}"
+            view = read_scalar_feature_view(self.store, [date_index], (family,))
+            sample[f"{family}_values"] = _zero_invalid_values(
+                view.values[0], view.valid[0], name=family
+            )
+            sample[f"{family}_valid"] = view.valid[0]
+            sample[f"{family}_age_sessions"] = view.age_sessions[0]
         if self.include_fast:
             (
                 fast_values,

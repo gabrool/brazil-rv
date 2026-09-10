@@ -101,16 +101,13 @@ def test_invalid_lending_sidecars_preserve_shared_parent_batch_fields_bitwise(tm
     right = collate_v2_daily([lending[0], lending[1]])
     for key, value in left.items():
         actual = right[key]
-        if key in ("slow_features", "slow_feature_mask", "slow_feature_age_sessions"):
-            assert actual.shape[-1] == value.shape[-1] + 2
-            actual = actual[..., : value.shape[-1]]
         if isinstance(value, torch.Tensor):
             assert torch.equal(actual, value), key
         else:
             assert actual == value, key
-    assert not right["slow_feature_mask"][..., -2:].any()
+    assert not right["sidecar_lending_valid"].any()
     assert "targets" in left and "target_mask" in left
-    assert not right["slow_features"][..., -2:].any()
+    assert not right["sidecar_lending_values"].any()
     parent.store.close()
     lending.store.close()
     selection.dataset.store.close()

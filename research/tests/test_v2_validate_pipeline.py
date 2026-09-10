@@ -617,7 +617,9 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         "max_abs_daily_cdi_rate": 0.0,
         "exact_byte_match": True,
     }
-    assert len(manifest["results"]["baselines"]) == 15
+    assert len(manifest["results"]["baselines"]) == 5 * len(
+        pipeline.protocol_preset("full").folds
+    )
     assert "old_new_baseline_ic_comparison" not in manifest["results"]
     assert "superseded_old_store" not in manifest["sources"]
     assert len(manifest["results"]["gbdt_triage"]) == 1
@@ -973,7 +975,9 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
         history_end_offsets=-1,
     )
     original_read = V2Store.read
-    age_index = store.manifest["feature_names"]["slow"].index("observed_history_age_sessions")
+    age_index = store.manifest["feature_names"]["slow"].index(
+        "observed_history_age_sessions"
+    )
 
     def read_with_diagnostic_age(self, name, selectors):
         values = original_read(self, name, selectors)
@@ -1004,7 +1008,9 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
             _borrow_panels(len(dates), len(store.isins)),
             {},
             transfer_chronology_clean=True,
-            execution_policy=(pipeline.ExecutionPolicy() if canonical_history_age else None),
+            execution_policy=(
+                pipeline.ExecutionPolicy() if canonical_history_age else None
+            ),
         )
     finally:
         store.close()
