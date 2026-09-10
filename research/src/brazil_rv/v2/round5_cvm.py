@@ -1114,6 +1114,16 @@ def expected_filing_distance(
     )
 
 
+def header_only_filing_lags(events: list[dict], headers: list[dict]) -> list[dict]:
+    """Original headers can date seasonal lags without duplicating RAD clocks."""
+    linked = {r["id"] for r in events if r["group"] == "structured" and r.get("id")}
+    return [
+        {**d, "group": "original_filing_header", "subject": ""}
+        for d in headers
+        if d["version"] == 1 and d["id"] not in linked
+    ]
+
+
 def event_features(
     events: list[dict], sessions: list[date], calendar: dict | None = None
 ) -> pl.DataFrame:
@@ -1124,7 +1134,14 @@ def event_features(
             by_issuer[event["cvm_code"]].append((index, event))
     output = []
     for code, source in by_issuer.items():
-        source.sort(key=lambda pair: (pair[0], pair[1]["receipt"]))
+        source.sort(
+            key=lambda pair: (
+                pair[0],
+                pair[1]["receipt"]
+                if isinstance(pair[1]["receipt"], datetime)
+                else datetime.combine(pair[1]["receipt"], clock_time.max),
+            )
+        )
         cursor = 0
         last_filing = last_fact = last_dividend = last_offer = None
         last_dfp = None
@@ -1138,15 +1155,21 @@ def event_features(
                 event_index, event = source[cursor]
                 cursor += 1
                 text = normalized(event["kind"] + " " + event.get("subject", ""))
-                if event["group"] == "structured":
-                    last_filing, last_dfp = (
-                        event_index,
-                        float(event["kind"].startswith("DFP")),
-                    )
+                if event["group"] in ("structured", "original_filing_header"):
+                    if event["group"] == "structured":
+                        last_filing, last_dfp = (
+                            event_index,
+                            float(event["kind"].startswith("DFP")),
+                        )
                     ref = event["reference"]
                     if ref is not None:
                         if str(event.get("version", "")) == "1":
-                            receipts.setdefault(ref, event["receipt"].date())
+                            receipts.setdefault(
+                                ref,
+                                event["receipt"].date()
+                                if isinstance(event["receipt"], datetime)
+                                else event["receipt"],
+                            )
                             receipt_indices.setdefault(ref, event_index)
                         if latest_reference is None or ref > latest_reference:
                             latest_reference = ref
@@ -2119,8 +2142,20 @@ def build(root: Path, store: Path, output: Path) -> dict:
         date.fromisoformat(d) for d in calendar["sessions"]
     ]
     codes = set(identity.get_column("cvm_code"))
+    issuer_events = [
+        r for r in rad if r["cvm_code"] in codes and r["group"] != "cadastre"
+    ]
+    header_lags = header_only_filing_lags(
+        issuer_events,
+        [
+            d
+            for d in filing_headers(root, "itr") + filing_headers(root, "dfp")
+            if d["cvm_code"] in codes
+        ],
+    )
+    write_json(output / "event_original_header_lags.json", header_lags)
     event_state = event_features(
-        [r for r in rad if r["cvm_code"] in codes and r["group"] != "cadastre"],
+        [*issuer_events, *header_lags],
         sessions,
         calendar,
     )
@@ -2242,6 +2277,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "identity_isins": identity.get_column("isin").n_unique(),
         "receipt_audit": audit,
         "original_recovery": recovery_audit,
+        "header_only_original_lag_documents": len(header_lags),
         "capital_sources_by_reference_year": dict(capital_coverage),
         "source_contracts": {
             name: {

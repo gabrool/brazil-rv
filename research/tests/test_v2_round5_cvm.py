@@ -162,6 +162,45 @@ def test_first_observed_later_version_cannot_supply_original_filing_lag():
     assert supported["sessions_until_expected_filing"][1] is not None
 
 
+def test_header_only_original_lag_uses_own_date_without_resetting_filing_clocks():
+    sessions = [date(2024, 1, d) for d in (2, 3, 4, 5)]
+    latest = {
+        "id": "20",
+        "cvm_code": "1",
+        "kind": "ITR",
+        "group": "structured",
+        "reference": date(2023, 9, 30),
+        "receipt": datetime(2024, 1, 2, 15, 44),
+        "version": "1",
+    }
+    header = {
+        "id": "10",
+        "cvm_code": "1",
+        "kind": "DFP",
+        "reference": date(2022, 12, 31),
+        "receipt": sessions[1],
+        "version": 1,
+    }
+    supplements = round5_cvm.header_only_filing_lags(
+        [latest], [header, {**header, "id": "20"}]
+    )
+    assert len(supplements) == 1  # a linked RAD original keeps its exact minute
+    revision = {
+        **latest,
+        "id": "21",
+        "version": "2",
+        "receipt": datetime(2024, 1, 4, 14),
+    }
+    baseline = event_features([latest, revision], sessions)
+    supported = event_features([latest, revision, *supplements], sessions)
+    assert baseline.head(2).equals(supported.head(2))
+    assert supported["sessions_until_expected_filing"][2] is not None
+    assert supported["sessions_since_financial_filing"].equals(
+        baseline["sessions_since_financial_filing"]
+    )
+    assert supported["filing_is_dfp"].to_list() == [0, 0, 0, 0]
+
+
 def test_expected_filing_calendar_is_not_clipped_or_backprojected():
     sessions = [
         date(2024, 11, 4),

@@ -12,6 +12,14 @@ restatements. The source age is the oldest publication actually used to establis
 the latest known reference and the prior-year version-1 seasonal expectation;
 an unrelated restatement cannot make the forecast appear newly observed.
 
+Original-version evidence may also come from the official financial header.
+Where the same public document is present in RAD, retain its exact minute.
+A version-1 header without that exact RAD link contributes only its own-date
+seasonal-lag evidence, available at the following session. It neither duplicates
+actual RAD filing clocks nor invents a minute timestamp. The source audit found
+no unknown-version RAD row with an exact available-header ID; its remaining
+unversioned legacy rows cannot be relabelled from issuer/date guesses.
+
 The development store ends on 2024-12-30. Its array boundary is not a prediction
 that future filing dates occur immediately after the last stored session. Compute
 the countdown using the accepted B3 calendar within its covered years. Beyond
