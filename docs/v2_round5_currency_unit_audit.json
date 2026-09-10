@@ -1,5 +1,5 @@
 {
-  "status": "Correction implemented and tested; candidate six-document review awaits clean producing-code acceptance. Broader source freeze remains false.",
+  "status": "Six source-currency corrections accepted against clean51fc446;41 existing candidates remain under review. No final family/store or source freeze.",
   "actual_source_audit": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_consumption_c305adb\\result.json",
     "sha256": "bd36bd128e638ca465106933235c75dfcd01f9d6bda64b7e5eceee31471d3bc9"
@@ -362,5 +362,47 @@
   "remaining_existing_candidates": 41,
   "limits": "Own-source currency units only, independent of capital quantities. No global multiplier, no adjacent-ratio masking, no final family/store/screens. Numeric text matches remain triage only.",
   "source_freeze_ready": false,
-  "forward_capture_enabled": false
+  "forward_capture_enabled": false,
+  "acceptance": {
+    "accepted_at_utc": "2026-09-10T20:29:58.960774+00:00",
+    "code_commit": "51fc446",
+    "code_source": {
+      "path": "C:\\quant\\brazil-rv-round5-cvm-51fc446\\research\\src\\brazil_rv\\v2\\round5_cvm.py",
+      "sha256": "ea569de8be2f23c3bdc36ee7474680e0c691a7146c1bb7a48ad95ca2343a4cd7"
+    },
+    "program": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_unit_review\\accepted_51fc446\\producer.py",
+      "sha256": "4cf4ea7a078330e194aba2d0b0346df905dc3eb578b7fb039e7fb508020cb938"
+    },
+    "source_audit": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_consumption_c305adb\\result.json",
+      "sha256": "bd36bd128e638ca465106933235c75dfcd01f9d6bda64b7e5eceee31471d3bc9"
+    },
+    "canonical_dispositions": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\account_unit_dispositions.json",
+      "sha256": "f16061d139e6eddd4dc366966d76d22c91fc6af24451deff1fb8e7cce539db0e"
+    },
+    "applied_ids": [
+      "14794",
+      "20394",
+      "40472",
+      "5553",
+      "6022",
+      "7872"
+    ],
+    "actual_html_documents_reparsed": 47,
+    "unchanged_unreviewed_documents": 41,
+    "checks": {
+      "reviewed_amounts_scaled_once": true,
+      "unreviewed_documents_exact": true,
+      "receipt_reference_and_periods_exact": true,
+      "raw_html_reparsed_and_hash_verified": true,
+      "note_evidence_hash_verified": true
+    },
+    "source_freeze_ready": false
+  },
+  "acceptance_file": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_unit_review\\accepted_51fc446\\acceptance.json",
+    "sha256": "f1457b46224178cd3802eda540d98d2a856492807a7e24e286d2696243e4a877"
+  }
 }
