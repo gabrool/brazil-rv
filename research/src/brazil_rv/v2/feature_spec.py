@@ -410,7 +410,7 @@ _ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
     ),
     "sessions_until_expected_filing": (
         "signed_sessions",
-        "next fiscal quarter end plus prior-year same-quarter first receipt lag, minus current decision in B3 sessions; negative means overdue expectation",
+        "next fiscal quarter end plus prior-year same-quarter first receipt lag, minus current decision in known B3 sessions; beyond the known schedule, Monday-Friday expectation only; announced 2025 calendar enters 2024-11-06; no store-end saturation; negative means overdue expectation",
         "precomputed_native",
     ),
     "log_market_cap": (

@@ -111,6 +111,60 @@ def test_event_source_mutation_changes_first_available_decision_only():
     assert changed["sessions_since_material_fact"][2] == 0
 
 
+def test_expected_filing_age_keeps_oldest_used_first_receipt_after_restatement():
+    sessions = [date(2024, 1, d) for d in (2, 3, 4, 5)]
+    previous = {
+        "cvm_code": "1",
+        "kind": "DFP",
+        "group": "structured",
+        "reference": date(2022, 12, 31),
+        "receipt": datetime(2024, 1, 2, 13),
+    }
+    latest = {
+        **previous,
+        "kind": "ITR",
+        "reference": date(2023, 9, 30),
+        "receipt": datetime(2024, 1, 3, 13),
+    }
+    revision = {**previous, "receipt": datetime(2024, 1, 4, 13)}
+    baseline = event_features([previous, latest], sessions)
+    changed = event_features([previous, latest, revision], sessions)
+    assert baseline["sessions_until_expected_filing"].equals(
+        changed["sessions_until_expected_filing"]
+    )
+    assert changed["sessions_until_expected_filing_age_sessions"][2] == 2
+    assert changed["sessions_since_financial_filing"][2] == 0
+
+
+def test_expected_filing_calendar_is_not_clipped_or_backprojected():
+    sessions = [
+        date(2024, 11, 4),
+        date(2024, 11, 5),
+        date(2024, 11, 6),
+        date(2024, 12, 30),
+    ]
+    calendar = {
+        "base_through": date(2024, 12, 31),
+        "through": date(2025, 12, 31),
+        "available_date": date(2024, 11, 6),
+        "full_sessions": sessions + [date(2025, 1, d) for d in (2, 3, 6, 7, 8)],
+    }
+    receipts = {date(2023, 12, 31): date(2024, 1, 8)}
+    first = round5_cvm.expected_filing_distance(
+        sessions[1], date(2024, 9, 30), receipts, sessions, calendar
+    )
+    mutated = {**calendar, "full_sessions": calendar["full_sessions"][:-1]}
+    assert first == round5_cvm.expected_filing_distance(
+        sessions[1], date(2024, 9, 30), receipts, sessions, mutated
+    )
+    # Before announcement the weekday estimate reaches past the store end.
+    assert first > len(sessions)
+    exact = round5_cvm.expected_filing_distance(
+        sessions[2], date(2024, 9, 30), receipts, sessions, calendar
+    )
+    assert exact == 6
+
+
 def test_identity_uses_known_cadastre_and_prior_ticker_observation():
     sessions = [date(2024, 1, d) for d in (2, 3, 4, 5)]
     document = {

@@ -1035,7 +1035,7 @@ def expected_filing_distance(
     latest: date | None,
     receipts: dict[date, date],
     sessions: list[date],
-    index: int,
+    calendar: dict | None = None,
 ) -> float | None:
     if latest is None:
         return None
@@ -1045,11 +1045,25 @@ def expected_filing_distance(
     if previous_receipt is None:
         return None
     expectation = following + (previous_receipt - previous)
-    # Calendar-to-session projection uses the known exchange calendar only.
-    return float(bisect.bisect_left(sessions, expectation) - index)
+    known = sessions
+    through = sessions[-1]
+    if calendar is not None:
+        through = calendar["base_through"]
+        if current >= calendar["available_date"]:
+            known, through = calendar["full_sessions"], calendar["through"]
+    origin = bisect.bisect_left(known, current)
+    if expectation <= through:
+        return float(bisect.bisect_left(known, expectation) - origin)
+    # An unannounced future calendar is an explicitly labelled weekday estimate.
+    # Never clip a future expected date to the last date in the research store.
+    return float(
+        len(known) - origin + np.busday_count(through + timedelta(days=1), expectation)
+    )
 
 
-def event_features(events: list[dict], sessions: list[date]) -> pl.DataFrame:
+def event_features(
+    events: list[dict], sessions: list[date], calendar: dict | None = None
+) -> pl.DataFrame:
     by_issuer = defaultdict(list)
     for event in events:
         index = available_session(event["receipt"], sessions)
@@ -1063,6 +1077,7 @@ def event_features(events: list[dict], sessions: list[date]) -> pl.DataFrame:
         last_dfp = None
         fact_indices = []
         receipts = {}
+        receipt_indices = {}
         latest_reference = None
         for index, current in enumerate(sessions):
             while cursor < len(source) and source[cursor][0] <= index:
@@ -1077,6 +1092,7 @@ def event_features(events: list[dict], sessions: list[date]) -> pl.DataFrame:
                     ref = event["reference"]
                     if ref is not None:
                         receipts.setdefault(ref, event["receipt"].date())
+                        receipt_indices.setdefault(ref, event_index)
                         latest_reference = (
                             max(latest_reference, ref) if latest_reference else ref
                         )
@@ -1124,9 +1140,27 @@ def event_features(events: list[dict], sessions: list[date]) -> pl.DataFrame:
                     last_offer is not None and index - last_offer < 5
                 ),
                 "sessions_until_expected_filing": expected_filing_distance(
-                    current, latest_reference, receipts, sessions, index
+                    current, latest_reference, receipts, sessions, calendar
                 ),
             }
+            expected_source_index = None
+            if record["sessions_until_expected_filing"] is not None:
+                prior_reference = year_before(quarter_next(latest_reference))
+                expected_source_index = min(
+                    receipt_indices[latest_reference], receipt_indices[prior_reference]
+                )
+                expectation = quarter_next(latest_reference) + (
+                    receipts[prior_reference] - prior_reference
+                )
+                if (
+                    calendar is not None
+                    and current >= calendar["available_date"]
+                    and expectation > calendar["base_through"]
+                ):
+                    expected_source_index = min(
+                        expected_source_index,
+                        bisect.bisect_left(sessions, calendar["available_date"]),
+                    )
             ages = {
                 "sessions_since_financial_filing": last_filing,
                 "filing_is_dfp": last_filing,
@@ -1134,7 +1168,7 @@ def event_features(events: list[dict], sessions: list[date]) -> pl.DataFrame:
                 "material_fact_count_20": index,
                 "dividend_announcement_age": last_dividend,
                 "offering_or_buyback_flag": index,
-                "sessions_until_expected_filing": last_filing,
+                "sessions_until_expected_filing": expected_source_index,
             }
             for feature, source_index in ages.items():
                 record[feature + "_age_sessions"] = (
@@ -1933,10 +1967,20 @@ def build(root: Path, store: Path, output: Path) -> dict:
     public_float_observations(root, rad, sessions).write_parquet(
         output / "free_float_observations.parquet"
     )
+    calendar_path = root / "calendar_2025_announced.json"
+    calendar = json.loads(calendar_path.read_text(encoding="utf8"))
+    if sha256(Path(calendar["source"]["path"])) != calendar["source"]["sha256"]:
+        raise ValueError("Announced calendar PDF differs from its source binding")
+    for key in ("available_date", "base_through", "through"):
+        calendar[key] = date.fromisoformat(calendar[key])
+    calendar["full_sessions"] = sessions + [
+        date.fromisoformat(d) for d in calendar["sessions"]
+    ]
     codes = set(identity.get_column("cvm_code"))
     event_state = event_features(
         [r for r in rad if r["cvm_code"] in codes and r["group"] != "cadastre"],
         sessions,
+        calendar,
     )
     events = (
         identity.select("date", "isin", "cvm_code")
@@ -2028,7 +2072,11 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "original_recovery": recovery_audit,
         "source_manifests": {
             name: {"path": str(root / name), "sha256": sha256(root / name)}
-            for name in ("annual_manifest.json", "rad_manifest.json")
+            for name in (
+                "annual_manifest.json",
+                "rad_manifest.json",
+                "calendar_2025_announced.json",
+            )
         },
         "age_rule": "filing and capital publication ages carried; multiquarter metrics use oldest source receipt in required accounting window; daily event-window absence has current-decision age zero",
         "coverage": family_tables,
