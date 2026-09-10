@@ -62,11 +62,21 @@ original registration and replay bindings remain intact.
   trading volume still describes D. Omitted OI is not zero without completeness
   evidence. Missing files with an empty archive response are described as
   unretrievable, not as proof that no historical publication existed.
-- Compact index pressure compares current and preview weights from the same
-  disclosed snapshot. Sum weight delta in percentage points times remaining
-  sessions, divided by ADV in BRL millions. This is a deterministic unit choice,
-  not an assumed fund AUM. Dated BDI opening-table footnotes can establish the
-  snapshot's availability even when a cached attachment was uploaded later.
+- Compact index pressure is the explicitly disclosed
+  `preview_minus_last_effective_weight_proxy_contains_price_drift`: published
+  preview weights minus the last published effective portfolio weights. The
+  BDI audit shows that tables labelled current can repeat the last effective
+  snapshot; their footnotes do not establish daily drift-adjusted weights.
+  Therefore this proxy includes intervening price drift and is not a pure
+  estimate of fund buying or selling. Sum weight delta in percentage points
+  times remaining B3 sessions, divided by prior ADV20 in BRL millions. This is
+  a deterministic unit choice, not an assumed fund AUM. Dated BDI opening-table
+  footnotes establish same-day availability when exact weights match the
+  attachment. When only the official announcement date is proven, use its
+  end-of-day bound and first subsequent decision; no HTTP Last-Modified clock
+  is used as first-publication evidence. Unproven publication or identity is
+  masked. No post-effective reversal or assumed corporate-action drift
+  correction is added.
 - A source remains unavailable when its measurement or first-publication semantics
   cannot be verified. Retain retrieved raw evidence and distinguish download
   failure, missing original vintage, identity ambiguity and timing ambiguity.

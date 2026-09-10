@@ -535,7 +535,7 @@ _ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
     ),
     "economic_beta_60": (
         "unitless_slope",
-        "causal economic BOVA11 OLS slope, minimum45/60 observed pairs through t-1, Blume0.67*beta+0.33 and original[-1,3] bound; consumer fit-only percentile clipping",
+        "causal economic BOVA11 OLS slope, minimum40/60 observed pairs through t-1, Blume0.67*beta+0.33 and original[-1,3] bound; consumer fit-only percentile clipping",
         "precomputed_native",
     ),
     **{
@@ -568,7 +568,7 @@ _ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
     ),
     "index_pressure": (
         "weight_percentage_points_times_sessions_per_million_brl",
-        "sum over IBOV/IBXX/SMLL of same-publication signed preview-minus-current weight in percentage points times remaining B3 sessions to effective date divided by prior cash ADV20 in BRL millions; no inferred fund AUM or months-old weight drift",
+        "sum over IBOV/IBXX/SMLL of published-preview minus last-effective weight in percentage points times remaining B3 sessions to effective date divided by prior cash ADV20 in BRL millions; proxy contains price drift, not pure fund flow; no inferred fund AUM",
         "precomputed_native",
     ),
     "index_event_age": (

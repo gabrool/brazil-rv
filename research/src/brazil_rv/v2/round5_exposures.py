@@ -45,7 +45,9 @@ SECTOR_FEATURE_NAMES = (
 )
 
 
-def market_shocks(levels: pl.DataFrame, returns: pl.DataFrame) -> pl.DataFrame:
+def market_shocks(
+    levels: pl.DataFrame, returns: pl.DataFrame, *, level_calendars: dict | None = None
+) -> pl.DataFrame:
     """Changes over exact source observations, retaining both clocks and gaps.
 
     Levels use log changes (rates: percentage-point differences). Futures and
@@ -59,6 +61,11 @@ def market_shocks(levels: pl.DataFrame, returns: pl.DataFrame) -> pl.DataFrame:
         if series not in SERIES:
             continue
         rows = frame.sort("reference_date").to_dicts()
+        calendar = (level_calendars or {}).get(
+            series, [row["reference_date"] for row in rows]
+        )
+        positions = {day: index for index, day in enumerate(calendar)}
+        by_date = {row["reference_date"]: row for row in rows}
         for index, row in enumerate(rows):
             if row["available_at"] is None:
                 continue
@@ -67,8 +74,13 @@ def market_shocks(levels: pl.DataFrame, returns: pl.DataFrame) -> pl.DataFrame:
             for horizon in (1, 5):
                 value = None
                 available = row["available_at"]
-                if index >= horizon:
-                    before = rows[index - horizon]
+                position = positions[row["reference_date"]]
+                before = (
+                    by_date.get(calendar[position - horizon])
+                    if position >= horizon
+                    else None
+                )
+                if before is not None:
                     if before["available_at"] is not None:
                         available = max(available, before["available_at"])
                         if series.startswith(("br_di_", "us_treasury_")):

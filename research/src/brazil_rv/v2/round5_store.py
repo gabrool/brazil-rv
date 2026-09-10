@@ -12,7 +12,7 @@ import numpy as np
 import polars as pl
 
 from .artifacts import sha256_file, write_json_atomic
-from .contract import DEVELOPMENT_END
+from .contract import DEVELOPMENT_END, FINETUNE_START, PRETRAIN_END
 from .feature_spec import (
     FeatureSpec,
     feature_schema_sha256,
@@ -20,7 +20,7 @@ from .feature_spec import (
     transform_feature_panel_into,
 )
 from .research_rounds import _git_identity
-from .store import StoreStaging, close_memmap, open_store_for_dates, peak_rss_bytes
+from .store import StoreStaging, close_memmap, open_store_for_samples, peak_rss_bytes
 
 MAXIMUM_RSS = 8 * 1024**3
 
@@ -86,6 +86,9 @@ def build(plan_path: Path, output: Path) -> dict:
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     code = _git_identity()
     registration = _verified_json(plan["registration"])
+    for amendment in plan["amendments"]:
+        if sha256_file(Path(amendment["path"])) != amendment["sha256"]:
+            raise ValueError("Round-5 formula amendment identity differs")
     base = registration["base_store"]
     source = Path(base["root"])
     if sha256_file(source / "manifest.json") != base["manifest_sha256"]:
@@ -96,7 +99,18 @@ def build(plan_path: Path, output: Path) -> dict:
     if output.resolve().is_relative_to(source.resolve()):
         raise ValueError("new store must be outside its immutable source")
     rows = np.arange(original["axes"]["date_count"])
-    store, access = open_store_for_dates(source, rows, purpose="training")
+    axis = np.load(source / "date_index.npy", allow_pickle=False)
+    samples = rows[
+        (axis <= np.datetime64(PRETRAIN_END)) | (axis >= np.datetime64(FINETUNE_START))
+    ]
+    # The ten-session embargo is causal context, never a fit/evaluation sample.
+    store, access = open_store_for_samples(
+        source,
+        samples,
+        purpose="training",
+        history_lookbacks=60,
+        history_end_offsets=0,
+    )
     dates = store.dates.astype(object).tolist()
     isins = store.isins
     active = store.read("active", rows)
@@ -223,6 +237,7 @@ def build(plan_path: Path, output: Path) -> dict:
                 "code": code,
                 "plan_path": str(plan_path),
                 "plan_sha256": sha256_file(plan_path),
+                "amendments": plan["amendments"],
                 "base_store": base,
                 "families": evidence,
                 "protected_arrays_copied_byte_for_byte": True,

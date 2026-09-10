@@ -70,6 +70,21 @@ def test_holiday_preserves_known_shock_and_age_not_a_fake_zero_print():
     assert age[9, 0] == 3 and np.isnan(historical[9])
 
 
+def test_missing_curve_vertex_does_not_shorten_source_horizon():
+    days, rows, returns = _source()
+    for row in rows:
+        row["series"] = "br_di_360"
+    del rows[4]
+    shocks = market_shocks(
+        pl.DataFrame(rows, schema=OBSERVATION_SCHEMA),
+        returns,
+        level_calendars={"br_di_360": days},
+    )
+    day_five = shocks.filter(pl.col("reference_date") == days[5]).row(0, named=True)
+    assert day_five["shock_1"] is None
+    assert day_five["shock_5"] == 100 * (rows[4]["value"] - rows[0]["value"])
+
+
 def test_futures_five_session_change_requires_linked_contract_returns():
     days, _, empty = _source()
     rows = [

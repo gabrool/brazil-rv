@@ -78,8 +78,11 @@ def test_extension_keeps_protected_files_exact_and_requires_admission_proof(
         return {"path": str(path), "sha256": sha256_file(path)}
 
     plan = tmp_path / "plan.json"
+    amendment = tmp_path / "formulas.md"
+    amendment.write_text("Frozen causal formulas", encoding="utf-8")
     payload = {
         "registration": bind(registration),
+        "amendments": [bind(amendment)],
         "families": [
             {
                 "family": "events",
@@ -108,6 +111,9 @@ def test_extension_keeps_protected_files_exact_and_requires_admission_proof(
     with pytest.raises(ValueError, match="manifest identity"):
         extension.build(plan, tmp_path / "bad_proof")
     assert not (tmp_path / "bad_proof").exists()
+    amendment.write_text("Unregistered replacement", encoding="utf-8")
+    with pytest.raises(ValueError, match="amendment identity"):
+        extension.build(plan, tmp_path / "bad_amendment")
 
 
 def test_extension_rejects_a_heldout_consumer_row_before_alignment():
