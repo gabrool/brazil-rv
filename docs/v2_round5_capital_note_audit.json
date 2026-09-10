@@ -165,12 +165,12 @@
       "sha256": "acdf479d708a296d0d03eb821aa4ed14640c749c1e2c39093bcbbc3ead13c4bb"
     },
     "example": "MPX/Eneva5553 public and inner currency scale1; parsed consolidated revenue98455 and parent income-256250. Own note pages185-186 declare thousands of reais and include those own-period amounts. Other accounts and cohort coverage still need independent reconciliation.",
-    "status": "Unresolved own-source currency audit; no global correction/masking.",
+    "status": "Fourteen exact own-source currency corrections accepted;33 currency candidates still open.",
     "current_acceptance": {
-      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_unit_review\\accepted_51fc446\\acceptance.json",
-      "sha256": "f1457b46224178cd3802eda540d98d2a856492807a7e24e286d2696243e4a877"
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_unit_review\\accepted_eight_20260910T204700Z\\acceptance.json",
+      "sha256": "6dd23f81de0f6c3341fc0a9db7227e34d202e0ff66dd8400f5639a4072fe276c"
     },
-    "meaning": "Actual HTML/XML monetary units agree but own notes establish a unit error for six reviewed filings. Clean51fc446 applies exact-row-bound corrections before temporal arithmetic.41 existing candidates remain; source hold stays."
+    "meaning": "The actual HTML account books and XML magnitudes agree, but the reviewed own-period disclosures establish thousand-BRL presentation for14 filings. Clean51fc446 corrects only exact bound rows before temporal arithmetic. Publication dates and independent share quantities remain unchanged."
   },
   "targeted_tests": 58,
   "source_freeze_ready": false,

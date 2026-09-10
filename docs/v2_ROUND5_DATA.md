@@ -1,4 +1,4 @@
-# Round 5 data round — work in progress
+# Round 5 data round â€” work in progress
 
 Status: original capital and FCA registration recovery and family validation are running. **The final store and
 GBDT screens are not yet complete. The continuous-book replay is complete.** This document
@@ -43,7 +43,7 @@ frozen replay. Original registration bytes are retained.
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
 | Cross-market | Sealed 57-field archive includes public shocks, causal exposures and interactions, with historical DST and early closes. Unavailable oil, ADR-premium and foreign-flow fields are explicitly masked. | Rebuild identity-dependent exposures and interactions against the accepted sector bridge, preserving common shocks and unavailable fields, then admit the final store. No guessed measurement or publication lag. |
 | Foreign flow | BDI02 recovered; published figures are month-to-date totals with a documented D+2 reference lag and historical methodology revisions. Differencing totals can mix revisions with daily flows. | Source-semantics unavailable for this round; no invented daily increments. |
-| Index | Sealed 20,438 decision/name rows across 107 sessions in 2023–2024. Twelve releases have opening proof; seven date-only releases enter the next decision. Weight-change signal is explicitly a proxy containing price drift. | Final store admission. |
+| Index | Sealed 20,438 decision/name rows across 107 sessions in 2023â€“2024. Twelve releases have opening proof; seven date-only releases enter the next decision. Weight-change signal is explicitly a proxy containing price drift. | Final store admission. |
 | Magnitudes | Four raw causal fields sealed. Fit-only clipping is bound through training, checkpoints and scoring; selection/evaluation cannot refit it. | Final store admission. |
 | Oddlot | Existing two fields are retained exactly. Trade summaries do not provide buy/sell direction. | Final store hash comparison. |
 | Microstructure | Sealed two-field archive has 966,714 decision/name rows across 712 ISINs. COTAHIST cash trades and official nonregular quantities support the requested formulas. | Final store admission. |
@@ -165,14 +165,17 @@ This investigation remains a source-freeze hold. See the
 
 Tracing the 47 currency candidates through the actual builder confirms that
 all use recovered HTML accounts, with monetary values matching original XML.
-Six own-document reviews establish thousands of reais despite the source
-unit heading: MPX/Eneva5553, Magnesita14794, CEG6022, Excelsior20394, OSX40472
-and Unipar7872. An explicit correction now binds each filing's complete input
+Fourteen own-document reviews establish thousands of reais despite the source
+unit heading. These include MPX/Eneva, Magnesita, CEG, Excelsior, OSX, Unipar,
+Cemig, Telefonica Brasil, Triunfo, Karsten, Tegma, Telebras and Banese. An explicit correction now binds each filing's complete input
 rows and source evidence before any temporal arithmetic. It preserves receipts,
 periods and independent share counts. Sixty-nine targeted tests pass, including
 first-eligible-decision behavior and changed-version/row/evidence failures.
 The [currency-unit audit](v2_round5_currency_unit_audit.json) records the reviewed
-cases and the still-open broader source review. No blanket currency rescaling
+cases, including eight further accepted filings, and the 33 remaining currency candidates.
+The Triunfo and Banese unit proofs reconcile precise current-period tables to
+explicit million-real amounts in their own management reports; rounded prose does
+not replace the precise table values. No blanket currency rescaling
 or model-input admission is implied by a matching number or a note heading.
 
 ## Store and model contract
@@ -216,6 +219,6 @@ timing tables are complete; none is a Round-5 model input.
 ## Outstanding before closure
 
 Finish source archives and family proofs; build and accept the new store;
-run the registered 14-fold × 5-seed CPU information screens and TreeSHAP. Then publish the final family coverage,
+run the registered 14-fold Ã— 5-seed CPU information screens and TreeSHAP. Then publish the final family coverage,
 revision shares, unavailable-source reasons, economic deltas, screen results,
 store identities and resulting Round-6 ordering here.
