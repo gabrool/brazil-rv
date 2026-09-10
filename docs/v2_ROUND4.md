@@ -3,12 +3,12 @@
 Status: A1–A3 is committed in `3d1e95f`. The 126-cell CPU replay and the three-seed
 neural parent on all fourteen folds are complete, accepted, sealed and recovered.
 The first session is closed. All 210 arm fits and nine selection-only fits are now
-complete; full screening is running on the unchanged frozen code. Gabriel's
+complete, as is full screening on the unchanged frozen code. The A4 CPU audit is running. Gabriel's
 2026-09-10 [A4 budget amendment](../research/preregistrations/v2_round4_budget_amendment.md)
 replaces the unexecuted extra three-seed stage with saved-score seed sensitivity.
 No additional neural training or replacement GH200 is planned.
-The original CPU root and historical B6 panels remain immutable. No arm comparison
-or promotion is made here. Holdout consumers and deployment remain outside this work.
+The original CPU root and historical B6 panels remain immutable. Arm comparisons are
+provisional until the A4 audit completes. Holdout consumers and deployment remain outside this work.
 
 The controlling [registration](../research/preregistrations/v2_round4.md) and
 [protocol JSON](../research/preregistrations/v2_round4.json) retain all six configurations,
@@ -166,7 +166,7 @@ took 111.01 minutes / 447 total epochs, with
 90.63% mean GPU utilization and 52,903 MiB peak memory. Parent acceptance
 then took 115 seconds. All model and training settings remained registered.
 
-At the measured parent rate, 210 arm fits project to about 9.25 GPU hours and
+The original budget, before A4, projected 210 arm fits at about 9.25 GPU hours and
 confirmation F to 3.70–11.10 hours depending on the registered roster. These are
 planning proxies: arm-specific patience can differ, and selection-only fits, fresh
 confirmation P, CPU readouts and transport add time. Continue in fresh sealed
@@ -202,7 +202,81 @@ root available on the same persistent filesystem. Completed trajectories are reu
 The driver started at 2026-09-10T01:58:35.317926+00:00, sequencing 210 arm fits,
 nine selection-only fits and full screening evaluation. The arm plan has SHA-256
 `d2e6370604abce6012b021cbc825d418d37303a2541e0a0d0e8a476dbf9a4187`
-and six concurrent trajectories; the first six processes are active. This session
+and six concurrent trajectories. All arm and selection trajectories completed. This session
 ends after screening with complete recovery, verification and exact-instance
 termination. A4 now replaces the former planned fresh confirmation session with
 a CPU-only saved-score audit on this instance before final recovery and closure.
+
+## Completed three-seed screening
+
+All 87 original screening/selection books pass the unchanged engineering gates.
+Arms took 9.04 hours, selection-only fits 38.54 minutes, and full screening readouts
+27.48 minutes. [The complete summary projection](v2_round4_screening_report.json)
+retains all pooled/per-fold readouts and pairs; only repetitive daily momentum
+arrays are omitted from GitHub and remain in the sealed, verified full source.
+
+All six configurations have nonnegative net point estimates. S0 is the provisional
+IC leader and provisional working parent; no economics override qualifies.
+**A4 stability is still running: these are not yet accepted final choices.**
+
+| Arm | Primary IC [95%] | Net excess bps/day [95%] | Persistence 1 | Turnover/NAV |
+| --- | --- | --- | ---: | ---: |
+| fast_off | 0.023481 [0.013620, 0.031649] | 4.201 [-0.491, 7.828] | 0.793029 | 0.319259 |
+| S0 | 0.026591 [0.016880, 0.035140] | 4.936 [1.174, 8.989] | 0.782725 | 0.299263 |
+| H | 0.023822 [0.013856, 0.032094] | 4.556 [0.201, 8.654] | 0.800255 | 0.294837 |
+| P | 0.022907 [0.011834, 0.031855] | 2.852 [-1.242, 6.282] | 0.981127 | 0.117978 |
+| L | 0.023737 [0.013873, 0.032420] | 4.785 [0.688, 8.998] | 0.808814 | 0.278204 |
+| C | 0.023992 [0.014375, 0.032796] | 3.857 [-0.445, 7.751] | 0.788803 | 0.315491 |
+
+| Arm minus fast_off | All-fold IC delta [95%] | All-fold net delta bps/day [95%] | Informative-fold IC delta [95%] |
+| --- | --- | --- | --- |
+| S0 | 0.003110 [0.001522, 0.005129] | 0.735 [-0.234, 3.130] | 0.006113 [0.002838, 0.009972] |
+| H | 0.000341 [-0.000055, 0.000684] | 0.356 [-0.332, 1.891] | 0.000341 [-0.000055, 0.000684] |
+| P | -0.000574 [-0.002773, 0.001134] | -1.348 [-3.374, 1.225] | -0.000574 [-0.002773, 0.001134] |
+| L | 0.000256 [-0.000255, 0.001350] | 0.585 [-0.408, 2.721] | 0.001553 [0.000543, 0.003041] |
+| C | 0.000511 [-0.000111, 0.001931] | -0.344 [-1.402, 1.360] | 0.000511 [-0.000111, 0.001931] |
+
+S0 uses F8–F14 and L uses F9–F14 as declared from input validity; H/P/C use all
+fourteen folds. Full paired tables include both members’ informative subsets.
+
+| Arm | Momentum rank correlation mean | SD | Momentum-residual primary IC | Extreme-momentum spread share |
+| --- | ---: | ---: | ---: | ---: |
+| fast_off | 0.689061 | 0.106642 | 0.012130 | 70.58% |
+| S0 | 0.726328 | 0.104797 | 0.015414 | 70.24% |
+| H | 0.692605 | 0.106719 | 0.012736 | 72.68% |
+| P | 0.760176 | 0.091832 | 0.008861 | 82.03% |
+| L | 0.700587 | 0.109470 | 0.011734 | 70.16% |
+| C | 0.688694 | 0.098953 | 0.012245 | 67.38% |
+
+S0 raises both momentum correlation and residual IC relative to fast_off. These
+are descriptive score diagnostics, not an independent alpha or implementability
+test. P produces much more persistent scores and lower turnover, alongside lower
+primary IC and net point estimates. None of these diagnostics changes the rule.
+
+| Fold | Momentum IC | fast_off | S0 | H | P | L | C |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| F1 | 0.002977 | 0.019438 | 0.019428 | 0.019096 | 0.007312 | 0.021954 | 0.017773 |
+| F2 | 0.023979 | 0.010322 | 0.009558 | 0.010830 | 0.022135 | 0.004355 | 0.008650 |
+| F3 | 0.031860 | 0.028163 | 0.028237 | 0.028102 | 0.024897 | 0.027697 | 0.028165 |
+| F4 | 0.015320 | 0.030088 | 0.032060 | 0.030621 | 0.030530 | 0.031529 | 0.031414 |
+| F5 | 0.064688 | 0.064379 | 0.065423 | 0.064197 | 0.060865 | 0.063692 | 0.063457 |
+| F6 | -0.009494 | -0.009113 | -0.009774 | -0.009039 | -0.017700 | -0.009883 | -0.010610 |
+| F7 | 0.013795 | 0.017480 | 0.016263 | 0.018340 | 0.015505 | 0.016541 | 0.016929 |
+| F8 | 0.051020 | 0.032764 | 0.033842 | 0.034552 | 0.042709 | 0.031721 | 0.032401 |
+| F9 | 0.038005 | 0.007636 | 0.033771 | 0.008933 | 0.028765 | 0.015915 | 0.018327 |
+| F10 | 0.012838 | 0.024872 | 0.025454 | 0.024942 | 0.022492 | 0.024535 | 0.025046 |
+| F11 | 0.008999 | 0.017604 | 0.020567 | 0.017441 | 0.012104 | 0.018656 | 0.018595 |
+| F12 | 0.024222 | 0.015426 | 0.018913 | 0.015958 | 0.016835 | 0.017862 | 0.016301 |
+| F13 | 0.012215 | 0.020673 | 0.023747 | 0.020196 | 0.014223 | 0.018987 | 0.020507 |
+| F14 | 0.061313 | 0.048760 | 0.054383 | 0.049081 | 0.040072 | 0.048415 | 0.048641 |
+
+The full original screening root contains 7,711 files / 5,111,515,026 bytes,
+verified on the host at 2026-09-10T12:19:54.065976+00:00.
+Inventory SHA-256: `a4c9d098124515594c27acc970b0f3805adc3a36ebbed74e9ddf5be82b284c76`.
+Full result SHA-256: `6ab60e7a3c37d53563c5fd3e140a0f001ce7b43dd9aa5b9a6ca92b5e281bdaee`.
+
+The first A4 audit attempt stopped before any book when the new caller omitted
+the canonical forecast reader’s required schema/date/security bindings. The
+reader was kept intact; the caller was corrected in `eb5e9ca`, 31 targeted tests
+passed, and the audit restarted in a fresh root. [Stop evidence](v2_round4_seed_audit_stop.json)
+binds the preserved failed attempt. No trained model or original screening result changed.

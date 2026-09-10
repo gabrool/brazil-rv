@@ -1,0 +1,16 @@
+{
+  "status": "exact_complete_copy_sha256_verified",
+  "source_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_arms_3d1e95f_20260910T015000Z",
+  "host_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_arms_3d1e95f_20260910T015000Z",
+  "verified_at_utc": "2026-09-10T12:19:54.065976+00:00",
+  "physical_file_count": 7711,
+  "total_bytes": 5111515026,
+  "transport_inventory_sha256": "1dd9f5ab35b6f40e6d1638958c5b1009566d96a3e5933dcad002d33bd62cc43d",
+  "archive_sha256": "47229a09a8481e9a7230a57fb538ef2cedf6994d5bdf1bb14207e1e322b3c0e0",
+  "hashes": {
+    "frozen_design.json": "b1965d5a6c87f9f8adf997a099e385618e42eecbfbcd80a0de55ce652211546b",
+    "screening_result.json": "6ab60e7a3c37d53563c5fd3e140a0f001ce7b43dd9aa5b9a6ca92b5e281bdaee",
+    "access_audit.json": "36597dcc90c322b3e5d1695d8bb4618ea092268c332e305a9e9712fbdddbf32b",
+    "artifact_inventory.json": "a4c9d098124515594c27acc970b0f3805adc3a36ebbed74e9ddf5be82b284c76"
+  }
+}
