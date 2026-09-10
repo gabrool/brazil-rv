@@ -2,11 +2,11 @@
   "status": "Historical source review in progress; no final family/store/screens and no forward capture.",
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "1260c22867a9efc80fc454deead3dbc9b4cdc06bb95ecb81270e056f85fb1161"
+    "sha256": "5cbb178ee897a3abba0af032b33d80849554fdbcfb752eb1f27bea3396868c4f"
   },
   "counts": {
-    "reconciled": 31,
-    "audited_unavailable": 7
+    "audited_unavailable": 7,
+    "reconciled": 52
   },
   "accepted_batch": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_batch_20260910T192900Z\\acceptance.json",
@@ -478,6 +478,473 @@
           "91021": "Historical purchase320PN is not a disclosed year-end balance. Retained current zero treasury is a source report, not an independently reconstructed endpoint. If all320 remained after the own-source eight-for-one split, net denominator difference would be2560 shares (0.0512821bps); that is a conditional sensitivity, not a corrected count."
         }
       }
+    },
+    {
+      "acceptance": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_twenty_one_notes_20260910T213000Z\\acceptance.json",
+        "sha256": "62197f6702d6592b75e0eaef7f3870197fa22f686cce7fae0be090c0a404ef40"
+      },
+      "review_file": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_twenty_one_notes_20260910T213000Z.json",
+        "sha256": "93f63cb62615f53d48df23ee97ecdfe71a69585890bc9830adc0fa427b2d74d6"
+      },
+      "review": {
+        "reviewed_at_utc": "2026-09-10T21:28:23.001518+00:00",
+        "scope": "21 independently reviewed original filings; exact own-period quantities, precision reconciliations, four source confirmations, and explicitly resolved payment/treasury contradictions. No automatic proposal admission or adjacent-ratio correction.",
+        "reconciliations": [
+          {
+            "id": "7690",
+            "reference": "2011-03-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 57466312,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              79
+            ],
+            "reason": "Own T4F current 31 March 2011 note21(a) explicitly states 57,466,312 ordinary shares and independently describes the January four-for-one grouping to that total. The February capital increase used reserves with no new shares. Use the exact own-version endpoint; the prior count 229,865,248 is not current. Retain the source capital table zero preferred and treasury quantities; full-text review found no contrary share-holding or unpaid-capital disclosure.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\7690\\result.json",
+              "sha256": "a5c438669be07ce9798eb63699768c40eb40a77ba6963aa673b6274e9bf294c3"
+            }
+          },
+          {
+            "id": "7748",
+            "reference": "2011-03-31",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 57466312,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              79
+            ],
+            "reason": "Own T4F current 31 March 2011 note21(a) explicitly states 57,466,312 ordinary shares and independently describes the January four-for-one grouping to that total. The February capital increase used reserves with no new shares. Use the exact own-version endpoint; the prior count 229,865,248 is not current. Retain the source capital table zero preferred and treasury quantities; full-text review found no contrary share-holding or unpaid-capital disclosure.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\7748\\result.json",
+              "sha256": "a8f45b9eb72d78125f32f8d96c5a3fd1d00ddf99c0d4aa19a3d493bcfe77ba39"
+            }
+          },
+          {
+            "id": "11018",
+            "reference": "2011-06-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 231411805,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              81
+            ],
+            "reason": "Own Qualicorp current 30 June 2011 note explicitly distinguishes 258,631,234 subscribed ordinary shares from 231,411,805 already paid in and 27,219,429 paid on 1 July 2011. Use 231,411,805 under the registered paid-in capital endpoint contract; the subscribed shareholder-table total is not paid-in capital at 30 June. This exact distinction is independently present in each version, including the source table with an otherwise correct unit. Retain explicit source zero treasury: the described 2010 repurchase was cancelled and option-settlement boilerplate supplies no current treasury holding.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\11018\\result.json",
+              "sha256": "fe639370c743b559f22e81f98ff408bf7d56088f57da13e43a7ffe547b62743d"
+            }
+          },
+          {
+            "id": "11036",
+            "reference": "2011-06-30",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 231411805,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              81
+            ],
+            "reason": "Own Qualicorp current 30 June 2011 note explicitly distinguishes 258,631,234 subscribed ordinary shares from 231,411,805 already paid in and 27,219,429 paid on 1 July 2011. Use 231,411,805 under the registered paid-in capital endpoint contract; the subscribed shareholder-table total is not paid-in capital at 30 June. This exact distinction is independently present in each version, including the source table with an otherwise correct unit. Retain explicit source zero treasury: the described 2010 repurchase was cancelled and option-settlement boilerplate supplies no current treasury holding.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\11036\\result.json",
+              "sha256": "fe540a0b0d974fcb2df1b31e2e930910bce3538838a4ef7f56804aeb78bc893b"
+            }
+          },
+          {
+            "id": "14393",
+            "reference": "2011-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 11651126,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              84
+            ],
+            "reason": "Own Itautec current 31 December 2011 note21(a) explicitly states 11,651,126 subscribed and fully paid ordinary shares. The separate authorization for up to 20 million ordinary and 40 million preferred shares is not issued capital. The 2011 capital increase issued no shares. Use the exact endpoint in each own version and retain source zero preferred/treasury counts; review found no contradictory actual share repurchase or unpaid capital.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\14393\\result.json",
+              "sha256": "b0f8e8e87d097246ad8b4a0258854b5a9e1877bb69eb376b176b26a45a9cd93d"
+            }
+          },
+          {
+            "id": "14405",
+            "reference": "2011-12-31",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 11651126,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              84
+            ],
+            "reason": "Own Itautec current 31 December 2011 note21(a) explicitly states 11,651,126 subscribed and fully paid ordinary shares. The separate authorization for up to 20 million ordinary and 40 million preferred shares is not issued capital. The 2011 capital increase issued no shares. Use the exact endpoint in each own version and retain source zero preferred/treasury counts; review found no contradictory actual share repurchase or unpaid capital.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\14405\\result.json",
+              "sha256": "24392ee4ecc634e49e10af789cc78a9659c7307d0a53898a2cf3ccf52d548c3a"
+            }
+          },
+          {
+            "id": "14654",
+            "reference": "2011-12-31",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 159816337,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 3279982,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              44,
+              99,
+              100,
+              108
+            ],
+            "reason": "Own B2W current 31 December 2011 management table p44 and note21(a)-(b) p99 agree on 159,816,337 ordinary shares, including 3,279,982 in treasury and 156,536,355 held outside treasury. Own p44/p100 confirms the June issue was fully paid. The p100 treasury rollforward is internally inconsistent: it includes a cancellation line while still printing 3,279,982 as its 2011 closing balance. Its cancellation-ad-referendum wording and own subsequent-events note31 p108 explicitly date board approval to 1 March 2012. Reconcile the reporting-date quantity using the two coherent dated shareholder tables and that later-event date, rather than retaining a contradictory zero treasury or arithmetically reconstructing a different endpoint. Both versions were independently reviewed. Net shares are 156,536,355; no later filing supplies the correction.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\14654\\result.json",
+              "sha256": "fcf022394b3e037a309a7ee1aa4a76c415e83558d6b40a686ad4903308a08af5"
+            }
+          },
+          {
+            "id": "14667",
+            "reference": "2011-12-31",
+            "version": 3,
+            "paid_in_shares": {
+              "ON": 159816337,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 3279982,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              44,
+              99,
+              100,
+              108
+            ],
+            "reason": "Own B2W current 31 December 2011 management table p44 and note21(a)-(b) p99 agree on 159,816,337 ordinary shares, including 3,279,982 in treasury and 156,536,355 held outside treasury. Own p44/p100 confirms the June issue was fully paid. The p100 treasury rollforward is internally inconsistent: it includes a cancellation line while still printing 3,279,982 as its 2011 closing balance. Its cancellation-ad-referendum wording and own subsequent-events note31 p108 explicitly date board approval to 1 March 2012. Reconcile the reporting-date quantity using the two coherent dated shareholder tables and that later-event date, rather than retaining a contradictory zero treasury or arithmetically reconstructing a different endpoint. Both versions were independently reviewed. Net shares are 156,536,355; no later filing supplies the correction.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\14667\\result.json",
+              "sha256": "061b4a991d8a07afb4c6d1eee3272680240baa29e995e6c3cfd349092764e46a"
+            }
+          },
+          {
+            "id": "76949",
+            "reference": "2018-06-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 47782714,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              18
+            ],
+            "reason": "Own Biomm current 30 June 2018 management report explicitly gives 47,782,714 ordinary shares and confirms that the 7 June issue of 12,473,938 shares was fully subscribed and paid. Use that exact endpoint in each version, correcting the thousand-share heading only where wrong. Retain the explicit source zero preferred/treasury counts; full-text review found no contrary holdings or payment disclosure.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\76949\\result.json",
+              "sha256": "facae82ebaa81a350e504e0185dcae87c47c46ac2d4cdb4cfe2ab8320f88b8b9"
+            }
+          },
+          {
+            "id": "77058",
+            "reference": "2018-06-30",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 47782714,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              18
+            ],
+            "reason": "Own Biomm current 30 June 2018 management report explicitly gives 47,782,714 ordinary shares and confirms that the 7 June issue of 12,473,938 shares was fully subscribed and paid. Use that exact endpoint in each version, correcting the thousand-share heading only where wrong. Retain the explicit source zero preferred/treasury counts; full-text review found no contrary holdings or payment disclosure.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\77058\\result.json",
+              "sha256": "b2b27b92bca26fd9b12dcb2f2927334fc7672de8c241418973e7343e68b02dcc"
+            }
+          },
+          {
+            "id": "81711",
+            "reference": "2018-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 1701229,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              54
+            ],
+            "reason": "Own CCX current 31 December 2018 note12 and the dated shareholder table agree on 1,701,229 ordinary shares, totaling 956,432 + 92,535 + 652,262. The prior 2017 total 17,012,293 is not current. Currency is separately labelled thousands of reais. Use the exact current total in each own version; retain source zero preferred and treasury quantities, with no contrary own-period holding disclosure.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\81711\\result.json",
+              "sha256": "5a60d94e73923a57c0086d898425b859e2bd17573ec2c78cf23c5d8676465572"
+            }
+          },
+          {
+            "id": "81954",
+            "reference": "2018-12-31",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 1701229,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              54
+            ],
+            "reason": "Own CCX current 31 December 2018 note12 and the dated shareholder table agree on 1,701,229 ordinary shares, totaling 956,432 + 92,535 + 652,262. The prior 2017 total 17,012,293 is not current. Currency is separately labelled thousands of reais. Use the exact current total in each own version; retain source zero preferred and treasury quantities, with no contrary own-period holding disclosure.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\81954\\result.json",
+              "sha256": "04da8d92c4317183d60f085fa6e870fa87433d14db7f3760ebe601bdb2e344ae"
+            }
+          },
+          {
+            "id": "98349",
+            "reference": "2020-09-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 78449779,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              68
+            ],
+            "reason": "Own Padtec note25.1 for 30 September 2020 gives rounded prose 78,450 but its same-page dated shareholder table totals 78,449,779 individual shares: 43,075,127 + 18,084,240 + 3,927,649 + 13,362,763. The prose explicitly calls capital subscribed and paid in; the own incorporation description distinguishes the subsidiary identity from the new parent shares. Use the precise own current table, not an inferred adjacent ratio or the 2019 comparative 16,343,566. Retain source zero preferred/treasury quantities; no contrary current holding or unpaid-capital evidence.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\98349\\result.json",
+              "sha256": "4f034a1f5931da50a56e74f23338824defbac742cd78ca5a329b81a25c798eaa"
+            }
+          },
+          {
+            "id": "98858",
+            "reference": "2020-09-30",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 78449779,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              69
+            ],
+            "reason": "Own Padtec note25.1 for 30 September 2020 gives rounded prose 78,450 but its same-page dated shareholder table totals 78,449,779 individual shares: 43,075,127 + 18,084,240 + 3,927,649 + 13,362,763. The prose explicitly calls capital subscribed and paid in; the own incorporation description distinguishes subsidiary and parent shares. Independently review each version and use its precise current table, not an adjacent ratio or the 2019 comparative 16,343,566. Retain source zero preferred/treasury quantities; no contrary current holding or unpaid-capital evidence.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\98858\\result.json",
+              "sha256": "744a0f2f123ebb3511dc4c929b36e82f8fa664ce56e178b3f0b8f9230f071204"
+            }
+          },
+          {
+            "id": "98902",
+            "reference": "2020-09-30",
+            "version": 3,
+            "paid_in_shares": {
+              "ON": 78449779,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              69
+            ],
+            "reason": "Own Padtec note25.1 for 30 September 2020 gives rounded prose 78,450 but its same-page dated shareholder table totals 78,449,779 individual shares: 43,075,127 + 18,084,240 + 3,927,649 + 13,362,763. The prose explicitly calls capital subscribed and paid in; the own incorporation description distinguishes subsidiary and parent shares. Independently review each version and use its precise current table, not an adjacent ratio or the 2019 comparative 16,343,566. Retain source zero preferred/treasury quantities; no contrary current holding or unpaid-capital evidence.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\98902\\result.json",
+              "sha256": "c8c66e67f5842a67b8009278792f82cce419bab9d014523dd9667ae38ffae846"
+            }
+          },
+          {
+            "id": "109635",
+            "reference": "2021-09-30",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 595833333,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              41
+            ],
+            "reason": "Own CBA current 30 September 2021 management composition explicitly states 595,833,333 ordinary shares, with controller 75.9% and other shareholders 24.1%. Use the own-version share count, not the nearby market-capitalization number or a later version. Retain source paid-in meaning and explicit zero preferred/treasury quantities; full-text review found no contrary own-period unpaid capital or treasury holding. The separately mentioned asset repurchase option concerns wind-project assets, not treasury shares.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109635\\result.json",
+              "sha256": "9bdecc94fe5fef6bac30b42ba5eb86b4a3e68422e8bae5690ae9b6f10237aeb2"
+            }
+          },
+          {
+            "id": "109639",
+            "reference": "2021-09-30",
+            "version": 3,
+            "paid_in_shares": {
+              "ON": 595833333,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              41
+            ],
+            "reason": "Own CBA current 30 September 2021 management composition explicitly states 595,833,333 ordinary shares, with controller 75.9% and other shareholders 24.1%. Use the own-version share count, not the nearby market-capitalization number or a later version. Retain source paid-in meaning and explicit zero preferred/treasury quantities; full-text review found no contrary own-period unpaid capital or treasury holding. The separately mentioned asset repurchase option concerns wind-project assets, not treasury shares.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\109639\\result.json",
+              "sha256": "e0c5a431ca187b4c690a40d280c0640299cc48566548da2e7854c7fc9068db73"
+            }
+          },
+          {
+            "id": "129783",
+            "reference": "2023-06-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 595833333,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              41
+            ],
+            "reason": "Own CBA current 30 June 2023 composition states 595,833,333 ordinary shares; controller 67.9% and free float 32.1% refer to that current total. Retain the independently confirmed source paid-in count and zero preferred/treasury quantities. Nearby market values are not used to derive shares; no contrary own-period unpaid-capital or treasury holding was found.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\129783\\result.json",
+              "sha256": "e3bd2674ac4e2e791b7eb50c79cbade5396026b175ebcc7c4685910638d13c4b"
+            }
+          },
+          {
+            "id": "131961",
+            "reference": "2023-09-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 595833333,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              41
+            ],
+            "reason": "Own CBA current 30 September 2023 composition states 595,833,333 ordinary shares. The separate November 2023 proposed private subscription and December payment date are subsequent events, not the reporting-date paid-in capital. Correct the wrong thousand-share factor using the own count; retain explicit source zero preferred/treasury quantities.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\131961\\result.json",
+              "sha256": "d026aa9dd5d68410096571facd87e92bf802f2edbbfe4a74d1a3b37655ca277c"
+            }
+          },
+          {
+            "id": "136465",
+            "reference": "2024-03-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 651072697,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              40
+            ],
+            "reason": "Own CBA current 31 March 2024 composition explicitly reports 651,072,697 ordinary shares after completion of the private subscription in January 2024. Use this same-version endpoint and retain source paid-in meaning and explicit zero preferred/treasury quantities. The market value, price and free-float percentage are not share-count inference inputs. Each version was inspected separately.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\136465\\result.json",
+              "sha256": "6854f6040e714eb809084f2f77739af3e0b2100eca1cec9f3108a84e176fd6a2"
+            }
+          },
+          {
+            "id": "139630",
+            "reference": "2024-03-31",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 651072697,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              40
+            ],
+            "reason": "Own CBA current 31 March 2024 composition explicitly reports 651,072,697 ordinary shares after completion of the private subscription in January 2024. Use this same-version endpoint and retain source paid-in meaning and explicit zero preferred/treasury quantities. The market value, price and free-float percentage are not share-count inference inputs. Each version was inspected separately.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\139630\\result.json",
+              "sha256": "ab5d66dd9fd0f9e073263a5fd3777ff195bc0c57f36416052784a91718c4e75c"
+            }
+          }
+        ],
+        "limitations": {
+          "14654/14667": "Treasury rollforward arithmetic is internally inconsistent; two own current shareholder tables plus explicit subsequent cancellation date establish reporting-date counts. This is an evidence-based reconciliation, not a claim that every own-source table agrees.",
+          "11018/11036": "Quantity represents paid-in capital at the filing reference date, received at the unchanged filing receipt. The next-day payment is not backdated into that endpoint."
+        }
+      }
     }
   ],
   "review_priority": {
@@ -491,7 +958,7 @@
     "final_exclusion_allowed": false
   },
   "note_helper_correction": {
-    "tests_passed": 15,
+    "tests_passed": 21,
     "bad_unadmitted_proposals": [
       "42401",
       "89068",
@@ -507,7 +974,8 @@
       "92819",
       "93475"
     ],
-    "scope": "These six earlier proposals were reviewed in the existing accepted batch. Other capital candidates remain under review; an absent proposal is not an unavailable disposition."
+    "scope": "These six earlier proposals were reviewed in the existing accepted batch. Other capital candidates remain under review; an absent proposal is not an unavailable disposition.",
+    "rule": "Review locator handles the own reference before or inside the capital declaration, named class quantities, and separately stated authorized ceilings. Prior periods, subsidiaries, weighted quantities and ambiguous units remain excluded. It proposes no treasury amount or source admission; nonzero treasury no longer prevents locating paid-in-capital evidence. Every proposal requires independent payment/treasury/source review."
   },
   "completed_note_acquisition": {
     "evidence": {

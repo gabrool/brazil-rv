@@ -23,20 +23,16 @@ MONTHS = (
 )
 
 
-def propose_paid_in_note(
-    text: str, reference: date, paid_in: dict, treasury: dict
-) -> dict | None:
+def propose_paid_in_note(text: str, reference: date, paid_in: dict) -> dict | None:
     """Locate literal share-count proposals for review, without source admission.
 
     This intentionally handles only prose with an explicit own-period date,
-    named ON/PN quantities and zero treasury in the source capital table. Tables,
+    named ON/PN quantities. Treasury is not inferred from paid-in capital. Tables,
     lot units, attributed/subsidiary capital and ambiguous periods need separate
     review. The source page and the filing's other capital/treasury notes must be
     reviewed before accepting a proposal. A non-match is not an unavailable
     disposition or a consumer mask. No treasury quantity is inferred here.
     """
-    if any(treasury.get(cls) != 0 for cls in ("ON", "PN") if paid_in[cls] > 0):
-        return None
     key = re.sub(r"\s+", " ", normalized(text))
     if re.search(r"\blote de mil acoes\b|\bacoes.{0,45}\bem milhares\b", key):
         return None
@@ -47,9 +43,20 @@ def propose_paid_in_note(
     )
     candidates = []
     for match in re.finditer(own_date, key):
+        # The date can precede the declaration or occur inside it, e.g.
+        # "O capital social em 31/12/2017 ...". Never cross a sentence to
+        # borrow an earlier capital description or a later report heading.
+        prefix = re.split(r"\.(?:\s|$)", key[: match.start()])[-1]
+        intro = list(
+            re.finditer(r"\bcapital (?:social|subscrito|integralizado)\b", prefix)
+        )
+        start = match.start()
+        if intro and len(prefix) - intro[-1].start() <= 200:
+            start -= len(prefix) - intro[-1].start()
         # A year followed by a period ends the sentence too. Number-grouping
         # periods have another digit immediately after them, not whitespace.
-        passage = re.split(r"\.(?:\s|$)", key[match.end() : match.end() + 850], 1)[0]
+        tail = re.split(r"\.(?:\s|$)", key[match.end() : match.end() + 850], 1)[0]
+        passage = key[start : match.end()] + tail
         declaration = re.search(
             r"\bcapital (?:social|subscrito|integralizado)\b.{0,300}?"
             r"\b(?:representad[oa]|dividid[oa]|compost[oa])\b",
@@ -60,6 +67,8 @@ def propose_paid_in_note(
         ):
             continue
         prelude = passage[: declaration.end()]
+        if re.search(r"\bautorizad[oa]\b", prelude):
+            continue
         if any(int(y) != year for y in re.findall(r"\b(?:19|20)\d{2}\b", prelude)):
             continue
         dates = [
@@ -73,13 +82,19 @@ def propose_paid_in_note(
             dates.append((int(d), MONTHS.index(name) + 1, int(y)))
         if any(parts != (day, month, year) for parts in dates):
             continue
+        quantity_text = re.split(
+            r"\be (?:o (?:capital )?)?autorizado\b",
+            passage[declaration.end() :],
+            maxsplit=1,
+        )[0]
         quantities = {}
         for cls, label in (("ON", "ordinarias"), ("PN", "preferenciais")):
             values = {
                 int(value.replace(".", ""))
                 for value in re.findall(
-                    rf"(?<![\d.,])((?:\d{{1,3}}(?:\.\d{{3}})+|\d+))\s+acoes\s+{label}\b",
-                    passage[declaration.end() :],
+                    rf"(?<![\d.,])((?:\d{{1,3}}(?:\.\d{{3}})+|\d+))\s+"
+                    rf"(?:acoes\s+)?(?:(?:nominativas|escriturais)\s+)*{label}\b",
+                    quantity_text,
                 )
             }
             if len(values) == 1:
@@ -92,7 +107,7 @@ def propose_paid_in_note(
             candidates.append(
                 {
                     "paid_in_shares": quantities,
-                    "normalized_evidence": key[match.start() : match.end()] + passage,
+                    "normalized_evidence": passage,
                 }
             )
     unique = {tuple(c["paid_in_shares"].items()) for c in candidates}

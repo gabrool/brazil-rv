@@ -37,7 +37,7 @@ frozen replay. Original registration bytes are retained.
 
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
-| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded retry are complete: 1,299 readable originals and 53 unresolved transport failures. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 31 reconciled and seven audited unavailable records. | Finish capital-share unit reviews and actual admitted-cohort coverage, then produce final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
+| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded retry are complete: 1,299 readable originals and 53 unresolved transport failures. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 52 reconciled and seven audited unavailable records. | Finish capital-share unit reviews and actual admitted-cohort coverage, then produce final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
 | Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. The 2,196-document supplement is complete and both failures are recovered: 1,766 original XML and 430 exact HTML metadata sources. The main 6,768-document queue continues. Sector translation uses only evidence received by each decision. | Audit remaining primary failures and actual newly admitted account/capital gaps; accept the revised dated bridge, then rebuild sector, cross-market exposures and lending utilization. Candidate retrieval is not automatic identity admission. Existing archives remain immutable comparators. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Refresh utilization against the accepted new identity/free float, then admit the final store. The other six fields remain exact. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
@@ -136,6 +136,24 @@ describes a February purchase of 320 shares without a year-end holding count;
 no subsequent disposal is invented. If all remained after the disclosed split,
 the denominator sensitivity would be 0.0513 bps. This is a disclosed source
 limitation, not an independently reconstructed treasury balance.
+
+A further batch of 21 independently reviewed filings resolves or confirms T4F,
+Qualicorp, Itautec, B2W, Biomm, CCX, Padtec and CBA quantities. Qualicorp's two
+2011-Q2 versions explicitly distinguish 231,411,805 paid-in shares from
+27,219,429 paid on the following day. Padtec's own dated shareholder tables total
+78,449,779 shares, resolving rounded prose without an adjacent-version inference.
+B2W's two 2011 versions have an inconsistent treasury rollforward: their two dated
+shareholder tables show 3,279,982 treasury shares, while cancellation was approved
+on 1 March 2012. Those same-filing sources establish the reporting-date net count
+of 156,536,355; the inconsistency remains explicitly disclosed. Source confirmations
+and precision improvements are included, not only thousandfold corrections.
+
+The capital-note review locator now recognizes dates inside the capital declaration
+and named classes without a repeated word for shares. It separates an explicitly
+authorized ceiling from paid-in quantities and leaves treasury evidence independent.
+Twenty-one targeted tests protect period boundaries, subsidiary/authorized-capital
+exclusions, unit ambiguity and non-inference of treasury. Locator output still requires
+source review and cannot supply masks or admissions automatically.
 
 Of the completed note collection's 231 non-ZIP responses, 228 contain the same
 CVM service-unavailable error, two report a closed connection and one is an
