@@ -1159,6 +1159,7 @@ def fiscal_quarters(
     basis: str,
     metric: str,
     source_indices: dict[date, int] | None = None,
+    source_versions: dict[date, int] | None = None,
 ) -> dict[date, float]:
     cumulative = {}
     for document in ledger.values():
@@ -1179,9 +1180,10 @@ def fiscal_quarters(
             cumulative[(account["start"], months // 3)] = (
                 account,
                 document.get("available_index", 0),
+                document["version"],
             )
     quarters = {}
-    for (start, number), (account, source_index) in cumulative.items():
+    for (start, number), (account, source_index, source_version) in cumulative.items():
         prior = cumulative.get((start, number - 1))
         if number == 1 or prior is not None:
             quarters[account["end"]] = account["value"] - (
@@ -1191,11 +1193,19 @@ def fiscal_quarters(
                 source_indices[account["end"]] = (
                     min(source_index, prior[1]) if prior else source_index
                 )
+            if source_versions is not None:
+                source_versions[account["end"]] = (
+                    max(source_version, prior[2]) if prior else source_version
+                )
     return quarters
 
 
 def trailing_twelve_months(
-    ledger: dict, basis: str, metric: str, end: date
+    ledger: dict,
+    basis: str,
+    metric: str,
+    end: date,
+    source_versions: list[int] | None = None,
 ) -> tuple[float | None, int | None]:
     """Annual flow directly, otherwise current YTD + prior annual − prior YTD.
 
@@ -1220,12 +1230,12 @@ def trailing_twelve_months(
         account = document["accounts"][basis][metric]
         if account["end"] != endpoint or account["start"] is None:
             return None
-        return account, document.get("available_index", 0)
+        return account, document.get("available_index", 0), document["version"]
 
     current = observation(end)
     if current is None:
         return None, None
-    account, source_index = current
+    account, source_index, source_version = current
     start = account["start"]
     months = (end.year - start.year) * 12 + end.month - start.month + 1
     last_day = date(end.year + (end.month == 12), end.month % 12 + 1, 1) - timedelta(
@@ -1234,6 +1244,8 @@ def trailing_twelve_months(
     if start.day != 1 or end != last_day:
         return None, None
     if months == 12:
+        if source_versions is not None:
+            source_versions.append(source_version)
         return account["value"], source_index
     if months not in (3, 6, 9):
         return None, None
@@ -1248,6 +1260,8 @@ def trailing_twelve_months(
         or prior_ytd[0]["start"] != prior_start
     ):
         return None, None
+    if source_versions is not None:
+        source_versions.extend((source_version, annual[2], prior_ytd[2]))
     return account["value"] + annual[0]["value"] - prior_ytd[0]["value"], min(
         source_index, annual[1], prior_ytd[1]
     )
@@ -1290,18 +1304,24 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
     result["_version"] = latest["version"]
     result["_balance_source_index"] = latest.get("available_index", 0)
     flow_sources = defaultdict(dict)
+    flow_versions = defaultdict(dict)
     flow = {
-        m: fiscal_quarters(ledger, basis, m, flow_sources[m])
+        m: fiscal_quarters(ledger, basis, m, flow_sources[m], flow_versions[m])
         for m in ("net_income", "parent_income")
     }
+    ttm_versions = defaultdict(list)
     ttm_values = {
-        m: trailing_twelve_months(ledger, basis, m, end)
+        m: trailing_twelve_months(ledger, basis, m, end, ttm_versions[m])
         for m in ("revenue", "gross_profit", "net_income", "parent_income", "cash_flow")
     }
     ttm = {m: value[0] for m, value in ttm_values.items()}
     source_indices = {
         "liabilities_to_assets": latest.get("available_index", 0),
         "book_to_market": latest.get("available_index", 0),
+    }
+    restated = {
+        "liabilities_to_assets": latest["version"] > 1,
+        "book_to_market": latest["version"] > 1,
     }
 
     def ttm_source(metric, endpoint):
@@ -1315,22 +1335,32 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
         source_indices["gross_profitability"] = min(
             latest.get("available_index", 0), ttm_source("gross_profit", end)
         )
+        restated["gross_profitability"] = latest["version"] > 1 or any(
+            v > 1 for v in ttm_versions["gross_profit"]
+        )
     earnings_metric = (
         "parent_income" if ttm["parent_income"] is not None else "net_income"
     )
     if ttm[earnings_metric] is not None:
         source_indices["earnings_yield_ttm"] = ttm_source(earnings_metric, end)
+        restated["earnings_yield_ttm"] = any(
+            v > 1 for v in ttm_versions[earnings_metric]
+        )
     result["_earnings_ttm"] = (
         ttm["parent_income"] if ttm["parent_income"] is not None else ttm["net_income"]
     )
     previous_year = year_before(end)
-    past_assets = [
-        d["accounts"][basis]["assets"]["value"]
+    past_asset_documents = [
+        d
         for d in ledger.values()
         if d["reference"] == previous_year
         and "assets" in d.get("accounts", {}).get(basis, {})
     ]
-    average_assets = (assets + past_assets[-1]) / 2 if past_assets else None
+    average_assets = (
+        (assets + past_asset_documents[-1]["accounts"][basis]["assets"]["value"]) / 2
+        if past_asset_documents
+        else None
+    )
     sector_text = normalized(sector or "")
     financial = any(
         x in sector_text
@@ -1352,15 +1382,19 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
     if ttm["gross_profit"] is not None and gross_comparable:
         result["gross_profitability"] = ttm["gross_profit"] / assets
     if not financial:
-        prior_revenue = trailing_twelve_months(ledger, basis, "revenue", previous_year)[
-            0
-        ]
+        prior_revenue_versions = []
+        prior_revenue = trailing_twelve_months(
+            ledger, basis, "revenue", previous_year, prior_revenue_versions
+        )[0]
         if ttm["revenue"] is not None and prior_revenue not in (None, 0):
             result["revenue_growth_yoy"] = (ttm["revenue"] - prior_revenue) / abs(
                 prior_revenue
             )
             source_indices["revenue_growth_yoy"] = min(
                 ttm_source("revenue", end), ttm_source("revenue", previous_year)
+            )
+            restated["revenue_growth_yoy"] = any(
+                v > 1 for v in ttm_versions["revenue"] + prior_revenue_versions
             )
         if (
             ttm["net_income"] is not None
@@ -1381,6 +1415,14 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
                     if d["reference"] == previous_year
                     and "assets" in d.get("accounts", {}).get(basis, {})
                 ],
+            )
+            restated["accruals_to_assets"] = (
+                latest["version"] > 1
+                or past_asset_documents[-1]["version"] > 1
+                or any(
+                    v > 1
+                    for v in ttm_versions["net_income"] + ttm_versions["cash_flow"]
+                )
             )
     earnings = (
         flow["parent_income"] if end in flow["parent_income"] else flow["net_income"]
@@ -1408,7 +1450,13 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
                 for ending in [*prior, end]
                 for d in (ending, year_before(ending))
             )
+            restated["sue"] = any(
+                flow_versions[sue_metric][d] > 1
+                for ending in [*prior, end]
+                for d in (ending, year_before(ending))
+            )
     result["_feature_source_indices"] = source_indices
+    result["_feature_has_later_version"] = restated
     return result
 
 
@@ -1516,6 +1564,9 @@ def fundamental_features(
         missing += not bool(d.get("accounts"))
         by_issuer[(d["cnpj"][:8], d["cvm_code"])].append(d)
     output = []
+    version_composition = defaultdict(
+        lambda: {"first_version_only": 0, "includes_later_version": 0}
+    )
     changes_by_issuer = defaultdict(list)
     for event in capital_changes:
         changes_by_issuer[(event["cnpj"][:8], event["cvm_code"])].append(event)
@@ -1529,6 +1580,7 @@ def fundamental_features(
         ledger = {}
         cached = {}
         latest_index = None
+        latest_receipt_version = None
         previous_sector = None
         for date_key, dated in (
             rows.sort("date").partition_by("date", as_dict=True).items()
@@ -1549,6 +1601,7 @@ def fundamental_features(
                     ledger[slot] = d
                     changed = True
                     latest_index = d["available_index"]
+                    latest_receipt_version = d["version"]
             sector = dated.get_column("sector")[0]
             if changed or not cached or previous_sector != sector:
                 cached = fundamental_state(ledger, sector)
@@ -1561,6 +1614,15 @@ def fundamental_features(
                 sessions,
                 market,
                 changes_by_issuer[(cnpj[:8], cvm_code)],
+            )
+            capital_later_version = (
+                max(
+                    (d for d in ledger.values() if d.get("shares")),
+                    key=lambda d: (d["reference"], d["version"]),
+                )["version"]
+                > 1
+                if market_cap is not None
+                else False
             )
             for isin in dated.get_column("isin"):
                 record = {
@@ -1624,6 +1686,23 @@ def fundamental_features(
                 )
                 record["valuation_single_class_flag"] = float(market_cap is not None)
                 record["valuation_single_class_flag_age_sessions"] = 0.0
+                for feature in FEATURES_FUNDAMENTALS:
+                    if record[feature] is None:
+                        continue
+                    later = cached.get("_feature_has_later_version", {}).get(
+                        feature, False
+                    )
+                    if feature in (
+                        "log_market_cap",
+                        "book_to_market",
+                        "earnings_yield_ttm",
+                    ):
+                        later = later or capital_later_version
+                    if feature == "statement_age_sessions":
+                        later = latest_receipt_version > 1
+                    version_composition[(current.year, feature)][
+                        "includes_later_version" if later else "first_version_only"
+                    ] += 1
                 output.append(record)
     return pl.DataFrame(
         output,
@@ -1644,6 +1723,13 @@ def fundamental_features(
         "exact_receipt_documents": exact_count,
         "date_only_receipt_documents": date_count,
         "unrecovered_account_documents": missing,
+        "first_version_documents": sum(d["version"] == 1 for d in documents),
+        "later_version_documents": sum(d["version"] > 1 for d in documents),
+        "feature_version_composition": [
+            {"year": year, "feature": feature, **counts}
+            for (year, feature), counts in sorted(version_composition.items())
+        ],
+        "feature_version_rule": "First-version-only means all contributing financial accounts and share counts are version1; any later-version contribution classifies the composite as includes_later_version. Cadastre versions are separate identity/sector provenance.",
         "valuation_status": "single_class_own_version_shares_prior_observed_close_no_intervening_known_capital_or_unit_boundary",
     }
 

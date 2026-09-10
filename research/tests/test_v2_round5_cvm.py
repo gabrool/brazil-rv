@@ -545,11 +545,19 @@ def test_joined_ttm_restatement_changes_on_its_own_first_receipt():
         "version": "2",
         "receipt": datetime(2024, 1, 4, 15, 44),
     }
-    result, _ = fundamental_features(
+    result, audit = fundamental_features(
         [*deepcopy(documents), revised], [*rad, revised_rad], identity, sessions, market
     )
     assert base.head(2).equals(result.head(2))
     assert base["gross_profitability"][2] == pytest.approx(2.3)
+    assert result["current_balance_version"].to_list() == [1, 1, 1, 1]
+    version_counts = {
+        row["feature"]: row for row in audit["feature_version_composition"]
+    }
+    assert version_counts["gross_profitability"]["first_version_only"] == 2
+    assert version_counts["gross_profitability"]["includes_later_version"] == 2
+    assert version_counts["liabilities_to_assets"]["first_version_only"] == 4
+    assert version_counts["liabilities_to_assets"]["includes_later_version"] == 0
     assert result["gross_profitability"][2] == pytest.approx(2.5)
     unavailable = deepcopy(revised)
     unavailable["accounts"] = {}
