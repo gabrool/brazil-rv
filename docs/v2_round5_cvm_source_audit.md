@@ -33,6 +33,8 @@ A smaller route opens the public ENET viewer for the exact document ID, follows 
 
 Public endpoints: [version-specific viewer](https://www.rad.cvm.gov.br/ENET/frmGerenciaPaginaFRE.aspx?NumeroSequencialDocumento=134555&CodigoTipoInstituicao=1), [original Petrobras v1](https://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=134555). No CAPTCHA bypass is used. Failed original versions remain explicitly unavailable.
 
+Failure-only ZIP recovery also returned originals 37949, 45890 and 51283 after their HTML viewers reported that the documents were absent. Their nested relational XML and PDFs agree on assets/revenue (BRL thousands): 836,784/54,520, 1,461,923/15,143 and 1,697,888/448,215 respectively. PDF physical pages are 11/13, 3/5 and 3/5. The first package distinguishes an unused zero quarter cell from the accumulated-period revenue, which the XML parser selects explicitly. The outer XML supplies the public ID/version/CVM/CNPJ; nested local IDs do not replace it. Capital quantities use their independently encoded units: Telebras 45890 explicitly prints shares in thousands on physical page 2. Source ZIPs total 14.88 MB in `original_unavailable_alternate_probe`; ID 45885 returned a non-ZIP backend-error body and remains unavailable pending a valid response. The normal recovery uses HTML first and requests a ZIP only after a viewer failure. Final families bind every consumed original manifest and verify its content hashes before atomic account attachment.
+
 ## Identity, sectors and capital
 
 - FCA starts in 2010 and has receipt/version headers, CNPJ, activity sector, security types, ticker fields and negotiation bounds. It has no direct ISIN column; dated COTAHIST identity is also required.

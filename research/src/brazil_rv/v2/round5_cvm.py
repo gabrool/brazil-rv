@@ -726,7 +726,29 @@ def recover_originals(root: Path, documents: list[dict], *, workers: int = 3) ->
                 destination / "failure.json",
                 {"id": document["id"], "error": str(error)},
             )
-            return {"id": document["id"], "status": "unavailable", "reason": str(error)}
+            try:
+                result = recover_original_zip(
+                    document, root / "original_zips" / document["id"]
+                )
+                return {
+                    "id": document["id"],
+                    "status": "recovered_zip",
+                    "bytes": result["bytes"],
+                }
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                TypeError,
+                StopIteration,
+                zipfile.BadZipFile,
+            ) as zip_error:
+                return {
+                    "id": document["id"],
+                    "status": "unavailable",
+                    "reason": str(error),
+                    "original_zip_reason": str(zip_error),
+                }
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for record in pool.map(recover, missing):
@@ -743,6 +765,46 @@ def recover_originals(root: Path, documents: list[dict], *, workers: int = 3) ->
     result = {"processed": len(records), "total": len(missing), "records": records}
     write_json(root / "recovery_result.json", result)
     return result
+
+
+def recover_original_zip(document: dict, destination: Path) -> dict:
+    """Failure-only original-package recovery, never a mass ZIP replacement."""
+    from .round5_cvm_xml import original_accounts
+
+    destination.mkdir(parents=True, exist_ok=True)
+    path = destination / "source.zip"
+    manifest_path = destination / "manifest.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf8"))
+        if sha256(path) != manifest["sha256"]:
+            raise ValueError("Original financial ZIP differs from its source manifest")
+        return manifest
+    url = (
+        "https://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?"
+        + urllib.parse.urlencode(
+            {"CodigoInstituicao": 1, "NumeroSequencialDocumento": document["id"]}
+        )
+    )
+    if not path.exists():
+        payload = fetch(url)
+        if not zipfile.is_zipfile(io.BytesIO(payload)):
+            failed = destination / (
+                "unavailable_" + hashlib.sha256(payload).hexdigest()[:16] + ".bin"
+            )
+            if not failed.exists():
+                failed.write_bytes(payload)
+            raise ValueError("Original download returned a non-ZIP response")
+        path.write_bytes(payload)
+    original_accounts(document, path)
+    manifest = {
+        "schema": "ROUND5_CVM_ORIGINAL_ZIP_V1",
+        "document": document,
+        "url": url,
+        "bytes": path.stat().st_size,
+        "sha256": sha256(path),
+    }
+    write_json(manifest_path, manifest)
+    return manifest
 
 
 def fca_documents(
@@ -1805,15 +1867,38 @@ def build(root: Path, store: Path, output: Path) -> dict:
             try:
                 attach_viewer_accounts(document, path)
                 recovery_audit["attached"] += 1
-                original_sources.append({
-                    "document_id": document["id"],
-                    "manifest_path": str(path / "manifest.json"),
-                    "manifest_sha256": sha256(path / "manifest.json"),
-                })
+                original_sources.append(
+                    {
+                        "document_id": document["id"],
+                        "manifest_path": str(path / "manifest.json"),
+                        "manifest_sha256": sha256(path / "manifest.json"),
+                    }
+                )
             except (ValueError, KeyError) as error:
                 recovery_audit["invalid"].append(
                     {"id": document["id"], "reason": str(error)}
                 )
+        zip_root = root / "original_zips" / document["id"]
+        if not document.get("accounts") and (zip_root / "manifest.json").exists():
+            from .round5_cvm_xml import original_accounts
+
+            original_manifest = json.loads(
+                (zip_root / "manifest.json").read_text(encoding="utf8")
+            )
+            if sha256(zip_root / "source.zip") != original_manifest["sha256"]:
+                raise ValueError(
+                    "Original financial ZIP differs from its source manifest"
+                )
+            parsed = original_accounts(document, zip_root / "source.zip")
+            document.update(parsed)
+            recovery_audit["attached"] += 1
+            original_sources.append(
+                {
+                    "document_id": document["id"],
+                    "manifest_path": str(zip_root / "manifest.json"),
+                    "manifest_sha256": sha256(zip_root / "manifest.json"),
+                }
+            )
     write_json(output / "original_source_manifests.json", original_sources)
     capital_changes = capital_change_observations(root, rad, sessions)
     write_json(output / "capital_change_observations.json", capital_changes)
@@ -1842,6 +1927,9 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "schema": "ROUND5_CVM_DERIVED_V1",
         "source_root": str(root),
         "source_program_sha256": sha256(Path(__file__)),
+        "original_zip_parser_sha256": sha256(
+            Path(__file__).with_name("round5_cvm_xml.py")
+        ),
         "base_store": str(store),
         "base_store_manifest_sha256": sha256(store / "manifest.json"),
         "through": str(END),
@@ -1860,7 +1948,8 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "coverage": family_tables,
         "files": {
             p.name: {"sha256": sha256(p), "bytes": p.stat().st_size}
-            for p in output.iterdir() if p.is_file()
+            for p in output.iterdir()
+            if p.is_file()
         },
         "limitations": [
             "EarlyFCA2010–2017 omits ticker symbols; only unique exact historical legal spellings with contemporaneous class/existing-security evidence are admitted.",

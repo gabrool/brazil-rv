@@ -1,6 +1,8 @@
 from copy import deepcopy
 from datetime import date, datetime
 import io
+import hashlib
+import json
 from pathlib import Path
 
 import numpy as np
@@ -64,6 +66,23 @@ def test_float_snapshot_date_is_separate_from_filing_year_and_receipt(monkeypatc
     assert result["snapshot_date"] == date(2024, 4, 30)
     assert result["reference"] == date(2024, 1, 1)
     assert result["cvm_code"] == "001234"
+
+
+def test_viewer_source_hash_failure_cannot_attach_partial_accounts(tmp_path):
+    payload = b"<h2>Reais Mil</h2><table><tr><td>Conta</td><td>Descricao</td><td>01/01/2024 a 31/03/2024</td></tr><tr><td>3.01</td><td>Receita</td><td>100</td></tr></table>"
+    document = {"id": "10", "version": 1, "reference": date(2024, 3, 31)}
+    (tmp_path / "valid.html").write_bytes(payload)
+    (tmp_path / "changed.html").write_bytes(payload + b"changed")
+    pages = [
+        {"file": name, "sha256": hashlib.sha256(payload).hexdigest(), "basis": "con"}
+        for name in ("valid.html", "changed.html")
+    ]
+    (tmp_path / "manifest.json").write_text(
+        json.dumps({"document": document, "pages": pages}, default=str)
+    )
+    with pytest.raises(ValueError, match="differs from its source manifest"):
+        round5_cvm.attach_viewer_accounts(document, tmp_path)
+    assert "accounts" not in document
 
 
 def test_event_source_mutation_changes_first_available_decision_only():
