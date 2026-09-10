@@ -1,0 +1,1193 @@
+{
+  "schema": "ROUND5_CONTINUOUS_BOOK_REVIEW_V1",
+  "code_commit": "c1de021",
+  "clean_worktree": "C:\\quant\\brazil-rv-round5-continuous-c1de021",
+  "wall_seconds": 121.40893249999499,
+  "peak_worker_working_set_gib": 3.438251495361328,
+  "memory_measurement": "Windows lifetime PeakWorkingSet64 of actual Python worker; uv environment launcher is a separate small parent",
+  "targeted_validation": "5 tests passed; Ruff format/check clean",
+  "source_result_path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\continuous_s0_c1de021\\result.json",
+  "source_result_sha256": "b8a2cb4d2af030695d01761808ae4de8126d430bbe5dbdb1969801f8c38f006c",
+  "source_memory_path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\continuous_s0_c1de021_worker_memory.json",
+  "source_memory_sha256": "4ae3eead3d1736557e1ccd983a4ba25ffd2245142912d179e6bff29fbde88533",
+  "all_scenario_gate_failures": {
+    "cost_2_borrow_balance": [],
+    "cost_2_borrow_strict": [],
+    "cost_2_borrow_open": [],
+    "borrow_balance": [],
+    "borrow_strict": [],
+    "borrow_open": [],
+    "cost_7_borrow_balance": [],
+    "cost_7_borrow_strict": [],
+    "cost_7_borrow_open": [],
+    "sensitivity_buffer_0": [],
+    "sensitivity_buffer_2k": [],
+    "comparator_sterile_proceeds": [],
+    "comparator_uniform_borrow": [],
+    "d5_only_diagnostic": []
+  },
+  "execution_policy": {
+    "buffer_per_quintile": 9,
+    "capacity_buffer_per_side": 30,
+    "horizons": [
+      3,
+      5,
+      10
+    ],
+    "inverse_volatility": false,
+    "label": "execution_parameter_selected_in_sample",
+    "theta": 1.0
+  },
+  "fold_means": [
+    {
+      "fold": "F1",
+      "start": "2018-01-02",
+      "end": "2018-06-29",
+      "dates": 123,
+      "continuous_mean_excess_bps": 9.245164933228708,
+      "repaired_reset_mean_excess_bps": 9.19553792852285
+    },
+    {
+      "fold": "F2",
+      "start": "2018-07-02",
+      "end": "2018-12-28",
+      "dates": 122,
+      "continuous_mean_excess_bps": -10.577908902826971,
+      "repaired_reset_mean_excess_bps": -7.977871188681605
+    },
+    {
+      "fold": "F3",
+      "start": "2019-01-02",
+      "end": "2019-06-28",
+      "dates": 122,
+      "continuous_mean_excess_bps": 2.1971757895407733,
+      "repaired_reset_mean_excess_bps": 0.31817148496087994
+    },
+    {
+      "fold": "F4",
+      "start": "2019-07-01",
+      "end": "2019-12-30",
+      "dates": 126,
+      "continuous_mean_excess_bps": 4.626109957167539,
+      "repaired_reset_mean_excess_bps": 7.003378539656329
+    },
+    {
+      "fold": "F5",
+      "start": "2020-01-02",
+      "end": "2020-06-30",
+      "dates": 123,
+      "continuous_mean_excess_bps": 19.41944377406179,
+      "repaired_reset_mean_excess_bps": 25.006986877766007
+    },
+    {
+      "fold": "F6",
+      "start": "2020-07-01",
+      "end": "2020-12-30",
+      "dates": 126,
+      "continuous_mean_excess_bps": 3.4295467392834245,
+      "repaired_reset_mean_excess_bps": 2.0829494915849613
+    },
+    {
+      "fold": "F7",
+      "start": "2021-01-04",
+      "end": "2021-06-30",
+      "dates": 122,
+      "continuous_mean_excess_bps": 2.096500304848798,
+      "repaired_reset_mean_excess_bps": 6.027789961812766
+    },
+    {
+      "fold": "F8",
+      "start": "2021-07-01",
+      "end": "2021-12-30",
+      "dates": 125,
+      "continuous_mean_excess_bps": 10.584878204071488,
+      "repaired_reset_mean_excess_bps": 9.62093287277251
+    },
+    {
+      "fold": "F9",
+      "start": "2022-01-03",
+      "end": "2022-06-30",
+      "dates": 124,
+      "continuous_mean_excess_bps": 12.84867692386552,
+      "repaired_reset_mean_excess_bps": 10.418942016611123
+    },
+    {
+      "fold": "F10",
+      "start": "2022-07-01",
+      "end": "2022-12-29",
+      "dates": 126,
+      "continuous_mean_excess_bps": -3.858180080195283,
+      "repaired_reset_mean_excess_bps": -2.6798267533920552
+    },
+    {
+      "fold": "F11",
+      "start": "2023-01-02",
+      "end": "2023-06-30",
+      "dates": 124,
+      "continuous_mean_excess_bps": 3.722842726603479,
+      "repaired_reset_mean_excess_bps": 2.673065457943793
+    },
+    {
+      "fold": "F12",
+      "start": "2023-07-03",
+      "end": "2023-12-28",
+      "dates": 124,
+      "continuous_mean_excess_bps": 0.8562685195094227,
+      "repaired_reset_mean_excess_bps": 1.4757649431243605
+    },
+    {
+      "fold": "F13",
+      "start": "2024-01-02",
+      "end": "2024-06-28",
+      "dates": 124,
+      "continuous_mean_excess_bps": -1.122443379214934,
+      "repaired_reset_mean_excess_bps": -3.495926493579633
+    },
+    {
+      "fold": "F14",
+      "start": "2024-07-01",
+      "end": "2024-12-30",
+      "dates": 127,
+      "continuous_mean_excess_bps": 10.035904741873047,
+      "repaired_reset_mean_excess_bps": 7.795930564165126
+    }
+  ],
+  "result": {
+    "action_terms_source": "inferred_cotahist_dismes_v1",
+    "borrow_source_label": "lending_archive_v2_2009_202412",
+    "boundary_evidence": [
+      {
+        "from_fold": "F1",
+        "nav_continuity_exact": true,
+        "new_model_date": "2018-07-02",
+        "next_close_state": {
+          "free_cash": -0.06027908581716617,
+          "hedge_restricted_cash": 0.20620327083784074,
+          "hedge_signed_shares": -0.002515363734941287,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.104733253622307
+        },
+        "next_opening_nav": 1.1528166415025156,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 1.1528166415025156,
+        "previous_date": "2018-06-29",
+        "prior_close_state_carried": {
+          "free_cash": -0.05583111929440125,
+          "hedge_restricted_cash": 0.20620327083784074,
+          "hedge_signed_shares": -0.002515363734941287,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.1035353234471803
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 0,
+        "to_fold": "F2"
+      },
+      {
+        "from_fold": "F2",
+        "nav_continuity_exact": true,
+        "new_model_date": "2019-01-02",
+        "next_close_state": {
+          "free_cash": -0.06257524082822973,
+          "hedge_restricted_cash": 0.08609707980047021,
+          "hedge_signed_shares": -0.0010464612234752945,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.0388696101477723
+        },
+        "next_opening_nav": 1.0408612256272218,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 1.0408612256272218,
+        "previous_date": "2018-12-28",
+        "prior_close_state_carried": {
+          "free_cash": -0.08583565832254622,
+          "hedge_restricted_cash": 0.1926965207050259,
+          "hedge_signed_shares": -0.0023421170297963177,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.0444969206762653
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 0,
+        "to_fold": "F3"
+      },
+      {
+        "from_fold": "F3",
+        "nav_continuity_exact": true,
+        "new_model_date": "2019-07-01",
+        "next_close_state": {
+          "free_cash": -0.016889498283723756,
+          "hedge_restricted_cash": 0.16528614083997545,
+          "hedge_signed_shares": -0.0017030924402550408,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.0432344673452687
+        },
+        "next_opening_nav": 1.098703672088414,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 31,
+        "pre_switch_orders_cancelled_after_switch": [],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 1.098703672088414,
+        "previous_date": "2019-06-28",
+        "prior_close_state_carried": {
+          "free_cash": -0.013489474417655556,
+          "hedge_restricted_cash": 0.10979843546626894,
+          "hedge_signed_shares": -0.0011336957714637992,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.081411749178432
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 0,
+        "to_fold": "F4"
+      },
+      {
+        "from_fold": "F4",
+        "nav_continuity_exact": true,
+        "new_model_date": "2020-01-02",
+        "next_close_state": {
+          "free_cash": -0.04512131115999083,
+          "hedge_restricted_cash": 0.126800225767965,
+          "hedge_signed_shares": -0.0012144864851671056,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.163794124688601
+        },
+        "next_opening_nav": 1.1913169955194634,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 1.1913169955194634,
+        "previous_date": "2019-12-30",
+        "prior_close_state_carried": {
+          "free_cash": -0.06606669682104264,
+          "hedge_restricted_cash": 0.126800225767965,
+          "hedge_signed_shares": -0.0012144864851671056,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.163794124688601
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 0,
+        "to_fold": "F5"
+      },
+      {
+        "from_fold": "F5",
+        "nav_continuity_exact": true,
+        "new_model_date": "2020-07-01",
+        "next_close_state": {
+          "free_cash": 0.04675122750444331,
+          "hedge_restricted_cash": 0.5099579839654745,
+          "hedge_signed_shares": -0.005571938348915136,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 0.9182396152880545
+        },
+        "next_opening_nav": 1.5233804780652989,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 1.5233804780652989,
+        "previous_date": "2020-06-30",
+        "prior_close_state_carried": {
+          "free_cash": -0.12585628843040939,
+          "hedge_restricted_cash": 0.18913820991551908,
+          "hedge_signed_shares": -0.002110352526192268,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.3912004520160774
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 0,
+        "to_fold": "F6"
+      },
+      {
+        "from_fold": "F6",
+        "nav_continuity_exact": true,
+        "new_model_date": "2021-01-04",
+        "next_close_state": {
+          "free_cash": -0.07117196362454882,
+          "hedge_restricted_cash": 0.02147535814170408,
+          "hedge_signed_shares": -0.0001903703777505673,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.5597053114295594
+        },
+        "next_opening_nav": 1.5970997060177003,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 1.5970997060177003,
+        "previous_date": "2020-12-30",
+        "prior_close_state_carried": {
+          "free_cash": -0.06946763087346847,
+          "hedge_restricted_cash": 0.02147535814170408,
+          "hedge_signed_shares": -0.0001903703777505673,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.5573758645212008
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 0,
+        "to_fold": "F7"
+      },
+      {
+        "from_fold": "F7",
+        "nav_continuity_exact": true,
+        "new_model_date": "2021-07-01",
+        "next_close_state": {
+          "free_cash": -0.10090215309573117,
+          "hedge_restricted_cash": 0.49586434570408866,
+          "hedge_signed_shares": -0.004067257439839788,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.6427052583356418
+        },
+        "next_opening_nav": 1.6434132965417272,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 1.6434132965417272,
+        "previous_date": "2021-06-30",
+        "prior_close_state_carried": {
+          "free_cash": -0.07850314206060714,
+          "hedge_restricted_cash": 0.49586434570408866,
+          "hedge_signed_shares": -0.004067257439839788,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.6363169101078887
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 0,
+        "to_fold": "F8"
+      },
+      {
+        "from_fold": "F8",
+        "nav_continuity_exact": true,
+        "new_model_date": "2022-01-03",
+        "next_close_state": {
+          "free_cash": -0.3052423987582096,
+          "hedge_restricted_cash": 0.0,
+          "hedge_signed_shares": 0.001665323795939665,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.8945897101253957
+        },
+        "next_opening_nav": 1.9202878645553083,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 1,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [
+          "order-00008046"
+        ],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 1.9202878645553083,
+        "previous_date": "2021-12-30",
+        "prior_close_state_carried": {
+          "free_cash": -0.27841560861414827,
+          "hedge_restricted_cash": 0.0,
+          "hedge_signed_shares": 0.001665323795939665,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 1.8916891176982455
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 1,
+        "to_fold": "F9"
+      },
+      {
+        "from_fold": "F9",
+        "nav_continuity_exact": true,
+        "new_model_date": "2022-07-01",
+        "next_close_state": {
+          "free_cash": 0.0048056966763881425,
+          "hedge_restricted_cash": 0.0,
+          "hedge_signed_shares": 0.0005144355126584525,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 2.135707442305387
+        },
+        "next_opening_nav": 2.3583779457392318,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [
+          "order-00009345",
+          "order-00009359"
+        ],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 2.3583779457392318,
+        "previous_date": "2022-06-30",
+        "prior_close_state_carried": {
+          "free_cash": -0.0205096145057912,
+          "hedge_restricted_cash": 0.0,
+          "hedge_signed_shares": 0.0005144355126584525,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 2.2755796619186723
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 2,
+        "to_fold": "F10"
+      },
+      {
+        "from_fold": "F10",
+        "nav_continuity_exact": true,
+        "new_model_date": "2023-01-02",
+        "next_close_state": {
+          "free_cash": -0.22873830484644037,
+          "hedge_restricted_cash": 0.14346617794788952,
+          "hedge_signed_shares": -0.0013641571306455627,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 2.3615889114662094
+        },
+        "next_opening_nav": 2.3776545271117104,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 2.3776545271117104,
+        "previous_date": "2022-12-29",
+        "prior_close_state_carried": {
+          "free_cash": -0.2352246737317668,
+          "hedge_restricted_cash": 0.14346617794788952,
+          "hedge_signed_shares": -0.0013641571306455627,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 2.3615889114662094
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 0,
+        "to_fold": "F11"
+      },
+      {
+        "from_fold": "F11",
+        "nav_continuity_exact": true,
+        "new_model_date": "2023-07-03",
+        "next_close_state": {
+          "free_cash": -0.09384970959889756,
+          "hedge_restricted_cash": 0.048271901972039705,
+          "hedge_signed_shares": -0.0004163524406765543,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 2.5555598724032587
+        },
+        "next_opening_nav": 2.6374114434763385,
+        "next_pending_entry_count": 1,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 2.6374114434763385,
+        "previous_date": "2023-06-30",
+        "prior_close_state_carried": {
+          "free_cash": -0.32356175163798323,
+          "hedge_restricted_cash": 0.0,
+          "hedge_signed_shares": 0.0018844649584938513,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 2.5495179783370476
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 0,
+        "to_fold": "F12"
+      },
+      {
+        "from_fold": "F12",
+        "nav_continuity_exact": true,
+        "new_model_date": "2024-01-02",
+        "next_close_state": {
+          "free_cash": -0.24032246344452254,
+          "hedge_restricted_cash": 0.24155038402683515,
+          "hedge_signed_shares": -0.001903559763209392,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 2.7759249872925054
+        },
+        "next_opening_nav": 2.8146684828966686,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 1,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [
+          "order-00011901"
+        ],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 2.8146684828966686,
+        "previous_date": "2023-12-28",
+        "prior_close_state_carried": {
+          "free_cash": -0.24810298595296004,
+          "hedge_restricted_cash": 0.24155038402683515,
+          "hedge_signed_shares": -0.001903559763209392,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 2.786474945305364
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 1,
+        "to_fold": "F13"
+      },
+      {
+        "from_fold": "F13",
+        "nav_continuity_exact": true,
+        "new_model_date": "2024-07-01",
+        "next_close_state": {
+          "free_cash": -0.6337743618904054,
+          "hedge_restricted_cash": 0.0,
+          "hedge_signed_shares": 0.004219169874134543,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 2.928814525935918
+        },
+        "next_opening_nav": 2.912723771259457,
+        "next_pending_entry_count": 0,
+        "next_pending_exit_count": 0,
+        "opening_long_count": 30,
+        "opening_short_count": 30,
+        "pre_switch_orders_cancelled_after_switch": [],
+        "pre_switch_orders_filled_after_switch": [],
+        "previous_close_nav": 2.912723771259457,
+        "previous_date": "2024-06-28",
+        "prior_close_state_carried": {
+          "free_cash": -0.6359454879371896,
+          "hedge_restricted_cash": 0.0,
+          "hedge_signed_shares": 0.004219169874134543,
+          "payables": 0.0,
+          "receivables": 0.0,
+          "restricted_cash": 2.9288959283090006
+        },
+        "prior_pending_entry_count": 0,
+        "prior_pending_exit_count": 0,
+        "to_fold": "F14"
+      }
+    ],
+    "date_count": 1738,
+    "deployment_changed": false,
+    "engineering_gate_failures": [],
+    "files": {
+      "economics.json": "9f78fbf122c90fe5c1015844a231f2cde7e85d323ad8f8c1fde9fe2fb837fabb",
+      "fold_reset_comparators.json": "2a0c4791263542de173415af6f78e592d8997ea6a7dbf3b0a995d49a410fbafc",
+      "frozen_design.json": "8d5e8e1a012d7b3b4df1d9ab07c0378d67b673646414d262e20bbf92b2fb7027"
+    },
+    "fold_reset_comparison": {
+      "repaired": {
+        "continuous_minus_reset_mean_bps": -0.27224422048710134,
+        "mean_net_excess_bps": 4.822005413696003,
+        "unresolved_folds": [
+          "F8",
+          "F9"
+        ]
+      },
+      "sealed": {
+        "continuous_minus_reset_mean_bps": -0.385999345407985,
+        "mean_net_excess_bps": 4.935760538616886,
+        "unresolved_folds": [
+          "F4",
+          "F8",
+          "F9"
+        ]
+      }
+    },
+    "frozen_design_sha256": "8d5e8e1a012d7b3b4df1d9ab07c0378d67b673646414d262e20bbf92b2fb7027",
+    "headline": {
+      "annualized_net_excess_sharpe": 0.7774035457662892,
+      "average_holding_sessions_approximation": 14.104617793539324,
+      "beta_hedge": true,
+      "blocked_entry_candidates_by_cause": {
+        "gross_cap": 43,
+        "missing_reference": 0,
+        "name_cap": 0,
+        "net_cap": 3335
+      },
+      "borrow_source": "borrow_balance",
+      "cancellations_by_reason": {
+        "band_exit": 0,
+        "evaluation_end": 0,
+        "exit_instruction": 0,
+        "expired": 60,
+        "position_closed": 0,
+        "prior_action_unresolved": 3,
+        "risk_name_cap": 0,
+        "risk_net_cap": 0,
+        "terminal_settlement": 22
+      },
+      "cancelled_entry_count": 3,
+      "compounded_net_excess_terminal_settlement_haircut_scenario": 0.7180846040139299,
+      "compounded_net_excess_unresolved_excluded": 1.044963758326467,
+      "compounded_net_excess_vs_all_cash": 1.044963758326467,
+      "economics_unresolved": true,
+      "entry_defect_signatures": {
+        "D1_entry_pending_printed_unblocked_unfilled": 0,
+        "D2_entry_fill_quantity_short": 0,
+        "D3_blocked_open_slots": 0,
+        "D4_cap_block_defects": 0,
+        "D5_ineligible_exit_within_hold_window": 0
+      },
+      "excluded_short_entry_candidate_count": 8410,
+      "exit_instructions_by_cause": {
+        "ineligible_hold_exhausted": 185,
+        "rank_out_of_retention": 6312,
+        "settlement_grace": 0,
+        "terminal": 60
+      },
+      "fill_count": 14353,
+      "gross_shortfall_decomposition": {
+        "occupancy_band_exhausted": 0.004411200613732259,
+        "occupancy_blocked": 0.0,
+        "occupancy_exit_gap": 0.0015726889144610664,
+        "occupancy_other": -0.0007671653241273495,
+        "occupancy_pending": 5.753739930955121e-05,
+        "occupancy_share": 0.20445764858657517,
+        "sizing_fill": -0.006321450228770519,
+        "sizing_mark_drift": -0.04082255572666556,
+        "sizing_nav_drift": 0.06766609699446219,
+        "small_universe": 0.0,
+        "total": 0.025796352642401654
+      },
+      "hedge_beta_fallback_sessions": 58,
+      "hedge_capped_session_count": 1,
+      "hedge_notional_cap_nav": 0.6,
+      "imputed_rate_share_of_short_notional": 0.00966537552868182,
+      "ineligible_exit_reeligible_within_10_sessions_share": 0.004925350161613052,
+      "ineligible_held_sessions_by_cause": {
+        "membership_false": 1400,
+        "score_nonfinite": 1400,
+        "score_valid_false": 1400
+      },
+      "ineligible_hold_sessions": 5,
+      "insolvency_date": null,
+      "insolvent": false,
+      "intended_entry_count": 6766,
+      "intended_entry_fill_rate": 0.9993908243478777,
+      "intended_order_count": 14438,
+      "mark_mode": "raw",
+      "maximum_absolute_hedge_fraction_nav": 0.6056859049711882,
+      "maximum_gross_fraction_nav": 2.3293245529507987,
+      "maximum_stale_mark_inventory_fraction_nav": 0.07305145050392478,
+      "maximum_unresolved_claim_inventory_fraction_nav": 0.0,
+      "maximum_unresolved_stale_inventory_fraction_nav": 0.07305145050392478,
+      "mean_absolute_ex_ante_beta_after_hedge": 0.016511863964486395,
+      "mean_absolute_net_fraction_nav_including_hedge": 0.10725295232520883,
+      "mean_absolute_volatility_occupancy_deviation_long": 0.6561565017261219,
+      "mean_absolute_volatility_occupancy_deviation_short": 0.6974683544303798,
+      "mean_daily_exits_per_side": 2.063866513233602,
+      "mean_deployed_net_fraction_nav": 0.07870062771329543,
+      "mean_entry_eligible_name_count": 183.49654775604142,
+      "mean_gross_fraction_nav": 1.9742036473575983,
+      "mean_gross_fraction_nav_including_hedge": 2.098082700187365,
+      "mean_net_excess_bps_per_day": 4.549761193208901,
+      "mean_pending_exit_age_sessions": 4.370967741935484,
+      "mean_stale_mark_inventory_fraction_nav": 0.0035685518254160178,
+      "mean_turnover_fraction_nav": 0.27993720585068105,
+      "mean_unresolved_claim_inventory_fraction_nav": 0.0,
+      "mean_unresolved_stale_inventory_fraction_nav": 0.0035685518254160178,
+      "mean_volatility_group_size_by_quintile": [
+        37.09378596087457,
+        36.699654775604145,
+        36.699079401611044,
+        36.699654775604145,
+        36.304372842347526
+      ],
+      "mean_volatility_occupancy_long_by_quintile": [
+        5.717491369390103,
+        6.165707710011508,
+        6.420023014959724,
+        6.280207134637514,
+        5.201380897583429
+      ],
+      "mean_volatility_occupancy_short_by_quintile": [
+        5.499424626006904,
+        6.147871116225547,
+        6.389528193325662,
+        6.1513233601841195,
+        5.135788262370541
+      ],
+      "mean_volatility_quota_by_quintile": [
+        6.0,
+        6.0,
+        6.0,
+        6.0,
+        6.0
+      ],
+      "minimum_gross_fraction_nav": 0.0,
+      "minimum_volatility_group_size_by_quintile": [
+        26,
+        26,
+        26,
+        26,
+        26
+      ],
+      "placeholder_priced_session_count": 1368,
+      "placeholder_rate_share_of_short_notional": 0.6696360141109622,
+      "risk_trim_days_by_type": {
+        "gross": 10,
+        "name": 249,
+        "net": 35
+      },
+      "risk_trim_notional_by_type": {
+        "gross": 4.6418793074607265,
+        "name": 0.9245867278180824,
+        "net": 11.488785364328498
+      },
+      "same_close_replacements": 6485,
+      "same_day_action_sessions": 692,
+      "scenario": "borrow_balance",
+      "settled_then_printed_count": 1,
+      "settlement_economics_unresolved_fraction_nav": 0.15,
+      "settlement_grace_sessions": 10,
+      "settlement_haircut": 0.3,
+      "share_sizing_mode": "notional_entries_position_fraction_exits",
+      "short_notional_weighted_borrow_rate": 0.028891975096803062,
+      "short_side_unshortable_candidate_share": 0.10668121218271535,
+      "spilled_entries_long_by_quintile": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "spilled_entries_short_by_quintile": [
+        0,
+        1,
+        1,
+        4,
+        0
+      ],
+      "stale_mark_name_days": 198,
+      "terminal_boundary_unpriced_inventory_notional": 0.0,
+      "terminal_hedge_last_mark_settlement_notional": 0.0,
+      "terminal_hedge_signed_notional": 0.0,
+      "terminal_nav": 3.467420814855944,
+      "terminal_nav_settlement_haircut_scenario": 2.9131676751654094,
+      "terminal_nav_unresolved_excluded": 3.467420814855944,
+      "terminal_net_notional_including_hedge": 0.0,
+      "terminal_no_print_dominates": false,
+      "terminal_settlement_convention": "last_mark_after_10_sessions",
+      "terminal_settlement_count": 22,
+      "terminal_settlement_economics_unresolved": true,
+      "terminal_settlement_notional": 1.4131138135470604,
+      "terminal_settlement_notional_fraction_nav": 0.6853204848187711,
+      "terminal_unresolved_inventory_fraction_nav": 0.0,
+      "terminal_unresolved_reason_breakdown": {
+        "no_terminal_print": {
+          "count": 0,
+          "notional": 0.0
+        },
+        "other": {
+          "count": 0,
+          "notional": 0.0
+        },
+        "prior_pending_exit": {
+          "count": 0,
+          "notional": 0.0
+        },
+        "settlement_grace_sessions": {
+          "count": 0,
+          "notional": 0.0
+        },
+        "unresolved_action": {
+          "count": 0,
+          "notional": 0.0
+        }
+      },
+      "unresolved_action_name_days": 0,
+      "unresolved_inventory_count": 0,
+      "unresolved_inventory_notional": 0.0,
+      "unresolved_payable": 0.0,
+      "unresolved_receivable": 0.0,
+      "valuation_scenario_count": 0,
+      "volatility_balanced_entries": true,
+      "zero_entry_days_by_cause": {
+        "gross_cap": 0,
+        "missing_reference": 0,
+        "name_cap": 0,
+        "net_cap": 33,
+        "small_universe": 0
+      }
+    },
+    "ledger_state_initializations": 1,
+    "limitations": [
+      "Development-only descriptive replay of in-sample-selected S0/policy; no new selection or deployment claim.",
+      "Registered inferred corporate-action and terminal-settlement uncertainty remains labelled; fold resets are historical comparators."
+    ],
+    "model_switch_count": 13,
+    "neural_fits": false,
+    "official_validation_accessed": false,
+    "research_claim": true,
+    "schedule_source": "reconstructed_v1",
+    "schema": "ROUND5_CONTINUOUS_BOOK_RESULT_V1",
+    "score_coverage": [
+      {
+        "date_count": 123,
+        "dates_with_any_score_by_head": [
+          123,
+          123,
+          123,
+          123,
+          123
+        ],
+        "end_offset": 122,
+        "final_date_valid_names_by_head": [
+          137,
+          137,
+          137,
+          137,
+          137
+        ],
+        "first_session_index": 1979,
+        "fold": "F1",
+        "last_session_index": 2101,
+        "missing_entire_score_dates": [],
+        "start_offset": 0
+      },
+      {
+        "date_count": 122,
+        "dates_with_any_score_by_head": [
+          122,
+          122,
+          122,
+          122,
+          122
+        ],
+        "end_offset": 244,
+        "final_date_valid_names_by_head": [
+          147,
+          147,
+          147,
+          147,
+          147
+        ],
+        "first_session_index": 2102,
+        "fold": "F2",
+        "last_session_index": 2223,
+        "missing_entire_score_dates": [],
+        "start_offset": 123
+      },
+      {
+        "date_count": 122,
+        "dates_with_any_score_by_head": [
+          122,
+          122,
+          122,
+          122,
+          122
+        ],
+        "end_offset": 366,
+        "final_date_valid_names_by_head": [
+          144,
+          144,
+          144,
+          144,
+          144
+        ],
+        "first_session_index": 2224,
+        "fold": "F3",
+        "last_session_index": 2345,
+        "missing_entire_score_dates": [],
+        "start_offset": 245
+      },
+      {
+        "date_count": 126,
+        "dates_with_any_score_by_head": [
+          126,
+          126,
+          126,
+          126,
+          126
+        ],
+        "end_offset": 492,
+        "final_date_valid_names_by_head": [
+          161,
+          161,
+          161,
+          161,
+          161
+        ],
+        "first_session_index": 2346,
+        "fold": "F4",
+        "last_session_index": 2471,
+        "missing_entire_score_dates": [],
+        "start_offset": 367
+      },
+      {
+        "date_count": 123,
+        "dates_with_any_score_by_head": [
+          123,
+          123,
+          123,
+          123,
+          123
+        ],
+        "end_offset": 615,
+        "final_date_valid_names_by_head": [
+          185,
+          185,
+          185,
+          185,
+          185
+        ],
+        "first_session_index": 2472,
+        "fold": "F5",
+        "last_session_index": 2594,
+        "missing_entire_score_dates": [],
+        "start_offset": 493
+      },
+      {
+        "date_count": 126,
+        "dates_with_any_score_by_head": [
+          126,
+          126,
+          126,
+          126,
+          126
+        ],
+        "end_offset": 741,
+        "final_date_valid_names_by_head": [
+          197,
+          197,
+          197,
+          197,
+          197
+        ],
+        "first_session_index": 2595,
+        "fold": "F6",
+        "last_session_index": 2720,
+        "missing_entire_score_dates": [],
+        "start_offset": 616
+      },
+      {
+        "date_count": 122,
+        "dates_with_any_score_by_head": [
+          122,
+          122,
+          122,
+          122,
+          122
+        ],
+        "end_offset": 863,
+        "final_date_valid_names_by_head": [
+          228,
+          228,
+          228,
+          228,
+          228
+        ],
+        "first_session_index": 2721,
+        "fold": "F7",
+        "last_session_index": 2842,
+        "missing_entire_score_dates": [],
+        "start_offset": 742
+      },
+      {
+        "date_count": 125,
+        "dates_with_any_score_by_head": [
+          125,
+          125,
+          125,
+          125,
+          125
+        ],
+        "end_offset": 988,
+        "final_date_valid_names_by_head": [
+          230,
+          230,
+          230,
+          230,
+          230
+        ],
+        "first_session_index": 2843,
+        "fold": "F8",
+        "last_session_index": 2967,
+        "missing_entire_score_dates": [],
+        "start_offset": 864
+      },
+      {
+        "date_count": 124,
+        "dates_with_any_score_by_head": [
+          124,
+          124,
+          124,
+          124,
+          124
+        ],
+        "end_offset": 1112,
+        "final_date_valid_names_by_head": [
+          210,
+          210,
+          210,
+          210,
+          210
+        ],
+        "first_session_index": 2968,
+        "fold": "F9",
+        "last_session_index": 3091,
+        "missing_entire_score_dates": [],
+        "start_offset": 989
+      },
+      {
+        "date_count": 126,
+        "dates_with_any_score_by_head": [
+          126,
+          126,
+          126,
+          126,
+          126
+        ],
+        "end_offset": 1238,
+        "final_date_valid_names_by_head": [
+          204,
+          204,
+          204,
+          204,
+          204
+        ],
+        "first_session_index": 3092,
+        "fold": "F10",
+        "last_session_index": 3217,
+        "missing_entire_score_dates": [],
+        "start_offset": 1113
+      },
+      {
+        "date_count": 124,
+        "dates_with_any_score_by_head": [
+          124,
+          124,
+          124,
+          124,
+          124
+        ],
+        "end_offset": 1362,
+        "final_date_valid_names_by_head": [
+          207,
+          207,
+          207,
+          207,
+          207
+        ],
+        "first_session_index": 3218,
+        "fold": "F11",
+        "last_session_index": 3341,
+        "missing_entire_score_dates": [],
+        "start_offset": 1239
+      },
+      {
+        "date_count": 124,
+        "dates_with_any_score_by_head": [
+          124,
+          124,
+          124,
+          124,
+          124
+        ],
+        "end_offset": 1486,
+        "final_date_valid_names_by_head": [
+          196,
+          196,
+          196,
+          196,
+          196
+        ],
+        "first_session_index": 3342,
+        "fold": "F12",
+        "last_session_index": 3465,
+        "missing_entire_score_dates": [],
+        "start_offset": 1363
+      },
+      {
+        "date_count": 124,
+        "dates_with_any_score_by_head": [
+          124,
+          124,
+          124,
+          124,
+          124
+        ],
+        "end_offset": 1610,
+        "final_date_valid_names_by_head": [
+          185,
+          185,
+          185,
+          185,
+          185
+        ],
+        "first_session_index": 3466,
+        "fold": "F13",
+        "last_session_index": 3589,
+        "missing_entire_score_dates": [],
+        "start_offset": 1487
+      },
+      {
+        "date_count": 127,
+        "dates_with_any_score_by_head": [
+          127,
+          127,
+          127,
+          127,
+          127
+        ],
+        "end_offset": 1737,
+        "final_date_valid_names_by_head": [
+          186,
+          186,
+          186,
+          186,
+          186
+        ],
+        "first_session_index": 3590,
+        "fold": "F14",
+        "last_session_index": 3716,
+        "missing_entire_score_dates": [],
+        "start_offset": 1611
+      }
+    ],
+    "source_artifact_hashes": {
+      "bova11_data": "26a536516c10c3bd304fb606eb32d5f6a610e6060056962388b86bfdf44cea3a",
+      "bova11_manifest": "2d554c84c7b28fbb89dbfd3945bfd0493089bc09dd35a50b73f6c5a601e69424",
+      "cdi_development_extension": "ee75978a727b4741660d58b5ab06ce39131a8ba3bbd0fadf12952302808a750e",
+      "cdi_experiment52_reference": "38d7934ebb6849b1e20310a81130f6faa68f4618c8edb0d046185067c83da2ea",
+      "checkpoint_registration": "dc28e9da065def77d30d214d2e0a08e855911b3ed573a4cdf9986d63a6f8257d",
+      "continuous_score_sources": "9f82ddf5ba51800de2db198a9289fc7a370e7c2ae0bc7a9faebe410b5b6b9c64",
+      "hedge_beta_manifest": "11d99362c2e7dac22594eac8f5a8d104ca88c20e767cf7844955a60aff6b4dad",
+      "lending_archive_balances": "f60ae328010e093e1cc18aff35c37561d3492ad9713c68f54c97efe3ab75aff8",
+      "lending_archive_manifest": "5b4c83dd59796baf1cc4c5b2c441c1010b098966dbe72c80a7c7f025e1993e2b",
+      "lending_archive_rates": "14b688452719e311544019c0f63f8700ce336aaf7ae9776a94bff8a9c4f2620f",
+      "v2_store_manifest": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64"
+    },
+    "strategy": "screening/S0",
+    "terminal_boundary": "2024-12-30",
+    "test_accessed": false,
+    "transfer_chronology_clean": true
+  }
+}
