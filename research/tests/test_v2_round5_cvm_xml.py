@@ -159,6 +159,36 @@ def test_flat_dfp_inner_version_must_match_public_envelope(tmp_path):
         original_accounts(document, path)
 
 
+def test_flat_xml_uses_same_statement_parent_for_equity_attribution(tmp_path):
+    document, source = flat_fixture(tmp_path)
+    with zipfile.ZipFile(source) as archive:
+        files = {name: archive.read(name) for name in archive.namelist()}
+    name = "022217DFP31-12-2014v1.xml"
+    accounts = "".join(
+        f"<Conta><CodigoConta>{code}</CodigoConta><DescricaoConta>{label}</DescricaoConta><UltimoExercicio>{value}</UltimoExercicio></Conta>"
+        for code, label, value in (
+            ("2.08.09", "Participacao dos Acionistas Nao Controladores", "95984"),
+            ("2.03.09", "Participacao dos Acionistas Nao Controladores", "0"),
+            ("2.03", "Passivos Financeiros ao Custo Amortizado", "0"),
+            ("2.08", "Patrimonio Liquido Consolidado", "8337366"),
+        )
+    )
+    files[name] = files[name].replace(
+        b"<DfIndividuais>",
+        (
+            "<DfIndividuais><BalancoPatrimonialPassivo>"
+            + accounts
+            + "</BalancoPatrimonialPassivo>"
+        ).encode(),
+    )
+    with zipfile.ZipFile(source, "w") as archive:
+        for name, payload in files.items():
+            archive.writestr(name, payload)
+    parsed = original_accounts(document, source)
+    assert parsed["accounts"]["ind"]["minority_equity"]["value"] == 95984000
+    assert parsed["accounts"]["ind"]["minority_equity"]["source_code"] == "2.08.09"
+
+
 @pytest.mark.parametrize("factory", (original_fixture, flat_fixture))
 @pytest.mark.parametrize("treasury", ("-5", "", "9999999999"))
 def test_invalid_capital_never_inflates_shares_or_erases_accounts(

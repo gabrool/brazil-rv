@@ -49,7 +49,12 @@ def flat_dfp_accounts(document: dict, payload: bytes, envelope: ET.Element) -> d
     parsed = {**document, "accounts": {}}
     form = annual.find("Formulario")
     for field, basis in (("DfIndividuais", "ind"), ("DfConsolidadas", "con")):
-        for node in form.findall(f"{field}/*/Conta"):
+        nodes = form.findall(f"{field}/*/Conta")
+        parent_descriptions = {
+            node.findtext("CodigoConta"): node.findtext("DescricaoConta", "")
+            for node in nodes
+        }
+        for node in nodes:
             code = node.findtext("CodigoConta")
             value = node.findtext("UltimoExercicio", "").strip()
             if code not in ACCOUNTS or not value:
@@ -62,6 +67,7 @@ def flat_dfp_accounts(document: dict, payload: bytes, envelope: ET.Element) -> d
                 start if code.startswith(("3", "6")) else None,
                 end,
                 node.findtext("DescricaoConta", ""),
+                parent_descriptions.get(code.rsplit(".", 1)[0]),
             )
     quantity_scale = {"1": 1, "2": 1000}.get(annual.findtext("EscalaQtdAcoes"))
     capital = form.find("DadosEmpresa/ComposicaoCapital")
@@ -159,9 +165,23 @@ def original_accounts(document: dict, source: Path) -> dict:
             }
             for node in ET.fromstring(inner.read("PeriodoDemonstracaoFinanceira.xml"))
         }
-        for node in ET.fromstring(
+        nodes = ET.fromstring(
             inner.read("InformacaoFinanceiraDemonstracaoFinanceira.xml")
-        ):
+        )
+        description_path = (
+            "DescricoesContaInformacaoFinanceiraDemonstracaoFinanceira/"
+            "DescricaoContaInformacaoFinanceiraDemonstracaoFinanceira/DescricaoConta"
+        )
+        parent_descriptions = {
+            (
+                node.findtext(
+                    "PlanoConta/VersaoPlanoConta/CodigoTipoInformacaoFinanceira"
+                ),
+                node.findtext("PlanoConta/NumeroConta"),
+            ): node.findtext(description_path, "")
+            for node in nodes
+        }
+        for node in nodes:
             code = node.findtext("PlanoConta/NumeroConta")
             if code not in ACCOUNTS:
                 continue
@@ -172,11 +192,7 @@ def original_accounts(document: dict, source: Path) -> dict:
             )
             if basis is None:
                 continue
-            description = node.findtext(
-                "DescricoesContaInformacaoFinanceiraDemonstracaoFinanceira/"
-                "DescricaoContaInformacaoFinanceiraDemonstracaoFinanceira/DescricaoConta",
-                "",
-            )
+            description = node.findtext(description_path, "")
             for column in node.find(
                 "ColunasInformacaoFinanceiraDemonstracaoFinanceira"
             ):
@@ -198,6 +214,14 @@ def original_accounts(document: dict, source: Path) -> dict:
                     period["start"] if flow else None,
                     period["end"],
                     description,
+                    parent_descriptions.get(
+                        (
+                            node.findtext(
+                                "PlanoConta/VersaoPlanoConta/CodigoTipoInformacaoFinanceira"
+                            ),
+                            code.rsplit(".", 1)[0],
+                        )
+                    ),
                 )
         # Quantity scale is independently encoded; never assume currency scale.
         quantity_scale = {"1": 1, "2": 1000}.get(

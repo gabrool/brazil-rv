@@ -3,6 +3,7 @@ from datetime import date, datetime
 import io
 import hashlib
 import json
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -22,6 +23,117 @@ from brazil_rv.v2.round5_cvm import (
     table_rows,
     trailing_twelve_months,
 )
+
+
+@pytest.mark.parametrize("reverse", (False, True))
+def test_csv_and_viewer_ignore_stale_nci_label_under_liabilities(
+    tmp_path, monkeypatch, reverse
+):
+    document = {
+        "id": "121447",
+        "cnpj": "00416968000101",
+        "cvm_code": "024406",
+        "reference": date(2022, 9, 30),
+        "version": 1,
+        "kind": "ITR",
+    }
+    entries = [
+        ("2.03", "Passivos Financeiros ao Custo Amortizado", "0"),
+        ("2.03.09", "Participacao dos Acionistas Nao Controladores", "0"),
+        ("2.08", "Patrimonio Liquido Consolidado", "8337366"),
+        ("2.08.09", "Participacao dos Acionistas Nao Controladores", "95984"),
+    ]
+    if reverse:
+        entries.reverse()
+    rows = [
+        {
+            "CNPJ_CIA": document["cnpj"],
+            "DT_REFER": "2022-09-30",
+            "VERSAO": "1",
+            "MOEDA": "REAL",
+            "ESCALA_MOEDA": "MIL",
+            "ORDEM_EXERC": "ÚLTIMO",
+            "DT_FIM_EXERC": "2022-09-30",
+            "CD_CONTA": code,
+            "DS_CONTA": label,
+            "VL_CONTA": value,
+        }
+        for code, label, value in entries
+    ]
+    source = tmp_path / "itr_cia_aberta_2022.zip"
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr(
+            "itr_cia_aberta_BPP_con_2022.csv",
+            pl.DataFrame(rows).write_csv(separator=";").encode("latin1"),
+        )
+    monkeypatch.setattr(
+        round5_cvm,
+        "filing_headers",
+        lambda root, kind: [deepcopy(document)] if kind == "itr" else [],
+    )
+    monkeypatch.setattr(
+        round5_cvm, "annual_paths", lambda root, kind: [source] if kind == "itr" else []
+    )
+    csv_book = round5_cvm.load_accounts(tmp_path)[0]["accounts"]["con"]
+    assert csv_book["minority_equity"]["value"] == 95984000
+    assert csv_book["minority_equity"]["source_code"] == "2.08.09"
+    payload = (
+        "<h2>Reais Mil</h2><table><tr><td>Conta</td><td>Descricao</td><td>30/09/2022</td></tr>"
+        + "".join(
+            f"<tr><td>{code}</td><td>{label}</td><td>{value}</td></tr>"
+            for code, label, value in entries
+        )
+        + "</table>"
+    ).encode()
+    (tmp_path / "statement.html").write_bytes(payload)
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "document": document,
+                "pages": [
+                    {
+                        "file": "statement.html",
+                        "sha256": hashlib.sha256(payload).hexdigest(),
+                        "basis": "con",
+                    }
+                ],
+            },
+            default=str,
+        )
+    )
+    round5_cvm.attach_viewer_accounts(document, tmp_path)
+    assert document["accounts"]["con"] == csv_book
+
+
+def test_income_attribution_requires_compatible_observed_parent():
+    document = {"id": "1"}
+    for code, parent in (
+        ("3.11.01", "Reversao dos Juros sobre Capital Proprio"),
+        ("3.13.01", "Lucro/Prejuizo do Periodo"),
+    ):
+        assign_account(
+            document,
+            "con",
+            code,
+            17,
+            date(2024, 1, 1),
+            date(2024, 3, 31),
+            "Atribuido a Empresa Controladora",
+            parent,
+        )
+    assert document["accounts"]["con"]["parent_income"]["source_code"] == "3.13.01"
+    # A missing parent is not an observed incompatible parent or an invented zero.
+    partial = {"id": "2"}
+    assign_account(
+        partial,
+        "con",
+        "3.13.01",
+        17,
+        date(2024, 1, 1),
+        date(2024, 3, 31),
+        "Atribuido a Empresa Controladora",
+    )
+    assert partial["accounts"]["con"]["parent_income"]["value"] == 17
 
 
 def test_minute_receipt_enters_first_available_decision():

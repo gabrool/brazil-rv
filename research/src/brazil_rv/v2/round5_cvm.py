@@ -511,16 +511,10 @@ def viewer_pages(document: dict, destination: Path) -> dict:
     return manifest
 
 
-def assign_account(
-    document: dict,
-    basis: str,
-    code: str,
-    value: float,
-    start: date | None,
-    end: date,
-    description: str,
-) -> None:
-    metric = ACCOUNTS[code]
+def _account_metric(code: str, description: str) -> str | None:
+    metric = ACCOUNTS.get(code)
+    if metric is None:
+        return None
     description_key = re.sub(r"[^a-z0-9]+", " ", normalized(description)).strip()
     # CVM banks/insurers use several charts: e.g. 2.03 may be deferred
     # income or provisions, and 3.11 may be JCP reversal rather than income.
@@ -555,6 +549,33 @@ def assign_account(
         "atribuido" in description_key and "nao controlador" in description_key
     ):
         return
+    return metric
+
+
+def assign_account(
+    document: dict,
+    basis: str,
+    code: str,
+    value: float,
+    start: date | None,
+    end: date,
+    description: str,
+    parent_description: str | None = None,
+) -> None:
+    metric = _account_metric(code, description)
+    if metric is None:
+        return
+    # Some filings retain obsolete child labels under a different chart parent.
+    # Use that same statement's parent meaning, independent of source row order.
+    if parent_description is not None and metric in (
+        "parent_equity",
+        "minority_equity",
+        "parent_income",
+        "minority_income",
+    ):
+        expected = "equity" if metric.endswith("equity") else "net_income"
+        if _account_metric(code.rsplit(".", 1)[0], parent_description) != expected:
+            return
     account = {
         "value": value,
         "start": start,
@@ -656,6 +677,16 @@ def load_accounts(root: Path, issuers: set[str] | None = None) -> list[dict]:
                         pl.col("CD_CONTA").is_in(list(ACCOUNTS))
                         & (pl.col("ORDEM_EXERC") == "ÚLTIMO")
                     )
+                    parent_descriptions = {
+                        (
+                            row["CNPJ_CIA"],
+                            row["DT_REFER"],
+                            row["VERSAO"],
+                            row["CD_CONTA"],
+                        ): row["DS_CONTA"]
+                        for row in frame.iter_rows(named=True)
+                        if row["CD_CONTA"].count(".") == 1
+                    }
                     for row in frame.iter_rows(named=True):
                         key = (
                             kind.upper(),
@@ -683,6 +714,14 @@ def load_accounts(root: Path, issuers: set[str] | None = None) -> list[dict]:
                             else None,
                             date.fromisoformat(row["DT_FIM_EXERC"]),
                             row["DS_CONTA"],
+                            parent_descriptions.get(
+                                (
+                                    row["CNPJ_CIA"],
+                                    row["DT_REFER"],
+                                    row["VERSAO"],
+                                    row["CD_CONTA"].rsplit(".", 1)[0],
+                                )
+                            ),
                         )
     return documents
 
@@ -711,6 +750,7 @@ def attach_viewer_accounts(document: dict, destination: Path) -> None:
         else:
             raise ValueError("Recovered account currency/scale is unavailable")
         rows = table_rows(payload)
+        parent_descriptions = {row[0]: row[1] for row in rows if len(row) >= 2}
         header = next((r for r in rows if len(r) > 2 and r[0] == "Conta"), None)
         if header is None:
             raise ValueError("Account table has no dated column header")
@@ -728,7 +768,14 @@ def attach_viewer_accounts(document: dict, destination: Path) -> None:
                     continue
                 value = float(row[column].replace(".", "").replace(",", ".")) * scale
                 assign_account(
-                    parsed, page["basis"], row[0], value, start, dates[-1], row[1]
+                    parsed,
+                    page["basis"],
+                    row[0],
+                    value,
+                    start,
+                    dates[-1],
+                    row[1],
+                    parent_descriptions.get(row[0].rsplit(".", 1)[0]),
                 )
     if not parsed["accounts"]:
         raise ValueError("Recovered account pages lack the requested reference period")

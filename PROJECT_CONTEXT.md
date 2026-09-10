@@ -199,6 +199,10 @@ omits that scale and is not a model count source. Negative treasury quantities
 require a separately evidenced same-filing reconciliation; otherwise the count
 stays unavailable while unrelated accounting fields remain usable. The final
 extended store is still pending; `docs/v2_ROUND5_DATA.md` records current status.
+Financial attribution rows also require compatibility with any observed parent
+account in the same statement; stale noncontrolling-shareholder labels beneath
+liability accounts are not equity. Parent meanings are resolved independently
+of row order in CSV, HTML and supported original XML sources.
 
 The store builder streams family-by-family into disk-backed float32 arrays and
 records peak RSS. Intended orders are fixed before later fill observations;

@@ -54,3 +54,21 @@ An explicitly audited unusable count may instead remain missing after bounded
 exact-source investigation. Such a disposition records its reason and evidence
 hashes; unaudited failures still block source acceptance. Neither outcome changes
 the existing causal class-price, capital-change or unit-boundary requirements.
+
+## Statement hierarchy and source contradictions
+
+An attribution row must also agree with its observed parent account's economic
+role in that same statement. Inter ITR2022Q3 document121447 retains a zero
+noncontrolling-shareholders label at2.03.09 under financial liabilities, alongside
+the actual95,984 thousand noncontrolling equity at2.08.09. CSV, original HTML and
+both supported XML layouts now resolve the parent's description before assigning
+equity or income attribution, independent of source row order. A missing parent
+does not invent a value or erase an otherwise usable direct attribution.
+Existing receipt, period, version, consolidated-basis and conflict checks remain.
+
+An explicit quantity-scale label does not guarantee that every issuer populated
+the table consistently. Exact112428 prints99,631,414 under a thousands heading
+and zero treasury, while its own note reports99,631 thousand paid-in shares and
+41,025 treasury shares. Its document-specific reconciliation uses only the
+note's stated quantities and precision. No market-price inference, global scale
+override, or claim of a complete note-by-note source audit is introduced.
