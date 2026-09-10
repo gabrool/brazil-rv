@@ -2,10 +2,10 @@
   "status": "Historical source review in progress; no final family/store/screens and no forward capture.",
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "2a15c1be313388502984c0adf20eb3cfe1be15684fa4d40b593c9f74d3049d54"
+    "sha256": "6866587639f8152e49fc8a7052301a40424d38aadbaa4bc8c9e5b637f7825ca4"
   },
   "counts": {
-    "reconciled": 17,
+    "reconciled": 25,
     "audited_unavailable": 7
   },
   "accepted_batch": {
@@ -169,5 +169,216 @@
   },
   "targeted_tests": 58,
   "source_freeze_ready": false,
-  "forward_capture_enabled": false
+  "forward_capture_enabled": false,
+  "additional_reviews": [
+    {
+      "review": {
+        "scope": "Two independently evidenced own-filing treasury-percentage reconciliations at source precision. No quantity unit guessed.",
+        "reviewed_at_utc": "2026-09-10T19:34:57.303098+00:00",
+        "reconciliations": [
+          {
+            "id": "6022",
+            "reference": "2010-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 51927546473,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 2440594.684231,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              33,
+              98
+            ],
+            "reason": "Exact own DFP2010 version 1 management report page33 independently states 51,927,546,473 ordinary shares and treasury ownership0.0047% at31Dec2010. Note21.1 page98 confirms the same percentage of capital; all shares are ordinary. Derive treasury from the published own-period percentage:2,440,594.684231 shares at its source precision. Under nearest rounding of the four-decimal percentage, treasury uncertainty is plus/minus25,963.7732365 shares, approximately0.005bps of the net valuation denominator. This is a percentage-derived observation, not an exact legal share count. The source capital table zero is contradicted; the unlabelled2,441 repurchase quantity is not used to infer a lot scale. No later version, price or adjacent ratio supplies either input.",
+            "precision": {
+              "method": "own_period_paid_in_times_published_treasury_percentage",
+              "published_percentage": "0.0047",
+              "published_percentage_point_step": "0.0001",
+              "nearest_rounding_half_step_shares": "25963.7732365",
+              "derived_treasury_shares": "2440594.684231",
+              "net_count_half_step_relative_bps": "0.005000235011045519139399551779",
+              "rounding_assumption": "Nearest rounding for half-step bound; truncation would at most double the stated bound."
+            }
+          },
+          {
+            "id": "6029",
+            "reference": "2010-12-31",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 51927546473,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 2440594.684231,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              33,
+              98
+            ],
+            "reason": "Exact own DFP2010 version 2 management report page33 independently states 51,927,546,473 ordinary shares and treasury ownership0.0047% at31Dec2010. Note21.1 page98 confirms the same percentage of capital; all shares are ordinary. Derive treasury from the published own-period percentage:2,440,594.684231 shares at its source precision. Under nearest rounding of the four-decimal percentage, treasury uncertainty is plus/minus25,963.7732365 shares, approximately0.005bps of the net valuation denominator. This is a percentage-derived observation, not an exact legal share count. The source capital table zero is contradicted; the unlabelled2,441 repurchase quantity is not used to infer a lot scale. No later version, price or adjacent ratio supplies either input.",
+            "precision": {
+              "method": "own_period_paid_in_times_published_treasury_percentage",
+              "published_percentage": "0.0047",
+              "published_percentage_point_step": "0.0001",
+              "nearest_rounding_half_step_shares": "25963.7732365",
+              "derived_treasury_shares": "2440594.684231",
+              "net_count_half_step_relative_bps": "0.005000235011045519139399551779",
+              "rounding_assumption": "Nearest rounding for half-step bound; truncation would at most double the stated bound."
+            }
+          }
+        ],
+        "source_freeze_ready": false
+      },
+      "acceptance": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_ceg_percentage_20260910T193500Z\\acceptance.json",
+        "sha256": "4234b279ca056d28c769337974ae39d9f948d16512e44e5e66ddaa236e61e9f2"
+      }
+    },
+    {
+      "review": {
+        "scope": "Six manually reviewed exact own-note capital reconciliations.",
+        "reviewed_at_utc": "2026-09-10T19:39:12.793686+00:00",
+        "reconciliations": [
+          {
+            "id": "42119",
+            "reference": "2014-09-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 176000000,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              76
+            ],
+            "reason": "Own note24(a) explicitly declares176,000,000 ordinary shares at30Sep2014; the current ownership table confirms that total and zero treasury. Earlier146,000,000 and authorized200,000,000 counts are different concepts and are not used. Exact own-filing note and explicit source capital-table zero treasury are used; no later filing, market price, or adjacent quantity ratio supplies the correction."
+          },
+          {
+            "id": "45620",
+            "reference": "2014-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 170122934,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              55
+            ],
+            "reason": "Own note17 explicitly declares170,122,934 ordinary shares at31Dec2014 and a same-period shareholder table reconciles the total. Note18 separately labels its EPS denominator in thousand shares; that weighted-average figure is not the capital quantity. Currency-thousands headings do not scale the explicitly stated share number. Exact own-filing note and explicit source capital-table zero treasury are used; no later filing, market price, or adjacent quantity ratio supplies the correction."
+          },
+          {
+            "id": "56368",
+            "reference": "2016-03-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 15527137,
+              "PN": 23044454
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              81
+            ],
+            "reason": "Own note26(a) states15,527,137 ordinary and23,044,454 preferred shares; the current31Mar2016 ownership table independently totals each class. The capital page instead prints15,527/23,044 under Units. Use the explicit individual counts and retain zero treasury. Exact own-filing note and explicit source capital-table zero treasury are used; no later filing, market price, or adjacent quantity ratio supplies the correction."
+          },
+          {
+            "id": "58321",
+            "reference": "2016-06-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 156293356,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              73
+            ],
+            "reason": "Own note24(a) explicitly declares156,293,356 ordinary shares at30Jun2016. The authorized160,000,000 ceiling is not issued capital. Capital-page treasury is explicitly zero; the EPS note contains the generic deduction convention and an equal weighted-average count, not an additional identified treasury holding. Exact own-filing note and explicit source capital-table zero treasury are used; no later filing, market price, or adjacent quantity ratio supplies the correction."
+          },
+          {
+            "id": "63712",
+            "reference": "2016-12-31",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 239128430,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              98
+            ],
+            "reason": "Own note21 explicitly declares239,128,430 ordinary shares at31Dec2016. It distinguishes the preceding16,176,982,098 shares, the100-for1 reverse split and subsequent capital increase. The own current shareholder table also explicitly reports zero treasury. No reverse-split ratio substitutes for the stated endpoint count. Exact own-filing note and explicit source capital-table zero treasury are used; no later filing, market price, or adjacent quantity ratio supplies the correction."
+          },
+          {
+            "id": "78942",
+            "reference": "2018-09-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 47782714,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              20
+            ],
+            "reason": "Own market-capital section explicitly declares47,782,714 ordinary shares at30Sep2018. Its preceding June issuance is12,473,938, not total capital. The capital page repeats47,782,714 beneath a thousands heading, with explicit zero preferred and treasury shares. Exact own-filing note and explicit source capital-table zero treasury are used; no later filing, market price, or adjacent quantity ratio supplies the correction."
+          }
+        ],
+        "source_freeze_ready": false
+      },
+      "acceptance": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_six_notes_20260910T194100Z\\acceptance.json",
+        "sha256": "6f6cef19aa2308cc4aaab0f344c177dd98a9de29400365d7bd48bcafd19643ee"
+      }
+    }
+  ],
+  "review_priority": {
+    "evidence": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_priority_20260910T193200Z.json",
+      "sha256": "ae2836dc66083b9b2671a33229589c6ab0d71e757972adfaeef9ce3efd777d35"
+    },
+    "potentially_consumed_on_old_bridge": 1318,
+    "no_old_bridge_link": 4,
+    "receipt_after_old_bridge_end": 30,
+    "final_exclusion_allowed": false
+  },
+  "note_helper_correction": {
+    "tests_passed": 15,
+    "bad_unadmitted_proposals": [
+      "42401",
+      "89068",
+      "91021"
+    ],
+    "reason": "Earlier-quarter capital in a current page header and prior-year classes after a sentence ending in a year must not be used as current capital. No consumer uses proposals directly.",
+    "remaining_manual_review": [
+      "54638",
+      "63573",
+      "73028",
+      "91021",
+      "92819",
+      "93475"
+    ]
+  }
 }

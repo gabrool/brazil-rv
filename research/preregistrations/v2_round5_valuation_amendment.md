@@ -90,3 +90,15 @@ A different nonzero public CNPJ is a conflict, not missingness. The resolver
 records which source supplied CNPJ; no external alias or later filing fills it.
 Nine cached Cremer/Nadir originals validate this case. Their recovered notes
 still require quantity review before admission.
+
+An explicit own-period treasury percentage may establish the treasury quantity
+when its denominator is the same filing's paid-in capital and class allocation
+is unambiguous. Calculate from those observed inputs and retain the percentage's
+published precision, including the resulting count uncertainty; do not present
+the derived count as an exact legal quantity. This is the same allowance for
+source rounding as a table reported in thousand-share lots. It does not permit
+guessing an omitted unit or borrowing another filing's quantity. CEG DFP2010
+versions1/2 independently disclose 51,927,546,473 ordinary shares and treasury
+ownership0.0047%; the half-step rounding uncertainty contributes approximately
+0.005 basis points to the resulting valuation denominator. The conflicting
+unlabelled repurchase count does not supply this calculation.

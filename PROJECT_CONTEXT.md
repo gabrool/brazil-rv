@@ -218,6 +218,10 @@ For original financial ZIPs, a blank or zero public-envelope CNPJ can be resolve
 from that same submitted `Documento.xml` only when its CNPJ, CVM registration and
 reference match the historical header. Public document ID/version remain exact;
 a conflicting nonzero public CNPJ cannot be replaced by this rule.
+Own-period treasury percentages can supply a derived quantity when paid-in
+capital and class allocation are explicit in the same filing. Preserve the
+percentage's published precision and disclose count uncertainty; this is not
+an exact legal share count or a guessed quantity-unit conversion.
 
 The store builder streams family-by-family into disk-backed float32 arrays and
 records peak RSS. Intended orders are fixed before later fill observations;

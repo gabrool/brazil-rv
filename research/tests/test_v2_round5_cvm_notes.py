@@ -56,3 +56,27 @@ def test_only_explicitly_unissued_class_can_omit_its_note_quantity():
     )
     assert result["paid_in_shares"] == {"ON": 1000, "PN": 0}
     assert propose_paid_in_note(text, REFERENCE, PAID, ZERO) is None
+
+
+def test_following_prior_year_sentence_cannot_supply_current_share_classes():
+    text = (
+        "Em 30 de setembro de 2019 o capital social está representado por "
+        "499.200.000 ações nominativas, totalmente integralizadas em ações "
+        "ordinárias, conforme assembleia de 30 de abril de 2019. "
+        "Em 31 de dezembro de 2018 está representado por 31.200.000 ações "
+        "ordinárias e 31.200.000 ações preferenciais."
+    )
+    assert (
+        propose_paid_in_note(text, date(2019, 9, 30), {"ON": 499200000, "PN": 0}, ZERO)
+        is None
+    )
+
+
+@pytest.mark.parametrize("prior_date", ["30 de junho de 2014", "30/06/2014"])
+def test_current_page_header_does_not_redate_an_explicit_earlier_quarter(prior_date):
+    text = (
+        "Notas explicativas em 30 de setembro de 2014 (em milhares de reais) "
+        f"O capital social em {prior_date} é representado por "
+        "5.513.608 ações ordinárias e 8.065.423 ações preferenciais."
+    )
+    assert propose_paid_in_note(text, date(2014, 9, 30), PAID, ZERO) is None

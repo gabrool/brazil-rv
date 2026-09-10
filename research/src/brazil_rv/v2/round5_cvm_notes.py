@@ -47,10 +47,9 @@ def propose_paid_in_note(
     )
     candidates = []
     for match in re.finditer(own_date, key):
-        # Stay within the same sentence. Decimal/grouping periods are not stops.
-        passage = re.split(
-            r"(?<!\d)\.(?:\s|$)", key[match.end() : match.end() + 850], 1
-        )[0]
+        # A year followed by a period ends the sentence too. Number-grouping
+        # periods have another digit immediately after them, not whitespace.
+        passage = re.split(r"\.(?:\s|$)", key[match.end() : match.end() + 850], 1)[0]
         declaration = re.search(
             r"\bcapital (?:social|subscrito|integralizado)\b.{0,300}?"
             r"\b(?:representad[oa]|dividid[oa]|compost[oa])\b",
@@ -62,6 +61,17 @@ def propose_paid_in_note(
             continue
         prelude = passage[: declaration.end()]
         if any(int(y) != year for y in re.findall(r"\b(?:19|20)\d{2}\b", prelude)):
+            continue
+        dates = [
+            tuple(map(int, parts))
+            for parts in re.findall(r"\b(\d{1,2})/(\d{1,2})/(\d{4})\b", prelude)
+        ]
+        for d, name, y in re.findall(
+            r"\b(\d{1,2}) de (" + "|".join(MONTHS) + r") de (\d{4})\b",
+            prelude,
+        ):
+            dates.append((int(d), MONTHS.index(name) + 1, int(y)))
+        if any(parts != (day, month, year) for parts in dates):
             continue
         quantities = {}
         for cls, label in (("ON", "ordinarias"), ("PN", "preferenciais")):

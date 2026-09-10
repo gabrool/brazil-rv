@@ -109,12 +109,27 @@ unit audit remains open; it has not produced a model-input admission yet.
 
 Five additional exact filings now have visually reviewed capital corrections:
 MPX/Eneva 5553, TOTVS 6714, Autometal 10338, Magnesita 14794 and Triunfo 25144.
-There are now 17 reconciled and seven audited unavailable source dispositions.
+There are now 25 reconciled and seven audited unavailable source dispositions.
 These are source decisions, not a completed family or store. Afluente 5872 is
 an explicit counterexample: its own thousand-share lot label confirms the
-existing large count, so no correction applies. CEG 6022 remains under review
-because its notes contradict zero treasury. Literal text extraction produces
+existing large count, so no correction applies. CEG 6022/6029 are now resolved
+using each filing's explicit ordinary-share count and treasury ownership0.0047%.
+The derived quantity retains that percentage's precision; a half-step rounding
+bound contributes approximately0.005bps of the net valuation denominator.
+Six further corrections cover Triunfo42119, CCX45620, Celesc56368, Fleury58321,
+Eneva63712 and Biomm78942. Literal text extraction produces
 review proposals only; it neither admits values nor creates missing masks.
+Two misleading date contexts found in proposals were rejected and the helper
+was corrected: a prior-year sentence cannot supply current classes, and a
+current page header cannot redate an explicitly earlier quarter. Fifteen
+targeted note-helper tests pass; no accepted quantity used those bad proposals.
+
+The review-priority check finds that1,318 of1,352 flagged documents could enter
+the earlier identity bridge; four lack a link and30 arrived after its final
+mapped date. These34 are lower priority, not final exclusions: the bridge is
+being repaired. Restricting review to relevant observations therefore saves
+only a small part of this batch. Own-source rounding and bounded recovery are
+used to resolve exceptions without demanding nonexistent numerical precision.
 
 Nine additional cached Cremer/Nadir originals were recovered without network
 requests after resolving a blank public CNPJ against the exact original inner
