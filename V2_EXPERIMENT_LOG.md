@@ -2854,3 +2854,13 @@ inconclusive, with fast_off retained as comparator. No independent replication,
 six-seed confirmation, holdout permission, deployment or Round 5 is implied.
 The original frozen screening root is preserved. See the A4 registration and
 `round4_seed_audit.py`; 11 targeted decision/registration tests passed before execution.
+
+A4 continuation: the initial loader stop occurred before any book and was repaired
+in `eb5e9ca` with immutable schema/date/security bindings and a canonical-artifact
+regression fixture. The fresh attempt then accepted 244 books before P/F14 with
+seeds 11/47 exceeded the occupancy limit (2.061417 > 2.0), with D1–D5 zero.
+A4.1 keeps the limit and failed report unchanged, disqualifies isolated non-baseline
+occupancy failures from every research-choice panel, and preserves global stops for
+baseline, D1–D5, other bounds and implementation failures. Its post-result timing is
+explicit. Complete unaffected cells in a fresh root with sealed report reuse;
+no accepted trajectory is retrained or overwritten. Forty targeted tests pass.

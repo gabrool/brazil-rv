@@ -217,7 +217,16 @@ arrays are omitted from GitHub and remain in the sealed, verified full source.
 
 All six configurations have nonnegative net point estimates. S0 is the provisional
 IC leader and provisional working parent; no economics override qualifies.
-**A4 stability is still running: these are not yet accepted final choices.**
+**A4 stability is not yet complete: these are not yet accepted final choices.**
+The first complete-score audit stopped at P/F14 with seeds 11/47: long-quintile
+occupancy deviation was 2.061417 against the unchanged 2.0 limit; D1–D5 were zero.
+[A4.1](../research/preregistrations/v2_round4_budget_amendment.md) now disqualifies
+an arm with an isolated non-baseline occupancy failure from all final-choice panels.
+The failed report remains failed. Baseline, D1–D5, other risk and implementation
+errors remain global stops. The continuation reuses sealed completed evaluations
+in a fresh root and completes the unaffected cells. This continuation rule was
+adopted after observing the failure. [Exact evidence](v2_round4_seed_balance_stop.json)
+includes all four P/F14 panels and their hashes.
 
 | Arm | Primary IC [95%] | Net excess bps/day [95%] | Persistence 1 | Turnover/NAV |
 | --- | --- | --- | ---: | ---: |

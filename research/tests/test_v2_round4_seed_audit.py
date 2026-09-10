@@ -1,6 +1,22 @@
 from brazil_rv.v2.round4_seed_audit import development_decision
 
 
+def test_only_isolated_nonbaseline_occupancy_failure_rejects_one_arm():
+    from brazil_rv.v2.round4_seed_audit import isolated_occupancy_failure
+
+    flag = "mean_quintile_occupancy_deviation_long_above_two"
+    occupancy = RuntimeError(f"registered book stop: {{'borrow_balance': ['{flag}']}}")
+    assert isolated_occupancy_failure(occupancy, "P")
+    assert not isolated_occupancy_failure(occupancy, "fast_off")
+    mixed = RuntimeError(
+        f"registered book stop: {{'borrow_balance': ['{flag}', 'D4_cap_block_defects']}}"
+    )
+    assert not isolated_occupancy_failure(mixed, "P")
+    assert not isolated_occupancy_failure(
+        RuntimeError("network identity mismatch"), "P"
+    )
+
+
 def panel(leader="H", parent="S0", eligible=("fast_off", "S0", "H")):
     return {
         "ic_leader": leader,

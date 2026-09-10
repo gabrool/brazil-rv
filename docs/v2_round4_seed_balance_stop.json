@@ -1,0 +1,125 @@
+{
+  "cause": "Isolated non-baseline P leave-one-out portfolio-balance rejection",
+  "failed_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_eb5e9ca_20260910",
+  "accepted_books_before_stop": 244,
+  "threshold": 2,
+  "observed_panel_values": [
+    {
+      "panel": "full_three_seed",
+      "path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_arms_3d1e95f_20260910T015000Z/aggregates/screening/P/F14/evaluation.json",
+      "sha256": "61d21ee6908c8ef347ae6eea2914ca1ea3dcd26c48fdceb7b0d4fcfdee6f1373",
+      "occupancy_long": 1.8409448818897638,
+      "mean_gross": 1.9468105339751143,
+      "mean_stale": 0.0014645228752641713,
+      "D1_D5": {
+        "D1_entry_pending_printed_unblocked_unfilled": 0,
+        "D2_entry_fill_quantity_short": 0,
+        "D3_blocked_open_slots": 0,
+        "D4_cap_block_defects": 0,
+        "D5_ineligible_exit_within_hold_window": 0
+      },
+      "long_quintile_means": [
+        8.826771653543307,
+        6.125984251968504,
+        6.102362204724409,
+        5.9921259842519685,
+        2.6929133858267718
+      ],
+      "quota": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    },
+    {
+      "panel": "omit_11",
+      "path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_eb5e9ca_20260910/omit_11/P/F14/evaluation.json",
+      "sha256": "8e0af98ea2b538555d4324d351bd333bed81d23a38c00183c99f1eaf77b2a555",
+      "occupancy_long": 1.5385826771653544,
+      "mean_gross": 1.9646501053828886,
+      "mean_stale": 0.0038542869585502662,
+      "D1_D5": {
+        "D1_entry_pending_printed_unblocked_unfilled": 0,
+        "D2_entry_fill_quantity_short": 0,
+        "D3_blocked_open_slots": 0,
+        "D4_cap_block_defects": 0,
+        "D5_ineligible_exit_within_hold_window": 0
+      },
+      "long_quintile_means": [
+        7.771653543307087,
+        6.31496062992126,
+        6.393700787401575,
+        5.559055118110236,
+        3.6850393700787403
+      ],
+      "quota": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    },
+    {
+      "panel": "omit_29",
+      "path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_eb5e9ca_20260910/omit_29/P/F14/evaluation.json",
+      "sha256": "a712fb24e1352efff7106b257d11cf05def2d654df6123101f7ae3a96e6ddd71",
+      "occupancy_long": 2.0614173228346457,
+      "mean_gross": 1.9372461068836875,
+      "mean_stale": 0.001441024635911263,
+      "D1_D5": {
+        "D1_entry_pending_printed_unblocked_unfilled": 0,
+        "D2_entry_fill_quantity_short": 0,
+        "D3_blocked_open_slots": 0,
+        "D4_cap_block_defects": 0,
+        "D5_ineligible_exit_within_hold_window": 0
+      },
+      "long_quintile_means": [
+        9.26771653543307,
+        6.4015748031496065,
+        6.070866141732283,
+        5.228346456692913,
+        2.7716535433070866
+      ],
+      "quota": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    },
+    {
+      "panel": "omit_47",
+      "path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_eb5e9ca_20260910/omit_47/P/F14/evaluation.json",
+      "sha256": "fff5ffd334d80a0914c87616709e61cc95942eb72d91ac45dc650a36b8814704",
+      "occupancy_long": 1.7102362204724408,
+      "mean_gross": 1.9165638120722688,
+      "mean_stale": 0.0014589112560156202,
+      "D1_D5": {
+        "D1_entry_pending_printed_unblocked_unfilled": 0,
+        "D2_entry_fill_quantity_short": 0,
+        "D3_blocked_open_slots": 0,
+        "D4_cap_block_defects": 0,
+        "D5_ineligible_exit_within_hold_window": 0
+      },
+      "long_quintile_means": [
+        8.708661417322835,
+        6.110236220472441,
+        5.881889763779528,
+        5.118110236220472,
+        3.9606299212598426
+      ],
+      "quota": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    }
+  ],
+  "resolution": "Keep limit unchanged. A4.1 disqualifies an arm with an isolated non-baseline occupancy failure from every research-choice panel. All original full-panel results and rejected book retained. Baseline, D1-D5, other bounds and implementation errors remain whole-audit stops. Complete unaffected cells in a fresh root with sealed accepted/evaluated-cell reuse; no neural training or scored-cell overwrite."
+}

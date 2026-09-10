@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import ast
 from dataclasses import replace
 from itertools import combinations
 from multiprocessing import get_context
 from pathlib import Path
+import shutil
 import time
 
 import numpy as np
@@ -16,11 +18,25 @@ from .artifacts import sha256_file, write_json_atomic
 from .config import PROJECT_ROOT
 from .contract import ALLOWED_SEEDS, DEVELOPMENT_FOLDS, TRADED_PRIMARY_HORIZONS
 from .evaluate import _primary_daily_metrics, _primary_population_components
-from .research_checkpoint import _context_arguments, _finish_cell
-from .round4 import ARMS, completed, promotion_trace
+from .checkpoint_readouts import retained
+from .research_checkpoint import _completed, _context_arguments, _finish_cell
+from .round4 import ARMS, promotion_trace
 
 REGISTRATION = PROJECT_ROOT / "research/preregistrations/v2_round4_budget_amendment.md"
 METRICS = ("primary_neutral_target_ic", "headline_net_excess_bps")
+
+
+def isolated_occupancy_failure(error: RuntimeError, arm: str) -> bool:
+    """Only a non-baseline occupancy failure can reject one arm under A4.1."""
+    prefix = "registered book stop: "
+    if arm == "fast_off" or not str(error).startswith(prefix):
+        return False
+    failures = ast.literal_eval(str(error)[len(prefix) :])
+    flags = {flag for values in failures.values() for flag in values}
+    return bool(flags) and flags <= {
+        "mean_quintile_occupancy_deviation_long_above_two",
+        "mean_quintile_occupancy_deviation_short_above_two",
+    }
 
 
 def development_decision(full: dict, omissions: dict[int, dict]) -> dict:
@@ -72,6 +88,7 @@ def _audit_omission(source: Path, output: Path, omitted: int) -> dict:
     levels = {arm: {} for arm in ARMS}
     solo = {arm: {} for arm in ARMS}
     pair_days = {f"{a}_minus_{b}": {} for a, b in combinations(ARMS, 2)}
+    rejected = {}
     try:
         for fold in DEVELOPMENT_FOLDS:
             results, singles = {}, {}
@@ -99,30 +116,54 @@ def _audit_omission(source: Path, output: Path, omitted: int) -> dict:
                     [members[s] for s in seeds], reference_mask
                 )
                 dest = output / f"omit_{omitted}" / arm / fold
-                rr._persist_scores(
-                    dest,
-                    {"scores": scores, "score_mask": reference_mask},
-                    {
-                        **rr._source_tier_labels(context.store.manifest),
-                        "arm": arm,
-                        "fold": fold,
-                        "seeds": list(seeds),
-                        "evaluation_date_indices": context.evaluation[fold].tolist(),
-                        "source_run_manifests": manifests,
-                        "budget_amendment_sha256": sha256_file(REGISTRATION),
-                    },
-                )
-                evaluated = rr._evaluate(
-                    **_context_arguments(context, source_hashes),
-                    indices=context.evaluation[fold],
-                    scores=scores,
-                    score_mask=reference_mask,
-                    fold=fold,
-                    output=dest / "evaluation.json",
-                    execution_policy=policy,
-                    settle_terminal_residuals=True,
-                )
-                _finish_cell(dest, evaluated, name=arm, fold=fold)
+                if not dest.exists():
+                    rr._persist_scores(
+                        dest,
+                        {"scores": scores, "score_mask": reference_mask},
+                        {
+                            **rr._source_tier_labels(context.store.manifest),
+                            "arm": arm,
+                            "fold": fold,
+                            "seeds": list(seeds),
+                            "evaluation_date_indices": context.evaluation[
+                                fold
+                            ].tolist(),
+                            "source_run_manifests": manifests,
+                            "budget_amendment_sha256": sha256_file(REGISTRATION),
+                        },
+                    )
+                try:
+                    if (dest / "evaluation.json").exists():
+                        evaluated = retained(context, dest, fold)
+                    else:
+                        evaluated = rr._evaluate(
+                            **_context_arguments(context, source_hashes),
+                            indices=context.evaluation[fold],
+                            scores=scores,
+                            score_mask=reference_mask,
+                            fold=fold,
+                            output=dest / "evaluation.json",
+                            execution_policy=policy,
+                            settle_terminal_residuals=True,
+                        )
+                    if not _completed(dest):
+                        _finish_cell(dest, evaluated, name=arm, fold=fold)
+                except RuntimeError as error:
+                    if not isolated_occupancy_failure(error, arm):
+                        raise
+                    rejected[f"{arm}/{fold}"] = str(error)
+                    write_json_atomic(
+                        dest / "rejected.json",
+                        {
+                            "arm": arm,
+                            "fold": fold,
+                            "engineering_acceptance": "failed",
+                            "error": str(error),
+                            "excluded_from_research_choices": True,
+                            "evaluation_sha256": sha256_file(dest / "evaluation.json"),
+                        },
+                    )
+                    evaluated = retained(context, dest, fold)
                 results[arm] = evaluated.result
                 fields = rr._daily_series(evaluated)
                 levels[arm][fold] = {key: _values(fields[key]) for key in METRICS}
@@ -206,7 +247,11 @@ def _audit_omission(source: Path, output: Path, omitted: int) -> dict:
                     },
                 }
         trace = promotion_trace(
-            readouts,
+            {
+                a: r
+                for a, r in readouts.items()
+                if a not in {cell.split("/")[0] for cell in rejected}
+            },
             comparisons,
             confirmed=False,
             s0_informative=comparisons["S0_minus_fast_off"]["informative_subsets"][
@@ -227,7 +272,8 @@ def _audit_omission(source: Path, output: Path, omitted: int) -> dict:
                 for arm in ARMS
             },
             "promotion_trace": trace,
-            "accepted_books": len(ARMS) * len(DEVELOPMENT_FOLDS),
+            "accepted_books": len(ARMS) * len(DEVELOPMENT_FOLDS) - len(rejected),
+            "rejected_books": rejected,
             **rr.RESEARCH_FLAGS,
         }
         write_json_atomic(output / f"omit_{omitted}_result.json", result)
@@ -236,7 +282,7 @@ def _audit_omission(source: Path, output: Path, omitted: int) -> dict:
         context.store.close()
 
 
-def run(source: Path, output: Path) -> str:
+def run(source: Path, output: Path, reuse: Path | None = None) -> str:
     code = rr._git_identity()
     source = source.resolve(strict=True)
     seal = rr._read_json(source / "artifact_inventory.json")
@@ -250,18 +296,23 @@ def run(source: Path, output: Path) -> str:
     screening = rr._read_json(source / "screening_result.json")
     if screening["status"] != "screened_requires_confirmation":
         raise ValueError("seed audit requires completed original screening")
-    design = rr._read_json(source / "frozen_design.json")
-    for arm in ARMS:
-        for fold in DEVELOPMENT_FOLDS:
-            for seed in ALLOWED_SEEDS:
-                completed(
-                    source / "trajectories" / arm / f"{fold}_seed_{seed}",
-                    design,
-                    arm,
-                    "F",
-                    seed,
-                    fold,
-                )
+    # The verified complete screening inventory already binds its accepted training
+    # contracts. Do not rehash every checkpoint a second time in a score-only audit.
+    reuse_record = None
+    if reuse is not None:
+        reused_seal = rr._read_json(reuse / "artifact_inventory.json")
+        reused_design = rr._read_json(reuse / "frozen_design.json")
+        if rr.inventory(
+            reuse, exclude=set(reused_seal["excluded_self"])
+        ) != reused_seal["files"] or reused_design[
+            "source_inventory_sha256"
+        ] != sha256_file(source / "artifact_inventory.json"):
+            raise ValueError("partial audit reuse differs from its sealed source")
+        reuse_record = {
+            "root": str(reuse),
+            "inventory_sha256": sha256_file(reuse / "artifact_inventory.json"),
+            "copied_evaluation_cells": [],
+        }
     output.mkdir(parents=True, exist_ok=False)
     write_json_atomic(
         output / "frozen_design.json",
@@ -283,6 +334,17 @@ def run(source: Path, output: Path) -> str:
             **rr.RESEARCH_FLAGS,
         },
     )
+    if reuse_record is not None:
+        for omitted in ALLOWED_SEEDS:
+            for arm in ARMS:
+                for fold in DEVELOPMENT_FOLDS:
+                    relative = Path(f"omit_{omitted}") / arm / fold
+                    if (reuse / relative / "evaluation.json").exists():
+                        shutil.copytree(reuse / relative, output / relative)
+                        reuse_record["copied_evaluation_cells"].append(
+                            relative.as_posix()
+                        )
+        write_json_atomic(output / "reuse_provenance.json", reuse_record)
     try:
         processes = [
             get_context("spawn").Process(
@@ -311,9 +373,33 @@ def run(source: Path, output: Path) -> str:
             seed: rr._read_json(output / f"omit_{seed}_result.json")
             for seed in ALLOWED_SEEDS
         }
+        excluded = sorted(
+            {
+                cell.split("/")[0]
+                for r in results.values()
+                for cell in r["rejected_books"]
+            }
+        )
+        panels = {
+            "full": {
+                "readouts": {a: r["pooled"] for a, r in screening["readouts"].items()},
+                "paired": screening["paired"],
+            },
+            **{str(s): r for s, r in results.items()},
+        }
+        traces = {
+            key: promotion_trace(
+                {a: r for a, r in panel["readouts"].items() if a not in excluded},
+                panel["paired"],
+                confirmed=False,
+                s0_informative=panel["paired"]["S0_minus_fast_off"][
+                    "informative_subsets"
+                ]["S0"],
+            )
+            for key, panel in panels.items()
+        }
         decision = development_decision(
-            screening["promotion_trace"],
-            {seed: result["promotion_trace"] for seed, result in results.items()},
+            traces["full"], {s: traces[str(s)] for s in ALLOWED_SEEDS}
         )
         digest = write_json_atomic(
             output / "seed_audit_result.json",
@@ -326,6 +412,11 @@ def run(source: Path, output: Path) -> str:
                     r["accepted_books"] for r in results.values()
                 ),
                 "new_training_runs": 0,
+                "excluded_arms": excluded,
+                "rejected_leave_one_out_books": {
+                    str(s): r["rejected_books"] for s, r in results.items()
+                },
+                "decision_traces_after_engineering_exclusions": traces,
                 "decision": decision,
                 "omission_result_sha256": {
                     str(seed): sha256_file(output / f"omit_{seed}_result.json")
@@ -348,8 +439,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--reuse", type=Path)
     args = parser.parse_args()
-    print(run(args.source, args.output), flush=True)
+    print(run(args.source, args.output, args.reuse), flush=True)
 
 
 if __name__ == "__main__":

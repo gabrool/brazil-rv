@@ -1,5 +1,21 @@
 # Round 4 A4: fixed three-seed development conclusion
 
+## A4.1: isolated portfolio-balance rejection (2026-09-10)
+
+After the first complete-score sensitivity attempt stopped, P with seeds 11/47 in
+F14 had long-quintile occupancy deviation 2.061417 versus the unchanged 2.0 limit
+(full three-seed P: 1.840945). Its D1–D5 signatures are zero. This is a failed
+candidate sensitivity, not a passing book or a reason to relax the balance limit.
+
+After recording and sealing that stop, an isolated long/short quintile-occupancy
+failure in a non-baseline arm disqualifies that arm from **all** four panels'
+research choices. Retain the failed report and label its metrics descriptive only;
+never write an accepted marker for it. Finish unaffected cells in a fresh root,
+reusing hash-verified completed reports and scores from the sealed partial attempt.
+Baseline failures, D1–D5, other risk bounds, identity/access errors and implementation
+errors still stop the entire audit. This narrower continuation rule was adopted
+after seeing the failure and is disclosed as such. No threshold or book is changed.
+
 Gabriel authorized this amendment on 2026-09-10 by asking to accelerate the
 remaining process without significantly reducing experiment quality. It supersedes
 the mandatory seeds 61/79/97 confirmation stage for this Round 4 only. This is a
