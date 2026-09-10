@@ -117,7 +117,7 @@ def test_option_snapshot_uses_known_version_and_keeps_missing_oi_unknown(tmp_pat
         pr,
         date(2024, 12, 27),
         date(2024, 12, 30),
-        {"ABC": (date(2020, 1, 1), date(2024, 12, 30))},
+        {"ABC": ((date(2020, 1, 1), date(2024, 12, 30)),)},
     )
     assert rows["oi_observed_series"].to_list() == [0]
     assert rows["oi_all_listed_observed"].to_list() == [False]
@@ -164,14 +164,27 @@ def test_cotahist_options_use_explicit_dated_isin_not_ticker_prefix(tmp_path):
         row[start : start + len(text)] = text
     path = tmp_path / "COTAHIST_A2010.ZIP"
     with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("COTAHIST_A2010.TXT", "".join(row))
+        text = "".join(row)
+        archive.writestr(
+            "COTAHIST_A2010.TXT",
+            "\n".join(
+                text.replace("20100104", day)
+                for day in ("20100104", "20100105", "20100106")
+            ),
+        )
     result = cotahist_option_quantities(
         path,
-        {"BRBBASACNOR3": (date(2010, 1, 4), date(2024, 12, 30))},
+        {
+            "BRBBASACNOR3": (
+                (date(2010, 1, 4), date(2010, 1, 4)),
+                (date(2010, 1, 6), date(2024, 12, 30)),
+            )
+        },
         end=date(2024, 12, 30),
     )
-    assert result["isin"].to_list() == ["BRBBASACNOR3"]
-    assert result["call_quantity"].to_list() == [123]
+    assert result["isin"].to_list() == ["BRBBASACNOR3", "BRBBASACNOR3"]
+    assert result["source_trade_date"].to_list() == [date(2010, 1, 4), date(2010, 1, 6)]
+    assert result["call_quantity"].to_list() == [123, 123]
 
 
 def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
@@ -243,6 +256,7 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
             "source_trade_date": sessions,
             "isin": ["ABC"] * 31,
             "listed_series": [2] * 31,
+            "oi_observed_series": [2] * 31,
             "call_oi": [100.0 + i for i in range(31)],
             "put_oi": [50.0] * 31,
             "oi_all_listed_observed": [True] * 31,
@@ -268,7 +282,9 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
     )
     changed_positions = opening_positions.with_columns(
         pl.when(pl.col("source_trade_date") == sessions[22])
-        .then(999.0).otherwise(pl.col("call_oi")).alias("call_oi")
+        .then(999.0)
+        .otherwise(pl.col("call_oi"))
+        .alias("call_oi")
     )
     oi_after, _ = activity_decision_features(
         cash, volumes, changed_positions, nonregular, sessions
@@ -276,18 +292,62 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
     assert oi_before.filter(pl.col("date") <= sessions[22]).equals(
         oi_after.filter(pl.col("date") <= sessions[22])
     )
-    for feature in ("put_call_oi_log_ratio", "delta_oi_to_volume_1"):
+    for feature in (
+        "put_call_oi_log_ratio",
+        "delta_oi_to_volume_1",
+        "observed_series_put_call_oi_log_ratio",
+    ):
         assert oi_before.filter(pl.col("date") == sessions[23])[feature].item() != (
             oi_after.filter(pl.col("date") == sessions[23])[feature].item()
         )
 
+    partial = opening_positions.with_columns(
+        pl.lit(False).alias("oi_all_listed_observed"),
+        pl.lit(4).alias("listed_series"),
+    )
+    partial_oi, _ = activity_decision_features(
+        cash, volumes, partial, nonregular, sessions
+    )
+    partial_row = partial_oi.filter(pl.col("date") == sessions[23]).row(0, named=True)
+    assert partial_row["put_call_oi_log_ratio"] is None
+    assert partial_row["delta_oi_to_volume_1"] is None
+    assert partial_row["observed_series_put_call_oi_log_ratio"] == np.log(50.0 / 122.0)
+    assert partial_row["observed_series_oi_coverage"] == 0.5
+    assert partial_row["observed_series_oi_coverage_age_sessions"] == 2
+    assert partial_row["observed_series_put_call_oi_log_ratio_age_sessions"] == 2
+    missing_call = partial.with_columns(
+        pl.when(pl.col("source_trade_date") == sessions[22])
+        .then(0.0)
+        .otherwise(pl.col("call_oi"))
+        .alias("call_oi"),
+        pl.when(pl.col("source_trade_date") == sessions[22])
+        .then(1)
+        .otherwise(pl.col("oi_observed_series"))
+        .alias("oi_observed_series"),
+    )
+    partial_after, _ = activity_decision_features(
+        cash, volumes, missing_call, nonregular, sessions
+    )
+    assert partial_oi.filter(pl.col("date") <= sessions[22]).equals(
+        partial_after.filter(pl.col("date") <= sessions[22])
+    )
+    missing_row = partial_after.filter(pl.col("date") == sessions[23]).row(
+        0, named=True
+    )
+    assert missing_row["observed_series_put_call_oi_log_ratio"] is None
+    assert missing_row["observed_series_put_call_oi_log_ratio_age_sessions"] is None
+    assert missing_row["observed_series_oi_coverage"] == 0.25
+
     changed_cash = cash.with_columns(
         pl.when(pl.col("source_trade_date") == sessions[22])
-        .then(20000.0).otherwise(pl.col("volume_brl")).alias("volume_brl")
+        .then(20000.0)
+        .otherwise(pl.col("volume_brl"))
+        .alias("volume_brl")
     )
     changed_nonregular = nonregular.with_columns(
         pl.when(pl.col("source_trade_date") == sessions[22])
-        .then(100.0).otherwise(pl.col("nonregular_quantity"))
+        .then(100.0)
+        .otherwise(pl.col("nonregular_quantity"))
         .alias("nonregular_quantity")
     )
     _, micro_after = activity_decision_features(
@@ -389,9 +449,10 @@ def test_lending_feature_uses_publication_date_and_preserves_reference_age():
         changed.filter(pl.col("date") == days[22])["loan_balance_to_volume_20"].item()
         == 6.0
     )
-    assert result.filter(pl.col("date") == days[20])[
-        "new_loan_volume_surprise"
-    ].item() is None
+    assert (
+        result.filter(pl.col("date") == days[20])["new_loan_volume_surprise"].item()
+        is None
+    )
     with_five_gaps = rates.filter(~pl.col("source_trade_date").is_in(days[5:10]))
     sparse = lending_decision_features(
         balance, with_five_gaps, days, ["ABC"], np.full((31, 1), 100.0)
@@ -406,9 +467,12 @@ def test_lending_feature_uses_publication_date_and_preserves_reference_age():
     insufficient = lending_decision_features(
         balance, with_six_gaps, days, ["ABC"], np.full((31, 1), 100.0)
     )
-    assert insufficient.filter(pl.col("date") == days[21])[
-        "new_loan_volume_surprise"
-    ].item() is None
+    assert (
+        insufficient.filter(pl.col("date") == days[21])[
+            "new_loan_volume_surprise"
+        ].item()
+        is None
+    )
 
 
 def test_utilization_uses_received_float_snapshot_and_known_unit_boundaries():

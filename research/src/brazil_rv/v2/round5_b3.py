@@ -39,6 +39,15 @@ RATE_FIELDS = (
 )
 
 
+def _clear_xml_record(element):
+    element.clear()
+    # Each B3 record has a separate Document/AppHdr inside BizGrp. Clearing
+    # only its payload retains every preceding message header in lxml's tree.
+    for node in (element, *element.iterancestors()):
+        while node.getprevious() is not None:
+            del node.getparent()[0]
+
+
 @contextmanager
 def historical_xml(path: Path, available_date: date):
     """Stream the latest B3-created version known before the first decision.
@@ -89,14 +98,18 @@ def parse_options_snapshot(
     pr_path: Path,
     source_date: date,
     available_date: date,
-    identities: dict[str, tuple[date, date]],
+    identities: dict[str, tuple[tuple[date, date], ...]],
 ) -> tuple[pl.DataFrame, pl.DataFrame, dict[str, object]]:
     """Extract reported OI and nonregular trading without inventing missing fields."""
     cash = {}
     options = {}
     with historical_xml(in_path, available_date) as (handle, in_audit):
         for _, element in iterparse(
-            handle, events=("end",), tag="{*}Instrm", resolve_entities=False, no_network=True
+            handle,
+            events=("end",),
+            tag="{*}Instrm",
+            resolve_entities=False,
+            no_network=True,
         ):
             identifier = _instrument_id(element)
             info = _descendant(element, "InstrmInf")
@@ -110,7 +123,9 @@ def parse_options_snapshot(
             ):
                 isin = _text(equity, "ISIN")
                 bounds = identities.get(isin)
-                if bounds and bounds[0] <= source_date <= bounds[1]:
+                if bounds and any(
+                    first <= source_date <= last for first, last in bounds
+                ):
                     cash[identifier] = isin
             elif active == "true" and option is not None:
                 start = _text(option, "TradgStartDt")
@@ -127,7 +142,7 @@ def parse_options_snapshot(
                         _text(option, "OptnTp"),
                         _text(option, "TckrSymb"),
                     )
-            element.clear()
+            _clear_xml_record(element)
     options = {key: value for key, value in options.items() if value[0] in cash}
     aggregates = defaultdict(
         lambda: {
@@ -144,7 +159,11 @@ def parse_options_snapshot(
     seen = set()
     with historical_xml(pr_path, available_date) as (handle, pr_audit):
         for _, element in iterparse(
-            handle, events=("end",), tag="{*}PricRpt", resolve_entities=False, no_network=True
+            handle,
+            events=("end",),
+            tag="{*}PricRpt",
+            resolve_entities=False,
+            no_network=True,
         ):
             identifier = _instrument_id(element)
             if identifier in options or identifier in cash:
@@ -172,7 +191,7 @@ def parse_options_snapshot(
                     agg["call_oi" if kind == "CALL" else "put_oi"] += value
             if identifier in cash:
                 stock_rows.append(_cash_record(element, cash[identifier]))
-            element.clear()
+            _clear_xml_record(element)
     oi_rows = [{"isin": isin, **values} for isin, values in aggregates.items()]
     for row in oi_rows:
         row["oi_all_listed_observed"] = (
@@ -224,23 +243,31 @@ def cash_price_report(
     seen = set()
     with historical_xml(pr_path, available_date) as (handle, audit):
         for _, element in iterparse(
-            handle, events=("end",), tag="{*}PricRpt", resolve_entities=False, no_network=True
+            handle,
+            events=("end",),
+            tag="{*}PricRpt",
+            resolve_entities=False,
+            no_network=True,
         ):
             isin = identities.get(_text(element, "TckrSymb"))
             if isin is not None:
                 if _text(_descendant(element, "TradDt"), "Dt") != str(source_date):
-                    raise ValueError("Cash price-report date does not match source date")
+                    raise ValueError(
+                        "Cash price-report date does not match source date"
+                    )
                 if isin in seen:
-                    raise ValueError("Multiple price-report records map to one cash ISIN")
+                    raise ValueError(
+                        "Multiple price-report records map to one cash ISIN"
+                    )
                 seen.add(isin)
                 rows.append(_cash_record(element, isin))
-            element.clear()
+            _clear_xml_record(element)
     return pl.DataFrame(rows), audit
 
 
 def cotahist_option_quantities(
     archive_path: Path,
-    identities: dict[str, tuple[date, date]],
+    identities: dict[str, tuple[tuple[date, date], ...]],
     *,
     end: date,
 ) -> pl.DataFrame:
@@ -258,7 +285,11 @@ def cotahist_option_quantities(
                     continue
                 day = option.trade_date
                 bounds = identities.get(option.isin)
-                if day > end or bounds is None or not bounds[0] <= day <= bounds[1]:
+                if (
+                    day > end
+                    or not bounds
+                    or not any(first <= day <= last for first, last in bounds)
+                ):
                     continue
                 values = totals[(day, option.isin)]
                 values[int(option.is_put)] += option.quantity
@@ -605,9 +636,7 @@ def lending_utilization_features(
     class_counts = mapped.group_by("date", "issuer_root", "cvm_code", "class").agg(
         pl.col("isin").n_unique().alias("class_security_count")
     )
-    mapped = mapped.join(
-        class_counts, on=["date", "issuer_root", "cvm_code", "class"]
-    )
+    mapped = mapped.join(class_counts, on=["date", "issuer_root", "cvm_code", "class"])
     joined = (
         balances.with_columns(
             pl.col("available_date").alias("date"),
@@ -653,12 +682,18 @@ def lending_utilization_features(
         document = max(
             candidates,
             key=lambda d: (
-                d["snapshot_date"], d["reference"], d["version"], d["date"], d["document_id"]
+                d["snapshot_date"],
+                d["reference"],
+                d["version"],
+                d["date"],
+                d["document_id"],
             ),
         )
         if any(
             event["available_index"] <= index
-            and document["snapshot_date"] < event["effective"] <= row["source_position_date"]
+            and document["snapshot_date"]
+            < event["effective"]
+            <= row["source_position_date"]
             for event in changes[(row["issuer_root"], row["cvm_code"])]
         ):
             audit["known_capital_boundary"] += 1
@@ -726,6 +761,7 @@ def activity_decision_features(
                 "source_trade_date",
                 "isin",
                 "listed_series",
+                "oi_observed_series",
                 "call_oi",
                 "put_oi",
                 "oi_all_listed_observed",
@@ -736,6 +772,7 @@ def activity_decision_features(
     else:
         grid = grid.with_columns(
             pl.lit(None, dtype=pl.Int64).alias("listed_series"),
+            pl.lit(None, dtype=pl.Int64).alias("oi_observed_series"),
             pl.lit(None, dtype=pl.Float64).alias("call_oi"),
             pl.lit(None, dtype=pl.Float64).alias("put_oi"),
             pl.lit(False).alias("oi_all_listed_observed"),
@@ -793,6 +830,12 @@ def activity_decision_features(
             pl.when(pl.col("oi_all_listed_observed"))
             .then(((pl.col("put_oi") + 1) / (pl.col("call_oi") + 1)).log())
             .alias("put_call_oi_log_ratio"),
+            pl.when((pl.col("call_oi") > 0) & (pl.col("put_oi") > 0))
+            .then((pl.col("put_oi") / pl.col("call_oi")).log())
+            .alias("observed_series_put_call_oi_log_ratio"),
+            pl.when(pl.col("listed_series") > 0)
+            .then(pl.col("oi_observed_series") / pl.col("listed_series"))
+            .alias("observed_series_oi_coverage"),
             pl.when(pl.col("oi_stock_quantity_20") > 0)
             .then(pl.col("oi_change") / (pl.col("oi_stock_quantity_20") / 20))
             .alias("delta_oi_to_volume_1"),
@@ -847,7 +890,13 @@ def activity_decision_features(
                     pl.when(pl.col(feature).is_not_null())
                     .then(
                         2
-                        if feature in {"put_call_oi_log_ratio", "delta_oi_to_volume_1"}
+                        if feature
+                        in {
+                            "put_call_oi_log_ratio",
+                            "delta_oi_to_volume_1",
+                            "observed_series_put_call_oi_log_ratio",
+                            "observed_series_oi_coverage",
+                        }
                         else 1
                     )
                     .alias(feature + "_age_sessions")
@@ -865,5 +914,7 @@ def activity_decision_features(
             "put_call_oi_log_ratio",
             "delta_oi_to_volume_1",
             "uncovered_call_share",
+            "observed_series_put_call_oi_log_ratio",
+            "observed_series_oi_coverage",
         ]
     ), selected(["avg_trade_size_20", "after_hours_volume_share_5"])

@@ -480,7 +480,7 @@ _ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
     ),
     "new_loan_volume_surprise": (
         "standardized_flow",
-        "positive registered share flow minus mean of the strictly prior 20 complete source sessions, divided by their sample deviation; actual accepted source availability",
+        "positive registered share flow minus mean of observed values in the strictly prior 20 B3 sessions, divided by their sample deviation; at least 15 observed sessions, current flow excluded from scale; actual accepted source availability",
         "rank_gauss",
     ),
     "option_to_stock_volume_20": (
@@ -497,6 +497,16 @@ _ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
         "log_ratio",
         "log((put OI + 1)/(call OI + 1)) only for a proven complete position snapshot; BVBG.086 opening D is closing D-1, with its actual publication clock",
         "rank_gauss",
+    ),
+    "observed_series_put_call_oi_log_ratio": (
+        "log_ratio",
+        "log(sum explicitly reported put OI / sum explicitly reported call OI), both sums positive; observed series subset, not complete-market OI; BVBG.086 opening D is closing D-1, actual publication clock",
+        "rank_gauss",
+    ),
+    "observed_series_oi_coverage": (
+        "fraction_0_1",
+        "listed series with an explicit OI field / dated known listed series; zero means no reported support, never zero economic OI; unknown listing population masked",
+        "bounded_fraction",
     ),
     "delta_oi_to_volume_1": (
         "quantity_ratio",
