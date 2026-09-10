@@ -223,9 +223,11 @@ def report(reference, cumulative, version=1):
     for code, value in (
         ("1", 100),
         ("2.03", 40),
+        ("2.03.09", 0),
         ("3.01", cumulative * 10),
         ("3.03", cumulative * 2),
         ("3.11", cumulative),
+        ("3.11.02", 0),
         ("6.01", cumulative),
     ):
         assign_account(
@@ -235,9 +237,76 @@ def report(reference, cumulative, version=1):
             value,
             date(reference.year, 1, 1) if code.startswith(("3", "6")) else None,
             reference,
-            "Revenue" if code == "3.01" else "Account",
+            {
+                "1": "Ativo Total",
+                "2.03": "Patrimônio Líquido Consolidado",
+                "2.03.09": "Participação dos Acionistas Não Controladores",
+                "3.01": "Receita de Venda de Bens e/ou Serviços",
+                "3.03": "Resultado Bruto",
+                "3.11": "Lucro/Prejuízo Consolidado do Período",
+                "3.11.02": "Atribuído a Sócios Não Controladores",
+                "6.01": "Caixa Líquido Atividades Operacionais",
+            }[code],
         )
     return d
+
+
+@pytest.mark.parametrize(
+    "equity_code,nci_code,income_code,parent_income_code",
+    (
+        ("2.03", "2.03.09", "3.11", "3.11.01"),
+        ("2.05", None, "3.13", "3.13.01"),
+        ("2.08", "2.08.09", "3.09", "3.09.01"),
+        ("2.07", "2.07.02", "3.11", "3.11.01"),
+    ),
+)
+def test_published_account_descriptions_identify_bank_insurer_and_industrial_roles(
+    equity_code,
+    nci_code,
+    income_code,
+    parent_income_code,
+):
+    reference = date(2023, 12, 31)
+    document = {"id": "bank", "reference": reference, "version": 1}
+    basis = "ind" if nci_code is None else "con"
+    # These account numbers do not mean equity/net income in the bank chart.
+    for code, label in (
+        ("2.03", "Resultados de Exercícios Futuros"),
+        ("2.05", "Passivos Fiscais"),
+        ("3.09", "IR Diferido"),
+        ("3.11", "Reversão dos Juros sobre Capital Próprio"),
+        ("2.07.02", "Reservas de Capital"),
+        ("2.07.02", "Passivos sobre Ativos de Operações Descontinuadas"),
+    ):
+        assign_account(document, basis, code, 9999, None, reference, label)
+    assert "accounts" not in document
+    observations = [
+        ("1", "Ativo Total", 100),
+        (equity_code, "Patrimônio Líquido Consolidado", 40),
+        (income_code, "Lucro/Prejuízo Consolidado do Período", 12),
+    ]
+    if nci_code:
+        observations.append(
+            (nci_code, "Participação dos Acionistas Não Controladores", 3)
+        )
+        observations.append(
+            (parent_income_code, "Atribuído aos Sócios da Empresa Controladora", 10)
+        )
+    for code, label, value in observations:
+        assign_account(
+            document,
+            basis,
+            code,
+            value,
+            date(2023, 1, 1) if code.startswith("3") else None,
+            reference,
+            label,
+        )
+    state = fundamental_state({("DFP", reference): document}, "Bancos")
+    assert state["liabilities_to_assets"] == pytest.approx(0.6)
+    assert state["_book_equity"] == (37 if nci_code else 40)
+    assert state["_earnings_ttm"] == (10 if nci_code else 12)
+    assert "gross_profitability" in state and state["gross_profitability"] is None
 
 
 def test_q4_requires_received_nine_month_and_annual_versions():
@@ -282,6 +351,115 @@ def test_nonfinancial_ratios_are_not_forced_onto_insurers():
     assert industrial["gross_profitability"] == pytest.approx(2.0)
     assert insurer["gross_profitability"] is None
     assert insurer["liabilities_to_assets"] == industrial["liabilities_to_assets"]
+
+
+def test_missing_consolidated_nci_is_not_an_observed_zero():
+    document = report(date(2023, 12, 31), 100)
+    ledger = {document["reference"]: document}
+    del document["accounts"]["con"]["minority_equity"]
+    missing = fundamental_state(ledger, "Industry")
+    assert missing["_book_equity"] is None
+    assert missing["liabilities_to_assets"] == pytest.approx(0.6)
+    assert missing["_earnings_ttm"] == 100
+    assign_account(
+        document,
+        "con",
+        "2.07.01",
+        38,
+        None,
+        document["reference"],
+        "Patrimônio Líquido Atribuído ao Controlador",
+    )
+    assert fundamental_state(ledger, "Industry")["_book_equity"] == 38
+
+
+def test_source_financial_chart_identifies_bank_without_sector_and_preserves_zero():
+    document = report(date(2023, 12, 31), 100)
+    document["accounts"]["con"]["gross_profit"].update(
+        description="Resultado Bruto de Intermediação Financeira",
+        value=0,
+    )
+    state = fundamental_state({document["reference"]: document})
+    assert state["_financial"] == 1
+    assert state["gross_profitability"] == 0  # a supported observed economic zero
+    assert state["revenue_growth_yoy"] is None
+    assert state["accruals_to_assets"] is None
+
+
+def test_parent_income_may_exceed_group_income_when_nci_has_losses():
+    document = report(date(2023, 12, 31), 100)
+    assign_account(
+        document,
+        "con",
+        "3.11.01",
+        110,
+        date(2023, 1, 1),
+        document["reference"],
+        "Atribuído a Sócios da Empresa Controladora",
+    )
+    assert fundamental_state({document["reference"]: document})["_earnings_ttm"] == 110
+
+
+def test_parent_flow_requires_reported_parent_or_same_period_nci_income():
+    document = report(date(2023, 12, 31), 100)
+    ledger = {document["reference"]: document}
+    minority = document["accounts"]["con"].pop("minority_income")
+    assert fundamental_state(ledger)["_earnings_ttm"] is None
+    document["accounts"]["con"]["minority_income"] = {**minority, "value": -10}
+    assert fundamental_state(ledger)["_earnings_ttm"] == 110
+    document["accounts"]["con"]["minority_income"]["start"] = date(2023, 4, 1)
+    assert fundamental_state(ledger)["_earnings_ttm"] is None
+    assert (
+        trailing_twelve_months(ledger, "con", "net_income", document["reference"])[0]
+        == 100
+    )
+
+
+def test_joined_parent_earnings_restatement_first_eligible_decision():
+    sessions, document, rad, identity, market = family_fixture()
+    del document["accounts"]["con"]["minority_income"]
+    base, _ = fundamental_features(
+        [deepcopy(document)], rad, identity, sessions, market
+    )
+    revised = deepcopy(document)
+    revised.update(id="2", version=2, receipt=sessions[2])
+    revised["accounts"]["con"]["minority_income"] = {
+        **revised["accounts"]["con"]["net_income"],
+        "value": -10,
+    }
+    changed, _ = fundamental_features(
+        [deepcopy(document), revised],
+        rad
+        + [
+            {
+                **rad[0],
+                "id": "2",
+                "version": "2",
+                "receipt": datetime(2024, 1, 4, 15, 44),
+            }
+        ],
+        identity,
+        sessions,
+        market,
+    )
+    assert base["earnings_yield_ttm"].null_count() == len(sessions)
+    assert base.head(2).equals(changed.head(2))
+    assert changed["earnings_yield_ttm"][2] == pytest.approx(110 / 2000)
+    assert changed["earnings_yield_ttm_age_sessions"][2] == 0
+
+
+def test_statement_financial_flag_age_ignores_later_identity_metadata():
+    sessions, document, rad, identity, market = family_fixture()
+    document["accounts"]["con"]["gross_profit"]["description"] = (
+        "Resultado Bruto de Intermediação Financeira"
+    )
+    identity = identity.with_columns(
+        pl.lit(None, dtype=pl.String).alias("sector"),
+        pl.lit(sessions[2]).alias("identity_known_date"),
+    )
+    values, _ = fundamental_features([document], rad, identity, sessions, market)
+    assert values["fundamental_financial_flag"].to_list() == [1, 1, 1, 1]
+    assert values["fundamental_financial_flag_age_sessions"].to_list() == [0, 1, 2, 3]
 
 
 def test_viewer_keeps_dates_blank_values_and_literal_numeric_units():

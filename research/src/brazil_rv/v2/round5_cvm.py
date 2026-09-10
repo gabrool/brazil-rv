@@ -57,11 +57,24 @@ FEATURES_FUNDAMENTALS = (
 ACCOUNTS = {
     "1": "assets",
     "2.03": "equity",
+    "2.05": "equity",
+    "2.07": "equity",
+    "2.08": "equity",
+    "2.07.01": "parent_equity",
     "2.03.09": "minority_equity",
+    "2.07.02": "minority_equity",
+    "2.08.09": "minority_equity",
     "3.01": "revenue",
     "3.03": "gross_profit",
     "3.11": "net_income",
+    "3.09": "net_income",
+    "3.13": "net_income",
     "3.11.01": "parent_income",
+    "3.09.01": "parent_income",
+    "3.13.01": "parent_income",
+    "3.09.02": "minority_income",
+    "3.11.02": "minority_income",
+    "3.13.02": "minority_income",
     "6.01": "cash_flow",
 }
 
@@ -508,7 +521,47 @@ def assign_account(
     description: str,
 ) -> None:
     metric = ACCOUNTS[code]
-    account = {"value": value, "start": start, "end": end, "description": description}
+    description_key = re.sub(r"[^a-z0-9]+", " ", normalized(description)).strip()
+    # CVM banks/insurers use several charts: e.g. 2.03 may be deferred
+    # income or provisions, and 3.11 may be JCP reversal rather than income.
+    # Candidate codes are only a filter; their published descriptions supply
+    # the semantic role. Never compare same-number but different accounts.
+    if metric == "assets" and description_key not in ("ativo", "ativo total"):
+        return
+    if metric == "equity" and description_key not in (
+        "patrimonio liquido",
+        "patrimonio liquido consolidado",
+    ):
+        return
+    if metric == "minority_equity" and "nao controlador" not in description_key:
+        return
+    if metric == "parent_equity" and not (
+        description_key.startswith("patrimonio liquido atribuido")
+        and "controlador" in description_key
+        and "nao controlador" not in description_key
+    ):
+        return
+    if metric == "net_income" and not (
+        description_key.startswith("lucro")
+        and ("periodo" in description_key or "exercicio" in description_key)
+        and "operacoes" not in description_key
+    ):
+        return
+    if metric == "parent_income" and not (
+        "atribuido" in description_key and "empresa controladora" in description_key
+    ):
+        return
+    if metric == "minority_income" and not (
+        "atribuido" in description_key and "nao controlador" in description_key
+    ):
+        return
+    account = {
+        "value": value,
+        "start": start,
+        "end": end,
+        "description": description,
+        "source_code": code,
+    }
     book = document.setdefault("accounts", {}).setdefault(basis, {})
     previous = book.get(metric)
     # ITR DRE often has both a current quarter and a YTD column. Keep YTD;
@@ -1188,6 +1241,22 @@ def event_features(
     )
 
 
+def flow_account(document: dict, basis: str, metric: str) -> dict | None:
+    """A missing parent flow needs explicit same-period NCI, never assumed zero."""
+    book = document.get("accounts", {}).get(basis, {})
+    if metric in book:
+        return book[metric]
+    if metric == "parent_income" and basis == "con":
+        total, minority = book.get("net_income"), book.get("minority_income")
+        if (
+            total is not None
+            and minority is not None
+            and all(total[key] == minority[key] for key in ("start", "end"))
+        ):
+            return {**total, "value": total["value"] - minority["value"]}
+    return None
+
+
 def fiscal_quarters(
     ledger: dict,
     basis: str,
@@ -1197,7 +1266,7 @@ def fiscal_quarters(
 ) -> dict[date, float]:
     cumulative = {}
     for document in ledger.values():
-        account = document.get("accounts", {}).get(basis, {}).get(metric)
+        account = flow_account(document, basis, metric)
         if account is None or account["start"] is None:
             continue
         months = (
@@ -1252,8 +1321,7 @@ def trailing_twelve_months(
         candidates = [
             d
             for d in ledger.values()
-            if d["reference"] == endpoint
-            and metric in d.get("accounts", {}).get(basis, {})
+            if d["reference"] == endpoint and flow_account(d, basis, metric) is not None
         ]
         if not candidates:
             return None
@@ -1261,7 +1329,7 @@ def trailing_twelve_months(
             candidates,
             key=lambda d: (d["version"], d.get("available_index", 0), d["id"]),
         )
-        account = document["accounts"][basis][metric]
+        account = flow_account(document, basis, metric)
         if account["end"] != endpoint or account["start"] is None:
             return None
         return account, document.get("available_index", 0), document["version"]
@@ -1331,7 +1399,13 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
         return result
     result["liabilities_to_assets"] = 1 - equity / assets
     result["_book_equity"] = (
-        equity - stocks.get("minority_equity", {"value": 0})["value"]
+        equity
+        if basis == "ind"
+        else stocks["parent_equity"]["value"]
+        if "parent_equity" in stocks
+        else equity - stocks["minority_equity"]["value"]
+        if "minority_equity" in stocks
+        else None
     )
     result["_basis_consolidated"] = float(basis == "con")
     result["_reference"] = end
@@ -1372,17 +1446,13 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
         restated["gross_profitability"] = latest["version"] > 1 or any(
             v > 1 for v in ttm_versions["gross_profit"]
         )
-    earnings_metric = (
-        "parent_income" if ttm["parent_income"] is not None else "net_income"
-    )
+    earnings_metric = "parent_income" if basis == "con" else "net_income"
     if ttm[earnings_metric] is not None:
         source_indices["earnings_yield_ttm"] = ttm_source(earnings_metric, end)
         restated["earnings_yield_ttm"] = any(
             v > 1 for v in ttm_versions[earnings_metric]
         )
-    result["_earnings_ttm"] = (
-        ttm["parent_income"] if ttm["parent_income"] is not None else ttm["net_income"]
-    )
+    result["_earnings_ttm"] = ttm[earnings_metric]
     previous_year = year_before(end)
     past_asset_documents = [
         d
@@ -1406,6 +1476,18 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
             "credito",
         )
     )
+    # The published statement can identify a financial accounting chart before
+    # a dated sector cadastre is available; no modern sector backprojection.
+    statement_financial = stocks["equity"].get("source_code") in {
+        "2.05",
+        "2.07",
+        "2.08",
+    } or any(
+        word in normalized(account.get("description", ""))
+        for account in stocks.values()
+        for word in ("intermediacao financeira", "seguradora", "resseguradora")
+    )
+    financial = financial or statement_financial
     gross_description = normalized(
         stocks.get("gross_profit", {}).get("description", "")
     )
@@ -1413,6 +1495,11 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
     # intermediation. Insurer accounts are not forced into gross-profit semantics.
     gross_comparable = not financial or ("intermedia" in gross_description)
     result["_financial"] = float(financial)
+    result["_financial_statement_source_index"] = (
+        latest.get("available_index", 0)
+        if statement_financial or sector is None
+        else None
+    )
     if ttm["gross_profit"] is not None and gross_comparable:
         result["gross_profitability"] = ttm["gross_profit"] / assets
     if not financial:
@@ -1458,9 +1545,7 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
                     for v in ttm_versions["net_income"] + ttm_versions["cash_flow"]
                 )
             )
-    earnings = (
-        flow["parent_income"] if end in flow["parent_income"] else flow["net_income"]
-    )
+    earnings = flow[earnings_metric]
     changes = {
         d: value - earnings[year_before(d)]
         for d, value in earnings.items()
@@ -1476,9 +1561,7 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
         denominator = float(np.std([changes[d] for d in prior], ddof=1))
         if denominator > 0:
             result["sue"] = changes[end] / denominator
-            sue_metric = (
-                "parent_income" if end in flow["parent_income"] else "net_income"
-            )
+            sue_metric = earnings_metric
             source_indices["sue"] = min(
                 flow_sources[sue_metric][d]
                 for ending in [*prior, end]
@@ -1522,7 +1605,7 @@ def valuation_market(store: Path) -> dict:
     }
 
 
-def single_class_market_cap(
+def issuer_market_cap(
     ledger: dict,
     identity_rows: list[dict],
     index: int,
@@ -1530,14 +1613,15 @@ def single_class_market_cap(
     market: dict | None,
     capital_changes: list[dict],
 ) -> tuple[float | None, int | None]:
-    """Known non-treasury shares times the exact prior observed class close.
+    """Sum known non-treasury shares times each class's prior observed close.
 
-    Exactly one issued class and one dated security are required. Units and
-    multiple classes need full class valuation and are unavailable here. A
+    Every positive reported class needs exactly one dated compatible security.
+    Aggregate PN counts cannot be allocated across preferred subclasses; units
+    cannot substitute for their underlying share prices. A
     share-count snapshot is invalidated by a subsequent known capital event or
     completed-session unit uncertainty, until a post-event count is received.
     """
-    if market is None or index == 0 or len(identity_rows) != 1:
+    if market is None or index == 0:
         return None, None
     known = [d for d in ledger.values() if d.get("shares")]
     if not known:
@@ -1545,10 +1629,7 @@ def single_class_market_cap(
     document = max(known, key=lambda d: (d["reference"], d["version"]))
     shares = document["shares"]
     classes = [cls for cls, count in shares.items() if count > 0]
-    identity = identity_rows[0]
-    if len(classes) != 1 or identity["class"] != classes[0]:
-        return None, None
-    if any(not np.isfinite(v) or v < 0 for v in shares.values()):
+    if not classes or any(not np.isfinite(v) or v < 0 for v in shares.values()):
         return None, None
     if any(
         event["available_index"] <= index
@@ -1556,17 +1637,28 @@ def single_class_market_cap(
         for event in capital_changes
     ):
         return None, None
-    column = market["columns"].get(identity["isin"])
-    if column is None or not market["observed"][index - 1, column]:
-        return None, None
     first = bisect.bisect_right(sessions, document["reference"])
     prefix = market["barrier_prefix"]
-    if first > index or prefix[index, column] != prefix[first, column]:
+    if first > index:
         return None, None
-    close = float(market["close"][index - 1, column])
-    if not np.isfinite(close) or close <= 0:
-        return None, None
-    return shares[classes[0]] * close, document["available_index"]
+    total = 0.0
+    for share_class in classes:
+        candidates = [r for r in identity_rows if r["class"] == share_class]
+        if len(candidates) != 1:
+            return None, None
+        identity = candidates[0]
+        if share_class == "PN" and identity.get("preferred_class"):
+            return None, None
+        column = market["columns"].get(identity["isin"])
+        if column is None or not market["observed"][index - 1, column]:
+            return None, None
+        if prefix[index, column] != prefix[first, column]:
+            return None, None
+        close = float(market["close"][index - 1, column])
+        if not np.isfinite(close) or close <= 0:
+            return None, None
+        total += shares[share_class] * close
+    return total, document["available_index"]
 
 
 def fundamental_features(
@@ -1601,6 +1693,8 @@ def fundamental_features(
     version_composition = defaultdict(
         lambda: {"first_version_only": 0, "includes_later_version": 0}
     )
+    valuation_coverage = defaultdict(lambda: defaultdict(int))
+    valuation_issuers = defaultdict(set)
     changes_by_issuer = defaultdict(list)
     for event in capital_changes:
         changes_by_issuer[(event["cnpj"][:8], event["cvm_code"])].append(event)
@@ -1640,8 +1734,17 @@ def fundamental_features(
             if changed or not cached or previous_sector != sector:
                 cached = fundamental_state(ledger, sector)
             previous_sector = sector
+            financial_source_indices = (
+                [bisect.bisect_left(sessions, dated["identity_known_date"][0])]
+                if sector is not None
+                else []
+            )
+            if cached.get("_financial_statement_source_index") is not None:
+                financial_source_indices.append(
+                    cached["_financial_statement_source_index"]
+                )
             identity_rows = dated.to_dicts()
-            market_cap, capital_index = single_class_market_cap(
+            market_cap, capital_index = issuer_market_cap(
                 ledger,
                 identity_rows,
                 index,
@@ -1649,14 +1752,24 @@ def fundamental_features(
                 market,
                 changes_by_issuer[(cnpj[:8], cvm_code)],
             )
+            capital_document = max(
+                (d for d in ledger.values() if d.get("shares")),
+                key=lambda d: (d["reference"], d["version"]),
+                default=None,
+            )
             capital_later_version = (
-                max(
-                    (d for d in ledger.values() if d.get("shares")),
-                    key=lambda d: (d["reference"], d["version"]),
-                )["version"]
-                > 1
-                if market_cap is not None
-                else False
+                capital_document is not None and capital_document["version"] > 1
+            )
+            positive_classes = sum(
+                count > 0
+                for count in (capital_document or {}).get("shares", {}).values()
+            )
+            class_scope = (
+                "single_class"
+                if positive_classes == 1
+                else "multiple_classes"
+                if positive_classes > 1
+                else "unavailable_or_zero_capital"
             )
             for isin in dated.get_column("isin"):
                 record = {
@@ -1705,10 +1818,7 @@ def fundamental_features(
                         else None
                     )
                 record["fundamental_financial_flag_age_sessions"] = (
-                    float(
-                        index
-                        - bisect.bisect_left(sessions, dated["identity_known_date"][0])
-                    )
+                    float(index - min(financial_source_indices))
                     if record["fundamental_financial_flag"] is not None
                     else None
                 )
@@ -1718,8 +1828,21 @@ def fundamental_features(
                     and balance_index is not None
                     else None
                 )
-                record["valuation_single_class_flag"] = float(market_cap is not None)
-                record["valuation_single_class_flag_age_sessions"] = 0.0
+                record["valuation_available_flag"] = float(market_cap is not None)
+                record["valuation_available_flag_age_sessions"] = 0.0
+                coverage_key = (current.year, class_scope)
+                valuation_coverage[coverage_key]["mapped_name_days"] += 1
+                valuation_issuers[(*coverage_key, "mapped")].add((cnpj[:8], cvm_code))
+                for feature in (
+                    "log_market_cap",
+                    "book_to_market",
+                    "earnings_yield_ttm",
+                ):
+                    if record[feature] is not None:
+                        valuation_coverage[coverage_key][feature] += 1
+                        valuation_issuers[(*coverage_key, feature)].add(
+                            (cnpj[:8], cvm_code)
+                        )
                 for feature in FEATURES_FUNDAMENTALS:
                     if record[feature] is None:
                         continue
@@ -1749,8 +1872,8 @@ def fundamental_features(
             "fundamental_financial_flag_age_sessions": pl.Float64,
             "fundamental_consolidated_flag": pl.Float64,
             "fundamental_consolidated_flag_age_sessions": pl.Float64,
-            "valuation_single_class_flag": pl.Float64,
-            "valuation_single_class_flag_age_sessions": pl.Float64,
+            "valuation_available_flag": pl.Float64,
+            "valuation_available_flag_age_sessions": pl.Float64,
             "current_balance_version": pl.Int32,
         },
     ), {
@@ -1764,7 +1887,24 @@ def fundamental_features(
             for (year, feature), counts in sorted(version_composition.items())
         ],
         "feature_version_rule": "First-version-only means all contributing financial accounts and share counts are version1; any later-version contribution classifies the composite as includes_later_version. Cadastre versions are separate identity/sector provenance.",
-        "valuation_status": "single_class_own_version_shares_prior_observed_close_no_intervening_known_capital_or_unit_boundary",
+        "valuation_coverage_by_class_count": [
+            {
+                "year": year,
+                "class_scope": scope,
+                **counts,
+                "issuer_counts": {
+                    feature: len(valuation_issuers[(year, scope, feature)])
+                    for feature in (
+                        "mapped",
+                        "log_market_cap",
+                        "book_to_market",
+                        "earnings_yield_ttm",
+                    )
+                },
+            }
+            for (year, scope), counts in sorted(valuation_coverage.items())
+        ],
+        "valuation_status": "all_reported_classes_own_version_shares_separate_prior_observed_closes_no_intervening_known_capital_or_unit_boundary",
     }
 
 
@@ -1991,7 +2131,10 @@ def build(root: Path, store: Path, output: Path) -> dict:
     documents = load_accounts(root, set(identity.get_column("cnpj")))
     recovery_audit = {"attached": 0, "invalid": []}
     original_sources = []
+    capital_sources = []
+    capital_coverage = defaultdict(lambda: defaultdict(int))
     for document in documents:
+        shares_source = "annual_csv" if document.get("shares") is not None else None
         path = root / "originals" / document["id"]
         if not document.get("accounts") and (path / "manifest.json").exists():
             try:
@@ -2009,7 +2152,9 @@ def build(root: Path, store: Path, output: Path) -> dict:
                     {"id": document["id"], "reason": str(error)}
                 )
         zip_root = root / "original_zips" / document["id"]
-        if not document.get("accounts") and (zip_root / "manifest.json").exists():
+        if (not document.get("accounts") or document.get("shares") is None) and (
+            zip_root / "manifest.json"
+        ).exists():
             from .round5_cvm_xml import original_accounts
 
             original_manifest = json.loads(
@@ -2020,8 +2165,13 @@ def build(root: Path, store: Path, output: Path) -> dict:
                     "Original financial ZIP differs from its source manifest"
                 )
             parsed = original_accounts(document, zip_root / "source.zip")
-            document.update(parsed)
-            recovery_audit["attached"] += 1
+            if not document.get("accounts"):
+                document.update(parsed)
+                recovery_audit["attached"] += 1
+            if document.get("shares") is None and "shares" in parsed:
+                document["shares"] = parsed["shares"]
+            if shares_source is None and "shares" in parsed:
+                shares_source = "original_zip"
             original_sources.append(
                 {
                     "document_id": document["id"],
@@ -2029,7 +2179,24 @@ def build(root: Path, store: Path, output: Path) -> dict:
                     "manifest_sha256": sha256(zip_root / "manifest.json"),
                 }
             )
+        capital_root = root / "capital" / document["id"]
+        if document.get("shares") is None and (capital_root / "manifest.json").exists():
+            from .round5_cvm_capital import load_capital
+
+            document["shares"] = load_capital(document, capital_root)["shares"]
+            shares_source = "capital_html"
+            capital_sources.append(
+                {
+                    "document_id": document["id"],
+                    "manifest_path": str(capital_root / "manifest.json"),
+                    "manifest_sha256": sha256(capital_root / "manifest.json"),
+                }
+            )
+        capital_coverage[str(document["reference"].year)][
+            shares_source or "unavailable"
+        ] += 1
     write_json(output / "original_source_manifests.json", original_sources)
+    write_json(output / "capital_source_manifests.json", capital_sources)
     capital_changes = capital_change_observations(root, rad, sessions)
     write_json(output / "capital_change_observations.json", capital_changes)
     fundamentals, audit = fundamental_features(
@@ -2060,6 +2227,9 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "original_zip_parser_sha256": sha256(
             Path(__file__).with_name("round5_cvm_xml.py")
         ),
+        "capital_html_parser_sha256": sha256(
+            Path(__file__).with_name("round5_cvm_capital.py")
+        ),
         "base_store": str(store),
         "base_store_manifest_sha256": sha256(store / "manifest.json"),
         "through": str(END),
@@ -2070,6 +2240,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "identity_isins": identity.get_column("isin").n_unique(),
         "receipt_audit": audit,
         "original_recovery": recovery_audit,
+        "capital_sources_by_reference_year": dict(capital_coverage),
         "source_manifests": {
             name: {"path": str(root / name), "sha256": sha256(root / name)}
             for name in (
@@ -2088,7 +2259,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "limitations": [
             "EarlyFCA2010–2017 omits ticker symbols; only unique exact historical legal spellings with contemporaneous class/existing-security evidence are admitted.",
             "MissingFCAoriginalversions are not reconstructed from later contents.",
-            "Valuation requires one issued class and one dated ISIN; DISMES or known capital changes invalidate older share counts without inventing adjustments. Capital CSV coverage begins2020; this sparse subset does not establish independently verified corporate-action completeness.",
+            "Valuation sums own-version non-treasury class shares times separate prior observed class prices, only when every positive issued class is unambiguously priced. Exact capital-child HTML supplements missing annual capital tables; DISMES and known capital changes invalidate older counts without invented adjustments. This does not establish independently verified corporate-action completeness.",
             "Accounting source recipes retain masked bank/insurance incomparable fields.",
         ],
     }

@@ -468,9 +468,9 @@ _ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
         "consolidated accounting basis selected, otherwise individual",
         "binary",
     ),
-    "valuation_single_class_flag": (
+    "valuation_available_flag": (
         "flag",
-        "market capitalization supported by one verified issued share class",
+        "issuer market capitalization supported by separately priced dated securities for every positive reported issued share class",
         "binary",
     ),
     "utilization_proxy": (

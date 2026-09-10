@@ -42,7 +42,10 @@ def original_fixture(tmp_path, quantity_scale="1"):
         accounts += f"""<InformacaoFinanceiraDemonstracaoFinanceira><PlanoConta>
         <NumeroConta>{code}</NumeroConta><VersaoPlanoConta>
         <CodigoTipoInformacaoFinanceira>2</CodigoTipoInformacaoFinanceira>
-        </VersaoPlanoConta></PlanoConta><ColunasInformacaoFinanceiraDemonstracaoFinanceira>"""
+        </VersaoPlanoConta></PlanoConta><DescricoesContaInformacaoFinanceiraDemonstracaoFinanceira>
+        <DescricaoContaInformacaoFinanceiraDemonstracaoFinanceira><DescricaoConta>{"Ativo Total" if code == "1" else "Receita de Venda de Bens e/ou Serviços"}</DescricaoConta>
+        </DescricaoContaInformacaoFinanceiraDemonstracaoFinanceira></DescricoesContaInformacaoFinanceiraDemonstracaoFinanceira>
+        <ColunasInformacaoFinanceiraDemonstracaoFinanceira>"""
         for period, value in columns:
             accounts += f"""<ColunasInformacaoFinanceiraDemonstracaoFinanceira>
             <PeriodoDemonstracaoFinanceira><NumeroIdentificacaoPeriodo>{period}</NumeroIdentificacaoPeriodo>
@@ -92,4 +95,61 @@ def test_original_xml_rejects_another_public_version(tmp_path):
     document, path = original_fixture(tmp_path)
     document["version"] = 2
     with pytest.raises(ValueError, match="NumeroVersaoDocumento"):
+        original_accounts(document, path)
+
+
+def flat_fixture(tmp_path, quantity_scale="1", inner_version=1):
+    document, nested = original_fixture(tmp_path, quantity_scale)
+    document["reference"] = date(2014, 12, 31)
+    with zipfile.ZipFile(nested) as archive:
+        envelope = archive.read("FormularioDemonstracaoFinanceiraITR.xml").decode()
+    envelope = envelope.replace("2014-03-31", "2014-12-31")
+    payload = f"""<XmlDemonstracoesFinanceiras><DadosEmpresa><CodigoCvm>022217</CodigoCvm>
+    <CnpjEmpresa>11721921000160</CnpjEmpresa></DadosEmpresa><Documento>
+    <VersaoDocumento>{inner_version}</VersaoDocumento></Documento><DadosDFP>
+    <DataReferencia>31/12/2014</DataReferencia><DtInicioUltimoExercicioSocial>01/01/2014</DtInicioUltimoExercicioSocial>
+    <DtFimUltimoExercicioSocial>31/12/2014</DtFimUltimoExercicioSocial><Moeda>1</Moeda>
+    <EscalaMoeda>2</EscalaMoeda><EscalaQtdAcoes>{quantity_scale}</EscalaQtdAcoes><Formulario>
+    <DadosEmpresa><ComposicaoCapital><CaptalIntegralizado><Ordinarias>1000</Ordinarias>
+    <Preferenciais>0</Preferenciais></CaptalIntegralizado><Tesouraria><Ordinarias>10</Ordinarias>
+    <Preferenciais>0</Preferenciais></Tesouraria></ComposicaoCapital></DadosEmpresa>
+    <DfIndividuais><DemonstracaoResultado><Conta><CodigoConta>3.01</CodigoConta>
+    <DescricaoConta>Receita</DescricaoConta><UltimoExercicio>1.234,50</UltimoExercicio>
+    <PenultimoExercicio>9.999.999</PenultimoExercicio></Conta></DemonstracaoResultado></DfIndividuais>
+    <DfConsolidadas><DemonstracaoResultado><Conta><CodigoConta>3.01</CodigoConta>
+    <UltimoExercicio/><PenultimoExercicio>99</PenultimoExercicio></Conta></DemonstracaoResultado></DfConsolidadas>
+    </Formulario></DadosDFP></XmlDemonstracoesFinanceiras>"""
+    path = tmp_path / "flat.zip"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("FormularioDemonstracaoFinanceiraDFP.xml", envelope)
+        archive.writestr("022217DFP31-12-2014v1.xml", payload)
+    return document, path
+
+
+@pytest.mark.parametrize("quantity_scale", ("1", "2"))
+def test_flat_dfp_uses_own_period_and_independent_quantity_scale(
+    tmp_path, quantity_scale
+):
+    document, path = flat_fixture(tmp_path, quantity_scale)
+    parsed = original_accounts(document, path)
+    assert parsed["accounts"] == {
+        "ind": {
+            "revenue": {
+                "value": 1234500,
+                "start": date(2014, 1, 1),
+                "end": date(2014, 12, 31),
+                "description": "Receita",
+                "source_code": "3.01",
+            }
+        }
+    }
+    assert parsed["shares"] == {
+        "ON": 990 * (1 if quantity_scale == "1" else 1000),
+        "PN": 0,
+    }
+
+
+def test_flat_dfp_inner_version_must_match_public_envelope(tmp_path):
+    document, path = flat_fixture(tmp_path, inner_version=2)
+    with pytest.raises(ValueError, match="VersaoDocumento"):
         original_accounts(document, path)

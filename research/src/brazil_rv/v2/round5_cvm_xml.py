@@ -4,9 +4,80 @@ from __future__ import annotations
 
 import io
 import zipfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from xml.etree import ElementTree as ET
+
+
+def flat_dfp_accounts(document: dict, payload: bytes, envelope: ET.Element) -> dict:
+    """Read the alternative official annual XML layout, never prior-year cells."""
+    from .round5_cvm import ACCOUNTS, assign_account, digits
+
+    source = ET.fromstring(payload)
+    if source.tag != "XmlDemonstracoesFinanceiras":
+        raise ValueError("Original financial package has an unknown XML layout")
+    expected = {
+        "DadosEmpresa/CodigoCvm": document["cvm_code"],
+        "DadosEmpresa/CnpjEmpresa": document["cnpj"],
+        "Documento/VersaoDocumento": str(document["version"]),
+    }
+    for key, value in expected.items():
+        if digits(source.findtext(key, "")) != value:
+            raise ValueError(f"Flat original financial XML identity differs at {key}")
+    annual = source.find("DadosDFP")
+    if annual is None:
+        raise ValueError("Flat original XML lacks supported annual DFP periods")
+    end = datetime.strptime(
+        annual.findtext("DtFimUltimoExercicioSocial"), "%d/%m/%Y"
+    ).date()
+    start = datetime.strptime(
+        annual.findtext("DtInicioUltimoExercicioSocial"), "%d/%m/%Y"
+    ).date()
+    reference = datetime.strptime(annual.findtext("DataReferencia"), "%d/%m/%Y").date()
+    if reference != document["reference"] or end != reference:
+        raise ValueError("Flat original financial XML reference period differs")
+    for flat_name, envelope_name in (
+        ("Moeda", "CodigoMoeda"),
+        ("EscalaMoeda", "CodigoEscalaMoeda"),
+        ("EscalaQtdAcoes", "CodigoEscalaQuantidade"),
+    ):
+        if annual.findtext(flat_name) != envelope.findtext(envelope_name):
+            raise ValueError(
+                f"Flat original financial XML scale differs at {flat_name}"
+            )
+    currency_scale = {"1": 1, "2": 1000}[annual.findtext("EscalaMoeda")]
+    parsed = {**document, "accounts": {}}
+    form = annual.find("Formulario")
+    for field, basis in (("DfIndividuais", "ind"), ("DfConsolidadas", "con")):
+        for node in form.findall(f"{field}/*/Conta"):
+            code = node.findtext("CodigoConta")
+            value = node.findtext("UltimoExercicio", "").strip()
+            if code not in ACCOUNTS or not value:
+                continue
+            assign_account(
+                parsed,
+                basis,
+                code,
+                float(value.replace(".", "").replace(",", ".")) * currency_scale,
+                start if code.startswith(("3", "6")) else None,
+                end,
+                node.findtext("DescricaoConta", ""),
+            )
+    quantity_scale = {"1": 1, "2": 1000}.get(annual.findtext("EscalaQtdAcoes"))
+    capital = form.find("DadosEmpresa/ComposicaoCapital")
+    if quantity_scale is not None and capital is not None:
+        parsed["shares"] = {
+            code: quantity_scale
+            * (
+                float(capital.findtext(f"CaptalIntegralizado/{label}"))
+                - float(capital.findtext(f"Tesouraria/{label}"))
+            )
+            for code, label in (("ON", "Ordinarias"), ("PN", "Preferenciais"))
+        }
+    if not parsed["accounts"]:
+        raise ValueError("Flat original financial XML lacks requested-period accounts")
+    parsed["recovered_original"] = True
+    return parsed
 
 
 def original_accounts(document: dict, source: Path) -> dict:
@@ -46,8 +117,24 @@ def original_accounts(document: dict, source: Path) -> dict:
         if scale is None:
             raise ValueError("Original financial ZIP currency scale is unavailable")
         nested_name = next(
-            name for name in outer.namelist() if name.lower().endswith((".itr", ".dfp"))
+            (
+                name
+                for name in outer.namelist()
+                if name.lower().endswith((".itr", ".dfp"))
+            ),
+            None,
         )
+        if nested_name is None:
+            flat_names = [
+                name
+                for name in outer.namelist()
+                if name.lower().endswith(".xml") and not name.startswith("Formulario")
+            ]
+            if len(flat_names) != 1:
+                raise ValueError(
+                    "Original financial package lacks one identifiable payload"
+                )
+            return flat_dfp_accounts(document, outer.read(flat_names[0]), envelope)
         nested_bytes = outer.read(nested_name)
     parsed = {**document, "accounts": {}}
     with zipfile.ZipFile(io.BytesIO(nested_bytes)) as inner:
