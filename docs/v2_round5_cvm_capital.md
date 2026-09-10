@@ -128,18 +128,59 @@ for both supported note counts and unrelated accounting fields.
 
 Immutable evidence under the Round5 root is:
 
-- `cvm/capital_source_dispositions.json`, SHA-256 `fe0f2fee42c01e977d465ea85c352bd71d6ab0be20150f843365652e8f8b3f7f`: exact document identities, source hashes, reasons, positive note quantities and unavailable dispositions.
+- `cvm/capital_source_dispositions.json`, SHA-256 `7bc18a5a580a8ebf371bdf2ebfb8b9af4495825b640aecb13ea7014899235e6c`: exact document identities, source hashes, reasons, positive note quantities and unavailable dispositions, including the completed annual review below. The preceding primary-only version is preserved byte-exact under `capital_annual_failure_audit_20260910/capital_source_dispositions_before_annual.json`.
 - `cvm/capital_failure_final_audit_20260910/`: all ten saved HTML chains, final original-source outcomes and exact PDF note pages. Earlier diagnostic parses are superseded by this corrected-parser audit.
-- `cvm/capital_pending_source_audit.json`, SHA-256 `746cdc83a91402d2e8c027b84e9aecc7f8186a053dd2e14040cd8785941ebcaa`: six annual negative-count filings123448,96021,98404,129981,132020,136104 remain pending exact-source quantity review. Known-scale probes123448/129981 were excluded from the scale queue only because their units were already established; their quantities are not accepted.
+- `cvm/capital_pending_source_audit.json`, SHA-256 `0b3161ded6822866d0740bc3824a4c7298b13ee77c908ac31bd7e707cde90d4a`: records the completed six-document annual review and the remaining broader source-freeze requirements. Known-scale probes123448/129981 were excluded from the scale queue only because their units were already established; both now have explicit own-count outcomes.
 
 The primary failure gate accepts only verified own-version HTML/XML, a
 hash-bound positive own-note reconciliation, or an explicit audited-unavailable
 disposition. Unreviewed errors still stop it. Passing that primary gate does not
-clear the overall source freeze: remaining scale/FCA collections, the six annual
-exceptions, any new batch failures and newly admitted identity-cohort gaps still
+clear the overall source freeze: remaining scale/FCA collections,
+any new batch failures and newly admitted identity-cohort gaps still
 require their source audits. Only afterward can the new CVM family be sealed and
 its dependent identity-based families rebuilt.
 
 The106 targeted tests passed for the shared count rule, XML account preservation,
 own-document disposition identity/source mutation, FCA identity and actual
 transformed first-decision causality. No model was fitted for these checks.
+
+## Completed six-document annual review
+
+All six own-version originals were retrieved in one bounded pass. The two
+Bradesco cases were reviewed independently, including the rendered capital and
+treasury-note pages. Four filings establish positive holdings; two remain
+unsupported after the exact-source review.
+
+| Filing and own reference | Own-note evidence | Net ON / PN shares |
+| --- | --- | ---: |
+| Bradesco123448, 2022-12-31 v1 | Physical PDFpages108/110: exact paid-in5,338,393,881 ON +5,320,094,147 PN; positive treasury8,089,200 ON +8,228,600 PN | 5,330,304,681 / 5,311,865,547 |
+| Bradesco136104, 2024-03-31 v1 | Physical PDFpages68/69: exact paid-in5,330,304,681 ON +5,311,865,547 PN; positive treasury11,970,600 ON +10,589,200 PN | 5,318,334,081 / 5,301,276,347 |
+| Azzas96021, 2020-06-30 v1 | Own note18.2, physical PDFpage62: positive65,207 ON treasury; paid-in90,954thousand ON | 90,888,793 / 0 |
+| Azzas98404, 2020-09-30 v1 | Own note18.2, physical PDFpage62: positive3,679 ON treasury; paid-in90,954thousand ON | 90,950,321 / 0 |
+| Ourofino129981, 2023-06-30 v1 | Exact original capital still prints−181,400 ON treasury; no positive end-period holding established by the reviewed own notes | Unavailable |
+| Ourofino132020, 2023-09-30 v1 | Same signed-quantity issue in its own exact original; no later filing borrowed | Unavailable |
+
+Bradesco's notes also provide exact physical paid-in counts, removing the
+structured table's thousand-share rounding. The Azzas reconciliations retain
+the paid-in table's thousand-share precision and use the exact note treasury
+holdings. All four use their own filing receipts; none uses an absolute value
+of the negative structured cell or a later period.
+
+Both Ourofino originals use the flat `XmlInformacoesTrimestraisFinanceiras`
+payload, which is outside the current original-account parser's nested-ITR and
+flat-DFP scope. A bounded independent XML audit verified their public envelopes,
+issuer, reference, version and quantity unit before reviewing the capital
+and PDF notes. This parser limitation does not remove accounting data: all six
+annual CSV keys map to exactly one matching public header, with24 requested
+own-version account rows per Bradesco filing and27 per other filing. Those
+account observations remain available when capital is unusable.
+
+Evidence and outcomes are retained under
+`cvm/capital_annual_failure_audit_20260910/`, including
+`annual_account_attachment_evidence.json`, `bradesco_evidence.json`, exact
+original bytes, note pages, flat-ITR identity/scale proofs and
+`annual_capital_outcomes.json`. All12 dispositions (six reconciled and six
+unavailable across the primary and annual reviews) passed source-hash and
+exact-document checks. The primary failure gate was rerun successfully under
+`5dfdaa4`. No final CVM family or store was built, and source freeze remains held
+for completed-batch exception and expanded-cohort audits.
