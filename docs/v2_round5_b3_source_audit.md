@@ -139,3 +139,48 @@ feature transforms, demonstrating unchanged values/masks/ages before publication
 and the first transformed change or mask change at the eligible decision. Lending's
 source functions are AST-identical to those used for its earlier sealed archive.
 Neither admission wrappers nor this report rewrite the preserved source manifests.
+
+## Annual admitted source coverage
+
+The following cells show stored decision/ISIN **rows / distinct ISINs** before
+active-universe eligibility, final date-axis alignment and rank-transform support
+masks. A stored row may have only some features available. Per-feature nonnull
+rows, distinct ISINs and first/last decision dates for each year are retained in
+`round5_b3_raw_coverage_by_year.json`, SHA-256
+`94a0c2f139abb96ba59d0102f86341c1ee49f39d6c170b48888a9dbcaaed26a3`.
+That file binds all three admission objects, feature parquets, original manifests,
+availability proofs and the read-only coverage script.
+
+| Decision year | Lending rows / ISINs | Options rows / ISINs | Microstructure rows / ISINs |
+| --- | ---: | ---: | ---: |
+| 2010 | 0 / 0 | 3,364 / 35 | 53,723 / 317 |
+| 2011 | 0 / 0 | 3,924 / 60 | 59,363 / 314 |
+| 2012 | 0 / 0 | 4,264 / 52 | 56,491 / 304 |
+| 2013 | 0 / 0 | 4,380 / 56 | 56,299 / 287 |
+| 2014 | 0 / 0 | 4,435 / 49 | 55,303 / 278 |
+| 2015 | 0 / 0 | 4,971 / 50 | 51,286 / 259 |
+| 2016 | 0 / 0 | 6,568 / 67 | 50,435 / 268 |
+| 2017 | 0 / 0 | 8,293 / 64 | 54,745 / 285 |
+| 2018 | 0 / 0 | 12,041 / 70 | 56,619 / 280 |
+| 2019 | 15,229 / 314 | 16,581 / 123 | 61,668 / 355 |
+| 2020 | 54,548 / 352 | 32,651 / 152 | 76,169 / 412 |
+| 2021 | 73,032 / 436 | 39,694 / 187 | 87,427 / 471 |
+| 2022 | 46,317 / 385 | 44,786 / 190 | 87,528 / 427 |
+| 2023 | 17,840 / 146 | 43,737 / 191 | 80,747 / 401 |
+| 2024 | 35,266 / 144 | 44,891 / 188 | 78,911 / 394 |
+
+All 16 declared features have their corresponding `Int32` age column. Every
+nonnull feature is finite and has a finite, nonnegative integer session age;
+there are zero invalid ages and zero ages attached to missing feature values.
+The all-unavailable `uncovered_call_share` and its age column remain null.
+Accepted loan-rate and daily-volume ages are one; complete OI ages are two;
+observed-subset OI ages are one or two according to actual publication.
+Utilization preserves its older contributing float receipt, with a maximum
+source age of 490 sessions rather than resetting it on every price decision.
+
+`round5_b3_finished_source_status.json`, SHA-256
+`47e5cdfaa7f70ed98094ba74885b083420afe1d212d7eae385de4051af5e212c`,
+records completed source work, the unavailable covered/uncovered split, the
+unadmitted latest-vintage rate recovery and remaining documented limitations.
+These are source-level statistics; the combined-store report separately
+measures observations actually available to the model after its masks.
