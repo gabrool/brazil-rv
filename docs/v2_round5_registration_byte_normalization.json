@@ -1,0 +1,10 @@
+{
+  "bova_replay_retains_original_protocol_binding": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round5_bova_replay_02c1166_20260910",
+  "normalized_document_sha256": "7239b5885666b2ceb0d171aed56cfe95b35a175f2660d9b5cdd01470ffc2a8dc",
+  "normalized_protocol_sha256": "223efef7984c3d6913a59377a86d3a3cffa47091c6b54180297464d55e13ac29",
+  "original_bytes_archive": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\registration_original_bytes",
+  "original_document_sha256": "56192dd81ac5f40e97aa16804d6396a3eca31a12d0ab8d8b00306fe7c0858b9b",
+  "original_protocol_sha256": "7a8b883011ea6ed3d5fb435f103420578b00ba9a5becd29c63eaa702d6ab3813",
+  "reason": "Preserve identical registration bytes in Windows checkouts and GitHub. Document meaning is unchanged. The economic-source field previously held the document hash; it now explicitly binds the protocol JSON and records the document hash separately.",
+  "research_contract_changed": false
+}

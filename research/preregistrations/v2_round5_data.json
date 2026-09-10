@@ -4,7 +4,7 @@
   "source_code_commit": "97635435aed191725cb1f32ec8b29981e925f9ca",
   "source_instruction_file": "C:\\Users\\gabri\\Downloads\\v2_round5_data_round.md",
   "source_instruction_sha256": "88ad6c7c61591a5c08f264e38d170a35cb72aa2b36f99f833a18dac564a45852",
-  "registration_sha256": "56192dd81ac5f40e97aa16804d6396a3eca31a12d0ab8d8b00306fe7c0858b9b",
+  "registration_sha256": "7239b5885666b2ceb0d171aed56cfe95b35a175f2660d9b5cdd01470ffc2a8dc",
   "base_store": {
     "root": "D:\\quant-data\\b3\\processed\\v2_daily_store_3d67624_20260909T100323Z",
     "manifest_sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64"

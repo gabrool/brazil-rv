@@ -9,7 +9,8 @@
     "root": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\hedge_beta"
   },
   "new_lending_rates": null,
-  "new_lending_rates_status": "source_audit_pending",
-  "registration_sha256": "56192dd81ac5f40e97aa16804d6396a3eca31a12d0ab8d8b00306fe7c0858b9b",
+  "new_lending_rates_status": "source_audit_pending; no_verified_new_rate_vintage_admitted",
+  "registration_document_sha256": "7239b5885666b2ceb0d171aed56cfe95b35a175f2660d9b5cdd01470ffc2a8dc",
+  "registration_sha256": "223efef7984c3d6913a59377a86d3a3cffa47091c6b54180297464d55e13ac29",
   "schema": "BRAZIL_RV_ROUND5_ECONOMIC_SOURCES_V1"
 }
