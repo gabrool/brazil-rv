@@ -37,7 +37,7 @@ frozen replay. Original registration bytes are retained.
 
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
-| Events and fundamentals | Refreshed RAD history; original filing recovery is necessary because account CSVs often retain only the latest version. Annual/YTD TTM bridges preserve usable original information. | Finish capital-count recovery, version reconciliation and joined coverage tables; account-page recovery alone does not supply share counts. |
+| Events and fundamentals | All 4,344 missing original account versions recovered. Description-based bank/insurer accounting, parent/group reconciliation and complete-class issuer valuation are corrected. Exact capital pages are being collected for 15,596 additional filings. | Finish capital-count recovery and final joined coverage/admission tables. |
 | Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. Three sector-relative fields are sealed; current sector files are not backprojected. | Final store admission. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Final store admission. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
@@ -54,6 +54,17 @@ The [CVM source audit](v2_round5_cvm_source_audit.md),
 The [formula amendment](../research/preregistrations/v2_round5_data_formulas.md)
 records exact choices under the user's standing authorization. No unavailable
 source is replaced by a guessed lag or a different economic quantity.
+
+The post-restart audit also corrected two forms of avoidable error. Financial
+account numbers change meaning across bank reporting charts, and missing
+minority interests cannot be silently treated as zero. Supported ordinary and
+preferred shares now contribute their own counts and separate prices to issuer
+valuation, instead of excluding every issuer with multiple classes. Seasonal
+filing expectations require the actual original version's receipt; a later
+revision first observed inside a truncated archive is not an original filing.
+The corresponding amendments and targeted tests are committed before the final
+family build. A quiet five-minute continuation monitor advances the remaining
+acquisition, build and screen stages, then returns to daily source capture.
 
 ## Store and model contract
 
