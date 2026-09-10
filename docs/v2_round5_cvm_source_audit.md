@@ -39,6 +39,29 @@ All 4,344 required original versions have now been acquired. Two final packages,
 
 ## Identity, sectors and capital
 
+The 4,344 completed originals above cover the earlier 9120d7d identity cohort.
+Original FCA recovery can expose additional issuer/date associations, so its
+accepted new bridge must trigger a fresh missing-account/capital inventory.
+No broader completeness claim is made before that comparison.
+
+The original FCA recovery now preserves generic `Ações` instead of accepting
+modern viewer enum labels as historical ordinary-share evidence. Generic rows
+can use independently observed ON/PN only through a unique exact historical
+legal-name association with the existing security; units and later-born
+successors remain excluded. Explicit source classes and observed preferred
+suffixes remain constraints. Exact original numeric sector codes become the
+grouping keys, while display labels are annotations. Annual labels require an
+unambiguous exact-ID code translation. Surviving annual converter semantics and
+unmatched labels remain source-freeze audit items.
+
+The dated identity uses exchange listing/cancellation, not entry into a trading
+segment. WEG's 1982 listing predates its 2007 Novo Mercado entry; Vale's 1968
+listing predates its 2017 segment entry. Both original XML and annual CSV expose
+the two date pairs. The [FCA source amendment](../research/preregistrations/v2_round5_fca_identity_amendment.md)
+binds these semantics and requires rebuilding affected sector/exposure/lending
+archives from the new identity. The previous archive remains an explicit
+before/after audit, rather than a required equality target.
+
 - FCA starts in 2010 and has receipt/version headers, CNPJ, activity sector, security types, ticker fields and negotiation bounds. It has no direct ISIN column; dated COTAHIST identity is also required.
 - FCA 2010–2017 cash-security rows have **zero ticker values**. FCA 2018 has 417 populated ticker rows out of 456 cash rows; the 2019–2024 rows examined have populated tickers. A current company-name match does not establish historical identity.
 - FCA details are latest-only too. FCA 2023 has 1,246 eligible headers but 731 general detail documents / 731 issuer-periods, with no multiversion detail period. Recover original contents or respect the actual surviving version's receipt.

@@ -870,9 +870,10 @@ def fca_documents(
         for row in read_csv_member(path, f"fca_cia_aberta_geral_{year}.csv"):
             document = by_id.get(digits(row["ID_Documento"]))
             if document is not None:
-                document["sector"] = row["Setor_Atividade"]
+                document["sector_label"] = row["Setor_Atividade"]
                 document["legal_name"] = row["Nome_Empresarial"]
                 document["securities"] = []
+                document["metadata_source"] = "annual_csv"
         for row in read_csv_member(path, f"fca_cia_aberta_valor_mobiliario_{year}.csv"):
             document = by_id.get(digits(row["ID_Documento"]))
             if (
@@ -885,36 +886,87 @@ def fca_documents(
             if not (
                 kind.startswith("acoes ordinarias")
                 or kind.startswith("acoes preferenciais")
+                or kind == "acoes"
                 or kind == "units"
             ):
                 continue
             document["securities"].append(
                 {
                     "ticker": row["Codigo_Negociacao"].strip().upper(),
-                    "class": "ON"
+                    "class": "SHARES"
+                    if kind == "acoes"
+                    else "ON"
                     if kind.startswith("acoes ordinarias")
                     else "PN"
                     if kind.startswith("acoes preferenciais")
                     else "UNIT",
                     "preferred_class": row["Sigla_Classe_Acao_Preferencial"],
                     "unit_composition": row["Composicao_BDR_Unit"],
-                    "start": date.fromisoformat(row["Data_Inicio_Negociacao"])
-                    if row["Data_Inicio_Negociacao"]
+                    "start": date.fromisoformat(row["Data_Inicio_Listagem"])
+                    if row["Data_Inicio_Listagem"]
                     else date.min,
-                    "end": date.fromisoformat(row["Data_Fim_Negociacao"])
-                    if row["Data_Fim_Negociacao"]
+                    "end": date.fromisoformat(row["Data_Fim_Listagem"])
+                    if row["Data_Fim_Listagem"]
                     else date.max,
+                    "segment_start": row["Data_Inicio_Negociacao"],
+                    "segment_end": row["Data_Fim_Negociacao"],
                 }
             )
     exact = {r["id"]: r for r in rad or [] if r["id"] and r["group"] == "cadastre"}
     for document in headers:
+        original = root / "fca_originals" / document["id"]
+        if (original / "manifest.json").exists():
+            from .round5_cvm_fca import load_fca
+
+            metadata = load_fca(document, original)
+            document["original_fca_source"] = {
+                "document_id": document["id"],
+                "manifest_path": str(original / "manifest.json"),
+                "manifest_sha256": sha256(original / "manifest.json"),
+            }
+            if metadata is not None:
+                document.update(metadata)
+                document["sector_label"] = metadata.get("sector")
+                document.pop("sector", None)
+                for security in document["securities"]:
+                    # These are exchange listing/cancellation bounds. Segment
+                    # negotiation dates do not restart an existing listing.
+                    for key in ("start", "end"):
+                        security[key] = date.fromisoformat(security[key])
         receipt = (
             exact[document["id"]]["receipt"]
             if document["id"] in exact
             else document["receipt"]
         )
         document["available_index"] = available_session(receipt, sessions)
+    normalize_fca_sectors(headers)
     return headers
+
+
+def normalize_fca_sectors(documents: list[dict]) -> None:
+    """Use original numeric groups; exact-ID labels only translate taxonomy.
+
+    A label may name several codes in the retrieved evidence. Such a label
+    cannot assign a code to annual rows that omit it; those sectors stay null.
+    This maps metadata vocabulary, never an issuer's later sector assignment.
+    """
+    codes_by_label = defaultdict(set)
+    for document in documents:
+        code, label = document.get("sector_code"), document.get("sector_label")
+        if code is not None and str(code).strip():
+            code = str(int(code))
+            document["sector_code"] = code
+            if label:
+                codes_by_label[normalized(label)].add(code)
+        else:
+            document["sector_code"] = None
+    for document in documents:
+        code = document.get("sector_code")
+        if code is None:
+            candidates = codes_by_label[normalized(document.get("sector_label") or "")]
+            if len(candidates) == 1:
+                code = next(iter(candidates))
+        document["sector"] = code
 
 
 def build_identity(
@@ -928,8 +980,9 @@ def build_identity(
     A missing original FCA version contributes no invented mapping. Sector is
     the versioned FCA classification, not a current B3 sector retrojection.
     Name fallback requires a unique contemporaneous CNPJ and an instrument
-    already observed before that FCA receipt. New securities cannot inherit an
-    old company's spelling (the Smiles 2017 legal succession is an example).
+    already observed before that FCA receipt. Original generic Ações can map
+    only to independently observed ON/PN classes through that exact name route.
+    New securities cannot inherit an old company's spelling.
     """
     universe = set(isins)
     events = defaultdict(list)
@@ -988,15 +1041,35 @@ def build_identity(
                     if security["ticker"] in ticker_isin
                     else []
                 )
-                if not security["ticker"]:
+                generic = security["class"] == "SHARES"
+                if not security["ticker"] or generic:
                     spelling = legal_spelling(document.get("legal_name", ""))
                     method = "exact_historical_legal_spelling"
-                    if legal_issuers[spelling] != {cnpj}:
+                    if not spelling or legal_issuers[spelling] != {cnpj}:
                         continue
                     candidates = name_isins[spelling]
                 for isin in candidates:
                     observed = known_security[isin]
                     spec = observed.get("security_spec_base", "")
+                    share_class = security["class"]
+                    preferred = security.get("preferred_class", "")
+                    identity_method = method
+                    cls = (
+                        "ON"
+                        if spec.startswith("ON")
+                        else "PN"
+                        if spec.startswith("PN")
+                        else "UNIT"
+                        if spec == "UNT"
+                        else None
+                    )
+                    if not generic and cls is not None:
+                        if cls != share_class:
+                            continue
+                        if cls == "PN":
+                            if preferred and spec != "PN" + preferred:
+                                continue
+                            preferred = spec[2:]
                     if (
                         method == "dated_fca_ticker"
                         and first_seen[isin] > document["receipt"]
@@ -1012,22 +1085,20 @@ def build_identity(
                         )
                         if not preannounced:
                             continue
-                        method = "dated_fca_preannounced_listing"
+                        identity_method = "dated_fca_preannounced_listing"
                     if method == "exact_historical_legal_spelling":
                         if first_seen[isin] > document["receipt"]:
                             continue
-                        cls = (
-                            "ON"
-                            if spec.startswith("ON")
-                            else "PN"
-                            if spec.startswith("PN")
-                            else "UNIT"
-                            if spec == "UNT"
-                            else None
-                        )
-                        if cls != security["class"]:
+                        if generic:
+                            if cls not in {"ON", "PN"}:
+                                continue
+                            share_class = cls
+                            preferred = spec[2:] if cls == "PN" else ""
+                            identity_method = (
+                                "original_generic_shares_exact_legal_spelling"
+                            )
+                        elif cls != share_class:
                             continue
-                        preferred = security.get("preferred_class", "")
                         if cls == "PN" and preferred and spec != "PN" + preferred:
                             continue
                     if isin in mapped and mapped[isin]["cnpj"] != cnpj:
@@ -1040,12 +1111,13 @@ def build_identity(
                         "cnpj": cnpj,
                         "cvm_code": document["cvm_code"],
                         "sector": document.get("sector") or None,
-                        "class": security["class"],
-                        "preferred_class": security["preferred_class"],
+                        "sector_label": document.get("sector_label") or None,
+                        "class": share_class,
+                        "preferred_class": preferred,
                         "unit_composition": security["unit_composition"],
                         "fca_id": document["id"],
                         "identity_known_date": sessions[document["available_index"]],
-                        "identity_method": method,
+                        "identity_method": identity_method,
                         "identity_effective_start": max(
                             security["start"], first_seen[isin]
                         ),
@@ -1057,6 +1129,7 @@ def build_identity(
         "cnpj": pl.String,
         "cvm_code": pl.String,
         "sector": pl.String,
+        "sector_label": pl.String,
         "class": pl.String,
         "preferred_class": pl.String,
         "unit_composition": pl.String,
@@ -1755,7 +1828,9 @@ def fundamental_features(
                     changed = True
                     latest_index = d["available_index"]
                     latest_receipt_version = d["version"]
-            sector = dated.get_column("sector")[0]
+            sector = dated.get_column(
+                "sector_label" if "sector_label" in dated.columns else "sector"
+            )[0]
             if changed or not cached or previous_sector != sector:
                 cached = fundamental_state(ledger, sector)
             previous_sector = sector
@@ -2127,6 +2202,50 @@ def build(root: Path, store: Path, output: Path) -> dict:
     sessions, isins, observations = store_axes_and_identity_observations(store)
     rad = rad_rows(root)
     cadastre = fca_documents(root, sessions, rad)
+    write_json(
+        output / "fca_source_manifests.json",
+        [d["original_fca_source"] for d in cadastre if "original_fca_source" in d],
+    )
+    write_json(
+        output / "fca_identity_documents.json",
+        [
+            d
+            for d in cadastre
+            if "securities" in d and d["available_index"] < len(sessions)
+        ],
+    )
+    fca_audit = []
+    for year in range(2010, 2025):
+        annual = [d for d in cadastre if d["reference"].year == year]
+        fca_audit.append(
+            {
+                "year": year,
+                "headers": len(annual),
+                "own_details": sum("securities" in d for d in annual),
+                "original_details": sum(
+                    d.get("metadata_source") == "original_fca_xml" for d in annual
+                ),
+                "generic_share_documents": sum(
+                    any(s["class"] == "SHARES" for s in d.get("securities", []))
+                    for d in annual
+                ),
+                "unresolved_sector_documents": [
+                    d["id"]
+                    for d in annual
+                    if "securities" in d and d.get("sector") is None
+                ],
+                "original_class_verification_required": [
+                    d["id"]
+                    for d in annual
+                    if d.get("metadata_source") == "annual_csv"
+                    and any(
+                        s["class"] in {"ON", "PN"} and not s["ticker"]
+                        for s in d.get("securities", [])
+                    )
+                ],
+            }
+        )
+    write_json(output / "fca_source_coverage.json", fca_audit)
     identity = build_identity(cadastre, observations, sessions, isins)
     identity.write_parquet(output / "identity.parquet")
     public_float_observations(root, rad, sessions).write_parquet(
@@ -2267,12 +2386,16 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "capital_html_parser_sha256": sha256(
             Path(__file__).with_name("round5_cvm_capital.py")
         ),
+        "original_fca_parser_sha256": sha256(
+            Path(__file__).with_name("round5_cvm_fca.py")
+        ),
         "base_store": str(store),
         "base_store_manifest_sha256": sha256(store / "manifest.json"),
         "through": str(END),
         "availability_rule": "exact RAD minute upper bound (+1min), first15:45at-or-after; date-only nextsession",
         "version_rule": "only own version account contents; missing original versions remain unavailable until recovered or replaced at actual later receipt",
-        "identity_rule": "own-receipt FCA cash ticker or exact historical legal spelling, prior COTAHIST ISIN and class, bounded existing security; legal CNPJ root plus CVM registration; no current-sector backprojection",
+        "identity_rule": "own-receipt FCA cash ticker or unique exact historical legal spelling, prior COTAHIST ISIN and class, bounded existing security; original generic shares require exact-name observed ON/PN, never units or modern HTML class backfill; legal CNPJ root plus CVM registration",
+        "sector_rule": "original numeric FCA group code; annual display labels map only through unambiguous exact-ID original code/label evidence; labels are annotations, never mixed grouping keys or later issuer-sector assignments",
         "identity_rows": identity.height,
         "identity_isins": identity.get_column("isin").n_unique(),
         "receipt_audit": audit,
@@ -2288,6 +2411,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
                 "v2_round5_data.json",
                 "v2_round5_event_calendar_amendment.md",
                 "v2_round5_valuation_amendment.md",
+                "v2_round5_fca_identity_amendment.md",
             )
         },
         "source_manifests": {
@@ -2307,7 +2431,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
         },
         "limitations": [
             "EarlyFCA2010–2017 omits ticker symbols; only unique exact historical legal spellings with contemporaneous class/existing-security evidence are admitted.",
-            "MissingFCAoriginalversions are not reconstructed from later contents.",
+            "Original FCA versions are recovered at their own receipt; any still-missing original remains unavailable until an actually received supported version. Unresolved annual sector-code translations remain missing rather than mixing labels and codes.",
             "Valuation sums own-version non-treasury class shares times separate prior observed class prices, only when every positive issued class is unambiguously priced. Exact capital-child HTML supplements missing annual capital tables; DISMES and known capital changes invalidate older counts without invented adjustments. This does not establish independently verified corporate-action completeness.",
             "Accounting source recipes retain masked bank/insurance incomparable fields.",
         ],
