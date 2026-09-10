@@ -1,0 +1,168 @@
+{
+  "status": "Historical source review in progress; no final family/store/screens and no forward capture.",
+  "capital_dispositions": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
+    "sha256": "2a15c1be313388502984c0adf20eb3cfe1be15684fa4d40b593c9f74d3049d54"
+  },
+  "counts": {
+    "reconciled": 17,
+    "audited_unavailable": 7
+  },
+  "accepted_batch": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_batch_20260910T192900Z\\acceptance.json",
+    "sha256": "43130b825bcfd093bf6882086e686b29d1ea6f1df9a43d02cd36d81fcfc206cd"
+  },
+  "review": {
+    "scope": "Manual source review of five material capital discrepancies and two counterexamples. Literal prose extraction is only a review aid, never a source admission.",
+    "reconciliations": [
+      {
+        "id": "5553",
+        "reference": "2010-12-31",
+        "version": 1,
+        "paid_in_shares": {
+          "ON": 136692680,
+          "PN": 0
+        },
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        },
+        "visually_reviewed_pages": [
+          3,
+          196
+        ],
+        "reason": "Exact MPX/Eneva DFP 2010 version 1 capital table reports 136,693 ordinary shares under Units. Own-endpoint prose and the shareholder table on physical page 196 explicitly identify 136,692,680 ordinary individual shares at 31 December 2010, no preferred class and zero treasury. The embedded old form heading says September 2010, but the actual capital paragraph and dated shareholder table both explicitly say 31 December 2010. Use their literal class quantities, not a later filing or a ratio rule. Currency-account amounts are a separate unresolved source audit."
+      },
+      {
+        "id": "6714",
+        "reference": "2011-03-31",
+        "version": 2,
+        "paid_in_shares": {
+          "ON": 157303220,
+          "PN": 0
+        },
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        },
+        "visually_reviewed_pages": [
+          2,
+          72
+        ],
+        "reason": "Exact TOTVS ITR 2011Q1 version 2 own note 19(a) at physical page 72 declares 157,303,220 ordinary shares at 31 March 2011 and its current shareholder table reconciles to that total. The capital page repeats the individual number beneath a thousands heading; its preferred and treasury quantities are explicitly zero. The preceding 31,459,272 count is a prior-period comparison, not the current endpoint. Own next-page disclosure describes the March five-for-one split; no later filing sets the corrected count."
+      },
+      {
+        "id": "10338",
+        "reference": "2011-06-30",
+        "version": 1,
+        "paid_in_shares": {
+          "ON": 125907641,
+          "PN": 0
+        },
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        },
+        "visually_reviewed_pages": [
+          2,
+          49
+        ],
+        "reason": "Exact Autometal ITR 2011Q2 version 1 note 18 at physical page 49 explicitly represents own-endpoint capital by 125,907,641 ordinary shares, fully paid. The page's thousands heading is expressly currency, not share quantity. The capital page incorrectly applies another thousands factor to that count; preferred and treasury quantities are explicitly zero. Retain the note's individual quantity at this version's receipt."
+      },
+      {
+        "id": "14794",
+        "reference": "2011-12-31",
+        "version": 1,
+        "paid_in_shares": {
+          "ON": 291981934,
+          "PN": 0
+        },
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        },
+        "visually_reviewed_pages": [
+          2,
+          37
+        ],
+        "reason": "Exact Magnesita DFP 2011 version 1 own management report section 10 declares capital divided into 291,981,934 ordinary shares at 31 December 2011. The shareholder table continuation and same-filing February issuance disclosure also reconcile to this count. The source capital page repeats individual shares under a thousands heading, with zero preferred and treasury quantities. No subsequent version or market capitalization supplies the correction."
+      },
+      {
+        "id": "25144",
+        "reference": "2012-12-31",
+        "version": 1,
+        "paid_in_shares": {
+          "ON": 146000000,
+          "PN": 0
+        },
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        },
+        "visually_reviewed_pages": [
+          3,
+          126,
+          149
+        ],
+        "reason": "Exact Triunfo DFP 2012 version 1 note 23(a) at physical page 126 explicitly declares 146,000,000 ordinary shares at 31 December 2012. Its current shareholder table at physical page 149 labels individual units and reconciles the same total, no preferred shares and treasury dashes consistent with explicit zero in the capital table. The capital page's 146,000 under Units is incorrect. No adjacent or later source supplies the correction."
+      }
+    ],
+    "counterexamples": [
+      {
+        "id": "5872",
+        "status": "source_counts_confirmed",
+        "paid_in_shares": {
+          "ON": 63085000,
+          "PN": 0
+        },
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        },
+        "physical_page": 36,
+        "reason": "Afluente DFP 2010 page 36 explicitly labels its current dividend-base ordinary count 63,085 in thousand-share lots. This supports the source capital table's 63,085,000 individual shares. The nearby prose omits that lot unit; its literal 63,085 must not trigger a downward correction. Canonical quantities remain unchanged."
+      },
+      {
+        "id": "6022",
+        "status": "pending_treasury_unit_resolution",
+        "physical_pages": [
+          33,
+          98
+        ],
+        "reason": "CEG DFP 2010 explicitly has 51,927,546,473 ordinary shares, while its capital table reports 51,927,546 and zero treasury. Own report and note 21.1 disclose nonzero treasury 0.0047% and a repurchase of 2,441 shares without an explicit lot scale for that number. A zero treasury assumption is contradicted. No quantity correction or unavailable disposition has yet been admitted; review own-source unit precision before resolving net shares."
+      }
+    ],
+    "source_freeze_ready": false
+  },
+  "original_identity_recovery": {
+    "documents": [
+      "19997",
+      "21978",
+      "30197",
+      "32293",
+      "32364",
+      "34876",
+      "42401",
+      "45434",
+      "45569"
+    ],
+    "network_requests": 0,
+    "actual_parser_acceptance": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\identity_recovery_20260910T191700Z\\parser_acceptance.json",
+      "sha256": "728d3de98552e345a271b89d116a3ea5d348f673794321ad22b228c2930083b5"
+    },
+    "rule": "Blank/zero public CNPJ may use the same original Documento.xml only with exact CNPJ/CVM/reference. Public ID/version exact; nonzero conflicts rejected.",
+    "source_admission": "Identity and notes recovered; capital quantities still need review."
+  },
+  "currency_units": {
+    "triage": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\currency_unit_triage_20260910T193600Z.json",
+      "sha256": "acdf479d708a296d0d03eb821aa4ed14640c749c1e2c39093bcbbc3ead13c4bb"
+    },
+    "example": "MPX/Eneva5553 public and inner currency scale1; parsed consolidated revenue98455 and parent income-256250. Own note pages185-186 declare thousands of reais and include those own-period amounts. Other accounts and cohort coverage still need independent reconciliation.",
+    "status": "Unresolved own-source currency audit; no global correction/masking."
+  },
+  "targeted_tests": 58,
+  "source_freeze_ready": false,
+  "forward_capture_enabled": false
+}

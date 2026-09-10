@@ -99,6 +99,53 @@ def flat_dfp_accounts(document: dict, payload: bytes, envelope: ET.Element) -> d
     return parsed
 
 
+def validate_original_identity(
+    document: dict, archive: zipfile.ZipFile, envelope: ET.Element
+) -> str:
+    """Bind the exact public filing; recover a blank CNPJ from its own payload."""
+    from .round5_cvm import digits
+
+    if envelope.tag != "Documento":
+        raise ValueError("Original financial ZIP lacks the public CVM envelope")
+    expected = {
+        "NumeroSequencialDocumento": str(document["id"]),
+        "NumeroVersaoDocumento": str(document["version"]),
+        "DataReferenciaDocumento": str(document["reference"]),
+        "CompanhiaAberta/CodigoCvm": document["cvm_code"],
+    }
+    for key, value in expected.items():
+        actual = envelope.findtext(key, "")
+        actual = actual[:10] if key == "DataReferenciaDocumento" else digits(actual)
+        if actual != value:
+            raise ValueError(f"Original financial ZIP identity differs at {key}")
+    field = "CompanhiaAberta/NumeroCnpjCompanhiaAberta"
+    actual = digits(envelope.findtext(field, ""))
+    if actual == document["cnpj"]:
+        return "public_envelope"
+    if actual.strip("0"):
+        raise ValueError(f"Original financial ZIP identity differs at {field}")
+    # Some historical public envelopes lost the CNPJ while the exact submitted
+    # Documento.xml retains it. A different nonzero CNPJ is never overwritten.
+    nested = next(
+        (n for n in archive.namelist() if n.lower().endswith((".itr", ".dfp"))),
+        None,
+    )
+    if nested is None:
+        raise ValueError("Missing public CNPJ lacks an original identity payload")
+    with zipfile.ZipFile(io.BytesIO(archive.read(nested))) as inner:
+        original = ET.fromstring(inner.read("Documento.xml"))
+    if (
+        original.tag != "Documento"
+        or digits(original.findtext(field, "")) != document["cnpj"]
+        or digits(original.findtext("CompanhiaAberta/CodigoCvm", ""))
+        != document["cvm_code"]
+        or original.findtext("DataReferenciaDocumento", "")[:10]
+        != str(document["reference"])
+    ):
+        raise ValueError("Original inner CNPJ, CVM or reference differs")
+    return "original_inner_document"
+
+
 def original_accounts(document: dict, source: Path) -> dict:
     """Parse one exact original .itr/.dfp, including its own-period capital count.
 
@@ -106,7 +153,7 @@ def original_accounts(document: dict, source: Path) -> dict:
     ID. Flow statements use accumulated periods (NumeroTrimestre=0), avoiding
     unused quarter cells that the original package can serialize as zero.
     """
-    from .round5_cvm import ACCOUNTS, assign_account, digits, net_share_counts
+    from .round5_cvm import ACCOUNTS, assign_account, net_share_counts
 
     with zipfile.ZipFile(source) as outer:
         envelope_name = next(
@@ -116,20 +163,7 @@ def original_accounts(document: dict, source: Path) -> dict:
             and name.endswith(".xml")
         )
         envelope = ET.fromstring(outer.read(envelope_name))
-        if envelope.tag != "Documento":
-            raise ValueError("Original financial ZIP lacks the public CVM envelope")
-        expected = {
-            "NumeroSequencialDocumento": str(document["id"]),
-            "NumeroVersaoDocumento": str(document["version"]),
-            "DataReferenciaDocumento": str(document["reference"]),
-            "CompanhiaAberta/CodigoCvm": document["cvm_code"],
-            "CompanhiaAberta/NumeroCnpjCompanhiaAberta": document["cnpj"],
-        }
-        for key, value in expected.items():
-            actual = envelope.findtext(key, "")
-            actual = actual[:10] if key == "DataReferenciaDocumento" else digits(actual)
-            if actual != value:
-                raise ValueError(f"Original financial ZIP identity differs at {key}")
+        identity_source = validate_original_identity(document, outer, envelope)
         if envelope.findtext("CodigoMoeda") != "1":
             raise ValueError("Original financial ZIP currency is not BRL")
         scale = {"1": 1, "2": 1000}.get(envelope.findtext("CodigoEscalaMoeda"))
@@ -155,7 +189,7 @@ def original_accounts(document: dict, source: Path) -> dict:
                 )
             return flat_dfp_accounts(document, outer.read(flat_names[0]), envelope)
         nested_bytes = outer.read(nested_name)
-    parsed = {**document, "accounts": {}}
+    parsed = {**document, "accounts": {}, "cnpj_identity_source": identity_source}
     with zipfile.ZipFile(io.BytesIO(nested_bytes)) as inner:
         periods = {
             node.findtext("NumeroIdentificacaoPeriodo"): {

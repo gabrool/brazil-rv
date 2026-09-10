@@ -214,6 +214,10 @@ of row order in CSV, HTML and supported original XML sources.
 An exact own-filing note audit supersedes syntactically valid capital quantities
 when the source table contradicts that note. Adjacent filings can locate source
 audits but never determine corrected quantities, masks or availability.
+For original financial ZIPs, a blank or zero public-envelope CNPJ can be resolved
+from that same submitted `Documento.xml` only when its CNPJ, CVM registration and
+reference match the historical header. Public document ID/version remain exact;
+a conflicting nonzero public CNPJ cannot be replaced by this rule.
 
 The store builder streams family-by-family into disk-backed float32 arrays and
 records peak RSS. Intended orders are fixed before later fill observations;

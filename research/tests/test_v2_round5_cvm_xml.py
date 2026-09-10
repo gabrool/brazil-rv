@@ -102,6 +102,65 @@ def test_original_xml_rejects_another_public_version(tmp_path):
         original_accounts(document, path)
 
 
+def identity_fixture(tmp_path, outer_cnpj="0", inner_change=None):
+    document, original = original_fixture(tmp_path)
+    with zipfile.ZipFile(original) as archive:
+        files = {name: archive.read(name) for name in archive.namelist()}
+    name = "FormularioDemonstracaoFinanceiraITR.xml"
+    header = files[name].decode()
+    files[name] = header.replace(
+        ">11721921000160</NumeroCnpjCompanhiaAberta>",
+        f">{outer_cnpj}</NumeroCnpjCompanhiaAberta>",
+    ).encode()
+    body = header
+    if inner_change:
+        body = body.replace(*inner_change)
+    nested_name = "022217201403310301.itr"
+    inner_bytes = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(files[nested_name])) as before:
+        with zipfile.ZipFile(inner_bytes, "w") as after:
+            for member in before.namelist():
+                after.writestr(member, before.read(member))
+            after.writestr("Documento.xml", body)
+    files[nested_name] = inner_bytes.getvalue()
+    result = tmp_path / "missing_public_identity.zip"
+    with zipfile.ZipFile(result, "w") as archive:
+        for member, payload in files.items():
+            archive.writestr(member, payload)
+    return document, original, result
+
+
+@pytest.mark.parametrize("blank", ["", "0", "00000000000000"])
+def test_original_submission_can_resolve_blank_public_cnpj(tmp_path, blank):
+    document, original, source = identity_fixture(tmp_path, blank)
+    control = original_accounts(document, original)
+    recovered = original_accounts(document, source)
+    assert recovered["accounts"] == control["accounts"]
+    assert recovered["shares"] == control["shares"]
+    assert recovered["cnpj_identity_source"] == "original_inner_document"
+    assert control["cnpj_identity_source"] == "public_envelope"
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        ("11721921000160", "11721921000161"),
+        ("02221-7", "02221-8"),
+        ("2014-03-31", "2013-03-31"),
+    ],
+)
+def test_missing_public_cnpj_requires_exact_own_issuer_and_period(tmp_path, change):
+    document, _, source = identity_fixture(tmp_path, inner_change=change)
+    with pytest.raises(ValueError, match="inner CNPJ, CVM or reference"):
+        original_accounts(document, source)
+
+
+def test_inner_identity_cannot_override_a_conflicting_nonzero_public_cnpj(tmp_path):
+    document, _, source = identity_fixture(tmp_path, "11721921000161")
+    with pytest.raises(ValueError, match="NumeroCnpjCompanhiaAberta"):
+        original_accounts(document, source)
+
+
 def flat_fixture(tmp_path, quantity_scale="1", inner_version=1, treasury="10"):
     document, nested = original_fixture(tmp_path, quantity_scale)
     document["reference"] = date(2014, 12, 31)

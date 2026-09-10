@@ -107,6 +107,26 @@ row beneath liabilities; 87 targeted tests and the actual account audit pass.
 These corrections are committed before final family construction. The broader
 unit audit remains open; it has not produced a model-input admission yet.
 
+Five additional exact filings now have visually reviewed capital corrections:
+MPX/Eneva 5553, TOTVS 6714, Autometal 10338, Magnesita 14794 and Triunfo 25144.
+There are now 17 reconciled and seven audited unavailable source dispositions.
+These are source decisions, not a completed family or store. Afluente 5872 is
+an explicit counterexample: its own thousand-share lot label confirms the
+existing large count, so no correction applies. CEG 6022 remains under review
+because its notes contradict zero treasury. Literal text extraction produces
+review proposals only; it neither admits values nor creates missing masks.
+
+Nine additional cached Cremer/Nadir originals were recovered without network
+requests after resolving a blank public CNPJ against the exact original inner
+document. The public ID/version and inner CNPJ/CVM/reference remain exact;
+58 targeted XML, capital and note-review tests pass, and all nine actual
+originals reparse successfully. The same review identified a separate possible
+currency-unit problem in early statements: some structured sources label units
+while their notes state thousands of reais. Matching own-period account rows
+must establish any correction; the presence of a note heading alone does not.
+This investigation remains a source-freeze hold. See the
+[source-note checkpoint](v2_round5_capital_note_audit.json).
+
 ## Store and model contract
 
 The registered base is `v2_daily_store_3d67624_20260909T100323Z`, manifestSHA256

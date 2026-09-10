@@ -81,3 +81,12 @@ individual-share quantities. Successful parsing cannot bypass such an audit.
 The superseded source and its hash remain recorded; unrelated accounts and the
 original availability timestamp remain unchanged. Adjacent filings locate
 investigation candidates only; they never determine corrected counts or masks.
+
+Some historical public financial envelopes contain a blank or zero CNPJ while
+the exact submitted `Documento.xml` retains the issuer identity. Permit that
+own-package identity only when its CNPJ, CVM registration and reference equal
+the historical filing header, with the exact public ID/version still enforced.
+A different nonzero public CNPJ is a conflict, not missingness. The resolver
+records which source supplied CNPJ; no external alias or later filing fills it.
+Nine cached Cremer/Nadir originals validate this case. Their recovered notes
+still require quantity review before admission.
