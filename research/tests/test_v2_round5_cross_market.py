@@ -16,6 +16,7 @@ from brazil_rv.v2.round5_cross_market import (
     SHANGHAI,
     TENORS,
     build,
+    calendar_gaps,
     dce_prefix,
     parse_di,
     parse_us,
@@ -29,9 +30,11 @@ from brazil_rv.v2.round5_market import (
 )
 
 
-def _di_payload(day: date, *, duplicated: bool = False) -> bytes:
+def _di_payload(
+    day: date, *, duplicated: bool = False, tenors: tuple[int, ...] = TENORS
+) -> bytes:
     lines = []
-    for index, tenor in enumerate(TENORS):
+    for index, tenor in enumerate(tenors):
         # The nominal 90d fixed vertex matures on the following business day.
         days = tenor + (tenor == 90)
         lines.append(
@@ -62,6 +65,12 @@ def test_di_fixed_tenor_keeps_holiday_roll_and_native_rate_scale():
         parse_di(_di_payload(day), date(2024, 12, 27))
     with pytest.raises(ValueError, match="duplicate"):
         parse_di(_di_payload(day, duplicated=True), day)
+    # Some official archives omit individual fixed vertices. Keep the other
+    # observed quotes instead of dropping a whole curve or inventing a rate.
+    partial = (30, 180, 720, 1080)
+    assert [
+        row["tenor"] for row in parse_di(_di_payload(day, tenors=partial), day)
+    ] == list(partial)
 
 
 def test_dce_prefix_stops_before_future_prices_even_if_payload_is_not_json(tmp_path):
@@ -119,6 +128,20 @@ def test_prior_oi_selects_same_contract_without_roll_jump_or_current_oi_leak():
     mutated[3]["open_interest"] = 1e9
     mutated[-1]["settlement"] = 1e6
     assert roll_returns(mutated)[0] == result[0]
+
+
+def test_official_holiday_keeps_return_but_missing_session_and_unknown_gap_mask():
+    rows = [_contract(2, "I2405", 100, 100), _contract(4, "I2405", 105, 100)]
+    missing, audit = calendar_gaps(
+        rows, "define(function(){return {2024:'20240103'};});"
+    )
+    assert missing == {"dce_iron": set()}
+    assert len(roll_returns(rows, missing)) == 1
+    missing, _ = calendar_gaps(rows, "define(function(){return {2024:'20240101'};});")
+    assert roll_returns(rows, missing) == []
+    missing, audit = calendar_gaps(rows, "")
+    assert roll_returns(rows, missing) == []
+    assert audit["calendar_years"] == []
 
 
 def test_missing_selected_contract_is_masked_without_current_day_replacement():

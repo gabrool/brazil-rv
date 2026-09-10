@@ -63,6 +63,7 @@ LAYOUT_URL = (
     "https://www.b3.com.br/data/files/E6/B6/70/64/BB1379106B8BCB69AC094EA8/"
     "TaxaSwap%20para%20UP2DATA.xlsx"
 )
+SHFE_CALENDAR_URL = "https://www.shfe.com.cn/data/config/js/trade-data.js"
 
 
 def _weekdays(start: date, end: date) -> list[date]:
@@ -179,6 +180,15 @@ def acquire(
             )
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?{query}"
             jobs.append(("us", root / "raw" / "us" / f"{symbol}.json", url, symbol))
+    if {"shfe", "dce"} & set(families):
+        jobs.append(
+            (
+                "documentation",
+                root / "documentation" / "shfe_trade_data.js",
+                SHFE_CALENDAR_URL,
+                "shfe_nontrading_calendar",
+            )
+        )
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(_fetch, job) for job in jobs]
         for index, future in enumerate(as_completed(futures), start=1):
@@ -233,7 +243,9 @@ def parse_di(payload: bytes, expected_date: date) -> list[dict]:
             raise ValueError("unrecognized TaxaSwap PRE layout")
         day = datetime.strptime(line[11:19], "%Y%m%d").date()
         if day != expected_date or day > DEVELOPMENT_END:
-            raise ValueError("TaxaSwap source date differs from bounded request")
+            raise ValueError(
+                f"TaxaSwap source date {day} differs from bounded request {expected_date}"
+            )
         tenor = int(line[67:72])
         if tenor not in TENORS:
             continue
@@ -246,8 +258,8 @@ def parse_di(payload: bytes, expected_date: date) -> list[dict]:
                 "rate_pct_252": int(line[51:66]) / 1e7,
             }
         )
-    if result and sorted(row["tenor"] for row in result) != list(TENORS):
-        raise ValueError("TaxaSwap has missing or duplicate requested PRE vertices")
+    if len({row["tenor"] for row in result}) != len(result):
+        raise ValueError("TaxaSwap has duplicate requested PRE vertices")
     return result
 
 
@@ -466,6 +478,40 @@ def _coverage(frame: pl.DataFrame, key: str) -> list[dict]:
     return json.loads(summary.write_json())
 
 
+def calendar_gaps(contracts: list[dict], calendar_text: str) -> tuple[dict, dict]:
+    """Identify missing mainland futures sessions without equating 404 with holiday.
+
+    The official SHFE daily-data UI takes the complement of trade-data.js to
+    mark trading dates. Its historical calendar starts in 2015. For earlier
+    history, an intervening absent weekday is unresolved and masks the return.
+    Applying this schedule to DCE is conservative: an extra DCE closure masks
+    a move instead of silently calling multiple observed sessions one session.
+    """
+    calendars = {
+        int(year): {datetime.strptime(day, "%Y%m%d").date() for day in days.split(",")}
+        for year, days in re.findall(r"(\d{4}):'([\d,]+)'", calendar_text)
+        if 2013 <= int(year) <= DEVELOPMENT_END.year
+    }
+    days_by_product: dict[str, set[date]] = {}
+    for row in contracts:
+        days_by_product.setdefault(row["product"], set()).add(row["reference_date"])
+    gaps = {}
+    for product, observed in days_by_product.items():
+        gaps[product] = {
+            day
+            for day in _weekdays(min(observed), max(observed))
+            if day not in observed and day not in calendars.get(day.year, set())
+        }
+    return gaps, {
+        "calendar_years": sorted(calendars),
+        "missing_or_unverified_weekdays": {
+            product: sorted(day.isoformat() for day in days)
+            for product, days in gaps.items()
+        },
+        "pre_calendar_gap_policy": "mask: missing weekday is not assumed to be an exchange holiday",
+    }
+
+
 def build(root: Path, acquisition: Path) -> dict:
     """Normalize the bounded archives without touching raw/canonical inputs."""
     acquisition_hash = sha256_file(acquisition)
@@ -488,7 +534,13 @@ def build(root: Path, acquisition: Path) -> dict:
         payload = path.read_bytes()
         if family == "di":
             day = date.fromisoformat(record["key"])
-            rows = parse_di(payload, day)
+            try:
+                rows = parse_di(payload, day)
+            except ValueError as error:
+                source_audit.append(
+                    {**record, "status": "unusable_payload", "error": str(error)}
+                )
+                continue
             for row in rows:
                 # This is a decision-equivalent after-close bound, not a
                 # claimed timestamp of the historical curve's publication.
@@ -512,6 +564,9 @@ def build(root: Path, acquisition: Path) -> dict:
                     **record,
                     "parsed_rows": len(rows),
                     "status": "parsed" if rows else "no_published_curve",
+                    "missing_tenors": sorted(
+                        set(TENORS) - {row["tenor"] for row in rows}
+                    ),
                 }
             )
         elif family == "shfe":
@@ -608,17 +663,17 @@ def build(root: Path, acquisition: Path) -> dict:
                 **audit,
             }
         )
-    failed_shfe_days = {
-        date.fromisoformat(row["key"])
-        for row in source_audit
-        if row.get("family") == "shfe"
-        and row["status"] in {"unavailable", "unusable_payload"}
-        and "404" not in row.get("error", "")
+    calendar_path = acquisition.parent / "documentation" / "shfe_trade_data.js"
+    if calendar_path.exists():
+        _get(calendar_path, SHFE_CALENDAR_URL)  # Verify the immutable cached response.
+    calendar_text = calendar_path.read_text("utf8") if calendar_path.exists() else ""
+    failed_days, futures_calendar_audit = calendar_gaps(contracts, calendar_text)
+    futures_calendar_audit["source"] = {
+        "path": str(calendar_path),
+        "url": SHFE_CALENDAR_URL,
+        "sha256": sha256_file(calendar_path) if calendar_path.exists() else None,
     }
-    returns = roll_returns(
-        contracts,
-        {f"shfe_{product}": failed_shfe_days for product in ("rb", "hc", "sp")},
-    )
+    returns = roll_returns(contracts, failed_days)
     # Preserve US return units rather than exposing arbitrary vendor level
     # scaling as a model input. Only adjacent source rows with real volume are
     # usable; missing rows never become zero observations.
@@ -714,6 +769,7 @@ def build(root: Path, acquisition: Path) -> dict:
         "shfe_archive_migration_metadata": migration_dates,
         "shfe_revision_share": None,
         "dce_revision_share": None,
+        "futures_calendar_audit": futures_calendar_audit,
         "dce_limitation": "Unofficial Sina individual-expiry mirror. Earlier expired contracts may not be retained. No undocumented I0 series, future roll weights or back-adjustment. 2025 expiry files consumed only through <=2024 prefix; their full-file hash is inherited from the sealed manifest, not re-read.",
         "us_availability": "Observed US day regular close 16:00 America/New_York, scheduled early closes 13:00; converted through historical DST to first eligible B3 15:45, which can be same-day on an early close. SUZ before its 2018-12-10 NYSE listing retains unverified availability: the prior SUZBY OTC segment is not assigned an NYSE closing time.",
         "us_price_semantics": "Vendor OHLC is historically split adjusted; adjusted_close also includes distributions. Raw response retained, but neither field proves contemporaneous cash price. Log returns cancel later common multiplicative adjustment factors; vendor correction/rounding revision share is unknown.",
