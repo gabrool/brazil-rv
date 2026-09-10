@@ -59,6 +59,7 @@ def _pooled(folds):
 
 def _audit_omission(source: Path, output: Path, omitted: int) -> dict:
     design = rr._read_json(source / "frozen_design.json")
+    _, dates = rr._read_store_header(Path(design["store"]["root"]))
     context = rr._open_ledger_replay(design)
     policy, _ = rr.load_selected_policy(
         Path(design["execution_policy"]["root"]),
@@ -81,7 +82,11 @@ def _audit_omission(source: Path, output: Path, omitted: int) -> dict:
                 for seed in ALLOWED_SEEDS:
                     run = source / "trajectories" / arm / f"{fold}_seed_{seed}"
                     score, mask = rr._score_artifact(
-                        run / "scores", require_clean_transfer=True
+                        run / "scores",
+                        require_clean_transfer=True,
+                        expected_dates=dates[context.evaluation[fold]],
+                        expected_isins=context.store.isins,
+                        expected_feature_schema_sha256=design["feature_schema_sha256"],
                     )
                     if reference_mask is not None and not np.array_equal(
                         reference_mask, mask

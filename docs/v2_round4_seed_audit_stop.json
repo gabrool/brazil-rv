@@ -1,0 +1,39 @@
+{
+  "failed_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_20e4c26_20260910",
+  "source_screening_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_arms_3d1e95f_20260910T015000Z",
+  "error": "network score feature schema differs from the store",
+  "cause": "audit caller omitted frozen feature schema, date axis and security axis required for canonical network artifacts",
+  "accepted_audit_books": 0,
+  "files": [
+    {
+      "path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_20e4c26_20260910/frozen_design.json",
+      "bytes": 1277,
+      "sha256": "a2386ecd672c13653d40fa10c06fafeb8223c183e44c0f68ce24fec27760e66d"
+    },
+    {
+      "path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round4_seed_audit_20e4c26_20260910/seed_audit_stop.json",
+      "bytes": 108,
+      "sha256": "264e0c3b1f6693e6be4cdbc7d7a6567a1ff82467e0a4115266869414900a221c"
+    },
+    {
+      "path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_ops/round4_seed_audit_248ec616.log",
+      "bytes": 2406,
+      "sha256": "79c9fcce99bd6931a8b377779145df1c47e23108f20894a0e0c652b083cf2fdc"
+    },
+    {
+      "path": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_ops/round4_a4_transition_248ec616.log",
+      "bytes": 3132,
+      "sha256": "10d52bbdd9a4fa208d72a2f55ceb98c0cbd45487799ad373a6416b78ce83a141"
+    }
+  ],
+  "stop": {
+    "at_utc": "2026-09-10T12:11:05.062398Z",
+    "error": "seed audit worker failed; preserve partial root"
+  },
+  "source_inventory_sha256": "a4c9d098124515594c27acc970b0f3805adc3a36ebbed74e9ddf5be82b284c76",
+  "source_screening_result_sha256": "6ab60e7a3c37d53563c5fd3e140a0f001ce7b43dd9aa5b9a6ca92b5e281bdaee",
+  "screen_pack_complete": true,
+  "new_training_runs": 0,
+  "resolution": "Supply all three immutable bindings from the frozen source store; canonical score reader remains unchanged. Regression fixture exercises actual network score artifacts. Restart in a fresh root; no model/score/evaluation overwritten.",
+  "regression_tests_passed": 31
+}

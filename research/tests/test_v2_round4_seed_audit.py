@@ -39,3 +39,91 @@ def test_matching_but_ineligible_parent_is_not_accepted():
     )
     assert not result["parent_stable"]
     assert result["parent_inconclusive"]
+
+
+def test_audit_loads_canonical_network_artifacts_with_frozen_axes(
+    tmp_path, monkeypatch
+):
+    import json
+    from types import SimpleNamespace
+
+    import numpy as np
+    import pytest
+
+    from brazil_rv.v2 import round4_seed_audit as audit
+    from brazil_rv.v2.artifacts import sha256_file
+
+    dates = np.asarray(["2024-01-02", "2024-01-03"], dtype="datetime64[D]")
+    isins = ("BR1", "BR2", "BR3")
+    tiers = {
+        "action_terms_source": "inferred_cotahist_dismes_v1",
+        "schedule_source": "reconstructed_v1",
+    }
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "frozen_design.json").write_text(
+        json.dumps(
+            {
+                "store": {"root": "unused"},
+                "feature_schema_sha256": "c" * 64,
+                "execution_policy": {"root": "unused", "result_sha256": "d" * 64},
+            }
+        )
+    )
+    baseline = source / "cpu_replay/baselines/momentum_12_1/F1"
+    baseline.mkdir(parents=True)
+    (baseline / "evaluation.json").write_text('{"source_artifact_hashes": {}}')
+    for seed in (11, 29, 47):
+        run = source / "trajectories/fast_off" / f"F1_seed_{seed}"
+        scores = run / "scores"
+        scores.mkdir(parents=True)
+        (run / "run_manifest.json").write_text("{}")
+        arrays = {
+            "scores.npy": np.zeros((2, 3, 5), dtype=np.float32),
+            "score_mask.npy": np.ones((2, 3, 5), dtype=bool),
+            "date_index.npy": dates,
+            "isin_index.npy": np.asarray(isins),
+        }
+        records = {}
+        for name, values in arrays.items():
+            path = scores / name
+            np.save(path, values, allow_pickle=False)
+            records[name] = {"bytes": path.stat().st_size, "sha256": sha256_file(path)}
+        (scores / "score_manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema": "BRAZIL_RV_V2_SCORE_ARTIFACT_V2",
+                    "status": "completed",
+                    **audit.rr.RESEARCH_FLAGS,
+                    **tiers,
+                    "feature_schema_sha256": "c" * 64,
+                    "artifacts": records,
+                }
+            )
+        )
+    closed = []
+    context = SimpleNamespace(
+        store=SimpleNamespace(
+            isins=isins, manifest={}, close=lambda: closed.append(True)
+        ),
+        evaluation={"F1": np.arange(2)},
+    )
+    monkeypatch.setattr(audit, "DEVELOPMENT_FOLDS", ("F1",))
+    monkeypatch.setattr(audit, "ARMS", ("fast_off",))
+    monkeypatch.setattr(audit.rr, "_read_store_header", lambda _: ({}, dates))
+    monkeypatch.setattr(audit.rr, "_open_ledger_replay", lambda _: context)
+    monkeypatch.setattr(audit.rr, "load_selected_policy", lambda *a, **k: (None, None))
+    monkeypatch.setattr(audit.rr, "_source_tier_labels", lambda _: tiers)
+
+    class LoadedCanonicalScores(Exception):
+        pass
+
+    def capture(path, arrays, metadata):
+        assert metadata["seeds"] == [29, 47]
+        assert arrays["scores"].shape == (2, 3, 5)
+        raise LoadedCanonicalScores
+
+    monkeypatch.setattr(audit.rr, "_persist_scores", capture)
+    with pytest.raises(LoadedCanonicalScores):
+        audit._audit_omission(source, tmp_path / "output", 11)
+    assert closed == [True]
