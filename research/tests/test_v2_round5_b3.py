@@ -263,6 +263,44 @@ def test_activity_windows_exclude_same_day_and_do_not_fill_listing_gaps():
     assert row["put_call_oi_log_ratio_age_sessions"] == 2
     assert row["option_to_stock_volume_20_age_sessions"] == 1
 
+    oi_before, _ = activity_decision_features(
+        cash, volumes, opening_positions, nonregular, sessions
+    )
+    changed_positions = opening_positions.with_columns(
+        pl.when(pl.col("source_trade_date") == sessions[22])
+        .then(999.0).otherwise(pl.col("call_oi")).alias("call_oi")
+    )
+    oi_after, _ = activity_decision_features(
+        cash, volumes, changed_positions, nonregular, sessions
+    )
+    assert oi_before.filter(pl.col("date") <= sessions[22]).equals(
+        oi_after.filter(pl.col("date") <= sessions[22])
+    )
+    for feature in ("put_call_oi_log_ratio", "delta_oi_to_volume_1"):
+        assert oi_before.filter(pl.col("date") == sessions[23])[feature].item() != (
+            oi_after.filter(pl.col("date") == sessions[23])[feature].item()
+        )
+
+    changed_cash = cash.with_columns(
+        pl.when(pl.col("source_trade_date") == sessions[22])
+        .then(20000.0).otherwise(pl.col("volume_brl")).alias("volume_brl")
+    )
+    changed_nonregular = nonregular.with_columns(
+        pl.when(pl.col("source_trade_date") == sessions[22])
+        .then(100.0).otherwise(pl.col("nonregular_quantity"))
+        .alias("nonregular_quantity")
+    )
+    _, micro_after = activity_decision_features(
+        changed_cash, volumes, pl.DataFrame(), changed_nonregular, sessions
+    )
+    assert micro.filter(pl.col("date") <= sessions[22]).equals(
+        micro_after.filter(pl.col("date") <= sessions[22])
+    )
+    for feature in ("avg_trade_size_20", "after_hours_volume_share_5"):
+        assert micro.filter(pl.col("date") == sessions[23])[feature].item() != (
+            micro_after.filter(pl.col("date") == sessions[23])[feature].item()
+        )
+
 
 def test_legacy_balance_identity_requires_exact_position_date_and_preserves_old():
     days = [date(2020, 1, d) for d in (2, 3, 6, 7)]

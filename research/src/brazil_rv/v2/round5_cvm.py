@@ -1518,11 +1518,11 @@ def fundamental_features(
     output = []
     changes_by_issuer = defaultdict(list)
     for event in capital_changes:
-        changes_by_issuer[event["cnpj"][:8]].append(event)
-    for key, rows in identity.partition_by("cnpj", as_dict=True).items():
-        cnpj = key[0]
+        changes_by_issuer[(event["cnpj"][:8], event["cvm_code"])].append(event)
+    for key, rows in identity.partition_by(["cnpj", "cvm_code"], as_dict=True).items():
+        cnpj, cvm_code = key
         source = sorted(
-            by_issuer[(cnpj[:8], rows["cvm_code"][0])],
+            by_issuer[(cnpj[:8], cvm_code)],
             key=lambda d: (d["available_index"], d["version"], int(d["id"])),
         )
         cursor = 0
@@ -1560,7 +1560,7 @@ def fundamental_features(
                 index,
                 sessions,
                 market,
-                changes_by_issuer[cnpj[:8]],
+                changes_by_issuer[(cnpj[:8], cvm_code)],
             )
             for isin in dated.get_column("isin"):
                 record = {

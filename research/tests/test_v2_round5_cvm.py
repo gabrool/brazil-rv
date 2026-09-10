@@ -338,12 +338,21 @@ def test_issuer_market_cap_never_prices_other_classes_at_one_class_close():
 
 def test_known_fre_capital_change_masks_prior_count_only_after_publication():
     sessions, document, rad, identity, market = family_fixture()
-    change = {"cnpj": "123", "effective": date(2024, 1, 2), "available_index": 2}
+    change = {
+        "cnpj": "123",
+        "cvm_code": "000001",
+        "effective": date(2024, 1, 2),
+        "available_index": 2,
+    }
     result, _ = fundamental_features(
         [document], rad, identity, sessions, market, [change]
     )
     assert result["log_market_cap"][1] is not None
     assert result["log_market_cap"][2] is None
+    unrelated, _ = fundamental_features(
+        [document], rad, identity, sessions, market, [{**change, "cvm_code": "000002"}]
+    )
+    assert unrelated["log_market_cap"][2] is not None
 
 
 def test_early_exact_legal_name_bridge_excludes_new_same_brand_security():

@@ -138,35 +138,32 @@ def _date_ids(
     return np.repeat(values, name_count)
 
 
-def _daily_spearman(
-    predictions: NDArray[np.floating],
-    targets: NDArray[np.floating],
-    dates: NDArray[np.int64],
-) -> float:
-    values: list[float] = []
-    for date_id in np.unique(dates):
-        selected = dates == date_id
-        if selected.sum() < 2:
-            continue
-        left = average_ranks(np.asarray(predictions[selected], dtype=np.float64))
-        right = average_ranks(np.asarray(targets[selected], dtype=np.float64))
-        left -= left.mean()
-        right -= right.mean()
-        denominator = np.sqrt(np.sum(left**2) * np.sum(right**2))
-        if denominator > 0:
-            values.append(float(np.sum(left * right) / denominator))
-    return float(np.mean(values)) if values else 0.0
-
-
 def _metric_for_dates(dates: NDArray[np.int64]):
+    """Prepare the fixed selection labels once for this fit's validation set."""
+    groups = [np.flatnonzero(dates == date_id) for date_id in np.unique(dates)]
+    groups = [indices for indices in groups if len(indices) >= 2]
+    prepared = None
+
     def metric(
         predictions: NDArray[np.floating], dataset: Any
     ) -> tuple[str, float, bool]:
-        return (
-            "mean_daily_spearman",
-            _daily_spearman(predictions, dataset.get_label(), dates),
-            True,
-        )
+        nonlocal prepared
+        if prepared is None:
+            labels = dataset.get_label()
+            prepared = []
+            for indices in groups:
+                right = average_ranks(np.asarray(labels[indices], dtype=np.float64))
+                right -= right.mean()
+                prepared.append((indices, right, np.sum(right**2)))
+        values: list[float] = []
+        for indices, right, right_sum in prepared:
+            left = average_ranks(np.asarray(predictions[indices], dtype=np.float64))
+            left -= left.mean()
+            denominator = np.sqrt(np.sum(left**2) * right_sum)
+            if denominator > 0:
+                values.append(float(np.sum(left * right) / denominator))
+        value = float(np.mean(values)) if values else 0.0
+        return "mean_daily_spearman", value, True
 
     return metric
 

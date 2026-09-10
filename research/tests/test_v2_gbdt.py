@@ -15,6 +15,52 @@ from brazil_rv.v2.gbdt import (
     gbdt_scalar_feature_names,
     require_lightgbm,
 )
+from brazil_rv.v2.normalization import average_ranks
+
+
+def test_selection_metric_cache_matches_original_arithmetic_and_isolates_fits():
+    def reference(predictions, targets, dates):
+        values = []
+        for day in np.unique(dates):
+            selected = dates == day
+            if selected.sum() < 2:
+                continue
+            left = average_ranks(np.asarray(predictions[selected], dtype=np.float64))
+            right = average_ranks(np.asarray(targets[selected], dtype=np.float64))
+            left -= left.mean()
+            right -= right.mean()
+            denominator = np.sqrt(np.sum(left**2) * np.sum(right**2))
+            if denominator > 0:
+                values.append(float(np.sum(left * right) / denominator))
+        return float(np.mean(values)) if values else 0.0
+
+    class Dataset:
+        def __init__(self, labels):
+            self.labels = labels
+            self.calls = 0
+
+        def get_label(self):
+            self.calls += 1
+            return self.labels
+
+    rng = np.random.default_rng(821)
+    dates = np.repeat([10, -2, 40, 7], [23, 1, 5, 13])
+    rng.shuffle(dates)
+    targets = rng.integers(-3, 4, size=len(dates)).astype(np.float32)
+    targets[dates == 40] = 1
+    datasets = [Dataset(targets), Dataset(-targets)]
+    callbacks = [gbdt_module._metric_for_dates(dates) for _ in datasets]
+    for _ in range(6):
+        predictions = rng.integers(-4, 5, size=len(dates)).astype(np.float64)
+        predictions[dates == 7] = 0
+        for callback, dataset in zip(callbacks, datasets):
+            name, actual, higher = callback(predictions, dataset)
+            assert actual == reference(predictions, dataset.labels, dates)
+            assert (name, higher) == ("mean_daily_spearman", True)
+    assert [dataset.calls for dataset in datasets] == [1, 1]
+    assert gbdt_module._metric_for_dates(np.ones(3, dtype=np.int64))(
+        np.ones(3), Dataset(np.ones(3))
+    )[1] == 0.0
 
 
 def test_missing_lightgbm_has_clear_install_error(monkeypatch) -> None:
