@@ -37,7 +37,7 @@ frozen replay. Original registration bytes are retained.
 
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
-| Events and fundamentals | The initial 4,344 missing account versions are recovered. The primary capital run is complete and its ten exceptions are audited. Six additional annual negative-treasury cases yielded four own-note reconciliations and two documented unavailable quantities. A further 6,728 exact capital pages are being recovered to establish quantity units absent from annual CSVs. | Audit new batch exceptions, reconcile actually admitted expanded-cohort coverage, and produce final joined admission tables. Unsupported capital quantities do not erase usable own-version accounts. |
+| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. Own-filing notes establish further unit contradictions even in parseable tables. Three such examples are reconciled; 1,352 candidate originals are being collected for review. | Finish the unit-note audit, reconcile actually admitted expanded-cohort coverage, and produce final joined admission tables. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
 | Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. The primary queue covers 6,765 missing original versions and three overlap probes; a disjoint 2,196-document supplement checks surviving blank-ticker filings and additional source candidates. Sector translation now uses only evidence received by each decision. | Audit retrieval failures and actual newly admitted account/capital gaps; accept the revised dated bridge, then rebuild sector, cross-market exposures and lending utilization. Candidate retrieval is not automatic identity admission. Existing archives remain immutable comparators. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Refresh utilization against the accepted new identity/free float, then admit the final store. The other six fields remain exact. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
@@ -94,6 +94,18 @@ be reconciled to the same filing's notes and retain its evidence; otherwise the
 count remains unavailable without erasing unrelated accounting fields. The
 [valuation amendment](../research/preregistrations/v2_round5_valuation_amendment.md)
 records these corrections; 106 targeted tests passed before the new collection.
+
+The completed scale supplement has 6,719 HTML sources, six own-note
+reconciliations, one usable original ZIP and two audited unavailable quantities.
+The broader unit audit found that explicit source headings can also be wrong:
+Petrobras's own notes contradict a thousands heading in two inspected versions.
+The builder now applies a sealed exact-filing disposition even when the wrong
+number parses successfully; 33 targeted capital/valuation tests pass, including
+the actual builder's source precedence. Statement-parent attribution was also
+corrected after an expanded-cohort Inter filing exposed an obsolete zero NCI
+row beneath liabilities; 87 targeted tests and the actual account audit pass.
+These corrections are committed before final family construction. The broader
+unit audit remains open; it has not produced a model-input admission yet.
 
 ## Store and model contract
 

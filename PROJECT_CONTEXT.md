@@ -208,6 +208,9 @@ Financial attribution rows also require compatibility with any observed parent
 account in the same statement; stale noncontrolling-shareholder labels beneath
 liability accounts are not equity. Parent meanings are resolved independently
 of row order in CSV, HTML and supported original XML sources.
+An exact own-filing note audit supersedes syntactically valid capital quantities
+when the source table contradicts that note. Adjacent filings can locate source
+audits but never determine corrected quantities, masks or availability.
 
 The store builder streams family-by-family into disk-backed float32 arrays and
 records peak RSS. Intended orders are fixed before later fill observations;

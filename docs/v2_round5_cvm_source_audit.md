@@ -125,6 +125,53 @@ Two apparent cross-era disagreements were classified:
 
 ## Acquisition and output contract
 
+### Own-filing unit contradictions
+
+Both capital acquisition queues are complete. The 6,728-document scale
+supplement resolves to 6,719 HTML sources, six same-filing note reconciliations,
+one original ZIP and two audited unavailable quantities. These source counts
+describe acquisition outcomes; they do not assert that every issuer populated
+its quantity heading correctly.
+
+A metadata audit of 22,306 capital manifests found 1,244 class transitions near
+1,000-fold across 1,352 distinct documents and 230 issuers. Such transitions can
+also reflect genuine capital events, so they locate investigation candidates
+only. They do not supply corrected quantities, masks or availability. The exact
+original ZIP/PDF acquisition for those candidates is separate historical work;
+no source later than the development cutoff is requested.
+
+Three inspected originals reproduce the HTML figures, while their own notes
+contradict the capital-page scale. The originals and six rendered pages were
+visually reviewed before sealing these document-specific reconciliations:
+
+| Exact original | Own-period capital evidence | Accepted individual-share quantities |
+|---|---|---|
+| [Petrobras DFP2010 v1, ID5007](https://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=5007) | Note24.1, physical PDF page191, explicitly states individual shares at 2010-12-31; capital page3 incorrectly labels the same figures as thousands. Treasury is explicitly zero. | ON7,442,454,142; PN5,602,042,788. |
+| [Petrobras DFP2017 v1, ID72291](https://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=72291) | Note23.1, physical page254, explicitly states individual shares at 2017-12-31; capital page3 repeats the heading contradiction. Treasury is explicitly zero. | ON7,442,454,142; PN5,602,042,788. |
+| [Tectoy ITR2015Q2 v1, ID50096](https://www.rad.cvm.gov.br/ENETCONSULTA/frmDownloadDocumento.aspx?CodigoInstituicao=1&NumeroSequencialDocumento=50096) | Note17(a), physical page39, labels current-period ON/PN rows as lots of1,000; the capital page2 has another1,000-fold scale discrepancy. Treasury is explicitly zero. | ON2,738,293,025,000; PN2,548,997,735,000, retaining the note's thousand-share precision. |
+
+Tectoy's adjoining issuance prose omits its lot unit. The correction follows the
+explicit unit on the own-endpoint class table and does not extrapolate the
+capital page's additional19/8shares. Neither later filings nor market prices
+determine these reconciliations. The existing receipt controls first availability.
+
+Evidence is sealed under
+`cvm/capital_unit_audit_20260910T181900Z/own_note_examples_acceptance.json` in the
+registered acquisition root. The current disposition file has19documents:
+12reconciliations and7audited unavailable quantities, SHA-256
+`02c61484ae73d54e6e219290c7978f90bd3721065a6b9d0e91c9486d3dddf641`.
+The broader candidate review remains incomplete. A retrieved original or a
+successfully parsed number is not semantic acceptance.
+
+Commit `d65c9df` fixes a consumer defect exposed by this audit: an exact-source
+disposition must override parseable erroneous counts as well as missing ones.
+The superseded source stays hash-bound and unrelated accounts remain intact.
+All33targeted capital/valuation tests pass. The source preflight uses the same
+priority; its9bounded tests pass. The separate account-hierarchy correction in
+`da60ba5` has87targeted passing tests and resolved the actual Inter121447
+expanded-cohort account conflict. The clean producing candidate is `d65c9df`;
+no final CVM family, extended store or CPU screening fit has started.
+
 The annual manifest binds 74 named archives: FCA, DFP, IPE and FRE 2010–2024, ITR 2011–2024. Existing immutable 2019–2024 sources are reused. The complete RAD manifest binds 150 bounded requests and 582,586 rows: structured 50,059; material facts 32,433; market communications 378,153; shareholder notices 52,705; cadastre 47,419; offerings 6,282; proventos 15,535. Receipts range from 2010-01-04 07:59 to 2024-12-30 23:30; post-cutoff rows cannot enter decisions.
 
 The first source inventory contained 4,230 financial versions missing account contents, including 3,356 first versions. The expanded exact-name issuer cohort contains 415 issuers and 22,561 financial documents; all 4,344 required originals, including 114 additional IDs, are acquired. This includes delisted issuers and the same-version ambiguity correction. Recovery resumed after the PC restart by verifying cached source identity and hashes, then downloading only missing versions. The resumed run is `resume_20260910T153518Z`; the two flat-layout resolutions are separately recorded. Missing exact capital tables are now acquired by eight bounded workers into `cvm/capital/{id}`, with inventory/progress/result under `capital_run_20260910T161211Z`. Account-source success is not equivalent to a complete final family: final derived coverage and availability acceptance follow the committed accounting and valuation corrections.
