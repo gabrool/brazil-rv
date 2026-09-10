@@ -14,7 +14,7 @@ from decimal import Decimal
 from html.parser import HTMLParser
 from pathlib import Path
 
-from .round5_cvm import ENET, Tables, normalized, sha256, write_json
+from .round5_cvm import ENET, Tables, net_share_counts, normalized, sha256, write_json
 
 
 def _text(payload: bytes) -> str:
@@ -153,7 +153,10 @@ def parse_capital(payload: bytes, document: dict) -> dict:
         ):
             if len(row) != 2 or normalized(row[0]) != label:
                 raise ValueError("Capital class labels differ")
-            if not re.fullmatch(r"(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?", row[1]):
+            if row[1] == "":
+                values[code] = None
+                continue
+            if not re.fullmatch(r"-?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?", row[1]):
                 raise ValueError("Capital quantity is missing or not a printed number")
             values[code] = float(
                 Decimal(row[1].replace(".", "").replace(",", ".")) * scale
@@ -161,12 +164,11 @@ def parse_capital(payload: bytes, document: dict) -> dict:
         # Retain the printed total. Independently rounded thousands can differ
         # from the sum of classes; that does not erase the observed class counts.
         result[key] = values
-    result["shares"] = {
-        code: result["paid_in"][code] - result["treasury"][code]
-        for code in ("ON", "PN")
-    }
-    if any(value < 0 for value in result["shares"].values()):
-        raise ValueError("Capital treasury exceeds paid-in shares")
+    result["shares"] = net_share_counts(result["paid_in"], result["treasury"])
+    if result["shares"] is None:
+        raise ValueError(
+            "Capital source has negative, inconsistent or unreported class quantities"
+        )
     return result
 
 
@@ -194,6 +196,46 @@ def load_capital(document: dict, destination: Path) -> dict:
     if result != manifest["capital"]:
         raise ValueError("Archived capital values differ from source table")
     return result
+
+
+def load_capital_dispositions(path: Path, documents: list[dict]) -> dict[str, dict]:
+    """Read source-audited note reconciliations or genuinely unusable counts.
+
+    Explicit document identities prevent a later note from repairing an earlier
+    filing. Evidence bytes and the disposition file are separately hash-bound
+    by the final family; no sign convention is inferred for other documents.
+    """
+    if not path.exists():
+        return {}
+    by_id = {str(d["id"]): d for d in documents}
+    output = {}
+    for record in json.loads(path.read_text(encoding="utf8"))["documents"]:
+        identifier = record["document"]["id"]
+        if identifier not in by_id:
+            continue
+        if identifier in output or record["document"] != _identity(by_id[identifier]):
+            raise ValueError(
+                "Capital disposition has a repeated or different filing identity"
+            )
+        if not record["reason"] or not record["evidence"]:
+            raise ValueError("Capital disposition lacks its source findings")
+        for source in record["evidence"]:
+            if sha256(Path(source["path"])) != source["sha256"]:
+                raise ValueError("Capital disposition source evidence hash differs")
+        if record["disposition"] == "reconciled":
+            shares = net_share_counts(
+                record["paid_in_shares"], record["treasury_shares"]
+            )
+            if shares is None:
+                raise ValueError(
+                    "Reconciled capital still has unusable class quantities"
+                )
+        elif record["disposition"] == "audited_unavailable":
+            shares = None
+        else:
+            raise ValueError("Capital disposition does not state a supported outcome")
+        output[identifier] = {**record, "shares": shares}
+    return output
 
 
 def capital_page(document: dict, destination: Path) -> dict:

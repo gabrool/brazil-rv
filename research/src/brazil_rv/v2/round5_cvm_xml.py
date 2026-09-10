@@ -11,7 +11,7 @@ from xml.etree import ElementTree as ET
 
 def flat_dfp_accounts(document: dict, payload: bytes, envelope: ET.Element) -> dict:
     """Read the alternative official annual XML layout, never prior-year cells."""
-    from .round5_cvm import ACCOUNTS, assign_account, digits
+    from .round5_cvm import ACCOUNTS, assign_account, digits, net_share_counts
 
     source = ET.fromstring(payload)
     if source.tag != "XmlDemonstracoesFinanceiras":
@@ -66,14 +66,27 @@ def flat_dfp_accounts(document: dict, payload: bytes, envelope: ET.Element) -> d
     quantity_scale = {"1": 1, "2": 1000}.get(annual.findtext("EscalaQtdAcoes"))
     capital = form.find("DadosEmpresa/ComposicaoCapital")
     if quantity_scale is not None and capital is not None:
-        parsed["shares"] = {
-            code: quantity_scale
-            * (
-                float(capital.findtext(f"CaptalIntegralizado/{label}"))
-                - float(capital.findtext(f"Tesouraria/{label}"))
-            )
+        paid_in = {
+            code: capital.findtext(f"CaptalIntegralizado/{label}")
             for code, label in (("ON", "Ordinarias"), ("PN", "Preferenciais"))
         }
+        treasury = {
+            code: capital.findtext(f"Tesouraria/{label}")
+            for code, label in (("ON", "Ordinarias"), ("PN", "Preferenciais"))
+        }
+        shares = net_share_counts(paid_in, treasury)
+        parsed["shares"] = (
+            {code: count * quantity_scale for code, count in shares.items()}
+            if shares is not None
+            else None
+        )
+        if shares is None:
+            parsed["capital_issue"] = {
+                "reason": "negative_inconsistent_or_unreported_class_quantities",
+                "paid_in": paid_in,
+                "treasury": treasury,
+                "quantity_scale": quantity_scale,
+            }
     if not parsed["accounts"]:
         raise ValueError("Flat original financial XML lacks requested-period accounts")
     parsed["recovered_original"] = True
@@ -87,7 +100,7 @@ def original_accounts(document: dict, source: Path) -> dict:
     ID. Flow statements use accumulated periods (NumeroTrimestre=0), avoiding
     unused quarter cells that the original package can serialize as zero.
     """
-    from .round5_cvm import ACCOUNTS, assign_account, digits
+    from .round5_cvm import ACCOUNTS, assign_account, digits, net_share_counts
 
     with zipfile.ZipFile(source) as outer:
         envelope_name = next(
@@ -200,18 +213,29 @@ def original_accounts(document: dict, source: Path) -> dict:
                     )
                 ]
                 if period["end"] == document["reference"]:
-                    parsed["shares"] = {
-                        code: quantity_scale
-                        * (
-                            float(
-                                node.findtext(
-                                    f"QuantidadeAcao{label}CapitalIntegralizado"
-                                )
-                            )
-                            - float(node.findtext(f"QuantidadeAcao{label}Tesouraria"))
+                    paid_in = {
+                        code: node.findtext(
+                            f"QuantidadeAcao{label}CapitalIntegralizado"
                         )
                         for code, label in (("ON", "Ordinaria"), ("PN", "Preferencial"))
                     }
+                    treasury = {
+                        code: node.findtext(f"QuantidadeAcao{label}Tesouraria")
+                        for code, label in (("ON", "Ordinaria"), ("PN", "Preferencial"))
+                    }
+                    shares = net_share_counts(paid_in, treasury)
+                    parsed["shares"] = (
+                        {code: count * quantity_scale for code, count in shares.items()}
+                        if shares is not None
+                        else None
+                    )
+                    if shares is None:
+                        parsed["capital_issue"] = {
+                            "reason": "negative_inconsistent_or_unreported_class_quantities",
+                            "paid_in": paid_in,
+                            "treasury": treasury,
+                            "quantity_scale": quantity_scale,
+                        }
     if not parsed["accounts"]:
         raise ValueError("Original financial ZIP lacks requested-period accounts")
     parsed["recovered_original"] = True

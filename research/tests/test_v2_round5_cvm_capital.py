@@ -111,8 +111,64 @@ def test_own_share_quantity_scale_and_treasury_are_independent_of_currency():
 
 @pytest.mark.parametrize("treasury", ["", "-", "NaN"])
 def test_missing_treasury_is_not_zero(treasury):
-    with pytest.raises(ValueError, match="missing or not a printed number"):
+    with pytest.raises(ValueError, match="missing|unreported"):
         capital.parse_capital(table(treasury=treasury), DOCUMENT)
+
+
+def test_negative_treasury_is_not_subtracted_or_made_absolute():
+    with pytest.raises(ValueError, match="negative"):
+        capital.parse_capital(table(treasury="-181.400"), DOCUMENT)
+
+
+def test_unissued_class_can_have_zero_outstanding_without_printed_treasury():
+    payload = table(treasury="").replace(b"5.602.042.788", b"0")
+    result = capital.parse_capital(payload, DOCUMENT)
+    assert result["shares"]["PN"] == 0
+    assert result["treasury"]["PN"] is None
+
+
+def disposition_fixture(tmp_path, disposition="reconciled"):
+    evidence = tmp_path / "original_note.txt"
+    evidence.write_text(
+        "Own-period ordinary treasury holdings: 5,207 shares.", encoding="utf8"
+    )
+    record = {
+        "document": capital._identity(DOCUMENT),
+        "disposition": disposition,
+        "reason": "Own reference/version note establishes positive treasury holdings.",
+        "evidence": [{"path": str(evidence), "sha256": capital.sha256(evidence)}],
+        "paid_in_shares": {"ON": 90_954_000, "PN": 0},
+        "treasury_shares": {"ON": 5207, "PN": 0},
+    }
+    path = tmp_path / "dispositions.json"
+    path.write_text(json.dumps({"documents": [record]}), encoding="utf8")
+    return path, evidence
+
+
+@pytest.mark.parametrize("disposition", ("reconciled", "audited_unavailable"))
+def test_source_disposition_preserves_exact_quantity_or_missingness(
+    tmp_path, disposition
+):
+    path, _ = disposition_fixture(tmp_path, disposition)
+    result = capital.load_capital_dispositions(path, [DOCUMENT])[DOCUMENT["id"]]
+    assert result["shares"] == (
+        {"ON": 90_948_793, "PN": 0} if disposition == "reconciled" else None
+    )
+
+
+def test_note_for_another_reference_cannot_repair_this_filing(tmp_path):
+    path, _ = disposition_fixture(tmp_path)
+    with pytest.raises(ValueError, match="filing identity"):
+        capital.load_capital_dispositions(
+            path, [{**DOCUMENT, "reference": date(2022, 12, 31)}]
+        )
+
+
+def test_changed_note_bytes_cannot_reuse_a_capital_disposition(tmp_path):
+    path, source = disposition_fixture(tmp_path)
+    source.write_text("Changed treasury holdings", encoding="utf8")
+    with pytest.raises(ValueError, match="hash differs"):
+        capital.load_capital_dispositions(path, [DOCUMENT])
 
 
 def test_reference_and_unknown_scale_cannot_borrow_another_period():

@@ -7,7 +7,7 @@ import pytest
 from brazil_rv.v2.round5_cvm_xml import original_accounts
 
 
-def original_fixture(tmp_path, quantity_scale="1"):
+def original_fixture(tmp_path, quantity_scale="1", treasury="3985658"):
     document = {
         "id": "37949",
         "version": 1,
@@ -60,6 +60,10 @@ def original_fixture(tmp_path, quantity_scale="1"):
     <QuantidadeAcaoPreferencialCapitalIntegralizado>0</QuantidadeAcaoPreferencialCapitalIntegralizado>
     <QuantidadeAcaoPreferencialTesouraria>0</QuantidadeAcaoPreferencialTesouraria>
     </ComposicaoCapitalSocialDemonstracaoFinanceira></Array>"""
+    shares = shares.replace(
+        ">3985658</QuantidadeAcaoOrdinariaTesouraria>",
+        f">{treasury}</QuantidadeAcaoOrdinariaTesouraria>",
+    )
     inner = io.BytesIO()
     with zipfile.ZipFile(inner, "w") as archive:
         archive.writestr("PeriodoDemonstracaoFinanceira.xml", periods)
@@ -98,7 +102,7 @@ def test_original_xml_rejects_another_public_version(tmp_path):
         original_accounts(document, path)
 
 
-def flat_fixture(tmp_path, quantity_scale="1", inner_version=1):
+def flat_fixture(tmp_path, quantity_scale="1", inner_version=1, treasury="10"):
     document, nested = original_fixture(tmp_path, quantity_scale)
     document["reference"] = date(2014, 12, 31)
     with zipfile.ZipFile(nested) as archive:
@@ -111,7 +115,7 @@ def flat_fixture(tmp_path, quantity_scale="1", inner_version=1):
     <DtFimUltimoExercicioSocial>31/12/2014</DtFimUltimoExercicioSocial><Moeda>1</Moeda>
     <EscalaMoeda>2</EscalaMoeda><EscalaQtdAcoes>{quantity_scale}</EscalaQtdAcoes><Formulario>
     <DadosEmpresa><ComposicaoCapital><CaptalIntegralizado><Ordinarias>1000</Ordinarias>
-    <Preferenciais>0</Preferenciais></CaptalIntegralizado><Tesouraria><Ordinarias>10</Ordinarias>
+    <Preferenciais>0</Preferenciais></CaptalIntegralizado><Tesouraria><Ordinarias>{treasury}</Ordinarias>
     <Preferenciais>0</Preferenciais></Tesouraria></ComposicaoCapital></DadosEmpresa>
     <DfIndividuais><DemonstracaoResultado><Conta><CodigoConta>3.01</CodigoConta>
     <DescricaoConta>Receita</DescricaoConta><UltimoExercicio>1.234,50</UltimoExercicio>
@@ -153,3 +157,15 @@ def test_flat_dfp_inner_version_must_match_public_envelope(tmp_path):
     document, path = flat_fixture(tmp_path, inner_version=2)
     with pytest.raises(ValueError, match="VersaoDocumento"):
         original_accounts(document, path)
+
+
+@pytest.mark.parametrize("factory", (original_fixture, flat_fixture))
+@pytest.mark.parametrize("treasury", ("-5", "", "9999999999"))
+def test_invalid_capital_never_inflates_shares_or_erases_accounts(
+    tmp_path, factory, treasury
+):
+    document, path = factory(tmp_path, treasury=treasury)
+    parsed = original_accounts(document, path)
+    assert parsed["shares"] is None
+    assert parsed["accounts"]
+    assert parsed["capital_issue"]["treasury"]["ON"] in (treasury, None)

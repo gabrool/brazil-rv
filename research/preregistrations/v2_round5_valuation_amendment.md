@@ -27,3 +27,30 @@ retained. The nine requested financial quantities and all protected S0 inputs
 retain their contracts. A 24-issuer fixture verifies separate class pricing and
 the first changed decision through parquet alignment and actual rank transforms;
 missing prices, preferred subclasses and unit boundaries remain explicit masks.
+
+## Own quantity scale and source-invalid treasury
+
+Exact-ID checks establish that annual capital CSV rows retain printed quantities
+without their independent quantity scale: Bradesco DFP2022 ID123448 is in
+thousands, while Ourofino ID129981 and Petrobras ID135086 are in units. Therefore
+the scale-less annual capital assignment is removed from the model path. Use
+only own-version XML/HTML counts with an explicit quantity scale, or a separately
+audited own-document note reconciliation. Currency scale and market prices do
+not infer share-count scale. Annual archives and their source audit remain intact.
+
+The shared net-count rule requires nonnegative finite paid-in and treasury class
+counts with treasury no greater than paid-in. A positive issued class with an
+unreported treasury count remains unavailable. An explicitly zero paid-in class
+has zero outstanding even if treasury is unreported; this is the only such
+logical inference. Negative printed treasury is neither subtracted nor made
+positive automatically. Invalid capital does not erase unrelated accounts.
+
+Document-specific original notes may establish positive treasury holdings at the
+same reference date and class. Bind exact public ID/version, original PDF/ZIP
+hash, page and quantity evidence; retain note precision and disclose source
+inconsistencies. The existing filing receipt governs availability. No later note
+repairs an earlier version, and no sign convention applies to other documents.
+An explicitly audited unusable count may instead remain missing after bounded
+exact-source investigation. Such a disposition records its reason and evidence
+hashes; unaudited failures still block source acceptance. Neither outcome changes
+the existing causal class-price, capital-change or unit-boundary requirements.

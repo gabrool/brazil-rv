@@ -580,6 +580,27 @@ def assign_account(
         raise ValueError(f"Conflicting account {document['id']}/{basis}/{metric}")
 
 
+def net_share_counts(paid_in: dict, treasury: dict) -> dict | None:
+    """Exact outstanding class counts, never unsigned guesses or missing zeros.
+
+    An explicitly unissued class has zero outstanding even if treasury is
+    unreported. Positive paid-in capital requires its actual treasury quantity.
+    Negative treasury needs independent source reconciliation, not subtraction.
+    """
+    result = {}
+    for share_class in ("ON", "PN"):
+        issued, held = paid_in.get(share_class), treasury.get(share_class)
+        try:
+            issued = float(issued)
+            held = 0.0 if issued == 0 and held in (None, "") else float(held)
+        except (TypeError, ValueError):
+            return None
+        if not np.isfinite(issued) or not np.isfinite(held) or not 0 <= held <= issued:
+            return None
+        result[share_class] = issued - held
+    return result
+
+
 def load_accounts(root: Path, issuers: set[str] | None = None) -> list[dict]:
     """Read each year's account data once, retaining its own version identity."""
     documents = filing_headers(root, "itr") + filing_headers(root, "dfp")
@@ -663,25 +684,6 @@ def load_accounts(root: Path, issuers: set[str] | None = None) -> list[dict]:
                             date.fromisoformat(row["DT_FIM_EXERC"]),
                             row["DS_CONTA"],
                         )
-            capital = read_csv_member(
-                path, f"{kind}_cia_aberta_composicao_capital_{year}.csv"
-            )
-            for row in capital:
-                document = keyed.get(
-                    (
-                        kind.upper(),
-                        digits(row["CNPJ_CIA"]),
-                        row["DT_REFER"],
-                        int(row["VERSAO"]),
-                    )
-                )
-                if document is not None:
-                    document["shares"] = {
-                        "ON": float(row["QT_ACAO_ORDIN_CAP_INTEGR"])
-                        - float(row["QT_ACAO_ORDIN_TESOURO"] or 0),
-                        "PN": float(row["QT_ACAO_PREF_CAP_INTEGR"])
-                        - float(row["QT_ACAO_PREF_TESOURO"] or 0),
-                    }
     return documents
 
 
@@ -2291,12 +2293,17 @@ def build(root: Path, store: Path, output: Path) -> dict:
     )
     events.write_parquet(output / "events.parquet")
     documents = load_accounts(root, set(identity.get_column("cnpj")))
+    from .round5_cvm_capital import load_capital_dispositions
+
+    disposition_path = root / "capital_source_dispositions.json"
+    capital_dispositions = load_capital_dispositions(disposition_path, documents)
     recovery_audit = {"attached": 0, "invalid": []}
     original_sources = []
     capital_sources = []
+    capital_issues = []
     capital_coverage = defaultdict(lambda: defaultdict(int))
     for document in documents:
-        shares_source = "annual_csv" if document.get("shares") is not None else None
+        shares_source = None
         path = root / "originals" / document["id"]
         if not document.get("accounts") and (path / "manifest.json").exists():
             try:
@@ -2327,12 +2334,20 @@ def build(root: Path, store: Path, output: Path) -> dict:
                     "Original financial ZIP differs from its source manifest"
                 )
             parsed = original_accounts(document, zip_root / "source.zip")
+            if "capital_issue" in parsed:
+                capital_issues.append(
+                    {
+                        "document_id": document["id"],
+                        "source": "original_zip",
+                        **parsed["capital_issue"],
+                    }
+                )
             if not document.get("accounts"):
                 document.update(parsed)
                 recovery_audit["attached"] += 1
-            if document.get("shares") is None and "shares" in parsed:
+            if document.get("shares") is None and parsed.get("shares") is not None:
                 document["shares"] = parsed["shares"]
-            if shares_source is None and "shares" in parsed:
+            if shares_source is None and parsed.get("shares") is not None:
                 shares_source = "original_zip"
             original_sources.append(
                 {
@@ -2354,11 +2369,28 @@ def build(root: Path, store: Path, output: Path) -> dict:
                     "manifest_sha256": sha256(capital_root / "manifest.json"),
                 }
             )
+        if document.get("shares") is None and document["id"] in capital_dispositions:
+            disposition = capital_dispositions[document["id"]]
+            document["shares"] = disposition["shares"]
+            shares_source = (
+                "source_note_reconciliation"
+                if disposition["shares"] is not None
+                else "audited_unavailable"
+            )
+            capital_sources.append(
+                {
+                    "document_id": document["id"],
+                    "manifest_path": str(disposition_path),
+                    "manifest_sha256": sha256(disposition_path),
+                    "disposition": disposition["disposition"],
+                }
+            )
         capital_coverage[str(document["reference"].year)][
             shares_source or "unavailable"
         ] += 1
     write_json(output / "original_source_manifests.json", original_sources)
     write_json(output / "capital_source_manifests.json", capital_sources)
+    write_json(output / "capital_quantity_issues.json", capital_issues)
     capital_changes = capital_change_observations(root, rad, sessions)
     write_json(output / "capital_change_observations.json", capital_changes)
     fundamentals, audit = fundamental_features(
@@ -2408,6 +2440,12 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "original_recovery": recovery_audit,
         "header_only_original_lag_documents": len(header_lags),
         "capital_sources_by_reference_year": dict(capital_coverage),
+        "capital_dispositions_source": {
+            "path": str(disposition_path),
+            "sha256": sha256(disposition_path),
+        }
+        if disposition_path.exists()
+        else None,
         "source_contracts": {
             name: {
                 "path": str(Path(__file__).parents[3] / "preregistrations" / name),
@@ -2438,7 +2476,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "limitations": [
             "EarlyFCA2010–2017 omits ticker symbols; only unique exact historical legal spellings with contemporaneous class/existing-security evidence are admitted.",
             "Original FCA versions are recovered at their own receipt; any still-missing original remains unavailable until an actually received supported version. Unresolved annual sector-code translations remain missing rather than mixing labels and codes.",
-            "Valuation sums own-version non-treasury class shares times separate prior observed class prices, only when every positive issued class is unambiguously priced. Exact capital-child HTML supplements missing annual capital tables; DISMES and known capital changes invalidate older counts without invented adjustments. This does not establish independently verified corporate-action completeness.",
+            "Valuation uses only own-version XML/HTML counts with independent quantity scale, or document-specific audited note reconciliation. Annual capital CSV omits quantity scale and is not a model count source. Negative/unknown treasury is never subtracted or zero-filled; audited unusable counts remain missing. Every positive issued class requires an unambiguous prior observed price; DISMES/known capital boundaries remain enforced. Independently verified action completeness is not established.",
             "Accounting source recipes retain masked bank/insurance incomparable fields.",
         ],
     }
