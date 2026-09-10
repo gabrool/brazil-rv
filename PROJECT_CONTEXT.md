@@ -198,6 +198,9 @@ original codes or unambiguous code/label evidence known by that decision.
 Later translation evidence cannot fill or erase earlier groups; mapping source
 and availability are separate from market-measurement ages. Own historical
 display labels remain usable for accounting at their original receipt.
+Original FCA establishment suffixes are preserved as `source_cnpj`; the legal
+eight-digit CNPJ root and exact CVM registration must match the public envelope.
+A modern establishment suffix cannot invalidate the same historical issuer.
 Issuer valuation requires own-version
 capital quantities with an explicit share-unit scale. The annual capital CSV
 omits that scale and is not a model count source. Negative treasury quantities

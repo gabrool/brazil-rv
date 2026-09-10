@@ -172,6 +172,28 @@ priority; its9bounded tests pass. The separate account-hierarchy correction in
 expanded-cohort account conflict. The clean producing candidate is `d65c9df`;
 no final CVM family, extended store or CPU screening fit has started.
 
+### Completed FCA supplement
+
+All2,196 supplemental FCA records now have exact metadata sources:
+1,766 original XML and430 exact HTML. The immutable batch initially recorded
+two failures. Separate recovery evidence preserves those attempts and adds:
+
+- Paranapanema359: original CNPJ60398369000126 and public-header
+  CNPJ60398369000479 have the same legal root and exact CVM009393. Commit
+  `9db0ba9` applies the existing legal-root-plus-CVM rule to nested original and
+  exact-ID HTML checks while preserving the historical full `source_cnpj`.
+  Public ID/version/reference checks remain exact; different issuers still fail.
+- LONGDIS116439: its original contains a flat code-only XML whose declared UTF8
+  encoding disagrees with its actual bytes. The unsupported original is retained.
+  A viewer retry recovers the exact historical metadata and explicitly lists a
+  non-Bolsa market, so the accepted metadata has no invented cash-share row.
+
+All19targeted FCA/identity tests pass. The two recoveries also reparse under
+clean`9db0ba9`, now the producing candidate. The full-batch exception audit is
+`cvm/fca_supplement_failure_audit_20260910T183300Z/batch_exception_acceptance.json`,
+SHA-256`f4ce168fce82e00c9d1038c0165f21d7c0c6ada6fb283d2f741002a15a242ac8`.
+The primary FCA queue and capital-unit source review remain incomplete.
+
 The annual manifest binds 74 named archives: FCA, DFP, IPE and FRE 2010–2024, ITR 2011–2024. Existing immutable 2019–2024 sources are reused. The complete RAD manifest binds 150 bounded requests and 582,586 rows: structured 50,059; material facts 32,433; market communications 378,153; shareholder notices 52,705; cadastre 47,419; offerings 6,282; proventos 15,535. Receipts range from 2010-01-04 07:59 to 2024-12-30 23:30; post-cutoff rows cannot enter decisions.
 
 The first source inventory contained 4,230 financial versions missing account contents, including 3,356 first versions. The expanded exact-name issuer cohort contains 415 issuers and 22,561 financial documents; all 4,344 required originals, including 114 additional IDs, are acquired. This includes delisted issuers and the same-version ambiguity correction. Recovery resumed after the PC restart by verifying cached source identity and hashes, then downloading only missing versions. The resumed run is `resume_20260910T153518Z`; the two flat-layout resolutions are separately recorded. Missing exact capital tables are now acquired by eight bounded workers into `cvm/capital/{id}`, with inventory/progress/result under `capital_run_20260910T161211Z`. Account-source success is not equivalent to a complete final family: final derived coverage and availability acceptance follow the committed accounting and valuation corrections.
