@@ -39,14 +39,39 @@ source date pairs are retained in provenance. WEG's 1982 listing versus 2007
 Novo Mercado entry and Vale's 1968 listing versus 2017 segment entry establish
 the distinction in the retrieved source tables.
 
-Sector grouping uses the original numeric FCA sector code. Exact-ID HTML
-labels are separately bound taxonomy annotations. An annual label lacking a
-code may be translated only when matched original code/label observations give
-one unambiguous code. This translates vocabulary, not a later issuer-sector
-assignment. Ambiguous or unsupported translations remain missing and enter the
-source recovery audit. Numeric codes and display labels are never mixed as
-grouping keys. Financial-accounting classification may use verified sector
-semantics together with the contemporaneous statement chart.
+Sector grouping uses the original numeric FCA sector code immediately at that
+document's receipt. Exact-ID HTML labels are separately bound annotations. No
+independently fixed historical taxonomy has been established: empirical
+code/label evidence is therefore part of the historical information set. An
+annual label lacking a code may use only unambiguous exact-ID code/label
+observations already received by the current decision. All-history unambiguity
+is insufficient: a later observation could otherwise fill or erase an earlier
+sector. Unsupported or conflicting translations remain missing. Numeric codes
+and display labels are never mixed as grouping keys.
+
+The existing decision sweep adds mapping evidence at its first eligible receipt
+session and re-resolves active annual records each session. A newly available
+mapping helps immediately, without waiting for the issuer to file again. A
+later conflict may remove a translation only from that decision onward; it
+cannot change earlier sectors or override a document's explicit numeric code.
+`sector_mapping_id` binds the earliest known exact source document for the
+translation; `sector_known_date` is the later of that source's availability and
+the issuer classification's own availability. Direct codes use their own
+document and receipt. Missing sectors have neither provenance field populated.
+The complete source inventory also retains mapping-provider documents without
+a cash-security row. Source acceptance verifies these bindings and the absence
+of already-known contradictory evidence.
+
+The issuer's original display label remains available for financial-accounting
+classification at its own receipt, together with the contemporaneous statement
+chart. Numeric translation does not delay that known label. Sector-relative
+feature ages remain the completed-return endpoint's one-session age; shrinkage
+ages remain the oldest latest observed fit-pair age among contributing names.
+Classification and translation availability are recorded separately and gate
+both consumers; a new translation never makes an old market measurement appear
+new. Actual producer/parquet/FeatureSpec fixtures must keep earlier values,
+masks and ages exact under future-only and future-conflicting mapping mutations,
+with the first change at the mapping's first eligible decision.
 
 Final admission records source manifests and the complete dated identity
 document provenance. It reports new/removed/changed identity name-days relative

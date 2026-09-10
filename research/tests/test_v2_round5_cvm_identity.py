@@ -6,7 +6,7 @@ from datetime import date
 import polars as pl
 
 from brazil_rv.v2 import round5_cvm, round5_cvm_fca
-from brazil_rv.v2.round5_cvm import build_identity, normalize_fca_sectors
+from brazil_rv.v2.round5_cvm import build_identity
 
 
 def fixture():
@@ -20,7 +20,7 @@ def fixture():
         "receipt": days[0],
         "available_index": 1,
         "legal_name": "EXAMPLE S.A.",
-        "sector": "17",
+        "sector_code": "17",
         "sector_label": "Historical industry",
         "securities": [
             {
@@ -95,34 +95,74 @@ def test_original_end_date_and_future_version_are_causal():
     baseline = build_identity([document], observations, days, ["ON", "PN"])
     assert set(baseline["date"]) == {days[1]}
     future = deepcopy(document)
-    future.update(id="2", version=2, receipt=days[2], available_index=3, sector="18")
+    future.update(
+        id="2", version=2, receipt=days[2], available_index=3, sector_code="18"
+    )
     future["securities"][0]["end"] = date.max
     changed = build_identity([document, future], observations, days, ["ON", "PN"])
     assert baseline.equals(changed.filter(pl.col("date") < days[3]))
     assert set(changed.filter(pl.col("date") == days[3])["sector"]) == {"18"}
 
 
-def test_sector_group_uses_code_and_only_unambiguous_label_translation():
-    documents = [
-        {"sector_code": "017", "sector_label": "Industry"},
-        {"sector_code": "17", "sector_label": "Renamed industry"},
-        {"sector_label": "Industry"},
-        {"sector_label": "Unknown"},
-        {"sector_code": "18", "sector_label": "Ambiguous"},
-        {"sector_code": "19", "sector_label": "Ambiguous"},
-        {"sector_label": "Ambiguous"},
-    ]
-    normalize_fca_sectors(documents)
-    assert [d["sector"] for d in documents] == [
-        "17",
-        "17",
-        "17",
-        None,
-        "18",
-        "19",
-        None,
-    ]
-    assert documents[0]["sector_label"] == "Industry"
+def test_sector_translation_enters_first_known_decision_without_refiling():
+    days, document, observations = fixture()
+    document["sector_code"] = None
+    evidence = {
+        "id": "10",
+        "receipt": days[2],
+        "available_index": 3,
+        "version": 1,
+        "sector_code": "17",
+        "sector_label": document["sector_label"],
+    }
+    before = build_identity([document], observations, days, ["ON", "PN"])
+    repeated = {**evidence, "id": "11", "receipt": days[3], "available_index": 4}
+    after = build_identity(
+        [document, evidence, repeated], observations, days, ["ON", "PN"]
+    )
+    assert before["sector"].null_count() == before.height
+    assert before.filter(pl.col("date") < days[3]).equals(
+        after.filter(pl.col("date") < days[3])
+    )
+    known = after.filter(pl.col("date") >= days[3])
+    assert set(known["sector"]) == {"17"}
+    assert set(known["sector_known_date"]) == {days[3]}
+    assert set(known["sector_mapping_id"]) == {"10"}
+    assert set(known["fca_id"]) == {"1"}  # No new issuer filing was needed.
+    assert set(after["identity_known_date"]) == {days[1]}
+    assert set(after["sector_label"]) == {document["sector_label"]}
+
+
+def test_future_sector_code_conflict_cannot_erase_prior_group_or_explicit_code():
+    days, document, observations = fixture()
+    annual = {**document, "sector_code": None}
+    prior = {
+        "id": "10",
+        "receipt": days[0],
+        "available_index": 1,
+        "version": 1,
+        "sector_code": "17",
+        "sector_label": document["sector_label"],
+    }
+    future = {
+        **prior,
+        "id": "11",
+        "receipt": days[2],
+        "available_index": 3,
+        "sector_code": "18",
+    }
+    before = build_identity([annual, prior], observations, days, ["ON", "PN"])
+    after = build_identity([annual, prior, future], observations, days, ["ON", "PN"])
+    assert before.filter(pl.col("date") < days[3]).equals(
+        after.filter(pl.col("date") < days[3])
+    )
+    unknown = after.filter(pl.col("date") >= days[3])
+    for column in ("sector", "sector_known_date", "sector_mapping_id"):
+        assert unknown[column].null_count() == unknown.height
+    explicit = build_identity([document, future], observations, days, ["ON", "PN"])
+    assert set(explicit["sector"]) == {"17"}
+    assert set(explicit["sector_known_date"]) == {days[1]}
+    assert set(explicit["sector_mapping_id"]) == {"1"}
 
 
 def test_original_attachment_uses_listing_bounds_and_ignores_segment_restart(
@@ -133,7 +173,13 @@ def test_original_attachment_uses_listing_bounds_and_ignores_segment_restart(
         k: v
         for k, v in header.items()
         if k
-        not in {"securities", "sector", "sector_label", "legal_name", "available_index"}
+        not in {
+            "securities",
+            "sector_code",
+            "sector_label",
+            "legal_name",
+            "available_index",
+        }
     }
     monkeypatch.setattr(round5_cvm, "filing_headers", lambda *_: [deepcopy(header)])
     monkeypatch.setattr(
@@ -168,7 +214,7 @@ def test_original_attachment_uses_listing_bounds_and_ignores_segment_restart(
     (source / "manifest.json").write_text("{}", encoding="utf8")
     metadata = {
         "legal_name": "EXAMPLE S.A.",
-        "sector_code": "17",
+        "sector_code": "017",
         "sector": "Industry",
         "metadata_source": "original_fca_xml",
         "securities": [
@@ -191,7 +237,7 @@ def test_original_attachment_uses_listing_bounds_and_ignores_segment_restart(
     assert documents[0]["securities"][0]["class"] == "SHARES"
     assert documents[0]["securities"][0]["start"] == days[0]
     assert documents[0]["securities"][0]["end"] == days[2]
-    assert documents[0]["sector"] == "17"
+    assert documents[0]["sector_code"] == "17"
     assert documents[0]["sector_label"] == "Industry"
     assert documents[0]["available_index"] == 1
     assert documents[0]["original_fca_source"]["manifest_path"] == str(

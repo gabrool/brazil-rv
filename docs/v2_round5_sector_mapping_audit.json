@@ -1,0 +1,80 @@
+{
+  "status": "corrected_before_final_source_freeze",
+  "defect": "All-history empirical sector label-to-code joins changed historical annual sector values and missingness when a future code observation was added.",
+  "counterexample": {
+    "source_path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_cvm.py",
+    "source_sha256": "3f9dab2fd64b7ae7b6cfdaa258227ddffbb55a059c491b7f81867ca514b1482d",
+    "future_first_decision": "2024-01-05",
+    "earlier_decisions": [
+      "2024-01-03",
+      "2024-01-04"
+    ],
+    "prior_known_mapping": [
+      "17",
+      [
+        "17",
+        "17",
+        "17",
+        "17"
+      ]
+    ],
+    "adding_future_conflict": [
+      null,
+      [
+        null,
+        null,
+        null,
+        null
+      ]
+    ],
+    "no_mapping": [
+      null,
+      [
+        null,
+        null,
+        null,
+        null
+      ]
+    ],
+    "adding_future_only_mapping": [
+      "17",
+      [
+        "17",
+        "17",
+        "17",
+        "17"
+      ]
+    ],
+    "verdict": "Data-dependent all-history crosswalk changes earlier annual sectors and masks before future evidence is available.",
+    "source_edited": false,
+    "full_build_run": false
+  },
+  "counterexample_artifact": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_sector_future_mapping_counterexample.json",
+    "sha256": "64ce52071b0d82e7403a075d72d24548b798142d80b4990396f0999de9721f50"
+  },
+  "correction": "Resolve label-only active documents from receipt-known code evidence inside the existing decision sweep. Direct numeric codes remain immediate. Earliest mapping provider and first usable decision are recorded; later conflicting evidence cannot change prior rows.",
+  "age_contract": "Sector return endpoint age remains1; exposure shrinkage retains maximum latest fit-pair age across contributors. Mapping availability is a separate gate and never resets market-source ages. Accounting keeps the own-receipt display label.",
+  "targeted_validation": {
+    "tests_passed": 71,
+    "junit": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\sector_clock_correction_tests.xml",
+      "sha256": "301288721993d016927bd12a2941c386c898723b1042f7e57dc5eb2146cd3d52"
+    },
+    "cases": [
+      "future-only translation leaves prior raw/transformed values, masks and ages exact and becomes usable at first eligible decision without a new issuer filing",
+      "future code conflict removes only current/future translations and cannot override explicit source codes",
+      "later same-code repetition does not reset mapping availability",
+      "24-name actual identity/sector/parquet/align_family/FeatureSpec pipeline; remaining23 names keep rank support after target masking",
+      "future sector_known_date is rejected by derived identity admission"
+    ]
+  },
+  "source_files": {
+    "research/src/brazil_rv/v2/round5_cvm.py": "529526592674a1eac9f71bbe36e0ba8c4691951e3a0c259db26f48d1ba976e64",
+    "research/src/brazil_rv/v2/round5_derived.py": "21a5f4e777f19f1b17eaafda1b852a88a8d21718b4088be7df1a6d23ff835632",
+    "research/tests/test_v2_round5_cvm_identity.py": "54c0ed4de1977e88a5ffa5a0bdac17ed9017abd3d11da3db1b2b16fdf67bca7c",
+    "research/tests/test_v2_round5_derived.py": "70af11567ffea35a002af1de62be1aa9b75253727fa30a457b4ac008ef01c5b0"
+  },
+  "full_dataset_rebuilt": false,
+  "source_freeze_hold_retained": true
+}

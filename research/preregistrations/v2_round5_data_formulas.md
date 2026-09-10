@@ -15,7 +15,7 @@ original registration and replay bindings remain intact.
   and accounting surprise retain their required adjacent-quarter inputs.
 - SUE is current seasonal earnings change divided by sample deviation of the
   previous eight consecutive seasonal changes. It does not include the current
-  surprise in its scale. Financial, consolidated and single-class-valuation flags
+  surprise in its scale. Financial, consolidated and complete-class valuation availability flags
   accompany the financial fields requested in the original scope.
 - Before FCA ticker columns become usable, exact normalized historical legal-name
   matches may connect a dated FCA issuer to dated COTAHIST identity. Require one
@@ -46,6 +46,12 @@ original registration and replay bindings remain intact.
   Without enough sector peers, retain the observed OLS slope. Other own share
   classes never count as independent peers. Sector-relative returns/momentum
   require at least two other issuers and use equal issuer weights.
+  Numeric sector translation is receipt-known as specified in the FCA identity
+  amendment; a future code/label match or conflict cannot revise prior groups.
+  Sector-relative ages measure the completed-return endpoint (one session),
+  and shrinkage ages take the oldest latest fit-pair age among actual
+  contributors. Separate `sector_known_date` metadata gates classification;
+  new translation evidence does not reset those market-source ages.
 - Common state, exposures, their products and magnitude channels keep physical
   units rather than cross-sectional ranks. This prevents a common scalar from
   becoming identically zero. Magnitudes alone have their registered per-fit

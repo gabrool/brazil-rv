@@ -947,34 +947,11 @@ def fca_documents(
             else document["receipt"]
         )
         document["available_index"] = available_session(receipt, sessions)
-    normalize_fca_sectors(headers)
-    return headers
-
-
-def normalize_fca_sectors(documents: list[dict]) -> None:
-    """Use original numeric groups; exact-ID labels only translate taxonomy.
-
-    A label may name several codes in the retrieved evidence. Such a label
-    cannot assign a code to annual rows that omit it; those sectors stay null.
-    This maps metadata vocabulary, never an issuer's later sector assignment.
-    """
-    codes_by_label = defaultdict(set)
-    for document in documents:
-        code, label = document.get("sector_code"), document.get("sector_label")
-        if code is not None and str(code).strip():
-            code = str(int(code))
-            document["sector_code"] = code
-            if label:
-                codes_by_label[normalized(label)].add(code)
-        else:
-            document["sector_code"] = None
-    for document in documents:
         code = document.get("sector_code")
-        if code is None:
-            candidates = codes_by_label[normalized(document.get("sector_label") or "")]
-            if len(candidates) == 1:
-                code = next(iter(candidates))
-        document["sector"] = code
+        document["sector_code"] = (
+            str(int(code)) if code is not None and str(code).strip() else None
+        )
+    return headers
 
 
 def build_identity(
@@ -991,12 +968,14 @@ def build_identity(
     already observed before that FCA receipt. Original generic Ações can map
     only to independently observed ON/PN classes through that exact name route.
     New securities cannot inherit an old company's spelling.
+    Explicit sector codes enter at their own receipt. Label-only sectors use
+    only unambiguous code/label evidence already received by this decision;
+    later evidence never fills or removes an earlier sector classification.
     """
     universe = set(isins)
     events = defaultdict(list)
     for d in documents:
-        if "securities" in d:
-            events[d["available_index"]].append(d)
+        events[d["available_index"]].append(d)
     prices_by_date = defaultdict(list)
     for row in observations.iter_rows(named=True):
         if row["isin"] in universe:
@@ -1005,6 +984,7 @@ def build_identity(
     ticker_isin = {}
     known_security = {}
     first_seen = {}
+    codes_by_label = defaultdict(dict)
 
     def observe(row):
         ticker_isin[row["ticker"]] = row["isin"]
@@ -1020,6 +1000,11 @@ def build_identity(
             for row in prices_by_date[sessions[index - 1]]:
                 observe(row)
         for d in sorted(events[index], key=lambda d: (d["receipt"], d["version"])):
+            code, label = d.get("sector_code"), d.get("sector_label")
+            if code is not None and label:
+                codes_by_label[normalized(label)].setdefault(code, d)
+            if "securities" not in d:
+                continue
             issuer_key = (d["cnpj"][:8], d["cvm_code"])
             prior = current.get(issuer_key)
             if prior is None or (d["reference"], d["version"]) > (
@@ -1040,6 +1025,20 @@ def build_identity(
             )
         for document in current.values():
             cnpj = document["cnpj"]
+            sector, mapping = document.get("sector_code"), None
+            if sector is not None:
+                mapping = document
+            else:
+                candidates = codes_by_label[
+                    normalized(document.get("sector_label") or "")
+                ]
+                if len(candidates) == 1:
+                    sector, mapping = next(iter(candidates.items()))
+            sector_known_date = (
+                sessions[max(document["available_index"], mapping["available_index"])]
+                if mapping is not None
+                else None
+            )
             for security in document["securities"]:
                 if not security["start"] <= current_date <= security["end"]:
                     continue
@@ -1118,8 +1117,10 @@ def build_identity(
                         "isin": isin,
                         "cnpj": cnpj,
                         "cvm_code": document["cvm_code"],
-                        "sector": document.get("sector") or None,
+                        "sector": sector,
                         "sector_label": document.get("sector_label") or None,
+                        "sector_known_date": sector_known_date,
+                        "sector_mapping_id": mapping["id"] if mapping else None,
                         "class": share_class,
                         "preferred_class": preferred,
                         "unit_composition": security["unit_composition"],
@@ -1138,6 +1139,8 @@ def build_identity(
         "cvm_code": pl.String,
         "sector": pl.String,
         "sector_label": pl.String,
+        "sector_known_date": pl.Date,
+        "sector_mapping_id": pl.String,
         "class": pl.String,
         "preferred_class": pl.String,
         "unit_composition": pl.String,
@@ -2219,7 +2222,11 @@ def build(root: Path, store: Path, output: Path) -> dict:
         [
             d
             for d in cadastre
-            if "securities" in d and d["available_index"] < len(sessions)
+            if d["available_index"] < len(sessions)
+            and (
+                "securities" in d
+                or (d.get("sector_code") is not None and d.get("sector_label"))
+            )
         ],
     )
     fca_audit = []
@@ -2237,10 +2244,10 @@ def build(root: Path, store: Path, output: Path) -> dict:
                     any(s["class"] == "SHARES" for s in d.get("securities", []))
                     for d in annual
                 ),
-                "unresolved_sector_documents": [
+                "sector_code_translation_required_documents": [
                     d["id"]
                     for d in annual
-                    if "securities" in d and d.get("sector") is None
+                    if "securities" in d and d.get("sector_code") is None
                 ],
                 "original_class_verification_required": [
                     d["id"]
@@ -2433,7 +2440,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "availability_rule": "exact RAD minute upper bound (+1min), first15:45at-or-after; date-only nextsession",
         "version_rule": "only own version account contents; missing original versions remain unavailable until recovered or replaced at actual later receipt",
         "identity_rule": "own-receipt FCA cash ticker or unique exact historical legal spelling, prior COTAHIST ISIN and class, bounded existing security; original generic shares require exact-name observed ON/PN, never units or modern HTML class backfill; legal CNPJ root plus CVM registration",
-        "sector_rule": "original numeric FCA group code; annual display labels map only through unambiguous exact-ID original code/label evidence; labels are annotations, never mixed grouping keys or later issuer-sector assignments",
+        "sector_rule": "explicit numeric FCA code at own receipt; annual labels resolve at each decision using only already-received unambiguous exact-ID code/label evidence; sector_known_date and sector_mapping_id bind availability and source; future evidence never changes earlier groups; display labels remain own-receipt accounting annotations",
         "identity_rows": identity.height,
         "identity_isins": identity.get_column("isin").n_unique(),
         "receipt_audit": audit,

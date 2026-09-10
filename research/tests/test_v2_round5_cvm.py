@@ -251,7 +251,8 @@ def test_identity_uses_known_cadastre_and_prior_ticker_observation():
         "version": 1,
         "receipt": date(2024, 1, 2),
         "available_index": 1,
-        "sector": "Industry",
+        "sector_code": "17",
+        "sector_label": "Industry",
         "securities": [
             {
                 "ticker": "ABC3",
@@ -269,7 +270,7 @@ def test_identity_uses_known_cadastre_and_prior_ticker_observation():
     result = build_identity([document], observations, sessions, ["ISIN1"])
     assert result["date"].min() == sessions[1]
     changed = deepcopy(document)
-    changed["sector"] = "Changed"
+    changed["sector_code"] = "18"
     assert (
         build_identity([changed], observations, sessions, ["ISIN1"])
         .filter(pl.col("date") < sessions[1])
@@ -674,7 +675,8 @@ def test_early_exact_legal_name_bridge_excludes_new_same_brand_security():
         "receipt": sessions[0],
         "available_index": 1,
         "legal_name": "SMILES S.A.",
-        "sector": "Services",
+        "sector_code": "18",
+        "sector_label": "Services",
         "securities": [
             {
                 "ticker": "",
@@ -707,7 +709,7 @@ def test_early_exact_legal_name_bridge_excludes_new_same_brand_security():
         receipt=sessions[2],
         available_index=3,
         version=2,
-        sector="New classification",
+        sector_code="19",
     )
     changed = build_identity(
         [document, mutated], observations, sessions, ["OLD", "NEW"]
@@ -728,7 +730,8 @@ def test_contemporaneous_exact_name_collision_is_masked():
         "receipt": sessions[0],
         "available_index": 1,
         "legal_name": "WEG SA",
-        "sector": "Industry",
+        "sector_code": "17",
+        "sector_label": "Industry",
         "securities": [
             {
                 "ticker": "",
@@ -890,7 +893,8 @@ def test_old_fca_ticker_cannot_relabel_a_new_isin_after_ticker_reuse():
         "version": 1,
         "receipt": sessions[0],
         "available_index": 1,
-        "sector": "Industry",
+        "sector_code": "17",
+        "sector_label": "Industry",
         "securities": [
             {
                 "ticker": "ABC3",
@@ -924,7 +928,8 @@ def test_preannounced_exact_listing_date_admits_new_isin_without_age_rule():
         "version": 1,
         "receipt": sessions[0],
         "available_index": 1,
-        "sector": "Industry",
+        "sector_code": "17",
+        "sector_label": "Industry",
         "securities": [
             {
                 "ticker": "ABC3",

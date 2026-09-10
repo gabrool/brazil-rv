@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from datetime import UTC, date, datetime, timedelta
 
 import numpy as np
@@ -24,6 +25,7 @@ from brazil_rv.v2.round5_magnitude import (
     magnitude_panel,
 )
 from brazil_rv.v2.round5_market import OBSERVATION_SCHEMA
+from brazil_rv.v2.round5_cvm import build_identity
 from brazil_rv.v2.round5_store import align_family
 
 
@@ -42,6 +44,7 @@ def test_sector_identity_mutation_enters_on_receipt_without_prior_projection():
             cvm_code=str(n),
             sector="original",
             identity_known_date=dates[0],
+            sector_known_date=dates[0],
         )
         for day in dates
         for n, isin in enumerate(isins)
@@ -52,7 +55,11 @@ def test_sector_identity_mutation_enters_on_receipt_without_prior_projection():
     before = sector_relative_panel(values, valid, sectors, issuers, active)
     for row in rows:
         if row["isin"] == "D" and row["date"] >= dates[2]:
-            row.update(sector="changed", identity_known_date=dates[2])
+            row.update(
+                sector="changed",
+                identity_known_date=dates[2],
+                sector_known_date=dates[2],
+            )
     sectors, issuers = identity_axes(pl.DataFrame(rows), dates, isins)
     after = sector_relative_panel(values, valid, sectors, issuers, active)
     for left, right in zip(before, after):
@@ -61,6 +68,10 @@ def test_sector_identity_mutation_enters_on_receipt_without_prior_projection():
     assert not after[1][2:, 3].any()
     rows[-1]["identity_known_date"] = dates[-1] + timedelta(days=1)
     with pytest.raises(ValueError, match="precedes"):
+        identity_axes(pl.DataFrame(rows), dates, isins)
+    rows[-1]["identity_known_date"] = dates[2]
+    rows[-1]["sector_known_date"] = dates[-1] + timedelta(days=1)
+    with pytest.raises(ValueError, match="translation"):
         identity_axes(pl.DataFrame(rows), dates, isins)
 
 
@@ -212,29 +223,50 @@ def test_transformed_market_archive_preserves_publication_and_native_common_stat
 
 
 def test_transformed_sector_archive_changes_only_at_known_classification(tmp_path):
-    days = [date(2024, 1, 2) + timedelta(days=i) for i in range(4)]
+    days = np.busday_offset("2024-01-02", np.arange(5)).astype(object).tolist()
     isins = tuple(f"BRFIXTURE{n:03}" for n in range(24))
-    rows = [
+    documents = [
         dict(
-            date=day,
-            isin=isin,
+            id=str(n + 1),
             cnpj=f"{n:014}",
             cvm_code=str(n),
-            sector="original",
-            identity_known_date=days[0],
+            reference=date(2023, 1, 1),
+            version=1,
+            receipt=days[0],
+            available_index=1,
+            sector_code=None if n == 0 else "17",
+            sector_label="Annual label" if n == 0 else "Direct label",
+            securities=[
+                dict(
+                    ticker=f"STOCK{n}",
+                    **{"class": "ON"},
+                    preferred_class="",
+                    unit_composition="",
+                    start=date(2000, 1, 1),
+                    end=date.max,
+                )
+            ],
         )
-        for day in days
         for n, isin in enumerate(isins)
     ]
-    values = np.broadcast_to(np.arange(24)[None, :, None], (4, 24, 3)).astype(float)
+    observed = pl.DataFrame(
+        {
+            "trade_date": [days[0]] * len(isins),
+            "isin": isins,
+            "ticker": [f"STOCK{n}" for n in range(len(isins))],
+            "security_spec_base": ["ON"] * len(isins),
+        }
+    )
+    values = np.broadcast_to(np.arange(24)[None, :, None], (5, 24, 3)).astype(float)
     names = (
         "name_minus_sector_return_5",
         "name_minus_sector_return_21",
         "sector_momentum_12_1",
     )
 
-    def archive(label):
-        sectors, issuers = identity_axes(pl.DataFrame(rows), days, isins)
+    def archive(label, evidence):
+        identity = build_identity([*documents, *evidence], observed, days, list(isins))
+        sectors, issuers = identity_axes(identity, days, isins)
         panel, mask = sector_relative_panel(
             values,
             np.ones_like(values, bool),
@@ -242,22 +274,49 @@ def test_transformed_sector_archive_changes_only_at_known_classification(tmp_pat
             issuers,
             np.ones(values.shape[:2], bool),
         )
-        return _transformed_archive(
+        ages = np.where(mask, 1, -1)
+        transformed = _transformed_archive(
             tmp_path / label,
             "sector",
             names,
-            (panel, mask, np.where(mask, 1, -1)),
+            (panel, mask, ages),
             days,
             isins,
         )
+        return (panel, mask, ages), transformed
 
-    before = archive("before")
-    for row in rows:
-        if row["isin"] == isins[0] and row["date"] >= days[2]:
-            row.update(sector="changed", identity_known_date=days[2])
-    after = archive("after")
-    _assert_first_change(before, after, 2, mask_changes=True)
-    assert after[1][2, 1:].all()  # 23 names still pass the actual 20-name rank rule.
+    future_mapping = dict(
+        id="100",
+        receipt=days[2],
+        available_index=3,
+        version=1,
+        sector_code="17",
+        sector_label="Annual label",
+    )
+    before = archive("before", [])
+    newly_known = archive("future_mapping", [future_mapping])
+    for old, new in zip(before, newly_known, strict=True):
+        _assert_first_change(old, new, 3, mask_changes=True)
+    # Translation admitted today enables yesterday's return, without making it age0.
+    assert newly_known[1][1][3].all()
+    assert np.all(newly_known[1][2][3] == 1)
+    prior_mapping = {**future_mapping, "receipt": days[0], "available_index": 1}
+    future_conflict = {**future_mapping, "id": "101", "sector_code": "18"}
+    known = archive("prior_mapping", [prior_mapping])
+    conflicted = archive("future_conflict", [prior_mapping, future_conflict])
+    for old, new in zip(known, conflicted, strict=True):
+        _assert_first_change(old, new, 3, mask_changes=True)
+    assert conflicted[1][1][3, 1:].all()  # The23 other names retain rank support.
+    assert np.all(conflicted[1][2][3, 1:] == 1)
+    future_classification = deepcopy(documents[1])
+    future_classification.update(
+        id="102", version=2, receipt=days[2], available_index=3, sector_code="18"
+    )
+    classified = archive(
+        "future_classification", [prior_mapping, future_classification]
+    )
+    for old, new in zip(known, classified, strict=True):
+        _assert_first_change(old, new, 3, mask_changes=True)
 
 
 def test_transformed_magnitude_archive_uses_next_close_and_current_dated_beta(tmp_path):

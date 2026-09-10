@@ -56,6 +56,10 @@ def identity_axes(identity, dates, isins):
             continue
         if row["identity_known_date"] > row["date"]:
             raise ValueError("sector identity precedes its publication")
+        if row["sector"] and (
+            row["sector_known_date"] is None or row["sector_known_date"] > row["date"]
+        ):
+            raise ValueError("sector code precedes its receipt-known translation")
         issuer = row["cnpj"][:8] + ":" + row["cvm_code"]
         if issuers[day, name] and issuers[day, name] != issuer:
             raise ValueError("ambiguous contemporaneous sector issuer")
@@ -380,8 +384,9 @@ def build(plan_path: Path, output: Path):
                 code,
                 fixture,
                 {
-                    "availability_rule": "own-receipt dated FCA sector; exact wealth returns through t-1; no current-sector projection",
-                    "sector_vintage": "known filed classification only, missing earlier original identity remains missing",
+                    "availability_rule": "own-receipt FCA classification and receipt-known numeric-code translation; exact wealth returns through t-1; no future code evidence",
+                    "sector_vintage": "sector_known_date gates classification; missing or ambiguous current translation stays missing",
+                    "age_rule": "age1 for the completed return endpoint; classification and translation receipt dates remain separate metadata, never reset the market measurement age",
                     "known_sector_active_name_days": int(
                         (active & (sectors != "")).sum()
                     ),

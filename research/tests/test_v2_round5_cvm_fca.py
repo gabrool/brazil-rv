@@ -124,7 +124,7 @@ def test_original_preferred_class_joins_actual_b3_pna_only(tmp_path):
             date.fromisoformat(row["start"]),
             date.fromisoformat(row["end"]),
         )
-    document.update(parsed, available_index=2, sector="1030", securities=securities)
+    document.update(parsed, available_index=2, securities=securities)
     observations = pl.DataFrame(
         {
             "trade_date": [sessions[0]] * 2,

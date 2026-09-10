@@ -188,7 +188,12 @@ original code commits. See the registration and `docs/v2_README.md`.
 
 Round-5 CVM identity uses each original filing's historical security description
 and exchange listing dates; modern viewer class labels and governance-segment
-entry dates cannot replace those facts. Issuer valuation requires own-version
+entry dates cannot replace those facts. Numeric sector groups use explicit
+original codes or unambiguous code/label evidence known by that decision.
+Later translation evidence cannot fill or erase earlier groups; mapping source
+and availability are separate from market-measurement ages. Own historical
+display labels remain usable for accounting at their original receipt.
+Issuer valuation requires own-version
 capital quantities with an explicit share-unit scale. The annual capital CSV
 omits that scale and is not a model count source. Negative treasury quantities
 require a separately evidenced same-filing reconciliation; otherwise the count
