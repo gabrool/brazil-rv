@@ -22,7 +22,7 @@ from brazil_rv.preprocessing.b3_options_open_interest import (
     _local,
     _text,
 )
-from brazil_rv.preprocessing.options_full import _archive_member, _option_record
+from brazil_rv.preprocessing.options_activity import _choose_txt_member, parse_option_line
 
 
 RATE_FIELDS = (
@@ -211,16 +211,16 @@ def cotahist_option_quantities(
     """
     totals = defaultdict(lambda: [0, 0, 0])
     with zipfile.ZipFile(archive_path) as archive:
-        with archive.open(_archive_member(archive, archive_path)) as handle:
+        with archive.open(_choose_txt_member(archive, archive_path)) as handle:
             for raw in handle:
-                parsed = _option_record(raw.rstrip(b"\r\n"))
-                if parsed is None:
+                option = parse_option_line(raw.rstrip(b"\r\n"))
+                if option is None:
                     continue
-                day, option = parsed
-                bounds = identities.get(option.underlying_isin)
+                day = option.trade_date
+                bounds = identities.get(option.isin)
                 if day > end or bounds is None or not bounds[0] <= day <= bounds[1]:
                     continue
-                values = totals[(day, option.underlying_isin)]
+                values = totals[(day, option.isin)]
                 values[int(option.is_put)] += option.quantity
                 values[2] += 1
     return pl.DataFrame(
