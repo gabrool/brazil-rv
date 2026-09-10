@@ -117,7 +117,18 @@ def parse_registered_lines(
     lines: Sequence[str], report_date: date
 ) -> list[RegisteredLoan]:
     rows = []
-    for line in lines:
+    for index, line in enumerate(lines):
+        # From late November 2024 the final year digit wraps onto the next
+        # physical PDF line. Recover that printed digit, never infer a date.
+        wrapped_date = re.match(r"^(\s*\d{2}/\d{2}/20\d)(\s+.*)$", line)
+        if wrapped_date is not None and index + 1 < len(lines):
+            continuation = re.match(r"^\s*(\d)(?:\s|$)", lines[index + 1])
+            if continuation is not None:
+                line = (
+                    wrapped_date.group(1)
+                    + continuation.group(1)
+                    + wrapped_date.group(2)
+                )
         match = REGISTERED_ROW.fullmatch(line)
         if match is None:
             continue

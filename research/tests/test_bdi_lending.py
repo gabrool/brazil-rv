@@ -94,6 +94,33 @@ def test_legacy_identity_is_exact_same_date_ticker_not_current_ticker() -> None:
     assert audit["unmapped"] == 1
 
 
+def test_old_pdf_layout_reads_printed_balance_date_and_prefixed_rows() -> None:
+    bulletin = parse_bdi_pages(
+        [
+            "Banco     de Títulos\n"
+            "SALDO ACUMULADO DE AÇÕES EMPRESTADAS\n"
+            "Em atenção ao artigo 11 da Instrução CVM 441, de 10/11/2006,\n"
+            "informamos o saldo acumulado de ações em-\n"
+            "prestadas em confome arquivo gerador em 20200626 20200627 .\n"
+            "Ação Empresa Tipo Saldo em Nº de Ações Saldo em R$\n"
+            "02 PETR4 PETROLEO BRASILEIRO PN 1234 45678,90\n"
+            "02 VIV T3 TELEFONICA BRASIL ON 84059 4110257,73\n"
+            "2 ABEV3 AMBEV ON 52.319,00 767.224,10\n"
+            "Mercado Número de contratos Valor referencial (R$)\n"
+            "02 ABCD4 unrelated section PN 999 999,00\n"
+        ],
+        date(2020, 6, 29),
+    )
+    assert bulletin is not None
+    assert bulletin.position_date == date(2020, 6, 26)
+    assert [(row.ticker, row.quantity) for row in bulletin.positions] == [
+        ("PETR4", 1234),
+        ("VIVT3", 84059),
+        ("ABEV3", 52319),
+    ]
+    assert bulletin.positions[1].balance_brl == 4_110_257.73
+
+
 def test_rows_use_next_session_exact_lags_and_future_mutation_isolated() -> None:
     first = date(2023, 1, 2)
     sessions = [first + timedelta(days=index) for index in range(43)]

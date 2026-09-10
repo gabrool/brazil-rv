@@ -99,3 +99,22 @@ def test_dce_robust_scaler_consumes_prior_history_only() -> None:
     assert baseline[1]
     assert mutated_future != baseline
     assert _robust(20.0, history) == baseline
+
+
+def test_lending_rate_wrapped_year_uses_printed_digit_and_keeps_zero_flow() -> None:
+    rows = parse_registered_lines(
+        [
+            "27/12/202 PETR4 BRPETRACNPR6 PETROBRAS Registro 0 0 0.00 "
+            "0.10% 0.20% 0.30% 0.40% 0.50% 0.60%",
+            "4 SA",
+            "27/12/202 VALE3 BRVALEACNOR0 VALE Registro 12 1,543 141,199.93 "
+            "0.10% 0.20% 0.30% 0.40% 0.50% 0.60%",
+            "4",
+        ],
+        date(2024, 12, 27),
+    )
+    assert len(rows) == 2
+    assert rows[0].quantity == 0
+    assert rows[0].taker_avg == 0.5
+    assert rows[1].quantity == 1543
+    assert rows[1].value_brl == 141199.93

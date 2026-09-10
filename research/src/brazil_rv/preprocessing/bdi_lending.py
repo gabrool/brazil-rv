@@ -34,8 +34,9 @@ MODERN_ROW = re.compile(
     r"(?P<balance>[0-9][0-9.,]*)\s*$"
 )
 LEGACY_ROW = re.compile(
-    r"^\s*(?P<ticker>[A-Z0-9]{4,12})\s+.*?\s+"
-    r"(?P<quantity>[0-9][0-9.]*)\s+"
+    r"^\s*(?:0?2\s+)?(?P<ticker>[A-Z0-9]{4,12}|"
+    r"[A-Z0-9](?:\s?[A-Z0-9]){3}\s?\d{1,2})\s+.*?\s+"
+    r"(?P<quantity>[0-9][0-9.]*(?:,[0-9]{2})?)\s+"
     r"(?P<balance>[0-9][0-9.,]*)\s*$"
 )
 MIN_PARSED_POSITIONS = 100
@@ -218,13 +219,18 @@ def _parse_legacy(lines: list[str], report_date: date) -> Bulletin | None:
         return None
     prefix = "\n".join(lines[start : start + 15])
     date_match = re.search(
-        r"saldo\s+acumulado[\s\S]{0,400}?\bem\s+(\d{2}/\d{2}/\d{4})",
+        r"(?:emprestadas|prestadas)\s+em\s*\.?\s*"
+        r"(?:confome arquivo gerador em\s+)?"
+        r"(\d{2}/\d{2}/\d{4}|20\d{6})",
         prefix,
         flags=re.IGNORECASE,
     )
     if date_match is None:
         raise ValueError("Legacy BDI lending table has no stated balance date")
-    position_date = _parse_day(date_match.group(1))
+    printed_date = date_match.group(1)
+    position_date = datetime.strptime(
+        printed_date, "%d/%m/%Y" if "/" in printed_date else "%Y%m%d"
+    ).date()
     if position_date > report_date:
         raise ValueError("BDI position date cannot follow its report date")
     end = len(lines)
@@ -246,14 +252,24 @@ def _parse_legacy(lines: list[str], report_date: date) -> Bulletin | None:
         match = LEGACY_ROW.fullmatch(line)
         if match is None:
             continue
-        ticker = match.group("ticker")
+        ticker = re.sub(r"\s", "", match.group("ticker"))
         if ticker in by_ticker:
             raise ValueError(f"Duplicate legacy BDI ticker row: {ticker}")
+        printed_quantity = match.group("quantity")
+        quantity = (
+            _money(printed_quantity)
+            if "," in printed_quantity
+            else _quantity(printed_quantity)
+        )
+        if quantity != int(quantity):
+            raise ValueError(
+                f"Nonintegral legacy BDI share quantity: {printed_quantity}"
+            )
         by_ticker[ticker] = Position(
             position_date=position_date,
             ticker=ticker,
             isin=None,
-            quantity=_quantity(match.group("quantity")),
+            quantity=int(quantity),
             balance_brl=_money(match.group("balance")),
         )
     if not by_ticker:
@@ -270,7 +286,12 @@ def _parse_legacy(lines: list[str], report_date: date) -> Bulletin | None:
 
 def parse_bdi_pages(pages: list[str], report_date: date) -> Bulletin | None:
     """Parse only the official BDI securities-loan open-balance section."""
-    lines = [line.rstrip() for page in pages for line in page.splitlines()]
+    # Older BDI PDFs insert layout spaces inside headings and ticker symbols.
+    lines = [
+        re.sub(r"\s+", " ", line).strip()
+        for page in pages
+        for line in page.splitlines()
+    ]
     modern = _parse_modern(lines, report_date)
     if modern is not None:
         return modern
