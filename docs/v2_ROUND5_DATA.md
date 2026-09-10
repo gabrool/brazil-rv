@@ -37,7 +37,7 @@ frozen replay. Original registration bytes are retained.
 
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
-| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. Own-filing notes establish further unit contradictions even in parseable tables. Three such examples are reconciled; 1,352 candidate originals are being collected for review. | Finish the unit-note audit, reconcile actually admitted expanded-cohort coverage, and produce final joined admission tables. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
+| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection has finished: 1,052 readable originals, nine separately recovered identity cases and 291 transport failures undergoing one bounded retry. The capital disposition file now has 31 reconciled and seven audited unavailable records. | Finish the identified unit discrepancies and actual admitted-cohort coverage, then produce final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
 | Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. The 2,196-document supplement is complete and both failures are recovered: 1,766 original XML and 430 exact HTML metadata sources. The main 6,768-document queue continues. Sector translation uses only evidence received by each decision. | Audit remaining primary failures and actual newly admitted account/capital gaps; accept the revised dated bridge, then rebuild sector, cross-market exposures and lending utilization. Candidate retrieval is not automatic identity admission. Existing archives remain immutable comparators. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Refresh utilization against the accepted new identity/free float, then admit the final store. The other six fields remain exact. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |
@@ -109,7 +109,7 @@ unit audit remains open; it has not produced a model-input admission yet.
 
 Five additional exact filings now have visually reviewed capital corrections:
 MPX/Eneva 5553, TOTVS 6714, Autometal 10338, Magnesita 14794 and Triunfo 25144.
-There are now 25 reconciled and seven audited unavailable source dispositions.
+There are now 31 reconciled and seven audited unavailable source dispositions.
 These are source decisions, not a completed family or store. Afluente 5872 is
 an explicit counterexample: its own thousand-share lot label confirms the
 existing large count, so no correction applies. CEG 6022/6029 are now resolved
@@ -123,6 +123,27 @@ Two misleading date contexts found in proposals were rejected and the helper
 was corrected: a prior-year sentence cannot supply current classes, and a
 current page header cannot redate an explicitly earlier quarter. Fifteen
 targeted note-helper tests pass; no accepted quantity used those bad proposals.
+
+Six more source corrections cover Pague Menos 54638/63573, SmartFit 73028/93475,
+Guararapes 91021 and B2W 92819. Each Pague Menos version independently reports
+300,000,000 paid-in shares and a further 42,726,580 subscribed shares awaiting
+payment; the latter are not added to the paid-in quantity. SmartFit's original
+notes establish class quantities, payment status and cancellation of the
+described prior treasury holdings. Guararapes's current ordinary-share count is
+499,200,000; its prior-year ON/PN composition does not supply current classes.
+Its explicit year-end zero treasury is retained as reported. The note also
+describes a February purchase of 320 shares without a year-end holding count;
+no subsequent disposal is invented. If all remained after the disclosed split,
+the denominator sensitivity would be 0.0513 bps. This is a disclosed source
+limitation, not an independently reconstructed treasury balance.
+
+Of the completed note collection's 231 non-ZIP responses, 228 contain the same
+CVM service-unavailable error, two report a closed connection and one is an
+incomplete ZIP. They are transport failures, not evidence that
+the historical filings do not exist. One two-worker retry preserves the original
+failures and skips all successful originals and nine cached identity recoveries.
+The retry also covers 38 timeouts, 15 truncated responses and seven disconnected
+responses. Further automatic retry loops are not scheduled.
 
 The review-priority check finds that1,318 of1,352 flagged documents could enter
 the earlier identity bridge; four lack a link and30 arrived after its final

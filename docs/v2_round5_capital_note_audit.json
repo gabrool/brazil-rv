@@ -2,10 +2,10 @@
   "status": "Historical source review in progress; no final family/store/screens and no forward capture.",
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "6866587639f8152e49fc8a7052301a40424d38aadbaa4bc8c9e5b637f7825ca4"
+    "sha256": "1260c22867a9efc80fc454deead3dbc9b4cdc06bb95ecb81270e056f85fb1161"
   },
   "counts": {
-    "reconciled": 25,
+    "reconciled": 31,
     "audited_unavailable": 7
   },
   "accepted_batch": {
@@ -352,6 +352,127 @@
         "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_six_notes_20260910T194100Z\\acceptance.json",
         "sha256": "6f6cef19aa2308cc4aaab0f344c177dd98a9de29400365d7bd48bcafd19643ee"
       }
+    },
+    {
+      "acceptance": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_six_notes_20260910T200316Z\\acceptance.json",
+        "sha256": "922eff1154eba88b301b5506470ae0246539d5ab4034b869f15d87b21a64a9ac"
+      },
+      "review": {
+        "reviewed_at_utc": "2026-09-10T20:03:16.321175+00:00",
+        "scope": "Six existing source-unit candidates; exact own-period values and original capital-table treasury endpoints. No adjacent-version correction or receipt change.",
+        "reconciliations": [
+          {
+            "id": "54638",
+            "reference": "2015-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 300000000,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              67,
+              68
+            ],
+            "reason": "Own note22(a), physical pages67-68: explicitly 300,000,000 fully paid ordinary shares at 2015-12-31. The additional 42,726,580 subscribed shares remained subject to payment by 2016-04-20; the 342,726,580 subscribed total is not the paid-in count. Correct the paid-in capital table unit error, retaining its explicit current zero treasury. No future payment is presumed."
+          },
+          {
+            "id": "63573",
+            "reference": "2015-12-31",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 300000000,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              69,
+              70
+            ],
+            "reason": "This exact version own note22(a), physical pages69-70, separately states 300,000,000 fully paid ordinary shares and 42,726,580 additional shares whose payment was due 2016-04-20. Use the own-source paid-in count and explicit current zero treasury; the subscribed total is not the paid-in count. No other version supplies this correction."
+          },
+          {
+            "id": "73028",
+            "reference": "2017-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 11057992,
+              "PN": 3552146
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              79,
+              80
+            ],
+            "reason": "Own current note22(a) physical page79 gives 11,057,992 ordinary and 3,552,146 preferred shares, with preferred classes summing to that total. Page80 records full payment of the described subscriptions by 2016-12-31; later capital reductions did not cancel shares. The capital table incorrectly labels these same numeric quantities in thousands. Retain its explicit current zero treasury. Preferred-class pricing remains separately subject to dated identity and class coverage."
+          },
+          {
+            "id": "91021",
+            "reference": "2019-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 499200000,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              94
+            ],
+            "reason": "Own current note29.1 physical page94 explicitly gives 499,200,000 fully paid ordinary shares at 2019-12-31 and a matching current shareholder table. The old 2018 ordinary/preferred split is not current. Correct the capital-table paid-in unit error; retain the explicit 2019-12-31 capital-table zero treasury. The same note discloses a February purchase of 320 preferred shares but no year-end holding quantity; do not invent a later disposal or carry that transaction forward as an exact endpoint. This retained source endpoint is not independently established by the transaction narrative."
+          },
+          {
+            "id": "92819",
+            "reference": "2020-03-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 523229262,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              71
+            ],
+            "reason": "Own note23(a)-(b), physical page71, explicitly reports 523,229,262 ordinary shares at 2020-03-31, independently totaled by the current shareholder table. Quantity and thousand-BRL currency columns are separate. Correct the capital-table thousand-share heading error and retain its explicit current zero treasury. Stock-option settlement boilerplate is not evidence of actual treasury holdings."
+          },
+          {
+            "id": "93475",
+            "reference": "2020-03-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 14712114,
+              "PN": 6464424
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              39,
+              65
+            ],
+            "reason": "Own note15(a), physical page65, gives current ordinary14,712,114 and preferred6,464,424, with explicit preferred-class totals. Own DMPL page39 shows zero capital awaiting payment at 2020-03-31. Page65 explicitly states the described repurchased shares were cancelled on 2019-10-17. Correct the capital-table thousand-share heading error and retain the current zero treasury; pricing still requires independently dated class coverage."
+          }
+        ],
+        "limitations": {
+          "91021": "Historical purchase320PN is not a disclosed year-end balance. Retained current zero treasury is a source report, not an independently reconstructed endpoint. If all320 remained after the own-source eight-for-one split, net denominator difference would be2560 shares (0.0512821bps); that is a conditional sensitivity, not a corrected count."
+        }
+      }
     }
   ],
   "review_priority": {
@@ -380,5 +501,16 @@
       "92819",
       "93475"
     ]
+  },
+  "completed_note_acquisition": {
+    "evidence": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\completed_transport_failure_audit.json",
+      "sha256": "ff8eadfb0a97a72f6db34bdd72dc32f73a3fafd3e49b04b8d90d143519ce987b"
+    },
+    "readable_originals": 1052,
+    "identity_recoveries": 9,
+    "transport_retries": 291,
+    "retry_workers": 2,
+    "source_ready_is_not_admitted": true
   }
 }
