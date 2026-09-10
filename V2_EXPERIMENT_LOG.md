@@ -2823,3 +2823,14 @@ checks pass. No arm, seed, training setting, execution policy or holdout permiss
 changes. Paid sessions are authorized after this revision's clean commit and fresh
 compute-host freeze. See `docs/v2_ROUND4.md`; continuous-book replay is registered
 for future work only. No Round-4 instance or neural score exists at this amendment.
+
+## 2026-09-10: Round-4 parent session accepted and recovered
+
+All six smokes, twelve P trajectories and 42 parent F trajectories pass their
+contracts. All fourteen parent books pass acceptance, with full 1,738-session economics.
+Primary IC is 0.023481 [0.013620, 0.031649]; net excess is 4.201
+[-0.491, 7.828] bps/day. F4/F8/F9 uncertainty labels remain. This is a parent
+checkpoint, with no arm selection, confirmation or holdout read. The complete root
+is sealed and host-verified; exact-ID closure follows publication. Arms continue
+in a fresh session using the same registered code/settings and sealed P/parent inputs.
+See docs/v2_ROUND4.md and its result/operations JSON for all folds and evidence.
