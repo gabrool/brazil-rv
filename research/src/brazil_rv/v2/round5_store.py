@@ -12,7 +12,13 @@ import numpy as np
 import polars as pl
 
 from .artifacts import sha256_file, write_json_atomic
+from .build_store import (
+    _external_feature_validity_by_survival_liquidity,
+    _feature_validity_by_survival,
+    _prior_adv20,
+)
 from .contract import DEVELOPMENT_END, FINETUNE_START, PRETRAIN_END
+from .data_foundation import continuation_identity_axis
 from .feature_spec import (
     FeatureSpec,
     feature_schema_sha256,
@@ -21,6 +27,7 @@ from .feature_spec import (
 )
 from .research_rounds import _git_identity
 from .store import StoreStaging, close_memmap, open_store_for_samples, peak_rss_bytes
+from .store_comparison import _survival_audit
 
 MAXIMUM_RSS = 8 * 1024**3
 
@@ -114,6 +121,15 @@ def build(plan_path: Path, output: Path) -> dict:
     dates = store.dates.astype(object).tolist()
     isins = store.isins
     active = store.read("active", rows)
+    observed = store.read("observed", rows)
+    links = pl.read_parquet(source / original["tables"]["isin_succession_links"]["path"])
+    survival_identities = continuation_identity_axis(isins, links)
+    survival = _survival_audit(store, axis)
+    if survival and survival["different_cells"]:
+        raise ValueError("Base survival audit flag differs from dated observations")
+    prior_adv = _prior_adv20(
+        store.read("volume_brl", rows), store.read("activity_valid", rows)
+    )
     families = plan["families"]
     if len({item["family"] for item in families}) != len(families):
         raise ValueError("duplicate planned sidecar family")
@@ -164,6 +180,38 @@ def build(plan_path: Path, output: Path) -> dict:
                     raise ValueError(f"{family} has no admission decision")
                 raw, mask, ages = align_family(frame, dates, isins, names)
                 del frame
+                present = mask.any(axis=2)
+                composition = {
+                    "population": "active observed name-days with at least one raw family field",
+                    "uses_outcomes_for_features": False,
+                    "survival": _feature_validity_by_survival(
+                        axis,
+                        active,
+                        observed,
+                        {family: (mask, present)},
+                        survival_identities,
+                        maximum_gap=None,
+                    ).to_dicts(),
+                    "liquidity_strata": [],
+                    "status": "source_unavailable_no_observable_population",
+                }
+                if np.any(active & observed & present & np.isfinite(prior_adv)):
+                    strata = _external_feature_validity_by_survival_liquidity(
+                        axis,
+                        active,
+                        observed,
+                        prior_adv,
+                        family,
+                        mask,
+                        present,
+                        survival_identities,
+                    )
+                    # The base helper carries an old fixed lending note. The
+                    # actual counts above describe this extended population.
+                    composition["liquidity_strata"] = strata.drop(
+                        "coverage_note"
+                    ).to_dicts()
+                    composition["status"] = "completed_no_binding_failure"
                 values = staging.create_array(f"{family}_values", raw.shape, np.float32)
                 valid = staging.create_array(f"{family}_valid", mask.shape, np.bool_)
                 transform_feature_panel_into(raw, mask, active, specs, values, valid)
@@ -192,7 +240,9 @@ def build(plan_path: Path, output: Path) -> dict:
                             ),
                         }
                     )
-                evidence.append({**item, "coverage": coverage})
+                evidence.append(
+                    {**item, "coverage": coverage, "composition_audit": composition}
+                )
                 observed_features = valid.any(axis=(0, 1))
                 metadata.setdefault("sidecar_capabilities", {})[item["family"]] = {
                     "enabled": [
@@ -242,6 +292,9 @@ def build(plan_path: Path, output: Path) -> dict:
                 "families": evidence,
                 "protected_arrays_copied_byte_for_byte": True,
                 "fit_dependent_clipping_in_store": False,
+                "survival_flag_reconstruction": survival,
+                "audit_table_scope": "Copied base tables describe the original store; current sidecar coverage and composition are recorded per family here.",
+                "provider_invariance": "Provider observations and verified terms are copied unchanged; the extension consumes only admitted feature archives and does not reconstruct protected features or targets from providers.",
             }
             staging.seal(
                 feature_names=feature_names,

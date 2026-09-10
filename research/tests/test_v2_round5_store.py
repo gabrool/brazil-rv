@@ -41,7 +41,16 @@ def test_decision_alignment_preserves_publication_boundary_without_another_lag()
 def test_extension_keeps_protected_files_exact_and_requires_admission_proof(
     tmp_path, monkeypatch
 ):
-    base = _base_store(tmp_path / "base")
+    base = _base_store(
+        tmp_path / "base",
+        extra_arrays={
+            "observed": np.ones((25, 3), dtype=bool),
+            "activity_valid": np.ones((25, 3), dtype=bool),
+            "volume_brl": np.full((25, 3), 1_000_000.0, dtype=np.float32),
+            "audit_eventual_survives_to_final_year": np.ones((25, 3), dtype=bool),
+        },
+        extra_tables={"isin_succession_links": pl.DataFrame()},
+    )
     registration = tmp_path / "registration.json"
     write_json_atomic(
         registration,
@@ -103,6 +112,12 @@ def test_extension_keeps_protected_files_exact_and_requires_admission_proof(
     result = extension.build(plan, tmp_path / "extended")
     assert result["protected_arrays_exact"]
     assert result["indices_and_tables_exact"]
+    audit = result["families"][0]["composition_audit"]
+    assert audit["status"] == "completed_no_binding_failure"
+    assert sum(row["possible_feature_cells"] for row in audit["survival"]) == 1
+    assert len(audit["liquidity_strata"]) == 10
+    assert not any(row["stratum_is_binding"] for row in audit["liquidity_strata"])
+    assert all("coverage_note" not in row for row in audit["liquidity_strata"])
     values = np.load(tmp_path / "extended/sidecar_events_valid.npy", allow_pickle=False)
     assert values[20, 0, 0]
     assert not values[:20].any()
