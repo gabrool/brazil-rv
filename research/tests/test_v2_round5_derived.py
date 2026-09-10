@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import numpy as np
 import polars as pl
@@ -12,7 +12,19 @@ from brazil_rv.v2.round5_derived import (
     joined_clock_fixture,
     write_family,
 )
-from brazil_rv.v2.round5_exposures import sector_relative_panel
+from brazil_rv.v2.feature_spec import feature_specs, transform_feature_panel_into
+from brazil_rv.v2.round5_exposures import (
+    exposure_panel,
+    market_shocks,
+    sector_relative_panel,
+    shock_axes,
+)
+from brazil_rv.v2.round5_magnitude import (
+    FEATURE_NAMES as MAGNITUDE_NAMES,
+    magnitude_panel,
+)
+from brazil_rv.v2.round5_market import OBSERVATION_SCHEMA
+from brazil_rv.v2.round5_store import align_family
 
 
 def test_joined_market_clocks_enter_at_first_eligible_decision():
@@ -102,3 +114,190 @@ def test_family_archive_keeps_missingness_and_physical_values(tmp_path):
     assert frame["isin"].to_list() == ["A", "A"]
     assert frame["economic_beta_60"].to_list() == [12.5, 25.0]
     assert frame["economic_beta_60_age_sessions"].to_list() == [0, 1]
+
+
+def _transformed_archive(root, family, names, panel, days, isins):
+    values, valid, ages = panel
+    active = np.ones(values.shape[:2], bool)
+    record = write_family(
+        root,
+        family,
+        names,
+        values,
+        valid,
+        ages,
+        days,
+        isins,
+        active,
+        {},
+        {"commit": "fixture"},
+        {},
+    )
+    raw, observed, source_age = align_family(
+        pl.read_parquet(record["data"]["path"]), days, isins, names
+    )
+    output, mask = np.empty_like(raw), np.empty_like(observed)
+    transform_feature_panel_into(
+        raw, observed, active, feature_specs(f"sidecar_{family}", names), output, mask
+    )
+    source_age[~mask] = -1
+    return output, mask, source_age
+
+
+def _assert_first_change(before, after, first, *, mask_changes=False):
+    for left, right in zip(before, after, strict=True):
+        np.testing.assert_array_equal(left[:first], right[:first])
+    assert not np.array_equal(before[0][first], after[0][first])
+    if mask_changes:
+        assert not np.array_equal(before[1][first], after[1][first])
+
+
+def test_transformed_market_archive_preserves_publication_and_native_common_state(
+    tmp_path,
+):
+    days = np.busday_offset("2024-01-02", np.arange(130)).astype(object).tolist()
+    isins = tuple(f"BRFIXTURE{n:03}" for n in range(24))
+    rng = np.random.default_rng(13)
+    levels = np.exp(np.cumsum(rng.normal(0, 0.01, len(days))))
+    stock_returns = rng.normal(0, 0.01, (len(days), len(isins)))
+    rows = [
+        dict(
+            series="ptax_brl_per_usd",
+            reference_date=day,
+            available_at=datetime.combine(day, datetime.min.time(), UTC).replace(
+                hour=21
+            ),
+            value=levels[i],
+            source_file="fixture",
+        )
+        for i, day in enumerate(days)
+    ]
+    empty_returns = pl.DataFrame(schema={"series": pl.String})
+    names = ("shock_fx_1", "exposure_fx", "exposure_fx_times_shock_1")
+
+    def archive(label):
+        current, age, history, published = shock_axes(
+            market_shocks(pl.DataFrame(rows, schema=OBSERVATION_SCHEMA), empty_returns),
+            days,
+        )["fx"]
+        beta, beta_mask, beta_age = exposure_panel(
+            stock_returns,
+            np.ones_like(stock_returns, bool),
+            history,
+            published,
+            np.full(stock_returns.shape, "sector", object),
+            np.broadcast_to(isins, stock_returns.shape),
+        )
+        shock = np.broadcast_to(current[:, :1], beta.shape)
+        shock_age = np.broadcast_to(age[:, :1], beta.shape)
+        values = np.stack((shock, beta, beta * shock), axis=-1).astype(np.float32)
+        valid = np.stack(
+            (np.isfinite(shock), beta_mask, beta_mask & np.isfinite(shock)), axis=-1
+        )
+        ages = np.stack((shock_age, beta_age, np.maximum(shock_age, beta_age)), axis=-1)
+        return _transformed_archive(
+            tmp_path / label, "cross_market", names, (values, valid, ages), days, isins
+        )
+
+    before = archive("before")
+    rows[90]["value"] *= 1.1
+    changed = archive("changed")
+    _assert_first_change(before, changed, 91)
+    # A common scalar keeps its nonzero physical value across all active names.
+    assert np.unique(before[0][91, :, 0]).size == 1 and before[0][91, 0, 0] != 0
+    assert before[1][91].all()
+    rows[90]["value"] = np.nan
+    missing = archive("unavailable_fixing")
+    _assert_first_change(before, missing, 91, mask_changes=True)
+
+
+def test_transformed_sector_archive_changes_only_at_known_classification(tmp_path):
+    days = [date(2024, 1, 2) + timedelta(days=i) for i in range(4)]
+    isins = tuple(f"BRFIXTURE{n:03}" for n in range(24))
+    rows = [
+        dict(
+            date=day,
+            isin=isin,
+            cnpj=f"{n:014}",
+            cvm_code=str(n),
+            sector="original",
+            identity_known_date=days[0],
+        )
+        for day in days
+        for n, isin in enumerate(isins)
+    ]
+    values = np.broadcast_to(np.arange(24)[None, :, None], (4, 24, 3)).astype(float)
+    names = (
+        "name_minus_sector_return_5",
+        "name_minus_sector_return_21",
+        "sector_momentum_12_1",
+    )
+
+    def archive(label):
+        sectors, issuers = identity_axes(pl.DataFrame(rows), days, isins)
+        panel, mask = sector_relative_panel(
+            values,
+            np.ones_like(values, bool),
+            sectors,
+            issuers,
+            np.ones(values.shape[:2], bool),
+        )
+        return _transformed_archive(
+            tmp_path / label,
+            "sector",
+            names,
+            (panel, mask, np.where(mask, 1, -1)),
+            days,
+            isins,
+        )
+
+    before = archive("before")
+    for row in rows:
+        if row["isin"] == isins[0] and row["date"] >= days[2]:
+            row.update(sector="changed", identity_known_date=days[2])
+    after = archive("after")
+    _assert_first_change(before, after, 2, mask_changes=True)
+    assert after[1][2, 1:].all()  # 23 names still pass the actual 20-name rank rule.
+
+
+def test_transformed_magnitude_archive_uses_next_close_and_current_dated_beta(tmp_path):
+    rng = np.random.default_rng(4)
+    close = np.exp(np.cumsum(rng.normal(0, 0.02, (65, 24)), axis=0))
+    days = np.busday_offset("2024-01-02", np.arange(65)).astype(object).tolist()
+    isins = tuple(f"BRFIXTURE{n:03}" for n in range(24))
+    inputs = dict(
+        wealth_open=close * 0.998,
+        wealth_high=close * 1.012,
+        wealth_low=close * 0.988,
+        wealth_close=close,
+        wealth_valid=np.ones(close.shape, bool),
+        volume_brl=np.full(close.shape, 1e7),
+        activity_valid=np.ones(close.shape, bool),
+        daily_feature_valid=np.ones((*close.shape, 3), bool),
+        slow_age_sessions=np.ones((*close.shape, 3), np.float32),
+        slow_feature_names=("log_return_1", "yang_zhang_vol_20", "log_volume_mean_20"),
+        economic_beta=np.full(close.shape, 1.2),
+        economic_beta_valid=np.ones(close.shape, bool),
+        economic_beta_age_sessions=np.ones(close.shape, np.float32),
+    )
+
+    def archive(label):
+        return _transformed_archive(
+            tmp_path / label,
+            "magnitudes",
+            MAGNITUDE_NAMES,
+            magnitude_panel(**inputs),
+            days,
+            isins,
+        )
+
+    before = archive("before")
+    inputs["wealth_close"][45, 0] *= 1.01
+    changed = archive("changed_close")
+    _assert_first_change(before, changed, 46)
+    inputs["wealth_valid"][45, 0] = False
+    missing = archive("missing_close")
+    _assert_first_change(before, missing, 46, mask_changes=True)
+    inputs["economic_beta"][45, 0] = 2
+    beta = archive("changed_beta")
+    _assert_first_change(missing, beta, 45)
