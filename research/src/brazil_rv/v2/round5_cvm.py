@@ -726,6 +726,49 @@ def load_accounts(root: Path, issuers: set[str] | None = None) -> list[dict]:
     return documents
 
 
+def apply_account_unit_dispositions(root: Path, documents: list[dict]) -> dict | None:
+    """Apply own-filing currency-unit corrections before any temporal arithmetic.
+
+    The reviewed input rows bind basis, periods and printed values, preventing
+    double scaling or silently applying a note to different source contents.
+    Receipts, quantities and raw archives are untouched. A note heading alone
+    is not a correction: each record carries its actual source reconciliation.
+    """
+    path = root / "account_unit_dispositions.json"
+    if not path.exists():
+        return None
+    by_id = {str(document["id"]): document for document in documents}
+    applied = []
+    for record in json.loads(path.read_text(encoding="utf8"))["documents"]:
+        identifier = record["document"]["id"]
+        if identifier not in by_id:
+            continue
+        document = by_id[identifier]
+        identity = {
+            key: str(document[key])
+            for key in ("id", "cnpj", "cvm_code", "kind", "reference", "version")
+        }
+        if identifier in applied or record["document"] != identity:
+            raise ValueError("Account unit correction has a different/repeated filing")
+        if not record["reason"] or not record["evidence"]:
+            raise ValueError("Account unit correction lacks its source reconciliation")
+        for source in record["evidence"]:
+            if sha256(Path(source["path"])) != source["sha256"]:
+                raise ValueError("Account unit correction evidence hash differs")
+        accounts = document.get("accounts", {})
+        snapshot = json.loads(json.dumps(accounts, default=str))
+        if not accounts or snapshot != record["accounts_before"]:
+            raise ValueError("Account unit correction differs from the reviewed rows")
+        multiplier = float(record["multiplier"])
+        if not np.isfinite(multiplier) or multiplier <= 0:
+            raise ValueError("Account currency multiplier must preserve amount signs")
+        for metrics in accounts.values():
+            for account in metrics.values():
+                account["value"] *= multiplier
+        applied.append(identifier)
+    return {"path": str(path), "sha256": sha256(path), "applied_ids": applied}
+
+
 def attach_viewer_accounts(document: dict, destination: Path) -> None:
     manifest = json.loads((destination / "manifest.json").read_text(encoding="utf8"))
     if (
@@ -2444,6 +2487,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
         capital_coverage[str(document["reference"].year)][
             shares_source or "unavailable"
         ] += 1
+    account_units = apply_account_unit_dispositions(root, documents)
     write_json(output / "original_source_manifests.json", original_sources)
     write_json(output / "capital_source_manifests.json", capital_sources)
     write_json(output / "capital_quantity_issues.json", capital_issues)
@@ -2494,6 +2538,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "identity_isins": identity.get_column("isin").n_unique(),
         "receipt_audit": audit,
         "original_recovery": recovery_audit,
+        "account_unit_dispositions_source": account_units,
         "header_only_original_lag_documents": len(header_lags),
         "capital_sources_by_reference_year": dict(capital_coverage),
         "capital_dispositions_source": {

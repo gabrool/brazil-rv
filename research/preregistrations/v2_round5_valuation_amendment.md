@@ -102,3 +102,22 @@ versions1/2 independently disclose 51,927,546,473 ordinary shares and treasury
 ownership0.0047%; the half-step rounding uncertainty contributes approximately
 0.005 basis points to the resulting valuation denominator. The conflicting
 unlabelled repurchase count does not supply this calculation.
+
+## Own-filing account currency units
+
+Currency units are independent of share-quantity units. A recovered statement
+can label its amounts as individual reais while its own submitted financial
+notes establish that matching same-period amounts are thousands of reais.
+The same-document reconciliation must identify basis, period, account amounts
+and the stated currency presentation; a note heading or adjacent-version ratio
+alone does not establish a correction.
+
+An explicit `account_unit_dispositions.json` records the exact public filing
+identity, the complete reviewed input account rows, a currency multiplier and
+hash-bound original evidence. Apply it after source parsing and before YTD
+differencing, trailing windows, ratios or valuation. It does not alter source
+archives, share counts, periods or receipt-time admission. A different version,
+changed source rows or already-rescaled input cannot silently receive the
+correction. The final family binds the disposition file and applied IDs.
+Other filings retain their own source units. This source correction does not
+authorize a blanket rescaling or an outcome-based missingness rule.

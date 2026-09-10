@@ -222,6 +222,11 @@ Own-period treasury percentages can supply a derived quantity when paid-in
 capital and class allocation are explicit in the same filing. Preserve the
 percentage's published precision and disclose count uncertainty; this is not
 an exact legal share count or a guessed quantity-unit conversion.
+Own-filing account-currency corrections bind the complete reviewed input rows,
+period/basis and original evidence. Apply them after parsing, before temporal
+account arithmetic; preserve receipt timestamps and independent share units.
+Explicit source headings can be wrong, but headings or adjacent ratios alone
+cannot determine an override. Final family manifests bind applied corrections.
 
 The store builder streams family-by-family into disk-backed float32 arrays and
 records peak RSS. Intended orders are fixed before later fill observations;

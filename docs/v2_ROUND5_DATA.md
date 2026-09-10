@@ -163,6 +163,18 @@ must establish any correction; the presence of a note heading alone does not.
 This investigation remains a source-freeze hold. See the
 [source-note checkpoint](v2_round5_capital_note_audit.json).
 
+Tracing the 47 currency candidates through the actual builder confirms that
+all use recovered HTML accounts, with monetary values matching original XML.
+Six own-document reviews establish thousands of reais despite the source
+unit heading: MPX/Eneva5553, Magnesita14794, CEG6022, Excelsior20394, OSX40472
+and Unipar7872. An explicit correction now binds each filing's complete input
+rows and source evidence before any temporal arithmetic. It preserves receipts,
+periods and independent share counts. Sixty-nine targeted tests pass, including
+first-eligible-decision behavior and changed-version/row/evidence failures.
+The [currency-unit audit](v2_round5_currency_unit_audit.json) records the reviewed
+cases and the still-open broader source review. No blanket currency rescaling
+or model-input admission is implied by a matching number or a note heading.
+
 ## Store and model contract
 
 The registered base is `v2_daily_store_3d67624_20260909T100323Z`, manifestSHA256

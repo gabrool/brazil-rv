@@ -706,6 +706,96 @@ def family_fixture():
     return sessions, document, rad, identity, market
 
 
+def write_account_unit_disposition(root, document):
+    evidence = root / "own_note.txt"
+    evidence.write_text("Current statement amounts are thousands of reais.")
+    path = root / "account_unit_dispositions.json"
+    path.write_text(
+        json.dumps(
+            {
+                "documents": [
+                    {
+                        "document": {
+                            key: str(document[key])
+                            for key in (
+                                "id",
+                                "cnpj",
+                                "cvm_code",
+                                "kind",
+                                "reference",
+                                "version",
+                            )
+                        },
+                        "accounts_before": document["accounts"],
+                        "multiplier": 1000,
+                        "reason": "Own-period fixture monetary rows reconcile to the note.",
+                        "evidence": [
+                            {
+                                "path": str(evidence),
+                                "sha256": round5_cvm.sha256(evidence),
+                            }
+                        ],
+                    }
+                ]
+            },
+            default=str,
+        )
+    )
+    return path, evidence
+
+
+def test_account_unit_correction_preserves_receipt_and_independent_capital(tmp_path):
+    sessions, document, rad, identity, market = family_fixture()
+    revised = deepcopy(document)
+    revised.update(id="2", version=2, receipt=sessions[2])
+    revised["accounts"]["con"]["cash_flow"]["value"] = -10
+    original = deepcopy(revised)
+    disposition, evidence = write_account_unit_disposition(tmp_path, revised)
+    evidence_before = evidence.read_bytes()
+    untouched = deepcopy(document)
+    audit = round5_cvm.apply_account_unit_dispositions(tmp_path, [document, revised])
+    assert document == untouched
+    assert evidence.read_bytes() == evidence_before
+    assert audit["sha256"] == round5_cvm.sha256(disposition)
+    assert audit["applied_ids"] == ["2"]
+    assert revised["accounts"]["con"]["cash_flow"]["value"] == -10000
+    for key in original.keys() - {"accounts"}:
+        assert revised[key] == original[key]
+    changed_rad = rad + [
+        {**rad[0], "id": "2", "version": "2", "receipt": datetime(2024, 1, 4, 15, 44)}
+    ]
+    base, _ = fundamental_features(
+        [deepcopy(document)], rad, identity, sessions, market
+    )
+    changed, _ = fundamental_features(
+        [deepcopy(document), revised], changed_rad, identity, sessions, market
+    )
+    assert base.head(2).equals(changed.head(2))
+    assert changed["book_to_market"][2] == pytest.approx(
+        base["book_to_market"][2] * 1000
+    )
+    assert changed["log_market_cap"].to_list() == base["log_market_cap"].to_list()
+    assert changed["book_to_market_age_sessions"][2] == 0
+
+
+@pytest.mark.parametrize("change", ("version", "period", "value", "basis", "evidence"))
+def test_account_unit_correction_cannot_repair_different_source_rows(tmp_path, change):
+    _, document, _, _, _ = family_fixture()
+    _, evidence = write_account_unit_disposition(tmp_path, document)
+    if change == "version":
+        document["version"] += 1
+    elif change == "period":
+        document["accounts"]["con"]["assets"]["end"] = date(2022, 12, 31)
+    elif change == "value":
+        document["accounts"]["con"]["assets"]["value"] *= 1000
+    elif change == "basis":
+        document["accounts"]["ind"] = document["accounts"].pop("con")
+    else:
+        evidence.write_text("A different source note.")
+    with pytest.raises(ValueError, match="Account unit correction"):
+        round5_cvm.apply_account_unit_dispositions(tmp_path, [document])
+
+
 def test_joined_family_future_filing_changes_first_receipt_and_keeps_real_age():
     sessions, document, rad, identity, market = family_fixture()
     base, _ = fundamental_features(

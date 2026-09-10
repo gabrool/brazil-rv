@@ -1,0 +1,366 @@
+{
+  "status": "Correction implemented and tested; candidate six-document review awaits clean producing-code acceptance. Broader source freeze remains false.",
+  "actual_source_audit": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_consumption_c305adb\\result.json",
+    "sha256": "bd36bd128e638ca465106933235c75dfcd01f9d6bda64b7e5eceee31471d3bc9"
+  },
+  "actual_source_counts": {
+    "original_html": 47
+  },
+  "candidate_dispositions": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_unit_review\\account_unit_dispositions.json",
+    "sha256": "f16061d139e6eddd4dc366966d76d22c91fc6af24451deff1fb8e7cce539db0e"
+  },
+  "reviewed_cases": [
+    {
+      "document": {
+        "id": "5553",
+        "cnpj": "04423567000121",
+        "cvm_code": "021237",
+        "kind": "DFP",
+        "reference": "2010-12-31",
+        "version": "1"
+      },
+      "currency_multiplier": 1000,
+      "consumed_before": {
+        "con": {
+          "revenue": 98455.0,
+          "gross_profit": -18027.0,
+          "net_income": -255614.0,
+          "parent_income": -256250.0,
+          "minority_income": 636.0,
+          "assets": 6279555.0,
+          "equity": 1701563.0,
+          "minority_equity": 43377.0,
+          "cash_flow": -319411.0
+        }
+      },
+      "physical_pages": [
+        61,
+        179
+      ],
+      "reason": "Own notes state thousands of reais. Physical page61 reconciles current 2010 consolidated parent equity1658186 to individual equity1713340; the consumed consolidated equity1701563 less NCI43377 equals1658186. Physical page179 explicitly reports consolidated net revenue98455 for2010. These are the same printed magnitudes as the recovered accounts, despite their individual-BRL heading. Correct monetary presentation to BRL; do not reinterpret the different segment asset totals or share units.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_consumption_c305adb\\result.json",
+          "sha256": "bd36bd128e638ca465106933235c75dfcd01f9d6bda64b7e5eceee31471d3bc9"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5553\\result.json",
+          "sha256": "5cfe0cf8229ae3d724cba24b25dc7418891bac3ade3668acd3895f0178609eb6"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\originals\\5553\\manifest.json",
+          "sha256": "5a67561d0fb480ebc34c212cb5e5871bc678de885b574578f149d4dbccb1437f"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\5553\\source.zip",
+          "sha256": "1e09ddc72d7036c0f46a2b118f2addf6aec992d685d98cac578f911453412376"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5553\\source.pdf",
+          "sha256": "757b2d37d099f82ef8d34b08558b757854c48a5cb39fa316c55a1c2c072c7c1c"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5553\\source.txt",
+          "sha256": "1d345f982058c95fd2d3b827071fb4d7dca9c41b176105ca09f29c009d6e5baa"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5553\\page_61.png",
+          "sha256": "341f8eaeec6f9a12f89cf435ed98ff7edcb8785ecc1564eb493ffc74e9bc80de"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5553\\page_179.png",
+          "sha256": "df05fe69b831a49b3c0ab8b3c26cc9fb0be898f9c32285467fb52acb3dc69391"
+        }
+      ]
+    },
+    {
+      "document": {
+        "id": "14794",
+        "cnpj": "08684547000165",
+        "cvm_code": "020842",
+        "kind": "DFP",
+        "reference": "2011-12-31",
+        "version": "1"
+      },
+      "currency_multiplier": 1000,
+      "consumed_before": {
+        "con": {
+          "revenue": 2318903.0,
+          "gross_profit": 730090.0,
+          "net_income": 98550.0,
+          "parent_income": 97911.0,
+          "minority_income": 639.0,
+          "assets": 5334169.0,
+          "equity": 2653161.0,
+          "minority_equity": 14830.0,
+          "cash_flow": 565382.0
+        }
+      },
+      "physical_pages": [
+        91
+      ],
+      "reason": "Own physicalpage91 states thousands of reais and explicitly dates the consolidated totals to the year ended2011-12-31. Current external revenue2318903 and net income98550 match consumed amounts. The note explicitly says segment reports agree with consolidated statements. Correct the monetary unit; retain printed account values and independent class counts.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_consumption_c305adb\\result.json",
+          "sha256": "bd36bd128e638ca465106933235c75dfcd01f9d6bda64b7e5eceee31471d3bc9"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\14794\\result.json",
+          "sha256": "aad2961ea351a949d3cf4d7e955e8c471c6f4da736122ec442f2538bec624afb"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\originals\\14794\\manifest.json",
+          "sha256": "664de1e4d3ebaaee6e6e7e1c36f2033f7b6530b188bdfd4eda5b6f7a392ee3be"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\14794\\source.zip",
+          "sha256": "775ab77dcc3fabd08483a81e7e6118856846c7c543c230b5320d25e083d4d89d"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\14794\\source.pdf",
+          "sha256": "5f10f4ff8ab2b0ac2fa7cab653c3c86769b6a0a4639496daff0cc0242a7c65c0"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\14794\\source.txt",
+          "sha256": "d3538370d6adb1dbdedb9518487e29ba4b9b6a31367c5b8a7480eacc3d98998c"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\14794\\page_91.png",
+          "sha256": "a4684cc02a06c0491165ff2e5e89acb58547805191f8c9398740dc4bfdff32dc"
+        }
+      ]
+    },
+    {
+      "document": {
+        "id": "6022",
+        "cnpj": "33938119000169",
+        "cvm_code": "016616",
+        "kind": "DFP",
+        "reference": "2010-12-31",
+        "version": "1"
+      },
+      "currency_multiplier": 1000,
+      "consumed_before": {
+        "ind": {
+          "revenue": 2263645.0,
+          "gross_profit": 732780.0,
+          "net_income": 230043.0,
+          "assets": 2012553.0,
+          "equity": 750563.0,
+          "cash_flow": 243448.0
+        }
+      },
+      "physical_pages": [
+        55
+      ],
+      "reason": "Own physicalpage55 is the original balance sheet explicitly in thousands of reais, with separately labeled2010/2009columns. Current2010 assets2012553 and equity750563 match consumed individual-basis amounts. Correct the monetary presentation of this exact2010v1 filing only; its separate treasury percentage/share-count reconciliation is unaffected.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_consumption_c305adb\\result.json",
+          "sha256": "bd36bd128e638ca465106933235c75dfcd01f9d6bda64b7e5eceee31471d3bc9"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\6022\\result.json",
+          "sha256": "f89ffc15b42c4129391dfdc0ba577890e76e7048a2161df5e8b0a0b9df751cbc"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\originals\\6022\\manifest.json",
+          "sha256": "30496f128705176adfa5322177f7cb9bf31e4aa72a3368e73a10e9609ccf3dcb"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\6022\\source.zip",
+          "sha256": "0c65b2c78666d605f750ed31276d518184d466a82e094fc1408b665df81e9caa"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\6022\\source.pdf",
+          "sha256": "2e48853bedccce81bec843a298073884465735efa893186dd345103f5c7e2f83"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\6022\\source.txt",
+          "sha256": "02c1889cca77f5b925572b09f82d6dfdf2f06bc0de9f6cb0710ff0b9a3753142"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\6022\\page_55.png",
+          "sha256": "7a7c423a9ef3bb7c45cf8530e1ffffc76a25663c21dd2958685743fa4567b451"
+        }
+      ]
+    },
+    {
+      "document": {
+        "id": "20394",
+        "cnpj": "95426862000197",
+        "cvm_code": "001570",
+        "kind": "ITR",
+        "reference": "2012-06-30",
+        "version": "1"
+      },
+      "currency_multiplier": 1000,
+      "consumed_before": {
+        "ind": {
+          "revenue": 43367.0,
+          "gross_profit": 12236.0,
+          "net_income": 1444.0,
+          "assets": 40040.0,
+          "equity": 5566.0,
+          "cash_flow": 1768.0
+        }
+      },
+      "physical_pages": [
+        20
+      ],
+      "reason": "Own physicalpage20 states thousands of reais. The Total Jun/12 column has revenue43367, independently totaled by two product segments and by geographical sales. It matches the current2012Q2 consumed revenue, not the Jun/11 comparative32084. Correct this exact filing monetary unit while preserving its original receipt and periods.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_consumption_c305adb\\result.json",
+          "sha256": "bd36bd128e638ca465106933235c75dfcd01f9d6bda64b7e5eceee31471d3bc9"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\20394\\result.json",
+          "sha256": "44f4dda7c961a05955d8b1f46fd44bce3d4e88a8c526e61b2a489758acb05ef7"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\originals\\20394\\manifest.json",
+          "sha256": "a2504d50ee271d81f7f8bcc52e9b9edc29f4ba5a663653d9fa28f036213d2807"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\20394\\source.zip",
+          "sha256": "f13e9bdc36ed4b58f3b36f348f817f9dc46eebab85ee3b72b726b4bc727506a7"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\20394\\source.pdf",
+          "sha256": "9a1e3398a62c57fc3ed53c50f6fc80871f00a805590c36d7e790644c1c5e3f8e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\20394\\source.txt",
+          "sha256": "e708d2b6df417c760d3b82772604a4d0658408f7b7d54760ccd0ce524c4095f3"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\20394\\page_20.png",
+          "sha256": "ceed06af5c3064f137423ff6c051ff2d230554c13521630f98a8768ea6ce7c93"
+        }
+      ]
+    },
+    {
+      "document": {
+        "id": "40472",
+        "cnpj": "09112685000132",
+        "cvm_code": "021342",
+        "kind": "ITR",
+        "reference": "2014-06-30",
+        "version": "1"
+      },
+      "currency_multiplier": 1000,
+      "consumed_before": {
+        "con": {
+          "revenue": 284413.0,
+          "gross_profit": 94279.0,
+          "net_income": -2830381.0,
+          "parent_income": -2607296.0,
+          "minority_income": -223085.0,
+          "assets": 5913777.0,
+          "equity": -686092.0,
+          "minority_equity": -231068.0,
+          "cash_flow": 280101.0
+        }
+      },
+      "physical_pages": [
+        89
+      ],
+      "reason": "Own physicalpage89 explicitly labels the six months ended2014-06-30 and thousands of reais. The consolidated column has revenue284413 and net loss2830381, matching recovered monetary magnitudes. Correct the shared monetary presentation without replacing printed line-item values with other segment-table entries or changing their periods.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_consumption_c305adb\\result.json",
+          "sha256": "bd36bd128e638ca465106933235c75dfcd01f9d6bda64b7e5eceee31471d3bc9"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\40472\\result.json",
+          "sha256": "d5cda8e89b6996859eee36a41350ec512e15e66916464daa841218e173a18364"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\originals\\40472\\manifest.json",
+          "sha256": "14ac64b8024fc4d52803433e7396937b2438d564b2409b278bfe5247b86096ba"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\40472\\source.zip",
+          "sha256": "b36725d96a6ee592a25b2bf76c53e7076633bc05e86f8f69b00f910cda20dfcf"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\40472\\source.pdf",
+          "sha256": "5208fd4338e2d319ef360feea209349f7cdfdb4f6c95a40adb59d70c44e3b0e5"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\40472\\source.txt",
+          "sha256": "d5f26bd93b27a1110ccd534cf91cd62bc3389c6ccc1d4ed1453a5581b2081f5d"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\40472\\page_89.png",
+          "sha256": "0abb2955e37e62b71b9c559bcbc79832f8e00bfe0d131bf59efde54570267fe7"
+        }
+      ]
+    },
+    {
+      "document": {
+        "id": "7872",
+        "cnpj": "33958695000178",
+        "cvm_code": "011592",
+        "kind": "ITR",
+        "reference": "2011-03-31",
+        "version": "1"
+      },
+      "currency_multiplier": 1000,
+      "consumed_before": {
+        "con": {
+          "revenue": 90895.0,
+          "gross_profit": 40600.0,
+          "net_income": 15027.0,
+          "parent_income": 15027.0,
+          "assets": 1033132.0,
+          "equity": 389106.0,
+          "cash_flow": 35470.0
+        }
+      },
+      "physical_pages": [
+        37
+      ],
+      "reason": "Own physicalpage37 explicitly states thousands of reais and separates the2011Q1/2010Q1 totals. The current consolidated total has revenue90895, net income15027 and assets1033132, matching consumed amounts. Correct this exact filing monetary unit; no prior-period figure supplies the correction.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\currency_consumption_c305adb\\result.json",
+          "sha256": "bd36bd128e638ca465106933235c75dfcd01f9d6bda64b7e5eceee31471d3bc9"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\7872\\result.json",
+          "sha256": "812ca7116c1a98b53ac0d7a3f1d2028c8f661c549d3eb6d03af0d876cd5b93be"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\originals\\7872\\manifest.json",
+          "sha256": "ed4936175000b05c6d97c366a10a9e641719440f175e303e82ffc1cd11213300"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\7872\\source.zip",
+          "sha256": "094aa52681870ba815b6a15488ce515e156fbe0a5e6de6c1e5d6d6f9946bd347"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\7872\\source.pdf",
+          "sha256": "48f9b1b4b5afd04f5228454f6248abaa3303d56689ee95280ff86a18751e5e0b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\7872\\source.txt",
+          "sha256": "6e972ef0f217bc74dfd3ad026157f8a64c8b0b36c199462ff5c2d9071eeb37db"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\7872\\page_37.png",
+          "sha256": "e3369f77371f0817899e98d3248f644a7372694083656846007a07ddfe1773f9"
+        }
+      ]
+    }
+  ],
+  "targeted_tests_passed": 69,
+  "remaining_existing_candidates": 41,
+  "limits": "Own-source currency units only, independent of capital quantities. No global multiplier, no adjacent-ratio masking, no final family/store/screens. Numeric text matches remain triage only.",
+  "source_freeze_ready": false,
+  "forward_capture_enabled": false
+}
