@@ -2864,3 +2864,11 @@ occupancy failures from every research-choice panel, and preserves global stops 
 baseline, D1–D5, other bounds and implementation failures. Its post-result timing is
 explicit. Complete unaffected cells in a fresh root with sealed report reuse;
 no accepted trajectory is retrained or overwritten. Forty targeted tests pass.
+
+Source inspection then caught a pooled-comparison adapter error before any A4
+decision was written. The continuation was interrupted with only the 246 copied
+evaluations present; the partial root and original interruption record are sealed.
+The shared adapter now supplies pooled metrics to the unchanged selection rule.
+Forty-two targeted tests pass, including both override outcomes and failed-arm
+exclusion, and the actual full screening report retains S0 after P exclusion.
+This is an implementation repair with no changed score or research decision rule.

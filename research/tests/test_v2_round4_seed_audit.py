@@ -1,4 +1,40 @@
 from brazil_rv.v2.round4_seed_audit import development_decision
+import pytest
+
+
+@pytest.mark.parametrize("net_lower,expected", [(-0.1, "S0"), (0.1, "fast_off")])
+def test_pooled_pair_adapter_preserves_selection_and_excludes_failed_arm(
+    net_lower, expected
+):
+    from brazil_rv.v2.round4_seed_audit import _trace
+
+    ic = "primary_neutral_target_ic"
+    net = "headline_net_excess_bps"
+    readouts = {
+        "fast_off": {ic: {"estimate": 0.02}, net: {"estimate": 5.0}},
+        "S0": {ic: {"estimate": 0.03}, net: {"estimate": 4.0}},
+        "P": {ic: {"estimate": 0.04}, net: {"estimate": 6.0}},
+    }
+    comparisons = {
+        "fast_off_minus_S0": {
+            "pooled": {
+                ic: {"lower_95": -0.02, "upper_95": 0.01},
+                net: {"lower_95": net_lower, "upper_95": 2.0},
+            }
+        },
+        "S0_minus_fast_off": {
+            "pooled": {},
+            "informative_subsets": {
+                "S0": {"pooled": {ic: {"lower_95": -0.01, "upper_95": 0.02}}}
+            },
+        },
+    }
+    trace = _trace(readouts, comparisons, excluded={"P"})
+    assert trace["ic_leader"] == "S0"
+    assert (trace["economics_override"] or trace["ic_leader"]) == expected
+    assert trace["provisional_parent"] == "S0"
+    assert "P" not in trace["eligible"]
+    assert trace["designation"] is None
 
 
 def test_only_isolated_nonbaseline_occupancy_failure_rejects_one_arm():

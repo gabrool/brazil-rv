@@ -289,3 +289,13 @@ the canonical forecast reader’s required schema/date/security bindings. The
 reader was kept intact; the caller was corrected in `eb5e9ca`, 31 targeted tests
 passed, and the audit restarted in a fresh root. [Stop evidence](v2_round4_seed_audit_stop.json)
 binds the preserved failed attempt. No trained model or original screening result changed.
+
+A subsequent source inspection caught a reporting adapter mismatch before the
+continuation could make a decision: `promotion_trace` consumes each comparison's
+pooled metrics, whereas the audit supplied the enclosing report. The audit was
+interrupted after copying 246 completed evaluations, with zero new evaluations.
+Its partial root and interruption logs are preserved and sealed. The corrected
+adapter is shared by the omission and final decisions. Forty-two targeted tests
+pass, including actual economics-override and excluded-arm selection through the
+nested-report adapter; it also reproduces the original screening choice on the
+published full report. No score, book, threshold or selection rule changes.

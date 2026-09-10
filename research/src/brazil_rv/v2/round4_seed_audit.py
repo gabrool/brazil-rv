@@ -73,6 +73,15 @@ def _pooled(folds):
     return rr._folded_bootstrap(tuple(np.asarray(v, dtype=float) for v in folds))
 
 
+def _trace(readouts: dict, comparisons: dict, excluded=()) -> dict:
+    return promotion_trace(
+        {arm: row for arm, row in readouts.items() if arm not in excluded},
+        {key: row["pooled"] for key, row in comparisons.items()},
+        confirmed=False,
+        s0_informative=comparisons["S0_minus_fast_off"]["informative_subsets"]["S0"],
+    )
+
+
 def _audit_omission(source: Path, output: Path, omitted: int) -> dict:
     design = rr._read_json(source / "frozen_design.json")
     _, dates = rr._read_store_header(Path(design["store"]["root"]))
@@ -246,17 +255,10 @@ def _audit_omission(source: Path, output: Path, omitted: int) -> dict:
                         for arm in (left, right)
                     },
                 }
-        trace = promotion_trace(
-            {
-                a: r
-                for a, r in readouts.items()
-                if a not in {cell.split("/")[0] for cell in rejected}
-            },
+        trace = _trace(
+            readouts,
             comparisons,
-            confirmed=False,
-            s0_informative=comparisons["S0_minus_fast_off"]["informative_subsets"][
-                "S0"
-            ],
+            {cell.split("/")[0] for cell in rejected},
         )
         result = {
             "omitted_seed": omitted,
@@ -388,14 +390,7 @@ def run(source: Path, output: Path, reuse: Path | None = None) -> str:
             **{str(s): r for s, r in results.items()},
         }
         traces = {
-            key: promotion_trace(
-                {a: r for a, r in panel["readouts"].items() if a not in excluded},
-                panel["paired"],
-                confirmed=False,
-                s0_informative=panel["paired"]["S0_minus_fast_off"][
-                    "informative_subsets"
-                ]["S0"],
-            )
+            key: _trace(panel["readouts"], panel["paired"], excluded)
             for key, panel in panels.items()
         }
         decision = development_decision(
